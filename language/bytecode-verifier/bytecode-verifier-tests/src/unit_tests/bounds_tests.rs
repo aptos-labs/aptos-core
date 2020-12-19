@@ -287,6 +287,87 @@ fn script_missing_signature() {
     );
 }
 
+#[test]
+fn invalid_signature_for_vector_operation() {
+    use Bytecode::*;
+
+    let skeleton = basic_test_module();
+    let sig_index = SignatureIndex(skeleton.signatures.len() as u16);
+    for bytecode in vec![
+        VecEmpty(sig_index),
+        VecLen(sig_index),
+        VecImmBorrow(sig_index),
+        VecMutBorrow(sig_index),
+        VecPushBack(sig_index),
+        VecPopBack(sig_index),
+        VecDestroyEmpty(sig_index),
+        VecSwap(sig_index),
+    ] {
+        let mut m = skeleton.clone();
+        m.function_defs[0].code.as_mut().unwrap().code = vec![bytecode];
+        assert_eq!(
+            BoundsChecker::verify_module(&m).unwrap_err().major_status(),
+            StatusCode::INDEX_OUT_OF_BOUNDS
+        );
+    }
+}
+
+#[test]
+fn invalid_struct_for_vector_operation() {
+    use Bytecode::*;
+    use SignatureToken::*;
+
+    let mut skeleton = basic_test_module();
+    skeleton
+        .signatures
+        .push(Signature(vec![Struct(StructHandleIndex::new(3))]));
+    let sig_index = SignatureIndex((skeleton.signatures.len() - 1) as u16);
+    for bytecode in vec![
+        VecEmpty(sig_index),
+        VecLen(sig_index),
+        VecImmBorrow(sig_index),
+        VecMutBorrow(sig_index),
+        VecPushBack(sig_index),
+        VecPopBack(sig_index),
+        VecDestroyEmpty(sig_index),
+        VecSwap(sig_index),
+    ] {
+        let mut m = skeleton.clone();
+        m.function_defs[0].code.as_mut().unwrap().code = vec![bytecode];
+        assert_eq!(
+            BoundsChecker::verify_module(&m).unwrap_err().major_status(),
+            StatusCode::INDEX_OUT_OF_BOUNDS
+        );
+    }
+}
+
+#[test]
+fn invalid_type_param_for_vector_operation() {
+    use Bytecode::*;
+    use SignatureToken::*;
+
+    let mut skeleton = basic_test_module();
+    skeleton.signatures.push(Signature(vec![TypeParameter(0)]));
+    let sig_index = SignatureIndex((skeleton.signatures.len() - 1) as u16);
+    for bytecode in vec![
+        VecEmpty(sig_index),
+        VecLen(sig_index),
+        VecImmBorrow(sig_index),
+        VecMutBorrow(sig_index),
+        VecPushBack(sig_index),
+        VecPopBack(sig_index),
+        VecDestroyEmpty(sig_index),
+        VecSwap(sig_index),
+    ] {
+        let mut m = skeleton.clone();
+        m.function_defs[0].code.as_mut().unwrap().code = vec![bytecode];
+        assert_eq!(
+            BoundsChecker::verify_module(&m).unwrap_err().major_status(),
+            StatusCode::INDEX_OUT_OF_BOUNDS
+        );
+    }
+}
+
 proptest! {
     #[test]
     fn valid_bounds(_module in CompiledModule::valid_strategy(20)) {

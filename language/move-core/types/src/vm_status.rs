@@ -574,7 +574,8 @@ pub enum StatusCode {
     CYCLIC_MODULE_FRIENDSHIP = 1107,
     // A phantom type parameter was used in a non-phantom position.
     INVALID_PHANTOM_TYPE_PARAM_POSITION = 1108,
-
+    VEC_UPDATE_EXISTS_MUTABLE_BORROW_ERROR = 1109,
+    VEC_BORROW_ELEMENT_EXISTS_MUTABLE_BORROW_ERROR = 1110,
 
     // These are errors that the VM might raise if a violation of internal
     // invariants takes place.

@@ -11,8 +11,8 @@ use move_binary_format::{
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::{
         Bytecode, ConstantPoolIndex, FieldHandleIndex, FieldInstantiationIndex,
-        FunctionHandleIndex, FunctionInstantiationIndex, StructDefInstantiationIndex,
-        StructDefinitionIndex, NUMBER_OF_NATIVE_FUNCTIONS,
+        FunctionHandleIndex, FunctionInstantiationIndex, SignatureIndex,
+        StructDefInstantiationIndex, StructDefinitionIndex, NUMBER_OF_NATIVE_FUNCTIONS,
     },
     file_format_common::{instruction_key, Opcodes},
 };
@@ -270,6 +270,14 @@ pub fn zero_cost_schedule() -> CostTable {
             GasCost::new(0, 0),
         ),
         (Nop, GasCost::new(0, 0)),
+        (VecEmpty(SignatureIndex::new(0)), GasCost::new(0, 0)),
+        (VecLen(SignatureIndex::new(0)), GasCost::new(0, 0)),
+        (VecImmBorrow(SignatureIndex::new(0)), GasCost::new(0, 0)),
+        (VecMutBorrow(SignatureIndex::new(0)), GasCost::new(0, 0)),
+        (VecPushBack(SignatureIndex::new(0)), GasCost::new(0, 0)),
+        (VecPopBack(SignatureIndex::new(0)), GasCost::new(0, 0)),
+        (VecDestroyEmpty(SignatureIndex::new(0)), GasCost::new(0, 0)),
+        (VecSwap(SignatureIndex::new(0)), GasCost::new(0, 0)),
     ];
     let native_table = (0..NUMBER_OF_NATIVE_FUNCTIONS)
         .map(|_| GasCost::new(0, 0))
@@ -382,6 +390,17 @@ pub static INITIAL_GAS_SCHEDULE: Lazy<CostTable> = Lazy::new(|| {
             GasCost::new(2, 1),
         ),
         (Nop, GasCost::new(1, 1)),
+        (VecEmpty(SignatureIndex::new(0)), GasCost::new(84, 1)),
+        (VecLen(SignatureIndex::new(0)), GasCost::new(98, 1)),
+        (VecImmBorrow(SignatureIndex::new(0)), GasCost::new(1334, 1)),
+        (VecMutBorrow(SignatureIndex::new(0)), GasCost::new(1902, 1)),
+        (VecPushBack(SignatureIndex::new(0)), GasCost::new(53, 1)),
+        (VecPopBack(SignatureIndex::new(0)), GasCost::new(227, 1)),
+        (
+            VecDestroyEmpty(SignatureIndex::new(0)),
+            GasCost::new(572, 1),
+        ),
+        (VecSwap(SignatureIndex::new(0)), GasCost::new(1436, 1)),
     ];
     // Note that the DiemVM is expecting the table sorted by instruction order.
     instrs.sort_by_key(|cost| instruction_key(&cost.0));
