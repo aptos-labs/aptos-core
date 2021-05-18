@@ -17,6 +17,7 @@ use diem_config::config::MempoolConfig;
 use diem_logger::prelude::*;
 use diem_types::{
     account_address::AccountAddress,
+    account_config::AccountSequenceInfo,
     mempool_status::{MempoolStatus, MempoolStatusCode},
     transaction::SignedTransaction,
 };
@@ -85,21 +86,31 @@ impl TransactionStore {
         None
     }
 
+    /// Fetch mempool transaction by account address + sequence_number.
+    pub(crate) fn get_mempool_txn(
+        &self,
+        address: &AccountAddress,
+        sequence_number: u64,
+    ) -> Option<MempoolTransaction> {
+        self.transactions
+            .get(address)
+            .and_then(|txns| txns.get(&sequence_number))
+            .cloned()
+    }
+
     /// Insert transaction into TransactionStore. Performs validation checks and updates indexes.
-    pub(crate) fn insert(
-        &mut self,
-        txn: MempoolTransaction,
-        current_sequence_number: u64,
-    ) -> MempoolStatus {
+    pub(crate) fn insert(&mut self, txn: MempoolTransaction) -> MempoolStatus {
         let address = txn.get_sender();
-        let sequence_number = txn.get_sequence_number();
+        let sequence_number = txn.sequence_info;
 
         // check if transaction is already present in Mempool
         // e.g. given request is update
         // we allow increase in gas price to speed up process.
         // ignores the case transaction hash is same for retrying submit transaction.
         if let Some(txns) = self.transactions.get_mut(&address) {
-            if let Some(current_version) = txns.get_mut(&sequence_number) {
+            if let Some(current_version) =
+                txns.get_mut(&sequence_number.transaction_sequence_number)
+            {
                 if current_version.txn == txn.txn {
                     return MempoolStatus::new(MempoolStatusCode::Accepted);
                 }
@@ -109,7 +120,7 @@ impl TransactionStore {
                         == txn.txn.expiration_timestamp_secs()
                     && current_version.get_gas_price() < txn.get_gas_price()
                 {
-                    if let Some(txn) = txns.remove(&txn.get_sequence_number()) {
+                    if let Some(txn) = txns.remove(&txn.sequence_info.transaction_sequence_number) {
                         self.index_remove(&txn);
                     }
                 } else {
@@ -120,7 +131,10 @@ impl TransactionStore {
             }
         }
 
-        if self.check_is_full_after_eviction(&txn, current_sequence_number) {
+        if self.check_is_full_after_eviction(
+            &txn,
+            sequence_number.account_sequence_number_type.min_seq(),
+        ) {
             return MempoolStatus::new(MempoolStatusCode::MempoolIsFull).with_message(format!(
                 "mempool size: {}, capacity: {}",
                 self.system_ttl_index.size(),
@@ -132,7 +146,10 @@ impl TransactionStore {
             .entry(address)
             .or_insert_with(AccountTransactions::new);
 
-        self.clean_committed_transactions(&address, current_sequence_number);
+        self.clean_committed_transactions(
+            &address,
+            sequence_number.account_sequence_number_type.min_seq(),
+        );
 
         if let Some(txns) = self.transactions.get_mut(&address) {
             // capacity check
@@ -149,10 +166,10 @@ impl TransactionStore {
             // insert into storage and other indexes
             self.system_ttl_index.insert(&txn);
             self.expiration_time_index.insert(&txn);
-            txns.insert(sequence_number, txn);
+            txns.insert(sequence_number.transaction_sequence_number, txn);
             self.track_indices();
         }
-        self.process_ready_transactions(&address, current_sequence_number);
+        self.process_ready_transactions(&address, sequence_number.account_sequence_number_type);
         MempoolStatus::new(MempoolStatusCode::Accepted)
     }
 
@@ -200,7 +217,7 @@ impl TransactionStore {
                     debug!(
                         LogSchema::new(LogEntry::MempoolFullEvictedTxn).txns(TxnsLog::new_txn(
                             txn.get_sender(),
-                            txn.get_sequence_number()
+                            txn.sequence_info.transaction_sequence_number
                         ))
                     );
                     self.index_remove(&txn);
@@ -217,7 +234,7 @@ impl TransactionStore {
     /// previous txn is committed).
     /// 2. The txn before this is ready for broadcast but not yet committed.
     fn check_txn_ready(&mut self, txn: &MempoolTransaction, curr_sequence_number: u64) -> bool {
-        let tx_sequence_number = txn.get_sequence_number();
+        let tx_sequence_number = txn.sequence_info.transaction_sequence_number;
         if tx_sequence_number == curr_sequence_number {
             return true;
         } else if tx_sequence_number == 0 {
@@ -237,32 +254,55 @@ impl TransactionStore {
     }
 
     /// Maintains the following invariants:
-    /// - All transactions of a given account that are sequential to the current sequence number
+    /// - All transactions of a given non-CRSN account that are sequential to the current sequence number
     ///   should be included in both the PriorityIndex (ordering for Consensus) and
     ///   TimelineIndex (txns for SharedMempool).
+    /// - All transactions of a given CRSN account that are greater than the account's min_nonce
+    ///   should be included in both the PriorityIndex and TimelineIndex.
     /// - Other txns are considered to be "non-ready" and should be added to ParkingLotIndex.
     fn process_ready_transactions(
         &mut self,
         address: &AccountAddress,
-        current_sequence_number: u64,
+        crsn_or_seqno: AccountSequenceInfo,
     ) {
         if let Some(txns) = self.transactions.get_mut(address) {
-            let mut sequence_number = current_sequence_number;
-            while let Some(txn) = txns.get_mut(&sequence_number) {
-                self.priority_index.insert(txn);
+            let mut min_seq = crsn_or_seqno.min_seq();
 
-                if txn.timeline_state == TimelineState::NotReady {
-                    self.timeline_index.insert(txn);
+            match crsn_or_seqno {
+                AccountSequenceInfo::CRSN { min_nonce, size } => {
+                    for i in min_nonce..size {
+                        if let Some(txn) = txns.get_mut(&i) {
+                            self.priority_index.insert(txn);
+
+                            if txn.timeline_state == TimelineState::NotReady {
+                                self.timeline_index.insert(txn);
+                            }
+
+                            // Remove txn from parking lot after it has been promoted to
+                            // priority_index / timeline_index, i.e., txn status is ready.
+                            self.parking_lot_index.remove(txn);
+                            min_seq = i;
+                        }
+                    }
                 }
+                AccountSequenceInfo::Sequential(_) => {
+                    while let Some(txn) = txns.get_mut(&min_seq) {
+                        self.priority_index.insert(txn);
 
-                // Temove txn from parking lot after it has been promoted to
-                // priority_index / timeline_index, i.e., txn status is ready.
-                self.parking_lot_index.remove(txn);
-                sequence_number += 1;
+                        if txn.timeline_state == TimelineState::NotReady {
+                            self.timeline_index.insert(txn);
+                        }
+
+                        // Remove txn from parking lot after it has been promoted to
+                        // priority_index / timeline_index, i.e., txn status is ready.
+                        self.parking_lot_index.remove(txn);
+                        min_seq += 1;
+                    }
+                }
             }
 
             let mut parking_lot_txns = 0;
-            for (_, txn) in txns.range_mut((Bound::Excluded(sequence_number), Bound::Unbounded)) {
+            for (_, txn) in txns.range_mut((Bound::Excluded(min_seq), Bound::Unbounded)) {
                 match txn.timeline_state {
                     TimelineState::Ready(_) => {}
                     _ => {
@@ -273,8 +313,8 @@ impl TransactionStore {
             }
             trace!(
                 LogSchema::new(LogEntry::ProcessReadyTxns).account(*address),
-                first_ready_seq_num = current_sequence_number,
-                last_ready_seq_num = sequence_number,
+                first_ready_seq_num = crsn_or_seqno.min_seq(),
+                last_ready_seq_num = min_seq,
                 num_parked_txns = parking_lot_txns,
             );
             self.track_indices();
@@ -294,7 +334,10 @@ impl TransactionStore {
 
             let mut rm_txns = TxnsLog::new();
             for transaction in txns_for_removal.values() {
-                rm_txns.add(transaction.get_sender(), transaction.get_sequence_number());
+                rm_txns.add(
+                    transaction.get_sender(),
+                    transaction.sequence_info.transaction_sequence_number,
+                );
                 self.index_remove(transaction);
             }
             trace!(
@@ -312,9 +355,9 @@ impl TransactionStore {
     pub(crate) fn commit_transaction(
         &mut self,
         account: &AccountAddress,
-        account_sequence_number: u64,
+        account_sequence_number: AccountSequenceInfo,
     ) {
-        self.clean_committed_transactions(account, account_sequence_number);
+        self.clean_committed_transactions(account, account_sequence_number.min_seq());
         self.process_ready_transactions(account, account_sequence_number);
     }
 
@@ -322,7 +365,10 @@ impl TransactionStore {
         if let Some(txns) = self.transactions.remove(account) {
             let mut txns_log = TxnsLog::new();
             for transaction in txns.values() {
-                txns_log.add(transaction.get_sender(), transaction.get_sequence_number());
+                txns_log.add(
+                    transaction.get_sender(),
+                    transaction.sequence_info.transaction_sequence_number,
+                );
                 self.index_remove(transaction);
             }
             debug!(LogSchema::new(LogEntry::CleanRejectedTxn).txns(txns_log));
@@ -448,9 +494,10 @@ impl TransactionStore {
                         counters::GC_PARKED_TXN_LABEL
                     };
                     let account = txn.get_sender();
-                    let sequence_number = txn.get_sequence_number();
-                    gc_txns_log.add_with_status(account, sequence_number, status);
-                    if let Some(&creation_time) = metrics_cache.get(&(account, sequence_number)) {
+                    let txn_sequence_number = txn.sequence_info.transaction_sequence_number;
+                    gc_txns_log.add_with_status(account, txn_sequence_number, status);
+                    if let Some(&creation_time) = metrics_cache.get(&(account, txn_sequence_number))
+                    {
                         if let Ok(time_delta) = SystemTime::now().duration_since(creation_time) {
                             counters::CORE_MEMPOOL_GC_LATENCY
                                 .with_label_values(&[metric_label, status])

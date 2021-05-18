@@ -32,21 +32,21 @@ module Std::BitVectorTests {
     }
 
     #[test]
-    #[expected_failure(abort_code = 0)]
+    #[expected_failure(abort_code = 7)]
     fun set_bit_out_of_bounds() {
         let bitvector = BitVector::new(BitVector::word_size());
         BitVector::set(&mut bitvector, BitVector::word_size());
     }
 
     #[test]
-    #[expected_failure(abort_code = 0)]
+    #[expected_failure(abort_code = 7)]
     fun unset_bit_out_of_bounds() {
         let bitvector = BitVector::new(BitVector::word_size());
         BitVector::unset(&mut bitvector, BitVector::word_size());
     }
 
     #[test]
-    #[expected_failure(abort_code = 0)]
+    #[expected_failure(abort_code = 7)]
     fun index_bit_out_of_bounds() {
         let bitvector = BitVector::new(BitVector::word_size());
         BitVector::is_index_set(&mut bitvector, BitVector::word_size());
@@ -60,6 +60,52 @@ module Std::BitVectorTests {
     #[test]
     fun test_set_bit_and_index_odd_size() {
         test_bitvector_set_unset_of_size(300)
+    }
+
+    #[test]
+    fun longest_sequence_no_set_zero_index() {
+        let bitvector = BitVector::new(100);
+        assert(BitVector::longest_set_sequence_starting_at(&bitvector, 0) == 0, 0);
+    }
+
+    #[test]
+    fun longest_sequence_one_set_zero_index() {
+        let bitvector = BitVector::new(100);
+        BitVector::set(&mut bitvector, 1);
+        assert(BitVector::longest_set_sequence_starting_at(&bitvector, 0) == 0, 0);
+    }
+
+    #[test]
+    fun longest_sequence_no_set_nonzero_index() {
+        let bitvector = BitVector::new(100);
+        assert(BitVector::longest_set_sequence_starting_at(&bitvector, 51) == 0, 0);
+    }
+
+    #[test]
+    fun longest_sequence_two_set_nonzero_index() {
+        let bitvector = BitVector::new(100);
+        BitVector::set(&mut bitvector, 50);
+        BitVector::set(&mut bitvector, 52);
+        assert(BitVector::longest_set_sequence_starting_at(&bitvector, 51) == 0, 0);
+    }
+
+    #[test]
+    fun longest_sequence_with_break() {
+        let bitvector = BitVector::new(100);
+        let i = 0;
+        while (i < 20) {
+            BitVector::set(&mut bitvector, i);
+            i = i + 1;
+        };
+        // create a break in the run
+        i = i + 1;
+        while (i < 100) {
+            BitVector::set(&mut bitvector, i);
+            i = i + 1;
+        };
+        assert(BitVector::longest_set_sequence_starting_at(&bitvector, 0) == 20, 0);
+        assert(BitVector::longest_set_sequence_starting_at(&bitvector, 20) == 0, 0);
+        assert(BitVector::longest_set_sequence_starting_at(&bitvector, 21) == 100 - 21, 0);
     }
 
     #[test]
@@ -157,7 +203,6 @@ module Std::BitVectorTests {
     }
 
     #[test]
-    #[expected_failure(abort_code = 0)]
     fun shift_left_more_than_size() {
         let bitlen = 133;
         let bitvector = BitVector::new(bitlen);
@@ -165,9 +210,9 @@ module Std::BitVectorTests {
     }
 
     #[test]
+    #[expected_failure(abort_code = 263)]
     fun empty_bitvector() {
-        let bitvector = BitVector::new(0);
-        assert(BitVector::length(&bitvector) == 0, 0);
+        BitVector::new(0);
     }
 
     #[test]

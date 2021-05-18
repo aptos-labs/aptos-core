@@ -15,7 +15,10 @@ use diem_config::{
     network_id::{NetworkContext, NetworkId, NodeNetworkId},
 };
 use diem_infallible::{Mutex, MutexGuard, RwLock};
-use diem_types::{account_address::AccountAddress, transaction::GovernanceRole, PeerId};
+use diem_types::{
+    account_address::AccountAddress, account_config::AccountSequenceInfo,
+    transaction::GovernanceRole, PeerId,
+};
 use enum_dispatch::enum_dispatch;
 use futures::{
     channel::mpsc::{self, unbounded, UnboundedReceiver},
@@ -369,7 +372,7 @@ impl Node {
                 transaction.clone(),
                 0,
                 transaction.gas_unit_price(),
-                0,
+                AccountSequenceInfo::Sequential(0),
                 TimelineState::NotReady,
                 GovernanceRole::NonGovernanceRole,
             );

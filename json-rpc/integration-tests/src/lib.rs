@@ -132,7 +132,7 @@ impl PublicUsageTest for BlockMetadata {
         // list of allowed scripts and publishing off
         assert_ne!(metadata["script_hash_allow_list"], json!([]));
         assert_eq!(metadata["module_publishing_allowed"], false);
-        assert_eq!(metadata["diem_version"], 3);
+        assert_eq!(metadata["diem_version"], DIEM_MAX_KNOWN_VERSION.major);
         assert_eq!(metadata["dual_attestation_limit"], 1000000000);
         assert_ne!(diem_ledger_timestampusec, 0);
         assert_ne!(diem_ledger_version, 0);

@@ -22,6 +22,7 @@ module DiemFramework::DiemAccount {
     use DiemFramework::Diem::{Self, Diem};
     use DiemFramework::Roles;
     use DiemFramework::VASPDomain;
+    use DiemFramework::CRSN;
     use Std::BCS;
     use Std::Event::{Self, EventHandle};
     use Std::Errors;
@@ -198,6 +199,7 @@ module DiemFramework::DiemAccount {
     const PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG: u64 = 1011;
     const PROLOGUE_EBAD_TRANSACTION_FEE_CURRENCY: u64 = 1012;
     const PROLOGUE_ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH: u64 = 1013;
+    const PROLOGUE_ESEQ_NONCE_INVALID: u64 = 1014;
 
     /// Initialize this module. This is only callable from genesis.
     public fun initialize(
@@ -1494,6 +1496,18 @@ module DiemFramework::DiemAccount {
 
     native fun create_signer(addr: address): signer;
 
+    public fun publish_crsn(account: &signer, size: u64)
+    acquires DiemAccount {
+        let account_state = borrow_global<DiemAccount>(Signer::address_of(account));
+        // Don't set this to start at account_state.sequence_number + 1, since
+        // after this the epilogue will record the sequence nonce
+        // `account_state.sequence_number` which will shift the window.
+        // If we set the window to start at `account_state.sequence_number +
+        // 1`, this transaction would be rejected in the epilogue as the
+        // sequence nonce would be outside of the window.
+        CRSN::publish(account, account_state.sequence_number, size)
+    }
+
     /// Helper to return the u64 value of the `balance` for `account`
     fun balance_for<Token>(balance: &Balance<Token>): u64 {
         Diem::value<Token>(&balance.coin)
@@ -1947,20 +1961,29 @@ module DiemFramework::DiemAccount {
             Errors::limit_exceeded(PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG)
         );
 
-        // [PCA11]: Check that the transaction sequence number is not too old (in the past)
-        assert(
-            txn_sequence_number >= sender_account.sequence_number,
-            Errors::invalid_argument(PROLOGUE_ESEQUENCE_NUMBER_TOO_OLD)
-        );
+        if (CRSN::has_crsn(transaction_sender)) {
+            // [PCA13]: If using a sequence nonce check that it's accepted
+            assert(
+                CRSN::check(sender, txn_sequence_number),
+                Errors::invalid_argument(PROLOGUE_ESEQ_NONCE_INVALID)
+            );
+        } else {
+            // [PCA11]: Check that the transaction sequence number is not too old (in the past)
+            assert(
+                txn_sequence_number >= sender_account.sequence_number,
+                Errors::invalid_argument(PROLOGUE_ESEQUENCE_NUMBER_TOO_OLD)
+            );
 
-        // [PCA12]: Check that the transaction's sequence number matches the
-        // current sequence number. Otherwise sequence number is too new by [PCA11].
-        assert(
-            txn_sequence_number == sender_account.sequence_number,
-            Errors::invalid_argument(PROLOGUE_ESEQUENCE_NUMBER_TOO_NEW)
-        );
-        // WARNING: No checks should be added here as the sequence number too new check should be the last check run
-        // by the prologue.
+            // [PCA12]: Check that the transaction's sequence number matches the
+            // current sequence number. Otherwise sequence number is too new by [PCA11].
+            assert(
+                txn_sequence_number == sender_account.sequence_number,
+                Errors::invalid_argument(PROLOGUE_ESEQUENCE_NUMBER_TOO_NEW)
+            );
+
+            // WARNING: No checks should be added here as the sequence number too new check should be the last check run
+            // by the prologue.
+        }
     }
     spec prologue_common {
         let transaction_sender = Signer::spec_address_of(sender);
@@ -2000,9 +2023,11 @@ module DiemFramework::DiemAccount {
         /// [PCA10] Covered: L81 (match 11)
         aborts_if txn_sequence_number >= MAX_U64 with Errors::LIMIT_EXCEEDED;
         /// [PCA11] Covered: L61 (Match 2)
-        aborts_if txn_sequence_number < global<DiemAccount>(transaction_sender).sequence_number with Errors::INVALID_ARGUMENT;
+        aborts_if !CRSN::has_crsn(transaction_sender) && txn_sequence_number < global<DiemAccount>(transaction_sender).sequence_number with Errors::INVALID_ARGUMENT;
         /// [PCA12] Covered: L63 (match 3)
-        aborts_if txn_sequence_number > global<DiemAccount>(transaction_sender).sequence_number with Errors::INVALID_ARGUMENT;
+        aborts_if !CRSN::has_crsn(transaction_sender) && txn_sequence_number > global<DiemAccount>(transaction_sender).sequence_number with Errors::INVALID_ARGUMENT;
+        /// [PCA13] Covered: L93 (match 14)
+        aborts_if CRSN::has_crsn(transaction_sender) && !CRSN::spec_check(transaction_sender, txn_sequence_number) with Errors::INVALID_ARGUMENT;
     }
 
     /// Collects gas and bumps the sequence number for executing a transaction.
@@ -2059,17 +2084,25 @@ module DiemFramework::DiemAccount {
             Errors::limit_exceeded(PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG)
         );
 
-        // [EA4; Invariant]: Make sure passed-in `txn_sequence_number` matches
-        // the `sender_account`'s `sequence_number`. Already checked in [PCA12].
-        assert(
-            sender_account.sequence_number == txn_sequence_number,
-            Errors::invalid_argument(PROLOGUE_ESEQUENCE_NUMBER_TOO_NEW)
-        );
+        if (CRSN::has_crsn(sender)) {
+            // Make sure the `sender_account`'s CRSN is still valid and record it.
+            assert(
+                CRSN::record(account, txn_sequence_number),
+                Errors::invalid_argument(PROLOGUE_ESEQ_NONCE_INVALID),
+            );
+        } else {
+            // [EA4; Invariant]: Make sure passed-in `txn_sequence_number` matches
+            // the `sender_account`'s `sequence_number`. Already checked in [PCA12].
+            assert(
+                sender_account.sequence_number == txn_sequence_number,
+                Errors::invalid_argument(PROLOGUE_ESEQUENCE_NUMBER_TOO_NEW)
+            );
+        };
 
         // The transaction sequence number is passed in to prevent any
         // possibility of the account's sequence number increasing by more than
         // one for any transaction.
-        sender_account.sequence_number = txn_sequence_number + 1;
+        sender_account.sequence_number = sender_account.sequence_number + 1;
 
         if (transaction_fee_amount > 0) {
             // [Invariant Use]: Balance for `Token` verified to exist for non-zero transaction fee amounts by [PCA7].
