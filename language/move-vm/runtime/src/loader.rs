@@ -558,7 +558,7 @@ impl Loader {
         module_id: &ModuleId,
         ty_args: &[TypeTag],
         is_script_execution: bool,
-        data_store: &mut impl DataStore,
+        data_store: &impl DataStore,
     ) -> VMResult<(Arc<Function>, Vec<Type>, Vec<Type>, Vec<Type>)> {
         let module = self.load_module(module_id, data_store)?;
         let idx = self
@@ -701,7 +701,7 @@ impl Loader {
         id: &ModuleId,
         bundle_verified: &BTreeMap<ModuleId, CompiledModule>,
         linking_in_progress: &mut BTreeMap<ModuleId, CompiledModule>,
-        data_store: &mut impl DataStore,
+        data_store: &impl DataStore,
     ) -> VMResult<()> {
         self.verify_module_dependencies(id, bundle_verified, linking_in_progress, data_store, false)
     }
@@ -718,7 +718,7 @@ impl Loader {
         id: &ModuleId,
         bundle_verified: &BTreeMap<ModuleId, CompiledModule>,
         linking_in_progress: &mut BTreeMap<ModuleId, CompiledModule>,
-        data_store: &mut impl DataStore,
+        data_store: &impl DataStore,
         verify_no_missing_modules: bool,
     ) -> VMResult<()> {
         // Invariant: the target module (identified by `id`) must be in `linking_in_progress`.
@@ -869,7 +869,7 @@ impl Loader {
     // Helpers for loading and verification
     //
 
-    fn load_type(&self, type_tag: &TypeTag, data_store: &mut impl DataStore) -> VMResult<Type> {
+    fn load_type(&self, type_tag: &TypeTag, data_store: &impl DataStore) -> VMResult<Type> {
         Ok(match type_tag {
             TypeTag::Bool => Type::Bool,
             TypeTag::U8 => Type::U8,
@@ -920,7 +920,7 @@ impl Loader {
         &self,
         id: &ModuleId,
         linking_in_progress: &mut BTreeMap<ModuleId, CompiledModule>,
-        data_store: &mut impl DataStore,
+        data_store: &impl DataStore,
         verify_module_is_not_missing: bool,
     ) -> VMResult<Arc<Module>> {
         // kept private to `load_module` to prevent verification errors from leaking
@@ -1032,7 +1032,7 @@ impl Loader {
     pub(crate) fn load_module(
         &self,
         id: &ModuleId,
-        data_store: &mut impl DataStore,
+        data_store: &impl DataStore,
     ) -> VMResult<Arc<Module>> {
         self.load_module_verify_not_missing(id, &mut BTreeMap::new(), data_store)
     }
@@ -1042,7 +1042,7 @@ impl Loader {
         &self,
         id: &ModuleId,
         linking_in_progress: &mut BTreeMap<ModuleId, CompiledModule>,
-        data_store: &mut impl DataStore,
+        data_store: &impl DataStore,
     ) -> VMResult<Arc<Module>> {
         self.load_module_internal(id, linking_in_progress, data_store, true)
     }
@@ -1052,7 +1052,7 @@ impl Loader {
         &self,
         id: &ModuleId,
         linking_in_progress: &mut BTreeMap<ModuleId, CompiledModule>,
-        data_store: &mut impl DataStore,
+        data_store: &impl DataStore,
     ) -> VMResult<Arc<Module>> {
         self.load_module_internal(id, linking_in_progress, data_store, false)
     }
@@ -1062,7 +1062,7 @@ impl Loader {
         &self,
         deps: Vec<ModuleId>,
         linking_in_progress: &mut BTreeMap<ModuleId, CompiledModule>,
-        data_store: &mut impl DataStore,
+        data_store: &impl DataStore,
     ) -> VMResult<Vec<Arc<Module>>> {
         deps.into_iter()
             .map(|dep| self.load_module_verify_not_missing(&dep, linking_in_progress, data_store))
@@ -1074,7 +1074,7 @@ impl Loader {
         &self,
         deps: Vec<ModuleId>,
         linking_in_progress: &mut BTreeMap<ModuleId, CompiledModule>,
-        data_store: &mut impl DataStore,
+        data_store: &impl DataStore,
     ) -> VMResult<Vec<Arc<Module>>> {
         deps.into_iter()
             .map(|dep| self.load_module_expect_not_missing(&dep, linking_in_progress, data_store))
@@ -2061,5 +2061,18 @@ impl Loader {
     }
     pub(crate) fn type_to_type_layout(&self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
         self.type_to_type_layout_impl(ty, 1)
+    }
+}
+
+// Public APIs for external uses.
+impl Loader {
+    pub(crate) fn get_type_layout(
+        &self,
+        type_tag: &TypeTag,
+        move_storage: &impl DataStore,
+    ) -> VMResult<MoveTypeLayout> {
+        let ty = self.load_type(type_tag, move_storage)?;
+        self.type_to_type_layout(&ty)
+            .map_err(|e| e.finish(Location::Undefined))
     }
 }

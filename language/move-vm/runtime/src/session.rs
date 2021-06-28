@@ -11,6 +11,7 @@ use move_core_types::{
     effects::{ChangeSet, Event},
     identifier::IdentStr,
     language_storage::{ModuleId, TypeTag},
+    value::MoveTypeLayout,
 };
 use move_vm_types::gas_schedule::GasStatus;
 
@@ -188,5 +189,11 @@ impl<'r, 'l, S: MoveStorage> Session<'r, 'l, S> {
         self.data_cache
             .into_effects()
             .map_err(|e| e.finish(Location::Undefined))
+    }
+
+    pub fn get_type_layout(&self, type_tag: &TypeTag) -> VMResult<MoveTypeLayout> {
+        self.runtime
+            .loader()
+            .get_type_layout(type_tag, &self.data_cache)
     }
 }
