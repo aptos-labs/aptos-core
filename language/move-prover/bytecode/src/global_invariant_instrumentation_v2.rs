@@ -147,30 +147,35 @@ impl<'a> Instrumenter<'a> {
 
     /// Returns list of invariant ids to be assumed at the beginning of the current function.
     fn compute_entrypoint_invariants(&mut self) -> BTreeSet<GlobalId> {
-        // Emit an assume of each invariant over memory touched by this function, and which
-        // are declared in this module or transitively dependent modules.
+        // Emit an assume of each invariant over memory touched by this function.
+        // Such invariants include
+        // - invariants declared in this module, or
+        // - invariants declared in transitively dependent modules
         //
-        // Excludes global invariants (a) those which are marked by the user
-        // explicitly as `[isolated]` (b) those which are not declared
-        // in dependent modules of the module defining the function
-        // (which may not be the target module) and upon which the
-        // code should therefore not depend, apart from the update
-        // itself. Also excludes "update" invariants.
+        // Excludes global invariants that
+        // - are marked by the user explicitly as `[isolated]`, or
+        // - are not declared in dependent modules of the module defining the
+        //   function (which may not be the target module) and upon which the
+        //   code should therefore not depend, apart from the update itself, or
+        // - are "update" invariants.
+
         let env = self.builder.global_env();
         // Invariants with types that are read or written by the function
         let mut invariants_for_used_memory = BTreeSet::new();
         // Invariants with types that are written by the function
         let mut invariants_for_modified_memory = BTreeSet::new();
+
         // get memory (list of structs) read or written by the function target,
         // then find all invariants in loaded modules that refer to that memory.
         for mem in usage_analysis::get_used_memory_inst(&self.builder.get_target()).iter() {
             invariants_for_used_memory.extend(env.get_global_invariants_for_memory(mem));
         }
-        // get memory (list of structs) written by function, find the invariants referring to that memory.
-        // Also called "invariants updated by the function"
+        // get memory (list of structs) written by function, find the invariants referring to that
+        // memory. Also called "invariants updated by the function"
         for mem in usage_analysis::get_modified_memory_inst(&self.builder.get_target()).iter() {
             invariants_for_modified_memory.extend(env.get_global_invariants_for_memory(mem));
         }
+
         let module_env = &self.builder.fun_env.module_env;
         invariants_for_used_memory
             .iter()
@@ -337,16 +342,20 @@ impl<'a> Instrumenter<'a> {
         entrypoint_invariants: &BTreeSet<GlobalId>,
     ) {
         // When invariants are enabled during the body of the current function, add asserts after
-        // the writeback for each invariant that the writeback could modify.
+        // the operation for each invariant that the operation could modify. Such an operation
+        // includes write-backs to a GlobalRoot or MoveTo/MoveFrom a location in the global storage.
         let target_invariants = &inv_ana_data.target_invariants;
         let disabled_inv_fun_set = &inv_ana_data.disabled_inv_fun_set;
         let non_inv_fun_set = &inv_ana_data.non_inv_fun_set;
         if !disabled_inv_fun_set.contains(&fun_id) && !non_inv_fun_set.contains(&fun_id) {
+            let env = self.builder.global_env();
+
             // consider only the invariants that are modified by instruction
-            let modified_invariants = self
-                .builder
-                .global_env()
-                .get_subset_invariants_for_memory(mem.clone(), target_invariants);
+            let modified_invariants = env
+                .get_global_invariants_for_memory(mem)
+                .intersection(target_invariants)
+                .copied()
+                .collect();
             self.emit_assumes_and_saves_before_bytecode(modified_invariants, entrypoint_invariants);
             // put out the modifying instruction byte code.
             self.builder.emit(bc.clone());
