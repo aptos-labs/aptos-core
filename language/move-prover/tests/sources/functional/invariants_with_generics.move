@@ -61,8 +61,9 @@ module A {
 
     // TODO (mengxu) all invariants (I1-I4) should be disproved in all functions (F1-F4)
     // currently,
-    // - I1-I3 is disproved in F1
-    // - I2 is disproved in F2
-    // - I3 is disproved in F3
+    // - I1-I3 are disproved in F1
+    // - I1-I3 are disproved in F2
+    // - I1-I3 are disproved in F3
+    // - I1-I3 are disproved in F4
 }
 }
