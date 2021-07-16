@@ -3255,6 +3255,7 @@ dependencies = [
  "rand_core 0.6.2",
  "rayon",
  "reqwest",
+ "serde",
  "serde_json",
  "structopt 0.3.21",
  "tempfile",
