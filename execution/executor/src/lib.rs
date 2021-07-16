@@ -791,6 +791,11 @@ impl<V: VMExecutor> BlockExecutor for Executor<V> {
             let parent_block_executed_trees =
                 Self::get_executed_trees_from_lock(&read_lock, parent_block_id)?;
 
+            // Hold a ref to the current base smt, so that all in-mem state in between the
+            // currently committed version and the end version of the parent block won't go away
+            // during execution.
+            let _base_smt = read_lock.committed_trees().state_tree().clone();
+
             let state_view = self.get_executed_state_view_from_lock(
                 &read_lock,
                 StateViewId::BlockExecution { block_id },
@@ -968,18 +973,9 @@ impl<V: VMExecutor> BlockExecutor for Executor<V> {
             )?;
         }
 
-        let mut write_lock = self.cache.write();
-        let arc_blocks = block_ids
-            .iter()
-            .map(|id| write_lock.get_block(id))
-            .collect::<Result<Vec<_>, Error>>()?;
-        let blocks = arc_blocks.iter().map(|b| b.lock()).collect::<Vec<_>>();
-
-        for block in blocks {
-            block.output().executed_trees().state_tree().prune()
-        }
-
-        write_lock.prune(ledger_info_with_sigs.ledger_info())?;
+        self.cache
+            .write()
+            .prune(ledger_info_with_sigs.ledger_info())?;
 
         // Now that the blocks are persisted successfully, we can reply to consensus
         Ok(())

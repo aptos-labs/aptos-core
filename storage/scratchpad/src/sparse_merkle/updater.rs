@@ -25,7 +25,6 @@ type InMemInternal<V> = super::node::InternalNode<V>;
 enum InMemSubTreeInfo<V> {
     Internal {
         subtree: InMemSubTree<V>,
-        // TODO(aldenhu): make it lazy (going up)
         node: InMemInternal<V>,
     },
     Leaf {
@@ -157,16 +156,34 @@ impl<'a, V: Clone + CryptoHash> SubTreeInfo<'a, V> {
     fn from_in_mem(subtree: &InMemSubTree<V>) -> Self {
         match &subtree {
             InMemSubTree::Empty => SubTreeInfo::new_empty(),
-            InMemSubTree::NonEmpty { root, .. } => match root.get_node_if_in_mem() {
+            InMemSubTree::NonEmpty { root, .. } => match root.get_if_in_mem() {
                 Some(arc_node) => match arc_node.borrow() {
-                    Node::Internal(node) => SubTreeInfo::InMem(InMemSubTreeInfo::Internal {
-                        node: (*node).clone(),
-                        subtree: subtree.weak(),
-                    }),
-                    Node::Leaf(node) => SubTreeInfo::InMem(InMemSubTreeInfo::Leaf {
-                        key: node.key,
-                        subtree: subtree.weak(),
-                    }),
+                    Node::Internal(internal_node) => {
+                        SubTreeInfo::InMem(InMemSubTreeInfo::Internal {
+                            node: internal_node.clone(),
+                            subtree: subtree.weak(),
+                        })
+                    }
+                    Node::Leaf(leaf_node) => {
+                        // Create a new leaf node with the data pointing to previous version via
+                        // weak ref (if exists). This is only necessary when this leaf node is "split"
+                        // during update hence changed position in the tree. In contrast, if the
+                        // node is referenced as is, a subtree.weak() should suffice, since it
+                        // becomes "unknown" if persisted and pruned, and a proof from the DB in
+                        // that case will reveal its information (since the position didn't change.)
+                        // The waste can be counteracted by making from_in_mem() lazy, as commented
+                        // in `into_children`
+                        let node = Node::Leaf(leaf_node.clone_with_weak_value());
+                        let subtree = InMemSubTree::NonEmpty {
+                            hash: subtree.hash(),
+                            root: NodeHandle::new_shared(node),
+                        };
+
+                        SubTreeInfo::InMem(InMemSubTreeInfo::Leaf {
+                            key: leaf_node.key,
+                            subtree,
+                        })
+                    }
                 },
                 None => SubTreeInfo::InMem(InMemSubTreeInfo::Unknown {
                     subtree: subtree.weak(),
@@ -203,6 +220,9 @@ impl<'a, V: Clone + CryptoHash> SubTreeInfo<'a, V> {
                     swap_if(myself, SubTreeInfo::new_empty(), key.bit(depth))
                 }
                 InMemSubTreeInfo::Internal { node, .. } => (
+                    // n.b. When we recurse into either side, the updates can be empty, where the
+                    // specific type of the in-mem node is irrelevant, so the parsing of it can be
+                    // lazy. But the saving seem not worth the complexity.
                     SubTreeInfo::from_in_mem(&node.left),
                     SubTreeInfo::from_in_mem(&node.right),
                 ),

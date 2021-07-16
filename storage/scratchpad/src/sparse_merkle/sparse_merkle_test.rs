@@ -38,7 +38,7 @@ fn test_replace_in_mem_leaf() {
     let key = b"hello".test_only_hash();
     let value_hash = b"world".test_only_hash();
     let leaf = SubTree::new_leaf_with_value_hash(key, value_hash);
-    let smt = SparseMerkleTree::new_impl(leaf, None);
+    let smt = SparseMerkleTree::new_with_root(leaf);
 
     let new_value: AccountStateBlob = vec![1, 2, 3].into();
     let root_hash = hash_leaf(key, new_value.hash());
@@ -53,7 +53,7 @@ fn test_split_in_mem_leaf() {
     let key1 = HashValue::from_slice(&[0; 32]).unwrap();
     let value1_hash = b"hello".test_only_hash();
     let leaf1 = SubTree::new_leaf_with_value_hash(key1, value1_hash);
-    let smt = SparseMerkleTree::new_impl(leaf1, None);
+    let smt = SparseMerkleTree::new_with_root(leaf1);
 
     let key2 = HashValue::from_slice(&[0xff; 32]).unwrap();
     let value2: AccountStateBlob = vec![1, 2, 3].into();
@@ -81,7 +81,7 @@ fn test_insert_at_in_mem_empty() {
     );
     let internal_hash = internal.hash();
     let root = SubTree::new_internal(internal, SubTree::new_empty());
-    let smt = SparseMerkleTree::new_impl(root, None);
+    let smt = SparseMerkleTree::new_with_root(root);
 
     let root_hash = hash_internal(internal_hash, hash_leaf(key3, value3.hash()));
     let updated = smt
@@ -271,15 +271,14 @@ fn test_update() {
 
     // Create the old tree and update the tree with new value and proof.
     let proof_reader = ProofReader::new(vec![(key4, proof)]);
-    let old_smt = SparseMerkleTree::new(old_root_hash);
-    let smt1 = old_smt
+    let smt1 = SparseMerkleTree::new(old_root_hash)
         .batch_update(vec![(key4, &value4)], &proof_reader)
         .unwrap();
 
     // Now smt1 should look like this:
     //             root
     //            /    \
-    //           y      key3 (subtree)
+    //           y      key3 (unknown)
     //          / \
     //         x   key4
     assert_eq!(smt1.get(key1), AccountStatus::Unknown);
@@ -314,14 +313,14 @@ fn test_update() {
         .batch_update(vec![(key1, &value1)], &proof_reader)
         .unwrap();
 
-    // Now the tree looks like:
+    // smt2 looks like:
     //              root
     //             /    \
-    //            y      key3 (subtree)
+    //            y      key3 (unknown, weak)
     //           / \
-    //          x   key4 (from smt1)
+    //          x   key4 (weak data)
     //         / \
-    //     key1    key2 (subtree)
+    //     key1    key2 (unknown)
     assert_eq!(
         smt2.get(key1),
         AccountStatus::ExistsInScratchPad(value1.clone())
@@ -347,12 +346,11 @@ fn test_update() {
         .unwrap();
 
     // smt22 is like:
-    // Now smt1 should look like this:
     //             root
     //            /    \
-    //           y'      key3 (subtree)
+    //           y'      key3 (unknown, weak)
     //          / \
-    //         x   key4
+    // (weak) x   key4
     assert_eq!(smt22.get(key1), AccountStatus::Unknown);
     assert_eq!(smt22.get(key2), AccountStatus::Unknown);
     assert_eq!(smt22.get(key3), AccountStatus::Unknown);
@@ -362,14 +360,14 @@ fn test_update() {
     );
 
     // Now prune smt1.
-    smt1.prune();
+    drop(smt1);
 
     // For smt2, only key1 should be available since smt2 was constructed by updating smt1 with
     // key1.
     assert_eq!(smt2.get(key1), AccountStatus::ExistsInScratchPad(value1));
     assert_eq!(smt2.get(key2), AccountStatus::Unknown);
     assert_eq!(smt2.get(key3), AccountStatus::Unknown);
-    assert_eq!(smt2.get(key4), AccountStatus::Unknown);
+    assert_eq!(smt2.get(key4), AccountStatus::ExistsInDB);
 
     // For smt22, only key4 should be available since smt22 was constructed by updating smt1 with
     // key4.
@@ -381,8 +379,9 @@ fn test_update() {
 
 #[test]
 fn test_drop() {
-    let mut smt = SparseMerkleTree::new(*SPARSE_MERKLE_PLACEHOLDER_HASH);
     let proof_reader = ProofReader::default();
+    let root_smt = SparseMerkleTree::new(*SPARSE_MERKLE_PLACEHOLDER_HASH);
+    let mut smt = root_smt.clone();
     for _ in 0..100000 {
         smt = smt
             .batch_update(
@@ -392,8 +391,9 @@ fn test_drop() {
             .unwrap()
     }
 
-    // smt with a lot of ancestors being dropped here. It's a stack overflow if a manual iterative
-    // `Drop` implementation is not in place.
+    // root_smt with a long chain of descendants being dropped here. It's a stack overflow if a
+    // manual iterative `Drop` implementation is not in place.
+    drop(root_smt)
 }
 
 proptest! {
