@@ -134,7 +134,7 @@ jobs:
         name: find website changes.
         uses: diem/actions/matches@faadd16607b77dfa2231a8f366883e01717b3225
         with:
-          pattern: "^documentation|^developers.diem.com"
+          pattern: '^documentation\|^developers.diem.com\|^.github'
       - id: test-coverage
         name: check if we should see if code coverage still works.
         uses: diem/actions/matches@faadd16607b77dfa2231a8f366883e01717b3225
@@ -955,3 +955,37 @@ jobs:
           retention-days: 5
           path: |
             /tmp/benches
+
+  developers-site:
+    name: run-developer-site-build
+    runs-on: ubuntu-latest
+    if: ${{ needs.prepare.outputs.test-website-build == 'true' }}
+    steps:
+      # Checks-out the Diem website repository under $GITHUB_WORKSPACE, so job can access it
+      - uses: actions/checkout@v2.3.4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/cache@v2.1.6
+      # Installs node and yarn
+      - name: Use Node.js 12
+        uses: actions/setup-node@v2.1.5
+        with:
+          node-version: '14'
+      # Install git
+      - name: Install git
+        run: |
+          sudo apt --assume-yes update
+          sudo apt --assume-yes install git
+      # Install Python 3.8
+      - name: Set up Python 3.8
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.8'
+      # Test that building the site is successful
+      - name: Build Site
+        run: |
+          cd developers.diem.com
+          # Only build the straight Docusaurus site now. Do not build rust `-r`
+          # or python docs `-p` on CI checks until we resolve the best way to
+          # build them for deployment
+          ./scripts/build_docs.sh -b
