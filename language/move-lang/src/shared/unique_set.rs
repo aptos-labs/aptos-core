@@ -25,6 +25,14 @@ impl<T: TName> UniqueSet<T> {
         self.0.add(x, ())
     }
 
+    pub fn remove(&mut self, x: &T) -> bool {
+        self.0.remove(x).is_some()
+    }
+
+    pub fn remove_(&mut self, x: &T::Key) -> bool {
+        self.0.remove_(x).is_some()
+    }
+
     pub fn contains(&self, x: &T) -> bool {
         self.0.contains_key(x)
     }
