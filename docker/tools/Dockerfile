@@ -45,6 +45,10 @@ COPY --from=builder /diem/target/release/db-restore /usr/local/bin
 COPY --from=builder /diem/target/release/diem-transaction-replay /usr/local/bin
 COPY --from=builder /diem/target/release/diem-writeset-generator /usr/local/bin
 
+### Get Move modules bytecodes for genesis ceremony
+RUN mkdir -p /diem/move
+COPY --from=builder /diem/language/diem-framework/releases/artifacts/current /diem/move
+
 ARG BUILD_DATE
 ARG GIT_REV
 ARG GIT_UPSTREAM
