@@ -21,7 +21,6 @@ module 0x8675309::M {
             let _ = x .. y;
             x
         }
-
     }
 
     struct T has key {x: u64}
@@ -140,5 +139,15 @@ module 0x8675309::M {
         invariant forall x: num, y: num, z: num : x == y && y == z ==> x == z;
         invariant forall x: num : exists y: num : y >= x;
         invariant exists x in 1..10, y in 8..12 : x == y;
+        invariant<X: key> exists<X>(0x0) <==> exists<X>(0x0);
+        invariant<X: key, Y: key> exists<X>(0x0) && exists<Y>(0x1) <==> exists<Y>(0x1) && exists<X>(0x0);
+    }
+
+    spec module {
+        fun spec_fun_non_zero(): num;
+        axiom spec_fun_non_zero() > 0;
+
+        fun spec_fun_identity<T>(x: T): T;
+        axiom<T> forall x: T: spec_fun_identity(x) == x;
     }
 }

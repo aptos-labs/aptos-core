@@ -2323,7 +2323,8 @@ fn parse_spec_block_member(tokens: &mut Lexer) -> Result<SpecBlockMember, Diagno
         Tok::Fun | Tok::Native => parse_spec_function(tokens),
         Tok::IdentifierValue => match tokens.content() {
             "assert" | "assume" | "decreases" | "aborts_if" | "aborts_with" | "succeeds_if"
-            | "modifies" | "emits" | "ensures" | "requires" | "axiom" => parse_condition(tokens),
+            | "modifies" | "emits" | "ensures" | "requires" => parse_condition(tokens),
+            "axiom" => parse_axiom(tokens),
             "include" => parse_spec_include(tokens),
             "apply" => parse_spec_apply(tokens),
             "pragma" => parse_spec_pragma(tokens),
@@ -2345,17 +2346,16 @@ fn parse_spec_block_member(tokens: &mut Lexer) -> Result<SpecBlockMember, Diagno
 
 // Parse a specification condition:
 //    SpecCondition =
-//        ("assert" | "assume" | "decreases" | "ensures" | "requires" )
-//        <ConditionProperties> <Exp> ";"
+//        ("assert" | "assume" | "ensures" | "requires" ) <ConditionProperties> <Exp> ";"
 //      | "aborts_if" <ConditionProperties> <Exp> ["with" <Exp>] ";"
-//      | "aborts_with" <ConditionProperties> Comma <Exp> ";"
+//      | "aborts_with" <ConditionProperties> <Exp> [Comma <Exp>]* ";"
+//      | "decreases" <ConditionProperties> <Exp> ";"
 //      | "emits" <ConditionProperties> <Exp> "to" <Exp> [If <Exp>] ";"
 fn parse_condition(tokens: &mut Lexer) -> Result<SpecBlockMember, Diagnostic> {
     let start_loc = tokens.start_loc();
     let kind = match tokens.content() {
         "assert" => SpecConditionKind::Assert,
         "assume" => SpecConditionKind::Assume,
-        "axiom" => SpecConditionKind::Axiom,
         "decreases" => SpecConditionKind::Decreases,
         "aborts_if" => SpecConditionKind::AbortsIf,
         "aborts_with" => SpecConditionKind::AbortsWith,
@@ -2411,6 +2411,7 @@ fn parse_condition(tokens: &mut Lexer) -> Result<SpecBlockMember, Diagnostic> {
         end_loc,
         SpecBlockMember_::Condition {
             kind,
+            type_parameters: vec![],
             properties,
             exp,
             additional_exps,
@@ -2435,11 +2436,35 @@ fn parse_condition_properties(tokens: &mut Lexer) -> Result<Vec<PragmaProperty>,
     Ok(properties)
 }
 
+// Parse an axiom:
+//     a = "axiom" <OptionalTypeParameters> <ConditionProperties> <Exp> ";"
+fn parse_axiom(tokens: &mut Lexer) -> Result<SpecBlockMember, Diagnostic> {
+    let start_loc = tokens.start_loc();
+    consume_identifier(tokens, "axiom")?;
+    let type_parameters = parse_optional_type_parameters(tokens)?;
+    let properties = parse_condition_properties(tokens)?;
+    let exp = parse_exp(tokens)?;
+    consume_token(tokens, Tok::Semicolon)?;
+    Ok(spanned(
+        tokens.file_name(),
+        start_loc,
+        tokens.previous_end_loc(),
+        SpecBlockMember_::Condition {
+            kind: SpecConditionKind::Axiom,
+            type_parameters,
+            properties,
+            exp,
+            additional_exps: vec![],
+        },
+    ))
+}
+
 // Parse an invariant:
-//     Invariant = "invariant" [ "update" ] <ConditionProperties> <Exp> ";"
+//     Invariant = "invariant" <OptionalTypeParameters> [ "update" ] <ConditionProperties> <Exp> ";"
 fn parse_invariant(tokens: &mut Lexer) -> Result<SpecBlockMember, Diagnostic> {
     let start_loc = tokens.start_loc();
     consume_token(tokens, Tok::Invariant)?;
+    let type_parameters = parse_optional_type_parameters(tokens)?;
     let kind = match tokens.peek() {
         Tok::IdentifierValue if tokens.content() == "update" => {
             tokens.advance()?;
@@ -2456,6 +2481,7 @@ fn parse_invariant(tokens: &mut Lexer) -> Result<SpecBlockMember, Diagnostic> {
         tokens.previous_end_loc(),
         SpecBlockMember_::Condition {
             kind,
+            type_parameters,
             properties,
             exp,
             additional_exps: vec![],

@@ -1141,10 +1141,12 @@ fn spec_member(context: &mut Context, sp!(loc, pm): P::SpecBlockMember) -> E::Sp
     let em = match pm {
         PM::Condition {
             kind,
+            type_parameters: pty_params,
             properties: pproperties,
             exp,
             additional_exps,
         } => {
+            let old_aliases = context.new_alias_scope(AliasMap::new());
             let properties = pproperties
                 .into_iter()
                 .map(|p| pragma_property(context, p))
@@ -1154,8 +1156,11 @@ fn spec_member(context: &mut Context, sp!(loc, pm): P::SpecBlockMember) -> E::Sp
                 .into_iter()
                 .map(|e| exp_(context, e))
                 .collect();
+            let type_parameters = fun_type_parameters(context, pty_params);
+            context.set_to_outer_scope(old_aliases);
             EM::Condition {
                 kind,
+                type_parameters,
                 properties,
                 exp,
                 additional_exps,
