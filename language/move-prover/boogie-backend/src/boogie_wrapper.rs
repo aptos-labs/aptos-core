@@ -106,7 +106,7 @@ impl<'env> BoogieWrapper<'env> {
     /// Calls boogie on the given file. On success, returns a struct representing the analyzed
     /// output of boogie.
     pub fn call_boogie(&self, boogie_file: &str) -> anyhow::Result<BoogieOutput> {
-        let args = self.options.get_boogie_command(boogie_file);
+        let args = self.options.get_boogie_command(boogie_file)?;
         info!("running solver");
         debug!("command line: {}", args.iter().join(" "));
         let task = RunBoogieWithSeeds {
@@ -142,11 +142,7 @@ impl<'env> BoogieWrapper<'env> {
                         all_output: "".to_string(),
                     });
                 } else {
-                    panic!(
-                        "cannot execute boogie `{}`: {}",
-                        self.options.get_boogie_command("")[0],
-                        err
-                    )
+                    panic!("cannot execute boogie `{:?}`: {}", args, err)
                 }
             }
             Ok(out) => out,
