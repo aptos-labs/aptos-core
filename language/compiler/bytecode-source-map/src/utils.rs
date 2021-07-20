@@ -13,8 +13,9 @@ use codespan_reporting::{
     },
 };
 use move_ir_types::location::Loc;
+use move_symbol_pool::Symbol;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{collections::HashMap, fs::File, io::Read, path::Path};
+use std::{fs::File, io::Read, path::Path};
 
 type FileId = usize;
 
@@ -67,13 +68,9 @@ pub struct OwnedLoc {
 }
 
 pub fn remap_owned_loc_to_loc(m: SourceMap<OwnedLoc>) -> SourceMap<Loc> {
-    let mut table: HashMap<String, &'static str> = HashMap::new();
     let mut f = |owned| {
         let OwnedLoc { file, start, end } = owned;
-        let file = *table
-            .entry(file.clone())
-            .or_insert_with(|| Box::leak(Box::new(file)));
-        Loc::new(file, start, end)
+        Loc::new(Symbol::from(file), start, end)
     };
     m.remap_locations(&mut f)
 }

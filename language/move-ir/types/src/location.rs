@@ -1,6 +1,8 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use move_symbol_pool::Symbol;
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::Ordering,
@@ -25,7 +27,7 @@ pub type ByteIndex = u32;
 /// byte vector
 pub struct Loc {
     /// The file the location points to
-    file: &'static str,
+    file: Symbol,
     /// The start byte index into file
     start: ByteIndex,
     /// The end byte index into file
@@ -33,11 +35,11 @@ pub struct Loc {
 }
 
 impl Loc {
-    pub fn new(file: &'static str, start: ByteIndex, end: ByteIndex) -> Loc {
+    pub fn new(file: Symbol, start: ByteIndex, end: ByteIndex) -> Loc {
         Loc { file, start, end }
     }
 
-    pub fn file(self) -> &'static str {
+    pub fn file(self) -> Symbol {
         self.file
     }
 
@@ -65,7 +67,7 @@ impl PartialOrd for Loc {
 
 impl Ord for Loc {
     fn cmp(&self, other: &Loc) -> Ordering {
-        let file_ord = self.file.cmp(other.file);
+        let file_ord = self.file.cmp(&other.file);
         if file_ord != Ordering::Equal {
             return file_ord;
         }
@@ -83,6 +85,8 @@ impl Ord for Loc {
 // Spanned
 //**************************************************************************************************
 
+static NO_LOC_FILE: Lazy<Symbol> = Lazy::new(|| Symbol::from(""));
+
 #[derive(Copy, Clone)]
 pub struct Spanned<T> {
     pub loc: Loc,
@@ -94,11 +98,10 @@ impl<T> Spanned<T> {
         Spanned { loc, value }
     }
 
-    const NO_LOC_FILE: &'static str = "";
     pub fn unsafe_no_loc(value: T) -> Spanned<T> {
         Spanned {
             value,
-            loc: Loc::new(Self::NO_LOC_FILE, 0, 0),
+            loc: Loc::new(*NO_LOC_FILE, 0, 0),
         }
     }
 }

@@ -18,6 +18,7 @@ use codespan_reporting::{
 };
 use move_command_line_common::env::read_env_var;
 use move_ir_types::location::*;
+use move_symbol_pool::Symbol;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     iter::FromIterator,
@@ -30,8 +31,8 @@ use std::{
 
 pub type FileId = usize;
 
-pub type FilesSourceText = HashMap<&'static str, String>;
-type FileMapping = HashMap<&'static str, FileId>;
+pub type FilesSourceText = HashMap<Symbol, String>;
+type FileMapping = HashMap<Symbol, FileId>;
 
 #[derive(PartialEq, Eq, Clone, Debug, Hash)]
 pub struct Diagnostic {
@@ -100,7 +101,7 @@ fn output_diagnostics<W: WriteColor>(
 
 fn render_diagnostics(
     writer: &mut dyn WriteColor,
-    files: &SimpleFiles<&'static str, &str>,
+    files: &SimpleFiles<Symbol, &str>,
     file_mapping: &FileMapping,
     mut diags: Diagnostics,
 ) {
@@ -122,7 +123,7 @@ fn render_diagnostics(
 
 fn convert_loc(file_mapping: &FileMapping, loc: Loc) -> (FileId, Range<usize>) {
     let fname = loc.file();
-    let id = *file_mapping.get(fname).unwrap();
+    let id = *file_mapping.get(&fname).unwrap();
     let range = loc.usize_range();
     (id, range)
 }

@@ -3,10 +3,11 @@
 
 use crate::{diag, diagnostics::Diagnostics};
 use move_ir_types::location::*;
+use move_symbol_pool::Symbol;
 use std::{collections::BTreeMap, iter::Peekable, str::Chars};
 
 /// Types to represent comments.
-pub type CommentMap = BTreeMap<&'static str, MatchedFileCommentMap>;
+pub type CommentMap = BTreeMap<Symbol, MatchedFileCommentMap>;
 pub type MatchedFileCommentMap = BTreeMap<u32, String>;
 pub type FileCommentMap = BTreeMap<(u32, u32), String>;
 
@@ -38,7 +39,7 @@ pub fn is_permitted_char(c: char) -> bool {
     is_permitted_printable_char(c) || is_permitted_newline_char(c)
 }
 
-fn verify_string(fname: &'static str, string: &str) -> Result<(), Diagnostics> {
+fn verify_string(fname: Symbol, string: &str) -> Result<(), Diagnostics> {
     match string
         .chars()
         .enumerate()
@@ -70,10 +71,7 @@ fn verify_string(fname: &'static str, string: &str) -> Result<(), Diagnostics> {
 /// (`/// .. <newline>` and `/** .. */`) will be not included in extracted comment string. The
 /// span in the returned map, however, covers the whole region of the comment, including the
 /// delimiters.
-fn strip_comments(
-    fname: &'static str,
-    input: &str,
-) -> Result<(String, FileCommentMap), Diagnostics> {
+fn strip_comments(fname: Symbol, input: &str) -> Result<(String, FileCommentMap), Diagnostics> {
     const SLASH: char = '/';
     const SPACE: char = ' ';
     const STAR: char = '*';
@@ -234,7 +232,7 @@ fn strip_comments(
 // We restrict strings to only ascii visual characters (0x20 <= c <= 0x7E) or a permitted newline
 // character--\n--or a tab--\t.
 pub(crate) fn strip_comments_and_verify(
-    fname: &'static str,
+    fname: Symbol,
     string: &str,
 ) -> Result<(String, FileCommentMap), Diagnostics> {
     verify_string(fname, string)?;

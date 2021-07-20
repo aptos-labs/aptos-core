@@ -8,6 +8,7 @@ use crate::{
     FileCommentMap, MatchedFileCommentMap,
 };
 use move_ir_types::location::Loc;
+use move_symbol_pool::Symbol;
 use std::fmt;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -161,7 +162,7 @@ impl fmt::Display for Tok {
 
 pub struct Lexer<'input> {
     text: &'input str,
-    file: &'static str,
+    file: Symbol,
     doc_comments: FileCommentMap,
     matched_doc_comments: MatchedFileCommentMap,
     prev_end: usize,
@@ -171,11 +172,7 @@ pub struct Lexer<'input> {
 }
 
 impl<'input> Lexer<'input> {
-    pub fn new(
-        text: &'input str,
-        file: &'static str,
-        doc_comments: FileCommentMap,
-    ) -> Lexer<'input> {
+    pub fn new(text: &'input str, file: Symbol, doc_comments: FileCommentMap) -> Lexer<'input> {
         Lexer {
             text,
             file,
@@ -196,7 +193,7 @@ impl<'input> Lexer<'input> {
         &self.text[self.cur_start..self.cur_end]
     }
 
-    pub fn file_name(&self) -> &'static str {
+    pub fn file_name(&self) -> Symbol {
         self.file
     }
 
@@ -296,11 +293,7 @@ impl<'input> Lexer<'input> {
 }
 
 // Find the next token and its length without changing the state of the lexer.
-fn find_token(
-    file: &'static str,
-    text: &str,
-    start_offset: usize,
-) -> Result<(Tok, usize), Diagnostic> {
+fn find_token(file: Symbol, text: &str, start_offset: usize) -> Result<(Tok, usize), Diagnostic> {
     let c: char = match text.chars().next() {
         Some(next_char) => next_char,
         None => {
