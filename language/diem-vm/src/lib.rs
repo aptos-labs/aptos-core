@@ -110,13 +110,15 @@ pub mod data_cache;
 #[cfg(feature = "mirai-contracts")]
 pub mod foreign_contracts;
 
-mod diem_vm;
+mod adapter_common;
+mod diem_vm_impl;
 mod errors;
 pub mod natives;
 pub mod transaction_metadata;
 
-pub mod diem_transaction_executor;
-pub mod diem_transaction_validator;
+// pub mod diem_transaction_executor;
+// pub mod diem_transaction_validator;
+pub mod diem_vm;
 pub mod logging;
 pub mod script_to_script_function;
 pub mod system_module_names;
@@ -124,10 +126,7 @@ pub mod system_module_names;
 #[cfg(test)]
 mod unit_tests;
 
-pub use crate::{
-    diem_transaction_executor::DiemVM, diem_transaction_validator::DiemVMValidator,
-    diem_vm::convert_changeset_and_events,
-};
+pub use crate::{diem_vm::DiemVM, diem_vm_impl::convert_changeset_and_events};
 
 use diem_state_view::StateView;
 use diem_types::{
