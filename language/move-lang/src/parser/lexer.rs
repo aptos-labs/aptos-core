@@ -7,9 +7,8 @@ use crate::{
     parser::syntax::make_loc,
     FileCommentMap, MatchedFileCommentMap,
 };
-use codespan::{ByteIndex, Span};
 use move_ir_types::location::Loc;
-use std::{collections::BTreeMap, fmt};
+use std::fmt;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Tok {
@@ -175,13 +174,13 @@ impl<'input> Lexer<'input> {
     pub fn new(
         text: &'input str,
         file: &'static str,
-        doc_comments: BTreeMap<Span, String>,
+        doc_comments: FileCommentMap,
     ) -> Lexer<'input> {
         Lexer {
             text,
             file,
             doc_comments,
-            matched_doc_comments: BTreeMap::new(),
+            matched_doc_comments: MatchedFileCommentMap::new(),
             prev_end: 0,
             cur_start: 0,
             cur_end: 0,
@@ -244,7 +243,7 @@ impl<'input> Lexer<'input> {
         let mut matched = vec![];
         let merged = self
             .doc_comments
-            .range(Span::new(start, start)..Span::new(end, end))
+            .range((start, start)..(end, end))
             .map(|(span, s)| {
                 matched.push(*span);
                 s.clone()
@@ -254,7 +253,7 @@ impl<'input> Lexer<'input> {
         for span in matched {
             self.doc_comments.remove(&span);
         }
-        self.matched_doc_comments.insert(ByteIndex(end), merged);
+        self.matched_doc_comments.insert(end, merged);
     }
 
     // At the end of parsing, checks whether there are any unmatched documentation comments,
@@ -265,7 +264,10 @@ impl<'input> Lexer<'input> {
         let errors = self
             .doc_comments
             .iter()
-            .map(|(span, _)| diag!(Syntax::InvalidDocComment, (Loc::new(self.file, *span), msg)))
+            .map(|((start, end), _)| {
+                let loc = Loc::new(self.file, *start, *end);
+                diag!(Syntax::InvalidDocComment, (loc, msg))
+            })
             .collect::<Diagnostics>();
         if errors.is_empty() {
             Ok(std::mem::take(&mut self.matched_doc_comments))

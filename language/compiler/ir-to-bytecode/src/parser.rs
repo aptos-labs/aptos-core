@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{bail, Result};
-use codespan::Files;
 use codespan_reporting::{
     diagnostic::{Diagnostic, Label},
+    files::SimpleFiles,
     term::{
         emit,
         termcolor::{ColorChoice, StandardStream},
@@ -121,10 +121,12 @@ pub fn parse_cmd_(
 fn handle_error<T>(e: syntax::ParseError<Loc, anyhow::Error>, code_str: &str) -> Result<T> {
     let msg = match &e {
         ParseError::InvalidToken { location } => {
-            let mut files = Files::new();
+            let mut files = SimpleFiles::new();
             let id = files.add(location.file(), code_str.to_string());
-            let lbl = Label::new(id, location.span(), "Invalid Token");
-            let error = Diagnostic::new_error("Parser Error", lbl);
+            let lbl = Label::primary(id, location.usize_range()).with_message("Invalid Token");
+            let error = Diagnostic::error()
+                .with_message("Parser Error")
+                .with_labels(vec![lbl]);
             let writer = &mut StandardStream::stderr(ColorChoice::Auto);
             emit(writer, &Config::default(), &files, &error).unwrap();
             "Invalid Token".to_string()

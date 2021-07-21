@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{anyhow, Context, Error};
-use codespan::{ByteIndex, Span};
 use std::{collections::BTreeSet, fmt, str::FromStr};
 
 use crate::lexer::*;
@@ -42,10 +41,7 @@ where
 }
 
 fn make_loc(file: &'static str, start: usize, end: usize) -> Loc {
-    Loc::new(
-        file,
-        Span::new(ByteIndex(start as u32), ByteIndex(end as u32)),
-    )
+    Loc::new(file, start as u32, end as u32)
 }
 
 fn current_token_loc(tokens: &Lexer) -> Loc {
@@ -385,10 +381,10 @@ fn parse_rhs_of_binary_exp(
             Tok::Percent => BinOp::Mod,
             _ => panic!("Unexpected token that is not a binary operator"),
         };
-        let start_loc = result.loc.span().start();
+        let start_loc = result.loc.start();
         let end_loc = tokens.previous_end_loc();
         let e = Exp_::BinopExp(Box::new(result), op, Box::new(rhs));
-        result = spanned(tokens.file_name(), start_loc.0 as usize, end_loc, e);
+        result = spanned(tokens.file_name(), start_loc as usize, end_loc, e);
     }
 
     Ok(result)

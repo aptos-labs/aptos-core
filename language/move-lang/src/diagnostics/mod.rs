@@ -123,9 +123,8 @@ fn render_diagnostics(
 fn convert_loc(file_mapping: &FileMapping, loc: Loc) -> (FileId, Range<usize>) {
     let fname = loc.file();
     let id = *file_mapping.get(fname).unwrap();
-    let start = loc.span().start().to_usize();
-    let end = loc.span().end().to_usize();
-    (id, Range { start, end })
+    let range = loc.usize_range();
+    (id, range)
 }
 
 fn render_diagnostic(

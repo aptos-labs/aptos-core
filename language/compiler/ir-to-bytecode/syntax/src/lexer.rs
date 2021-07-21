@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::syntax::ParseError;
-use codespan::{ByteIndex, Span};
 use move_ir_types::location::*;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -343,8 +342,8 @@ impl<'input> Lexer<'input> {
             '[' => (Tok::LSquare, 1), // for vector specs
             ']' => (Tok::RSquare, 1), // for vector specs
             _ => {
-                let idx = ByteIndex(start_offset as u32);
-                let location = Loc::new(self.file_name(), Span::new(idx, idx));
+                let idx = start_offset as u32;
+                let location = Loc::new(self.file_name(), idx, idx);
                 return Err(ParseError::InvalidToken { location });
             }
         };

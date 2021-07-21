@@ -3,6 +3,7 @@
 
 #![forbid(unsafe_code)]
 
+use codespan::ByteIndex;
 use codespan_reporting::diagnostic::{Diagnostic, Label};
 use itertools::Itertools;
 #[allow(unused_imports)]
@@ -103,7 +104,13 @@ pub fn run_model_builder_with_compilation_flags(
     // Add any documentation comments found by the Move compiler to the env.
     for (fname, documentation) in comment_map {
         let file_id = env.get_file_id(fname).expect("file name defined");
-        env.add_documentation(file_id, documentation);
+        env.add_documentation(
+            file_id,
+            documentation
+                .into_iter()
+                .map(|(idx, s)| (ByteIndex(idx), s))
+                .collect(),
+        )
     }
 
     // Step 2: run the compiler up to expansion

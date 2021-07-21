@@ -244,7 +244,7 @@ fn merge_spans(cov: FunctionSourceCoverage) -> Vec<Span> {
     let mut covs: Vec<_> = cov
         .uncovered_locations
         .iter()
-        .map(|loc| loc.span())
+        .map(|loc| Span::new(loc.start(), loc.end()))
         .collect();
     covs.sort();
 

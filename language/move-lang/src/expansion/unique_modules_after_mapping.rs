@@ -43,13 +43,12 @@ pub fn verify(
         if let Some(prev) = decl_locs.insert(mident_.clone(), compiled_mident) {
             let prev = &prev;
             let cur = &decl_locs[&mident_];
-            let (orig, duplicate) = if cur.loc.file() == prev.loc.file()
-                && cur.loc.span().start() > prev.loc.span().start()
-            {
-                (prev, cur)
-            } else {
-                (cur, prev)
-            };
+            let (orig, duplicate) =
+                if cur.loc.file() == prev.loc.file() && cur.loc.start() > prev.loc.start() {
+                    (prev, cur)
+                } else {
+                    (cur, prev)
+                };
 
             // Formatting here is a bit weird, but it is guaranteed that at least one of the
             // declarations (prev or cur) will have an address_name of Some(_)

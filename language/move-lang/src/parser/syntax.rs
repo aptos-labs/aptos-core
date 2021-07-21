@@ -1,7 +1,6 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use codespan::{ByteIndex, Span};
 use move_ir_types::location::*;
 
 use crate::{
@@ -9,8 +8,8 @@ use crate::{
     diagnostics::{Diagnostic, Diagnostics},
     parser::{ast::*, lexer::*},
     shared::*,
+    FileCommentMap, MatchedFileCommentMap,
 };
-use std::collections::BTreeMap;
 
 // In the informal grammar comments in this file, Comma<T> is shorthand for:
 //      (<T> ",")* <T>?
@@ -60,10 +59,7 @@ fn unexpected_token_error_(
 //**************************************************************************************************
 
 pub fn make_loc(file: &'static str, start: usize, end: usize) -> Loc {
-    Loc::new(
-        file,
-        Span::new(ByteIndex(start as u32), ByteIndex(end as u32)),
-    )
+    Loc::new(file, start as u32, end as u32)
 }
 
 fn current_token_loc(tokens: &Lexer) -> Loc {
@@ -911,7 +907,7 @@ fn parse_name_exp(tokens: &mut Lexer) -> Result<Exp_, Diagnostic> {
     // assume that the "<" is a boolean operator.
     let mut tys = None;
     let start_loc = tokens.start_loc();
-    if tokens.peek() == Tok::Less && start_loc == n.loc.span().end().to_usize() {
+    if tokens.peek() == Tok::Less && start_loc == n.loc.end() as usize {
         let loc = make_loc(tokens.file_name(), start_loc, start_loc);
         tys = parse_optional_type_args(tokens).map_err(|mut diag| {
             let msg = "Perhaps you need a blank space before this '<' operator?";
@@ -1148,7 +1144,7 @@ fn parse_binop_exp(tokens: &mut Lexer, lhs: Exp, min_prec: u32) -> Result<Exp, D
         };
         let sp_op = spanned(tokens.file_name(), op_start_loc, op_end_loc, op);
 
-        let start_loc = result.loc.span().start().to_usize();
+        let start_loc = result.loc.start() as usize;
         let end_loc = tokens.previous_end_loc();
         let e = Exp_::BinopExp(Box::new(result), sp_op, Box::new(rhs));
         result = spanned(tokens.file_name(), start_loc, end_loc, e);
@@ -2846,8 +2842,8 @@ fn parse_file(tokens: &mut Lexer) -> Result<Vec<Definition>, Diagnostic> {
 pub fn parse_file_string(
     file: &'static str,
     input: &str,
-    comment_map: BTreeMap<Span, String>,
-) -> Result<(Vec<Definition>, BTreeMap<ByteIndex, String>), Diagnostics> {
+    comment_map: FileCommentMap,
+) -> Result<(Vec<Definition>, MatchedFileCommentMap), Diagnostics> {
     let mut tokens = Lexer::new(input, file, comment_map);
     match tokens.advance() {
         Err(err) => Err(Diagnostics::from(vec![err])),

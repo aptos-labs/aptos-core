@@ -41,7 +41,7 @@ impl Context {
 
 pub fn decode(loc: Loc, text: &str) -> Result<Vec<u8>, Diagnostics> {
     let filename = loc.file();
-    let start_offset = loc.span().start().0 as usize;
+    let start_offset = loc.start() as usize;
     let mut context = Context::new(filename, start_offset);
     let mut buffer = vec![];
     let chars: Vec<_> = text.chars().collect();

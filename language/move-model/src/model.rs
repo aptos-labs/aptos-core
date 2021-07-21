@@ -520,7 +520,7 @@ impl GlobalEnv {
             )
         };
         let unknown_loc = fake_loc("<unknown>");
-        let unknown_move_ir_loc = MoveIrLoc::new("<unknown>", Span::default());
+        let unknown_move_ir_loc = MoveIrLoc::new("<unknown>", 0, 0);
         let internal_loc = fake_loc("<internal>");
         GlobalEnv {
             source_files,
@@ -739,7 +739,7 @@ impl GlobalEnv {
         });
         Loc {
             file_id,
-            span: loc.span(),
+            span: Span::new(loc.start(), loc.end()),
         }
     }
 

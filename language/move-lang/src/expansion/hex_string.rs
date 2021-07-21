@@ -9,7 +9,7 @@ pub fn decode(loc: Loc, s: &str) -> Result<Vec<u8>, Diagnostic> {
         Ok(vec) => Ok(vec),
         Err(hex::FromHexError::InvalidHexCharacter { c, index }) => {
             let filename = loc.file();
-            let start_offset = loc.span().start().0 as usize;
+            let start_offset = loc.start() as usize;
             let offset = start_offset + 2 + index;
             let loc = make_loc(filename, offset, offset);
             Err(diag!(

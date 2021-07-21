@@ -8,8 +8,6 @@ license = "Apache-2.0"
 
 [dependencies]
 anyhow = "1.0.38"
-codespan = "0.8.0"
-codespan-new = { package = "codespan", version = "0.11.1" }
 codespan-reporting = { package = "codespan-reporting", version = "0.11.1" }
 hex = "0.4.3"
 regex = "1.4.3"

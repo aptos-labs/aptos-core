@@ -2,14 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{diag, diagnostics::Diagnostics};
-use codespan::{ByteIndex, Span};
 use move_ir_types::location::*;
 use std::{collections::BTreeMap, iter::Peekable, str::Chars};
 
 /// Types to represent comments.
 pub type CommentMap = BTreeMap<&'static str, MatchedFileCommentMap>;
-pub type MatchedFileCommentMap = BTreeMap<ByteIndex, String>;
-pub type FileCommentMap = BTreeMap<Span, String>;
+pub type MatchedFileCommentMap = BTreeMap<u32, String>;
+pub type FileCommentMap = BTreeMap<(u32, u32), String>;
 
 /// Determine if a character is an allowed eye-visible (printable) character.
 ///
@@ -47,8 +46,7 @@ fn verify_string(fname: &'static str, string: &str) -> Result<(), Diagnostics> {
     {
         None => Ok(()),
         Some((idx, chr)) => {
-            let span = Span::new(ByteIndex(idx as u32), ByteIndex(idx as u32));
-            let loc = Loc::new(fname, span);
+            let loc = Loc::new(fname, idx as u32, idx as u32);
             let msg = format!(
                 "Invalid character '{}' found when reading file. Only ASCII printable characters, \
                  tabs (\\t), and line endings (\\n) are permitted.",
@@ -105,7 +103,7 @@ fn strip_comments(
         State::BlockComment if !content.starts_with('*') || content.starts_with("**") => {}
         State::LineComment if !content.starts_with('/') || content.starts_with("//") => {}
         _ => {
-            comment_map.insert(Span::new(start_pos, end_pos), content[1..].to_string());
+            comment_map.insert((start_pos, end_pos), content[1..].to_string());
         }
     };
 
@@ -218,8 +216,8 @@ fn strip_comments(
                 // try to point to last real character
                 pos -= 1;
             }
-            let loc = Loc::new(fname, Span::new(pos, pos));
-            let start_loc = Loc::new(fname, Span::new(comment_start_pos, comment_start_pos + 2));
+            let loc = Loc::new(fname, pos, pos);
+            let start_loc = Loc::new(fname, comment_start_pos, comment_start_pos + 2);
             let diag = diag!(
                 Syntax::InvalidDocComment,
                 (loc, "Unclosed block comment"),

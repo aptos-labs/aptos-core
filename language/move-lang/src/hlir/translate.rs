@@ -399,7 +399,12 @@ fn type_name(_context: &Context, sp!(loc, ntn_): N::TypeName) -> H::TypeName {
     use H::TypeName_ as HT;
     use N::TypeName_ as NT;
     let tn_ = match ntn_ {
-        NT::Multiple(_) => panic!("ICE type constraints failed {}:{}", loc.file(), loc.span()),
+        NT::Multiple(_) => panic!(
+            "ICE type constraints failed {}:{}-{}",
+            loc.file(),
+            loc.start(),
+            loc.end()
+        ),
         NT::Builtin(bt) => HT::Builtin(bt),
         NT::ModuleType(m, s) => HT::ModuleType(m, s),
     };
@@ -417,7 +422,12 @@ fn base_type(context: &Context, sp!(loc, nb_): N::Type) -> H::BaseType {
     use H::BaseType_ as HB;
     use N::Type_ as NT;
     let b_ = match nb_ {
-        NT::Var(_) => panic!("ICE tvar not expanded: {}:{}", loc.file(), loc.span()),
+        NT::Var(_) => panic!(
+            "ICE tvar not expanded: {}:{}-{}",
+            loc.file(),
+            loc.start(),
+            loc.end()
+        ),
         NT::Apply(None, n, tys) => {
             crate::shared::ast_debug::print_verbose(&NT::Apply(None, n, tys));
             panic!("ICE kind not expanded: {:#?}", loc)
@@ -427,7 +437,12 @@ fn base_type(context: &Context, sp!(loc, nb_): N::Type) -> H::BaseType {
         NT::UnresolvedError => HB::UnresolvedError,
         NT::Anything => HB::Unreachable,
         NT::Ref(_, _) | NT::Unit => {
-            panic!("ICE type constraints failed {}:{}", loc.file(), loc.span())
+            panic!(
+                "ICE type constraints failed {}:{}-{}",
+                loc.file(),
+                loc.start(),
+                loc.end()
+            )
         }
     };
     sp(loc, b_)
