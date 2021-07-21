@@ -112,7 +112,7 @@ impl EpochManager {
         let author = node_config.validator_network.as_ref().unwrap().peer_id();
         let config = node_config.consensus.clone();
         let sr_config = &node_config.consensus.safety_rules;
-        if sr_config.decoupled_execution != config.decoupled {
+        if sr_config.decoupled_execution != config.decoupled_execution {
             panic!("Inconsistent decoupled-execution configuration of consensus and safety-rules\nMake sure consensus.decoupled = safety_rules.decoupled_execution.")
         }
         let safety_rules_manager = SafetyRulesManager::new(sr_config);
@@ -425,7 +425,7 @@ impl EpochManager {
 
         let safety_rules_container = Arc::new(Mutex::new(safety_rules));
 
-        let mut processor = if self.config.decoupled {
+        let mut processor = if self.config.decoupled_execution {
             let (round_manager, execution_phase, commit_phase) = self.prepare_decoupled_execution(
                 epoch,
                 recovery_data,

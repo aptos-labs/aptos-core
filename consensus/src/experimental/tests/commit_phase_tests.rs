@@ -336,6 +336,48 @@ mod commit_phase_e2e_tests {
         });
     }
 
+    /// commit message retry test
+    #[test]
+    fn test_retry() {
+        let mut runtime = consensus_runtime();
+        let (
+            mut commit_tx,
+            _msg_tx,
+            _commit_result_rx,
+            mut self_loop_rx,
+            _safety_rules_container,
+            signers,
+            _state_computer,
+            _validator,
+            commit_phase,
+        ) = prepare_commit_phase();
+
+        runtime.spawn(commit_phase.start());
+
+        timed_block_on(&mut runtime, async move {
+            // send good commit arguments
+            commit_tx
+                .send(prepare_executed_blocks_with_ordered_ledger_info(
+                    &signers[0],
+                ))
+                .await
+                .ok();
+
+            // check the next two messages from the self loop channel
+            let commit_vote_msg = self_loop_rx.next().await.unwrap();
+            if let Event::Message(_, ConsensusMsg::CommitVoteMsg(request)) = commit_vote_msg {
+                let second_commit_vote_msg = self_loop_rx.next().await.unwrap();
+                if let Event::Message(_, ConsensusMsg::CommitVoteMsg(second_request)) =
+                    second_commit_vote_msg
+                {
+                    assert_eq!(request, second_request);
+                    return;
+                }
+            }
+            panic!("We expect only commit vote messages from the self loop channel in this test.");
+        });
+    }
+
     // [ Attention ]
     // These e2e tests below are end-to-end negative tests.
     // They might yield false negative results if now_or_never() is called

@@ -5,7 +5,7 @@ use crate::common::{Author, Round};
 use anyhow::Context;
 use diem_crypto::ed25519::Ed25519Signature;
 use diem_types::{
-    ledger_info::LedgerInfo, validator_signer::ValidatorSigner,
+    block_info::BlockInfo, ledger_info::LedgerInfo, validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
 };
 use serde::{Deserialize, Serialize};
@@ -90,5 +90,9 @@ impl CommitVote {
         validator
             .verify(self.author(), &self.ledger_info, &self.signature)
             .context("Failed to verify Commit Proposal")
+    }
+
+    pub fn commit_info(&self) -> &BlockInfo {
+        self.ledger_info().commit_info()
     }
 }

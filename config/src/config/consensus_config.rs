@@ -26,7 +26,7 @@ pub struct ConsensusConfig {
     pub mempool_poll_count: u64,
     // global switch for the decoupling execution feature
     // only when decoupled is true, the execution and committing will be pipelined in different phases
-    pub decoupled: bool,
+    pub decoupled_execution: bool,
     pub channel_size: usize,
     pub back_pressure_limit: u64,
 }
@@ -47,8 +47,8 @@ impl Default for ConsensusConfig {
             safety_rules: SafetyRulesConfig::default(),
             sync_only: false,
             mempool_poll_count: 1,
-            decoupled: false, // by default, we turn of the decoupling execution feature
-            channel_size: 30, // hard-coded
+            decoupled_execution: false, // by default, we turn of the decoupling execution feature
+            channel_size: 30,           // hard-coded
             back_pressure_limit: 1,
         }
     }

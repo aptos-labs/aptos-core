@@ -6,7 +6,7 @@ use crate::{
     network::NetworkSender, network_interface::ConsensusMsg, round_manager::VerifiedEvent,
     state_replication::StateComputer,
 };
-use channel::Receiver;
+use channel::{Receiver, Sender};
 use consensus_types::{
     common::Author,
     executed_block::ExecutedBlock,
@@ -24,12 +24,13 @@ use diem_types::{
     validator_verifier::{ValidatorVerifier, VerifyError},
 };
 use executor_types::Error as ExecutionError;
-use futures::{select, StreamExt};
+use futures::{select, SinkExt, StreamExt};
 use safety_rules::TSafetyRules;
 use std::{
     collections::BTreeMap,
     sync::{atomic::AtomicU64, Arc},
 };
+use tokio::time;
 
 /*
 Commit phase takes in the executed blocks from the execution
@@ -41,6 +42,8 @@ decision message together with the quorum of signatures. The commit
 decision message helps the slower nodes to quickly catch up without
 having to collect the signatures.
 */
+
+const COMMIT_PHASE_TIMEOUT_SEC: u64 = 1; // retry timeout in seconds
 
 #[derive(Clone)]
 pub struct PendingBlocks {
@@ -103,6 +106,8 @@ pub struct CommitPhase {
     author: Author,
     back_pressure: Arc<AtomicU64>,
     network_sender: NetworkSender,
+    timeout_event_tx: Sender<CommitVote>,
+    timeout_event_rx: Receiver<CommitVote>,
 }
 
 /// Wrapper for ExecutionProxy.commit
@@ -131,6 +136,22 @@ macro_rules! report_err {
     };
 }
 
+/// shortcut for sendng a message with a timeout retry event
+async fn broadcast_commit_vote_with_retry(
+    mut network_sender: NetworkSender,
+    cv: CommitVote,
+    mut notification: Sender<CommitVote>,
+) {
+    network_sender
+        .broadcast(ConsensusMsg::CommitVoteMsg(Box::new(cv.clone())))
+        .await;
+    time::sleep(time::Duration::from_secs(COMMIT_PHASE_TIMEOUT_SEC)).await;
+    report_err!(
+        notification.send(cv).await,
+        "Error in sending timeout events"
+    )
+}
+
 impl CommitPhase {
     pub fn new(
         commit_channel_recv: Receiver<(Vec<ExecutedBlock>, LedgerInfoWithSignatures)>,
@@ -142,6 +163,10 @@ impl CommitPhase {
         back_pressure: Arc<AtomicU64>,
         network_sender: NetworkSender,
     ) -> Self {
+        let (timeout_event_tx, timeout_event_rx) = channel::new::<CommitVote>(
+            2,
+            &counters::DECOUPLED_EXECUTION__COMMIT_MESSAGE_TIMEOUT_CHANNEL,
+        );
         Self {
             commit_channel_recv,
             execution_proxy,
@@ -152,6 +177,8 @@ impl CommitPhase {
             author,
             back_pressure,
             network_sender,
+            timeout_event_tx,
+            timeout_event_rx,
         }
     }
 
@@ -191,7 +218,7 @@ impl CommitPhase {
             let commit_ledger_info = commit_decision.ledger_info();
 
             // if the block infos do not match
-            if commit_ledger_info.ledger_info().commit_info() != pending_blocks.block_info() {
+            if commit_ledger_info.commit_info() != pending_blocks.block_info() {
                 return Err(Error::InconsistentBlockInfo(
                     commit_ledger_info.ledger_info().commit_info().clone(),
                     pending_blocks.block_info().clone(),
@@ -254,12 +281,8 @@ impl CommitPhase {
             .lock()
             .sign_commit_vote(ordered_ledger_info, commit_ledger_info.clone())?;
 
-        // if fails, it needs to resend, otherwise the liveness might compromise.
-        let msg = ConsensusMsg::CommitVoteMsg(Box::new(CommitVote::new_with_signature(
-            self.author,
-            commit_ledger_info.clone(),
-            signature,
-        )));
+        let commit_vote =
+            CommitVote::new_with_signature(self.author, commit_ledger_info.clone(), signature);
 
         let commit_ledger_info_with_sig = LedgerInfoWithSignatures::new(
             commit_ledger_info,
@@ -275,7 +298,12 @@ impl CommitPhase {
 
         // asynchronously broadcast the message.
         // note that this message will also reach the node itself
-        self.network_sender.broadcast(msg).await;
+        // if the message delivery fails, it needs to resend the message, or otherwise the liveness might compromise.
+        tokio::spawn(broadcast_commit_vote_with_retry(
+            self.network_sender.clone(),
+            commit_vote,
+            self.timeout_event_tx.clone(),
+        ));
 
         Ok(())
     }
@@ -317,7 +345,14 @@ impl CommitPhase {
                             }
                         };
                     }
-                    // TODO: add a timer to repeat sending commit votes in later PR
+                    retry_cv = self.timeout_event_rx.select_next_some() => {
+                        if let Some(ref pending_blocks) = self.blocks {
+                            if pending_blocks.block_info() == retry_cv.commit_info() {
+                                // retry broadcasting the message if the blocks are still pending
+                                tokio::spawn(broadcast_commit_vote_with_retry(self.network_sender.clone(), retry_cv, self.timeout_event_tx.clone()));
+                            }
+                        }
+                    }
                     complete => break,
                 }
                 report_err!(

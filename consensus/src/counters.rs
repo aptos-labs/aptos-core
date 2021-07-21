@@ -306,3 +306,13 @@ pub static DECOUPLED_EXECUTION__COMMIT_MESSAGE_CHANNEL: Lazy<IntGauge> = Lazy::n
     )
     .unwrap()
 });
+
+/// Counter for the decoupling execution channel of commit messages
+/// from commit phase to itself when a timeout triggers
+pub static DECOUPLED_EXECUTION__COMMIT_MESSAGE_TIMEOUT_CHANNEL: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "decoupled_execution__commit_message_timeout_channel",
+        "Number of pending commit phase message timeouts (CommitVote/CommitDecision)"
+    )
+    .unwrap()
+});

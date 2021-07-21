@@ -228,6 +228,10 @@ impl LedgerInfoWithV0 {
         &self.ledger_info
     }
 
+    pub fn commit_info(&self) -> &BlockInfo {
+        self.ledger_info.commit_info()
+    }
+
     pub fn add_signature(&mut self, validator: AccountAddress, signature: Ed25519Signature) {
         self.signatures.entry(validator).or_insert(signature);
     }
