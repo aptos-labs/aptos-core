@@ -47,6 +47,7 @@ use move_binary_format::{
         FunctionDefinitionIndex, FunctionHandleIndex, SignatureIndex, SignatureToken,
         StructDefinitionIndex, StructFieldInformation, StructHandleIndex, Visibility,
     },
+    normalized::Type as MType,
     views::{
         FieldDefinitionView, FunctionDefinitionView, FunctionHandleView, SignatureTokenView,
         StructDefinitionView, StructHandleView,
@@ -1287,19 +1288,20 @@ impl GlobalEnv {
         sid: StructId,
         ts: &[Type],
     ) -> Option<language_storage::StructTag> {
-        if ts.iter().any(|t| t.is_open()) {
-            None
-        } else {
-            let menv = self.get_module(mid);
-            Some(language_storage::StructTag {
-                address: *menv.self_address(),
-                module: menv.get_identifier(),
-                name: menv.get_struct(sid).get_identifier(),
-                type_params: ts
-                    .iter()
-                    .map(|t| t.clone().into_type_tag(self).unwrap())
-                    .collect(),
-            })
+        self.get_struct_type(mid, sid, ts).into_struct_tag()
+    }
+
+    /// Attempt to compute a struct type for (`mid`, `sid`, `ts`).
+    pub fn get_struct_type(&self, mid: ModuleId, sid: StructId, ts: &[Type]) -> MType {
+        let menv = self.get_module(mid);
+        MType::Struct {
+            address: *menv.self_address(),
+            module: menv.get_identifier(),
+            name: menv.get_struct(sid).get_identifier(),
+            type_arguments: ts
+                .iter()
+                .map(|t| t.clone().into_normalized_type(self).unwrap())
+                .collect(),
         }
     }
 

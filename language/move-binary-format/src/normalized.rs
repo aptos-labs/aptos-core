@@ -211,6 +211,13 @@ impl Type {
             return None;
         })
     }
+
+    pub fn into_struct_tag(self) -> Option<StructTag> {
+        match self.into_type_tag()? {
+            TypeTag::Struct(s) => Some(s),
+            _ => None,
+        }
+    }
 }
 
 impl Field {
