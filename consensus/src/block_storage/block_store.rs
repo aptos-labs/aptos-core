@@ -39,6 +39,12 @@ mod block_store_and_lec_recovery_test;
 #[path = "sync_manager.rs"]
 pub mod sync_manager;
 
+fn update_counters_for_ordered_blocks(ordered_blocks: &[Arc<ExecutedBlock>]) {
+    for block in ordered_blocks {
+        observe_block(block.block().timestamp_usecs(), BlockStage::ORDERED);
+    }
+}
+
 fn update_counters_for_committed_blocks(blocks_to_commit: &[Arc<ExecutedBlock>]) {
     for block in blocks_to_commit {
         observe_block(block.block().timestamp_usecs(), BlockStage::COMMITTED);
@@ -94,6 +100,40 @@ pub struct BlockStore {
     storage: Arc<dyn PersistentLivenessStorage>,
     /// Used to ensure that any block stored will have a timestamp < the local time
     time_service: Arc<dyn TimeService>,
+}
+
+pub fn update_counters_and_prune_blocks(
+    block_tree: Arc<RwLock<BlockTree>>,
+    storage: Arc<dyn PersistentLivenessStorage>,
+    root: Arc<ExecutedBlock>,
+    blocks_to_commit: &[Arc<ExecutedBlock>],
+) {
+    let block_to_commit = blocks_to_commit.last().unwrap().clone();
+    update_counters_for_committed_blocks(blocks_to_commit);
+    let current_round = root.round();
+    let committed_round = block_to_commit.round();
+    debug!(
+        LogSchema::new(LogEvent::CommitViaBlock).round(current_round),
+        committed_round = committed_round,
+        block_id = block_to_commit.id(),
+    );
+    event!("committed",
+        "block_id": block_to_commit.id().short_str(),
+        "epoch": block_to_commit.epoch(),
+        "round": committed_round,
+        "parent_id": block_to_commit.parent_id().short_str(),
+    );
+
+    let id_to_remove = block_tree.read().find_blocks_to_prune(block_to_commit.id());
+    if let Err(e) = storage.prune_tree(id_to_remove.clone().into_iter().collect()) {
+        // it's fine to fail here, as long as the commit succeeds, the next restart will clean
+        // up dangling blocks, and we need to prune the tree to keep the root consistent with
+        // executor.
+        error!(error = ?e, "fail to delete block");
+    }
+    block_tree
+        .write()
+        .update_commit_id_and_process_pruned_blocks(block_to_commit.id(), id_to_remove);
 }
 
 impl BlockStore {
@@ -215,25 +255,25 @@ impl BlockStore {
             .path_from_root(block_id_to_commit)
             .unwrap_or_else(Vec::new);
 
+        let block_tree = self.inner.clone();
+        let storage = self.storage.clone();
+        let root = self.root();
+
+        self.inner.write().update_root_id(block_to_commit.id());
+        update_counters_for_ordered_blocks(&blocks_to_commit);
+
+        // asynchronously execute and commit
         self.state_computer
-            .commit(&blocks_to_commit, finality_proof)
+            .commit(
+                &blocks_to_commit,
+                finality_proof,
+                Box::new(move |executed_blocks: &[Arc<ExecutedBlock>]| {
+                    update_counters_and_prune_blocks(block_tree, storage, root, &executed_blocks);
+                }),
+            )
             .await
             .expect("Failed to persist commit");
-        update_counters_for_committed_blocks(&blocks_to_commit);
-        let current_round = self.root().round();
-        let committed_round = block_to_commit.round();
-        debug!(
-            LogSchema::new(LogEvent::CommitViaBlock).round(current_round),
-            committed_round = committed_round,
-            block_id = block_to_commit.id(),
-        );
-        event!("committed",
-            "block_id": block_to_commit.id().short_str(),
-            "epoch": block_to_commit.epoch(),
-            "round": committed_round,
-            "parent_id": block_to_commit.parent_id().short_str(),
-        );
-        self.prune_tree(block_to_commit.id());
+
         Ok(())
     }
 
@@ -397,9 +437,12 @@ impl BlockStore {
             // executor.
             error!(error = ?e, "fail to delete block");
         }
+
+        // synchronously update both root_id and commit_root_id
         self.inner
             .write()
-            .process_pruned_blocks(next_root_id, id_to_remove.clone());
+            .update_root_id(next_root_id)
+            .update_commit_id_and_process_pruned_blocks(next_root_id, id_to_remove.clone());
         id_to_remove
     }
 }

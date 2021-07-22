@@ -60,8 +60,10 @@ impl LinkableBlock {
 pub struct BlockTree {
     /// All the blocks known to this replica (with parent links)
     id_to_block: HashMap<HashValue, LinkableBlock>,
-    /// Root of the tree.
+    /// Root of the tree. This is the root of ordering phase
     root_id: HashValue,
+    /// Commit Root id: this is the root of commit phase
+    commit_root_id: HashValue,
     /// A certified block id with highest round
     highest_certified_block_id: HashValue,
 
@@ -110,6 +112,7 @@ impl BlockTree {
         BlockTree {
             id_to_block,
             root_id,
+            commit_root_id: root_id,
             highest_certified_block_id: root_id,
             highest_quorum_cert: Arc::clone(&root_quorum_cert),
             highest_timeout_cert,
@@ -131,8 +134,10 @@ impl BlockTree {
     }
 
     // This method will only be used in this module.
+    // This method is used in pruning and length query,
+    // to reflect the actual root, we use commit root
     fn linkable_root(&self) -> &LinkableBlock {
-        self.get_linkable_block(&self.root_id)
+        self.get_linkable_block(&self.commit_root_id)
             .expect("Root must exist")
     }
 
@@ -259,8 +264,8 @@ impl BlockTree {
     ///
     /// Note this function is read-only, use with process_pruned_blocks to do the actual prune.
     pub(super) fn find_blocks_to_prune(&self, next_root_id: HashValue) -> VecDeque<HashValue> {
-        // Nothing to do if this is the root
-        if next_root_id == self.root_id {
+        // Nothing to do if this is the commit root
+        if next_root_id == self.commit_root_id {
             return VecDeque::new();
         }
 
@@ -284,19 +289,24 @@ impl BlockTree {
         blocks_pruned
     }
 
+    pub(super) fn update_root_id(&mut self, root_id: HashValue) -> &mut Self {
+        assert!(self.block_exists(&root_id));
+        // Update the next root
+        self.root_id = root_id;
+        self
+    }
+
     /// Process the data returned by the prune_tree, they're separated because caller might
     /// be interested in doing extra work e.g. delete from persistent storage.
     /// Note that we do not necessarily remove the pruned blocks: they're kept in a separate buffer
     /// for some time in order to enable other peers to retrieve the blocks even after they've
     /// been committed.
-    pub(super) fn process_pruned_blocks(
+    pub(super) fn update_commit_id_and_process_pruned_blocks(
         &mut self,
-        root_id: HashValue,
+        next_root_id: HashValue,
         mut newly_pruned_blocks: VecDeque<HashValue>,
     ) {
-        assert!(self.block_exists(&root_id));
-        // Update the next root
-        self.root_id = root_id;
+        self.commit_root_id = next_root_id;
         counters::NUM_BLOCKS_IN_TREE.sub(newly_pruned_blocks.len() as i64);
         // The newly pruned blocks are pushed back to the deque pruned_block_ids.
         // In case the overall number of the elements is greater than the predefined threshold,

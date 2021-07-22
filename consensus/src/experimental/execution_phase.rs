@@ -1,7 +1,10 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::state_replication::StateComputer;
+use crate::{
+    experimental::commit_phase::CommitChannelType,
+    state_replication::{StateComputer, StateComputerCommitCallBackType},
+};
 use channel::{Receiver, Sender};
 use consensus_types::{block::Block, executed_block::ExecutedBlock};
 use diem_types::ledger_info::LedgerInfoWithSignatures;
@@ -13,17 +16,25 @@ use std::sync::Arc;
 /// ExecutionPhase is a singleton that receives ordered blocks from
 /// the ordering state computer and execute them. After the execution is done,
 /// ExecutionPhase sends the ordered blocks to the commit phase.
+///
+
+pub type ExecutionChannelType = (
+    Vec<Block>,
+    LedgerInfoWithSignatures,
+    StateComputerCommitCallBackType,
+);
+
 pub struct ExecutionPhase {
-    executor_channel_recv: Receiver<(Vec<Block>, LedgerInfoWithSignatures)>,
+    executor_channel_recv: Receiver<ExecutionChannelType>,
     execution_proxy: Arc<dyn StateComputer>,
-    commit_channel_send: Sender<(Vec<ExecutedBlock>, LedgerInfoWithSignatures)>,
+    commit_channel_send: Sender<CommitChannelType>,
 }
 
 impl ExecutionPhase {
     pub fn new(
-        executor_channel_recv: Receiver<(Vec<Block>, LedgerInfoWithSignatures)>,
+        executor_channel_recv: Receiver<ExecutionChannelType>,
         execution_proxy: Arc<dyn StateComputer>,
-        commit_channel_send: Sender<(Vec<ExecutedBlock>, LedgerInfoWithSignatures)>,
+        commit_channel_send: Sender<CommitChannelType>,
     ) -> Self {
         Self {
             executor_channel_recv,
@@ -34,7 +45,8 @@ impl ExecutionPhase {
 
     pub async fn start(mut self) {
         // main loop
-        while let Some((vecblock, ledger_info)) = self.executor_channel_recv.next().await {
+        while let Some((vecblock, ledger_info, callback)) = self.executor_channel_recv.next().await
+        {
             // execute the blocks with execution_correctness_client
             let executed_blocks: Vec<ExecutedBlock> = vecblock
                 .into_iter()
@@ -48,7 +60,7 @@ impl ExecutionPhase {
 
             // pass the executed blocks into the commit phase
             self.commit_channel_send
-                .send((executed_blocks, ledger_info))
+                .send((executed_blocks, ledger_info, callback))
                 .await
                 .map_err(|e| ExecutionError::InternalError {
                     error: e.to_string(),

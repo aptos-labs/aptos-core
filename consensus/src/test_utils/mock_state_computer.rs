@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    error::StateSyncError, state_replication::StateComputer, test_utils::mock_storage::MockStorage,
+    error::StateSyncError,
+    state_replication::{StateComputer, StateComputerCommitCallBackType},
+    test_utils::mock_storage::MockStorage,
 };
 use anyhow::{format_err, Result};
 use consensus_types::{block::Block, common::Payload, executed_block::ExecutedBlock};
@@ -55,6 +57,7 @@ impl StateComputer for MockStateComputer {
         &self,
         blocks: &[Arc<ExecutedBlock>],
         commit: LedgerInfoWithSignatures,
+        call_back: StateComputerCommitCallBackType,
     ) -> Result<(), Error> {
         self.consensus_db
             .commit_to_storage(commit.ledger_info().clone());
@@ -73,6 +76,9 @@ impl StateComputer for MockStateComputer {
         let _ = self.state_sync_client.unbounded_send(txns);
 
         let _ = self.commit_callback.unbounded_send(commit);
+
+        call_back(blocks);
+
         Ok(())
     }
 
@@ -108,6 +114,7 @@ impl StateComputer for EmptyStateComputer {
         &self,
         _blocks: &[Arc<ExecutedBlock>],
         _commit: LedgerInfoWithSignatures,
+        _call_back: StateComputerCommitCallBackType,
     ) -> Result<(), Error> {
         Ok(())
     }
@@ -149,6 +156,7 @@ impl StateComputer for RandomComputeResultStateComputer {
         &self,
         _blocks: &[Arc<ExecutedBlock>],
         _commit: LedgerInfoWithSignatures,
+        _call_back: StateComputerCommitCallBackType,
     ) -> Result<(), Error> {
         Ok(())
     }

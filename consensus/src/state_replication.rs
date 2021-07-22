@@ -9,6 +9,11 @@ use diem_types::ledger_info::LedgerInfoWithSignatures;
 use executor_types::{Error as ExecutionError, StateComputeResult};
 use std::sync::Arc;
 
+pub type StateComputerCommitCallBackType = Box<dyn FnOnce(&[Arc<ExecutedBlock>]) + Send + Sync>;
+pub fn empty_state_computer_call_back() -> StateComputerCommitCallBackType {
+    Box::new(|_| {})
+}
+
 /// Retrieves and updates the status of transactions on demand (e.g., via talking with Mempool)
 #[async_trait::async_trait]
 pub trait TxnManager: Send + Sync {
@@ -54,6 +59,7 @@ pub trait StateComputer: Send + Sync {
         &self,
         blocks: &[Arc<ExecutedBlock>],
         finality_proof: LedgerInfoWithSignatures,
+        callback: StateComputerCommitCallBackType,
     ) -> Result<(), ExecutionError>;
 
     /// Best effort state synchronization to the given target LedgerInfo.

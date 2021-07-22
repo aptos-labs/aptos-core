@@ -1,7 +1,10 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{error::StateSyncError, state_replication::StateComputer};
+use crate::{
+    error::StateSyncError, experimental::execution_phase::ExecutionChannelType,
+    state_replication::StateComputer,
+};
 use anyhow::Result;
 use channel::Sender;
 use consensus_types::{block::Block, executed_block::ExecutedBlock};
@@ -12,17 +15,19 @@ use fail::fail_point;
 use futures::SinkExt;
 use std::{boxed::Box, sync::Arc};
 
+use crate::state_replication::StateComputerCommitCallBackType;
+
 /// Ordering-only execution proxy
 /// implements StateComputer traits.
 /// Used only when node_config.validator.consensus.decoupled = true.
 pub struct OrderingStateComputer {
     // the channel to pour vectors of blocks into
     // the real execution phase (will be handled in ExecutionPhase).
-    executor_channel: Sender<(Vec<Block>, LedgerInfoWithSignatures)>,
+    executor_channel: Sender<ExecutionChannelType>,
 }
 
 impl OrderingStateComputer {
-    pub fn new(executor_channel: Sender<(Vec<Block>, LedgerInfoWithSignatures)>) -> Self {
+    pub fn new(executor_channel: Sender<ExecutionChannelType>) -> Self {
         Self { executor_channel }
     }
 }
@@ -49,12 +54,13 @@ impl StateComputer for OrderingStateComputer {
         &self,
         blocks: &[Arc<ExecutedBlock>],
         finality_proof: LedgerInfoWithSignatures,
+        callback: StateComputerCommitCallBackType,
     ) -> Result<(), ExecutionError> {
         let ordered_block = blocks.iter().map(|b| b.block().clone()).collect();
 
         self.executor_channel
             .clone()
-            .send((ordered_block, finality_proof))
+            .send((ordered_block, finality_proof, callback))
             .await
             .map_err(|e| ExecutionError::InternalError {
                 error: e.to_string(),

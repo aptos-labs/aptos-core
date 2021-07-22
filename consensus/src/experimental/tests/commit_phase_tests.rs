@@ -1,26 +1,16 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    experimental::commit_phase::CommitPhase,
-    network::NetworkSender,
-    test_utils::{consensus_runtime, MockStorage},
-};
-use channel::message_queues::QueueStyle;
+use crate::{experimental::commit_phase::CommitPhase, test_utils::consensus_runtime};
+
 use consensus_types::executed_block::ExecutedBlock;
 use diem_logger::debug;
-use diem_types::{
-    epoch_state::EpochState,
-    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-};
-use network::peer_manager::{ConnectionRequestSender, PeerManagerRequestSender};
-use std::sync::{atomic::AtomicU64, Arc};
+use diem_types::ledger_info::{LedgerInfo, LedgerInfoWithSignatures};
 
-use crate::{
-    metrics_safety_rules::MetricsSafetyRules,
-    network_interface::{ConsensusMsg, ConsensusNetworkSender},
-};
-use channel::{diem_channel, Receiver, Sender};
+use std::sync::Arc;
+
+use crate::{metrics_safety_rules::MetricsSafetyRules, network_interface::ConsensusMsg};
+use channel::{Receiver, Sender};
 use diem_infallible::Mutex;
 use futures::{SinkExt, StreamExt};
 
@@ -28,183 +18,54 @@ use crate::{
     experimental::ordering_state_computer::OrderingStateComputer, state_replication::StateComputer,
 };
 use consensus_types::block::{block_test_utils::certificate_for_genesis, Block};
-use diem_crypto::{
-    ed25519::{Ed25519PrivateKey, Ed25519Signature},
-    hash::{HashValue, ACCUMULATOR_PLACEHOLDER_HASH},
-    Uniform,
-};
-use diem_secure_storage::Storage;
+use diem_crypto::{ed25519::Ed25519Signature, hash::ACCUMULATOR_PLACEHOLDER_HASH};
+
 use diem_types::{
-    account_address::AccountAddress,
-    validator_signer::ValidatorSigner,
-    validator_verifier::{random_validator_verifier, ValidatorVerifier},
-    waypoint::Waypoint,
+    account_address::AccountAddress, validator_signer::ValidatorSigner,
+    validator_verifier::ValidatorVerifier,
 };
 use futures::future::FutureExt;
-use network::protocols::network::{Event, NewNetworkSender};
-use safety_rules::{PersistentSafetyStorage, SafetyRulesManager};
+use network::protocols::network::Event;
+
 use std::collections::BTreeMap;
 
-use crate::test_utils::timed_block_on;
+use crate::test_utils::{timed_block_on, EmptyStateComputer};
 use consensus_types::experimental::{commit_decision::CommitDecision, commit_vote::CommitVote};
 use diem_types::block_info::BlockInfo;
 
 use crate::{
-    experimental::{commit_phase::PendingBlocks, errors::Error},
+    block_storage::BlockStore,
+    experimental::{
+        commit_phase::{CommitChannelType, PendingBlocks},
+        errors::Error,
+        execution_phase::ExecutionChannelType,
+    },
     round_manager::VerifiedEvent,
+    state_replication::empty_state_computer_call_back,
 };
-use executor_types::StateComputeResult;
 
-fn prepare_commit_phase() -> (
-    Sender<(Vec<ExecutedBlock>, LedgerInfoWithSignatures)>,
+use crate::experimental::tests::test_utils::{
+    prepare_commit_phase_with_block_store_state_computer,
+    prepare_executed_blocks_with_executed_ledger_info,
+    prepare_executed_blocks_with_ordered_ledger_info,
+};
+use tokio::runtime::Runtime;
+
+pub fn prepare_commit_phase(
+    runtime: &Runtime,
+) -> (
+    Sender<CommitChannelType>,
     Sender<VerifiedEvent>,
-    Receiver<(Vec<Block>, LedgerInfoWithSignatures)>,
+    Receiver<ExecutionChannelType>,
     Receiver<Event<ConsensusMsg>>,
     Arc<Mutex<MetricsSafetyRules>>,
     Vec<ValidatorSigner>,
     Arc<OrderingStateComputer>,
     ValidatorVerifier,
     CommitPhase,
+    Arc<BlockStore>,
 ) {
-    let num_nodes = 1;
-
-    // constants
-    let channel_size = 30;
-    let back_pressure = Arc::new(AtomicU64::new(0));
-
-    // environment setup
-    let (signers, validators) = random_validator_verifier(num_nodes, None, false);
-    let validator_set = (&validators).into();
-    let signer = &signers[0];
-
-    let waypoint =
-        Waypoint::new_epoch_boundary(&LedgerInfo::mock_genesis(Some(validator_set))).unwrap();
-
-    let safety_storage = PersistentSafetyStorage::initialize(
-        Storage::from(diem_secure_storage::InMemoryStorage::new()),
-        signer.author(),
-        signer.private_key().clone(),
-        Ed25519PrivateKey::generate_for_testing(),
-        waypoint,
-        true,
-    );
-    let safety_rules_manager = SafetyRulesManager::new_local(safety_storage, false, false, true);
-
-    let (_initial_data, storage) = MockStorage::start_for_testing((&validators).into());
-    let epoch_state = EpochState {
-        epoch: 1,
-        verifier: storage.get_validator_set().into(),
-    };
-    let validators = epoch_state.verifier.clone();
-    let (network_reqs_tx, _network_reqs_rx) = diem_channel::new(QueueStyle::FIFO, 8, None);
-    let (connection_reqs_tx, _) = diem_channel::new(QueueStyle::FIFO, 8, None);
-
-    let network_sender = ConsensusNetworkSender::new(
-        PeerManagerRequestSender::new(network_reqs_tx),
-        ConnectionRequestSender::new(connection_reqs_tx),
-    );
-    let author = signer.author();
-
-    let (self_loop_tx, self_loop_rx) = channel::new_test(1000);
-    let network = NetworkSender::new(author, network_sender, self_loop_tx, validators);
-
-    let (commit_result_tx, commit_result_rx) =
-        channel::new_test::<(Vec<Block>, LedgerInfoWithSignatures)>(channel_size);
-    let state_computer = Arc::new(OrderingStateComputer::new(commit_result_tx));
-
-    let mut safety_rules = MetricsSafetyRules::new(safety_rules_manager.client(), storage);
-    safety_rules.perform_initialize().unwrap();
-
-    let safety_rules_container = Arc::new(Mutex::new(safety_rules));
-
-    // setting up channels
-    let (commit_tx, commit_rx) =
-        channel::new_test::<(Vec<ExecutedBlock>, LedgerInfoWithSignatures)>(channel_size);
-
-    let (msg_tx, msg_rx) = channel::new_test::<VerifiedEvent>(channel_size);
-
-    let commit_phase = CommitPhase::new(
-        commit_rx,
-        state_computer.clone(),
-        msg_rx,
-        epoch_state.verifier.clone(),
-        safety_rules_container.clone(),
-        author,
-        back_pressure,
-        network,
-    );
-
-    (
-        commit_tx,        // channel to pass executed blocks into the commit phase
-        msg_tx,           // channel to pass commit messages into the commit phase
-        commit_result_rx, // channel to receive commit result from the commit phase
-        self_loop_rx,     // channel to receive message from the commit phase itself
-        safety_rules_container,
-        signers,
-        state_computer,
-        epoch_state.verifier,
-        commit_phase,
-    )
-}
-
-fn prepare_executed_blocks_with_ledger_info(
-    signer: &ValidatorSigner,
-    executed_hash: HashValue,
-    consensus_hash: HashValue,
-) -> (Vec<ExecutedBlock>, LedgerInfoWithSignatures) {
-    let genesis_qc = certificate_for_genesis();
-    let block = Block::new_proposal(vec![], 1, 1, genesis_qc, signer);
-    let compute_result = StateComputeResult::new(
-        executed_hash,
-        vec![], // dummy subtree
-        0,
-        vec![],
-        0,
-        None,
-        vec![],
-        vec![],
-        vec![],
-    );
-
-    let li = LedgerInfo::new(
-        block.gen_block_info(
-            compute_result.root_hash(),
-            compute_result.version(),
-            compute_result.epoch_state().clone(),
-        ),
-        consensus_hash,
-    );
-
-    let mut li_sig = LedgerInfoWithSignatures::new(
-        li.clone(),
-        BTreeMap::<AccountAddress, Ed25519Signature>::new(),
-    );
-
-    li_sig.add_signature(signer.author(), signer.sign(&li));
-
-    let executed_block = ExecutedBlock::new(block, compute_result);
-
-    (vec![executed_block], li_sig)
-}
-
-fn prepare_executed_blocks_with_executed_ledger_info(
-    signer: &ValidatorSigner,
-) -> (Vec<ExecutedBlock>, LedgerInfoWithSignatures) {
-    prepare_executed_blocks_with_ledger_info(
-        signer,
-        HashValue::random(),
-        HashValue::from_u64(0xbeef),
-    )
-}
-
-fn prepare_executed_blocks_with_ordered_ledger_info(
-    signer: &ValidatorSigner,
-) -> (Vec<ExecutedBlock>, LedgerInfoWithSignatures) {
-    prepare_executed_blocks_with_ledger_info(
-        signer,
-        *ACCUMULATOR_PLACEHOLDER_HASH,
-        *ACCUMULATOR_PLACEHOLDER_HASH,
-    )
+    prepare_commit_phase_with_block_store_state_computer(runtime, Arc::new(EmptyStateComputer), 30)
 }
 
 fn generate_random_commit_vote(signer: &ValidatorSigner) -> CommitVote {
@@ -244,16 +105,17 @@ mod commit_phase_e2e_tests {
             _state_computer,
             validator,
             commit_phase,
-        ) = prepare_commit_phase();
+            _block_store,
+        ) = prepare_commit_phase(&runtime);
+
+        let (vecblocks, li_sig) = prepare_executed_blocks_with_ordered_ledger_info(&signers[0]);
 
         runtime.spawn(commit_phase.start());
 
         timed_block_on(&mut runtime, async move {
             // send good commit arguments
             commit_tx
-                .send(prepare_executed_blocks_with_ordered_ledger_info(
-                    &signers[0],
-                ))
+                .send((vecblocks, li_sig, empty_state_computer_call_back()))
                 .await
                 .ok();
 
@@ -269,7 +131,7 @@ mod commit_phase_e2e_tests {
             };
 
             // it commits the block
-            assert!(matches!(commit_result_rx.next().await, Some((_, _)),));
+            assert!(commit_result_rx.next().await.is_some());
             // and it sends a commit decision
             assert!(matches!(
                 self_loop_rx.next().await,
@@ -292,16 +154,17 @@ mod commit_phase_e2e_tests {
             _state_computer,
             _validator,
             commit_phase,
-        ) = prepare_commit_phase();
+            _block_store,
+        ) = prepare_commit_phase(&runtime);
+
+        let (vecblocks, li_sig) = prepare_executed_blocks_with_ordered_ledger_info(&signers[0]);
 
         runtime.spawn(commit_phase.start());
 
         timed_block_on(&mut runtime, async move {
             // send good commit arguments
             commit_tx
-                .send(prepare_executed_blocks_with_ordered_ledger_info(
-                    &signers[0],
-                ))
+                .send((vecblocks, li_sig, empty_state_computer_call_back()))
                 .await
                 .ok();
 
@@ -350,16 +213,17 @@ mod commit_phase_e2e_tests {
             _state_computer,
             _validator,
             commit_phase,
-        ) = prepare_commit_phase();
+            _block_store,
+        ) = prepare_commit_phase(&runtime);
+
+        let (vecblocks, li_sig) = prepare_executed_blocks_with_ordered_ledger_info(&signers[0]);
 
         runtime.spawn(commit_phase.start());
 
         timed_block_on(&mut runtime, async move {
             // send good commit arguments
             commit_tx
-                .send(prepare_executed_blocks_with_ordered_ledger_info(
-                    &signers[0],
-                ))
+                .send((vecblocks, li_sig, empty_state_computer_call_back()))
                 .await
                 .ok();
 
@@ -397,17 +261,18 @@ mod commit_phase_e2e_tests {
             state_computer,
             _validator,
             commit_phase,
-        ) = prepare_commit_phase();
+            _block_store,
+        ) = prepare_commit_phase(&runtime);
+
+        let genesis_qc = certificate_for_genesis();
+        let block = Block::new_proposal(vec![], 1, 1, genesis_qc, signers.first().unwrap());
+        let compute_result = state_computer
+            .compute(&block, *ACCUMULATOR_PLACEHOLDER_HASH)
+            .unwrap();
 
         runtime.spawn(commit_phase.start());
 
         timed_block_on(&mut runtime, async move {
-            let genesis_qc = certificate_for_genesis();
-            let block = Block::new_proposal(vec![], 1, 1, genesis_qc, signers.first().unwrap());
-            let compute_result = state_computer
-                .compute(&block, *ACCUMULATOR_PLACEHOLDER_HASH)
-                .unwrap();
-
             // bad blocks
             commit_tx
                 .send((
@@ -419,6 +284,7 @@ mod commit_phase_e2e_tests {
                         ),
                         BTreeMap::<AccountAddress, Ed25519Signature>::new(),
                     ),
+                    empty_state_computer_call_back(),
                 ))
                 .await
                 .ok();
@@ -446,16 +312,17 @@ mod commit_phase_e2e_tests {
             _state_computer,
             _validator,
             commit_phase,
-        ) = prepare_commit_phase();
+            _block_store,
+        ) = prepare_commit_phase(&runtime);
+
+        let (vecblocks, li_sig) = prepare_executed_blocks_with_ordered_ledger_info(&signers[0]);
 
         runtime.spawn(commit_phase.start());
 
         timed_block_on(&mut runtime, async move {
             // send good commit arguments
             commit_tx
-                .send(prepare_executed_blocks_with_ordered_ledger_info(
-                    &signers[0],
-                ))
+                .send((vecblocks, li_sig, empty_state_computer_call_back()))
                 .await
                 .ok();
 
@@ -492,14 +359,19 @@ mod commit_phase_e2e_tests {
             _state_computer,
             _validator,
             commit_phase,
-        ) = prepare_commit_phase();
+            _block_store,
+        ) = prepare_commit_phase(&runtime);
+
+        let (vecblocks, li_sig) = prepare_executed_blocks_with_ordered_ledger_info(&signers[0]);
 
         runtime.spawn(commit_phase.start());
 
         timed_block_on(&mut runtime, async move {
             // send good commit arguments
-            let (vecblocks, li_sig) = prepare_executed_blocks_with_ordered_ledger_info(&signers[0]);
-            commit_tx.send((vecblocks, li_sig)).await.ok();
+            commit_tx
+                .send((vecblocks, li_sig, empty_state_computer_call_back()))
+                .await
+                .ok();
 
             let (_, li_sig_prime) = prepare_executed_blocks_with_ordered_ledger_info(&signers[0]);
 
@@ -527,6 +399,8 @@ mod commit_phase_e2e_tests {
 
 mod commit_phase_function_tests {
     use super::*;
+    use crate::experimental::tests::test_utils::new_executed_ledger_info_with_empty_signature;
+
     /// negative tests for commit_phase.process_commit_vote
     #[test]
     fn test_commit_phase_process_commit_vote() {
@@ -541,14 +415,19 @@ mod commit_phase_function_tests {
             _state_computer,
             _validator,
             mut commit_phase,
-        ) = prepare_commit_phase();
+            _block_store,
+        ) = prepare_commit_phase(&runtime);
 
         timed_block_on(&mut runtime, async move {
             let signer = &signers[0];
 
             let (vecblocks, li_sig) = prepare_executed_blocks_with_executed_ledger_info(signer);
 
-            commit_phase.set_blocks(Some(PendingBlocks::new(vecblocks, li_sig)));
+            commit_phase.set_blocks(Some(PendingBlocks::new(
+                vecblocks,
+                li_sig,
+                empty_state_computer_call_back(),
+            )));
 
             let random_commit_vote = generate_random_commit_vote(signer);
 
@@ -572,14 +451,19 @@ mod commit_phase_function_tests {
             _state_computer,
             _validator,
             mut commit_phase,
-        ) = prepare_commit_phase();
+            _block_store,
+        ) = prepare_commit_phase(&runtime);
 
         timed_block_on(&mut runtime, async move {
             let signer = &signers[0];
 
             let (vecblocks, li_sig) = prepare_executed_blocks_with_executed_ledger_info(signer);
 
-            commit_phase.set_blocks(Some(PendingBlocks::new(vecblocks, li_sig)));
+            commit_phase.set_blocks(Some(PendingBlocks::new(
+                vecblocks,
+                li_sig,
+                empty_state_computer_call_back(),
+            )));
 
             let random_commit_decision = generate_random_commit_decision(signer);
 
@@ -605,7 +489,8 @@ mod commit_phase_function_tests {
             _state_computer,
             _validator,
             mut commit_phase,
-        ) = prepare_commit_phase();
+            _block_store,
+        ) = prepare_commit_phase(&runtime);
 
         timed_block_on(&mut runtime, async move {
             let signer = &signers[0];
@@ -619,7 +504,11 @@ mod commit_phase_function_tests {
 
             assert!(commit_phase.blocks().is_none());
 
-            commit_phase.set_blocks(Some(PendingBlocks::new(vecblocks.clone(), li_sig.clone())));
+            commit_phase.set_blocks(Some(PendingBlocks::new(
+                vecblocks.clone(),
+                li_sig.clone(),
+                empty_state_computer_call_back(),
+            )));
 
             // when blocks is good
             commit_phase.check_commit().await.ok();
@@ -629,14 +518,16 @@ mod commit_phase_function_tests {
             assert_eq!(commit_phase.load_back_pressure(), 1);
 
             // when block contains bad signatures
-            let ledger_info_with_no_sig = LedgerInfoWithSignatures::new(
-                LedgerInfo::new(
-                    vecblocks.last().unwrap().block_info(),
-                    li_sig.ledger_info().consensus_data_hash(),
-                ),
-                BTreeMap::<AccountAddress, Ed25519Signature>::new(), //empty
+            let ledger_info_with_no_sig = new_executed_ledger_info_with_empty_signature(
+                vecblocks.last().unwrap().block_info(),
+                li_sig.ledger_info(),
             );
-            commit_phase.set_blocks(Some(PendingBlocks::new(vecblocks, ledger_info_with_no_sig)));
+
+            commit_phase.set_blocks(Some(PendingBlocks::new(
+                vecblocks,
+                ledger_info_with_no_sig,
+                empty_state_computer_call_back(),
+            )));
             commit_phase.check_commit().await.ok();
 
             // the block should be there
@@ -657,25 +548,27 @@ mod commit_phase_function_tests {
             _state_computer,
             _validator,
             mut commit_phase,
-        ) = prepare_commit_phase();
+            _block_store,
+        ) = prepare_commit_phase(&runtime);
 
         timed_block_on(&mut runtime, async move {
             let _signer = &signers[0];
 
             let (vecblocks, li_sig) = prepare_executed_blocks_with_ordered_ledger_info(&signers[0]);
 
-            let ledger_info_with_no_sig = LedgerInfoWithSignatures::new(
-                LedgerInfo::new(
-                    vecblocks.last().unwrap().block_info(),
-                    li_sig.ledger_info().consensus_data_hash(),
-                ),
-                BTreeMap::<AccountAddress, Ed25519Signature>::new(), //empty
+            let ledger_info_with_no_sig = new_executed_ledger_info_with_empty_signature(
+                vecblocks.last().unwrap().block_info(),
+                li_sig.ledger_info(),
             );
 
             // no signatures
             assert!(matches!(
                 commit_phase
-                    .process_executed_blocks(vecblocks, ledger_info_with_no_sig)
+                    .process_executed_blocks(
+                        vecblocks,
+                        ledger_info_with_no_sig,
+                        empty_state_computer_call_back()
+                    )
                     .await,
                 Err(_),
             ));

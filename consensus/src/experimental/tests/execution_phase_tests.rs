@@ -4,10 +4,14 @@
 use crate::experimental::{
     execution_phase::ExecutionPhase, tests::ordering_state_computer_tests::random_empty_block,
 };
-use consensus_types::{block::Block, executed_block::ExecutedBlock};
+
 use diem_types::ledger_info::{LedgerInfo, LedgerInfoWithSignatures};
 
-use crate::test_utils::{consensus_runtime, timed_block_on, RandomComputeResultStateComputer};
+use crate::{
+    experimental::{commit_phase::CommitChannelType, execution_phase::ExecutionChannelType},
+    state_replication::empty_state_computer_call_back,
+    test_utils::{consensus_runtime, timed_block_on, RandomComputeResultStateComputer},
+};
 use consensus_types::block::block_test_utils::certificate_for_genesis;
 use diem_crypto::{ed25519::Ed25519Signature, hash::ACCUMULATOR_PLACEHOLDER_HASH};
 use diem_types::{account_address::AccountAddress, validator_verifier::random_validator_verifier};
@@ -22,10 +26,10 @@ fn test_execution_phase() {
     let mut runtime = consensus_runtime();
 
     let (mut execution_phase_tx, execution_phase_rx) =
-        channel::new_test::<(Vec<Block>, LedgerInfoWithSignatures)>(channel_size);
+        channel::new_test::<ExecutionChannelType>(channel_size);
 
     let (commit_phase_tx, mut commit_phase_rx) =
-        channel::new_test::<(Vec<ExecutedBlock>, LedgerInfoWithSignatures)>(channel_size);
+        channel::new_test::<CommitChannelType>(channel_size);
 
     let random_state_computer = RandomComputeResultStateComputer::new();
     let random_execute_result_root_hash = random_state_computer.get_root_hash();
@@ -60,8 +64,11 @@ fn test_execution_phase() {
     let blocks = vec![block.clone()];
 
     timed_block_on(&mut runtime, async move {
-        execution_phase_tx.send((blocks, li_sig.clone())).await.ok();
-        let (executed_blocks, executed_finality_proof) = commit_phase_rx.next().await.unwrap();
+        execution_phase_tx
+            .send((blocks, li_sig.clone(), empty_state_computer_call_back()))
+            .await
+            .ok();
+        let (executed_blocks, executed_finality_proof, _) = commit_phase_rx.next().await.unwrap();
         assert_eq!(executed_blocks.len(), 1);
         assert_eq!(
             executed_blocks[0].compute_result(),

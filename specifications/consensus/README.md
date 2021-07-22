@@ -516,12 +516,13 @@ fn compute(block: Block) -> BlockInfo;
 * return the executed result i.e. BlockInfo which captures the root hash of the new merkle tree and the `next_epoch_state`
 
 ```rust
-fn commit(blocks: Vec<Block>, finality_proof: LedgerInfoWithSignatures);
+fn commit(blocks: Vec<Block>, finality_proof: LedgerInfoWithSignatures, callback: StateComputerCommitCallBackType);
 ```
 
 * ensure `finality_proof.commit_info()` match the last block in `blocks` and its executed result
 * ensure the `blocks` form a chain and the parent of the first is the current committed block
 * commit and persist `blocks` and the proof `finality_proof`
+* finally, call `callback()`
 
 ```rust
 fn sync_to(target: LedgerInfoWithSignatures);

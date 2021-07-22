@@ -14,7 +14,11 @@ use diem_types::{
 use executor_types::StateComputeResult;
 use std::sync::Arc;
 
-use crate::test_utils::{consensus_runtime, timed_block_on};
+use crate::{
+    experimental::execution_phase::ExecutionChannelType,
+    state_replication::empty_state_computer_call_back,
+    test_utils::{consensus_runtime, timed_block_on},
+};
 use consensus_types::{executed_block::ExecutedBlock, quorum_cert::QuorumCert};
 use diem_crypto::ed25519::Ed25519Signature;
 use diem_types::{account_address::AccountAddress, validator_signer::ValidatorSigner};
@@ -24,12 +28,9 @@ use std::collections::BTreeMap;
 
 pub fn prepare_ordering_state_computer(
     channel_size: usize,
-) -> (
-    Arc<OrderingStateComputer>,
-    Receiver<(Vec<Block>, LedgerInfoWithSignatures)>,
-) {
+) -> (Arc<OrderingStateComputer>, Receiver<ExecutionChannelType>) {
     let (commit_result_tx, commit_result_rx) =
-        channel::new_test::<(Vec<Block>, LedgerInfoWithSignatures)>(channel_size);
+        channel::new_test::<ExecutionChannelType>(channel_size);
     let state_computer = Arc::new(OrderingStateComputer::new(commit_result_tx));
 
     (state_computer, commit_result_rx)
@@ -79,9 +80,12 @@ fn test_ordering_state_computer() {
 
     // ordering_state_computer should send the same block and finality proof to the channel
     timed_block_on(&mut runtime, async move {
-        state_computer.commit(&blocks, li_sig.clone()).await.ok();
+        state_computer
+            .commit(&blocks, li_sig.clone(), empty_state_computer_call_back())
+            .await
+            .ok();
 
-        let (ordered_block, finality_proof) = commit_result_rx.next().await.unwrap();
+        let (ordered_block, finality_proof, _) = commit_result_rx.next().await.unwrap();
         assert_eq!(ordered_block.len(), 1);
         assert_eq!(ordered_block[0], block);
         assert_eq!(finality_proof, li_sig);

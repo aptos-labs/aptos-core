@@ -6,7 +6,8 @@ use crate::{
     counters,
     error::{error_kind, DbError},
     experimental::{
-        commit_phase::CommitPhase, execution_phase::ExecutionPhase,
+        commit_phase::{CommitChannelType, CommitPhase},
+        execution_phase::{ExecutionChannelType, ExecutionPhase},
         ordering_state_computer::OrderingStateComputer,
     },
     liveness::{
@@ -29,10 +30,8 @@ use crate::{
 use anyhow::{anyhow, bail, ensure, Context};
 use channel::{diem_channel, Sender};
 use consensus_types::{
-    block::Block,
     common::{Author, Round},
     epoch_retrieval::EpochRetrievalRequest,
-    executed_block::ExecutedBlock,
 };
 use diem_config::config::{ConsensusConfig, ConsensusProposerType, NodeConfig};
 use diem_infallible::{duration_since_epoch, Mutex};
@@ -42,7 +41,6 @@ use diem_types::{
     account_address::AccountAddress,
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
-    ledger_info::LedgerInfoWithSignatures,
     on_chain_config::{OnChainConfigPayload, ValidatorSet},
 };
 use futures::{select, SinkExt, StreamExt};
@@ -304,11 +302,10 @@ impl EpochManager {
         safety_rules_container: Arc<Mutex<MetricsSafetyRules>>,
         network_sender: NetworkSender,
     ) -> (RoundManager, ExecutionPhase, CommitPhase) {
-        let (execution_phase_tx, execution_phase_rx) =
-            channel::new::<(Vec<Block>, LedgerInfoWithSignatures)>(
-                self.config.channel_size,
-                &counters::DECOUPLED_EXECUTION__EXECUTION_PHASE_CHANNEL,
-            );
+        let (execution_phase_tx, execution_phase_rx) = channel::new::<ExecutionChannelType>(
+            self.config.channel_size,
+            &counters::DECOUPLED_EXECUTION__EXECUTION_PHASE_CHANNEL,
+        );
 
         let state_computer: Arc<dyn StateComputer> =
             Arc::new(OrderingStateComputer::new(execution_phase_tx));
@@ -333,11 +330,10 @@ impl EpochManager {
             self.config.max_block_size,
         );
 
-        let (commit_phase_tx, commit_phase_rx) =
-            channel::new::<(Vec<ExecutedBlock>, LedgerInfoWithSignatures)>(
-                self.config.channel_size,
-                &counters::DECOUPLED_EXECUTION__COMMIT_PHASE_CHANNEL,
-            );
+        let (commit_phase_tx, commit_phase_rx) = channel::new::<CommitChannelType>(
+            self.config.channel_size,
+            &counters::DECOUPLED_EXECUTION__COMMIT_PHASE_CHANNEL,
+        );
 
         let execution_phase = ExecutionPhase::new(
             execution_phase_rx,

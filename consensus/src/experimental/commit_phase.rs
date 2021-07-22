@@ -32,6 +32,8 @@ use std::{
 };
 use tokio::time;
 
+use crate::state_replication::StateComputerCommitCallBackType;
+
 /*
 Commit phase takes in the executed blocks from the execution
 phase and commit them. Specifically, commit phase signs a commit
@@ -45,21 +47,33 @@ having to collect the signatures.
 
 const COMMIT_PHASE_TIMEOUT_SEC: u64 = 1; // retry timeout in seconds
 
-#[derive(Clone)]
+pub type CommitChannelType = (
+    Vec<ExecutedBlock>,
+    LedgerInfoWithSignatures,
+    StateComputerCommitCallBackType,
+);
+
+//#[derive(Clone)]
 pub struct PendingBlocks {
     blocks: Vec<ExecutedBlock>,
     ledger_info_sig: LedgerInfoWithSignatures,
     block_info: BlockInfo,
+    callback: StateComputerCommitCallBackType,
 }
 
 impl PendingBlocks {
-    pub fn new(blocks: Vec<ExecutedBlock>, ledger_info_sig: LedgerInfoWithSignatures) -> Self {
+    pub fn new(
+        blocks: Vec<ExecutedBlock>,
+        ledger_info_sig: LedgerInfoWithSignatures,
+        callback: StateComputerCommitCallBackType,
+    ) -> Self {
         assert!(!blocks.is_empty()); // the commit phase should not accept empty blocks.
         let block_info = blocks.last().unwrap().block_info();
         Self {
             blocks,
             ledger_info_sig,
             block_info,
+            callback,
         }
     }
 
@@ -69,6 +83,10 @@ impl PendingBlocks {
 
     pub fn round(&self) -> u64 {
         self.block_info().round()
+    }
+
+    pub fn take_callback(self) -> StateComputerCommitCallBackType {
+        self.callback
     }
 
     pub fn blocks(&self) -> &Vec<ExecutedBlock> {
@@ -97,7 +115,7 @@ impl PendingBlocks {
 }
 
 pub struct CommitPhase {
-    commit_channel_recv: Receiver<(Vec<ExecutedBlock>, LedgerInfoWithSignatures)>,
+    commit_channel_recv: Receiver<CommitChannelType>,
     execution_proxy: Arc<dyn StateComputer>,
     blocks: Option<PendingBlocks>,
     commit_msg_rx: channel::Receiver<VerifiedEvent>,
@@ -113,18 +131,23 @@ pub struct CommitPhase {
 /// Wrapper for ExecutionProxy.commit
 pub async fn commit(
     execution_proxy: &Arc<dyn StateComputer>,
-    blocks: &[ExecutedBlock],
-    ledger_info: &LedgerInfoWithSignatures,
+    pending_blocks: PendingBlocks,
 ) -> Result<(), ExecutionError> {
+    let blocks_to_commit = pending_blocks
+        .blocks()
+        .iter()
+        .map(|eb| Arc::new(eb.clone()))
+        .collect::<Vec<Arc<ExecutedBlock>>>();
     execution_proxy
         .commit(
-            &blocks
-                .iter()
-                .map(|eb| Arc::new(eb.clone()))
-                .collect::<Vec<Arc<ExecutedBlock>>>(),
-            ledger_info.clone(),
+            &blocks_to_commit,
+            pending_blocks.ledger_info_sig().clone(),
+            pending_blocks.take_callback(),
         )
         .await
+        .expect("Failed to persist commit");
+
+    Ok(())
 }
 
 macro_rules! report_err {
@@ -154,7 +177,7 @@ async fn broadcast_commit_vote_with_retry(
 
 impl CommitPhase {
     pub fn new(
-        commit_channel_recv: Receiver<(Vec<ExecutedBlock>, LedgerInfoWithSignatures)>,
+        commit_channel_recv: Receiver<CommitChannelType>,
         execution_proxy: Arc<dyn StateComputer>,
         commit_msg_rx: channel::Receiver<VerifiedEvent>,
         verifier: ValidatorVerifier,
@@ -245,19 +268,17 @@ impl CommitPhase {
                     )))
                     .await;
 
-                commit(
-                    &self.execution_proxy,
-                    pending_blocks.blocks(),
-                    pending_blocks.ledger_info_sig(),
-                )
-                .await
-                .expect("Failed to commit the executed blocks.");
+                let pending_blocks = self.blocks.take().unwrap();
+                let round = pending_blocks.round();
+
+                commit(&self.execution_proxy, pending_blocks)
+                    .await
+                    .expect("Failed to commit the executed blocks.");
 
                 // update the back pressure
-                self.back_pressure
-                    .store(pending_blocks.round(), Ordering::SeqCst);
+                self.back_pressure.store(round, Ordering::SeqCst);
 
-                self.set_blocks(None); // prepare for the next batch of blocks
+                // now self.blocks is none, ready for the next batch of blocks
             }
         }
 
@@ -268,6 +289,7 @@ impl CommitPhase {
         &mut self,
         blocks: Vec<ExecutedBlock>,
         ordered_ledger_info: LedgerInfoWithSignatures,
+        callback: StateComputerCommitCallBackType,
     ) -> anyhow::Result<()> {
         // TODO: recover from the safety_rules error
 
@@ -288,12 +310,13 @@ impl CommitPhase {
             commit_ledger_info,
             BTreeMap::<AccountAddress, Ed25519Signature>::new(),
         );
+
         // we need to wait for the commit vote itself to collect the signature.
         //commit_ledger_info_with_sig.add_signature(self.author, signature);
-
         self.set_blocks(Some(PendingBlocks::new(
             blocks,
             commit_ledger_info_with_sig,
+            callback,
         )));
 
         // asynchronously broadcast the message.
@@ -362,10 +385,12 @@ impl CommitPhase {
                 );
             }
 
-            if let Some((blocks, ordered_ledger_info)) = self.commit_channel_recv.next().await {
+            if let Some((blocks, ordered_ledger_info, callback)) =
+                self.commit_channel_recv.next().await
+            {
                 report_err!(
                     // receive new blocks from execution phase
-                    self.process_executed_blocks(blocks, ordered_ledger_info)
+                    self.process_executed_blocks(blocks, ordered_ledger_info, callback)
                         .await,
                     "Error in processing received blocks"
                 );
