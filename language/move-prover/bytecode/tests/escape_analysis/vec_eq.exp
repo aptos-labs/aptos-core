@@ -1,0 +1,244 @@
+============ initial translation from Move ================
+
+[variant baseline]
+public intrinsic fun Vector::contains<#0>($t0|v: &vector<#0>, $t1|e: &#0): bool;
+
+
+[variant baseline]
+public intrinsic fun Vector::index_of<#0>($t0|v: &vector<#0>, $t1|e: &#0): (bool, u64);
+
+
+[variant baseline]
+public intrinsic fun Vector::append<#0>($t0|lhs: &mut vector<#0>, $t1|other: vector<#0>);
+
+
+[variant baseline]
+public native fun Vector::borrow<#0>($t0|v: &vector<#0>, $t1|i: u64): &#0;
+
+
+[variant baseline]
+public native fun Vector::borrow_mut<#0>($t0|v: &mut vector<#0>, $t1|i: u64): &mut #0;
+
+
+[variant baseline]
+public native fun Vector::destroy_empty<#0>($t0|v: vector<#0>);
+
+
+[variant baseline]
+public native fun Vector::empty<#0>(): vector<#0>;
+
+
+[variant baseline]
+public intrinsic fun Vector::is_empty<#0>($t0|v: &vector<#0>): bool;
+
+
+[variant baseline]
+public native fun Vector::length<#0>($t0|v: &vector<#0>): u64;
+
+
+[variant baseline]
+public native fun Vector::pop_back<#0>($t0|v: &mut vector<#0>): #0;
+
+
+[variant baseline]
+public native fun Vector::push_back<#0>($t0|v: &mut vector<#0>, $t1|e: #0);
+
+
+[variant baseline]
+public intrinsic fun Vector::remove<#0>($t0|v: &mut vector<#0>, $t1|i: u64): #0;
+
+
+[variant baseline]
+public intrinsic fun Vector::reverse<#0>($t0|v: &mut vector<#0>);
+
+
+[variant baseline]
+public fun Vector::singleton<#0>($t0|e: #0): vector<#0> {
+     var $t1|v: vector<#0>
+     var $t2: vector<#0>
+     var $t3: &mut vector<#0>
+     var $t4: #0
+     var $t5: vector<#0>
+  0: $t2 := Vector::empty<#0>()
+  1: $t1 := $t2
+  2: $t3 := borrow_local($t1)
+  3: $t4 := move($t0)
+  4: Vector::push_back<#0>($t3, $t4)
+  5: $t5 := move($t1)
+  6: return $t5
+}
+
+
+[variant baseline]
+public native fun Vector::swap<#0>($t0|v: &mut vector<#0>, $t1|i: u64, $t2|j: u64);
+
+
+[variant baseline]
+public intrinsic fun Vector::swap_remove<#0>($t0|v: &mut vector<#0>, $t1|i: u64): #0;
+
+
+[variant baseline]
+public fun VecEq::leak_index_into_v($t0|g: &mut VecEq::G): &mut u64 {
+     var $t1: &mut VecEq::G
+     var $t2: &mut vector<u64>
+     var $t3: u64
+     var $t4: &mut u64
+  0: $t1 := move($t0)
+  1: $t2 := borrow_field<VecEq::G>.v($t1)
+  2: $t3 := 0
+  3: $t4 := Vector::borrow_mut<u64>($t2, $t3)
+  4: return $t4
+}
+
+
+[variant baseline]
+public fun VecEq::leak_v($t0|g: &mut VecEq::G): &mut vector<u64> {
+     var $t1: &mut VecEq::G
+     var $t2: &mut vector<u64>
+  0: $t1 := move($t0)
+  1: $t2 := borrow_field<VecEq::G>.v($t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun VecEq::new(): VecEq::G {
+     var $t0: u64
+     var $t1: vector<u64>
+     var $t2: VecEq::G
+  0: $t0 := 10
+  1: $t1 := Vector::singleton<u64>($t0)
+  2: $t2 := pack VecEq::G($t1)
+  3: return $t2
+}
+
+============ after pipeline `escape_analysis` ================
+
+[variant baseline]
+public intrinsic fun Vector::contains<#0>($t0|v: &vector<#0>, $t1|e: &#0): bool;
+
+
+[variant baseline]
+public intrinsic fun Vector::index_of<#0>($t0|v: &vector<#0>, $t1|e: &#0): (bool, u64);
+
+
+[variant baseline]
+public intrinsic fun Vector::append<#0>($t0|lhs: &mut vector<#0>, $t1|other: vector<#0>);
+
+
+[variant baseline]
+public native fun Vector::borrow<#0>($t0|v: &vector<#0>, $t1|i: u64): &#0;
+
+
+[variant baseline]
+public native fun Vector::borrow_mut<#0>($t0|v: &mut vector<#0>, $t1|i: u64): &mut #0;
+
+
+[variant baseline]
+public native fun Vector::destroy_empty<#0>($t0|v: vector<#0>);
+
+
+[variant baseline]
+public native fun Vector::empty<#0>(): vector<#0>;
+
+
+[variant baseline]
+public intrinsic fun Vector::is_empty<#0>($t0|v: &vector<#0>): bool;
+
+
+[variant baseline]
+public native fun Vector::length<#0>($t0|v: &vector<#0>): u64;
+
+
+[variant baseline]
+public native fun Vector::pop_back<#0>($t0|v: &mut vector<#0>): #0;
+
+
+[variant baseline]
+public native fun Vector::push_back<#0>($t0|v: &mut vector<#0>, $t1|e: #0);
+
+
+[variant baseline]
+public intrinsic fun Vector::remove<#0>($t0|v: &mut vector<#0>, $t1|i: u64): #0;
+
+
+[variant baseline]
+public intrinsic fun Vector::reverse<#0>($t0|v: &mut vector<#0>);
+
+
+[variant baseline]
+public fun Vector::singleton<#0>($t0|e: #0): vector<#0> {
+     var $t1|v: vector<#0>
+     var $t2: vector<#0>
+     var $t3: &mut vector<#0>
+     var $t4: #0
+     var $t5: vector<#0>
+  0: $t2 := Vector::empty<#0>()
+  1: $t1 := $t2
+  2: $t3 := borrow_local($t1)
+  3: $t4 := move($t0)
+  4: Vector::push_back<#0>($t3, $t4)
+  5: $t5 := move($t1)
+  6: return $t5
+}
+
+
+[variant baseline]
+public native fun Vector::swap<#0>($t0|v: &mut vector<#0>, $t1|i: u64, $t2|j: u64);
+
+
+[variant baseline]
+public intrinsic fun Vector::swap_remove<#0>($t0|v: &mut vector<#0>, $t1|i: u64): #0;
+
+
+[variant baseline]
+public fun VecEq::leak_index_into_v($t0|g: &mut VecEq::G): &mut u64 {
+     var $t1: &mut VecEq::G
+     var $t2: &mut vector<u64>
+     var $t3: u64
+     var $t4: &mut u64
+  0: $t1 := move($t0)
+  1: $t2 := borrow_field<VecEq::G>.v($t1)
+  2: $t3 := 0
+  3: $t4 := Vector::borrow_mut<u64>($t2, $t3)
+  4: return $t4
+}
+
+
+[variant baseline]
+public fun VecEq::leak_v($t0|g: &mut VecEq::G): &mut vector<u64> {
+     var $t1: &mut VecEq::G
+     var $t2: &mut vector<u64>
+  0: $t1 := move($t0)
+  1: $t2 := borrow_field<VecEq::G>.v($t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun VecEq::new(): VecEq::G {
+     var $t0: u64
+     var $t1: vector<u64>
+     var $t2: VecEq::G
+  0: $t0 := 10
+  1: $t1 := Vector::singleton<u64>($t0)
+  2: $t2 := pack VecEq::G($t1)
+  3: return $t2
+}
+
+============ Diagnostics ================
+error: Leaked mutable module-internal reference via return value 0
+   ┌─ tests/escape_analysis/vec_eq.move:17:5
+   │
+17 │ ╭     public fun leak_v(g: &mut G): &mut vector<u64> {
+18 │ │         &mut g.v
+19 │ │     }
+   │ ╰─────^
+
+error: Leaked mutable module-internal reference via return value 0
+   ┌─ tests/escape_analysis/vec_eq.move:22:5
+   │
+22 │ ╭     public fun leak_index_into_v(g: &mut G): &mut u64 {
+23 │ │         Vector::borrow_mut(&mut g.v, 0)
+24 │ │     }
+   │ ╰─────^

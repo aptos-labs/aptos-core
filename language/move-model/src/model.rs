@@ -787,6 +787,11 @@ impl GlobalEnv {
         self.source_files.source_slice(loc.file_id, loc.span)
     }
 
+    /// Return the source file name for `file_id`
+    pub fn get_file(&self, file_id: FileId) -> &OsStr {
+        self.source_files.name(file_id)
+    }
+
     /// Return the source file names.
     pub fn get_source_file_names(&self) -> Vec<String> {
         self.file_name_map
@@ -835,12 +840,21 @@ impl GlobalEnv {
 
     /// Writes accumulated diagnostics of given or higher severity.
     pub fn report_diag<W: WriteColor>(&self, writer: &mut W, severity: Severity) {
+        self.report_diag_with_filter(writer, |d| d.severity >= severity)
+    }
+
+    /// Writes accumulated diagnostics that pass through `filter`
+    pub fn report_diag_with_filter<W: WriteColor, F: Fn(&Diagnostic<FileId>) -> bool>(
+        &self,
+        writer: &mut W,
+        filter: F,
+    ) {
         let mut shown = BTreeSet::new();
         for (diag, reported) in self
             .diags
             .borrow_mut()
             .iter_mut()
-            .filter(|(d, _)| d.severity >= severity)
+            .filter(|(d, _)| filter(d))
         {
             if !*reported {
                 // Avoid showing the same message twice. This can happen e.g. because of
@@ -889,6 +903,14 @@ impl GlobalEnv {
             }
         }
         inv_ids
+    }
+
+    pub fn get_global_invariants_for_module(&self, module_id: ModuleId) -> Vec<&GlobalInvariant> {
+        self.global_invariants
+            .iter()
+            .filter(|(_, inv)| inv.declaring_module == module_id)
+            .map(|(_, inv)| inv)
+            .collect()
     }
 
     pub fn get_global_invariants_by_module(&self, module_id: ModuleId) -> BTreeSet<GlobalId> {
@@ -1430,6 +1452,46 @@ impl GlobalEnv {
             .borrow()
             .get(&node_id)
             .and_then(|info| info.instantiation.clone())
+    }
+
+    /// Return the total number of declared functions in the modules of `self`
+    pub fn get_declared_function_count(&self) -> usize {
+        let mut total = 0;
+        for m in &self.module_data {
+            total += m.module.function_defs().len();
+        }
+        total
+    }
+
+    /// Return the total number of declared structs in the modules of `self`
+    pub fn get_declared_struct_count(&self) -> usize {
+        let mut total = 0;
+        for m in &self.module_data {
+            total += m.module.struct_defs().len();
+        }
+        total
+    }
+
+    /// Return the total number of Move bytecode instructions (not stackless bytecode) in the modules of `self`
+    pub fn get_move_bytecode_instruction_count(&self) -> usize {
+        let mut total = 0;
+        for m in self.get_modules() {
+            for f in m.get_functions() {
+                total += f.get_bytecode().len();
+            }
+        }
+        total
+    }
+
+    /// Return the total number of Move modules that contain specs
+    pub fn get_modules_with_specs_count(&self) -> usize {
+        let mut total = 0;
+        for m in self.get_modules() {
+            if m.has_specs() {
+                total += 1
+            }
+        }
+        total
     }
 }
 
@@ -2071,6 +2133,32 @@ impl<'env> ModuleEnv<'env> {
         disas
             .disassemble()
             .expect("Failed to disassemble a verified module")
+    }
+
+    /// Return true if the module has any global, module, function, or struct specs
+    pub fn has_specs(&self) -> bool {
+        // module specs
+        if self.get_spec().has_conditions() {
+            return true;
+        }
+        // function specs
+        for f in self.get_functions() {
+            if f.get_spec().has_conditions() || !f.get_spec().on_impl.is_empty() {
+                return true;
+            }
+        }
+        // struct specs
+        for s in self.get_structs() {
+            if s.get_spec().has_conditions() {
+                return true;
+            }
+        }
+        // global specs
+        let global_invariants = self.env.get_global_invariants_by_module(self.get_id());
+        if !global_invariants.is_empty() {
+            return true;
+        }
+        false
     }
 }
 

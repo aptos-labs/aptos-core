@@ -7,6 +7,7 @@ use bytecode::{
     clean_and_optimize::CleanAndOptimizeProcessor,
     data_invariant_instrumentation::DataInvariantInstrumentationProcessor,
     eliminate_imm_refs::EliminateImmRefsProcessor,
+    escape_analysis::EscapeAnalysisProcessor,
     function_target_pipeline::{
         FunctionTargetPipeline, FunctionTargetsHolder, ProcessorResultDisplay,
     },
@@ -78,6 +79,11 @@ fn get_tested_transformation_pipeline(
             pipeline.add_processor(ReachingDefProcessor::new());
             pipeline.add_processor(LiveVarAnalysisProcessor::new());
             pipeline.add_processor(BorrowAnalysisProcessor::new());
+            Ok(Some(pipeline))
+        }
+        "escape_analysis" => {
+            let mut pipeline = FunctionTargetPipeline::default();
+            pipeline.add_processor(Box::new(EscapeAnalysisProcessor {}));
             Ok(Some(pipeline))
         }
         "memory_instr" => {
@@ -259,7 +265,13 @@ fn test_runner(path: &Path) -> datatest_stable::Result<()> {
             }
             .to_string();
         }
-
+        // add Warning and Error diagnostics to output
+        let mut error_writer = Buffer::no_color();
+        if env.has_errors() || env.has_warnings() {
+            env.report_diag(&mut error_writer, Severity::Warning);
+            text += "============ Diagnostics ================\n";
+            text += &String::from_utf8_lossy(&error_writer.into_inner()).to_string();
+        }
         text
     };
     let baseline_path = path.with_extension(EXP_EXT);

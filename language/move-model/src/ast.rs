@@ -18,7 +18,8 @@ use crate::{
     exp_rewriter::ExpRewriterFunctions,
     model::{
         EnvDisplay, FieldId, FunId, FunctionVisibility, GlobalEnv, GlobalId, Loc, ModuleId, NodeId,
-        QualifiedInstId, SchemaId, SpecFunId, StructId, TypeParameter, GHOST_MEMORY_PREFIX,
+        QualifiedId, QualifiedInstId, SchemaId, SpecFunId, StructId, TypeParameter,
+        GHOST_MEMORY_PREFIX,
     },
     symbol::{Symbol, SymbolPool},
     ty::{Type, TypeDisplayContext},
@@ -26,7 +27,7 @@ use crate::{
 use internment::LocalIntern;
 use itertools::Itertools;
 use once_cell::sync::Lazy;
-use std::{borrow::Borrow, fmt::Debug, hash::Hash, ops::Deref};
+use std::{borrow::Borrow, collections::HashSet, fmt::Debug, hash::Hash, ops::Deref};
 
 // =================================================================================================
 /// # Declarations
@@ -754,6 +755,52 @@ impl ExpData {
             }
         }
         None
+    }
+
+    /// Collect struct-related operations
+    pub fn struct_usage(&self, usage: &mut BTreeSet<QualifiedId<StructId>>) {
+        self.visit(&mut |e| {
+            if let ExpData::Call(_, oper, _) = e {
+                use Operation::*;
+                match oper {
+                    Select(mid, sid, ..) | UpdateField(mid, sid, ..) | Pack(mid, sid) => {
+                        usage.insert(mid.qualified(*sid));
+                    }
+                    _ => {}
+                }
+            }
+        });
+    }
+
+    /// Collect field-related operations
+    pub fn field_usage(&self, usage: &mut BTreeSet<(QualifiedId<StructId>, FieldId)>) {
+        self.visit(&mut |e| {
+            if let ExpData::Call(_, oper, _) = e {
+                use Operation::*;
+                match oper {
+                    Select(mid, sid, fid) | UpdateField(mid, sid, fid) => {
+                        usage.insert((mid.qualified(*sid), *fid));
+                    }
+                    _ => {}
+                }
+            }
+        });
+    }
+
+    /// Collect vector-related operations
+    pub fn vector_usage(&self, usage: &mut HashSet<Operation>) {
+        self.visit(&mut |e| {
+            if let ExpData::Call(_, oper, _) = e {
+                use Operation::*;
+                match oper {
+                    Index | Slice | ConcatVec | EmptyVec | SingleVec | UpdateVec | IndexOfVec
+                    | ContainsVec | InRangeVec | RangeVec => {
+                        usage.insert(oper.clone());
+                    }
+                    _ => {}
+                }
+            }
+        });
     }
 }
 

@@ -10,11 +10,15 @@ use boogie_backend::{
     add_prelude, boogie_wrapper::BoogieWrapper, bytecode_translator::BoogieTranslator,
 };
 use bytecode::{
+    escape_analysis::EscapeAnalysisProcessor,
     function_target_pipeline::{FunctionTargetPipeline, FunctionTargetsHolder},
     pipeline_factory,
     read_write_set_analysis::{self, ReadWriteSetProcessor},
 };
-use codespan_reporting::term::termcolor::{ColorChoice, StandardStream, WriteColor};
+use codespan_reporting::{
+    diagnostic::Severity,
+    term::termcolor::{Buffer, ColorChoice, StandardStream, WriteColor},
+};
 use docgen::Docgen;
 use errmapgen::ErrmapGen;
 #[allow(unused_imports)]
@@ -97,6 +101,13 @@ pub fn run_move_prover_with_model<W: WriteColor>(
             Ok(())
         };
     }
+    // Same for escape analysis
+    if options.run_escape {
+        return {
+            run_escape(env, &options, now);
+            Ok(())
+        };
+    }
 
     // Check correct backend versions.
     options.backend.check_tool_versions()?;
@@ -135,6 +146,13 @@ pub fn run_move_prover_with_model<W: WriteColor>(
         trafo_duration.as_secs_f64(),
         gen_duration.as_secs_f64(),
         verify_duration.as_secs_f64()
+    );
+    info!(
+        "Total prover time in ms: {}",
+        build_duration.as_millis()
+            + trafo_duration.as_millis()
+            + gen_duration.as_millis()
+            + verify_duration.as_millis()
     );
     check_errors(
         env,
@@ -322,4 +340,42 @@ fn run_read_write_set(env: &GlobalEnv, options: &Options, now: Instant) {
 
     let end = now.elapsed();
     info!("{:.3}s analyzing", (end - start).as_secs_f64());
+}
+
+fn run_escape(env: &GlobalEnv, options: &Options, now: Instant) {
+    let mut targets = FunctionTargetsHolder::default();
+    for module_env in env.get_modules() {
+        for func_env in module_env.get_functions() {
+            targets.add_target(&func_env)
+        }
+    }
+    println!(
+        "Analyzing {} modules, {} declared functions, {} declared structs, {} total bytecodes",
+        env.get_module_count(),
+        env.get_declared_function_count(),
+        env.get_declared_struct_count(),
+        env.get_move_bytecode_instruction_count(),
+    );
+    let mut pipeline = FunctionTargetPipeline::default();
+    pipeline.add_processor(EscapeAnalysisProcessor::new());
+
+    let start = now.elapsed();
+    pipeline.run(env, &mut targets);
+    let end = now.elapsed();
+
+    // print escaped internal refs flagged by analysis. do not report errors in dependencies
+    let mut error_writer = Buffer::no_color();
+    env.report_diag_with_filter(&mut error_writer, |d| {
+        let fname = env.get_file(d.labels[0].file_id).to_str().unwrap();
+        options.move_sources.iter().any(|d| {
+            let p = Path::new(d);
+            if p.is_file() {
+                d == fname
+            } else {
+                Path::new(fname).parent().unwrap() == p
+            }
+        }) && d.severity >= Severity::Error
+    });
+    println!("{}", String::from_utf8_lossy(&error_writer.into_inner()));
+    info!("in ms, analysis took {:.3}", (end - start).as_millis())
 }

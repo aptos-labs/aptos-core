@@ -1,0 +1,116 @@
+============ initial translation from Move ================
+
+[variant baseline]
+public fun StructSpecRelevance::create($t0|i: u64, $t1|j: u64): StructSpecRelevance::Nonzero {
+     var $t2|tmp#$2: bool
+     var $t3|tmp#$3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: bool
+     var $t7: bool
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: StructSpecRelevance::Nonzero
+  0: $t4 := copy($t0)
+  1: $t5 := 0
+  2: $t6 := >($t4, $t5)
+  3: $t2 := $t6
+  4: $t7 := move($t2)
+  5: if ($t7) goto 9 else goto 6
+  6: label L1
+  7: $t8 := 0
+  8: abort($t8)
+  9: label L0
+ 10: $t9 := copy($t0)
+ 11: $t10 := copy($t1)
+ 12: $t11 := pack StructSpecRelevance::Nonzero($t9, $t10)
+ 13: return $t11
+}
+
+
+[variant baseline]
+public fun StructSpecRelevance::leak_i_bad($t0|n: &mut StructSpecRelevance::Nonzero): &mut u64 {
+     var $t1: &mut StructSpecRelevance::Nonzero
+     var $t2: &mut u64
+  0: $t1 := move($t0)
+  1: $t2 := borrow_field<StructSpecRelevance::Nonzero>.i($t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun StructSpecRelevance::leak_j_ok($t0|n: &mut StructSpecRelevance::Nonzero): &mut u64 {
+     var $t1: &mut StructSpecRelevance::Nonzero
+     var $t2: &mut u64
+  0: $t1 := move($t0)
+  1: $t2 := borrow_field<StructSpecRelevance::Nonzero>.j($t1)
+  2: return $t2
+}
+
+============ after pipeline `escape_analysis` ================
+
+[variant baseline]
+public fun StructSpecRelevance::create($t0|i: u64, $t1|j: u64): StructSpecRelevance::Nonzero {
+     var $t2|tmp#$2: bool
+     var $t3|tmp#$3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: bool
+     var $t7: bool
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: StructSpecRelevance::Nonzero
+  0: $t4 := copy($t0)
+  1: $t5 := 0
+  2: $t6 := >($t4, $t5)
+  3: $t2 := $t6
+  4: $t7 := move($t2)
+  5: if ($t7) goto 9 else goto 6
+  6: label L1
+  7: $t8 := 0
+  8: abort($t8)
+  9: label L0
+ 10: $t9 := copy($t0)
+ 11: $t10 := copy($t1)
+ 12: $t11 := pack StructSpecRelevance::Nonzero($t9, $t10)
+ 13: return $t11
+}
+
+
+[variant baseline]
+public fun StructSpecRelevance::leak_i_bad($t0|n: &mut StructSpecRelevance::Nonzero): &mut u64 {
+     var $t1: &mut StructSpecRelevance::Nonzero
+     var $t2: &mut u64
+  0: $t1 := move($t0)
+  1: $t2 := borrow_field<StructSpecRelevance::Nonzero>.i($t1)
+  2: return $t2
+}
+
+
+[variant baseline]
+public fun StructSpecRelevance::leak_j_ok($t0|n: &mut StructSpecRelevance::Nonzero): &mut u64 {
+     var $t1: &mut StructSpecRelevance::Nonzero
+     var $t2: &mut u64
+  0: $t1 := move($t0)
+  1: $t2 := borrow_field<StructSpecRelevance::Nonzero>.j($t1)
+  2: return $t2
+}
+
+============ Diagnostics ================
+error: Leaked mutable module-internal reference via return value 0
+   ┌─ tests/escape_analysis/struct_spec_relevance.move:14:5
+   │
+14 │ ╭     public fun leak_j_ok(n: &mut Nonzero): &mut u64 {
+15 │ │         &mut n.j
+16 │ │     }
+   │ ╰─────^
+
+error: Leaked mutable module-internal reference via return value 0
+   ┌─ tests/escape_analysis/struct_spec_relevance.move:9:5
+   │
+ 9 │ ╭     public fun leak_i_bad(n: &mut Nonzero): &mut u64 {
+10 │ │         &mut n.i
+11 │ │     }
+   │ ╰─────^

@@ -55,6 +55,8 @@ pub struct Options {
     pub run_errmapgen: bool,
     /// Whether to run the read write set analysis instead of the prover
     pub run_read_write_set: bool,
+    /// Whether to run the internal reference escape analysis instead of the prover
+    pub run_escape: bool,
     /// The paths to the Move sources.
     pub move_sources: Vec<String>,
     /// The paths to any dependencies for the Move sources. Those will not be verified but
@@ -89,6 +91,7 @@ impl Default for Options {
             run_abigen: false,
             run_errmapgen: false,
             run_read_write_set: false,
+            run_escape: false,
             verbosity_level: LevelFilter::Info,
             move_sources: vec![],
             move_deps: vec![],
@@ -300,6 +303,11 @@ impl Options {
                 Arg::with_name("packedtypesgen")
                     .long("packedtypesgen")
                     .help("runs the packed types generator instead of the prover.")
+            )
+            .arg(
+                Arg::with_name("escape")
+                    .long("escape")
+                    .help("runs the escape analysis instead of the prover.")
             )
             .arg(
                 Arg::with_name("read-write-set")
@@ -648,6 +656,9 @@ impl Options {
         }
         if matches.is_present("read-write-set") {
             options.run_read_write_set = true;
+        }
+        if matches.is_present("escape") {
+            options.run_escape = true;
         }
         if matches.is_present("trace") {
             options.prover.auto_trace_level = AutoTraceLevel::VerifiedFunction;
