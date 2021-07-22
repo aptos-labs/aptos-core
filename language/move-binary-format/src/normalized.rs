@@ -218,6 +218,34 @@ impl Type {
             _ => None,
         }
     }
+
+    pub fn subst(&self, type_args: &[Type]) -> Self {
+        use Type::*;
+        match self {
+            Bool | U8 | U64 | U128 | Address | Signer => self.clone(),
+            Reference(ty) => Reference(Box::new(ty.subst(type_args))),
+            MutableReference(ty) => MutableReference(Box::new(ty.subst(type_args))),
+            Vector(t) => Vector(Box::new(t.subst(type_args))),
+            Struct {
+                address,
+                module,
+                name,
+                type_arguments,
+            } => Struct {
+                address: *address,
+                module: module.clone(),
+                name: name.clone(),
+                type_arguments: type_arguments
+                    .iter()
+                    .map(|t| t.subst(type_arguments))
+                    .collect::<Vec<_>>(),
+            },
+            TypeParameter(i) => type_args
+                .get(*i as usize)
+                .expect("Type parameter index out of bound")
+                .clone(),
+        }
+    }
 }
 
 impl Field {
@@ -277,5 +305,66 @@ impl Function {
                 .collect(),
         };
         (name, f)
+    }
+}
+
+impl From<&TypeTag> for Type {
+    fn from(ty: &TypeTag) -> Type {
+        use Type::*;
+        match ty {
+            TypeTag::Bool => Bool,
+            TypeTag::U8 => U8,
+            TypeTag::U64 => U64,
+            TypeTag::U128 => U128,
+            TypeTag::Address => Address,
+            TypeTag::Signer => Signer,
+            TypeTag::Vector(ty) => Vector(Box::new(Type::from(&**ty))),
+            TypeTag::Struct(s) => Struct {
+                address: s.address,
+                module: s.module.clone(),
+                name: s.name.clone(),
+                type_arguments: s.type_params.iter().map(|ty| ty.into()).collect(),
+            },
+        }
+    }
+}
+
+impl std::fmt::Display for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Type::Struct {
+                address,
+                module,
+                name,
+                type_arguments,
+            } => {
+                write!(
+                    f,
+                    "0x{}::{}::{}",
+                    address.short_str_lossless(),
+                    module,
+                    name
+                )?;
+                if let Some(first_ty) = type_arguments.first() {
+                    write!(f, "<")?;
+                    write!(f, "{}", first_ty)?;
+                    for ty in type_arguments.iter().skip(1) {
+                        write!(f, ", {}", ty)?;
+                    }
+                    write!(f, ">")?;
+                }
+                Ok(())
+            }
+            Type::Vector(ty) => write!(f, "Vector<{}>", ty),
+            Type::U8 => write!(f, "U8"),
+            Type::U64 => write!(f, "U64"),
+            Type::U128 => write!(f, "U128"),
+            Type::Address => write!(f, "Address"),
+            Type::Signer => write!(f, "Signer"),
+            Type::Bool => write!(f, "Bool"),
+            Type::Reference(r) => write!(f, "&{}", r),
+            Type::MutableReference(r) => write!(f, "&mut {}", r),
+            Type::TypeParameter(i) => write!(f, "#{:?}", i),
+        }
     }
 }
