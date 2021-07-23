@@ -8,12 +8,10 @@ Failures in 0x2::A:
 
 ┌── check_global_basics_fail ──────
 │ error: failed to evaluate expression
-│
-│     ┌── tests/concrete_check/property/global_basics.move:28:20 ───
-│     │
-│  28 │             assert global<R>(a).f2 == 42;
-│     │                    ^^^^^^^^^^^^^^^^^^^^^
-│     │
+│    ┌─ tests/concrete_check/property/global_basics.move:28:20
+│    │
+│ 28 │             assert global<R>(a).f2 == 42;
+│    │                    ^^^^^^^^^^^^^^^^^^^^^
 │
 │
 └──────────────────

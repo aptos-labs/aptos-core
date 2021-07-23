@@ -8,12 +8,10 @@ Failures in 0x2::A:
 
 ┌── check_boolean_fail ──────
 │ error: property does not hold
-│
-│     ┌── tests/concrete_check/property/boolean.move:13:20 ───
-│     │
-│  13 │             assert true ==> false;
-│     │                    ^^^^^^^^^^^^^^
-│     │
+│    ┌─ tests/concrete_check/property/boolean.move:13:20
+│    │
+│ 13 │             assert true ==> false;
+│    │                    ^^^^^^^^^^^^^^
 │
 │
 └──────────────────

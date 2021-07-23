@@ -7,7 +7,7 @@ use std::{collections::BTreeMap, fs, num::ParseIntError, option::Option::None};
 
 use anyhow::anyhow;
 use codespan::{ByteIndex, ColumnIndex, LineIndex, Location, Span};
-use codespan_reporting::diagnostic::{Diagnostic, Label, Severity};
+use codespan_reporting::diagnostic::{Diagnostic, Label};
 use itertools::Itertools;
 use log::{debug, info, warn};
 use num::BigInt;
@@ -231,8 +231,10 @@ impl<'env> BoogieWrapper<'env> {
     /// Helper to add a boogie error as a codespan Diagnostic.
     fn add_error(&self, error: &BoogieError) {
         // Create the error
-        let label = Label::new(error.loc.file_id(), error.loc.span(), "");
-        let mut diag = Diagnostic::new(Severity::Error, error.message.clone(), label);
+        let label = Label::primary(error.loc.file_id(), error.loc.span());
+        let mut diag = Diagnostic::error()
+            .with_message(error.message.clone())
+            .with_labels(vec![label]);
 
         // Now add trace diagnostics.
         if error.kind.is_from_verification() && !error.execution_trace.is_empty() {
@@ -335,11 +337,11 @@ impl<'env> BoogieWrapper<'env> {
                 } else {
                     "".to_string()
                 };
-                diag.secondary_labels = vec![Label::new(
+                diag = diag.with_labels(vec![Label::secondary(
                     abort_loc.file_id(),
                     abort_loc.span(),
-                    &format!("abort happened here{}", code),
-                )];
+                )
+                .with_message(&format!("abort happened here{}", code))]);
             }
             diag = diag.with_notes(display);
         }

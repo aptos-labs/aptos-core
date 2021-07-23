@@ -20,6 +20,6 @@ anyhow = "1.0.38"
 serde = { version = "1.0.124", features = ["derive"] }
 
 [dev-dependencies]
-codespan-reporting = "0.8.0"
+codespan-reporting = "0.11.1"
 move-prover = { path = ".." }
 datatest-stable = "0.1.1"

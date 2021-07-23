@@ -1,10 +1,8 @@
-error:
-
-   ┌── tests/sources/variables_ok.move:9:20 ───
-   │
- 9 │     invariant pack sum = sum + x;
-   │                    ^^^ Unexpected 'sum'
-   ·
- 9 │     invariant pack sum = sum + x;
-   │                    --- Expected ';'
-   │
+error: unexpected token
+  ┌─ tests/sources/variables_ok.move:9:20
+  │
+9 │     invariant pack sum = sum + x;
+  │                    ^^^
+  │                    │
+  │                    Unexpected 'sum'
+  │                    Expected ';'

@@ -204,18 +204,28 @@ impl Diagnostics {
         self.diagnostics
     }
 
-    #[deprecated]
-    pub fn into_loc_string_vec(self) -> Vec<Vec<(Loc, String)>> {
+    pub fn into_codespan_format(
+        self,
+    ) -> Vec<(
+        codespan_reporting::diagnostic::Severity,
+        &'static str,
+        (Loc, String),
+        Vec<(Loc, String)>,
+    )> {
         let mut v = vec![];
         for diag in self.into_vec() {
             let Diagnostic {
-                info: _,
+                info,
                 primary_label,
                 secondary_labels,
             } = diag;
-            let mut inner_v = vec![primary_label];
-            inner_v.extend(secondary_labels);
-            v.push(inner_v)
+            let csr_diag = (
+                info.severity().into_codespan_severity(),
+                info.message(),
+                primary_label,
+                secondary_labels,
+            );
+            v.push(csr_diag)
         }
         v
     }

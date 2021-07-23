@@ -19,8 +19,8 @@ diem-workspace-hack = { path = "../../../common/workspace-hack" }
 move-core-types = { path = "../../move-core/types" }
 move-command-line-common = { path = "../../move-command-line-common" }
 
-codespan = "0.8.0"
-codespan-reporting = { version = "0.8.0", features = ["serde", "serialization"] }
+codespan = "0.11.1"
+codespan-reporting = { version = "0.11.1", features = ["serde", "serialization"] }
 num = "0.4.0"
 im = "15.0.0"
 itertools = "0.10.0"
@@ -33,8 +33,6 @@ petgraph = "0.5.1"
 [dev-dependencies]
 datatest-stable = "0.1.1"
 move-prover-test-utils = { path = "../test-utils" }
-codespan = "0.8.0"
-codespan-reporting = "0.8.0"
 anyhow = "1.0.38"
 
 [[test]]

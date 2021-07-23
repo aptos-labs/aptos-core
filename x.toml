@@ -150,8 +150,6 @@ proptest = "proptest is only for testing and fuzzing"
 
 [workspace.direct-dep-dups]
 allow = [
-    "codespan",
-    "codespan-reporting",
 ]
 
 [workspace.overlay]

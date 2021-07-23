@@ -23,10 +23,7 @@ use std::{
     rc::Rc,
 };
 
-use codespan::{
-    ByteIndex, ByteOffset, ColumnOffset, FileId, Files, LineOffset, Location, Span,
-    SpanOutOfBoundsError,
-};
+use codespan::{ByteIndex, ByteOffset, ColumnOffset, FileId, Files, LineOffset, Location, Span};
 use codespan_reporting::{
     diagnostic::{Diagnostic, Label, Severity},
     term::{emit, termcolor::WriteColor, Config},
@@ -466,7 +463,7 @@ pub struct GlobalEnv {
     internal_loc: Loc,
     /// Accumulated diagnosis. In a RefCell so we can add to it without needing a mutable GlobalEnv.
     /// The boolean indicates whether the diag was reported.
-    diags: RefCell<Vec<(Diagnostic, bool)>>,
+    diags: RefCell<Vec<(Diagnostic<FileId>, bool)>>,
     /// Pool of symbols -- internalized strings.
     symbol_pool: SymbolPool,
     /// A counter for allocating node ids.
@@ -654,7 +651,7 @@ impl GlobalEnv {
     }
 
     /// Adds diagnostic to the environment.
-    pub fn add_diag(&self, diag: Diagnostic) {
+    pub fn add_diag(&self, diag: Diagnostic<FileId>) {
         self.diags.borrow_mut().push((diag, false));
     }
 
@@ -670,13 +667,17 @@ impl GlobalEnv {
 
     /// Adds a diagnostic of given severity to this environment.
     pub fn diag(&self, severity: Severity, loc: &Loc, msg: &str) {
-        let diag = Diagnostic::new(severity, msg, Label::new(loc.file_id, loc.span, ""));
+        let diag = Diagnostic::new(severity)
+            .with_message(msg)
+            .with_labels(vec![Label::primary(loc.file_id, loc.span)]);
         self.add_diag(diag);
     }
 
     /// Adds a diagnostic of given severity to this environment, with notes.
     pub fn diag_with_notes(&self, severity: Severity, loc: &Loc, msg: &str, notes: Vec<String>) {
-        let diag = Diagnostic::new(severity, msg, Label::new(loc.file_id, loc.span, ""));
+        let diag = Diagnostic::new(severity)
+            .with_message(msg)
+            .with_labels(vec![Label::primary(loc.file_id, loc.span)]);
         let diag = diag.with_notes(notes);
         self.add_diag(diag);
     }
@@ -689,12 +690,14 @@ impl GlobalEnv {
         msg: &str,
         labels: Vec<(Loc, String)>,
     ) {
-        let mut diag = Diagnostic::new(severity, msg, Label::new(loc.file_id, loc.span, ""));
+        let diag = Diagnostic::new(severity)
+            .with_message(msg)
+            .with_labels(vec![Label::primary(loc.file_id, loc.span)]);
         let labels = labels
             .into_iter()
-            .map(|(l, m)| Label::new(l.file_id, l.span, m))
+            .map(|(l, m)| Label::secondary(l.file_id, l.span).with_message(m))
             .collect_vec();
-        diag.secondary_labels = labels;
+        let diag = diag.with_labels(labels);
         self.add_diag(diag);
     }
 
@@ -785,7 +788,7 @@ impl GlobalEnv {
     }
 
     /// Return the source text for the given location.
-    pub fn get_source(&self, loc: &Loc) -> Result<&str, SpanOutOfBoundsError> {
+    pub fn get_source(&self, loc: &Loc) -> Result<&str, codespan_reporting::files::Error> {
         self.source_files.source_slice(loc.file_id, loc.span)
     }
 

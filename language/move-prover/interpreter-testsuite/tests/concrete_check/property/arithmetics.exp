@@ -9,12 +9,10 @@ Failures in 0x2::A:
 
 ┌── check_arithmetics_div0 ──────
 │ error: failed to evaluate expression
-│
-│     ┌── tests/concrete_check/property/arithmetics.move:17:20 ───
-│     │
-│  17 │             assert 5 / 0 == 1;
-│     │                    ^^^^^^^^^^
-│     │
+│    ┌─ tests/concrete_check/property/arithmetics.move:17:20
+│    │
+│ 17 │             assert 5 / 0 == 1;
+│    │                    ^^^^^^^^^^
 │
 │
 └──────────────────
@@ -22,12 +20,10 @@ Failures in 0x2::A:
 
 ┌── check_arithmetics_mod0 ──────
 │ error: failed to evaluate expression
-│
-│     ┌── tests/concrete_check/property/arithmetics.move:24:20 ───
-│     │
-│  24 │             assert 5 % 0 == 1;
-│     │                    ^^^^^^^^^^
-│     │
+│    ┌─ tests/concrete_check/property/arithmetics.move:24:20
+│    │
+│ 24 │             assert 5 % 0 == 1;
+│    │                    ^^^^^^^^^^
 │
 │
 └──────────────────

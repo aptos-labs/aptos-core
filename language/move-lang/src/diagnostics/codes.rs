@@ -242,6 +242,10 @@ impl DiagnosticInfo {
         (string_code, message)
     }
 
+    pub fn message(&self) -> &'static str {
+        self.message
+    }
+
     pub fn severity(&self) -> Severity {
         self.severity
     }

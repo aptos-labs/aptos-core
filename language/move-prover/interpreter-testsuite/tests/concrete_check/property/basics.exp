@@ -10,12 +10,10 @@ Failures in 0x2::A:
 
 ┌── check_const_fail ──────
 │ error: property does not hold
-│
-│     ┌── tests/concrete_check/property/basics.move:12:20 ───
-│     │
-│  12 │             assert false;
-│     │                    ^^^^^
-│     │
+│    ┌─ tests/concrete_check/property/basics.move:12:20
+│    │
+│ 12 │             assert false;
+│    │                    ^^^^^
 │
 │
 └──────────────────
@@ -23,12 +21,10 @@ Failures in 0x2::A:
 
 ┌── check_local_fail ──────
 │ error: property does not hold
-│
-│     ┌── tests/concrete_check/property/basics.move:29:20 ───
-│     │
-│  29 │             assert a;
-│     │                    ^
-│     │
+│    ┌─ tests/concrete_check/property/basics.move:29:20
+│    │
+│ 29 │             assert a;
+│    │                    ^
 │
 │
 └──────────────────

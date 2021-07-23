@@ -4,7 +4,7 @@
 #![forbid(unsafe_code)]
 
 use codespan::ByteIndex;
-use codespan_reporting::diagnostic::{Diagnostic, Label};
+use codespan_reporting::diagnostic::{Diagnostic, Label, LabelStyle};
 use itertools::Itertools;
 #[allow(unused_imports)]
 use log::warn;
@@ -284,15 +284,25 @@ pub fn run_bytecode_model_builder<'a>(
 }
 
 fn add_move_lang_diagnostics(env: &mut GlobalEnv, diags: Diagnostics) {
-    let mk_label = |env: &mut GlobalEnv, err: (move_ir_types::location::Loc, String)| {
-        let loc = env.to_loc(&err.0);
-        Label::new(loc.file_id(), loc.span(), err.1)
+    let mk_label = |is_primary: bool, (loc, msg): (move_ir_types::location::Loc, String)| {
+        let style = if is_primary {
+            LabelStyle::Primary
+        } else {
+            LabelStyle::Secondary
+        };
+        let loc = env.to_loc(&loc);
+        Label::new(style, loc.file_id(), loc.span()).with_message(msg)
     };
-    #[allow(deprecated)]
-    for mut labels in diags.into_loc_string_vec() {
-        let primary = labels.remove(0);
-        let diag = Diagnostic::new_error("", mk_label(env, primary))
-            .with_secondary_labels(labels.into_iter().map(|e| mk_label(env, e)));
+    for (severity, msg, primary_label, secondary_labels) in diags.into_codespan_format() {
+        let diag = Diagnostic::new(severity)
+            .with_labels(vec![mk_label(true, primary_label)])
+            .with_message(msg)
+            .with_labels(
+                secondary_labels
+                    .into_iter()
+                    .map(|e| mk_label(false, e))
+                    .collect(),
+            );
         env.add_diag(diag);
     }
 }
