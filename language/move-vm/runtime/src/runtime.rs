@@ -106,7 +106,7 @@ impl VMRuntime {
             if data_store.exists_module(&module_id)? {
                 let old_module_ref = self
                     .loader
-                    .load_module_expect_not_missing(&module_id, data_store)?;
+                    .load_module_verify_not_missing(&module_id, data_store)?;
                 let old_module = old_module_ref.module();
                 let old_m = normalized::Module::new(old_module);
                 let new_m = normalized::Module::new(&module);

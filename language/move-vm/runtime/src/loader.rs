@@ -647,7 +647,8 @@ impl Loader {
         // module will NOT show up in `module_cache`. In the module republishing case, it means
         // that the old module is still in the `module_cache`, unless a new Loader is created,
         // which means that a new MoveVM instance needs to be created.
-
+        bytecode_verifier::verify_module(&module)?;
+        self.check_natives(&module)?;
         self.verify_module_verify_no_missing_dependencies(module, bundle_verified, data_store)?;
 
         // friendship is an upward edge in the dependencies DAG, so for modules that are in the
@@ -668,27 +669,32 @@ impl Loader {
         bundle_verified: &BTreeMap<ModuleId, CompiledModule>,
         data_store: &mut impl DataStore,
     ) -> VMResult<()> {
-        self.verify_module(module, bundle_verified, data_store, true)
+        self.verify_module(
+            module,
+            bundle_verified,
+            &mut BTreeMap::new(),
+            data_store,
+            true,
+        )
     }
 
     fn verify_module_expect_no_missing_dependencies(
         &self,
         module: &CompiledModule,
+        in_progress: &mut BTreeMap<ModuleId, CompiledModule>,
         data_store: &mut impl DataStore,
     ) -> VMResult<()> {
-        self.verify_module(module, &BTreeMap::new(), data_store, false)
+        self.verify_module(module, &BTreeMap::new(), in_progress, data_store, false)
     }
 
     fn verify_module(
         &self,
         module: &CompiledModule,
         bundle_verified: &BTreeMap<ModuleId, CompiledModule>,
+        in_progress: &mut BTreeMap<ModuleId, CompiledModule>,
         data_store: &mut impl DataStore,
         verify_no_missing_modules: bool,
     ) -> VMResult<()> {
-        bytecode_verifier::verify_module(&module)?;
-        self.check_natives(&module)?;
-
         // All immediate dependencies of the module being verified should be either in the code
         // cache or in the verified portion of the bundle (e.g., verified before this module).
         let mut bundle_deps = vec![];
@@ -703,7 +709,11 @@ impl Loader {
         let loaded_imm_deps = if verify_no_missing_modules {
             self.load_dependencies_verify_no_missing_dependencies(cached_deps, data_store)?
         } else {
-            self.load_dependencies_expect_no_missing_dependencies(cached_deps, data_store)?
+            self.load_dependencies_expect_no_missing_dependencies(
+                cached_deps,
+                in_progress,
+                data_store,
+            )?
         };
         let all_imm_deps = loaded_imm_deps
             .iter()
@@ -828,13 +838,14 @@ impl Loader {
 
     // The process of loading is recursive, and module are cached by the loader as soon as
     // they are verifiable (including dependencies).
+    //
     // Effectively that means modules are cached from leaf to root in the dependency DAG.
     // If a dependency error is found, loading stops and the error is returned.
     // However all modules cached up to that point stay loaded.
     // In principle that is not the safest model but it is justified
     // by the fact that publishing is limited, and complex/tricky dependencies error
     // are difficult or impossible to accomplish in reality.
-
+    //
     // The process of deserialization and verification is not and it must not be under lock.
     // So when publishing modules through the dependency DAG it may happen that a different
     // thread had loaded the module after this process fetched it from storage.
@@ -842,6 +853,7 @@ impl Loader {
     fn load_module(
         &self,
         id: &ModuleId,
+        in_progress: &mut BTreeMap<ModuleId, CompiledModule>,
         data_store: &mut impl DataStore,
         verify_module_is_not_missing: bool,
     ) -> VMResult<Arc<Module>> {
@@ -851,8 +863,8 @@ impl Loader {
             loader: &Loader,
             id: &ModuleId,
             bytes: Vec<u8>,
-            data_store: &mut impl DataStore,
         ) -> VMResult<CompiledModule> {
+            // deserialization
             let module = CompiledModule::deserialize(&bytes).map_err(|err| {
                 error!("[VM] deserializer for module returned error: {:?}", err);
                 let msg = format!("Deserialization error: {:?}", err);
@@ -860,7 +872,10 @@ impl Loader {
                     .with_message(msg)
                     .finish(Location::Module(id.clone()))
             })?;
-            loader.verify_module_expect_no_missing_dependencies(&module, data_store)?;
+
+            // self-check
+            bytecode_verifier::verify_module(&module)?;
+            loader.check_natives(&module)?;
             Ok(module)
         }
 
@@ -868,17 +883,28 @@ impl Loader {
             return Ok(module);
         }
 
-        let bytes = match data_store.load_module(id) {
-            Ok(bytes) => bytes,
-            Err(err) if verify_module_is_not_missing => return Err(err),
-            Err(err) => {
-                error!("[VM] Error fetching module with id {:?}", id);
-                return Err(expect_no_verification_errors(err));
+        let module = match in_progress.get(id).cloned() {
+            None => {
+                let bytes = match data_store.load_module(id) {
+                    Ok(bytes) => bytes,
+                    Err(err) if verify_module_is_not_missing => return Err(err),
+                    Err(err) => {
+                        error!("[VM] Error fetching module with id {:?}", id);
+                        return Err(expect_no_verification_errors(err));
+                    }
+                };
+                let module = deserialize_and_verify_module(self, id, bytes)
+                    .map_err(expect_no_verification_errors)?;
+                in_progress.insert(module.self_id(), module.clone());
+                module
             }
+            Some(cached) => cached,
         };
 
-        let module = deserialize_and_verify_module(self, id, bytes, data_store)
-            .map_err(expect_no_verification_errors)?;
+        // load and check dependencies
+        self.verify_module_expect_no_missing_dependencies(&module, in_progress, data_store)?;
+
+        // put the module into code cache
         let module_ref = self
             .module_cache
             .write()
@@ -887,7 +913,7 @@ impl Loader {
         // friendship is an upward edge in the dependencies DAG, so it has to be checked after the
         // module is put into cache, otherwise it is a chicken-and-egg problem.
         let friends = module_ref.module().immediate_friends();
-        self.load_dependencies_expect_no_missing_dependencies(friends, data_store)?;
+        self.load_dependencies_expect_no_missing_dependencies(friends, in_progress, data_store)?;
         self.verify_module_cyclic_relations(
             module_ref.module(),
             &BTreeMap::new(),
@@ -898,21 +924,22 @@ impl Loader {
     }
 
     // Returns a verifier error if the module does not exist
-    fn load_module_verify_not_missing(
+    pub(crate) fn load_module_verify_not_missing(
         &self,
         id: &ModuleId,
         data_store: &mut impl DataStore,
     ) -> VMResult<Arc<Module>> {
-        self.load_module(id, data_store, true)
+        self.load_module(id, &mut BTreeMap::new(), data_store, true)
     }
 
     // Expects all modules to be on chain. Gives an invariant violation if it is not found
-    pub(crate) fn load_module_expect_not_missing(
+    fn load_module_expect_not_missing(
         &self,
         id: &ModuleId,
+        in_progress: &mut BTreeMap<ModuleId, CompiledModule>,
         data_store: &mut impl DataStore,
     ) -> VMResult<Arc<Module>> {
-        self.load_module(id, data_store, false)
+        self.load_module(id, in_progress, data_store, false)
     }
 
     // Returns a verifier error if the module does not exist
@@ -930,10 +957,11 @@ impl Loader {
     fn load_dependencies_expect_no_missing_dependencies(
         &self,
         deps: Vec<ModuleId>,
+        in_progress: &mut BTreeMap<ModuleId, CompiledModule>,
         data_store: &mut impl DataStore,
     ) -> VMResult<Vec<Arc<Module>>> {
         deps.into_iter()
-            .map(|dep| self.load_module_expect_not_missing(&dep, data_store))
+            .map(|dep| self.load_module_expect_not_missing(&dep, in_progress, data_store))
             .collect()
     }
 
