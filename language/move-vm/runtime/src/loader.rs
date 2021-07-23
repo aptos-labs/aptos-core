@@ -366,6 +366,11 @@ impl ModuleCache {
         Ok(res)
     }
 
+    // Given a module id, returns whether the module cache has the module or not
+    fn has_module(&self, module_id: &ModuleId) -> bool {
+        self.modules.id_map.contains_key(module_id)
+    }
+
     // Given a ModuleId::struct_name, retrieve the `StructType` and the index associated.
     // Return and error if the type has not been loaded
     fn resolve_struct_by_name(
@@ -715,6 +720,12 @@ impl Loader {
                 data_store,
             )?
         };
+
+        // shortcut the linking check if the target module has already been loaded while verifying
+        // its dependencies
+        if self.module_cache.read().has_module(&module.self_id()) {
+            return Ok(());
+        }
         let all_imm_deps = loaded_imm_deps
             .iter()
             .map(|module| module.module())
@@ -903,6 +914,12 @@ impl Loader {
 
         // load and check dependencies
         self.verify_module_expect_no_missing_dependencies(&module, in_progress, data_store)?;
+
+        // shortcut the cyclic dependency and friend check if the target module has already been
+        // loaded into the code cache while verifying its dependencies
+        if let Some(module_ref) = self.module_cache.read().module_at(id) {
+            return Ok(module_ref);
+        }
 
         // put the module into code cache
         let module_ref = self
