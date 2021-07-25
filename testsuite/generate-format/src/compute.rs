@@ -29,7 +29,7 @@ fn main() {
         match output_file {
             Some(path) => {
                 let mut f = File::create("testsuite/generate-format/".to_string() + path).unwrap();
-                writeln!(f, "{}", content).unwrap();
+                write!(f, "{}", content).unwrap();
             }
             None => panic!("Corpus {:?} doesn't record formats on disk", options.corpus),
         }
