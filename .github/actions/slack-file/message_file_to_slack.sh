@@ -58,7 +58,7 @@ fi
 
 if [ -e "${PAYLOAD_FILE}" ]; then
     jq -n \
-    --arg msg "$(cat "${PAYLOAD_FILE}")" \
+    --arg msg "$(head -n 50 < "${PAYLOAD_FILE}")" \
     --arg url "${URL}" \
     '{
         attachments: [
