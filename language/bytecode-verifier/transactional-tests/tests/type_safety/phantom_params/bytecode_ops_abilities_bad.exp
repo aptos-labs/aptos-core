@@ -38,20 +38,20 @@ Error: Unable to publish module '00000000000000000000000000000001::M5'. Got VMEr
 
 task 5 'publish'. lines 59-71:
 Error: Unable to publish module '00000000000000000000000000000001::M6'. Got VMError: {
-    major_status: VERIFIER_INVARIANT_VIOLATION,
+    major_status: MOVETO_WITHOUT_KEY_ABILITY,
     sub_status: None,
     location: 0x1::M6,
     indices: [(FunctionDefinition, 0)],
-    offsets: [],
+    offsets: [(FunctionDefinitionIndex(0), 2)],
 }
 
 task 6 'publish'. lines 73-83:
 Error: Unable to publish module '00000000000000000000000000000001::M7'. Got VMError: {
-    major_status: VERIFIER_INVARIANT_VIOLATION,
+    major_status: MOVEFROM_WITHOUT_KEY_ABILITY,
     sub_status: None,
     location: 0x1::M7,
     indices: [(FunctionDefinition, 0)],
-    offsets: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
 }
 
 task 7 'publish'. lines 85-95:

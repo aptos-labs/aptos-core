@@ -64,7 +64,7 @@ module M3 {
 
     // `MoveTo` requires key
     f(s: &signer, x: Self.HasKey<M1.NoAbilities, M1.NoAbilities>) {
-        move_to<HasKey<M1.NoAbilities>>(move(s), move(x));
+        move_to<HasKey<M1.NoAbilities, M1.NoAbilities>>(move(s), move(x));
         return;
     }
 
@@ -78,7 +78,7 @@ module M3 {
 
     // `MoveFrom` requires key
     f(): Self.HasKey<M1.NoAbilities, M1.NoAbilities> acquires HasKey {
-        return move_from<HasKey<M1.NoAbilities>>(0x0);
+        return move_from<HasKey<M1.NoAbilities, M1.NoAbilities>>(0x0);
     }
  }
 
