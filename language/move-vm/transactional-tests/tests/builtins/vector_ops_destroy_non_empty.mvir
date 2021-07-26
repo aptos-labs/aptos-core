@@ -1,0 +1,10 @@
+//# run
+main() {
+    let v: vector<u64>;
+
+    v = vec_pack_0<u64>();
+    vec_push_back<u64>(&mut v, 0);
+    vec_unpack_0<u64>(move(v));
+
+    return;
+}
