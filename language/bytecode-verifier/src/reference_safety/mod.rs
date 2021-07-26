@@ -347,12 +347,14 @@ fn execute_inner(
         Bytecode::VecImmBorrow(_) => {
             checked_verify!(verifier.stack.pop().unwrap().is_value());
             let vec_ref = verifier.stack.pop().unwrap();
-            state.vector_element_borrow(offset, vec_ref, false)?;
+            let elem_ref = state.vector_element_borrow(offset, vec_ref, false)?;
+            verifier.stack.push(elem_ref);
         }
         Bytecode::VecMutBorrow(_) => {
             checked_verify!(verifier.stack.pop().unwrap().is_value());
             let vec_ref = verifier.stack.pop().unwrap();
-            state.vector_element_borrow(offset, vec_ref, true)?;
+            let elem_ref = state.vector_element_borrow(offset, vec_ref, true)?;
+            verifier.stack.push(elem_ref);
         }
 
         Bytecode::VecPushBack(_) => {

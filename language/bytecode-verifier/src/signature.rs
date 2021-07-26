@@ -180,12 +180,13 @@ impl<'a> SignatureChecker<'a> {
                 | VecPushBack(idx) | VecPopBack(idx) | VecDestroyEmpty(idx) | VecSwap(idx) => {
                     let type_arguments = &self.resolver.signature_at(*idx).0;
                     if type_arguments.len() != 1 {
-                        return Err(PartialVMError::new(StatusCode::TYPE_MISMATCH).with_message(
-                            format!(
-                                "expected 1 type token for vector operations, got {}",
-                                type_arguments.len()
-                            ),
-                        ));
+                        return Err(PartialVMError::new(
+                            StatusCode::NUMBER_OF_TYPE_ARGUMENTS_MISMATCH,
+                        )
+                        .with_message(format!(
+                            "expected 1 type token for vector operations, got {}",
+                            type_arguments.len()
+                        )));
                     }
                     self.check_signature_tokens(type_arguments)
                 }

@@ -348,7 +348,7 @@ fn borrow_vector_element(
     verifier: &mut TypeSafetyChecker,
     declared_element_type: &SignatureToken,
     offset: CodeOffset,
-    mut_: bool,
+    mut_ref_only: bool,
 ) -> PartialVMResult<()> {
     let operand_idx = verifier.stack.pop().unwrap();
     let operand_vec = verifier.stack.pop().unwrap();
@@ -359,11 +359,11 @@ fn borrow_vector_element(
     }
 
     // check vector and update stack
-    let element_type = match get_vector_element_type(operand_vec, mut_) {
+    let element_type = match get_vector_element_type(operand_vec, mut_ref_only) {
         Some(ty) if &ty == declared_element_type => ty,
         _ => return Err(verifier.error(StatusCode::TYPE_MISMATCH, offset)),
     };
-    let element_ref_type = if mut_ {
+    let element_ref_type = if mut_ref_only {
         ST::MutableReference(Box::new(element_type))
     } else {
         ST::Reference(Box::new(element_type))
@@ -838,11 +838,14 @@ fn instantiate(token: &SignatureToken, subst: &Signature) -> SignatureToken {
     }
 }
 
-fn get_vector_element_type(vector_ref_ty: SignatureToken, mut_: bool) -> Option<SignatureToken> {
+fn get_vector_element_type(
+    vector_ref_ty: SignatureToken,
+    mut_ref_only: bool,
+) -> Option<SignatureToken> {
     use SignatureToken::*;
     match vector_ref_ty {
         Reference(referred_type) => {
-            if mut_ {
+            if mut_ref_only {
                 None
             } else if let ST::Vector(element_type) = *referred_type {
                 Some(*element_type)
@@ -851,9 +854,7 @@ fn get_vector_element_type(vector_ref_ty: SignatureToken, mut_: bool) -> Option<
             }
         }
         MutableReference(referred_type) => {
-            if !mut_ {
-                None
-            } else if let ST::Vector(element_type) = *referred_type {
+            if let ST::Vector(element_type) = *referred_type {
                 Some(*element_type)
             } else {
                 None
