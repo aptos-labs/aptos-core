@@ -1,0 +1,17 @@
+//# run
+main() {
+    _ = vec_empty<u64, bool>();
+    return;
+}
+
+//# run
+main() {
+    _ = vec_empty<>();
+    return;
+}
+
+//# run
+main() {
+    _ = vec_empty<&u64>();
+    return;
+}

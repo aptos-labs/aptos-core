@@ -1,0 +1,55 @@
+processed 6 tasks
+
+task 0 'run'. lines 1-6:
+Error: Script execution failed with VMError: {
+    major_status: STLOC_TYPE_MISMATCH_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+}
+
+task 1 'run'. lines 8-17:
+Error: Script execution failed with VMError: {
+    major_status: STLOC_TYPE_MISMATCH_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 3)],
+}
+
+task 2 'run'. lines 19-30:
+Error: Script execution failed with VMError: {
+    major_status: STLOC_TYPE_MISMATCH_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 6)],
+}
+
+task 3 'run'. lines 32-44:
+Error: Script execution failed with VMError: {
+    major_status: TYPE_MISMATCH,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 8)],
+}
+
+task 4 'run'. lines 46-58:
+Error: Script execution failed with VMError: {
+    major_status: TYPE_MISMATCH,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 6)],
+}
+
+task 5 'run'. lines 60-74:
+Error: Script execution failed with VMError: {
+    major_status: STLOC_TYPE_MISMATCH_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+}

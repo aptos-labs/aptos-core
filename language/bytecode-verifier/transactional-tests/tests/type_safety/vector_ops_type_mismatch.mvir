@@ -1,0 +1,74 @@
+//# run
+main() {
+    let v: vector<u8>;
+    v = vec_empty<bool>();
+    return;
+}
+
+//# run
+main() {
+    let v: vector<u8>;
+    let v_mut: &mut vector<bool>;
+
+    v = vec_empty<u8>();
+    v_mut = &mut v;
+
+    return;
+}
+
+//# run
+main() {
+    let v: vector<u8>;
+    let v_imm: &vector<u8>;
+    let v_len: u8;
+
+    v = vec_empty<u8>();
+    v_imm = &v;
+    v_len = vec_len<u8>(move(v_imm));
+
+    return;
+}
+
+//# run
+main() {
+    let v: vector<u8>;
+    let v_mut: &mut vector<u8>;
+    let e: u64;
+
+    e = 0;
+    v = vec_empty<u8>();
+    v_mut = &mut v;
+    vec_push_back<u8>(move(v_mut), move(e));
+
+    return;
+}
+
+//# run
+main() {
+    let v: vector<u8>;
+    let v_mut: &mut vector<u8>;
+    let e: u64;
+
+    v = vec_empty<u8>();
+    v_mut = &mut v;
+    vec_push_back<u8>(copy(v_mut), 0);
+
+    e = vec_pop_back<u8>(move(v_mut));
+    return;
+}
+
+//# run
+main() {
+    let v: vector<u8>;
+    let v_mut: &mut vector<u8>;
+    let i1: u8;
+    let i2: u128;
+
+    i1 = 0;
+    i2 = 1;
+    v = vec_empty<u8>();
+    v_mut = &mut v;
+    vec_swap<u8>(move(v_mut), move(i1), move(i2));
+
+    return;
+}
