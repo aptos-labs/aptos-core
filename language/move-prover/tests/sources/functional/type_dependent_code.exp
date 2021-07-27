@@ -1,0 +1,40 @@
+Move prover returns: exiting with boogie verification errors
+error: abort not covered by any of the `aborts_if` clauses
+   ┌─ tests/sources/functional/type_dependent_code.move:10:5
+   │
+ 8 │           move_to<S<u8>>(&account, S { x: 0 });
+   │           ------- abort happened here with execution failure
+ 9 │       }
+10 │ ╭     spec extract {
+11 │ │         aborts_if exists<S<X>>(Signer::spec_address_of(account));
+12 │ │         aborts_if exists<S<u8>>(Signer::spec_address_of(account));
+13 │ │
+   · │
+19 │ │         // abort condition.
+20 │ │     }
+   │ ╰─────^
+   │
+   =     at tests/sources/functional/type_dependent_code.move:6: extract
+   =         account = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/functional/type_dependent_code.move:7: extract
+   =     at tests/sources/functional/type_dependent_code.move:8: extract
+   =     at tests/sources/functional/type_dependent_code.move:8: extract
+   =         ABORTED
+
+error: function does not abort under this condition
+   ┌─ tests/sources/functional/type_dependent_code.move:35:9
+   │
+35 │         aborts_if !exists<S<X>>(Signer::spec_address_of(account));
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/type_dependent_code.move:28: extract
+   =         account = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/functional/type_dependent_code.move:29: extract
+   =     at tests/sources/functional/type_dependent_code.move:30: extract
+   =         r = <redacted>
+   =     at tests/sources/functional/type_dependent_code.move:31: extract
+   =     at tests/sources/functional/type_dependent_code.move:32: extract
+   =     at tests/sources/functional/type_dependent_code.move:34
+   =     at tests/sources/functional/type_dependent_code.move:35
