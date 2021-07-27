@@ -226,13 +226,23 @@ impl<'a> Instrumenter<'a> {
 
         let inv_ana_data = global_env.get_extension::<InvariantAnalysisData>().unwrap();
         let disabled_inv_fun_set = &inv_ana_data.disabled_inv_fun_set;
+        let non_inv_fun_set = &inv_ana_data.non_inv_fun_set;
         let target_invariants = &inv_ana_data.target_invariants;
+        let disabled_invs_for_fun = &inv_ana_data.disabled_invs_for_fun;
 
         // Extract and clear current code
         let old_code = std::mem::take(&mut self.builder.data.code);
 
         // Emit entrypoint assumptions
-        let entrypoint_invariants = self.filter_entrypoint_invariants(&self.related_invariants);
+        let mut entrypoint_invariants = self.filter_entrypoint_invariants(&self.related_invariants);
+        if non_inv_fun_set.contains(&fun_id) {
+            if let Some(invs_disabled) = disabled_invs_for_fun.get(&fun_id) {
+                entrypoint_invariants = entrypoint_invariants
+                    .difference(invs_disabled)
+                    .cloned()
+                    .collect();
+            }
+        }
         let xlated_spec = SpecTranslator::translate_invariants_by_id(
             self.options.auto_trace_level.invariants(),
             &mut self.builder,
@@ -426,7 +436,8 @@ impl<'a> Instrumenter<'a> {
                 .difference(entrypoint_invariants)
                 .cloned()
                 .collect();
-            // assert the invariants that are modified by the called function
+            // assume the invariants that are modified by the called function
+            // TODO: Check whether we can use inv_ana_data.invs_modified_by_fun here.
             let modified_invs =
                 self.get_invs_modified_by_fun(&invs_to_assume, called_fun_id, funs_that_modify_inv);
             self.emit_assumes_and_saves_before_bytecode(modified_invs, entrypoint_invariants);
