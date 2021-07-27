@@ -1,0 +1,22 @@
+\SubSection{Specification Injection}
+
+Move specifications -- function specifications, data invariants, and global
+invariants -- are transformed in assume/assert statements. While in the actual
+implementation this happens as a bytecode transformation, we illustrate the
+approach here again by a source level transformation into |spec assert p| and
+|spec assume p| Move level statements. As usual, the assert postulates something
+which must be proven, and the assume something which can be assumed to hold for
+a prove. All specification constructs in Move are reduced to this basic format,
+as discussed below.
+
+\SubSubSection{Functions}
+
+
+\SubSubSection{Modular Verification}
+\SubSubSection{Data Invariants}
+\SubSubSection{Global Invariants}
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "main"
+%%% End:
