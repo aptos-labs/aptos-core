@@ -17,10 +17,11 @@ use diem_secure_storage::{CryptoStorage, KVStorage, VaultStorage};
 pub struct K8sFactory {
     root_key: [u8; ED25519_PRIVATE_KEY_LENGTH],
     treasury_compliance_key: [u8; ED25519_PRIVATE_KEY_LENGTH],
+    helm_repo: String,
 }
 
 impl K8sFactory {
-    pub fn new() -> std::result::Result<K8sFactory, Error> {
+    pub fn new(helm_repo: String) -> std::result::Result<K8sFactory, Error> {
         let vault_addr = env::var("VAULT_ADDR")
             .map_err(|_| format_err!("Expected environment variable VAULT_ADDR"))?;
         let vault_cacert = env::var("VAULT_CACERT")
@@ -59,6 +60,7 @@ impl K8sFactory {
         Ok(Self {
             root_key,
             treasury_compliance_key,
+            helm_repo,
         })
     }
 }
@@ -67,7 +69,11 @@ impl Factory for K8sFactory {
     fn launch_swarm(&self, _node_num: usize) -> Box<dyn Swarm> {
         let rt = Runtime::new().unwrap();
         let swarm = rt
-            .block_on(K8sSwarm::new(&self.root_key, &self.treasury_compliance_key))
+            .block_on(K8sSwarm::new(
+                &self.root_key,
+                &self.treasury_compliance_key,
+                &self.helm_repo,
+            ))
             .unwrap();
         Box::new(swarm)
     }

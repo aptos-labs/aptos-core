@@ -35,8 +35,6 @@ const HEALTH_CHECK_URL: &str = "http://127.0.0.1:8001";
 const KUBECTL_BIN: &str = "kubectl";
 const HELM_BIN: &str = "helm";
 const JSON_RPC_PORT: u32 = 80;
-const DEFL_NUM_VALIDATORS: usize = 30;
-const DEFL_HELM_REPO_NAME: &str = "testnet-internal";
 const VALIDATOR_LB: &str = "validator-fullnode-lb";
 
 pub struct K8sSwarm {
@@ -47,11 +45,16 @@ pub struct K8sSwarm {
     designated_dealer_account: LocalAccount,
     kube_client: K8sClient,
     runtime: Runtime,
+    helm_repo: String,
     pub chain_id: ChainId,
 }
 
 impl K8sSwarm {
-    pub async fn new(root_key: &[u8], treasury_compliance_key: &[u8]) -> Result<Self> {
+    pub async fn new(
+        root_key: &[u8],
+        treasury_compliance_key: &[u8],
+        helm_repo: &str,
+    ) -> Result<Self> {
         Command::new(KUBECTL_BIN).arg("proxy").spawn()?;
         diem_retrier::retry_async(k8s_retry_strategy(), || {
             Box::pin(async move {
@@ -138,6 +141,7 @@ impl K8sSwarm {
             kube_client,
             runtime: Runtime::new().unwrap(),
             chain_id: ChainId::new(NamedChain::DEVNET.id()),
+            helm_repo: helm_repo.to_string(),
         })
     }
 
@@ -159,7 +163,9 @@ impl K8sSwarm {
 impl Drop for K8sSwarm {
     // When the K8sSwarm struct goes out of scope we need to wipe the chain state
     fn drop(&mut self) {
-        clean_k8s_cluster_internal();
+        clean_k8s_cluster(self.helm_repo.clone(), self.validators.len())
+            .map_err(|err| format_err!("Failed to clean k8s cluster with new genesis: {}", err))
+            .unwrap();
     }
 }
 
@@ -297,12 +303,6 @@ fn load_root_key(root_key_bytes: &[u8]) -> Ed25519PrivateKey {
 
 fn load_tc_key(tc_key_bytes: &[u8]) -> Ed25519PrivateKey {
     Ed25519PrivateKey::try_from(tc_key_bytes).unwrap()
-}
-
-fn clean_k8s_cluster_internal() {
-    clean_k8s_cluster(DEFL_HELM_REPO_NAME.to_string(), DEFL_NUM_VALIDATORS)
-        .map_err(|err| format_err!("Failed to clean k8s cluster with new genesis: {}", err))
-        .unwrap()
 }
 
 pub fn clean_k8s_cluster(

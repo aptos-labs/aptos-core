@@ -63,7 +63,11 @@ fn main() -> Result<()> {
             &args.options,
         )
     } else {
-        forge_main(k8s_test_suite(), K8sFactory::new().unwrap(), &args.options)
+        forge_main(
+            k8s_test_suite(),
+            K8sFactory::new(args.helm_repo).unwrap(),
+            &args.options,
+        )
     }
 }
 
