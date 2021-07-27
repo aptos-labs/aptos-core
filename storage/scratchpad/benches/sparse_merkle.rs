@@ -49,11 +49,13 @@ impl Group {
             group.bench_function(BenchmarkId::new("serial_update", block_size), |b| {
                 b.iter_batched(
                     || small_batches.clone(),
-                    |small_batches| {
+                    // return the resulting smt so the cost of Dropping it is not counted
+                    |small_batches| -> SparseMerkleTree<AccountStateBlob> {
                         block
                             .smt
                             .serial_update(small_batches, &block.proof_reader)
-                            .unwrap();
+                            .unwrap()
+                            .1
                     },
                     BatchSize::LargeInput,
                 )
@@ -61,11 +63,13 @@ impl Group {
             group.bench_function(BenchmarkId::new("batches_update", block_size), |b| {
                 b.iter_batched(
                     || small_batches.clone(),
-                    |small_batches| {
+                    // return the resulting smt so the cost of Dropping it is not counted
+                    |small_batches| -> SparseMerkleTree<AccountStateBlob> {
                         block
                             .smt
                             .batches_update(small_batches, &block.proof_reader)
-                            .unwrap();
+                            .unwrap()
+                            .1
                     },
                     BatchSize::LargeInput,
                 )
@@ -75,11 +79,13 @@ impl Group {
                 |b| {
                     b.iter_batched(
                         || one_large_batch.clone(),
-                        |one_large_batch| {
+                        // return the resulting smt so the cost of Dropping it is not counted
+                        |one_large_batch| -> SparseMerkleTree<AccountStateBlob> {
                             block
                                 .smt
                                 .batches_update(vec![one_large_batch], &block.proof_reader)
-                                .unwrap();
+                                .unwrap()
+                                .1
                         },
                         BatchSize::LargeInput,
                     )
@@ -88,11 +94,12 @@ impl Group {
             group.bench_function(BenchmarkId::new("batch_update", block_size), |b| {
                 b.iter_batched(
                     || one_large_batch.clone(),
-                    |one_large_batch| {
+                    // return the resulting smt so the cost of Dropping it is not counted
+                    |one_large_batch| -> SparseMerkleTree<AccountStateBlob> {
                         block
                             .smt
                             .batch_update(one_large_batch, &block.proof_reader)
-                            .unwrap();
+                            .unwrap()
                     },
                     BatchSize::LargeInput,
                 )
