@@ -14,8 +14,7 @@ use diem_sdk::{
         AccountKey, LocalAccount, PeerId,
     },
 };
-use k8s_openapi::api::batch::v1::Job;
-use k8s_openapi::api::core::v1::Service;
+use k8s_openapi::api::{batch::v1::Job, core::v1::Service};
 use kube::{
     api::{Api, ListParams},
     client::Client as K8sClient,
@@ -386,7 +385,7 @@ pub fn clean_k8s_cluster(
                 match status.succeeded {
                     Some(1) => {
                         println!("Genesis job completed");
-                        return Ok(());
+                        Ok(())
                     }
                     _ => bail!("Genesis job not completed"),
                 }
