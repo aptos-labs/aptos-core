@@ -3255,6 +3255,7 @@ dependencies = [
  "rand 0.8.3",
  "rand_core 0.6.2",
  "rayon",
+ "regex",
  "reqwest",
  "serde",
  "serde_json",
