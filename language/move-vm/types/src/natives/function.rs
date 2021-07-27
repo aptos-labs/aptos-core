@@ -20,9 +20,9 @@ use crate::{gas_schedule::NativeCostIndex, values::Value};
 use move_core_types::gas_schedule::{
     AbstractMemorySize, CostTable, GasAlgebra, GasCarrier, InternalGasUnits,
 };
-use smallvec::SmallVec;
+use smallvec::{smallvec, SmallVec};
 
-pub use move_binary_format::errors::PartialVMError;
+pub use move_binary_format::errors::{PartialVMError, PartialVMResult};
 pub use move_core_types::vm_status::StatusCode;
 
 /// Result of a native function execution requires charges for execution cost.
@@ -59,6 +59,48 @@ impl NativeResult {
             cost,
             result: Err(abort_code),
         }
+    }
+
+    /// Convert a PartialVMResult<()> into a PartialVMResult<NativeResult>
+    pub fn map_partial_vm_result_empty(
+        cost: InternalGasUnits<GasCarrier>,
+        res: PartialVMResult<()>,
+    ) -> PartialVMResult<Self> {
+        let result = match res {
+            Ok(_) => NativeResult::ok(cost, smallvec![]),
+            Err(err) if err.major_status() == StatusCode::ABORTED => {
+                let (_, abort_code, _, _, _) = err.all_data();
+                NativeResult::err(
+                    cost,
+                    abort_code.unwrap_or(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR as u64),
+                )
+            }
+            Err(err) => {
+                return Err(err);
+            }
+        };
+        Ok(result)
+    }
+
+    /// Convert a PartialVMResult<Value> into a PartialVMResult<NativeResult>
+    pub fn map_partial_vm_result_one(
+        cost: InternalGasUnits<GasCarrier>,
+        res: PartialVMResult<Value>,
+    ) -> PartialVMResult<Self> {
+        let result = match res {
+            Ok(val) => NativeResult::ok(cost, smallvec![val]),
+            Err(err) if err.major_status() == StatusCode::ABORTED => {
+                let (_, abort_code, _, _, _) = err.all_data();
+                NativeResult::err(
+                    cost,
+                    abort_code.unwrap_or(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR as u64),
+                )
+            }
+            Err(err) => {
+                return Err(err);
+            }
+        };
+        Ok(result)
     }
 }
 

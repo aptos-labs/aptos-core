@@ -1,7 +1,6 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::natives::function::NativeResult;
 use move_binary_format::{
     errors::*,
     file_format::{Constant, SignatureToken},
@@ -9,13 +8,12 @@ use move_binary_format::{
 use move_core_types::{
     account_address::AccountAddress,
     gas_schedule::{
-        AbstractMemorySize, GasAlgebra, GasCarrier, InternalGasUnits, CONST_SIZE,
-        MIN_EXISTS_DATA_SIZE, REFERENCE_SIZE, STRUCT_SIZE,
+        AbstractMemorySize, GasAlgebra, GasCarrier, CONST_SIZE, MIN_EXISTS_DATA_SIZE,
+        REFERENCE_SIZE, STRUCT_SIZE,
     },
     value::{MoveStructLayout, MoveTypeLayout},
     vm_status::{sub_status::NFE_VECTOR_ERROR_BASE, StatusCode},
 };
-use smallvec::smallvec;
 use std::{
     cell::RefCell,
     fmt::{self, Debug, Display},
@@ -1531,7 +1529,7 @@ impl IntegerValue {
 
 pub const INDEX_OUT_OF_BOUNDS: u64 = NFE_VECTOR_ERROR_BASE + 1;
 pub const POP_EMPTY_VEC: u64 = NFE_VECTOR_ERROR_BASE + 2;
-pub const DESTROY_NON_EMPTY_VEC: u64 = NFE_VECTOR_ERROR_BASE + 3;
+pub const VEC_UNPACK_PARITY_MISMATCH: u64 = NFE_VECTOR_ERROR_BASE + 3;
 
 fn check_elem_layout(ty: &Type, v: &Container) -> PartialVMResult<()> {
     match (ty, v) {
@@ -1583,7 +1581,6 @@ impl VectorRef {
             Container::VecBool(r) => r.borrow().len(),
             Container::VecAddress(r) => r.borrow().len(),
             Container::Vec(r) => r.borrow().len(),
-
             Container::Locals(_) | Container::Struct(_) => unreachable!(),
         };
         Ok(Value::u64(len as u64))
@@ -1600,42 +1597,31 @@ impl VectorRef {
             Container::VecBool(r) => r.borrow_mut().push(e.value_as()?),
             Container::VecAddress(r) => r.borrow_mut().push(e.value_as()?),
             Container::Vec(r) => r.borrow_mut().push(e.0),
-
             Container::Locals(_) | Container::Struct(_) => unreachable!(),
         }
-        self.0.mark_dirty();
 
+        self.0.mark_dirty();
         Ok(())
     }
 
-    pub fn borrow_elem(
-        &self,
-        idx: usize,
-        cost: InternalGasUnits<GasCarrier>,
-        type_param: &Type,
-    ) -> PartialVMResult<NativeResult> {
+    pub fn borrow_elem(&self, idx: usize, type_param: &Type) -> PartialVMResult<Value> {
         let c = self.0.container();
         check_elem_layout(type_param, c)?;
         if idx >= c.len() {
-            return Ok(NativeResult::err(cost, INDEX_OUT_OF_BOUNDS));
+            return Err(
+                PartialVMError::new(StatusCode::ABORTED).with_sub_status(INDEX_OUT_OF_BOUNDS)
+            );
         }
-        Ok(NativeResult::ok(
-            cost,
-            smallvec![Value(self.0.borrow_elem(idx)?)],
-        ))
+        Ok(Value(self.0.borrow_elem(idx)?))
     }
 
-    pub fn pop(
-        &self,
-        cost: InternalGasUnits<GasCarrier>,
-        type_param: &Type,
-    ) -> PartialVMResult<NativeResult> {
+    pub fn pop(&self, type_param: &Type) -> PartialVMResult<Value> {
         let c = self.0.container();
         check_elem_layout(type_param, c)?;
 
         macro_rules! err_pop_empty_vec {
             () => {
-                return Ok(NativeResult::err(cost, POP_EMPTY_VEC));
+                return Err(PartialVMError::new(StatusCode::ABORTED).with_sub_status(POP_EMPTY_VEC));
             };
         }
 
@@ -1660,27 +1646,18 @@ impl VectorRef {
                 Some(x) => Value::address(x),
                 None => err_pop_empty_vec!(),
             },
-
             Container::Vec(r) => match r.borrow_mut().pop() {
                 Some(x) => Value(x),
                 None => err_pop_empty_vec!(),
             },
-
             Container::Locals(_) | Container::Struct(_) => unreachable!(),
         };
 
         self.0.mark_dirty();
-
-        Ok(NativeResult::ok(cost, smallvec![res]))
+        Ok(res)
     }
 
-    pub fn swap(
-        &self,
-        idx1: usize,
-        idx2: usize,
-        cost: InternalGasUnits<GasCarrier>,
-        type_param: &Type,
-    ) -> PartialVMResult<NativeResult> {
+    pub fn swap(&self, idx1: usize, idx2: usize, type_param: &Type) -> PartialVMResult<()> {
         let c = self.0.container();
         check_elem_layout(type_param, c)?;
 
@@ -1688,7 +1665,8 @@ impl VectorRef {
             ($v: expr) => {{
                 let mut v = $v.borrow_mut();
                 if idx1 >= v.len() || idx2 >= v.len() {
-                    return Ok(NativeResult::err(cost, INDEX_OUT_OF_BOUNDS));
+                    return Err(PartialVMError::new(StatusCode::ABORTED)
+                        .with_sub_status(INDEX_OUT_OF_BOUNDS));
                 }
                 v.swap(idx1, idx2);
             }};
@@ -1701,31 +1679,53 @@ impl VectorRef {
             Container::VecBool(r) => swap!(r),
             Container::VecAddress(r) => swap!(r),
             Container::Vec(r) => swap!(r),
-
             Container::Locals(_) | Container::Struct(_) => unreachable!(),
         }
 
         self.0.mark_dirty();
-
-        Ok(NativeResult::ok(cost, smallvec![]))
+        Ok(())
     }
 }
 
 impl Vector {
-    pub fn empty(
-        cost: InternalGasUnits<GasCarrier>,
-        type_param: &Type,
-    ) -> PartialVMResult<NativeResult> {
+    pub fn pack(type_param: &Type, elements: Vec<Value>) -> PartialVMResult<Value> {
         let container = match type_param {
-            Type::U8 => Value::vector_u8(iter::empty::<u8>()),
-            Type::U64 => Value::vector_u64(iter::empty::<u64>()),
-            Type::U128 => Value::vector_u128(iter::empty::<u128>()),
-            Type::Bool => Value::vector_bool(iter::empty::<bool>()),
-            Type::Address => Value::vector_address(iter::empty::<AccountAddress>()),
+            Type::U8 => Value::vector_u8(
+                elements
+                    .into_iter()
+                    .map(|v| v.value_as())
+                    .collect::<PartialVMResult<Vec<_>>>()?,
+            ),
+            Type::U64 => Value::vector_u64(
+                elements
+                    .into_iter()
+                    .map(|v| v.value_as())
+                    .collect::<PartialVMResult<Vec<_>>>()?,
+            ),
+            Type::U128 => Value::vector_u128(
+                elements
+                    .into_iter()
+                    .map(|v| v.value_as())
+                    .collect::<PartialVMResult<Vec<_>>>()?,
+            ),
+            Type::Bool => Value::vector_bool(
+                elements
+                    .into_iter()
+                    .map(|v| v.value_as())
+                    .collect::<PartialVMResult<Vec<_>>>()?,
+            ),
+            Type::Address => Value::vector_address(
+                elements
+                    .into_iter()
+                    .map(|v| v.value_as())
+                    .collect::<PartialVMResult<Vec<_>>>()?,
+            ),
 
+            // TODO: it feels weird that the the elements for primitive types are checked but the
+            // checking is skipped for complex types.
             Type::Signer | Type::Vector(_) | Type::Struct(_) | Type::StructInstantiation(_, _) => {
                 Value(ValueImpl::Container(Container::Vec(Rc::new(RefCell::new(
-                    vec![],
+                    elements.into_iter().map(|v| v.0).collect(),
                 )))))
             }
 
@@ -1737,32 +1737,50 @@ impl Vector {
             }
         };
 
-        Ok(NativeResult::ok(cost, smallvec![container]))
+        Ok(container)
     }
 
-    pub fn destroy_empty(
-        self,
-        cost: InternalGasUnits<GasCarrier>,
-        type_param: &Type,
-    ) -> PartialVMResult<NativeResult> {
+    pub fn empty(type_param: &Type) -> PartialVMResult<Value> {
+        Self::pack(type_param, vec![])
+    }
+
+    pub fn unpack(self, type_param: &Type, expected_num: u64) -> PartialVMResult<Vec<Value>> {
         check_elem_layout(type_param, &self.0)?;
-
-        let is_empty = match &self.0 {
-            Container::VecU8(r) => r.borrow().is_empty(),
-            Container::VecU64(r) => r.borrow().is_empty(),
-            Container::VecU128(r) => r.borrow().is_empty(),
-            Container::VecBool(r) => r.borrow().is_empty(),
-            Container::VecAddress(r) => r.borrow().is_empty(),
-            Container::Vec(r) => r.borrow().is_empty(),
-
+        let elements: Vec<_> = match self.0 {
+            Container::VecU8(r) => take_unique_ownership(r)?
+                .into_iter()
+                .map(Value::u8)
+                .collect(),
+            Container::VecU64(r) => take_unique_ownership(r)?
+                .into_iter()
+                .map(Value::u64)
+                .collect(),
+            Container::VecU128(r) => take_unique_ownership(r)?
+                .into_iter()
+                .map(Value::u128)
+                .collect(),
+            Container::VecBool(r) => take_unique_ownership(r)?
+                .into_iter()
+                .map(Value::bool)
+                .collect(),
+            Container::VecAddress(r) => take_unique_ownership(r)?
+                .into_iter()
+                .map(Value::address)
+                .collect(),
+            Container::Vec(r) => take_unique_ownership(r)?.into_iter().map(Value).collect(),
             Container::Locals(_) | Container::Struct(_) => unreachable!(),
         };
-
-        if is_empty {
-            Ok(NativeResult::ok(cost, smallvec![]))
+        if expected_num as usize == elements.len() {
+            Ok(elements)
         } else {
-            Ok(NativeResult::err(cost, DESTROY_NON_EMPTY_VEC))
+            Err(PartialVMError::new(StatusCode::ABORTED)
+                .with_sub_status(VEC_UNPACK_PARITY_MISMATCH))
         }
+    }
+
+    pub fn destroy_empty(self, type_param: &Type) -> PartialVMResult<()> {
+        self.unpack(type_param, 0)?;
+        Ok(())
     }
 }
 
