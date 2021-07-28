@@ -308,8 +308,8 @@ impl Function {
     }
 }
 
-impl From<&TypeTag> for Type {
-    fn from(ty: &TypeTag) -> Type {
+impl From<TypeTag> for Type {
+    fn from(ty: TypeTag) -> Type {
         use Type::*;
         match ty {
             TypeTag::Bool => Bool,
@@ -318,12 +318,12 @@ impl From<&TypeTag> for Type {
             TypeTag::U128 => U128,
             TypeTag::Address => Address,
             TypeTag::Signer => Signer,
-            TypeTag::Vector(ty) => Vector(Box::new(Type::from(&**ty))),
+            TypeTag::Vector(ty) => Vector(Box::new(Type::from(*ty))),
             TypeTag::Struct(s) => Struct {
                 address: s.address,
-                module: s.module.clone(),
-                name: s.name.clone(),
-                type_arguments: s.type_params.iter().map(|ty| ty.into()).collect(),
+                module: s.module,
+                name: s.name,
+                type_arguments: s.type_params.into_iter().map(|ty| ty.into()).collect(),
             },
         }
     }
