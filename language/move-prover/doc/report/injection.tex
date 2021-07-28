@@ -1,20 +1,183 @@
 \SubSection{Specification Injection}
 
-Move specifications -- function specifications, data invariants, and global
-invariants -- are transformed in assume/assert statements. While in the actual
-implementation this happens as a bytecode transformation, we illustrate the
-approach here again by a source level transformation into |spec assert p| and
-|spec assume p| Move level statements. As usual, the assert postulates something
-which must be proven, and the assume something which can be assumed to hold for
-a prove. All specification constructs in Move are reduced to this basic format,
-as discussed below.
+Move specifications are reduced to basic assume/assert statements injected into
+the Move code. As usual, an assume statement formulates a condition which can be
+assumed to hold for verification at a given program point, whereas an assert
+statement a condition which needs to be verified.
 
-\SubSubSection{Functions}
+
+Specification instrumentation starts from a program for which references have
+been removed, and mutation is transformed into a read-update-write cycle
+(Sec.~\ref{sec:RefElim}).
 
 
 \SubSubSection{Modular Verification}
+\label{sec:ModularVerification}
+
+Modular verification applies to all types of injections, and its principles are
+therefore described first. When the Move prover is run, it takes as input a set
+of Move modules which is closed under the transitive dependency relation (module
+imports). However, only a subset of those modules are \emph{verification target}
+(typically just one module). It is assumed that the tool environment ensures
+that modules in the dependency relation which are not target of verification
+have already successfully verified.
+
+From the set of target modules, the set of \emph{target functions} is
+derived. This set might be enriched by additional functions which need
+verification because of global invariants, as discussed in
+Sec.~\ref{sec:GlobalInvariants}. The resulting set of target functions will then
+be verified one-by-one, assuming that any called functions have successfully
+verified. If a called function is among the target functions, it might in fact
+not verify; however, in this case a verification error will be reported at the
+called function, and the verification result at the caller side can be ignored.
+
+\SubSubSection{Function Specifications}
+
+The injection of basic function specifications is illustrated in
+Fig.~\ref{fig:RequiresEnsuresAbortsIf}.  An extension of the Move source
+language is used to specify abort behavior. With~%
+|fun f() { .. } onabort { conditions }| a Move function is defined where
+|conditions| are assume or assert statements that are evaluated at every program
+point the function aborts (either implicitly or with an |abort| statement). This
+construct simplifies the presentation and corresponds to a per-function abort
+block on bytecode level which is target of branching.
+
+\begin{figure}[t!]
+  \caption{Requires, Ensures, and AbortsIf Injection}
+  \label{fig:RequiresEnsuresAbortsIf}
+  \centering
+\begin{MoveBox}
+  fun f(x: u64, y: u64): u64 { x + y }
+  spec f {
+    requires x < y;
+    aborts_if x + y > MAX_U64;
+    ensures result == x + y;
+  }
+  fun g(x: u64): u64 { f(x, x + 1) }
+  spec g {
+    ensures result > x;
+  }
+  @\transform@
+  fun f(x: u64, y: u64): u64 {
+    // requires
+    spec assume x < y;
+    let result = x + y;
+    // ensures
+    spec assert result == x + y;
+    // abort_if must not hold
+    spec assert !(x + y > MAX_U64); @\label{line:aborts_holds_not}@
+    result
+  } onabort {
+    // abort_if must hold
+    spec assert x + y > MAX_U64; @\label{line:aborts_holds}@
+  }
+  fun g(x: u64): u64 {
+    // requires of f
+    spec assert x < x + 1;
+@$\textrm{\it if inlined}$\label{line:inline}@
+    // inlined call to f
+    let result = inline f(x, x + 1);
+@$\textrm{\it elif opaque}$\label{line:opaque}@
+    // aborts_if of f
+    if (x + x + 1 > MAX_U64) abort;
+    // ensures of f
+    spec assume result == x + x + 1;
+@$\textrm{\it endif}$@
+    // ensures of g
+    spec assert result > x;
+    result
+  }
+\end{MoveBox}
+\end{figure}
+
+An aborts condition is translated into two different asserts: one where the
+function aborts and the condition must hold (line~\ref{line:aborts_holds}), and
+one where it returns and the condition must \emph{not} hold
+(line~\ref{line:aborts_holds_not}). If there are multiple |aborts_if|, they are
+or-ed. If there is no aborts condition, no asserts are generated. This means
+that once a user specifies aborts conditions, they must completely cover the
+abort behavior of the code. (The prover also provides an option to relax this
+behavior, where aborts conditions can be partial and are only enforced on
+function return.)
+
+For a function call site we distinguish two variants: the call is \emph{inlined}
+(line~\ref{line:inline}) or it is \emph{opaque} (line~\ref{line:opaque}). In
+both cases, it is assumed that the called function is verified (see Modular
+Verification, Sec.~\ref{sec:ModularVerification}). For inlined calls, the
+function definition, with all injected assumptions and assertions turned into
+assumptions (as those are considered proven) is substituted. For opaque
+functions the specification conditions are inserted as
+assumptions. Methodlogically, opaque functions need precise specificatons
+relative to a particular objective, where as in the case of inlined functions
+the code is still the source of truth and specifications can be partial or
+omitted. However, inlining does not scale arbitrarily, and can be only used for
+small function systems.
+
+\Paragraph{Modifies Condition}
+
+\begin{figure}[t!]
+  \caption{Modifies Injection}
+  \label{fig:Modifies}
+  \centering
+\begin{MoveBox}
+  fun f(addr: address) { move_to<T>(addr, T{}) }
+  spec f {
+    pragma opaque;
+    ensures exists<T>(addr);
+    modifies global<T>(addr);
+  }
+  fun g() { f(0x1) }
+  spec g {
+    modifies global<T>(0x1), global<T>(0x2);
+  }
+  @\transform@
+  fun f(addr: address) {
+    let can_modify_T = {addr};
+    // check whether move_to can be called
+    spec assert addr in can_modify;
+    move_to<T>(addr, T{});
+  }
+  fun g() {
+    let can_modify_T = {0x1, 0x2};
+    // check whether f can be called
+    spec assert 0x1 in can_modify_T;
+    // havoc the memory f modifies
+    spec havoc global<T>(0x1);
+    // ensures of f
+    spec assume exists<T>(0x1);
+  }
+\end{MoveBox}
+\end{figure}
+
+
+The |modifies| condition, part of a function specification, is implemented in a
+particular way.  Part of it is realized by a static type check analysis, and
+part of it injected as assertions. Fig.~\ref{fig:Modifies} illustrates the
+approach.
+
+The type check ensures that if a function specificies a~%
+|modifies global<T>(addr)|, then all called functions which are \emph{opaque}
+declare modifies for the same type |T|. This is important so we can relate the
+callees memory modifications to that what is allowed on caller side.
+
+At verification time, whenever an operation is performed which modifies memory,
+it is checked whether this is actually allowed. The allowed addresses derived
+from the modifies clause are stored in a set |can_modify_T|. The check is
+perfomed when the primitive |store_global| is called (injected by reference
+elimination), or when an opaque function is called, in which cause we derive the
+modified memory from the callees modifies clause, which is guaranteed to exist
+by static analysis. For opaque functions, we also need to havoc the memory they
+modify; if there is not related ensures for this memory, its value is
+arbitrary. If the function is inlined, we proceed by substituting its code.
+
+
+
 \SubSubSection{Data Invariants}
 \SubSubSection{Global Invariants}
+\label{sec:GlobalInvariants}
+
+
+
 
 %%% Local Variables:
 %%% mode: latex
