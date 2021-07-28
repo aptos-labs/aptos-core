@@ -106,7 +106,7 @@ jobs:
         name: find helm changes
         uses: diem/actions/matches@faadd16607b77dfa2231a8f366883e01717b3225
         with:
-          pattern: '^.github\|^helm\|^developers.diem.com'
+          pattern: '^helm'
       - id: dev-setup-sh-changes
         name: find dev-setup.sh/base docker image changes
         uses: diem/actions/matches@faadd16607b77dfa2231a8f366883e01717b3225
