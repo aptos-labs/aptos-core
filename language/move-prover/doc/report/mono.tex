@@ -1,0 +1,76 @@
+\SubSection{Monomorphization}
+\label{sec:Mono}
+
+Monomorphization is the process of removing all generics from a Move programs.
+It greatly improves the performance of the backend solvers.
+
+\SubSubSection{Generic Functions}
+
+\begin{figure}[t!]
+\caption{Basic Monomorphization}
+\label{fig:Mono}
+\centering
+\begin{MoveBox}
+  fun f<T>(x: T) { g<S<T>>(S(x)) }
+  @\transform@
+  struct given_T{}
+  fun f_T(x: given_T) { g_S_T(S_T(x)) }
+\end{MoveBox}
+\end{figure}
+
+To verify a generic function, monomorphization skolemizes the type parameter
+into a given type. It then, for all functions which are inlined, inserts their
+code specializing it for the given type instantiation, including specialization
+of all used types. Fig.~\ref{fig:Mono} sketches this approach.
+
+The underlying conjecture is that if we verify |f<given_T>|, we have also
+verified for all possible instantiations. However, this statement is
+only correct for code which does not depend on runtime type information.
+
+\SubSubSection{Type Dependent Code}
+
+In Move, types are (almost) not able to influence runtime semantics. There is
+one exception: if memory is indexed by a generic, as in |S<T>|. One can
+essentially implement a generic type check in move:
+
+\begin{Move}
+  fun init() { move_to<S<u64>>(s, S{} }
+  fun is_u64<T>(): bool { exists<S<u64>> }
+\end{Move}
+
+\noindent The important property enabling monomorphization is that we can
+identify such dependencies by looking at the memory accessed by code (and
+injected specifications). Assume that a function |f<T>| accesses memory |S<T>|.
+If the same function also access any instantiation of this memory (say |S<u64>|),
+we need to deal with the case that |S<T>| and |S<u64>| overlap in the effects.
+Specifically, if we just monmorphize into |f_T| which uses |S_T| and |S_u64|, we
+miss any conditions dependent on the case that |T = u64|. Consider the
+following code fragment:
+
+\begin{Move}
+  fun f<T>() { move_to<S<T>>(s, ..); move_to<S<u64>>(s, ..) }
+\end{Move}
+
+\noindent This function aborts in the case that |T = u64|, but not necessary if |T != u64|.
+
+The solution to this problem is that we verify not only |f_T| but also
+|f_u64|. In general, the set of monomorphized instances of a function |f<T>|
+which need to be verified is determined by finding all instantiations of |T|
+that some pair of memory accesses in the function can overlap.
+
+\TODO{}{formalization and proof?}
+
+Notice that even though it is not common in regular Move code to work with both
+memory |S<T>| and, say, |S<u64>| in one function, there is a common scenario
+where such code is implicitly created by injection of global
+invariants. Consider the example in Fig.~\ref{fig:Genericity}. The invariant
+|I1| which works on |S<u64>| is injected into the function |g<R>| which works on
+|S<R>|. When monomorphizing |g|, we need to verify an instance |g_u64| in order
+to ensure that |I1| holds.
+
+
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "main"
+%%% End:
