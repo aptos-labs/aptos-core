@@ -259,7 +259,7 @@ pub enum SpecBlockMember_ {
 pub type SpecBlockMember = Spanned<SpecBlockMember_>;
 
 #[derive(PartialEq, Clone, Debug)]
-pub enum SpecConditionKind {
+pub enum SpecConditionKind_ {
     Assert,
     Assume,
     Decreases,
@@ -274,6 +274,7 @@ pub enum SpecConditionKind {
     InvariantUpdate(Vec<(Name, AbilitySet)>),
     Axiom(Vec<(Name, AbilitySet)>),
 }
+pub type SpecConditionKind = Spanned<SpecConditionKind_>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PragmaProperty_ {
@@ -964,9 +965,9 @@ impl AstDebug for SpecBlockTarget_ {
     }
 }
 
-impl AstDebug for SpecConditionKind {
+impl AstDebug for SpecConditionKind_ {
     fn ast_debug(&self, w: &mut AstWriter) {
-        use SpecConditionKind::*;
+        use SpecConditionKind_::*;
         match self {
             Assert => w.write("assert "),
             Assume => w.write("assume "),
