@@ -234,7 +234,7 @@ impl<T: FootprintDomain> AccessPathTrie<T> {
             match (*data1_opt, data2_opt) {
                 (Some(data1), Some(data2)) => {
                     let mut new_data = data1.clone();
-                    new_data.join(&data2);
+                    new_data.join(data2);
                     self.update_access_path_weak(ap.clone(), Some(new_data));
                 }
                 (None, Some(data)) | (Some(data), None) => {

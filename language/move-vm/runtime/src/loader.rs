@@ -70,9 +70,7 @@ where
     }
 
     fn get(&self, key: &K) -> Option<&Arc<V>> {
-        self.id_map
-            .get(&key)
-            .and_then(|idx| self.binaries.get(*idx))
+        self.id_map.get(key).and_then(|idx| self.binaries.get(*idx))
     }
 }
 
@@ -277,7 +275,7 @@ impl ModuleCache {
     ) -> PartialVMResult<Type> {
         let self_id = module.self_id();
         self.make_type_internal(
-            BinaryIndexedView::Module(&module),
+            BinaryIndexedView::Module(module),
             tok,
             &|struct_name, module_id| {
                 if module_id == &self_id {
@@ -529,7 +527,7 @@ impl Loader {
     // Script verification steps.
     // See `verify_module()` for module verification steps.
     fn verify_script(&self, script: &CompiledScript) -> VMResult<()> {
-        bytecode_verifier::verify_script(&script)
+        bytecode_verifier::verify_script(script)
     }
 
     fn verify_script_dependencies(
@@ -900,7 +898,7 @@ impl Loader {
         }
 
         // module self-check
-        let module = self.load_and_verify_module(&id, data_store, allow_module_loading_failure)?;
+        let module = self.load_and_verify_module(id, data_store, allow_module_loading_failure)?;
         visited.insert(id.clone());
         friends_discovered.extend(module.immediate_friends());
 
@@ -1303,7 +1301,7 @@ impl<'a> Resolver<'a> {
     }
 
     pub(crate) fn loader(&self) -> &Loader {
-        &self.loader
+        self.loader
     }
 }
 

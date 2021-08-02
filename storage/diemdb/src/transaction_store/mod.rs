@@ -137,7 +137,7 @@ impl TransactionStore {
                 &version,
             )?;
         }
-        cs.batch.put::<TransactionSchema>(&version, &transaction)?;
+        cs.batch.put::<TransactionSchema>(&version, transaction)?;
 
         Ok(())
     }

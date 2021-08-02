@@ -61,7 +61,7 @@ impl<'env> Runtime<'env> {
         let (converted_ty_args, converted_args) =
             check_and_convert_type_args_and_args(fun_env, ty_args, args)
                 .map_err(|e| e.finish(Location::Undefined))?;
-        let fun_target = choose_variant(self.functions, &fun_env);
+        let fun_target = choose_variant(self.functions, fun_env);
         self.execute_target(
             fun_target,
             &converted_ty_args,

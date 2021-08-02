@@ -28,11 +28,11 @@ const L: [u8; 32] = [
 
 // Hash functions
 pub fn sha2_256_of(bytes: &[u8]) -> Vec<u8> {
-    Sha256::digest(&bytes).to_vec()
+    Sha256::digest(bytes).to_vec()
 }
 
 pub fn sha3_256_of(bytes: &[u8]) -> Vec<u8> {
-    Sha3_256::digest(&bytes).to_vec()
+    Sha3_256::digest(bytes).to_vec()
 }
 
 // Ed25519

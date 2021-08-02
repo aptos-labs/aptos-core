@@ -41,7 +41,7 @@ fn prepare_module(executor: &mut FakeExecutor, account: &Account, seq_num: u64) 
     let output = executor.execute_transaction(txn);
     // module publishing should always succeed
     assert!(transaction_status_eq(
-        &output.status(),
+        output.status(),
         &TransactionStatus::Keep(KeptVMStatus::Executed),
     ));
     executor.apply_write_set(output.write_set());
@@ -74,7 +74,7 @@ fn script_fn_payload_invoke_private_fn() {
 
     let output = executor.execute_transaction(txn.clone());
     assert!(transaction_status_eq(
-        &output.status(),
+        output.status(),
         &TransactionStatus::Discard(DiscardedVMStatus::FEATURE_UNDER_GATING),
     ));
 
@@ -88,7 +88,7 @@ fn script_fn_payload_invoke_private_fn() {
 
     let output = executor.execute_transaction(txn);
     assert!(transaction_status_eq(
-        &output.status(),
+        output.status(),
         &TransactionStatus::Keep(KeptVMStatus::MiscellaneousError),
     ));
 }
@@ -118,7 +118,7 @@ fn script_fn_payload_invoke_public_fn() {
 
     let output = executor.execute_transaction(txn.clone());
     assert!(transaction_status_eq(
-        &output.status(),
+        output.status(),
         &TransactionStatus::Discard(DiscardedVMStatus::FEATURE_UNDER_GATING),
     ));
 
@@ -132,7 +132,7 @@ fn script_fn_payload_invoke_public_fn() {
 
     let output = executor.execute_transaction(txn);
     assert!(transaction_status_eq(
-        &output.status(),
+        output.status(),
         &TransactionStatus::Keep(KeptVMStatus::MiscellaneousError),
     ));
 }
@@ -162,7 +162,7 @@ fn script_fn_payload_invoke_script_fn() {
 
     let output = executor.execute_transaction(txn.clone());
     assert!(transaction_status_eq(
-        &output.status(),
+        output.status(),
         &TransactionStatus::Discard(DiscardedVMStatus::FEATURE_UNDER_GATING),
     ));
 
@@ -176,7 +176,7 @@ fn script_fn_payload_invoke_script_fn() {
 
     let output = executor.execute_transaction(txn);
     assert!(transaction_status_eq(
-        &output.status(),
+        output.status(),
         &TransactionStatus::Keep(KeptVMStatus::Executed),
     ));
 }

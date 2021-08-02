@@ -27,7 +27,7 @@ impl Command for QueryCommand {
             Box::new(QueryCommandGetLatestAccountResources {}),
         ];
 
-        subcommand_execute(&params[0], commands, client, &params[1..]);
+        subcommand_execute(params[0], commands, client, &params[1..]);
     }
 }
 
@@ -49,7 +49,7 @@ impl Command for QueryCommandGetBalance {
             println!("Invalid number of arguments for balance query");
             return;
         }
-        match client.get_balances(&params) {
+        match client.get_balances(params) {
             Ok(balances) => balances
                 .iter()
                 .for_each(|balance| println!("Balance is: {}", balance)),
@@ -74,7 +74,7 @@ impl Command for QueryCommandGetSeqNum {
     }
     fn execute(&self, client: &mut ClientProxy, params: &[&str]) {
         println!(">> Getting current sequence number");
-        match client.get_sequence_number(&params) {
+        match client.get_sequence_number(params) {
             Ok(sn) => println!("Sequence number is: {}", sn),
             Err(e) => report_error("Error getting sequence number", e),
         }
@@ -96,7 +96,7 @@ impl Command for QueryCommandGetLatestAccountState {
     }
     fn execute(&self, client: &mut ClientProxy, params: &[&str]) {
         println!(">> Getting latest account state");
-        match client.get_latest_account(&params) {
+        match client.get_latest_account(params) {
             Ok(acc) => println!(
                 "Latest account state is: \n \
                  Account: {:#?}\n \
@@ -128,7 +128,7 @@ impl Command for QueryCommandGetLatestAccountResources {
     }
     fn execute(&self, client: &mut ClientProxy, params: &[&str]) {
         println!(">> Getting latest account state");
-        match client.get_latest_account_resources(&params) {
+        match client.get_latest_account_resources(params) {
             Ok((Some(acc), version)) => println!(
                 "Latest account state is: \n \
                  Account: {:#?}\n \
@@ -167,7 +167,7 @@ impl Command for QueryCommandGetTxnByAccountSeq {
     }
     fn execute(&self, client: &mut ClientProxy, params: &[&str]) {
         println!(">> Getting committed transaction by account and sequence number");
-        match client.get_committed_txn_by_acc_seq(&params) {
+        match client.get_committed_txn_by_acc_seq(params) {
             Ok(txn_view) => {
                 match txn_view {
                     Some(txn_view) => {
@@ -200,7 +200,7 @@ impl Command for QueryCommandGetTxnByRange {
     }
     fn execute(&self, client: &mut ClientProxy, params: &[&str]) {
         println!(">> Getting committed transaction by range");
-        match client.get_committed_txn_by_range(&params) {
+        match client.get_committed_txn_by_range(params) {
             Ok(comm_txns_and_events) => {
                 // Note that this should never panic because we shouldn't return items
                 // if the version wasn't able to be parsed in the first place
@@ -230,7 +230,7 @@ impl Command for QueryCommandGetEvent {
     }
     fn execute(&self, client: &mut ClientProxy, params: &[&str]) {
         println!(">> Getting events by account and event type.");
-        match client.get_events_by_account_and_type(&params) {
+        match client.get_events_by_account_and_type(params) {
             Ok((events, last_event_state)) => {
                 if events.is_empty() {
                     println!("No events returned");

@@ -20,5 +20,5 @@ pub fn compile(
     let (files, compiled_units) = Compiler::new(sources, interface_files)
         .set_flags(Flags::empty().set_sources_shadow_deps(sources_shadow_deps))
         .build_and_report()?;
-    move_lang::output_compiled_units(emit_source_map, files, compiled_units, &output_dir)
+    move_lang::output_compiled_units(emit_source_map, files, compiled_units, output_dir)
 }

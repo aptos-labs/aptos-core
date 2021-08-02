@@ -75,7 +75,7 @@ pub trait DataflowAnalysis: TransferFunctions {
         );
         while let Some(block_id) = work_list.pop_front() {
             let pre = state_map.get(&block_id).expect("basic block").pre.clone();
-            let post = self.execute_block(block_id, pre, &instrs, cfg);
+            let post = self.execute_block(block_id, pre, instrs, cfg);
 
             // propagate postcondition of this block to successor blocks
             for next_block_id in cfg.successors(block_id) {

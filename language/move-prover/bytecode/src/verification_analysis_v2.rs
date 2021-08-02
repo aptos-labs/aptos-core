@@ -564,7 +564,7 @@ impl FunctionTargetProcessor for VerificationAnalysisProcessorV2 {
             .flat_map(|mod_env| mod_env.get_functions())
             .map(|fun| fun.get_qualified_id())
             .collect();
-        let dep_fun_ids = compute_dep_fun_ids(&global_env, &target_modules);
+        let dep_fun_ids = compute_dep_fun_ids(global_env, &target_modules);
         let (disabled_inv_fun_set, non_inv_fun_set) =
             compute_disabled_and_non_inv_fun_sets(global_env);
         let target_invariants = get_target_invariants(global_env, &target_modules);

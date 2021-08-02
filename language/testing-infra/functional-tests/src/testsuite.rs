@@ -65,11 +65,7 @@ fn print_stage(haystack: &str) -> bool {
 }
 
 fn write_horizontal_line(output: &mut Buffer, term_width: usize) -> std::io::Result<()> {
-    writeln!(
-        output,
-        "{}",
-        iter::repeat('=').take(term_width).collect::<String>()
-    )
+    writeln!(output, "{}", "=".repeat(term_width))
 }
 
 fn write_test_header(
@@ -135,7 +131,7 @@ fn run_checker_directives(
     log: &EvaluationLog,
     directives: &[LineSp<Directive>],
 ) -> datatest_stable::Result<()> {
-    let res = match_output(&log, directives);
+    let res = match_output(log, directives);
 
     let errs = match res.status {
         MatchStatus::Success => return Ok(()),
@@ -209,7 +205,7 @@ fn run_checker_directives(
                         _ => format!("[{}] {}\n", id, entry),
                     }
                 })
-                .filter(|x| print_stage(&x))
+                .filter(|x| print_stage(x))
                 .collect::<String>()
                 .lines()
                 .map(|line| format!("    {}\n", line))
@@ -286,7 +282,7 @@ fn run_checker_directives(
     writeln!(output)?;
     write_horizontal_line(output, term_width)?;
     writeln!(output)?;
-    bufwtr.print(&output)?;
+    bufwtr.print(output)?;
 
     panic!("test failed")
 }

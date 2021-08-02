@@ -110,7 +110,7 @@ impl LiveVarAnalysisProcessor {
         code: Vec<Bytecode>,
     ) -> (Vec<Bytecode>, BTreeMap<CodeOffset, LiveVarInfoAtCodeOffset>) {
         let annotations = Self::analyze(func_target, &code);
-        let mut analyzer = LiveVarAnalysis::new(&func_target, next_free_label, next_free_attr);
+        let mut analyzer = LiveVarAnalysis::new(func_target, next_free_label, next_free_attr);
         let new_bytecode = analyzer.transform_code(&annotations, code);
         (new_bytecode, annotations)
     }
@@ -121,13 +121,13 @@ impl LiveVarAnalysisProcessor {
     ) -> BTreeMap<CodeOffset, LiveVarInfoAtCodeOffset> {
         // Perform backward analysis from all blocks just in case some block
         // cannot reach an exit block
-        let cfg = StacklessControlFlowGraph::new_backward(&code, true);
-        let analyzer = LiveVarAnalysis::new(&func_target, 0, 0);
+        let cfg = StacklessControlFlowGraph::new_backward(code, true);
+        let analyzer = LiveVarAnalysis::new(func_target, 0, 0);
         let state_map = analyzer.analyze_function(
             LiveVarState {
                 livevars: BTreeSet::new(),
             },
-            &code,
+            code,
             &cfg,
         );
         analyzer.state_per_instruction(state_map, code, &cfg, |before, after| {

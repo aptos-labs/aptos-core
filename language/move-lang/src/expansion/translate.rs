@@ -85,7 +85,7 @@ impl<'env> Context<'env> {
     }
 
     pub fn extract_exp_specs(&mut self) -> BTreeMap<SpecId, E::SpecBlock> {
-        std::mem::replace(&mut self.exp_specs, BTreeMap::new())
+        std::mem::take(&mut self.exp_specs)
     }
 }
 
@@ -549,7 +549,7 @@ fn all_module_members<'a>(
                 let addr = match &m.address {
                     Some(a) => address_impl(
                         compilation_env,
-                        &address_mapping,
+                        address_mapping,
                         /* suggest_declaration */ true,
                         a.clone(),
                     ),
@@ -561,7 +561,7 @@ fn all_module_members<'a>(
             P::Definition::Address(addr_def) => {
                 let addr = address_impl(
                     compilation_env,
-                    &address_mapping,
+                    address_mapping,
                     /* suggest_declaration */ false,
                     addr_def.addr.clone(),
                 );
@@ -2176,7 +2176,7 @@ fn unbound_names_bind(unbound: &mut BTreeSet<Name>, sp!(_, l_): &E::LValue) {
     use E::LValue_ as EL;
     match l_ {
         EL::Var(sp!(_, E::ModuleAccess_::Name(n)), _) => {
-            unbound.remove(&n);
+            unbound.remove(n);
         }
         EL::Var(sp!(_, E::ModuleAccess_::ModuleAccess(..)), _) => {
             // Qualified vars are not considered in unbound set.

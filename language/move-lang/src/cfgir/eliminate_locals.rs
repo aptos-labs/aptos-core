@@ -316,7 +316,7 @@ mod eliminate {
     }
 
     fn lvalues(context: &mut Context, ls: &mut Vec<LValue>) -> Vec<Option<Var>> {
-        let old = std::mem::replace(ls, vec![]);
+        let old = std::mem::take(ls);
         old.into_iter()
             .map(|l| match lvalue(context, l) {
                 LRes::Same(lvalue) => {
@@ -404,8 +404,8 @@ mod eliminate {
                     UnannotatedExp_::ExpList(es) => es,
                     _ => panic!("ICE local elimination type mismatch"),
                 };
-                let old_tys = std::mem::replace(tys, vec![]);
-                let old_es = std::mem::replace(es, vec![]);
+                let old_tys = std::mem::take(tys);
+                let old_es = std::mem::take(es);
                 for ((mut item, ty), elim_opt) in old_es.into_iter().zip(old_tys).zip(eliminated) {
                     let e = match &mut item {
                         ExpListItem::Single(e, _) => e,

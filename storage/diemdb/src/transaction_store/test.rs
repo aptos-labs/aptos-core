@@ -27,7 +27,7 @@ proptest! {
         let tmp_dir = TempPath::new();
         let db = DiemDB::new_for_test(&tmp_dir);
         let store = &db.transaction_store;
-        let txns = init_store(universe, gens, &store);
+        let txns = init_store(universe, gens, store);
 
         let ledger_version = txns.len() as Version - 1;
         for (ver, txn) in txns.iter().enumerate() {
@@ -61,7 +61,7 @@ proptest! {
         let tmp_dir = TempPath::new();
         let db = DiemDB::new_for_test(&tmp_dir);
         let store = &db.transaction_store;
-        let txns = init_store(universe, gens, &store);
+        let txns = init_store(universe, gens, store);
 
         let total_num_txns = txns.len();
 
@@ -121,7 +121,7 @@ proptest! {
         let mut cs = ChangeSet::new();
         for (ver, txn) in txns.iter().enumerate() {
             store
-                .put_transaction(ver as Version, &txn, &mut cs)
+                .put_transaction(ver as Version, txn, &mut cs)
                 .unwrap();
         }
         store.db.write_schemas(cs.batch).unwrap();
@@ -166,7 +166,7 @@ proptest! {
         let tmp_dir = TempPath::new();
         let db = DiemDB::new_for_test(&tmp_dir);
         let store = &db.transaction_store;
-        let txns = init_store(universe, gens, &store);
+        let txns = init_store(universe, gens, store);
 
         let txns = txns
             .iter()
@@ -252,9 +252,7 @@ fn init_store(
 
     let mut cs = ChangeSet::new();
     for (ver, txn) in txns.iter().enumerate() {
-        store
-            .put_transaction(ver as Version, &txn, &mut cs)
-            .unwrap();
+        store.put_transaction(ver as Version, txn, &mut cs).unwrap();
     }
     store.db.write_schemas(cs.batch).unwrap();
 

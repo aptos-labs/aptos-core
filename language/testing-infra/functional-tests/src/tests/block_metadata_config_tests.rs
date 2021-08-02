@@ -61,7 +61,7 @@ fn parse_new_transaction() {
 }
 
 fn parse_and_build_config(global_config: &GlobalConfig, s: &str) -> Result<BlockMetadata> {
-    build_block_metadata(&global_config, &parse_each_line_as::<Entry>(s)?)
+    build_block_metadata(global_config, &parse_each_line_as::<Entry>(s)?)
 }
 
 #[rustfmt::skip]

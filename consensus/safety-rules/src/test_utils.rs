@@ -205,7 +205,7 @@ pub fn make_timeout_cert(
 ) -> TwoChainTimeoutCertificate {
     let timeout = TwoChainTimeout::new(1, round, hqc.clone());
     let mut tc = TwoChainTimeoutCertificate::new(timeout.clone());
-    let signature = timeout.sign(&signer);
+    let signature = timeout.sign(signer);
     tc.add(signer.author(), timeout, signature);
     tc
 }

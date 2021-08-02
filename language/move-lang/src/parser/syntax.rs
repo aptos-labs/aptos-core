@@ -783,7 +783,7 @@ fn parse_sequence(tokens: &mut Lexer) -> Result<Sequence, Diagnostic> {
             break;
         }
         seq.push(item);
-        last_semicolon_loc = Some(current_token_loc(&tokens));
+        last_semicolon_loc = Some(current_token_loc(tokens));
         consume_token(tokens, Tok::Semicolon)?;
     }
     tokens.advance()?; // consume the RBrace

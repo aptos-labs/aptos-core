@@ -741,7 +741,7 @@ impl Script {
     /// Accessor for the body of the 'main' procedure
     pub fn body(&self) -> &Block_ {
         match self.main.value.body {
-            FunctionBody::Move { ref code, .. } => &code,
+            FunctionBody::Move { ref code, .. } => code,
             FunctionBody::Bytecode { .. } => panic!("Invalid body access on bytecode main()"),
             FunctionBody::Native => panic!("main() cannot be native"),
         }
@@ -804,7 +804,7 @@ impl QualifiedModuleIdent {
 impl ModuleIdent {
     pub fn name(&self) -> &ModuleName {
         match self {
-            ModuleIdent::Transaction(name) => &name,
+            ModuleIdent::Transaction(name) => name,
             ModuleIdent::Qualified(id) => &id.name,
         }
     }

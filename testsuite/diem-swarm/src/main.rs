@@ -184,7 +184,7 @@ fn main() {
                 args.cli_path.as_ref().unwrap().as_ref(),
                 port,
                 Path::new(&diem_root_key_path),
-                &tmp_mnemonic_file.path(),
+                tmp_mnemonic_file.path(),
                 waypoint,
             )
         };

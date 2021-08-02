@@ -159,7 +159,7 @@ impl EpochEndingBackupController {
             .storage
             .create_for_write(backup_handle, &Self::chunk_name(first_epoch))
             .await?;
-        chunk_file.write_all(&chunk_bytes).await?;
+        chunk_file.write_all(chunk_bytes).await?;
         chunk_file.shutdown().await?;
         Ok(EpochEndingChunk {
             first_epoch,
@@ -185,7 +185,7 @@ impl EpochEndingBackupController {
         };
         let (manifest_handle, mut manifest_file) = self
             .storage
-            .create_for_write(&backup_handle, Self::manifest_name())
+            .create_for_write(backup_handle, Self::manifest_name())
             .await?;
         manifest_file
             .write_all(&serde_json::to_vec(&manifest)?)

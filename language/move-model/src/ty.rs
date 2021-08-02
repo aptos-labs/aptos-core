@@ -443,7 +443,7 @@ impl Type {
             TypeTag::Address => Primitive(PrimitiveType::Address),
             TypeTag::Signer => Primitive(PrimitiveType::Signer),
             TypeTag::Struct(s) => {
-                let qid = env.find_struct_by_tag(&s).unwrap_or_else(|| {
+                let qid = env.find_struct_by_tag(s).unwrap_or_else(|| {
                     panic!("Invariant violation: couldn't resolve struct {:?}", s)
                 });
                 let type_args = s
@@ -601,10 +601,10 @@ impl Substitution {
         }
 
         // Substitute or assign variables.
-        if let Some(rt) = self.try_substitute_or_assign(variance, false, &t1, &t2)? {
+        if let Some(rt) = self.try_substitute_or_assign(variance, false, t1, t2)? {
             return Ok(rt);
         }
-        if let Some(rt) = self.try_substitute_or_assign(variance, true, &t2, &t1)? {
+        if let Some(rt) = self.try_substitute_or_assign(variance, true, t2, t1)? {
             return Ok(rt);
         }
 
@@ -717,7 +717,7 @@ impl Substitution {
         t2: &Type,
     ) -> Result<Option<Type>, TypeUnificationError> {
         if let Type::Var(v1) = t1 {
-            if let Some(s1) = self.subs.get(&v1).cloned() {
+            if let Some(s1) = self.subs.get(v1).cloned() {
                 return if swapped {
                     // Place the type terms in the right order again, so we
                     // get the 'expected vs actual' direction right.

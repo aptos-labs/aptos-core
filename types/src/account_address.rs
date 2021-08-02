@@ -63,7 +63,7 @@ mod test {
 
         let mut hash = [0u8; 32];
         let bytes = &hash_vec[..32];
-        hash.copy_from_slice(&bytes);
+        hash.copy_from_slice(bytes);
 
         assert_eq!(address.hash(), HashValue::new(hash));
     }

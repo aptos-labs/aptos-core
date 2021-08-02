@@ -397,7 +397,7 @@ fn used_local_info(
     used_local_types: &BTreeMap<Var, H::SingleType>,
 ) -> UniqueMap<Var, VarInfo> {
     UniqueMap::maybe_from_iter(used_local_types.iter().map(|(v, ty)| {
-        let (v, info) = var_info(&local_map, v.clone(), ty.clone());
+        let (v, info) = var_info(local_map, v.clone(), ty.clone());
         let v_orig_ = match display_var(&v.0.value) {
             DisplayVar::Tmp => panic!("ICE spec block captured a tmp"),
             DisplayVar::Orig(s) => s,

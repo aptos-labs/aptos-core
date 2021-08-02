@@ -153,7 +153,7 @@ impl UnitTestingConfig {
                     writeln!(
                         shared_writer.lock().unwrap(),
                         "{}::{}: test",
-                        format_module_id(&module_id),
+                        format_module_id(module_id),
                         test_name
                     )?;
                 }

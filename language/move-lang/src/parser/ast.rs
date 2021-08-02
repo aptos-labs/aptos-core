@@ -1492,7 +1492,7 @@ impl AstDebug for StructTypeParameter {
             w.write("phantom ");
         }
         w.write(&name.value);
-        ability_constraints_ast_debug(w, &constraints);
+        ability_constraints_ast_debug(w, constraints);
     }
 }
 

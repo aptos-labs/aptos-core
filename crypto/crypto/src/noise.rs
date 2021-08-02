@@ -284,7 +284,7 @@ impl NoiseConfig {
         let mut h = PROTOCOL_NAME.to_vec();
         let mut ck = PROTOCOL_NAME.to_vec();
         let rs = remote_public; // for naming consistency with the specification
-        mix_hash(&mut h, &prologue);
+        mix_hash(&mut h, prologue);
         mix_hash(&mut h, rs.as_slice());
 
         // -> e

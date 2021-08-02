@@ -380,7 +380,7 @@ impl<'a> Instrumenter<'a> {
             // assuming they hold).
             Ret(_, _) => {
                 let (global_target_invs, _update_target_invs) =
-                    self.separate_update_invariants(&target_invariants);
+                    self.separate_update_invariants(target_invariants);
                 if disabled_inv_fun_set.contains(&fun_id) {
                     let xlated_spec = SpecTranslator::translate_invariants_by_id(
                         self.options.auto_trace_level.invariants(),
@@ -483,7 +483,7 @@ impl<'a> Instrumenter<'a> {
         let target_invariants = &inv_ana_data.target_invariants;
         let disabled_inv_fun_set = &inv_ana_data.disabled_inv_fun_set;
         let non_inv_fun_set = &inv_ana_data.non_inv_fun_set;
-        if !disabled_inv_fun_set.contains(&fun_id) && !non_inv_fun_set.contains(&fun_id) {
+        if !disabled_inv_fun_set.contains(fun_id) && !non_inv_fun_set.contains(fun_id) {
             let env = self.builder.global_env();
 
             // consider only the invariants that are modified by instruction

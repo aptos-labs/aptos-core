@@ -42,7 +42,7 @@ impl StorageClient {
 
     fn process_one_message(&self, input: &[u8]) -> Result<Vec<u8>, Error> {
         let mut client = self.network_client.lock();
-        client.write(&input)?;
+        client.write(input)?;
         client.read().map_err(|e| e.into())
     }
 

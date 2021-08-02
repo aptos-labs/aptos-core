@@ -325,7 +325,7 @@ impl CFG {
             if *i == block_id {
                 break;
             }
-            if let Some(block) = cfg.basic_blocks.get(&i) {
+            if let Some(block) = cfg.basic_blocks.get(i) {
                 offset += block.instructions.len() as u16;
             }
         }
@@ -343,7 +343,7 @@ impl CFG {
         let mut bytecode: Vec<Bytecode> = Vec::new();
         let block_order = self.serialize_block_order();
         for block_id in &block_order {
-            let block = self.basic_blocks.get_mut(&block_id);
+            let block = self.basic_blocks.get_mut(block_id);
             // The generated block order contains every block
             assume!(block.is_some());
             let block = block.unwrap();

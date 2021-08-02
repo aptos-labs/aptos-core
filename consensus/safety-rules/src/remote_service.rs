@@ -75,7 +75,7 @@ impl RemoteClient {
     }
 
     fn process_one_message(&mut self, input: &[u8]) -> Result<Vec<u8>, Error> {
-        self.network_client.write(&input)?;
+        self.network_client.write(input)?;
         self.network_client.read().map_err(|e| e.into())
     }
 }

@@ -38,7 +38,7 @@ fn verify(
 fn save(store: &LedgerStore, first_version: Version, txn_infos: &[TransactionInfo]) -> HashValue {
     let mut cs = ChangeSet::new();
     let root_hash = store
-        .put_transaction_infos(first_version, &txn_infos, &mut cs)
+        .put_transaction_infos(first_version, txn_infos, &mut cs)
         .unwrap();
     store.db.write_schemas(cs.batch).unwrap();
     root_hash

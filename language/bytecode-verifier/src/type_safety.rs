@@ -66,7 +66,7 @@ impl<'a> TypeSafetyChecker<'a> {
 
     fn abilities(&self, t: &SignatureToken) -> PartialVMResult<AbilitySet> {
         self.resolver
-            .abilities(&t, self.function_view.type_parameters())
+            .abilities(t, self.function_view.type_parameters())
     }
 
     fn error(&self, status: StatusCode, offset: CodeOffset) -> PartialVMError {

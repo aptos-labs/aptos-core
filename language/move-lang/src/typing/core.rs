@@ -270,7 +270,7 @@ impl<'env> Context<'env> {
             .iter()
             .filter(|(_, v, _)| !old_locals.contains_key_(v))
         {
-            self.locals.remove_(&new_local);
+            self.locals.remove_(new_local);
         }
 
         // return old type
@@ -551,10 +551,10 @@ pub fn infer_abilities(context: &Context, subst: &Subst, ty: Type) -> AbilitySet
                 TypeName_::Multiple(_) => (AbilitySet::collection(loc), ty_args),
                 TypeName_::Builtin(b) => (b.value.declared_abilities(b.loc), ty_args),
                 TypeName_::ModuleType(m, n) => {
-                    let declared_abilities = context.struct_declared_abilities(&m, &n).clone();
+                    let declared_abilities = context.struct_declared_abilities(m, n).clone();
                     let non_phantom_ty_args = ty_args
                         .into_iter()
-                        .zip(context.struct_tparams(&m, &n))
+                        .zip(context.struct_tparams(m, n))
                         .filter(|(_, param)| !param.is_phantom)
                         .map(|(arg, _)| arg)
                         .collect::<Vec<_>>();
@@ -599,8 +599,8 @@ fn debug_abilities_info(context: &Context, ty: &Type) -> (Option<Loc>, AbilitySe
             (None, b.value.declared_abilities(b.loc), ty_args.clone())
         }
         T::Apply(_, sp!(_, TypeName_::ModuleType(m, n)), ty_args) => (
-            Some(context.struct_declared_loc(&m, &n)),
-            context.struct_declared_abilities(&m, &n).clone(),
+            Some(context.struct_declared_loc(m, n)),
+            context.struct_declared_abilities(m, n).clone(),
             ty_args.clone(),
         ),
     }
@@ -902,7 +902,7 @@ pub fn solve_constraints(context: &mut Context) {
     }
     context.subst = subst;
 
-    let constraints = std::mem::replace(&mut context.constraints, vec![]);
+    let constraints = std::mem::take(&mut context.constraints);
     for constraint in constraints {
         match constraint {
             Constraint::IsImplicitlyCopyable { loc, msg, ty, fix } => {
@@ -1013,7 +1013,7 @@ pub fn ability_not_satisified_tips<'a>(
             let mut label_added = false;
             for (ty_arg, ty_arg_abilities) in ty_args {
                 if !ty_arg_abilities.has_ability_(requirement) {
-                    let ty_arg_str = error_format(ty_arg, &subst);
+                    let ty_arg_str = error_format(ty_arg, subst);
                     let msg = format!(
                         "The type {ty} can have the ability '{constraint}' but the type argument \
                          {ty_arg} does not have the required ability '{requirement}'",
@@ -1646,7 +1646,7 @@ fn join_bind_tvar(subst: &mut Subst, loc: Loc, tvar: TVar, ty: Type) -> Result<b
     }
 
     // check not necessary for soundness but improves error message structure
-    if !check_num_tvar(&subst, loc, tvar, &ty) {
+    if !check_num_tvar(subst, loc, tvar, &ty) {
         return Ok(false);
     }
 

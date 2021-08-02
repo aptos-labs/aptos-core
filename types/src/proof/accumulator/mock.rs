@@ -153,7 +153,6 @@ impl MockTransactionAccumulator {
         let new_root = self.get_root_hash(end_version);
 
         let height_diff = maybe_old_root
-            .clone()
             .map(|old_root| self.height(new_root) - self.height(old_root))
             .unwrap_or(0);
 

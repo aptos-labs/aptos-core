@@ -68,7 +68,7 @@ fn main() {
     };
 
     source_cov
-        .compute_source_coverage(&source_path)
+        .compute_source_coverage(source_path)
         .output_source_coverage(&mut coverage_writer)
         .unwrap();
 }

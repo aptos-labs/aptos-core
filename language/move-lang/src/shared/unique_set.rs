@@ -38,7 +38,7 @@ impl<T: TName> UniqueSet<T> {
     }
 
     pub fn contains_(&self, x_: &T::Key) -> bool {
-        self.0.contains_key_(&x_)
+        self.0.contains_key_(x_)
     }
 
     pub fn get_loc(&self, x: &T) -> Option<&T::Loc> {

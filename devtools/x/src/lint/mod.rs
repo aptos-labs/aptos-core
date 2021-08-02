@@ -51,7 +51,7 @@ pub fn run(args: Args, xctx: XContext) -> crate::Result<()> {
         &allowed_paths::AllowedPaths::new(&workspace_config.allowed_paths)?,
         &determinator::DeterminatorMatch::new(
             xctx.core().package_graph()?,
-            &xctx.config().determinator_rules(),
+            xctx.config().determinator_rules(),
         )?,
     ];
 

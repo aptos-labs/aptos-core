@@ -57,7 +57,7 @@ impl FuzzTargetImpl for SignedTransactionTarget {
     }
 
     fn fuzz(&self, data: &[u8]) {
-        let _: Result<SignedTransaction, _> = bcs::from_bytes(&data);
+        let _: Result<SignedTransaction, _> = bcs::from_bytes(data);
     }
 }
 
@@ -99,7 +99,7 @@ impl FuzzTargetImpl for MutatedSignedTransaction {
             return;
         }
 
-        if let Ok(signed_txn) = bcs::from_bytes::<SignedTransaction>(&data) {
+        if let Ok(signed_txn) = bcs::from_bytes::<SignedTransaction>(data) {
             assert_ne!(*SIGNED_TXN, signed_txn);
         }
     }

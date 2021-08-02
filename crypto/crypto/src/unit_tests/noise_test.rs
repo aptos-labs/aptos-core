@@ -172,12 +172,10 @@ fn test_vectors() {
     // initiate peers with test vector
     use crate::traits::ValidCryptoMaterialStringExt;
     let initiator_private =
-        x25519::PrivateKey::from_encoded_string(&test_vector.init_static.as_ref().unwrap())
-            .unwrap();
+        x25519::PrivateKey::from_encoded_string(test_vector.init_static.as_ref().unwrap()).unwrap();
     let initiator_public = initiator_private.public_key();
     let responder_private =
-        x25519::PrivateKey::from_encoded_string(&test_vector.resp_static.as_ref().unwrap())
-            .unwrap();
+        x25519::PrivateKey::from_encoded_string(test_vector.resp_static.as_ref().unwrap()).unwrap();
     let responder_public = responder_private.public_key();
 
     let initiator = NoiseConfig::new(initiator_private);

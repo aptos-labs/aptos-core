@@ -1478,7 +1478,7 @@ impl PublicUsageTest for GetTransactionsWithProofs {
             let expected_hash = li.ledger_info().transaction_accumulator_hash();
 
             // and we verify the signature of the provided ledger info that provided the accumulator hash
-            assert!(li.verify_signatures(&validator_set).is_ok());
+            assert!(li.verify_signatures(validator_set).is_ok());
 
             // and we eventually verify the proofs for the transactions
             assert!(li_to_tip
@@ -1507,7 +1507,7 @@ impl AdminTest for AddAndRemoveVaspDomain {
             .create_parent_vasp_account(Currency::XUS, vasp.authentication_key())?;
 
         // add domain
-        let domain = DiemIdVaspDomainIdentifier::new(&"diem")
+        let domain = DiemIdVaspDomainIdentifier::new("diem")
             .unwrap()
             .as_str()
             .as_bytes()
@@ -1668,7 +1668,7 @@ impl PublicUsageTest for GetEventsWithProofs {
             .unwrap()
             .verifier;
         // And we verify the signature
-        assert!(li.verify_signatures(&validator_set).is_ok());
+        assert!(li.verify_signatures(validator_set).is_ok());
 
         // We now need to verify the events using this verified ledger_info:
         let ledger_info = li.ledger_info();

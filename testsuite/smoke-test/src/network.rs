@@ -191,7 +191,7 @@ fn check_endpoint(
     private_key: &x25519::PrivateKey,
 ) -> bool {
     let address = node.network_address(&network_id);
-    let result = op_tool.check_endpoint_with_key(&network_id, address.clone(), &private_key);
+    let result = op_tool.check_endpoint_with_key(&network_id, address.clone(), private_key);
     println!(
         "Endpoint check for {}:{} is:  {:?}",
         network_id, address, result

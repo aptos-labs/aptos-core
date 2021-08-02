@@ -965,7 +965,7 @@ impl<T: ExecutorProxyTrait> StateSyncCoordinator<T> {
             ),
         }
         .map_err(|error| {
-            self.request_manager.process_invalid_chunk(&peer);
+            self.request_manager.process_invalid_chunk(peer);
             Error::ProcessInvalidChunk(error.to_string())
         })?;
 
@@ -1025,7 +1025,7 @@ impl<T: ExecutorProxyTrait> StateSyncCoordinator<T> {
         }
 
         // Verify the chunk response is well formed before trying to process it.
-        self.verify_chunk_response_is_valid(&peer, &response)?;
+        self.verify_chunk_response_is_valid(peer, &response)?;
 
         // Validate the response and store the chunk if possible.
         // Any errors thrown here should be for detecting bad chunks.
@@ -1088,7 +1088,7 @@ impl<T: ExecutorProxyTrait> StateSyncCoordinator<T> {
                     &peer.peer_id().to_string(),
                 ])
                 .inc();
-            self.request_manager.process_chunk_from_downstream(&peer);
+            self.request_manager.process_chunk_from_downstream(peer);
             return Err(Error::ReceivedChunkFromDownstream(peer.to_string()));
         }
 
@@ -1101,14 +1101,14 @@ impl<T: ExecutorProxyTrait> StateSyncCoordinator<T> {
 
             if first_chunk_version != expected_version {
                 self.request_manager.process_chunk_version_mismatch(
-                    &peer,
+                    peer,
                     first_chunk_version,
                     known_version,
                 )?;
             }
         } else {
             // The chunk is empty
-            self.request_manager.process_empty_chunk(&peer);
+            self.request_manager.process_empty_chunk(peer);
             return Err(Error::ReceivedEmptyChunk(peer.to_string()));
         }
 
@@ -1751,7 +1751,7 @@ mod tests {
         // Create validator coordinator with waypoint higher than 0
         let waypoint_version = 10;
         let waypoint_ledger_info = create_ledger_info_at_version(waypoint_version);
-        let waypoint = Waypoint::new_any(&waypoint_ledger_info.ledger_info());
+        let waypoint = Waypoint::new_any(waypoint_ledger_info.ledger_info());
         let mut validator_coordinator =
             create_coordinator_with_config_and_waypoint(NodeConfig::default(), waypoint);
 
@@ -1825,7 +1825,7 @@ mod tests {
         // Create a coordinator with the waypoint version higher than 0
         let waypoint_version = 10;
         let waypoint_ledger_info = create_ledger_info_at_version(waypoint_version);
-        let waypoint = Waypoint::new_any(&waypoint_ledger_info.ledger_info());
+        let waypoint = Waypoint::new_any(waypoint_ledger_info.ledger_info());
         let mut validator_coordinator =
             create_coordinator_with_config_and_waypoint(NodeConfig::default(), waypoint);
 
@@ -2224,7 +2224,7 @@ mod tests {
     fn test_process_chunk_response_waypoint() {
         // Create a coordinator for a validator node with waypoint version of 10
         let waypoint_ledger_info = create_ledger_info_at_version(10);
-        let waypoint = Waypoint::new_any(&waypoint_ledger_info.ledger_info());
+        let waypoint = Waypoint::new_any(waypoint_ledger_info.ledger_info());
         let mut validator_coordinator =
             create_coordinator_with_config_and_waypoint(NodeConfig::default(), waypoint);
 

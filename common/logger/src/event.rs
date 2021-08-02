@@ -36,7 +36,7 @@ impl<'a> Event<'a> {
     }
 
     pub fn metadata(&self) -> &'a Metadata {
-        &self.metadata
+        self.metadata
     }
 
     pub fn message(&self) -> Option<fmt::Arguments<'a>> {
@@ -44,7 +44,7 @@ impl<'a> Event<'a> {
     }
 
     pub fn keys_and_values(&self) -> &'a [&'a dyn Schema] {
-        &self.keys_and_values.0
+        self.keys_and_values.0
     }
 }
 

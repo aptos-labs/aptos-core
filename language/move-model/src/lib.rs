@@ -247,7 +247,7 @@ fn collect_related_modules_recursive<'a>(
     visited_addresses: &mut BTreeSet<&'a str>,
     visited_modules: &mut BTreeSet<ModuleIdent_>,
 ) {
-    if visited_modules.contains(&mident) {
+    if visited_modules.contains(mident) {
         return;
     }
     let mdef = modules.get_(mident).unwrap();
@@ -292,7 +292,7 @@ pub fn run_bytecode_model_builder<'a>(
             let name = m.identifier_at(m.struct_handle_at(def.struct_handle).name);
             let symbol = env.symbol_pool().make(name.as_str());
             let struct_id = StructId::new(symbol);
-            let data = env.create_struct_data(&m, def_idx, symbol, Loc::default(), Spec::default());
+            let data = env.create_struct_data(m, def_idx, symbol, Loc::default(), Spec::default());
             module_data.struct_data.insert(struct_id, data);
             module_data.struct_idx_to_id.insert(def_idx, struct_id);
         }

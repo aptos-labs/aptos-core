@@ -297,7 +297,7 @@ impl DiemVMImpl {
         session
             .execute_function(
                 &account_config::ACCOUNT_MODULE,
-                &MODULE_PROLOGUE_NAME,
+                MODULE_PROLOGUE_NAME,
                 vec![gas_currency_ty],
                 serialize_values(&vec![
                     MoveValue::Signer(txn_data.sender),
@@ -340,7 +340,7 @@ impl DiemVMImpl {
         session
             .execute_function(
                 &account_config::ACCOUNT_MODULE,
-                &USER_EPILOGUE_NAME,
+                USER_EPILOGUE_NAME,
                 vec![gas_currency_ty],
                 serialize_values(&vec![
                     MoveValue::Signer(txn_data.sender),
@@ -375,7 +375,7 @@ impl DiemVMImpl {
         session
             .execute_function(
                 &account_config::ACCOUNT_MODULE,
-                &USER_EPILOGUE_NAME,
+                USER_EPILOGUE_NAME,
                 vec![gas_currency_ty],
                 serialize_values(&vec![
                     MoveValue::Signer(txn_data.sender),
@@ -410,7 +410,7 @@ impl DiemVMImpl {
         session
             .execute_function(
                 &account_config::ACCOUNT_MODULE,
-                &WRITESET_PROLOGUE_NAME,
+                WRITESET_PROLOGUE_NAME,
                 vec![],
                 serialize_values(&vec![
                     MoveValue::Signer(txn_data.sender),
@@ -439,7 +439,7 @@ impl DiemVMImpl {
         session
             .execute_function(
                 &account_config::ACCOUNT_MODULE,
-                &WRITESET_EPILOGUE_NAME,
+                WRITESET_EPILOGUE_NAME,
                 vec![],
                 serialize_values(&vec![
                     MoveValue::Signer(txn_data.sender),

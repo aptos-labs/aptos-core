@@ -131,7 +131,7 @@ fn traverse_events_by_key(
     let mut last_batch_len = LIMIT;
     loop {
         let mut batch = store
-            .lookup_events_by_key(&event_key, seq_num, LIMIT, ledger_version)
+            .lookup_events_by_key(event_key, seq_num, LIMIT, ledger_version)
             .unwrap();
         if last_batch_len < LIMIT {
             assert!(batch.is_empty());
@@ -260,7 +260,7 @@ fn test_index_get_impl(event_batches: Vec<Vec<ContractEvent>>) {
                 .into_iter()
                 .map(|(e, _)| e)
                 .collect::<Vec<_>>();
-            let traversed = traverse_events_by_key(&store, &path, ledger_version_plus_one);
+            let traversed = traverse_events_by_key(store, &path, ledger_version_plus_one);
             assert_eq!(events, traversed);
         });
 }

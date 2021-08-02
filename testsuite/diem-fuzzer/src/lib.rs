@@ -85,7 +85,7 @@ pub fn fuzz_data_to_value<T: std::fmt::Debug>(
 ) -> T {
     // setup proptest with passthrough RNG
     let passthrough_rng =
-        test_runner::TestRng::from_seed(test_runner::RngAlgorithm::PassThrough, &data);
+        test_runner::TestRng::from_seed(test_runner::RngAlgorithm::PassThrough, data);
     let config = test_runner::Config::default();
     let mut runner = TestRunner::new_with_rng(config, passthrough_rng);
 

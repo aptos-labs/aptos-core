@@ -106,7 +106,7 @@ impl AccountRoleView {
                 let preburn_balances: Vec<_> = preburn_balances
                     .iter()
                     .map(|(currency_code, balance)| {
-                        AmountView::new(balance.coin(), &currency_code.as_str())
+                        AmountView::new(balance.coin(), currency_code.as_str())
                     })
                     .collect();
                 let preburn_queues = preburn_balances
@@ -132,7 +132,7 @@ impl AccountRoleView {
                             preburns.preburns().iter().fold(0, |acc: u64, preburn| {
                                 acc.checked_add(preburn.preburn().coin()).unwrap()
                             });
-                        AmountView::new(total_balance, &currency_code.as_str())
+                        AmountView::new(total_balance, currency_code.as_str())
                     })
                     .collect();
                 let preburn_queues = preburn_queues
@@ -146,7 +146,7 @@ impl AccountRoleView {
                                 .map(|preburn| PreburnWithMetadataView {
                                     preburn: AmountView::new(
                                         preburn.preburn().coin(),
-                                        &currency_code.as_str(),
+                                        currency_code.as_str(),
                                     ),
                                     metadata: Some(BytesView::new(preburn.metadata())),
                                 })
@@ -191,7 +191,7 @@ impl AccountView {
             balances: balances
                 .iter()
                 .map(|(currency_code, balance)| {
-                    AmountView::new(balance.coin(), &currency_code.as_str())
+                    AmountView::new(balance.coin(), currency_code.as_str())
                 })
                 .collect(),
             sequence_number: account.sequence_number(),
@@ -1509,17 +1509,17 @@ impl TryFrom<&AccountStateProofView> for AccountStateProof {
         account_state_proof_view: &AccountStateProofView,
     ) -> Result<AccountStateProof, Self::Error> {
         let ledger_info_to_transaction_info_proof: TransactionAccumulatorProof = bcs::from_bytes(
-            &account_state_proof_view
+            account_state_proof_view
                 .ledger_info_to_transaction_info_proof
                 .as_ref(),
         )?;
         let transaction_info: TransactionInfo =
-            bcs::from_bytes(&account_state_proof_view.transaction_info.as_ref())?;
+            bcs::from_bytes(account_state_proof_view.transaction_info.as_ref())?;
         let transaction_info_with_proof =
             TransactionInfoWithProof::new(ledger_info_to_transaction_info_proof, transaction_info);
         let transaction_info_to_account_proof: SparseMerkleProof<AccountStateBlob> =
             bcs::from_bytes(
-                &account_state_proof_view
+                account_state_proof_view
                     .transaction_info_to_account_proof
                     .as_ref(),
             )?;

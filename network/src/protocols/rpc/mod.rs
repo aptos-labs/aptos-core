@@ -397,13 +397,13 @@ impl OutboundRpcs {
 
         // Drop the outbound request if the application layer has already canceled.
         if application_response_tx.is_canceled() {
-            counters::rpc_messages(&network_context, REQUEST_LABEL, CANCELED_LABEL).inc();
+            counters::rpc_messages(network_context, REQUEST_LABEL, CANCELED_LABEL).inc();
             return Err(RpcError::UnexpectedResponseChannelCancel);
         }
 
         // Drop new outbound requests if our completion queue is at capacity.
         if self.outbound_rpc_tasks.len() == self.max_concurrent_outbound_rpcs as usize {
-            counters::rpc_messages(&network_context, REQUEST_LABEL, DECLINED_LABEL).inc();
+            counters::rpc_messages(network_context, REQUEST_LABEL, DECLINED_LABEL).inc();
             // Notify application that their request was dropped due to capacity.
             let err = Err(RpcError::TooManyPending(self.max_concurrent_outbound_rpcs));
             let _ = application_response_tx.send(err);
@@ -540,7 +540,7 @@ impl OutboundRpcs {
                     .inc_by(request_len);
 
                 trace!(
-                    NetworkSchema::new(&network_context).remote_peer(&peer_id),
+                    NetworkSchema::new(network_context).remote_peer(peer_id),
                     "{} Received response for request_id {} from peer {} \
                      with {:.6} seconds of latency",
                     network_context,
@@ -557,7 +557,7 @@ impl OutboundRpcs {
                 }
 
                 warn!(
-                    NetworkSchema::new(&network_context).remote_peer(&peer_id),
+                    NetworkSchema::new(network_context).remote_peer(peer_id),
                     "{} Error making outbound rpc request with request_id {} to {}: {}",
                     network_context,
                     request_id,

@@ -300,6 +300,7 @@ pub fn verify_module(
     Ok(module)
 }
 
+#[allow(dead_code)]
 /// A set of common parameters required to create transactions.
 struct TransactionParameters<'a> {
     pub sender_addr: AccountAddress,
@@ -649,7 +650,7 @@ fn eval_transaction<TComp: Compiler>(
             log.append(EvaluationOutput::Stage(Stage::Runtime));
         }
         let script_function_transaction =
-            make_script_function_transaction(&exec, &transaction.config, module, function)?;
+            make_script_function_transaction(exec, &transaction.config, module, function)?;
 
         if global_config.exp_mode {
             run_transaction_exp_mode(exec, script_function_transaction, log, &transaction.config);
@@ -735,7 +736,7 @@ fn eval_transaction<TComp: Compiler>(
                     bytes
                 }
             };
-            let script_transaction = make_script_transaction(&exec, &transaction.config, bytes)?;
+            let script_transaction = make_script_transaction(exec, &transaction.config, bytes)?;
 
             if global_config.exp_mode {
                 run_transaction_exp_mode(exec, script_transaction, log, &transaction.config);
@@ -785,7 +786,7 @@ fn eval_transaction<TComp: Compiler>(
                 log.append(EvaluationOutput::Stage(Stage::Runtime));
             }
             let module_transaction =
-                make_module_transaction(&exec, &transaction.config, compiled_module)?;
+                make_module_transaction(exec, &transaction.config, compiled_module)?;
 
             if global_config.exp_mode {
                 run_transaction_exp_mode(exec, module_transaction, log, &transaction.config);
@@ -851,13 +852,13 @@ pub fn eval<TComp: Compiler>(
         // use custom validator set. this requires dynamically generating a new genesis tx and
         // is thus more expensive.
         FakeExecutor::custom_genesis(
-            &module_blobs,
+            module_blobs,
             Some(config.validator_accounts),
             VMPublishingOption::open(),
         )
     };
     for data in config.accounts.values() {
-        exec.add_account_data(&data);
+        exec.add_account_data(data);
     }
 
     for (idx, command) in commands.iter().enumerate() {

@@ -207,7 +207,7 @@ proptest! {
 
         let f_send_all = async {
             for message in &messages {
-                message_tx.send(&message).await.unwrap();
+                message_tx.send(message).await.unwrap();
             }
             message_tx.close().await.unwrap();
         };

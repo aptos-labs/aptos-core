@@ -37,7 +37,7 @@ impl HealthCheck for LivenessHealthCheck {
     fn on_event(&mut self, ve: &ValidatorEvent, ctx: &mut HealthCheckContext) {
         match ve.event {
             Event::Commit(..) => {
-                if let Some(ref prev) = self.last_committed.get(&ve.validator) {
+                if let Some(prev) = self.last_committed.get(&ve.validator) {
                     if prev.timestamp > ve.timestamp {
                         return;
                     }

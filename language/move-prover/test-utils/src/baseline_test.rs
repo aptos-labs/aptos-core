@@ -80,7 +80,7 @@ fn diff(old_content: &str, new_content: &str) -> anyhow::Result<()> {
         }
     };
 
-    let diff = diff_lines(&new_content, &old_content);
+    let diff = diff_lines(new_content, old_content);
     let mut result = vec!["
 New output differs from baseline!
 Call this test with env variable UPBL=1 to regenerate or remove old baseline files.

@@ -106,7 +106,7 @@ impl Transport for TcpTransport {
                 _ => None,
             };
 
-            addr.and_then(|https_proxy| Url::parse(&https_proxy).ok())
+            addr.and_then(|https_proxy| Url::parse(https_proxy).ok())
                 .and_then(|url| {
                     if url.has_host() && url.scheme() == "http" {
                         Some(format!(
@@ -203,7 +203,7 @@ async fn connect_via_proxy(proxy_addr: String, addr: NetworkAddress) -> io::Resu
                     io::ErrorKind::Other,
                     format!(
                         "HTTP proxy CONNECT failed: {}",
-                        String::from_utf8_lossy(&msg)
+                        String::from_utf8_lossy(msg)
                     ),
                 ));
             } else if msg.len() >= 16

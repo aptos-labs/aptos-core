@@ -243,7 +243,7 @@ impl Runner {
         )?;
 
         // Generate boogie code.
-        let code_writer = generate_boogie(&env, &self.options, &targets)?;
+        let code_writer = generate_boogie(env, &self.options, &targets)?;
         check_errors(
             env,
             &self.options,
@@ -253,7 +253,7 @@ impl Runner {
 
         // Verify boogie, measuring duration.
         let now = Instant::now();
-        verify_boogie(&env, &self.options, &targets, code_writer)?;
+        verify_boogie(env, &self.options, &targets, code_writer)?;
 
         // Determine result status.
         let status = if env.error_count() > 0 {

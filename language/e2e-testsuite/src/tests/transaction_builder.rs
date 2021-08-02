@@ -705,7 +705,7 @@ fn create_dual_attestation_payment(
         msg
     };
     let signature = <Ed25519PrivateKey as SigningKey>::sign_arbitrary_message(
-        &receiver_compliance_private_key,
+        receiver_compliance_private_key,
         &message,
     );
     encode_peer_to_peer_with_metadata_script(

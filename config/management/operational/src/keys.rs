@@ -309,7 +309,7 @@ pub fn load_key<Key: ValidCryptoMaterial>(
         }
         EncodingType::Hex => {
             let hex_string = String::from_utf8(data).unwrap();
-            Key::from_encoded_string(&hex_string.trim())
+            Key::from_encoded_string(hex_string.trim())
                 .map_err(|err| Error::UnableToParse("Key", err.to_string()))
         }
         EncodingType::Base64 => {

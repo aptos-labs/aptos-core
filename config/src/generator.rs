@@ -44,7 +44,7 @@ pub fn validator_swarm(
 
     // set the first validator as every validators' initial configured seed peer.
     let seed_config = &nodes[0].validator_network.as_ref().unwrap();
-    let seeds = build_seed_for_network(&seed_config, PeerRole::Validator);
+    let seeds = build_seed_for_network(seed_config, PeerRole::Validator);
     for node in &mut nodes {
         let network = node.validator_network.as_mut().unwrap();
         network.seeds = seeds.clone();

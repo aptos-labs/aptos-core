@@ -80,7 +80,7 @@ impl TxnManager for MockTransactionManager {
                 .mempool_proxy
                 .as_ref()
                 .unwrap()
-                .notify(&block, &mock_compute_result)
+                .notify(block, &mock_compute_result)
                 .await
                 .is_ok());
         }

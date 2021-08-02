@@ -309,7 +309,7 @@ pub fn test_append_many_impl(batches: Vec<Vec<HashValue>>) {
     let mut leaves: Vec<HashValue> = Vec::new();
     let mut num_leaves = 0;
     for hashes in batches.iter() {
-        let (root_hash, writes) = TestAccumulator::append(&store, num_leaves, &hashes).unwrap();
+        let (root_hash, writes) = TestAccumulator::append(&store, num_leaves, hashes).unwrap();
         store.put_many(&writes);
 
         num_leaves += hashes.len() as LeafCount;

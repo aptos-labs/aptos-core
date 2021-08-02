@@ -60,7 +60,7 @@ impl StacklessControlFlowGraph {
                 if from_all_blocks && *succ_block_id == DUMMY_EXIT {
                     continue;
                 }
-                let predecessors = &mut block_id_to_predecessors.get_mut(&succ_block_id).unwrap();
+                let predecessors = &mut block_id_to_predecessors.get_mut(succ_block_id).unwrap();
                 predecessors.push(*block_id);
             }
         }

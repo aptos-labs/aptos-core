@@ -130,7 +130,7 @@ impl Mnemonic {
             .into());
         }
         let mut file = File::create(output_file_path)?;
-        file.write_all(&self.to_string().as_bytes())?;
+        file.write_all(self.to_string().as_bytes())?;
         Ok(())
     }
 
@@ -463,8 +463,8 @@ fn test_roundtrip_mnemonic() {
     let file = TempPath::new();
     let path = file.path();
     let mnemonic = Mnemonic::mnemonic(&buf[..]).unwrap();
-    mnemonic.write(&path).unwrap();
-    let other_mnemonic = Mnemonic::read(&path).unwrap();
+    mnemonic.write(path).unwrap();
+    let other_mnemonic = Mnemonic::read(path).unwrap();
     assert_eq!(mnemonic.to_string(), other_mnemonic.to_string());
 }
 

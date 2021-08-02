@@ -89,7 +89,7 @@ impl K8sSwarm {
             .collect::<Result<HashMap<_, _>>>()?;
 
         let client = validators.values().next().unwrap().json_rpc_client();
-        let key = load_root_key(&root_key);
+        let key = load_root_key(root_key);
         let account_key = AccountKey::from_private_key(key);
         let address = diem_sdk::types::account_config::diem_root_address();
         let sequence_number = query_sequence_numbers(&client, &[address])
@@ -103,7 +103,7 @@ impl K8sSwarm {
             })?[0];
         let root_account = LocalAccount::new(address, account_key, sequence_number);
 
-        let key = load_tc_key(&treasury_compliance_key);
+        let key = load_tc_key(treasury_compliance_key);
         let account_key = AccountKey::from_private_key(key);
         let address = diem_sdk::types::account_config::treasury_compliance_account_address();
         let sequence_number = query_sequence_numbers(&client, &[address])
@@ -117,7 +117,7 @@ impl K8sSwarm {
             })?[0];
         let treasury_compliance_account = LocalAccount::new(address, account_key, sequence_number);
 
-        let key = load_tc_key(&treasury_compliance_key);
+        let key = load_tc_key(treasury_compliance_key);
         let account_key = AccountKey::from_private_key(key);
         let address = diem_sdk::types::account_config::testnet_dd_account_address();
         let sequence_number = query_sequence_numbers(&client, &[address])

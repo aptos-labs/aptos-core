@@ -7,7 +7,7 @@ use super::{ast::*, cfg::BlockCFG};
 pub fn optimize(cfg: &mut BlockCFG) -> bool {
     let mut changed = false;
     for block in cfg.blocks_mut().values_mut() {
-        let old_block = std::mem::replace(block, BasicBlock::new());
+        let old_block = std::mem::take(block);
         let old_len = old_block.len();
         *block = old_block
             .into_iter()

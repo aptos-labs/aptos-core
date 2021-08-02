@@ -32,7 +32,7 @@ impl MetricsPusher {
         if let Err(e) = TextEncoder::new().encode(&diem_metrics_core::gather(), &mut buffer) {
             error!("Failed to encode push metrics: {}.", e.to_string());
         } else {
-            let response = ureq::post(&push_metrics_endpoint)
+            let response = ureq::post(push_metrics_endpoint)
                 .timeout_connect(10_000)
                 .send_bytes(&buffer);
             if let Some(error) = response.synthetic_error() {

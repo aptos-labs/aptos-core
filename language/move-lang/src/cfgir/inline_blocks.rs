@@ -19,7 +19,7 @@ pub fn optimize(cfg: &mut BlockCFG) -> bool {
 }
 
 fn optimize_(start: Label, blocks: &mut BasicBlocks) -> bool {
-    let single_target_labels = find_single_target_labels(start, &blocks);
+    let single_target_labels = find_single_target_labels(start, blocks);
     inline_single_target_blocks(&single_target_labels, start, blocks)
 }
 
@@ -61,7 +61,7 @@ fn inline_single_target_blocks(
     let mut labels = labels_vec.into_iter();
     let mut next = labels.next();
 
-    let mut working_blocks = std::mem::replace(blocks, BasicBlocks::new());
+    let mut working_blocks = std::mem::take(blocks);
     let finished_blocks = blocks;
 
     let mut remapping = BTreeMap::new();
@@ -126,7 +126,7 @@ fn remap_to_last_target(
     for label in blocks.keys() {
         remapping.entry(*label).or_insert(*label);
     }
-    let owned_blocks = std::mem::replace(blocks, BasicBlocks::new());
+    let owned_blocks = std::mem::take(blocks);
     let (_start, remapped_blocks) = remap_labels(&remapping, start, owned_blocks);
     *blocks = remapped_blocks;
 }

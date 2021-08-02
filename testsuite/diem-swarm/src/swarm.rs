@@ -460,7 +460,7 @@ impl DiemSwarm {
     /// The directory for the last failed attempt won't be removed.
     fn setup_config_dir(config_dir: &Option<String>) -> DiemSwarmDir {
         if let Some(dir_str) = config_dir {
-            let path_buf = PathBuf::from_str(&dir_str).expect("unable to create config dir");
+            let path_buf = PathBuf::from_str(dir_str).expect("unable to create config dir");
             if path_buf.exists() {
                 std::fs::remove_dir_all(dir_str).expect("unable to delete previous config dir");
             }
@@ -576,7 +576,7 @@ impl DiemSwarm {
                 &self.diem_node_bin_path,
                 node_id.clone(),
                 self.node_type,
-                &path,
+                path,
                 logs_dir_path.join(format!("{}.log", index)),
             )
             .unwrap();

@@ -33,8 +33,8 @@ fn move_check_testsuite(path: &Path) -> datatest_stable::Result<()> {
         );
         run_test(
             path,
-            &Path::new(&test_exp_path),
-            &Path::new(&test_out_path),
+            Path::new(&test_exp_path),
+            Path::new(&test_out_path),
             Flags::testing(),
         )?;
     }

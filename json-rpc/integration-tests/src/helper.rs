@@ -110,8 +110,8 @@ impl JsonRpcTestHelper {
     }
 
     pub fn submit_and_wait(&self, txn: &SignedTransaction) -> Value {
-        self.submit(&txn);
-        self.wait_for_txn(&txn)
+        self.submit(txn);
+        self.wait_for_txn(txn)
     }
 
     pub fn submit(&self, txn: &SignedTransaction) -> JsonRpcResponse {

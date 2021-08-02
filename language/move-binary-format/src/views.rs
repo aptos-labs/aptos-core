@@ -212,7 +212,7 @@ impl<'a, T: ModuleAccess> StructHandleView<'a, T> {
     }
 
     pub fn handle(&self) -> &StructHandle {
-        &self.struct_handle
+        self.struct_handle
     }
 
     pub fn abilities(&self) -> AbilitySet {

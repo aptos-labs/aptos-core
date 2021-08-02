@@ -54,7 +54,7 @@ impl<'a> Context<'a> {
     pub fn finish_function(
         &mut self,
     ) -> BTreeMap<SpecId, (IR::NopLabel, BTreeMap<Var, H::SingleType>)> {
-        std::mem::replace(&mut self.spec_info, BTreeMap::new())
+        std::mem::take(&mut self.spec_info)
     }
 
     //**********************************************************************************************
@@ -234,7 +234,7 @@ impl<'a> Context<'a> {
     }
 
     pub fn translate_module_ident(&mut self, ident: ModuleIdent) -> Option<IR::ModuleIdent> {
-        match Self::translate_module_ident_impl(&self.addresses, ident) {
+        match Self::translate_module_ident_impl(self.addresses, ident) {
             Ok(ident) => Some(ident),
             Err(d) => {
                 self.env.add_diag(d);

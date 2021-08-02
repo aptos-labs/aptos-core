@@ -798,7 +798,7 @@ impl NaiveInternalNode {
             return children
                 .get(&begin.into())
                 .map_or(BinaryTreeNode::Null, |child| {
-                    BinaryTreeNode::new_child(begin, &child)
+                    BinaryTreeNode::new_child(begin, child)
                 });
         }
 

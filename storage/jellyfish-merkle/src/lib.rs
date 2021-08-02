@@ -671,7 +671,7 @@ where
                 }
                 Self::create_leaf_node(
                     NodeKey::new_empty_path(version),
-                    &nibble_iter,
+                    nibble_iter,
                     value,
                     tree_cache,
                 )

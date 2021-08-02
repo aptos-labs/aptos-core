@@ -159,7 +159,7 @@ test = false
     std::fs::create_dir(stdlib_dir_path.join("src")).unwrap();
     let source_path = stdlib_dir_path.join("src/lib.rs");
     let mut source = std::fs::File::create(&source_path).unwrap();
-    buildgen::rust::output(&mut source, &abis, /* local types */ false).unwrap();
+    buildgen::rust::output(&mut source, abis, /* local types */ false).unwrap();
 
     std::fs::copy(demo_file, stdlib_dir_path.join("src/stdlib_demo.rs")).unwrap();
 

@@ -69,7 +69,7 @@ impl WalletLibrary {
     /// NOTE: This is not secure, and in general the Mnemonic would need to be decrypted before it
     /// can be written to file; otherwise the encrypted Mnemonic should be written to file
     pub fn write_recovery(&self, output_file_path: &Path) -> Result<()> {
-        io_utils::write_recovery(&self, &output_file_path)?;
+        io_utils::write_recovery(self, &output_file_path)?;
         Ok(())
     }
 
@@ -177,7 +177,7 @@ impl WalletLibrary {
 
     /// Return private key for an address in the wallet
     pub fn get_private_key(&self, address: &AccountAddress) -> Result<Ed25519PrivateKey> {
-        if let Some(child) = self.addr_map.get(&address) {
+        if let Some(child) = self.addr_map.get(address) {
             Ok(self.key_factory.private_child(*child)?.get_private_key())
         } else {
             Err(WalletError::DiemWalletGeneric("missing address".to_string()).into())
@@ -186,7 +186,7 @@ impl WalletLibrary {
 
     /// Return authentication key (AuthenticationKey) for an address in the wallet
     pub fn get_authentication_key(&self, address: &AccountAddress) -> Result<AuthenticationKey> {
-        if let Some(child) = self.addr_map.get(&address) {
+        if let Some(child) = self.addr_map.get(address) {
             Ok(self
                 .key_factory
                 .private_child(*child)?

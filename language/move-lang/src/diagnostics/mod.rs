@@ -68,7 +68,7 @@ pub fn unwrap_or_report_diagnostics<T>(files: &FilesSourceText, res: Result<T, D
         Ok(t) => t,
         Err(diags) => {
             assert!(!diags.is_empty());
-            report_diagnostics(&files, diags)
+            report_diagnostics(files, diags)
         }
     }
 }

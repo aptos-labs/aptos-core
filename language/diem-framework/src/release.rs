@@ -58,7 +58,7 @@ fn build_modules(output_path: impl AsRef<Path>) -> BTreeMap<String, CompiledModu
     for (name, module) in &compiled_modules {
         let mut bytes = Vec::new();
         module.serialize(&mut bytes).unwrap();
-        let mut module_path = Path::join(&output_path, name);
+        let mut module_path = Path::join(output_path, name);
         module_path.set_extension(MOVE_COMPILED_EXTENSION);
         save_binary(&module_path, &bytes);
     }
@@ -399,6 +399,6 @@ pub fn sync_doc_files(output_path: &str) {
 
     sync(
         &Path::new(output_path).join("docs").join("scripts"),
-        &Path::new("script_documentation"),
+        Path::new("script_documentation"),
     );
 }

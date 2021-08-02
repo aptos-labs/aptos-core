@@ -98,7 +98,7 @@ fn execute_and_commit(txns: Vec<Transaction>, db: &DbReaderWriter, signer: &Vali
         .execute_block((block_id, txns), executor.committed_block_id())
         .unwrap();
     assert_eq!(output.num_leaves(), target_version + 1);
-    let ledger_info_with_sigs = gen_ledger_info_with_sigs(epoch, &output, block_id, vec![&signer]);
+    let ledger_info_with_sigs = gen_ledger_info_with_sigs(epoch, &output, block_id, vec![signer]);
     executor
         .commit_blocks(vec![block_id], ledger_info_with_sigs)
         .unwrap();
@@ -270,7 +270,7 @@ fn test_pre_genesis() {
     let (account1, account1_key, account2, account2_key) = get_demo_accounts();
     let txn1 = get_account_transaction(genesis_key, 0, &account1, &account1_key);
     let txn2 = get_account_transaction(genesis_key, 1, &account2, &account2_key);
-    let txn3 = get_mint_transaction(&genesis_key, 0, &account1, 2000);
+    let txn3 = get_mint_transaction(genesis_key, 0, &account1, 2000);
     let txn4 = get_mint_transaction(genesis_key, 1, &account2, 2000);
     execute_and_commit(vec![txn1, txn2, txn3, txn4], &db_rw, &signer);
     assert_eq!(get_balance(&account1, &db_rw), 2000);

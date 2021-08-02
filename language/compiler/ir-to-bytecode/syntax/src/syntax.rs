@@ -185,7 +185,7 @@ fn parse_account_address(
             location: current_token_loc(tokens),
         });
     }
-    let addr = AccountAddress::from_hex_literal(&tokens.content())
+    let addr = AccountAddress::from_hex_literal(tokens.content())
         .with_context(|| {
             format!(
                 "The address {:?} is of invalid length. Addresses are at most 32-bytes long",

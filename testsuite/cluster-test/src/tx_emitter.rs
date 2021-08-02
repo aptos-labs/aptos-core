@@ -322,7 +322,7 @@ impl TxEmitter {
         client: &JsonRpcClient,
         address: AccountAddress,
     ) -> Result<LocalAccount> {
-        let sequence_number = query_sequence_numbers(&client, &[address])
+        let sequence_number = query_sequence_numbers(client, &[address])
             .await
             .map_err(|e| {
                 format_err!(
@@ -358,7 +358,7 @@ impl TxEmitter {
         let mint_key: Ed25519PrivateKey = generate_key::load_key(DD_KEY);
         let account_key = AccountKey::from_private_key(mint_key);
         let address = account_key.authentication_key().derived_address();
-        let sequence_number = query_sequence_numbers(&client, &[address])
+        let sequence_number = query_sequence_numbers(client, &[address])
             .await
             .map_err(|e| {
                 format_err!(
@@ -379,7 +379,7 @@ impl TxEmitter {
         let mint_key: Ed25519PrivateKey = generate_key::load_key(file);
         let account_key = AccountKey::from_private_key(mint_key);
         let address = account_key.authentication_key().derived_address();
-        let sequence_number = query_sequence_numbers(&client, &[address])
+        let sequence_number = query_sequence_numbers(client, &[address])
             .await
             .map_err(|e| {
                 format_err!(
@@ -979,7 +979,7 @@ fn gen_rng_for_reusable_account(count: usize) -> Vec<StdRng> {
 async fn gen_reusable_account(client: &JsonRpcClient, rng: &mut StdRng) -> Result<LocalAccount> {
     let account_key = AccountKey::generate(rng);
     let address = account_key.authentication_key().derived_address();
-    let sequence_number = match query_sequence_numbers(&client, &[address]).await {
+    let sequence_number = match query_sequence_numbers(client, &[address]).await {
         Ok(v) => v[0],
         Err(_) => 0,
     };

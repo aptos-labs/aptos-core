@@ -593,7 +593,7 @@ impl Client for diem_client::BlockingClient {
             Some(account_blob) => account_blob,
             None => return Ok(Response::new(None, response_state)),
         };
-        let account_blob: AccountStateBlob = bcs::from_bytes(&account_blob_view.as_ref())
+        let account_blob: AccountStateBlob = bcs::from_bytes(account_blob_view.as_ref())
             .context("Failed to deserialize AccountStateBlob")?;
 
         let account_state =

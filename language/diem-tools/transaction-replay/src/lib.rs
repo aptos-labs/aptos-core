@@ -147,7 +147,7 @@ impl DiemDebugger {
         let (_, output) = vm
             .execute_writeset_transaction(
                 &cache,
-                &payload,
+                payload,
                 txn_data,
                 &AdapterLogSchema::new(state_view.id(), 0),
             )

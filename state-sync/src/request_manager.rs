@@ -143,7 +143,7 @@ impl RequestManager {
     }
 
     pub fn disable_peer(&mut self, peer: &PeerNetworkId) -> Result<(), Error> {
-        info!(LogSchema::new(LogEntry::LostPeer).peer(&peer));
+        info!(LogSchema::new(LogEntry::LostPeer).peer(peer));
 
         if self.peer_scores.contains_key(peer) {
             counters::ACTIVE_UPSTREAM_PEERS
@@ -151,7 +151,7 @@ impl RequestManager {
                 .dec();
             self.peer_scores.remove(peer);
         } else {
-            warn!(LogSchema::new(LogEntry::LostPeerNotKnown).peer(&peer));
+            warn!(LogSchema::new(LogEntry::LostPeerNotKnown).peer(peer));
         }
 
         Ok(())
@@ -348,11 +348,11 @@ impl RequestManager {
     }
 
     pub fn process_chunk_from_downstream(&mut self, peer: &PeerNetworkId) {
-        self.update_score(&peer, PeerScoreUpdateType::InvalidChunk);
+        self.update_score(peer, PeerScoreUpdateType::InvalidChunk);
     }
 
     pub fn process_empty_chunk(&mut self, peer: &PeerNetworkId) {
-        self.update_score(&peer, PeerScoreUpdateType::EmptyChunk);
+        self.update_score(peer, PeerScoreUpdateType::EmptyChunk);
     }
 
     pub fn process_invalid_chunk(&mut self, peer: &PeerNetworkId) {
@@ -393,7 +393,7 @@ impl RequestManager {
                 chunk_version.to_string(),
             ))
         } else {
-            self.update_score(&peer, PeerScoreUpdateType::ChunkVersionCannotBeApplied);
+            self.update_score(peer, PeerScoreUpdateType::ChunkVersionCannotBeApplied);
             Err(Error::ReceivedNonSequentialChunk(
                 peer.to_string(),
                 synced_version.to_string(),
@@ -833,9 +833,9 @@ mod tests {
         for (index, validator) in validators.iter().enumerate() {
             if validator_index != index {
                 if check_highest_frequency {
-                    assert!(validator_count > pick_counts.get(&validator).unwrap());
+                    assert!(validator_count > pick_counts.get(validator).unwrap());
                 } else {
-                    assert!(validator_count < pick_counts.get(&validator).unwrap());
+                    assert!(validator_count < pick_counts.get(validator).unwrap());
                 }
             }
         }

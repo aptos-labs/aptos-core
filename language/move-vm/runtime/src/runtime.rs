@@ -107,7 +107,7 @@ impl VMRuntime {
                 let old_module_ref = self.loader.load_module(&module_id, data_store)?;
                 let old_module = old_module_ref.module();
                 let old_m = normalized::Module::new(old_module);
-                let new_m = normalized::Module::new(&module);
+                let new_m = normalized::Module::new(module);
                 let compat = Compatibility::check(&old_m, &new_m);
                 if !compat.is_fully_compatible() {
                     return Err(PartialVMError::new(
@@ -274,7 +274,7 @@ impl VMRuntime {
         let n_signer_params = number_of_signer_params(file_format_version, tys);
 
         let args = if n_signer_params == 0 {
-            self.deserialize_args(file_format_version, &tys, args)?
+            self.deserialize_args(file_format_version, tys, args)?
         } else {
             let n_signers = senders.len();
             if n_signer_params != n_signers {
@@ -398,7 +398,7 @@ impl VMRuntime {
 
         let mut serialized_vals = vec![];
         for (val, layout) in return_vals.into_iter().zip(return_layouts.iter()) {
-            serialized_vals.push(val.simple_serialize(&layout).ok_or_else(|| {
+            serialized_vals.push(val.simple_serialize(layout).ok_or_else(|| {
                 PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
                     .with_message("failed to serialize return values".to_string())
                     .finish(Location::Undefined)

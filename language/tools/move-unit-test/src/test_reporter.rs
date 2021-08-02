@@ -227,7 +227,7 @@ impl TestFailure {
                     .filter_map(|(fdef_idx, offset)| {
                         let function_source_map = test_plan
                             .module_info
-                            .get(&module_id)?
+                            .get(module_id)?
                             .1
                             .get_function_source_map(*fdef_idx)
                             .ok()?;
@@ -302,7 +302,7 @@ impl TestResults {
             for test_result in test_results {
                 let qualified_function_name = format!(
                     "{}::{}",
-                    format_module_id(&module_id),
+                    format_module_id(module_id),
                     test_result.function_ident
                 );
                 max_function_name_size =
@@ -319,7 +319,7 @@ impl TestResults {
             for test_failure in test_failures {
                 let qualified_function_name = format!(
                     "{}::{}",
-                    format_module_id(&module_id),
+                    format_module_id(module_id),
                     test_failure.test_run_info.function_ident
                 );
                 max_function_name_size =
@@ -400,7 +400,7 @@ impl TestResults {
                 writeln!(
                     writer.lock().unwrap(),
                     "Failures in {}:",
-                    format_module_id(&module_id)
+                    format_module_id(module_id)
                 )?;
                 for test_failure in test_failures {
                     writeln!(

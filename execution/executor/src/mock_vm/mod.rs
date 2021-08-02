@@ -83,7 +83,7 @@ impl VMExecutor for MockVM {
         let mut outputs = vec![];
 
         for txn in transactions {
-            match decode_transaction(&txn.as_signed_user_txn().unwrap()) {
+            match decode_transaction(txn.as_signed_user_txn().unwrap()) {
                 MockVMTransaction::Mint { sender, amount } => {
                     let old_balance = read_balance(&output_cache, state_view, sender);
                     let new_balance = old_balance + amount;
@@ -192,16 +192,16 @@ fn read_seqnum(
 }
 
 fn read_balance_from_storage(state_view: &dyn StateView, balance_access_path: &AccessPath) -> u64 {
-    read_u64_from_storage(state_view, &balance_access_path)
+    read_u64_from_storage(state_view, balance_access_path)
 }
 
 fn read_seqnum_from_storage(state_view: &dyn StateView, seqnum_access_path: &AccessPath) -> u64 {
-    read_u64_from_storage(state_view, &seqnum_access_path)
+    read_u64_from_storage(state_view, seqnum_access_path)
 }
 
 fn read_u64_from_storage(state_view: &dyn StateView, access_path: &AccessPath) -> u64 {
     state_view
-        .get(&access_path)
+        .get(access_path)
         .expect("Failed to query storage.")
         .map_or(0, |bytes| decode_bytes(&bytes))
 }

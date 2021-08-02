@@ -108,7 +108,7 @@ where
 {
     /// Delegates to [`KeyCodec::encode_key`].
     fn encode_seek_key(&self) -> Result<Vec<u8>> {
-        <K as KeyCodec<S>>::encode_key(&self)
+        <K as KeyCodec<S>>::encode_key(self)
     }
 }
 

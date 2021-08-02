@@ -655,7 +655,7 @@ impl BorrowState {
             )
         } else {
             let msg = || format!("Invalid immutable borrow at field '{}'.", field);
-            self.readable(loc, ReferenceSafety::RefTrans, msg, id, Some(&field))
+            self.readable(loc, ReferenceSafety::RefTrans, msg, id, Some(field))
         };
         let field_borrow_id = self.declare_new_ref(mut_);
         self.add_field_borrow(loc, id, field.clone(), field_borrow_id);

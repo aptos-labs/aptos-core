@@ -141,7 +141,7 @@ pub fn generate_boogie(
 ) -> anyhow::Result<CodeWriter> {
     let writer = CodeWriter::new(env.internal_loc());
     add_prelude(env, &options.backend, &writer)?;
-    let mut translator = BoogieTranslator::new(&env, &options.backend, &targets, &writer);
+    let mut translator = BoogieTranslator::new(env, &options.backend, targets, &writer);
     translator.translate();
     Ok(writer)
 }
@@ -156,8 +156,8 @@ pub fn verify_boogie(
     debug!("writing boogie to `{}`", &options.output_path);
     writer.process_result(|result| fs::write(&options.output_path, result))?;
     let boogie = BoogieWrapper {
-        env: &env,
-        targets: &targets,
+        env,
+        targets,
         writer: &writer,
         options: &options.backend,
     };

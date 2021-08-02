@@ -65,7 +65,7 @@ pub async fn test_save_and_list_metadata_files_impl(
     input: Vec<(ShellSafeName, TextLine)>,
 ) {
     for (name, content) in &input {
-        store.save_metadata_line(name, &content).await.unwrap();
+        store.save_metadata_line(name, content).await.unwrap();
     }
 
     let mut read_back = Vec::new();

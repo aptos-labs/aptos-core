@@ -15,7 +15,7 @@ pub fn quote_container_definitions(
     let generator = rust::CodeGenerator::new(&config)
         .with_derive_macros(Vec::new())
         .with_track_visibility(false);
-    generator.quote_container_definitions(&registry)
+    generator.quote_container_definitions(registry)
 }
 
 /// Replace the markdown content in `reader` and return a new string, where some of the Rust quotes

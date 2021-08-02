@@ -71,20 +71,19 @@ impl Mempool {
 
         let current_seq_number = self
             .sequence_number_cache
-            .remove(&sender)
+            .remove(sender)
             .unwrap_or_default();
 
         if is_rejected {
             if sequence_number >= current_seq_number {
                 self.transactions
-                    .reject_transaction(&sender, sequence_number);
+                    .reject_transaction(sender, sequence_number);
             }
         } else {
             // update current cached sequence number for account
             let new_seq_number = max(current_seq_number, sequence_number + 1);
             self.sequence_number_cache.insert(*sender, new_seq_number);
-            self.transactions
-                .commit_transaction(&sender, new_seq_number);
+            self.transactions.commit_transaction(sender, new_seq_number);
         }
     }
 

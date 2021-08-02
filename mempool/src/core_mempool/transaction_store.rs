@@ -77,7 +77,7 @@ impl TransactionStore {
     ) -> Option<SignedTransaction> {
         if let Some(txn) = self
             .transactions
-            .get(&address)
+            .get(address)
             .and_then(|txns| txns.get(&sequence_number))
         {
             return Some(txn.txn.clone());
@@ -246,7 +246,7 @@ impl TransactionStore {
         address: &AccountAddress,
         current_sequence_number: u64,
     ) {
-        if let Some(txns) = self.transactions.get_mut(&address) {
+        if let Some(txns) = self.transactions.get_mut(address) {
             let mut sequence_number = current_sequence_number;
             while let Some(txn) = txns.get_mut(&sequence_number) {
                 self.priority_index.insert(txn);
@@ -266,7 +266,7 @@ impl TransactionStore {
                 match txn.timeline_state {
                     TimelineState::Ready(_) => {}
                     _ => {
-                        self.parking_lot_index.insert(&txn);
+                        self.parking_lot_index.insert(txn);
                         parking_lot_txns += 1;
                     }
                 }
@@ -286,7 +286,7 @@ impl TransactionStore {
         // This can happen if transactions are sent to multiple nodes and one of the
         // nodes has sent the transaction to consensus but this node still has the
         // transaction sitting in mempool.
-        if let Some(txns) = self.transactions.get_mut(&address) {
+        if let Some(txns) = self.transactions.get_mut(address) {
             let mut active = txns.split_off(&sequence_number);
             let txns_for_removal = txns.clone();
             txns.clear();
@@ -319,11 +319,11 @@ impl TransactionStore {
     }
 
     pub(crate) fn reject_transaction(&mut self, account: &AccountAddress, _sequence_number: u64) {
-        if let Some(txns) = self.transactions.remove(&account) {
+        if let Some(txns) = self.transactions.remove(account) {
             let mut txns_log = TxnsLog::new();
             for transaction in txns.values() {
                 txns_log.add(transaction.get_sender(), transaction.get_sequence_number());
-                self.index_remove(&transaction);
+                self.index_remove(transaction);
             }
             debug!(LogSchema::new(LogEntry::CleanRejectedTxn).txns(txns_log));
         }
@@ -332,11 +332,11 @@ impl TransactionStore {
     /// Removes transaction from all indexes.
     fn index_remove(&mut self, txn: &MempoolTransaction) {
         counters::CORE_MEMPOOL_REMOVED_TXNS.inc();
-        self.system_ttl_index.remove(&txn);
-        self.expiration_time_index.remove(&txn);
-        self.priority_index.remove(&txn);
-        self.timeline_index.remove(&txn);
-        self.parking_lot_index.remove(&txn);
+        self.system_ttl_index.remove(txn);
+        self.expiration_time_index.remove(txn);
+        self.priority_index.remove(txn);
+        self.timeline_index.remove(txn);
+        self.parking_lot_index.remove(txn);
         self.track_indices();
     }
 
@@ -436,9 +436,9 @@ impl TransactionStore {
                     });
                 // mark all following txns as non-ready, i.e. park them
                 for (_, t) in txns.range((park_range_start, park_range_end)) {
-                    self.parking_lot_index.insert(&t);
-                    self.priority_index.remove(&t);
-                    self.timeline_index.remove(&t);
+                    self.parking_lot_index.insert(t);
+                    self.priority_index.remove(t);
+                    self.timeline_index.remove(t);
                 }
                 if let Some(txn) = txns.remove(&key.sequence_number) {
                     let is_active = self.priority_index.contains(&txn);

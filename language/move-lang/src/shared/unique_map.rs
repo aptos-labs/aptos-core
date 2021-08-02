@@ -36,7 +36,7 @@ impl<K: TName, V> UniqueMap<K, V> {
     }
 
     pub fn contains_key(&self, key: &K) -> bool {
-        self.contains_key_(&key.borrow().1)
+        self.contains_key_(key.borrow().1)
     }
 
     pub fn contains_key_(&self, key_: &K::Key) -> bool {
@@ -44,7 +44,7 @@ impl<K: TName, V> UniqueMap<K, V> {
     }
 
     pub fn get(&self, key: &K) -> Option<&V> {
-        self.get_(&key.borrow().1)
+        self.get_(key.borrow().1)
     }
 
     pub fn get_(&self, key_: &K::Key) -> Option<&V> {
@@ -52,7 +52,7 @@ impl<K: TName, V> UniqueMap<K, V> {
     }
 
     pub fn get_mut(&mut self, key: &K) -> Option<&mut V> {
-        self.get_mut_(&key.borrow().1)
+        self.get_mut_(key.borrow().1)
     }
 
     pub fn get_mut_(&mut self, key_: &K::Key) -> Option<&mut V> {
@@ -60,7 +60,7 @@ impl<K: TName, V> UniqueMap<K, V> {
     }
 
     pub fn get_loc(&self, key: &K) -> Option<&K::Loc> {
-        self.get_loc_(&key.borrow().1)
+        self.get_loc_(key.borrow().1)
     }
 
     pub fn get_loc_(&self, key_: &K::Key) -> Option<&K::Loc> {
@@ -68,7 +68,7 @@ impl<K: TName, V> UniqueMap<K, V> {
     }
 
     pub fn remove(&mut self, key: &K) -> Option<V> {
-        self.remove_(&key.borrow().1)
+        self.remove_(key.borrow().1)
     }
 
     pub fn remove_(&mut self, key_: &K::Key) -> Option<V> {
@@ -138,7 +138,7 @@ impl<K: TName, V> UniqueMap<K, V> {
             assert!(joined.add(k, v).is_ok())
         }
         for (loc, k_, v2) in other.iter() {
-            if !joined.contains_key_(&k_) {
+            if !joined.contains_key_(k_) {
                 let k = K::add_loc(loc, k_.clone());
                 assert!(joined.add(k, v2.clone()).is_ok())
             }
@@ -185,8 +185,8 @@ impl<K: TName, V> UniqueMap<K, V> {
 impl<K: TName, V: PartialEq> PartialEq for UniqueMap<K, V> {
     fn eq(&self, other: &UniqueMap<K, V>) -> bool {
         self.iter()
-            .all(|(_, k_, v1)| other.get_(&k_).map(|v2| v1 == v2).unwrap_or(false))
-            && other.iter().all(|(_, k_, _)| self.contains_key_(&k_))
+            .all(|(_, k_, v1)| other.get_(k_).map(|v2| v1 == v2).unwrap_or(false))
+            && other.iter().all(|(_, k_, _)| self.contains_key_(k_))
     }
 }
 impl<K: TName, V: Eq> Eq for UniqueMap<K, V> {}

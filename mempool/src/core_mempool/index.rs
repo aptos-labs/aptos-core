@@ -40,11 +40,11 @@ impl PriorityIndex {
     }
 
     pub(crate) fn insert(&mut self, txn: &MempoolTransaction) {
-        self.data.insert(self.make_key(&txn));
+        self.data.insert(self.make_key(txn));
     }
 
     pub(crate) fn remove(&mut self, txn: &MempoolTransaction) {
-        self.data.remove(&self.make_key(&txn));
+        self.data.remove(&self.make_key(txn));
     }
 
     pub(crate) fn contains(&self, txn: &MempoolTransaction) -> bool {
@@ -133,11 +133,11 @@ impl TTLIndex {
     }
 
     pub(crate) fn insert(&mut self, txn: &MempoolTransaction) {
-        self.data.insert(self.make_key(&txn));
+        self.data.insert(self.make_key(txn));
     }
 
     pub(crate) fn remove(&mut self, txn: &MempoolTransaction) {
-        self.data.remove(&self.make_key(&txn));
+        self.data.remove(&self.make_key(txn));
     }
 
     /// Garbage collect all old transactions.
@@ -337,7 +337,7 @@ impl ParkingLotIndex {
 
     pub(crate) fn contains(&self, account: &AccountAddress, seq_num: &u64) -> bool {
         self.account_indices
-            .get(&account)
+            .get(account)
             .and_then(|idx| self.data.get(*idx))
             .map_or(false, |(_account, txns)| txns.contains(seq_num))
     }

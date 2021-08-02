@@ -182,7 +182,7 @@ fn check_no_loop_splits(context: &ControlFlowVerifier, labels: &[Label]) -> Part
             Some((_cur_loop, last_continue)) => jump_target > *last_continue,
         }
     };
-    let loop_depth = count_loop_depth(&labels);
+    let loop_depth = count_loop_depth(labels);
     check_code(context, labels, |loop_stack, i, instr| {
         match instr {
             // Forward jump/"break"

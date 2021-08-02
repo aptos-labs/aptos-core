@@ -23,7 +23,7 @@ impl SourcePackageLayout {
     /// ├── specifications (optional)
     /// └── tests          (optional)
     pub fn path(&self) -> &Path {
-        &Path::new(self.location_str())
+        Path::new(self.location_str())
     }
 
     pub fn location_str(&self) -> &'static str {

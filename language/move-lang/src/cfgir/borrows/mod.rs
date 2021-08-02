@@ -71,7 +71,7 @@ impl TransferFunctions for BorrowSafety {
         command(&mut context, cmd);
         context
             .borrow_state
-            .canonicalize_locals(&context.local_numbers);
+            .canonicalize_locals(context.local_numbers);
         context.get_diags()
     }
 }

@@ -40,7 +40,7 @@ impl KVStorage for GitHubStorage {
                 data, e
             ))
         })?;
-        serde_json::from_str(&data).map_err(|e| e.into())
+        serde_json::from_str(data).map_err(|e| e.into())
     }
 
     fn set<T: Serialize>(&mut self, key: &str, value: T) -> Result<(), Error> {

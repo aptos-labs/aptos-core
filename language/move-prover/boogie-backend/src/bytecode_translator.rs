@@ -1631,7 +1631,7 @@ impl<'env> FunctionTranslator<'env> {
             emitln!(
                 self.parent.writer,
                 "assume {{:print \"$at{}\"}} true;",
-                self.loc_str(&loc)
+                self.loc_str(loc)
             );
         }
     }

@@ -164,14 +164,14 @@ fn test_vault_key_value_policies() {
     assert_eq!(storage.get::<u64>(PARTIAL).unwrap().value, 3);
     assert_eq!(storage.get::<u64>(FULL).unwrap().value, 4);
 
-    let writer_token = storage.create_token(vec![&WRITER]).unwrap();
+    let writer_token = storage.create_token(vec![WRITER]).unwrap();
     let mut writer = create_vault_storage(writer_token.clone(), ttl, false);
     assert_eq!(writer.get::<u64>(ANYONE).unwrap().value, 1);
     assert_eq!(writer.get::<u64>(ROOT), Err(Error::PermissionDenied));
     assert_eq!(writer.get::<u64>(PARTIAL).unwrap().value, 3);
     assert_eq!(writer.get::<u64>(FULL).unwrap().value, 4);
 
-    let reader_token = storage.create_token(vec![&READER]).unwrap();
+    let reader_token = storage.create_token(vec![READER]).unwrap();
     let mut reader = create_vault_storage(reader_token.clone(), ttl, false);
     assert_eq!(reader.get::<u64>(ANYONE).unwrap().value, 1);
     assert_eq!(reader.get::<u64>(ROOT), Err(Error::PermissionDenied));
@@ -254,7 +254,7 @@ fn test_vault_crypto_policies() {
     let message = TestDiemCrypto("Hello, World".to_string());
 
     // Verify exporter policy
-    let exporter_token = storage.create_token(vec![&EXPORTER]).unwrap();
+    let exporter_token = storage.create_token(vec![EXPORTER]).unwrap();
     let mut exporter_store = create_vault_storage(exporter_token.clone(), None, true);
     exporter_store.export_private_key(CRYPTO_KEY).unwrap();
     exporter_store.get_public_key(CRYPTO_KEY).unwrap_err();
@@ -270,7 +270,7 @@ fn test_vault_crypto_policies() {
         .unwrap_err();
 
     // Verify noone policy
-    let noone_token = storage.create_token(vec![&NOONE]).unwrap();
+    let noone_token = storage.create_token(vec![NOONE]).unwrap();
     let mut noone_store = create_vault_storage(noone_token, None, true);
     noone_store.export_private_key(CRYPTO_KEY).unwrap_err();
     noone_store.get_public_key(CRYPTO_KEY).unwrap_err();
@@ -278,7 +278,7 @@ fn test_vault_crypto_policies() {
     noone_store.sign(CRYPTO_KEY, &message).unwrap_err();
 
     // Verify reader policy
-    let reader_token = storage.create_token(vec![&READER]).unwrap();
+    let reader_token = storage.create_token(vec![READER]).unwrap();
     let mut reader_store = create_vault_storage(reader_token.clone(), None, true);
     reader_store.export_private_key(CRYPTO_KEY).unwrap_err();
     assert_eq!(
@@ -297,7 +297,7 @@ fn test_vault_crypto_policies() {
         .unwrap_err();
 
     // Verify rotater policy
-    let rotater_token = storage.create_token(vec![&ROTATER]).unwrap();
+    let rotater_token = storage.create_token(vec![ROTATER]).unwrap();
     let mut rotater_store = create_vault_storage(rotater_token.clone(), None, true);
     rotater_store.export_private_key(CRYPTO_KEY).unwrap_err();
     assert_eq!(
@@ -318,7 +318,7 @@ fn test_vault_crypto_policies() {
     let new_pubkey = storage.get_public_key(CRYPTO_KEY).unwrap().public_key;
 
     // Verify signer policy
-    let signer_token = storage.create_token(vec![&SIGNER]).unwrap();
+    let signer_token = storage.create_token(vec![SIGNER]).unwrap();
     let mut signer_store = create_vault_storage(signer_token.clone(), None, true);
     signer_store.export_private_key(CRYPTO_KEY).unwrap_err();
     signer_store.get_public_key(CRYPTO_KEY).unwrap_err();
@@ -350,7 +350,7 @@ fn test_vault_tokens() {
         .set_policies(PARTIAL, &VaultEngine::KVSecrets, &partial)
         .unwrap();
 
-    let writer_token = storage.create_token(vec![&WRITER]).unwrap();
+    let writer_token = storage.create_token(vec![WRITER]).unwrap();
     let mut writer = Namespaced::new(
         VAULT_NAMESPACE_1,
         create_vault_storage(writer_token.clone(), None, true),

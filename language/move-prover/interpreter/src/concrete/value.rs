@@ -1189,7 +1189,7 @@ impl EvalState {
         self.saved_memory
             .get(label)
             .and_then(|sub| sub.get(&inst.ident))
-            .and_then(|sub| sub.get(&inst))
+            .and_then(|sub| sub.get(inst))
             .and_then(|sub| sub.get(addr))
             .cloned()
     }

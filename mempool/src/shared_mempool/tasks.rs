@@ -158,7 +158,7 @@ fn gen_ack_response(
         }
     }
 
-    update_ack_counter(&peer, counters::SENT_LABEL, retry, backoff);
+    update_ack_counter(peer, counters::SENT_LABEL, retry, backoff);
     MempoolSyncMsg::BroadcastTransactionsResponse {
         request_id,
         retry,

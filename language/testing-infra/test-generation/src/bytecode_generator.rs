@@ -466,7 +466,7 @@ impl<'a> BytecodeGenerator<'a> {
         } else {
             1.0
         };
-        let prob_add = Self::value_backpressure(&state, prob_add);
+        let prob_add = Self::value_backpressure(state, prob_add);
         debug!("Pr[add] = {:?}", prob_add);
         let next_instruction_index;
         if self.rng.gen_range(0.0..1.0) <= prob_add {
@@ -796,7 +796,7 @@ impl<'a> BytecodeGenerator<'a> {
                     // Return: Add return types to last block
                     for token_type in module.signatures[fh.return_.0 as usize].0.iter() {
                         let next_instructions =
-                            Self::inhabit_with_bytecode_seq(&mut state_f.module, &token_type);
+                            Self::inhabit_with_bytecode_seq(&mut state_f.module, token_type);
                         debug!(
                             "Return value instructions: {:#?} for token {:#?}",
                             next_instructions, &token_type
@@ -847,7 +847,7 @@ impl<'a> BytecodeGenerator<'a> {
                 code.code = self.generate(
                     &mut fn_context,
                     &locals_sigs,
-                    &f_handle,
+                    f_handle,
                     &fdef.acquires_global_resources,
                     &mut module,
                     &mut call_graph,
@@ -891,7 +891,7 @@ impl<'a> BytecodeGenerator<'a> {
                     .iter()
                     .flat_map(|field| {
                         let field_sig_tok = &field.signature.0;
-                        Self::inhabit_with_bytecode_seq(module, &field_sig_tok)
+                        Self::inhabit_with_bytecode_seq(module, field_sig_tok)
                     })
                     .collect();
                 bytecodes.push(Bytecode::Pack(StructDefinitionIndex(
@@ -919,7 +919,7 @@ impl<'a> BytecodeGenerator<'a> {
                     .iter()
                     .flat_map(|field| {
                         let field_sig_tok = &field.signature.0;
-                        let reified_field_sig_tok = substitute(field_sig_tok, &instantiation);
+                        let reified_field_sig_tok = substitute(field_sig_tok, instantiation);
                         Self::inhabit_with_bytecode_seq(module, &reified_field_sig_tok)
                     })
                     .collect();

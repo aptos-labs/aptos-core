@@ -376,7 +376,7 @@ impl<'a> Context<'a> {
         &mut self,
         label_to_index: HashMap<BlockLabel, u16>,
     ) -> HashMap<u16, u16> {
-        let labels = std::mem::replace(&mut self.labels, HashMap::new());
+        let labels = std::mem::take(&mut self.labels);
         label_to_index
             .into_iter()
             .map(|(lbl, actual_idx)| (labels[&lbl], actual_idx))
@@ -532,7 +532,7 @@ impl<'a> Context<'a> {
 
     /// Get the struct definition index, fails if it is not bound.
     pub fn struct_definition_index(&self, s: &StructName) -> Result<StructDefinitionIndex> {
-        match self.struct_defs.get(&s) {
+        match self.struct_defs.get(s) {
             None => bail!("Missing struct definition for {}", s),
             Some(idx) => Ok(StructDefinitionIndex(*idx)),
         }
@@ -773,7 +773,7 @@ impl<'a> Context<'a> {
                 SignatureToken::MutableReference(Box::new(correct_inner))
             }
             SignatureToken::Struct(orig_sh_idx) => {
-                let dep_info = self.dependency(&dep)?;
+                let dep_info = self.dependency(dep)?;
                 let (mident, sname) = dep_info
                     .source_struct_info(orig_sh_idx)
                     .ok_or_else(|| format_err!("Malformed dependency"))?;
@@ -786,7 +786,7 @@ impl<'a> Context<'a> {
                 SignatureToken::Struct(correct_sh_idx)
             }
             SignatureToken::StructInstantiation(orig_sh_idx, inners) => {
-                let dep_info = self.dependency(&dep)?;
+                let dep_info = self.dependency(dep)?;
                 let (mident, sname) = dep_info
                     .source_struct_info(orig_sh_idx)
                     .ok_or_else(|| format_err!("Malformed dependency"))?;

@@ -697,7 +697,7 @@ impl crate::SourceInstaller for Installer {
             &mut file,
             self.serde_package_name.clone(),
             self.diem_package_name.clone(),
-            &abis,
+            abis,
         )?;
         Ok(())
     }

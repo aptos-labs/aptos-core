@@ -464,7 +464,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                     let return_type = self
                         .func_env
                         .module_env
-                        .globalize_signature(&return_type_view.as_inner());
+                        .globalize_signature(return_type_view.as_inner());
                     return_temp_indices.push(return_temp_index);
                     self.temp_stack.push(return_temp_index);
                     self.local_types.push(return_type);
@@ -501,7 +501,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                     let return_type = self
                         .func_env
                         .module_env
-                        .globalize_signature(&return_type_view.as_inner())
+                        .globalize_signature(return_type_view.as_inner())
                         .instantiate(&type_sigs);
                     return_temp_indices.push(return_temp_index);
                     self.temp_stack.push(return_temp_index);

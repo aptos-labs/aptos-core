@@ -550,7 +550,7 @@ impl<Location: Clone + Eq> SourceMap<Location> {
                 .function_map
                 .get_mut(&(function_idx as TableIndex))
                 .ok_or_else(|| format_err!("Unable to get function map while generating dummy"))?
-                .dummy_function_map(&view, &function_def, default_loc.clone())?;
+                .dummy_function_map(view, function_def, default_loc.clone())?;
         }
 
         for (struct_idx, struct_def) in view.struct_defs().into_iter().flatten().enumerate() {
@@ -562,7 +562,7 @@ impl<Location: Clone + Eq> SourceMap<Location> {
                 .struct_map
                 .get_mut(&(struct_idx as TableIndex))
                 .ok_or_else(|| format_err!("Unable to get struct map while generating dummy"))?
-                .dummy_struct_map(&view, &struct_def, default_loc.clone())?;
+                .dummy_struct_map(view, struct_def, default_loc.clone())?;
         }
 
         for const_idx in 0..view.constant_pool().len() {

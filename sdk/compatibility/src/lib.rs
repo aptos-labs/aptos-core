@@ -484,11 +484,10 @@ fn add_currency_to_account() -> Result<()> {
 
     // Ensure that the account doesn't carry a balance of XDX
     let account_view = client.get_account(account.address())?.into_inner().unwrap();
-    assert!(account_view
+    assert!(!account_view
         .balances
         .iter()
-        .find(|b| b.currency == Currency::XDX)
-        .is_none());
+        .any(|b| b.currency == Currency::XDX));
 
     // Submit txn to add XDX to the account
     let txn = account.sign_with_transaction_builder(

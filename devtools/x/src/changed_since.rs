@@ -32,7 +32,7 @@ pub(crate) fn changed_since_impl<'g>(
     base: &str,
 ) -> Result<PackageSet<'g>> {
     let merge_base = git_cli
-        .merge_base(&base)
+        .merge_base(base)
         .with_context(|| "failed to get merge base with HEAD")?;
     let (old_graph, (new_graph, files_changed)) = rayon::join(
         || {

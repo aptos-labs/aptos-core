@@ -141,7 +141,7 @@ impl Interpreter {
                         current_frame = frame;
                         current_frame.pc += 1; // advance past the Call instruction in the caller
                     } else {
-                        return Ok(mem::replace(&mut self.operand_stack.0, vec![]));
+                        return Ok(mem::take(&mut self.operand_stack.0));
                     }
                 }
                 ExitCode::Call(fh_idx) => {
@@ -690,8 +690,8 @@ impl Frame {
                     &self.locals,
                     self.pc,
                     instruction,
-                    &resolver,
-                    &interpreter
+                    resolver,
+                    interpreter
                 );
 
                 fail_point!("move_vm::interpreter_loop", |_| {

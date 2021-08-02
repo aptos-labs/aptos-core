@@ -139,5 +139,5 @@ fn restore_without_interruption<V>(
     }
     restore.finish().unwrap();
 
-    assert_success(&target_db, expected_root_hash, &btree, target_version);
+    assert_success(target_db, expected_root_hash, btree, target_version);
 }

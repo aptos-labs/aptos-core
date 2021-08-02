@@ -149,7 +149,7 @@ prop_compose! {
                     should_fail_without_waypoints = true;
                 }
                 if overwrite || trusted {
-                    res_waypoints.push(Waypoint::new_epoch_boundary(&li.ledger_info()).unwrap())
+                    res_waypoints.push(Waypoint::new_epoch_boundary(li.ledger_info()).unwrap())
                 }
                 res_lis.push(li);
 

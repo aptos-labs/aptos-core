@@ -315,7 +315,7 @@ impl DecryptedValidatorConfig {
             Error::JsonRpcReadError("validator-config", "not present".to_string())
         })?;
 
-        let mut value = Self::from_validator_config(&config, account_address, encryptor)?;
+        let mut value = Self::from_validator_config(config, account_address, encryptor)?;
         value.name = Self::human_name(&config_resource.human_name);
         Ok(value)
     }

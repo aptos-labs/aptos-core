@@ -819,7 +819,7 @@ fn compile_type(
             }
         }
         Type::TypeParameter(ty_var) => {
-            let idx = match type_parameters.get(&ty_var) {
+            let idx = match type_parameters.get(ty_var) {
                 None => bail!("Unbound type parameter {}", ty_var),
                 Some(idx) => *idx,
             };

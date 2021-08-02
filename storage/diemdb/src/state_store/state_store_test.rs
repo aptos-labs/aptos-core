@@ -240,7 +240,7 @@ proptest! {
         let tmp_dir = TempPath::new();
         let db = DiemDB::new_for_test(&tmp_dir);
         let store = &db.state_store;
-        init_store(&store, kvs.clone().into_iter());
+        init_store(store, kvs.clone().into_iter());
 
         // Test iterator at each version.
         for i in 0..kvs.len() {
@@ -270,7 +270,7 @@ proptest! {
         let tmp_dir1 = TempPath::new();
         let db1 = DiemDB::new_for_test(&tmp_dir1);
         let store1 = &db1.state_store;
-        init_store(&store1, input.clone().into_iter());
+        init_store(store1, input.clone().into_iter());
 
         let version = (input.len() - 1) as Version;
         let expected_root_hash = store1.get_root_hash(version).unwrap();
@@ -328,7 +328,7 @@ proptest! {
         let tmp_dir1 = TempPath::new();
         let db1 = DiemDB::new_for_test(&tmp_dir1);
         let store1 = &db1.state_store;
-        init_store(&store1, input.clone().into_iter());
+        init_store(store1, input.clone().into_iter());
 
         let version = (input.len() - 1) as Version;
         let expected_root_hash = store1.get_root_hash(version).unwrap();

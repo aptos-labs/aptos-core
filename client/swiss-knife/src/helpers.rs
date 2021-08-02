@@ -65,7 +65,7 @@ pub fn read_stdin() -> String {
 
 pub fn coin_tag_parser(coin_tag: &str) -> TypeTag {
     type_tag_for_currency_code(
-        from_currency_code_string(&coin_tag)
+        from_currency_code_string(coin_tag)
             .map_err(|err| {
                 exit_with_error(format!("Failed to parse coin_tag {} : {}", coin_tag, err))
             })

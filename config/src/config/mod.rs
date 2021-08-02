@@ -132,7 +132,7 @@ impl WaypointConfig {
                 let content = fs::read_to_string(path)
                     .unwrap_or_else(|_| panic!("Failed to read waypoint file {}", path.display()));
                 Some(
-                    Waypoint::from_str(&content.trim())
+                    Waypoint::from_str(content.trim())
                         .unwrap_or_else(|_| panic!("Failed to parse waypoint: {}", content.trim())),
                 )
             }
@@ -396,7 +396,7 @@ pub trait PersistableConfig: Serialize + DeserializeOwned {
     }
 
     fn parse(serialized: &str) -> Result<Self, Error> {
-        serde_yaml::from_str(&serialized).map_err(|e| Error::Yaml("config".to_string(), e))
+        serde_yaml::from_str(serialized).map_err(|e| Error::Yaml("config".to_string(), e))
     }
 }
 
@@ -471,7 +471,7 @@ mod test {
         NodeConfig::parse(docker_public_full_node).unwrap();
 
         let contents = std::include_str!("test_data/safety_rules.yaml");
-        SafetyRulesConfig::parse(&contents)
+        SafetyRulesConfig::parse(contents)
             .unwrap_or_else(|e| panic!("Error in safety_rules.yaml: {}", e));
     }
 }

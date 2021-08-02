@@ -23,7 +23,7 @@ pub(crate) fn verify<'a>(
     function_view: &'a FunctionView<'a>,
 ) -> PartialVMResult<()> {
     let initial_state = AbstractState::new(resolver, function_view)?;
-    let inv_map = LocalsSafetyAnalysis().analyze_function(initial_state, &function_view);
+    let inv_map = LocalsSafetyAnalysis().analyze_function(initial_state, function_view);
     // Report all the join failures
     for (_block_id, BlockInvariant { post, .. }) in inv_map {
         match post {

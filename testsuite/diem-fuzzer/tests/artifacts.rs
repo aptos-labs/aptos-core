@@ -56,7 +56,7 @@ fn test_artifact_impl(artifact_path: &Path) {
         .unwrap_or_else(|| panic!("unknown fuzz target: {}", target_name));
     let data = fs::read(artifact_path).expect("failed to read artifact");
 
-    let reg = Region::new(&GLOBAL);
+    let reg = Region::new(GLOBAL);
     target.fuzz(&data);
     let stats = reg.change();
 

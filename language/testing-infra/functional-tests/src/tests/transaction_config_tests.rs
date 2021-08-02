@@ -105,7 +105,7 @@ fn parse_new_transaction() {
 
 fn parse_and_build_config<'a>(global_config: &'a GlobalConfig, s: &str) -> Result<Config<'a>> {
     Config::build(
-        &global_config,
+        global_config,
         &parse_each_line_as::<Entry>(&substitute_addresses_and_auth_keys(global_config, s))?,
     )
 }

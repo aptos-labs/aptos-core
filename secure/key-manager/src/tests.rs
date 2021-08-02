@@ -353,7 +353,7 @@ fn setup_node<T: DiemInterface + Clone>(
 ) -> Node<T> {
     let time = TimeService::mock();
     let diem_test_harness = DiemInterfaceTestHarness::new(diem);
-    let storage = setup_secure_storage(&node_config, time.clone());
+    let storage = setup_secure_storage(node_config, time.clone());
 
     let key_manager = KeyManager::new(
         diem_test_harness.clone(),

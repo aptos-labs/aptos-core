@@ -102,8 +102,8 @@ impl SdkInfo {
         let lowercase_user_agent = user_agent.to_lowercase();
         let user_agent_parts: Vec<&str> = lowercase_user_agent.split('/').collect();
         if user_agent_parts.len() == 2 {
-            let language = SdkLang::from_str(&user_agent_parts[0]);
-            let version = SdkVersion::from_str(&user_agent_parts[1]);
+            let language = SdkLang::from_str(user_agent_parts[0]);
+            let version = SdkVersion::from_str(user_agent_parts[1]);
             if language != SdkLang::Unknown && version != SdkVersion::default() {
                 return SdkInfo { language, version };
             }

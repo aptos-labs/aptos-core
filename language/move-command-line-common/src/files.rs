@@ -41,7 +41,7 @@ pub fn find_filenames<Predicate: FnMut(&Path) -> bool>(
             .filter_map(|e| e.ok())
         {
             let entry_path = entry.path();
-            if !entry.file_type().is_file() || !is_file_desired(&entry_path) {
+            if !entry.file_type().is_file() || !is_file_desired(entry_path) {
                 continue;
             }
 

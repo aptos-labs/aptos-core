@@ -81,7 +81,7 @@ impl<'env> Context<'env> {
     pub fn extract_function_locals(&mut self) -> (UniqueMap<Var, H::SingleType>, BTreeSet<Var>) {
         self.local_scope = UniqueMap::new();
         let locals = std::mem::replace(&mut self.function_locals, UniqueMap::new());
-        let used = std::mem::replace(&mut self.used_locals, BTreeSet::new());
+        let used = std::mem::take(&mut self.used_locals);
         (locals, used)
     }
 
@@ -949,7 +949,7 @@ fn exp_<'env>(
         operands: vec![],
         context,
     };
-    let rc_result = Rc::new(RefCell::new(std::mem::replace(result, Block::new())));
+    let rc_result = Rc::new(RefCell::new(std::mem::take(result)));
     exp_loop(
         &mut stack,
         rc_result.clone(),

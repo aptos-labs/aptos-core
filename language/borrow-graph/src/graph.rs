@@ -248,7 +248,7 @@ impl<Loc: Copy, Lbl: Clone + Ord> BorrowGraph<Loc, Lbl> {
             }
         }
         for child_ref_id in borrowed_by.0.keys() {
-            let child = self.0.get_mut(&child_ref_id).unwrap();
+            let child = self.0.get_mut(child_ref_id).unwrap();
             child.borrows_from.remove(&id);
         }
         debug_checked_postcondition!(self.check_invariant());

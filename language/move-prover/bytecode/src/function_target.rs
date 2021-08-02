@@ -394,7 +394,7 @@ impl<'env> FunctionTarget<'env> {
         texts.push(format!(
             "{:>3}: {}",
             offset,
-            code.display(self, &label_offsets)
+            code.display(self, label_offsets)
         ));
 
         texts.join("\n")

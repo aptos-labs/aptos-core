@@ -252,7 +252,7 @@ fn zero_amount_peer_to_peer() {
         let output = &executor.execute_transaction(txn);
         // Error code 7 means that the transaction was a zero-amount one.
         assert!(transaction_status_eq(
-            &output.status(),
+            output.status(),
             &TransactionStatus::Keep(KeptVMStatus::MoveAbort(
                 known_locations::account_module_abort(),
                 519
@@ -293,7 +293,7 @@ fn create_cyclic_transfers(
     for i in 0..count {
         let sender = &accounts[i];
         let sender_resource = executor
-            .read_account_resource(&sender)
+            .read_account_resource(sender)
             .expect("sender must exist");
         let seq_num = sender_resource.sequence_number();
         let receiver = &accounts[(i + 1) % count];
@@ -317,7 +317,7 @@ fn create_one_to_many_transfers(
     // grab account 0 as a sender
     let sender = &accounts[0];
     let sender_resource = executor
-        .read_account_resource(&sender)
+        .read_account_resource(sender)
         .expect("sender must exist");
     let seq_num = sender_resource.sequence_number();
     // loop through all transactions and let each transfer the same amount to the next one
@@ -376,15 +376,15 @@ fn check_and_apply_transfer_output(
         let receiver = &txn_info.receiver;
         let transfer_amount = txn_info.transfer_amount;
         let sender_resource = executor
-            .read_account_resource(&sender)
+            .read_account_resource(sender)
             .expect("sender must exist");
         let sender_balance = executor
-            .read_balance_resource(&sender, account::xus_currency_code())
+            .read_balance_resource(sender, account::xus_currency_code())
             .expect("sender balance must exist");
         let sender_initial_balance = sender_balance.coin();
         let sender_seq_num = sender_resource.sequence_number();
         let receiver_initial_balance = executor
-            .read_balance_resource(&receiver, account::xus_currency_code())
+            .read_balance_resource(receiver, account::xus_currency_code())
             .expect("receiver balance must exist")
             .coin();
 
@@ -396,13 +396,13 @@ fn check_and_apply_transfer_output(
         let sender_balance = sender_initial_balance - transfer_amount;
         let receiver_balance = receiver_initial_balance + transfer_amount;
         let updated_sender = executor
-            .read_account_resource(&sender)
+            .read_account_resource(sender)
             .expect("sender must exist");
         let updated_sender_balance = executor
-            .read_balance_resource(&sender, account::xus_currency_code())
+            .read_balance_resource(sender, account::xus_currency_code())
             .expect("sender balance must exist");
         let updated_receiver_balance = executor
-            .read_balance_resource(&receiver, account::xus_currency_code())
+            .read_balance_resource(receiver, account::xus_currency_code())
             .expect("receiver balance must exist");
         assert_eq!(receiver_balance, updated_receiver_balance.coin());
         assert_eq!(sender_balance, updated_sender_balance.coin());
@@ -414,7 +414,7 @@ fn check_and_apply_transfer_output(
 fn print_accounts(executor: &FakeExecutor, accounts: &[Account]) {
     for account in accounts {
         let account_resource = executor
-            .read_account_resource(&account)
+            .read_account_resource(account)
             .expect("sender must exist");
         println!("{:?}", account_resource);
     }

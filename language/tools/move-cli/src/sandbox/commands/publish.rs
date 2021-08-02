@@ -81,7 +81,7 @@ pub fn publish(
 
                     let res = session.publish_module(module_bytes, sender, &mut gas_status);
                     if let Err(err) = res {
-                        explain_publish_error(err, &state, module)?;
+                        explain_publish_error(err, state, module)?;
                         has_error = true;
                         break;
                     }
@@ -131,7 +131,7 @@ pub fn publish(
             let (changeset, events) = session.finish().map_err(|e| e.into_vm_status())?;
             assert!(events.is_empty());
             if verbose {
-                explain_publish_changeset(&changeset, &state);
+                explain_publish_changeset(&changeset, state);
             }
             let modules: Vec<_> = changeset
                 .into_modules()

@@ -214,7 +214,7 @@ fn mark_inlined(
         return;
     }
     debug_assert!(
-        targets.get_target_variants(fun_env).contains(&variant),
+        targets.get_target_variants(fun_env).contains(variant),
         "`{}` has variant `{:?}`",
         fun_env.get_name().display(fun_env.symbol_pool()),
         variant

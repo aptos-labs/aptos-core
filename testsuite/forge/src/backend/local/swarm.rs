@@ -140,7 +140,7 @@ impl LocalSwarmBuilder {
         let initial_version = self.initial_version.unwrap_or_else(|| {
             versions
                 .iter()
-                .max_by(|v1, v2| v1.0.cmp(&v2.0))
+                .max_by(|v1, v2| v1.0.cmp(v2.0))
                 .unwrap()
                 .0
                 .clone()
@@ -296,7 +296,7 @@ impl Swarm for LocalSwarm {
     fn upgrade_validator(&mut self, id: PeerId, version: &Version) -> Result<()> {
         let version = self
             .versions
-            .get(&version)
+            .get(version)
             .cloned()
             .ok_or_else(|| anyhow!("Invalid version: {:?}", version))?;
         let validator = self

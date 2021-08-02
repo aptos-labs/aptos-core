@@ -138,7 +138,7 @@ impl Directive {
     /// Returns the pattern of the directive.
     pub fn pattern_str(&self) -> &str {
         match self {
-            Self::Check(s) | Self::Not(s) => &s,
+            Self::Check(s) | Self::Not(s) => s,
         }
     }
 

@@ -106,7 +106,7 @@ impl fmt::Display for ChainId {
         write!(
             f,
             "{}",
-            NamedChain::from_chain_id(&self)
+            NamedChain::from_chain_id(self)
                 .map_or_else(|_| self.0.to_string(), |chain| chain.to_string())
         )
     }

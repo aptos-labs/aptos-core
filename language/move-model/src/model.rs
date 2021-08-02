@@ -2671,7 +2671,7 @@ impl<'env> FunctionEnv<'env> {
     /// If such pragma is not specified for this function, None is returned.
     pub fn get_ident_pragma(&self, name: &str) -> Option<Rc<String>> {
         let sym = &self.symbol_pool().make(name);
-        match self.get_spec().properties.get(&sym) {
+        match self.get_spec().properties.get(sym) {
             Some(PropertyValue::Symbol(sym)) => Some(self.symbol_pool().string(*sym)),
             Some(PropertyValue::QualifiedSymbol(qsym)) => {
                 let module_name = qsym.module_name.display(self.symbol_pool());
@@ -2689,7 +2689,7 @@ impl<'env> FunctionEnv<'env> {
     /// exists and its value represents a function in the system.
     pub fn get_func_env_from_pragma(&self, name: &str) -> Option<FunctionEnv<'env>> {
         let sym = &self.symbol_pool().make(name);
-        match self.get_spec().properties.get(&sym) {
+        match self.get_spec().properties.get(sym) {
             Some(PropertyValue::Symbol(sym)) => self.module_env.find_function(*sym),
             Some(PropertyValue::QualifiedSymbol(qsym)) => {
                 if let Some(module_env) = self.module_env.env.find_module(&qsym.module_name) {
@@ -3181,7 +3181,7 @@ impl Loc {
 
 impl<'env> fmt::Display for LocDisplay<'env> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some((fname, pos)) = self.env.get_file_and_location(&self.loc) {
+        if let Some((fname, pos)) = self.env.get_file_and_location(self.loc) {
             if self.only_line {
                 write!(f, "at {}:{}", fname, pos.line + LineOffset(1))
             } else {

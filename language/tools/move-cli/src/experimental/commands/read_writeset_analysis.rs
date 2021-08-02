@@ -43,10 +43,10 @@ pub fn analyze_read_write_set(
     if let Some(fenv) = rw.get_function_env(&module_id, &fun_id) {
         let signer_addresses = signers
             .iter()
-            .map(|s| AccountAddress::from_hex_literal(&s))
+            .map(|s| AccountAddress::from_hex_literal(s))
             .collect::<Result<Vec<AccountAddress>, _>>()?;
         // TODO: parse Value's directly instead of going through the indirection of TransactionArgument?
-        let script_args: Vec<Vec<u8>> = convert_txn_args(&txn_args);
+        let script_args: Vec<Vec<u8>> = convert_txn_args(txn_args);
         // substitute given script arguments + blockchain state into abstract r/w set
         match concretize {
             ConcretizeMode::Paths => {
@@ -66,7 +66,7 @@ pub fn analyze_read_write_set(
                     &fun_id,
                     &signer_addresses,
                     &script_args,
-                    &type_args,
+                    type_args,
                     state,
                 )?;
                 for key in results {
@@ -79,7 +79,7 @@ pub fn analyze_read_write_set(
                     &fun_id,
                     &signer_addresses,
                     &script_args,
-                    &type_args,
+                    type_args,
                     state,
                 )?;
                 for key in results {

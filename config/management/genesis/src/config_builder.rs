@@ -69,7 +69,7 @@ impl FullnodeBuilder {
             .expect("vfn missing vfn full node network in config");
         fn_vfn.seeds = seeds;
 
-        Self::insert_waypoint_and_genesis(&mut full_node_config, &validator_config);
+        Self::insert_waypoint_and_genesis(&mut full_node_config, validator_config);
         full_node_config
     }
 

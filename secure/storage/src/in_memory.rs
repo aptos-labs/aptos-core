@@ -44,7 +44,7 @@ impl KVStorage for InMemoryStorage {
             .get(key)
             .ok_or_else(|| Error::KeyNotSet(key.to_string()))?;
 
-        serde_json::from_slice(&response).map_err(|e| e.into())
+        serde_json::from_slice(response).map_err(|e| e.into())
     }
 
     fn set<V: Serialize>(&mut self, key: &str, value: V) -> Result<(), Error> {

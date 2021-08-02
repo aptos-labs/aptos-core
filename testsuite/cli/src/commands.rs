@@ -107,7 +107,7 @@ pub fn subcommand_execute(
     }
 
     match commands_map.get(&params[0]) {
-        Some(&idx) => commands[idx].execute(client, &params),
+        Some(&idx) => commands[idx].execute(client, params),
         _ => print_subcommand_help(parent_command_name, &commands),
     }
 }

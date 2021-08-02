@@ -39,7 +39,7 @@ pub fn verify(
         }
         Ok(ordered_ids) => {
             for (order, mident) in ordered_ids.iter().rev().enumerate() {
-                modules.get_mut(&mident).unwrap().dependency_order = order;
+                modules.get_mut(mident).unwrap().dependency_order = order;
             }
         }
     }

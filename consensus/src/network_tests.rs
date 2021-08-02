@@ -151,7 +151,7 @@ impl NetworkPlayground {
                     };
 
                     let mut node_consensus_tx =
-                        node_consensus_txs.lock().get(&dst_twin_id).unwrap().clone();
+                        node_consensus_txs.lock().get(dst_twin_id).unwrap().clone();
 
                     let inbound_req = InboundRpcRequest {
                         protocol_id: outbound_req.protocol_id,
@@ -390,7 +390,7 @@ impl NetworkPlayground {
                 let consensus_msg = msg.protocol_id.from_bytes(&msg.mdata).unwrap();
 
                 // Deliver and copy message it if it's not dropped
-                if !self.is_message_dropped(&src_twin_id, &dst_twin_id, consensus_msg) {
+                if !self.is_message_dropped(&src_twin_id, dst_twin_id, consensus_msg) {
                     self.deliver_message(src_twin_id, *dst_twin_id, msg_notif)
                         .await;
                 }

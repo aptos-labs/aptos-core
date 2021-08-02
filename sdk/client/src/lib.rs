@@ -128,8 +128,8 @@ cfg_async_or_blocking! {
     ) -> Result<Vec<Result<Response<MethodResponse>>>> {
         let mut responses = std::collections::HashMap::new();
         for raw_response in &raw_responses {
-            let id = get_id(&raw_response)?;
-            let response = validate(state_manager, req_state, &raw_response, false);
+            let id = get_id(raw_response)?;
+            let response = validate(state_manager, req_state, raw_response, false);
 
             responses.insert(id, response);
         }

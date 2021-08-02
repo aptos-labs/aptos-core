@@ -86,8 +86,8 @@ fn format_human_summary<M, F, W: Write>(
     let mut total_covered = 0;
     let mut total_instructions = 0;
 
-    for module in get_modules(&args).iter() {
-        let coverage_summary = summary_func(&module, coverage_map);
+    for module in get_modules(args).iter() {
+        let coverage_summary = summary_func(module, coverage_map);
         let (total, covered) = coverage_summary
             .summarize_human(summary_writer, args.summarize_functions)
             .unwrap();
@@ -115,8 +115,8 @@ fn format_csv_summary<M, F, W: Write>(
 {
     writeln!(summary_writer, "ModuleName,FunctionName,Covered,Uncovered").unwrap();
 
-    for module in get_modules(&args).iter() {
-        let coverage_summary = summary_func(&module, coverage_map);
+    for module in get_modules(args).iter() {
+        let coverage_summary = summary_func(module, coverage_map);
         coverage_summary.summarize_csv(summary_writer).unwrap();
     }
 }

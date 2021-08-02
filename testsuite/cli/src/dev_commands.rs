@@ -30,7 +30,7 @@ impl Command for DevCommand {
             Box::new(DevCommandEnableCustomScript {}),
             Box::new(DevSubmitWriteSet {}),
         ];
-        subcommand_execute(&params[0], commands, client, &params[1..]);
+        subcommand_execute(params[0], commands, client, &params[1..]);
     }
 }
 

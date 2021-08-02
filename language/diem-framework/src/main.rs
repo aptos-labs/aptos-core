@@ -82,6 +82,6 @@ fn main() {
     // Sync the generated docs for the modules and docs to their old locations to maintain
     // documentation locations.
     if matches.value_of("output").is_none() {
-        release::sync_doc_files(&output_path);
+        release::sync_doc_files(output_path);
     }
 }

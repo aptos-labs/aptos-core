@@ -26,7 +26,7 @@ impl Command for AccountCommand {
             Box::new(AccountCommandAddCurrency {}),
         ];
 
-        subcommand_execute(&params[0], commands, client, &params[1..]);
+        subcommand_execute(params[0], commands, client, &params[1..]);
     }
 }
 
@@ -68,7 +68,7 @@ impl Command for AccountCommandRecoverWallet {
     }
     fn execute(&self, client: &mut ClientProxy, params: &[&str]) {
         println!(">> Recovering Wallet");
-        match client.recover_wallet_accounts(&params) {
+        match client.recover_wallet_accounts(params) {
             Ok(account_data) => {
                 println!(
                     "Wallet recovered and the first {} child accounts were derived",
@@ -98,7 +98,7 @@ impl Command for AccountCommandWriteRecovery {
     }
     fn execute(&self, client: &mut ClientProxy, params: &[&str]) {
         println!(">> Saving Diem wallet mnemonic recovery seed to disk");
-        match client.write_recovery(&params) {
+        match client.write_recovery(params) {
             Ok(_) => println!("Saved mnemonic seed to disk"),
             Err(e) => report_error("Error writing mnemonic recovery seed to file", e),
         }
@@ -138,7 +138,7 @@ impl Command for AccountCommandMint {
             println!("Invalid number of arguments for mint");
             return;
         }
-        match client.mint_coins(&params, true) {
+        match client.mint_coins(params, true) {
             Ok(_) => {
                 println!("Finished sending coins from faucet!");
             }
@@ -167,7 +167,7 @@ impl Command for AccountCommandAddCurrency {
         }
         println!(">> Adding zero balance in currency to account");
         let is_blocking = blocking_cmd(params[0]);
-        match client.add_currency(&params, is_blocking) {
+        match client.add_currency(params, is_blocking) {
             Ok(_) => {
                 if is_blocking {
                     println!("Finished adding currency to account!");

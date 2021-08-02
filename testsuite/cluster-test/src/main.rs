@@ -231,7 +231,7 @@ async fn handle_cluster_test_runner_commands(
             Reset {}
         );
     } else if args.emit_tx {
-        emit_tx(&runner.cluster, &args).await?;
+        emit_tx(&runner.cluster, args).await?;
     } else if let Some(ref exec) = args.exec {
         let pos = exec.find(':');
         let pos = pos.ok_or_else(|| {
@@ -555,12 +555,12 @@ impl ClusterTestRunner {
             "Generating changelog from {:?} to {}",
             from_commit, to_commit
         );
-        let changelog = self.get_changelog(from_commit.as_ref(), &to_commit);
+        let changelog = self.get_changelog(from_commit.as_ref(), to_commit);
         self.slack_changelog_message(format!("{}\n\n{}", changelog, perf_msg));
     }
 
     fn get_changelog(&self, prev_commit: Option<&String>, upstream_commit: &str) -> String {
-        let commits = self.github.get_commits("diem/diem", &upstream_commit);
+        let commits = self.github.get_commits("diem/diem", upstream_commit);
         match commits {
             Err(e) => {
                 info!("Failed to get github commits: {:?}", e);

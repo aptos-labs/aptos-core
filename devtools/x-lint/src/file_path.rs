@@ -38,7 +38,7 @@ impl<'l> FilePathContext<'l> {
 
     /// Returns the path of this file, relative to the root of the repository.
     pub fn file_path(&self) -> &'l Utf8Path {
-        &self.file_path
+        self.file_path
     }
 
     /// Returns the extension of the file. Returns `None` if there's no extension.

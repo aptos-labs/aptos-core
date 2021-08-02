@@ -182,7 +182,7 @@ impl NetworkClient {
                 NetworkMode::Client,
                 LogEvent::DisconnectedPeerOnRead,
             )
-            .error(&err)
+            .error(err)
             .remote_peer(&self.server));
 
             self.stream = None;
@@ -217,7 +217,7 @@ impl NetworkClient {
                 NetworkMode::Client,
                 LogEvent::DisconnectedPeerOnWrite,
             )
-            .error(&err)
+            .error(err)
             .remote_peer(&self.server));
 
             self.stream = None;
@@ -311,8 +311,8 @@ impl NetworkServer {
                 NetworkMode::Server,
                 LogEvent::DisconnectedPeerOnRead,
             )
-            .error(&err)
-            .remote_peer(&remote));
+            .error(err)
+            .remote_peer(remote));
 
             self.stream = None;
         } else {
@@ -353,8 +353,8 @@ impl NetworkServer {
                 NetworkMode::Server,
                 LogEvent::DisconnectedPeerOnWrite,
             )
-            .error(&err)
-            .remote_peer(&remote));
+            .error(err)
+            .remote_peer(remote));
 
             self.stream = None;
         } else {

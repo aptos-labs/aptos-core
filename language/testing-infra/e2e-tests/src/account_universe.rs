@@ -145,7 +145,7 @@ impl AccountCurrent {
 
     /// Returns the underlying account.
     pub fn account(&self) -> &Account {
-        &self.initial_data.account()
+        self.initial_data.account()
     }
 
     /// Rotates the key in this account.
@@ -405,7 +405,7 @@ pub fn assert_accounts_match(
 ) -> Result<(), TestCaseError> {
     for (idx, account) in universe.accounts().iter().enumerate() {
         let resource = executor
-            .read_account_resource(&account.account())
+            .read_account_resource(account.account())
             .expect("account resource must exist");
         let resource_balance = executor
             .read_balance_resource(account.account(), account::xus_currency_code())

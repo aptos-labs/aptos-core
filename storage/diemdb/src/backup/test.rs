@@ -17,7 +17,7 @@ proptest! {
 
         let mut cur_ver = 0;
         for (txns_to_commit, ledger_info_with_sigs) in input.iter() {
-            db.save_transactions(&txns_to_commit, cur_ver, Some(ledger_info_with_sigs))
+            db.save_transactions(txns_to_commit, cur_ver, Some(ledger_info_with_sigs))
                 .unwrap();
             cur_ver += txns_to_commit.len() as u64;
         }

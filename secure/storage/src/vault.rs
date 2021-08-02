@@ -156,7 +156,7 @@ impl KVStorage for VaultStorage {
     fn get<T: DeserializeOwned>(&self, key: &str) -> Result<GetResponse<T>, Error> {
         let secret = key;
         let key = self.unnamespaced(key);
-        let resp = self.client().read_secret(&secret, key)?;
+        let resp = self.client().read_secret(secret, key)?;
         let last_update = DateTime::parse_from_rfc3339(&resp.creation_time)?.timestamp() as u64;
         let value: T = serde_json::from_value(resp.value)?;
         self.secret_versions
@@ -175,7 +175,7 @@ impl KVStorage for VaultStorage {
         };
         let new_version =
             self.client()
-                .write_secret(&secret, key, &serde_json::to_value(&value)?, version)?;
+                .write_secret(secret, key, &serde_json::to_value(&value)?, version)?;
         self.secret_versions
             .write()
             .insert(key.to_string(), new_version);

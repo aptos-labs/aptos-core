@@ -27,7 +27,7 @@ fn remove_fall_through(
         let next_block = &blocks[idx + 1].0.clone();
         let (lbl, block) = &mut blocks[idx];
         // Don't inline loop heads for the move-prover
-        if loop_heads.contains(&lbl) {
+        if loop_heads.contains(lbl) {
             continue;
         }
 
@@ -45,7 +45,7 @@ fn remove_empty_blocks(blocks: &mut IR::BytecodeBlocks) -> bool {
     let mut label_map = HashMap::new();
     let mut cur_label = None;
     let mut removed = false;
-    let old_blocks = std::mem::replace(blocks, vec![]);
+    let old_blocks = std::mem::take(blocks);
     for (label, block) in old_blocks.into_iter().rev() {
         if block.is_empty() {
             removed = true;

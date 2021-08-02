@@ -172,7 +172,7 @@ pub fn last_usage(
     cfg: &mut BlockCFG,
     infinite_loop_starts: &BTreeSet<Label>,
 ) {
-    let (final_invariants, per_command_states) = analyze(cfg, &infinite_loop_starts);
+    let (final_invariants, per_command_states) = analyze(cfg, infinite_loop_starts);
     for (lbl, block) in cfg.blocks_mut() {
         let final_invariant = final_invariants.get(lbl).unwrap();
         let command_states = per_command_states.get(lbl).unwrap();
@@ -414,7 +414,7 @@ pub fn release_dead_refs(
     cfg: &mut BlockCFG,
     infinite_loop_starts: &BTreeSet<Label>,
 ) {
-    let (liveness_pre_states, _per_command_states) = analyze(cfg, &infinite_loop_starts);
+    let (liveness_pre_states, _per_command_states) = analyze(cfg, infinite_loop_starts);
     let forward_intersections = build_forward_intersections(cfg, &liveness_pre_states);
     for (lbl, block) in cfg.blocks_mut() {
         let locals_pre_state = locals_pre_states.get(lbl).unwrap();

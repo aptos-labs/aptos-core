@@ -70,7 +70,7 @@ pub fn type_(context: &mut Context, ty: &mut Type) {
         Apply(Some(_), sp!(_, TypeName_::Builtin(_)), tys) => types(context, tys),
         Apply(Some(_), _, _) => panic!("ICE expanding pre expanded type"),
         Apply(None, _, _) => {
-            let abilities = core::infer_abilities(&context, &context.subst, ty.clone());
+            let abilities = core::infer_abilities(context, &context.subst, ty.clone());
             match &mut ty.value {
                 Apply(abilities_opt, _, tys) => {
                     *abilities_opt = Some(abilities);

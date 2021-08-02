@@ -86,7 +86,7 @@ move run` must be applied to a module inside `storage/`",
         fs::read(path)?
     } else {
         // script source file; compile first and then extract bytecode
-        let script_opt = compile_script(&state, script_file, verbose)?;
+        let script_opt = compile_script(state, script_file, verbose)?;
         match script_opt {
             Some(script) => {
                 let mut script_bytes = vec![];
@@ -99,10 +99,10 @@ move run` must be applied to a module inside `storage/`",
 
     let signer_addresses = signers
         .iter()
-        .map(|s| AccountAddress::from_hex_literal(&s))
+        .map(|s| AccountAddress::from_hex_literal(s))
         .collect::<Result<Vec<AccountAddress>, _>>()?;
     // TODO: parse Value's directly instead of going through the indirection of TransactionArgument?
-    let vm_args: Vec<Vec<u8>> = convert_txn_args(&txn_args);
+    let vm_args: Vec<Vec<u8>> = convert_txn_args(txn_args);
 
     let vm = MoveVM::new(natives).unwrap();
     let mut gas_status = get_gas_status(gas_budget)?;
@@ -118,7 +118,7 @@ move run` must be applied to a module inside `storage/`",
             session
                 .execute_script_function(
                     &module.self_id(),
-                    &IdentStr::new(script_name)?,
+                    IdentStr::new(script_name)?,
                     vm_type_args.clone(),
                     vm_args,
                     signer_addresses.clone(),
@@ -139,7 +139,7 @@ move run` must be applied to a module inside `storage/`",
         explain_execution_error(
             error_descriptions,
             err,
-            &state,
+            state,
             &script_type_parameters,
             &script_parameters,
             &vm_type_args,
@@ -149,8 +149,8 @@ move run` must be applied to a module inside `storage/`",
     } else {
         let (changeset, events) = session.finish().map_err(|e| e.into_vm_status())?;
         if verbose {
-            explain_execution_effects(&changeset, &events, &state)?
+            explain_execution_effects(&changeset, &events, state)?
         }
-        maybe_commit_effects(!dry_run, changeset, events, &state)
+        maybe_commit_effects(!dry_run, changeset, events, state)
     }
 }

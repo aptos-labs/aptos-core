@@ -230,7 +230,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 }
             }
             EA::SpecBlockTarget_::Schema(name, _) => {
-                let qsym = self.qualified_by_module_from_name(&name);
+                let qsym = self.qualified_by_module_from_name(name);
                 if self.parent.spec_schema_table.contains_key(&qsym) {
                     Some(SpecBlockContext::Schema(qsym))
                 } else {
@@ -384,7 +384,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         }
         // If this is a schema spec block, process its declaration.
         if let EA::SpecBlockTarget_::Schema(name, type_params) = &block.value.target.value {
-            self.decl_ana_schema(&block, &name, type_params.iter().map(|(name, _)| name));
+            self.decl_ana_schema(block, name, type_params.iter().map(|(name, _)| name));
         }
     }
 
@@ -680,7 +680,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                             }
                         }
                         _ => {
-                            self.parent.error(&loc, "item not allowed");
+                            self.parent.error(loc, "item not allowed");
                         }
                     }
                 }
@@ -752,7 +752,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 let mut field_map = BTreeMap::new();
                 for (_name_loc, field_name_, (idx, ty)) in fields {
                     let field_sym = et.symbol_pool().make(field_name_);
-                    let field_ty = et.translate_type(&ty);
+                    let field_ty = et.translate_type(ty);
                     field_map.insert(field_sym, (*idx, field_ty));
                 }
                 Some(field_map)
@@ -793,7 +793,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             for (idx, (n, ty)) in params.iter().enumerate() {
                 et.define_local(&loc, *n, ty.clone(), None, Some(idx));
             }
-            let translated = et.translate_seq(&loc, &seq, &result_type);
+            let translated = et.translate_seq(&loc, seq, &result_type);
             et.finalize_types();
             // If no errors were generated, then the function is considered pure.
             if !*et.errors_generated.borrow() {
@@ -923,7 +923,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         });
 
         for member in let_sorted_members {
-            self.def_ana_spec_block_member(context, &member)
+            self.def_ana_spec_block_member(context, member)
         }
 
         // tweak the opaque pragma.
@@ -1508,7 +1508,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     }
                     None
                 };
-                let mut rewriter = ExpRewriter::new(&self.parent.env, &mut replacer);
+                let mut rewriter = ExpRewriter::new(self.parent.env, &mut replacer);
                 let exp = rewriter.rewrite_exp(exp);
                 let additional_exps = additional_exps
                     .into_iter()
@@ -2150,7 +2150,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         };
 
         // Translate type arguments
-        let mut et = self.exp_translator_for_schema(&loc, context_type_params, vars);
+        let mut et = self.exp_translator_for_schema(loc, context_type_params, vars);
         let type_arguments = &et.translate_types_opt(type_args_opt);
         if schema_entry.type_params.len() != type_arguments.len() {
             self.parent.error(

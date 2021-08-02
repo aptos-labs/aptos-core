@@ -143,7 +143,7 @@ impl ReputationHeuristic for ActiveInactiveHeuristic {
         candidates
             .iter()
             .map(|author| {
-                if set.contains(&author) {
+                if set.contains(author) {
                     self.active_weight
                 } else {
                     self.inactive_weight

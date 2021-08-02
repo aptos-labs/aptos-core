@@ -49,7 +49,7 @@ impl AbstractState {
             .0
             .iter()
             .chain(function_view.locals().0.iter())
-            .map(|st| resolver.abilities(st, &function_view.type_parameters()))
+            .map(|st| resolver.abilities(st, function_view.type_parameters()))
             .collect::<PartialVMResult<Vec<_>>>()?;
 
         Ok(Self {

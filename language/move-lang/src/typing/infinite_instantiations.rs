@@ -409,7 +409,7 @@ fn make_call_string(
         .iter()
         .map(|tp| {
             if tp == tparam {
-                core::error_format_nested(&targ, &Subst::empty())
+                core::error_format_nested(targ, &Subst::empty())
             } else {
                 "_".to_owned()
             }

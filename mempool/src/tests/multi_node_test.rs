@@ -401,7 +401,7 @@ impl TestHarness {
         is_primary_receiver: bool,
         seq_num: u64,
     ) {
-        let (txns, rx_peer) = self.broadcast_txns_successfully(&sender_id, is_primary_sender, 1);
+        let (txns, rx_peer) = self.broadcast_txns_successfully(sender_id, is_primary_sender, 1);
         assert_eq!(1, txns.len(), "Expected only one transaction");
         let actual_seq_num = txns.get(0).unwrap().sequence_number();
         assert_eq!(
@@ -484,10 +484,10 @@ fn test_basic_flow() {
     let (v_a, v_b) = (validators.get(0).unwrap(), validators.get(1).unwrap());
 
     // Add transactions to send
-    harness.add_txns(&v_a, test_transactions(0, 3));
+    harness.add_txns(v_a, test_transactions(0, 3));
 
     // A discovers new peer B
-    harness.connect(&v_b, &v_a);
+    harness.connect(v_b, v_a);
 
     // A sends messages, which are received by B
     for seq_num in 0..3 {
@@ -518,7 +518,7 @@ fn test_metric_cache_ignore_shared_txns() {
     );
 
     // Connect B to A incoming
-    harness.connect(&v_b, &v_a);
+    harness.connect(v_b, v_a);
 
     // TODO: Why not use the information that comes back from the broadcast?
     for txn in txns.iter().take(3) {
@@ -542,19 +542,19 @@ fn test_interruption_in_sync() {
     harness.add_txns(v_a, vec![test_transaction(0)]);
 
     // A discovers first peer
-    harness.connect(&v_b, &v_a);
+    harness.connect(v_b, v_a);
 
     // Make sure first txn delivered to first peer
     harness.broadcast_txns_and_validate(v_a, v_b, 0);
 
     // A discovers second peer
-    harness.connect(&v_c, &v_a);
+    harness.connect(v_c, v_a);
 
     // Make sure first txn delivered to second peer
     harness.broadcast_txns_and_validate(v_a, v_c, 0);
 
     // A loses connection to B
-    harness.disconnect(&v_a, true, &v_b, true);
+    harness.disconnect(v_a, true, v_b, true);
 
     // Only C receives the following transactions
     for seq_num in 1..3 {
@@ -563,7 +563,7 @@ fn test_interruption_in_sync() {
     }
 
     // B reconnects to A
-    harness.connect(&v_b, &v_a);
+    harness.connect(v_b, v_a);
 
     // B should receive the remaining txns
     for seq_num in 1..3 {
@@ -595,7 +595,7 @@ fn test_broadcast_self_transactions() {
     let (mut harness, validators) =
         TestHarness::bootstrap_validator_network(2, Some(MempoolOverrideConfig::new()));
     let (v_a, v_b) = (validators.get(0).unwrap(), validators.get(1).unwrap());
-    harness.add_txns(&v_a, vec![test_transaction(0)]);
+    harness.add_txns(v_a, vec![test_transaction(0)]);
 
     // A and B discover each other
     harness.connect(v_b, v_a);
@@ -651,7 +651,7 @@ fn test_broadcast_updated_transaction() {
     harness.connect(v_b, v_a);
 
     // B receives 0
-    let (txn, _) = harness.broadcast_txns_successfully(&v_a, true, 1);
+    let (txn, _) = harness.broadcast_txns_successfully(v_a, true, 1);
     assert_eq!(txn.get(0).unwrap().sequence_number(), 0);
     assert_eq!(txn.get(0).unwrap().gas_unit_price(), 1);
 
@@ -706,8 +706,8 @@ fn test_vfn_multi_network() {
     harness.broadcast_txns_and_validate_with_networks(vfn_a, false, vfn_b, false, 0);
 
     // Check no other mesages sent
-    harness.assert_no_message_sent(&vfn_a, true);
-    harness.assert_no_message_sent(&vfn_a, false);
+    harness.assert_no_message_sent(vfn_a, true);
+    harness.assert_no_message_sent(vfn_a, false);
 }
 
 #[test]
@@ -836,18 +836,18 @@ fn test_max_broadcast_limit() {
     // Check that mempool doesn't broadcast more than max_broadcasts_per_peer, even
     // if there are more txns in mempool.
     for _ in 0..10 {
-        harness.assert_no_message_sent(&v_a, true);
+        harness.assert_no_message_sent(v_a, true);
     }
 
     // Deliver ACK from B to A.
     // This should unblock A to send more broadcasts.
-    harness.deliver_response(&v_b, true);
-    let (txns, _) = harness.broadcast_txns(&v_a, true, 1, false, true, true);
+    harness.deliver_response(v_b, true);
+    let (txns, _) = harness.broadcast_txns(v_a, true, 1, false, true, true);
     assert_eq!(3, txns.get(0).unwrap().sequence_number());
 
     // Check that mempool doesn't broadcast more than max_broadcasts_per_peer, even
     // if there are more txns in mempool.
     for _ in 0..10 {
-        harness.assert_no_message_sent(&v_a, true);
+        harness.assert_no_message_sent(v_a, true);
     }
 }

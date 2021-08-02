@@ -68,7 +68,7 @@ impl SelectedPackageArgs {
             let git_cli = xctx.core().git_cli().with_context(|| {
                 "May only use --changes-since if working in a local git repository."
             })?;
-            let affected_set = changed_since_impl(git_cli, &xctx, &base)?;
+            let affected_set = changed_since_impl(git_cli, xctx, base)?;
             includes = includes.intersection(
                 affected_set
                     .packages(DependencyDirection::Forward)

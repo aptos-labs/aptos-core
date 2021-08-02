@@ -64,7 +64,7 @@ fn write_output(path: &Path, buf: &[u8]) {
     let mut f = fs::File::create(path)
         .with_context(|| format!("Unable to open output file {:?}", path))
         .unwrap();
-    f.write_all(&buf)
+    f.write_all(buf)
         .with_context(|| format!("Unable to write to output file {:?}", path))
         .unwrap();
 }

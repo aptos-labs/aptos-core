@@ -30,8 +30,8 @@ fn get_initial_data_and_qc(db: &dyn DbReader) -> (RecoveryData, QuorumCert) {
     let ledger_info_with_sigs = startup_info.latest_ledger_info.clone();
 
     let qc = QuorumCert::certificate_for_genesis_from_ledger_info(
-        &ledger_info_with_sigs.ledger_info(),
-        Block::make_genesis_block_from_ledger_info(&ledger_info_with_sigs.ledger_info()).id(),
+        ledger_info_with_sigs.ledger_info(),
+        Block::make_genesis_block_from_ledger_info(ledger_info_with_sigs.ledger_info()).id(),
     );
 
     let ledger_recovery_data = LedgerRecoveryData::new(ledger_info_with_sigs);

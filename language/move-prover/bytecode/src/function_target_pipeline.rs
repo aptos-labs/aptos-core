@@ -187,7 +187,7 @@ impl FunctionTargetsHolder {
                     variant
                 )
             });
-        FunctionTarget::new(func_env, &data)
+        FunctionTarget::new(func_env, data)
     }
 
     /// Gets all available variants for function.
@@ -219,7 +219,7 @@ impl FunctionTargetsHolder {
         id: &QualifiedId<FunId>,
         variant: &FunctionVariant,
     ) -> Option<&FunctionData> {
-        self.targets.get(id).and_then(|vs| vs.get(&variant))
+        self.targets.get(id).and_then(|vs| vs.get(variant))
     }
 
     /// Gets mutable function data for a variant.
@@ -228,7 +228,7 @@ impl FunctionTargetsHolder {
         id: &QualifiedId<FunId>,
         variant: &FunctionVariant,
     ) -> Option<&mut FunctionData> {
-        self.targets.get_mut(id).and_then(|vs| vs.get_mut(&variant))
+        self.targets.get_mut(id).and_then(|vs| vs.get_mut(variant))
     }
 
     /// Removes function data for a variant.
@@ -240,7 +240,7 @@ impl FunctionTargetsHolder {
         self.targets
             .get_mut(id)
             .expect("function target exists")
-            .remove(&variant)
+            .remove(variant)
             .expect("variant exists")
     }
 

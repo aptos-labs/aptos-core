@@ -445,7 +445,7 @@ impl DiemDB {
             // Caller wants the latest, figure out the latest seq_num.
             // In the case of no events on that path, use 0 and expect empty result below.
             self.event_store
-                .get_latest_sequence_number(ledger_version, &event_key)?
+                .get_latest_sequence_number(ledger_version, event_key)?
                 .unwrap_or(0)
         } else {
             start_seq_num
@@ -456,7 +456,7 @@ impl DiemDB {
 
         // Query the index.
         let mut event_indices = self.event_store.lookup_events_by_key(
-            &event_key,
+            event_key,
             first_seq,
             real_limit,
             ledger_version,
@@ -612,7 +612,7 @@ impl DbReader for DiemDB {
     ) -> Result<EpochChangeProof> {
         gauged_api("get_epoch_ending_ledger_infos", || {
             let (ledger_info_with_sigs, more) =
-                Self::get_epoch_ending_ledger_infos(&self, start_epoch, end_epoch)?;
+                Self::get_epoch_ending_ledger_infos(self, start_epoch, end_epoch)?;
             Ok(EpochChangeProof::new(ledger_info_with_sigs, more))
         })
     }
@@ -962,7 +962,7 @@ impl DbReader for DiemDB {
             // requested event_version.
             let maybe_seq_num = self
                 .event_store
-                .get_latest_sequence_number(event_version, &event_key)?;
+                .get_latest_sequence_number(event_version, event_key)?;
 
             let (lower_bound_incl, upper_bound_excl) = if let Some(seq_num) = maybe_seq_num {
                 // We need to request the surrounding events (surrounding
@@ -975,7 +975,7 @@ impl DbReader for DiemDB {
                 let limit = 2;
 
                 let events = self.get_events_with_proof_by_event_key(
-                    &event_key,
+                    event_key,
                     seq_num,
                     Order::Ascending,
                     limit,
@@ -996,7 +996,7 @@ impl DbReader for DiemDB {
                 let limit = 1;
 
                 let events = self.get_events_with_proof_by_event_key(
-                    &event_key,
+                    event_key,
                     seq_num,
                     Order::Ascending,
                     limit,

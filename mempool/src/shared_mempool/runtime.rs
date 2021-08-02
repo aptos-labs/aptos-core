@@ -103,7 +103,7 @@ pub fn bootstrap(
         .enable_all()
         .build()
         .expect("[shared mempool] failed to create runtime");
-    let mempool = Arc::new(Mutex::new(CoreMempool::new(&config)));
+    let mempool = Arc::new(Mutex::new(CoreMempool::new(config)));
     let vm_validator = Arc::new(RwLock::new(VMValidator::new(Arc::clone(&db))));
     start_shared_mempool(
         runtime.handle(),

@@ -31,7 +31,7 @@ fn main() -> Result<()> {
             diem_vm::natives::diem_natives(),
             &error_descriptions,
             &args.move_args,
-            &cmd,
+            cmd,
         ),
     }
 }

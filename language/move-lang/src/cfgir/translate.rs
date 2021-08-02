@@ -102,9 +102,9 @@ impl<'env> Context<'env> {
     pub fn finish_blocks(&mut self) -> (Label, BasicBlocks, Vec<(Label, BlockInfo)>) {
         self.next_label = None;
         let start = mem::replace(&mut self.start, None);
-        let blocks = mem::replace(&mut self.blocks, BasicBlocks::new());
-        let block_ordering = mem::replace(&mut self.block_ordering, BTreeMap::new());
-        let block_info = mem::replace(&mut self.block_info, vec![]);
+        let blocks = mem::take(&mut self.blocks);
+        let block_ordering = mem::take(&mut self.block_ordering);
+        let block_info = mem::take(&mut self.block_info);
         self.loop_bounds = BTreeMap::new();
         self.label_count = 0;
         self.loop_begin = None;
@@ -368,7 +368,7 @@ fn move_value_from_value(context: &mut Context, sp!(loc, v_): Value) -> Option<M
     use Value_ as V;
     Some(match v_ {
         V::InferredNum(_) => panic!("ICE inferred num should have been expanded"),
-        V::Address(a) => match a.into_addr_bytes(&context.addresses, loc, "address value") {
+        V::Address(a) => match a.into_addr_bytes(context.addresses, loc, "address value") {
             Ok(bytes) => MV::Address(MoveAddress::new(bytes.into_bytes())),
             Err(diag) => {
                 context.env.add_diag(diag);
@@ -505,7 +505,7 @@ fn block_(context: &mut Context, cur_label: &mut Label, blocks: H::Block) -> Bas
     macro_rules! finish_block {
         (next_label: $next_label:expr) => {{
             let lbl = mem::replace(cur_label, $next_label);
-            let bb = mem::replace(&mut basic_block, BasicBlock::new());
+            let bb = mem::take(&mut basic_block);
             context.insert_block(lbl, bb);
         }};
     }
@@ -645,13 +645,13 @@ fn command(context: &Context, sp!(_, hc_): &mut H::Command) {
         | C::IgnoreAndPop { .. } => {}
         C::Continue => {
             *hc_ = C::Jump {
-                target: context.loop_begin.clone().unwrap(),
+                target: context.loop_begin.unwrap(),
                 from_user: true,
             }
         }
         C::Break => {
             *hc_ = C::Jump {
-                target: context.loop_end.clone().unwrap(),
+                target: context.loop_end.unwrap(),
                 from_user: true,
             }
         }

@@ -158,7 +158,7 @@ impl ConcretizedFormals {
         let env = fun_env.module_env.env;
         let new_type_actuals = type_actuals
             .iter()
-            .map(|t| Type::from_type_tag(t, &env))
+            .map(|t| Type::from_type_tag(t, env))
             .collect::<Vec<Type>>();
         Ok(Self::from_args_(
             accesses,
@@ -267,7 +267,7 @@ impl ConcretizedFormals {
             assert!(!addrs.is_empty()); // TODO: enforce this in AbsAddr constructor instead
             let tag = g.struct_type().get_type_tag(env).unwrap(); // safe because we checked g.is_statically_known
             for addr in &addrs {
-                if let Some(resource_bytes) = annotator.get_resource_bytes(&addr, &tag) {
+                if let Some(resource_bytes) = annotator.get_resource_bytes(addr, &tag) {
                     let mut ap = AccessPath::new_global_constant(
                         move_model::addr_to_big_uint(addr),
                         g.struct_type().clone(),

@@ -255,7 +255,7 @@ impl PerformanceBenchmark {
             context.prometheus.link_to_dashboard(start, end)
         );
 
-        let pv = PrometheusRangeView::new(&context.prometheus, start, end);
+        let pv = PrometheusRangeView::new(context.prometheus, start, end);
 
         // Transaction stats
         if let Some(avg_txns_per_block) = pv.avg_txns_per_block() {

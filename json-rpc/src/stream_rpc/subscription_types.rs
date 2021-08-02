@@ -103,7 +103,7 @@ impl SubscriptionHelper {
         counters::SUBSCRIPTION_OKS
             .with_label_values(&[
                 self.client.connection_context.transport.as_str(),
-                &self.method.as_str(),
+                self.method.as_str(),
                 counters::RpcResult::Success.as_str(),
                 self.client.connection_context.sdk_info.language.as_str(),
                 &self.client.connection_context.sdk_info.version.to_string(),

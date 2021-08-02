@@ -71,7 +71,7 @@ impl Experiment for CpuFlamegraph {
         let run_id = env::var("RUN_ID")
             .map_err(|e| anyhow!("RUN_ID could not be read from the environment, Error:{}", e))?;
         let filename = "diem-node-perf.svg";
-        let command = generate_perf_flamegraph_command(&filename, &run_id, self.duration_secs);
+        let command = generate_perf_flamegraph_command(filename, &run_id, self.duration_secs);
         let flame_graph = self.perf_instance.util_cmd(command, "generate-flamegraph");
         let flame_graph_future = tokio::time::sleep(buffer)
             .then(|_| async move { flame_graph.await })

@@ -34,8 +34,8 @@ impl Command for TransferCommand {
         }
 
         println!(">> Transferring");
-        let is_blocking = blocking_cmd(&params[0]);
-        match client.transfer_coins(&params, is_blocking) {
+        let is_blocking = blocking_cmd(params[0]);
+        match client.transfer_coins(params, is_blocking) {
             Ok(index_and_seq) => {
                 if is_blocking {
                     println!("Finished transaction!");

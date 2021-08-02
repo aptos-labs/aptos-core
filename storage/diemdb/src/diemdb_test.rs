@@ -86,7 +86,7 @@ pub fn test_save_blocks_impl(input: Vec<(Vec<TransactionToCommit>, LedgerInfoWit
     let mut all_committed_txns = vec![];
     for (batch_idx, (txns_to_commit, ledger_info_with_sigs)) in input.iter().enumerate() {
         db.save_transactions(
-            &txns_to_commit,
+            txns_to_commit,
             cur_ver, /* first_version */
             Some(ledger_info_with_sigs),
         )
@@ -98,7 +98,7 @@ pub fn test_save_blocks_impl(input: Vec<(Vec<TransactionToCommit>, LedgerInfoWit
         );
         verify_committed_transactions(
             &db,
-            &txns_to_commit,
+            txns_to_commit,
             cur_ver,
             ledger_info_with_sigs,
             batch_idx + 1 == num_batches, /* is_latest */
@@ -106,7 +106,7 @@ pub fn test_save_blocks_impl(input: Vec<(Vec<TransactionToCommit>, LedgerInfoWit
 
         // check getting all events by version for all committed transactions
         // up to this point using the current ledger info
-        all_committed_txns.extend_from_slice(&txns_to_commit);
+        all_committed_txns.extend_from_slice(txns_to_commit);
         verify_get_event_by_version(
             &db,
             &all_committed_txns,
@@ -159,15 +159,15 @@ fn test_sync_transactions_impl(input: Vec<(Vec<TransactionToCommit>, LedgerInfoW
         db.save_transactions(
             &txns_to_commit[batch1_len..],
             cur_ver + batch1_len as u64, /* first_version */
-            Some(&ledger_info_with_sigs),
+            Some(ledger_info_with_sigs),
         )
         .unwrap();
 
         verify_committed_transactions(
             &db,
-            &txns_to_commit,
+            txns_to_commit,
             cur_ver,
-            &ledger_info_with_sigs,
+            ledger_info_with_sigs,
             batch_idx + 1 == num_batches, /* is_latest */
         );
 
@@ -219,7 +219,7 @@ fn get_events_by_event_key(
             .map(|(e, seq_num)| {
                 e.verify(
                     ledger_info,
-                    &event_key,
+                    event_key,
                     seq_num,
                     e.transaction_version,
                     e.event_index,

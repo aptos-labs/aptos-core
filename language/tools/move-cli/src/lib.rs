@@ -391,7 +391,7 @@ pub fn run_cli(
                 base::commands::check(
                     &[mode_interface_dir],
                     false,
-                    &source_files,
+                    source_files,
                     move_args.verbose,
                 )
             } else {
@@ -399,16 +399,16 @@ pub fn run_cli(
                     &[mode_interface_dir],
                     &move_args.build_dir,
                     false,
-                    &source_files,
+                    source_files,
                     !*no_source_maps,
                     move_args.verbose,
                 )
             }
         }
         Command::Sandbox { cmd } => {
-            handle_sandbox_commands(natives, error_descriptions, &move_args, &mode, cmd)
+            handle_sandbox_commands(natives, error_descriptions, move_args, &mode, cmd)
         }
-        Command::Experimental { cmd } => handle_experimental_commands(&move_args, &mode, cmd),
+        Command::Experimental { cmd } => handle_experimental_commands(move_args, &mode, cmd),
     }
 }
 

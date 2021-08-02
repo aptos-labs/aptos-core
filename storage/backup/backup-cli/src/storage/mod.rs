@@ -53,7 +53,7 @@ impl ShellSafeName {
 
     fn sanitize(name: &str) -> Result<()> {
         static RE: Lazy<Regex> = Lazy::new(|| Regex::new(ShellSafeName::PATTERN).unwrap());
-        ensure!(RE.is_match(&name), "Illegal name: {}", name,);
+        ensure!(RE.is_match(name), "Illegal name: {}", name,);
         Ok(())
     }
 }

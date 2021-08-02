@@ -229,7 +229,7 @@ impl NetworkBuilder {
         network_builder.discovery_listeners = Some(Vec::new());
         for discovery_method in config.discovery_methods() {
             network_builder.add_discovery_change_listener(
-                &discovery_method,
+                discovery_method,
                 pubkey,
                 config.encryptor(),
             );

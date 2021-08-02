@@ -214,11 +214,11 @@ impl<'input> Lexer<'input> {
                         (Tok::AccountAddressValue, 2 + hex_len)
                     }
                 } else {
-                    get_decimal_number(&text)
+                    get_decimal_number(text)
                 }
             }
             'a'..='z' | 'A'..='Z' | '$' | '_' => {
-                let len = get_name_len(&text);
+                let len = get_name_len(text);
                 let name = &text[..len];
                 if !self.spec_mode {
                     match &text[len..].chars().next() {

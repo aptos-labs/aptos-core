@@ -33,7 +33,7 @@ impl Layout {
     }
 
     pub fn parse(contents: &str) -> Result<Self, Error> {
-        toml::from_str(&contents).map_err(|e| Error::UnexpectedError(e.to_string()))
+        toml::from_str(contents).map_err(|e| Error::UnexpectedError(e.to_string()))
     }
 
     pub fn to_toml(&self) -> Result<String, Error> {

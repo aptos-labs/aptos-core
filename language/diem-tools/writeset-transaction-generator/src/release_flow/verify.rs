@@ -29,7 +29,7 @@ pub fn verify_release(
     use_latest_version: bool,
 ) -> Result<()> {
     for (_, module) in remote_modules {
-        verify_module(&module).expect("invalid remote module");
+        verify_module(module).expect("invalid remote module");
     }
 
     let artifact = load_latest_artifact(&chain_id)?;
@@ -60,7 +60,7 @@ pub fn verify_release(
     verify_payload_change(
         remote,
         override_version,
-        &writeset_payload,
+        writeset_payload,
         remote_modules.iter().map(|(_bytes, m)| m),
     )
 }

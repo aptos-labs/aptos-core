@@ -197,17 +197,17 @@ impl std::error::Error for DiemIdParseError {}
 fn test_invalid_user_identifier() {
     // Test valid domain
     let raw_identifier = "abcd1234";
-    let identifier = DiemIdUserIdentifier::new(&raw_identifier);
+    let identifier = DiemIdUserIdentifier::new(raw_identifier);
     assert!(identifier.is_ok());
 
     // Test having 64 characters is valid
     let raw_identifier = "aaaaaaaaaabbbbbbbbbbccccccccccddddddddddeeeeeeeeeeffffffffff1234";
-    let identifier = DiemIdUserIdentifier::new(&raw_identifier);
+    let identifier = DiemIdUserIdentifier::new(raw_identifier);
     assert!(identifier.is_ok());
 
     // Test using "-" character is invalid
     let raw_identifier = "abcd!!!1234";
-    let identifier = DiemIdUserIdentifier::new(&raw_identifier);
+    let identifier = DiemIdUserIdentifier::new(raw_identifier);
     assert_eq!(
         identifier.unwrap_err(),
         DiemIdParseError {
@@ -216,7 +216,7 @@ fn test_invalid_user_identifier() {
     );
     // Test having 64 characters is invalid
     let raw_identifier = "aaaaaaaaaabbbbbbbbbbccccccccccddddddddddeeeeeeeeeeffffffffff12345";
-    let identifier = DiemIdUserIdentifier::new(&raw_identifier);
+    let identifier = DiemIdUserIdentifier::new(raw_identifier);
     assert_eq!(
         identifier.unwrap_err(),
         DiemIdParseError {
@@ -229,17 +229,17 @@ fn test_invalid_user_identifier() {
 fn test_invalid_vasp_domain_identifier() {
     // Test valid domain
     let raw_identifier = "diem";
-    let identifier = DiemIdVaspDomainIdentifier::new(&raw_identifier);
+    let identifier = DiemIdVaspDomainIdentifier::new(raw_identifier);
     assert!(identifier.is_ok());
 
     // Test having 63 characters is valid
     let raw_identifier = "aaaaaaaaaabbbbbbbbbbccccccccccddddddddddeeeeeeeeeeffffffffff123";
-    let identifier = DiemIdVaspDomainIdentifier::new(&raw_identifier);
+    let identifier = DiemIdVaspDomainIdentifier::new(raw_identifier);
     assert!(identifier.is_ok());
 
     // Test using "-" character is invalid
     let raw_identifier = "diem-domain";
-    let identifier = DiemIdVaspDomainIdentifier::new(&raw_identifier);
+    let identifier = DiemIdVaspDomainIdentifier::new(raw_identifier);
     assert_eq!(
         identifier.unwrap_err(),
         DiemIdParseError {
@@ -248,7 +248,7 @@ fn test_invalid_vasp_domain_identifier() {
     );
     // Test having 64 characters is invalid
     let raw_identifier = "aaaaaaaaaabbbbbbbbbbccccccccccddddddddddeeeeeeeeeeffffffffffgggg";
-    let identifier = DiemIdVaspDomainIdentifier::new(&raw_identifier);
+    let identifier = DiemIdVaspDomainIdentifier::new(raw_identifier);
     assert_eq!(
         identifier.unwrap_err(),
         DiemIdParseError {
@@ -259,8 +259,8 @@ fn test_invalid_vasp_domain_identifier() {
 
 #[test]
 fn test_get_diem_id_string_from_components() {
-    let user_identifier = DiemIdUserIdentifier::new(&"username").unwrap();
-    let vasp_domain_identifier = DiemIdVaspDomainIdentifier::new(&"diem").unwrap();
+    let user_identifier = DiemIdUserIdentifier::new("username").unwrap();
+    let vasp_domain_identifier = DiemIdVaspDomainIdentifier::new("diem").unwrap();
     let diem_id = DiemId::new(user_identifier, vasp_domain_identifier);
     let full_id = diem_id.to_string();
     assert_eq!(full_id, "username@diem");

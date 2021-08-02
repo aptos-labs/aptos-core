@@ -29,7 +29,7 @@ pub fn function_body_(
     }
 
     for (annotated_acquire, annotated_loc) in annotated_acquires {
-        if !seen.contains_key(&annotated_acquire) {
+        if !seen.contains_key(annotated_acquire) {
             let msg = format!(
                 "Invalid 'acquires' list. The struct '{}::{}' was never acquired by '{}', '{}', \
                  '{}', or a transitive call",

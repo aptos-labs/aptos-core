@@ -197,7 +197,7 @@ impl FakeExecutor {
         publishing_options: VMPublishingOption,
     ) -> Self {
         let genesis = vm_genesis::generate_test_genesis(
-            &genesis_modules,
+            genesis_modules,
             publishing_options,
             validator_accounts,
         );

@@ -138,7 +138,7 @@ impl ClientConnection {
             });
 
             task.0.abort();
-            tasks.remove(&id);
+            tasks.remove(id);
             Some(())
         } else {
             debug!(
@@ -191,7 +191,7 @@ impl ClientConnection {
                     "failed to parse subscription request ({})", &err
                 );
                 metric_subscription_rpc_received(
-                    &self,
+                    self,
                     method.map_or(UNKNOWN, |m| m.as_str()),
                     counters::RpcResult::Error,
                 );
@@ -247,7 +247,7 @@ impl ClientConnection {
             Ok(task) => {
                 tasks.insert(request.id.clone(), Task(task));
                 metric_subscription_rpc_received(
-                    &self,
+                    self,
                     request.method_name(),
                     counters::RpcResult::Success,
                 );
@@ -256,7 +256,7 @@ impl ClientConnection {
             Err(err) => {
                 // This error comes from within the subscription itself, before the task is started: it's most likely parameter validation.
                 metric_subscription_rpc_received(
-                    &self,
+                    self,
                     request.method_name(),
                     counters::RpcResult::Error,
                 );

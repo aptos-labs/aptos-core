@@ -317,7 +317,7 @@ fn get_latest_metadata() -> VerifyingRequest {
         };
 
         let latest_li = ctxt.state_proof.latest_ledger_info();
-        let diem_root = verify_account_state(ctxt, &diem_root, diem_root_address(), None)?
+        let diem_root = verify_account_state(ctxt, diem_root, diem_root_address(), None)?
             .ok_or_else(|| Error::rpc_response("DiemRoot account is missing"))?;
 
         let version = latest_li.version();
@@ -373,7 +373,7 @@ fn get_historical_metadata(version: Version) -> VerifyingRequest {
         // verify that the historical accumulator_summary is actually a prefix of
         // our latest verified accumulator_summary.
         let _ = accumulator_summary
-            .try_extend_with_proof(&consistency_v2li, &latest_li)
+            .try_extend_with_proof(&consistency_v2li, latest_li)
             .map_err(Error::invalid_proof)?;
 
         // NewBlockEvent can be special cased so we don't need to lookup the diem_root::DiemBlock->height
@@ -443,7 +443,7 @@ fn get_account(address: AccountAddress, version: Option<Version>) -> VerifyingRe
 
         let ledger_version = ctxt.state_proof.latest_ledger_info().version();
         let version = version.unwrap_or(ledger_version);
-        let maybe_account_state = verify_account_state(ctxt, &account, address, Some(version))?;
+        let maybe_account_state = verify_account_state(ctxt, account, address, Some(version))?;
         let maybe_account_view = maybe_account_state
             .map(|account_state| {
                 AccountView::try_from_account_state(address, account_state, version)
@@ -663,7 +663,7 @@ fn get_currencies() -> VerifyingRequest {
             }
         };
 
-        let diem_root = verify_account_state(ctxt, &diem_root, diem_root_address(), None)?
+        let diem_root = verify_account_state(ctxt, diem_root, diem_root_address(), None)?
             .ok_or_else(|| Error::rpc_response("DiemRoot account is missing"))?;
         let currency_infos = diem_root
             .get_registered_currency_info_resources()

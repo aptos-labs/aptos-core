@@ -487,7 +487,7 @@ impl DiemVM {
         session
             .execute_function(
                 &DIEM_BLOCK_MODULE,
-                &BLOCK_PROLOGUE,
+                BLOCK_PROLOGUE,
                 vec![],
                 args,
                 &mut gas_status,
@@ -525,7 +525,7 @@ impl DiemVM {
         if let Err(e) = validate_signature_checked_transaction(
             &self.0,
             &mut session,
-            &txn,
+            txn,
             storage,
             false,
             log_context,
@@ -546,7 +546,7 @@ impl DiemVM {
                     )));
                 }
             },
-            TransactionMetadata::new(&txn),
+            TransactionMetadata::new(txn),
             log_context,
         )
     }
@@ -573,7 +573,7 @@ impl DiemVM {
             log_context,
         )?;
 
-        if let Err(e) = self.read_writeset(storage, &change_set.write_set()) {
+        if let Err(e) = self.read_writeset(storage, change_set.write_set()) {
             // Any error at this point would be an invalid writeset
             return Ok((e, discard_error_output(StatusCode::INVALID_WRITE_SET)));
         };

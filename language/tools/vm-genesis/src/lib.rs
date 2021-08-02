@@ -85,7 +85,7 @@ pub fn encode_genesis_change_set(
     let mut state_view = GenesisStateView::new();
     for module_bytes in stdlib_module_bytes {
         let module = CompiledModule::deserialize(module_bytes).unwrap();
-        state_view.add_module(&module.self_id(), &module_bytes);
+        state_view.add_module(&module.self_id(), module_bytes);
         stdlib_modules.push(module)
     }
     let data_cache = StateViewCache::new(&state_view);
@@ -102,8 +102,8 @@ pub fn encode_genesis_change_set(
 
     create_and_initialize_main_accounts(
         &mut session,
-        &&diem_root_key,
-        &treasury_compliance_key,
+        diem_root_key,
+        treasury_compliance_key,
         vm_publishing_option,
         &xdx_ty,
         chain_id,
@@ -116,7 +116,7 @@ pub fn encode_genesis_change_set(
         .iter()
         .any(|test_chain_id| test_chain_id.id() == chain_id.id())
     {
-        create_and_initialize_testnet_minting(&mut session, &&treasury_compliance_key);
+        create_and_initialize_testnet_minting(&mut session, treasury_compliance_key);
     }
 
     let (mut changeset1, mut events1) = session.finish().unwrap();
@@ -446,7 +446,7 @@ pub fn test_genesis_change_set_and_validators(
     count: Option<usize>,
 ) -> (ChangeSet, Vec<TestValidator>) {
     generate_test_genesis(
-        &current_module_blobs(),
+        current_module_blobs(),
         VMPublishingOption::locked(LegacyStdlibScript::allowlist()),
         count,
     )

@@ -37,6 +37,11 @@ allowed = [
     "clippy::rc_buffer",
     "clippy::upper_case_acronyms",
     "clippy::len-without-is-empty",
+    "clippy::from-iter-instead-of-collect",
+    "clippy::while-let-on-iterator",
+    "clippy::bool-assert-comparison",
+    "clippy::needless-collect",
+    "clippy::enum-variant-names",
 ]
 warn = [
     "clippy::wildcard_dependencies",

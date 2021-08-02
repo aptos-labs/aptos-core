@@ -103,7 +103,7 @@ impl RestoreHandler {
             .iter()
             .zip(frozen_subtrees.iter().rev())
             .map(|(p, h)| {
-                if let Some(_h) = self.db.get::<TransactionAccumulatorSchema>(&p)? {
+                if let Some(_h) = self.db.get::<TransactionAccumulatorSchema>(p)? {
                     ensure!(
                         h == &_h,
                         "Frozen subtree root does not match that already in DB. Provided: {}, in db: {}.",

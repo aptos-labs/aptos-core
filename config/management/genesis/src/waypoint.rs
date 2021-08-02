@@ -44,6 +44,6 @@ pub fn create_genesis_waypoint(genesis: &Transaction) -> Result<Waypoint, Error>
         .map_err(|e| Error::UnexpectedError(e.to_string()))?;
     let db_rw = DbReaderWriter::new(diemdb);
 
-    db_bootstrapper::generate_waypoint::<DiemVM>(&db_rw, &genesis)
+    db_bootstrapper::generate_waypoint::<DiemVM>(&db_rw, genesis)
         .map_err(|e| Error::UnexpectedError(e.to_string()))
 }

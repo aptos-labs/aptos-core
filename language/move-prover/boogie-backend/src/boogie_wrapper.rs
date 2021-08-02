@@ -287,7 +287,7 @@ impl<'env> BoogieWrapper<'env> {
                             let ty = fun_target.get_local_type(*idx);
                             display.extend(self.make_trace_entry(
                                 var_name,
-                                value.pretty_or_raw(self, error.model.as_ref().unwrap(), &ty),
+                                value.pretty_or_raw(self, error.model.as_ref().unwrap(), ty),
                             ));
                         }
                     }
@@ -306,7 +306,7 @@ impl<'env> BoogieWrapper<'env> {
                             let ty = fun_target.get_return_type(*idx);
                             display.extend(self.make_trace_entry(
                                 var_name,
-                                value.pretty_or_raw(self, error.model.as_ref().unwrap(), &ty),
+                                value.pretty_or_raw(self, error.model.as_ref().unwrap(), ty),
                             ));
                         }
                     }
@@ -598,7 +598,7 @@ impl<'env> BoogieWrapper<'env> {
     /// Extracts inconclusive (timeout) errors.
     fn extract_inconclusive_errors(&self, out: &str) -> Vec<BoogieError> {
         INCONCLUSIVE_DIAG_STARTS
-            .captures_iter(&out)
+            .captures_iter(out)
             .filter_map(|cap| {
                 let str = cap.name("str").unwrap().as_str();
                 if str.contains("$verify_inconsistency") {
@@ -635,7 +635,7 @@ impl<'env> BoogieWrapper<'env> {
     /// Extracts inconsistency errors.
     fn extract_inconsistency_errors(&self, out: &str) -> Vec<BoogieError> {
         INCONSISTENCY_DIAG_STARTS
-            .captures_iter(&out)
+            .captures_iter(out)
             .map(|cap| {
                 let args = cap.name("args").unwrap().as_str();
                 let loc = self.report_error(self.extract_loc(args), self.env.unknown_loc());
@@ -960,7 +960,7 @@ impl ModelValue {
             }
             Type::Vector(param) => self.pretty_vector(wrapper, model, param),
             Type::Struct(module_id, struct_id, params) => {
-                self.pretty_struct(wrapper, model, *module_id, *struct_id, &params)
+                self.pretty_struct(wrapper, model, *module_id, *struct_id, params)
             }
             Type::Reference(_, bt) => {
                 Some(PrettyDoc::text("&").append(self.pretty(wrapper, model, &*bt)?))

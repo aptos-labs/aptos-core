@@ -149,7 +149,7 @@ impl ReadWriteSetState {
         let callee_summary = callee_summary_.clone();
         // (1) bind all footprint values and types in callee locals to their caller values
         let mut new_callee_locals = callee_summary.locals.substitute_footprint(
-            &actuals,
+            actuals,
             type_actuals,
             caller_fun_env,
             &self.locals,
@@ -157,7 +157,7 @@ impl ReadWriteSetState {
         );
         // (2) bind all footprint values and types in callee accesses to their caller values
         let mut new_callee_accesses = callee_summary.accesses.substitute_footprint_skip_data(
-            &actuals,
+            actuals,
             type_actuals,
             caller_fun_env,
             &self.locals,
@@ -549,7 +549,7 @@ impl<'a> TransferFunctions for ReadWriteSetAnalysis<'a> {
                     {
                         state.apply_summary(
                             callee_summary,
-                            &args,
+                            args,
                             types,
                             rets,
                             func_env,
@@ -862,10 +862,10 @@ pub struct ReadWriteSetStateDisplay<'a> {
 impl<'a> fmt::Display for ReadWriteSetStateDisplay<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.write_str("Accesses:\n")?;
-        writeln!(f, "{}", self.state.accesses.display(&self.env))?;
+        writeln!(f, "{}", self.state.accesses.display(self.env))?;
         f.write_str("Locals:\n")?;
         self.state.locals.iter_paths(|path, v| {
-            writeln!(f, "{}: {}", path.display(&self.env), v.display(&self.env)).unwrap();
+            writeln!(f, "{}: {}", path.display(self.env), v.display(self.env)).unwrap();
         });
         Ok(())
     }

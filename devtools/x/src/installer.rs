@@ -38,7 +38,7 @@ impl Installer {
     pub fn install_via_cargo_if_needed(&self, name: &str) -> bool {
         match &self.cargo_installation(name) {
             Some(cargo_installation) => {
-                install_cargo_component_if_needed(&self.cargo_config, name, &cargo_installation)
+                install_cargo_component_if_needed(&self.cargo_config, name, cargo_installation)
             }
             None => {
                 info!("No version of tool {} is specified ", name);
@@ -81,8 +81,8 @@ impl Installer {
 
     pub fn install_all(&self) -> bool {
         let mut result =
-            install_all_cargo_components(&self.cargo_config, &self.cargo_installations.as_slice());
-        result &= install_all_rustup_components(&self.rust_installation.as_slice());
+            install_all_cargo_components(&self.cargo_config, self.cargo_installations.as_slice());
+        result &= install_all_rustup_components(self.rust_installation.as_slice());
         result
     }
 }
@@ -131,7 +131,7 @@ pub fn install_cargo_component_if_needed(
     if !check_installed_cargo_component(name, &installation.version) {
         info!("Installing {} {}", name, installation.version);
         //prevent recursive install attempts of sccache.
-        let mut cmd = Cargo::new(&cargo_config, "install", true);
+        let mut cmd = Cargo::new(cargo_config, "install", true);
         cmd.arg("--force");
         if let Some(features) = &installation.features {
             if !features.is_empty() {
@@ -169,7 +169,7 @@ fn check_installed_cargo_component(name: &str, version: &str) -> bool {
     let result = Command::new(name).arg("--version").output();
     let found = match result {
         Ok(output) => format!("{} {}", name, version)
-            .eq(String::from_utf8_lossy(&output.stdout.as_slice()).trim()),
+            .eq(String::from_utf8_lossy(output.stdout.as_slice()).trim()),
         _ => false,
     };
     info!(

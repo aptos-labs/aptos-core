@@ -208,7 +208,7 @@ pub trait ExpRewriterFunctions {
                 } else {
                     args.as_slice()
                 };
-                if let Some(new_exp) = self.rewrite_call(new_id, oper, &args_ref) {
+                if let Some(new_exp) = self.rewrite_call(new_id, oper, args_ref) {
                     new_exp
                 } else if new_args_opt.is_some() || id_changed {
                     let args_owned = if let Some(new_args) = new_args_opt {

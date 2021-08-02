@@ -333,7 +333,7 @@ fn find_token(file: Symbol, text: &str, start_offset: usize) -> Result<(Tok, usi
                     }
                 }
             } else {
-                let len = get_name_len(&text);
+                let len = get_name_len(text);
                 (get_name_token(&text[..len]), len)
             }
         }

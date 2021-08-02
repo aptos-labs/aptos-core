@@ -319,7 +319,7 @@ impl DB {
             .with_label_values(&[S::COLUMN_FAMILY_NAME])
             .start_timer();
 
-        let k = <S::Key as KeyCodec<S>>::encode_key(&schema_key)?;
+        let k = <S::Key as KeyCodec<S>>::encode_key(schema_key)?;
         let cf_handle = self.get_cf_handle(S::COLUMN_FAMILY_NAME)?;
 
         let result = self.inner.get_cf(cf_handle, &k)?;
@@ -444,7 +444,7 @@ impl DB {
 
     pub fn get_property(&self, cf_name: &str, property_name: &str) -> Result<u64> {
         self.inner
-            .property_int_value_cf(self.get_cf_handle(&cf_name)?, property_name)?
+            .property_int_value_cf(self.get_cf_handle(cf_name)?, property_name)?
             .ok_or_else(|| {
                 format_err!(
                     "Unable to get property \"{}\" of  column family \"{}\".",

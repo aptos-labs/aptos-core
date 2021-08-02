@@ -769,7 +769,7 @@ impl<'a> Instrumenter<'a> {
             .iter()
             .filter(|(_, is_post, ..)| *is_post == post_state);
         for (loc, _, temp, exp) in lets {
-            self.emit_traces(spec, targs, &exp);
+            self.emit_traces(spec, targs, exp);
             let exp = self.instantiate_exp(exp.to_owned(), targs);
             self.builder.set_loc(loc.to_owned());
             let assign = self
@@ -1029,7 +1029,7 @@ fn check_modifies(env: &GlobalEnv, targets: &FunctionTargetsHolder) {
     for module_env in env.get_modules() {
         if module_env.is_target() {
             for fun_env in module_env.get_functions() {
-                check_caller_callee_modifies_relation(&env, targets, &fun_env);
+                check_caller_callee_modifies_relation(env, targets, &fun_env);
                 check_opaque_modifies_completeness(env, targets, &fun_env);
             }
         }
@@ -1044,7 +1044,7 @@ fn check_caller_callee_modifies_relation(
     if fun_env.is_native() || fun_env.is_intrinsic() {
         return;
     }
-    let caller_func_target = targets.get_target(&fun_env, &FunctionVariant::Baseline);
+    let caller_func_target = targets.get_target(fun_env, &FunctionVariant::Baseline);
     for callee in fun_env.get_called_functions() {
         let callee_fun_env = env.get_function(callee);
         if callee_fun_env.is_native() || callee_fun_env.is_intrinsic() {

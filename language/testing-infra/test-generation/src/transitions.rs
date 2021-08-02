@@ -19,7 +19,7 @@ use move_binary_format::{
 };
 
 use move_binary_format::file_format::TableIndex;
-use std::collections::HashMap;
+use std::collections::{hash_map::Entry, HashMap};
 
 //---------------------------------------------------------------------------
 // Type Instantiations from Unification with the Abstract Stack
@@ -242,7 +242,7 @@ pub fn stack_ref_polymorphic_eq(state: &AbstractState, index1: usize, index2: us
                 SignatureToken::MutableReference(token) | SignatureToken::Reference(token) => {
                     let abstract_value_inner = AbstractValue {
                         token: (*token).clone(),
-                        abilities: abilities_for_token(&state, &*token, &state.instantiation[..]),
+                        abilities: abilities_for_token(state, &*token, &state.instantiation[..]),
                     };
                     return Some(abstract_value_inner) == state.stack_peek(index2);
                 }
@@ -439,13 +439,11 @@ pub fn get_struct_instantiation_for_state(
     let struct_def = StructDefinitionView::new(&state.module.module, struct_def);
     let typs = struct_def.type_parameters();
     for (index, type_param) in typs.iter().enumerate() {
-        if !partial_instantiation.subst.contains_key(&index) {
+        if let Entry::Vacant(e) = partial_instantiation.subst.entry(index) {
             if type_param.constraints.has_key() {
                 unimplemented!("[Struct Instantiation] Need to fill in resource type params");
             } else {
-                partial_instantiation
-                    .subst
-                    .insert(index, SignatureToken::U64);
+                e.insert(SignatureToken::U64);
             }
         }
     }
@@ -673,7 +671,7 @@ pub fn stack_unpack_struct(
     for token_view in token_views {
         let abstract_value = AbstractValue {
             token: substitute(token_view.as_inner(), &ty_instantiation),
-            abilities: abilities_for_token(&state, &token_view.as_inner(), &abilities),
+            abilities: abilities_for_token(&state, token_view.as_inner(), &abilities),
         };
         state = stack_push(&state, abstract_value)?;
     }
@@ -715,7 +713,7 @@ pub fn stack_struct_borrow_field(
     // the correctness of this.
     let abstract_value = AbstractValue {
         token: SignatureToken::MutableReference(Box::new(reified_field_sig)),
-        abilities: abilities_for_token(&state, &field_signature, &abilities),
+        abilities: abilities_for_token(&state, field_signature, &abilities),
     };
     state = stack_push(&state, abstract_value)?;
     Ok(state)
@@ -818,7 +816,7 @@ pub fn stack_satisfies_function_signature(
                 token: parameter.clone(),
                 abilities,
             };
-            stack_has(&state, i, Some(abstract_value))
+            stack_has(state, i, Some(abstract_value))
         };
         if !has {
             satisfied = false;
@@ -860,7 +858,7 @@ pub fn stack_function_call(
     let abilities = abilities_for_instantiation(&state_copy, ty_instantiation);
     for return_type in return_.0.iter() {
         let abstract_value = AbstractValue {
-            token: substitute(return_type, &ty_instantiation),
+            token: substitute(return_type, ty_instantiation),
             abilities: abilities_for_token(&state, return_type, &abilities),
         };
         state = stack_push(&state, abstract_value)?;
@@ -892,13 +890,11 @@ pub fn get_function_instantiation_for_state(
     let function_handle = FunctionHandleView::new(&state.module.module, function_handle);
     let typs = function_handle.type_parameters();
     for (index, abilities) in typs.iter().enumerate() {
-        if !partial_instantiation.subst.contains_key(&index) {
+        if let Entry::Vacant(e) = partial_instantiation.subst.entry(index) {
             if abilities.has_key() {
                 unimplemented!("[Struct Instantiation] Need to fill in resource type params");
             } else {
-                partial_instantiation
-                    .subst
-                    .insert(index, SignatureToken::U64);
+                e.insert(SignatureToken::U64);
             }
         }
     }

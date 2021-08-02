@@ -191,7 +191,7 @@ impl<'a> InstantiationLoopChecker<'a> {
                         self.add_edge(
                             Node(caller_idx, type_param),
                             Node(callee_idx, formal_idx),
-                            Edge::TyConApp(&ty),
+                            Edge::TyConApp(ty),
                         );
                     }
                 }

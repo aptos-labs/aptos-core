@@ -655,7 +655,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             }
             Ref(is_mut, ty) => Type::Reference(*is_mut, Box::new(self.translate_type(&*ty))),
             Fun(args, result) => Type::Fun(
-                self.translate_types(&args),
+                self.translate_types(args),
                 Box::new(self.translate_type(&*result)),
             ),
             Unit => Type::Tuple(vec![]),
@@ -716,13 +716,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             EA::Exp_::Call(maccess, type_params, args) => {
                 // Need to make a &[&Exp] out of args.
                 let args = args.value.iter().collect_vec();
-                self.translate_fun_call(
-                    expected_type,
-                    &loc,
-                    &maccess,
-                    type_params.as_deref(),
-                    &args,
-                )
+                self.translate_fun_call(expected_type, &loc, maccess, type_params.as_deref(), &args)
             }
             EA::Exp_::Pack(maccess, generics, fields) => {
                 self.translate_pack(&loc, maccess, generics, fields, expected_type)
@@ -865,10 +859,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let sym_ty = entry.type_.clone();
                 let (arg_types, args) = self.translate_exp_list(args, false);
                 let fun_t = Type::Fun(arg_types, Box::new(expected_type.clone()));
-                let sym_ty = self.check_type(&loc, &sym_ty, &fun_t, "in expression");
+                let sym_ty = self.check_type(loc, &sym_ty, &fun_t, "in expression");
                 let local_id = self.new_node_id_with_type_loc(&sym_ty, &self.to_loc(&n.loc));
                 let local_var = ExpData::LocalVar(local_id, sym);
-                let id = self.new_node_id_with_type_loc(expected_type, &loc);
+                let id = self.new_node_id_with_type_loc(expected_type, loc);
                 return ExpData::Invoke(id, local_var.into_exp(), args);
             }
         }
@@ -888,17 +882,17 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         if is_old {
             match self.old_status {
                 OldExpStatus::NotSupported => {
-                    self.error(&loc, "`old(..)` expression not allowed in this context");
+                    self.error(loc, "`old(..)` expression not allowed in this context");
                 }
                 OldExpStatus::InsideOld => {
-                    self.error(&loc, "`old(..old(..)..)` not allowed");
+                    self.error(loc, "`old(..old(..)..)` not allowed");
                 }
                 OldExpStatus::OutsideOld => {
                     self.old_status = OldExpStatus::InsideOld;
                 }
             }
         }
-        let result = self.translate_call(&loc, &module_name, name, generics, args, expected_type);
+        let result = self.translate_call(loc, &module_name, name, generics, args, expected_type);
         if is_old && self.old_status == OldExpStatus::InsideOld {
             self.old_status = OldExpStatus::OutsideOld;
         }
@@ -1153,7 +1147,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         } else {
             // If this is not (known to be) a range, assume its an index.
             self.check_type(
-                &loc,
+                loc,
                 &index_ty,
                 &Type::new_prim(PrimitiveType::Num),
                 "in index expression",
@@ -1161,7 +1155,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             (elem_ty, Operation::Index)
         };
         let result_t = self.check_type(loc, &result_t, expected_type, "in index expression");
-        let id = self.new_node_id_with_type_loc(&result_t, &loc);
+        let id = self.new_node_id_with_type_loc(&result_t, loc);
         ExpData::Call(id, oper, vec![vector_exp.into_exp(), ie.into_exp()])
     }
 
@@ -1205,7 +1199,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             self.error(loc, "`update_field` requires 3 arguments");
             return self.new_error_exp();
         }
-        let struct_exp = self.translate_exp(&args[0], expected_type);
+        let struct_exp = self.translate_exp(args[0], expected_type);
         let expected_type = &self.subs.specialize(expected_type);
         if let EA::Exp_::Name(
             Spanned {
@@ -1216,11 +1210,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         ) = &args[1].value
         {
             if let Some((struct_id, field_id, field_type)) =
-                self.lookup_field(loc, &expected_type, name)
+                self.lookup_field(loc, expected_type, name)
             {
                 // Translate the new value with the field type as the expected type.
-                let value_exp = self.translate_exp(&args[2], &self.subs.specialize(&field_type));
-                let id = self.new_node_id_with_type_loc(&expected_type, loc);
+                let value_exp = self.translate_exp(args[2], &self.subs.specialize(&field_type));
+                let id = self.new_node_id_with_type_loc(expected_type, loc);
                 self.set_node_instantiation(id, vec![expected_type.clone()]);
                 ExpData::Call(
                     id,
@@ -1253,7 +1247,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         // of a type constraint to type unification, where the constraint would be
         // 'type var X where X has field F'. This makes unification significant more complex,
         // so lets see how far we get without this.
-        let struct_ty = self.subs.specialize(&struct_ty);
+        let struct_ty = self.subs.specialize(struct_ty);
         let field_name = self.symbol_pool().make(&name.value);
         if let Type::Struct(mid, sid, targs) = &struct_ty {
             // Lookup the StructEntry in the build. It must be defined for valid
@@ -1282,7 +1276,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     ))
                 } else {
                     self.error(
-                        &loc,
+                        loc,
                         &format!(
                             "field `{}` not declared in struct `{}`",
                             field_name.display(self.symbol_pool()),
@@ -1293,7 +1287,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 }
             } else {
                 self.error(
-                    &loc,
+                    loc,
                     &format!(
                         "struct `{}` is native and does not support field selection",
                         struct_name.display(self.symbol_pool())
@@ -1303,7 +1297,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             }
         } else {
             self.error(
-                &loc,
+                loc,
                 &format!(
                     "type `{}` cannot be resolved as a struct",
                     struct_ty.display(&self.type_display_context()),
@@ -1325,7 +1319,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         expected_type: &Type,
     ) -> ExpData {
         // Translate generic arguments, if any.
-        let generics = generics.as_ref().map(|ts| self.translate_types(&ts));
+        let generics = generics.as_ref().map(|ts| self.translate_types(ts));
         // Translate arguments. Skip any lambda expressions; they are resolved after the overload
         // is identified to avoid restrictions with type inference.
         let (arg_types, mut translated_args) = self.translate_exp_list(args, true);
@@ -1589,7 +1583,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     ) -> ExpData {
         let struct_name = self.parent.module_access_to_qualified(maccess);
         let struct_name_loc = self.to_loc(&maccess.loc);
-        let generics = generics.as_ref().map(|ts| self.translate_types(&ts));
+        let generics = generics.as_ref().map(|ts| self.translate_types(ts));
         if let Some(entry) = self.parent.parent.struct_table.get(&struct_name) {
             let entry = entry.clone();
             let (instantiation, diag) =
@@ -1603,7 +1597,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 fields_not_covered.extend(field_decls.keys());
                 let mut args = BTreeMap::new();
                 for (name_loc, name_, (_, exp)) in fields.iter() {
-                    let field_name = self.symbol_pool().make(&name_);
+                    let field_name = self.symbol_pool().make(name_);
                     if let Some((idx, field_ty)) = field_decls.get(&field_name) {
                         let exp = self.translate_exp(exp, &field_ty.instantiate(&instantiation));
                         fields_not_covered.remove(&field_name);
@@ -1843,7 +1837,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             Ok(t) => t,
             Err(err) => {
                 self.error(
-                    &loc,
+                    loc,
                     &format!(
                         "{} {}",
                         err.message(&self.type_display_context()),

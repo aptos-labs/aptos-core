@@ -69,7 +69,7 @@ fn write_helper_file(
     emitter.output_transaction_script_encoder_map(&common::transaction_script_abis(abis))?;
     emitter.output_script_function_encoder_map(&common::script_function_abis(abis))?;
     for abi in &common::transaction_script_abis(abis) {
-        emitter.output_code_constant(&abi)?;
+        emitter.output_code_constant(abi)?;
     }
     // Must be defined after the constants.
     emitter.output_decoder_maps(abis)?;

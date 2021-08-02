@@ -40,7 +40,7 @@ async fn test_websocket_call_and_response() {
         assert_eq!(num_clients(&cm), 1);
 
         ws_client.send_text(request).await;
-        let result = next_message(&mut ws_client, &name).await;
+        let result = next_message(&mut ws_client, name).await;
         assert_eq!(result.to_str().unwrap(), expected);
     }
 }
@@ -100,8 +100,8 @@ async fn test_websocket_fetching_data() {
         assert_eq!(num_clients(&cm), 1);
 
         ws_client.send_text(request.to_string()).await;
-        let sub_result = next_message(&mut ws_client, &name).await;
-        let _transaction_version = verify_ok(sub_result, &name);
+        let sub_result = next_message(&mut ws_client, name).await;
+        let _transaction_version = verify_ok(sub_result, name);
 
         let client = get_latest_client(&cm);
         assert_eq!(num_tasks(&client), 1);
@@ -114,7 +114,7 @@ async fn test_websocket_fetching_data() {
             assert_eq!(resp.id.unwrap().to_string(), "\"client-generated-id\"");
         }
 
-        close_ws(ws_client, &name).await;
+        close_ws(ws_client, name).await;
 
         assert_eq!(num_clients(&cm), 0);
     }
@@ -142,7 +142,7 @@ async fn test_multiple_subscriptions_and_response() {
         assert_eq!(num_clients(&cm), 1);
 
         ws_client.send_text(request).await;
-        let result = next_message(&mut ws_client, &name).await;
+        let result = next_message(&mut ws_client, name).await;
         assert_eq!(result.to_str().unwrap(), expected);
     }
 }

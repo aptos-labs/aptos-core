@@ -219,7 +219,7 @@ fn test_2chain_timeout_certificate() {
     // timeout cert with (round, hqc round) = (4, 1), (4, 2), (4, 3)
     let mut valid_timeout_cert = TwoChainTimeoutCertificate::new(timeouts[0].clone());
     for (timeout, signer) in timeouts.iter().zip(&signers) {
-        valid_timeout_cert.add(signer.author(), timeout.clone(), timeout.sign(&signer));
+        valid_timeout_cert.add(signer.author(), timeout.clone(), timeout.sign(signer));
     }
     valid_timeout_cert.verify(&validators).unwrap();
 

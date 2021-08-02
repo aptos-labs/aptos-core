@@ -123,7 +123,7 @@ impl<'a> BlockCFG<'a> {
     }
 
     pub fn blocks(&self) -> &BasicBlocks {
-        &self.blocks
+        self.blocks
     }
 
     pub fn blocks_mut(&mut self) -> &mut BasicBlocks {
@@ -181,7 +181,7 @@ fn dead_code_error(diags: &mut Diagnostics, block: &BasicBlock) {
     let first_command = block.front().unwrap();
     match unreachable_loc(first_command) {
         Some(loc) => diags.add(diag!(UnusedItem::DeadCode, (loc, DEAD_ERR_EXP))),
-        None if is_implicit_control_flow(&block) => (),
+        None if is_implicit_control_flow(block) => (),
         None => diags.add(diag!(
             UnusedItem::DeadCode,
             (first_command.loc, DEAD_ERR_CMD)
@@ -309,7 +309,7 @@ fn determine_infinite_loop_starts(
             &mut infinite_loop_starts,
             cur_loop_start,
             cur_loop_end,
-            &cfg.blocks()[&lbl],
+            &cfg.blocks()[lbl],
         );
         prev_opt = Some(*lbl);
     }
@@ -407,7 +407,7 @@ impl<'a> ReverseBlockCFG<'a> {
     }
 
     pub fn blocks(&self) -> &BasicBlocks {
-        &self.blocks
+        self.blocks
     }
 
     pub fn block(&self, label: Label) -> &BasicBlock {

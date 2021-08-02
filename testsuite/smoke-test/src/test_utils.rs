@@ -111,9 +111,9 @@ pub mod diem_swarm_utils {
         ClientProxy::new(
             ChainId::test(),
             &format!("http://localhost:{}/v1", port),
-            &diem_root_key_path,
-            &diem_root_key_path,
-            &diem_root_key_path,
+            diem_root_key_path,
+            diem_root_key_path,
+            diem_root_key_path,
             false,
             /* faucet server */ None,
             Some(mnemonic_file_path),
@@ -231,7 +231,7 @@ pub fn write_key_to_file_hex_format(key: &Ed25519PublicKey, key_file_path: PathB
     let hex_encoded_key = hex::encode(key.to_bytes());
     let key_and_newline = hex_encoded_key + "\n";
     let mut file = File::create(key_file_path).unwrap();
-    file.write_all(&key_and_newline.as_bytes()).unwrap();
+    file.write_all(key_and_newline.as_bytes()).unwrap();
 }
 
 /// Writes a given public key to a file specified by the given path using bcs encoding.

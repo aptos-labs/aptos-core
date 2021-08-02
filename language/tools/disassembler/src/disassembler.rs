@@ -141,7 +141,7 @@ impl<'a, Location: Clone + Eq> Disassembler<'a, Location> {
                 self.coverage_map.as_ref().and_then(|coverage_map| {
                     coverage_map
                         .module_maps
-                        .get(&module)
+                        .get(module)
                         .and_then(|module_map| module_map.get_function_coverage(function_name))
                 })
             })
@@ -808,7 +808,7 @@ impl<'a, Location: Clone + Eq> Disassembler<'a, Location> {
                     instruction,
                     locals_sigs,
                     function_source_map,
-                    &decl_location,
+                    decl_location,
                 )
             })
             .collect::<Result<Vec<String>>>()?;

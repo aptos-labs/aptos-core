@@ -66,7 +66,7 @@ where
     }
 
     pub fn remove(&mut self, key: &K) -> Option<V> {
-        match self.data.remove(&key) {
+        match self.data.remove(key) {
             Some(info) => {
                 self.ttl_index.remove(&info.ttl);
                 Some(info.value)

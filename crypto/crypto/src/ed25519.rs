@@ -239,7 +239,7 @@ impl SigningKey for Ed25519PrivateKey {
         bcs::serialize_into(&mut bytes, &message)
             .map_err(|_| CryptoMaterialError::SerializationError)
             .expect("Serialization of signable material should not fail.");
-        Ed25519PrivateKey::sign_arbitrary_message(&self, bytes.as_ref())
+        Ed25519PrivateKey::sign_arbitrary_message(self, bytes.as_ref())
     }
 
     #[cfg(any(test, feature = "fuzzing"))]

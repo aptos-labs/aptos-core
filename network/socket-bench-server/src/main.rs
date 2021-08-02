@@ -34,12 +34,12 @@ fn main() {
     let executor = rt.handle();
 
     if let Some(addr) = args.tcp_addr {
-        let addr = start_stream_server(&executor, TcpTransport::default(), addr);
+        let addr = start_stream_server(executor, TcpTransport::default(), addr);
         info!("bench: tcp: listening on: {}", addr);
     }
 
     if let Some(addr) = args.tcp_noise_addr {
-        let addr = start_stream_server(&executor, build_tcp_noise_transport(), addr);
+        let addr = start_stream_server(executor, build_tcp_noise_transport(), addr);
         info!("bench: tcp+noise: listening on: {}", addr);
     }
     std::thread::park();

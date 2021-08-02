@@ -48,7 +48,7 @@ impl<'a> SummaryCache<'a> {
     }
 
     pub fn global_env(&self) -> &GlobalEnv {
-        &self.global_env
+        self.global_env
     }
 }
 

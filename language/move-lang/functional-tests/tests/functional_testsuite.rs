@@ -42,7 +42,7 @@ impl<'a> MoveSourceCompiler<'a> {
         Result<Vec<CompiledUnit>, diagnostics::Diagnostics>,
     )> {
         let (files, comments_and_compiler_res) = MoveCompiler::new(targets, &self.deps)
-            .set_pre_compiled_lib(&self.pre_compiled_deps)
+            .set_pre_compiled_lib(self.pre_compiled_deps)
             .run::<PASS_COMPILATION>()?;
         match comments_and_compiler_res {
             Err(diags) => Ok((files, Err(diags))),

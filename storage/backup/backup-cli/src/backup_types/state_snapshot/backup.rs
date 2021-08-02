@@ -172,7 +172,7 @@ impl StateSnapshotBackupController {
             .storage
             .create_for_write(backup_handle, &Self::chunk_name(first_idx))
             .await?;
-        chunk_file.write_all(&chunk_bytes).await?;
+        chunk_file.write_all(chunk_bytes).await?;
         chunk_file.shutdown().await?;
         let (proof_handle, mut proof_file) = self
             .storage
@@ -209,7 +209,7 @@ impl StateSnapshotBackupController {
 
         let (proof_handle, mut proof_file) = self
             .storage
-            .create_for_write(&backup_handle, Self::proof_name())
+            .create_for_write(backup_handle, Self::proof_name())
             .await?;
         proof_file.write_all(&proof_bytes).await?;
         proof_file.shutdown().await?;
@@ -223,7 +223,7 @@ impl StateSnapshotBackupController {
 
         let (manifest_handle, mut manifest_file) = self
             .storage
-            .create_for_write(&backup_handle, Self::manifest_name())
+            .create_for_write(backup_handle, Self::manifest_name())
             .await?;
         manifest_file
             .write_all(&serde_json::to_vec(&manifest)?)

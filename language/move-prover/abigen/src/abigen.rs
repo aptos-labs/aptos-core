@@ -171,7 +171,7 @@ impl<'env> Abigen<'env> {
 
         // This is a transaction script, so include the code, but no module ID
         if module_env.is_script_module() {
-            let code = self.load_compiled_bytes(&module_env)?.to_vec();
+            let code = self.load_compiled_bytes(module_env)?.to_vec();
             Ok(ScriptABI::TransactionScript(TransactionScriptABI::new(
                 name, doc, code, ty_args, args,
             )))

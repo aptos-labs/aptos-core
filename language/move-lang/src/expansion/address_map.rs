@@ -59,7 +59,7 @@ fn definition(context: &mut Context, def: &P::Definition) {
     };
 
     let addr_value_opt = &addr_def.addr_value;
-    match (context.map.get(&name), addr_value_opt) {
+    match (context.map.get(name), addr_value_opt) {
         // If address name is not bound, add it to the map
         (None, _) => context.map.add(name.clone(), *addr_value_opt).unwrap(),
 

@@ -256,6 +256,6 @@ pub fn get_write_set_txn(
 ) -> SignatureCheckedTransaction {
     let write_set = write_set.unwrap_or_default();
     RawTransaction::new_write_set(sender, sequence_number, write_set, ChainId::test())
-        .sign(&private_key, public_key)
+        .sign(private_key, public_key)
         .unwrap()
 }

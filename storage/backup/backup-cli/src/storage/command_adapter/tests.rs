@@ -88,7 +88,7 @@ async fn assert_commands_error(cmd: &str) {
     // open_for_read
     let mut buf = String::new();
     assert!(store
-        .open_for_read(&handle)
+        .open_for_read(handle)
         .await
         .unwrap()
         .read_to_string(&mut buf)
@@ -97,7 +97,7 @@ async fn assert_commands_error(cmd: &str) {
 
     // create_for_write
     assert!(async {
-        let (_, mut file) = store.create_for_write(&handle, &name).await?;
+        let (_, mut file) = store.create_for_write(handle, &name).await?;
         file.write_all(&[0; 1024]).await?;
         file.shutdown().await?;
         Result::<()>::Ok(())
@@ -127,7 +127,7 @@ async fn assert_commands_okay(cmd: &str) {
     // open_for_read
     let mut buf = String::new();
     store
-        .open_for_read(&handle)
+        .open_for_read(handle)
         .await
         .unwrap()
         .read_to_string(&mut buf)
@@ -136,7 +136,7 @@ async fn assert_commands_okay(cmd: &str) {
     assert_eq!(&buf, "okay\n");
 
     // create_for_write
-    let (out_handle, mut file) = store.create_for_write(&handle, &name).await.unwrap();
+    let (out_handle, mut file) = store.create_for_write(handle, &name).await.unwrap();
     assert_eq!(out_handle, "okay");
     file.write_all(&[0; 1024]).await.unwrap();
     file.shutdown().await.unwrap();

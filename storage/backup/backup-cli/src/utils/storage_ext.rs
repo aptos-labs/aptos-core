@@ -22,18 +22,18 @@ pub trait BackupStorageExt {
 #[async_trait]
 impl BackupStorageExt for Arc<dyn BackupStorage> {
     async fn read_all(&self, file_handle: &FileHandleRef) -> Result<Vec<u8>> {
-        let mut file = self.open_for_read(&file_handle).await?;
+        let mut file = self.open_for_read(file_handle).await?;
         let mut bytes = Vec::new();
         file.read_to_end(&mut bytes).await?;
         Ok(bytes)
     }
 
     async fn load_bcs_file<T: DeserializeOwned>(&self, file_handle: &FileHandleRef) -> Result<T> {
-        Ok(bcs::from_bytes(&self.read_all(&file_handle).await?)?)
+        Ok(bcs::from_bytes(&self.read_all(file_handle).await?)?)
     }
 
     async fn load_json_file<T: DeserializeOwned>(&self, file_handle: &FileHandleRef) -> Result<T> {
-        Ok(serde_json::from_slice(&self.read_all(&file_handle).await?)?)
+        Ok(serde_json::from_slice(&self.read_all(file_handle).await?)?)
     }
 
     async fn create_backup_with_random_suffix(&self, name: &str) -> Result<BackupHandle> {

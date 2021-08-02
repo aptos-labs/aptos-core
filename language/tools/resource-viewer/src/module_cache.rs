@@ -35,7 +35,7 @@ where
     pub fn get(&self, key: &K) -> Option<Rc<V>> {
         self.id_map
             .borrow()
-            .get(&key)
+            .get(key)
             .and_then(|idx| self.modules.borrow().get(*idx).cloned())
     }
 }

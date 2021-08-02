@@ -35,7 +35,7 @@ impl ShortHexStr {
             // We include a tiny hex encode here instead of using the `hex` crate's
             // `encode_to_slice`, since the compiler seems unable to inline across
             // the crate boundary.
-            hex_encode(&src_short_bytes, &mut dest_bytes);
+            hex_encode(src_short_bytes, &mut dest_bytes);
             Ok(Self(dest_bytes))
         } else {
             Err(InputTooShortError)

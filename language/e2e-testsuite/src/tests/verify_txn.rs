@@ -1559,7 +1559,7 @@ pub fn publish_and_register_new_currency() {
     "#;
 
     let (compiled_module, module) =
-        compile_module_with_address(&account_config::CORE_CODE_ADDRESS, "file_name", &module);
+        compile_module_with_address(&account_config::CORE_CODE_ADDRESS, "file_name", module);
     let txn = sender
         .transaction()
         .module(module)
