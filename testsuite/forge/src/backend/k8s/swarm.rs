@@ -547,16 +547,21 @@ pub fn clean_k8s_cluster(
         .filter_map(|(_, val)| {
             let val_name = val.name.clone();
             println!("Attempting health check: {}", val_name);
-            return match val.health_check() {
+            // perform healthcheck with retry, returning unhealthy
+            let check = diem_retrier::retry(k8s_retry_strategy(), || match val.health_check() {
                 Ok(_) => {
                     println!("Validator {} healthy", val_name);
-                    None
+                    Ok(())
                 }
-                Err(x) => {
+                Err(ref x) => {
                     println!("Validator {} unhealthy: {}", val_name, x);
-                    Some(val)
+                    Err(())
                 }
-            };
+            });
+            if check.is_err() {
+                return Some(val);
+            }
+            None
         })
         .collect::<Vec<_>>();
     if !unhealthy_validators.is_empty() {
