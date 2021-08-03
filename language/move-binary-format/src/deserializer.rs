@@ -1193,37 +1193,32 @@ fn load_function_def(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Functio
         PartialVMError::new(StatusCode::MALFORMED).with_message("Unexpected EOF".to_string())
     })?;
 
-    let (visibility, mut extra_flags) = match cursor.version() {
-        VERSION_1 => {
-            let is_public_bit = Visibility::Public as u8;
-            let vis = if (flags & is_public_bit) != 0 {
-                flags ^= is_public_bit;
-                Visibility::Public
-            } else {
-                Visibility::Private
-            };
-            (vis, flags)
-        }
-        VERSION_2 | VERSION_3 => {
-            // NOTE: changes compared with VERSION_1
-            // - in VERSION_1: the flags is a byte compositing both the visibility info and whether
-            //                 the function is a native function
-            // - in VERSION_2: the flags only represent the visibility info and we need to advance
-            //                 the cursor to read up the next byte as flags
-            let vis = flags.try_into().map_err(|_| {
-                PartialVMError::new(StatusCode::MALFORMED)
-                    .with_message("Invalid visibility byte".to_string())
-            })?;
-            let extra_flags = cursor.read_u8().map_err(|_| {
-                PartialVMError::new(StatusCode::MALFORMED)
-                    .with_message("Unexpected EOF".to_string())
-            })?;
-            (vis, extra_flags)
-        }
-        _ => {
-            return Err(PartialVMError::new(StatusCode::UNREACHABLE)
-                .with_message(String::from("Invalid bytecode version")))
-        }
+    // NOTE: changes compared with VERSION_1
+    // - in VERSION_1: the flags is a byte compositing both the visibility info and whether
+    //                 the function is a native function
+    // - in VERSION_2 onwards: the flags only represent the visibility info and we need to
+    //                 advance the cursor to read up the next byte as flags
+    let (visibility, mut extra_flags) = if cursor.version() == VERSION_1 {
+        let is_public_bit = Visibility::Public as u8;
+        let vis = if (flags & is_public_bit) != 0 {
+            flags ^= is_public_bit;
+            Visibility::Public
+        } else {
+            Visibility::Private
+        };
+        (vis, flags)
+    } else if cursor.version() <= VERSION_MAX {
+        let vis = flags.try_into().map_err(|_| {
+            PartialVMError::new(StatusCode::MALFORMED)
+                .with_message("Invalid visibility byte".to_string())
+        })?;
+        let extra_flags = cursor.read_u8().map_err(|_| {
+            PartialVMError::new(StatusCode::MALFORMED).with_message("Unexpected EOF".to_string())
+        })?;
+        (vis, extra_flags)
+    } else {
+        return Err(PartialVMError::new(StatusCode::UNREACHABLE)
+            .with_message(String::from("Invalid bytecode version")));
     };
 
     let acquires_global_resources = load_struct_definition_indices(cursor)?;
