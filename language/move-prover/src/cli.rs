@@ -250,7 +250,14 @@ impl Options {
             .arg(
                 Arg::with_name("ignore-pragma-opaque-when-possible")
                     .long("ignore-pragma-opaque-when-possible")
-                    .help("Ignore the \"opaque\" pragma on function specs when possible"),
+                    .help("Ignore the \"opaque\" pragma on specs of \
+                    all functions when possible"),
+            )
+            .arg(
+                Arg::with_name("ignore-pragma-opaque-internal-only")
+                    .long("ignore-pragma-opaque-internal-only")
+                    .help("Ignore the \"opaque\" pragma on specs of \
+                    internal functions when possible"),
             )
             .arg(
                 Arg::with_name("docgen")
@@ -543,6 +550,9 @@ impl Options {
         }
         if matches.is_present("ignore-pragma-opaque-when-possible") {
             options.model_builder.ignore_pragma_opaque_when_possible = true;
+        }
+        if matches.is_present("ignore-pragma-opaque-internal-only") {
+            options.model_builder.ignore_pragma_opaque_internal_only = true;
         }
         if matches.is_present("docgen") {
             options.run_docgen = true;

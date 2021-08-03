@@ -107,6 +107,12 @@ error: emitted event not covered by any of the `emits` clauses
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:311: opaque_completeness_incorrect
     =     at tests/sources/functional/emits.move:312: opaque_completeness_incorrect
+    =     at tests/sources/functional/emits.move:264: callee
+    =         handle = <redacted>
+    =     at tests/sources/functional/emits.move:265: callee
+    =     at tests/sources/functional/emits.move:266: callee
+    =         handle = <redacted>
+    =     at tests/sources/functional/emits.move:267: callee
     =     at tests/sources/functional/emits.move:313: opaque_completeness_incorrect
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:314: opaque_completeness_incorrect
@@ -125,6 +131,12 @@ error: function does not emit the expected event
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:288: opaque_incorrect
     =     at tests/sources/functional/emits.move:289: opaque_incorrect
+    =     at tests/sources/functional/emits.move:264: callee
+    =         handle = <redacted>
+    =     at tests/sources/functional/emits.move:265: callee
+    =     at tests/sources/functional/emits.move:266: callee
+    =         handle = <redacted>
+    =     at tests/sources/functional/emits.move:267: callee
     =     at tests/sources/functional/emits.move:290: opaque_incorrect
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:291: opaque_incorrect
@@ -133,31 +145,6 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:295
     =     at tests/sources/functional/emits.move:296
     =     at tests/sources/functional/emits.move:297
-
-error: emitted event not covered by any of the `emits` clauses
-    ┌─ tests/sources/functional/emits.move:356:5
-    │
-356 │ ╭     spec opaque_partial_incorrect {
-357 │ │         emits DummyEvent{msg: 0} to handle;
-358 │ │         emits DummyEvent{msg: 7} to handle;
-359 │ │         emits DummyEvent{msg: 77} to handle;
-360 │ │         emits DummyEvent{msg: 1} to handle;
-361 │ │         // The completeness check of the `emits` spec of this function should fail.
-362 │ │     }
-    │ ╰─────^
-    │
-    =     at tests/sources/functional/emits.move:351: opaque_partial_incorrect
-    =         handle = <redacted>
-    =     at tests/sources/functional/emits.move:352: opaque_partial_incorrect
-    =     at tests/sources/functional/emits.move:353: opaque_partial_incorrect
-    =     at tests/sources/functional/emits.move:354: opaque_partial_incorrect
-    =         handle = <redacted>
-    =     at tests/sources/functional/emits.move:355: opaque_partial_incorrect
-    =     at tests/sources/functional/emits.move:357
-    =     at tests/sources/functional/emits.move:358
-    =     at tests/sources/functional/emits.move:359
-    =     at tests/sources/functional/emits.move:360
-    =     at tests/sources/functional/emits.move:356
 
 error: emitted event not covered by any of the `emits` clauses
     ┌─ tests/sources/functional/emits.move:236:5

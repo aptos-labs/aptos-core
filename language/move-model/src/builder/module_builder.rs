@@ -44,7 +44,7 @@ use crate::{
     pragmas::{
         is_pragma_valid_for_block, is_property_valid_for_condition, CONDITION_ABSTRACT_PROP,
         CONDITION_CONCRETE_PROP, CONDITION_DEACTIVATED_PROP, CONDITION_INJECTED_PROP,
-        OPAQUE_PRAGMA,
+        OPAQUE_PRAGMA, VERIFY_PRAGMA,
     },
     project_1st, project_2nd,
     symbol::{Symbol, SymbolPool},
@@ -689,8 +689,12 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 
         // Perform post analyzes of state usage in spec functions.
         self.compute_state_usage();
+
         // Perform post reduction of module invariants.
         self.process_module_invariants();
+
+        // Apply tweaks after all specs are analyzed
+        self.apply_tweaks(module_def);
     }
 
     /// Validates whether a function signature provided with a spec block target matches the
@@ -924,49 +928,6 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 
         for member in let_sorted_members {
             self.def_ana_spec_block_member(context, member)
-        }
-
-        // tweak the opaque pragma.
-        //
-        // If the `ignore_pragma_opaque_when_possible` option is set, the opaque pragma will be
-        // removed from the function spec property bag when
-        // - "pragma" is in the property bag, and
-        // - the function does not have unknown callers (i.e., the function can be either `friend`
-        //   or `private` visibility), and
-        // - there are no properties marked as "[concrete]" or "[abstract]" in the function spec.
-        if let SpecBlockContext::Function(fun_name) = context {
-            let env = &self.parent.env;
-            let ignore_pragma_opaque_when_possible = env
-                .get_extension::<ModelBuilderOptions>()
-                .map_or(false, |options| options.ignore_pragma_opaque_when_possible);
-            if ignore_pragma_opaque_when_possible {
-                let spec = self.fun_specs.get_mut(&fun_name.symbol).unwrap();
-                let has_pragma_opaque = env
-                    .is_property_true(&spec.properties, OPAQUE_PRAGMA)
-                    .unwrap_or(false);
-                if has_pragma_opaque {
-                    let fun_entry = self.parent.fun_table.get(fun_name).unwrap();
-                    let has_unknown_caller = matches!(
-                        fun_entry.visibility,
-                        FunctionVisibility::Public | FunctionVisibility::Script
-                    );
-                    if !has_unknown_caller {
-                        let has_opaque_prop = spec.any(|cond| {
-                            env.is_property_true(&cond.properties, CONDITION_CONCRETE_PROP)
-                                .unwrap_or(false)
-                                || env
-                                    .is_property_true(&cond.properties, CONDITION_ABSTRACT_PROP)
-                                    .unwrap_or(false)
-                        });
-                        if !has_opaque_prop {
-                            let opaque_symbol = env.symbol_pool().make(OPAQUE_PRAGMA);
-                            self.update_spec(context, move |spec| {
-                                spec.properties.remove(&opaque_symbol);
-                            })
-                        }
-                    }
-                }
-            }
         }
 
         // clear the let bindings stored in the build.
@@ -2783,6 +2744,92 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 member_locs,
                 target,
             })
+        }
+    }
+}
+
+/// # Tweak application
+
+impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
+    /// Tweak the specifications at the AST level based on `ModuleBuilderOptions`.
+    fn apply_tweaks(&mut self, module_def: &EA::ModuleDefinition) {
+        self.tweak_pragma_opaque(module_def);
+    }
+
+    /// If the `ignore_pragma_opaque_*` options are set, the opaque pragma will be
+    /// removed from the function spec property bag according to the options.
+    fn tweak_pragma_opaque(&mut self, module_def: &EA::ModuleDefinition) {
+        let env = &self.parent.env;
+        let options = env
+            .get_extension::<ModelBuilderOptions>()
+            .unwrap_or_default();
+        if !(options.ignore_pragma_opaque_when_possible
+            || options.ignore_pragma_opaque_internal_only)
+        {
+            return;
+        }
+
+        for spec in &module_def.specs {
+            if matches!(spec.value.target.value, EA::SpecBlockTarget_::Schema(..)) {
+                continue;
+            }
+            if let Some(SpecBlockContext::Function(fun_name)) =
+                self.get_spec_block_context(&spec.value.target)
+            {
+                if let Some(spec) = self.fun_specs.get_mut(&fun_name.symbol) {
+                    // if the spec does not have "pragma opaque;" do nothing,
+                    let has_pragma_opaque = env
+                        .is_property_true(&spec.properties, OPAQUE_PRAGMA)
+                        .unwrap_or(false);
+                    if !has_pragma_opaque {
+                        continue;
+                    }
+
+                    // if the spec has `pragma verify = false;` do not remove its `opaque` mark
+                    let is_verified = env
+                        .is_property_true(&spec.properties, VERIFY_PRAGMA)
+                        .unwrap_or(true)
+                        && env
+                            .is_property_true(&self.module_spec.properties, VERIFY_PRAGMA)
+                            .unwrap_or(true);
+                    if !is_verified {
+                        continue;
+                    }
+
+                    // if the spec has `[concrete]` or `[abstract]` properties, do not remove its
+                    // `opaque` mark
+                    let has_opaque_prop = spec.any(|cond| {
+                        env.is_property_true(&cond.properties, CONDITION_CONCRETE_PROP)
+                            .unwrap_or(false)
+                            || env
+                                .is_property_true(&cond.properties, CONDITION_ABSTRACT_PROP)
+                                .unwrap_or(false)
+                    });
+                    if has_opaque_prop {
+                        continue;
+                    }
+
+                    // if the function may have unknown callers, respect the option
+                    // `ignore_pragma_opaque_internal_only`.
+                    let fun_entry = self.parent.fun_table.get(&fun_name).unwrap_or_else(|| {
+                        panic!(
+                            "Unable to find function `{}`",
+                            fun_name.display(env.symbol_pool())
+                        )
+                    });
+                    let has_unknown_caller = matches!(
+                        fun_entry.visibility,
+                        FunctionVisibility::Public | FunctionVisibility::Script
+                    );
+                    if has_unknown_caller && options.ignore_pragma_opaque_internal_only {
+                        continue;
+                    }
+
+                    // everything is cleared, we can remove the `opaque` mark now
+                    let opaque_symbol = env.symbol_pool().make(OPAQUE_PRAGMA);
+                    spec.properties.remove(&opaque_symbol);
+                }
+            }
         }
     }
 }
