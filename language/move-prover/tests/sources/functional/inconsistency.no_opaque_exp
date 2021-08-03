@@ -11,14 +11,6 @@ error: post-condition does not hold
    =     at tests/sources/functional/inconsistency.move:44
 
 error: there is an inconsistent assumption in the function, which may allow any post-condition (including false) to be proven
-   ┌─ tests/sources/functional/inconsistency.move:49:5
-   │
-49 │ ╭     fun always_abort() {
-50 │ │         abort 0
-51 │ │     }
-   │ ╰─────^
-
-error: there is an inconsistent assumption in the function, which may allow any post-condition (including false) to be proven
    ┌─ tests/sources/functional/inconsistency.move:17:5
    │
 17 │ ╭     fun assume_false(x: u64): u64 {

@@ -426,6 +426,12 @@ impl Options {
                     .help("checks whether there is any inconsistency")
             )
             .arg(
+                Arg::with_name("unconditional-abort-as-inconsistency")
+                    .long("unconditional-abort-as-inconsistency")
+                    .help("treat functions that do not return (i.e., abort unconditionally) \
+                    as inconsistency violations")
+            )
+            .arg(
                 Arg::with_name("verify-only")
                     .long("verify-only")
                     .takes_value(true)
@@ -627,8 +633,12 @@ impl Options {
         if matches.is_present("generate-smt") {
             options.backend.generate_smt = true;
         }
+
         if matches.is_present("check-inconsistency") {
             options.prover.check_inconsistency = true;
+        }
+        if matches.is_present("unconditional-abort-as-inconsistency") {
+            options.prover.unconditional_abort_as_inconsistency = true;
         }
 
         if matches.is_present("verify-only") {
