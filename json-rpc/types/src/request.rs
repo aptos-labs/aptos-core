@@ -76,6 +76,7 @@ pub enum MethodRequest {
     //
     // Experimental APIs
     //
+    GetResources(GetResourcesParams),
     GetStateProof(GetStateProofParams),
     GetAccumulatorConsistencyProof(GetAccumulatorConsistencyProofParams),
     GetAccountStateWithProof(GetAccountStateWithProofParams),
@@ -105,6 +106,7 @@ impl MethodRequest {
             Method::GetNetworkStatus => {
                 MethodRequest::GetNetworkStatus(serde_json::from_value(value)?)
             }
+            Method::GetResources => MethodRequest::GetResources(serde_json::from_value(value)?),
             Method::GetStateProof => MethodRequest::GetStateProof(serde_json::from_value(value)?),
             Method::GetAccumulatorConsistencyProof => {
                 MethodRequest::GetAccumulatorConsistencyProof(serde_json::from_value(value)?)
@@ -140,6 +142,7 @@ impl MethodRequest {
             MethodRequest::GetEvents(_) => Method::GetEvents,
             MethodRequest::GetCurrencies(_) => Method::GetCurrencies,
             MethodRequest::GetNetworkStatus(_) => Method::GetNetworkStatus,
+            MethodRequest::GetResources(_) => Method::GetResources,
             MethodRequest::GetStateProof(_) => Method::GetStateProof,
             MethodRequest::GetAccumulatorConsistencyProof(_) => {
                 Method::GetAccumulatorConsistencyProof
@@ -318,6 +321,13 @@ impl<'de> de::Visitor<'de> for NoParamsVisitor {
     {
         Ok(())
     }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct GetResourcesParams {
+    pub account: AccountAddress,
+    #[serde(default)]
+    pub version: Option<u64>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
