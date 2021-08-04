@@ -33,7 +33,8 @@ struct Args {
     )]
     duration: u64,
 
-    // operator options
+    // operator "clean-up" options
+    // XXX: this should really be a subcommand if possible
     #[structopt(long, help = "If set, wipes the state of the test backend and exits")]
     clean_up: bool,
     #[structopt(
@@ -46,9 +47,27 @@ struct Args {
     num_validators: usize,
     #[structopt(
         long,
+        help = "Override the image tag used for validators",
+        default_value = "devnet"
+    )]
+    validator_image_tag: String,
+    #[structopt(
+        long,
+        help = "Override the image tag used for testnet-specific components",
+        default_value = "devnet"
+    )]
+    testnet_image_tag: String,
+    #[structopt(
+        long,
         help = "If set, performs validator healthcheck and assumes k8s DNS access"
     )]
     require_validator_healthcheck: bool,
+
+    // operator "upgrade-validator" options
+    #[structopt(long, help = "If set, upgrades a validator to validator_image_tag")]
+    upgrade_validator: bool,
+    #[structopt(long, help = "Validator to upgrade")]
+    validator: Option<String>,
 
     #[structopt(flatten)]
     options: Options,
@@ -61,8 +80,16 @@ fn main() -> Result<()> {
         return clean_k8s_cluster(
             args.helm_repo,
             args.num_validators,
+            args.validator_image_tag,
+            args.testnet_image_tag,
             args.require_validator_healthcheck,
         );
+    } else if args.upgrade_validator {
+        return set_validator_image_tag(
+            &args.validator.unwrap(),
+            &args.helm_repo,
+            &args.validator_image_tag,
+        )
     }
 
     if args.local_swarm {
