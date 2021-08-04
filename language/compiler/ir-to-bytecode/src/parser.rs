@@ -68,24 +68,27 @@ pub fn parse_cmd_(
 }
 
 fn handle_error<T>(e: syntax::ParseError<Loc, anyhow::Error>, code_str: &str) -> Result<T> {
-    let msg = match &e {
-        ParseError::InvalidToken { location } => {
-            let mut files = SimpleFiles::new();
-            let id = files.add(location.file(), code_str.to_string());
-            let lbl = Label::primary(id, location.usize_range()).with_message("Invalid Token");
-            let error = Diagnostic::error()
-                .with_message("Parser Error")
-                .with_labels(vec![lbl]);
-            let writer = &mut StandardStream::stderr(ColorChoice::Auto);
-            emit(writer, &Config::default(), &files, &error).unwrap();
-            "Invalid Token".to_string()
+    let location = match &e {
+        ParseError::InvalidToken { location } => location,
+        ParseError::User { location, .. } => location,
+    };
+    let mut files = SimpleFiles::new();
+    let id = files.add(location.file(), code_str.to_string());
+    let lbl = match &e {
+        ParseError::InvalidToken { .. } => {
+            Label::primary(id, location.usize_range()).with_message("Invalid Token")
         }
-        ParseError::User { error } => {
-            println!("{}", error);
-            format!("{}", error)
+        ParseError::User { error, .. } => {
+            Label::primary(id, location.usize_range()).with_message(format!("{}", error))
         }
     };
-    bail!("ParserError: {}", msg)
+    let message = lbl.message.clone();
+    let error = Diagnostic::error()
+        .with_message("Parser Error")
+        .with_labels(vec![lbl]);
+    let writer = &mut StandardStream::stderr(ColorChoice::Auto);
+    emit(writer, &Config::default(), &files, &error).unwrap();
+    bail!("ParserError: {}", message)
 }
 
 #[cfg(test)]

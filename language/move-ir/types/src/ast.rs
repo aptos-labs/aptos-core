@@ -5,7 +5,6 @@ use crate::{
     location::*,
     spec_language_ast::{Condition, Invariant, SyntheticDefinition},
 };
-use anyhow::Result;
 use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
     value::MoveValue,
@@ -825,8 +824,8 @@ impl ModuleDefinition {
         constants: Vec<Constant>,
         functions: Vec<(FunctionName, Function)>,
         synthetics: Vec<SyntheticDefinition>,
-    ) -> Result<Self> {
-        Ok(ModuleDefinition {
+    ) -> Self {
+        ModuleDefinition {
             name: ModuleName(name),
             friends,
             imports,
@@ -835,7 +834,7 @@ impl ModuleDefinition {
             constants,
             functions,
             synthetics,
-        })
+        }
     }
 
     /// Return a vector of `ModuleId` for the external dependencies.
@@ -918,14 +917,14 @@ impl StructDefinition_ {
         type_formals: Vec<StructTypeParameter>,
         fields: Fields<Type>,
         invariants: Vec<Invariant>,
-    ) -> Result<Self> {
-        Ok(StructDefinition_ {
+    ) -> Self {
+        StructDefinition_ {
             abilities,
             name: StructName(name),
             type_formals,
             fields: StructDefinitionFields::Move { fields },
             invariants,
-        })
+        }
     }
 
     /// Creates a new StructDefinition from the abilities, the string representation of the name,
@@ -934,14 +933,14 @@ impl StructDefinition_ {
         abilities: BTreeSet<Ability>,
         name: Symbol,
         type_formals: Vec<StructTypeParameter>,
-    ) -> Result<Self> {
-        Ok(StructDefinition_ {
+    ) -> Self {
+        StructDefinition_ {
             abilities,
             name: StructName(name),
             type_formals,
             fields: StructDefinitionFields::Native,
             invariants: vec![],
-        })
+        }
     }
 }
 

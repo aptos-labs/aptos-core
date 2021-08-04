@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{anyhow, Context, Error};
+use anyhow::{anyhow, Context};
 use std::{collections::BTreeSet, fmt, str::FromStr};
 
 use crate::lexer::*;
@@ -15,13 +15,7 @@ use move_symbol_pool::Symbol;
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ParseError<L, E> {
     InvalidToken { location: L },
-    User { error: E },
-}
-
-impl<L> From<Error> for ParseError<L, Error> {
-    fn from(error: Error) -> Self {
-        ParseError::User { error }
-    }
+    User { location: L, error: E },
 }
 
 impl<L, E> fmt::Display for ParseError<L, E>
@@ -32,7 +26,7 @@ where
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use self::ParseError::*;
         match *self {
-            User { ref error } => write!(f, "{}", error),
+            User { ref error, .. } => write!(f, "{}", error),
             InvalidToken { ref location } => write!(f, "Invalid token at {}", location),
         }
     }
@@ -1169,9 +1163,9 @@ fn token_to_ability(token: Tok, contents: &str) -> Option<Ability> {
 //     "store" => Ability::Store,
 //     "key" => Ability::Key,
 // }
-fn parse_ability(tokens: &mut Lexer) -> Result<Ability, ParseError<Loc, anyhow::Error>> {
+fn parse_ability(tokens: &mut Lexer) -> Result<(Ability, Loc), ParseError<Loc, anyhow::Error>> {
     let a = match token_to_ability(tokens.peek(), tokens.content()) {
-        Some(a) => a,
+        Some(a) => (a, current_token_loc(tokens)),
         None => {
             return Err(ParseError::InvalidToken {
                 location: current_token_loc(tokens),
@@ -1299,10 +1293,11 @@ fn parse_type_parameter(
             parse_ability,
         )?;
         let mut ability_set = BTreeSet::new();
-        for ability in abilities {
+        for (ability, location) in abilities {
             let was_new_element = ability_set.insert(ability);
             if !was_new_element {
                 return Err(ParseError::User {
+                    location,
                     error: anyhow!("Duplicate ability '{}'", ability),
                 });
             }
@@ -1956,10 +1951,11 @@ fn parse_struct_decl(
         tokens.advance()?;
         let abilities_vec =
             parse_comma_list(tokens, &[Tok::LBrace, Tok::Semicolon], parse_ability, false)?;
-        for ability in abilities_vec {
+        for (ability, location) in abilities_vec {
             let was_new_element = abilities.insert(ability);
             if !was_new_element {
                 return Err(ParseError::User {
+                    location,
                     error: anyhow!("Duplicate ability '{}'", ability),
                 });
             }
@@ -1973,7 +1969,7 @@ fn parse_struct_decl(
             tokens.file_name(),
             start_loc,
             end_loc,
-            StructDefinition_::native(abilities, name, type_parameters)?,
+            StructDefinition_::native(abilities, name, type_parameters),
         ));
     }
 
@@ -1995,7 +1991,7 @@ fn parse_struct_decl(
         tokens.file_name(),
         start_loc,
         end_loc,
-        StructDefinition_::move_declared(abilities, name, type_parameters, fields, invariants)?,
+        StructDefinition_::move_declared(abilities, name, type_parameters, fields, invariants),
     ))
 }
 
@@ -2133,7 +2129,7 @@ fn parse_module(tokens: &mut Lexer) -> Result<ModuleDefinition, ParseError<Loc, 
         vec![],
         functions,
         synthetics,
-    )?)
+    ))
 }
 
 // pub ScriptOrModule: ScriptOrModule = {
