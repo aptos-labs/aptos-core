@@ -1344,8 +1344,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             // Check whether the inclusion is correct regards usage of post state.
 
             // First check for lets.
-            for name in cond.exp.free_vars(self.parent.env).keys() {
-                if let Some((true, id)) = self.spec_block_lets.get(name) {
+            for (name, _) in cond.exp.free_vars(self.parent.env) {
+                if let Some((true, id)) = self.spec_block_lets.get(&name) {
                     let label_cond = (cond.loc.clone(), "not allowed to use post state".to_owned());
                     let label_let = (
                         self.parent.env.get_node_loc(*id),
