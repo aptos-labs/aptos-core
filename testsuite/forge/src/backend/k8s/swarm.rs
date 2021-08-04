@@ -293,6 +293,7 @@ async fn get_validators(client: K8sClient) -> Result<HashMap<PeerId, K8sNode>> {
             let node_id = parse_node_id(&s.name).expect("error to parse node id");
             let node = K8sNode {
                 name: format!("val-{}", node_id),
+                // TODO: fetch this from running node
                 peer_id: PeerId::random(),
                 node_id,
                 ip: s.host_ip.clone(),
