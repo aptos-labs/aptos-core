@@ -1,10 +1,9 @@
-module {{default}}::C {
+module 0x43::C {
     struct T {}
 }
 
-//! new-transaction
-module {{default}}::B {
-    use {{default}}::C;
+module 0x42::B {
+    use 0x43::C;
     public fun foo(): C::T {
         C::T {}
     }
