@@ -89,7 +89,7 @@ fn main() -> Result<()> {
             &args.validator.unwrap(),
             &args.helm_repo,
             &args.validator_image_tag,
-        )
+        );
     }
 
     if args.local_swarm {
