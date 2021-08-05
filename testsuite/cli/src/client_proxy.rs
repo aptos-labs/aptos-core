@@ -936,6 +936,9 @@ impl ClientProxy {
         for dep in &space_delim_strings[2..] {
             args.push_str(&format!(" -d {}", dep));
         }
+        for (name, addr) in diem_framework::diem_framework_named_addresses() {
+            args.push_str(&format!(" -a {}=0x{:#X}", name, addr));
+        }
 
         let status = Command::new("cargo")
             .args(args.split(' '))
