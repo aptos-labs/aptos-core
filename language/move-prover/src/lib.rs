@@ -71,11 +71,17 @@ pub fn run_move_prover<W: WriteColor>(
     }
     // Same for the error map generator
     if options.run_errmapgen {
-        return Ok(run_errmapgen(&env, &options, now));
+        return {
+            run_errmapgen(&env, &options, now);
+            Ok(())
+        };
     }
     // Same for read/write set analysis
     if options.run_read_write_set {
-        return Ok(run_read_write_set(&env, &options, now));
+        return {
+            run_read_write_set(&env, &options, now);
+            Ok(())
+        };
     }
 
     // Check correct backend versions.
