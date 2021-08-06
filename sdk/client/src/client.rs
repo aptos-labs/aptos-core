@@ -27,7 +27,7 @@ use diem_types::{
 use move_core_types::move_resource::{MoveResource, MoveStructType};
 use reqwest::Client as ReqwestClient;
 use serde::{de::DeserializeOwned, Serialize};
-use std::time::Duration;
+use std::{mem, time::Duration};
 
 #[derive(Clone, Debug)]
 pub struct Client {
@@ -54,6 +54,10 @@ impl Client {
             state: StateManager::new(),
             retry,
         }
+    }
+
+    pub(crate) fn take_retry(&mut self) -> Retry {
+        mem::replace(&mut self.retry, Retry::none())
     }
 
     pub fn last_known_state(&self) -> Option<State> {

@@ -24,6 +24,10 @@ impl Retry {
         Self { max_retries, delay }
     }
 
+    pub fn none() -> Self {
+        Self::new(0, Duration::ZERO)
+    }
+
     pub fn max_retries(&self) -> u32 {
         self.max_retries
     }

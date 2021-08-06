@@ -6,6 +6,7 @@ use crate::{
     error::{Error, Result, WaitForTransactionError},
     request::MethodRequest,
     response::{MethodResponse, Response},
+    retry::Retry,
     verifying_client::{methods::VerifyingBatch, state_store::StateStore},
 };
 use diem_crypto::hash::{CryptoHash, HashValue};
@@ -21,7 +22,6 @@ use diem_types::{
 };
 use std::{fmt::Debug, time::Duration};
 
-// TODO(philiphayes): figure out retry strategy
 // TODO(philiphayes): fill out rest of the methods
 // TODO(philiphayes): all clients should validate chain id (allow users to trust-on-first-use or pre-configure)
 // TODO(philiphayes): we could abstract the async client so VerifyingClient takes a dyn Trait?
@@ -56,26 +56,34 @@ use std::{fmt::Debug, time::Duration};
 pub struct VerifyingClient<S> {
     inner: Client,
     state_store: S,
+    retry: Retry,
 }
 
 impl<S: StateStore> VerifyingClient<S> {
-    // TODO(philiphayes): construct the client ourselves? we probably want to
-    // control the retries out here. For example, during sync, if we get a stale
-    // state proof the retry logic should include that and not just fail immediately.
-    pub fn new(inner: Client, state_store: S) -> Result<Self> {
-        let this = Self { inner, state_store };
+    pub fn new(mut inner: Client, state_store: S) -> Result<Self> {
+        let retry = inner.take_retry();
+        let this = Self {
+            inner,
+            state_store,
+            retry,
+        };
         this.version()?; // state store must be initialized
         Ok(this)
     }
 
     pub fn new_with_state(
-        inner: Client,
+        mut inner: Client,
         state_store: S,
         initial_state: &TrustedState,
     ) -> Result<Self> {
-        let client = Self { inner, state_store };
-        client.ratchet_state(Some(initial_state))?;
-        Ok(client)
+        let retry = inner.take_retry();
+        let this = Self {
+            inner,
+            state_store,
+            retry,
+        };
+        this.ratchet_state(Some(initial_state))?;
+        Ok(this)
     }
 
     /// Get a snapshot of our current trusted ledger [`Version`].
@@ -168,9 +176,14 @@ impl<S: StateStore> VerifyingClient<S> {
     /// node's current version (unless we experience a verification error or other
     /// I/O error).
     pub async fn sync(&self) -> Result<()> {
-        // TODO(philiphayes): retries
-        while self.sync_one_step().await? {}
-        Ok(())
+        self.retry
+            .retry_async(|| async {
+                while self.sync_one_step().await? {
+                    // TODO(philiphayes): logging / callback?
+                }
+                Ok(())
+            })
+            .await
     }
 
     /// Issue a single `get_state_proof` request and try to verify it. Returns
@@ -178,7 +191,7 @@ impl<S: StateStore> VerifyingClient<S> {
     /// `Ok(false)` if we have finished syncing.
     pub async fn sync_one_step(&self) -> Result<bool> {
         // batch([]) is effectively just a get_state_proof request
-        match self.batch(vec![]).await {
+        match self.batch_without_retry(vec![]).await {
             Ok(_) => Ok(false),
             Err(err) => {
                 if err.is_need_sync() {
@@ -218,9 +231,9 @@ impl<S: StateStore> VerifyingClient<S> {
     /// connection to a single server, so the broadcasting needs to happen at a
     /// higher layer.
     pub async fn submit(&self, txn: &SignedTransaction) -> Result<Response<()>> {
-        self.request(MethodRequest::submit(txn).map_err(Error::request)?)
-            .await?
-            .and_then(MethodResponse::try_into_submit)
+        // TODO(philiphayes): fix retries for txn submit. need to
+        // avoid the whole verifying client machinery for submits
+        self.inner.submit(txn).await
     }
 
     pub async fn get_metadata_by_version(
@@ -327,19 +340,41 @@ impl<S: StateStore> VerifyingClient<S> {
             .and_then(MethodResponse::try_into_get_network_status)
     }
 
+    pub fn actual_batch_size(&self, requests: &[MethodRequest]) -> Result<usize> {
+        Ok(VerifyingBatch::from_batch(requests.to_vec()).num_requests(&self.trusted_state()?))
+    }
+
     /// Send a single request via `VerifyingClient::batch`.
     pub async fn request(&self, request: MethodRequest) -> Result<Response<MethodResponse>> {
-        let mut responses = self.batch(vec![request]).await?.into_iter();
+        self.retry
+            .retry_async(|| self.request_without_retry(request.clone()))
+            .await
+    }
+
+    pub async fn batch(
+        &self,
+        requests: Vec<MethodRequest>,
+    ) -> Result<Vec<Result<Response<MethodResponse>>>> {
+        self.retry
+            .retry_async(|| self.batch_without_retry(requests.clone()))
+            .await
+    }
+
+    //
+    // Private Helpers
+    //
+
+    async fn request_without_retry(
+        &self,
+        request: MethodRequest,
+    ) -> Result<Response<MethodResponse>> {
+        let mut responses = self.batch_without_retry(vec![request]).await?.into_iter();
         responses
             .next()
             .expect("batch guarantees the correct number of responses")
     }
 
-    pub fn actual_batch_size(&self, requests: &[MethodRequest]) -> Result<usize> {
-        Ok(VerifyingBatch::from_batch(requests.to_vec()).num_requests(&self.trusted_state()?))
-    }
-
-    pub async fn batch(
+    async fn batch_without_retry(
         &self,
         requests: Vec<MethodRequest>,
     ) -> Result<Vec<Result<Response<MethodResponse>>>> {
