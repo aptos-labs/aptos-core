@@ -1,3 +1,91 @@
+# Move Version 1.4
+
+Version 1.4 of Move (released along with Diem Core version 1.4) includes named addresses,
+phantom type parameters, a new version of the bytecode format, and a number of bug fixes
+and other improvements.
+
+## Highlights
+
+* Move Language Enhancements: This version of Move adds support for two new language features,
+described in more detail in separate change descriptions:
+    * [Named Addresses](changes/5-named-addresses.md): This allows names to be used in
+      place of numerical values in any spot where addresses are used. (Some aspects of this
+      feature were already included in Move version 1.3.)
+    * [Phantom Type Parameters](changes/6-phantom-type-params.md): Type parameters for generic
+      structs can now be declared `phantom` when they are not used for anything except
+      compile-time type checking. This avoids the need for spurious abilities to satisfy the
+      type checker.
+* Version 3 of the Move bytecode format: The bytecode format has been changed to support
+phantom type parameters. The Move VM still reads and processes older versions of the Move
+bytecode, but new bytecode files will require the new Move VM version.
+
+## Compiler
+
+* Error messages from the compiler have been significantly revised, after updating the compiler
+to use a recent version of the `codespan-reporting` crate
+([#8812](https://github.com/diem/diem/pull/8812)).
+* Fixed a report of memory leaks in the compiler by adding an internal pool of symbols
+and using it to record source file names
+([#8742](https://github.com/diem/diem/pull/8742)).
+* Improved compiler performance by about 60% by rewriting the code for handling scoped aliases
+([#8804](https://github.com/diem/diem/pull/8804)).
+
+## Prover
+
+* Set up a new lab to compare cvc5 with z3 in benchmarks
+([#8732](https://github.com/diem/diem/pull/8732)).
+* Improved error message if the Boogie command cannot be found
+([#8778](https://github.com/diem/diem/pull/8778)).
+* Fixed an inconsistency in global invariant processing that was exposed by using
+the `disable_invariants_in_body` pragma
+([#8840](https://github.com/diem/diem/pull/8840)).
+Verifying global invariants remains an active area of development so there may
+still be some related issues in this release.
+
+## VM
+
+* Added VM support for publishing multiple modules in a single transaction
+([#8555](https://github.com/diem/diem/pull/8555)).
+This allows publishing a set of interdependent modules that are verified and link-checked
+together.
+* Improved logging of errors when deserializing Move modules
+([#8681](https://github.com/diem/diem/pull/8681)).
+* Fixed performance problems when loading and verifying friend modules. In addition to
+caching the results of deserializing and verifying modules, the loader has been
+significantly refactored to be more robust and to improve its internal APIs
+([#8832](https://github.com/diem/diem/pull/8832)).
+
+## Command Line Interpreter (CLI)
+
+* The `move compile` command now includes the Move standard library by default
+([#8679](https://github.com/diem/diem/pull/8679)).
+* Split out the Diem-specific part of the CLI to a new `df-cli` tool
+([#8615](https://github.com/diem/diem/pull/8615))
+and refactored the Move CLI so that `df-cli` (or other clients) can
+extend it with new subcommands
+([#8764](https://github.com/diem/diem/pull/8764)).
+
+## Miscellaneous
+
+* Updated the Move language book to use abilities
+([#8582](https://github.com/diem/diem/pull/8582)).
+The documentation still needs more updates to catch up with the latest features.
+* Finished the process of removing Cargo dependencies on Diem crates,
+continuing our effort to make Move usable apart from Diem.
+* Refactored various command line tools to share common code in a new
+`move-command-line-common` crate
+([#8680](https://github.com/diem/diem/pull/8680)).
+* Enhanced the Move bytecode disassembler to print the bytecode version
+([#8690](https://github.com/diem/diem/pull/8690)).
+* Removed the deprecated `CompiledScript::into_module` method
+([#8655](https://github.com/diem/diem/pull/8655)).
+* Removed the `CompiledModuleMut` and `CompiledScriptMut` types
+([#8667](https://github.com/diem/diem/pull/8667))
+along with the `into_inner`, `as_inner`, and `freeze` methods from the
+`CompiledModule` and `CompiledScript` types
+([#8712](https://github.com/diem/diem/pull/8712)).
+
+
 # Move Version 1.3
 
 Version 1.3 of Move (released along with Diem Core version 1.3) introduces some syntax changes
