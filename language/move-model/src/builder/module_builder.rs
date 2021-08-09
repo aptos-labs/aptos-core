@@ -1251,7 +1251,22 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 
                 et
             }
-            Module => ExpTranslator::new_with_old(self, allows_old),
+            Module => {
+                let mut et = ExpTranslator::new_with_old(self, allows_old);
+
+                // define the type locals
+                match kind {
+                    ConditionKind::GlobalInvariant(tys)
+                    | ConditionKind::GlobalInvariantUpdate(tys) => {
+                        for ty in tys {
+                            et.define_type_local(loc, ty.clone());
+                        }
+                    }
+                    _ => (),
+                }
+
+                et
+            }
             Schema(name) => {
                 let entry = self
                     .parent
@@ -1265,6 +1280,13 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 let mut et = ExpTranslator::new_with_old(self, allows_old);
                 for (n, ty) in type_params {
                     et.define_type_param(loc, n, ty);
+                }
+
+                // define the type locals
+                if let ConditionKind::SchemaInvariant(tys) = kind {
+                    for ty in tys {
+                        et.define_type_local(loc, ty.clone());
+                    }
                 }
 
                 et.enter_scope();
