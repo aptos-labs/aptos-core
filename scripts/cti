@@ -204,7 +204,7 @@ then
       echo "-E|--env <ENV>: Set environment variable, ex. -E RUST_LOG=debug. Can be repeated, e.g. -E A=B -E C=D"
       echo "-R|--report file.json: Generate json report into file.json"
       echo
-      echo "To see cluster test runner arguments run cti --stable"
+      echo "To see cluster test runner arguments run cti --stable --help"
       echo
       echo "Examples:"
       echo "cti --pr <PR> --run bench # Run benchmark"
