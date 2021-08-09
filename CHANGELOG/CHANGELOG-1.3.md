@@ -1,8 +1,8 @@
 # Changelog
 
-## [Unreleased](https://github.com/diem/diem/tree/HEAD)
+## [diem-core-v1.3.0](https://github.com/diem/diem/tree/diem-core-v1.3.0)
 
-[Full Changelog](https://github.com/diem/diem/compare/diem-core-v1.2.0...HEAD)
+[Full Changelog](https://github.com/diem/diem/compare/diem-core-v1.2.0...diem-core-v1.3.0)
 
 **Fixed bugs:**
 
