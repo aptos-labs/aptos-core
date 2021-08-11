@@ -1,5 +1,5 @@
 [package]
-name = "bytecode-verifier-transactional-tests"
+name = "move-vm-transactional-tests"
 version = "0.1.0"
 authors = ["Diem Association <opensource@diem.com>"]
 publish = false

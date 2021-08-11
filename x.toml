@@ -219,6 +219,7 @@ members = [
     "move-prover-test-utils",
     "move-transactional-test-runner",
     "move-vm-integration-tests",
+    "move-vm-transactional-tests",
     "offchain",
     "scratchpad-benchmark",
     "sdk-compatibility",
