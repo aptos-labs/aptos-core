@@ -2210,6 +2210,7 @@ dependencies = [
  "executor-types",
  "fail",
  "futures",
+ "hex",
  "jemallocator",
  "network-builder",
  "rand 0.8.3",

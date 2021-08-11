@@ -4,6 +4,8 @@
 #![forbid(unsafe_code)]
 
 use diem_config::config::NodeConfig;
+use hex::FromHex;
+use rand::{rngs::StdRng, SeedableRng};
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -19,6 +21,14 @@ struct Args {
     config: Option<PathBuf>,
     #[structopt(long, help = "Enable a single validator testnet")]
     test: bool,
+
+    #[structopt(
+        long,
+        help = "RNG Seed to use when starting single validator testnet",
+        parse(try_from_str = FromHex::from_hex),
+        requires("test")
+    )]
+    seed: Option<[u8; 32]>,
     #[structopt(long, help = "Enabling random ports for testnet")]
     random_ports: bool,
 }
@@ -31,7 +41,11 @@ fn main() {
 
     if args.test {
         println!("Entering test mode, this should never be used in production!");
-        diem_node::load_test_environment(args.config, args.random_ports, rand::rngs::OsRng);
+        let rng = args
+            .seed
+            .map(StdRng::from_seed)
+            .unwrap_or_else(StdRng::from_entropy);
+        diem_node::load_test_environment(args.config, args.random_ports, rng);
     } else {
         let config = NodeConfig::load(args.config.unwrap()).expect("Failed to load node config");
         println!("Using node config {:?}", &config);
