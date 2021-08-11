@@ -51,6 +51,7 @@ fn get_initial_data_and_qc(db: &dyn DbReader) -> (RecoveryData, QuorumCert) {
             ),
             vec![],
             None,
+            None,
         )
         .unwrap(),
         qc,

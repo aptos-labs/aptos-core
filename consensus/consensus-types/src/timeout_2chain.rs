@@ -150,6 +150,11 @@ impl TwoChainTimeoutCertificate {
         Ok(())
     }
 
+    /// The epoch of the timeout.
+    pub fn epoch(&self) -> u64 {
+        self.timeout.epoch()
+    }
+
     /// The round of the timeout.
     pub fn round(&self) -> Round {
         self.timeout.round()
