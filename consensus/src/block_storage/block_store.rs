@@ -17,10 +17,9 @@ use crate::{
 };
 use anyhow::{bail, ensure, format_err, Context};
 
-use consensus_types::timeout_2chain::TwoChainTimeoutCertificate;
 use consensus_types::{
     block::Block, executed_block::ExecutedBlock, quorum_cert::QuorumCert, sync_info::SyncInfo,
-    timeout_certificate::TimeoutCertificate,
+    timeout_2chain::TwoChainTimeoutCertificate, timeout_certificate::TimeoutCertificate,
 };
 use diem_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
 use diem_infallible::RwLock;

@@ -1,8 +1,10 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::timeout_2chain::TwoChainTimeout;
-use crate::{common::Author, timeout::Timeout, vote_data::VoteData};
+use crate::{
+    common::Author, quorum_cert::QuorumCert, timeout::Timeout, timeout_2chain::TwoChainTimeout,
+    vote_data::VoteData,
+};
 use anyhow::{ensure, Context};
 use diem_crypto::{ed25519::Ed25519Signature, hash::CryptoHash};
 use diem_types::{
@@ -124,6 +126,15 @@ impl Vote {
         Timeout::new(
             self.vote_data().proposed().epoch(),
             self.vote_data().proposed().round(),
+        )
+    }
+
+    /// Returns the 2-chain timeout.
+    pub fn generate_2chain_timeout(&self, qc: QuorumCert) -> TwoChainTimeout {
+        TwoChainTimeout::new(
+            self.vote_data.proposed().epoch(),
+            self.vote_data.proposed().round(),
+            qc,
         )
     }
 

@@ -12,8 +12,7 @@ mod block_tree;
 pub mod tracing;
 
 pub use block_store::{sync_manager::BlockRetriever, BlockStore};
-use consensus_types::sync_info::SyncInfo;
-use consensus_types::timeout_2chain::TwoChainTimeoutCertificate;
+use consensus_types::{sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutCertificate};
 use diem_types::ledger_info::LedgerInfoWithSignatures;
 
 pub trait BlockReader: Send + Sync {

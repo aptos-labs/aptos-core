@@ -1,8 +1,10 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::timeout_2chain::TwoChainTimeoutCertificate;
-use crate::{common::Round, quorum_cert::QuorumCert, timeout_certificate::TimeoutCertificate};
+use crate::{
+    common::Round, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate,
+    timeout_certificate::TimeoutCertificate,
+};
 use anyhow::{ensure, Context};
 use diem_types::{
     block_info::BlockInfo, ledger_info::LedgerInfoWithSignatures,
@@ -62,6 +64,9 @@ impl SyncInfo {
     ) -> Self {
         // No need to include HTC if it's lower than HQC
         let highest_timeout_cert = highest_timeout_cert
+            .filter(|tc| tc.round() > highest_quorum_cert.certified_block().round());
+
+        let highest_2chain_timeout_cert = highest_2chain_timeout_cert
             .filter(|tc| tc.round() > highest_quorum_cert.certified_block().round());
 
         let highest_ordered_cert =

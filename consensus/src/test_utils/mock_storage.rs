@@ -8,9 +8,9 @@ use crate::{
     },
 };
 use anyhow::Result;
-use consensus_types::timeout_2chain::TwoChainTimeoutCertificate;
 use consensus_types::{
-    block::Block, quorum_cert::QuorumCert, timeout_certificate::TimeoutCertificate, vote::Vote,
+    block::Block, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate,
+    timeout_certificate::TimeoutCertificate, vote::Vote,
 };
 use diem_crypto::HashValue;
 use diem_infallible::Mutex;

@@ -3,9 +3,9 @@
 
 use crate::counters;
 use anyhow::bail;
-use consensus_types::timeout_2chain::TwoChainTimeoutCertificate;
 use consensus_types::{
-    executed_block::ExecutedBlock, quorum_cert::QuorumCert, timeout_certificate::TimeoutCertificate,
+    executed_block::ExecutedBlock, quorum_cert::QuorumCert,
+    timeout_2chain::TwoChainTimeoutCertificate, timeout_certificate::TimeoutCertificate,
 };
 use diem_crypto::HashValue;
 use diem_logger::prelude::*;

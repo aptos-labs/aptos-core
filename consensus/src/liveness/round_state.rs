@@ -235,7 +235,7 @@ impl RoundState {
             self.vote_sent = None;
             let timeout = self.setup_timeout();
             // The new round reason is QCReady in case both QC and TC are equal
-            let new_round_reason = if sync_info.highest_timeout_certificate().is_none() {
+            let new_round_reason = if sync_info.highest_certified_round() + 1 == new_round {
                 NewRoundReason::QCReady
             } else {
                 NewRoundReason::Timeout

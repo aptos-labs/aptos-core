@@ -3,9 +3,9 @@
 
 use crate::{consensusdb::ConsensusDB, epoch_manager::LivenessStorageData, error::DbError};
 use anyhow::{format_err, Context, Result};
-use consensus_types::timeout_2chain::TwoChainTimeoutCertificate;
 use consensus_types::{
-    block::Block, quorum_cert::QuorumCert, timeout_certificate::TimeoutCertificate, vote::Vote,
+    block::Block, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate,
+    timeout_certificate::TimeoutCertificate, vote::Vote,
 };
 use diem_config::config::NodeConfig;
 use diem_crypto::HashValue;
