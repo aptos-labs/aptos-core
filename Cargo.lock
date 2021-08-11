@@ -6893,7 +6893,6 @@ checksum = "ef703b7cb59335eae2eb93ceb664c0eb7ea6bf567079d843e09420219668e072"
 name = "safety-rules"
 version = "0.1.0"
 dependencies = [
- "bcs",
  "consensus-types",
  "crash-handler",
  "criterion",
@@ -6915,6 +6914,7 @@ dependencies = [
  "rand 0.8.3",
  "rand_core 0.6.2",
  "serde",
+ "serde_json",
  "tempfile",
  "thiserror",
 ]

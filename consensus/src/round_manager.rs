@@ -541,7 +541,7 @@ impl RoundManager {
         };
 
         if !timeout_vote.is_timeout() {
-            let timeout = timeout_vote.timeout();
+            let timeout = timeout_vote.generate_timeout();
             let signature = self
                 .safety_rules
                 .lock()

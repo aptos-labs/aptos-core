@@ -152,7 +152,7 @@ impl PendingVotes {
         if let Some(timeout_signature) = vote.timeout_signature() {
             // form timeout struct
             // TODO(mimoo): stronger: pass the (epoch, round) tuple as arguments of this function
-            let timeout = vote.timeout();
+            let timeout = vote.generate_timeout();
 
             // if no partial TC exist, create one
             let partial_tc = self
@@ -339,7 +339,7 @@ mod tests {
         );
 
         // submit the same vote but enhanced with a timeout -> VoteAdded
-        let timeout = vote1_author_0.timeout();
+        let timeout = vote1_author_0.generate_timeout();
         let signature = timeout.sign(&signers[0]);
         vote1_author_0.add_timeout_signature(signature);
 
@@ -358,7 +358,7 @@ mod tests {
         );
 
         // if that vote is now enhanced with a timeout signature -> NewTimeoutCertificate
-        let timeout = vote2_author_1.timeout();
+        let timeout = vote2_author_1.generate_timeout();
         let signature = timeout.sign(&signers[1]);
         vote2_author_1.add_timeout_signature(signature);
         match pending_votes.insert_vote(&vote2_author_1, &validator) {

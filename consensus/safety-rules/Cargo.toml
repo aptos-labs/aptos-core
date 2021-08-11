@@ -14,7 +14,6 @@ rand_core = "0.6.2"
 
 crash-handler = { path = "../../common/crash-handler" }
 consensus-types = { path = "../consensus-types" }
-bcs = "0.1.2"
 diem-config = { path = "../../config" }
 diem-crypto = { path = "../../crypto/crypto" }
 diem-global-constants = { path = "../../config/global-constants"}
@@ -29,6 +28,7 @@ diem-types = { path = "../../types" }
 diem-vault-client = { path = "../../secure/storage/vault" }
 diem-workspace-hack = { path = "../../common/workspace-hack" }
 serde = { version = "1.0.124", default-features = false }
+serde_json = "1.0.64"
 thiserror = "1.0.24"
 
 [dev-dependencies]

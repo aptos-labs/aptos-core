@@ -1,6 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::timeout_2chain::TwoChainTimeout;
 use crate::{common::Author, timeout::Timeout, vote_data::VoteData};
 use anyhow::{ensure, Context};
 use diem_crypto::{ed25519::Ed25519Signature, hash::CryptoHash};
@@ -28,6 +29,9 @@ pub struct Vote {
     signature: Ed25519Signature,
     /// The round signatures can be aggregated into a timeout certificate if present.
     timeout_signature: Option<Ed25519Signature>,
+    /// The 2-chain timeout and corresponding signature.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    two_chain_timeout: Option<(TwoChainTimeout, Ed25519Signature)>,
 }
 
 // this is required by structured log
@@ -77,6 +81,7 @@ impl Vote {
             ledger_info,
             signature,
             timeout_signature: None,
+            two_chain_timeout: None,
         }
     }
 
@@ -88,6 +93,11 @@ impl Vote {
         }
 
         self.timeout_signature.replace(signature);
+    }
+
+    /// Add the 2-chain timeout and signature in the vote.
+    pub fn add_2chain_timeout(&mut self, timeout: TwoChainTimeout, signature: Ed25519Signature) {
+        self.two_chain_timeout = Some((timeout, signature));
     }
 
     pub fn vote_data(&self) -> &VoteData {
@@ -110,7 +120,7 @@ impl Vote {
     }
 
     /// Returns the hash of the data represent by a timeout proposal
-    pub fn timeout(&self) -> Timeout {
+    pub fn generate_timeout(&self) -> Timeout {
         Timeout::new(
             self.vote_data().proposed().epoch(),
             self.vote_data().proposed().round(),
@@ -128,10 +138,15 @@ impl Vote {
         self.timeout_signature.as_ref()
     }
 
+    /// Return the two chain timeout vote and signature.
+    pub fn two_chain_timeout(&self) -> Option<&(TwoChainTimeout, Ed25519Signature)> {
+        self.two_chain_timeout.as_ref()
+    }
+
     /// The vote message is considered a timeout vote message if it carries a signature on the
     /// round, which can then be used for aggregating it to the TimeoutCertificate.
     pub fn is_timeout(&self) -> bool {
-        self.timeout_signature.is_some()
+        self.timeout_signature.is_some() || self.two_chain_timeout.is_some()
     }
 
     /// Verifies that the consensus data hash of LedgerInfo corresponds to the vote info,
@@ -146,8 +161,22 @@ impl Vote {
             .context("Failed to verify Vote")?;
         if let Some(timeout_signature) = &self.timeout_signature {
             validator
-                .verify(self.author(), &self.timeout(), timeout_signature)
+                .verify(self.author(), &self.generate_timeout(), timeout_signature)
                 .context("Failed to verify Timeout Vote")?;
+        }
+        if let Some((timeout, signature)) = &self.two_chain_timeout {
+            ensure!(
+                (timeout.epoch(), timeout.round())
+                    == (self.epoch(), self.vote_data.proposed().round()),
+                "2-chain timeout has different (epoch, round) than Vote"
+            );
+            timeout
+                .quorum_cert()
+                .verify(validator)
+                .context("Failed to verify QC from 2-chain timeout")?;
+            validator
+                .verify(self.author(), &timeout.signing_format(), signature)
+                .context("Failed to verify 2-chain timeout signature")?;
         }
         // Let us verify the vote data as well
         self.vote_data().verify()?;

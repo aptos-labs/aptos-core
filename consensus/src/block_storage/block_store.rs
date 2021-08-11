@@ -17,6 +17,7 @@ use crate::{
 };
 use anyhow::{bail, ensure, format_err, Context};
 
+use consensus_types::timeout_2chain::TwoChainTimeoutCertificate;
 use consensus_types::{
     block::Block, executed_block::ExecutedBlock, quorum_cert::QuorumCert, sync_info::SyncInfo,
     timeout_certificate::TimeoutCertificate,
@@ -242,6 +243,7 @@ impl BlockStore {
             root_commit_li,
             max_pruned_blocks_in_mem,
             highest_timeout_cert.map(Arc::new),
+            None,
         );
 
         let block_store = Self {
@@ -538,12 +540,18 @@ impl BlockReader for BlockStore {
         self.inner.read().highest_timeout_cert()
     }
 
+    fn highest_2chain_timeout_cert(&self) -> Option<Arc<TwoChainTimeoutCertificate>> {
+        self.inner.read().highest_2chain_timeout_cert()
+    }
+
     fn sync_info(&self) -> SyncInfo {
         SyncInfo::new_decoupled(
             self.highest_quorum_cert().as_ref().clone(),
             self.highest_ordered_cert().as_ref().clone(),
             Some(self.highest_ledger_info()),
             self.highest_timeout_cert().map(|tc| tc.as_ref().clone()),
+            self.highest_2chain_timeout_cert()
+                .map(|tc| tc.as_ref().clone()),
         )
     }
 }
