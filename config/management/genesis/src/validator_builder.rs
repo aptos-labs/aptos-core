@@ -130,14 +130,14 @@ pub struct RootKeys {
 }
 
 impl RootKeys {
-    pub fn generate<R>(rng: &mut R) -> Self
+    pub fn generate<R>(mut rng: R) -> Self
     where
         R: ::rand::RngCore + ::rand::CryptoRng,
     {
         // TODO use distinct keys for diem root and treasury
         // let root_key = Ed25519PrivateKey::generate(rng);
         // let treasury_compliance_key = Ed25519PrivateKey::generate(rng);
-        let key = Ed25519PrivateKey::generate(rng).to_bytes();
+        let key = Ed25519PrivateKey::generate(&mut rng).to_bytes();
         let root_key = Ed25519PrivateKey::try_from(key.as_ref()).unwrap();
         let treasury_compliance_key = Ed25519PrivateKey::try_from(key.as_ref()).unwrap();
 
@@ -189,10 +189,10 @@ impl ValidatorBuilder {
         self
     }
 
-    pub fn build(mut self) -> Result<(RootKeys, Vec<ValidatorConfig>)> {
-        // TODO Pass this in
-        let mut rng = rand::rngs::OsRng;
-
+    pub fn build<R>(mut self, mut rng: R) -> Result<(RootKeys, Vec<ValidatorConfig>)>
+    where
+        R: ::rand::RngCore + ::rand::CryptoRng,
+    {
         // Canonicalize the config directory path
         self.config_directory = self.config_directory.canonicalize()?;
 
@@ -254,7 +254,7 @@ impl ValidatorBuilder {
     fn initialize_validator_config<R>(
         &self,
         index: usize,
-        rng: &mut R,
+        rng: R,
         validator_network_address_encryption_key: NetworkAddressEncryptionKey,
         validator_network_address_encryption_key_version: NetworkAddressEncryptionKeyVersion,
     ) -> Result<ValidatorConfig>
@@ -321,7 +321,7 @@ impl ValidatorBuilder {
 
     fn initialize_validator_storage<R>(
         validator: &ValidatorConfig,
-        rng: &mut R,
+        mut rng: R,
         validator_network_address_encryption_key: NetworkAddressEncryptionKey,
         validator_network_address_encryption_key_version: NetworkAddressEncryptionKeyVersion,
     ) -> Result<()>
@@ -331,22 +331,22 @@ impl ValidatorBuilder {
         let mut storage = validator.storage();
 
         // Set owner key and account address
-        storage.import_private_key(OWNER_KEY, Ed25519PrivateKey::generate(rng))?;
+        storage.import_private_key(OWNER_KEY, Ed25519PrivateKey::generate(&mut rng))?;
         let owner_address =
             diem_config::utils::validator_owner_account_from_name(validator.owner().as_bytes());
         storage.set(OWNER_ACCOUNT, owner_address)?;
 
         // Set operator key and account address
-        let operator_key = Ed25519PrivateKey::generate(rng);
+        let operator_key = Ed25519PrivateKey::generate(&mut rng);
         let operator_address =
             AuthenticationKey::ed25519(&Ed25519PublicKey::from(&operator_key)).derived_address();
         storage.set(OPERATOR_ACCOUNT, operator_address)?;
         storage.import_private_key(OPERATOR_KEY, operator_key)?;
 
-        storage.import_private_key(CONSENSUS_KEY, Ed25519PrivateKey::generate(rng))?;
-        storage.import_private_key(EXECUTION_KEY, Ed25519PrivateKey::generate(rng))?;
-        storage.import_private_key(FULLNODE_NETWORK_KEY, Ed25519PrivateKey::generate(rng))?;
-        storage.import_private_key(VALIDATOR_NETWORK_KEY, Ed25519PrivateKey::generate(rng))?;
+        storage.import_private_key(CONSENSUS_KEY, Ed25519PrivateKey::generate(&mut rng))?;
+        storage.import_private_key(EXECUTION_KEY, Ed25519PrivateKey::generate(&mut rng))?;
+        storage.import_private_key(FULLNODE_NETWORK_KEY, Ed25519PrivateKey::generate(&mut rng))?;
+        storage.import_private_key(VALIDATOR_NETWORK_KEY, Ed25519PrivateKey::generate(&mut rng))?;
 
         // Initialize all other data in storage
         storage.set(SAFETY_DATA, SafetyData::new(0, 0, 0, 0, None))?;

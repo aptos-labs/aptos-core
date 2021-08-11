@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{Factory, Result, Swarm, Version};
+use rand::rngs::StdRng;
 use std::{
     collections::HashMap,
     num::NonZeroUsize,
@@ -120,11 +121,16 @@ impl Factory for LocalFactory {
         Box::new(self.versions.keys().cloned())
     }
 
-    fn launch_swarm(&self, node_num: NonZeroUsize, version: &Version) -> Result<Box<dyn Swarm>> {
+    fn launch_swarm(
+        &self,
+        rng: &mut StdRng,
+        node_num: NonZeroUsize,
+        version: &Version,
+    ) -> Result<Box<dyn Swarm>> {
         let mut swarm = LocalSwarm::builder(self.versions.clone())
             .number_of_validators(node_num)
             .initial_version(version.clone())
-            .build()?;
+            .build(rng)?;
         swarm.launch()?;
 
         Ok(Box::new(swarm))

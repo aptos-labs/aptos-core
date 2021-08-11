@@ -115,7 +115,10 @@ impl LocalSwarmBuilder {
         self
     }
 
-    pub fn build(self) -> Result<LocalSwarm> {
+    pub fn build<R>(self, rng: R) -> Result<LocalSwarm>
+    where
+        R: ::rand::RngCore + ::rand::CryptoRng,
+    {
         let dir = if let Some(dir) = self.dir {
             if dir.exists() {
                 fs::remove_dir_all(&dir)?;
@@ -132,7 +135,7 @@ impl LocalSwarmBuilder {
         )
         .num_validators(self.number_of_validators)
         .template(self.template)
-        .build()?;
+        .build(rng)?;
 
         // Get the initial version to start the nodes with, either the one provided or fallback to
         // using the the latest version

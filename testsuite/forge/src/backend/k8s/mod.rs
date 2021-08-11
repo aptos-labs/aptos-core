@@ -3,6 +3,7 @@
 
 use crate::{Factory, Result, Swarm, Version};
 use anyhow::format_err;
+use rand::rngs::StdRng;
 use std::{env, fs::File, io::Read, num::NonZeroUsize, path::PathBuf};
 use tokio::runtime::Runtime;
 
@@ -73,7 +74,12 @@ impl Factory for K8sFactory {
         )))
     }
 
-    fn launch_swarm(&self, _node_num: NonZeroUsize, _version: &Version) -> Result<Box<dyn Swarm>> {
+    fn launch_swarm(
+        &self,
+        _rng: &mut StdRng,
+        _node_num: NonZeroUsize,
+        _version: &Version,
+    ) -> Result<Box<dyn Swarm>> {
         let rt = Runtime::new().unwrap();
         let swarm = rt
             .block_on(K8sSwarm::new(
