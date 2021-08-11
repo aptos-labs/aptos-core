@@ -92,7 +92,10 @@ pub fn start(config: &NodeConfig, log_file: Option<PathBuf>) {
     }
 }
 
-pub fn load_test_environment(config_path: Option<PathBuf>, random_ports: bool) {
+pub fn load_test_environment<R>(config_path: Option<PathBuf>, random_ports: bool, rng: R)
+where
+    R: ::rand::RngCore + ::rand::CryptoRng,
+{
     // Either allocate a temppath or reuse the passed in path and make sure the directory exists
     let config_temp_path = diem_temppath::TempPath::new();
     let config_path = config_path.unwrap_or_else(|| config_temp_path.as_ref().to_path_buf());
@@ -114,7 +117,8 @@ pub fn load_test_environment(config_path: Option<PathBuf>, random_ports: bool) {
     .template(template)
     .randomize_first_validator_ports(random_ports);
     let test_config =
-        diem_genesis_tool::swarm_config::SwarmConfig::build(&builder, &config_path).unwrap();
+        diem_genesis_tool::swarm_config::SwarmConfig::build_with_rng(&builder, &config_path, rng)
+            .unwrap();
 
     // Prepare log file since we cannot automatically route logs to stderr
     let mut log_file = config_path.clone();

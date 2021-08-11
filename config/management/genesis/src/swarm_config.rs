@@ -16,7 +16,9 @@ use std::{
 
 pub trait BuildSwarm {
     /// Generate the configs for a swarm
-    fn build_swarm(&self) -> Result<(Vec<NodeConfig>, Ed25519PrivateKey)>;
+    fn build_swarm<R>(&self, rng: R) -> Result<(Vec<NodeConfig>, Ed25519PrivateKey)>
+    where
+        R: ::rand::RngCore + ::rand::CryptoRng;
 }
 
 pub struct SwarmConfig {
@@ -27,8 +29,12 @@ pub struct SwarmConfig {
 }
 
 impl SwarmConfig {
-    pub fn build<T: BuildSwarm>(config_builder: &T, output_dir: &Path) -> Result<Self> {
-        let (mut configs, diem_root_key) = config_builder.build_swarm()?;
+    pub fn build_with_rng<T, R>(config_builder: &T, output_dir: &Path, rng: R) -> Result<Self>
+    where
+        T: BuildSwarm,
+        R: ::rand::RngCore + ::rand::CryptoRng,
+    {
+        let (mut configs, diem_root_key) = config_builder.build_swarm(rng)?;
         let mut config_files = vec![];
 
         for (index, config) in configs.iter_mut().enumerate() {
@@ -60,11 +66,18 @@ impl SwarmConfig {
             waypoint: configs[0].base.waypoint.waypoint(),
         })
     }
+
+    pub fn build<T: BuildSwarm>(config_builder: &T, output_dir: &Path) -> Result<Self> {
+        Self::build_with_rng(config_builder, output_dir, rand::rngs::OsRng)
+    }
 }
 
 impl BuildSwarm for ValidatorBuilder {
-    fn build_swarm(&self) -> Result<(Vec<NodeConfig>, Ed25519PrivateKey)> {
-        let (root_keys, validators) = self.clone().build(rand::rngs::OsRng)?;
+    fn build_swarm<R>(&self, rng: R) -> Result<(Vec<NodeConfig>, Ed25519PrivateKey)>
+    where
+        R: ::rand::RngCore + ::rand::CryptoRng,
+    {
+        let (root_keys, validators) = self.clone().build(rng)?;
 
         Ok((
             validators.into_iter().map(|v| v.config).collect(),

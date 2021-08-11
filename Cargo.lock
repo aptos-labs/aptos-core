@@ -2212,6 +2212,7 @@ dependencies = [
  "futures",
  "jemallocator",
  "network-builder",
+ "rand 0.8.3",
  "state-sync",
  "storage-client",
  "storage-interface",

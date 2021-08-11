@@ -108,7 +108,10 @@ impl FullnodeBuilder {
 }
 
 impl BuildSwarm for FullnodeBuilder {
-    fn build_swarm(&self) -> anyhow::Result<(Vec<NodeConfig>, Ed25519PrivateKey)> {
+    fn build_swarm<R>(&self, _rng: R) -> anyhow::Result<(Vec<NodeConfig>, Ed25519PrivateKey)>
+    where
+        R: ::rand::RngCore + ::rand::CryptoRng,
+    {
         let configs = match self.build_type {
             FullnodeType::ValidatorFullnode => self.build_vfn(),
             FullnodeType::PublicFullnode(num_nodes) => self.build_public_fn(num_nodes),
@@ -126,7 +129,7 @@ pub fn test_config() -> (NodeConfig, Ed25519PrivateKey) {
         diem_framework_releases::current_module_blobs().to_vec(),
     )
     .template(NodeConfig::default_for_validator());
-    let (mut configs, key) = builder.build_swarm().unwrap();
+    let (mut configs, key) = builder.build_swarm(rand::rngs::OsRng).unwrap();
 
     let mut config = configs.swap_remove(0);
     config.set_data_dir(path.path().to_path_buf());

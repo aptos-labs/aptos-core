@@ -13,6 +13,7 @@ edition = "2018"
 fail = "0.4.0"
 futures = "0.3.12"
 jemallocator = { version = "0.3.2", features = ["profiling", "unprefixed_malloc_on_supported_platforms"] }
+rand = "0.8.3"
 structopt = "0.3.21"
 tokio = { version = "1.8.1", features = ["full"] }
 tokio-stream = "0.1.4"
