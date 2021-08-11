@@ -236,59 +236,8 @@ pub struct ViewCommand {
     pub resource: (ModuleId, Identifier, Vec<TypeTag>),
 }
 
-#[macro_export]
-macro_rules! define_commands {
-    ($command:ident
-        $(, init: $exinit:ident)?
-        $(, publish: $expub:ident)?
-        $(, run: $exrun:ident)?
-        $(, subcommands: $subcommand:ident)?
-    ) => {
-        #[allow(unused_imports)]
-        use structopt::*;
-        #[derive(Debug, StructOpt)]
-        #[structopt(
-            name = "task",
-            about = "Transactional task commands",
-            rename_all = "kebab-case"
-        )]
-        pub enum $command {
-            #[structopt(name = "init")]
-            Init {
-                #[structopt(flatten)]
-                command: $crate::tasks::InitCommand
-                $(, #[structopt(flatten)] extra_args: $exinit)?
-            },
-
-            #[structopt(name = "publish")]
-            Publish {
-                #[structopt(flatten)]
-                command: $crate::tasks::PublishCommand
-                $(, #[structopt(flatten)] extra_args: $expub)?
-            },
-
-            #[structopt(name = "run")]
-            Run {
-                #[structopt(flatten)]
-                command: $crate::tasks::RunCommand
-                $(, #[structopt(flatten)] extra_args: $exrun)?
-            },
-
-            #[structopt(name = "view")]
-            View {
-                #[structopt(flatten)]
-                command: $crate::tasks::ViewCommand,
-            },
-
-            $(
-                #[structopt(flatten)]
-                Subcommand($subcommand),
-            )?
-        }
-    }
-}
-
-pub enum KnownCommandFormat<ExtraInitArgs, ExtraPublishArgs, ExtraRunArgs, SubCommands> {
+#[derive(Debug)]
+pub enum TaskCommand<ExtraInitArgs, ExtraPublishArgs, ExtraRunArgs, SubCommands> {
     Init(InitCommand, ExtraInitArgs),
     Publish(PublishCommand, ExtraPublishArgs),
     Run(RunCommand, ExtraRunArgs),
@@ -296,8 +245,76 @@ pub enum KnownCommandFormat<ExtraInitArgs, ExtraPublishArgs, ExtraRunArgs, SubCo
     Subcommand(SubCommands),
 }
 
+// Note: this needs to be manually implemented because structopt cannot handle generic tuples
+// with more than 1 element currently.
+//
+// The code is a simplified version of what `#[derive(StructOpt)` would generate had it worked.
+// (`cargo expand` is useful in printing out the derived code.)
+//
+// We are aware that it is discouraged to use `StructOptInternal` as a public API:
+//   https://github.com/TeXitoi/structopt/blob/7ad03a023534c63136836ddfd1710c75e6dcdaa9/src/lib.rs#L1172
+//   https://github.com/TeXitoi/structopt/issues/317
+//
+// It should be fine in this particular case since `#[struct_opt(flatten)]` relies on
+// `StructOptInternal::augment_clap` to work. In case structopt decides to change this API in
+// a backward-incompatible way, they'll still need to offer the ability to extract arguments
+// from an `App` in one way or another, or otherwise `#[struct_opt(flatten)`, which is a public
+// API, will get broken.
+impl<ExtraInitArgs, ExtraPublishArgs, ExtraRunArgs, SubCommands> StructOpt
+    for TaskCommand<ExtraInitArgs, ExtraPublishArgs, ExtraRunArgs, SubCommands>
+where
+    ExtraInitArgs: StructOptInternal,
+    ExtraPublishArgs: StructOptInternal,
+    ExtraRunArgs: StructOptInternal,
+    SubCommands: StructOptInternal,
+{
+    fn clap<'a, 'b>() -> clap::App<'a, 'b> {
+        let app = clap::App::new("Task Command");
+
+        let app = app.subcommand({
+            let subcommand = InitCommand::clap().name("init");
+            ExtraInitArgs::augment_clap(subcommand)
+        });
+
+        let app = app.subcommand({
+            let subcommand = PublishCommand::clap().name("publish");
+            ExtraPublishArgs::augment_clap(subcommand)
+        });
+
+        let app = app.subcommand({
+            let subcommand = RunCommand::clap().name("run");
+            ExtraRunArgs::augment_clap(subcommand)
+        });
+
+        let app = app.subcommand(ViewCommand::clap().name("view"));
+
+        app
+    }
+
+    fn from_clap(matches: &clap::ArgMatches<'_>) -> Self {
+        match matches.subcommand() {
+            ("init", Some(matches)) => {
+                TaskCommand::Init(StructOpt::from_clap(matches), StructOpt::from_clap(matches))
+            }
+            ("publish", Some(matches)) => {
+                TaskCommand::Publish(StructOpt::from_clap(matches), StructOpt::from_clap(matches))
+            }
+            ("run", Some(matches)) => {
+                TaskCommand::Run(StructOpt::from_clap(matches), StructOpt::from_clap(matches))
+            }
+            ("view", Some(matches)) => TaskCommand::View(StructOpt::from_clap(matches)),
+            _ => {
+                panic!(
+                    "Failed to construct command from structopt matches. \
+                        There is likely something wrong with your clap::App definition."
+                )
+            }
+        }
+    }
+}
+
 #[derive(Debug, StructOpt)]
-pub enum EmptyCommand {}
+pub struct EmptyCommand {}
 
 fn parse_account_address(s: &str) -> Result<AccountAddress> {
     let n = move_lang::shared::parse_u128(s)

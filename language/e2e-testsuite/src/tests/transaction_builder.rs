@@ -9,6 +9,7 @@
 #![forbid(unsafe_code)]
 
 use diem_crypto::{ed25519::Ed25519PrivateKey, traits::SigningKey, PrivateKey, Uniform};
+use diem_keygen::KeyGen;
 use diem_transaction_builder::stdlib::*;
 use diem_types::{
     account_address::AccountAddress,
@@ -24,9 +25,7 @@ use language_e2e_tests::{
     common_transactions::rotate_key_txn,
     currencies, current_function_name,
     executor::FakeExecutor,
-    gas_costs,
-    keygen::KeyGen,
-    test_with_different_versions,
+    gas_costs, test_with_different_versions,
     versioning::CURRENT_RELEASE_VERSIONS,
 };
 use move_core_types::language_storage::TypeTag;

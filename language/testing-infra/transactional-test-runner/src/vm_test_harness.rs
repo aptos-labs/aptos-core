@@ -4,9 +4,8 @@
 use std::{collections::BTreeMap, path::Path};
 
 use crate::{
-    define_commands,
     framework::{run_test_impl, CompiledState, MoveTestAdapter},
-    tasks::{InitCommand, KnownCommandFormat, SyntaxChoice, TaskInput},
+    tasks::{EmptyCommand, InitCommand, SyntaxChoice, TaskInput},
 };
 use anyhow::*;
 use move_binary_format::{
@@ -19,7 +18,7 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::IdentStr,
     language_storage::{ModuleId, StructTag, TypeTag},
-    resolver::ResourceResolver,
+    resolver::MoveResolver,
     transaction_argument::{convert_txn_args, TransactionArgument},
 };
 use move_lang::{
@@ -35,8 +34,6 @@ use move_vm_types::gas_schedule::GasStatus;
 use once_cell::sync::Lazy;
 use resource_viewer::MoveValueAnnotator;
 
-define_commands!(TaskCommand);
-
 const STD_ADDR: AccountAddress =
     AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]);
 
@@ -46,11 +43,33 @@ struct SimpleVMTestAdapter<'a> {
     default_syntax: SyntaxChoice,
 }
 
+pub fn view_resource_in_move_storage(
+    storage: &impl MoveResolver,
+    address: AccountAddress,
+    module: &ModuleId,
+    resource: &IdentStr,
+    type_args: Vec<TypeTag>,
+) -> Result<String> {
+    let tag = StructTag {
+        address: *module.address(),
+        module: module.name().to_owned(),
+        name: resource.to_owned(),
+        type_params: type_args,
+    };
+    match storage.get_resource(&address, &tag).unwrap() {
+        None => Ok("[No Resource Exists]".to_owned()),
+        Some(data) => {
+            let annotated = MoveValueAnnotator::new(storage).view_resource(&tag, &data)?;
+            Ok(format!("{}", annotated))
+        }
+    }
+}
+
 impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
-    type ExtraInitArgs = ();
-    type ExtraPublishArgs = ();
-    type ExtraRunArgs = ();
-    type Subcommand = ();
+    type ExtraInitArgs = EmptyCommand;
+    type ExtraPublishArgs = EmptyCommand;
+    type ExtraRunArgs = EmptyCommand;
+    type Subcommand = EmptyCommand;
 
     fn compiled_state(&mut self) -> &mut CompiledState<'a> {
         &mut self.compiled_state
@@ -63,10 +82,10 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
     fn init(
         default_syntax: SyntaxChoice,
         pre_compiled_deps: Option<&'a FullyCompiledProgram>,
-        task_opt: Option<TaskInput<(InitCommand, ())>>,
+        task_opt: Option<TaskInput<(InitCommand, EmptyCommand)>>,
     ) -> Self {
         let additional_mapping = match task_opt.map(|t| t.command) {
-            Some((InitCommand { named_addresses }, ())) => {
+            Some((InitCommand { named_addresses }, _)) => {
                 verify_and_create_named_address_mapping(named_addresses).unwrap()
             }
             None => BTreeMap::new(),
@@ -191,20 +210,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         resource: &IdentStr,
         type_args: Vec<TypeTag>,
     ) -> Result<String> {
-        let tag = StructTag {
-            address: *module.address(),
-            module: module.name().to_owned(),
-            name: resource.to_owned(),
-            type_params: type_args,
-        };
-        match self.storage.get_resource(&address, &tag).unwrap() {
-            None => Ok("[No Resource Exists]".to_owned()),
-            Some(data) => {
-                let annotated =
-                    MoveValueAnnotator::new(&self.storage).view_resource(&tag, &data)?;
-                Ok(format!("{}", annotated))
-            }
-        }
+        view_resource_in_move_storage(&self.storage, address, module, resource, type_args)
     }
 
     fn handle_subcommand(&mut self, _: TaskInput<Self::Subcommand>) -> Result<Option<String>> {
@@ -302,10 +308,5 @@ static MOVE_STDLIB_COMPILED: Lazy<Vec<CompiledModule>> = Lazy::new(|| {
 });
 
 pub fn run_test(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    run_test_impl::<_, SimpleVMTestAdapter, _>(path, Some(&*PRECOMPILED_MOVE_STDLIB), |c| match c {
-        TaskCommand::Init { command } => KnownCommandFormat::Init(command, ()),
-        TaskCommand::Publish { command } => KnownCommandFormat::Publish(command, ()),
-        TaskCommand::Run { command } => KnownCommandFormat::Run(command, ()),
-        TaskCommand::View { command } => KnownCommandFormat::View(command),
-    })
+    run_test_impl::<SimpleVMTestAdapter>(path, Some(&*PRECOMPILED_MOVE_STDLIB))
 }

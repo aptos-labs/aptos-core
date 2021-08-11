@@ -29,6 +29,7 @@ vm-genesis = { path = "../../tools/vm-genesis" }
 diem-vm = { path = "../../diem-vm" }
 proptest = "1.0.0"
 proptest-derive = "0.3.0"
+diem-keygen = { path = "../../diem-tools/diem-keygen" }
 diem-proptest-helpers = { path = "../../../common/proptest-helpers" }
 diem-config = { path = "../../../config" }
 diem-framework-releases = { path = "../../diem-framework/releases" }

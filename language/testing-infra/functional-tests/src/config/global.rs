@@ -6,11 +6,9 @@
 
 use crate::{errors::*, genesis_accounts::make_genesis_accounts};
 use diem_crypto::PrivateKey;
+use diem_keygen::KeyGen;
 use diem_types::account_config;
-use language_e2e_tests::{
-    account::{Account, AccountData, AccountRoleSpecifier},
-    keygen::KeyGen,
-};
+use language_e2e_tests::account::{Account, AccountData, AccountRoleSpecifier};
 use move_core_types::identifier::Identifier;
 use once_cell::sync::Lazy;
 use std::{

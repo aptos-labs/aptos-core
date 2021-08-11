@@ -4,7 +4,7 @@
 #![forbid(unsafe_code)]
 
 use crate::tasks::{
-    taskify, InitCommand, KnownCommandFormat, PublishCommand, RunCommand, SyntaxChoice, TaskInput,
+    taskify, InitCommand, PublishCommand, RunCommand, SyntaxChoice, TaskCommand, TaskInput,
     ViewCommand,
 };
 use anyhow::*;
@@ -102,7 +102,7 @@ pub trait MoveTestAdapter<'a> {
     fn handle_command(
         &mut self,
         task: TaskInput<
-            KnownCommandFormat<
+            TaskCommand<
                 Self::ExtraInitArgs,
                 Self::ExtraPublishArgs,
                 Self::ExtraRunArgs,
@@ -120,10 +120,10 @@ pub trait MoveTestAdapter<'a> {
             data,
         } = task;
         match command {
-            KnownCommandFormat::Init { .. } => {
+            TaskCommand::Init { .. } => {
                 panic!("The 'init' command is optional. But if used, it must be the first command")
             }
-            KnownCommandFormat::Publish(
+            TaskCommand::Publish(
                 PublishCommand {
                     gas_budget,
                     syntax,
@@ -180,7 +180,7 @@ pub trait MoveTestAdapter<'a> {
                 self.publish_module(module, gas_budget, extra_args)?;
                 Ok(warnings_opt)
             }
-            KnownCommandFormat::Run(
+            TaskCommand::Run(
                 RunCommand {
                     signers,
                     args,
@@ -222,7 +222,7 @@ pub trait MoveTestAdapter<'a> {
                 self.execute_script(script, type_args, signers, args, gas_budget, extra_args)?;
                 Ok(warning_opt)
             }
-            KnownCommandFormat::Run(
+            TaskCommand::Run(
                 RunCommand {
                     signers,
                     args,
@@ -248,7 +248,7 @@ pub trait MoveTestAdapter<'a> {
                 )?;
                 Ok(None)
             }
-            KnownCommandFormat::View(ViewCommand {
+            TaskCommand::View(ViewCommand {
                 address,
                 resource: (module, name, type_arguments),
             }) => Ok(Some(self.view_data(
@@ -257,7 +257,7 @@ pub trait MoveTestAdapter<'a> {
                 name.as_ident_str(),
                 type_arguments,
             )?)),
-            KnownCommandFormat::Subcommand(c) => self.handle_subcommand(TaskInput {
+            TaskCommand::Subcommand(c) => self.handle_subcommand(TaskInput {
                 command: c,
                 name,
                 number,
@@ -413,22 +413,16 @@ fn compile_ir_script<'a>(
     Ok(script)
 }
 
-pub fn run_test_impl<'a, Command, Adapter, FIntoKnown>(
+pub fn run_test_impl<'a, Adapter>(
     path: &Path,
     fully_compiled_program_opt: Option<&'a FullyCompiledProgram>,
-    view_command: FIntoKnown,
 ) -> Result<(), Box<dyn std::error::Error>>
 where
-    Command: Debug + StructOpt,
     Adapter: MoveTestAdapter<'a>,
-    FIntoKnown: Fn(
-        Command,
-    ) -> KnownCommandFormat<
-        Adapter::ExtraInitArgs,
-        Adapter::ExtraPublishArgs,
-        Adapter::ExtraRunArgs,
-        Adapter::Subcommand,
-    >,
+    Adapter::ExtraInitArgs: StructOptInternal + Debug,
+    Adapter::ExtraPublishArgs: StructOptInternal + Debug,
+    Adapter::ExtraRunArgs: StructOptInternal + Debug,
+    Adapter::Subcommand: StructOptInternal + Debug,
 {
     let extension = path.extension().unwrap().to_str().unwrap();
     let default_syntax = if extension == MOVE_IR_EXTENSION {
@@ -438,11 +432,17 @@ where
         SyntaxChoice::Source
     };
     let mut output = String::new();
-    let mut tasks = taskify::<Command>(path)
-        .unwrap()
-        .into_iter()
-        .map(|t| t.map(&view_command))
-        .collect::<VecDeque<_>>();
+    let mut tasks = taskify::<
+        TaskCommand<
+            Adapter::ExtraInitArgs,
+            Adapter::ExtraPublishArgs,
+            Adapter::ExtraRunArgs,
+            Adapter::Subcommand,
+        >,
+    >(path)
+    .unwrap()
+    .into_iter()
+    .collect::<VecDeque<_>>();
     assert!(!tasks.is_empty());
     let num_tasks = tasks.len();
     output.push_str(&format!(
@@ -453,8 +453,8 @@ where
 
     let first_task = tasks.pop_front().unwrap();
     let init_opt = match &first_task.command {
-        KnownCommandFormat::Init(_, _) => Some(first_task.map(|known| match known {
-            KnownCommandFormat::Init(command, extra_args) => (command, extra_args),
+        TaskCommand::Init(_, _) => Some(first_task.map(|known| match known {
+            TaskCommand::Init(command, extra_args) => (command, extra_args),
             _ => unreachable!(),
         })),
         _ => {
@@ -474,7 +474,7 @@ fn handle_known_task<'a, Adapter: MoveTestAdapter<'a>>(
     output: &mut String,
     adapter: &mut Adapter,
     task: TaskInput<
-        KnownCommandFormat<
+        TaskCommand<
             Adapter::ExtraInitArgs,
             Adapter::ExtraPublishArgs,
             Adapter::ExtraRunArgs,

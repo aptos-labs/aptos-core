@@ -8,6 +8,7 @@ use diem_crypto::{
     PrivateKey, SigningKey, Uniform,
 };
 use diem_framework_releases::legacy::transaction_scripts::LegacyStdlibScript;
+use diem_keygen::KeyGen;
 use diem_transaction_builder::{
     stdlib as transaction_builder, stdlib::encode_peer_to_peer_with_metadata_script,
 };
@@ -33,9 +34,7 @@ use language_e2e_tests::{
     compile::compile_module_with_address,
     current_function_name,
     executor::FakeExecutor,
-    gas_costs,
-    keygen::KeyGen,
-    test_with_different_versions, transaction_status_eq,
+    gas_costs, test_with_different_versions, transaction_status_eq,
     versioning::CURRENT_RELEASE_VERSIONS,
 };
 use move_binary_format::file_format::CompiledModule;

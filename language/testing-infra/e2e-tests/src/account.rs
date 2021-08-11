@@ -3,9 +3,10 @@
 
 //! Test infrastructure for modeling Diem accounts.
 
-use crate::{gas_costs, keygen::KeyGen};
+use crate::gas_costs;
 use anyhow::{Error, Result};
 use diem_crypto::ed25519::*;
+use diem_keygen::KeyGen;
 use diem_types::{
     access_path::AccessPath,
     account_address::AccountAddress,

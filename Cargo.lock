@@ -2051,6 +2051,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "diem-keygen"
+version = "0.1.0"
+dependencies = [
+ "diem-crypto",
+ "diem-types",
+ "diem-workspace-hack",
+ "hex",
+ "rand 0.8.3",
+ "sha3",
+]
+
+[[package]]
 name = "diem-log-derive"
 version = "0.1.0"
 dependencies = [
@@ -2510,6 +2522,30 @@ dependencies = [
  "move-vm-types",
  "structopt 0.3.21",
  "vm-genesis",
+]
+
+[[package]]
+name = "diem-transactional-test-harness"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bcs",
+ "datatest-stable",
+ "diem-crypto",
+ "diem-framework",
+ "diem-state-view",
+ "diem-types",
+ "diem-vm",
+ "diem-workspace-hack",
+ "either",
+ "language-e2e-tests",
+ "move-binary-format",
+ "move-command-line-common",
+ "move-core-types",
+ "move-lang",
+ "move-transactional-test-runner",
+ "once_cell",
+ "structopt 0.3.21",
 ]
 
 [[package]]
@@ -3351,6 +3387,7 @@ dependencies = [
  "diem-crypto",
  "diem-framework",
  "diem-framework-releases",
+ "diem-keygen",
  "diem-state-view",
  "diem-types",
  "diem-vm",
@@ -4348,6 +4385,7 @@ dependencies = [
  "diem-config",
  "diem-crypto",
  "diem-framework-releases",
+ "diem-keygen",
  "diem-proptest-helpers",
  "diem-state-view",
  "diem-transaction-builder",
@@ -4379,6 +4417,7 @@ dependencies = [
  "compiler",
  "diem-crypto",
  "diem-framework-releases",
+ "diem-keygen",
  "diem-logger",
  "diem-state-view",
  "diem-transaction-builder",

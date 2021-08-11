@@ -6,6 +6,7 @@ use diem_crypto::{
     multi_ed25519::{MultiEd25519PublicKey, MultiEd25519Signature},
     PrivateKey, SigningKey, Uniform,
 };
+use diem_keygen::KeyGen;
 use diem_types::{
     transaction::{authenticator::AuthenticationKey, SignedTransaction, TransactionStatus},
     vm_status::{KeptVMStatus, StatusCode},
@@ -13,7 +14,6 @@ use diem_types::{
 use language_e2e_tests::{
     account,
     common_transactions::{raw_rotate_key_txn, rotate_key_txn},
-    keygen::KeyGen,
     test_with_different_versions,
     versioning::CURRENT_RELEASE_VERSIONS,
 };
