@@ -26,6 +26,9 @@ pub struct MutationTester {}
 pub struct MutationManager {
     pub mutated: bool,
     pub add_sub: usize,
+    pub sub_add: usize,
+    pub mul_div: usize,
+    pub div_mul: usize,
 }
 
 impl MutationTester {
@@ -34,18 +37,48 @@ impl MutationTester {
     }
 }
 
+fn mutate_arith(
+    call: Bytecode,
+    mutation_value: usize,
+    global_env: &GlobalEnv,
+    mutation_manager: MutationManager,
+    bc: Bytecode,
+) -> Bytecode {
+    if mutation_value > 1 {
+        global_env.set_extension(MutationManager {
+            mutated: mutation_manager.mutated,
+            add_sub: mutation_manager.add_sub,
+            sub_add: mutation_manager.sub_add,
+            mul_div: mutation_manager.mul_div,
+            div_mul: mutation_manager.div_mul,
+        });
+    }
+    if mutation_value == 1 {
+        global_env.set_extension(MutationManager {
+            mutated: true,
+            add_sub: mutation_manager.add_sub,
+            sub_add: mutation_manager.sub_add,
+            mul_div: mutation_manager.mul_div,
+            div_mul: mutation_manager.div_mul,
+        });
+        call
+    } else {
+        bc
+    }
+}
+
 impl FunctionTargetProcessor for MutationTester {
     fn initialize(&self, global_env: &GlobalEnv, _targets: &mut FunctionTargetsHolder) {
         let options = ProverOptions::get(global_env);
         let m = global_env.get_extension::<MutationManager>();
         match m {
-            Some(x) => global_env.set_extension(MutationManager {
-                mutated: x.mutated,
-                add_sub: x.add_sub,
-            }),
+            Some(x) => global_env.set_extension(MutationManager { ..*x }),
             None => global_env.set_extension(MutationManager {
                 mutated: false,
                 add_sub: options.mutation_add_sub,
+                sub_add: options.mutation_sub_add,
+                mul_div: options.mutation_mul_div,
+                div_mul: options.mutation_div_mul,
             }),
         };
     }
@@ -78,28 +111,88 @@ impl FunctionTargetProcessor for MutationTester {
         for bc in code {
             match bc {
                 Call(ref attrid, ref indices, Operation::Add, ref srcs, ref dests) => {
+                    let call = Call(
+                        *attrid,
+                        (*indices).clone(),
+                        Operation::Sub,
+                        (*srcs).clone(),
+                        (*dests).clone(),
+                    );
                     let mv = m.add_sub;
-                    if mv == 1 {
-                        builder.emit(Call(
-                            *attrid,
-                            (*indices).clone(),
-                            Operation::Sub,
-                            (*srcs).clone(),
-                            (*dests).clone(),
-                        ));
-                        global_env.set_extension(MutationManager {
-                            mutated: true,
-                            add_sub: mv - 1,
-                        });
+                    let result: usize;
+                    if mv > 0 {
+                        result = mv - 1;
                     } else {
-                        builder.emit(bc);
+                        result = mv;
                     }
-                    if mv > 1 {
-                        global_env.set_extension(MutationManager {
-                            add_sub: mv - 1,
-                            mutated: m.mutated,
-                        });
+                    let mm = MutationManager {
+                        add_sub: result,
+                        ..*m
+                    };
+                    builder.emit(mutate_arith(call, mv, global_env, mm, bc));
+                }
+                Call(ref attrid, ref indices, Operation::Sub, ref srcs, ref dests) => {
+                    let call = Call(
+                        *attrid,
+                        (*indices).clone(),
+                        Operation::Add,
+                        (*srcs).clone(),
+                        (*dests).clone(),
+                    );
+                    let mv = m.sub_add;
+                    let result: usize;
+                    if mv > 0 {
+                        result = mv - 1;
+                    } else {
+                        result = mv;
                     }
+                    let mm = MutationManager {
+                        sub_add: result,
+                        ..*m
+                    };
+                    builder.emit(mutate_arith(call, mv, global_env, mm, bc));
+                }
+                Call(ref attrid, ref indices, Operation::Mul, ref srcs, ref dests) => {
+                    let call = Call(
+                        *attrid,
+                        (*indices).clone(),
+                        Operation::Div,
+                        (*srcs).clone(),
+                        (*dests).clone(),
+                    );
+                    let mv = m.mul_div;
+                    let result: usize;
+                    if mv > 0 {
+                        result = mv - 1;
+                    } else {
+                        result = mv;
+                    }
+                    let mm = MutationManager {
+                        mul_div: result,
+                        ..*m
+                    };
+                    builder.emit(mutate_arith(call, mv, global_env, mm, bc));
+                }
+                Call(ref attrid, ref indices, Operation::Div, ref srcs, ref dests) => {
+                    let call = Call(
+                        *attrid,
+                        (*indices).clone(),
+                        Operation::Mul,
+                        (*srcs).clone(),
+                        (*dests).clone(),
+                    );
+                    let mv = m.div_mul;
+                    let result: usize;
+                    if mv > 0 {
+                        result = mv - 1;
+                    } else {
+                        result = mv;
+                    }
+                    let mm = MutationManager {
+                        div_mul: result,
+                        ..*m
+                    };
+                    builder.emit(mutate_arith(call, mv, global_env, mm, bc));
                 }
                 _ => {
                     builder.emit(bc);

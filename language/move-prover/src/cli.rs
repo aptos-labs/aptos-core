@@ -347,6 +347,39 @@ impl Options {
                     ),
             )
             .arg(
+                Arg::with_name("mutation-sub-add")
+                    .long("mutation-sub-add")
+                    .takes_value(true)
+                    .value_name("COUNT")
+                    .validator(is_number)
+                    .help(
+                        "indicates that this program should mutate the indicated minus operation to a plus\
+                        specifically by modifyig the \"nth\" such operation",
+                    ),
+            )
+            .arg(
+                Arg::with_name("mutation-mul-div")
+                    .long("mutation-mul-div")
+                    .takes_value(true)
+                    .value_name("COUNT")
+                    .validator(is_number)
+                    .help(
+                        "indicates that this program should mutate the indicated multiplication operation to a divide\
+                        specifically by modifyig the \"nth\" such operation",
+                    ),
+            )
+            .arg(
+                Arg::with_name("mutation-div-mul")
+                    .long("mutation-div-mul")
+                    .takes_value(true)
+                    .value_name("COUNT")
+                    .validator(is_number)
+                    .help(
+                        "indicates that this program should mutate the indicated divide operation to a multiplication\
+                        specifically by modifyig the \"nth\" such operation",
+                    ),
+            )
+            .arg(
                 Arg::with_name("dependencies")
                     .long("dependency")
                     .short("d")
@@ -561,6 +594,24 @@ impl Options {
         if matches.is_present("mutation-add-sub") {
             options.prover.mutation_add_sub = matches
                 .value_of("mutation-add-sub")
+                .unwrap()
+                .parse::<usize>()?;
+        }
+        if matches.is_present("mutation-sub-add") {
+            options.prover.mutation_sub_add = matches
+                .value_of("mutation-sub-add")
+                .unwrap()
+                .parse::<usize>()?;
+        }
+        if matches.is_present("mutation-mul-div") {
+            options.prover.mutation_mul_div = matches
+                .value_of("mutation-mul-div")
+                .unwrap()
+                .parse::<usize>()?;
+        }
+        if matches.is_present("mutation-div-mul") {
+            options.prover.mutation_div_mul = matches
+                .value_of("mutation-div-mul")
                 .unwrap()
                 .parse::<usize>()?;
         }

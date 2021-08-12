@@ -53,6 +53,12 @@ pub struct ProverOptions {
     pub mutation: bool,
     /// Indicates that we should use the add-subtract mutation on the given block
     pub mutation_add_sub: usize,
+    /// Indicates that we should use the subtract-add mutation on the given block
+    pub mutation_sub_add: usize,
+    /// Indicates that we should use the multiply-divide mutation on the given block
+    pub mutation_mul_div: usize,
+    /// Indicates that we should use the divide-multiply mutation on the given block
+    pub mutation_div_mul: usize,
     /// Whether to assume a global invariant when the related memory
     /// is accessed, instead of on function entry. This is currently known to be slower
     /// if one than off, so off by default.
@@ -79,6 +85,8 @@ pub struct ProverOptions {
     pub for_interpretation: bool,
 }
 
+// add custom struct for mutation options
+
 impl Default for ProverOptions {
     fn default() -> Self {
         Self {
@@ -92,6 +100,9 @@ impl Default for ProverOptions {
             assume_wellformed_on_access: false,
             mutation: false,
             mutation_add_sub: 0,
+            mutation_sub_add: 0,
+            mutation_mul_div: 0,
+            mutation_div_mul: 0,
             deep_pack_unpack: false,
             auto_trace_level: AutoTraceLevel::Off,
             report_severity: Severity::Warning,

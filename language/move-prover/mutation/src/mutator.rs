@@ -10,7 +10,8 @@ use itertools::Itertools;
 use log::LevelFilter;
 use move_model::{
     model::{FunctionEnv, GlobalEnv, VerificationScope},
-    run_model_builder,
+    options::ModelBuilderOptions,
+    parse_addresses_from_options, run_model_builder_with_options,
 };
 use move_prover::{
     check_errors, cli::Options, create_and_process_bytecode, generate_boogie, verify_boogie,
@@ -34,6 +35,16 @@ pub fn mutate(args: &[String]) {
         .version("0.1.0")
         .about("Mutation tool for the move prover")
         .author("The Diem Core Contributors")
+        .arg(
+            Arg::with_name("addresses")
+                .long("address")
+                .short("a")
+                .multiple(true)
+                .number_of_values(1)
+                .takes_value(true)
+                .value_name("ADDRESS")
+                .help("Address specified for the move prover"),
+        )
         .arg(
             Arg::with_name("config")
                 .short("c")
@@ -75,6 +86,7 @@ pub fn mutate(args: &[String]) {
             _ => vec![],
         }
     };
+    let addresses = get_vec("addresses");
     let sources = get_vec("sources");
     let deps = get_vec("dependencies");
     let configs: Vec<Option<String>> = if matches.is_present("config") {
@@ -94,7 +106,7 @@ pub fn mutate(args: &[String]) {
         } else {
             (None, "mutation.data".to_string())
         };
-        if let Err(s) = apply_mutation(config.as_ref(), &sources, &deps) {
+        if let Err(s) = apply_mutation(config.as_ref(), &addresses, &sources, &deps) {
             println!("ERROR: execution failed: {}", s);
         } else {
             println!("results stored at `{}`", out);
@@ -104,11 +116,17 @@ pub fn mutate(args: &[String]) {
 
 fn apply_mutation(
     config_file_opt: Option<&String>,
+    addresses: &[String],
     modules: &[String],
     dep_dirs: &[String],
 ) -> anyhow::Result<()> {
     println!("building model");
-    let env = run_model_builder(modules, dep_dirs)?;
+    let env = run_model_builder_with_options(
+        modules,
+        dep_dirs,
+        ModelBuilderOptions::default(),
+        parse_addresses_from_options(addresses.to_owned())?,
+    )?;
     let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
     let mut options = if let Some(config_file) = config_file_opt {
         Options::create_from_toml_file(config_file)?
@@ -145,6 +163,63 @@ fn apply_mutation(
         env.set_extension(MutationManager {
             mutated: false,
             add_sub: i,
+            sub_add: 0,
+            mul_div: 0,
+            div_mul: 0,
+        });
+        mutation_applied = runner.mutate(&env)?;
+        if !mutation_applied {
+            println!("No mutations applied");
+        }
+    }
+    i = 0;
+    mutation_applied = true;
+    while mutation_applied {
+        i += 1;
+        println!("Applying sub-add mutation {}", i);
+        runner.options.prover.mutation_sub_add = i;
+        env.set_extension(MutationManager {
+            mutated: false,
+            add_sub: 0,
+            sub_add: i,
+            mul_div: 0,
+            div_mul: 0,
+        });
+        mutation_applied = runner.mutate(&env)?;
+        if !mutation_applied {
+            println!("No mutations applied");
+        }
+    }
+    i = 0;
+    mutation_applied = true;
+    while mutation_applied {
+        i += 1;
+        println!("Applying mul-div mutation {}", i);
+        runner.options.prover.mutation_mul_div = i;
+        env.set_extension(MutationManager {
+            mutated: false,
+            add_sub: 0,
+            sub_add: 0,
+            mul_div: i,
+            div_mul: 0,
+        });
+        mutation_applied = runner.mutate(&env)?;
+        if !mutation_applied {
+            println!("No mutations applied");
+        }
+    }
+    i = 0;
+    mutation_applied = true;
+    while mutation_applied {
+        i += 1;
+        println!("Applying div-mul mutation {}", i);
+        runner.options.prover.mutation_div_mul = i;
+        env.set_extension(MutationManager {
+            mutated: false,
+            add_sub: 0,
+            sub_add: 0,
+            mul_div: 0,
+            div_mul: i,
         });
         mutation_applied = runner.mutate(&env)?;
         if !mutation_applied {
