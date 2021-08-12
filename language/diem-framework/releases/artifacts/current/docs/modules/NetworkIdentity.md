@@ -7,8 +7,11 @@ Module managing Diemnet NetworkIdentity
 
 
 -  [Resource `NetworkIdentity`](#0x1_NetworkIdentity_NetworkIdentity)
+-  [Resource `NetworkIdentityEventHandle`](#0x1_NetworkIdentity_NetworkIdentityEventHandle)
 -  [Struct `NetworkIdentityChangeNotification`](#0x1_NetworkIdentity_NetworkIdentityChangeNotification)
 -  [Constants](#@Constants_0)
+-  [Function `initialize_network_identity_event_handle`](#0x1_NetworkIdentity_initialize_network_identity_event_handle)
+-  [Function `tc_network_identity_event_handle_exists`](#0x1_NetworkIdentity_tc_network_identity_event_handle_exists)
 -  [Function `initialize_network_identity`](#0x1_NetworkIdentity_initialize_network_identity)
 -  [Function `get`](#0x1_NetworkIdentity_get)
 -  [Function `add_identities`](#0x1_NetworkIdentity_add_identities)
@@ -20,6 +23,7 @@ Module managing Diemnet NetworkIdentity
 <pre><code><b>use</b> <a href="DiemTimestamp.md#0x1_DiemTimestamp">0x1::DiemTimestamp</a>;
 <b>use</b> <a href="../../../../../../move-stdlib/docs/Errors.md#0x1_Errors">0x1::Errors</a>;
 <b>use</b> <a href="../../../../../../move-stdlib/docs/Event.md#0x1_Event">0x1::Event</a>;
+<b>use</b> <a href="Roles.md#0x1_Roles">0x1::Roles</a>;
 <b>use</b> <a href="../../../../../../move-stdlib/docs/Signer.md#0x1_Signer">0x1::Signer</a>;
 <b>use</b> <a href="../../../../../../move-stdlib/docs/Vector.md#0x1_Vector">0x1::Vector</a>;
 </code></pre>
@@ -49,12 +53,6 @@ Holder for all <code><a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIde
 <dd>
 
 </dd>
-<dt>
-<code>identity_change_events: <a href="../../../../../../move-stdlib/docs/Event.md#0x1_Event_EventHandle">Event::EventHandle</a>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityChangeNotification">NetworkIdentity::NetworkIdentityChangeNotification</a>&gt;</code>
-</dt>
-<dd>
- Event handle for <code>identities</code> rotation events
-</dd>
 </dl>
 
 
@@ -68,6 +66,33 @@ Holder for all <code><a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIde
 <pre><code><b>include</b> <a href="NetworkIdentity.md#0x1_NetworkIdentity_UniqueMembers">UniqueMembers</a>&lt;vector&lt;u8&gt;&gt; {members: identities};
 </code></pre>
 
+
+
+</details>
+
+<a name="0x1_NetworkIdentity_NetworkIdentityEventHandle"></a>
+
+## Resource `NetworkIdentityEventHandle`
+
+
+
+<pre><code><b>struct</b> <a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityEventHandle">NetworkIdentityEventHandle</a> has key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>identity_change_events: <a href="../../../../../../move-stdlib/docs/Event.md#0x1_Event_EventHandle">Event::EventHandle</a>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityChangeNotification">NetworkIdentity::NetworkIdentityChangeNotification</a>&gt;</code>
+</dt>
+<dd>
+ Event handle for <code>identities</code> rotation events
+</dd>
+</dl>
 
 
 </details>
@@ -89,6 +114,12 @@ Message sent when there are updates to the <code><a href="NetworkIdentity.md#0x1
 
 
 <dl>
+<dt>
+<code>account: address</code>
+</dt>
+<dd>
+ The address of the account that changed identities
+</dd>
 <dt>
 <code>identities: vector&lt;vector&lt;u8&gt;&gt;</code>
 </dt>
@@ -117,6 +148,16 @@ Network ID doesn't exist when trying to get it
 
 
 <pre><code><b>const</b> <a href="NetworkIdentity.md#0x1_NetworkIdentity_ENETWORK_ID_DOESNT_EXIST">ENETWORK_ID_DOESNT_EXIST</a>: u64 = 0;
+</code></pre>
+
+
+
+<a name="0x1_NetworkIdentity_ENETWORK_ID_EVENT_HANDLE_INVALID"></a>
+
+Network identity event handle invalid
+
+
+<pre><code><b>const</b> <a href="NetworkIdentity.md#0x1_NetworkIdentity_ENETWORK_ID_EVENT_HANDLE_INVALID">ENETWORK_ID_EVENT_HANDLE_INVALID</a>: u64 = 3;
 </code></pre>
 
 
@@ -150,6 +191,65 @@ No identities provided for changes
 
 
 
+<a name="0x1_NetworkIdentity_initialize_network_identity_event_handle"></a>
+
+## Function `initialize_network_identity_event_handle`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="NetworkIdentity.md#0x1_NetworkIdentity_initialize_network_identity_event_handle">initialize_network_identity_event_handle</a>(tc_account: &signer)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="NetworkIdentity.md#0x1_NetworkIdentity_initialize_network_identity_event_handle">initialize_network_identity_event_handle</a>(tc_account: &signer) {
+    <a href="Roles.md#0x1_Roles_assert_treasury_compliance">Roles::assert_treasury_compliance</a>(tc_account);
+    <b>assert</b>(
+        !<b>exists</b>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityEventHandle">NetworkIdentityEventHandle</a>&gt;(<a href="../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(tc_account)),
+        <a href="../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_already_published">Errors::already_published</a>(<a href="NetworkIdentity.md#0x1_NetworkIdentity_ENETWORK_ID_EVENT_HANDLE_INVALID">ENETWORK_ID_EVENT_HANDLE_INVALID</a>)
+    );
+    <b>let</b> event_handle = <a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityEventHandle">NetworkIdentityEventHandle</a> {
+        identity_change_events: <a href="../../../../../../move-stdlib/docs/Event.md#0x1_Event_new_event_handle">Event::new_event_handle</a>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityChangeNotification">NetworkIdentityChangeNotification</a>&gt;(tc_account),
+    };
+    move_to(
+        tc_account,
+        event_handle,
+    );
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_NetworkIdentity_tc_network_identity_event_handle_exists"></a>
+
+## Function `tc_network_identity_event_handle_exists`
+
+
+
+<pre><code><b>fun</b> <a href="NetworkIdentity.md#0x1_NetworkIdentity_tc_network_identity_event_handle_exists">tc_network_identity_event_handle_exists</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="NetworkIdentity.md#0x1_NetworkIdentity_tc_network_identity_event_handle_exists">tc_network_identity_event_handle_exists</a>(): bool {
+    <b>exists</b>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityEventHandle">NetworkIdentityEventHandle</a>&gt;(@TreasuryCompliance)
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_NetworkIdentity_initialize_network_identity"></a>
 
 ## Function `initialize_network_identity`
@@ -168,8 +268,7 @@ Initialize <code><a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentit
 
 <pre><code><b>fun</b> <a href="NetworkIdentity.md#0x1_NetworkIdentity_initialize_network_identity">initialize_network_identity</a>(account: &signer) {
     <b>let</b> identities = <a href="../../../../../../move-stdlib/docs/Vector.md#0x1_Vector_empty">Vector::empty</a>&lt;vector&lt;u8&gt;&gt;();
-    <b>let</b> identity_change_events = <a href="../../../../../../move-stdlib/docs/Event.md#0x1_Event_new_event_handle">Event::new_event_handle</a>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityChangeNotification">NetworkIdentityChangeNotification</a>&gt;(account);
-    move_to(account, <a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a> { identities, identity_change_events });
+    move_to(account, <a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a> { identities });
 }
 </code></pre>
 
@@ -248,14 +347,16 @@ Update and create if not exist <code><a href="NetworkIdentity.md#0x1_NetworkIden
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="NetworkIdentity.md#0x1_NetworkIdentity_add_identities">add_identities</a>(account: &signer, to_add: vector&lt;vector&lt;u8&gt;&gt;) <b>acquires</b> <a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="NetworkIdentity.md#0x1_NetworkIdentity_add_identities">add_identities</a>(account: &signer, to_add: vector&lt;vector&lt;u8&gt;&gt;) <b>acquires</b> <a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a>, <a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityEventHandle">NetworkIdentityEventHandle</a> {
+    <b>assert</b>(<a href="NetworkIdentity.md#0x1_NetworkIdentity_tc_network_identity_event_handle_exists">tc_network_identity_event_handle_exists</a>(), <a href="../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="NetworkIdentity.md#0x1_NetworkIdentity_ENETWORK_ID_EVENT_HANDLE_INVALID">ENETWORK_ID_EVENT_HANDLE_INVALID</a>));
     <b>let</b> num_to_add = <a href="../../../../../../move-stdlib/docs/Vector.md#0x1_Vector_length">Vector::length</a>(&to_add);
     <b>assert</b>(num_to_add &gt; 0, <a href="../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="NetworkIdentity.md#0x1_NetworkIdentity_ENETWORK_ID_NO_INPUT">ENETWORK_ID_NO_INPUT</a>));
 
     <b>if</b> (!<b>exists</b>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a>&gt;(<a href="../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account))) {
         <a href="NetworkIdentity.md#0x1_NetworkIdentity_initialize_network_identity">initialize_network_identity</a>(account);
     };
-    <b>let</b> identity = borrow_global_mut&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a>&gt;(<a href="../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account));
+    <b>let</b> account_addr = <a href="../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
+    <b>let</b> identity = borrow_global_mut&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a>&gt;(account_addr);
     <b>let</b> identities = &<b>mut</b> identity.identities;
 
     <b>assert</b>(
@@ -265,10 +366,14 @@ Update and create if not exist <code><a href="NetworkIdentity.md#0x1_NetworkIden
 
     <b>let</b> has_change = <a href="NetworkIdentity.md#0x1_NetworkIdentity_add_members_internal">add_members_internal</a>(identities, &to_add);
     <b>if</b> (has_change) {
-        <a href="../../../../../../move-stdlib/docs/Event.md#0x1_Event_emit_event">Event::emit_event</a>(&<b>mut</b> identity.identity_change_events, <a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityChangeNotification">NetworkIdentityChangeNotification</a> {
-            identities: *&identity.identities,
-            time_rotated_seconds: <a href="DiemTimestamp.md#0x1_DiemTimestamp_now_seconds">DiemTimestamp::now_seconds</a>(),
-        });
+        <a href="../../../../../../move-stdlib/docs/Event.md#0x1_Event_emit_event">Event::emit_event</a>(
+            &<b>mut</b> borrow_global_mut&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityEventHandle">NetworkIdentityEventHandle</a>&gt;(@TreasuryCompliance).identity_change_events,
+            <a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityChangeNotification">NetworkIdentityChangeNotification</a> {
+                account: account_addr,
+                identities: *&identity.identities,
+                time_rotated_seconds: <a href="DiemTimestamp.md#0x1_DiemTimestamp_now_seconds">DiemTimestamp::now_seconds</a>(),
+            }
+        );
     }
 }
 </code></pre>
@@ -289,11 +394,13 @@ Update and create if not exist <code><a href="NetworkIdentity.md#0x1_NetworkIden
     vec()
 };
 <b>let</b> has_change = (<b>exists</b> e in to_add: !contains(prior_identities, e));
-<b>let</b> post handle = <b>global</b>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a>&gt;(account_addr).identity_change_events;
+<b>let</b> post handle = <b>global</b>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityEventHandle">NetworkIdentityEventHandle</a>&gt;(@TreasuryCompliance).identity_change_events;
 <b>let</b> post msg = <a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityChangeNotification">NetworkIdentityChangeNotification</a> {
+    account: account_addr,
     identities: <b>global</b>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a>&gt;(account_addr).identities,
     time_rotated_seconds: <a href="DiemTimestamp.md#0x1_DiemTimestamp_spec_now_seconds">DiemTimestamp::spec_now_seconds</a>(),
 };
+<b>aborts_if</b> !<a href="NetworkIdentity.md#0x1_NetworkIdentity_tc_network_identity_event_handle_exists">tc_network_identity_event_handle_exists</a>() <b>with</b> <a href="../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a>;
 <b>aborts_if</b> len(to_add) == 0 <b>with</b> <a href="../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>;
 <b>aborts_if</b> len(prior_identities) + len(to_add) &gt; MAX_U64;
 <b>aborts_if</b> len(prior_identities) + len(to_add) &gt; <a href="NetworkIdentity.md#0x1_NetworkIdentity_MAX_ADDR_IDENTITIES">MAX_ADDR_IDENTITIES</a> <b>with</b> <a href="../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_LIMIT_EXCEEDED">Errors::LIMIT_EXCEEDED</a>;
@@ -326,7 +433,8 @@ Remove <code><a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="NetworkIdentity.md#0x1_NetworkIdentity_remove_identities">remove_identities</a>(account: &signer, to_remove: vector&lt;vector&lt;u8&gt;&gt;) <b>acquires</b> <a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="NetworkIdentity.md#0x1_NetworkIdentity_remove_identities">remove_identities</a>(account: &signer, to_remove: vector&lt;vector&lt;u8&gt;&gt;) <b>acquires</b> <a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a>, <a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityEventHandle">NetworkIdentityEventHandle</a> {
+    <b>assert</b>(<a href="NetworkIdentity.md#0x1_NetworkIdentity_tc_network_identity_event_handle_exists">tc_network_identity_event_handle_exists</a>(), <a href="../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="NetworkIdentity.md#0x1_NetworkIdentity_ENETWORK_ID_EVENT_HANDLE_INVALID">ENETWORK_ID_EVENT_HANDLE_INVALID</a>));
     <b>let</b> num_to_remove = <a href="../../../../../../move-stdlib/docs/Vector.md#0x1_Vector_length">Vector::length</a>(&to_remove);
     <b>assert</b>(num_to_remove &gt; 0, <a href="../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="NetworkIdentity.md#0x1_NetworkIdentity_ENETWORK_ID_NO_INPUT">ENETWORK_ID_NO_INPUT</a>));
     <b>assert</b>(
@@ -345,10 +453,14 @@ Remove <code><a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a
 
     <b>let</b> has_change = <a href="NetworkIdentity.md#0x1_NetworkIdentity_remove_members_internal">remove_members_internal</a>(identities, &to_remove);
     <b>if</b> (has_change) {
-        <a href="../../../../../../move-stdlib/docs/Event.md#0x1_Event_emit_event">Event::emit_event</a>(&<b>mut</b> identity.identity_change_events, <a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityChangeNotification">NetworkIdentityChangeNotification</a> {
-            identities: *&identity.identities,
-            time_rotated_seconds: <a href="DiemTimestamp.md#0x1_DiemTimestamp_now_seconds">DiemTimestamp::now_seconds</a>(),
-        });
+        <a href="../../../../../../move-stdlib/docs/Event.md#0x1_Event_emit_event">Event::emit_event</a>(
+            &<b>mut</b> borrow_global_mut&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityEventHandle">NetworkIdentityEventHandle</a>&gt;(@TreasuryCompliance).identity_change_events,
+            <a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityChangeNotification">NetworkIdentityChangeNotification</a> {
+                account: account_addr,
+                identities: *&identity.identities,
+                time_rotated_seconds: <a href="DiemTimestamp.md#0x1_DiemTimestamp_now_seconds">DiemTimestamp::now_seconds</a>(),
+            }
+        );
     };
 }
 </code></pre>
@@ -365,11 +477,13 @@ Remove <code><a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a
 <pre><code><b>let</b> account_addr = <a href="../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account);
 <b>let</b> prior_identities = <b>global</b>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a>&gt;(account_addr).identities;
 <b>let</b> has_change = (<b>exists</b> e in to_remove: contains(prior_identities, e));
-<b>let</b> post handle = <b>global</b>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a>&gt;(account_addr).identity_change_events;
+<b>let</b> post handle = <b>global</b>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityEventHandle">NetworkIdentityEventHandle</a>&gt;(@TreasuryCompliance).identity_change_events;
 <b>let</b> post msg = <a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityChangeNotification">NetworkIdentityChangeNotification</a> {
+    account: account_addr,
     identities: <b>global</b>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a>&gt;(account_addr).identities,
     time_rotated_seconds: <a href="DiemTimestamp.md#0x1_DiemTimestamp_spec_now_seconds">DiemTimestamp::spec_now_seconds</a>(),
 };
+<b>aborts_if</b> !<a href="NetworkIdentity.md#0x1_NetworkIdentity_tc_network_identity_event_handle_exists">tc_network_identity_event_handle_exists</a>() <b>with</b> <a href="../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a>;
 <b>aborts_if</b> len(to_remove) == 0 <b>with</b> <a href="../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>;
 <b>aborts_if</b> len(to_remove) &gt; <a href="NetworkIdentity.md#0x1_NetworkIdentity_MAX_ADDR_IDENTITIES">MAX_ADDR_IDENTITIES</a> <b>with</b> <a href="../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_LIMIT_EXCEEDED">Errors::LIMIT_EXCEEDED</a>;
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a>&gt;(account_addr) <b>with</b> <a href="../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a>;

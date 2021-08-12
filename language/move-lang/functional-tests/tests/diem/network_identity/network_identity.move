@@ -18,6 +18,20 @@ script {
 //! new-transaction
 //! sender: blessed
 script{
+    use DiemFramework::NetworkIdentity;
+
+    fun main(tc_account: signer) {
+        let tc_account = &tc_account;
+
+        // Initialize event handle
+        NetworkIdentity::initialize_network_identity_event_handle(tc_account);
+    }
+}
+// check: "Keep(EXECUTED)"
+
+//! new-transaction
+//! sender: blessed
+script{
     use DiemFramework::DiemAccount;
     use DiemFramework::NetworkIdentity;
     use Std::Signer;
