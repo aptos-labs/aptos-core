@@ -51,33 +51,8 @@ jobs:
         with:
           pattern: '.github/workflows/ci-post-land.yml\|.github/actions/dockerhub_login/action.yml\|docker/ci/github/Dockerfile\|scripts/dev_setup.sh\|rust-toolchain'
 
-  update-sccache-osx:
-    needs: prepare
-    runs-on: macos-11
-    environment:
-      name: Sccache
-    if: ${{ needs.prepare.outputs.rust-changes == 'true' }}
-    steps:
-      - uses: actions/checkout@v2.3.4
-        with:
-          # This ensures that the tip of the PR is checked out instead of the merge between the base ref and the tip
-          # On `push` this value will be empty and will "do-the-right-thing"
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0 #get all the history!!!
-      - uses: ./.github/actions/build-setup
-      - uses: actions/cache@v2.1.6
-        with:
-          path: "/opt/cargo/git\n/opt/cargo/registry\n/opt/cargo/.package-cache"
-          key: crates-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
-          restore-keys: "crates-${{ runner.os }}"
-      - name: build all unit test code.
-        run: |
-          $pre_command && cargo x test --no-run --jobs ${max_threads} --unit
-        env:
-          TARGET_BRANCH: ${{ needs.prepare.outputs.changes-target-branch }}
-          SCCACHE_AWS_ACCESS_KEY_ID: ${{ secrets.ENV_DIEM_S3_AWS_ACCESS_KEY_ID }}
-          SCCACHE_AWS_SECRET_ACCESS_KEY: ${{ secrets.ENV_DIEM_S3_AWS_SECRET_ACCESS_KEY }}
-      - uses: ./.github/actions/build-teardown
+  # NOTE: update-sscache-osx removed as cost savings effort. It strongly resembled update-sccache-ubuntu
+  # except for a 'runs-on: macos-11', and no container.  Restore when there are more osx contributors.
 
   update-sccache-ubuntu:
     needs: prepare
