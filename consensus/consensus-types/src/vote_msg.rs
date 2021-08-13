@@ -56,8 +56,8 @@ impl VoteMsg {
         );
         if let Some((timeout, _)) = self.vote().two_chain_timeout() {
             ensure!(
-                timeout.hqc_round() <= self.sync_info.highest_timeout_round(),
-                "2-chain Timeout hqc should be less or equal than the sycn info hqc"
+                timeout.hqc_round() <= self.sync_info.highest_certified_round(),
+                "2-chain Timeout hqc should be less or equal than the sync info hqc"
             );
         }
         // We're not verifying SyncInfo here yet: we are going to verify it only in case we need

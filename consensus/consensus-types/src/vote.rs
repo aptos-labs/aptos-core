@@ -90,6 +90,10 @@ impl Vote {
     /// Generates a round signature, which can then be used for aggregating a timeout certificate.
     /// Typically called for generating vote messages that are sent upon timeouts.
     pub fn add_timeout_signature(&mut self, signature: Ed25519Signature) {
+        assert!(
+            self.two_chain_timeout.is_none(),
+            "2-chain timeout shouldn't co-exist with timeout"
+        );
         if self.timeout_signature.is_some() {
             return; // round signature is already set
         }
@@ -99,6 +103,10 @@ impl Vote {
 
     /// Add the 2-chain timeout and signature in the vote.
     pub fn add_2chain_timeout(&mut self, timeout: TwoChainTimeout, signature: Ed25519Signature) {
+        assert!(
+            self.timeout_signature.is_none(),
+            "2-chain timeout shouldn't co-exist with timeout"
+        );
         self.two_chain_timeout = Some((timeout, signature));
     }
 
@@ -166,6 +174,10 @@ impl Vote {
         ensure!(
             self.ledger_info.consensus_data_hash() == self.vote_data.hash(),
             "Vote's hash mismatch with LedgerInfo"
+        );
+        ensure!(
+            self.timeout_signature.is_none() || self.two_chain_timeout.is_none(),
+            "Only one timeout should exist"
         );
         validator
             .verify(self.author(), &self.ledger_info, &self.signature)

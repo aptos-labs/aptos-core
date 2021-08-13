@@ -4,17 +4,21 @@
 use crate::{consensusdb::ConsensusDB, epoch_manager::LivenessStorageData, error::DbError};
 use anyhow::{format_err, Context, Result};
 use consensus_types::{
-    block::Block, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate,
-    timeout_certificate::TimeoutCertificate, vote::Vote,
+    block::Block, common::Author, quorum_cert::QuorumCert,
+    timeout_2chain::TwoChainTimeoutCertificate, timeout_certificate::TimeoutCertificate,
+    vote::Vote, vote_data::VoteData,
 };
 use diem_config::config::NodeConfig;
-use diem_crypto::HashValue;
+use diem_crypto::{ed25519::Ed25519Signature, HashValue};
 use diem_logger::prelude::*;
 use diem_types::{
-    block_info::Round, epoch_change::EpochChangeProof, ledger_info::LedgerInfoWithSignatures,
+    block_info::Round,
+    epoch_change::EpochChangeProof,
+    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     transaction::Version,
 };
 use executor_types::ExecutedTrees;
+use serde::Deserialize;
 use std::{cmp::max, collections::HashSet, sync::Arc};
 use storage_interface::DbReader;
 
@@ -354,8 +358,34 @@ impl PersistentLivenessStorage for StorageWriteProxy {
             .get_data()
             .expect("unable to recover consensus data");
 
-        let last_vote = raw_data.0.map(|vote_data| {
-            bcs::from_bytes(&vote_data[..]).expect("unable to deserialize last vote msg")
+        let last_vote = raw_data.0.map(|bytes| {
+            // backward compatible for the 2-chain struct change
+            #[derive(Deserialize)]
+            struct OldVote {
+                pub vote_data: VoteData,
+                pub author: Author,
+                pub ledger_info: LedgerInfo,
+                pub signature: Ed25519Signature,
+                pub timeout_signature: Option<Ed25519Signature>,
+            }
+            match bcs::from_bytes(&bytes[..]) {
+                Ok(v) => v,
+                Err(_) => {
+                    let OldVote {
+                        vote_data,
+                        author,
+                        ledger_info,
+                        signature,
+                        timeout_signature,
+                    } = bcs::from_bytes(&bytes).expect("unable to deserialize last vote");
+                    let mut vote =
+                        Vote::new_with_signature(vote_data, author, ledger_info, signature);
+                    if let Some(sig) = timeout_signature {
+                        vote.add_timeout_signature(sig);
+                    }
+                    vote
+                }
+            }
         });
 
         let highest_timeout_certificate = raw_data.1.map(|ts| {

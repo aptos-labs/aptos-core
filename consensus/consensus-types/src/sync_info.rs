@@ -189,7 +189,7 @@ impl SyncInfo {
         );
 
         ensure!(
-            !(self.highest_timeout_cert.is_some() && self.highest_2chain_timeout_cert.is_some()),
+            self.highest_timeout_cert.is_none() || self.highest_2chain_timeout_cert.is_none(),
             "Only One timeout cert should be carried"
         );
 

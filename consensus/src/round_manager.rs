@@ -689,22 +689,22 @@ impl RoundManager {
         );
 
         let maybe_signed_vote_proposal = executed_block.maybe_signed_vote_proposal();
-        let vote = if self.two_chain {
+        let vote_result = if self.two_chain {
             self.safety_rules.lock().construct_and_sign_vote_two_chain(
                 &maybe_signed_vote_proposal,
                 self.block_store.highest_2chain_timeout_cert().as_deref(),
-            )?
+            )
         } else {
             self.safety_rules
                 .lock()
                 .construct_and_sign_vote(&maybe_signed_vote_proposal)
-                .context(format!(
-                    "[RoundManager] SafetyRules {}Rejected{} {}",
-                    Fg(Red),
-                    Fg(Reset),
-                    executed_block.block()
-                ))?
         };
+        let vote = vote_result.context(format!(
+            "[RoundManager] SafetyRules {}Rejected{} {}",
+            Fg(Red),
+            Fg(Reset),
+            executed_block.block()
+        ))?;
         observe_block(executed_block.block().timestamp_usecs(), BlockStage::VOTED);
 
         self.storage
