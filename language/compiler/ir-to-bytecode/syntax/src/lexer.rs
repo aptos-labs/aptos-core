@@ -100,13 +100,13 @@ pub enum Tok {
     U64,
     U128,
     Vector,
-    VecEmpty,
+    VecPack(u64),
     VecLen,
     VecImmBorrow,
     VecMutBorrow,
     VecPushBack,
     VecPopBack,
-    VecDestroyEmpty,
+    VecUnpack(u64),
     VecSwap,
     While,
     LBrace,
@@ -269,13 +269,11 @@ impl<'input> Lexer<'input> {
                         }
                         Some('<') => match name {
                             "vector" => (Tok::Vector, len),
-                            "vec_empty" => (Tok::VecEmpty, len),
                             "vec_len" => (Tok::VecLen, len),
                             "vec_imm_borrow" => (Tok::VecImmBorrow, len),
                             "vec_mut_borrow" => (Tok::VecMutBorrow, len),
                             "vec_push_back" => (Tok::VecPushBack, len),
                             "vec_pop_back" => (Tok::VecPopBack, len),
-                            "vec_destroy_empty" => (Tok::VecDestroyEmpty, len),
                             "vec_swap" => (Tok::VecSwap, len),
                             "borrow_global" => (Tok::BorrowGlobal, len + 1),
                             "borrow_global_mut" => (Tok::BorrowGlobalMut, len + 1),
@@ -283,7 +281,21 @@ impl<'input> Lexer<'input> {
                             "move_from" => (Tok::MoveFrom, len + 1),
                             "move_to" => (Tok::MoveTo, len + 1),
                             "main" => (Tok::Main, len),
-                            _ => (Tok::NameBeginTyValue, len + 1),
+                            _ => {
+                                if let Some(stripped) = name.strip_prefix("vec_pack_") {
+                                    match stripped.parse::<u64>() {
+                                        Ok(num) => (Tok::VecPack(num), len),
+                                        Err(_) => (Tok::NameBeginTyValue, len + 1),
+                                    }
+                                } else if let Some(stripped) = name.strip_prefix("vec_unpack_") {
+                                    match stripped.parse::<u64>() {
+                                        Ok(num) => (Tok::VecUnpack(num), len),
+                                        Err(_) => (Tok::NameBeginTyValue, len + 1),
+                                    }
+                                } else {
+                                    (Tok::NameBeginTyValue, len + 1)
+                                }
+                            }
                         },
                         Some('(') => match name {
                             "assert" => (Tok::Assert, len + 1),

@@ -312,7 +312,7 @@ impl FunctionFrame {
 
     // Manage the stack info for the function
     fn push(&mut self) -> Result<()> {
-        if self.cur_stack_depth == i64::max_value() {
+        if self.cur_stack_depth == i64::MAX {
             bail!("ICE Stack depth accounting overflow. The compiler can only support a maximum stack depth of up to i64::max_value")
         }
         self.cur_stack_depth += 1;
@@ -321,7 +321,7 @@ impl FunctionFrame {
     }
 
     fn pop(&mut self) -> Result<()> {
-        if self.cur_stack_depth == i64::min_value() {
+        if self.cur_stack_depth == i64::MIN {
             bail!("ICE Stack depth accounting underflow. The compiler can only support a minimum stack depth of up to i64::min_value")
         }
         self.cur_stack_depth -= 1;
@@ -1689,11 +1689,14 @@ fn compile_call(
                     function_frame.pop()?; // pop the value to be moved
                     vec_deque![]
                 }
-                Builtin::VecEmpty(tys) => {
+                Builtin::VecPack(tys, num) => {
                     let tokens = compile_types(context, function_frame.type_parameters(), &tys)?;
                     let type_actuals_id = context.signature_index(Signature(tokens))?;
-                    push_instr!(call.loc, Bytecode::VecPack(type_actuals_id, 0));
+                    push_instr!(call.loc, Bytecode::VecPack(type_actuals_id, num));
 
+                    for _ in 0..num {
+                        function_frame.pop()?;
+                    }
                     function_frame.push()?; // push the return value
 
                     // NOTE: we do actually infer the type here because we want to allow the type
@@ -1751,12 +1754,15 @@ fn compile_call(
                     function_frame.push()?; // push the value
                     vec_deque![InferredType::Anything]
                 }
-                Builtin::VecDestroyEmpty(tys) => {
+                Builtin::VecUnpack(tys, num) => {
                     let tokens = compile_types(context, function_frame.type_parameters(), &tys)?;
                     let type_actuals_id = context.signature_index(Signature(tokens))?;
-                    push_instr!(call.loc, Bytecode::VecUnpack(type_actuals_id, 0));
+                    push_instr!(call.loc, Bytecode::VecUnpack(type_actuals_id, num));
 
                     function_frame.pop()?; // pop the vector ref
+                    for _ in 0..num {
+                        function_frame.push()?;
+                    }
                     vec_deque![]
                 }
                 Builtin::VecSwap(tys) => {

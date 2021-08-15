@@ -1,17 +1,17 @@
 //# run
 main() {
-    _ = vec_empty<u64, bool>();
+    _ = vec_pack_0<u64, bool>();
     return;
 }
 
 //# run
 main() {
-    _ = vec_empty<>();
+    _ = vec_pack_0<>();
     return;
 }
 
 //# run
 main() {
-    _ = vec_empty<&u64>();
+    _ = vec_pack_0<&u64>();
     return;
 }

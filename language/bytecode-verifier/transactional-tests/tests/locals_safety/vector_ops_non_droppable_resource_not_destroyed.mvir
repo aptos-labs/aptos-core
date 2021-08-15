@@ -3,7 +3,7 @@ module M {
     struct R has store { b: bool }
     f() {
         let v: vector<Self.R>;
-        v = vec_empty<Self.R>();
+        v = vec_pack_0<Self.R>();
         return;
     }
 }

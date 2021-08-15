@@ -275,7 +275,7 @@ fn compile_builtin_vector_ops() {
                 let e_imm: &u64;
                 let e_mut: &mut u64;
 
-                v = vec_empty<u64>();
+                v = vec_pack_0<u64>();
                 v_imm = &v;
                 v_len = vec_len<u64>(copy(v_imm));
                 _ = move(v_imm);
@@ -294,7 +294,7 @@ fn compile_builtin_vector_ops() {
                 _ = vec_pop_back<u64>(copy(v_mut));
                 _ = move(v_mut);
 
-                vec_destroy_empty<u64>(move(v));
+                vec_unpack_0<u64>(move(v));
                 return;
             }
         }

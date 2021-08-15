@@ -393,8 +393,8 @@ pub enum Builtin {
     /// Publish an instantiated struct object into signer's (signer is the first arg) account.
     MoveTo(StructName, Vec<Type>),
 
-    /// Create an empty vector
-    VecEmpty(Vec<Type>),
+    /// Pack a vector fix a fixed number of elements. Zero elements means an empty vector.
+    VecPack(Vec<Type>, u64),
     /// Get the length of a vector
     VecLen(Vec<Type>),
     /// Acquire an immutable reference to the element at a given index of the vector
@@ -405,8 +405,8 @@ pub enum Builtin {
     VecPushBack(Vec<Type>),
     /// Pop and return an element from the end of the vector
     VecPopBack(Vec<Type>),
-    /// Destroy an empty vector
-    VecDestroyEmpty(Vec<Type>),
+    /// Destroy a vector of a fixed length. Zero length means destroying an empty vector.
+    VecUnpack(Vec<Type>, u64),
     /// Swap the elements at twi indices in the vector
     VecSwap(Vec<Type>),
 
@@ -1545,14 +1545,14 @@ impl fmt::Display for Builtin {
             }
             Builtin::MoveFrom(t, tys) => write!(f, "move_from<{}{}>", t, format_type_actuals(tys)),
             Builtin::MoveTo(t, tys) => write!(f, "move_to<{}{}>", t, format_type_actuals(tys)),
-            Builtin::VecEmpty(tys) => write!(f, "vec_empty{}", format_type_actuals(tys)),
+            Builtin::VecPack(tys, num) => write!(f, "vec_pack_{}{}", num, format_type_actuals(tys)),
             Builtin::VecLen(tys) => write!(f, "vec_len{}", format_type_actuals(tys)),
             Builtin::VecImmBorrow(tys) => write!(f, "vec_imm_borrow{}", format_type_actuals(tys)),
             Builtin::VecMutBorrow(tys) => write!(f, "vec_mut_borrow{}", format_type_actuals(tys)),
             Builtin::VecPushBack(tys) => write!(f, "vec_push_back{}", format_type_actuals(tys)),
             Builtin::VecPopBack(tys) => write!(f, "vec_pop_back{}", format_type_actuals(tys)),
-            Builtin::VecDestroyEmpty(tys) => {
-                write!(f, "vec_destroy_empty{}", format_type_actuals(tys))
+            Builtin::VecUnpack(tys, num) => {
+                write!(f, "vec_unpack_{}{}", num, format_type_actuals(tys))
             }
             Builtin::VecSwap(tys) => write!(f, "vec_swap{}", format_type_actuals(tys)),
             Builtin::Freeze => write!(f, "freeze"),

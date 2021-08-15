@@ -3,7 +3,7 @@ main() {
     let v: vector<u64>;
     let e_imm: &u64;
 
-    v = vec_empty<u64>();
+    v = vec_pack_0<u64>();
     vec_push_back<u64>(&mut v, 0);
     e_imm = vec_imm_borrow<u64>(&v, 0);
 
@@ -16,7 +16,7 @@ main() {
     let v: vector<u64>;
     let e_mut: &mut u64;
 
-    v = vec_empty<u64>();
+    v = vec_pack_0<u64>();
     vec_push_back<u64>(&mut v, 0);
     e_mut = vec_mut_borrow<u64>(&mut v, 0);
 

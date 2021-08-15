@@ -4,7 +4,7 @@ main() {
     let e_imm1: &u64;
     let e_mut2: &mut u64;
 
-    v = vec_empty<u64>();
+    v = vec_pack_0<u64>();
     vec_push_back<u64>(&mut v, 0);
     vec_push_back<u64>(&mut v, 1);
 
@@ -20,7 +20,7 @@ main() {
     let e_mut1: &mut u64;
     let e_imm2: &u64;
 
-    v = vec_empty<u64>();
+    v = vec_pack_0<u64>();
     vec_push_back<u64>(&mut v, 0);
     vec_push_back<u64>(&mut v, 1);
 
@@ -36,7 +36,7 @@ main() {
     let e_mut1: &mut u64;
     let e_mut2: &mut u64;
 
-    v = vec_empty<u64>();
+    v = vec_pack_0<u64>();
     vec_push_back<u64>(&mut v, 0);
     vec_push_back<u64>(&mut v, 1);
 
