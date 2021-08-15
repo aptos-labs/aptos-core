@@ -1095,13 +1095,13 @@ impl Frame {
                         gas_status.charge_instr(Opcodes::NOP)?;
                     }
                     // TODO: bridge calls to native vector functions
-                    Bytecode::VecEmpty(_)
+                    Bytecode::VecPack(..)
                     | Bytecode::VecLen(_)
                     | Bytecode::VecImmBorrow(_)
                     | Bytecode::VecMutBorrow(_)
                     | Bytecode::VecPushBack(_)
                     | Bytecode::VecPopBack(_)
-                    | Bytecode::VecDestroyEmpty(_)
+                    | Bytecode::VecUnpack(..)
                     | Bytecode::VecSwap(_) => {
                         return Err(PartialVMError::new(StatusCode::ABORTED).with_message(
                             format!(

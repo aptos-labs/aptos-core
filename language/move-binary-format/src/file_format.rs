@@ -1491,12 +1491,14 @@ pub enum Bytecode {
     ///
     /// ```..., u64_value(1), u64_value(2) -> ..., u64_value```
     Shr,
-    /// Create an empty vector.
+    /// Create a vector by packing a statically known number of elements from the stack. Abort the
+    /// execution if there are not enough number of elements on the stack to pack from or they don't
+    /// have the same type identified by the SignatureIndex.
     ///
     /// Stack transition:
     ///
-    /// ```... -> ..., vec[]```
-    VecEmpty(SignatureIndex),
+    /// ```..., e1, e2, ..., eN -> ..., vec[e1, e2, ..., eN]```
+    VecPack(SignatureIndex, u64),
     /// Return the length of the vector,
     ///
     /// Stack transition:
@@ -1529,12 +1531,13 @@ pub enum Bytecode {
     ///
     /// ```..., vector_reference -> ..., element```
     VecPopBack(SignatureIndex),
-    /// Destroy the vector. Aborts if the vector is not empty
+    /// Destroy the vector and unpack a statically known number of elements onto the stack. Aborts
+    /// if the vector does not have a length N.
     ///
     /// Stack transition:
     ///
-    /// ```..., vec[] -> ...`
-    VecDestroyEmpty(SignatureIndex),
+    /// ```..., vec[e1, e2, ..., eN] -> ..., e1, e2, ..., eN```
+    VecUnpack(SignatureIndex, u64),
     /// Swaps the elements at two indices in the vector. Abort the execution if any of the indice
     /// is out of bounds.
     ///
@@ -1610,13 +1613,13 @@ impl ::std::fmt::Debug for Bytecode {
             Bytecode::MoveFromGeneric(a) => write!(f, "MoveFromGeneric({:?})", a),
             Bytecode::MoveTo(a) => write!(f, "MoveTo({:?})", a),
             Bytecode::MoveToGeneric(a) => write!(f, "MoveToGeneric({:?})", a),
-            Bytecode::VecEmpty(a) => write!(f, "VecEmpty({})", a),
+            Bytecode::VecPack(a, n) => write!(f, "VecPack({}, {})", a, n),
             Bytecode::VecLen(a) => write!(f, "VecLen({})", a),
             Bytecode::VecImmBorrow(a) => write!(f, "VecImmBorrow({})", a),
             Bytecode::VecMutBorrow(a) => write!(f, "VecMutBorrow({})", a),
             Bytecode::VecPushBack(a) => write!(f, "VecPushBack({})", a),
             Bytecode::VecPopBack(a) => write!(f, "VecPopBack({})", a),
-            Bytecode::VecDestroyEmpty(a) => write!(f, "VecDestroyEmpty({})", a),
+            Bytecode::VecUnpack(a, n) => write!(f, "VecUnpack({}, {})", a, n),
             Bytecode::VecSwap(a) => write!(f, "VecSwap({})", a),
         }
     }

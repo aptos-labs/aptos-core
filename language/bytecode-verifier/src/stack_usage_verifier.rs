@@ -47,7 +47,7 @@ impl<'a> StackUsageVerifier<'a> {
         let block_start = cfg.block_start(block_id);
         for i in block_start..=cfg.block_end(block_id) {
             let (num_pops, num_pushes) = self.instruction_effect(&code[i as usize])?;
-            // Check that the stack height is sufficient to accomodate the number
+            // Check that the stack height is sufficient to accommodate the number
             // of pops this instruction does
             if stack_size_increment < num_pops {
                 return Err(
@@ -72,14 +72,13 @@ impl<'a> StackUsageVerifier<'a> {
     /// The effect of an instruction is a tuple where the first element
     /// is the number of pops it does, and the second element is the number
     /// of pushes it does
-    fn instruction_effect(&self, instruction: &Bytecode) -> PartialVMResult<(u32, u32)> {
+    fn instruction_effect(&self, instruction: &Bytecode) -> PartialVMResult<(u64, u64)> {
         Ok(match instruction {
             // Instructions that pop, but don't push
             Bytecode::Pop
             | Bytecode::BrTrue(_)
             | Bytecode::BrFalse(_)
             | Bytecode::StLoc(_)
-            | Bytecode::VecDestroyEmpty(_)
             | Bytecode::Abort => (1, 0),
 
             // Instructions that push, but don't pop
@@ -92,8 +91,7 @@ impl<'a> StackUsageVerifier<'a> {
             | Bytecode::CopyLoc(_)
             | Bytecode::MoveLoc(_)
             | Bytecode::MutBorrowLoc(_)
-            | Bytecode::ImmBorrowLoc(_)
-            | Bytecode::VecEmpty(_) => (0, 1),
+            | Bytecode::ImmBorrowLoc(_) => (0, 1),
 
             // Instructions that pop and push once
             Bytecode::Not
@@ -137,6 +135,10 @@ impl<'a> StackUsageVerifier<'a> {
             | Bytecode::Le
             | Bytecode::Ge => (2, 1),
 
+            // Vector packing and unpacking
+            Bytecode::VecPack(_, num) => (*num, 1),
+            Bytecode::VecUnpack(_, num) => (1, *num),
+
             // Vector indexing operations (pop twice and push once)
             Bytecode::VecImmBorrow(_) | Bytecode::VecMutBorrow(_) => (2, 1),
 
@@ -155,21 +157,21 @@ impl<'a> StackUsageVerifier<'a> {
             // Return performs `return_count` pops
             Bytecode::Ret => {
                 let return_count = self.return_.len();
-                (return_count as u32, 0)
+                (return_count as u64, 0)
             }
 
             // Call performs `arg_count` pops and `return_count` pushes
             Bytecode::Call(idx) => {
                 let function_handle = self.resolver.function_handle_at(*idx);
-                let arg_count = self.resolver.signature_at(function_handle.parameters).len() as u32;
-                let return_count = self.resolver.signature_at(function_handle.return_).len() as u32;
+                let arg_count = self.resolver.signature_at(function_handle.parameters).len() as u64;
+                let return_count = self.resolver.signature_at(function_handle.return_).len() as u64;
                 (arg_count, return_count)
             }
             Bytecode::CallGeneric(idx) => {
                 let func_inst = self.resolver.function_instantiation_at(*idx);
                 let function_handle = self.resolver.function_handle_at(func_inst.handle);
-                let arg_count = self.resolver.signature_at(function_handle.parameters).len() as u32;
-                let return_count = self.resolver.signature_at(function_handle.return_).len() as u32;
+                let arg_count = self.resolver.signature_at(function_handle.parameters).len() as u64;
+                let return_count = self.resolver.signature_at(function_handle.return_).len() as u64;
                 (arg_count, return_count)
             }
 
@@ -181,7 +183,7 @@ impl<'a> StackUsageVerifier<'a> {
                     StructFieldInformation::Native => 0,
                     StructFieldInformation::Declared(fields) => fields.len(),
                 };
-                (field_count as u32, 1)
+                (field_count as u64, 1)
             }
             Bytecode::PackGeneric(idx) => {
                 let struct_inst = self.resolver.struct_instantiation_at(*idx)?;
@@ -191,7 +193,7 @@ impl<'a> StackUsageVerifier<'a> {
                     StructFieldInformation::Native => 0,
                     StructFieldInformation::Declared(fields) => fields.len(),
                 };
-                (field_count as u32, 1)
+                (field_count as u64, 1)
             }
 
             // Unpack performs one pop and `num_fields` pushes
@@ -202,7 +204,7 @@ impl<'a> StackUsageVerifier<'a> {
                     StructFieldInformation::Native => 0,
                     StructFieldInformation::Declared(fields) => fields.len(),
                 };
-                (1, field_count as u32)
+                (1, field_count as u64)
             }
             Bytecode::UnpackGeneric(idx) => {
                 let struct_inst = self.resolver.struct_instantiation_at(*idx)?;
@@ -212,7 +214,7 @@ impl<'a> StackUsageVerifier<'a> {
                     StructFieldInformation::Native => 0,
                     StructFieldInformation::Declared(fields) => fields.len(),
                 };
-                (1, field_count as u32)
+                (1, field_count as u64)
             }
         })
     }

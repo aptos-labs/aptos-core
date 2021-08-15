@@ -1055,13 +1055,13 @@ impl<'a> StacklessBytecodeGenerator<'a> {
             MoveBytecode::Nop => self.code.push(Bytecode::Nop(attr_id)),
 
             // TODO: implement the translation when the the vector-related bytecode is ready
-            MoveBytecode::VecEmpty(_)
+            MoveBytecode::VecPack(..)
             | MoveBytecode::VecLen(_)
             | MoveBytecode::VecImmBorrow(_)
             | MoveBytecode::VecMutBorrow(_)
             | MoveBytecode::VecPushBack(_)
             | MoveBytecode::VecPopBack(_)
-            | MoveBytecode::VecDestroyEmpty(_)
+            | MoveBytecode::VecUnpack(..)
             | MoveBytecode::VecSwap(_) => unimplemented!("Vector bytecode not supported yet"),
         }
     }

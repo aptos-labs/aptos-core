@@ -502,13 +502,13 @@ enum BytecodeGen {
     MutBorrowLoc(PropIndex),
     ImmBorrowLoc(PropIndex),
 
-    VecEmpty(PropIndex),
+    VecPack((PropIndex, u64)),
     VecLen(PropIndex),
     VecImmBorrow(PropIndex),
     VecMutBorrow(PropIndex),
     VecPushBack(PropIndex),
     VecPopBack(PropIndex),
-    VecDestroyEmpty(PropIndex),
+    VecUnpack((PropIndex, u64)),
     VecSwap(PropIndex),
 }
 
@@ -539,13 +539,13 @@ impl BytecodeGen {
             any::<PropIndex>().prop_map(StLoc),
             any::<PropIndex>().prop_map(MutBorrowLoc),
             any::<PropIndex>().prop_map(ImmBorrowLoc),
-            any::<PropIndex>().prop_map(VecEmpty),
+            (any::<PropIndex>(), any::<u64>()).prop_map(VecPack),
             any::<PropIndex>().prop_map(VecLen),
             any::<PropIndex>().prop_map(VecImmBorrow),
             any::<PropIndex>().prop_map(VecMutBorrow),
             any::<PropIndex>().prop_map(VecPushBack),
             any::<PropIndex>().prop_map(VecPopBack),
-            any::<PropIndex>().prop_map(VecDestroyEmpty),
+            (any::<PropIndex>(), any::<u64>()).prop_map(VecUnpack),
             any::<PropIndex>().prop_map(VecSwap),
         ]
     }
@@ -776,7 +776,7 @@ impl BytecodeGen {
                 }
                 Bytecode::ImmBorrowLoc(idx.index(locals_signature.len()) as LocalIndex)
             }
-            BytecodeGen::VecEmpty(idx) => {
+            BytecodeGen::VecPack((idx, num)) => {
                 let sigs_len = state.signatures.signatures.len();
                 if sigs_len == 0 {
                     return None;
@@ -786,7 +786,7 @@ impl BytecodeGen {
                 if !BytecodeGen::is_valid_vector_element_sig(sig) {
                     return None;
                 }
-                Bytecode::VecEmpty(SignatureIndex(sig_idx as TableIndex))
+                Bytecode::VecPack(SignatureIndex(sig_idx as TableIndex), num)
             }
             BytecodeGen::VecLen(idx) => {
                 let sigs_len = state.signatures.signatures.len();
@@ -848,7 +848,7 @@ impl BytecodeGen {
                 }
                 Bytecode::VecPopBack(SignatureIndex(sig_idx as TableIndex))
             }
-            BytecodeGen::VecDestroyEmpty(idx) => {
+            BytecodeGen::VecUnpack((idx, num)) => {
                 let sigs_len = state.signatures.signatures.len();
                 if sigs_len == 0 {
                     return None;
@@ -858,7 +858,7 @@ impl BytecodeGen {
                 if !BytecodeGen::is_valid_vector_element_sig(sig) {
                     return None;
                 }
-                Bytecode::VecDestroyEmpty(SignatureIndex(sig_idx as TableIndex))
+                Bytecode::VecUnpack(SignatureIndex(sig_idx as TableIndex), num)
             }
             BytecodeGen::VecSwap(idx) => {
                 let sigs_len = state.signatures.signatures.len();

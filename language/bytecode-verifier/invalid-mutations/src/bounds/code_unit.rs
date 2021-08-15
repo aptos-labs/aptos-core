@@ -65,6 +65,22 @@ macro_rules! new_bytecode {
             ),
         )
     }};
+
+    ($dst_len:expr, $fidx:expr, $bcidx:expr, $offset:expr, $kind:ident, $bytecode_ident:tt, $($others:expr),+) => {{
+        let dst_len: usize = $dst_len;
+        let new_idx: usize = dst_len + $offset;
+        (
+            $bytecode_ident($kind::new(new_idx as TableIndex), $($others),+),
+            offset_out_of_bounds(
+                StatusCode::INDEX_OUT_OF_BOUNDS,
+                $kind::KIND,
+                new_idx,
+                dst_len,
+                $fidx,
+                $bcidx as CodeOffset,
+            ),
+        )
+    }};
 }
 
 macro_rules! struct_bytecode {
@@ -392,13 +408,14 @@ impl<'a> ApplyCodeUnitBoundsContext<'a> {
                         offset,
                         ImmBorrowLoc
                     ),
-                    VecEmpty(_) => new_bytecode!(
+                    VecPack(_, num) => new_bytecode!(
                         signature_pool_len,
                         current_fdef,
                         bytecode_idx,
                         offset,
                         SignatureIndex,
-                        VecEmpty
+                        VecPack,
+                        num
                     ),
                     VecLen(_) => new_bytecode!(
                         signature_pool_len,
@@ -440,13 +457,14 @@ impl<'a> ApplyCodeUnitBoundsContext<'a> {
                         SignatureIndex,
                         VecPopBack
                     ),
-                    VecDestroyEmpty(_) => new_bytecode!(
+                    VecUnpack(_, num) => new_bytecode!(
                         signature_pool_len,
                         current_fdef,
                         bytecode_idx,
                         offset,
                         SignatureIndex,
-                        VecDestroyEmpty
+                        VecUnpack,
+                        num
                     ),
                     VecSwap(_) => new_bytecode!(
                         signature_pool_len,
@@ -508,13 +526,13 @@ fn is_interesting(bytecode: &Bytecode) -> bool {
         | StLoc(_)
         | MutBorrowLoc(_)
         | ImmBorrowLoc(_)
-        | VecEmpty(_)
+        | VecPack(..)
         | VecLen(_)
         | VecImmBorrow(_)
         | VecMutBorrow(_)
         | VecPushBack(_)
         | VecPopBack(_)
-        | VecDestroyEmpty(_)
+        | VecUnpack(..)
         | VecSwap(_) => true,
 
         // List out the other options explicitly so there's a compile error if a new

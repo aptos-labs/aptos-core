@@ -1692,7 +1692,7 @@ fn compile_call(
                 Builtin::VecEmpty(tys) => {
                     let tokens = compile_types(context, function_frame.type_parameters(), &tys)?;
                     let type_actuals_id = context.signature_index(Signature(tokens))?;
-                    push_instr!(call.loc, Bytecode::VecEmpty(type_actuals_id));
+                    push_instr!(call.loc, Bytecode::VecPack(type_actuals_id, 0));
 
                     function_frame.push()?; // push the return value
 
@@ -1754,7 +1754,7 @@ fn compile_call(
                 Builtin::VecDestroyEmpty(tys) => {
                     let tokens = compile_types(context, function_frame.type_parameters(), &tys)?;
                     let type_actuals_id = context.signature_index(Signature(tokens))?;
-                    push_instr!(call.loc, Bytecode::VecDestroyEmpty(type_actuals_id));
+                    push_instr!(call.loc, Bytecode::VecUnpack(type_actuals_id, 0));
 
                     function_frame.pop()?; // pop the vector ref
                     vec_deque![]

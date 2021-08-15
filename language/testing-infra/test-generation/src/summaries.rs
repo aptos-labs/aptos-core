@@ -569,13 +569,13 @@ pub fn instruction_summary(instruction: Bytecode, exact: bool) -> Summary {
             effects: Effects::NoTyParams(vec![]),
         },
         // TODO: implement summaries for vector-related instructions
-        Bytecode::VecEmpty(_)
+        Bytecode::VecPack(..)
         | Bytecode::VecLen(_)
         | Bytecode::VecImmBorrow(_)
         | Bytecode::VecMutBorrow(_)
         | Bytecode::VecPushBack(_)
         | Bytecode::VecPopBack(_)
-        | Bytecode::VecDestroyEmpty(_)
+        | Bytecode::VecUnpack(..)
         | Bytecode::VecSwap(_) => unimplemented!("Vector bytecode not supported yet"),
     }
 }

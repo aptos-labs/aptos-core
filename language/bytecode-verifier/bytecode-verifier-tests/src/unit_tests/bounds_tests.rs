@@ -294,13 +294,13 @@ fn invalid_signature_for_vector_operation() {
     let skeleton = basic_test_module();
     let sig_index = SignatureIndex(skeleton.signatures.len() as u16);
     for bytecode in vec![
-        VecEmpty(sig_index),
+        VecPack(sig_index, 0),
         VecLen(sig_index),
         VecImmBorrow(sig_index),
         VecMutBorrow(sig_index),
         VecPushBack(sig_index),
         VecPopBack(sig_index),
-        VecDestroyEmpty(sig_index),
+        VecUnpack(sig_index, 0),
         VecSwap(sig_index),
     ] {
         let mut m = skeleton.clone();
@@ -323,13 +323,13 @@ fn invalid_struct_for_vector_operation() {
         .push(Signature(vec![Struct(StructHandleIndex::new(3))]));
     let sig_index = SignatureIndex((skeleton.signatures.len() - 1) as u16);
     for bytecode in vec![
-        VecEmpty(sig_index),
+        VecPack(sig_index, 0),
         VecLen(sig_index),
         VecImmBorrow(sig_index),
         VecMutBorrow(sig_index),
         VecPushBack(sig_index),
         VecPopBack(sig_index),
-        VecDestroyEmpty(sig_index),
+        VecUnpack(sig_index, 0),
         VecSwap(sig_index),
     ] {
         let mut m = skeleton.clone();
@@ -350,13 +350,13 @@ fn invalid_type_param_for_vector_operation() {
     skeleton.signatures.push(Signature(vec![TypeParameter(0)]));
     let sig_index = SignatureIndex((skeleton.signatures.len() - 1) as u16);
     for bytecode in vec![
-        VecEmpty(sig_index),
+        VecPack(sig_index, 0),
         VecLen(sig_index),
         VecImmBorrow(sig_index),
         VecMutBorrow(sig_index),
         VecPushBack(sig_index),
         VecPopBack(sig_index),
-        VecDestroyEmpty(sig_index),
+        VecUnpack(sig_index, 0),
         VecSwap(sig_index),
     ] {
         let mut m = skeleton.clone();

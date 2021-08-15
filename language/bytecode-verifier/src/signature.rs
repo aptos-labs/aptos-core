@@ -176,8 +176,14 @@ impl<'a> SignatureChecker<'a> {
                         type_parameters,
                     )
                 }
-                VecEmpty(idx) | VecLen(idx) | VecImmBorrow(idx) | VecMutBorrow(idx)
-                | VecPushBack(idx) | VecPopBack(idx) | VecDestroyEmpty(idx) | VecSwap(idx) => {
+                VecPack(idx, _)
+                | VecLen(idx)
+                | VecImmBorrow(idx)
+                | VecMutBorrow(idx)
+                | VecPushBack(idx)
+                | VecPopBack(idx)
+                | VecUnpack(idx, _)
+                | VecSwap(idx) => {
                     let type_arguments = &self.resolver.signature_at(*idx).0;
                     if type_arguments.len() != 1 {
                         return Err(PartialVMError::new(

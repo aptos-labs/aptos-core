@@ -17,7 +17,7 @@ use move_binary_format::{
     errors::{PartialVMError, PartialVMResult},
     file_format::{
         Bytecode, CodeOffset, FunctionDefinitionIndex, FunctionHandle, IdentifierIndex,
-        SignatureToken, StructDefinition, StructFieldInformation,
+        SignatureIndex, SignatureToken, StructDefinition, StructFieldInformation,
     },
 };
 use move_core_types::vm_status::StatusCode;
@@ -119,6 +119,18 @@ fn unpack(verifier: &mut ReferenceSafetyAnalysis, struct_def: &StructDefinition)
     // TODO maybe call state.value_for
     for _ in 0..num_fields(struct_def) {
         verifier.stack.push(AbstractValue::NonReference)
+    }
+}
+
+fn vec_element_type(
+    verifier: &mut ReferenceSafetyAnalysis,
+    idx: SignatureIndex,
+) -> PartialVMResult<SignatureToken> {
+    match verifier.resolver.signature_at(idx).0.get(0) {
+        Some(ty) => Ok(ty.clone()),
+        None => Err(PartialVMError::new(
+            StatusCode::VERIFIER_INVARIANT_VIOLATION,
+        )),
     }
 }
 
@@ -324,18 +336,15 @@ fn execute_inner(
             unpack(verifier, struct_def)
         }
 
-        Bytecode::VecEmpty(idx) => {
-            let element_type = match verifier.resolver.signature_at(*idx).0.get(0) {
-                Some(ty) => ty,
-                None => {
-                    return Err(PartialVMError::new(
-                        StatusCode::VERIFIER_INVARIANT_VIOLATION,
-                    ))
-                }
-            };
+        Bytecode::VecPack(idx, num) => {
+            for _ in 0..*num {
+                checked_verify!(verifier.stack.pop().unwrap().is_value())
+            }
+
+            let element_type = vec_element_type(verifier, *idx)?;
             verifier
                 .stack
-                .push(state.value_for(&SignatureToken::Vector(Box::new(element_type.clone()))));
+                .push(state.value_for(&SignatureToken::Vector(Box::new(element_type))));
         }
 
         Bytecode::VecLen(_) => {
@@ -366,19 +375,18 @@ fn execute_inner(
         Bytecode::VecPopBack(idx) => {
             let vec_ref = verifier.stack.pop().unwrap();
             state.vector_op(offset, vec_ref, true)?;
-            let element_type = match verifier.resolver.signature_at(*idx).0.get(0) {
-                Some(ty) => ty,
-                None => {
-                    return Err(PartialVMError::new(
-                        StatusCode::VERIFIER_INVARIANT_VIOLATION,
-                    ))
-                }
-            };
-            verifier.stack.push(state.value_for(element_type));
+
+            let element_type = vec_element_type(verifier, *idx)?;
+            verifier.stack.push(state.value_for(&element_type));
         }
 
-        Bytecode::VecDestroyEmpty(_) => {
+        Bytecode::VecUnpack(idx, num) => {
             checked_verify!(verifier.stack.pop().unwrap().is_value());
+
+            let element_type = vec_element_type(verifier, *idx)?;
+            for _ in 0..*num {
+                verifier.stack.push(state.value_for(&element_type));
+            }
         }
 
         Bytecode::VecSwap(_) => {

@@ -840,9 +840,10 @@ fn serialize_instruction_inner(binary: &mut BinaryData, opcode: &Bytecode) -> Re
             binary.push(Opcodes::MOVE_TO_GENERIC as u8)?;
             serialize_struct_def_inst_index(binary, class_idx)
         }
-        Bytecode::VecEmpty(sig_idx) => {
-            binary.push(Opcodes::VEC_EMPTY as u8)?;
-            serialize_signature_index(binary, sig_idx)
+        Bytecode::VecPack(sig_idx, num) => {
+            binary.push(Opcodes::VEC_PACK as u8)?;
+            serialize_signature_index(binary, sig_idx)?;
+            write_u64(binary, *num)
         }
         Bytecode::VecLen(sig_idx) => {
             binary.push(Opcodes::VEC_LEN as u8)?;
@@ -864,9 +865,10 @@ fn serialize_instruction_inner(binary: &mut BinaryData, opcode: &Bytecode) -> Re
             binary.push(Opcodes::VEC_POP_BACK as u8)?;
             serialize_signature_index(binary, sig_idx)
         }
-        Bytecode::VecDestroyEmpty(sig_idx) => {
-            binary.push(Opcodes::VEC_DESTROY_EMPTY as u8)?;
-            serialize_signature_index(binary, sig_idx)
+        Bytecode::VecUnpack(sig_idx, num) => {
+            binary.push(Opcodes::VEC_UNPACK as u8)?;
+            serialize_signature_index(binary, sig_idx)?;
+            write_u64(binary, *num)
         }
         Bytecode::VecSwap(sig_idx) => {
             binary.push(Opcodes::VEC_SWAP as u8)?;

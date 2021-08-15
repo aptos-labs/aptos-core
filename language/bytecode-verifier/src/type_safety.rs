@@ -719,9 +719,11 @@ fn verify_instr(
             move_to(verifier, offset, struct_def, type_args)?
         }
 
-        Bytecode::VecEmpty(idx) => {
-            let element_sig = verifier.resolver.signature_at(*idx);
-            let element_type = &element_sig.0[0];
+        Bytecode::VecPack(idx, num) => {
+            let element_type = &verifier.resolver.signature_at(*idx).0[0];
+            for _ in 0..*num {
+                verifier.stack.pop().unwrap();
+            }
             verifier
                 .stack
                 .push(ST::Vector(Box::new(element_type.clone())));
@@ -771,11 +773,14 @@ fn verify_instr(
             };
         }
 
-        Bytecode::VecDestroyEmpty(idx) => {
+        Bytecode::VecUnpack(idx, num) => {
             let operand_vec = verifier.stack.pop().unwrap();
             let declared_element_type = &verifier.resolver.signature_at(*idx).0[0];
             if operand_vec != ST::Vector(Box::new(declared_element_type.clone())) {
                 return Err(verifier.error(StatusCode::TYPE_MISMATCH, offset));
+            }
+            for _ in 0..*num {
+                verifier.stack.push(declared_element_type.clone());
             }
         }
 

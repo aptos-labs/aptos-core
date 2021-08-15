@@ -147,13 +147,13 @@ fn execute_inner(
         | Bytecode::MoveFromGeneric(_)
         | Bytecode::MoveTo(_)
         | Bytecode::MoveToGeneric(_)
-        | Bytecode::VecEmpty(_)
+        | Bytecode::VecPack(..)
         | Bytecode::VecLen(_)
         | Bytecode::VecImmBorrow(_)
         | Bytecode::VecMutBorrow(_)
         | Bytecode::VecPushBack(_)
         | Bytecode::VecPopBack(_)
-        | Bytecode::VecDestroyEmpty(_)
+        | Bytecode::VecUnpack(..)
         | Bytecode::VecSwap(_) => (),
     };
     Ok(())

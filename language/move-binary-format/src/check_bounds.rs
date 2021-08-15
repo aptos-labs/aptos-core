@@ -421,8 +421,14 @@ impl<'a> BoundsChecker<'a> {
                 }
 
                 // Instructions that refer to a signature
-                VecEmpty(idx) | VecLen(idx) | VecImmBorrow(idx) | VecMutBorrow(idx)
-                | VecPushBack(idx) | VecPopBack(idx) | VecDestroyEmpty(idx) | VecSwap(idx) => {
+                VecPack(idx, _)
+                | VecLen(idx)
+                | VecImmBorrow(idx)
+                | VecMutBorrow(idx)
+                | VecPushBack(idx)
+                | VecPopBack(idx)
+                | VecUnpack(idx, _)
+                | VecSwap(idx) => {
                     self.check_code_unit_bounds_impl(
                         self.view.signatures(),
                         *idx,

@@ -138,9 +138,9 @@ impl<'a> InstructionConsistency<'a> {
                 | LdU128(_) | LdConst(_) | CastU8 | CastU64 | CastU128 | LdTrue | LdFalse
                 | ReadRef | WriteRef | Add | Sub | Mul | Mod | Div | BitOr | BitAnd | Xor | Shl
                 | Shr | Or | And | Not | Eq | Neq | Lt | Gt | Le | Ge | CopyLoc(_) | MoveLoc(_)
-                | StLoc(_) | MutBorrowLoc(_) | ImmBorrowLoc(_) | VecEmpty(_) | VecLen(_)
+                | StLoc(_) | MutBorrowLoc(_) | ImmBorrowLoc(_) | VecPack(..) | VecLen(_)
                 | VecImmBorrow(_) | VecMutBorrow(_) | VecPushBack(_) | VecPopBack(_)
-                | VecDestroyEmpty(_) | VecSwap(_) | Abort | Nop => (),
+                | VecUnpack(..) | VecSwap(_) | Abort | Nop => (),
             }
         }
         Ok(())
