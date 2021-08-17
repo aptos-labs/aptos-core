@@ -23,8 +23,8 @@ move-core-types = { path = "../move-core/types" }
 move-bytecode-verifier = { path = "../bytecode-verifier", package = "bytecode-verifier" }
 move-symbol-pool = { path = "../move-symbol-pool" }
 diem-workspace-hack = { path = "../../common/workspace-hack" }
-move-ir-types = {path = "../move-ir/types" }
-ir-to-bytecode = {path = "../compiler/ir-to-bytecode" }
+move-ir-types = { path = "../move-ir/types" }
+ir-to-bytecode = { path = "../compiler/ir-to-bytecode" }
 borrow-graph = { path = "../borrow-graph" }
 bytecode-source-map = { path = "../compiler/bytecode-source-map" }
 bcs = "0.1.2"
@@ -38,7 +38,3 @@ datatest-stable = "0.1.1"
 [[test]]
 name = "move_check_testsuite"
 harness = false
-
-[[test]]
-name = "ir_test_coverage"
-harness = true

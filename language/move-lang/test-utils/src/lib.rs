@@ -17,13 +17,7 @@ pub const TODO_EXTENSION: &str = "move_TODO";
 
 pub const DEBUG_MODULE_FILE_NAME: &str = "debug.move";
 
-pub const COMPLETED_DIRECTORIES: &[&str; 5] = &[
-    "move/borrow_tests",
-    "move/commands",
-    "move/generics/instantiation_loops",
-    "move/signer",
-    "move/operators",
-];
+pub const COMPLETED_DIRECTORIES: &[&str; 3] = &["move/commands", "move/signer", "move/operators"];
 
 //**************************************************************************************************
 // IR Test Translation
