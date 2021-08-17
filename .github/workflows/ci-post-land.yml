@@ -91,7 +91,9 @@ jobs:
   unit-test-allure-report:
     name: Unit Test Reports
     runs-on: ubuntu-latest
-    if: ${{ needs.prepare.output.changes-target-branch == 'main' }}
+    if: ${{ github.ref == 'refs/heads/main' }}
+    environment:
+      name: Sccache
     container:
       image: diem/build_environment:main
       volumes:
