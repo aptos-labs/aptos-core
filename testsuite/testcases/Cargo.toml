@@ -1,5 +1,5 @@
 [package]
-name = "compatibility-test"
+name = "testcases"
 version = "0.0.0"
 authors = ["Diem Association <opensource@diem.com>"]
 description = "compat tests"
@@ -19,5 +19,9 @@ diem-logger = { path = "../../common/logger" }
 diem-workspace-hack = { path = "../../common/workspace-hack" }
 
 [[test]]
-name = "forge-compatibility"
+name = "forge-local-compatibility"
+harness = false
+
+[[test]]
+name = "forge-local-performance"
 harness = false

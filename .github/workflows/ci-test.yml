@@ -704,7 +704,7 @@ jobs:
           restore-keys: "crates-${{ runner.os }}"
       - name: compatibility tests
         run: |
-          cargo test -p compatibility-test
+          cargo test -p testcases --test forge-local-compatibility
 
   docker-compose-test:
     runs-on: ubuntu-latest-xl

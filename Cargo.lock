@@ -1049,19 +1049,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "compatibility-test"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "diem-logger",
- "diem-sdk",
- "diem-workspace-hack",
- "forge",
- "rand 0.8.3",
- "tokio",
-]
-
-[[package]]
 name = "compiler"
 version = "0.1.0"
 dependencies = [
@@ -3340,13 +3327,13 @@ name = "forge-cli"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "compatibility-test",
  "diem-sdk",
  "diem-workspace-hack",
  "forge",
  "itertools 0.10.0",
  "rand_core 0.6.2",
  "structopt 0.3.21",
+ "testcases",
  "tokio",
 ]
 
@@ -7960,6 +7947,19 @@ dependencies = [
  "structopt 0.3.21",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "testcases"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "diem-logger",
+ "diem-sdk",
+ "diem-workspace-hack",
+ "forge",
+ "rand 0.8.3",
+ "tokio",
 ]
 
 [[package]]

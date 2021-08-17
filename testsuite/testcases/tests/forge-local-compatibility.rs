@@ -1,9 +1,9 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use compatibility_test::SimpleValidatorUpgrade;
 use forge::{forge_main, ForgeConfig, InitialVersion, LocalFactory, Options, Result};
 use std::num::NonZeroUsize;
+use testcases::compatibility_test::SimpleValidatorUpgrade;
 
 fn main() -> Result<()> {
     ::diem_logger::Logger::init_for_testing();

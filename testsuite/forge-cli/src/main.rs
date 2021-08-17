@@ -1,7 +1,6 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use compatibility_test::{generate_traffic, SimpleValidatorUpgrade};
 use diem_sdk::{
     client::{BlockingClient, MethodRequest},
     move_types::account_address::AccountAddress,
@@ -10,6 +9,10 @@ use diem_sdk::{
 use forge::{forge_main, ForgeConfig, Options, Result, *};
 use std::{num::NonZeroUsize, time::Duration};
 use structopt::StructOpt;
+use testcases::{
+    compatibility_test::SimpleValidatorUpgrade, generate_traffic,
+    performance_test::PerformanceBenchmark,
+};
 
 #[derive(StructOpt, Debug)]
 struct Args {
@@ -57,6 +60,8 @@ struct Args {
         default_value = "devnet"
     )]
     base_image_tag: String,
+    #[structopt(long, help = "Specify a test suite to run")]
+    suite: Option<String>,
 }
 
 #[derive(StructOpt, Debug)]
@@ -145,8 +150,12 @@ fn main() -> Result<()> {
             &args.options,
         )
     } else {
+        let mut test_suite = k8s_test_suite();
+        if let Some(suite) = args.suite.as_ref() {
+            test_suite = get_test_suite(suite);
+        }
         forge_main(
-            k8s_test_suite(),
+            test_suite,
             K8sFactory::new(
                 args.cluster_name,
                 args.helm_repo,
@@ -156,6 +165,14 @@ fn main() -> Result<()> {
             .unwrap(),
             &args.options,
         )
+    }
+}
+
+fn get_test_suite(suite_name: &str) -> ForgeConfig<'static> {
+    match suite_name {
+        "land_blocking_compat" => land_blocking_test_compat_suite(),
+        "land_blocking" => land_blocking_test_suite(),
+        _ => k8s_test_suite(),
     }
 }
 
@@ -172,6 +189,18 @@ fn k8s_test_suite() -> ForgeConfig<'static> {
         .with_public_usage_tests(&[&FundAccount, &TransferCoins])
         .with_admin_tests(&[&GetMetadata])
         .with_network_tests(&[&EmitTransaction, &SimpleValidatorUpgrade])
+}
+
+fn land_blocking_test_suite() -> ForgeConfig<'static> {
+    ForgeConfig::default()
+        .with_initial_validator_count(NonZeroUsize::new(30).unwrap())
+        .with_network_tests(&[&PerformanceBenchmark])
+}
+
+fn land_blocking_test_compat_suite() -> ForgeConfig<'static> {
+    ForgeConfig::default()
+        .with_initial_validator_count(NonZeroUsize::new(30).unwrap())
+        .with_network_tests(&[&PerformanceBenchmark, &SimpleValidatorUpgrade])
 }
 
 //TODO Make public test later

@@ -168,7 +168,6 @@ members = [
     "testsuite/cli",
     "testsuite/cli/diem-wallet",
     "testsuite/cluster-test",
-    "testsuite/compatibility-test",
     "testsuite/diem-fuzzer",
     "testsuite/diem-fuzzer/fuzz",
     "testsuite/diem-swarm",
@@ -177,6 +176,7 @@ members = [
     "testsuite/generate-format",
     "testsuite/smoke-test",
     "testsuite/smoke-test/attribute",
+    "testsuite/testcases",
     "types",
     "vm-validator",
 ]
