@@ -24,6 +24,7 @@ jobs:
       changes-base-githash: ${{ steps.changes.outputs.changes-base-githash }}
       changes-pull-request-number: ${{ steps.changes.outputs.changes-pull-request-number }}
       build-images: ${{ steps.need-build-images.outputs.changes-found }}
+      any-changes-founds: ${{ steps.any-changes-found.outputs.changes-found }}
       need-base-images: ${{ steps.need-base-images.outputs.need-extra }}
       test-land-blocking: ${{ steps.need-land-blocking-test.outputs.need-lbt }}
       test-compatibility: ${{ steps.need-compat-tests.outputs.need-compat }}
@@ -94,15 +95,14 @@ jobs:
             echo "compatibility suite is enabled."
           fi
           echo "::set-output name=need-compat::$(echo $res)";
-      - id: environment
-        name: Which environment should we use for secrets.
+      - id: any-changes-found
+        name: determine if there are any files listed in the CHANGES_CHANGED_FILE_OUTPUTFILE.
         run: |
-          output=None
-          if ${{ github.event_name == 'push' }}; then
-            echo "will use sccache environment for rust builds";
-            output=Sccache
+          res=true
+          if [[ ! -f "$CHANGES_CHANGED_FILE_OUTPUTFILE" ]] || [[ "$(cat "$CHANGES_CHANGED_FILE_OUTPUTFILE" | wc -l)" == 0 ]]; then
+            res=false;
           fi
-          echo "::set-output name=name::$(echo $output)";
+          echo "::set-output name=changes-found::$(echo $res)";
       - id: rust-changes
         name: find rust/cargo changes.
         uses: diem/actions/matches@faadd16607b77dfa2231a8f366883e01717b3225
@@ -497,7 +497,7 @@ jobs:
     runs-on: ubuntu-latest-xl
     timeout-minutes: 30
     needs: prepare
-    #if: ${{ needs.prepare.outputs.test-rust == 'true' }}
+    if: ${{ needs.prepare.outputs.any-changes-founds == 'true' }}
     container:
       image: diem/build_environment:${{ needs.prepare.outputs.changes-target-branch }}
       volumes:
