@@ -34,7 +34,6 @@ move-bytecode-utils = { path = "../move-bytecode-utils" }
 [dev-dependencies]
 datatest-stable = "0.1.1"
 difference = "2.0.0"
-move-lang-test-utils = { path = "../../move-lang/test-utils" }
 
 [[bin]]
 name = "move-unit-test"

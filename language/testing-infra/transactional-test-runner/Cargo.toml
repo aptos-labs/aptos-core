@@ -38,7 +38,6 @@ resource-viewer = { path = "../../tools/resource-viewer" }
 [dev-dependencies]
 datatest-stable = "0.1.1"
 difference = "2.0.0"
-move-lang-test-utils = { path = "../../move-lang/test-utils" }
 
 [[test]]
 name = "tests"

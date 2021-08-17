@@ -11,7 +11,6 @@ use move_lang::{
     shared::{AddressBytes, Flags},
     unit_test, CommentMap, Compiler, SteppedCompiler, PASS_CFGIR, PASS_PARSER,
 };
-use move_lang_test_utils::*;
 use std::{collections::BTreeMap, fs, path::Path};
 
 /// Shared flag to keep any temporary results of the test
@@ -159,4 +158,4 @@ fn move_check_for_errors(
     diags
 }
 
-datatest_stable::harness!(move_check_testsuite, MOVE_CHECK_DIR, r".*\.move$");
+datatest_stable::harness!(move_check_testsuite, "tests/move_check", r".*\.move$");
