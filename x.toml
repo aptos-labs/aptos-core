@@ -213,7 +213,6 @@ members = [
     "memsocket",
     "module-generation",
     "move-lang-functional-tests",
-    "move-lang-ir-utils",
     "move-lang-test-utils",
     "move-oncall-trainer",
     "move-prover-test-utils",

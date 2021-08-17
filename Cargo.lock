@@ -4805,17 +4805,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "move-lang-ir-utils"
-version = "0.1.0"
-dependencies = [
- "diem-workspace-hack",
- "move-lang",
- "move-lang-test-utils",
- "regex",
- "structopt 0.3.21",
-]
-
-[[package]]
 name = "move-lang-test-utils"
 version = "0.1.0"
 dependencies = [
