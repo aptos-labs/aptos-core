@@ -37,6 +37,8 @@ struct Args {
     #[structopt(subcommand)]
     ops_cmd: Option<OperatorCommand>,
 
+    #[structopt(long, help = "Name of the EKS cluster")]
+    cluster_name: String,
     #[structopt(
         long,
         help = "Override the helm repo used for k8s tests",
@@ -61,6 +63,7 @@ struct Args {
 enum OperatorCommand {
     SetValidator(SetValidator),
     CleanUp(CleanUp),
+    Resize(Resize),
 }
 
 #[derive(StructOpt, Debug)]
@@ -72,6 +75,12 @@ struct SetValidator {
 
 #[derive(StructOpt, Debug)]
 struct CleanUp {
+    #[structopt(long, help = "If set, uses k8s service account to auth with AWS")]
+    auth_with_k8s_env: bool,
+}
+
+#[derive(StructOpt, Debug)]
+struct Resize {
     #[structopt(long, default_value = "30")]
     num_validators: usize,
     #[structopt(
@@ -91,6 +100,8 @@ struct CleanUp {
         help = "If set, performs validator healthcheck and assumes k8s DNS access"
     )]
     require_validator_healthcheck: bool,
+    #[structopt(long, help = "If set, uses k8s service account to auth with AWS")]
+    auth_with_k8s_env: bool,
 }
 
 fn main() -> Result<()> {
@@ -105,14 +116,24 @@ fn main() -> Result<()> {
                     &args.helm_repo,
                 )
             }
-            OperatorCommand::CleanUp(cleanup) => {
+            OperatorCommand::Resize(resize) => {
+                set_eks_nodegroup_size(
+                    args.cluster_name,
+                    resize.num_validators,
+                    resize.auth_with_k8s_env,
+                )?;
+                uninstall_from_k8s_cluster()?;
                 return clean_k8s_cluster(
                     args.helm_repo,
-                    cleanup.num_validators,
-                    cleanup.validator_image_tag,
-                    cleanup.testnet_image_tag,
-                    cleanup.require_validator_healthcheck,
-                )
+                    resize.num_validators,
+                    resize.validator_image_tag,
+                    resize.testnet_image_tag,
+                    resize.require_validator_healthcheck,
+                );
+            }
+            OperatorCommand::CleanUp(cleanup) => {
+                uninstall_from_k8s_cluster()?;
+                return set_eks_nodegroup_size(args.cluster_name, 0, cleanup.auth_with_k8s_env);
             }
         }
     }
@@ -126,7 +147,13 @@ fn main() -> Result<()> {
     } else {
         forge_main(
             k8s_test_suite(),
-            K8sFactory::new(args.helm_repo, args.image_tag, args.base_image_tag).unwrap(),
+            K8sFactory::new(
+                args.cluster_name,
+                args.helm_repo,
+                args.image_tag,
+                args.base_image_tag,
+            )
+            .unwrap(),
             &args.options,
         )
     }

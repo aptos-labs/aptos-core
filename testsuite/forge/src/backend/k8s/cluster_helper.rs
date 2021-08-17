@@ -4,14 +4,25 @@
 use crate::{get_validators, k8s_retry_strategy, nodes_healthcheck, Result, Validator};
 use anyhow::{bail, format_err};
 use diem_logger::*;
+use hyper::{Client, Uri};
+use hyper_proxy::{Intercept, Proxy, ProxyConnector};
+use hyper_tls::HttpsConnector;
 use k8s_openapi::api::batch::v1::Job;
 use kube::{api::Api, client::Client as K8sClient, Config};
 use rand::Rng;
 use rayon::prelude::*;
 use regex::Regex;
+use rusoto_core::Region;
+use rusoto_credential::EnvironmentProvider;
+use rusoto_eks::{
+    DescribeUpdateRequest, Eks, EksClient, NodegroupScalingConfig, UpdateNodegroupConfigRequest,
+};
+use rusoto_sts::WebIdentityProvider;
 use serde_json::Value;
 use std::{
+    cmp,
     convert::TryFrom,
+    env,
     fs::File,
     io::Write,
     process::{Command, Stdio},
@@ -61,84 +72,86 @@ pub fn set_validator_image_tag(
     upgrade_validator(validator_name, helm_repo, &validator_upgrade_options)
 }
 
-pub(crate) fn remove_validator(validator_name: &str) -> Result<()> {
-    let validator_uninstall_args = ["uninstall", "--keep-history", validator_name];
-    println!("{:?}", validator_uninstall_args);
-    let validator_uninstall_output = Command::new(HELM_BIN)
+pub(crate) fn remove_helm_release(release_name: &str) -> Result<()> {
+    let release_uninstall_args = ["uninstall", "--keep-history", release_name];
+    println!("{:?}", release_uninstall_args);
+    let release_uninstall_output = Command::new(HELM_BIN)
         .stdout(Stdio::inherit())
-        .args(&validator_uninstall_args)
+        .args(&release_uninstall_args)
         .output()
         .expect("failed to helm uninstall valNN");
 
     let uninstalled_re = Regex::new(r"already deleted").unwrap();
-    let uninstall_stderr = String::from_utf8(validator_uninstall_output.stderr).unwrap();
+    let uninstall_stderr = String::from_utf8(release_uninstall_output.stderr).unwrap();
     let already_uninstalled = uninstalled_re.is_match(&uninstall_stderr);
     assert!(
-        validator_uninstall_output.status.success() || already_uninstalled,
+        release_uninstall_output.status.success() || already_uninstalled,
         "{}",
         uninstall_stderr
     );
     Ok(())
 }
 
-fn upgrade_validator(validator_name: &str, helm_repo: &str, options: &[&str]) -> Result<()> {
-    let validator_upgrade_base_args = [
-        "upgrade",
-        validator_name,
-        &format!("{}/diem-validator", helm_repo),
+fn helm_release_patch(release_name: &str, version: usize) -> Result<()> {
+    // trick helm into letting us upgrade later
+    // https://phoenixnap.com/kb/helm-has-no-deployed-releases#ftoc-heading-5
+    let helm_patch_args = [
+        "patch",
+        "secret",
+        &format!("sh.helm.release.v1.{}.v{}", release_name, version),
+        "--type=merge",
+        "-p",
+        "{\"metadata\":{\"labels\":{\"status\":\"deployed\"}}}",
     ];
-    let validator_upgrade_args = [&validator_upgrade_base_args, options].concat();
-    println!("{:?}", validator_upgrade_args);
-    let validator_upgrade_output = Command::new(HELM_BIN)
+    println!("{:?}", helm_patch_args);
+    let helm_patch_output = Command::new(KUBECTL_BIN)
         .stdout(Stdio::inherit())
-        .args(&validator_upgrade_args)
+        .args(&helm_patch_args)
         .output()
-        .expect("failed to helm upgrade valNN");
-    if !validator_upgrade_output.status.success() {
+        .expect("failed to kubectl patch secret valNN");
+    assert!(
+        helm_patch_output.status.success(),
+        "{}",
+        String::from_utf8(helm_patch_output.stderr).unwrap()
+    );
+
+    Ok(())
+}
+
+fn upgrade_helm_release(release_name: &str, helm_chart: &str, options: &[&str]) -> Result<()> {
+    let upgrade_base_args = ["upgrade", release_name, helm_chart];
+    let upgrade_args = [&upgrade_base_args, options].concat();
+    println!("{:?}", upgrade_args);
+    let upgrade_output = Command::new(HELM_BIN)
+        .stdout(Stdio::inherit())
+        .args(&upgrade_args)
+        .output()
+        .unwrap_or_else(|_| {
+            panic!(
+                "failed to helm upgrade release {} with chart {}",
+                release_name, helm_chart
+            )
+        });
+    if !upgrade_output.status.success() {
         bail!(format!(
             "Upgrade not completed: {}",
-            String::from_utf8(validator_upgrade_output.stderr).unwrap()
+            String::from_utf8(upgrade_output.stderr).unwrap()
         ));
     }
 
     Ok(())
 }
 
-fn upgrade_testnet(
-    helm_repo: &str,
-    era_num: &str,
-    num_validator: usize,
-    image_tag: &str,
-) -> Result<()> {
-    // upgrade testnet
-    let testnet_upgrade_args = [
-        "upgrade",
-        "diem",
-        &format!("{}/testnet", helm_repo),
-        "--reuse-values",
-        "--history-max",
-        "2",
-        "--set",
-        &format!("genesis.era={}", era_num),
-        "--set",
-        &format!("genesis.numValidators={}", num_validator),
-        "--set",
-        &format!("imageTag={}", image_tag),
-    ];
-    println!("{:?}", testnet_upgrade_args);
-    let testnet_upgrade_output = Command::new(HELM_BIN)
-        .stdout(Stdio::inherit())
-        .args(&testnet_upgrade_args)
-        .output()
-        .expect("failed to helm upgrade diem");
-    assert!(
-        testnet_upgrade_output.status.success(),
-        "{}",
-        String::from_utf8(testnet_upgrade_output.stderr).unwrap()
-    );
-    println!("Testnet upgraded");
+fn upgrade_validator(validator_name: &str, helm_repo: &str, options: &[&str]) -> Result<()> {
+    upgrade_helm_release(
+        validator_name,
+        &format!("{}/diem-validator", helm_repo),
+        options,
+    )
+}
 
-    Ok(())
+fn upgrade_testnet(helm_repo: &str, options: &[&str]) -> Result<()> {
+    upgrade_helm_release("diem", &format!("{}/testnet", helm_repo), options)
 }
 
 fn get_helm_status(helm_release_name: &str) -> Result<Value> {
@@ -160,6 +173,19 @@ fn get_helm_values(helm_release_name: &str) -> Result<Value> {
     Ok(v["config"].take())
 }
 
+pub fn uninstall_from_k8s_cluster() -> Result<()> {
+    // helm uninstall validators while keeping history for later
+    (0..MAX_NUM_VALIDATORS).into_par_iter().for_each(|i| {
+        remove_helm_release(&format!("val{}", i)).unwrap();
+    });
+    println!("All validators removed");
+
+    // NOTE: for now, do not remove testnet helm chart since it is more expensive
+    // remove_helm_release("diem").unwrap();
+    // println!("Testnet release removed");
+    Ok(())
+}
+
 pub fn clean_k8s_cluster(
     helm_repo: String,
     base_num_validators: usize,
@@ -170,12 +196,6 @@ pub fn clean_k8s_cluster(
     assert!(base_num_validators <= MAX_NUM_VALIDATORS);
 
     let new_era = get_new_era().unwrap();
-
-    // scale down. helm uninstall validators while keeping history for later
-    (0..MAX_NUM_VALIDATORS).into_par_iter().for_each(|i| {
-        remove_validator(&format!("val{}", i)).unwrap();
-    });
-    println!("All validators removed");
 
     let tmp_dir = TempDir::new().expect("Could not create temp dir");
 
@@ -200,27 +220,7 @@ pub fn clean_k8s_cluster(
         file.write_all(&config.to_string().into_bytes())
             .expect("Could not write to file");
 
-        // trick helm into letting us upgrade later
-        // https://phoenixnap.com/kb/helm-has-no-deployed-releases#ftoc-heading-5
-        let validator_helm_patch_args = [
-            "patch",
-            "secret",
-            &format!("sh.helm.release.v1.val{}.v{}", i, version),
-            "--type=merge",
-            "-p",
-            "{\"metadata\":{\"labels\":{\"status\":\"deployed\"}}}",
-        ];
-        println!("{:?}", validator_helm_patch_args);
-        let validator_helm_patch_output = Command::new(KUBECTL_BIN)
-            .stdout(Stdio::inherit())
-            .args(&validator_helm_patch_args)
-            .output()
-            .expect("failed to kubectl patch secret valNN");
-        assert!(
-            validator_helm_patch_output.status.success(),
-            "{}",
-            String::from_utf8(validator_helm_patch_output.stderr).unwrap()
-        );
+        helm_release_patch(&format!("val{}", i), version).unwrap();
     });
     println!("All validators prepare for upgrade");
 
@@ -241,23 +241,55 @@ pub fn clean_k8s_cluster(
             &format!("chain.era={}", &new_era),
             "--set",
             &format!("imageTag={}", &base_validator_image_tag),
+            "--set",
+            "loggingToNull=true",
         ];
         upgrade_validator(&format!("val{}", i), &helm_repo, &validator_upgrade_options).unwrap();
     });
     println!("All validators upgraded");
 
+    // get testnet values
+    let v: Value = get_helm_status("diem").unwrap();
+    let version = v["version"].as_i64().expect("not a i64") as usize;
+    let config = &v["config"];
+
+    // prep testnet chart for release
+    helm_release_patch("diem", version).unwrap();
+
+    // store the helm values for later use
+    let file_path = tmp_dir.path().join("diem_status.json");
+    println!("Wrote helm values to: {:?}", &file_path);
+    let mut file = File::create(file_path).expect("Could not create file in temp dir");
+    file.write_all(&config.to_string().into_bytes())
+        .expect("Could not write to file");
+    let file_path_str = tmp_dir
+        .path()
+        .join("diem_status.json")
+        .display()
+        .to_string();
+    let testnet_upgrade_options = [
+        "-f",
+        &file_path_str,
+        "--install",
+        "--history-max",
+        "2",
+        "--set",
+        &format!("genesis.era={}", &new_era),
+        "--set",
+        &format!("genesis.numValidators={}", base_num_validators),
+        "--set",
+        &format!("imageTag={}", &base_testnet_image_tag),
+        "--set",
+        "monitoring.prometheus.useHttps=false",
+    ];
+
     // upgrade testnet
-    upgrade_testnet(
-        &helm_repo,
-        &new_era,
-        base_num_validators,
-        &base_testnet_image_tag,
-    )?;
+    upgrade_testnet(&helm_repo, &testnet_upgrade_options)?;
 
     // wait for genesis to run again, and get the updated validators
     let rt = Runtime::new().unwrap();
     let mut validators = rt.block_on(async {
-        let kube_client = k8s_client().await;
+        let kube_client = create_k8s_client().await;
         wait_genesis_job(&kube_client, &new_era).await.unwrap();
         let vals = get_validators(kube_client.clone(), &base_validator_image_tag)
             .await
@@ -294,7 +326,7 @@ fn era_to_string(era_value: &Value) -> Result<String> {
     }
 }
 
-pub async fn k8s_client() -> K8sClient {
+pub async fn create_k8s_client() -> K8sClient {
     let _ = Command::new(KUBECTL_BIN).arg("proxy").spawn();
     let _ = diem_retrier::retry_async(k8s_retry_strategy(), || {
         Box::pin(async move {
@@ -309,4 +341,184 @@ pub async fn k8s_client() -> K8sClient {
         reqwest::Url::parse(HEALTH_CHECK_URL).expect("Failed to parse kubernetes endpoint url"),
     );
     K8sClient::try_from(config).unwrap()
+}
+
+fn create_eks_client(auth_with_k8s_env: bool) -> Result<EksClient> {
+    let connector = HttpsConnector::new();
+    let http_connector: hyper_proxy::ProxyConnector<
+        hyper_tls::HttpsConnector<hyper::client::HttpConnector>,
+    >;
+    if let Ok(proxy_url) = std::env::var("HTTP_PROXY") {
+        let proxy = Proxy::new(Intercept::All, proxy_url.parse::<Uri>()?);
+        http_connector = ProxyConnector::from_proxy(connector, proxy)?;
+    } else {
+        http_connector = ProxyConnector::new(connector)?;
+    }
+    let mut hyper_builder = Client::builder();
+    // disabling due to connection closed issue
+    hyper_builder.pool_max_idle_per_host(0);
+    let dispatcher = rusoto_core::HttpClient::from_builder(hyper_builder, http_connector);
+    let eks_client = if auth_with_k8s_env {
+        EksClient::new_with(
+            dispatcher,
+            WebIdentityProvider::from_k8s_env(),
+            Region::UsWest2,
+        )
+    } else {
+        EksClient::new_with(dispatcher, EnvironmentProvider::default(), Region::UsWest2)
+    };
+    Ok(eks_client)
+}
+
+fn create_update_nodegroup_config_request(
+    cluster_name: &str,
+    nodegroup_name: &str,
+    nodegroup_scaling_config: NodegroupScalingConfig,
+) -> UpdateNodegroupConfigRequest {
+    UpdateNodegroupConfigRequest {
+        client_request_token: None,
+        cluster_name: cluster_name.to_string(),
+        labels: None,
+        nodegroup_name: nodegroup_name.to_string(),
+        scaling_config: Some(nodegroup_scaling_config),
+    }
+}
+
+async fn submit_update_nodegroup_config_request(
+    eks_client: &EksClient,
+    cluster_name: &str,
+    nodegroup_name: &str,
+    nodegroup_scaling_config: NodegroupScalingConfig,
+) -> Result<String> {
+    let update_nodegroup_request = create_update_nodegroup_config_request(
+        cluster_name,
+        nodegroup_name,
+        nodegroup_scaling_config,
+    );
+    let update_response = eks_client
+        .update_nodegroup_config(update_nodegroup_request)
+        .await;
+    let update_id = update_response.unwrap().update.unwrap().id.unwrap();
+    println!(
+        "Created {} nodegroup update request with ID: {}",
+        nodegroup_name, update_id
+    );
+    Ok(update_id)
+}
+
+pub fn set_eks_nodegroup_size(
+    cluster_name: String,
+    num_validators: usize,
+    auth_with_k8s_env: bool,
+) -> Result<()> {
+    // https://github.com/lucdew/rusoto-example/blob/master/src/client.rs
+    // Create rusoto client through an http proxy
+    let eks_client = create_eks_client(auth_with_k8s_env).unwrap();
+    println!("Created rusoto http client");
+
+    // nodegroup scaling factors
+    let max_surge = 2; // multiplier for max size
+    let num_validators: i64 = num_validators as i64;
+    let idle_utilities_size = 5; // keep extra utilities nodes around for forge pods and monitoring
+    let validator_scaling = NodegroupScalingConfig {
+        desired_size: Some(cmp::max(num_validators * 3, 1)),
+        max_size: Some(cmp::max((num_validators * 3 + 1) * max_surge, 1)),
+        min_size: Some(cmp::max(num_validators * 3, 1)),
+    };
+    let utilities_scaling = NodegroupScalingConfig {
+        desired_size: Some(cmp::max(num_validators * 3, idle_utilities_size)),
+        max_size: Some(cmp::max(
+            num_validators * 3 * max_surge,
+            idle_utilities_size,
+        )),
+        min_size: Some(cmp::max(num_validators * 3, idle_utilities_size)),
+    };
+    let trusted_scaling = NodegroupScalingConfig {
+        desired_size: Some(num_validators),
+        max_size: Some(cmp::max(num_validators * max_surge, 1)),
+        min_size: Some(num_validators),
+    };
+
+    // submit the scaling requests
+    let rt = Runtime::new().unwrap();
+    let validators_update_id = rt
+        .block_on(submit_update_nodegroup_config_request(
+            &eks_client,
+            &cluster_name,
+            "validators",
+            validator_scaling,
+        ))
+        .unwrap();
+    let utilities_update_id = rt
+        .block_on(submit_update_nodegroup_config_request(
+            &eks_client,
+            &cluster_name,
+            "utilities",
+            utilities_scaling,
+        ))
+        .unwrap();
+    let trusted_update_id = rt
+        .block_on(submit_update_nodegroup_config_request(
+            &eks_client,
+            &cluster_name,
+            "trusted",
+            trusted_scaling,
+        ))
+        .unwrap();
+
+    // wait for nodegroup updates
+    let updates: Vec<(&str, &str)> = vec![
+        ("validators", &validators_update_id),
+        ("utilities", &utilities_update_id),
+        ("trusted", &trusted_update_id),
+    ];
+    updates
+        .into_par_iter()
+        .for_each(|(nodegroup_name, update_id)| {
+            let rt = Runtime::new().unwrap();
+            rt.block_on(async {
+                diem_retrier::retry_async(k8s_retry_strategy(), || {
+                    let client = eks_client.clone();
+                    let describe_update_request = DescribeUpdateRequest {
+                        addon_name: None,
+                        name: cluster_name.clone(),
+                        nodegroup_name: Some(nodegroup_name.to_string()),
+                        update_id: update_id.to_string(),
+                    };
+                    Box::pin(async move {
+                        let describe_update = client
+                            .describe_update(describe_update_request)
+                            .await
+                            .unwrap()
+                            .update
+                            .unwrap();
+                        let stat = describe_update.status;
+                        match stat {
+                            Some(s) => match s.as_str() {
+                                "Failed" => bail!("Nodegroup update failed"),
+                                "Successful" => {
+                                    println!(
+                                        "{} nodegroup update {} successful!!!",
+                                        &nodegroup_name, update_id
+                                    );
+                                    Ok(())
+                                }
+                                &_ => {
+                                    println!(
+                                        "Waiting for {} update {}: {} ...",
+                                        &nodegroup_name, update_id, s
+                                    );
+                                    bail!("Waiting for valid update status")
+                                }
+                            },
+                            None => bail!("Failed to describe nodegroup update"),
+                        }
+                    })
+                })
+                .await
+            })
+            .unwrap();
+        });
+
+    Ok(())
 }

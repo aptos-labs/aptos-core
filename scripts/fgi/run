@@ -167,13 +167,13 @@ print(
 )
 print("**********")
 
-print(f"\nLog output: {OUTPUT_TEE}")
 print("==========begin-pod-logs==========")
 subprocess.call(
     f"kubectl --context={context} logs -f -l job-name={job_name} | tee {OUTPUT_TEE}",
     shell=True,
 )
 print("==========end-pod-logs==========")
+print(f"\nLog output: {OUTPUT_TEE}")
 
 try:
     job_status = json.loads(

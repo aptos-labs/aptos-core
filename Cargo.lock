@@ -3311,6 +3311,9 @@ dependencies = [
  "diem-secure-storage",
  "diem-workspace-hack",
  "futures",
+ "hyper",
+ "hyper-proxy",
+ "hyper-tls",
  "itertools 0.10.0",
  "k8s-openapi",
  "kube",
@@ -3319,6 +3322,10 @@ dependencies = [
  "rayon",
  "regex",
  "reqwest",
+ "rusoto_core",
+ "rusoto_credential",
+ "rusoto_eks",
+ "rusoto_sts",
  "serde",
  "serde_json",
  "structopt 0.3.21",
@@ -3958,6 +3965,24 @@ dependencies = [
  "tower-service",
  "tracing",
  "want",
+]
+
+[[package]]
+name = "hyper-proxy"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ca815a891b24fdfb243fa3239c86154392b0953ee584aa1a2a1f66d20cbe75cc"
+dependencies = [
+ "bytes",
+ "futures",
+ "headers",
+ "http",
+ "hyper",
+ "hyper-tls",
+ "native-tls",
+ "tokio",
+ "tokio-native-tls",
+ "tower-service",
 ]
 
 [[package]]
@@ -6640,6 +6665,21 @@ dependencies = [
  "shlex",
  "tokio",
  "zeroize",
+]
+
+[[package]]
+name = "rusoto_eks"
+version = "0.46.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "91d7e1e577d4102a9d80d5eafc0547064d3e8817d094f00e95ae45d03ae3accb"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "futures",
+ "rusoto_core",
+ "serde",
+ "serde_derive",
+ "serde_json",
 ]
 
 [[package]]
