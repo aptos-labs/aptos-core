@@ -3,7 +3,6 @@
 use compiler::Compiler;
 use diem_types::{
     access_path::AccessPath,
-    account_config,
     on_chain_config::DiemVersion,
     transaction::{ChangeSet, Script, TransactionStatus, WriteSetPayload},
     vm_status::KeptVMStatus,
@@ -12,8 +11,7 @@ use diem_types::{
 use diem_vm::DiemVM;
 use diem_writeset_generator::build_changeset;
 use language_e2e_tests::{
-    account::Account, compile::compile_module_with_address, current_function_name,
-    executor::FakeExecutor,
+    account::Account, compile::compile_module, current_function_name, executor::FakeExecutor,
 };
 
 #[test]
@@ -26,14 +24,13 @@ fn build_upgrade_writeset() {
 
     let program = String::from(
         "
-        module M {
+        module 0x1.M {
             public magic(): u64 { return 42; }
         }
         ",
     );
 
-    let module =
-        compile_module_with_address(&account_config::CORE_CODE_ADDRESS, "file_name", &program).0;
+    let module = compile_module("file_name", &program).0;
     let module_bytes = {
         let mut v = vec![];
         module.serialize(&mut v).unwrap();
@@ -84,7 +81,6 @@ main(lr_account: signer) {
 "#;
 
         let compiler = Compiler {
-            address: account_config::CORE_CODE_ADDRESS,
             deps: vec![&module],
         };
         compiler

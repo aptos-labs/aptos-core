@@ -85,7 +85,7 @@ main() {
 // check: INTEGER_OP_TYPE_MISMATCH_ERROR
 
 //! new-transaction
-module M {
+module {{default}}.M {
     struct R { x: bool }
     f() {
         _ = 0 + (R { x: true });
@@ -94,7 +94,7 @@ module M {
 }
 // check: INTEGER_OP_TYPE_MISMATCH_ERROR
 //! new-transaction
-module M {
+module {{default}}.M {
     struct R { x: bool }
     g() {
         _ = (R { x: true }) + 0;
@@ -103,7 +103,7 @@ module M {
 }
 // check: INTEGER_OP_TYPE_MISMATCH_ERROR
 //! new-transaction
-module M {
+module {{default}}.M {
     struct R { x: bool }
     h() {
         _ = (R { x: true }) + (R { x: true });
@@ -199,7 +199,7 @@ main() {
 // check: INTEGER_OP_TYPE_MISMATCH_ERROR
 
 //! new-transaction
-module M {
+module {{default}}.M {
     struct R { x: bool }
     f() {
         _ = 0 - (R { x: true });
@@ -208,7 +208,7 @@ module M {
 }
 // check: INTEGER_OP_TYPE_MISMATCH_ERROR
 //! new-transaction
-module M {
+module {{default}}.M {
     struct R { x: bool }
     g() {
         _ = (R { x: true }) - 0;
@@ -217,7 +217,7 @@ module M {
 }
 // check: INTEGER_OP_TYPE_MISMATCH_ERROR
 //! new-transaction
-module M {
+module {{default}}.M {
     struct R { x: bool }
     h() {
         _ = (R { x: true }) - (R { x: true });
@@ -313,7 +313,7 @@ main() {
 // check: INTEGER_OP_TYPE_MISMATCH_ERROR
 
 //! new-transaction
-module M {
+module {{default}}.M {
     struct R { x: bool }
     f() {
         _ = 0 * (R { x: true });
@@ -322,7 +322,7 @@ module M {
 }
 // check: INTEGER_OP_TYPE_MISMATCH_ERROR
 //! new-transaction
-module M {
+module {{default}}.M {
     struct R { x: bool }
     g() {
         _ = (R { x: true }) * 0;
@@ -331,7 +331,7 @@ module M {
 }
 // check: INTEGER_OP_TYPE_MISMATCH_ERROR
 //! new-transaction
-module M {
+module {{default}}.M {
     struct R { x: bool }
     h() {
         _ = (R { x: true }) * (R { x: true });
@@ -427,7 +427,7 @@ main() {
 // check: INTEGER_OP_TYPE_MISMATCH_ERROR
 
 //! new-transaction
-module M {
+module {{default}}.M {
     struct R { x: bool }
     f() {
         _ = 0 / (R { x: true });
@@ -436,7 +436,7 @@ module M {
 }
 // check: INTEGER_OP_TYPE_MISMATCH_ERROR
 //! new-transaction
-module M {
+module {{default}}.M {
     struct R { x: bool }
     g() {
         _ = (R { x: true }) / 0;
@@ -445,7 +445,7 @@ module M {
 }
 // check: INTEGER_OP_TYPE_MISMATCH_ERROR
 //! new-transaction
-module M {
+module {{default}}.M {
     struct R { x: bool }
     h() {
         _ = (R { x: true }) / (R { x: true });
@@ -541,7 +541,7 @@ main() {
 // check: INTEGER_OP_TYPE_MISMATCH_ERROR
 
 //! new-transaction
-module M {
+module {{default}}.M {
     struct R { x: bool }
     f() {
         _ = 0 & (R { x: true });
@@ -550,7 +550,7 @@ module M {
 }
 // check: INTEGER_OP_TYPE_MISMATCH_ERROR
 //! new-transaction
-module M {
+module {{default}}.M {
     struct R { x: bool }
     g() {
         _ = (R { x: true }) & 0;
@@ -559,7 +559,7 @@ module M {
 }
 // check: INTEGER_OP_TYPE_MISMATCH_ERROR
 //! new-transaction
-module M {
+module {{default}}.M {
     struct R { x: bool }
     h() {
         _ = (R { x: true }) & (R { x: true });
@@ -655,7 +655,7 @@ main() {
 // check: INTEGER_OP_TYPE_MISMATCH_ERROR
 
 //! new-transaction
-module M {
+module {{default}}.M {
     struct R { x: bool }
     f() {
         _ = 0 | (R { x: true });
@@ -664,7 +664,7 @@ module M {
 }
 // check: INTEGER_OP_TYPE_MISMATCH_ERROR
 //! new-transaction
-module M {
+module {{default}}.M {
     struct R { x: bool }
     g() {
         _ = (R { x: true }) | 0;
@@ -673,7 +673,7 @@ module M {
 }
 // check: INTEGER_OP_TYPE_MISMATCH_ERROR
 //! new-transaction
-module M {
+module {{default}}.M {
     struct R { x: bool }
     h() {
         _ = (R { x: true }) | (R { x: true });
@@ -769,7 +769,7 @@ main() {
 // check: INTEGER_OP_TYPE_MISMATCH_ERROR
 
 //! new-transaction
-module M {
+module {{default}}.M {
     struct R { x: bool }
     f() {
         _ = 0 ^ (R { x: true });
@@ -778,7 +778,7 @@ module M {
 }
 // check: INTEGER_OP_TYPE_MISMATCH_ERROR
 //! new-transaction
-module M {
+module {{default}}.M {
     struct R { x: bool }
     g() {
         _ = (R { x: true }) ^ 0;
@@ -787,7 +787,7 @@ module M {
 }
 // check: INTEGER_OP_TYPE_MISMATCH_ERROR
 //! new-transaction
-module M {
+module {{default}}.M {
     struct R { x: bool }
     h() {
         _ = (R { x: true }) ^ (R { x: true });
@@ -869,7 +869,7 @@ main() {
 // check: EQUALITY_OP_TYPE_MISMATCH_ERROR
 
 //! new-transaction
-module M {
+module {{default}}.M {
     struct R { x: bool }
     f() {
         _ = 0 == (R { x: true });
@@ -878,7 +878,7 @@ module M {
 }
 // check: EQUALITY_OP_TYPE_MISMATCH_ERROR
 //! new-transaction
-module M {
+module {{default}}.M {
     struct R { x: bool }
     g() {
         _ = (R { x: true }) == 0;
@@ -960,7 +960,7 @@ main() {
 // check: EQUALITY_OP_TYPE_MISMATCH_ERROR
 
 //! new-transaction
-module M {
+module {{default}}.M {
     struct R { x: bool }
     f() {
         _ = 0 != (R { x: true });
@@ -969,7 +969,7 @@ module M {
 }
 // check: EQUALITY_OP_TYPE_MISMATCH_ERROR
 //! new-transaction
-module M {
+module {{default}}.M {
     struct R { x: bool }
     g() {
         _ = (R { x: true }) != 0;
@@ -1321,7 +1321,7 @@ main() {
 // check: INTEGER_OP_TYPE_MISMATCH_ERROR
 
 //! new-transaction
-module M {
+module {{default}}.M {
     struct R { x: bool }
     f() {
         _ = 0 << (R { x: true });
@@ -1330,7 +1330,7 @@ module M {
 }
 // check: INTEGER_OP_TYPE_MISMATCH_ERROR
 //! new-transaction
-module M {
+module {{default}}.M {
     struct R { x: bool }
     g() {
         _ = (R { x: true }) << 0;
@@ -1339,7 +1339,7 @@ module M {
 }
 // check: INTEGER_OP_TYPE_MISMATCH_ERROR
 //! new-transaction
-module M {
+module {{default}}.M {
     struct R { x: bool }
     h() {
         _ = (R { x: true }) << (R { x: true });
@@ -1407,7 +1407,7 @@ main() {
 // check: INTEGER_OP_TYPE_MISMATCH_ERROR
 
 //! new-transaction
-module M {
+module {{default}}.M {
     struct R { x: bool }
     f() {
         _ = 0 >> (R { x: true });
@@ -1416,7 +1416,7 @@ module M {
 }
 // check: INTEGER_OP_TYPE_MISMATCH_ERROR
 //! new-transaction
-module M {
+module {{default}}.M {
     struct R { x: bool }
     g() {
         _ = (R { x: true }) >> 0;
@@ -1425,7 +1425,7 @@ module M {
 }
 // check: INTEGER_OP_TYPE_MISMATCH_ERROR
 //! new-transaction
-module M {
+module {{default}}.M {
     struct R { x: bool }
     h() {
         _ = (R { x: true }) >> (R { x: true });

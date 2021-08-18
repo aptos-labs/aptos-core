@@ -3,7 +3,6 @@
 
 use anyhow::{bail, Result};
 use diem_framework::diem_framework_named_addresses;
-use diem_types::account_address::AccountAddress as DiemAddress;
 use functional_tests::{
     compiler::{Compiler, ScriptOrModule},
     testsuite,
@@ -76,7 +75,6 @@ impl<'a> Compiler for MoveSourceCompiler<'a> {
     fn compile<Logger: FnMut(String)>(
         &mut self,
         _log: Logger,
-        _address: DiemAddress,
         input: &str,
     ) -> Result<ScriptOrModule> {
         let cur_file = NamedTempFile::new()?;

@@ -1,6 +1,6 @@
-//# publish --address 0x1
+//# publish
 
-module A {
+module 0x1.A {
     struct Coin has store { u: u64 }
 
     public new(): Self.Coin {
@@ -26,9 +26,9 @@ module A {
     }
 }
 
-//# publish --address 0x1
+//# publish
 
-module Tester {
+module 0x1.Tester {
     import 0x1.A;
 
     struct Pair has key { x: A.Coin, y: A.Coin }

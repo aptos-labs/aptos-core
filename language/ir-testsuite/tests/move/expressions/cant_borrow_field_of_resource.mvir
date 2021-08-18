@@ -1,6 +1,6 @@
 // check: Unbound field v
 
-module Token {
+module {{default}}.Token {
     struct T has key {v: u64}
 
     public new(v: u64): Self.T {

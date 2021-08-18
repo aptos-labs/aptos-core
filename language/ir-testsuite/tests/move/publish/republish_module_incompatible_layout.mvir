@@ -1,10 +1,10 @@
-module Duplicate {
+module {{default}}.Duplicate {
   struct T { f: u64 }
 }
 
 //! new-transaction
 
-module Duplicate {
+module {{default}}.Duplicate {
   struct T { f: u64, g: bool }
 }
 

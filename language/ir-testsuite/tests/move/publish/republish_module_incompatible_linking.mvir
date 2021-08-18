@@ -1,11 +1,11 @@
-module Duplicate {
+module {{default}}.Duplicate {
   public f() { return; }
   public g() { return; }
 }
 
 //! new-transaction
 
-module Duplicate {
+module {{default}}.Duplicate {
   public f() { return; }
 }
 

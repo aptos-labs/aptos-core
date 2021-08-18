@@ -1,5 +1,5 @@
-//# publish --address 0x1
-module M {
+//# publish
+module 0x1.M {
     struct Foo<T> { x: T }
 
     foo() {
@@ -10,8 +10,8 @@ module M {
     }
 }
 
-//# publish --address 0x1
-module N {
+//# publish
+module 0x1.N {
     struct Foo<T1: copy + drop, T2> { x: T1, y: T2 }
 
     foo() {

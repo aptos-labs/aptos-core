@@ -1,5 +1,5 @@
-//# publish --address 0x1
-module M {
+//# publish
+module 0x1.M {
     struct NoAbilities { a: bool }
     struct HasDrop<phantom T1, T2> has drop { a: bool }
     struct HasCopy<phantom T1, T2> has copy { a: bool }

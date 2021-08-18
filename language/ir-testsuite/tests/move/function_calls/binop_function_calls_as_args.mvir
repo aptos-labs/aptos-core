@@ -1,4 +1,4 @@
-module A {
+module {{default}}.A {
     public div_by_two(v: u64): bool {
         if (move(v) % 2 == 0) { return true;}
         else { return false;}

@@ -1,4 +1,4 @@
-module Tester {
+module {{default}}.Tester {
     public no(): &u64 {
         let x: u64;
         let x_ref: &u64;

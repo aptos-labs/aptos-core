@@ -1,6 +1,6 @@
 // check: Invalid Token
 
-module M {
+module {{default}}.M {
     struct T{
         x: u64,
         no() {

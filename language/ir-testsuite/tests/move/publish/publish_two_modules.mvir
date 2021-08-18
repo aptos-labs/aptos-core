@@ -1,4 +1,4 @@
-module MoneyHolder {
+module {{default}}.MoneyHolder {
         import 0x1.XUS;
         import 0x1.Diem;
 
@@ -27,7 +27,7 @@ module MoneyHolder {
 
 //! new-transaction
 
-module Bar {
+module {{default}}.Bar {
         struct T has drop {baz: u64}
         public new(m: u64): Self.T {
             return T{baz: move(m)};

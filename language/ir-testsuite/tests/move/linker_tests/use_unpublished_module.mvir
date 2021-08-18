@@ -1,5 +1,5 @@
 //! no-run: runtime
-module M {
+module {{default}}.M {
     public foo() {
         return;
     }

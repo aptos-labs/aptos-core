@@ -1,6 +1,6 @@
 // check: Field y defined out of order for struct T
 
-module M {
+module {{default}}.M {
     struct T {
         x: u64,
         y: u64

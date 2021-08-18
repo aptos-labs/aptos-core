@@ -31,7 +31,7 @@ automatically calls the bytecode verifier at the end of compilation.
 
 ```text
 USAGE:
-    compiler [FLAGS] [OPTIONS] <source-path> --address <address>
+    compiler [FLAGS] [OPTIONS] <source-path>
 
 FLAGS:
     -h, --help                 Prints help information
@@ -42,8 +42,7 @@ FLAGS:
     -V, --version              Prints version information
 
 OPTIONS:
-    -a, --address <address>    Account address used for publishing
-    -d, --deps <deps-path>     Path to the list of modules that we want to link with
+    -d, --deps <deps-path>    Path to the list of modules that we want to link with
 
 ARGS:
     <source-path>    Path to the Move IR source to compile

@@ -1,5 +1,5 @@
-//# publish --address 0x1
-module M {
+//# publish
+module 0x1.M {
     struct Foo<T> has key { x: T }
 
     struct Bar<T1, T2: key, T3: copy + drop> { x: T3, y: T2, z: T1 }

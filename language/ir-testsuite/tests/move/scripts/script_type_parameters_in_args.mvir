@@ -19,7 +19,7 @@ main<T: copy + drop>(v: vector<T>) {
 
 
 //! new-transaction
-module M {
+module {{default}}.M {
     struct Box<T> has drop { x: T }
 }
 // check: "Keep(EXECUTED)"

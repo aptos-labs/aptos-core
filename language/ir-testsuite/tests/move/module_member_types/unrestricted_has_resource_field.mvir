@@ -1,6 +1,6 @@
 // check: FIELD_MISSING_TYPE_ABILITY
 
-module Test {
+module {{default}}.Test {
 import 0x1.XUS;
     import 0x1.Diem;
 

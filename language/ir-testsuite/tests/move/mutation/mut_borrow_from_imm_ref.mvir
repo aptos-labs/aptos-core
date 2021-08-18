@@ -1,4 +1,4 @@
-module Token {
+module {{default}}.Token {
     struct T{value: u64}
     public new(m: u64): Self.T {
         return T{value: copy(m)};

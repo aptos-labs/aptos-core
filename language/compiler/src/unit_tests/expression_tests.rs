@@ -160,7 +160,7 @@ fn compile_assert() {
 fn single_resource() {
     let code = String::from(
         "
-module Test {
+module 0xf1.Test {
     struct T { i: u64 }
 
     public new_t(): Self.T {
@@ -198,7 +198,7 @@ fn compile_immutable_borrow_local() {
 fn compile_borrow_field() {
     let code = String::from(
         "
-        module Foobar {
+        module 0x3d.Foobar {
             struct FooCoin { value: u64 }
 
             public borrow_immut_field(arg: &Self.FooCoin) {
@@ -232,7 +232,7 @@ fn compile_borrow_field() {
 fn compile_borrow_field_generic() {
     let code = String::from(
         "
-        module Foobar {
+        module 0x4d.Foobar {
             struct FooCoin<T> { value: u64 }
 
             public borrow_immut_field(arg: &Self.FooCoin<u64>) {
@@ -266,7 +266,7 @@ fn compile_borrow_field_generic() {
 fn compile_builtin_vector_ops() {
     let code = String::from(
         "
-        module Foobar {
+        module 0xfab.Foobar {
             public vector_ops() {
                 let v: vector<u64>;
                 let v_imm: &vector<u64>;

@@ -1,9 +1,9 @@
-//# publish --address 0x1
+//# publish
 
 // This module checks that phantom arguments are not considered by checking against
 // the abilities required for the fields of a struct.
 
-module M {
+module 0x1.M {
     struct NoAbilities { a: bool }
 
     struct HasDrop<phantom T1, T2> has drop { a: bool }

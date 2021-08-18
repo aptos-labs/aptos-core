@@ -1,4 +1,4 @@
-module M {
+module {{default}}.M {
     public id3(a: u64, b: bool, c: address): u64 * bool * address {
         return move(a), move(b), move(c);
     }

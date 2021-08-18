@@ -1,4 +1,4 @@
-module M {
+module {{default}}.M {
     public max(a: u64, b: u64): u64 {
         if (copy(a) > copy(b)) {
             return copy(a);

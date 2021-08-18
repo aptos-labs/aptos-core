@@ -1,4 +1,4 @@
-module M {
+module {{default}}.M {
     public foo(u: u64): u64 * u64 * u64 {
         let twice: u64;
         let quadruple: u64;

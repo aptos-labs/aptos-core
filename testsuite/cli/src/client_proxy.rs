@@ -625,7 +625,6 @@ impl ClientProxy {
             );
 
             let compiler = Compiler {
-                address: diem_types::account_config::CORE_CODE_ADDRESS,
                 deps: diem_framework_releases::current_modules().iter().collect(),
             };
             compiler

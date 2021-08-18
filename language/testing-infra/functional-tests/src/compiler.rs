@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
-use diem_types::account_address::AccountAddress;
 use move_binary_format::file_format::{CompiledModule, CompiledScript};
 
 pub trait Compiler {
@@ -10,7 +9,6 @@ pub trait Compiler {
     fn compile<Logger: FnMut(String)>(
         &mut self,
         log: Logger,
-        address: AccountAddress,
         input: &str,
     ) -> Result<ScriptOrModule>;
 

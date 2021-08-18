@@ -1,17 +1,17 @@
-module M {
+module {{default}}.M {
     native struct T;
     native struct T2;
 }
 // check: MISSING_DEPENDENCY
 
 //! new-transaction
-module M2 {
+module {{default}}.M2 {
     native struct T;
 }
 // check: MISSING_DEPENDENCY
 
 //! new-transaction
-module M3 {
+module {{default}}.M3 {
     native struct T2;
 }
 // check: MISSING_DEPENDENCY

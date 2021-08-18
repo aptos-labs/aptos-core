@@ -208,8 +208,6 @@ pub struct PublishCommand {
     pub gas_budget: Option<u64>,
     #[structopt(long = "syntax")]
     pub syntax: Option<SyntaxChoice>,
-    #[structopt(long = "address", parse(try_from_str = parse_account_address))]
-    pub address: Option<AccountAddress>,
 }
 
 #[derive(Debug, StructOpt)]

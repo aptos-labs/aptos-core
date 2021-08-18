@@ -38,7 +38,7 @@ pub fn generate_modules(
     let (callee_names, callees): (Set<Symbol>, Vec<ModuleDefinition>) = (0..(number - 1))
         .map(|_| {
             let module = ModuleGenerator::create(rng, options.clone(), &Set::new());
-            let module_name = module.name.0;
+            let module_name = module.identifier.name.0;
             (module_name, module)
         })
         .unzip();
@@ -48,9 +48,7 @@ pub fn generate_modules(
     let compiled_callees = callees
         .into_iter()
         .map(|module| {
-            let mut module = compile_module(AccountAddress::ZERO, module, &empty_deps)
-                .unwrap()
-                .0;
+            let mut module = compile_module(module, &empty_deps).unwrap().0;
             Pad::pad(table_size, &mut module, options.clone());
             module
         })
@@ -58,9 +56,7 @@ pub fn generate_modules(
 
     // TODO: for friend visibility, maybe we could generate a module that friend all other modules...
 
-    let mut compiled_root = compile_module(AccountAddress::ZERO, root_module, &compiled_callees)
-        .unwrap()
-        .0;
+    let mut compiled_root = compile_module(root_module, &compiled_callees).unwrap().0;
     Pad::pad(table_size, &mut compiled_root, options);
     (compiled_root, compiled_callees)
 }
@@ -331,7 +327,10 @@ impl<'a> ModuleGenerator<'a> {
             random_string(gen, len)
         };
         let current_module = ModuleDefinition {
-            name: ModuleName(module_name.into()),
+            identifier: QualifiedModuleIdent {
+                name: ModuleName(module_name.into()),
+                address: AccountAddress::random(),
+            },
             friends: Vec::new(),
             imports: Self::imports(callable_modules),
             explicit_dependency_declarations: Vec::new(),

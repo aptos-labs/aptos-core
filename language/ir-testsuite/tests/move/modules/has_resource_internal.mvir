@@ -1,6 +1,6 @@
 // check: Missing struct definition for T
 
-module Token {
+module {{default}}.Token {
     struct T has key { b: bool }
     public new(): Self.T {
         return T{ b: true };

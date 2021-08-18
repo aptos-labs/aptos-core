@@ -1,4 +1,4 @@
-module Test {
+module {{default}}.Test {
     import 0x1.Signer;
 
     struct Config has copy, drop, store { b: bool }

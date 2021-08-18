@@ -9,7 +9,7 @@
 //! sender: sys
 // Implements a sorted linked list in which everyone can insert a new node (e.g. for DNS)
 // but only the list owner/node owner can remove a node
-module SortedLinkedList
+module {{sys}}.SortedLinkedList
 {
     import 0x1.Signer;
 

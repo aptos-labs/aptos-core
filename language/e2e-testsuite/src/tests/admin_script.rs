@@ -5,7 +5,6 @@ use language_e2e_tests::{account::Account, current_function_name, executor::Fake
 
 use diem_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use diem_types::{
-    account_config,
     transaction::{authenticator::AuthenticationKey, Script, TransactionArgument},
     vm_status::StatusCode,
 };
@@ -39,7 +38,6 @@ main(dr_account: signer, account: signer, auth_key_prefix: vector<u8>) {
 "#;
 
         let compiler = Compiler {
-            address: account_config::CORE_CODE_ADDRESS,
             deps: diem_framework_releases::current_modules().iter().collect(),
         };
         compiler
@@ -104,7 +102,6 @@ main(dr_account: signer, account: signer, auth_key_prefix: vector<u8>) {
 "#;
 
         let compiler = Compiler {
-            address: account_config::CORE_CODE_ADDRESS,
             deps: diem_framework_releases::current_modules().iter().collect(),
         };
         compiler
@@ -167,7 +164,6 @@ main(account: signer, auth_key_prefix: vector<u8>) {
 "#;
 
         let compiler = Compiler {
-            address: account_config::CORE_CODE_ADDRESS,
             deps: diem_framework_releases::current_modules().iter().collect(),
         };
         compiler

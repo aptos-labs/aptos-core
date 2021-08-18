@@ -1,4 +1,4 @@
-module M {
+module {{default}}.M {
     public foo(x: u64): u64 {
         return copy(x)*2;
     }
@@ -6,7 +6,7 @@ module M {
 
 //! new-transaction
 
-module N {
+module {{default}}.N {
     public bar(x: u64): u64 {
         return copy(x)*3;
     }

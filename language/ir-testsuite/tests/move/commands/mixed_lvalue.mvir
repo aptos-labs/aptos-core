@@ -1,4 +1,4 @@
-module A {
+module {{default}}.A {
 
     struct S { f: u64 }
 

@@ -1,5 +1,5 @@
-//# publish --address 0x1
-module Tester {
+//# publish
+module 0x1.Tester {
     eqtest1() {
         let x: u64;
         let r: &mut u64;
@@ -12,8 +12,8 @@ module Tester {
     }
 }
 
-//# publish --address 0x1
-module Tester2 {
+//# publish
+module 0x1.Tester2 {
     eqtest2() {
         let x: u64;
         let r: &mut u64;
@@ -26,8 +26,8 @@ module Tester2 {
     }
 }
 
-//# publish --address 0x1
-module Tester3 {
+//# publish
+module 0x1.Tester3 {
     neqtest1() {
         let x: u64;
         let r: &mut u64;
@@ -40,8 +40,8 @@ module Tester3 {
     }
 }
 
-//# publish --address 0x1
-module Tester4 {
+//# publish
+module 0x1.Tester4 {
     neqtest2() {
         let x: u64;
         let r: &mut u64;

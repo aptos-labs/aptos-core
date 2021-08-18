@@ -1,9 +1,9 @@
-//# publish --address 0x1
+//# publish
 
 // TODO: we might need to modify this test if we enable unreachable code
 // checking in the verifier.
 
-module Test {
+module 0x1.Test {
     public t(): u64 {
         return 100;
         return 0;

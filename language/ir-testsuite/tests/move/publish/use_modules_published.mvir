@@ -6,7 +6,7 @@
 
 
 //! sender: alice
-module M {
+module {{alice}}.M {
     public foo(): u64 {
         return 5;
     }
@@ -16,7 +16,7 @@ module M {
 //! new-transaction
 //! sender: bob
 
-module M {
+module {{bob}}.M {
     public bar(): u64 {
         return 7;
     }
@@ -25,7 +25,7 @@ module M {
 //! new-transaction
 //! sender: carol
 
-module M {
+module {{carol}}.M {
     import {{alice}}.M as M1;
     import {{bob}}.M as M2;
 
@@ -51,7 +51,7 @@ main() {
 //! new-transaction
 //! sender: dave
 
-module M {
+module {{dave}}.M {
     public baz(): u64 {
         return 9;
     }

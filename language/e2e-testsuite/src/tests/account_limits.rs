@@ -42,7 +42,6 @@ fn encode_add_account_limits_admin_script(execute_as: AccountAddress) -> WriteSe
     }
 ";
         let compiler = Compiler {
-            address: account_config::CORE_CODE_ADDRESS,
             deps: diem_framework_releases::current_modules().iter().collect(),
         };
         compiler
@@ -88,7 +87,6 @@ fn encode_update_account_limit_definition_script(
     }
 ";
         let compiler = Compiler {
-            address: account_config::CORE_CODE_ADDRESS,
             deps: diem_framework_releases::current_modules().iter().collect(),
         };
         compiler
@@ -134,7 +132,6 @@ fn encode_update_account_limit_window_info_script(
     }
 ";
         let compiler = Compiler {
-            address: account_config::CORE_CODE_ADDRESS,
             deps: diem_framework_releases::current_modules().iter().collect(),
         };
         compiler

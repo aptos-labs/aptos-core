@@ -1,4 +1,4 @@
-module M {
+module {{default}}.M {
     t(s1: signer, s2: signer) {
         s1 = move(s2);
         return;

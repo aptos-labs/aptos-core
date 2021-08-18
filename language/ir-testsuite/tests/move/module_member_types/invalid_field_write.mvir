@@ -1,4 +1,4 @@
-module Test {
+module {{default}}.Test {
     struct T{fr: bool}
 
     public new(): Self.T {

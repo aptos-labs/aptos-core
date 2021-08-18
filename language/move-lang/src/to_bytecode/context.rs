@@ -88,7 +88,7 @@ impl<'a> Context<'a> {
             let dependency_order = dependency_orderings[&module];
             let ir_name = Self::ir_module_alias(&module);
             let ir_ident = Self::translate_module_ident_impl(env.named_address_mapping(), module);
-            imports.push(IR::ImportDefinition::new(ir_ident, Some(ir_name.clone())));
+            imports.push(IR::ImportDefinition::new(ir_ident, Some(ir_name)));
             ordered_dependencies.push((
                 dependency_order,
                 IR::ModuleDependency {

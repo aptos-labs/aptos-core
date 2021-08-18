@@ -1,4 +1,4 @@
-module B {
+module {{default}}.B {
     struct T has drop {g: u64}
 
     public new(g: u64): Self.T {
@@ -17,7 +17,7 @@ module B {
 
 //! new-transaction
 
-module A {
+module {{default}}.A {
     import {{default}}.B;
     struct T has drop {f: B.T}
 

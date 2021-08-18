@@ -8,8 +8,8 @@ use diem_types::{
     vm_status::{KeptVMStatus, StatusCode},
 };
 use language_e2e_tests::{
-    account::Account, assert_prologue_parity, compile::compile_module_with_address,
-    current_function_name, executor::FakeExecutor, transaction_status_eq,
+    account::Account, assert_prologue_parity, compile::compile_module, current_function_name,
+    executor::FakeExecutor, transaction_status_eq,
 };
 
 // A module with an address different from the sender's address should be rejected
@@ -25,16 +25,16 @@ fn bad_module_address() {
     executor.add_account_data(&account1);
     executor.add_account_data(&account2);
 
-    let program = String::from(
+    let program = format!(
         "
-        module M {
-
-        }
+        module 0x{}.M {{
+        }}
         ",
+        account1.address()
     );
 
     // compile with account 1's address
-    let compiled_module = compile_module_with_address(account1.address(), "file_name", &program).1;
+    let compiled_module = compile_module("file_name", &program).1;
     // send with account 2's address
     let txn = account2
         .account()
@@ -72,9 +72,8 @@ macro_rules! module_republish_test {
             let account = executor.create_raw_account_data(1_000_000, sequence_number);
             executor.add_account_data(&account);
 
-            let program1 = String::from($prog1);
-            let compiled_module1 =
-                compile_module_with_address(account.address(), "file_name", &program1).1;
+            let program1 = String::from($prog1).replace("##ADDRESS##", &account.address().to_hex());
+            let compiled_module1 = compile_module("file_name", &program1).1;
 
             let txn1 = account
                 .account()
@@ -83,9 +82,8 @@ macro_rules! module_republish_test {
                 .sequence_number(sequence_number)
                 .sign();
 
-            let program2 = String::from($prog2);
-            let compiled_module2 =
-                compile_module_with_address(account.address(), "file_name", &program2).1;
+            let program2 = String::from($prog2).replace("##ADDRESS##", &account.address().to_hex());
+            let compiled_module2 = compile_module("file_name", &program2).1;
 
             let txn2 = account
                 .account()
@@ -116,13 +114,13 @@ macro_rules! module_republish_test {
 module_republish_test!(
     duplicate_module,
     "
-    module M {
+    module 0x##ADDRESS##.M {
         struct T { f: u64 }
         public f() { return; }
     }
     ",
     "
-    module M {
+    module 0x##ADDRESS##.M {
         struct T { f: u64 }
         public f() { return; }
     }
@@ -134,11 +132,11 @@ module_republish_test!(
 module_republish_test!(
     layout_compatible_module,
     "
-    module M {
+    module 0x##ADDRESS##.M {
     }
     ",
     "
-    module M {
+    module 0x##ADDRESS##.M {
         struct T { f: u64 }
     }
     ",
@@ -149,11 +147,11 @@ module_republish_test!(
 module_republish_test!(
     linking_compatible_module,
     "
-    module M {
+    module 0x##ADDRESS##.M {
     }
     ",
     "
-    module M {
+    module 0x##ADDRESS##.M {
         public f() { return; }
     }
     ",
@@ -164,12 +162,12 @@ module_republish_test!(
 module_republish_test!(
     layout_incompatible_module_with_new_field,
     "
-    module M {
+    module 0x##ADDRESS##.M {
         struct T { f: u64 }
     }
     ",
     "
-    module M {
+    module 0x##ADDRESS##.M {
         struct T { f: u64, g: bool }
     }
     ",
@@ -179,12 +177,12 @@ module_republish_test!(
 module_republish_test!(
     layout_incompatible_module_with_changed_field,
     "
-    module M {
+    module 0x##ADDRESS##.M {
         struct T { f: u64 }
     }
     ",
     "
-    module M {
+    module 0x##ADDRESS##.M {
         struct T { f: bool }
     }
     ",
@@ -194,12 +192,12 @@ module_republish_test!(
 module_republish_test!(
     layout_incompatible_module_with_removed_field,
     "
-    module M {
+    module 0x##ADDRESS##.M {
         struct T { f: u64 }
     }
     ",
     "
-    module M {
+    module 0x##ADDRESS##.M {
         struct T {}
     }
     ",
@@ -209,12 +207,12 @@ module_republish_test!(
 module_republish_test!(
     layout_incompatible_module_with_removed_struct,
     "
-    module M {
+    module 0x##ADDRESS##.M {
         struct T { f: u64 }
     }
     ",
     "
-    module M {
+    module 0x##ADDRESS##.M {
     }
     ",
     MiscellaneousError
@@ -224,12 +222,12 @@ module_republish_test!(
 module_republish_test!(
     linking_incompatible_module_with_added_param,
     "
-    module M {
+    module 0x##ADDRESS##.M {
         public f() { return; }
     }
     ",
     "
-    module M {
+    module 0x##ADDRESS##.M {
         public f(_a: u64) { return; }
     }
     ",
@@ -239,12 +237,12 @@ module_republish_test!(
 module_republish_test!(
     linking_incompatible_module_with_changed_param,
     "
-    module M {
+    module 0x##ADDRESS##.M {
         public f(_a: u64) { return; }
     }
     ",
     "
-    module M {
+    module 0x##ADDRESS##.M {
         public f(_a: bool) { return; }
     }
     ",
@@ -254,12 +252,12 @@ module_republish_test!(
 module_republish_test!(
     linking_incompatible_module_with_removed_pub_fn,
     "
-    module M {
+    module 0x##ADDRESS##.M {
         public f() { return; }
     }
     ",
     "
-    module M {
+    module 0x##ADDRESS##.M {
     }
     ",
     MiscellaneousError
@@ -276,14 +274,15 @@ pub fn test_publishing_no_modules_non_allowlist_script() {
     let sender = executor.create_raw_account_data(1_000_000, 10);
     executor.add_account_data(&sender);
 
-    let program = String::from(
+    let program = format!(
         "
-        module M {
-        }
+        module 0x{}.M {{
+        }}
         ",
+        sender.address(),
     );
 
-    let random_module = compile_module_with_address(sender.address(), "file_name", &program).1;
+    let random_module = compile_module("file_name", &program).1;
     let txn = sender
         .account()
         .transaction()
@@ -311,13 +310,12 @@ pub fn test_publishing_no_modules_non_allowlist_script_proper_sender() {
 
     let program = String::from(
         "
-        module M {
+        module 0x1.M {
         }
         ",
     );
 
-    let random_module =
-        compile_module_with_address(&account_config::CORE_CODE_ADDRESS, "file_name", &program).1;
+    let random_module = compile_module("file_name", &program).1;
     let txn = sender
         .transaction()
         .module(random_module)
@@ -341,13 +339,12 @@ pub fn test_publishing_no_modules_proper_sender() {
 
     let program = String::from(
         "
-        module M {
+        module 0x1.M {
         }
         ",
     );
 
-    let random_script =
-        compile_module_with_address(&account_config::CORE_CODE_ADDRESS, "file_name", &program).1;
+    let random_script = compile_module("file_name", &program).1;
     let txn = sender
         .transaction()
         .module(random_script)
@@ -371,13 +368,12 @@ pub fn test_publishing_no_modules_core_code_sender() {
 
     let program = String::from(
         "
-        module M {
+        module 0x1.M {
         }
         ",
     );
 
-    let random_script =
-        compile_module_with_address(&account_config::CORE_CODE_ADDRESS, "file_name", &program).1;
+    let random_script = compile_module("file_name", &program).1;
     let txn = sender
         .transaction()
         .module(random_script)
@@ -401,14 +397,15 @@ pub fn test_publishing_no_modules_invalid_sender() {
     let sender = executor.create_raw_account_data(1_000_000, 10);
     executor.add_account_data(&sender);
 
-    let program = String::from(
+    let program = format!(
         "
-        module M {
-        }
+        module 0x{}.M {{
+        }}
         ",
+        sender.address(),
     );
 
-    let random_script = compile_module_with_address(sender.address(), "file_name", &program).1;
+    let random_script = compile_module("file_name", &program).1;
     let txn = sender
         .account()
         .transaction()
@@ -432,14 +429,15 @@ pub fn test_publishing_allow_modules() {
     let sender = executor.create_raw_account_data(1_000_000, 10);
     executor.add_account_data(&sender);
 
-    let program = String::from(
+    let program = format!(
         "
-        module M {
-        }
+        module 0x{}.M {{
+        }}
         ",
+        sender.address(),
     );
 
-    let random_script = compile_module_with_address(sender.address(), "file_name", &program).1;
+    let random_script = compile_module("file_name", &program).1;
     let txn = sender
         .account()
         .transaction()

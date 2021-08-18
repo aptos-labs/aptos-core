@@ -2091,7 +2091,7 @@ fn is_struct_decl(tokens: &mut Lexer) -> Result<bool, ParseError<Loc, anyhow::Er
 
 fn parse_module(tokens: &mut Lexer) -> Result<ModuleDefinition, ParseError<Loc, anyhow::Error>> {
     consume_token(tokens, Tok::Module)?;
-    let name = parse_name(tokens)?;
+    let identifier = parse_qualified_module_ident(tokens)?;
     consume_token(tokens, Tok::LBrace)?;
 
     let mut friends: Vec<ModuleIdent> = vec![];
@@ -2121,7 +2121,7 @@ fn parse_module(tokens: &mut Lexer) -> Result<ModuleDefinition, ParseError<Loc, 
     tokens.advance()?; // consume the RBrace
 
     Ok(ModuleDefinition::new(
-        name,
+        identifier,
         friends,
         imports,
         vec![],

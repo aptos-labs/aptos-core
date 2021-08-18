@@ -630,8 +630,6 @@ fn eval_transaction<TComp: Compiler>(
         }};
     }
 
-    let sender_addr = *transaction.config.sender.address();
-
     // Start processing a new transaction.
     // stage 1: Compile the script/module
     if transaction.config.is_stage_disabled(Stage::Compiler) {
@@ -676,7 +674,7 @@ fn eval_transaction<TComp: Compiler>(
         static FILENAME_PAT: Lazy<Regex> =
             Lazy::new(|| Regex::new(r"[A-Za-z0-9_/.]+:([0-9]+):([0-9]+)").unwrap());
 
-        let compiler_res = compiler.compile(compiler_log, sender_addr, &transaction.input);
+        let compiler_res = compiler.compile(compiler_log, &transaction.input);
         let filtered_compiler_res = compiler_res.map_err(|err| {
             let msg = err.to_string();
             let filtered = FILENAME_PAT

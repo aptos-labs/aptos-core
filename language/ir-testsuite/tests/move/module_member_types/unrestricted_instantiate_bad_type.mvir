@@ -1,4 +1,4 @@
-module Test {
+module {{default}}.Test {
     struct T{fint: u64}
 
     public t1(): Self.T {

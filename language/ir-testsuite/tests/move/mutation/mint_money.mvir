@@ -1,6 +1,6 @@
 // check: "Unbound field balance"
 
-module Hack {
+module {{default}}.Hack {
 import 0x1.XUS;
     import 0x1.Diem;
     import 0x1.DiemAccount;

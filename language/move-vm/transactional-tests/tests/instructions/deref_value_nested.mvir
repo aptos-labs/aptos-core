@@ -1,5 +1,5 @@
-//# publish --address 0x1
-module B {
+//# publish
+module 0x1.B {
     struct T has drop {g: u64}
 
     public new(g: u64): Self.T {
@@ -16,8 +16,8 @@ module B {
     }
 }
 
-//# publish --address 0x1
-module A {
+//# publish
+module 0x1.A {
     import Transaction.B;
 
     struct T has drop {f: B.T}

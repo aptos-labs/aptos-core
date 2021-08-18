@@ -12,7 +12,6 @@ use move_binary_format::{
     errors::{Location, VMError},
     file_format::{CompiledModule, CompiledScript},
 };
-use move_core_types::account_address::AccountAddress;
 use move_symbol_pool::Symbol;
 
 #[allow(unused_macros)]
@@ -32,7 +31,7 @@ fn compile_script_string_impl(
     deps: Vec<CompiledModule>,
 ) -> Result<(CompiledScript, Option<VMError>)> {
     let parsed_script = parse_script(Symbol::from("file_name"), code).unwrap();
-    let script = compile_script(None, parsed_script, &deps)?.0;
+    let script = compile_script(parsed_script, &deps)?.0;
 
     let mut serialized_script = Vec::<u8>::new();
     script.serialize(&mut serialized_script)?;
@@ -81,9 +80,8 @@ fn compile_module_string_impl(
     code: &str,
     deps: Vec<CompiledModule>,
 ) -> Result<(CompiledModule, Option<VMError>)> {
-    let address = AccountAddress::ZERO;
     let module = parse_module(Symbol::from("file_name"), code).unwrap();
-    let compiled_module = compile_module(address, module, &deps)?.0;
+    let compiled_module = compile_module(module, &deps)?.0;
 
     let mut serialized_module = Vec::<u8>::new();
     compiled_module.serialize(&mut serialized_module)?;

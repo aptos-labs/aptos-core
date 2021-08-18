@@ -1,4 +1,4 @@
-module No {
+module {{default}}.No {
     native public made_up(x: u64): u64;
 }
 

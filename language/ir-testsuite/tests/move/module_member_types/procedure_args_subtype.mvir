@@ -1,6 +1,6 @@
 // check: CALL_TYPE_MISMATCH_ERROR
 
-module Test {
+module {{default}}.Test {
     public t(fr: &u64) {
         _ = move(fr);
         return;

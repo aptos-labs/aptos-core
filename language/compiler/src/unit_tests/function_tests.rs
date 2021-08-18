@@ -7,7 +7,7 @@ use crate::unit_tests::testutils::compile_module_string;
 fn compile_module_with_functions() {
     let code = String::from(
         "
-        module Foobar {
+        module 0x27.Foobar {
             struct FooCoin { value: u64 }
 
             public value(this: &Self.FooCoin): u64 {
@@ -71,7 +71,7 @@ fn generate_function(name: &str, num_formals: usize, num_locals: usize) -> Strin
 fn compile_module_with_large_frame() {
     let mut code = String::from(
         "
-        module Foobar {
+        module 0x16.Foobar {
             struct FooCoin { value: u64 }
         ",
     );
@@ -89,7 +89,7 @@ fn compile_module_with_large_frame() {
 fn compile_module_with_script_visibility_functions() {
     let code = String::from(
         "
-        module Foobar {
+        module 0xa1.Foobar {
             public(script) foo() {
                 return;
             }

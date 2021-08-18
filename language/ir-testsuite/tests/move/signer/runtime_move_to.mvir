@@ -1,4 +1,4 @@
-module M {
+module {{default}}.M {
     import 0x1.Signer;
 
     struct R1 has key { f: bool }

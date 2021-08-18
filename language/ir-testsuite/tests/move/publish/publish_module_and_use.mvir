@@ -1,4 +1,4 @@
-module MoneyHolder {
+module {{default}}.MoneyHolder {
         import 0x1.XUS;
         import 0x1.Diem;
 

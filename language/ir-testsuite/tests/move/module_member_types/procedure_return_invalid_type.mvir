@@ -1,4 +1,4 @@
-module Test {
+module {{default}}.Test {
     public no(): u64 {
         return false;
     }

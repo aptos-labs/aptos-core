@@ -1,6 +1,6 @@
 // check: DUPLICATE_ELEMENT
 
-module M {
+module {{default}}.M {
     struct T{b: bool}
     struct T{x: u64}
 }

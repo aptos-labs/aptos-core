@@ -1,4 +1,4 @@
-module Test {
+module {{default}}.Test {
     public foo(v: u64): u64 * u64 {
         let one_less: u64;
         let one_more: u64;

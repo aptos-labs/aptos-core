@@ -1,4 +1,4 @@
-module DiemAccount {
+module {{default}}.DiemAccount {
     import 0x1.DiemAccount;
     import 0x1.Signer;
 

@@ -1,4 +1,4 @@
-module A {
+module {{default}}.A {
     struct Coin { balance: u64 }
     struct A { c: Self.Coin }
 

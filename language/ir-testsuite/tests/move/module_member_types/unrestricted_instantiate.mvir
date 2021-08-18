@@ -1,4 +1,4 @@
-module Test {
+module {{default}}.Test {
     struct T has drop {fint: u64, fv: bool}
 
     public t1(fint: u64, fv: bool): Self.T {

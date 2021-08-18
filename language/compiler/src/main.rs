@@ -14,7 +14,6 @@ use move_binary_format::{
 use move_command_line_common::files::{
     MOVE_COMPILED_EXTENSION, MOVE_IR_EXTENSION, SOURCE_MAP_EXTENSION,
 };
-use move_core_types::account_address::AccountAddress;
 use move_symbol_pool::Symbol;
 use std::{
     fs,
@@ -29,9 +28,6 @@ struct Args {
     /// Treat input file as a module (default is to treat file as a script)
     #[structopt(short = "m", long = "module")]
     pub module_input: bool,
-    /// Account address used for publishing
-    #[structopt(short = "a", long = "address")]
-    pub address: String,
     /// Do not automatically run the bytecode verifier
     #[structopt(long = "no-verify")]
     pub no_verify: bool,
@@ -81,13 +77,6 @@ fn write_output(path: &Path, buf: &[u8]) {
 fn main() {
     let args = Args::from_args();
 
-    let address = match AccountAddress::from_hex_literal(&args.address) {
-        Ok(address) => address,
-        Err(_) => {
-            println!("Bad address: {}", args.address);
-            std::process::exit(1);
-        }
-    };
     let source_path = Path::new(&args.source_path);
     let mvir_extension = MOVE_IR_EXTENSION;
     let mv_extension = MOVE_COMPILED_EXTENSION;
@@ -141,8 +130,7 @@ fn main() {
     };
 
     if args.module_input {
-        let (compiled_module, source_map) =
-            util::do_compile_module(&args.source_path, address, &deps_owned);
+        let (compiled_module, source_map) = util::do_compile_module(&args.source_path, &deps_owned);
         if !args.no_verify {
             do_verify_module(&compiled_module, &deps_owned);
         }
@@ -162,8 +150,7 @@ fn main() {
             .expect("Unable to serialize module");
         write_output(&source_path.with_extension(mv_extension), &module);
     } else {
-        let (compiled_script, source_map) =
-            util::do_compile_script(&args.source_path, address, &deps_owned);
+        let (compiled_script, source_map) = util::do_compile_script(&args.source_path, &deps_owned);
         if !args.no_verify {
             do_verify_script(&compiled_script, &deps_owned);
         }

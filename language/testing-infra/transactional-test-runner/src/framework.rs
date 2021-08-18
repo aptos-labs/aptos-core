@@ -123,25 +123,8 @@ pub trait MoveTestAdapter<'a> {
             TaskCommand::Init { .. } => {
                 panic!("The 'init' command is optional. But if used, it must be the first command")
             }
-            TaskCommand::Publish(
-                PublishCommand {
-                    gas_budget,
-                    syntax,
-                    address,
-                },
-                extra_args,
-            ) => {
+            TaskCommand::Publish(PublishCommand { gas_budget, syntax }, extra_args) => {
                 let syntax = syntax.unwrap_or_else(|| self.default_syntax());
-                match (syntax, address) {
-                    (SyntaxChoice::Source, None) | (SyntaxChoice::IR, Some(_)) => (),
-                    (SyntaxChoice::IR, None) => {
-                        panic!("The address flag for 'publish' must be set for IR syntax")
-                    }
-                    (SyntaxChoice::Source, Some(_)) => panic!(
-                        "The address flag for 'publish' cannot be set \
-                        for Move source language syntax"
-                    ),
-                };
                 let data = match data {
                     Some(f) => f,
                     None => panic!(
@@ -171,8 +154,7 @@ pub trait MoveTestAdapter<'a> {
                     }
                     }
                     SyntaxChoice::IR => {
-                        let module =
-                            compile_ir_module(state.dep_modules(), address.unwrap(), data_path)?;
+                        let module = compile_ir_module(state.dep_modules(), data_path)?;
                         (None, module, None)
                     }
                 };
@@ -394,12 +376,11 @@ fn compile_source_unit(
 
 fn compile_ir_module<'a>(
     deps: impl Iterator<Item = &'a CompiledModule>,
-    address: AccountAddress,
     file_name: &str,
 ) -> Result<CompiledModule> {
     use compiler::Compiler as IRCompiler;
     let code = std::fs::read_to_string(file_name).unwrap();
-    IRCompiler::new(address, deps.collect()).into_compiled_module(file_name, &code)
+    IRCompiler::new(deps.collect()).into_compiled_module(file_name, &code)
 }
 
 fn compile_ir_script<'a>(
@@ -408,7 +389,7 @@ fn compile_ir_script<'a>(
 ) -> Result<CompiledScript> {
     use compiler::Compiler as IRCompiler;
     let code = std::fs::read_to_string(file_name).unwrap();
-    let (script, _) = IRCompiler::new(/* unused */ AccountAddress::ZERO, deps.collect())
+    let (script, _) = IRCompiler::new(deps.collect())
         .into_compiled_script_and_source_map(file_name.into(), &code)?;
     Ok(script)
 }

@@ -1,4 +1,4 @@
-module M {
+module {{default}}.M {
     public(friend) foo() {
         return;
     }
@@ -6,7 +6,7 @@ module M {
 
 //! new-transaction
 
-module N {
+module {{default}}.N {
     import {{default}}.M;
     foo() {
         M.foo();

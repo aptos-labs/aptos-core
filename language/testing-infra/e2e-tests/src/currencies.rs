@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{account::Account, compile, executor::FakeExecutor};
-use diem_types::{account_address::AccountAddress, transaction::WriteSetPayload};
+use diem_types::transaction::WriteSetPayload;
 
 pub fn add_currency_to_system(
     executor: &mut FakeExecutor,
@@ -21,7 +21,7 @@ pub fn add_currency_to_system(
                 return;
             }
             ";
-            compile::compile_script_with_address(dr_account.address(), "file_name", script, vec![])
+            compile::compile_script("file_name", script, vec![])
         };
 
         let txn = dr_account
@@ -40,7 +40,7 @@ pub fn add_currency_to_system(
     let (compiled_module, module) = {
         let module = format!(
             r#"
-            module {} {{
+            module 0x1.{} {{
                 import 0x1.Diem;
                 import 0x1.FixedPoint32;
                 struct {currency_code} has store {{ x: bool }}
@@ -58,14 +58,10 @@ pub fn add_currency_to_system(
             }}
             "#,
             currency_code = currency_code_to_register,
-            currency_code_hex = hex::encode(currency_code_to_register)
+            currency_code_hex = hex::encode(currency_code_to_register),
         );
 
-        compile::compile_module_with_address(
-            &AccountAddress::from_hex_literal("0x1").unwrap(),
-            "this_is_a_filename",
-            &module,
-        )
+        compile::compile_module("this_is_a_filename", &module)
     };
 
     let txn = dr_account
@@ -90,12 +86,7 @@ pub fn add_currency_to_system(
             "#,
                 currency_code = currency_code_to_register
             );
-            compile::compile_script_with_address(
-                dr_account.address(),
-                "file_name",
-                &script,
-                vec![compiled_module],
-            )
+            compile::compile_script("file_name", &script, vec![compiled_module])
         };
 
         let write_set_payload = WriteSetPayload::Script {

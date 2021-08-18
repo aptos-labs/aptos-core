@@ -1,6 +1,6 @@
 // check: Invalid Token
 
-module Token {
+module {{default}}.Token {
     struct T has key { b: bool }
     public new(): Self.T {
         return T{ b: true };

@@ -2,7 +2,7 @@
 //! account: bob
 
 //! sender: alice
-module M {
+module {{alice}}.M {
     public foo(x: u64): u64 {
         return move(x)*2;
     }

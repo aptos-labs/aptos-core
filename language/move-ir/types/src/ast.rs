@@ -67,12 +67,12 @@ pub struct Script {
 //**************************************************************************************************
 
 /// Newtype for a name of a module
-#[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct ModuleName(pub Symbol);
 
 /// Newtype of the address + the module name
 /// `addr.m`
-#[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct QualifiedModuleIdent {
     /// Name for the module. Will be unique among modules published under the same address
     pub name: ModuleName,
@@ -83,8 +83,8 @@ pub struct QualifiedModuleIdent {
 /// A Move module
 #[derive(Clone, Debug, PartialEq)]
 pub struct ModuleDefinition {
-    /// name of the module
-    pub name: ModuleName,
+    /// name and address of the module
+    pub identifier: QualifiedModuleIdent,
     /// the module's friends
     pub friends: Vec<ModuleIdent>,
     /// the module's dependencies
@@ -105,7 +105,7 @@ pub struct ModuleDefinition {
 
 /// Either a qualified module name like `addr.m` or `Transaction.m`, which refers to a module in
 /// the same transaction.
-#[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub enum ModuleIdent {
     Transaction(ModuleName),
     Qualified(QualifiedModuleIdent),
@@ -816,7 +816,7 @@ impl ModuleDefinition {
     /// and procedures
     /// Does not verify the correctness of any internal properties of its elements
     pub fn new(
-        name: Symbol,
+        identifier: QualifiedModuleIdent,
         friends: Vec<ModuleIdent>,
         imports: Vec<ImportDefinition>,
         explicit_dependency_declarations: Vec<ModuleDependency>,
@@ -826,7 +826,7 @@ impl ModuleDefinition {
         synthetics: Vec<SyntheticDefinition>,
     ) -> Self {
         ModuleDefinition {
-            name: ModuleName(name),
+            identifier,
             friends,
             imports,
             explicit_dependency_declarations,
@@ -900,7 +900,7 @@ impl ImportDefinition {
     pub fn new(ident: ModuleIdent, alias_opt: Option<ModuleName>) -> Self {
         let alias = match alias_opt {
             Some(alias) => alias,
-            None => ident.name().clone(),
+            None => *ident.name(),
         };
         ImportDefinition { ident, alias }
     }
@@ -1268,7 +1268,7 @@ impl fmt::Display for QualifiedModuleIdent {
 
 impl fmt::Display for ModuleDefinition {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "Module({}, ", self.name)?;
+        writeln!(f, "Module({}, ", self.identifier)?;
 
         writeln!(f, "Imports(")?;
         for import in &self.imports {

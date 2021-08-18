@@ -215,7 +215,6 @@ fn enable_custom_script(ctx: &mut AdminContext) -> Result<()> {
         ";
 
         let compiler = Compiler {
-            address: diem_sdk::types::account_config::CORE_CODE_ADDRESS,
             deps: diem_framework_releases::current_modules().iter().collect(),
         };
         compiler

@@ -1,6 +1,6 @@
 // check: CALL_BORROWED_MUTABLE_REFERENCE_ERROR
 
-module Tester {
+module {{default}}.Tester {
     struct T has drop {v: u64}
 
     public new(v: u64): Self.T  {

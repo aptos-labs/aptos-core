@@ -1,6 +1,6 @@
 // check: UNSAFE_RET_UNUSED_VALUES_WITHOUT_DROP
 
-module A {
+module {{default}}.A {
 import 0x1.XUS;
     import 0x1.Diem;
 

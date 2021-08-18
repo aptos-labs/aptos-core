@@ -1,4 +1,4 @@
-module Token {
+module {{default}}.Token {
     import 0x1.Signer;
 
     struct T has key {balance: u64}

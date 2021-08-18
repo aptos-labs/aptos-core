@@ -2,7 +2,7 @@
 
 // Test parsing invariants and synthetics, parsing only.
 //! no-run: runtime
-module TestInvariants {
+module {{default}}.TestInvariants {
 
   synthetic all_values: u128;
 

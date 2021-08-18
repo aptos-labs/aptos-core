@@ -1,4 +1,4 @@
-module Math {
+module {{default}}.Math {
 
   public sum_(n: u64, acc: u64): u64 {
     let new_n: u64;

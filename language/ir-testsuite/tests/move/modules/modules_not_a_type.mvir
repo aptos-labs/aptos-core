@@ -1,6 +1,6 @@
 // check: "Unbound struct Self.M"
 
-module M {
+module {{default}}.M {
     public no(x: Self.M) {
         return;
     }

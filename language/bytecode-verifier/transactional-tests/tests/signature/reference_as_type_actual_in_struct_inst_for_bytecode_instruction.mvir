@@ -1,5 +1,5 @@
-//# publish --address 0x1
-module M {
+//# publish
+module 0x1.M {
     import 0x1.Signer;
 
     struct Some<T> has key { item: T }
@@ -11,8 +11,8 @@ module M {
     }
 }
 
-//# publish --address 0x1
-module M {
+//# publish
+module 0x1.M {
     import 0x1.Signer;
 
     struct Some<T> has key { item: T }
@@ -25,8 +25,8 @@ module M {
     }
 }
 
-//# publish --address 0x1
-module M {
+//# publish
+module 0x1.M {
     import 0x1.Signer;
 
     struct Some<T> has key { item: T }
@@ -38,8 +38,8 @@ module M {
     }
 }
 
-//# publish --address 0x1
-module M {
+//# publish
+module 0x1.M {
     import 0x1.Signer;
 
     struct Some<T> has key { item: T }
@@ -53,7 +53,7 @@ module M {
 // check: INVALID_SIGNATURE_TOKEN
 
 //! new-transaction
-module M {
+module 0x1.M {
     import 0x1.Signer;
 
     struct Some<T> has key { item: T }
@@ -64,8 +64,8 @@ module M {
     }
 }
 
-//# publish --address 0x1
-module M {
+//# publish
+module 0x1.M {
     struct Some<T> { item: T }
 
     foo() {
@@ -80,8 +80,8 @@ module M {
     }
 }
 
-//# publish --address 0x1
-module M {
+//# publish
+module 0x1.M {
     struct Some<T> { item: T }
 
     foo() {
@@ -94,8 +94,8 @@ module M {
     }
 }
 
-//# publish --address 0x1
-module M {
+//# publish
+module 0x1.M {
     struct S<T> { v: T }
 
     // cannot use refs in generics
@@ -104,8 +104,8 @@ module M {
     }
 }
 
-//# publish --address 0x1
-module M {
+//# publish
+module 0x1.M {
     struct S<T> { v: T }
 
     // cannot use refs in generics

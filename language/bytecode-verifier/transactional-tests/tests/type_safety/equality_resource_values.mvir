@@ -1,5 +1,5 @@
-//# publish --address 0x1
-module Token {
+//# publish
+module 0x1.Token {
     struct T has key { b: bool }
 
     public test() {

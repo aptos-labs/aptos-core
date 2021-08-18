@@ -1,15 +1,15 @@
-module A {
+module {{default}}.A {
 }
 
 //! new-transaction
 
-module B {
+module {{default}}.B {
     friend {{default}}.A;
 }
 
 //! new-transaction
 
-module A {
+module {{default}}.A {
     friend {{default}}.B;
 }
 

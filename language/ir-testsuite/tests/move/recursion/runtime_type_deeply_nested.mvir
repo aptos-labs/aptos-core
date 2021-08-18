@@ -1,4 +1,4 @@
-module M {
+module {{default}}.M {
     struct Foo<T> { x: bool }
     public f0<T>() { return; }
     public f3<T>() { Self.f0<Self.Foo<Self.Foo<Self.Foo<T>>>>(); return; }

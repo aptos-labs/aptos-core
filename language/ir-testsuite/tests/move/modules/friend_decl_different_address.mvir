@@ -3,13 +3,13 @@
 
 //! sender: alice
 
-module M {
+module {{alice}}.M {
 }
 
 //! new-transaction
 //! sender: bob
 
-module N {
+module {{bob}}.N {
     friend {{alice}}.M;
 }
 

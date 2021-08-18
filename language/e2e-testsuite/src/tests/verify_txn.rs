@@ -31,7 +31,7 @@ use language_e2e_tests::{
     common_transactions::{
         multi_agent_mint_script, multi_agent_swap_script, raw_multi_agent_swap_txn, rotate_key_txn,
     },
-    compile::compile_module_with_address,
+    compile::compile_module,
     current_function_name,
     executor::FakeExecutor,
     gas_costs, test_with_different_versions, transaction_status_eq,
@@ -782,28 +782,29 @@ pub fn test_publish_from_diem_root() {
     let sender = executor.create_raw_account_data(1_000_000, 10);
     executor.add_account_data(&sender);
 
-    let module = String::from(
+    let module = format!(
         "
-        module M {
-            public max(a: u64, b: u64): u64 {
-                if (copy(a) > copy(b)) {
+        module 0x{}.M {{
+            public max(a: u64, b: u64): u64 {{
+                if (copy(a) > copy(b)) {{
                     return copy(a);
-                } else {
+                }} else {{
                     return copy(b);
-                }
+                }}
                 return 0;
-            }
+            }}
 
-            public sum(a: u64, b: u64): u64 {
+            public sum(a: u64, b: u64): u64 {{
                 let c: u64;
                 c = copy(a) + copy(b);
                 return copy(c);
-            }
-        }
+            }}
+        }}
         ",
+        sender.address(),
     );
 
-    let random_module = compile_module_with_address(sender.address(), "file_name", &module).1;
+    let random_module = compile_module("file_name", &module).1;
     let txn = sender
         .account()
         .transaction()
@@ -984,7 +985,7 @@ pub fn test_no_publishing_diem_root_sender() {
 
     let module = String::from(
         "
-        module M {
+        module 0x1.M {
             public max(a: u64, b: u64): u64 {
                 if (copy(a) > copy(b)) {
                     return copy(a);
@@ -1003,8 +1004,7 @@ pub fn test_no_publishing_diem_root_sender() {
         ",
     );
 
-    let random_module =
-        compile_module_with_address(&account_config::CORE_CODE_ADDRESS, "file_name", &module).1;
+    let random_module = compile_module("file_name", &module).1;
     let txn = sender
         .transaction()
         .module(random_module)
@@ -1030,28 +1030,29 @@ pub fn test_open_publishing_invalid_address() {
     executor.add_account_data(&sender);
     executor.add_account_data(&receiver);
 
-    let module = String::from(
+    let module = format!(
         "
-        module M {
-            public max(a: u64, b: u64): u64 {
-                if (copy(a) > copy(b)) {
+        module 0x{}.M {{
+            public max(a: u64, b: u64): u64 {{
+                if (copy(a) > copy(b)) {{
                     return copy(a);
-                } else {
+                }} else {{
                     return copy(b);
-                }
+                }}
                 return 0;
-            }
+            }}
 
-            public sum(a: u64, b: u64): u64 {
+            public sum(a: u64, b: u64): u64 {{
                 let c: u64;
                 c = copy(a) + copy(b);
                 return copy(c);
-            }
-        }
+            }}
+        }}
         ",
+        receiver.address(),
     );
 
-    let random_module = compile_module_with_address(receiver.address(), "file_name", &module).1;
+    let random_module = compile_module("file_name", &module).1;
     let txn = sender
         .account()
         .transaction()
@@ -1088,28 +1089,29 @@ pub fn test_open_publishing() {
     let sender = executor.create_raw_account_data(1_000_000, 10);
     executor.add_account_data(&sender);
 
-    let program = String::from(
+    let program = format!(
         "
-        module M {
-            public max(a: u64, b: u64): u64 {
-                if (copy(a) > copy(b)) {
+        module 0x{}.M {{
+            public max(a: u64, b: u64): u64 {{
+                if (copy(a) > copy(b)) {{
                     return copy(a);
-                } else {
+                }} else {{
                     return copy(b);
-                }
+                }}
                 return 0;
-            }
+            }}
 
-            public sum(a: u64, b: u64): u64 {
+            public sum(a: u64, b: u64): u64 {{
                 let c: u64;
                 c = copy(a) + copy(b);
                 return copy(c);
-            }
-        }
+            }}
+        }}
         ",
+        sender.address(),
     );
 
-    let random_module = compile_module_with_address(sender.address(), "file_name", &program).1;
+    let random_module = compile_module("file_name", &program).1;
     let txn = sender
         .account()
         .transaction()
@@ -1127,7 +1129,7 @@ pub fn test_open_publishing() {
 
 fn bad_module() -> (CompiledModule, Vec<u8>) {
     let bad_module_code = "
-    module Test {
+    module 0x1.Test {
         struct R1 { b: bool }
         struct S1 has copy, drop { r1: Self.R1 }
 
@@ -1140,10 +1142,7 @@ fn bad_module() -> (CompiledModule, Vec<u8>) {
         }
     }
     ";
-    let compiler = Compiler {
-        address: account_config::CORE_CODE_ADDRESS,
-        deps: vec![],
-    };
+    let compiler = Compiler { deps: vec![] };
     let module = compiler
         .into_compiled_module("file_name", bad_module_code)
         .expect("Failed to compile");
@@ -1156,29 +1155,31 @@ fn good_module_uses_bad(
     address: AccountAddress,
     bad_dep: CompiledModule,
 ) -> (CompiledModule, Vec<u8>) {
-    let good_module_code = "
-    module Test2 {
+    let good_module_code = format!(
+        "
+    module 0x{}.Test2 {{
         import 0x1.Test;
-        struct S { b: bool }
+        struct S {{ b: bool }}
 
-        foo(): Test.S1 {
+        foo(): Test.S1 {{
             return Test.new_S1();
-        }
-        public bar() {
+        }}
+        public bar() {{
             return;
-        }
-    }
-    ";
+        }}
+    }}
+    ",
+        address,
+    );
 
     let compiler = Compiler {
-        address,
         deps: diem_framework_releases::current_modules()
             .iter()
             .chain(std::iter::once(&bad_dep))
             .collect(),
     };
     let module = compiler
-        .into_compiled_module("file_name", good_module_code)
+        .into_compiled_module("file_name", good_module_code.as_str())
         .expect("Failed to compile");
     let mut bytes = vec![];
     module.serialize(&mut bytes).unwrap();
@@ -1209,7 +1210,6 @@ fn test_script_dependency_fails_verification() {
     ";
 
     let compiler = Compiler {
-        address: *sender.address(),
         deps: vec![&module],
     };
     let script = compiler
@@ -1290,7 +1290,6 @@ fn test_type_tag_dependency_fails_verification() {
     ";
 
     let compiler = Compiler {
-        address: *sender.address(),
         deps: vec![&module],
     };
     let script = compiler
@@ -1352,7 +1351,6 @@ fn test_script_transitive_dependency_fails_verification() {
     ";
 
     let compiler = Compiler {
-        address: *sender.address(),
         deps: vec![&good_module],
     };
     let script = compiler
@@ -1395,23 +1393,25 @@ fn test_module_transitive_dependency_fails_verification() {
     let sender = executor.create_raw_account_data(1_000_000, 10);
     executor.add_account_data(&sender);
 
-    let module_code = "
-    module Test3 {
+    let module_code = format!(
+        "
+    module 0x{}.Test3 {{
         import 0x1.Test2;
-        public bar() {
+        public bar() {{
             Test2.bar();
             return;
-        }
-    }
-    ";
+        }}
+    }}
+    ",
+        sender.address()
+    );
     let module = {
         let compiler = Compiler {
-            address: *sender.address(),
             deps: vec![&good_module],
         };
         diem_types::transaction::Module::new(
             compiler
-                .into_module_blob("file_name", module_code)
+                .into_module_blob("file_name", module_code.as_str())
                 .expect("Module compilation failed"),
         )
     };
@@ -1460,7 +1460,6 @@ fn test_type_tag_transitive_dependency_fails_verification() {
     ";
 
     let compiler = Compiler {
-        address: *sender.address(),
         deps: vec![&good_module],
     };
     let script = compiler
@@ -1539,7 +1538,7 @@ pub fn publish_and_register_new_currency() {
     let tc_account = Account::new_blessed_tc();
 
     let module = r#"
-        module COIN {
+        module 0x1.COIN {
             import 0x1.FixedPoint32;
             import 0x1.Diem;
             struct COIN has store { x: bool }
@@ -1557,8 +1556,7 @@ pub fn publish_and_register_new_currency() {
         }
     "#;
 
-    let (compiled_module, module) =
-        compile_module_with_address(&account_config::CORE_CODE_ADDRESS, "file_name", module);
+    let (compiled_module, module) = compile_module("file_name", module);
     let txn = sender
         .transaction()
         .module(module)
@@ -1581,7 +1579,6 @@ pub fn publish_and_register_new_currency() {
             }
             "#;
             let compiler = Compiler {
-                address: account_config::CORE_CODE_ADDRESS,
                 deps: vec![&compiled_module],
             };
             compiler

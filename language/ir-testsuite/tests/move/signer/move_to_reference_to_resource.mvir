@@ -1,4 +1,4 @@
-module M {
+module {{default}}.M {
     struct R has key { f: bool }
     t0(s: &signer, r: &Self.R) {
         (copy(s));
@@ -11,7 +11,7 @@ module M {
 
 //! new-transaction
 
-module N {
+module {{default}}.N {
     struct R<T> has key { f: T }
     t0(s: &signer, r: &mut Self.R<bool>) {
         move_to<R<bool>>(copy(s), move(r));

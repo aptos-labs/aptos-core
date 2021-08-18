@@ -6,7 +6,7 @@
 
 // Test parsing the conditions themselves relative to return values, acquires clauses
 //! no-run: runtime
-module TestConditions {
+module {{default}}.TestConditions {
 
   struct T has key { i: u64 }
 
@@ -84,7 +84,7 @@ module TestConditions {
 // check that we can parse the language of spec expressions without access paths
 //! new-transaction
 //! no-run: runtime
-module TestSpecExp {
+module {{default}}.TestSpecExp {
 
   struct T { b: bool }
   struct T1<Name> { b: Name }
@@ -162,7 +162,7 @@ module TestSpecExp {
 // check that we can handle the trickier case of access paths
 //! new-transaction
 //! no-run: runtime
-module TestEnsuresAccessPath {
+module {{default}}.TestEnsuresAccessPath {
 
   struct T { b: bool, a: address }
   struct T1 { y: Self.T }
@@ -209,7 +209,7 @@ module TestEnsuresAccessPath {
 
 //! new-transaction
 //! no-run: runtime
-module TestBinaryOps {
+module {{default}}.TestBinaryOps {
   struct T { b: bool }
   struct Pair { x: u64, y: u64}
 

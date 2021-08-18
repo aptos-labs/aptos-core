@@ -580,11 +580,11 @@ impl<'a> Context<'a> {
         alias: ModuleName,
     ) -> Result<ModuleHandleIndex> {
         // We don't care about duplicate aliases, if they exist
-        self.aliases.insert(id.clone(), alias.clone());
+        self.aliases.insert(id, alias);
         let address = self.address_index(id.address)?;
         let name = self.identifier_index(id.name.0)?;
         self.modules
-            .insert(alias.clone(), (id, ModuleHandle { address, name }));
+            .insert(alias, (id, ModuleHandle { address, name }));
         Ok(ModuleHandleIndex(get_or_add_item_ref(
             &mut self.module_handles,
             &self.modules.get(&alias).unwrap().1,
@@ -650,7 +650,7 @@ impl<'a> Context<'a> {
         fname: FunctionName,
         signature: FunctionSignature,
     ) -> Result<()> {
-        let m_f = (mname.clone(), fname.clone());
+        let m_f = (mname, fname.clone());
         let module = self.module_handle_index(&mname)?;
         let name = self.identifier_index(fname.0)?;
 
@@ -732,7 +732,7 @@ impl<'a> Context<'a> {
         if s.module == ModuleName::module_self() {
             bail!("Unbound struct {}", s)
         }
-        let mident = self.module_ident(&s.module)?.clone();
+        let mident = *self.module_ident(&s.module)?;
         let dep = self.dependency(&mident)?;
         match dep.struct_handle(&mident.name, &s.name) {
             None => bail!("Unbound struct {}", s),
@@ -783,7 +783,7 @@ impl<'a> Context<'a> {
                 let (mident, sname) = dep_info
                     .source_struct_info(orig_sh_idx)
                     .ok_or_else(|| format_err!("Malformed dependency"))?;
-                let module_name = self.module_alias(&mident)?.clone();
+                let module_name = *self.module_alias(&mident)?;
                 let sident = QualifiedStructIdent {
                     module: module_name,
                     name: sname,
@@ -796,7 +796,7 @@ impl<'a> Context<'a> {
                 let (mident, sname) = dep_info
                     .source_struct_info(orig_sh_idx)
                     .ok_or_else(|| format_err!("Malformed dependency"))?;
-                let module_name = self.module_alias(&mident)?.clone();
+                let module_name = *self.module_alias(&mident)?;
                 let sident = QualifiedStructIdent {
                     module: module_name,
                     name: sname,
@@ -842,7 +842,7 @@ impl<'a> Context<'a> {
         if m == &ModuleName::module_self() {
             bail!("Unbound function {}.{}", m, f)
         }
-        let mident = self.module_ident(m)?.clone();
+        let mident = *self.module_ident(m)?;
         let dep = self.dependency(&mident)?;
         match dep.function_signature(f) {
             None => bail!("Unbound function {}.{}", mident, f),
@@ -851,7 +851,7 @@ impl<'a> Context<'a> {
     }
 
     fn ensure_function_declared(&mut self, m: ModuleName, f: FunctionName) -> Result<()> {
-        let m_f = (m.clone(), f.clone());
+        let m_f = (m, f.clone());
         if !self.function_handles.contains_key(&m_f) {
             assert!(!self.function_signatures.contains_key(&m_f));
             let sig = self.dep_function_signature(&m, &f)?;
@@ -871,7 +871,7 @@ impl<'a> Context<'a> {
         m: ModuleName,
         f: FunctionName,
     ) -> Result<&(FunctionHandle, FunctionHandleIndex)> {
-        self.ensure_function_declared(m.clone(), f.clone())?;
+        self.ensure_function_declared(m, f.clone())?;
         Ok(self.function_handles.get(&(m, f)).unwrap())
     }
 
@@ -883,7 +883,7 @@ impl<'a> Context<'a> {
         m: ModuleName,
         f: FunctionName,
     ) -> Result<&FunctionSignature> {
-        self.ensure_function_declared(m.clone(), f.clone())?;
+        self.ensure_function_declared(m, f.clone())?;
         Ok(self.function_signatures.get(&(m, f)).unwrap())
     }
 }

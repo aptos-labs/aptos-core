@@ -1,4 +1,4 @@
-module M {
+module {{default}}.M {
     struct S<T> { s: T }
     t(s: signer): Self.S<signer> {
         let x: Self.S<signer>;
@@ -9,7 +9,7 @@ module M {
 // check: READREF_WITHOUT_COPY_ABILITY
 
 //! new-transaction
-module M {
+module {{default}}.M {
     struct S<T> { s: T }
     t(s: signer): signer {
         let x: Self.S<signer>;

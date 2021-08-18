@@ -7,30 +7,31 @@ use diem_types::{
     vm_status::{DiscardedVMStatus, KeptVMStatus},
 };
 use language_e2e_tests::{
-    account::Account, compile::compile_module_with_address, current_function_name,
-    executor::FakeExecutor, transaction_status_eq, utils,
+    account::Account, compile::compile_module, current_function_name, executor::FakeExecutor,
+    transaction_status_eq, utils,
 };
 use move_core_types::{identifier::Identifier, language_storage::ModuleId};
 
 fn prepare_module(executor: &mut FakeExecutor, account: &Account, seq_num: u64) -> u64 {
-    let program = String::from(
+    let program = format!(
         "
-        module M {
-            f_private(s: &signer) {
+        module 0x{}.M {{
+            f_private(s: &signer) {{
                 return;
-            }
+            }}
 
-            public f_public(s: &signer) {
+            public f_public(s: &signer) {{
                 return;
-            }
+            }}
 
-            public(script) f_script(s: signer) {
+            public(script) f_script(s: signer) {{
                 return;
-            }
-        }
+            }}
+        }}
         ",
+        account.address(),
     );
-    let compiled_module = compile_module_with_address(account.address(), "file_name", &program).1;
+    let compiled_module = compile_module("file_name", &program).1;
 
     let txn = account
         .transaction()

@@ -1,5 +1,5 @@
-//# publish --address 0x1
-module TestMoveFrom {
+//# publish
+module 0x1.TestMoveFrom {
     import 0x1.Signer;
 
     struct Counter has key { i: u64 }

@@ -1,6 +1,6 @@
 // check: RECURSIVE_STRUCT_DEFINITION
 
-module M {
+module {{default}}.M {
     struct A{b: Self.B}
     struct B{a: Self.A}
 }

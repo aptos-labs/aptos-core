@@ -1,21 +1,21 @@
-module A {
+module {{default}}.A {
 }
 
 //! new-transaction
 
-module B {
+module {{default}}.B {
     friend {{default}}.A;
 }
 
 //! new-transaction
 
-module C {
+module {{default}}.C {
     friend {{default}}.B;
 }
 
 //! new-transaction
 
-module A {
+module {{default}}.A {
     friend {{default}}.C;
 }
 

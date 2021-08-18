@@ -1,5 +1,5 @@
-//# publish --address 0x1
-module M {
+//# publish
+module 0x1.M {
     struct X has drop { y: Self.Y }
     struct Y has drop { u: u64 }
 
@@ -13,8 +13,8 @@ module M {
     }
 }
 
-//# publish --address 0x1
-module M2 {
+//# publish
+module 0x1.M2 {
     struct X has drop { y: Self.Y }
     struct Y has drop { u: u64 }
     t2(): &u64 {
@@ -27,8 +27,8 @@ module M2 {
     }
 }
 
-//# publish --address 0x1
-module M3 {
+//# publish
+module 0x1.M3 {
     struct X has drop { y: Self.Y }
     struct Y has drop { u: u64 }
     t3(): &u64 {
@@ -45,8 +45,8 @@ module M3 {
     }
 }
 
-//# publish --address 0x1
-module M4 {
+//# publish
+module 0x1.M4 {
     struct X has drop { y: Self.Y }
     struct Y has drop { u: u64 }
     t4(): &u64 {

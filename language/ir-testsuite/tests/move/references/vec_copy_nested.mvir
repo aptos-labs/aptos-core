@@ -1,4 +1,4 @@
-module DeepCopy {
+module {{default}}.DeepCopy {
     import 0x1.Vector;
 
     struct Config has copy, drop, store { i: u64 }

@@ -1,7 +1,7 @@
-//# publish --address 0x1
+//# publish
 
 // testing valid usages of == and != over references
-module Tester {
+module 0x1.Tester {
     eqtest1() {
         let x: u64;
         let r: &mut u64;

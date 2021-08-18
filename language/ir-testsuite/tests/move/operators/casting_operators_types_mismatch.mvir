@@ -44,7 +44,7 @@ main() {
 
 
 //! new-transaction
-module M {
+module {{default}}.M {
     struct S { x: bool }
     f() {
         _ = to_u8(S { x: true });
@@ -53,7 +53,7 @@ module M {
 }
 //! new-transaction
 // check: INTEGER_OP_TYPE_MISMATCH_ERROR
-module M {
+module {{default}}.M {
     struct S { x: bool }
     g() {
         _ = to_u64(S { x: true });
@@ -62,7 +62,7 @@ module M {
 }
 //! new-transaction
 // check: INTEGER_OP_TYPE_MISMATCH_ERROR
-module M {
+module {{default}}.M {
     struct S { x: bool }
     h() {
         _ = to_u128(S { x: true });

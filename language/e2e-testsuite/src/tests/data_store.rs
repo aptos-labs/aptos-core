@@ -8,8 +8,7 @@ use diem_types::{
     vm_status::KeptVMStatus,
 };
 use language_e2e_tests::{
-    account::AccountData, compile::compile_script_with_address, current_function_name,
-    executor::FakeExecutor,
+    account::AccountData, compile::compile_script, current_function_name, executor::FakeExecutor,
 };
 use move_binary_format::CompiledModule;
 
@@ -205,41 +204,41 @@ fn change_after_move() {
 }
 
 fn add_module_txn(sender: &AccountData, seq_num: u64) -> (CompiledModule, SignedTransaction) {
-    let module_code = String::from(
+    let module_code = format!(
         "
-        module M {
+        module 0x{}.M {{
             import 0x1.Signer;
-            struct T1 has key { v: u64 }
+            struct T1 has key {{ v: u64 }}
 
-            public borrow_t1(account: &signer) acquires T1 {
+            public borrow_t1(account: &signer) acquires T1 {{
                 let t1: &Self.T1;
                 t1 = borrow_global<T1>(Signer.address_of(move(account)));
                 return;
-            }
+            }}
 
-            public change_t1(account: &signer, v: u64) acquires T1 {
+            public change_t1(account: &signer, v: u64) acquires T1 {{
                 let t1: &mut Self.T1;
                 t1 = borrow_global_mut<T1>(Signer.address_of(move(account)));
                 *&mut move(t1).v = move(v);
                 return;
-            }
+            }}
 
-            public remove_t1(account: &signer) acquires T1 {
+            public remove_t1(account: &signer) acquires T1 {{
                 let v: u64;
-                T1 { v } = move_from<T1>(Signer.address_of(move(account)));
+                T1 {{ v }} = move_from<T1>(Signer.address_of(move(account)));
                 return;
-            }
+            }}
 
-            public publish_t1(account: &signer) {
-                move_to<T1>(move(account), T1 { v: 3 });
+            public publish_t1(account: &signer) {{
+                move_to<T1>(move(account), T1 {{ v: 3 }});
                 return;
-            }
-        }
+            }}
+        }}
         ",
+        sender.address(),
     );
 
     let compiler = Compiler {
-        address: *sender.address(),
         deps: diem_framework_releases::current_modules().iter().collect(),
     };
     let module = compiler
@@ -278,7 +277,7 @@ fn add_resource_txn(
         sender.address(),
     );
 
-    let module = compile_script_with_address(sender.address(), "file_name", &program, extra_deps);
+    let module = compile_script("file_name", &program, extra_deps);
     sender
         .account()
         .transaction()
@@ -304,7 +303,7 @@ fn remove_resource_txn(
         sender.address(),
     );
 
-    let module = compile_script_with_address(sender.address(), "file_name", &program, extra_deps);
+    let module = compile_script("file_name", &program, extra_deps);
     sender
         .account()
         .transaction()
@@ -330,7 +329,7 @@ fn borrow_resource_txn(
         sender.address(),
     );
 
-    let module = compile_script_with_address(sender.address(), "file_name", &program, extra_deps);
+    let module = compile_script("file_name", &program, extra_deps);
     sender
         .account()
         .transaction()
@@ -356,7 +355,7 @@ fn change_resource_txn(
         sender.address(),
     );
 
-    let module = compile_script_with_address(sender.address(), "file_name", &program, extra_deps);
+    let module = compile_script("file_name", &program, extra_deps);
     sender
         .account()
         .transaction()

@@ -1,10 +1,10 @@
-//# publish --address 0x1
+//# publish
 
 // This test checks that for each function definition
 //   1) type parameters have correct kind constraints
 //   2) variables have correct types
 
-module M {
+module 0x1.M {
     public id<T>(x: T): T {
         return move(x);
     }

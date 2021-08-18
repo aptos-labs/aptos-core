@@ -1,6 +1,6 @@
-//# publish --address 0x1
+//# publish
 // ensure that generic structs instantiated with struct types behave like resources
-module M1 {
+module 0x1.M1 {
     struct MyResource { b: bool }
     struct S<T> { t: T }
 
@@ -10,8 +10,8 @@ module M1 {
     }
 }
 
-//# publish --address 0x1
-module M2 {
+//# publish
+module 0x1.M2 {
     struct MyResource { b: bool }
     struct S<T> { t: T }
 
@@ -22,8 +22,8 @@ module M2 {
     }
 }
 
-//# publish --address 0x1
-module M3 {
+//# publish
+module 0x1.M3 {
     struct MyResource { b: bool }
     struct S<T> { t: T }
 
@@ -33,8 +33,8 @@ module M3 {
     }
 }
 
-//# publish --address 0x1
-module M4 {
+//# publish
+module 0x1.M4 {
     struct MyResource { b: bool }
     struct S<T> { t: T }
 
@@ -45,8 +45,8 @@ module M4 {
     }
 }
 
-//# publish --address 0x1
-module M5 {
+//# publish
+module 0x1.M5 {
     struct MyResource { b: bool }
     struct S<T> { t: T }
 

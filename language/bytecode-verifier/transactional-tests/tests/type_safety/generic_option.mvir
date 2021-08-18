@@ -1,7 +1,7 @@
-//# publish --address 0x42
+//# publish
 
 // example using generics in a few common/interesting/non-trivial ways
-module Option {
+module 0x42.Option {
     import 0x1.Vector;
 
     struct T<E> has copy, drop, store {

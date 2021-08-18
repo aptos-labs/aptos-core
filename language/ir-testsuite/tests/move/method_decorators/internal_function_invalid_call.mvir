@@ -1,4 +1,4 @@
-module Test {
+module {{default}}.Test {
     struct T{value: u64}
 
     initial_value(): u64 {

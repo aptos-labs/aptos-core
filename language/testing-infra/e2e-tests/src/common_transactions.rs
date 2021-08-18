@@ -49,7 +49,6 @@ pub static CREATE_ACCOUNT_SCRIPT: Lazy<Vec<u8>> = Lazy::new(|| {
 ";
 
     let compiler = Compiler {
-        address: account_config::CORE_CODE_ADDRESS,
         deps: diem_framework_releases::current_modules().iter().collect(),
     };
     compiler
@@ -65,7 +64,6 @@ pub static EMPTY_SCRIPT: Lazy<Vec<u8>> = Lazy::new(|| {
 ";
 
     let compiler = Compiler {
-        address: account_config::CORE_CODE_ADDRESS,
         deps: diem_framework_releases::current_modules().iter().collect(),
     };
     compiler
@@ -107,7 +105,6 @@ pub static MULTI_AGENT_SWAP_SCRIPT: Lazy<Vec<u8>> = Lazy::new(|| {
 ";
 
     let compiler = Compiler {
-        address: account_config::CORE_CODE_ADDRESS,
         deps: diem_framework_releases::current_modules().iter().collect(),
     };
     compiler
@@ -152,7 +149,6 @@ pub static MULTI_AGENT_MINT_SCRIPT: Lazy<Vec<u8>> = Lazy::new(|| {
 ";
 
     let compiler = Compiler {
-        address: account_config::CORE_CODE_ADDRESS,
         deps: diem_framework_releases::current_modules().iter().collect(),
     };
     compiler

@@ -1,4 +1,4 @@
-module M {
+module {{default}}.M {
     public case(a: u64, b: bool): u64 {
         if (copy(b)) {
             return copy(a);

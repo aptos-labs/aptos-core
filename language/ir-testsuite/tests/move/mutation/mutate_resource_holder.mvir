@@ -1,4 +1,4 @@
-module A {
+module {{default}}.A {
 import 0x1.XUS;
     import 0x1.Diem;
     struct A { c: Diem.Diem<XUS.XUS> }

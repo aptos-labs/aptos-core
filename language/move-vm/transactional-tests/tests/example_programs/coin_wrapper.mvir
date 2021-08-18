@@ -1,5 +1,5 @@
-//# publish --address 0x1
-module Coin {
+//# publish
+module 0x1.Coin {
     struct Coin<phantom CoinType> has store { value: u64 }
 
     public zero<CoinType>(): Self.Coin<CoinType> {
@@ -17,14 +17,14 @@ module Coin {
     }
 }
 
-//# publish --address 0x1
-module YYZ {
+//# publish
+module 0x1.YYZ {
     struct YYZ { unused: bool }
 }
 
 
-//# publish --address 0x1
-module M {
+//# publish
+module 0x1.M {
     import 0x1.Coin;
     import 0x1.Signer;
     import 0x1.YYZ;

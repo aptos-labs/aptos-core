@@ -2,7 +2,7 @@
 // republishing flow (i.e., module N) to keep the loader happy --- the loader expects module N
 // to exist when loading module M.
 
-module N {
+module {{default}}.N {
     foo() {
         return;
     }
@@ -10,7 +10,7 @@ module N {
 
 //! new-transaction
 
-module M {
+module {{default}}.M {
     friend {{default}}.N;
     public(friend) foo() {
         return;
@@ -19,7 +19,7 @@ module M {
 
 //! new-transaction
 
-module N {
+module {{default}}.N {
     import {{default}}.M;
     foo() {
         M.foo();

@@ -1,4 +1,4 @@
-module Math {
+module {{default}}.Math {
 
   public even(n: u64): bool {
     let is_pred_odd: bool;

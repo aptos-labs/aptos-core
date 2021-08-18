@@ -1,4 +1,4 @@
-module Test {
+module {{default}}.Test {
     struct T has drop {v: u64}
 
     public new(g: u64): Self.T {

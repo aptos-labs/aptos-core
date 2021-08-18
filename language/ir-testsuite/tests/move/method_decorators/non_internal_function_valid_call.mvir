@@ -1,4 +1,4 @@
-module Test {
+module {{default}}.Test {
     struct T has drop {value: u64}
 
     initial_value(): u64 {

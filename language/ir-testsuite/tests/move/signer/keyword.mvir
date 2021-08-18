@@ -1,4 +1,4 @@
-module M {
+module {{default}}.M {
     foo(signer: address) {
         return;
     }

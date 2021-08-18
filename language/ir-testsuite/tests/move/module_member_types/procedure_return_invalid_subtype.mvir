@@ -1,4 +1,4 @@
-module Test {
+module {{default}}.Test {
     public no(r: &mut u64): &u64 {
         return move(r);
     }

@@ -1,14 +1,14 @@
-module A {
+module {{default}}.A {
 }
 
 //! new-transaction
 
-module B {
+module {{default}}.B {
 }
 
 //! new-transaction
 
-module M {
+module {{default}}.M {
     friend {{default}}.A;
     public(friend) foo() {
         return;
@@ -17,7 +17,7 @@ module M {
 
 //! new-transaction
 
-module M {
+module {{default}}.M {
     friend {{default}}.A;
     friend {{default}}.B;
     public(friend) foo() {

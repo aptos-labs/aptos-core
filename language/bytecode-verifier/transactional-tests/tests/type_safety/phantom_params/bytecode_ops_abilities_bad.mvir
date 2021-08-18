@@ -1,14 +1,14 @@
-//# publish --address 0x1
+//# publish
 
 // This file contains tests checking that type arguments used in phantom position
 // (phantom arguments) are not considered when deriving the abilities for a struct.
 
-module M1 {
+module 0x1.M1 {
     struct NoAbilities { a: bool }
 }
 
-//# publish --address 0x1
-module M2 {
+//# publish
+module 0x1.M2 {
     import 0x1.M1;
 
     struct HasDrop<phantom T1, T2> has drop { a: bool }
@@ -20,8 +20,8 @@ module M2 {
     }
 }
 
-//# publish --address 0x1
-module M3 {
+//# publish
+module 0x1.M3 {
     import 0x1.M1;
 
     struct HasDrop<phantom T1, T2> has drop { a: bool }
@@ -33,8 +33,8 @@ module M3 {
     }
  }
 
-//# publish --address 0x1
- module M4 {
+//# publish
+ module 0x1.M4 {
     import 0x1.M1;
 
     struct HasDrop<phantom T1, T2> has drop { a: bool }
@@ -45,8 +45,8 @@ module M3 {
     }
  }
 
-//# publish --address 0x1
- module M5 {
+//# publish
+ module 0x1.M5 {
     import 0x1.M1;
     struct HasCopy<phantom T1, T2> has copy { a : bool }
 
@@ -56,8 +56,8 @@ module M3 {
     }
  }
 
-//# publish --address 0x1
- module M6 {
+//# publish
+ module 0x1.M6 {
     import 0x1.M1;
 
     struct HasKey<phantom T1, T2> has key { a : bool }
@@ -70,8 +70,8 @@ module M3 {
 
  }
 
-//# publish --address 0x1
- module M7 {
+//# publish
+ module 0x1.M7 {
     import 0x1.M1;
 
     struct HasKey<phantom T1, T2> has key { a : bool }
@@ -82,8 +82,8 @@ module M3 {
     }
  }
 
-//# publish --address 0x1
- module M8 {
+//# publish
+ module 0x1.M8 {
     import 0x1.M1;
 
     struct HasKey<phantom T1, T2> has key { a : bool }
@@ -94,8 +94,8 @@ module M3 {
     }
 }
 
-//# publish --address 0x1
-module M9 {
+//# publish
+module 0x1.M9 {
     import 0x1.M1;
 
     struct HasStore<phantom T1, T2> has store { a: bool }
