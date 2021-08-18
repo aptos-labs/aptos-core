@@ -16,6 +16,7 @@ tokio = { version = "1.8.1", features = ["full"] }
 
 diem-events-fetcher = { path = "../../language/diem-tools/diem-events-fetcher" }
 diem-sdk = { path = "../../sdk" }
+diem-transaction-replay = { path = "../../language/diem-tools/transaction-replay" }
 forge = { path = "../forge" }
 
 [dev-dependencies]
@@ -55,7 +56,6 @@ diem-smoke-test-attribute = { path = "../smoke-test/attribute" }
 diem-swarm = { path = "../diem-swarm"}
 diem-temppath = { path = "../../common/temppath" }
 diem-time-service = { path = "../../common/time-service", features = ["testing"] }
-diem-transaction-replay = { path = "../../language/diem-tools/transaction-replay" }
 diem-types = { path = "../../types" }
 diem-vault-client = { path = "../../secure/storage/vault", features = ["fuzzing"] }
 diem-validator-interface = { path = "../../language/diem-tools/diem-validator-interface" }

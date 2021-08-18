@@ -86,7 +86,6 @@ pub mod diem_swarm_utils {
     use diem_operational_tool::test_helper::OperationalTool;
     use diem_secure_storage::{KVStorage, Storage};
     use diem_swarm::swarm::DiemSwarm;
-    use diem_transaction_replay::DiemDebugger;
     use diem_types::{chain_id::ChainId, waypoint::Waypoint};
     use std::path::PathBuf;
 
@@ -137,14 +136,6 @@ pub mod diem_swarm_utils {
     ) -> JsonRpcDiemInterface {
         let json_rpc_endpoint = format!("http://127.0.0.1:{}", swarm.get_client_port(node_index));
         JsonRpcDiemInterface::new(json_rpc_endpoint)
-    }
-
-    /// Returns a Diem Debugger pointing to a node at the given node index.
-    pub fn get_diem_debugger(swarm: &DiemSwarm, node_index: usize) -> DiemDebugger {
-        let (node_config, _) = load_node_config(swarm, node_index);
-        let swarm_rpc_endpoint =
-            format!("http://localhost:{}", node_config.json_rpc.address.port());
-        DiemDebugger::json_rpc(swarm_rpc_endpoint.as_str()).unwrap()
     }
 
     /// Returns an operational tool pointing to a validator node at the given node index.

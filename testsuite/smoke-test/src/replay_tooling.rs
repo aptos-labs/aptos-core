@@ -1,62 +1,81 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    test_utils::{diem_swarm_utils::get_diem_debugger, setup_swarm_and_client_proxy},
-    workspace_builder,
+use diem_sdk::{
+    client::views::VMStatusView, transaction_builder::Currency,
+    types::account_address::AccountAddress,
 };
-use diem_sdk::client::views::VMStatusView;
+use diem_transaction_replay::DiemDebugger;
+use forge::{PublicUsageContext, PublicUsageTest, Result, Test};
 
-#[test]
-fn test_replay_tooling() {
-    let (env, mut client) = setup_swarm_and_client_proxy(1, 0);
-    let json_debugger = get_diem_debugger(&env.validator_swarm, 0);
+pub struct ReplayTooling;
 
-    client.create_next_account(false).unwrap();
-    client.create_next_account(false).unwrap();
-    client
-        .mint_coins(&["mintb", "0", "100", "XUS"], true)
-        .unwrap();
+impl Test for ReplayTooling {
+    fn name(&self) -> &'static str {
+        "smoke-test::replay-tooling"
+    }
+}
 
-    client
-        .mint_coins(&["mintb", "1", "100", "XUS"], true)
-        .unwrap();
+impl PublicUsageTest for ReplayTooling {
+    fn run<'t>(&self, ctx: &mut PublicUsageContext<'t>) -> Result<()> {
+        let client = ctx.client();
+        let json_debugger = DiemDebugger::json_rpc(ctx.url())?;
 
-    client
-        .transfer_coins(&["tb", "0", "1", "3", "XUS"], true)
-        .unwrap();
+        let treasury_account_address =
+            AccountAddress::from_hex("0000000000000000000000000b1e55ed")?;
 
-    let txn = client
-        .get_committed_txn_by_acc_seq(&["txn_acc_seq", "0", "0", "false"])
-        .unwrap()
-        .unwrap();
+        let treasury_account = client
+            .get_account(treasury_account_address)?
+            .into_inner()
+            .unwrap();
+        let mut account1 = ctx.random_account();
+        let account2 = ctx.random_account();
+        ctx.create_parent_vasp_account(account1.authentication_key())?;
+        ctx.create_parent_vasp_account(account2.authentication_key())?;
+        ctx.fund(account1.address(), 100)?;
+        ctx.fund(account2.address(), 100)?;
+        let txn = account1.sign_with_transaction_builder(ctx.transaction_factory().peer_to_peer(
+            Currency::XUS,
+            account2.address(),
+            3,
+        ));
+        client.submit(&txn)?;
+        let txn = client
+            .wait_for_signed_transaction(&txn, None, None)?
+            .into_inner();
 
-    let replay_result = json_debugger
-        .execute_past_transactions(txn.version, 1, false)
-        .unwrap()
-        .pop()
-        .unwrap();
+        let replay_result = json_debugger
+            .execute_past_transactions(txn.version, 1, false)?
+            .pop()
+            .unwrap();
 
-    let (account, _) = client.get_account_address_from_parameter("0").unwrap();
-    let script_path = workspace_builder::workspace_root()
-        .join("language/diem-tools/transaction-replay/examples/account_exists.move");
+        let script_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../language/diem-tools/transaction-replay/examples/account_exists.move")
+            .canonicalize()?;
 
-    let bisect_result = json_debugger
-        .bisect_transactions_by_script(script_path.to_str().unwrap(), account, 0, txn.version, None)
-        .unwrap()
-        .unwrap();
+        let bisect_result = json_debugger
+            .bisect_transactions_by_script(
+                script_path.to_str().unwrap(),
+                account1.address(),
+                0,
+                txn.version,
+                None,
+            )?
+            .unwrap();
 
-    let account_creation_txn = client
-        .get_committed_txn_by_acc_seq(&[
-            "txn_acc_seq",
-            "0000000000000000000000000b1e55ed",
-            "0",
-            "false",
-        ])
-        .unwrap()
-        .unwrap();
+        let account_creation_txn = client
+            .get_account_transaction(
+                treasury_account_address,
+                treasury_account.sequence_number,
+                false,
+            )?
+            .into_inner()
+            .unwrap();
 
-    assert_eq!(account_creation_txn.version + 1, bisect_result);
-    assert_eq!(replay_result.gas_used(), txn.gas_used);
-    assert_eq!(VMStatusView::Executed, txn.vm_status);
+        assert_eq!(account_creation_txn.version + 1, bisect_result);
+        assert_eq!(replay_result.gas_used(), txn.gas_used);
+        assert_eq!(VMStatusView::Executed, txn.vm_status);
+
+        Ok(())
+    }
 }

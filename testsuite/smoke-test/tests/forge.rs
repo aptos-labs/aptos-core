@@ -4,6 +4,7 @@
 use forge::{forge_main, ForgeConfig, LocalFactory, Options, Result};
 use smoke_test::{
     event_fetcher::EventFetcher,
+    replay_tooling::ReplayTooling,
     transaction::ExternalTransactionSigner,
     verifying_client::{VerifyingClientEquivalence, VerifyingGetLatestMetadata, VerifyingSubmit},
 };
@@ -12,6 +13,7 @@ fn main() -> Result<()> {
     let tests = ForgeConfig::default().with_public_usage_tests(&[
         &EventFetcher,
         &ExternalTransactionSigner,
+        &ReplayTooling,
         &VerifyingSubmit,
         &VerifyingClientEquivalence,
         &VerifyingGetLatestMetadata,
