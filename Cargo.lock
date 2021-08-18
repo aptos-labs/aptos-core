@@ -7386,6 +7386,7 @@ dependencies = [
  "base64",
  "bcs",
  "cli",
+ "compiler",
  "debug-interface",
  "diem-config",
  "diem-crypto",
@@ -7430,6 +7431,7 @@ dependencies = [
  "rusty-fork",
  "serde_yaml",
  "tokio",
+ "walkdir",
 ]
 
 [[package]]

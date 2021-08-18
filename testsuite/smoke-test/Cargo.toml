@@ -10,17 +10,24 @@ publish = false
 edition = "2018"
 
 [dependencies]
+anyhow = "1.0.38"
 bcs = "0.1.2"
 proptest = "1.0.0"
 tokio = { version = "1.8.1", features = ["full"] }
+walkdir = "2.3.1"
 
+compiler = { path = "../../language/compiler" }
 diem-events-fetcher = { path = "../../language/diem-tools/diem-events-fetcher" }
+diem-framework = { path = "../../language/diem-framework" }
+diem-framework-releases = { path = "../../language/diem-framework/releases" }
 diem-sdk = { path = "../../sdk" }
+diem-temppath = { path = "../../common/temppath" }
 diem-transaction-replay = { path = "../../language/diem-tools/transaction-replay" }
+move-command-line-common = { path = "../../language/move-command-line-common" }
+move-stdlib = { path = "../../language/move-stdlib" }
 forge = { path = "../forge" }
 
 [dev-dependencies]
-anyhow = "1.0.38"
 base64 = "0.13.0"
 hex = "0.4.3"
 once_cell = "1.7.2"
@@ -34,12 +41,9 @@ serde_yaml = "0.8.17"
 
 backup-cli = { path = "../../storage/backup/backup-cli" }
 cli = { path = "../cli", features = ["fuzzing"]  }
-diem-framework-releases = { path = "../../language/diem-framework/releases" }
 debug-interface = { path = "../../common/debug-interface" }
 futures = "0.3.12"
 generate-key = { path = "../../config/generate-key" }
-move-move-command-line-common = { path = "../../language/move-command-line-common", package = "move-command-line-common" }
-move-stdlib = { path = "../../language/move-stdlib" }
 diem-config = { path = "../../config" }
 diem-crypto = { path = "../../crypto/crypto" }
 diem-genesis-tool = {path = "../../config/management/genesis", features = ["testing"] }
@@ -54,14 +58,12 @@ diem-operational-tool = {path = "../../config/management/operational", features 
 diem-secure-storage = { path = "../../secure/storage", features = ["testing"] }
 diem-smoke-test-attribute = { path = "../smoke-test/attribute" }
 diem-swarm = { path = "../diem-swarm"}
-diem-temppath = { path = "../../common/temppath" }
 diem-time-service = { path = "../../common/time-service", features = ["testing"] }
 diem-types = { path = "../../types" }
 diem-vault-client = { path = "../../secure/storage/vault", features = ["fuzzing"] }
 diem-validator-interface = { path = "../../language/diem-tools/diem-validator-interface" }
 diem-workspace-hack = { path = "../../common/workspace-hack" }
 diem-writeset-generator = { path = "../../language/diem-tools/writeset-transaction-generator" }
-diem-framework = { path = "../../language/diem-framework" }
 diem-transaction-builder = { path = "../../sdk/transaction-builder" }
 
 [[test]]

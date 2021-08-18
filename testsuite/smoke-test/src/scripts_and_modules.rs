@@ -1,148 +1,195 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    test_utils::{compare_balances, setup_swarm_and_client_proxy},
-    workspace_builder,
-};
+use anyhow::{bail, format_err};
 use diem_temppath::TempPath;
-use diem_types::account_address::AccountAddress;
-use move_move_command_line_common::files::MOVE_EXTENSION;
+use move_command_line_common::files::MOVE_EXTENSION;
 use std::{
     fs, io,
     io::Write,
     path::{Path, PathBuf},
+    process::Command,
 };
 
-#[test]
-fn test_malformed_script() {
-    let (_env, mut client) = setup_swarm_and_client_proxy(1, 0);
-    client
-        .enable_custom_script(&["enable_custom_script"], false, true)
-        .unwrap();
-    client.create_next_account(false).unwrap();
-    client
-        .mint_coins(&["mintb", "0", "100", "XUS"], true)
-        .unwrap();
+use compiler::Compiler;
+use diem_sdk::{
+    client::{views::AmountView, WaitForTransactionError},
+    transaction_builder::Currency,
+    types::{
+        account_address::AccountAddress,
+        transaction::{Module, Script, TransactionArgument, TransactionPayload},
+    },
+};
+use forge::{AdminContext, AdminTest, Result, Test};
 
-    let script_path = workspace_builder::workspace_root()
-        .join("testsuite/smoke-test/src/dev_modules/test_script.move");
+pub struct MalformedScript;
 
-    let unwrapped_script_path = script_path.to_str().unwrap();
-    let move_stdlib_dir = move_stdlib::move_stdlib_modules_full_path();
-    let diem_framework_dir = diem_framework::diem_stdlib_modules_full_path();
-    let script_params = &[
-        "compile",
-        unwrapped_script_path,
-        move_stdlib_dir.as_str(),
-        diem_framework_dir.as_str(),
-    ];
-    let mut script_compiled_paths = client.compile_program(script_params).unwrap();
-    let script_compiled_path = if script_compiled_paths.len() != 1 {
-        panic!("compiler output has more than one file")
-    } else {
-        script_compiled_paths.pop().unwrap()
-    };
-
-    // the script expects two arguments. Passing only one in the test, which will cause a failure.
-    client
-        .execute_script(&["execute", "0", &script_compiled_path[..], "10"])
-        .expect_err("malformed script did not fail!");
-
-    // Previous transaction should not choke the system.
-    client
-        .mint_coins(&["mintb", "0", "10", "XUS"], true)
-        .unwrap();
+impl Test for MalformedScript {
+    fn name(&self) -> &'static str {
+        "smoke-test::malformed-script"
+    }
 }
 
-#[test]
-fn test_execute_custom_module_and_script() {
-    let (_env, mut client) = setup_swarm_and_client_proxy(1, 0);
-    client
-        .enable_custom_script(&["enable_custom_script"], true, true)
-        .unwrap();
-    client.create_next_account(false).unwrap();
-    client
-        .mint_coins(&["mintb", "0", "50", "XUS"], true)
-        .unwrap();
-    assert!(compare_balances(
-        vec![(50.0, "XUS".to_string())],
-        client.get_balances(&["b", "0"]).unwrap(),
-    ));
+impl AdminTest for MalformedScript {
+    fn run<'t>(&self, ctx: &mut AdminContext<'t>) -> Result<()> {
+        enable_custom_script(ctx)?;
+        let mut account = ctx.random_account();
+        ctx.chain_info()
+            .create_parent_vasp_account(Currency::XUS, account.authentication_key())?;
+        ctx.chain_info()
+            .fund(Currency::XUS, account.address(), 100)?;
 
-    let recipient_address = client.create_next_account(false).unwrap().address;
-    client
-        .mint_coins(&["mintb", "1", "1", "XUS"], true)
-        .unwrap();
+        let script_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .join("testsuite/smoke-test/src/dev_modules/test_script.move")
+            .canonicalize()?;
+        let move_stdlib_dir = move_stdlib::move_stdlib_modules_full_path();
+        let diem_framework_dir = diem_framework::diem_stdlib_modules_full_path();
+        let dependencies = &[move_stdlib_dir.as_str(), diem_framework_dir.as_str()];
+        let compiled_script = compile_program(script_path.to_str().unwrap(), dependencies)?;
 
-    let (sender_account, _) = client.get_account_address_from_parameter("0").unwrap();
+        // the script expects two arguments. Passing only one in the test, which will cause a failure.
+        let client = ctx.client();
+        let factory = ctx.chain_info().transaction_factory();
+        let txn =
+            account.sign_with_transaction_builder(factory.payload(TransactionPayload::Script(
+                Script::new(compiled_script, vec![], vec![TransactionArgument::U64(10)]),
+            )));
+        client.submit(&txn)?;
+        assert!(matches!(
+            client
+                .wait_for_signed_transaction(&txn, None, None)
+                .unwrap_err(),
+            WaitForTransactionError::TransactionExecutionFailed(..)
+        ));
 
-    // Get the path to the Move stdlib sources
-    let move_stdlib_dir = move_stdlib::move_stdlib_modules_full_path();
-    let diem_framework_dir = diem_framework::diem_stdlib_modules_full_path();
+        // Previous transaction should not choke the system.
+        ctx.chain_info()
+            .fund(Currency::XUS, account.address(), 100)?;
 
-    // Make a copy of module.move with "{{sender}}" substituted.
-    let module_path = workspace_builder::workspace_root()
-        .join("testsuite/smoke-test/src/dev_modules/module.move");
-    let copied_module_path = copy_file_with_sender_address(&module_path, sender_account).unwrap();
-    let unwrapped_module_path = copied_module_path.to_str().unwrap();
+        Ok(())
+    }
+}
 
-    // Compile and publish that module.
-    let module_params = &[
-        "compile",
-        unwrapped_module_path,
-        move_stdlib_dir.as_str(),
-        diem_framework_dir.as_str(),
-    ];
-    let mut module_compiled_paths = client.compile_program(module_params).unwrap();
-    let module_compiled_path = if module_compiled_paths.len() != 1 {
-        panic!("compiler output has more than one file")
-    } else {
-        module_compiled_paths.pop().unwrap()
-    };
-    client
-        .publish_module(&["publish", "0", &module_compiled_path[..]])
-        .unwrap();
+pub struct ExecuteCustomModuleAndScript;
 
-    // Make a copy of script.move with "{{sender}}" substituted.
-    let script_path = workspace_builder::workspace_root()
-        .join("testsuite/smoke-test/src/dev_modules/script.move");
-    let copied_script_path = copy_file_with_sender_address(&script_path, sender_account).unwrap();
-    let unwrapped_script_path = copied_script_path.to_str().unwrap();
+impl Test for ExecuteCustomModuleAndScript {
+    fn name(&self) -> &'static str {
+        "smoke-test::execute-custom-module-and-script"
+    }
+}
 
-    // Compile and execute the script.
-    let script_params = &[
-        "compile",
-        unwrapped_script_path,
-        unwrapped_module_path,
-        move_stdlib_dir.as_str(),
-        diem_framework_dir.as_str(),
-    ];
-    let mut script_compiled_paths = client.compile_program(script_params).unwrap();
-    let script_compiled_path = if script_compiled_paths.len() != 1 {
-        panic!("compiler output has more than one file")
-    } else {
-        script_compiled_paths.pop().unwrap()
-    };
-    let formatted_recipient_address = format!("0x{}", recipient_address);
-    client
-        .execute_script(&[
-            "execute",
-            "0",
-            &script_compiled_path[..],
-            &formatted_recipient_address[..],
-            "10",
-        ])
-        .unwrap();
+impl AdminTest for ExecuteCustomModuleAndScript {
+    fn run<'t>(&self, ctx: &mut AdminContext<'t>) -> Result<()> {
+        let client = ctx.client();
+        let factory = ctx.chain_info().transaction_factory();
+        enable_custom_script(ctx)?;
 
-    assert!(compare_balances(
-        vec![(49.999_990, "XUS".to_string())],
-        client.get_balances(&["b", "0"]).unwrap(),
-    ));
-    assert!(compare_balances(
-        vec![(1.000_010, "XUS".to_string())],
-        client.get_balances(&["b", "1"]).unwrap(),
-    ));
+        let mut account1 = ctx.random_account();
+        ctx.chain_info()
+            .create_parent_vasp_account(Currency::XUS, account1.authentication_key())?;
+        ctx.chain_info()
+            .fund(Currency::XUS, account1.address(), 100)?;
+
+        assert_eq!(
+            vec![AmountView {
+                amount: 100,
+                currency: "XUS".to_string()
+            }],
+            client
+                .get_account(account1.address())?
+                .into_inner()
+                .unwrap()
+                .balances
+        );
+
+        let account2 = ctx.random_account();
+        ctx.chain_info()
+            .create_parent_vasp_account(Currency::XUS, account2.authentication_key())?;
+        ctx.chain_info()
+            .fund(Currency::XUS, account2.address(), 1)?;
+
+        // Get the path to the Move stdlib sources
+        let move_stdlib_dir = move_stdlib::move_stdlib_modules_full_path();
+        let diem_framework_dir = diem_framework::diem_stdlib_modules_full_path();
+
+        // Make a copy of module.move with "{{sender}}" substituted.
+        let module_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .join("testsuite/smoke-test/src/dev_modules/module.move")
+            .canonicalize()?;
+        let copied_module_path =
+            copy_file_with_sender_address(&module_path, account1.address()).unwrap();
+        let unwrapped_module_path = copied_module_path.to_str().unwrap();
+
+        let compiled_module = compile_program(
+            unwrapped_module_path,
+            &[move_stdlib_dir.as_str(), diem_framework_dir.as_str()],
+        )?;
+
+        let publish_txn = account1.sign_with_transaction_builder(
+            factory.payload(TransactionPayload::Module(Module::new(compiled_module))),
+        );
+        client.submit(&publish_txn)?;
+        client.wait_for_signed_transaction(&publish_txn, None, None)?;
+
+        // Make a copy of script.move with "{{sender}}" substituted.
+        let script_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .join("testsuite/smoke-test/src/dev_modules/script.move")
+            .canonicalize()?;
+        let copied_script_path =
+            copy_file_with_sender_address(&script_path, account1.address()).unwrap();
+        let unwrapped_script_path = copied_script_path.to_str().unwrap();
+
+        let compiled_script = compile_program(
+            unwrapped_script_path,
+            &[
+                unwrapped_module_path,
+                move_stdlib_dir.as_str(),
+                diem_framework_dir.as_str(),
+            ],
+        )?;
+
+        let execute_txn = account1.sign_with_transaction_builder(factory.payload(
+            TransactionPayload::Script(Script::new(
+                compiled_script,
+                vec![],
+                vec![
+                    TransactionArgument::Address(account2.address()),
+                    TransactionArgument::U64(10),
+                ],
+            )),
+        ));
+        client.submit(&execute_txn)?;
+        client.wait_for_signed_transaction(&execute_txn, None, None)?;
+
+        assert_eq!(
+            vec![AmountView {
+                amount: 90,
+                currency: "XUS".to_string()
+            }],
+            client
+                .get_account(account1.address())?
+                .into_inner()
+                .unwrap()
+                .balances
+        );
+
+        assert_eq!(
+            vec![AmountView {
+                amount: 11,
+                currency: "XUS".to_string()
+            }],
+            client
+                .get_account(account2.address())?
+                .into_inner()
+                .unwrap()
+                .balances
+        );
+
+        Ok(())
+    }
 }
 
 fn copy_file_with_sender_address(file_path: &Path, sender: AccountAddress) -> io::Result<PathBuf> {
@@ -152,4 +199,92 @@ fn copy_file_with_sender_address(file_path: &Path, sender: AccountAddress) -> io
     code = code.replace("{{sender}}", &format!("0x{}", sender));
     writeln!(tmp_source_file, "{}", code)?;
     Ok(tmp_source_path)
+}
+
+fn enable_custom_script(ctx: &mut AdminContext) -> Result<()> {
+    let script_body = {
+        let code = "
+            import 0x1.DiemTransactionPublishingOption;
+
+            main(account: signer) {
+                DiemTransactionPublishingOption.set_open_script(&account);
+                DiemTransactionPublishingOption.set_open_module(&account, true);
+
+                return;
+            }
+        ";
+
+        let compiler = Compiler {
+            address: diem_sdk::types::account_config::CORE_CODE_ADDRESS,
+            deps: diem_framework_releases::current_modules().iter().collect(),
+        };
+        compiler
+            .into_script_blob("file_name", code)
+            .expect("Failed to compile")
+    };
+
+    let client = ctx.client();
+    let factory = ctx.chain_info().transaction_factory();
+    let txn =
+        ctx.chain_info()
+            .root_account
+            .sign_with_transaction_builder(factory.payload(TransactionPayload::Script(
+                Script::new(script_body, vec![], vec![]),
+            )));
+    client.submit(&txn)?;
+    client.wait_for_signed_transaction(&txn, None, None)?;
+    Ok(())
+}
+
+/// Compile Move program
+pub fn compile_program(file_path: &str, dependency_paths: &[&str]) -> Result<Vec<u8>> {
+    let tmp_output_dir = TempPath::new();
+    tmp_output_dir
+        .create_as_dir()
+        .expect("error creating temporary output directory");
+    let tmp_output_path = tmp_output_dir.as_ref().display().to_string();
+
+    let mut command = Command::new("cargo");
+    command
+        .args(&["run", "-p", "move-lang", "--bin", "move-build", "--"])
+        .arg(file_path)
+        .args(&["-o", &tmp_output_path]);
+
+    for dep in dependency_paths {
+        command.args(&["-d", dep]);
+    }
+    for (name, addr) in diem_framework::diem_framework_named_addresses() {
+        command.args(&["-a", &format!("{}=0x{:#X}", name, addr)]);
+    }
+
+    let output = command.output()?;
+    if !output.status.success() {
+        return Err(format_err!("compilation failed"));
+    }
+
+    let mut output_files = walkdir::WalkDir::new(tmp_output_path)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| {
+            let path = e.path();
+            e.file_type().is_file()
+                && path
+                    .extension()
+                    .and_then(|s| s.to_str())
+                    .map(|ext| ext == "mv")
+                    .unwrap_or(false)
+        })
+        .filter_map(|e| e.path().to_str().map(|s| s.to_string()))
+        .collect::<Vec<_>>();
+    if output_files.is_empty() {
+        bail!("compiler failed to produce an output file")
+    }
+
+    let compiled_program = if output_files.len() != 1 {
+        bail!("compiler output has more than one file")
+    } else {
+        fs::read(output_files.pop().unwrap())?
+    };
+
+    Ok(compiled_program)
 }
