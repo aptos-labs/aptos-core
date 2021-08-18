@@ -1517,13 +1517,7 @@ impl IntegerValue {
 *
 * Vector
 *
-*   Native function imeplementations of the Vector module.
-*
-*   TODO: split the code into two parts:
-*         1) Internal vector APIs that define & implements the core operations
-             (and operations only).
-*         2) Native function adapters that the dispatcher can call into. These will
-*            check if arguments are valid and deal with gas metering.
+*   Implemented as a built-in data type.
 *
 **************************************************************************************/
 
@@ -1721,8 +1715,6 @@ impl Vector {
                     .collect::<PartialVMResult<Vec<_>>>()?,
             ),
 
-            // TODO: it feels weird that the the elements for primitive types are checked but the
-            // checking is skipped for complex types.
             Type::Signer | Type::Vector(_) | Type::Struct(_) | Type::StructInstantiation(_, _) => {
                 Value(ValueImpl::Container(Container::Vec(Rc::new(RefCell::new(
                     elements.into_iter().map(|v| v.0).collect(),
