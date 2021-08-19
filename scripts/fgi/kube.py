@@ -85,14 +85,10 @@ def get_cluster_context(cluster_name):
 def get_cluster_name_from_context(context):
     return context.split("/")[1]
 
-# randomly select a cluster that is free based on its pod status:
-# - no other forge pods currently Running or Pending
-# - all monitoring pods are ready
-def kube_select_cluster():
-    shuffled_clusters = random.sample(FORGE_K8S_CLUSTERS, len(FORGE_K8S_CLUSTERS))
+def kube_ensure_cluster(clusters):
     attempts = 360
     for attempt in range(attempts):
-        for cluster in shuffled_clusters:
+        for cluster in clusters:
             context = get_cluster_context(cluster)
             running_pods = get_forge_pods_by_phase(context, "Running")
             pending_pods = get_forge_pods_by_phase(context, "Pending")
@@ -103,14 +99,7 @@ def kube_select_cluster():
             num_pending_pods = len(pending_pods["items"])
             for pod in monitoring_pods["items"]:
                 pod_name = pod["metadata"]["name"]
-                healthy = all(
-                    list(
-                        map(
-                            lambda container: container["ready"],
-                            pod["status"]["containerStatuses"],
-                        )
-                    )
-                )
+                healthy = pod["status"]["phase"] == "Running"
                 if not healthy:
                     print(
                         f"{cluster} has an unhealthy monitoring pod {pod_name}. Skipping."
@@ -130,6 +119,13 @@ def kube_select_cluster():
         time.sleep(10)
     print("Failed to schedule forge pod. All clusters are busy")
     return None
+
+# randomly select a cluster that is free based on its pod status:
+# - no other forge pods currently Running or Pending
+# - all monitoring pods are ready
+def kube_select_cluster():
+    shuffled_clusters = random.sample(FORGE_K8S_CLUSTERS, len(FORGE_K8S_CLUSTERS))
+    return kube_ensure_cluster(shuffled_clusters)
 
 
 def kube_wait_job(job_name, context):

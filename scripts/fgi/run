@@ -8,6 +8,7 @@ import getpass, os, subprocess, sys
 from kube import (
     kube_init_context,
     kube_select_cluster,
+    kube_ensure_cluster,
     get_cluster_context,
     kube_wait_job,
     create_forge_job,
@@ -128,6 +129,11 @@ if not args.workspace:
     workspace = kube_select_cluster()
     if not workspace:
         print(f"{FAIL}Failed to select forge testnet cluster{RESTORE}")
+        sys.exit(1)
+else:
+    ret = kube_ensure_cluster([workspace])
+    if not ret:
+        print(f"{FAIL}Failed to acquire specified forge testnet cluster {workspace}{RESTORE}")
         sys.exit(1)
 context = get_cluster_context(workspace)
 print(f"Running experiments on cluster: {workspace}")

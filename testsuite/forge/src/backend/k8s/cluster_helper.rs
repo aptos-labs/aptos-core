@@ -413,7 +413,7 @@ pub fn set_eks_nodegroup_size(
 ) -> Result<()> {
     // https://github.com/lucdew/rusoto-example/blob/master/src/client.rs
     // Create rusoto client through an http proxy
-    let eks_client = create_eks_client(auth_with_k8s_env).unwrap();
+    let eks_client = create_eks_client(auth_with_k8s_env)?;
     println!("Created rusoto http client");
 
     // nodegroup scaling factors
@@ -440,31 +440,25 @@ pub fn set_eks_nodegroup_size(
     };
 
     // submit the scaling requests
-    let rt = Runtime::new().unwrap();
-    let validators_update_id = rt
-        .block_on(submit_update_nodegroup_config_request(
-            &eks_client,
-            &cluster_name,
-            "validators",
-            validator_scaling,
-        ))
-        .unwrap();
-    let utilities_update_id = rt
-        .block_on(submit_update_nodegroup_config_request(
-            &eks_client,
-            &cluster_name,
-            "utilities",
-            utilities_scaling,
-        ))
-        .unwrap();
-    let trusted_update_id = rt
-        .block_on(submit_update_nodegroup_config_request(
-            &eks_client,
-            &cluster_name,
-            "trusted",
-            trusted_scaling,
-        ))
-        .unwrap();
+    let rt = Runtime::new()?;
+    let validators_update_id = rt.block_on(submit_update_nodegroup_config_request(
+        &eks_client,
+        &cluster_name,
+        "validators",
+        validator_scaling,
+    ))?;
+    let utilities_update_id = rt.block_on(submit_update_nodegroup_config_request(
+        &eks_client,
+        &cluster_name,
+        "utilities",
+        utilities_scaling,
+    ))?;
+    let trusted_update_id = rt.block_on(submit_update_nodegroup_config_request(
+        &eks_client,
+        &cluster_name,
+        "trusted",
+        trusted_scaling,
+    ))?;
 
     // wait for nodegroup updates
     let updates: Vec<(&str, &str)> = vec![
@@ -492,9 +486,8 @@ pub fn set_eks_nodegroup_size(
                             .unwrap()
                             .update
                             .unwrap();
-                        let stat = describe_update.status;
-                        match stat {
-                            Some(s) => match s.as_str() {
+                        if let Some(s) = describe_update.status {
+                            match s.as_str() {
                                 "Failed" => bail!("Nodegroup update failed"),
                                 "Successful" => {
                                     println!(
@@ -510,8 +503,9 @@ pub fn set_eks_nodegroup_size(
                                     );
                                     bail!("Waiting for valid update status")
                                 }
-                            },
-                            None => bail!("Failed to describe nodegroup update"),
+                            }
+                        } else {
+                            bail!("Failed to describe nodegroup update")
                         }
                     })
                 })
