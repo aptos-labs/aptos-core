@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{BCS_EXTENSION, DEFAULT_BUILD_DIR, DEFAULT_STORAGE_DIR};
+use crate::BCS_EXTENSION;
 use anyhow::{anyhow, bail, Result};
 use disassembler::disassembler::Disassembler;
 use move_binary_format::{
@@ -514,13 +514,6 @@ impl ResourceResolver for OnDiskStateView {
         struct_tag: &StructTag,
     ) -> Result<Option<Vec<u8>>, Self::Error> {
         self.get_resource_bytes(*address, struct_tag.clone())
-    }
-}
-
-impl Default for OnDiskStateView {
-    fn default() -> Self {
-        OnDiskStateView::create(Path::new(DEFAULT_BUILD_DIR), Path::new(DEFAULT_STORAGE_DIR))
-            .expect("Failure creating OnDiskStateView")
     }
 }
 

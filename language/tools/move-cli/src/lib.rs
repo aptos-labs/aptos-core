@@ -31,7 +31,10 @@ use move_core_types::{
 use move_lang::shared::{self, AddressBytes};
 use move_vm_runtime::native_functions::NativeFunction;
 use sandbox::utils::mode::{Mode, ModeType};
-use std::{fs, path::Path};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 use structopt::{clap::arg_enum, StructOpt};
 
 type NativeFunctionRecord = (AccountAddress, Identifier, Identifier, NativeFunction);
@@ -55,11 +58,12 @@ pub struct Move {
 
     /// Directory storing Move resources, events, and module bytecodes produced by module publishing
     /// and script execution.
-    #[structopt(long, default_value = DEFAULT_STORAGE_DIR, global = true)]
-    storage_dir: String,
+    #[structopt(long, default_value = DEFAULT_STORAGE_DIR, parse(from_os_str), global = true)]
+    storage_dir: PathBuf,
     /// Directory storing build artifacts produced by compilation
-    #[structopt(long, short = "d", default_value = DEFAULT_BUILD_DIR, global = true)]
-    build_dir: String,
+    #[structopt(long, default_value = DEFAULT_BUILD_DIR, parse(from_os_str), global = true)]
+    build_dir: PathBuf,
+
     /// Dependency inclusion mode
     #[structopt(
         long,
@@ -67,6 +71,7 @@ pub struct Move {
         global = true,
     )]
     mode: ModeType,
+
     /// Print additional diagnostics
     #[structopt(short = "v", global = true)]
     verbose: bool,
@@ -214,6 +219,13 @@ pub enum SandboxCommand {
     /// Typecheck and verify the scripts and/or modules under `src`.
     #[structopt(name = "link")]
     Link {
+        /// The source files containing modules to publish
+        #[structopt(
+            name = "PATH_TO_SOURCE_FILE",
+            default_value = DEFAULT_SOURCE_DIR,
+        )]
+        source_files: Vec<String>,
+
         /// If set, fail when attempting to typecheck a module that already exists in global storage
         #[structopt(long = "no-republish")]
         no_republish: bool,
@@ -298,12 +310,15 @@ fn handle_sandbox_commands(
     let additional_named_addresses =
         shared::verify_and_create_named_address_mapping(move_args.named_addresses.clone())?;
     match sandbox_command {
-        SandboxCommand::Link { no_republish } => {
+        SandboxCommand::Link {
+            source_files,
+            no_republish,
+        } => {
             let state = mode.prepare_state(&move_args.build_dir, &move_args.storage_dir)?;
             base::commands::check(
                 &[state.interface_files_dir()?],
                 !*no_republish,
-                &[DEFAULT_SOURCE_DIR.to_string()],
+                source_files,
                 state.get_named_addresses(additional_named_addresses)?,
                 move_args.verbose,
             )
@@ -421,7 +436,7 @@ pub fn run_cli(
             } else {
                 base::commands::compile(
                     &[state.interface_files_dir()?],
-                    &move_args.build_dir,
+                    state.build_dir().to_str().unwrap(),
                     false,
                     source_files,
                     state.get_named_addresses(additional_named_addresses)?,

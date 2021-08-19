@@ -111,20 +111,53 @@ pub fn run_one(
     use_temp_dir: bool,
     track_cov: bool,
 ) -> anyhow::Result<Option<ExecCoverageMapWithModules>> {
+    fn simple_copy_dir(dst: &Path, src: &Path) -> io::Result<()> {
+        for entry in fs::read_dir(src)? {
+            let src_entry = entry?;
+            let src_entry_path = src_entry.path();
+            let dst_entry_path = dst.join(src_entry.file_name());
+            if src_entry_path.is_dir() {
+                fs::create_dir(&dst_entry_path)?;
+                simple_copy_dir(&dst_entry_path, &src_entry_path)?;
+            } else {
+                fs::copy(&src_entry_path, &dst_entry_path)?;
+            }
+        }
+        Ok(())
+    }
+
     let args_file = io::BufReader::new(File::open(args_path)?).lines();
     let cli_binary_path = Path::new(cli_binary).canonicalize()?;
 
     // path where we will run the binary
     let exe_dir = args_path.parent().unwrap();
-    let temp_dir = if use_temp_dir { Some(tempdir()?) } else { None };
+    let temp_dir = if use_temp_dir {
+        // symlink everything in the exe_dir into the temp_dir
+        let dir = tempdir()?;
+        simple_copy_dir(dir.path(), exe_dir)?;
+        Some(dir)
+    } else {
+        None
+    };
     let wks_dir = temp_dir.as_ref().map_or(exe_dir, |t| t.path());
 
     let storage_dir = wks_dir.join(DEFAULT_STORAGE_DIR);
     let build_output = wks_dir.join(DEFAULT_BUILD_DIR);
+
+    // template for preparing a cli command
+    let cli_command_template = || {
+        let mut command = Command::new(cli_binary_path.clone());
+        if let Some(work_dir) = temp_dir.as_ref() {
+            command.current_dir(work_dir.path());
+        } else {
+            command.current_dir(exe_dir);
+        }
+        command
+    };
+
     if storage_dir.exists() || build_output.exists() {
         // need to clean before testing
-        Command::new(cli_binary_path.clone())
-            .current_dir(exe_dir)
+        cli_command_template()
             .arg("sandbox")
             .arg("clean")
             .output()?;
@@ -165,10 +198,7 @@ pub fn run_one(
             Some(path) => env::set_var(MOVE_VM_TRACING_ENV_VAR_NAME, path.as_os_str()),
         }
 
-        let cmd_output = Command::new(cli_binary_path.clone())
-            .current_dir(exe_dir)
-            .args(args_iter)
-            .output()?;
+        let cmd_output = cli_command_template().args(args_iter).output()?;
         output += &format!("Command `{}`:\n", args_line);
         output += std::str::from_utf8(&cmd_output.stdout)?;
         output += std::str::from_utf8(&cmd_output.stderr)?;
@@ -193,12 +223,10 @@ pub fn run_one(
 
     // post-test cleanup and cleanup checks
     // check that the test command didn't create a src dir
-
     let run_move_clean = !read_bool_env_var(NO_MOVE_CLEAN);
     if run_move_clean {
-        // run `move clean` to ensure that temporary state is cleaned up
-        Command::new(cli_binary_path)
-            .current_dir(exe_dir)
+        // run the clean command to ensure that temporary state is cleaned up
+        cli_command_template()
             .arg("sandbox")
             .arg("clean")
             .output()?;

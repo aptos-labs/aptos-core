@@ -6,7 +6,7 @@ use crate::{
         package::{MovePackage, SourceFilter},
         OnDiskStateView,
     },
-    DEFAULT_BUILD_DIR, DEFAULT_PACKAGE_DIR, DEFAULT_STORAGE_DIR,
+    DEFAULT_PACKAGE_DIR,
 };
 use anyhow::{bail, Result};
 use include_dir::{include_dir, Dir};
@@ -100,20 +100,16 @@ impl Mode {
         }
     }
 
-    pub fn prepare_default_state() -> Result<OnDiskStateView> {
-        Self::new(ModeType::default()).prepare_state(DEFAULT_STORAGE_DIR, DEFAULT_BUILD_DIR)
-    }
-
     /// Prepare an OnDiskStateView that is ready to use. Library modules will be preloaded into the
     /// storage if `load_libraries` is true.
     ///
     /// NOTE: this is the only way to get a state view in Move CLI, and thus, this function needs
     /// to be run before every command that needs a state view, i.e., `check`, `publish`, `run`,
     /// `view`, and `doctor`.
-    pub fn prepare_state(&self, build_dir: &str, storage_dir: &str) -> Result<OnDiskStateView> {
-        let state = OnDiskStateView::create(build_dir, storage_dir)?;
-        let package_dir = Path::new(build_dir).join(DEFAULT_PACKAGE_DIR);
+    pub fn prepare_state(&self, build_dir: &Path, storage_dir: &Path) -> Result<OnDiskStateView> {
+        let package_dir = build_dir.join(DEFAULT_PACKAGE_DIR);
         let named_address_values = self.prepare(&package_dir, false)?;
+        let state = OnDiskStateView::create(build_dir, storage_dir)?;
 
         // preload the storage with library modules (if such modules do not exist yet)
         let lib_modules = self.compiled_modules(&package_dir)?;
