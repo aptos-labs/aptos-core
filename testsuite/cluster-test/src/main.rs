@@ -25,12 +25,12 @@ use cluster_test::{
     instance::Instance,
     prometheus::Prometheus,
     report::SuiteReport,
-    slack::SlackClient,
     suite::ExperimentSuite,
     tx_emitter::{EmitJobRequest, EmitThreadParams, TxEmitter},
 };
 use diem_config::config::DEFAULT_JSON_RPC_PORT;
 use diem_sdk::types::LocalAccount;
+use forge::SlackClient;
 use futures::{
     future::{join_all, FutureExt},
     select,

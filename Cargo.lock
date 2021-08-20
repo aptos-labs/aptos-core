@@ -3339,6 +3339,7 @@ dependencies = [
  "structopt 0.3.21",
  "testcases",
  "tokio",
+ "url",
 ]
 
 [[package]]

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::Test;
-use crate::{CoreContext, Result};
+use crate::{CoreContext, Result, TestReport};
 use diem_sdk::{
     client::{BlockingClient, FaucetClient},
     move_types::account_address::AccountAddress,
@@ -22,11 +22,16 @@ pub struct PublicUsageContext<'t> {
     core: CoreContext,
 
     public_info: PublicInfo<'t>,
+    pub report: &'t mut TestReport,
 }
 
 impl<'t> PublicUsageContext<'t> {
-    pub fn new(core: CoreContext, public_info: PublicInfo<'t>) -> Self {
-        Self { core, public_info }
+    pub fn new(core: CoreContext, public_info: PublicInfo<'t>, report: &'t mut TestReport) -> Self {
+        Self {
+            core,
+            public_info,
+            report,
+        }
     }
 
     pub fn client(&self) -> BlockingClient {

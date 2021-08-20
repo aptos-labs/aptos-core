@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{ChainInfo, CoreContext, Test};
-use crate::Result;
+use crate::{Result, TestReport};
 use diem_sdk::{client::BlockingClient, types::LocalAccount};
 
 /// The testing interface which defines a test written from the perspective of the Admin of the
@@ -18,11 +18,16 @@ pub struct AdminContext<'t> {
     core: CoreContext,
 
     chain_info: ChainInfo<'t>,
+    pub report: &'t mut TestReport,
 }
 
 impl<'t> AdminContext<'t> {
-    pub fn new(core: CoreContext, chain_info: ChainInfo<'t>) -> Self {
-        Self { core, chain_info }
+    pub fn new(core: CoreContext, chain_info: ChainInfo<'t>, report: &'t mut TestReport) -> Self {
+        Self {
+            core,
+            chain_info,
+            report,
+        }
     }
 
     pub fn core(&self) -> &CoreContext {

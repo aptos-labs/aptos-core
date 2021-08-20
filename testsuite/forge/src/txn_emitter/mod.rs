@@ -600,7 +600,7 @@ async fn wait_for_accounts_sequence(
     client: &JsonRpcClient,
     accounts: &mut [LocalAccount],
 ) -> Result<(), Vec<AccountAddress>> {
-    let deadline = Instant::now() + Duration::from_secs(10); //TXN_MAX_WAIT;
+    let deadline = Instant::now() + Duration::from_secs(30); //TXN_MAX_WAIT;
     let addresses: Vec<_> = accounts.iter().map(|d| d.address()).collect();
     let mut uncommitted = addresses.clone().into_iter().collect::<HashSet<_>>();
 

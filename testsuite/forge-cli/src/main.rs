@@ -6,13 +6,14 @@ use diem_sdk::{
     move_types::account_address::AccountAddress,
     transaction_builder::Currency,
 };
-use forge::{forge_main, ForgeConfig, Options, Result, *};
-use std::{num::NonZeroUsize, time::Duration};
+use forge::{ForgeConfig, Options, Result, *};
+use std::{env, num::NonZeroUsize, process, time::Duration};
 use structopt::StructOpt;
 use testcases::{
     compatibility_test::SimpleValidatorUpgrade, generate_traffic,
     performance_test::PerformanceBenchmark,
 };
+use url::Url;
 
 #[derive(StructOpt, Debug)]
 struct Args {
@@ -144,7 +145,7 @@ fn main() -> Result<()> {
     }
 
     if args.local_swarm {
-        forge_main(
+        run_forge(
             local_test_suite(),
             LocalFactory::from_workspace()?,
             &args.options,
@@ -154,7 +155,7 @@ fn main() -> Result<()> {
         if let Some(suite) = args.suite.as_ref() {
             test_suite = get_test_suite(suite);
         }
-        forge_main(
+        run_forge(
             test_suite,
             K8sFactory::new(
                 args.cluster_name,
@@ -165,6 +166,35 @@ fn main() -> Result<()> {
             .unwrap(),
             &args.options,
         )
+    }
+}
+
+pub fn run_forge<F: Factory>(tests: ForgeConfig<'_>, factory: F, options: &Options) -> Result<()> {
+    let forge = Forge::new(options, tests, factory);
+
+    if options.list {
+        forge.list()?;
+
+        return Ok(());
+    }
+
+    match forge.run() {
+        Ok(report) => {
+            let slack_url: Option<Url> = env::var("SLACK_URL")
+                .map(|u| u.parse().expect("Failed to parse SLACK_URL"))
+                .ok();
+            if let Some(ref slack_url) = slack_url {
+                let slack_client = SlackClient::new();
+                if let Err(e) = slack_client.send_message(slack_url, &report.to_string()) {
+                    println!("Failed to send slack message: {}", e);
+                }
+            }
+            Ok(())
+        }
+        Err(e) => {
+            eprintln!("Failed to run tests:\n{}", e);
+            process::exit(101); // Exit with a non-zero exit code if tests failed
+        }
     }
 }
 
@@ -200,7 +230,7 @@ fn land_blocking_test_suite() -> ForgeConfig<'static> {
 fn land_blocking_test_compat_suite() -> ForgeConfig<'static> {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(30).unwrap())
-        .with_network_tests(&[&PerformanceBenchmark, &SimpleValidatorUpgrade])
+        .with_network_tests(&[&SimpleValidatorUpgrade, &PerformanceBenchmark])
 }
 
 //TODO Make public test later
@@ -375,7 +405,6 @@ impl NetworkTest for EmitTransaction {
         let stats = generate_traffic(ctx, &all_validators, duration).unwrap();
         ctx.report
             .report_txn_stats(self.name().to_string(), stats, duration);
-        ctx.report.print_report();
 
         Ok(())
     }

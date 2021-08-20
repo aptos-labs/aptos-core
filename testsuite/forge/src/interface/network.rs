@@ -15,11 +15,11 @@ pub trait NetworkTest: Test {
 pub struct NetworkContext<'t> {
     core: CoreContext,
     swarm: &'t mut dyn Swarm,
-    pub report: TestReport,
+    pub report: &'t mut TestReport,
 }
 
 impl<'t> NetworkContext<'t> {
-    pub fn new(core: CoreContext, swarm: &'t mut dyn Swarm, report: TestReport) -> Self {
+    pub fn new(core: CoreContext, swarm: &'t mut dyn Swarm, report: &'t mut TestReport) -> Self {
         Self {
             core,
             swarm,

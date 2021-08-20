@@ -23,7 +23,7 @@ BUILD_PROJECTS=()
 
 while [[ "$1" =~ ^- ]]; do case $1 in
   --build-all )
-    BUILD_PROJECTS=(diem-validator diem-cluster-test diem-init diem-faucet diem-safety-rules diem-tools)
+    BUILD_PROJECTS=(diem-validator diem-cluster-test diem-init diem-faucet diem-safety-rules diem-tools diem-forge)
     ;;
     # NOTE: This is used in land-blocking job `.github/workflows/ci-test.yml`
     #       If you change the list of projects to be built for `--build-all-cti`, please

@@ -34,7 +34,7 @@ pub struct Options {
     nocapture: bool,
     #[structopt(long)]
     /// List all tests
-    list: bool,
+    pub list: bool,
     #[structopt(long)]
     /// List or run ignored tests
     ignored: bool,
@@ -80,7 +80,7 @@ pub fn forge_main<F: Factory>(tests: ForgeConfig<'_>, factory: F, options: &Opti
     }
 
     match forge.run() {
-        Ok(()) => Ok(()),
+        Ok(..) => Ok(()),
         Err(e) => {
             eprintln!("Failed to run tests:\n{}", e);
             process::exit(101); // Exit with a non-zero exit code if tests failed
@@ -204,10 +204,11 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
         .expect("There has to be at least 1 version")
     }
 
-    pub fn run(&self) -> Result<()> {
+    pub fn run(&self) -> Result<TestReport> {
         let test_count = self.filter_tests(self.tests.all_tests()).count();
         let filtered_out = test_count.saturating_sub(self.tests.all_tests().count());
 
+        let mut report = TestReport::new();
         let mut summary = TestSummary::new(test_count, filtered_out);
         summary.write_starting_msg()?;
 
@@ -232,6 +233,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                 let mut public_ctx = PublicUsageContext::new(
                     CoreContext::from_rng(&mut rng),
                     swarm.chain_info().into_public_info(),
+                    &mut report,
                 );
                 let result = run_test(|| test.run(&mut public_ctx));
                 summary.handle_result(test.name().to_owned(), result)?;
@@ -239,19 +241,23 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
 
             // Run AdminTests
             for test in self.filter_tests(self.tests.admin_tests.iter()) {
-                let mut admin_ctx =
-                    AdminContext::new(CoreContext::from_rng(&mut rng), swarm.chain_info());
+                let mut admin_ctx = AdminContext::new(
+                    CoreContext::from_rng(&mut rng),
+                    swarm.chain_info(),
+                    &mut report,
+                );
                 let result = run_test(|| test.run(&mut admin_ctx));
                 summary.handle_result(test.name().to_owned(), result)?;
             }
 
             for test in self.filter_tests(self.tests.network_tests.iter()) {
-                let report = TestReport::new();
                 let mut network_ctx =
-                    NetworkContext::new(CoreContext::from_rng(&mut rng), &mut *swarm, report);
+                    NetworkContext::new(CoreContext::from_rng(&mut rng), &mut *swarm, &mut report);
                 let result = run_test(|| test.run(&mut network_ctx));
                 summary.handle_result(test.name().to_owned(), result)?;
             }
+
+            report.print_report();
 
             io::stdout().flush()?;
             io::stderr().flush()?;
@@ -265,7 +271,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
         summary.write_summary()?;
 
         if summary.success() {
-            Ok(())
+            Ok(report)
         } else {
             Err(anyhow::anyhow!("Tests Failed"))
         }

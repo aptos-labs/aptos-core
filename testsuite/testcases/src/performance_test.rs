@@ -26,7 +26,6 @@ impl NetworkTest for PerformanceBenchmark {
         let txn_stat = generate_traffic(ctx, &all_validators, duration)?;
         ctx.report
             .report_txn_stats(self.name().to_string(), txn_stat, duration);
-        ctx.report.print_report();
 
         Ok(())
     }

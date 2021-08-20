@@ -27,7 +27,12 @@ impl NetworkTest for SimpleValidatorUpgrade {
             (versions[0].clone(), versions[1].clone())
         };
 
-        println!("testing upgrade from {} -> {}", old_version, new_version);
+        let msg = format!(
+            "Compatibility test results for {} ==> {} (PR)",
+            old_version, new_version
+        );
+        println!("{}", msg);
+        ctx.report.report_text(msg);
 
         // Split the swarm into 2 parts
         if ctx.swarm().validators().count() < 4 {
@@ -43,7 +48,12 @@ impl NetworkTest for SimpleValidatorUpgrade {
         let first_node = first_batch.pop().unwrap();
         let duration = Duration::from_secs(5);
 
-        println!("1. Downgrade all validators to older version");
+        let msg = format!(
+            "1. Downgrade all validators to older version: {}",
+            old_version
+        );
+        println!("{}", msg);
+        ctx.report.report_text(msg);
         // Ensure that all validators are running the older version of the software
         let validators_to_downgrade = ctx
             .swarm()
@@ -57,24 +67,42 @@ impl NetworkTest for SimpleValidatorUpgrade {
         generate_traffic(ctx, &all_validators, duration)?;
 
         // Update the first Validator
-        println!("2. upgrading first Validator");
+        let msg = format!(
+            "2. Upgrading first Validator to new version: {}",
+            new_version
+        );
+        println!("{}", msg);
+        ctx.report.report_text(msg);
         batch_update(ctx, &[first_node], &new_version)?;
         generate_traffic(ctx, &[first_node], duration)?;
 
         // Update the rest of the first batch
-        println!("3. upgrading rest of first batch");
+        let msg = format!(
+            "3. Upgrading rest of first batch to new version: {}",
+            new_version
+        );
+        println!("{}", msg);
+        ctx.report.report_text(msg);
         batch_update(ctx, &first_batch, &new_version)?;
         generate_traffic(ctx, &first_batch, duration)?;
 
         ctx.swarm().fork_check()?;
 
         // Update the second batch
-        println!("4. upgrading second batch");
+        let msg = format!("4. upgrading second batch to new version: {}", new_version);
+        println!("{}", msg);
+        ctx.report.report_text(msg);
         batch_update(ctx, &second_batch, &new_version)?;
         generate_traffic(ctx, &second_batch, duration)?;
 
-        println!("5. check swarm health");
+        let msg = "5. check swarm health".to_string();
+        println!("{}", msg);
+        ctx.report.report_text(msg);
         ctx.swarm().fork_check()?;
+        ctx.report.report_text(format!(
+            "Compatibility test for {} ==> {} passed",
+            old_version, new_version
+        ));
 
         Ok(())
     }
