@@ -5,6 +5,7 @@
 
 pub mod builder;
 pub mod command;
+pub mod fullnode_builder;
 mod genesis;
 mod key;
 pub mod layout;
