@@ -7,6 +7,7 @@ use crate::{
     FullNode, Node, Result, Swarm, Validator, Version,
 };
 use anyhow::{anyhow, bail, format_err};
+use diem_config::config::NodeConfig;
 use diem_logger::*;
 use diem_sdk::{
     crypto::ed25519::Ed25519PrivateKey,
@@ -202,7 +203,7 @@ impl Swarm for K8sSwarm {
         self.fullnodes.get_mut(&id).map(|v| v as &mut dyn FullNode)
     }
 
-    fn add_validator(&mut self, _id: PeerId) -> Result<PeerId> {
+    fn add_validator(&mut self, _version: &Version, _template: NodeConfig) -> Result<PeerId> {
         todo!()
     }
 
@@ -210,7 +211,7 @@ impl Swarm for K8sSwarm {
         remove_helm_release(self.validator(id).unwrap().name())
     }
 
-    fn add_full_node(&mut self, _id: PeerId) -> Result<()> {
+    fn add_full_node(&mut self, _version: &Version, _template: NodeConfig) -> Result<PeerId> {
         todo!()
     }
 

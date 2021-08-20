@@ -7,7 +7,7 @@ use crate::{
 };
 use anyhow::{anyhow, Result};
 use diem_config::config::NodeConfig;
-use diem_genesis_tool::validator_builder::ValidatorBuilder;
+use diem_genesis_tool::{fullnode_builder::FullnodeConfig, validator_builder::ValidatorBuilder};
 use diem_sdk::{
     crypto::ed25519::Ed25519PrivateKey,
     types::{
@@ -189,12 +189,12 @@ impl LocalSwarmBuilder {
         );
 
         Ok(LocalSwarm {
-            node_count: validators.len() as u64,
+            node_name_counter: validators.len() as u64,
             genesis,
             genesis_waypoint,
             versions,
             validators,
-            full_nodes: HashMap::new(),
+            fullnodes: HashMap::new(),
             dir,
             validator_network_address_encryption_key,
             root_account,
@@ -207,12 +207,12 @@ impl LocalSwarmBuilder {
 
 #[derive(Debug)]
 pub struct LocalSwarm {
-    node_count: u64,
+    node_name_counter: u64,
     genesis: Transaction,
     genesis_waypoint: Waypoint,
     versions: Arc<HashMap<Version, LocalVersion>>,
     validators: HashMap<PeerId, LocalNode>,
-    full_nodes: HashMap<PeerId, LocalNode>,
+    fullnodes: HashMap<PeerId, LocalNode>,
     dir: SwarmDirectory,
     validator_network_address_encryption_key: ValidatorNetworkAddressEncryptionKey,
     root_account: LocalAccount,
@@ -276,6 +276,32 @@ impl LocalSwarm {
 
         Err(anyhow!("Launching Swarm timed out"))
     }
+
+    fn add_fullnode(&mut self, version: &Version, template: NodeConfig) -> Result<PeerId> {
+        let name = self.node_name_counter.to_string();
+        self.node_name_counter += 1;
+        let fullnode_config = FullnodeConfig::public_fullnode(
+            name,
+            self.dir.as_ref(),
+            template,
+            &self.genesis_waypoint,
+            &self.genesis,
+        )?;
+
+        let version = self.versions.get(version).unwrap();
+        let mut fullnode = LocalNode::new(
+            version.to_owned(),
+            fullnode_config.name,
+            fullnode_config.directory,
+        )?;
+
+        let peer_id = fullnode.peer_id();
+        fullnode.start()?;
+
+        self.fullnodes.insert(peer_id, fullnode);
+
+        Ok(peer_id)
+    }
 }
 
 impl Swarm for LocalSwarm {
@@ -319,26 +345,26 @@ impl Swarm for LocalSwarm {
     }
 
     fn full_nodes<'a>(&'a self) -> Box<dyn Iterator<Item = &'a dyn FullNode> + 'a> {
-        Box::new(self.full_nodes.values().map(|v| v as &'a dyn FullNode))
+        Box::new(self.fullnodes.values().map(|v| v as &'a dyn FullNode))
     }
 
     fn full_nodes_mut<'a>(&'a mut self) -> Box<dyn Iterator<Item = &'a mut dyn FullNode> + 'a> {
         Box::new(
-            self.full_nodes
+            self.fullnodes
                 .values_mut()
                 .map(|v| v as &'a mut dyn FullNode),
         )
     }
 
     fn full_node(&self, id: PeerId) -> Option<&dyn FullNode> {
-        self.full_nodes.get(&id).map(|v| v as &dyn FullNode)
+        self.fullnodes.get(&id).map(|v| v as &dyn FullNode)
     }
 
     fn full_node_mut(&mut self, id: PeerId) -> Option<&mut dyn FullNode> {
-        self.full_nodes.get_mut(&id).map(|v| v as &mut dyn FullNode)
+        self.fullnodes.get_mut(&id).map(|v| v as &mut dyn FullNode)
     }
 
-    fn add_validator(&mut self, _id: PeerId) -> Result<PeerId> {
+    fn add_validator(&mut self, _version: &Version, _template: NodeConfig) -> Result<PeerId> {
         todo!()
     }
 
@@ -346,12 +372,16 @@ impl Swarm for LocalSwarm {
         todo!()
     }
 
-    fn add_full_node(&mut self, _id: PeerId) -> Result<()> {
-        todo!()
+    fn add_full_node(&mut self, version: &Version, template: NodeConfig) -> Result<PeerId> {
+        self.add_fullnode(version, template)
     }
 
-    fn remove_full_node(&mut self, _id: PeerId) -> Result<()> {
-        todo!()
+    fn remove_full_node(&mut self, id: PeerId) -> Result<()> {
+        if let Some(mut fullnode) = self.fullnodes.remove(&id) {
+            fullnode.stop();
+        }
+
+        Ok(())
     }
 
     fn versions<'a>(&'a self) -> Box<dyn Iterator<Item = Version> + 'a> {

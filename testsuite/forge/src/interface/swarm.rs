@@ -3,6 +3,7 @@
 
 use crate::{ChainInfo, FullNode, NodeExt, Result, Validator, Version};
 use anyhow::anyhow;
+use diem_config::config::NodeConfig;
 use diem_sdk::{client::BlockingClient, types::PeerId};
 use std::{
     thread,
@@ -43,13 +44,13 @@ pub trait Swarm {
     fn full_node_mut(&mut self, id: PeerId) -> Option<&mut dyn FullNode>;
 
     /// Adds a Validator to the swarm with the provided PeerId
-    fn add_validator(&mut self, id: PeerId) -> Result<PeerId>;
+    fn add_validator(&mut self, version: &Version, template: NodeConfig) -> Result<PeerId>;
 
     /// Removes the Validator with the provided PeerId
     fn remove_validator(&mut self, id: PeerId) -> Result<()>;
 
     /// Adds a FullNode to the swarm with the provided PeerId
-    fn add_full_node(&mut self, id: PeerId) -> Result<()>;
+    fn add_full_node(&mut self, version: &Version, template: NodeConfig) -> Result<PeerId>;
 
     /// Removes the FullNode with the provided PeerId
     fn remove_full_node(&mut self, id: PeerId) -> Result<()>;
