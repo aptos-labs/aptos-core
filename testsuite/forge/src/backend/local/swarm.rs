@@ -10,7 +10,10 @@ use diem_config::config::NodeConfig;
 use diem_genesis_tool::validator_builder::ValidatorBuilder;
 use diem_sdk::{
     crypto::ed25519::Ed25519PrivateKey,
-    types::{chain_id::ChainId, AccountKey, LocalAccount, PeerId},
+    types::{
+        chain_id::ChainId, transaction::Transaction, waypoint::Waypoint, AccountKey, LocalAccount,
+        PeerId,
+    },
 };
 use std::{
     collections::HashMap,
@@ -129,7 +132,7 @@ impl LocalSwarmBuilder {
             SwarmDirectory::Temporary(TempDir::new()?)
         };
 
-        let (root_keys, validators) = ValidatorBuilder::new(
+        let (root_keys, genesis, genesis_waypoint, validators) = ValidatorBuilder::new(
             &dir,
             diem_framework_releases::current_module_blobs().to_vec(),
         )
@@ -186,6 +189,9 @@ impl LocalSwarmBuilder {
         );
 
         Ok(LocalSwarm {
+            node_count: validators.len() as u64,
+            genesis,
+            genesis_waypoint,
             versions,
             validators,
             full_nodes: HashMap::new(),
@@ -201,6 +207,9 @@ impl LocalSwarmBuilder {
 
 #[derive(Debug)]
 pub struct LocalSwarm {
+    node_count: u64,
+    genesis: Transaction,
+    genesis_waypoint: Waypoint,
     versions: Arc<HashMap<Version, LocalVersion>>,
     validators: HashMap<PeerId, LocalNode>,
     full_nodes: HashMap<PeerId, LocalNode>,

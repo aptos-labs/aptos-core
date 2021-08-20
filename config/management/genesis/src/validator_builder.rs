@@ -197,7 +197,10 @@ impl ValidatorBuilder {
         self
     }
 
-    pub fn build<R>(mut self, mut rng: R) -> Result<(RootKeys, Vec<ValidatorConfig>)>
+    pub fn build<R>(
+        mut self,
+        mut rng: R,
+    ) -> Result<(RootKeys, Transaction, Waypoint, Vec<ValidatorConfig>)>
     where
         R: ::rand::RngCore + ::rand::CryptoRng,
     {
@@ -253,7 +256,7 @@ impl ValidatorBuilder {
             validator.save_config()?;
         }
 
-        Ok((root_keys, validators))
+        Ok((root_keys, genesis, waypoint, validators))
     }
 
     //

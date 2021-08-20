@@ -77,7 +77,7 @@ impl BuildSwarm for ValidatorBuilder {
     where
         R: ::rand::RngCore + ::rand::CryptoRng,
     {
-        let (root_keys, validators) = self.clone().build(rng)?;
+        let (root_keys, _genesis, _genesis_waypoint, validators) = self.clone().build(rng)?;
 
         Ok((
             validators.into_iter().map(|v| v.config).collect(),
