@@ -58,7 +58,7 @@ use network::{
 use network_builder::builder::NetworkBuilder;
 use once_cell::sync::Lazy;
 use rand::{rngs::StdRng, SeedableRng};
-use state_sync::{
+use state_sync_v1::{
     bootstrapper::StateSyncBootstrapper,
     client::StateSyncClient,
     error::Error,
@@ -397,7 +397,7 @@ impl StateSyncEnvironment {
             );
 
             let (sender, events) = network_builder
-                .add_protocol_handler(state_sync::network::network_endpoint_config());
+                .add_protocol_handler(state_sync_v1::network::network_endpoint_config());
             network_builder.build(self.runtime.handle().clone()).start();
             network_handles.push((NodeNetworkId::new(network_id, 0), sender, events));
         };

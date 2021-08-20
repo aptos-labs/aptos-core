@@ -19,7 +19,7 @@ use diem_mempool::ConsensusRequest;
 use diem_types::on_chain_config::OnChainConfigPayload;
 use execution_correctness::ExecutionCorrectnessManager;
 use futures::channel::mpsc;
-use state_sync::client::StateSyncClient;
+use state_sync_v1::client::StateSyncClient;
 use std::{collections::HashMap, sync::Arc};
 use storage_interface::DbReader;
 use tokio::runtime::{self, Runtime};

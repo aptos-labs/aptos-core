@@ -998,7 +998,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
- "state-sync",
+ "state-sync-v1",
  "structopt 0.3.21",
  "termion",
  "tokio",
@@ -1122,7 +1122,7 @@ dependencies = [
  "serde",
  "serde_json",
  "short-hex-str",
- "state-sync",
+ "state-sync-v1",
  "storage-interface",
  "subscription-service",
  "tempfile",
@@ -1844,7 +1844,7 @@ dependencies = [
  "scratchpad",
  "serde_json",
  "sha-1 0.9.4",
- "state-sync",
+ "state-sync-v1",
  "stats_alloc",
  "storage-interface",
  "structopt 0.3.21",
@@ -2227,7 +2227,7 @@ dependencies = [
  "jemallocator",
  "network-builder",
  "rand 0.8.3",
- "state-sync",
+ "state-sync-v1",
  "storage-client",
  "storage-interface",
  "storage-service",
@@ -7497,7 +7497,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "state-sync"
+name = "state-sync-v1"
 version = "0.1.0"
 dependencies = [
  "bcs",

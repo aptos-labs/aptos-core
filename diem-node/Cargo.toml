@@ -41,7 +41,7 @@ diem-vm = { path = "../language/diem-vm" }
 diem-workspace-hack = { path = "../common/workspace-hack" }
 diemdb = { path = "../storage/diemdb" }
 network-builder = { path = "../network/builder" }
-state-sync = { path = "../state-sync" }
+state-sync-v1 = { path = "../state-sync/state-sync-v1" }
 storage-client = { path = "../storage/storage-client" }
 storage-interface= { path = "../storage/storage-interface" }
 storage-service = { path = "../storage/storage-service" }
@@ -50,4 +50,4 @@ subscription-service = { path = "../common/subscription-service" }
 [features]
 default = []
 assert-private-keys-not-cloneable = ["diem-crypto/assert-private-keys-not-cloneable"]
-failpoints = ["fail/failpoints", "consensus/failpoints", "executor/failpoints", "diem-json-rpc/failpoints", "diem-mempool/failpoints", "state-sync/failpoints"]
+failpoints = ["fail/failpoints", "consensus/failpoints", "executor/failpoints", "diem-json-rpc/failpoints", "diem-mempool/failpoints", "state-sync-v1/failpoints"]

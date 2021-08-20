@@ -24,7 +24,7 @@ use executor::{db_bootstrapper::maybe_bootstrap, Executor};
 use executor_types::ChunkExecutor;
 use futures::{channel::mpsc::channel, executor::block_on};
 use network_builder::builder::NetworkBuilder;
-use state_sync::bootstrapper::StateSyncBootstrapper;
+use state_sync_v1::bootstrapper::StateSyncBootstrapper;
 use std::{
     boxed::Box,
     convert::TryFrom,
@@ -343,7 +343,7 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
 
         // Create the endpoints to connect the Network to State Sync.
         let (state_sync_sender, state_sync_events) =
-            network_builder.add_protocol_handler(state_sync::network::network_endpoint_config());
+            network_builder.add_protocol_handler(state_sync_v1::network::network_endpoint_config());
         state_sync_network_handles.push((
             NodeNetworkId::new(network_id.clone(), idx),
             state_sync_sender,

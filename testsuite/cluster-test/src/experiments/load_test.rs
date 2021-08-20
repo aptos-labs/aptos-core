@@ -21,7 +21,7 @@ use network::{
     connectivity_manager::DiscoverySource, protocols::network::Event, ConnectivityRequest,
 };
 use network_builder::builder::NetworkBuilder;
-use state_sync::network::{StateSyncEvents, StateSyncSender};
+use state_sync_v1::network::{StateSyncEvents, StateSyncSender};
 use std::{
     collections::HashSet,
     fmt,
@@ -277,7 +277,7 @@ impl StubbedNode {
         );
 
         let state_sync_handle = Some(
-            network_builder.add_protocol_handler(state_sync::network::network_endpoint_config()),
+            network_builder.add_protocol_handler(state_sync_v1::network::network_endpoint_config()),
         );
 
         let mempool_handle = Some(network_builder.add_protocol_handler(
@@ -417,11 +417,11 @@ async fn state_sync_load_test(
         ));
     };
 
-    let chunk_request = state_sync::chunk_request::GetChunkRequest::new(
+    let chunk_request = state_sync_v1::chunk_request::GetChunkRequest::new(
         1,
         1,
         1000,
-        state_sync::chunk_request::TargetType::HighestAvailable {
+        state_sync_v1::chunk_request::TargetType::HighestAvailable {
             target_li: None,
             timeout_ms: 10_000,
         },
@@ -432,7 +432,7 @@ async fn state_sync_load_test(
     let mut bytes = 0_u64;
     let mut msg_num = 0_u64;
     while Instant::now().duration_since(task_start) < duration {
-        use state_sync::network::StateSyncMessage::*;
+        use state_sync_v1::network::StateSyncMessage::*;
 
         let msg = GetChunkRequest(Box::new(chunk_request.clone()));
         bytes += bcs::to_bytes(&msg)?.len() as u64;

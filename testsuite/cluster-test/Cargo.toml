@@ -62,7 +62,7 @@ move-core-types = { path = "../../language/move-core/types" }
 network = { path = "../../network" }
 network-builder = { path = "../../network/builder" }
 seed-peer-generator = { path = "../../config/seed-peer-generator" }
-state-sync = { path = "../../state-sync" }
+state-sync-v1 = { path = "../../state-sync/state-sync-v1" }
 diem-sdk = { path = "../../sdk" }
 diem-transaction-builder = { path = "../../sdk/transaction-builder" }
 

@@ -1,8 +1,13 @@
 ---
-id: state_sync
-title: State Sync
-custom_edit_url: https://github.com/diem/diem/edit/main/state-synchronizer/README.md
+id: state_sync_v1
+title: State Sync v1
+custom_edit_url: https://github.com/diem/diem/edit/main/state-sync/state-sync-v1/README.md
 ---
+
+*** **Note: there are plans to build and deploy a new version of state sync. As
+such, this version (v1) will be deprecated in the near future. See this
+[issue](https://github.com/diem/diem/issues/8906) for more information.** ***
+
 # State synchronizer (State sync)
 
 State sync is a component that helps Diem nodes advance local blockchain ledger
@@ -12,7 +17,7 @@ fall behind or are freshly deployed).
 
 ## Overview
 
-Refer to the [State Sync Specification](../specifications/state_sync) for a
+Refer to the [State Sync Specification](../../specifications/state_sync) for a
 high-level overview and description of State Sync.
 
 ## Implementation details

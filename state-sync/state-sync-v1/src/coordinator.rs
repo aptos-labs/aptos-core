@@ -343,7 +343,7 @@ impl<T: ExecutorProxyTrait> StateSyncCoordinator<T> {
     /// Note: when processing a sync request, state sync assumes that it's the only one
     /// modifying storage, i.e., consensus is not trying to commit transactions concurrently.
     fn process_sync_request(&mut self, request: SyncRequest) -> Result<(), Error> {
-        fail_point!("state_sync::process_sync_request_message", |_| {
+        fail_point!("state_sync_v1::process_sync_request_message", |_| {
             Err(crate::error::Error::UnexpectedError(
                 "Injected error in process_sync_request_message".into(),
             ))
@@ -648,7 +648,7 @@ impl<T: ExecutorProxyTrait> StateSyncCoordinator<T> {
                 .chunk_request(request.clone())
                 .local_li_version(self.local_state.committed_version())
         );
-        fail_point!("state_sync::process_chunk_request", |_| {
+        fail_point!("state_sync_v1::process_chunk_request", |_| {
             Err(crate::error::Error::UnexpectedError(
                 "Injected error in process_chunk_request".into(),
             ))
@@ -930,7 +930,7 @@ impl<T: ExecutorProxyTrait> StateSyncCoordinator<T> {
                 .chunk_response(response.clone())
                 .peer(peer)
         );
-        fail_point!("state_sync::apply_chunk", |_| {
+        fail_point!("state_sync_v1::apply_chunk", |_| {
             Err(crate::error::Error::UnexpectedError(
                 "Injected error in apply_chunk".into(),
             ))

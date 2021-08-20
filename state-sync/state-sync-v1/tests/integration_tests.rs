@@ -8,7 +8,7 @@ use diem_config::config::RoleType;
 use diem_types::{transaction::TransactionListWithProof, waypoint::Waypoint, PeerId};
 use netcore::transport::ConnectionOrigin::*;
 use network::protocols::direct_send::Message;
-use state_sync::{error::Error, network::StateSyncMessage};
+use state_sync_v1::{error::Error, network::StateSyncMessage};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use test_harness::StateSyncEnvironment;
 

@@ -148,7 +148,7 @@ members = [
     "secure/storage",
     "secure/storage/github",
     "secure/storage/vault",
-    "state-sync",
+    "state-sync/state-sync-v1",
     "storage/accumulator",
     "storage/backup/backup-cli",
     "storage/backup/backup-service",
