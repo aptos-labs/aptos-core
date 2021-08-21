@@ -17,6 +17,7 @@ tokio = { version = "1.8.1", features = ["full"] }
 walkdir = "2.3.1"
 
 compiler = { path = "../../language/compiler" }
+diem-config = { path = "../../config" }
 diem-events-fetcher = { path = "../../language/diem-tools/diem-events-fetcher" }
 diem-framework = { path = "../../language/diem-framework" }
 diem-framework-releases = { path = "../../language/diem-framework/releases" }
@@ -44,7 +45,6 @@ cli = { path = "../cli", features = ["fuzzing"]  }
 debug-interface = { path = "../../common/debug-interface" }
 futures = "0.3.12"
 generate-key = { path = "../../config/generate-key" }
-diem-config = { path = "../../config" }
 diem-crypto = { path = "../../crypto/crypto" }
 diem-genesis-tool = {path = "../../config/management/genesis", features = ["testing"] }
 diem-global-constants = { path = "../../config/global-constants" }

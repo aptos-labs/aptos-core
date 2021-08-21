@@ -4,6 +4,7 @@
 use forge::{forge_main, ForgeConfig, LocalFactory, Options, Result};
 use smoke_test::{
     event_fetcher::EventFetcher,
+    fullnode::LaunchFullnode,
     replay_tooling::ReplayTooling,
     scripts_and_modules::{ExecuteCustomModuleAndScript, MalformedScript},
     transaction::ExternalTransactionSigner,
@@ -20,7 +21,8 @@ fn main() -> Result<()> {
             &VerifyingClientEquivalence,
             &VerifyingGetLatestMetadata,
         ])
-        .with_admin_tests(&[&MalformedScript, &ExecuteCustomModuleAndScript]);
+        .with_admin_tests(&[&MalformedScript, &ExecuteCustomModuleAndScript])
+        .with_network_tests(&[&LaunchFullnode]);
 
     let options = Options::from_args();
     forge_main(tests, LocalFactory::from_workspace()?, &options)

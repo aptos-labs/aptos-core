@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod event_fetcher;
+pub mod fullnode;
 pub mod replay_tooling;
 pub mod scripts_and_modules;
 pub mod transaction;
