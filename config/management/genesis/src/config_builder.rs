@@ -56,6 +56,7 @@ impl FullnodeBuilder {
         pfn.identity = v_vfn.identity.clone();
         let temp_listen = v_vfn.listen_address.clone();
         v_vfn.listen_address = pfn.listen_address.clone();
+        v_vfn.network_id = NetworkId::Private("vfn".into()); // Make sure this interface is a private one
         pfn.listen_address = temp_listen;
 
         // Now let's prepare the full nodes internal network to communicate with the validators

@@ -7,8 +7,12 @@ use crate::{
 };
 use anyhow::Result;
 use consensus_types::safety_data::SafetyData;
-use diem_config::config::{
-    Identity, NodeConfig, OnDiskStorageConfig, SafetyRulesService, SecureBackend, WaypointConfig,
+use diem_config::{
+    config::{
+        Identity, NetworkConfig, NodeConfig, OnDiskStorageConfig, SafetyRulesService,
+        SecureBackend, WaypointConfig,
+    },
+    network_id::NetworkId,
 };
 use diem_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
@@ -290,13 +294,8 @@ impl ValidatorBuilder {
 
         validator.config.set_data_dir(validator.directory.clone());
         let mut config = &mut validator.config;
-        if index > 0 || self.randomize_first_validator_ports {
-            config.randomize_ports();
-        }
-
         // Setup the network configs
         let validator_network = config.validator_network.as_mut().unwrap();
-        let fullnode_network = &mut config.full_node_networks[0];
 
         let validator_identity = validator_network.identity_from_storage();
         validator_network.identity = Identity::from_storage(
@@ -308,18 +307,52 @@ impl ValidatorBuilder {
             validator.storage_config.clone(),
         ));
 
-        let fullnode_identity = fullnode_network.identity_from_storage();
-        fullnode_network.identity = Identity::from_storage(
-            fullnode_identity.key_name,
-            fullnode_identity.peer_id_name,
-            SecureBackend::OnDiskStorage(validator.storage_config.clone()),
-        );
+        // By default we don't start a swarm with VFNs, so make sure the public fullnode endpoint
+        // really is publicly accessable
+
+        let fullnode_network_listen_address =
+            if let Some(template_fullnode_config) = config.full_node_networks.first() {
+                template_fullnode_config.listen_address.clone()
+            } else {
+                diem_config::utils::get_available_port_in_multiaddr(true)
+            };
+        let fullnode_network = NetworkConfig {
+            listen_address: fullnode_network_listen_address,
+            network_id: NetworkId::Public,
+            max_outbound_connections: 0,
+            identity: Identity::from_storage(
+                FULLNODE_NETWORK_KEY.to_owned(),
+                OWNER_ACCOUNT.to_owned(),
+                SecureBackend::OnDiskStorage(validator.storage_config.clone()),
+            ),
+
+            ..Default::default()
+        };
+
+        let vfn_network = NetworkConfig {
+            listen_address: diem_config::utils::get_available_port_in_multiaddr(true),
+            network_id: NetworkId::Private("vfn".to_owned()),
+            max_outbound_connections: 0,
+            identity: Identity::from_storage(
+                FULLNODE_NETWORK_KEY.to_owned(),
+                OWNER_ACCOUNT.to_owned(),
+                SecureBackend::OnDiskStorage(validator.storage_config.clone()),
+            ),
+
+            ..Default::default()
+        };
+
+        config.full_node_networks = vec![fullnode_network, vfn_network];
 
         // Setup consensus and execution configs
         config.consensus.safety_rules.service = SafetyRulesService::Thread;
         config.consensus.safety_rules.backend =
             SecureBackend::OnDiskStorage(validator.storage_config.clone());
         config.execution.backend = SecureBackend::OnDiskStorage(validator.storage_config.clone());
+
+        if index > 0 || self.randomize_first_validator_ports {
+            config.randomize_ports();
+        }
 
         Ok(validator)
     }
