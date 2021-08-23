@@ -38,14 +38,14 @@ use crate::{
     experimental::{
         commit_phase::{CommitChannelType, PendingBlocks},
         errors::Error,
-        execution_phase::ExecutionChannelType,
+        execution_phase::ExecutionRequest,
     },
     round_manager::VerifiedEvent,
     state_replication::empty_state_computer_call_back,
 };
 
 use crate::experimental::{
-    execution_phase::ResetAck,
+    buffer_manager::ResetAck,
     tests::test_utils::{
         prepare_commit_phase_with_block_store_state_computer,
         prepare_executed_blocks_with_executed_ledger_info,
@@ -63,7 +63,7 @@ pub fn prepare_commit_phase(
     Sender<CommitChannelType>,
     Sender<VerifiedEvent>,
     Sender<oneshot::Sender<ResetAck>>,
-    Receiver<ExecutionChannelType>,
+    Receiver<ExecutionRequest>,
     Receiver<Event<ConsensusMsg>>,
     Arc<Mutex<MetricsSafetyRules>>,
     Vec<ValidatorSigner>,
@@ -100,124 +100,11 @@ fn generate_random_commit_decision(signer: &ValidatorSigner) -> CommitDecision {
 
 mod commit_phase_e2e_tests {
     use super::*;
-    use crate::round_manager::UnverifiedEvent;
 
     /// happy path test
     #[test]
     fn test_happy_path() {
-        let mut runtime = consensus_runtime();
-        let (
-            mut commit_tx,
-            mut msg_tx,
-            _commit_phase_reset_tx,
-            mut commit_result_rx,
-            mut self_loop_rx,
-            _safety_rules_container,
-            signers,
-            _state_computer,
-            validator,
-            commit_phase,
-            _block_store,
-        ) = prepare_commit_phase(&runtime);
-
-        let (vecblocks, li_sig) = prepare_executed_blocks_with_ordered_ledger_info(&signers[0]);
-
-        runtime.spawn(commit_phase.start());
-
-        timed_block_on(&mut runtime, async move {
-            // send good commit arguments
-            commit_tx
-                .send(CommitChannelType(
-                    vecblocks,
-                    li_sig,
-                    empty_state_computer_call_back(),
-                ))
-                .await
-                .ok();
-
-            match self_loop_rx.next().await {
-                Some(Event::Message(_, msg)) => {
-                    let event: UnverifiedEvent = msg.into();
-                    // verify the message and send the message into self loop
-                    msg_tx.send(event.verify(&validator).unwrap()).await.ok();
-                }
-                _ => {
-                    panic!("We are expecting a commit vote message.");
-                }
-            };
-
-            // it commits the block
-            assert!(commit_result_rx.next().await.is_some());
-            // and it sends a commit decision
-            assert!(matches!(
-                self_loop_rx.next().await,
-                Some(Event::Message(_, ConsensusMsg::CommitDecisionMsg(_))),
-            ));
-        });
-    }
-
-    /// happy path 2 - getting a good commit decision
-    #[test]
-    fn test_happy_path_commit_decision() {
-        let mut runtime = consensus_runtime();
-        let (
-            mut commit_tx,
-            mut msg_tx,
-            _commit_phase_reset_tx,
-            mut commit_result_rx,
-            mut self_loop_rx,
-            _safety_rules_container,
-            signers,
-            _state_computer,
-            _validator,
-            commit_phase,
-            _block_store,
-        ) = prepare_commit_phase(&runtime);
-
-        let (vecblocks, li_sig) = prepare_executed_blocks_with_ordered_ledger_info(&signers[0]);
-
-        runtime.spawn(commit_phase.start());
-
-        timed_block_on(&mut runtime, async move {
-            // send good commit arguments
-            commit_tx
-                .send(CommitChannelType(
-                    vecblocks,
-                    li_sig,
-                    empty_state_computer_call_back(),
-                ))
-                .await
-                .ok();
-
-            // it sends itself a commit vote
-            match self_loop_rx.next().await {
-                Some(Event::Message(_, ConsensusMsg::CommitVoteMsg(request))) => {
-                    let commit_vote = *request;
-                    let mut signatures = BTreeMap::<AccountAddress, Ed25519Signature>::new();
-                    signatures.insert(commit_vote.author(), commit_vote.signature().clone());
-                    // construct a good commit decision from request
-                    let commit_decision = VerifiedEvent::CommitDecision(Box::new(
-                        CommitDecision::new(LedgerInfoWithSignatures::new(
-                            commit_vote.ledger_info().clone(),
-                            signatures,
-                        )),
-                    ));
-
-                    msg_tx.send(commit_decision).await.ok();
-                }
-                _ => {
-                    panic!("We are expecting a commit vote message.");
-                }
-            };
-
-            // it commits the block
-            assert!(commit_result_rx.next().await.is_some());
-            // and it sends a commit decision
-            assert!(matches!(
-                self_loop_rx.next().await,
-                Some(Event::Message(_, ConsensusMsg::CommitDecisionMsg(_))),
-            ));
-        });
+        // TODO
     }
 
     /// reset test

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    error::StateSyncError, experimental::execution_phase::ExecutionChannelType,
+    error::StateSyncError, experimental::execution_phase::ExecutionRequest,
     state_replication::StateComputer,
 };
 use anyhow::Result;
@@ -16,7 +16,7 @@ use futures::SinkExt;
 use std::{boxed::Box, sync::Arc};
 
 use crate::{
-    experimental::{errors::Error, execution_phase::ResetAck},
+    experimental::{buffer_manager::ResetAck, errors::Error},
     state_replication::StateComputerCommitCallBackType,
 };
 use futures::channel::oneshot;
@@ -27,14 +27,14 @@ use futures::channel::oneshot;
 pub struct OrderingStateComputer {
     // the channel to pour vectors of blocks into
     // the real execution phase (will be handled in ExecutionPhase).
-    executor_channel: Sender<ExecutionChannelType>,
+    executor_channel: Sender<ExecutionRequest>,
     state_computer_for_sync: Arc<dyn StateComputer>,
     reset_event_channel_tx: Sender<oneshot::Sender<ResetAck>>,
 }
 
 impl OrderingStateComputer {
     pub fn new(
-        executor_channel: Sender<ExecutionChannelType>,
+        executor_channel: Sender<ExecutionRequest>,
         state_computer_for_sync: Arc<dyn StateComputer>,
         reset_event_channel_tx: Sender<oneshot::Sender<ResetAck>>,
     ) -> Self {
@@ -67,24 +67,13 @@ impl StateComputer for OrderingStateComputer {
     async fn commit(
         &self,
         blocks: &[Arc<ExecutedBlock>],
-        finality_proof: LedgerInfoWithSignatures,
-        callback: StateComputerCommitCallBackType,
+        _finality_proof: LedgerInfoWithSignatures,
+        _callback: StateComputerCommitCallBackType,
     ) -> Result<(), ExecutionError> {
         assert!(!blocks.is_empty());
 
-        let ordered_block = blocks.iter().map(|b| b.block().clone()).collect();
+        // TODO: send blocks to buffer manager
 
-        self.executor_channel
-            .clone()
-            .send(ExecutionChannelType(
-                ordered_block,
-                finality_proof,
-                callback,
-            ))
-            .await
-            .map_err(|e| ExecutionError::InternalError {
-                error: e.to_string(),
-            })?;
         Ok(())
     }
 

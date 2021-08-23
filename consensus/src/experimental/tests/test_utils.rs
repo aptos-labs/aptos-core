@@ -4,8 +4,9 @@
 use crate::{
     block_storage::BlockStore,
     experimental::{
+        buffer_manager::ResetAck,
         commit_phase::{CommitChannelType, CommitPhase},
-        execution_phase::{ExecutionChannelType, ResetAck},
+        execution_phase::ExecutionRequest,
         ordering_state_computer::OrderingStateComputer,
     },
     metrics_safety_rules::MetricsSafetyRules,
@@ -58,7 +59,7 @@ pub fn prepare_commit_phase_with_block_store_state_computer(
     Sender<CommitChannelType>,
     Sender<VerifiedEvent>,
     Sender<oneshot::Sender<ResetAck>>,
-    Receiver<ExecutionChannelType>,
+    Receiver<ExecutionRequest>,
     Receiver<Event<ConsensusMsg>>,
     Arc<Mutex<MetricsSafetyRules>>,
     Vec<ValidatorSigner>,
@@ -108,8 +109,7 @@ pub fn prepare_commit_phase_with_block_store_state_computer(
     let (self_loop_tx, self_loop_rx) = channel::new_test(1000);
     let network = NetworkSender::new(author, network_sender, self_loop_tx, validators);
 
-    let (commit_result_tx, commit_result_rx) =
-        channel::new_test::<ExecutionChannelType>(channel_size);
+    let (commit_result_tx, commit_result_rx) = channel::new_test::<ExecutionRequest>(channel_size);
 
     // Note: we assume no OrderingStateComputer::sync_to will be called during the test
     // OrderingStateComputer::sync_to might block the inner state computer

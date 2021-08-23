@@ -33,7 +33,7 @@ use std::{
 use tokio::time;
 
 use crate::{
-    experimental::execution_phase::{reset_ack_new, ResetAck},
+    experimental::buffer_manager::{reset_ack_new, ResetAck},
     state_replication::StateComputerCommitCallBackType,
 };
 use diem_logger::error;
