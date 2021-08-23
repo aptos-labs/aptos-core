@@ -127,21 +127,26 @@ public fun Test::update_ints() {
 
 function Test::update [baseline] {
   used = {Test::A<#0, #0>}
+  directly used = {Test::A<#0, #0>}
   modified = {Test::A<#0, #0>}
   directly modified = {Test::A<#0, #0>}
 function Test::publish [baseline] {
   used = {Test::A<#0, u8>}
+  directly used = {Test::A<#0, u8>}
   modified = {Test::A<#0, u8>}
   directly modified = {Test::A<#0, u8>}
 function Test::test [baseline] {
   used = {Test::A<u64, #0>}
+  directly used = {Test::A<u64, #0>}
   modified = {}
   directly modified = {}
 function Test::update_caller [baseline] {
   used = {Test::A<u8, u8>}
+  directly used = {}
   modified = {Test::A<u8, u8>}
   directly modified = {}
 function Test::update_ints [baseline] {
   used = {Test::A<u64, u128>}
+  directly used = {Test::A<u64, u128>}
   modified = {Test::A<u64, u128>}
   directly modified = {Test::A<u64, u128>}

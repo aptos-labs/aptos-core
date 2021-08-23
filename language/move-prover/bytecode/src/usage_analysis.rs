@@ -7,7 +7,7 @@ use crate::{
     dataflow_domains::{AbstractDomain, JoinResult, SetDomain},
     function_target::{FunctionData, FunctionTarget},
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder, FunctionVariant},
-    stackless_bytecode::{Bytecode, Operation},
+    stackless_bytecode::{BorrowNode, Bytecode, Operation},
 };
 use itertools::Itertools;
 use move_binary_format::file_format::CodeOffset;
@@ -47,6 +47,16 @@ pub fn get_used_memory_inst<'env>(
         .used_memory
 }
 
+pub fn get_directly_used_memory_inst<'env>(
+    target: &'env FunctionTarget,
+) -> &'env SetDomain<QualifiedInstId<StructId>> {
+    &target
+        .get_annotations()
+        .get::<UsageState>()
+        .expect("Invariant violation: target not analyzed")
+        .directly_used_memory
+}
+
 pub fn get_modified_memory_inst<'env>(
     target: &'env FunctionTarget,
 ) -> &'env SetDomain<QualifiedInstId<StructId>> {
@@ -70,10 +80,13 @@ pub fn get_directly_modified_memory_inst<'env>(
 /// The annotation for usage of functions. This is computed by the function target processor.
 #[derive(Debug, Clone, Default, Eq, PartialOrd, PartialEq)]
 struct UsageState {
-    // The memory which is directly and transitively accessed by this function.
+    // The memory which is either directly or transitively accessed by this function.
     used_memory: SetDomain<QualifiedInstId<StructId>>,
-    // The memory which is directly and transitively modified by this function.
+    // The memory which is directly accessed by this function (instead of by one of its callees).
+    directly_used_memory: SetDomain<QualifiedInstId<StructId>>,
+    // The memory which is either directly or transitively modified by this function.
     modified_memory: SetDomain<QualifiedInstId<StructId>>,
+    // The memory which is directly modified by this function  (instead of by one of its callees).
     directly_modified_memory: SetDomain<QualifiedInstId<StructId>>,
 }
 
@@ -82,13 +95,17 @@ impl AbstractDomain for UsageState {
     fn join(&mut self, other: &Self) -> JoinResult {
         match (
             self.used_memory.join(&other.used_memory),
+            self.directly_used_memory.join(&other.directly_used_memory),
             self.modified_memory.join(&other.modified_memory),
             self.directly_modified_memory
                 .join(&other.directly_modified_memory),
         ) {
-            (JoinResult::Unchanged, JoinResult::Unchanged, JoinResult::Unchanged) => {
-                JoinResult::Unchanged
-            }
+            (
+                JoinResult::Unchanged,
+                JoinResult::Unchanged,
+                JoinResult::Unchanged,
+                JoinResult::Unchanged,
+            ) => JoinResult::Unchanged,
             _ => JoinResult::Changed,
         }
     }
@@ -165,6 +182,14 @@ impl FunctionTargetProcessor for UsageProcessor {
                     )?;
                     writeln!(
                         f,
+                        "  directly used = {{{}}}",
+                        get_directly_used_memory_inst(target)
+                            .iter()
+                            .map(|qid| env.display(qid).to_string())
+                            .join(", ")
+                    )?;
+                    writeln!(
+                        f,
                         "  modified = {{{}}}",
                         get_modified_memory_inst(target)
                             .iter()
@@ -197,7 +222,9 @@ impl<'a> TransferFunctions for MemoryUsageAnalysis<'a> {
 
         if let Call(_, _, oper, _, _) = code {
             match oper {
-                Function(mid, fid, inst) => {
+                Function(mid, fid, inst)
+                | OpaqueCallBegin(mid, fid, inst)
+                | OpaqueCallEnd(mid, fid, inst) => {
                     if let Some(summary) = self
                         .cache
                         .get::<UsageState>(mid.qualified(*fid), &FunctionVariant::Baseline)
@@ -228,10 +255,22 @@ impl<'a> TransferFunctions for MemoryUsageAnalysis<'a> {
                     state
                         .used_memory
                         .insert(mid.qualified_inst(*sid, inst.to_owned()));
+                    state
+                        .directly_used_memory
+                        .insert(mid.qualified_inst(*sid, inst.to_owned()));
+                }
+                WriteBack(BorrowNode::GlobalRoot(mem), _) => {
+                    state.modified_memory.insert(mem.clone());
+                    state.directly_modified_memory.insert(mem.clone());
+                    state.used_memory.insert(mem.clone());
+                    state.directly_used_memory.insert(mem.clone());
                 }
                 Exists(mid, sid, inst) | GetGlobal(mid, sid, inst) => {
                     state
                         .used_memory
+                        .insert(mid.qualified_inst(*sid, inst.to_owned()));
+                    state
+                        .directly_used_memory
                         .insert(mid.qualified_inst(*sid, inst.to_owned()));
                 }
                 _ => {}
