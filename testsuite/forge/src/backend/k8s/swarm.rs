@@ -21,7 +21,7 @@ use kube::{
     api::{Api, ListParams},
     client::Client as K8sClient,
 };
-use std::{collections::HashMap, convert::TryFrom, str, sync::Arc};
+use std::{collections::HashMap, convert::TryFrom, env, process::Command, str, sync::Arc};
 use tokio::{runtime::Runtime, time::Duration};
 
 const JSON_RPC_PORT: u32 = 80;
@@ -234,8 +234,21 @@ impl Swarm for K8sSwarm {
         )
     }
 
+    // Returns env CENTRAL_LOGGING_ADDRESS if present (without timestamps)
+    // otherwise returns a kubectl logs command to retrieve the logs manually
     fn logs_location(&mut self) -> String {
-        todo!()
+        if let Ok(central_logging_address) = std::env::var("CENTRAL_LOGGING_ADDRESS") {
+            central_logging_address
+        } else {
+            let hostname_output = Command::new("hostname")
+                .output()
+                .expect("failed to get pod hostname");
+            let hostname = String::from_utf8(hostname_output.stdout).unwrap();
+            format!(
+                "aws eks --region us-west-2 update-kubeconfig --name {} && kubectl logs {}",
+                &self.cluster_name, hostname
+            )
+        }
     }
 }
 
