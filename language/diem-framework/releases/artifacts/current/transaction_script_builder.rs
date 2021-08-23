@@ -14,7 +14,7 @@
 #![allow(unused_imports)]
 use diem_types::{
     account_address::AccountAddress,
-    transaction::{Script, ScriptFunction, TransactionArgument, TransactionPayload},
+    transaction::{Script, ScriptFunction, TransactionArgument, TransactionPayload, VecBytes},
 };
 use move_core_types::{
     ident_str,

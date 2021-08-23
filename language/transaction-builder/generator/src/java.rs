@@ -78,7 +78,7 @@ fn write_helper_file(
     emitter.output_script_function_decoder_map(&common::script_function_abis(abis))?;
 
     emitter.output_encoding_helpers(abis)?;
-    emitter.output_decoding_helpers(abis)?;
+    emitter.output_decoding_helpers(&common::filter_transaction_scripts(abis))?;
 
     emitter.out.unindent();
     writeln!(emitter.out, "\n}}\n")
@@ -193,6 +193,7 @@ import com.diem.types.TransactionPayload;
 import com.diem.types.Identifier;
 import com.diem.types.ModuleId;
 import com.diem.types.TransactionArgument;
+import com.diem.types.VecBytes;
 import com.diem.types.TypeTag;
 import com.novi.bcs.BcsDeserializer;
 import com.novi.bcs.BcsSerializer;
@@ -816,6 +817,7 @@ private static {} decode_{}_argument(TransactionArgument arg) {{
             Address => "AccountAddress".into(),
             Vector(type_tag) => match type_tag.as_ref() {
                 U8 => "Bytes".into(),
+                Vector(type_tag) if type_tag.as_ref() == &U8 => "VecBytes".into(),
                 _ => common::type_not_allowed(type_tag),
             },
             Struct(_) | Signer => common::type_not_allowed(type_tag),
@@ -861,6 +863,7 @@ private static {} decode_{}_argument(TransactionArgument arg) {{
             Address => None,
             Vector(type_tag) => match type_tag.as_ref() {
                 U8 => Some("bytes"),
+                Vector(type_tag) if type_tag.as_ref() == &U8 => None,
                 _ => common::type_not_allowed(type_tag),
             },
             Struct(_) | Signer => common::type_not_allowed(type_tag),

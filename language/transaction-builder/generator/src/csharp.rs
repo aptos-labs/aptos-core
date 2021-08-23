@@ -75,7 +75,7 @@ fn write_helper_file(
     emitter.output_decoder_maps(abis)?;
 
     emitter.output_encoding_helpers(abis)?;
-    emitter.output_decoding_helpers(abis)?;
+    emitter.output_decoding_helpers(&common::filter_transaction_scripts(abis))?;
 
     emitter.out.unindent();
     writeln!(emitter.out, "\n}}\n")?; // class
@@ -181,7 +181,7 @@ using System.Collections;
 using System.Collections.Generic; // For List, Dictonary
 using System.Numerics; // For BigInteger
 using Bcs;
-using Diem.Types; // For Script, TransactionArgument, TypeTag, TransactionPayload, ScriptFunction
+using Diem.Types; // For Script, TransactionArgument, VecBytes, TypeTag, TransactionPayload, ScriptFunction
 using Serde; // For ValueArray (e.g., ValueArray<byte>)
 "#,
         )?;
@@ -812,6 +812,7 @@ private static {} decode_{}_argument(TransactionArgument arg) {{
             Address => "AccountAddress".into(),
             Vector(type_tag) => match type_tag.as_ref() {
                 U8 => "ValueArray<byte>".into(),
+                Vector(type_tag) if type_tag.as_ref() == &U8 => "VecBytes".into(),
                 _ => common::type_not_allowed(type_tag),
             },
 
@@ -857,6 +858,7 @@ private static {} decode_{}_argument(TransactionArgument arg) {{
             Address => None,
             Vector(type_tag) => match type_tag.as_ref() {
                 U8 => Some("bytes"),
+                Vector(type_tag) if type_tag.as_ref() == &U8 => None,
                 _ => common::type_not_allowed(type_tag),
             },
             Struct(_) | Signer => common::type_not_allowed(type_tag),

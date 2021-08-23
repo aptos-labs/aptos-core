@@ -63,6 +63,7 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<transaction::metadata::CoinTradeMetadata>(&samples)?;
     tracer.trace_type::<transaction::Transaction>(&samples)?;
     tracer.trace_type::<transaction::TransactionArgument>(&samples)?;
+    tracer.trace_type::<transaction::VecBytes>(&samples)?;
     tracer.trace_type::<transaction::TransactionPayload>(&samples)?;
     tracer.trace_type::<transaction::WriteSetPayload>(&samples)?;
     tracer.trace_type::<transaction::authenticator::AccountAuthenticator>(&samples)?;

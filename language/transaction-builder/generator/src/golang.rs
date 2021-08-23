@@ -70,7 +70,7 @@ pub fn output(
     emitter.output_script_function_decoder_map(&common::script_function_abis(abis))?;
 
     emitter.output_encoding_helpers(abis)?;
-    emitter.output_decoding_helpers(abis)?;
+    emitter.output_decoding_helpers(&common::filter_transaction_scripts(abis))?;
 
     Ok(())
 }
@@ -697,6 +697,7 @@ func decode_{0}_argument(arg diemtypes.TransactionArgument) (value {1}, err erro
             Address => "diemtypes.AccountAddress".into(),
             Vector(type_tag) => match type_tag.as_ref() {
                 U8 => "[]byte".into(),
+                Vector(type_tag) if type_tag.as_ref() == &U8 => "diemtypes.VecBytes".into(),
                 _ => common::type_not_allowed(type_tag),
             },
             Struct(_) | Signer => common::type_not_allowed(type_tag),
@@ -741,6 +742,7 @@ func decode_{0}_argument(arg diemtypes.TransactionArgument) (value {1}, err erro
             Address => None,
             Vector(type_tag) => match type_tag.as_ref() {
                 U8 => Some("Bytes"),
+                Vector(type_tag) if type_tag.as_ref() == &U8 => None,
                 _ => common::type_not_allowed(type_tag),
             },
             Struct(_) | Signer => common::type_not_allowed(type_tag),

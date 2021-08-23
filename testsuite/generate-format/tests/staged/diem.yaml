@@ -335,6 +335,9 @@ UnstructuredBytesMetadata:
   STRUCT:
     - metadata:
         OPTION: BYTES
+VecBytes:
+  NEWTYPESTRUCT:
+    SEQ: BYTES
 WriteOp:
   ENUM:
     0:

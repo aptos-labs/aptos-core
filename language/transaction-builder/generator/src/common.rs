@@ -34,7 +34,7 @@ fn quote_type_as_format(type_tag: &TypeTag) -> Format {
             U8 => Format::Bytes,
             Vector(type_tag) => {
                 if type_tag.as_ref() == &U8 {
-                    Format::Seq(Box::new(Format::Bytes))
+                    Format::TypeName("VecBytes".into())
                 } else {
                     type_not_allowed(type_tag)
                 }
@@ -93,7 +93,7 @@ pub(crate) fn mangle_type(type_tag: &TypeTag) -> String {
             U8 => "u8vector".into(),
             Vector(type_tag) => {
                 if type_tag.as_ref() == &U8 {
-                    "vectorvectoru8".into()
+                    "vecbytes".into()
                 } else {
                     type_not_allowed(type_tag)
                 }
@@ -107,7 +107,13 @@ pub(crate) fn mangle_type(type_tag: &TypeTag) -> String {
 pub(crate) fn get_external_definitions(diem_types: &str) -> serde_generate::ExternalDefinitions {
     let definitions = vec![(
         diem_types,
-        vec!["AccountAddress", "TypeTag", "Script", "TransactionArgument"],
+        vec![
+            "AccountAddress",
+            "TypeTag",
+            "Script",
+            "TransactionArgument",
+            "VecBytes",
+        ],
     )];
     definitions
         .into_iter()
@@ -129,6 +135,13 @@ pub(crate) fn get_required_helper_types(abis: &[ScriptABI]) -> BTreeSet<&TypeTag
         }
     }
     required_types
+}
+
+pub(crate) fn filter_transaction_scripts(abis: &[ScriptABI]) -> Vec<ScriptABI> {
+    abis.iter()
+        .cloned()
+        .filter(|abi| abi.is_transaction_script_abi())
+        .collect()
 }
 
 pub(crate) fn transaction_script_abis(abis: &[ScriptABI]) -> Vec<TransactionScriptABI> {

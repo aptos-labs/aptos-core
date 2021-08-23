@@ -51,7 +51,7 @@ pub use script::{
 };
 
 use std::{collections::BTreeSet, ops::Deref};
-pub use transaction_argument::{parse_transaction_argument, TransactionArgument};
+pub use transaction_argument::{parse_transaction_argument, TransactionArgument, VecBytes};
 
 pub type Version = u64; // Height - also used for MVCC in StateDB
 

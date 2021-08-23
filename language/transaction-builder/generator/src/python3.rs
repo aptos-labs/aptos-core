@@ -56,7 +56,7 @@ pub fn output(
     emitter.output_script_function_decoder_map(common::script_function_abis(abis).as_slice())?;
 
     emitter.output_encoding_helpers(abis)?;
-    emitter.output_decoding_helpers(abis)?;
+    emitter.output_decoding_helpers(&common::filter_transaction_scripts(abis))?;
 
     Ok(())
 }
@@ -84,7 +84,7 @@ where
             self.out,
             r#"
 from {}bcs import (deserialize as bcs_deserialize, serialize as bcs_serialize)
-from {}diem_types import (Script, ScriptFunction, TransactionPayload, TransactionPayload__ScriptFunction, Identifier, ModuleId, TypeTag, AccountAddress, TransactionArgument, TransactionArgument__Bool, TransactionArgument__U8, TransactionArgument__U64, TransactionArgument__U128, TransactionArgument__Address, TransactionArgument__U8Vector)"#,
+from {}diem_types import (Script, ScriptFunction, TransactionPayload, TransactionPayload__ScriptFunction, Identifier, ModuleId, TypeTag, AccountAddress, TransactionArgument, VecBytes, TransactionArgument__Bool, TransactionArgument__U8, TransactionArgument__U64, TransactionArgument__U128, TransactionArgument__Address, TransactionArgument__U8Vector)"#,
             diem_pkg_root, diem_pkg_root
         )
     }
@@ -606,6 +606,7 @@ def decode_{}_argument(arg: TransactionArgument) -> {}:
             Address => "AccountAddress".into(),
             Vector(type_tag) => match type_tag.as_ref() {
                 U8 => "bytes".into(),
+                Vector(type_tag) if type_tag.as_ref() == &U8 => "VecBytes".into(),
                 _ => common::type_not_allowed(type_tag),
             },
             Struct(_) | Signer => common::type_not_allowed(type_tag),
@@ -651,6 +652,7 @@ def decode_{}_argument(arg: TransactionArgument) -> {}:
             Address => None,
             Vector(type_tag) => match type_tag.as_ref() {
                 U8 => Some("bytes"),
+                Vector(type_tag) if type_tag.as_ref() == &U8 => None,
                 _ => common::type_not_allowed(type_tag),
             },
             Struct(_) | Signer => common::type_not_allowed(type_tag),
