@@ -23,9 +23,6 @@ module DiemFramework::NetworkIdentity {
         /// The time at which the `identities` was rotated
         time_rotated_seconds: u64,
     }
-    spec NetworkIdentityChangeNotification {
-        include UniqueMembers<vector<u8>> {members: identities};
-    }
 
     const MAX_ADDR_IDENTITIES: u64 = 100;
 

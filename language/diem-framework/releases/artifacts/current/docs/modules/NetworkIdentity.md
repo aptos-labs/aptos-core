@@ -106,18 +106,6 @@ Message sent when there are updates to the <code><a href="NetworkIdentity.md#0x1
 
 </details>
 
-<details>
-<summary>Specification</summary>
-
-
-
-<pre><code><b>include</b> <a href="NetworkIdentity.md#0x1_NetworkIdentity_UniqueMembers">UniqueMembers</a>&lt;vector&lt;u8&gt;&gt; {members: identities};
-</code></pre>
-
-
-
-</details>
-
 <a name="@Constants_0"></a>
 
 ## Constants
