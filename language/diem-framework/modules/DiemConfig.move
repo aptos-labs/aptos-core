@@ -7,6 +7,12 @@ module DiemFramework::DiemConfig {
     use Std::Errors;
     use Std::Event;
     use Std::Signer;
+    friend DiemFramework::DiemVersion;
+    friend DiemFramework::RegisteredCurrencies;
+    friend DiemFramework::DiemTransactionPublishingOption;
+    friend DiemFramework::DiemVMConfig;
+    friend DiemFramework::DiemSystem;
+    friend DiemFramework::DiemConsensusConfig;
 
     /// A generic singleton resource that holds a value of a specific type.
     struct DiemConfig<Config: copy + drop + store> has key, store {
@@ -104,7 +110,7 @@ module DiemFramework::DiemConfig {
     /// Set a config item to a new value with the default capability stored under config address and trigger a
     /// reconfiguration. This function requires that the signer have a `ModifyConfigCapability<Config>`
     /// resource published under it.
-    public fun set<Config: copy + drop + store>(account: &signer, payload: Config)
+    public(friend) fun set<Config: copy + drop + store>(account: &signer, payload: Config)
     acquires DiemConfig, Configuration {
         let signer_address = Signer::address_of(account);
         // Next should always be true if properly initialized.
@@ -148,7 +154,7 @@ module DiemFramework::DiemConfig {
     /// It is called by `DiemSystem::update_config_and_reconfigure`, which allows
     /// validator operators to change the validator set.  All other config changes require
     /// a Diem root signer.
-    public fun set_with_capability_and_reconfigure<Config: copy + drop + store>(
+    public(friend) fun set_with_capability_and_reconfigure<Config: copy + drop + store>(
         _cap: &ModifyConfigCapability<Config>,
         payload: Config
     ) acquires DiemConfig, Configuration {
@@ -201,7 +207,7 @@ module DiemFramework::DiemConfig {
     /// The caller will use the returned ModifyConfigCapability to specify the access control
     /// policy for who can modify the config.
     /// Does not trigger a reconfiguration.
-    public fun publish_new_config_and_get_capability<Config: copy + drop + store>(
+    public(friend) fun publish_new_config_and_get_capability<Config: copy + drop + store>(
         dr_account: &signer,
         payload: Config,
     ): ModifyConfigCapability<Config> {
@@ -227,7 +233,7 @@ module DiemFramework::DiemConfig {
     /// Publish a new config item. Only Diem root can modify such config.
     /// Publishes the capability to modify this config under the Diem root account.
     /// Does not trigger a reconfiguration.
-    public fun publish_new_config<Config: copy + drop + store>(
+    public(friend) fun publish_new_config<Config: copy + drop + store>(
         dr_account: &signer,
         payload: Config
     ) {
@@ -400,6 +406,14 @@ module DiemFramework::DiemConfig {
     public fun set_for_testing<Config: copy + drop + store>(account: &signer, payload: Config)
     acquires DiemConfig, Configuration {
         set(account, payload)
+    }
+
+    #[test_only]
+    public fun publish_new_config_for_testing<Config: copy + drop + store>(
+        dr_account: &signer,
+        payload: Config
+    ) {
+        publish_new_config(dr_account, payload);
     }
 
     // =================================================================

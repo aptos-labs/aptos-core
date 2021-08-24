@@ -393,7 +393,7 @@ reconfiguration. This function requires that the signer have a <code><a href="Di
 resource published under it.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="DiemConfig.md#0x1_DiemConfig_set">set</a>&lt;Config: <b>copy</b>, drop, store&gt;(account: &signer, payload: Config)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="DiemConfig.md#0x1_DiemConfig_set">set</a>&lt;Config: <b>copy</b>, drop, store&gt;(account: &signer, payload: Config)
 </code></pre>
 
 
@@ -402,7 +402,7 @@ resource published under it.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="DiemConfig.md#0x1_DiemConfig_set">set</a>&lt;Config: <b>copy</b> + drop + store&gt;(account: &signer, payload: Config)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="DiemConfig.md#0x1_DiemConfig_set">set</a>&lt;Config: <b>copy</b> + drop + store&gt;(account: &signer, payload: Config)
 <b>acquires</b> <a href="DiemConfig.md#0x1_DiemConfig">DiemConfig</a>, <a href="DiemConfig.md#0x1_DiemConfig_Configuration">Configuration</a> {
     <b>let</b> signer_address = <a href="../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
     // Next should always be <b>true</b> <b>if</b> properly initialized.
@@ -490,7 +490,7 @@ validator operators to change the validator set.  All other config changes requi
 a Diem root signer.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="DiemConfig.md#0x1_DiemConfig_set_with_capability_and_reconfigure">set_with_capability_and_reconfigure</a>&lt;Config: <b>copy</b>, drop, store&gt;(_cap: &<a href="DiemConfig.md#0x1_DiemConfig_ModifyConfigCapability">DiemConfig::ModifyConfigCapability</a>&lt;Config&gt;, payload: Config)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="DiemConfig.md#0x1_DiemConfig_set_with_capability_and_reconfigure">set_with_capability_and_reconfigure</a>&lt;Config: <b>copy</b>, drop, store&gt;(_cap: &<a href="DiemConfig.md#0x1_DiemConfig_ModifyConfigCapability">DiemConfig::ModifyConfigCapability</a>&lt;Config&gt;, payload: Config)
 </code></pre>
 
 
@@ -499,7 +499,7 @@ a Diem root signer.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="DiemConfig.md#0x1_DiemConfig_set_with_capability_and_reconfigure">set_with_capability_and_reconfigure</a>&lt;Config: <b>copy</b> + drop + store&gt;(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="DiemConfig.md#0x1_DiemConfig_set_with_capability_and_reconfigure">set_with_capability_and_reconfigure</a>&lt;Config: <b>copy</b> + drop + store&gt;(
     _cap: &<a href="DiemConfig.md#0x1_DiemConfig_ModifyConfigCapability">ModifyConfigCapability</a>&lt;Config&gt;,
     payload: Config
 ) <b>acquires</b> <a href="DiemConfig.md#0x1_DiemConfig">DiemConfig</a>, <a href="DiemConfig.md#0x1_DiemConfig_Configuration">Configuration</a> {
@@ -632,7 +632,7 @@ policy for who can modify the config.
 Does not trigger a reconfiguration.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="DiemConfig.md#0x1_DiemConfig_publish_new_config_and_get_capability">publish_new_config_and_get_capability</a>&lt;Config: <b>copy</b>, drop, store&gt;(dr_account: &signer, payload: Config): <a href="DiemConfig.md#0x1_DiemConfig_ModifyConfigCapability">DiemConfig::ModifyConfigCapability</a>&lt;Config&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="DiemConfig.md#0x1_DiemConfig_publish_new_config_and_get_capability">publish_new_config_and_get_capability</a>&lt;Config: <b>copy</b>, drop, store&gt;(dr_account: &signer, payload: Config): <a href="DiemConfig.md#0x1_DiemConfig_ModifyConfigCapability">DiemConfig::ModifyConfigCapability</a>&lt;Config&gt;
 </code></pre>
 
 
@@ -641,7 +641,7 @@ Does not trigger a reconfiguration.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="DiemConfig.md#0x1_DiemConfig_publish_new_config_and_get_capability">publish_new_config_and_get_capability</a>&lt;Config: <b>copy</b> + drop + store&gt;(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="DiemConfig.md#0x1_DiemConfig_publish_new_config_and_get_capability">publish_new_config_and_get_capability</a>&lt;Config: <b>copy</b> + drop + store&gt;(
     dr_account: &signer,
     payload: Config,
 ): <a href="DiemConfig.md#0x1_DiemConfig_ModifyConfigCapability">ModifyConfigCapability</a>&lt;Config&gt; {
@@ -695,7 +695,7 @@ Publishes the capability to modify this config under the Diem root account.
 Does not trigger a reconfiguration.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="DiemConfig.md#0x1_DiemConfig_publish_new_config">publish_new_config</a>&lt;Config: <b>copy</b>, drop, store&gt;(dr_account: &signer, payload: Config)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="DiemConfig.md#0x1_DiemConfig_publish_new_config">publish_new_config</a>&lt;Config: <b>copy</b>, drop, store&gt;(dr_account: &signer, payload: Config)
 </code></pre>
 
 
@@ -704,7 +704,7 @@ Does not trigger a reconfiguration.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="DiemConfig.md#0x1_DiemConfig_publish_new_config">publish_new_config</a>&lt;Config: <b>copy</b> + drop + store&gt;(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="DiemConfig.md#0x1_DiemConfig_publish_new_config">publish_new_config</a>&lt;Config: <b>copy</b> + drop + store&gt;(
     dr_account: &signer,
     payload: Config
 ) {

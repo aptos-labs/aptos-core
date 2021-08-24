@@ -34,6 +34,6 @@ module DiemFramework::OnChainConfigTests {
     #[expected_failure(abort_code = 2)]
     fun invalid_publish(account: signer, tc: signer, dr: signer) {
         Genesis::setup(&dr, &tc);
-        DiemConfig::publish_new_config(&account, 0);
+        DiemConfig::publish_new_config_for_testing(&account, 0);
     }
 }
