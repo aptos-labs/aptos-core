@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    experimental::execution_phase::{ExecutionPhase, ExecutionRequest, ExecutionResponse},
+    experimental::{
+        execution_phase::{ExecutionPhase, ExecutionRequest, ExecutionResponse},
+        pipeline_phase::{PipelinePhase, StatelessPipeline},
+    },
     test_utils::{consensus_runtime, timed_block_on, RandomComputeResultStateComputer},
 };
 use consensus_types::block::{block_test_utils::certificate_for_genesis, Block};
@@ -14,26 +17,32 @@ use futures::{
 };
 use std::sync::Arc;
 
-pub fn prepare_execution_phase() -> (
+pub fn prepare_execution_phase() -> (HashValue, ExecutionPhase) {
+    let execution_proxy = Arc::new(RandomComputeResultStateComputer::new());
+    let random_hash_value = execution_proxy.get_root_hash();
+    let execution_phase = ExecutionPhase::new(execution_proxy);
+    (random_hash_value, execution_phase)
+}
+
+pub fn prepare_execution_pipeline() -> (
     UnboundedSender<ExecutionRequest>,
     UnboundedReceiver<ExecutionResponse>,
     HashValue,
-    ExecutionPhase,
+    PipelinePhase<ExecutionPhase>,
 ) {
     let (in_channel_tx, in_channel_rx) = unbounded::<ExecutionRequest>();
     let (out_channel_tx, out_channel_rx) = unbounded::<ExecutionResponse>();
 
-    let execution_proxy = Arc::new(RandomComputeResultStateComputer::new());
+    let (hash_val, execution_phase) = prepare_execution_phase();
 
-    let random_hash_value = execution_proxy.get_root_hash();
-
-    let execution_phase = ExecutionPhase::new(in_channel_rx, out_channel_tx, execution_proxy);
+    let execution_phase_pipeline =
+        PipelinePhase::new(in_channel_rx, out_channel_tx, Box::new(execution_phase));
 
     (
         in_channel_tx,
         out_channel_rx,
-        random_hash_value,
-        execution_phase,
+        hash_val,
+        execution_phase_pipeline,
     )
 }
 
@@ -42,8 +51,7 @@ pub fn prepare_execution_phase() -> (
 fn test_execution_phase_process() {
     let mut runtime = consensus_runtime();
 
-    let (_in_channel_tx, _out_channel_rx, random_hash_value, execution_phase) =
-        prepare_execution_phase();
+    let (random_hash_value, execution_phase) = prepare_execution_phase();
 
     let genesis_qc = certificate_for_genesis();
     let (signers, _validators) = random_validator_verifier(1, None, false);
@@ -67,10 +75,10 @@ fn test_execution_phase_process() {
 fn test_execution_phase_happy_path() {
     let mut runtime = consensus_runtime();
 
-    let (mut in_channel_tx, mut out_channel_rx, random_hash_value, execution_phase) =
-        prepare_execution_phase();
+    let (mut in_channel_tx, mut out_channel_rx, random_hash_value, execution_phase_pipeline) =
+        prepare_execution_pipeline();
 
-    runtime.spawn(execution_phase.start());
+    runtime.spawn(execution_phase_pipeline.start());
 
     let genesis_qc = certificate_for_genesis();
     let (signers, _validators) = random_validator_verifier(1, None, false);

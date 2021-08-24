@@ -4,11 +4,13 @@
 // TODO: add diagram
 
 #![allow(dead_code)]
-mod buffer_manager;
+pub mod buffer_manager;
 pub mod commit_phase;
 pub mod errors;
 pub mod execution_phase;
 pub mod ordering_state_computer;
+pub mod pipeline_phase;
+pub mod signing_phase;
 
 #[cfg(test)]
 mod tests;

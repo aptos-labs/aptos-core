@@ -1,15 +1,12 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::state_replication::StateComputer;
+use crate::{experimental::pipeline_phase::StatelessPipeline, state_replication::StateComputer};
 use anyhow::Result;
+use async_trait::async_trait;
 use consensus_types::{block::Block, executed_block::ExecutedBlock};
 use diem_crypto::HashValue;
 use executor_types::Error as ExecutionError;
-use futures::{
-    channel::mpsc::{UnboundedReceiver, UnboundedSender},
-    SinkExt, StreamExt,
-};
 use std::{
     fmt::{Debug, Display, Formatter},
     sync::Arc,
@@ -27,14 +24,14 @@ pub struct ExecutionRequest {
 }
 
 impl Debug for ExecutionRequest {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         write!(f, "{}", self)
     }
 }
 
 impl Display for ExecutionRequest {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "ExecutionChannelType({:?})", self.blocks)
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "ExecutionRequest({:?})", self.blocks)
     }
 }
 
@@ -43,8 +40,6 @@ pub struct ExecutionResponse {
 }
 
 pub struct ExecutionPhase {
-    rx: UnboundedReceiver<ExecutionRequest>,
-    tx: UnboundedSender<ExecutionResponse>,
     execution_proxy: Arc<dyn StateComputer>,
 }
 
@@ -71,23 +66,20 @@ impl Display for ExecutionPhaseError {
 }
 
 impl ExecutionPhase {
-    pub fn new(
-        rx: UnboundedReceiver<ExecutionRequest>,
-        tx: UnboundedSender<ExecutionResponse>,
-        execution_proxy: Arc<dyn StateComputer>,
-    ) -> Self {
-        Self {
-            rx,
-            tx,
-            execution_proxy,
-        }
+    pub fn new(execution_proxy: Arc<dyn StateComputer>) -> Self {
+        Self { execution_proxy }
     }
+}
 
-    pub async fn process(&self, item: ExecutionRequest) -> ExecutionResponse {
-        let ExecutionRequest { blocks } = item;
+#[async_trait]
+impl StatelessPipeline for ExecutionPhase {
+    type Request = ExecutionRequest;
+    type Response = ExecutionResponse;
+    async fn process(&self, req: ExecutionRequest) -> ExecutionResponse {
+        let ExecutionRequest { blocks } = req;
 
         // execute the blocks with execution_correctness_client
-        let out_item = blocks
+        let resp_inner = blocks
             .into_iter()
             .map(|b| {
                 let state_compute_result = self
@@ -101,16 +93,6 @@ impl ExecutionPhase {
             })
             .collect::<Result<Vec<ExecutedBlock>, ExecutionPhaseError>>();
 
-        ExecutionResponse { inner: out_item }
-    }
-
-    pub async fn start(mut self) {
-        // main loop
-        while let Some(in_item) = self.rx.next().await {
-            let out_item = self.process(in_item).await;
-            if self.tx.send(out_item).await.is_err() {
-                break;
-            }
-        }
+        ExecutionResponse { inner: resp_inner }
     }
 }
