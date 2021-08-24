@@ -2,16 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    smoke_test_environment::SmokeTestEnvironment,
+    smoke_test_environment::new_local_swarm,
     test_utils::{
-        diem_swarm_utils::{
-            get_json_rpc_diem_interface, get_op_tool, load_backend_storage, load_diem_root_storage,
-            load_node_config,
-        },
-        wait_for_transaction_on_all_nodes, write_key_to_file_bcs_format,
-        write_key_to_file_hex_format,
+        diem_swarm_utils::{create_root_storage, load_validators_backend_storage},
+        write_key_to_file_bcs_format, write_key_to_file_hex_format,
     },
 };
+use anyhow::{bail, Result};
 use diem_config::{
     config::{PeerRole, SecureBackend},
     network_id::NetworkId,
@@ -24,13 +21,13 @@ use diem_global_constants::{
     CONSENSUS_KEY, FULLNODE_NETWORK_KEY, GENESIS_WAYPOINT, OPERATOR_ACCOUNT, OPERATOR_KEY,
     OWNER_ACCOUNT, OWNER_KEY, VALIDATOR_NETWORK_ADDRESS_KEYS, VALIDATOR_NETWORK_KEY, WAYPOINT,
 };
-use diem_key_manager::diem_interface::DiemInterface;
+use diem_key_manager::diem_interface::{DiemInterface, JsonRpcDiemInterface};
 use diem_management::storage::to_x25519;
 use diem_operational_tool::{
     keys::{EncodingType, KeyType},
     test_helper::OperationalTool,
 };
-use diem_sdk::client::views::VMStatusView;
+use diem_sdk::client::{views::VMStatusView, BlockingClient};
 use diem_secure_storage::{CryptoStorage, KVStorage, Storage};
 use diem_temppath::TempPath;
 use diem_types::{
@@ -41,6 +38,7 @@ use diem_types::{
     transaction::authenticator::AuthenticationKey,
     waypoint::Waypoint,
 };
+use forge::{LocalNode, LocalSwarm, Node, NodeExt, SwarmExt};
 use rand::rngs::OsRng;
 use std::{
     collections::HashSet,
@@ -48,11 +46,12 @@ use std::{
     fs,
     path::PathBuf,
     str::FromStr,
+    time::{Duration, Instant},
 };
 
 #[test]
 fn test_account_resource() {
-    let (_env, op_tool, _, storage) = launch_swarm_with_op_tool_and_backend(1, 0);
+    let (_env, op_tool, _, storage) = launch_swarm_with_op_tool_and_backend(1);
 
     // Fetch the owner account resource
     let owner_account = storage.get::<AccountAddress>(OWNER_ACCOUNT).unwrap().value;
@@ -80,7 +79,7 @@ fn test_account_resource() {
 
 #[test]
 fn test_auto_validate_options() {
-    let (env, op_tool, backend, _) = launch_swarm_with_op_tool_and_backend(1, 0);
+    let (swarm, op_tool, backend, _) = launch_swarm_with_op_tool_and_backend(1);
 
     // Rotate the operator key with a really low timeout to prevent validation
     let (txn_ctx, _) = op_tool
@@ -89,10 +88,8 @@ fn test_auto_validate_options() {
     assert!(txn_ctx.execution_result.is_none());
 
     // Now wait for transaction execution
-    let client = env.get_validator_client(0, None);
-    client
-        .wait_for_transaction(txn_ctx.address, txn_ctx.sequence_number)
-        .unwrap();
+    let client = swarm.validators().next().unwrap().json_rpc_client();
+    wait_for_account_sequence_number(&client, txn_ctx.address, txn_ctx.sequence_number).unwrap();
 
     // Verify that the transaction was executed correctly
     let txn_ctx = op_tool
@@ -109,7 +106,7 @@ fn test_auto_validate_options() {
 
 #[test]
 fn test_consensus_key_rotation() {
-    let (_env, op_tool, backend, mut storage) = launch_swarm_with_op_tool_and_backend(1, 0);
+    let (_env, op_tool, backend, mut storage) = launch_swarm_with_op_tool_and_backend(1);
 
     // Rotate the consensus key
     let (txn_ctx, new_consensus_key) = op_tool.rotate_consensus_key(&backend, false).unwrap();
@@ -163,7 +160,7 @@ fn test_create_validator_bcs_file() {
 #[test]
 fn test_disable_address_validation() {
     let num_nodes = 1;
-    let (_env, op_tool, backend, _) = launch_swarm_with_op_tool_and_backend(num_nodes, 0);
+    let (_env, op_tool, backend, _) = launch_swarm_with_op_tool_and_backend(num_nodes);
 
     // Try to set the validator config with a bad address and verify failure
     let bad_network_address = NetworkAddress::from_str("/dns4/127.0.0.1/tcp/1234").unwrap();
@@ -209,7 +206,7 @@ fn test_disable_address_validation() {
 #[test]
 fn test_set_operator_and_add_new_validator() {
     let num_nodes = 3;
-    let (env, op_tool, _, _) = launch_swarm_with_op_tool_and_backend(num_nodes, 0);
+    let (mut swarm, op_tool, _, _) = launch_swarm_with_op_tool_and_backend(num_nodes);
 
     // Create new validator and validator operator keys and accounts
     let (validator_key, validator_account) = create_new_test_account();
@@ -218,10 +215,10 @@ fn test_set_operator_and_add_new_validator() {
     // Write the validator key to a file and create the validator account
     let validator_key_path = write_key_to_file(
         &validator_key.public_key(),
-        &env,
+        swarm.validators().next().unwrap(),
         write_key_to_file_hex_format,
     );
-    let diem_backend = load_diem_root_storage(&env.validator_swarm, 0);
+    let diem_backend = create_root_storage(&mut swarm);
     let val_human_name = "new_validator";
     let (txn_ctx, _) = op_tool
         .create_validator(
@@ -233,10 +230,11 @@ fn test_set_operator_and_add_new_validator() {
         .unwrap();
     assert_eq!(VMStatusView::Executed, txn_ctx.execution_result.unwrap());
 
+    let validator = swarm.validators().next().unwrap();
     // Write the operator key to a file and create the operator account
     let operator_key_path = write_key_to_file(
         &operator_key.public_key(),
-        &env,
+        validator,
         write_key_to_file_bcs_format,
     );
     let op_human_name = "new_operator";
@@ -250,10 +248,8 @@ fn test_set_operator_and_add_new_validator() {
         .unwrap();
 
     // Wait for transaction execution
-    let client = env.get_validator_client(0, None);
-    client
-        .wait_for_transaction(txn_ctx.address, txn_ctx.sequence_number)
-        .unwrap();
+    let client = validator.json_rpc_client();
+    wait_for_account_sequence_number(&client, txn_ctx.address, txn_ctx.sequence_number).unwrap();
 
     // Verify that the transaction was executed
     let txn_ctx = op_tool
@@ -262,7 +258,7 @@ fn test_set_operator_and_add_new_validator() {
     assert_eq!(VMStatusView::Executed, txn_ctx.execution_result.unwrap());
 
     // Overwrite the keys in storage to execute the command from the new validator's perspective
-    let backend = load_backend_storage(&env.validator_swarm, 0);
+    let backend = load_validators_backend_storage(validator);
     let mut storage: Storage = (&backend).try_into().unwrap();
     storage.set(OWNER_ACCOUNT, validator_account).unwrap();
     storage
@@ -270,7 +266,7 @@ fn test_set_operator_and_add_new_validator() {
         .unwrap();
 
     // Verify no validator operator
-    let diem_json_rpc = get_json_rpc_diem_interface(&env.validator_swarm, 0);
+    let diem_json_rpc = JsonRpcDiemInterface::new(validator.json_rpc_endpoint().to_string());
     let account_state = diem_json_rpc
         .retrieve_account_state(validator_account)
         .unwrap();
@@ -288,9 +284,7 @@ fn test_set_operator_and_add_new_validator() {
     assert!(txn_ctx.execution_result.is_none());
 
     // Wait for transaction execution
-    client
-        .wait_for_transaction(txn_ctx.address, txn_ctx.sequence_number)
-        .unwrap();
+    wait_for_account_sequence_number(&client, txn_ctx.address, txn_ctx.sequence_number).unwrap();
 
     // Verify the operator has been set correctly
     let account_state = diem_json_rpc
@@ -326,9 +320,7 @@ fn test_set_operator_and_add_new_validator() {
     assert!(txn_ctx.execution_result.is_none());
 
     // Wait for transaction execution
-    client
-        .wait_for_transaction(txn_ctx.address, txn_ctx.sequence_number)
-        .unwrap();
+    wait_for_account_sequence_number(&client, txn_ctx.address, txn_ctx.sequence_number).unwrap();
 
     // Check the validator set size
     let validator_set_infos = op_tool.validator_set(None, Some(&backend)).unwrap();
@@ -343,9 +335,7 @@ fn test_set_operator_and_add_new_validator() {
         .unwrap();
 
     // Wait for transaction execution
-    client
-        .wait_for_transaction(txn_ctx.address, txn_ctx.sequence_number)
-        .unwrap();
+    wait_for_account_sequence_number(&client, txn_ctx.address, txn_ctx.sequence_number).unwrap();
     // Verify that the transaction wasn't executed
     let txn_ctx = op_tool
         .validate_transaction(txn_ctx.address, txn_ctx.sequence_number)
@@ -386,10 +376,10 @@ fn test_set_operator_and_add_new_validator() {
 
 #[test]
 fn test_extract_private_key() {
-    let (env, op_tool, backend, storage) = launch_swarm_with_op_tool_and_backend(1, 0);
+    let (swarm, op_tool, backend, storage) = launch_swarm_with_op_tool_and_backend(1);
 
     // Extract the operator private key to file
-    let (_, node_config_path) = load_node_config(&env.validator_swarm, 0);
+    let node_config_path = swarm.validators().next().unwrap().config_path();
     let key_file_path = node_config_path.with_file_name(OPERATOR_KEY);
     let _ = op_tool
         .extract_private_key(
@@ -410,10 +400,10 @@ fn test_extract_private_key() {
 
 #[test]
 fn test_extract_public_key() {
-    let (env, op_tool, backend, storage) = launch_swarm_with_op_tool_and_backend(1, 0);
+    let (swarm, op_tool, backend, storage) = launch_swarm_with_op_tool_and_backend(1);
 
     // Extract the operator public key to file
-    let (_, node_config_path) = load_node_config(&env.validator_swarm, 0);
+    let node_config_path = swarm.validators().next().unwrap().config_path();
     let key_file_path = node_config_path.with_file_name(OPERATOR_KEY);
     let _ = op_tool
         .extract_public_key(
@@ -434,11 +424,10 @@ fn test_extract_public_key() {
 
 #[test]
 fn test_extract_peer_from_storage() {
-    let (mut env, op_tool, backend, _) = launch_swarm_with_op_tool_and_backend(1, 0);
-    env.setup_vfn_swarm();
+    let (swarm, op_tool, backend, _) = launch_swarm_with_op_tool_and_backend(1);
 
-    // Check Validator
-    let (config, _) = load_node_config(&env.validator_swarm, 0);
+    // Check Validator Network Key
+    let config = swarm.validators().next().unwrap().config().clone();
     let map = op_tool
         .extract_peer_from_storage(VALIDATOR_NETWORK_KEY, &backend)
         .unwrap();
@@ -449,8 +438,7 @@ fn test_extract_peer_from_storage() {
     assert_eq!(expected_public_key, *peer.keys.iter().next().unwrap());
     assert_eq!(expected_peer_id, *peer_id);
 
-    // Check VFN now
-    let (config, _) = load_node_config(&env.vfn_swarm().lock(), 0);
+    // Check FullNode Network Key
     let map = op_tool
         .extract_peer_from_storage(FULLNODE_NETWORK_KEY, &backend)
         .unwrap();
@@ -562,7 +550,7 @@ fn test_generate_key() {
 
 #[test]
 fn test_insert_waypoint() {
-    let (_env, op_tool, backend, storage) = launch_swarm_with_op_tool_and_backend(1, 0);
+    let (_env, op_tool, backend, storage) = launch_swarm_with_op_tool_and_backend(1);
 
     // Get the current waypoint from storage
     let current_waypoint: Waypoint = storage.get(WAYPOINT).unwrap().value;
@@ -596,17 +584,15 @@ fn test_insert_waypoint() {
 #[test]
 fn test_fullnode_network_key_rotation() {
     let num_nodes = 1;
-    let (env, op_tool, backend, storage) = launch_swarm_with_op_tool_and_backend(num_nodes, 0);
+    let (env, op_tool, backend, storage) = launch_swarm_with_op_tool_and_backend(num_nodes);
 
     // Rotate the full node network key
     let (txn_ctx, new_network_key) = op_tool.rotate_fullnode_network_key(&backend, true).unwrap();
     assert!(txn_ctx.execution_result.is_none());
 
     // Wait for transaction execution
-    let client = env.get_validator_client(0, None);
-    client
-        .wait_for_transaction(txn_ctx.address, txn_ctx.sequence_number)
-        .unwrap();
+    let client = env.validators().next().unwrap().json_rpc_client();
+    wait_for_account_sequence_number(&client, txn_ctx.address, txn_ctx.sequence_number).unwrap();
 
     // Verify that the config has been loaded correctly with new key
     let validator_account = storage.get::<AccountAddress>(OWNER_ACCOUNT).unwrap().value;
@@ -631,7 +617,7 @@ fn test_fullnode_network_key_rotation() {
 #[test]
 fn test_network_key_rotation() {
     let num_nodes = 4;
-    let (mut env, op_tool, backend, storage) = launch_swarm_with_op_tool_and_backend(num_nodes, 0);
+    let (mut swarm, op_tool, backend, storage) = launch_swarm_with_op_tool_and_backend(num_nodes);
 
     // Rotate the validator network key
     let (txn_ctx, new_network_key) = op_tool
@@ -640,7 +626,7 @@ fn test_network_key_rotation() {
     assert!(txn_ctx.execution_result.is_none());
 
     // Ensure all nodes have received the transaction
-    wait_for_transaction_on_all_nodes(&env, num_nodes, txn_ctx.address, txn_ctx.sequence_number);
+    wait_for_transaction_on_all_nodes(&swarm, txn_ctx.address, txn_ctx.sequence_number);
 
     // Verify that config has been loaded correctly with new key
     let validator_account = storage.get::<AccountAddress>(OWNER_ACCOUNT).unwrap().value;
@@ -663,15 +649,19 @@ fn test_network_key_rotation() {
 
     // Restart validator
     // At this point, the `add_node` call ensures connectivity to all nodes
-    env.validator_swarm.kill_node(0);
-    env.validator_swarm.start_node(0).unwrap();
+    let validator = swarm.validators_mut().next().unwrap();
+    validator.stop();
+    validator.start().unwrap();
+    swarm
+        .wait_for_connectivity(Instant::now() + Duration::from_secs(60))
+        .unwrap();
 }
 
 #[test]
 fn test_network_key_rotation_recovery() {
     let num_nodes = 4;
-    let (mut env, op_tool, backend, mut storage) =
-        launch_swarm_with_op_tool_and_backend(num_nodes, 0);
+    let (mut swarm, op_tool, backend, mut storage) =
+        launch_swarm_with_op_tool_and_backend(num_nodes);
 
     // Rotate the network key in storage manually and perform a key rotation using the op_tool.
     // Here, we expected the op_tool to see that the network key in storage doesn't match the one
@@ -684,7 +674,7 @@ fn test_network_key_rotation_recovery() {
     assert_eq!(new_network_key, to_x25519(rotated_network_key).unwrap());
 
     // Ensure all nodes have received the transaction
-    wait_for_transaction_on_all_nodes(&env, num_nodes, txn_ctx.address, txn_ctx.sequence_number);
+    wait_for_transaction_on_all_nodes(&swarm, txn_ctx.address, txn_ctx.sequence_number);
 
     // Verify that config has been loaded correctly with new key
     let validator_account = storage.get::<AccountAddress>(OWNER_ACCOUNT).unwrap().value;
@@ -707,22 +697,24 @@ fn test_network_key_rotation_recovery() {
 
     // Restart validator
     // At this point, the `add_node` call ensures connectivity to all nodes
-    env.validator_swarm.kill_node(0);
-    env.validator_swarm.start_node(0).unwrap();
+    let validator = swarm.validators_mut().next().unwrap();
+    validator.stop();
+    validator.start().unwrap();
+    swarm
+        .wait_for_connectivity(Instant::now() + Duration::from_secs(60))
+        .unwrap();
 }
 
 #[test]
 fn test_operator_key_rotation() {
-    let (env, op_tool, backend, storage) = launch_swarm_with_op_tool_and_backend(1, 0);
+    let (env, op_tool, backend, storage) = launch_swarm_with_op_tool_and_backend(1);
 
     let (txn_ctx, _) = op_tool.rotate_operator_key(&backend, true).unwrap();
     assert!(txn_ctx.execution_result.is_none());
 
     // Wait for transaction execution
-    let client = env.get_validator_client(0, None);
-    client
-        .wait_for_transaction(txn_ctx.address, txn_ctx.sequence_number)
-        .unwrap();
+    let client = env.validators().next().unwrap().json_rpc_client();
+    wait_for_account_sequence_number(&client, txn_ctx.address, txn_ctx.sequence_number).unwrap();
 
     // Verify that the transaction was executed correctly
     let txn_ctx = op_tool
@@ -745,7 +737,7 @@ fn test_operator_key_rotation() {
 
 #[test]
 fn test_operator_key_rotation_recovery() {
-    let (env, op_tool, backend, mut storage) = launch_swarm_with_op_tool_and_backend(1, 0);
+    let (env, op_tool, backend, mut storage) = launch_swarm_with_op_tool_and_backend(1);
 
     // Rotate the operator key
     let (txn_ctx, new_operator_key) = op_tool.rotate_operator_key(&backend, false).unwrap();
@@ -778,10 +770,8 @@ fn test_operator_key_rotation_recovery() {
     assert_eq!(rotated_operator_key, new_operator_key);
 
     // Wait for transaction execution
-    let client = env.get_validator_client(0, None);
-    client
-        .wait_for_transaction(txn_ctx.address, txn_ctx.sequence_number)
-        .unwrap();
+    let client = env.validators().next().unwrap().json_rpc_client();
+    wait_for_account_sequence_number(&client, txn_ctx.address, txn_ctx.sequence_number).unwrap();
 
     // Verify that the transaction was executed correctly
     let txn_ctx = op_tool
@@ -800,7 +790,7 @@ fn test_operator_key_rotation_recovery() {
 
 #[test]
 fn test_print_account() {
-    let (_env, op_tool, backend, storage) = launch_swarm_with_op_tool_and_backend(1, 0);
+    let (_env, op_tool, backend, storage) = launch_swarm_with_op_tool_and_backend(1);
 
     // Print the owner account
     let op_tool_owner_account = op_tool.print_account(OWNER_ACCOUNT, &backend).unwrap();
@@ -818,7 +808,7 @@ fn test_print_account() {
 
 #[test]
 fn test_print_key() {
-    let (_env, op_tool, backend, storage) = launch_swarm_with_op_tool_and_backend(1, 0);
+    let (_env, op_tool, backend, storage) = launch_swarm_with_op_tool_and_backend(1);
 
     // Print the operator key
     let op_tool_operator_key = op_tool.print_key(OPERATOR_KEY, &backend).unwrap();
@@ -833,7 +823,7 @@ fn test_print_key() {
 
 #[test]
 fn test_print_waypoints() {
-    let (_env, op_tool, backend, _) = launch_swarm_with_op_tool_and_backend(1, 0);
+    let (_env, op_tool, backend, _) = launch_swarm_with_op_tool_and_backend(1);
 
     // Insert a new waypoint and genesis waypoint into storage
     let inserted_waypoint =
@@ -853,7 +843,7 @@ fn test_print_waypoints() {
 
 #[test]
 fn test_validate_transaction() {
-    let (env, op_tool, backend, _) = launch_swarm_with_op_tool_and_backend(1, 0);
+    let (swarm, op_tool, backend, _) = launch_swarm_with_op_tool_and_backend(1);
 
     // Validate an unknown transaction and verify no VM state found
     let operator_account = op_tool.print_account(OPERATOR_ACCOUNT, &backend).unwrap();
@@ -867,10 +857,8 @@ fn test_validate_transaction() {
 
     // Submit a transaction (rotate the operator key) and validate the transaction execution
     let (txn_ctx, _) = op_tool.rotate_operator_key(&backend, true).unwrap();
-    let client = env.get_validator_client(0, None);
-    client
-        .wait_for_transaction(operator_account, txn_ctx.sequence_number)
-        .unwrap();
+    let client = swarm.validators().next().unwrap().json_rpc_client();
+    wait_for_account_sequence_number(&client, operator_account, txn_ctx.sequence_number).unwrap();
 
     let result = op_tool
         .validate_transaction(operator_account, txn_ctx.sequence_number)
@@ -891,7 +879,7 @@ fn test_validate_transaction() {
 
 #[test]
 fn test_validator_config() {
-    let (_env, op_tool, backend, mut storage) = launch_swarm_with_op_tool_and_backend(1, 0);
+    let (_env, op_tool, backend, mut storage) = launch_swarm_with_op_tool_and_backend(1);
 
     // Fetch the initial validator config for this operator's owner
     let owner_account = storage.get::<AccountAddress>(OWNER_ACCOUNT).unwrap().value;
@@ -936,7 +924,7 @@ fn test_validator_config() {
 
 #[test]
 fn test_validator_decryption() {
-    let (_env, op_tool, backend, mut storage) = launch_swarm_with_op_tool_and_backend(1, 0);
+    let (_env, op_tool, backend, mut storage) = launch_swarm_with_op_tool_and_backend(1);
 
     // Fetch the validator config and validator info for this operator's owner
     let owner_account = storage.get::<AccountAddress>(OWNER_ACCOUNT).unwrap().value;
@@ -979,7 +967,7 @@ fn test_validator_decryption() {
 #[test]
 fn test_validator_set() {
     let num_nodes = 4;
-    let (_env, op_tool, backend, mut storage) = launch_swarm_with_op_tool_and_backend(num_nodes, 0);
+    let (_env, op_tool, backend, mut storage) = launch_swarm_with_op_tool_and_backend(num_nodes);
 
     // Fetch the validator config and validator info for this operator's owner
     let owner_account = storage.get::<AccountAddress>(OWNER_ACCOUNT).unwrap().value;
@@ -1051,22 +1039,23 @@ fn create_new_test_account() -> (Ed25519PrivateKey, AccountAddress) {
 /// Creates a new validator operator using the given file writer and verifies
 /// the operator account is correctly initialized on-chain.
 fn create_operator_with_file_writer(file_writer: fn(&Ed25519PublicKey, PathBuf)) {
-    let (env, op_tool, _, _) = launch_swarm_with_op_tool_and_backend(1, 0);
+    let (mut swarm, op_tool, _, _) = launch_swarm_with_op_tool_and_backend(1);
 
     // Create a new operator key and account
     let (operator_key, operator_account) = create_new_test_account();
 
+    let validator = swarm.validators().next().unwrap();
     // Verify the corresponding account doesn't exist on-chain
-    let diem_json_rpc = get_json_rpc_diem_interface(&env.validator_swarm, 0);
+    let diem_json_rpc = JsonRpcDiemInterface::new(validator.json_rpc_endpoint().to_string());
     diem_json_rpc
         .retrieve_account_state(operator_account)
         .unwrap_err();
 
     // Write the key to a file using the provided file writer
-    let key_file_path = write_key_to_file(&operator_key.public_key(), &env, file_writer);
+    let key_file_path = write_key_to_file(&operator_key.public_key(), validator, file_writer);
 
     // Create the operator account
-    let backend = load_diem_root_storage(&env.validator_swarm, 0);
+    let backend = create_root_storage(&mut swarm);
     let op_human_name = "new_operator";
     let (txn_ctx, account_address) = op_tool
         .create_validator_operator(
@@ -1093,22 +1082,24 @@ fn create_operator_with_file_writer(file_writer: fn(&Ed25519PublicKey, PathBuf))
 /// Creates a new validator using the given file writer and verifies
 /// the account is correctly initialized on-chain.
 fn create_validator_with_file_writer(file_writer: fn(&Ed25519PublicKey, PathBuf)) {
-    let (env, op_tool, _, _) = launch_swarm_with_op_tool_and_backend(1, 0);
+    let (mut swarm, op_tool, _, _) = launch_swarm_with_op_tool_and_backend(1);
 
     // Create a new validator key and account
     let (validator_key, validator_account) = create_new_test_account();
 
+    let validator = swarm.validators().next().unwrap();
+    let client = validator.json_rpc_client();
     // Verify the corresponding account doesn't exist on-chain
-    let diem_json_rpc = get_json_rpc_diem_interface(&env.validator_swarm, 0);
+    let diem_json_rpc = JsonRpcDiemInterface::new(validator.json_rpc_endpoint().to_string());
     diem_json_rpc
         .retrieve_account_state(validator_account)
         .unwrap_err();
 
     // Write the key to a file using the provided file writer
-    let key_file_path = write_key_to_file(&validator_key.public_key(), &env, file_writer);
+    let key_file_path = write_key_to_file(&validator_key.public_key(), validator, file_writer);
 
     // Create the validator account
-    let backend = load_diem_root_storage(&env.validator_swarm, 0);
+    let backend = create_root_storage(&mut swarm);
     let val_human_name = "new_validator";
     let (txn_ctx, account_address) = op_tool
         .create_validator(
@@ -1122,10 +1113,7 @@ fn create_validator_with_file_writer(file_writer: fn(&Ed25519PublicKey, PathBuf)
     assert_eq!(validator_account, account_address);
 
     // Wait for transaction execution
-    let client = env.get_validator_client(0, None);
-    client
-        .wait_for_transaction(txn_ctx.address, txn_ctx.sequence_number)
-        .unwrap();
+    wait_for_account_sequence_number(&client, txn_ctx.address, txn_ctx.sequence_number).unwrap();
 
     // Verify that the transaction was executed
     let txn_ctx = op_tool
@@ -1147,38 +1135,75 @@ fn create_validator_with_file_writer(file_writer: fn(&Ed25519PublicKey, PathBuf)
 }
 
 /// Launches a validator swarm of a specified size, connects an operational
-/// tool to the node at the specified index and fetches the node's secure backend.
+/// tool to the first node and fetches that node's secure backend.
 pub fn launch_swarm_with_op_tool_and_backend(
     num_nodes: usize,
-    node_index: usize,
-) -> (
-    SmokeTestEnvironment,
-    OperationalTool,
-    SecureBackend,
-    Storage,
-) {
-    // Launch validator swarm
-    let mut env = SmokeTestEnvironment::new(num_nodes);
-    env.validator_swarm.launch();
+) -> (LocalSwarm, OperationalTool, SecureBackend, Storage) {
+    let swarm = new_local_swarm(num_nodes);
+    let chain_id = swarm.chain_id();
+    let validator = swarm.validators().next().unwrap();
 
     // Connect the operator tool to the node's JSON RPC API
-    let op_tool = get_op_tool(&env.validator_swarm, node_index);
+    let op_tool = OperationalTool::new(validator.json_rpc_endpoint().to_string(), chain_id);
 
     // Load validator's on disk storage
-    let backend = load_backend_storage(&env.validator_swarm, node_index);
+    let backend = load_validators_backend_storage(validator);
     let storage: Storage = (&backend).try_into().unwrap();
 
-    (env, op_tool, backend, storage)
+    (swarm, op_tool, backend, storage)
 }
 
 /// Writes a given key to file using a specified file writer and test environment.
 fn write_key_to_file(
     key: &Ed25519PublicKey,
-    env: &SmokeTestEnvironment,
+    node: &LocalNode,
     file_writer: fn(&Ed25519PublicKey, PathBuf),
 ) -> PathBuf {
-    let (_, node_config_path) = load_node_config(&env.validator_swarm, 0);
+    let node_config_path = node.config_path();
     let file_path = node_config_path.with_file_name("KEY_FILE");
     file_writer(key, file_path.clone());
     file_path
+}
+
+fn wait_for_account_sequence_number(
+    client: &BlockingClient,
+    address: AccountAddress,
+    seq: u64,
+) -> Result<()> {
+    const DEFAULT_WAIT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(120);
+
+    let start = std::time::Instant::now();
+    while start.elapsed() < DEFAULT_WAIT_TIMEOUT {
+        let account_txn = client
+            .get_account_transaction(address, seq, false)?
+            .into_inner();
+        if let Some(txn) = account_txn {
+            if let diem_sdk::client::views::TransactionDataView::UserTransaction {
+                sequence_number,
+                ..
+            } = txn.transaction
+            {
+                if sequence_number >= seq {
+                    return Ok(());
+                }
+            }
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    bail!(
+        "wait for account(address={}) transaction(seq={}) timeout",
+        address,
+        seq
+    )
+}
+
+pub fn wait_for_transaction_on_all_nodes(
+    swarm: &LocalSwarm,
+    account: AccountAddress,
+    sequence_number: u64,
+) {
+    for validator in swarm.validators() {
+        let client = validator.json_rpc_client();
+        wait_for_account_sequence_number(&client, account, sequence_number).unwrap();
+    }
 }

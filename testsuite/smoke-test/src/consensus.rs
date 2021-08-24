@@ -14,15 +14,16 @@ use diem_global_constants::OWNER_ACCOUNT;
 use diem_sdk::client::views::VMStatusView;
 use diem_secure_storage::{KVStorage, Storage};
 use diem_types::{account_address::AccountAddress, network_address::NetworkAddress};
+use forge::NodeExt;
 use std::{convert::TryInto, str::FromStr};
 
 #[test]
 fn test_consensus_observer_mode_storage_error() {
     let num_nodes = 4;
-    let (env, op_tool, backend, _) = launch_swarm_with_op_tool_and_backend(num_nodes, 0);
+    let (swarm, op_tool, backend, _) = launch_swarm_with_op_tool_and_backend(num_nodes);
 
     // Kill safety rules storage for validator 1 to ensure it fails on the next epoch change
-    let (node_config, _) = load_node_config(&env.validator_swarm, 1);
+    let node_config = swarm.validators().skip(1).next().unwrap().config().clone();
     let safety_rules_storage = match node_config.consensus.safety_rules.backend {
         SecureBackend::OnDiskStorage(config) => SecureBackend::OnDiskStorage(config),
         _ => panic!("On-disk storage is the only backend supported in smoke tests"),
@@ -49,14 +50,20 @@ fn test_consensus_observer_mode_storage_error() {
     }
 
     // Verify validator 1 is still able to stay up to date with validator 0 (despite safety rules failing)
-    let mut client_0 = env.get_validator_client(0, None);
+    let client_0 = swarm.validators().next().unwrap().json_rpc_client();
     let sequence_number_0 = client_0
-        .get_sequence_number(&["sequence", &txn_ctx.address.to_string()])
-        .unwrap();
-    let mut client_1 = env.get_validator_client(1, None);
+        .get_account(txn_ctx.address)
+        .unwrap()
+        .into_inner()
+        .unwrap()
+        .sequence_number;
+    let client_1 = swarm.validators().skip(1).next().unwrap().json_rpc_client();
     let sequence_number_1 = client_1
-        .get_sequence_number(&["sequence", &txn_ctx.address.to_string()])
-        .unwrap();
+        .get_account(txn_ctx.address)
+        .unwrap()
+        .into_inner()
+        .unwrap()
+        .sequence_number;
     assert_eq!(sequence_number_0, sequence_number_1);
 }
 

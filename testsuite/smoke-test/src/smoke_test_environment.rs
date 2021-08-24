@@ -10,7 +10,18 @@ use diem_infallible::Mutex;
 use diem_swarm::swarm::DiemSwarm;
 use diem_temppath::TempPath;
 use diem_types::waypoint::Waypoint;
-use std::{collections::HashMap, sync::Arc};
+use forge::{LocalFactory, LocalSwarm};
+use once_cell::sync::Lazy;
+use rand::rngs::OsRng;
+use std::{collections::HashMap, num::NonZeroUsize, sync::Arc};
+
+pub fn new_local_swarm(num_validators: usize) -> LocalSwarm {
+    static FACTORY: Lazy<LocalFactory> = Lazy::new(|| LocalFactory::from_workspace().unwrap());
+
+    FACTORY
+        .new_swarm(OsRng, NonZeroUsize::new(num_validators).unwrap())
+        .unwrap()
+}
 
 /// A way to get us to have multiple full node swarms in the environment
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]

@@ -81,12 +81,13 @@ pub fn wait_for_transaction_on_all_nodes(
 pub mod diem_swarm_utils {
     use crate::test_utils::fetch_backend_storage;
     use cli::client_proxy::ClientProxy;
-    use diem_config::config::{NodeConfig, SecureBackend, WaypointConfig};
-    use diem_key_manager::diem_interface::JsonRpcDiemInterface;
+    use diem_config::config::{NodeConfig, OnDiskStorageConfig, SecureBackend, WaypointConfig};
+    use diem_global_constants::{DIEM_ROOT_KEY, TREASURY_COMPLIANCE_KEY};
     use diem_operational_tool::test_helper::OperationalTool;
-    use diem_secure_storage::{KVStorage, Storage};
+    use diem_secure_storage::{CryptoStorage, KVStorage, OnDiskStorage, Storage};
     use diem_swarm::swarm::DiemSwarm;
     use diem_types::{chain_id::ChainId, waypoint::Waypoint};
+    use forge::{LocalNode, LocalSwarm, Swarm};
     use std::path::PathBuf;
 
     /// Returns a new client proxy connected to the given swarm at the specified
@@ -128,16 +129,6 @@ pub mod diem_swarm_utils {
         format!("http://127.0.0.1:{}", swarm.get_client_port(node_index))
     }
 
-    /// Returns a JSON RPC based Diem Interface pointing to a node at the given
-    /// node index.
-    pub fn get_json_rpc_diem_interface(
-        swarm: &DiemSwarm,
-        node_index: usize,
-    ) -> JsonRpcDiemInterface {
-        let json_rpc_endpoint = format!("http://127.0.0.1:{}", swarm.get_client_port(node_index));
-        JsonRpcDiemInterface::new(json_rpc_endpoint)
-    }
-
     /// Returns an operational tool pointing to a validator node at the given node index.
     pub fn get_op_tool(swarm: &DiemSwarm, node_index: usize) -> OperationalTool {
         OperationalTool::new(
@@ -152,9 +143,37 @@ pub mod diem_swarm_utils {
         fetch_backend_storage(&node_config, None)
     }
 
+    /// Loads the nodes's storage backend identified by the node index in the given swarm.
+    pub fn load_validators_backend_storage(validator: &LocalNode) -> SecureBackend {
+        fetch_backend_storage(validator.config(), None)
+    }
+
     /// Loads the diem root's storage backend identified by the node index in the given swarm.
     pub fn load_diem_root_storage(swarm: &DiemSwarm, _node_index: usize) -> SecureBackend {
         SecureBackend::OnDiskStorage(swarm.config.root_storage.clone())
+    }
+
+    pub fn create_root_storage(swarm: &mut LocalSwarm) -> SecureBackend {
+        let chain_info = swarm.chain_info();
+        let root_key =
+            bcs::from_bytes(&bcs::to_bytes(chain_info.root_account.private_key()).unwrap())
+                .unwrap();
+        let treasury_compliance_key = bcs::from_bytes(
+            &bcs::to_bytes(chain_info.treasury_compliance_account.private_key()).unwrap(),
+        )
+        .unwrap();
+
+        let mut root_storage_config = OnDiskStorageConfig::default();
+        root_storage_config.path = swarm.dir().join("root-storage.json");
+        let mut root_storage = OnDiskStorage::new(root_storage_config.path());
+        root_storage
+            .import_private_key(DIEM_ROOT_KEY, root_key)
+            .unwrap();
+        root_storage
+            .import_private_key(TREASURY_COMPLIANCE_KEY, treasury_compliance_key)
+            .unwrap();
+
+        SecureBackend::OnDiskStorage(root_storage_config)
     }
 
     /// Loads the node config for the validator at the specified index. Also returns the node
