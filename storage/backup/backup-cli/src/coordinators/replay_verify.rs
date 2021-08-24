@@ -3,60 +3,63 @@
 
 use crate::{
     backup_types::{
-        epoch_ending::restore::EpochHistoryRestoreController,
         state_snapshot::restore::{StateSnapshotRestoreController, StateSnapshotRestoreOpt},
         transaction::restore::TransactionRestoreBatchController,
     },
     metadata,
     metadata::cache::MetadataCacheOpt,
-    metrics::verify::{
-        VERIFY_COORDINATOR_FAIL_TS, VERIFY_COORDINATOR_START_TS, VERIFY_COORDINATOR_SUCC_TS,
-    },
     storage::BackupStorage,
-    utils::{unix_timestamp_sec, GlobalRestoreOptions, RestoreRunMode, TrustedWaypointOpt},
+    utils::{GlobalRestoreOptions, RestoreRunMode, TrustedWaypointOpt},
 };
-use anyhow::Result;
+use anyhow::{ensure, Result};
 use diem_logger::prelude::*;
 use diem_types::transaction::Version;
+use diemdb::backup::restore_handler::RestoreHandler;
 use std::sync::Arc;
 
-pub struct VerifyCoordinator {
+pub struct ReplayVerifyCoordinator {
     storage: Arc<dyn BackupStorage>,
     metadata_cache_opt: MetadataCacheOpt,
     trusted_waypoints_opt: TrustedWaypointOpt,
     concurrent_downloads: usize,
+    restore_handler: RestoreHandler,
+    start_version: Version,
+    end_version: Version,
 }
 
-impl VerifyCoordinator {
+impl ReplayVerifyCoordinator {
     pub fn new(
         storage: Arc<dyn BackupStorage>,
         metadata_cache_opt: MetadataCacheOpt,
         trusted_waypoints_opt: TrustedWaypointOpt,
         concurrent_downloads: usize,
+        restore_handler: RestoreHandler,
+        start_version: Version,
+        end_version: Version,
     ) -> Result<Self> {
         Ok(Self {
             storage,
             metadata_cache_opt,
             trusted_waypoints_opt,
             concurrent_downloads,
+            restore_handler,
+            start_version,
+            end_version,
         })
     }
 
     pub async fn run(self) -> Result<()> {
-        info!("Verify coordinator started.");
-        VERIFY_COORDINATOR_START_TS.set(unix_timestamp_sec());
+        info!("ReplayVerify coordinator started.");
 
         let ret = self.run_impl().await;
 
         if let Err(e) = &ret {
             error!(
                 error = ?e,
-                "Verify coordinator failed."
+                "ReplayVerify coordinator failed."
             );
-            VERIFY_COORDINATOR_FAIL_TS.set(unix_timestamp_sec());
         } else {
-            info!("Verify coordinator exiting with success.");
-            VERIFY_COORDINATOR_SUCC_TS.set(unix_timestamp_sec());
+            info!("ReplayVerify coordinator exiting with success.");
         }
 
         ret
@@ -69,30 +72,31 @@ impl VerifyCoordinator {
             self.concurrent_downloads,
         )
         .await?;
-        let ver_max = Version::max_value();
-        let state_snapshot = metadata_view.select_state_snapshot(ver_max)?;
-        let transactions = metadata_view.select_transaction_backups(0, ver_max)?;
-        let epoch_endings = metadata_view.select_epoch_ending_backups(ver_max)?;
+        ensure!(
+            self.start_version <= self.end_version,
+            "start_version should precede end_version."
+        );
+
+        let state_snapshot = if self.start_version == 0 {
+            None
+        } else {
+            metadata_view.select_state_snapshot(self.start_version.wrapping_sub(1))?
+        };
+        let replay_transactions_from_version = state_snapshot
+            .as_ref()
+            .map(|b| b.version.wrapping_add(1))
+            .unwrap_or(0);
+        let transactions = metadata_view
+            .select_transaction_backups(replay_transactions_from_version, self.end_version)?;
 
         let global_opt = GlobalRestoreOptions {
-            target_version: ver_max,
+            target_version: self.end_version,
             trusted_waypoints: Arc::new(self.trusted_waypoints_opt.verify()?),
-            run_mode: Arc::new(RestoreRunMode::Verify),
+            run_mode: Arc::new(RestoreRunMode::Restore {
+                restore_handler: self.restore_handler,
+            }),
             concurrent_downloads: self.concurrent_downloads,
         };
-
-        let epoch_history = Arc::new(
-            EpochHistoryRestoreController::new(
-                epoch_endings
-                    .into_iter()
-                    .map(|backup| backup.manifest)
-                    .collect(),
-                global_opt.clone(),
-                self.storage.clone(),
-            )
-            .run()
-            .await?,
-        );
 
         if let Some(backup) = state_snapshot {
             StateSnapshotRestoreController::new(
@@ -102,7 +106,7 @@ impl VerifyCoordinator {
                 },
                 global_opt.clone(),
                 Arc::clone(&self.storage),
-                Some(Arc::clone(&epoch_history)),
+                None, /* epoch_history */
             )
             .run()
             .await?;
@@ -113,8 +117,8 @@ impl VerifyCoordinator {
             global_opt,
             self.storage,
             txn_manifests,
-            None, /* replay_from_version */
-            Some(epoch_history),
+            Some(replay_transactions_from_version), /* replay_from_version */
+            None,                                   /* epoch_history */
         )
         .run()
         .await?;
