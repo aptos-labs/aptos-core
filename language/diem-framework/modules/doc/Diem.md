@@ -73,7 +73,9 @@ minting and burning of coins.
         -  [Burning](#@Burning_4)
         -  [Preburning](#@Preburning_5)
         -  [Update Exchange Rates](#@Update_Exchange_Rates_6)
-    -  [Helper Functions](#@Helper_Functions_7)
+        -  [Enable/disable minting](#@Enable/disable_minting_7)
+        -  [Register new currency](#@Register_new_currency_8)
+    -  [Helper Functions](#@Helper_Functions_9)
 
 
 <pre><code><b>use</b> <a href="CoreAddresses.md#0x1_CoreAddresses">0x1::CoreAddresses</a>;
@@ -4196,38 +4198,47 @@ resource struct <code><a href="Diem.md#0x1_Diem_MintCapability">MintCapability</
 #### Update Exchange Rates
 
 
-
-<a name="0x1_Diem_ExchangeRateRemainsSame"></a>
-
-The exchange rate to XDX stays constant.
+Only TreasuryCompliance can change the exchange rate [[H5]][PERMISSION].
 
 
-<pre><code><b>schema</b> <a href="Diem.md#0x1_Diem_ExchangeRateRemainsSame">ExchangeRateRemainsSame</a>&lt;CoinType&gt; {
-    <b>ensures</b> <b>old</b>(<a href="Diem.md#0x1_Diem_spec_is_currency">spec_is_currency</a>&lt;CoinType&gt;())
-        ==&gt; <a href="Diem.md#0x1_Diem_spec_currency_info">spec_currency_info</a>&lt;CoinType&gt;().to_xdx_exchange_rate
-            == <b>old</b>(<a href="Diem.md#0x1_Diem_spec_currency_info">spec_currency_info</a>&lt;CoinType&gt;().to_xdx_exchange_rate);
-}
+<pre><code><b>invariant</b>&lt;CoinType&gt; <b>update</b> <b>old</b>(<a href="Diem.md#0x1_Diem_spec_is_currency">spec_is_currency</a>&lt;CoinType&gt;()) ==&gt;
+    ((<a href="Diem.md#0x1_Diem_spec_xdx_exchange_rate">spec_xdx_exchange_rate</a>&lt;CoinType&gt;() != <b>old</b>(<a href="Diem.md#0x1_Diem_spec_xdx_exchange_rate">spec_xdx_exchange_rate</a>&lt;CoinType&gt;()))
+        ==&gt; <a href="Roles.md#0x1_Roles_spec_signed_by_treasury_compliance_role">Roles::spec_signed_by_treasury_compliance_role</a>());
 </code></pre>
 
 
 
-The permission "UpdateExchangeRate(type)" is granted to TreasuryCompliance [[H5]][PERMISSION].
+<a name="@Enable/disable_minting_7"></a>
+
+#### Enable/disable minting
 
 
-<pre><code><b>apply</b> <a href="Roles.md#0x1_Roles_AbortsIfNotTreasuryCompliance">Roles::AbortsIfNotTreasuryCompliance</a>{account: tc_account} <b>to</b> <a href="Diem.md#0x1_Diem_update_xdx_exchange_rate">update_xdx_exchange_rate</a>&lt;FromCoinType&gt;;
+Only TreasuryCompliance can enable/disable minting [[H2]][PERMISSION].
+
+
+<pre><code><b>invariant</b>&lt;CoinType&gt; <b>update</b> <b>old</b>(<a href="Diem.md#0x1_Diem_spec_is_currency">spec_is_currency</a>&lt;CoinType&gt;()) ==&gt;
+    ((<a href="Diem.md#0x1_Diem_spec_can_mint">spec_can_mint</a>&lt;CoinType&gt;() != <b>old</b>(<a href="Diem.md#0x1_Diem_spec_can_mint">spec_can_mint</a>&lt;CoinType&gt;()))
+        ==&gt; <a href="Roles.md#0x1_Roles_spec_signed_by_treasury_compliance_role">Roles::spec_signed_by_treasury_compliance_role</a>());
 </code></pre>
 
 
-Only update_xdx_exchange_rate can change the exchange rate [[H5]][PERMISSION].
+
+<a name="@Register_new_currency_8"></a>
+
+#### Register new currency
 
 
-<pre><code><b>apply</b> <a href="Diem.md#0x1_Diem_ExchangeRateRemainsSame">ExchangeRateRemainsSame</a>&lt;CoinType&gt; <b>to</b> *&lt;CoinType&gt;
-    <b>except</b> <a href="Diem.md#0x1_Diem_update_xdx_exchange_rate">update_xdx_exchange_rate</a>&lt;CoinType&gt;;
+Only DiemRoot can register a new currency [[H8]][PERMISSION].
+
+
+<pre><code><b>invariant</b>&lt;CoinType&gt; <b>update</b>
+    !<b>old</b>(<a href="Diem.md#0x1_Diem_spec_is_currency">spec_is_currency</a>&lt;CoinType&gt;()) && <a href="Diem.md#0x1_Diem_spec_is_currency">spec_is_currency</a>&lt;CoinType&gt;()
+        ==&gt; <a href="Roles.md#0x1_Roles_spec_signed_by_diem_root_role">Roles::spec_signed_by_diem_root_role</a>();
 </code></pre>
 
 
 
-<a name="@Helper_Functions_7"></a>
+<a name="@Helper_Functions_9"></a>
 
 ### Helper Functions
 
@@ -4265,9 +4276,29 @@ Specification version of <code><a href="Diem.md#0x1_Diem_approx_xdx_for_value">S
 <pre><code><b>fun</b> <a href="Diem.md#0x1_Diem_spec_approx_xdx_for_value">spec_approx_xdx_for_value</a>&lt;CoinType&gt;(value: num):  num {
     <a href="../../../../../../move-stdlib/docs/FixedPoint32.md#0x1_FixedPoint32_spec_multiply_u64">FixedPoint32::spec_multiply_u64</a>(value, <a href="Diem.md#0x1_Diem_spec_xdx_exchange_rate">spec_xdx_exchange_rate</a>&lt;CoinType&gt;())
 }
+</code></pre>
+
+
+Returns the <code>to_xdx_exchange_rate</code> of CoinType
+
+
 <a name="0x1_Diem_spec_xdx_exchange_rate"></a>
-<b>fun</b> <a href="Diem.md#0x1_Diem_spec_xdx_exchange_rate">spec_xdx_exchange_rate</a>&lt;CoinType&gt;(): <a href="../../../../../../move-stdlib/docs/FixedPoint32.md#0x1_FixedPoint32">FixedPoint32</a> {
+
+
+<pre><code><b>fun</b> <a href="Diem.md#0x1_Diem_spec_xdx_exchange_rate">spec_xdx_exchange_rate</a>&lt;CoinType&gt;(): <a href="../../../../../../move-stdlib/docs/FixedPoint32.md#0x1_FixedPoint32">FixedPoint32</a> {
     <b>global</b>&lt;<a href="Diem.md#0x1_Diem_CurrencyInfo">CurrencyInfo</a>&lt;CoinType&gt;&gt;(@<a href="Diem.md#0x1_Diem_CurrencyInfo">CurrencyInfo</a>).to_xdx_exchange_rate
+}
+</code></pre>
+
+
+Returns the <code>to_xdx_exchange_rate</code> of CoinType
+
+
+<a name="0x1_Diem_spec_can_mint"></a>
+
+
+<pre><code><b>fun</b> <a href="Diem.md#0x1_Diem_spec_can_mint">spec_can_mint</a>&lt;CoinType&gt;(): bool {
+    <b>global</b>&lt;<a href="Diem.md#0x1_Diem_CurrencyInfo">CurrencyInfo</a>&lt;CoinType&gt;&gt;(@<a href="Diem.md#0x1_Diem_CurrencyInfo">CurrencyInfo</a>).can_mint
 }
 </code></pre>
 

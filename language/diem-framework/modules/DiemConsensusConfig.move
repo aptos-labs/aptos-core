@@ -52,6 +52,18 @@ module DiemFramework::DiemConsensusConfig {
 
     /// # Access Control
 
+    /// The permission "UpdateDiemConsensusConfig" is granted to DiemRoot [[H12]][PERMISSION].
+    spec module {
+        invariant [global, isolated] forall addr: address where exists<DiemConfig<DiemConsensusConfig>>(addr):
+            addr == @DiemRoot;
+
+        invariant update old(DiemConfig::spec_is_published<DiemConsensusConfig>())
+            && DiemConfig::spec_is_published<DiemConsensusConfig>()
+            && old(DiemConfig::get<DiemConsensusConfig>()) != DiemConfig::get<DiemConsensusConfig>()
+                ==> Roles::spec_signed_by_diem_root_role();
+    }
+
+    // TODO: The following is the old style spec, which can removed later.
     /// Only "set" can modify the DiemConsensusConfig config [[H12]][PERMISSION]
     spec schema DiemConsensusConfigRemainsSame {
         ensures old(DiemConfig::spec_is_published<DiemConsensusConfig>()) ==>
@@ -60,11 +72,5 @@ module DiemFramework::DiemConsensusConfig {
     }
     spec module {
         apply DiemConsensusConfigRemainsSame to * except set;
-    }
-
-    spec module {
-        /// The permission "UpdateDiemConsensusConfig" is granted to DiemRoot [[H12]][PERMISSION].
-        invariant [global, isolated] forall addr: address where exists<DiemConfig<DiemConsensusConfig>>(addr):
-            addr == @DiemRoot;
     }
 }

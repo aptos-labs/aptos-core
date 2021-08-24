@@ -215,16 +215,10 @@ module DiemFramework::AccountFreezing {
         /// resource struct FreezeEventsHolder is there forever after initialization
         invariant update DiemTimestamp::is_operating() ==> exists<FreezeEventsHolder>(@DiemRoot);
 
-        /// The permission "{Freeze,Unfreeze}Account" is granted to TreasuryCompliance only [[H7]][PERMISSION].
-        apply Roles::AbortsIfNotTreasuryCompliance to freeze_account, unfreeze_account;
-
-        /// Only (un)freeze functions can change the freezing bits of accounts [[H7]][PERMISSION].
-        apply FreezingBitRemainsSame to * except freeze_account, unfreeze_account;
-    }
-
-    spec schema FreezingBitRemainsSame {
-        ensures forall addr: address where old(exists<FreezingBit>(addr)):
-            global<FreezingBit>(addr).is_frozen == old(global<FreezingBit>(addr).is_frozen);
+        /// Only TreasuryCompliance can change the freezing bits of accounts [[H7]][PERMISSION].
+        invariant update forall addr: address where old(exists<FreezingBit>(addr)):
+            global<FreezingBit>(addr).is_frozen != old(global<FreezingBit>(addr).is_frozen)
+                ==> Roles::spec_signed_by_treasury_compliance_role();
     }
 
     /// # Helper Functions

@@ -65,16 +65,17 @@ module DiemFramework::ValidatorConfig {
     }
 
     spec publish {
-        include PublishAbortsIf {validator_addr: Signer::spec_address_of(validator_account)};
+        include PublishAbortsIf;
         ensures exists_config(Signer::spec_address_of(validator_account));
     }
 
     spec schema PublishAbortsIf {
-        validator_addr: address;
+        validator_account: signer;
         dr_account: signer;
+        let validator_addr = Signer::spec_address_of(validator_account);
         include DiemTimestamp::AbortsIfNotOperating;
         include Roles::AbortsIfNotDiemRoot{account: dr_account};
-        include Roles::AbortsIfNotValidator{validator_addr: validator_addr};
+        include Roles::AbortsIfNotValidator{account: validator_account};
         aborts_if exists_config(validator_addr)
             with Errors::ALREADY_PUBLISHED;
     }
@@ -110,8 +111,7 @@ module DiemFramework::ValidatorConfig {
     }
     spec set_operator {
         /// Must abort if the signer does not have the Validator role [[H16]][PERMISSION].
-        let sender = Signer::spec_address_of(validator_account);
-        include Roles::AbortsIfNotValidator{validator_addr: sender};
+        include Roles::AbortsIfNotValidator{account: validator_account};
         include SetOperatorAbortsIf;
         include SetOperatorEnsures;
     }
@@ -121,7 +121,7 @@ module DiemFramework::ValidatorConfig {
         validator_account: signer;
         operator_addr: address;
         let validator_addr = Signer::spec_address_of(validator_account);
-        include Roles::AbortsIfNotValidator{validator_addr: validator_addr};
+        include Roles::AbortsIfNotValidator{account: validator_account};
         aborts_if !ValidatorOperatorConfig::has_validator_operator_config(operator_addr)
             with Errors::INVALID_ARGUMENT;
         include AbortsIfNoValidatorConfig{addr: validator_addr};
@@ -152,7 +152,7 @@ module DiemFramework::ValidatorConfig {
     spec remove_operator {
         /// Must abort if the signer does not have the Validator role [[H16]][PERMISSION].
         let sender = Signer::spec_address_of(validator_account);
-        include Roles::AbortsIfNotValidator{validator_addr: sender};
+        include Roles::AbortsIfNotValidator{account: validator_account};
         include AbortsIfNoValidatorConfig{addr: sender};
         ensures !spec_has_operator(Signer::spec_address_of(validator_account));
 
@@ -313,17 +313,11 @@ module DiemFramework::ValidatorConfig {
 
     /// # Access Control
 
+    /// The permission "{Set,Remove}ValidatorOperator(addr)" is granted to Validator [[H16]][PERMISSION]
     spec module {
-        /// Only `Self::set_operator` and `Self::remove_operator` may change the operator for a
-        /// particular (validator owner) address [[H16]][PERMISSION].
-        /// These two functions have a &signer argument for the validator account, so we know
-        /// that the change has been authorized by the validator owner via signing the transaction.
-        apply OperatorRemainsSame to * except set_operator, remove_operator;
-    }
-
-    spec schema OperatorRemainsSame {
-        ensures forall addr1: address where old(exists<ValidatorConfig>(addr1)):
-            global<ValidatorConfig>(addr1).operator_account == old(global<ValidatorConfig>(addr1).operator_account);
+        invariant update forall a: address where old(exists<ValidatorConfig>(a)) && exists<ValidatorConfig>(a):
+            old(global<ValidatorConfig>(a).operator_account) != global<ValidatorConfig>(a).operator_account
+                ==> Signer::is_txn_signer_addr(a) && Roles::spec_has_validator_role_addr(a);
     }
 
     /// # Validity of Validators

@@ -1,37 +1,42 @@
 // separate_baseline: cvc4
 // separate_baseline: no_opaque
 // The separate baseline is legit and caused by a different choice in the generated model.
-module 0x42::SimpleIsSigner {
+module 0x42::SimpleIsTxnSigner {
     use Std::Signer;
     use DiemFramework::Roles;
 
-    // ---------------
-    // Simple examples
-    // ---------------
+    // ----------------------------------------
+    // Simple examples for `is_txn_signer`
+    // ----------------------------------------
+
+
+    // ----------------------------------------
+    // Simple examples for `is_txn_signer_addr`
+    // ----------------------------------------
 
     public fun f1_incorrect() {
-        spec { assert Signer::is_signer(@0x7); } // This is unprovable because it is not true in general.
+        spec { assert Signer::is_txn_signer_addr(@0x7); } // This is unprovable because it is not true in general.
     }
 
     public fun f2_incorrect(_account: &signer) {
-        spec { assert Signer::is_signer(@0x7); } // This is unprovable because it is not true in general.
+        spec { assert Signer::is_txn_signer_addr(@0x7); } // This is unprovable because it is not true in general.
     }
 
     public fun f3(account: &signer) {
         assert(Signer::address_of(account) == @0x7, 1);
-        spec { assert Signer::is_signer(@0x7); } // It's true in general.
+        spec { assert Signer::is_txn_signer_addr(@0x7); } // It's true in general.
     }
 
     public fun f4_incorrect(account: &signer) {
         assert(Signer::address_of(account) == @0x3, 1);
-        spec { assert Signer::is_signer(@0x7); } // This is unprovable because it is not true in general.
+        spec { assert Signer::is_txn_signer_addr(@0x7); } // This is unprovable because it is not true in general.
     }
 
     fun f5() {
-        spec { assert Signer::is_signer(@0x7); } // This is provable because of the "requires" condition.
+        spec { assert Signer::is_txn_signer_addr(@0x7); } // This is provable because of the "requires" condition.
     }
     spec f5 {
-        requires Signer::is_signer(@0x7); // f5 requires this to be true at its callers' sites
+        requires Signer::is_txn_signer_addr(@0x7); // f5 requires this to be true at its callers' sites
     }
 
     public fun f6(account: &signer) { // This function produces no error because it satisfies f5's requires condition.
@@ -67,7 +72,7 @@ module 0x42::SimpleIsSigner {
         if(hasPermission(a))
         {
             spec {
-                assert exists addr:address: (Signer::is_signer(addr) && hasPermissionAddr(addr));
+                assert exists addr:address: (Signer::is_txn_signer_addr(addr) && hasPermissionAddr(addr));
             };
             // privileged operation
         }
@@ -76,7 +81,7 @@ module 0x42::SimpleIsSigner {
     public fun g2(a: &signer, _b: &signer) {
         assert (hasPermission(a), 1);
         spec {
-            assert exists addr:address: (Signer::is_signer(addr) && hasPermissionAddr(addr));
+            assert exists addr:address: (Signer::is_txn_signer_addr(addr) && hasPermissionAddr(addr));
         };
         // privileged operation
     }
@@ -88,12 +93,12 @@ module 0x42::SimpleIsSigner {
 
     public fun helper() {
         spec {
-            assert exists addr:address: (Signer::is_signer(addr) && hasPermissionAddr(addr));
+            assert exists addr:address: (Signer::is_txn_signer_addr(addr) && hasPermissionAddr(addr));
         };
         // privileged operation
     }
     spec helper {
-        requires exists addr:address: (Signer::is_signer(addr) && hasPermissionAddr(addr));
+        requires exists addr:address: (Signer::is_txn_signer_addr(addr) && hasPermissionAddr(addr));
     }
 
 
@@ -110,7 +115,7 @@ module 0x42::SimpleIsSigner {
     const AUTH_FAILED: u64 = 1;
 
     public fun publish(account: &signer) {
-        spec { assume Signer::is_signer(Signer::spec_address_of(account)); };
+        spec { assume Signer::is_txn_signer_addr(Signer::spec_address_of(account)); };
 
         assert(Signer::address_of(account) == ADMIN_ADDRESS(), AUTH_FAILED);
         move_to(account, Counter { i: 0 });
@@ -135,6 +140,6 @@ module 0x42::SimpleIsSigner {
     spec module {
         // Access control spec: Only the admin is allowed to increment the counter value.
         invariant update (old(exists<Counter>(ADMIN_ADDRESS())) && global<Counter>(ADMIN_ADDRESS()).i != old(global<Counter>(ADMIN_ADDRESS()).i))
-            ==> Signer::is_signer(ADMIN_ADDRESS());
+            ==> Signer::is_txn_signer_addr(ADMIN_ADDRESS());
     }
 }

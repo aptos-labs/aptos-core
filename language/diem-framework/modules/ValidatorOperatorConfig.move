@@ -33,17 +33,18 @@ module DiemFramework::ValidatorOperatorConfig {
     }
     spec publish {
         include Roles::AbortsIfNotDiemRoot{account: dr_account};
-        include Roles::AbortsIfNotValidatorOperator{validator_operator_addr: Signer::address_of(validator_operator_account)};
-        include PublishAbortsIf {validator_operator_addr: Signer::spec_address_of(validator_operator_account)};
+        include Roles::AbortsIfNotValidatorOperator{account: validator_operator_account};
+        include PublishAbortsIf;
         ensures has_validator_operator_config(Signer::spec_address_of(validator_operator_account));
     }
 
     spec schema PublishAbortsIf {
-        validator_operator_addr: address;
+        validator_operator_account: signer;
         dr_account: signer;
+        let validator_operator_addr = Signer::spec_address_of(validator_operator_account);
         include DiemTimestamp::AbortsIfNotOperating;
         include Roles::AbortsIfNotDiemRoot{account: dr_account};
-        include Roles::AbortsIfNotValidatorOperator;
+        include Roles::AbortsIfNotValidatorOperator{account: validator_operator_account};
         aborts_if has_validator_operator_config(validator_operator_addr)
             with Errors::ALREADY_PUBLISHED;
     }

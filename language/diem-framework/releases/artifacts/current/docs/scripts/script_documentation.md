@@ -3767,7 +3767,7 @@ because CapabilityHolder is published during initialization (Genesis).
 Only a Validator account can set its Validator Operator [[H16]][PERMISSION].
 
 
-<pre><code><b>include</b> <a href="../../../../../releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_AbortsIfNotValidator">Roles::AbortsIfNotValidator</a>{validator_addr: account_addr};
+<pre><code><b>include</b> <a href="../../../../../releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_AbortsIfNotValidator">Roles::AbortsIfNotValidator</a>;
 </code></pre>
 
 
@@ -3903,7 +3903,7 @@ This is ensured by DiemAccount::writeset_prologue.
 Only a Validator account can set its Validator Operator [[H16]][PERMISSION].
 
 
-<pre><code><b>include</b> <a href="../../../../../releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_AbortsIfNotValidator">Roles::AbortsIfNotValidator</a>{validator_addr: account_addr};
+<pre><code><b>include</b> <a href="../../../../../releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_AbortsIfNotValidator">Roles::AbortsIfNotValidator</a>;
 </code></pre>
 
 

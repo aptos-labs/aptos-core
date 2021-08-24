@@ -321,7 +321,7 @@ module DiemFramework::Roles {
     }
     spec assert_validator {
         pragma opaque;
-        include AbortsIfNotValidator{validator_addr: Signer::address_of(validator_account)};
+        include AbortsIfNotValidator{account: validator_account};
     }
 
     /// Assert that the account has the validator operator role.
@@ -335,7 +335,7 @@ module DiemFramework::Roles {
     }
     spec assert_validator_operator {
         pragma opaque;
-        include AbortsIfNotValidatorOperator{validator_operator_addr: Signer::spec_address_of(validator_operator_account)};
+        include AbortsIfNotValidatorOperator{account: validator_operator_account};
     }
 
     /// Assert that the account has either the parent vasp or designated dealer role.
@@ -517,6 +517,14 @@ module DiemFramework::Roles {
                 spec_has_child_VASP_role_addr(addr) ||
                 spec_has_designated_dealer_role_addr(addr)
         }
+
+        fun spec_signed_by_treasury_compliance_role(): bool {
+            exists a: address: Signer::is_txn_signer_addr(a) && spec_has_treasury_compliance_role_addr(a)
+        }
+
+        fun spec_signed_by_diem_root_role(): bool {
+            exists a: address: Signer::is_txn_signer_addr(a) && spec_has_diem_root_role_addr(a)
+        }
     }
 
     spec schema ThisRoleIsNotNewlyPublished {
@@ -580,15 +588,19 @@ module DiemFramework::Roles {
     }
 
     spec schema AbortsIfNotValidator {
-        validator_addr: address;
-        aborts_if !exists<RoleId>(validator_addr) with Errors::NOT_PUBLISHED;
-        aborts_if global<RoleId>(validator_addr).role_id != VALIDATOR_ROLE_ID with Errors::REQUIRES_ROLE;
+        account: signer;
+        let addr = Signer::spec_address_of(account);
+        //validator_addr: address;
+        aborts_if !exists<RoleId>(addr) with Errors::NOT_PUBLISHED;
+        aborts_if global<RoleId>(addr).role_id != VALIDATOR_ROLE_ID with Errors::REQUIRES_ROLE;
     }
 
     spec schema AbortsIfNotValidatorOperator {
-        validator_operator_addr: address;
-        aborts_if !exists<RoleId>(validator_operator_addr) with Errors::NOT_PUBLISHED;
-        aborts_if global<RoleId>(validator_operator_addr).role_id != VALIDATOR_OPERATOR_ROLE_ID
+        account: signer;
+        let addr = Signer::spec_address_of(account);
+        //validator_operator_addr: address;
+        aborts_if !exists<RoleId>(addr) with Errors::NOT_PUBLISHED;
+        aborts_if global<RoleId>(addr).role_id != VALIDATOR_OPERATOR_ROLE_ID
             with Errors::REQUIRES_ROLE;
     }
 }

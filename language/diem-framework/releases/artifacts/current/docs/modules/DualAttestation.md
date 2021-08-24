@@ -1424,40 +1424,12 @@ Mirrors <code><a href="DualAttestation.md#0x1_DualAttestation_get_cur_microdiem_
 ### Access Control
 
 
-
-<a name="0x1_DualAttestation_PreserveCredentialExistence"></a>
-
-The existence of Preburn is preserved.
+Only TreasuryCompliance can change the limit [[H6]][PERMISSION].
 
 
-<pre><code><b>schema</b> <a href="DualAttestation.md#0x1_DualAttestation_PreserveCredentialExistence">PreserveCredentialExistence</a> {
-    <b>ensures</b> <b>forall</b> addr1: address:
-        <b>old</b>(<a href="DualAttestation.md#0x1_DualAttestation_spec_has_credential">spec_has_credential</a>(addr1)) ==&gt;
-            <a href="DualAttestation.md#0x1_DualAttestation_spec_has_credential">spec_has_credential</a>(addr1);
-}
-</code></pre>
-
-
-
-
-<a name="0x1_DualAttestation_PreserveCredentialAbsence"></a>
-
-The absence of Preburn is preserved.
-
-
-<pre><code><b>schema</b> <a href="DualAttestation.md#0x1_DualAttestation_PreserveCredentialAbsence">PreserveCredentialAbsence</a> {
-    <b>ensures</b> <b>forall</b> addr1: address:
-        <b>old</b>(!<a href="DualAttestation.md#0x1_DualAttestation_spec_has_credential">spec_has_credential</a>(addr1)) ==&gt;
-            !<a href="DualAttestation.md#0x1_DualAttestation_spec_has_credential">spec_has_credential</a>(addr1);
-}
-</code></pre>
-
-
-
-The permission "RotateDualAttestationInfo(addr)" is not transferred [[J17]][PERMISSION].
-
-
-<pre><code><b>apply</b> <a href="DualAttestation.md#0x1_DualAttestation_PreserveCredentialExistence">PreserveCredentialExistence</a> <b>to</b> *;
+<pre><code><b>invariant</b> <b>update</b> <b>forall</b> a: address <b>where</b> <b>old</b>(<b>exists</b>&lt;<a href="DualAttestation.md#0x1_DualAttestation_Limit">Limit</a>&gt;(@DiemRoot)):
+    <a href="DualAttestation.md#0x1_DualAttestation_spec_get_cur_microdiem_limit">spec_get_cur_microdiem_limit</a>() != <b>old</b>(<a href="DualAttestation.md#0x1_DualAttestation_spec_get_cur_microdiem_limit">spec_get_cur_microdiem_limit</a>())
+		     ==&gt; <a href="Roles.md#0x1_Roles_spec_signed_by_treasury_compliance_role">Roles::spec_signed_by_treasury_compliance_role</a>();
 </code></pre>
 
 
@@ -1465,75 +1437,31 @@ The permission "RotateDualAttestationInfo(addr)" is only granted to ParentVASP o
 "Credential" resources are only published under ParentVASP or DD accounts.
 
 
-<pre><code><b>apply</b> <a href="DualAttestation.md#0x1_DualAttestation_PreserveCredentialAbsence">PreserveCredentialAbsence</a> <b>to</b> * <b>except</b> publish_credential;
-<b>apply</b> <a href="Roles.md#0x1_Roles_AbortsIfNotParentVaspOrDesignatedDealer">Roles::AbortsIfNotParentVaspOrDesignatedDealer</a>{account: created} <b>to</b> publish_credential;
-<b>invariant</b> <b>forall</b> addr1: address:
+<pre><code><b>invariant</b> <b>forall</b> addr1: address:
     <a href="DualAttestation.md#0x1_DualAttestation_spec_has_credential">spec_has_credential</a>(addr1) ==&gt;
         (<a href="Roles.md#0x1_Roles_spec_has_parent_VASP_role_addr">Roles::spec_has_parent_VASP_role_addr</a>(addr1) ||
         <a href="Roles.md#0x1_Roles_spec_has_designated_dealer_role_addr">Roles::spec_has_designated_dealer_role_addr</a>(addr1));
 </code></pre>
 
 
-Only set_microdiem_limit can change the limit [[H6]][PERMISSION].
+Only the one who owns Credential can rotate the dual attenstation info [[H17]][PERMISSION].
 
 
-<a name="0x1_DualAttestation_DualAttestationLimitRemainsSame"></a>
-
-The DualAttestation limit stays constant.
-
-
-<pre><code><b>schema</b> <a href="DualAttestation.md#0x1_DualAttestation_DualAttestationLimitRemainsSame">DualAttestationLimitRemainsSame</a> {
-    <b>ensures</b> <b>old</b>(<a href="DualAttestation.md#0x1_DualAttestation_spec_is_published">spec_is_published</a>())
-        ==&gt; <a href="DualAttestation.md#0x1_DualAttestation_spec_get_cur_microdiem_limit">spec_get_cur_microdiem_limit</a>() == <b>old</b>(<a href="DualAttestation.md#0x1_DualAttestation_spec_get_cur_microdiem_limit">spec_get_cur_microdiem_limit</a>());
-}
+<pre><code><b>invariant</b> <b>update</b> <b>forall</b> a: address <b>where</b> <b>old</b>(<a href="DualAttestation.md#0x1_DualAttestation_spec_has_credential">spec_has_credential</a>(a)):
+    <b>global</b>&lt;<a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a>&gt;(a).compliance_public_key != <b>old</b>(<b>global</b>&lt;<a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a>&gt;(a).compliance_public_key)
+		     ==&gt; <a href="../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_is_txn_signer_addr">Signer::is_txn_signer_addr</a>(a);
+<b>invariant</b> <b>update</b> <b>forall</b> a: address <b>where</b> <b>old</b>(<a href="DualAttestation.md#0x1_DualAttestation_spec_has_credential">spec_has_credential</a>(a)):
+    <b>global</b>&lt;<a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a>&gt;(a).base_url != <b>old</b>(<b>global</b>&lt;<a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a>&gt;(a).base_url)
+		     ==&gt; <a href="../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_is_txn_signer_addr">Signer::is_txn_signer_addr</a>(a);
 </code></pre>
 
 
+The permission "RotateDualAttestationInfo(addr)" is not transferred [[J17]][PERMISSION].
+resource struct <code><a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a></code> is persistent.
 
 
-<pre><code><b>apply</b> <a href="DualAttestation.md#0x1_DualAttestation_DualAttestationLimitRemainsSame">DualAttestationLimitRemainsSame</a> <b>to</b> * <b>except</b> set_microdiem_limit;
-</code></pre>
-
-
-Only rotate_compliance_public_key can rotate the compliance public key [[H17]][PERMISSION].
-
-
-<a name="0x1_DualAttestation_CompliancePublicKeyRemainsSame"></a>
-
-The compliance public key stays constant.
-
-
-<pre><code><b>schema</b> <a href="DualAttestation.md#0x1_DualAttestation_CompliancePublicKeyRemainsSame">CompliancePublicKeyRemainsSame</a> {
-    <b>ensures</b> <b>forall</b> addr1: address <b>where</b> <b>old</b>(<a href="DualAttestation.md#0x1_DualAttestation_spec_has_credential">spec_has_credential</a>(addr1)):
-        <b>global</b>&lt;<a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a>&gt;(addr1).compliance_public_key == <b>old</b>(<b>global</b>&lt;<a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a>&gt;(addr1).compliance_public_key);
-}
-</code></pre>
-
-
-
-
-<pre><code><b>apply</b> <a href="DualAttestation.md#0x1_DualAttestation_CompliancePublicKeyRemainsSame">CompliancePublicKeyRemainsSame</a> <b>to</b> * <b>except</b> rotate_compliance_public_key;
-</code></pre>
-
-
-Only rotate_base_url can rotate the base url [[H17]][PERMISSION].
-
-
-<a name="0x1_DualAttestation_BaseURLRemainsSame"></a>
-
-The base url stays constant.
-
-
-<pre><code><b>schema</b> <a href="DualAttestation.md#0x1_DualAttestation_BaseURLRemainsSame">BaseURLRemainsSame</a> {
-    <b>ensures</b> <b>forall</b> addr1: address <b>where</b> <b>old</b>(<a href="DualAttestation.md#0x1_DualAttestation_spec_has_credential">spec_has_credential</a>(addr1)):
-        <b>global</b>&lt;<a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a>&gt;(addr1).base_url == <b>old</b>(<b>global</b>&lt;<a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a>&gt;(addr1).base_url);
-}
-</code></pre>
-
-
-
-
-<pre><code><b>apply</b> <a href="DualAttestation.md#0x1_DualAttestation_BaseURLRemainsSame">BaseURLRemainsSame</a> <b>to</b> * <b>except</b> rotate_base_url;
+<pre><code><b>invariant</b>&lt;CoinType&gt; <b>update</b> <b>forall</b> a: address:
+    <b>old</b>(<a href="DualAttestation.md#0x1_DualAttestation_spec_has_credential">spec_has_credential</a>(a)) ==&gt; <a href="DualAttestation.md#0x1_DualAttestation_spec_has_credential">spec_has_credential</a>(a);
 </code></pre>
 
 

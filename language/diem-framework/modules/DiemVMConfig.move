@@ -218,6 +218,18 @@ module DiemFramework::DiemVMConfig {
 
     /// # Access Control
 
+    /// The permission "UpdateVMConfig" is granted to DiemRoot [[H11]][PERMISSION].
+    spec module {
+        invariant [global, isolated] forall addr: address where exists<DiemConfig<DiemVMConfig>>(addr):
+            addr == @DiemRoot;
+
+        invariant update old(DiemConfig::spec_is_published<DiemVMConfig>())
+            && DiemConfig::spec_is_published<DiemVMConfig>()
+            && old(DiemConfig::get<DiemVMConfig>()) != DiemConfig::get<DiemVMConfig>()
+                ==> Roles::spec_signed_by_diem_root_role();
+    }
+
+    // TODO: The following is the old style spec, which can removed later.
     /// No one can update DiemVMConfig except for the Diem Root account [[H11]][PERMISSION].
     spec schema DiemVMConfigRemainsSame {
         ensures old(DiemConfig::spec_is_published<DiemVMConfig>()) ==>

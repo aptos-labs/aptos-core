@@ -1795,19 +1795,27 @@ module DiemFramework::Diem {
 
 
     /// ## Update Exchange Rates
-    spec schema ExchangeRateRemainsSame<CoinType> {
-        /// The exchange rate to XDX stays constant.
-        ensures old(spec_is_currency<CoinType>())
-            ==> spec_currency_info<CoinType>().to_xdx_exchange_rate
-                == old(spec_currency_info<CoinType>().to_xdx_exchange_rate);
-    }
     spec module {
-        /// The permission "UpdateExchangeRate(type)" is granted to TreasuryCompliance [[H5]][PERMISSION].
-        apply Roles::AbortsIfNotTreasuryCompliance{account: tc_account} to update_xdx_exchange_rate<FromCoinType>;
+        /// Only TreasuryCompliance can change the exchange rate [[H5]][PERMISSION].
+        invariant<CoinType> update old(spec_is_currency<CoinType>()) ==>
+            ((spec_xdx_exchange_rate<CoinType>() != old(spec_xdx_exchange_rate<CoinType>()))
+                ==> Roles::spec_signed_by_treasury_compliance_role());
+    }
 
-        /// Only update_xdx_exchange_rate can change the exchange rate [[H5]][PERMISSION].
-        apply ExchangeRateRemainsSame<CoinType> to *<CoinType>
-            except update_xdx_exchange_rate<CoinType>;
+    /// ## Enable/disable minting
+    spec module {
+        /// Only TreasuryCompliance can enable/disable minting [[H2]][PERMISSION].
+        invariant<CoinType> update old(spec_is_currency<CoinType>()) ==>
+            ((spec_can_mint<CoinType>() != old(spec_can_mint<CoinType>()))
+                ==> Roles::spec_signed_by_treasury_compliance_role());
+    }
+
+    /// ## Register new currency
+    spec module {
+        /// Only DiemRoot can register a new currency [[H8]][PERMISSION].
+        invariant<CoinType> update
+            !old(spec_is_currency<CoinType>()) && spec_is_currency<CoinType>()
+                ==> Roles::spec_signed_by_diem_root_role();
     }
 
     /// # Helper Functions
@@ -1828,8 +1836,14 @@ module DiemFramework::Diem {
             FixedPoint32::spec_multiply_u64(value, spec_xdx_exchange_rate<CoinType>())
         }
 
+        /// Returns the `to_xdx_exchange_rate` of CoinType
         fun spec_xdx_exchange_rate<CoinType>(): FixedPoint32 {
             global<CurrencyInfo<CoinType>>(@CurrencyInfo).to_xdx_exchange_rate
+        }
+
+        /// Returns the `to_xdx_exchange_rate` of CoinType
+        fun spec_can_mint<CoinType>(): bool {
+            global<CurrencyInfo<CoinType>>(@CurrencyInfo).can_mint
         }
 
         /// Checks whether the currency has a mint capability.  This is only relevant for

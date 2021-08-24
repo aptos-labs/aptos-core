@@ -5,7 +5,7 @@
 /// > Note: When trying to understand this code, it's important to know that "config"
 /// and "configuration" are used for several distinct concepts.
 module DiemFramework::DiemSystem {
-    use DiemFramework::DiemConfig::{Self, ModifyConfigCapability};
+    use DiemFramework::DiemConfig::{Self, DiemConfig, ModifyConfigCapability};
     use DiemFramework::ValidatorConfig;
     use DiemFramework::Roles;
     use DiemFramework::DiemTimestamp;
@@ -341,7 +341,7 @@ module DiemFramework::DiemSystem {
         let validator_operator_addr = Signer::address_of(validator_operator_account);
         include DiemTimestamp::AbortsIfNotOperating;
         /// Must abort if the signer does not have the ValidatorOperator role [[H15]][PERMISSION].
-        include Roles::AbortsIfNotValidatorOperator{validator_operator_addr: validator_operator_addr};
+        include Roles::AbortsIfNotValidatorOperator{account: validator_operator_account};
         include ValidatorConfig::AbortsIfNoValidatorConfig{addr: validator_addr};
         aborts_if ValidatorConfig::get_operator(validator_addr) != validator_operator_addr
             with Errors::INVALID_ARGUMENT;
@@ -587,10 +587,30 @@ module DiemFramework::DiemSystem {
     /// `update_config_and_reconfigure`.
 
     spec module {
-       /// The permission "{Add, Remove} Validator" is granted to DiemRoot [[H14]][PERMISSION].
-       apply Roles::AbortsIfNotDiemRoot{account: dr_account} to add_validator, remove_validator;
+        invariant [global, isolated] forall addr: address where exists<DiemConfig<DiemSystem>>(addr):
+            addr == @DiemRoot;
+
+        invariant update old(DiemConfig::spec_is_published<DiemSystem>())
+            && DiemConfig::spec_is_published<DiemSystem>()
+            && old(len(DiemConfig::get<DiemSystem>().validators)) != len(DiemConfig::get<DiemSystem>().validators)
+                ==> Roles::spec_signed_by_diem_root_role();
+
+        invariant update forall addr: address where old(DiemConfig::spec_is_published<DiemSystem>())
+            && DiemConfig::spec_is_published<DiemSystem>():
+                (exists i in 0..len(DiemConfig::get<DiemSystem>().validators) where
+                    old(DiemConfig::get<DiemSystem>().validators[i].addr == addr):
+                        old(DiemConfig::get<DiemSystem>().validators[i].config) !=
+                        DiemConfig::get<DiemSystem>().validators[i].config
+                ) ==> (exists a: address: Signer::is_txn_signer_addr(a) && ValidatorConfig::get_operator(addr) == a);
     }
 
+    // TODO: The following is the old style spec, which can removed later.
+    spec module {
+        /// The permission "{Add, Remove} Validator" is granted to DiemRoot [[H14]][PERMISSION].
+        apply Roles::AbortsIfNotDiemRoot{account: dr_account} to add_validator, remove_validator;
+        /// The permission "UpdateValidatorConfig(addr)" is granted to ValidatorOperator [[H15]][PERMISSION]
+        apply Roles::AbortsIfNotValidatorOperator{account: validator_operator_account} to update_config_and_reconfigure;
+    }
     spec schema ValidatorSetConfigRemainsSame {
         ensures spec_get_validators() == old(spec_get_validators());
     }

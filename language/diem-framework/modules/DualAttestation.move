@@ -553,60 +553,31 @@ module DiemFramework::DualAttestation {
     }
 
     /// # Access Control
-
-    spec schema PreserveCredentialExistence {
-        /// The existence of Preburn is preserved.
-        ensures forall addr1: address:
-            old(spec_has_credential(addr1)) ==>
-                spec_has_credential(addr1);
-    }
-    spec schema PreserveCredentialAbsence {
-        /// The absence of Preburn is preserved.
-        ensures forall addr1: address:
-            old(!spec_has_credential(addr1)) ==>
-                !spec_has_credential(addr1);
-    }
     spec module {
-        /// The permission "RotateDualAttestationInfo(addr)" is not transferred [[J17]][PERMISSION].
-        apply PreserveCredentialExistence to *;
+        /// Only TreasuryCompliance can change the limit [[H6]][PERMISSION].
+        invariant update forall a: address where old(exists<Limit>(@DiemRoot)):
+            spec_get_cur_microdiem_limit() != old(spec_get_cur_microdiem_limit())
+		     ==> Roles::spec_signed_by_treasury_compliance_role();
 
         /// The permission "RotateDualAttestationInfo(addr)" is only granted to ParentVASP or DD [[H17]][PERMISSION].
         /// "Credential" resources are only published under ParentVASP or DD accounts.
-        apply PreserveCredentialAbsence to * except publish_credential;
-        apply Roles::AbortsIfNotParentVaspOrDesignatedDealer{account: created} to publish_credential;
         invariant forall addr1: address:
             spec_has_credential(addr1) ==>
                 (Roles::spec_has_parent_VASP_role_addr(addr1) ||
                 Roles::spec_has_designated_dealer_role_addr(addr1));
-    }
 
-    /// Only set_microdiem_limit can change the limit [[H6]][PERMISSION].
-    spec schema DualAttestationLimitRemainsSame {
-        /// The DualAttestation limit stays constant.
-        ensures old(spec_is_published())
-            ==> spec_get_cur_microdiem_limit() == old(spec_get_cur_microdiem_limit());
-    }
-    spec module {
-        apply DualAttestationLimitRemainsSame to * except set_microdiem_limit;
-    }
+        /// Only the one who owns Credential can rotate the dual attenstation info [[H17]][PERMISSION].
+        invariant update forall a: address where old(spec_has_credential(a)):
+            global<Credential>(a).compliance_public_key != old(global<Credential>(a).compliance_public_key)
+		     ==> Signer::is_txn_signer_addr(a);
 
-    /// Only rotate_compliance_public_key can rotate the compliance public key [[H17]][PERMISSION].
-    spec schema CompliancePublicKeyRemainsSame {
-        /// The compliance public key stays constant.
-        ensures forall addr1: address where old(spec_has_credential(addr1)):
-            global<Credential>(addr1).compliance_public_key == old(global<Credential>(addr1).compliance_public_key);
-    }
-    spec module {
-        apply CompliancePublicKeyRemainsSame to * except rotate_compliance_public_key;
-    }
+        invariant update forall a: address where old(spec_has_credential(a)):
+            global<Credential>(a).base_url != old(global<Credential>(a).base_url)
+		     ==> Signer::is_txn_signer_addr(a);
 
-    /// Only rotate_base_url can rotate the base url [[H17]][PERMISSION].
-    spec schema BaseURLRemainsSame {
-        /// The base url stays constant.
-        ensures forall addr1: address where old(spec_has_credential(addr1)):
-            global<Credential>(addr1).base_url == old(global<Credential>(addr1).base_url);
-    }
-    spec module {
-        apply BaseURLRemainsSame to * except rotate_base_url;
+        /// The permission "RotateDualAttestationInfo(addr)" is not transferred [[J17]][PERMISSION].
+        /// resource struct `Credential` is persistent.
+        invariant<CoinType> update forall a: address:
+            old(spec_has_credential(a)) ==> spec_has_credential(a);
     }
 }
