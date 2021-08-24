@@ -302,6 +302,22 @@ impl LocalSwarm {
 
         Ok(peer_id)
     }
+
+    pub fn chain_id(&self) -> ChainId {
+        self.chain_id
+    }
+
+    pub fn validators(&self) -> impl Iterator<Item = &LocalNode> {
+        self.validators.values()
+    }
+
+    pub fn validators_mut(&mut self) -> impl Iterator<Item = &mut LocalNode> {
+        self.validators.values_mut()
+    }
+
+    pub fn dir(&self) -> &Path {
+        self.dir.as_ref()
+    }
 }
 
 impl Swarm for LocalSwarm {
