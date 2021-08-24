@@ -56,7 +56,6 @@ diem-logger = { path = "../../common/logger" }
 diem-management = { path = "../../config/management", features = ["testing"] }
 diem-operational-tool = {path = "../../config/management/operational", features = ["testing"] }
 diem-secure-storage = { path = "../../secure/storage", features = ["testing"] }
-diem-smoke-test-attribute = { path = "../smoke-test/attribute" }
 diem-swarm = { path = "../diem-swarm"}
 diem-time-service = { path = "../../common/time-service", features = ["testing"] }
 diem-types = { path = "../../types" }

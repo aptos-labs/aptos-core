@@ -192,7 +192,6 @@ members = [
     "diem-proptest-helpers",
     "diem-read-write-set",
     "diem-retrier",
-    "diem-smoke-test-attribute",
     "diem-swarm",
     "diem-transactional-test-harness",
     "diem-transaction-benchmarks",

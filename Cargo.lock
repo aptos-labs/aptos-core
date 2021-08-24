@@ -2394,15 +2394,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "diem-smoke-test-attribute"
-version = "0.1.0"
-dependencies = [
- "diem-workspace-hack",
- "proc-macro2 1.0.28",
- "quote 1.0.9",
-]
-
-[[package]]
 name = "diem-state-view"
 version = "0.1.0"
 dependencies = [
@@ -7477,7 +7468,6 @@ dependencies = [
  "diem-operational-tool",
  "diem-sdk",
  "diem-secure-storage",
- "diem-smoke-test-attribute",
  "diem-swarm",
  "diem-temppath",
  "diem-time-service",
