@@ -535,14 +535,18 @@ impl<Location: Clone + Eq> SourceMap<Location> {
     /// Create a 'dummy' source map for a compiled module or script. This is useful for e.g. disassembling
     /// with generated or real names depending upon if the source map is available or not.
     pub fn dummy_from_view(view: &BinaryIndexedView, default_loc: Location) -> Result<Self> {
-        let module_handle = view.module_handle_at(ModuleHandleIndex::new(0));
-        let module_name = ModuleName(Symbol::from(
-            view.identifier_at(module_handle.name).as_str(),
-        ));
-        let address = *view.address_identifier_at(module_handle.address);
-        let module_ident = QualifiedModuleIdent::new(module_name, address);
-
-        let mut empty_source_map = Self::new(Some(module_ident));
+        let module_ident = match view {
+            BinaryIndexedView::Script(..) => None,
+            BinaryIndexedView::Module(..) => {
+                let module_handle = view.module_handle_at(ModuleHandleIndex::new(0));
+                let module_name = ModuleName(Symbol::from(
+                    view.identifier_at(module_handle.name).as_str(),
+                ));
+                let address = *view.address_identifier_at(module_handle.address);
+                Some(QualifiedModuleIdent::new(module_name, address))
+            }
+        };
+        let mut empty_source_map = Self::new(module_ident);
 
         for (function_idx, function_def) in view.function_defs().into_iter().flatten().enumerate() {
             empty_source_map.add_top_level_function_mapping(
