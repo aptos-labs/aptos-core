@@ -115,6 +115,34 @@ impl LocalFactory {
         let merge_base = cargo::git_merge_base(upstream_main)?;
         Self::with_revision_and_workspace(&merge_base)
     }
+
+    pub fn new_swarm<R>(&self, rng: R, number_of_validators: NonZeroUsize) -> Result<LocalSwarm>
+    where
+        R: ::rand::RngCore + ::rand::CryptoRng,
+    {
+        let version = self.versions.keys().max().unwrap();
+        self.new_swarm_with_version(rng, number_of_validators, version)
+    }
+
+    pub fn new_swarm_with_version<R>(
+        &self,
+        rng: R,
+        number_of_validators: NonZeroUsize,
+        version: &Version,
+    ) -> Result<LocalSwarm>
+    where
+        R: ::rand::RngCore + ::rand::CryptoRng,
+    {
+        let mut swarm = LocalSwarm::builder(self.versions.clone())
+            .number_of_validators(number_of_validators)
+            .initial_version(version.clone())
+            .build(rng)?;
+        swarm
+            .launch()
+            .with_context(|| format!("Swarm logs can be found here: {}", swarm.logs_location()))?;
+
+        Ok(swarm)
+    }
 }
 
 impl Factory for LocalFactory {
@@ -128,25 +156,7 @@ impl Factory for LocalFactory {
         node_num: NonZeroUsize,
         version: &Version,
     ) -> Result<Box<dyn Swarm>> {
-        let mut swarm = LocalSwarm::builder(self.versions.clone())
-            .number_of_validators(node_num)
-            .initial_version(version.clone())
-            .build(rng)?;
-        swarm
-            .launch()
-            .with_context(|| format!("Swarm logs can be found here: {}", swarm.logs_location()))?;
-
-        // swarm.launch().map_err(|e| {
-        //     swarm.logs_location()
-        //     e
-        // });
-        // match swarm.launch() {
-        //     Ok(()) => {}
-        //     Err(e) => {
-        //         swarm.
-        //         return e;
-        //     }
-        // }
+        let swarm = self.new_swarm_with_version(rng, node_num, version)?;
 
         Ok(Box::new(swarm))
     }
