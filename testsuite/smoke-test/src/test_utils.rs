@@ -5,7 +5,6 @@ use crate::smoke_test_environment::SmokeTestEnvironment;
 use cli::client_proxy::ClientProxy;
 use diem_config::config::{Identity, NodeConfig, SecureBackend};
 use diem_crypto::ed25519::Ed25519PublicKey;
-use diem_types::account_address::AccountAddress;
 use rust_decimal::{prelude::FromPrimitive, Decimal};
 use std::{collections::BTreeMap, fs::File, io::Write, path::PathBuf, str::FromStr};
 
@@ -55,22 +54,6 @@ pub fn setup_swarm_and_client_proxy(
 
     let client = env.get_validator_client(node_index, None);
     (env, client)
-}
-
-/// Waits for a transaction to be processed by all validator nodes in the smoke
-/// test environment.
-pub fn wait_for_transaction_on_all_nodes(
-    env: &SmokeTestEnvironment,
-    num_nodes: usize,
-    account: AccountAddress,
-    sequence_number: u64,
-) {
-    for i in 0..num_nodes {
-        let client = env.get_validator_client(i, None);
-        client
-            .wait_for_transaction(account, sequence_number)
-            .unwrap();
-    }
 }
 
 /// This module provides useful functions for operating, handling and managing
@@ -135,12 +118,6 @@ pub mod diem_swarm_utils {
             format!("http://127.0.0.1:{}", swarm.get_client_port(node_index)),
             ChainId::test(),
         )
-    }
-
-    /// Loads the nodes's storage backend identified by the node index in the given swarm.
-    pub fn load_backend_storage(swarm: &DiemSwarm, node_index: usize) -> SecureBackend {
-        let (node_config, _) = load_node_config(swarm, node_index);
-        fetch_backend_storage(&node_config, None)
     }
 
     /// Loads the nodes's storage backend identified by the node index in the given swarm.
