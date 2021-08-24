@@ -39,6 +39,7 @@ pub mod stackless_bytecode;
 pub mod stackless_bytecode_generator;
 pub mod stackless_control_flow_graph;
 pub mod usage_analysis;
+pub mod verification_analysis;
 pub mod verification_analysis_v2;
 
 /// Print function targets for testing and debugging.
