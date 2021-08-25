@@ -6,7 +6,7 @@ It greatly improves the performance of the backend solvers.
 
 \SubSubSection{Generic Functions}
 
-\begin{figure}[t!]
+\begin{Figure}
 \caption{Basic Monomorphization}
 \label{fig:Mono}
 \centering
@@ -16,7 +16,7 @@ It greatly improves the performance of the backend solvers.
   struct given_T{}
   fun f_T(x: given_T) { g_S_T(S_T(x)) }
 \end{MoveBox}
-\end{figure}
+\end{Figure}
 
 To verify a generic function, monomorphization skolemizes the type parameter
 into a given type. It then, for all functions which are inlined, inserts their

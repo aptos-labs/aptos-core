@@ -54,11 +54,11 @@ scope.  Because of the guarantees of the borrow semantics, during the mutation
 of the data in |l| no other reference can exist into data in |l|.
 
 The fact that |&mut| has exclusive access to the whole value in a location
-allows to reduce mutable references to a \emph{read-update-write} cycle. We can
-create a copy of the data in |l| and single-thread this to a sequence of
+allows to reduce mutable references to a \emph{read-update-write} cycle. One can
+create a copy of the data in |l| and single-thread it to a sequence of
 mutation steps which are represented as purely functional data updates.  Once
 the last reference for the data in |l| goes out of scope, the updated value is
-written back to |l|. We effectively turned an imperative program with references
+written back to |l|. This effectively turns an imperative program with references
 into an imperative program which only has state updates on global memory or
 variables on the stack, a class of programs which is known to have a significant
 simpler semantics. We illustrate the basics of this approach by an example:
