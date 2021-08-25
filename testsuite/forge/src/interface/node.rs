@@ -58,12 +58,6 @@ pub trait Node {
     /// This should be a noop if the Node isn't running.
     fn stop(&mut self) -> Result<()>;
 
-    /// Restarts this Node by calling Node::Stop followed by Node::Start
-    fn restart(&mut self) -> Result<()> {
-        self.stop()?;
-        self.start()
-    }
-
     /// Clears this Node's Storage
     fn clear_storage(&mut self) -> Result<()>;
 
