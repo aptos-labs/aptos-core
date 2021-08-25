@@ -2,17 +2,24 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    smoke_test_environment::SmokeTestEnvironment,
+    scripts_and_modules::{compile_program, enable_custom_script},
+    smoke_test_environment::new_local_swarm,
     test_utils::{
-        compare_balances,
-        diem_swarm_utils::{insert_waypoint, load_node_config, save_node_config},
-        setup_swarm_and_client_proxy,
+        assert_balance, create_and_fund_account, diem_swarm_utils::insert_waypoint, transfer_coins,
     },
-    workspace_builder,
 };
-use diem_config::config::NodeConfig;
-use diem_types::waypoint::Waypoint;
-use std::{fs, path::PathBuf};
+use diem_types::{
+    account_address::AccountAddress,
+    epoch_change::EpochChangeProof,
+    transaction::{Script, TransactionArgument, TransactionPayload},
+    waypoint::Waypoint,
+};
+use forge::{NodeExt, Swarm, SwarmExt};
+use std::{
+    fs,
+    path::PathBuf,
+    time::{Duration, Instant},
+};
 
 #[test]
 fn test_basic_state_synchronization() {
@@ -23,124 +30,130 @@ fn test_basic_state_synchronization() {
     // - Verify that the restarted node has synced up with the submitted transactions.
 
     // we set a smaller chunk limit (=5) here to properly test multi-chunk state sync
-    let mut env = SmokeTestEnvironment::new_with_chunk_limit(4, 5);
-    env.validator_swarm.launch();
-    let mut client_1 = env.get_validator_client(1, None);
+    let mut swarm = new_local_swarm(4);
+    for validator in swarm.validators_mut() {
+        let mut config = validator.config().clone();
+        config.state_sync.chunk_limit = 5;
+        config.save(validator.config_path()).unwrap();
+        validator.restart().unwrap();
+    }
+    swarm.launch().unwrap(); // Make sure all nodes are healthy and live
+    let validator_peer_ids = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
 
-    client_1.create_next_account(false).unwrap();
-    client_1.create_next_account(false).unwrap();
-    client_1
-        .mint_coins(&["mb", "0", "100", "XUS"], true)
-        .unwrap();
-    client_1
-        .mint_coins(&["mb", "1", "10", "XUS"], true)
-        .unwrap();
-    client_1
-        .transfer_coins(&["tb", "0", "1", "10", "XUS"], true)
-        .unwrap();
-    assert!(compare_balances(
-        vec![(90.0, "XUS".to_string())],
-        client_1.get_balances(&["b", "0"]).unwrap(),
-    ));
-    assert!(compare_balances(
-        vec![(20.0, "XUS".to_string())],
-        client_1.get_balances(&["b", "1"]).unwrap(),
-    ));
+    let client_1 = swarm
+        .validator(validator_peer_ids[1])
+        .unwrap()
+        .json_rpc_client();
+    let transaction_factory = swarm.chain_info().transaction_factory();
 
-    // Test single chunk sync, chunk_size = 5
-    let node_to_restart = 0;
-    env.validator_swarm.kill_node(node_to_restart);
-    // All these are executed while one node is down
-    assert!(compare_balances(
-        vec![(90.0, "XUS".to_string())],
-        client_1.get_balances(&["b", "0"]).unwrap(),
-    ));
-    assert!(compare_balances(
-        vec![(20.0, "XUS".to_string())],
-        client_1.get_balances(&["b", "1"]).unwrap(),
-    ));
-    client_1
-        .transfer_coins(&["tb", "0", "1", "1", "XUS"], true)
+    let mut account_0 = create_and_fund_account(&mut swarm, 100);
+    let account_1 = create_and_fund_account(&mut swarm, 10);
+    transfer_coins(
+        &client_1,
+        &transaction_factory,
+        &mut account_0,
+        &account_1,
+        10,
+    );
+    assert_balance(&client_1, &account_0, 90);
+    assert_balance(&client_1, &account_1, 20);
+
+    // Stop a node
+    let node_to_restart = validator_peer_ids[0];
+    swarm.validator_mut(node_to_restart).unwrap().stop();
+
+    // Do a transfer and ensure it still executes
+    transfer_coins(
+        &client_1,
+        &transaction_factory,
+        &mut account_0,
+        &account_1,
+        1,
+    );
+    assert_balance(&client_1, &account_0, 89);
+    assert_balance(&client_1, &account_1, 21);
+
+    // Restart killed node and wait for all nodes to catchup
+    swarm
+        .validator_mut(node_to_restart)
+        .unwrap()
+        .start()
         .unwrap();
-
-    // Reconnect and synchronize the state
-    assert!(env.validator_swarm.start_node(node_to_restart).is_ok());
-
-    // Wait for all the nodes to catch up
-    assert!(env.validator_swarm.wait_for_all_nodes_to_catchup());
+    swarm
+        .validator_mut(node_to_restart)
+        .unwrap()
+        .wait_until_healthy(Instant::now() + Duration::from_secs(10))
+        .unwrap();
+    swarm
+        .wait_for_all_nodes_to_catchup(Instant::now() + Duration::from_secs(60))
+        .unwrap();
 
     // Connect to the newly recovered node and verify its state
-    let mut client_2 = env.get_validator_client(node_to_restart, None);
-    client_2.set_accounts(client_1.copy_all_accounts());
-    assert!(compare_balances(
-        vec![(89.0, "XUS".to_string())],
-        client_2.get_balances(&["b", "0"]).unwrap(),
-    ));
-    assert!(compare_balances(
-        vec![(21.0, "XUS".to_string())],
-        client_2.get_balances(&["b", "1"]).unwrap(),
-    ));
+    let client_0 = swarm.validator(node_to_restart).unwrap().json_rpc_client();
+    assert_balance(&client_0, &account_0, 89);
+    assert_balance(&client_0, &account_1, 21);
 
     // Test multiple chunk sync
-    env.validator_swarm.kill_node(node_to_restart);
-    // All these are executed while one node is down
-    assert!(compare_balances(
-        vec![(89.0, "XUS".to_string())],
-        client_1.get_balances(&["b", "0"]).unwrap(),
-    ));
-    assert!(compare_balances(
-        vec![(21.0, "XUS".to_string())],
-        client_1.get_balances(&["b", "1"]).unwrap(),
-    ));
+    swarm.validator_mut(node_to_restart).unwrap().stop();
+
     for _ in 0..10 {
-        client_1
-            .transfer_coins(&["tb", "0", "1", "1", "XUS"], true)
-            .unwrap();
+        transfer_coins(
+            &client_1,
+            &transaction_factory,
+            &mut account_0,
+            &account_1,
+            1,
+        );
     }
 
-    // Reconnect and synchronize the state
-    assert!(env.validator_swarm.start_node(node_to_restart).is_ok());
+    assert_balance(&client_1, &account_0, 79);
+    assert_balance(&client_1, &account_1, 31);
 
-    // Wait for all the nodes to catch up
-    assert!(env.validator_swarm.wait_for_all_nodes_to_catchup());
+    // Restart killed node and wait for all nodes to catchup
+    swarm
+        .validator_mut(node_to_restart)
+        .unwrap()
+        .start()
+        .unwrap();
+    swarm
+        .validator_mut(node_to_restart)
+        .unwrap()
+        .wait_until_healthy(Instant::now() + Duration::from_secs(10))
+        .unwrap();
+    swarm
+        .wait_for_all_nodes_to_catchup(Instant::now() + Duration::from_secs(60))
+        .unwrap();
 
-    // Connect to the newly recovered node and verify its state
-    client_2.set_accounts(client_1.copy_all_accounts());
-    assert!(compare_balances(
-        vec![(79.0, "XUS".to_string())],
-        client_2.get_balances(&["b", "0"]).unwrap(),
-    ));
-    assert!(compare_balances(
-        vec![(31.0, "XUS".to_string())],
-        client_2.get_balances(&["b", "1"]).unwrap(),
-    ));
+    assert_balance(&client_0, &account_0, 79);
+    assert_balance(&client_0, &account_1, 31);
 }
 
 #[test]
 fn test_startup_sync_state() {
-    let (mut env, mut client_1) = setup_swarm_and_client_proxy(4, 1);
-    client_1.create_next_account(false).unwrap();
-    client_1.create_next_account(false).unwrap();
-    client_1
-        .mint_coins(&["mb", "0", "100", "XUS"], true)
-        .unwrap();
-    client_1
-        .mint_coins(&["mb", "1", "10", "XUS"], true)
-        .unwrap();
-    client_1
-        .transfer_coins(&["tb", "0", "1", "10", "XUS"], true)
-        .unwrap();
-    assert!(compare_balances(
-        vec![(90.0, "XUS".to_string())],
-        client_1.get_balances(&["b", "0"]).unwrap(),
-    ));
-    assert!(compare_balances(
-        vec![(20.0, "XUS".to_string())],
-        client_1.get_balances(&["b", "1"]).unwrap(),
-    ));
-    let peer_to_stop = 0;
-    env.validator_swarm.kill_node(peer_to_stop);
-    let (node_config, _) = load_node_config(&env.validator_swarm, peer_to_stop);
+    let mut swarm = new_local_swarm(4);
+    let validator_peer_ids = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
+    let client_1 = swarm
+        .validator(validator_peer_ids[1])
+        .unwrap()
+        .json_rpc_client();
+    let transaction_factory = swarm.chain_info().transaction_factory();
+
+    let mut account_0 = create_and_fund_account(&mut swarm, 100);
+    let account_1 = create_and_fund_account(&mut swarm, 10);
+    let txn = transfer_coins(
+        &client_1,
+        &transaction_factory,
+        &mut account_0,
+        &account_1,
+        10,
+    );
+    assert_balance(&client_1, &account_0, 90);
+    assert_balance(&client_1, &account_1, 20);
+
+    // Stop a node
+    let node_to_restart = validator_peer_ids[0];
+    let node_config = swarm.validator(node_to_restart).unwrap().config().clone();
+    swarm.validator_mut(node_to_restart).unwrap().stop();
     // TODO Remove hardcoded path to state db
     let state_db_path = node_config.storage.dir().join("diemdb");
     // Verify that state_db_path exists and
@@ -150,179 +163,243 @@ fn test_startup_sync_state() {
     // behind consensus db and forcing a state sync
     // during a node startup
     fs::remove_dir_all(state_db_path).unwrap();
-    assert!(env.validator_swarm.start_node(peer_to_stop).is_ok());
-    // create the client for the restarted node
-    let accounts = client_1.copy_all_accounts();
-    let mut client_0 = env.get_validator_client(0, None);
-    let sender_address = accounts[0].address;
-    client_0.set_accounts(accounts);
-    client_0.wait_for_transaction(sender_address, 0).unwrap();
-    assert!(compare_balances(
-        vec![(90.0, "XUS".to_string())],
-        client_0.get_balances(&["b", "0"]).unwrap(),
-    ));
-    assert!(compare_balances(
-        vec![(20.0, "XUS".to_string())],
-        client_0.get_balances(&["b", "1"]).unwrap(),
-    ));
-    client_1
-        .transfer_coins(&["tb", "0", "1", "10", "XUS"], true)
+    swarm
+        .validator_mut(node_to_restart)
+        .unwrap()
+        .start()
         .unwrap();
-    client_0.wait_for_transaction(sender_address, 1).unwrap();
-    assert!(compare_balances(
-        vec![(80.0, "XUS".to_string())],
-        client_0.get_balances(&["b", "0"]).unwrap(),
-    ));
-    assert!(compare_balances(
-        vec![(30.0, "XUS".to_string())],
-        client_0.get_balances(&["b", "1"]).unwrap(),
-    ));
+    swarm
+        .validator_mut(node_to_restart)
+        .unwrap()
+        .wait_until_healthy(Instant::now() + Duration::from_secs(10))
+        .unwrap();
+
+    let client_0 = swarm.validator(node_to_restart).unwrap().json_rpc_client();
+    // Wait for the txn to by synced to the restarted node
+    client_0
+        .wait_for_signed_transaction(&txn, None, None)
+        .unwrap();
+    assert_balance(&client_0, &account_0, 90);
+    assert_balance(&client_0, &account_1, 20);
+
+    let txn = transfer_coins(
+        &client_1,
+        &transaction_factory,
+        &mut account_0,
+        &account_1,
+        10,
+    );
+    client_0
+        .wait_for_signed_transaction(&txn, None, None)
+        .unwrap();
+
+    assert_balance(&client_0, &account_0, 80);
+    assert_balance(&client_0, &account_1, 30);
 }
 
 #[test]
 fn test_startup_sync_state_with_empty_consensus_db() {
-    let (mut env, mut client_1) = setup_swarm_and_client_proxy(4, 1);
-    client_1.create_next_account(false).unwrap();
-    client_1.create_next_account(false).unwrap();
-    client_1
-        .mint_coins(&["mb", "0", "100", "XUS"], true)
-        .unwrap();
-    client_1
-        .mint_coins(&["mb", "1", "10", "XUS"], true)
-        .unwrap();
-    client_1
-        .transfer_coins(&["tb", "0", "1", "10", "XUS"], true)
-        .unwrap();
-    assert!(compare_balances(
-        vec![(90.0, "XUS".to_string())],
-        client_1.get_balances(&["b", "0"]).unwrap(),
-    ));
-    assert!(compare_balances(
-        vec![(20.0, "XUS".to_string())],
-        client_1.get_balances(&["b", "1"]).unwrap(),
-    ));
-    let peer_to_stop = 0;
-    env.validator_swarm.kill_node(peer_to_stop);
-    let node_config = NodeConfig::load(
-        env.validator_swarm
-            .config
-            .config_files
-            .get(peer_to_stop)
-            .unwrap(),
-    )
-    .unwrap();
+    let mut swarm = new_local_swarm(4);
+    let validator_peer_ids = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
+    let client_1 = swarm
+        .validator(validator_peer_ids[1])
+        .unwrap()
+        .json_rpc_client();
+    let transaction_factory = swarm.chain_info().transaction_factory();
+
+    let mut account_0 = create_and_fund_account(&mut swarm, 100);
+    let account_1 = create_and_fund_account(&mut swarm, 10);
+    let txn = transfer_coins(
+        &client_1,
+        &transaction_factory,
+        &mut account_0,
+        &account_1,
+        10,
+    );
+    assert_balance(&client_1, &account_0, 90);
+    assert_balance(&client_1, &account_1, 20);
+
+    // Stop a node
+    let node_to_restart = validator_peer_ids[0];
+    let node_config = swarm.validator(node_to_restart).unwrap().config().clone();
+    swarm.validator_mut(node_to_restart).unwrap().stop();
     let consensus_db_path = node_config.storage.dir().join("consensusdb");
     // Verify that consensus db exists and
     // we are not deleting a non-existent directory
     assert!(consensus_db_path.as_path().exists());
     // Delete the consensus db to simulate consensus db is nuked
     fs::remove_dir_all(consensus_db_path).unwrap();
-    assert!(env.validator_swarm.start_node(peer_to_stop).is_ok());
-    // create the client for the restarted node
-    let accounts = client_1.copy_all_accounts();
-    let mut client_0 = env.get_validator_client(0, None);
-    let sender_address = accounts[0].address;
-    client_0.set_accounts(accounts);
-    client_0.wait_for_transaction(sender_address, 0).unwrap();
-    assert!(compare_balances(
-        vec![(90.0, "XUS".to_string())],
-        client_0.get_balances(&["b", "0"]).unwrap(),
-    ));
-    assert!(compare_balances(
-        vec![(20.0, "XUS".to_string())],
-        client_0.get_balances(&["b", "1"]).unwrap(),
-    ));
-    client_1
-        .transfer_coins(&["tb", "0", "1", "10", "XUS"], true)
+    swarm
+        .validator_mut(node_to_restart)
+        .unwrap()
+        .start()
         .unwrap();
-    client_0.wait_for_transaction(sender_address, 1).unwrap();
-    assert!(compare_balances(
-        vec![(80.0, "XUS".to_string())],
-        client_0.get_balances(&["b", "0"]).unwrap(),
-    ));
-    assert!(compare_balances(
-        vec![(30.0, "XUS".to_string())],
-        client_0.get_balances(&["b", "1"]).unwrap(),
-    ));
+    swarm
+        .validator_mut(node_to_restart)
+        .unwrap()
+        .wait_until_healthy(Instant::now() + Duration::from_secs(10))
+        .unwrap();
+
+    let client_0 = swarm.validator(node_to_restart).unwrap().json_rpc_client();
+    // Wait for the txn to by synced to the restarted node
+    client_0
+        .wait_for_signed_transaction(&txn, None, None)
+        .unwrap();
+    assert_balance(&client_0, &account_0, 90);
+    assert_balance(&client_0, &account_1, 20);
+
+    let txn = transfer_coins(
+        &client_1,
+        &transaction_factory,
+        &mut account_0,
+        &account_1,
+        10,
+    );
+    client_0
+        .wait_for_signed_transaction(&txn, None, None)
+        .unwrap();
+
+    assert_balance(&client_0, &account_0, 80);
+    assert_balance(&client_0, &account_1, 30);
 }
 
 #[test]
 fn test_state_sync_multichunk_epoch() {
-    let mut env = SmokeTestEnvironment::new_with_chunk_limit(4, 5);
-    env.validator_swarm.launch();
-    let mut client = env.get_validator_client(0, None);
-    client
-        .enable_custom_script(&["enable_custom_script"], false, true)
-        .unwrap();
+    let mut swarm = new_local_swarm(4);
+    for validator in swarm.validators_mut() {
+        let mut config = validator.config().clone();
+        config.state_sync.chunk_limit = 5;
+        config.save(validator.config_path()).unwrap();
+        validator.restart().unwrap();
+    }
+    swarm.launch().unwrap(); // Make sure all nodes are healthy and live
+    let validator_peer_ids = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
+
+    let client_0 = swarm
+        .validator(validator_peer_ids[0])
+        .unwrap()
+        .json_rpc_client();
+    let transaction_factory = swarm.chain_info().transaction_factory();
+    enable_custom_script(
+        &client_0,
+        &transaction_factory,
+        swarm.chain_info().root_account,
+    )
+    .unwrap();
+
+    let mut account_0 = create_and_fund_account(&mut swarm, 100);
+    let account_1 = create_and_fund_account(&mut swarm, 10);
+    assert_balance(&client_0, &account_0, 100);
+    assert_balance(&client_0, &account_1, 10);
+
     // we bring this validator back up with waypoint s.t. the waypoint sync spans multiple epochs,
     // and each epoch spanning multiple chunks
-    env.validator_swarm.kill_node(3);
-    client.create_next_account(false).unwrap();
-
-    client
-        .mint_coins(&["mintb", "0", "10", "XUS"], true)
-        .unwrap();
-    assert!(compare_balances(
-        vec![(10.0, "XUS".to_string())],
-        client.get_balances(&["b", "0"]).unwrap(),
-    ));
+    let node_to_restart = validator_peer_ids[3];
+    swarm.validator_mut(node_to_restart).unwrap().stop();
 
     // submit more transactions to make the current epoch (=1) span > 1 chunk (= 5 versions)
     for _ in 0..7 {
-        client
-            .mint_coins(&["mintb", "0", "10", "XUS"], true)
-            .unwrap();
+        transfer_coins(
+            &client_0,
+            &transaction_factory,
+            &mut account_0,
+            &account_1,
+            10,
+        );
     }
 
-    let script_path = workspace_builder::workspace_root()
-        .join("testsuite/smoke-test/src/dev_modules/test_script.move");
-    let unwrapped_script_path = script_path.to_str().unwrap();
+    let script_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join("testsuite/smoke-test/src/dev_modules/test_script.move")
+        .canonicalize()
+        .unwrap();
     let move_stdlib_dir = move_stdlib::move_stdlib_modules_full_path();
     let diem_framework_dir = diem_framework::diem_stdlib_modules_full_path();
-    let script_params = &[
-        "compile",
-        unwrapped_script_path,
-        move_stdlib_dir.as_str(),
-        diem_framework_dir.as_str(),
-    ];
-    let mut script_compiled_paths = client.compile_program(script_params).unwrap();
-    let script_compiled_path = if script_compiled_paths.len() != 1 {
-        panic!("compiler output has more than one file")
-    } else {
-        script_compiled_paths.pop().unwrap()
-    };
+    let dependencies = &[move_stdlib_dir.as_str(), diem_framework_dir.as_str()];
+    let compiled_script = compile_program(script_path.to_str().unwrap(), dependencies).unwrap();
 
-    // Initially publishing option was set to CustomScript, this transaction should be executed.
-    client
-        .execute_script(&["execute", "0", &script_compiled_path[..], "10", "0x0"])
+    let txn = account_0.sign_with_transaction_builder(transaction_factory.payload(
+        TransactionPayload::Script(Script::new(
+            compiled_script,
+            vec![],
+            vec![
+                TransactionArgument::U64(10),
+                TransactionArgument::Address(AccountAddress::from_hex_literal("0x0").unwrap()),
+            ],
+        )),
+    ));
+    client_0.submit(&txn).unwrap();
+    client_0
+        .wait_for_signed_transaction(&txn, None, None)
         .unwrap();
 
     // Bump epoch by trigger a reconfig for multiple epochs
     for curr_epoch in 2..=3 {
         // bumps epoch from curr_epoch -> curr_epoch + 1
-        client
-            .enable_custom_script(&["enable_custom_script"], false, true)
-            .unwrap();
-        assert_eq!(
-            client
-                .latest_epoch_change_li()
+        enable_custom_script(
+            &client_0,
+            &transaction_factory,
+            swarm.chain_info().root_account,
+        )
+        .unwrap();
+
+        let epoch_change_proof: EpochChangeProof = bcs::from_bytes(
+            client_0
+                .get_state_proof(0)
                 .unwrap()
-                .ledger_info()
-                .epoch(),
-            curr_epoch
-        );
+                .into_inner()
+                .epoch_change_proof
+                .inner(),
+        )
+        .unwrap();
+
+        let ledger_info = epoch_change_proof
+            .ledger_info_with_sigs
+            .last()
+            .unwrap()
+            .ledger_info();
+
+        assert_eq!(ledger_info.epoch(), curr_epoch);
     }
 
     // bring back dead validator with waypoint
-    let waypoint_epoch_2 =
-        Waypoint::new_epoch_boundary(client.latest_epoch_change_li().unwrap().ledger_info())
-            .unwrap();
-    let (mut node_config, _) = load_node_config(&env.validator_swarm, 3);
+    let epoch_change_proof: EpochChangeProof = bcs::from_bytes(
+        client_0
+            .get_state_proof(0)
+            .unwrap()
+            .into_inner()
+            .epoch_change_proof
+            .inner(),
+    )
+    .unwrap();
+    let waypoint_epoch_2 = Waypoint::new_epoch_boundary(
+        epoch_change_proof
+            .ledger_info_with_sigs
+            .last()
+            .unwrap()
+            .ledger_info(),
+    )
+    .unwrap();
+
+    let node_config_path = swarm.validator(node_to_restart).unwrap().config_path();
+    let mut node_config = swarm.validator(node_to_restart).unwrap().config().clone();
     node_config.execution.genesis = None;
     node_config.execution.genesis_file_location = PathBuf::from("");
     insert_waypoint(&mut node_config, waypoint_epoch_2);
-    save_node_config(&mut node_config, &env.validator_swarm, 3);
-    env.validator_swarm.start_node(3).unwrap();
+    node_config.save(node_config_path).unwrap();
 
-    assert!(env.validator_swarm.wait_for_all_nodes_to_catchup());
+    // Restart killed node and wait for all nodes to catchup
+    swarm
+        .validator_mut(node_to_restart)
+        .unwrap()
+        .start()
+        .unwrap();
+    swarm
+        .validator_mut(node_to_restart)
+        .unwrap()
+        .wait_until_healthy(Instant::now() + Duration::from_secs(10))
+        .unwrap();
+    swarm
+        .wait_for_all_nodes_to_catchup(Instant::now() + Duration::from_secs(60))
+        .unwrap();
 }

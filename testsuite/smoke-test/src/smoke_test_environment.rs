@@ -18,6 +18,8 @@ use std::{collections::HashMap, num::NonZeroUsize, sync::Arc};
 pub fn new_local_swarm(num_validators: usize) -> LocalSwarm {
     static FACTORY: Lazy<LocalFactory> = Lazy::new(|| LocalFactory::from_workspace().unwrap());
 
+    ::diem_logger::Logger::new().init();
+
     FACTORY
         .new_swarm(OsRng, NonZeroUsize::new(num_validators).unwrap())
         .unwrap()

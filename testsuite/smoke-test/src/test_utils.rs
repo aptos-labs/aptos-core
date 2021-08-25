@@ -5,6 +5,12 @@ use crate::smoke_test_environment::SmokeTestEnvironment;
 use cli::client_proxy::ClientProxy;
 use diem_config::config::{Identity, NodeConfig, SecureBackend};
 use diem_crypto::ed25519::Ed25519PublicKey;
+use diem_sdk::{
+    client::BlockingClient,
+    transaction_builder::{Currency, TransactionFactory},
+    types::{transaction::SignedTransaction, LocalAccount},
+};
+use forge::{LocalSwarm, Swarm};
 use rust_decimal::{prelude::FromPrimitive, Decimal};
 use std::{collections::BTreeMap, fs::File, io::Write, path::PathBuf, str::FromStr};
 
@@ -54,6 +60,55 @@ pub fn setup_swarm_and_client_proxy(
 
     let client = env.get_validator_client(node_index, None);
     (env, client)
+}
+
+pub fn create_and_fund_account(swarm: &mut LocalSwarm, amount: u64) -> LocalAccount {
+    let account = LocalAccount::generate(&mut rand::rngs::OsRng);
+    swarm
+        .chain_info()
+        .create_parent_vasp_account(Currency::XUS, account.authentication_key())
+        .unwrap();
+    swarm
+        .chain_info()
+        .fund(Currency::XUS, account.address(), amount)
+        .unwrap();
+    account
+}
+
+pub fn transfer_coins(
+    client: &BlockingClient,
+    transaction_factory: &TransactionFactory,
+    sender: &mut LocalAccount,
+    receiver: &LocalAccount,
+    amount: u64,
+) -> SignedTransaction {
+    let txn = sender.sign_with_transaction_builder(transaction_factory.peer_to_peer(
+        Currency::XUS,
+        receiver.address(),
+        amount,
+    ));
+
+    client.submit(&txn).unwrap();
+    client
+        .wait_for_signed_transaction(&txn, None, None)
+        .unwrap();
+
+    txn
+}
+
+pub fn assert_balance(client: &BlockingClient, account: &LocalAccount, balance: u64) {
+    let account_view = client
+        .get_account(account.address())
+        .unwrap()
+        .into_inner()
+        .unwrap();
+
+    let onchain_balance = account_view
+        .balances
+        .into_iter()
+        .find(|amount_view| amount_view.currency == Currency::XUS)
+        .unwrap();
+    assert_eq!(onchain_balance.amount, balance);
 }
 
 /// This module provides useful functions for operating, handling and managing

@@ -16,6 +16,8 @@ mod consensus;
 mod key_manager;
 #[cfg(test)]
 mod operational_tooling;
+#[cfg(test)]
+mod state_sync;
 
 // Left to convert
 
@@ -33,9 +35,6 @@ mod network;
 
 #[cfg(test)]
 mod release_flow;
-
-#[cfg(test)]
-mod state_sync;
 
 #[cfg(test)]
 mod storage;

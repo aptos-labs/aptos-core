@@ -13,11 +13,12 @@ use std::{
 
 use compiler::Compiler;
 use diem_sdk::{
-    client::{views::AmountView, WaitForTransactionError},
-    transaction_builder::Currency,
+    client::{views::AmountView, BlockingClient, WaitForTransactionError},
+    transaction_builder::{Currency, TransactionFactory},
     types::{
         account_address::AccountAddress,
         transaction::{Module, Script, TransactionArgument, TransactionPayload},
+        LocalAccount,
     },
 };
 use forge::{AdminContext, AdminTest, Result, Test};
@@ -32,7 +33,13 @@ impl Test for MalformedScript {
 
 impl AdminTest for MalformedScript {
     fn run<'t>(&self, ctx: &mut AdminContext<'t>) -> Result<()> {
-        enable_custom_script(ctx)?;
+        let client = ctx.client();
+        let transaction_factory = ctx.chain_info().transaction_factory();
+        enable_custom_script(
+            &client,
+            &transaction_factory,
+            &mut ctx.chain_info().root_account,
+        )?;
         let mut account = ctx.random_account();
         ctx.chain_info()
             .create_parent_vasp_account(Currency::XUS, account.authentication_key())?;
@@ -83,7 +90,7 @@ impl AdminTest for ExecuteCustomModuleAndScript {
     fn run<'t>(&self, ctx: &mut AdminContext<'t>) -> Result<()> {
         let client = ctx.client();
         let factory = ctx.chain_info().transaction_factory();
-        enable_custom_script(ctx)?;
+        enable_custom_script(&client, &factory, &mut ctx.chain_info().root_account)?;
 
         let mut account1 = ctx.random_account();
         ctx.chain_info()
@@ -201,7 +208,11 @@ fn copy_file_with_sender_address(file_path: &Path, sender: AccountAddress) -> io
     Ok(tmp_source_path)
 }
 
-fn enable_custom_script(ctx: &mut AdminContext) -> Result<()> {
+pub(crate) fn enable_custom_script(
+    client: &BlockingClient,
+    transaction_factory: &TransactionFactory,
+    root_account: &mut LocalAccount,
+) -> Result<()> {
     let script_body = {
         let code = "
             import 0x1.DiemTransactionPublishingOption;
@@ -222,14 +233,9 @@ fn enable_custom_script(ctx: &mut AdminContext) -> Result<()> {
             .expect("Failed to compile")
     };
 
-    let client = ctx.client();
-    let factory = ctx.chain_info().transaction_factory();
-    let txn =
-        ctx.chain_info()
-            .root_account
-            .sign_with_transaction_builder(factory.payload(TransactionPayload::Script(
-                Script::new(script_body, vec![], vec![]),
-            )));
+    let txn = root_account.sign_with_transaction_builder(transaction_factory.payload(
+        TransactionPayload::Script(Script::new(script_body, vec![], vec![])),
+    ));
     client.submit(&txn)?;
     client.wait_for_signed_transaction(&txn, None, None)?;
     Ok(())
