@@ -25,5 +25,15 @@ module Test {
     public fun publish<T: store>(signer: &signer, x: A<T, u8>) {
         move_to<A<T, u8>>(signer, x)
     }
+
+    public fun assert_assume_memory() {
+        spec {
+            assume exists<A<bool, u64>>(@0x1);
+            assert exists<A<u64, bool>>(@0x1);
+        };
+    }
+    public fun call_assert_assume_memory() {
+        assert_assume_memory();
+    }
 }
 }

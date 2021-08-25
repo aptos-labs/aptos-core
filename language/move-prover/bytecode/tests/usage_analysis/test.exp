@@ -16,6 +16,21 @@ public fun Test::update<#0>($t0|x: #0) {
 
 
 [variant baseline]
+public fun Test::assert_assume_memory() {
+  0: assume exists<Test::A<bool, u64>>(1)
+  1: assert exists<Test::A<u64, bool>>(1)
+  2: return ()
+}
+
+
+[variant baseline]
+public fun Test::call_assert_assume_memory() {
+  0: Test::assert_assume_memory()
+  1: return ()
+}
+
+
+[variant baseline]
 public fun Test::publish<#0>($t0|signer: &signer, $t1|x: Test::A<#0, u8>) {
      var $t2: &signer
      var $t3: Test::A<#0, u8>
@@ -77,6 +92,21 @@ public fun Test::update<#0>($t0|x: #0) {
 
 
 [variant baseline]
+public fun Test::assert_assume_memory() {
+  0: assume exists<Test::A<bool, u64>>(1)
+  1: assert exists<Test::A<u64, bool>>(1)
+  2: return ()
+}
+
+
+[variant baseline]
+public fun Test::call_assert_assume_memory() {
+  0: Test::assert_assume_memory()
+  1: return ()
+}
+
+
+[variant baseline]
 public fun Test::publish<#0>($t0|signer: &signer, $t1|x: Test::A<#0, u8>) {
      var $t2: &signer
      var $t3: Test::A<#0, u8>
@@ -133,6 +163,26 @@ function Test::update [baseline] {
   assumed = {}
   directly assumed = {}
   asserted = {}
+  directly asserted = {}
+}
+function Test::assert_assume_memory [baseline] {
+  accessed = {}
+  directly accessed = {}
+  modified = {}
+  directly modified = {}
+  assumed = {Test::A<bool, u64>}
+  directly assumed = {Test::A<bool, u64>}
+  asserted = {Test::A<u64, bool>}
+  directly asserted = {Test::A<u64, bool>}
+}
+function Test::call_assert_assume_memory [baseline] {
+  accessed = {}
+  directly accessed = {}
+  modified = {}
+  directly modified = {}
+  assumed = {Test::A<bool, u64>}
+  directly assumed = {}
+  asserted = {Test::A<u64, bool>}
   directly asserted = {}
 }
 function Test::publish [baseline] {
