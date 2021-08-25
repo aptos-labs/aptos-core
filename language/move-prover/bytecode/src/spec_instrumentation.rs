@@ -303,7 +303,8 @@ impl<'a> Instrumenter<'a> {
             // Inject well-formedness assumption for used memory.
             for mem in usage_analysis::get_memory_usage(&self.builder.get_target())
                 .accessed
-                .get_all()
+                .all
+                .clone()
             {
                 // If this is native or intrinsic memory, skip this.
                 let struct_env = self
@@ -1054,7 +1055,7 @@ fn check_opaque_modifies_completeness(
     //   an immutable reference. We should find a better way how to deal with event handles.
     for mem in usage_analysis::get_memory_usage(&target)
         .modified
-        .get_all()
+        .all
         .iter()
     {
         if env.is_wellknown_event_handle_type(&Type::Struct(mem.module_id, mem.id, vec![])) {

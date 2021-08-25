@@ -613,6 +613,7 @@ dependencies = [
  "move-stdlib",
  "num 0.4.0",
  "once_cell",
+ "paste",
  "petgraph",
  "read-write-set-types",
  "serde",
@@ -5731,6 +5732,12 @@ dependencies = [
  "base64ct",
  "rand_core 0.6.2",
 ]
+
+[[package]]
+name = "paste"
+version = "1.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "acbf547ad0c65e31259204bd90935776d1c693cec2f4ff7abb7a1bbbd40dfe58"
 
 [[package]]
 name = "pathdiff"

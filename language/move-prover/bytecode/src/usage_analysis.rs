@@ -17,6 +17,7 @@ use move_model::{
 };
 
 use itertools::Itertools;
+use paste::paste;
 use std::{collections::BTreeSet, fmt, fmt::Formatter};
 
 pub fn get_memory_usage<'env>(target: &FunctionTarget<'env>) -> &'env UsageState {
@@ -33,6 +34,8 @@ pub struct MemoryUsage {
     pub direct: SetDomain<QualifiedInstId<StructId>>,
     // The memory transitively used in either the function itself or at least one of its callees.
     pub transitive: SetDomain<QualifiedInstId<StructId>>,
+    // The union of the above sets
+    pub all: SetDomain<QualifiedInstId<StructId>>,
 }
 
 #[derive(Default, Clone)]
@@ -45,19 +48,23 @@ pub struct UsageState {
     pub assumed: MemoryUsage,
     // The memory mentioned by the assert expressions in this function.
     pub asserted: MemoryUsage,
+    // The union of the above sets
+    pub all: MemoryUsage,
 }
 
 impl MemoryUsage {
     //
-    // accessors that union the sets
+    // setters that insert element(s) to related sets
     //
 
-    pub fn get_all(&self) -> BTreeSet<QualifiedInstId<StructId>> {
-        self.direct
-            .iter()
-            .chain(self.transitive.iter())
-            .cloned()
-            .collect()
+    fn add_direct(&mut self, mem: QualifiedInstId<StructId>) {
+        self.direct.insert(mem.clone());
+        self.all.insert(mem);
+    }
+
+    fn add_transitive(&mut self, mem: QualifiedInstId<StructId>) {
+        self.transitive.insert(mem.clone());
+        self.all.insert(mem);
     }
 
     //
@@ -79,8 +86,8 @@ impl MemoryUsage {
     }
 
     pub fn get_all_inst(&self, inst: &[Type]) -> BTreeSet<QualifiedInstId<StructId>> {
-        self.get_all()
-            .into_iter()
+        self.all
+            .iter()
             .map(|mem| mem.instantiate_ref(inst))
             .collect()
     }
@@ -104,7 +111,7 @@ impl MemoryUsage {
     }
 
     pub fn get_all_uninst(&self) -> BTreeSet<QualifiedId<StructId>> {
-        self.get_all()
+        self.all
             .iter()
             .map(|mem| mem.module_id.qualified(mem.id))
             .collect()
@@ -116,11 +123,50 @@ impl AbstractDomain for MemoryUsage {
         match (
             self.direct.join(&other.direct),
             self.transitive.join(&other.transitive),
+            self.all.join(&other.all),
         ) {
-            (JoinResult::Unchanged, JoinResult::Unchanged) => JoinResult::Unchanged,
+            (JoinResult::Unchanged, JoinResult::Unchanged, JoinResult::Unchanged) => {
+                JoinResult::Unchanged
+            }
             _ => JoinResult::Changed,
         }
     }
+}
+
+macro_rules! generate_inserter {
+    ($field: ident, $method: ident) => {
+        paste! {
+            #[allow(dead_code)]
+            fn [<$method _ $field>](&mut self, mem: QualifiedInstId<StructId>) {
+                self.$field.$method(mem.clone());
+                self.all.$method(mem);
+            }
+
+            #[allow(dead_code)]
+            fn [<$method _ $field _iter>](
+                &mut self,
+                mems: impl Iterator<Item = QualifiedInstId<StructId>>
+            ) {
+                for mem in mems {
+                    self.[<$method _ $field>](mem);
+                }
+            }
+        }
+    };
+}
+
+impl UsageState {
+    generate_inserter!(accessed, add_direct);
+    generate_inserter!(accessed, add_transitive);
+
+    generate_inserter!(modified, add_direct);
+    generate_inserter!(modified, add_transitive);
+
+    generate_inserter!(assumed, add_direct);
+    generate_inserter!(assumed, add_transitive);
+
+    generate_inserter!(asserted, add_direct);
+    generate_inserter!(asserted, add_transitive);
 }
 
 impl AbstractDomain for UsageState {
@@ -130,8 +176,10 @@ impl AbstractDomain for UsageState {
             self.modified.join(&other.modified),
             self.assumed.join(&other.assumed),
             self.asserted.join(&other.asserted),
+            self.all.join(&other.all),
         ) {
             (
+                JoinResult::Unchanged,
                 JoinResult::Unchanged,
                 JoinResult::Unchanged,
                 JoinResult::Unchanged,
@@ -173,49 +221,45 @@ impl<'a> TransferFunctions for MemoryUsageAnalysis<'a> {
                         .cache
                         .get::<UsageState>(mid.qualified(*fid), &FunctionVariant::Baseline)
                     {
-                        state
-                            .modified
-                            .transitive
-                            .extend(summary.modified.get_all_inst(inst));
-                        state
-                            .accessed
-                            .transitive
-                            .extend(summary.accessed.get_all_inst(inst));
-                        state
-                            .assumed
-                            .transitive
-                            .extend(summary.assumed.get_all_inst(inst));
-                        state
-                            .asserted
-                            .transitive
-                            .extend(summary.asserted.get_all_inst(inst));
+                        state.add_transitive_accessed_iter(
+                            summary.accessed.get_all_inst(inst).into_iter(),
+                        );
+                        state.add_transitive_modified_iter(
+                            summary.modified.get_all_inst(inst).into_iter(),
+                        );
+                        state.add_transitive_assumed_iter(
+                            summary.assumed.get_all_inst(inst).into_iter(),
+                        );
+                        state.add_transitive_asserted_iter(
+                            summary.asserted.get_all_inst(inst).into_iter(),
+                        );
                     }
                 }
                 MoveTo(mid, sid, inst)
                 | MoveFrom(mid, sid, inst)
                 | BorrowGlobal(mid, sid, inst) => {
                     let mem = mid.qualified_inst(*sid, inst.to_owned());
-                    state.modified.direct.insert(mem.clone());
-                    state.accessed.direct.insert(mem);
+                    state.add_direct_modified(mem.clone());
+                    state.add_direct_accessed(mem);
                 }
                 WriteBack(BorrowNode::GlobalRoot(mem), _) => {
-                    state.modified.direct.insert(mem.clone());
-                    state.accessed.direct.insert(mem.clone());
+                    state.add_direct_modified(mem.clone());
+                    state.add_direct_accessed(mem.clone());
                 }
                 Exists(mid, sid, inst) | GetGlobal(mid, sid, inst) => {
                     let mem = mid.qualified_inst(*sid, inst.to_owned());
-                    state.accessed.direct.insert(mem);
+                    state.add_direct_accessed(mem);
                 }
                 _ => {}
             },
             // memory accesses in expressions
             Prop(_, kind, exp) => match kind {
-                Assume => state.assumed.direct.extend(
+                Assume => state.add_direct_assumed_iter(
                     exp.used_memory(self.cache.global_env())
                         .into_iter()
                         .map(|(usage, _)| usage),
                 ),
-                Assert => state.asserted.direct.extend(
+                Assert => state.add_direct_asserted_iter(
                     exp.used_memory(self.cache.global_env())
                         .into_iter()
                         .map(|(usage, _)| usage),
@@ -282,7 +326,7 @@ impl FunctionTargetProcessor for UsageProcessor {
                             f,
                             "  {} = {{{}}}",
                             name,
-                            set.get_all()
+                            set.all
                                 .iter()
                                 .map(|qid| env.display(qid).to_string())
                                 .join(", ")

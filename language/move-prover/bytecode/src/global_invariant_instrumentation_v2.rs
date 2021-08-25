@@ -120,11 +120,7 @@ impl Analyzer {
         // get memory (list of structs) read or written by the function target,
         // then find all invariants in loaded modules that refer to that memory.
         let mut invariants_for_used_memory = BTreeSet::new();
-        for mem in usage_analysis::get_memory_usage(target)
-            .accessed
-            .get_all()
-            .iter()
-        {
+        for mem in usage_analysis::get_memory_usage(target).accessed.all.iter() {
             invariants_for_used_memory.extend(env.get_global_invariants_for_memory(mem));
         }
 
@@ -148,7 +144,7 @@ impl Analyzer {
         // collect instantiations of this function that are needed to check this global invariant
         let mut func_insts = BTreeSet::new();
 
-        let fun_mems = usage_analysis::get_memory_usage(target).accessed.get_all();
+        let fun_mems = &usage_analysis::get_memory_usage(target).accessed.all;
         let fun_arity = target.get_type_parameters().len();
         for inv_mem in &invariant.mem_usage {
             for fun_mem in fun_mems.iter() {
