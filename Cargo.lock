@@ -4999,6 +4999,7 @@ dependencies = [
  "move-command-line-common",
  "move-core-types",
  "move-lang",
+ "move-model",
  "move-symbol-pool",
  "petgraph",
  "serde",
