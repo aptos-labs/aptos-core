@@ -180,6 +180,10 @@ module DiemFramework::AccountFreezing {
         aborts_if spec_account_is_frozen(account) with Errors::INVALID_STATE;
     }
 
+    #[test_only]
+    public fun create_for_test(account: &signer) {
+        create(account)
+    }
 
     // =================================================================
     // Module Specification

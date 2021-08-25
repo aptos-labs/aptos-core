@@ -394,6 +394,15 @@ module DiemFramework::DiemConfig {
     }
 
     // =================================================================
+    // Test-only functions
+
+    #[test_only]
+    public fun set_for_testing<Config: copy + drop + store>(account: &signer, payload: Config)
+    acquires DiemConfig, Configuration {
+        set(account, payload)
+    }
+
+    // =================================================================
     // Module Specification
 
     spec module {} // Switch to module documentation context
