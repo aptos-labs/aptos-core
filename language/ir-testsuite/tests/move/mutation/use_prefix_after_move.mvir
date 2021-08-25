@@ -16,7 +16,7 @@ module {{default}}.B {
 //! new-transaction
 
 module {{default}}.A {
-    import Transaction.B;
+    import {{default}}.B;
     struct T has drop {f: B.T}
 
     public new(f: B.T): Self.T {

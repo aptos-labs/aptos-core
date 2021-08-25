@@ -282,8 +282,7 @@ impl<'a> ModuleGenerator<'a> {
                 let module_name = ModuleName(*ident);
                 let qualified_mod_ident =
                     QualifiedModuleIdent::new(module_name, AccountAddress::ZERO);
-                let module_ident = ModuleIdent::Qualified(qualified_mod_ident);
-                ImportDefinition::new(module_ident, None)
+                ImportDefinition::new(qualified_mod_ident, None)
             })
             .collect()
     }

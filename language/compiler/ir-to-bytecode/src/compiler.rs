@@ -14,10 +14,7 @@ use move_binary_format::{
     },
     file_format_common::VERSION_MAX,
 };
-use move_core_types::{
-    account_address::AccountAddress,
-    value::{MoveTypeLayout, MoveValue},
-};
+use move_core_types::value::{MoveTypeLayout, MoveValue};
 use move_ir_types::{
     ast::{self, Bytecode as IRBytecode, Bytecode_ as IRBytecode_, *},
     sp,
@@ -412,11 +409,10 @@ pub fn compile_script<'a>(
         context.add_compiled_dependency(dep)?;
     }
 
-    compile_imports(&mut context, None, script.imports.clone())?;
+    compile_imports(&mut context, script.imports.clone())?;
     // Add explicit handles/dependency declarations to `dependencies`
     compile_explicit_dependency_declarations(
         &mut context,
-        None,
         script.imports,
         script.explicit_dependency_declarations,
     )?;
@@ -479,25 +475,23 @@ pub fn compile_module<'a>(
     dependencies: impl IntoIterator<Item = &'a CompiledModule>,
 ) -> Result<(CompiledModule, SourceMap)> {
     let current_module = module.identifier;
-    let address = current_module.address;
     let mut context = Context::new(HashMap::new(), Some(current_module))?;
     for dep in dependencies {
         context.add_compiled_dependency(dep)?;
     }
 
     // Compile friends
-    let friend_decls = compile_friends(&mut context, Some(address), module.friends)?;
+    let friend_decls = compile_friends(&mut context, module.friends)?;
 
     // Compile imports
     let self_name = ModuleName::module_self();
     let self_module_handle_idx = context.declare_import(current_module, self_name)?;
     // Explicitly declare all imports as they will be included even if not used
-    compile_imports(&mut context, Some(address), module.imports.clone())?;
+    compile_imports(&mut context, module.imports.clone())?;
 
     // Add explicit handles/dependency declarations to `dependencies`
     compile_explicit_dependency_declarations(
         &mut context,
-        Some(address),
         module.imports,
         module.explicit_dependency_declarations,
     )?;
@@ -572,7 +566,6 @@ pub fn compile_module<'a>(
 // Any `Error` should stop compilation in the caller
 fn compile_explicit_dependency_declarations(
     outer_context: &mut Context,
-    address_opt: Option<AccountAddress>,
     imports: Vec<ImportDefinition>,
     dependencies: Vec<ModuleDependency>,
 ) -> Result<()> {
@@ -585,7 +578,7 @@ fn compile_explicit_dependency_declarations(
         } = dependency;
         let current_module = outer_context.module_ident(&mname)?;
         let mut context = Context::new(dependencies_acc, Some(*current_module))?;
-        compile_imports(&mut context, address_opt, imports.clone())?;
+        compile_imports(&mut context, imports.clone())?;
         let self_module_handle_idx = context.module_handle_index(&mname)?;
         for struct_dep in structs {
             let StructDependency {
@@ -651,46 +644,19 @@ fn compile_explicit_dependency_declarations(
 
 fn compile_friends(
     context: &mut Context,
-    address_opt: Option<AccountAddress>,
-    friends: Vec<ast::ModuleIdent>,
+    friends: Vec<ast::QualifiedModuleIdent>,
 ) -> Result<Vec<ModuleHandle>> {
     let mut friend_decls = vec![];
     for friend in friends {
-        let ident = match (address_opt, friend) {
-            (Some(address), ModuleIdent::Transaction(name)) => {
-                QualifiedModuleIdent { name, address }
-            }
-            (None, ModuleIdent::Transaction(name)) => bail!(
-                "Invalid friend '{}'. No address specified for script so cannot resolve friend",
-                name
-            ),
-            (_, ModuleIdent::Qualified(id)) => id,
-        };
-        let handle = context.declare_friend(ident)?;
-        friend_decls.push(handle);
+        friend_decls.push(context.declare_friend(friend)?);
     }
     Ok(friend_decls)
 }
 
-fn compile_imports(
-    context: &mut Context,
-    address_opt: Option<AccountAddress>,
-    imports: Vec<ImportDefinition>,
-) -> Result<()> {
-    for import in imports {
-        let ident = match (address_opt, import.ident) {
-            (Some(address), ModuleIdent::Transaction(name)) => {
-                QualifiedModuleIdent { name, address }
-            }
-            (None, ModuleIdent::Transaction(name)) => bail!(
-                "Invalid import '{}'. No address specified for script so cannot resolve import",
-                name
-            ),
-            (_, ModuleIdent::Qualified(id)) => id,
-        };
-        context.declare_import(ident, import.alias)?;
-    }
-    Ok(())
+fn compile_imports(context: &mut Context, imports: Vec<ImportDefinition>) -> Result<()> {
+    Ok(for import in imports {
+        context.declare_import(import.ident, import.alias)?;
+    })
 }
 
 fn type_parameter_indexes<'a>(

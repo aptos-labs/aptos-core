@@ -86,7 +86,7 @@ pub struct ModuleDefinition {
     /// name and address of the module
     pub identifier: QualifiedModuleIdent,
     /// the module's friends
-    pub friends: Vec<ModuleIdent>,
+    pub friends: Vec<QualifiedModuleIdent>,
     /// the module's dependencies
     pub imports: Vec<ImportDefinition>,
     /// Explicit declaration of dependencies. If not provided, will be inferred based on given
@@ -101,14 +101,6 @@ pub struct ModuleDefinition {
     pub functions: Vec<(FunctionName, Function)>,
     /// the synthetic, specification variables the module defines.
     pub synthetics: Vec<SyntheticDefinition>,
-}
-
-/// Either a qualified module name like `addr.m` or `Transaction.m`, which refers to a module in
-/// the same transaction.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
-pub enum ModuleIdent {
-    Transaction(ModuleName),
-    Qualified(QualifiedModuleIdent),
 }
 
 /// Explicitly given dependency
@@ -130,8 +122,8 @@ pub struct ModuleDependency {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ImportDefinition {
     /// the dependency
-    /// `addr.m` or `Transaction.m`
-    pub ident: ModuleIdent,
+    /// `addr.m`
+    pub ident: QualifiedModuleIdent,
     /// the alias for that dependency
     /// `m`
     pub alias: ModuleName,
@@ -724,10 +716,8 @@ pub type Bytecode = Spanned<Bytecode_>;
 fn get_external_deps(imports: &[ImportDefinition]) -> Vec<ModuleId> {
     let mut deps = HashSet::new();
     for dep in imports.iter() {
-        if let ModuleIdent::Qualified(id) = &dep.ident {
-            let identifier = Identifier::new(id.name.0.as_str().to_owned()).unwrap();
-            deps.insert(ModuleId::new(id.address, identifier));
-        }
+        let identifier = Identifier::new(dep.ident.name.0.as_str().to_owned()).unwrap();
+        deps.insert(ModuleId::new(dep.ident.address, identifier));
     }
     deps.into_iter().collect()
 }
@@ -802,22 +792,13 @@ impl QualifiedModuleIdent {
     }
 }
 
-impl ModuleIdent {
-    pub fn name(&self) -> &ModuleName {
-        match self {
-            ModuleIdent::Transaction(name) => name,
-            ModuleIdent::Qualified(id) => &id.name,
-        }
-    }
-}
-
 impl ModuleDefinition {
     /// Creates a new `ModuleDefinition` from its string name, dependencies, structs+resources,
     /// and procedures
     /// Does not verify the correctness of any internal properties of its elements
     pub fn new(
         identifier: QualifiedModuleIdent,
-        friends: Vec<ModuleIdent>,
+        friends: Vec<QualifiedModuleIdent>,
         imports: Vec<ImportDefinition>,
         explicit_dependency_declarations: Vec<ModuleDependency>,
         structs: Vec<StructDefinition>,
@@ -897,7 +878,7 @@ impl QualifiedStructIdent {
 impl ImportDefinition {
     /// Creates a new import definition from a module identifier and an optional alias
     /// If the alias is `None`, the alias will be a cloned copy of the identifiers module name
-    pub fn new(ident: ModuleIdent, alias_opt: Option<ModuleName>) -> Self {
+    pub fn new(ident: QualifiedModuleIdent, alias_opt: Option<ModuleName>) -> Self {
         let alias = match alias_opt {
             Some(alias) => alias,
             None => *ident.name(),
@@ -1241,16 +1222,6 @@ impl fmt::Display for Script {
         write!(f, "{}", self.main)?;
         write!(f, ")")?;
         write!(f, ")")
-    }
-}
-
-impl fmt::Display for ModuleIdent {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use ModuleIdent::*;
-        match self {
-            Transaction(module_name) => write!(f, "{}", module_name),
-            Qualified(qual_module_ident) => write!(f, "{}", qual_module_ident),
-        }
     }
 }
 
