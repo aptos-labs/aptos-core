@@ -15,7 +15,6 @@ use ir_to_bytecode::{
     parser::{parse_module, parse_script},
 };
 use move_binary_format::file_format::{CompiledModule, CompiledScript};
-use move_ir_types::location::Loc;
 use move_symbol_pool::Symbol;
 
 /// An API for the compiler. Supports setting custom options.
@@ -35,7 +34,7 @@ impl<'a> Compiler<'a> {
         self,
         file_name: Symbol,
         code: &str,
-    ) -> Result<(CompiledScript, SourceMap<Loc>)> {
+    ) -> Result<(CompiledScript, SourceMap)> {
         let (compiled_script, source_map) = self.compile_script(file_name, code)?;
         Ok((compiled_script, source_map))
     }
@@ -63,22 +62,14 @@ impl<'a> Compiler<'a> {
         Ok(serialized_module)
     }
 
-    fn compile_script(
-        self,
-        file_name: Symbol,
-        code: &str,
-    ) -> Result<(CompiledScript, SourceMap<Loc>)> {
+    fn compile_script(self, file_name: Symbol, code: &str) -> Result<(CompiledScript, SourceMap)> {
         let parsed_script = parse_script(file_name, code)?;
         let (compiled_script, source_map) =
             compile_script(parsed_script, self.deps.iter().map(|d| &**d))?;
         Ok((compiled_script, source_map))
     }
 
-    fn compile_mod(
-        self,
-        file_name: Symbol,
-        code: &str,
-    ) -> Result<(CompiledModule, SourceMap<Loc>)> {
+    fn compile_mod(self, file_name: Symbol, code: &str) -> Result<(CompiledModule, SourceMap)> {
         let parsed_module = parse_module(file_name, code)?;
         let (compiled_module, source_map) =
             compile_module(parsed_module, self.deps.iter().map(|d| &**d))?;

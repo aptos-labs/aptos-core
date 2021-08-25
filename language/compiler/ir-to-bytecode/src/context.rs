@@ -19,12 +19,9 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
 };
-use move_ir_types::{
-    ast::{
-        BlockLabel, ConstantName, Field_, FunctionName, ModuleName, QualifiedModuleIdent,
-        QualifiedStructIdent, StructName,
-    },
-    location::*,
+use move_ir_types::ast::{
+    BlockLabel, ConstantName, Field_, FunctionName, ModuleName, QualifiedModuleIdent,
+    QualifiedStructIdent, StructName,
 };
 use std::{clone::Clone, collections::HashMap, hash::Hash};
 
@@ -272,7 +269,7 @@ pub(crate) struct Context<'a> {
     current_function_index: FunctionDefinitionIndex,
 
     // Source location mapping for this module
-    pub source_map: SourceMap<Loc>,
+    pub source_map: SourceMap,
 }
 
 impl<'a> Context<'a> {
@@ -351,9 +348,7 @@ impl<'a> Context<'a> {
     }
 
     /// Finish compilation, and materialize the pools for file format.
-    pub fn materialize_pools(
-        self,
-    ) -> (MaterializedPools, CompiledDependencies<'a>, SourceMap<Loc>) {
+    pub fn materialize_pools(self) -> (MaterializedPools, CompiledDependencies<'a>, SourceMap) {
         let num_functions = self.function_handles.len();
         assert!(num_functions == self.function_signatures.len());
         let function_handles = Self::materialize_pool(

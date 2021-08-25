@@ -19,6 +19,7 @@ use move_binary_format::{
 };
 use move_core_types::identifier::IdentStr;
 use move_coverage::coverage_map::{ExecCoverageMap, FunctionCoverage};
+use move_ir_types::location::Loc;
 
 /// Holds the various options that we support while disassembling code.
 #[derive(Debug, Default)]
@@ -47,16 +48,16 @@ impl DisassemblerOptions {
     }
 }
 
-pub struct Disassembler<'a, Location: Clone + Eq> {
-    source_mapper: SourceMapping<'a, Location>,
+pub struct Disassembler<'a> {
+    source_mapper: SourceMapping<'a>,
     // The various options that we can set for disassembly.
     options: DisassemblerOptions,
     // Optional coverage map for use in displaying code coverage
     coverage_map: Option<ExecCoverageMap>,
 }
 
-impl<'a, Location: Clone + Eq> Disassembler<'a, Location> {
-    pub fn new(source_mapper: SourceMapping<'a, Location>, options: DisassemblerOptions) -> Self {
+impl<'a> Disassembler<'a> {
+    pub fn new(source_mapper: SourceMapping<'a>, options: DisassemblerOptions) -> Self {
         Self {
             source_mapper,
             options,
@@ -64,7 +65,7 @@ impl<'a, Location: Clone + Eq> Disassembler<'a, Location> {
         }
     }
 
-    pub fn from_view(view: BinaryIndexedView<'a>, default_loc: Location) -> Result<Self> {
+    pub fn from_view(view: BinaryIndexedView<'a>, default_loc: Loc) -> Result<Self> {
         let mut options = DisassemblerOptions::new();
         options.print_code = true;
         Ok(Self {
@@ -271,7 +272,7 @@ impl<'a, Location: Clone + Eq> Disassembler<'a, Location> {
     fn name_for_parameter_or_local(
         &self,
         local_idx: usize,
-        function_source_map: &FunctionSourceMap<Location>,
+        function_source_map: &FunctionSourceMap,
     ) -> Result<String> {
         let name = function_source_map
                 .get_parameter_or_local_name(local_idx as u64)
@@ -289,7 +290,7 @@ impl<'a, Location: Clone + Eq> Disassembler<'a, Location> {
         idx: usize,
         parameters: &Signature,
         locals: &Signature,
-        function_source_map: &FunctionSourceMap<Location>,
+        function_source_map: &FunctionSourceMap,
     ) -> Result<String> {
         let sig_tok = if idx < parameters.len() {
             &parameters.0[idx]
@@ -305,7 +306,7 @@ impl<'a, Location: Clone + Eq> Disassembler<'a, Location> {
         &self,
         local_idx: usize,
         locals: &Signature,
-        function_source_map: &FunctionSourceMap<Location>,
+        function_source_map: &FunctionSourceMap,
     ) -> Result<String> {
         let sig_tok = locals
             .0
@@ -363,7 +364,7 @@ impl<'a, Location: Clone + Eq> Disassembler<'a, Location> {
     fn disassemble_sig_tok(
         &self,
         sig_tok: SignatureToken,
-        type_param_context: &[SourceName<Location>],
+        type_param_context: &[SourceName],
     ) -> Result<String> {
         Ok(match sig_tok {
             SignatureToken::Bool => "bool".to_string(),
@@ -430,8 +431,8 @@ impl<'a, Location: Clone + Eq> Disassembler<'a, Location> {
         parameters: &Signature,
         instruction: &Bytecode,
         locals_sigs: &Signature,
-        function_source_map: &FunctionSourceMap<Location>,
-        default_location: &Location,
+        function_source_map: &FunctionSourceMap,
+        default_location: &Loc,
     ) -> Result<String> {
         match instruction {
             Bytecode::LdConst(idx) => {
@@ -727,7 +728,7 @@ impl<'a, Location: Clone + Eq> Disassembler<'a, Location> {
                                 sig_tok.clone(),
                                 &function_source_map.type_parameters,
                             )?,
-                            default_location.clone(),
+                            *default_location,
                         ))
                     })
                     .collect::<Result<Vec<_>>>()?;
@@ -839,7 +840,7 @@ impl<'a, Location: Clone + Eq> Disassembler<'a, Location> {
     }
 
     fn disassemble_struct_type_formals(
-        source_map_ty_params: &[SourceName<Location>],
+        source_map_ty_params: &[SourceName],
         type_parameters: &[StructTypeParameter],
     ) -> String {
         let ty_params: Vec<String> = source_map_ty_params
@@ -868,7 +869,7 @@ impl<'a, Location: Clone + Eq> Disassembler<'a, Location> {
     }
 
     fn disassemble_fun_type_formals(
-        source_map_ty_params: &[SourceName<Location>],
+        source_map_ty_params: &[SourceName],
         ablities: &[AbilitySet],
     ) -> String {
         let ty_params: Vec<String> = source_map_ty_params
@@ -889,7 +890,7 @@ impl<'a, Location: Clone + Eq> Disassembler<'a, Location> {
 
     fn disassemble_locals(
         &self,
-        function_source_map: &FunctionSourceMap<Location>,
+        function_source_map: &FunctionSourceMap,
         locals_idx: SignatureIndex,
         parameter_len: usize,
     ) -> Result<Vec<String>> {

@@ -8,14 +8,13 @@ use ir_to_bytecode::{
     parser::{parse_module, parse_script},
 };
 use move_binary_format::file_format::{CompiledModule, CompiledScript};
-use move_ir_types::location::Loc;
 use move_symbol_pool::Symbol;
 use std::{fs, path::Path};
 
 pub fn do_compile_script(
     source_path: &Path,
     dependencies: &[CompiledModule],
-) -> (CompiledScript, SourceMap<Loc>) {
+) -> (CompiledScript, SourceMap) {
     let source = fs::read_to_string(source_path)
         .with_context(|| format!("Unable to read file: {:?}", source_path))
         .unwrap();
@@ -27,7 +26,7 @@ pub fn do_compile_script(
 pub fn do_compile_module(
     source_path: &Path,
     dependencies: &[CompiledModule],
-) -> (CompiledModule, SourceMap<Loc>) {
+) -> (CompiledModule, SourceMap) {
     let source = fs::read_to_string(source_path)
         .with_context(|| format!("Unable to read file: {:?}", source_path))
         .unwrap();

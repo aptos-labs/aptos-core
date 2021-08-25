@@ -7,7 +7,6 @@ use bytecode_source_map::utils::source_map_from_file;
 use move_binary_format::file_format::CompiledModule;
 use move_command_line_common::files::SOURCE_MAP_EXTENSION;
 use move_coverage::{coverage_map::CoverageMap, source_coverage::SourceCoverageBuilder};
-use move_ir_types::location::Loc;
 use std::{
     fs,
     fs::File,
@@ -52,7 +51,7 @@ fn main() {
     let compiled_module =
         CompiledModule::deserialize(&bytecode_bytes).expect("Module blob can't be deserialized");
 
-    let source_map = source_map_from_file::<Loc>(
+    let source_map = source_map_from_file(
         &Path::new(&args.module_binary_path).with_extension(source_map_extension),
     )
     .unwrap();

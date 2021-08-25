@@ -4719,6 +4719,7 @@ dependencies = [
  "move-command-line-common",
  "move-core-types",
  "move-coverage",
+ "move-ir-types",
  "move-lang",
  "move-stdlib",
  "move-symbol-pool",

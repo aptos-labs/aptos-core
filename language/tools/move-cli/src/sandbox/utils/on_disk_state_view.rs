@@ -17,6 +17,7 @@ use move_core_types::{
     parser,
     resolver::{ModuleResolver, ResourceResolver},
 };
+use move_ir_types::location::Spanned;
 use move_lang::{shared::AddressBytes, MOVE_COMPILED_INTERFACES_DIR};
 use move_symbol_pool::Symbol;
 use resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue, MoveValueAnnotator};
@@ -308,7 +309,6 @@ impl OnDiskStateView {
     }
 
     fn view_bytecode(path: &Path, is_module: bool) -> Result<Option<String>> {
-        type Loc = u64;
         if path.is_dir() {
             bail!("Bad bytecode path {:?}. Needed file, found directory")
         }
@@ -327,7 +327,8 @@ impl OnDiskStateView {
                     BinaryIndexedView::Script(&script)
                 };
                 // TODO: find or create source map and pass it to disassembler
-                let d: Disassembler<Loc> = Disassembler::from_view(view, 0)?;
+                let d: Disassembler =
+                    Disassembler::from_view(view, Spanned::unsafe_no_loc(()).loc)?;
                 Some(d.disassemble()?)
             }
             None => None,

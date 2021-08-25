@@ -20,7 +20,6 @@ use move_core_types::{
 };
 use move_ir_types::{
     ast::{self, Bytecode as IRBytecode, Bytecode_ as IRBytecode_, *},
-    location::*,
     sp,
 };
 use std::{
@@ -407,7 +406,7 @@ impl FunctionFrame {
 pub fn compile_script<'a>(
     script: Script,
     dependencies: impl IntoIterator<Item = &'a CompiledModule>,
-) -> Result<(CompiledScript, SourceMap<Loc>)> {
+) -> Result<(CompiledScript, SourceMap)> {
     let mut context = Context::new(HashMap::new(), None)?;
     for dep in dependencies {
         context.add_compiled_dependency(dep)?;
@@ -478,7 +477,7 @@ pub fn compile_script<'a>(
 pub fn compile_module<'a>(
     module: ModuleDefinition,
     dependencies: impl IntoIterator<Item = &'a CompiledModule>,
-) -> Result<(CompiledModule, SourceMap<Loc>)> {
+) -> Result<(CompiledModule, SourceMap)> {
     let current_module = module.identifier;
     let address = current_module.address;
     let mut context = Context::new(HashMap::new(), Some(current_module))?;

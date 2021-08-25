@@ -149,7 +149,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         loc: Loc,
         module_def: EA::ModuleDefinition,
         compiled_module: CompiledModule,
-        source_map: SourceMap<MoveIrLoc>,
+        source_map: SourceMap,
         function_infos: UniqueMap<PA::FunctionName, FunctionInfo>,
     ) {
         self.decl_ana(&module_def, &compiled_module, &source_map);
@@ -249,7 +249,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         &mut self,
         module_def: &EA::ModuleDefinition,
         compiled_module: &CompiledModule,
-        source_map: &SourceMap<MoveIrLoc>,
+        source_map: &SourceMap,
     ) {
         for (name, struct_def) in module_def.structs.key_cloned_iter() {
             self.decl_ana_struct(&name, struct_def);
@@ -270,7 +270,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         name: &PA::ConstantName,
         def: &EA::Constant,
         compiled_module: &CompiledModule,
-        source_map: &SourceMap<MoveIrLoc>,
+        source_map: &SourceMap,
     ) {
         let qsym = self.qualified_by_module_from_name(&name.0);
         let name = qsym.symbol;
@@ -2918,7 +2918,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         &mut self,
         loc: Loc,
         module: CompiledModule,
-        source_map: SourceMap<MoveIrLoc>,
+        source_map: SourceMap,
     ) {
         let struct_data: BTreeMap<StructId, StructData> = (0..module.struct_defs().len())
             .filter_map(|idx| {

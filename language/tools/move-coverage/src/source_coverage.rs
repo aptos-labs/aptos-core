@@ -57,7 +57,7 @@ impl SourceCoverageBuilder {
     pub fn new(
         module: &CompiledModule,
         coverage_map: &CoverageMap,
-        source_map: &SourceMap<Loc>,
+        source_map: &SourceMap,
     ) -> Self {
         let module_name = module.self_id();
         let unified_exec_map = coverage_map.to_unified_exec_map();

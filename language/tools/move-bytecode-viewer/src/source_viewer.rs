@@ -11,7 +11,6 @@ use crate::{
     interfaces::{RightScreen, SourceContext},
 };
 use move_binary_format::file_format::CompiledModule;
-use move_ir_types::location::Loc;
 use std::{cmp, fs, path::Path};
 
 const CONTEXT_SIZE: usize = 1000;
@@ -20,12 +19,12 @@ const CONTEXT_SIZE: usize = 1000;
 pub struct ModuleViewer {
     file_index: usize,
     source_code: Vec<String>,
-    source_map: SourceMap<Loc>,
+    source_map: SourceMap,
     module: CompiledModule,
 }
 
 impl ModuleViewer {
-    pub fn new(module: CompiledModule, source_map: SourceMap<Loc>, source_location: &Path) -> Self {
+    pub fn new(module: CompiledModule, source_map: SourceMap, source_location: &Path) -> Self {
         let mut source_code = vec![];
         let file_contents = fs::read_to_string(source_location).unwrap();
         let file_index = source_code.len() - 1;

@@ -55,14 +55,14 @@ pub enum CompiledUnit {
     Module {
         ident: CompiledModuleIdent,
         module: F::CompiledModule,
-        source_map: SourceMap<Loc>,
+        source_map: SourceMap,
         function_infos: UniqueMap<FunctionName, FunctionInfo>,
     },
     Script {
         loc: Loc,
         key: Symbol,
         script: F::CompiledScript,
-        source_map: SourceMap<Loc>,
+        source_map: SourceMap,
         function_info: FunctionInfo,
     },
 }

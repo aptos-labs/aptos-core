@@ -8,14 +8,13 @@ use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
     value::MoveValue,
 };
-use move_ir_types::location::*;
 use std::collections::BTreeMap;
 
 pub mod filter_test_members;
 pub mod plan_builder;
 
 pub type TestName = String;
-pub type MappedCompiledModule = (CompiledModule, SourceMap<Loc>);
+pub type MappedCompiledModule = (CompiledModule, SourceMap);
 
 #[derive(Debug, Clone)]
 pub struct TestPlan {
