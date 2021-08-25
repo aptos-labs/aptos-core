@@ -11,7 +11,7 @@ use move_binary_format::{
 };
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 use move_ir_types::{
-    ast::{ConstantName, ModuleName, NopLabel, QualifiedModuleIdent},
+    ast::{ConstantName, ModuleIdent, ModuleName, NopLabel},
     location::Loc,
 };
 use move_symbol_pool::Symbol;
@@ -242,7 +242,7 @@ impl FunctionSourceMap {
 }
 
 impl SourceMap {
-    pub fn new(module_name_opt: Option<QualifiedModuleIdent>) -> Self {
+    pub fn new(module_name_opt: Option<ModuleIdent>) -> Self {
         let module_name_opt = module_name_opt.map(|module_name| {
             let ident = Identifier::new(module_name.name.0.as_str()).unwrap();
             (module_name.address, ident)
@@ -468,7 +468,7 @@ impl SourceMap {
                     view.identifier_at(module_handle.name).as_str(),
                 ));
                 let address = *view.address_identifier_at(module_handle.address);
-                Some(QualifiedModuleIdent::new(module_name, address))
+                Some(ModuleIdent::new(module_name, address))
             }
         };
         let mut empty_source_map = Self::new(module_ident);

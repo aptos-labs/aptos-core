@@ -1995,28 +1995,24 @@ fn parse_struct_decl(
     ))
 }
 
-// QualifiedModuleIdent: QualifiedModuleIdent = {
-//     <a: AccountAddress> "." <m: ModuleName> => QualifiedModuleIdent::new(m, a),
+// ModuleIdent: ModuleIdent = {
+//     <a: AccountAddress> "." <m: ModuleName> => ModuleIdent::new(m, a),
 // }
 
-fn parse_qualified_module_ident(
-    tokens: &mut Lexer,
-) -> Result<QualifiedModuleIdent, ParseError<Loc, anyhow::Error>> {
+fn parse_module_ident(tokens: &mut Lexer) -> Result<ModuleIdent, ParseError<Loc, anyhow::Error>> {
     let a = parse_account_address(tokens)?;
     consume_token(tokens, Tok::Period)?;
     let m = parse_module_name(tokens)?;
-    Ok(QualifiedModuleIdent::new(m, a))
+    Ok(ModuleIdent::new(m, a))
 }
 
 // FriendDecl: ModuleIdent = {
 //     "friend" <ident: ModuleIdent> ";" => { ... }
 // }
 
-fn parse_friend_decl(
-    tokens: &mut Lexer,
-) -> Result<QualifiedModuleIdent, ParseError<Loc, anyhow::Error>> {
+fn parse_friend_decl(tokens: &mut Lexer) -> Result<ModuleIdent, ParseError<Loc, anyhow::Error>> {
     consume_token(tokens, Tok::Friend)?;
-    let ident = parse_qualified_module_ident(tokens)?;
+    let ident = parse_module_ident(tokens)?;
     consume_token(tokens, Tok::Semicolon)?;
     Ok(ident)
 }
@@ -2045,7 +2041,7 @@ fn parse_import_decl(
     tokens: &mut Lexer,
 ) -> Result<ImportDefinition, ParseError<Loc, anyhow::Error>> {
     consume_token(tokens, Tok::Import)?;
-    let ident = parse_qualified_module_ident(tokens)?;
+    let ident = parse_module_ident(tokens)?;
     let alias = if tokens.peek() == Tok::As {
         Some(parse_import_alias(tokens)?)
     } else {
@@ -2071,7 +2067,7 @@ fn is_struct_decl(tokens: &mut Lexer) -> Result<bool, ParseError<Loc, anyhow::Er
 
 fn parse_module(tokens: &mut Lexer) -> Result<ModuleDefinition, ParseError<Loc, anyhow::Error>> {
     consume_token(tokens, Tok::Module)?;
-    let identifier = parse_qualified_module_ident(tokens)?;
+    let identifier = parse_module_ident(tokens)?;
     consume_token(tokens, Tok::LBrace)?;
 
     let mut friends = vec![];

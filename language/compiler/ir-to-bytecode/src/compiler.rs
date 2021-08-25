@@ -644,7 +644,7 @@ fn compile_explicit_dependency_declarations(
 
 fn compile_friends(
     context: &mut Context,
-    friends: Vec<ast::QualifiedModuleIdent>,
+    friends: Vec<ast::ModuleIdent>,
 ) -> Result<Vec<ModuleHandle>> {
     let mut friend_decls = vec![];
     for friend in friends {

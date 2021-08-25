@@ -280,8 +280,7 @@ impl<'a> ModuleGenerator<'a> {
             .iter()
             .map(|ident| {
                 let module_name = ModuleName(*ident);
-                let qualified_mod_ident =
-                    QualifiedModuleIdent::new(module_name, AccountAddress::ZERO);
+                let qualified_mod_ident = ModuleIdent::new(module_name, AccountAddress::ZERO);
                 ImportDefinition::new(qualified_mod_ident, None)
             })
             .collect()
@@ -326,7 +325,7 @@ impl<'a> ModuleGenerator<'a> {
             random_string(gen, len)
         };
         let current_module = ModuleDefinition {
-            identifier: QualifiedModuleIdent {
+            identifier: ModuleIdent {
                 name: ModuleName(module_name.into()),
                 address: AccountAddress::random(),
             },

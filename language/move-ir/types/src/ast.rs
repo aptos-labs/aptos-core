@@ -73,7 +73,7 @@ pub struct ModuleName(pub Symbol);
 /// Newtype of the address + the module name
 /// `addr.m`
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
-pub struct QualifiedModuleIdent {
+pub struct ModuleIdent {
     /// Name for the module. Will be unique among modules published under the same address
     pub name: ModuleName,
     /// Address that this module is published under
@@ -84,9 +84,9 @@ pub struct QualifiedModuleIdent {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ModuleDefinition {
     /// name and address of the module
-    pub identifier: QualifiedModuleIdent,
+    pub identifier: ModuleIdent,
     /// the module's friends
-    pub friends: Vec<QualifiedModuleIdent>,
+    pub friends: Vec<ModuleIdent>,
     /// the module's dependencies
     pub imports: Vec<ImportDefinition>,
     /// Explicit declaration of dependencies. If not provided, will be inferred based on given
@@ -123,7 +123,7 @@ pub struct ModuleDependency {
 pub struct ImportDefinition {
     /// the dependency
     /// `addr.m`
-    pub ident: QualifiedModuleIdent,
+    pub ident: ModuleIdent,
     /// the alias for that dependency
     /// `m`
     pub alias: ModuleName,
@@ -774,11 +774,11 @@ impl ModuleName {
     }
 }
 
-impl QualifiedModuleIdent {
+impl ModuleIdent {
     /// Creates a new fully qualified module identifier from the module name and the address at
     /// which it is published
     pub fn new(name: ModuleName, address: AccountAddress) -> Self {
-        QualifiedModuleIdent { name, address }
+        ModuleIdent { name, address }
     }
 
     /// Accessor for the name of the fully qualified module identifier
@@ -797,8 +797,8 @@ impl ModuleDefinition {
     /// and procedures
     /// Does not verify the correctness of any internal properties of its elements
     pub fn new(
-        identifier: QualifiedModuleIdent,
-        friends: Vec<QualifiedModuleIdent>,
+        identifier: ModuleIdent,
+        friends: Vec<ModuleIdent>,
         imports: Vec<ImportDefinition>,
         explicit_dependency_declarations: Vec<ModuleDependency>,
         structs: Vec<StructDefinition>,
@@ -878,7 +878,7 @@ impl QualifiedStructIdent {
 impl ImportDefinition {
     /// Creates a new import definition from a module identifier and an optional alias
     /// If the alias is `None`, the alias will be a cloned copy of the identifiers module name
-    pub fn new(ident: QualifiedModuleIdent, alias_opt: Option<ModuleName>) -> Self {
+    pub fn new(ident: ModuleIdent, alias_opt: Option<ModuleName>) -> Self {
         let alias = match alias_opt {
             Some(alias) => alias,
             None => *ident.name(),
@@ -1231,7 +1231,7 @@ impl fmt::Display for ModuleName {
     }
 }
 
-impl fmt::Display for QualifiedModuleIdent {
+impl fmt::Display for ModuleIdent {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}.{}", self.address, self.name)
     }

@@ -207,7 +207,7 @@ fn module(
         }
     ) = ident;
     let ir_module = IR::ModuleDefinition {
-        identifier: IR::QualifiedModuleIdent {
+        identifier: IR::ModuleIdent {
             address: MoveAddress::new(addr_bytes.into_bytes()),
             name: IR::ModuleName(module_name.0.value),
         },

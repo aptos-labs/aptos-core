@@ -214,17 +214,17 @@ impl<'a> Context<'a> {
         addr.into_addr_bytes(self.env.named_address_mapping())
     }
 
-    pub fn translate_module_ident(&self, ident: ModuleIdent) -> IR::QualifiedModuleIdent {
+    pub fn translate_module_ident(&self, ident: ModuleIdent) -> IR::ModuleIdent {
         Self::translate_module_ident_impl(self.env.named_address_mapping(), ident)
     }
 
     fn translate_module_ident_impl(
         addresses: &BTreeMap<Symbol, AddressBytes>,
         sp!(_, ModuleIdent_ { address, module }): ModuleIdent,
-    ) -> IR::QualifiedModuleIdent {
+    ) -> IR::ModuleIdent {
         let address_bytes = address.into_addr_bytes(addresses);
         let name = Self::translate_module_name_(module.0.value);
-        IR::QualifiedModuleIdent::new(name, MoveAddress::new(address_bytes.into_bytes()))
+        IR::ModuleIdent::new(name, MoveAddress::new(address_bytes.into_bytes()))
     }
 
     fn translate_module_name_(s: Symbol) -> IR::ModuleName {
