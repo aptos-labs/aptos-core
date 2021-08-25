@@ -1,8 +1,6 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::smoke_test_environment::SmokeTestEnvironment;
-use cli::client_proxy::ClientProxy;
 use diem_config::config::{Identity, NodeConfig, SecureBackend};
 use diem_crypto::ed25519::Ed25519PublicKey;
 use diem_sdk::{
@@ -47,19 +45,6 @@ pub fn compare_balances(
                 false
             }
         })
-}
-
-/// Sets up a SmokeTestEnvironment with specified size and connects a client
-/// proxy to the node_index.
-pub fn setup_swarm_and_client_proxy(
-    num_nodes: usize,
-    node_index: usize,
-) -> (SmokeTestEnvironment, ClientProxy) {
-    let mut env = SmokeTestEnvironment::new(num_nodes);
-    env.validator_swarm.launch();
-
-    let client = env.get_validator_client(node_index, None);
-    (env, client)
 }
 
 pub fn create_and_fund_account(swarm: &mut LocalSwarm, amount: u64) -> LocalAccount {
@@ -121,7 +106,6 @@ pub mod diem_swarm_utils {
     use cli::client_proxy::ClientProxy;
     use diem_config::config::{NodeConfig, OnDiskStorageConfig, SecureBackend, WaypointConfig};
     use diem_global_constants::{DIEM_ROOT_KEY, TREASURY_COMPLIANCE_KEY};
-    use diem_operational_tool::test_helper::OperationalTool;
     use diem_secure_storage::{CryptoStorage, KVStorage, OnDiskStorage, Storage};
     use diem_swarm::swarm::DiemSwarm;
     use diem_types::{chain_id::ChainId, waypoint::Waypoint};
@@ -161,22 +145,9 @@ pub mod diem_swarm_utils {
         .unwrap()
     }
 
-    /// Returns an operational tool pointing to a validator node at the given node index.
-    pub fn get_op_tool(swarm: &DiemSwarm, node_index: usize) -> OperationalTool {
-        OperationalTool::new(
-            format!("http://127.0.0.1:{}", swarm.get_client_port(node_index)),
-            ChainId::test(),
-        )
-    }
-
     /// Loads the nodes's storage backend identified by the node index in the given swarm.
     pub fn load_validators_backend_storage(validator: &LocalNode) -> SecureBackend {
         fetch_backend_storage(validator.config(), None)
-    }
-
-    /// Loads the diem root's storage backend identified by the node index in the given swarm.
-    pub fn load_diem_root_storage(swarm: &DiemSwarm, _node_index: usize) -> SecureBackend {
-        SecureBackend::OnDiskStorage(swarm.config.root_storage.clone())
     }
 
     pub fn create_root_storage(swarm: &mut LocalSwarm) -> SecureBackend {
@@ -200,20 +171,6 @@ pub mod diem_swarm_utils {
             .unwrap();
 
         SecureBackend::OnDiskStorage(root_storage_config)
-    }
-
-    /// Loads the node config for the validator at the specified index. Also returns the node
-    /// config path.
-    pub fn load_node_config(swarm: &DiemSwarm, node_index: usize) -> (NodeConfig, PathBuf) {
-        let node_config_path = swarm.config.config_files.get(node_index).unwrap();
-        let node_config = NodeConfig::load(&node_config_path).unwrap();
-        (node_config, node_config_path.clone())
-    }
-
-    /// Saves the node config for the node at the specified index in the given swarm.
-    pub fn save_node_config(node_config: &mut NodeConfig, swarm: &DiemSwarm, node_index: usize) {
-        let node_config_path = swarm.config.config_files.get(node_index).unwrap();
-        node_config.save(node_config_path).unwrap();
     }
 
     pub fn insert_waypoint(node_config: &mut NodeConfig, waypoint: Waypoint) {

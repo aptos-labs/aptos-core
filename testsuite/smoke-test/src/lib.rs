@@ -11,6 +11,8 @@ pub mod verifying_client;
 
 // Converted to local Forge backend
 #[cfg(test)]
+mod client;
+#[cfg(test)]
 mod consensus;
 #[cfg(test)]
 mod genesis;
@@ -26,9 +28,6 @@ mod state_sync;
 mod storage;
 
 // Left to convert
-
-#[cfg(test)]
-mod client;
 
 #[cfg(test)]
 mod full_nodes;

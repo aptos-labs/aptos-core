@@ -2,24 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    smoke_test_environment::SmokeTestEnvironment,
-    test_utils::{
-        compare_balances,
-        diem_swarm_utils::{
-            get_op_tool, load_diem_root_storage, load_node_config, save_node_config,
-        },
-        setup_swarm_and_client_proxy,
-    },
+    smoke_test_environment::new_local_swarm,
+    test_utils::{assert_balance, create_and_fund_account, transfer_coins},
 };
-use cli::client_proxy::ClientProxy;
-
 use diem_json_rpc_types::Id;
 use diem_sdk::client::stream::{
-    request::StreamMethod, response::StreamJsonRpcResponseView, StreamingClientConfig,
+    request::StreamMethod, response::StreamJsonRpcResponseView, StreamingClient,
+    StreamingClientConfig,
 };
-use diem_types::{ledger_info::LedgerInfo, waypoint::Waypoint};
+use forge::{LocalSwarm, Node, NodeExt, Swarm};
 use futures::StreamExt;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::{
     runtime::Runtime,
     time::{sleep, timeout},
@@ -27,16 +20,15 @@ use tokio::{
 
 #[test]
 fn test_create_mint_transfer_block_metadata() {
-    let (env, client) = setup_swarm_and_client_proxy(1, 0);
+    let mut swarm = new_local_swarm(1);
 
     // This script does 4 transactions
-    check_create_mint_transfer(client);
+    check_create_mint_transfer(&mut swarm);
 
     // Test if we commit not only user transactions but also block metadata transactions,
     // assert committed version > # of user transactions
-    let mut vclient = env.get_validator_client(0, None);
-    vclient.test_trusted_connection().expect("success");
-    let version = vclient.get_latest_version();
+    let client = swarm.validators().next().unwrap().json_rpc_client();
+    let version = client.get_metadata().unwrap().into_inner().version;
     assert!(
         version > 4,
         "BlockMetadata txn not produced, current version: {}",
@@ -46,24 +38,25 @@ fn test_create_mint_transfer_block_metadata() {
 
 #[test]
 fn test_get_events_via_websocket_stream() {
-    let num_nodes = 2;
-    let mut env = SmokeTestEnvironment::new(num_nodes);
+    let mut swarm = new_local_swarm(1);
 
     // Update all nodes to enable websockets
-    for node_index in 0..num_nodes {
-        let (mut node_config, _) = load_node_config(&env.validator_swarm, node_index);
+    for validator in swarm.validators_mut() {
+        let mut node_config = validator.config().clone();
         node_config.json_rpc.stream_rpc.enabled = true;
-        save_node_config(&mut node_config, &env.validator_swarm, node_index);
+        node_config.save(validator.config_path()).unwrap();
+        validator.restart().unwrap();
+        validator
+            .wait_until_healthy(Instant::now() + Duration::from_secs(10))
+            .unwrap();
     }
 
-    env.validator_swarm.launch();
-
-    let client = env.get_validator_client(0, None);
+    let client = swarm.validators().next().unwrap().json_rpc_client();
 
     let currencies = client
-        .client
-        .get_currency_info()
-        .expect("Could not get currency info");
+        .get_currencies()
+        .expect("Could not get currency info")
+        .into_inner();
 
     let rt = Runtime::new().unwrap();
     let _guard = rt.enter();
@@ -74,8 +67,20 @@ fn test_get_events_via_websocket_stream() {
         channel_size: 1,
         ok_timeout_millis: 1_000,
     });
+
+    let mut streaming_url = swarm.validators().next().unwrap().json_rpc_endpoint();
+    streaming_url
+        .set_scheme("ws")
+        .expect("Could not set scheme");
+    // Path from /json-rpc/src/stream_rpc/transport/websocket.rs#L43
+    streaming_url.set_path("/v1/stream/ws");
+    println!("ws_url: {}", &streaming_url);
+
     let mut s_client = rt
-        .block_on(timeout(ms_500, client.streaming_client(config)))
+        .block_on(timeout(
+            ms_500,
+            StreamingClient::new(streaming_url, config.unwrap_or_default(), None),
+        ))
         .unwrap_or_else(|e| panic!("Timeout creating StreamingClient: {}", e))
         .unwrap_or_else(|e| panic!("Error connecting to WS endpoint: {}", e));
 
@@ -148,187 +153,92 @@ fn test_get_events_via_websocket_stream() {
 #[test]
 fn test_basic_fault_tolerance() {
     // A configuration with 4 validators should tolerate single node failure.
-    let (mut env, client) = setup_swarm_and_client_proxy(4, 1);
-    env.validator_swarm.kill_node(0);
-    check_create_mint_transfer(client);
+    let mut swarm = new_local_swarm(4);
+    swarm.validators_mut().nth(3).unwrap().stop();
+    check_create_mint_transfer(&mut swarm);
 }
 
 #[test]
 fn test_basic_restartability() {
-    let (mut env, mut client) = setup_swarm_and_client_proxy(4, 0);
+    let mut swarm = new_local_swarm(4);
+    let client = swarm.validators().next().unwrap().json_rpc_client();
+    let transaction_factory = swarm.chain_info().transaction_factory();
 
-    client.create_next_account(false).unwrap();
-    client.create_next_account(false).unwrap();
-    client.mint_coins(&["mb", "0", "100", "XUS"], true).unwrap();
-    client.mint_coins(&["mb", "1", "10", "XUS"], true).unwrap();
-    client
-        .transfer_coins(&["tb", "0", "1", "10", "XUS"], true)
-        .unwrap();
-    assert!(compare_balances(
-        vec![(90.0, "XUS".to_string())],
-        client.get_balances(&["b", "0"]).unwrap(),
-    ));
-    assert!(compare_balances(
-        vec![(20.0, "XUS".to_string())],
-        client.get_balances(&["b", "1"]).unwrap(),
-    ));
-
-    let peer_to_restart = 0;
-    env.validator_swarm.kill_node(peer_to_restart);
-
-    assert!(env.validator_swarm.start_node(peer_to_restart).is_ok());
-    assert!(compare_balances(
-        vec![(90.0, "XUS".to_string())],
-        client.get_balances(&["b", "0"]).unwrap(),
-    ));
-    assert!(compare_balances(
-        vec![(20.0, "XUS".to_string())],
-        client.get_balances(&["b", "1"]).unwrap(),
-    ));
-
-    client
-        .transfer_coins(&["tb", "0", "1", "10", "XUS"], true)
-        .unwrap();
-    assert!(compare_balances(
-        vec![(80.0, "XUS".to_string())],
-        client.get_balances(&["b", "0"]).unwrap(),
-    ));
-    assert!(compare_balances(
-        vec![(30.0, "XUS".to_string())],
-        client.get_balances(&["b", "1"]).unwrap(),
-    ));
-}
-
-#[test]
-fn test_client_waypoints() {
-    let (env, mut client) = setup_swarm_and_client_proxy(4, 1);
-
-    client.create_next_account(false).unwrap();
-    client
-        .mint_coins(&["mintb", "0", "10", "XUS"], true)
-        .unwrap();
-
-    // Create the waypoint for the initial epoch
-    let genesis_li = client.latest_epoch_change_li().unwrap();
-    assert_eq!(genesis_li.ledger_info().epoch(), 0);
-    let genesis_waypoint = Waypoint::new_epoch_boundary(genesis_li.ledger_info()).unwrap();
-
-    // Start another client with the genesis waypoint and make sure it successfully connects
-    let mut client_with_waypoint = env.get_validator_client(0, Some(genesis_waypoint));
-    client_with_waypoint.test_trusted_connection().unwrap();
-    assert_eq!(
-        client_with_waypoint.latest_epoch_change_li().unwrap(),
-        genesis_li
+    let mut account_0 = create_and_fund_account(&mut swarm, 100);
+    let account_1 = create_and_fund_account(&mut swarm, 10);
+    transfer_coins(
+        &client,
+        &transaction_factory,
+        &mut account_0,
+        &account_1,
+        10,
     );
+    assert_balance(&client, &account_0, 90);
+    assert_balance(&client, &account_1, 20);
 
-    // Start next epoch
-    let peer_id = env.validator_swarm.get_node(0).unwrap().peer_id();
-    let op_tool = get_op_tool(&env.validator_swarm, 1);
-    let diem_root = load_diem_root_storage(&env.validator_swarm, 0);
-    let _ = op_tool
-        .remove_validator(peer_id, &diem_root, false)
+    let validator = swarm.validators_mut().next().unwrap();
+    validator.restart().unwrap();
+    validator
+        .wait_until_healthy(Instant::now() + Duration::from_secs(10))
         .unwrap();
 
-    client
-        .mint_coins(&["mintb", "0", "10", "XUS"], true)
-        .unwrap();
-    assert!(compare_balances(
-        vec![(20.0, "XUS".to_string())],
-        client.get_balances(&["b", "0"]).unwrap(),
-    ));
-    let epoch_1_li = client
-        .latest_epoch_change_li()
-        .expect("Failed to retrieve end of epoch 1 LedgerInfo");
+    assert_balance(&client, &account_0, 90);
+    assert_balance(&client, &account_1, 20);
 
-    assert_eq!(epoch_1_li.ledger_info().epoch(), 1);
-    let epoch_1_waypoint = Waypoint::new_epoch_boundary(epoch_1_li.ledger_info())
-        .expect("Failed to generate waypoint from end of epoch 1");
-
-    // Start a client with the waypoint for end of epoch 1 and make sure it successfully connects
-    client_with_waypoint = env.get_validator_client(1, Some(epoch_1_waypoint));
-    client_with_waypoint.test_trusted_connection().unwrap();
-    assert_eq!(
-        client_with_waypoint.latest_epoch_change_li().unwrap(),
-        epoch_1_li
+    transfer_coins(
+        &client,
+        &transaction_factory,
+        &mut account_0,
+        &account_1,
+        10,
     );
-
-    // Verify that a client with the wrong waypoint is not going to be able to connect to the chain.
-    let bad_li = LedgerInfo::mock_genesis(None);
-    let bad_waypoint = Waypoint::new_epoch_boundary(&bad_li).unwrap();
-    let mut client_with_bad_waypoint = env.get_validator_client(1, Some(bad_waypoint));
-    assert!(client_with_bad_waypoint.test_trusted_connection().is_err());
+    assert_balance(&client, &account_0, 80);
+    assert_balance(&client, &account_1, 30);
 }
 
 #[test]
 fn test_concurrent_transfers_single_node() {
-    let (_env, mut client) = setup_swarm_and_client_proxy(1, 0);
+    let mut swarm = new_local_swarm(1);
+    let client = swarm.validators().next().unwrap().json_rpc_client();
+    let transaction_factory = swarm.chain_info().transaction_factory();
 
-    client.create_next_account(false).unwrap();
-    client
-        .mint_coins(&["mintb", "0", "100", "XUS"], true)
-        .unwrap();
-
-    client.create_next_account(false).unwrap();
-    client
-        .mint_coins(&["mintb", "1", "10", "XUS"], true)
-        .unwrap();
+    let mut account_0 = create_and_fund_account(&mut swarm, 100);
+    let account_1 = create_and_fund_account(&mut swarm, 10);
+    assert_balance(&client, &account_0, 100);
+    assert_balance(&client, &account_1, 10);
 
     for _ in 0..20 {
-        client
-            .transfer_coins(&["t", "0", "1", "1", "XUS"], false)
-            .unwrap();
+        let txn = account_0.sign_with_transaction_builder(transaction_factory.peer_to_peer(
+            diem_sdk::transaction_builder::Currency::XUS,
+            account_1.address(),
+            1,
+        ));
+        client.submit(&txn).unwrap();
     }
-    client
-        .transfer_coins(&["tb", "0", "1", "1", "XUS"], true)
-        .unwrap();
 
-    assert!(compare_balances(
-        vec![(79.0, "XUS".to_string())],
-        client.get_balances(&["b", "0"]).unwrap(),
-    ));
-    assert!(compare_balances(
-        vec![(31.0, "XUS".to_string())],
-        client.get_balances(&["b", "1"]).unwrap(),
-    ));
+    transfer_coins(&client, &transaction_factory, &mut account_0, &account_1, 1);
+    assert_balance(&client, &account_0, 79);
+    assert_balance(&client, &account_1, 31);
 }
 
 /// This helper function creates 3 new accounts, mints funds, transfers funds
 /// between the accounts and verifies that these operations succeed.
-fn check_create_mint_transfer(mut client: ClientProxy) {
+fn check_create_mint_transfer(swarm: &mut LocalSwarm) {
+    let client = swarm.validators().next().unwrap().json_rpc_client();
+    let transaction_factory = swarm.chain_info().transaction_factory();
+
     // Create account 0, mint 10 coins and check balance
-    client.create_next_account(false).unwrap();
-    client
-        .mint_coins(&["mintb", "0", "10", "XUS"], true)
-        .unwrap();
-    assert!(compare_balances(
-        vec![(10.0, "XUS".to_string())],
-        client.get_balances(&["b", "0"]).unwrap(),
-    ));
+    let mut account_0 = create_and_fund_account(swarm, 10);
+    assert_balance(&client, &account_0, 10);
 
     // Create account 1, mint 1 coin, transfer 3 coins from account 0 to 1, check balances
-    client.create_next_account(false).unwrap();
-    client
-        .mint_coins(&["mintb", "1", "1", "XUS"], true)
-        .unwrap();
-    client
-        .transfer_coins(&["tb", "0", "1", "3", "XUS"], true)
-        .unwrap();
-    assert!(compare_balances(
-        vec![(7.0, "XUS".to_string())],
-        client.get_balances(&["b", "0"]).unwrap(),
-    ));
-    assert!(compare_balances(
-        vec![(4.0, "XUS".to_string())],
-        client.get_balances(&["b", "1"]).unwrap(),
-    ));
+    let account_1 = create_and_fund_account(swarm, 1);
+    transfer_coins(&client, &transaction_factory, &mut account_0, &account_1, 3);
+
+    assert_balance(&client, &account_0, 7);
+    assert_balance(&client, &account_1, 4);
 
     // Create account 2, mint 15 coins and check balance
-    client.create_next_account(false).unwrap();
-    client
-        .mint_coins(&["mintb", "2", "15", "XUS"], true)
-        .unwrap();
-    assert!(compare_balances(
-        vec![(15.0, "XUS".to_string())],
-        client.get_balances(&["b", "2"]).unwrap(),
-    ));
+    let account_2 = create_and_fund_account(swarm, 15);
+    assert_balance(&client, &account_2, 15);
 }
