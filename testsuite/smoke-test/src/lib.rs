@@ -18,6 +18,8 @@ mod key_manager;
 mod operational_tooling;
 #[cfg(test)]
 mod state_sync;
+#[cfg(test)]
+mod storage;
 
 // Left to convert
 
@@ -35,9 +37,6 @@ mod network;
 
 #[cfg(test)]
 mod release_flow;
-
-#[cfg(test)]
-mod storage;
 
 #[cfg(test)]
 mod smoke_test_environment;

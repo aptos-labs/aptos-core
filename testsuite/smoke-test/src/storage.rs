@@ -2,72 +2,76 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    smoke_test_environment::new_local_swarm,
     test_utils::{
-        compare_balances,
-        diem_swarm_utils::{insert_waypoint, load_node_config, save_node_config},
-        setup_swarm_and_client_proxy,
+        assert_balance, create_and_fund_account, diem_swarm_utils::insert_waypoint, transfer_coins,
     },
     workspace_builder,
     workspace_builder::workspace_root,
 };
 use anyhow::{bail, Result};
 use backup_cli::metadata::view::BackupStorageState;
-use cli::client_proxy::ClientProxy;
+use diem_sdk::{
+    client::BlockingClient, transaction_builder::TransactionFactory, types::LocalAccount,
+};
 use diem_temppath::TempPath;
 use diem_types::{transaction::Version, waypoint::Waypoint};
+use forge::{NodeExt, Swarm, SwarmExt};
 use rand::random;
 use std::{
     fs,
     path::Path,
     process::Command,
-    string::ToString,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
     time::{Duration, Instant},
 };
 
 #[test]
 fn test_db_restore() {
-    let (mut env, mut client) = setup_swarm_and_client_proxy(4, 1);
-
     // pre-build tools
     workspace_builder::get_bin("db-backup");
     workspace_builder::get_bin("db-restore");
     workspace_builder::get_bin("db-backup-verify");
 
-    // set up: two accounts, a lot of money
-    client.create_next_account(false).unwrap();
-    client.create_next_account(false).unwrap();
-    client
-        .mint_coins(&["mb", "0", "1000000", "XUS"], true)
-        .unwrap();
-    client
-        .mint_coins(&["mb", "1", "1000000", "XUS"], true)
-        .unwrap();
-    client
-        .transfer_coins(&["tb", "0", "1", "1", "XUS"], true)
-        .unwrap();
-    assert!(compare_balances(
-        vec![(999999.0, "XUS".to_string())],
-        client.get_balances(&["b", "0"]).unwrap(),
-    ));
-    assert!(compare_balances(
-        vec![(1000001.0, "XUS".to_string())],
-        client.get_balances(&["b", "1"]).unwrap(),
-    ));
+    let mut swarm = new_local_swarm(4);
+    let validator_peer_ids = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
+    let client_1 = swarm
+        .validator(validator_peer_ids[1])
+        .unwrap()
+        .json_rpc_client();
+    let transaction_factory = swarm.chain_info().transaction_factory();
 
-    // start thread to transfer money from account 0 to account 1
-    let accounts = client.copy_all_accounts();
-    let transfer_quit = Arc::new(AtomicBool::new(false));
-    let transfer_quit_clone = transfer_quit.clone();
-    let transfer_thread = std::thread::spawn(|| {
-        transfer_and_reconfig(client, 999999.0, 1000001.0, transfer_quit_clone)
-    });
+    // set up: two accounts, a lot of money
+    let mut account_0 = create_and_fund_account(&mut swarm, 1000000);
+    let account_1 = create_and_fund_account(&mut swarm, 1000000);
+    transfer_coins(
+        &client_1,
+        &transaction_factory,
+        &mut account_0,
+        &account_1,
+        1,
+    );
+
+    let mut expected_balance_0 = 999999;
+    let mut expected_balance_1 = 1000001;
+    assert_balance(&client_1, &account_0, expected_balance_0);
+    assert_balance(&client_1, &account_1, expected_balance_1);
+
+    transfer_and_reconfig(
+        &client_1,
+        &transaction_factory,
+        swarm.chain_info().root_account,
+        &mut account_0,
+        &account_1,
+        20,
+    )
+    .unwrap();
+    expected_balance_0 -= 20;
+    expected_balance_1 += 20;
+    assert_balance(&client_1, &account_0, expected_balance_0);
+    assert_balance(&client_1, &account_1, expected_balance_1);
 
     // make a backup from node 1
-    let (node1_config, _) = load_node_config(&env.validator_swarm, 1);
+    let node1_config = swarm.validator(validator_peer_ids[1]).unwrap().config();
     let backup_path = db_backup(
         node1_config.storage.backup_service_address.port(),
         1,
@@ -78,13 +82,15 @@ fn test_db_restore() {
     );
 
     // take down node 0
-    env.validator_swarm.kill_node(0);
+    let node_to_restart = validator_peer_ids[0];
+    swarm.validator_mut(node_to_restart).unwrap().stop();
 
     // nuke db
-    let (mut node0_config, _) = load_node_config(&env.validator_swarm, 0);
+    let node0_config_path = swarm.validator(node_to_restart).unwrap().config_path();
+    let mut node0_config = swarm.validator(node_to_restart).unwrap().config().clone();
     let genesis_waypoint = node0_config.base.waypoint.genesis_waypoint();
     insert_waypoint(&mut node0_config, genesis_waypoint);
-    save_node_config(&mut node0_config, &env.validator_swarm, 0);
+    node0_config.save(node0_config_path).unwrap();
     let db_dir = node0_config.storage.dir();
     fs::remove_dir_all(db_dir.join("diemdb")).unwrap();
     fs::remove_dir_all(db_dir.join("consensusdb")).unwrap();
@@ -92,22 +98,41 @@ fn test_db_restore() {
     // restore db from backup
     db_restore(backup_path.path(), db_dir.as_path(), &[]);
 
+    {
+        transfer_and_reconfig(
+            &client_1,
+            &transaction_factory,
+            swarm.chain_info().root_account,
+            &mut account_0,
+            &account_1,
+            20,
+        )
+        .unwrap();
+        expected_balance_0 -= 20;
+        expected_balance_1 += 20;
+        assert_balance(&client_1, &account_0, expected_balance_0);
+        assert_balance(&client_1, &account_1, expected_balance_1);
+    }
+
     // start node 0 on top of restored db
-    // (add_node() waits for it to connect to peers)
-    env.validator_swarm.start_node(0).unwrap();
-
-    // stop transferring
-    transfer_quit.store(true, Ordering::Relaxed);
-    let transferred = transfer_thread.join().unwrap();
-
+    swarm
+        .validator_mut(node_to_restart)
+        .unwrap()
+        .start()
+        .unwrap();
+    swarm
+        .validator_mut(node_to_restart)
+        .unwrap()
+        .wait_until_healthy(Instant::now() + Duration::from_secs(10))
+        .unwrap();
     // verify it's caught up
-    assert!(env.validator_swarm.wait_for_all_nodes_to_catchup());
-    let mut client0 = env.get_validator_client(0, None);
-    client0.set_accounts(accounts);
-    assert!(compare_balances(
-        vec![(999999.0 - transferred, "XUS".to_string())],
-        client0.get_balances(&["b", "0"]).unwrap(),
-    ));
+    swarm
+        .wait_for_all_nodes_to_catchup(Instant::now() + Duration::from_secs(60))
+        .unwrap();
+
+    let client_0 = swarm.validator(node_to_restart).unwrap().json_rpc_client();
+    assert_balance(&client_0, &account_0, expected_balance_0);
+    assert_balance(&client_0, &account_1, expected_balance_1);
 }
 
 fn db_backup_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
@@ -273,41 +298,27 @@ pub(crate) fn db_restore(backup_path: &Path, db_path: &Path, trusted_waypoints: 
 }
 
 fn transfer_and_reconfig(
-    mut client: ClientProxy,
-    balance0: f64,
-    balance1: f64,
-    quit: Arc<AtomicBool>,
-) -> f64 {
-    let now = Instant::now();
-    let mut transferred = 0f64;
-    while !quit.load(Ordering::Relaxed) {
+    client: &BlockingClient,
+    transaction_factory: &TransactionFactory,
+    root_account: &mut LocalAccount,
+    account0: &mut LocalAccount,
+    account1: &LocalAccount,
+    transfers: usize,
+) -> Result<()> {
+    for _ in 0..transfers {
         if random::<u16>() % 10 == 0 {
-            println!(
-                "Changing diem version to {}: {:?}",
-                transferred,
-                client
-                    .change_diem_version(&["change_diem_version", &transferred.to_string()], true)
+            let current_version = client.get_metadata()?.into_inner().diem_version.unwrap();
+            let txn = root_account.sign_with_transaction_builder(
+                transaction_factory.update_diem_version(0, current_version + 1),
             );
+            client.submit(&txn)?;
+            client.wait_for_signed_transaction(&txn, None, None)?;
+
+            println!("Changing diem version to {}", current_version + 1,);
         }
 
-        client
-            .transfer_coins(&["tb", "0", "1", "1", "XUS"], true)
-            .unwrap();
-        transferred += 1.0;
-
-        assert!(compare_balances(
-            vec![(balance0 - transferred, "XUS".to_string())],
-            client.get_balances(&["b", "0"]).unwrap(),
-        ));
-        assert!(compare_balances(
-            vec![(balance1 + transferred, "XUS".to_string())],
-            client.get_balances(&["b", "1"]).unwrap(),
-        ));
+        transfer_coins(client, transaction_factory, account0, account1, 1);
     }
-    println!(
-        "{} coins transfered in {} seconds.",
-        transferred,
-        now.elapsed().as_secs()
-    );
-    transferred
+
+    Ok(())
 }
