@@ -13,6 +13,8 @@ pub mod verifying_client;
 #[cfg(test)]
 mod consensus;
 #[cfg(test)]
+mod genesis;
+#[cfg(test)]
 mod key_manager;
 #[cfg(test)]
 mod operational_tooling;
@@ -30,9 +32,6 @@ mod client;
 
 #[cfg(test)]
 mod full_nodes;
-
-#[cfg(test)]
-mod genesis;
 
 #[cfg(test)]
 mod network;
