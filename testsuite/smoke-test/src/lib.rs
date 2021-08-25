@@ -17,6 +17,8 @@ mod key_manager;
 #[cfg(test)]
 mod operational_tooling;
 #[cfg(test)]
+mod release_flow;
+#[cfg(test)]
 mod state_sync;
 #[cfg(test)]
 mod storage;
@@ -34,9 +36,6 @@ mod genesis;
 
 #[cfg(test)]
 mod network;
-
-#[cfg(test)]
-mod release_flow;
 
 #[cfg(test)]
 mod smoke_test_environment;

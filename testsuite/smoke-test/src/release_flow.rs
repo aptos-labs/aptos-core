@@ -1,24 +1,32 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::test_utils::{diem_swarm_utils::get_json_rpc_url, setup_swarm_and_client_proxy};
-use diem_framework_releases::current_modules_with_blobs;
-use diem_types::{
-    chain_id::ChainId, on_chain_config::DIEM_MAX_KNOWN_VERSION, transaction::TransactionPayload,
+use crate::{
+    smoke_test_environment::new_local_swarm,
+    test_utils::{assert_balance, create_and_fund_account},
 };
+use diem_framework_releases::current_modules_with_blobs;
+use diem_sdk::transaction_builder::Currency;
+use diem_types::{on_chain_config::DIEM_MAX_KNOWN_VERSION, transaction::TransactionPayload};
 use diem_validator_interface::{DiemValidatorInterface, JsonRpcDebuggerInterface};
 use diem_writeset_generator::{
     create_release, release_flow::test_utils::release_modules, verify_release,
 };
+use forge::{Node, NodeExt, Swarm};
 use std::collections::BTreeMap;
 
 #[test]
 fn test_move_release_flow() {
-    let (env, mut client) = setup_swarm_and_client_proxy(1, 0);
-    let url = get_json_rpc_url(&env.validator_swarm, 0);
+    let mut swarm = new_local_swarm(1);
+    let transaction_factory = swarm.chain_info().transaction_factory();
+    let chain_id = swarm.chain_id();
+    let validator = swarm.validators().next().unwrap();
+    let json_rpc_endpoint = validator.json_rpc_endpoint();
+    let url = json_rpc_endpoint.to_string();
+    let client = validator.json_rpc_client();
+
     let validator_interface = JsonRpcDebuggerInterface::new(&url).unwrap();
 
-    let chain_id = ChainId::test();
     let old_modules = current_modules_with_blobs()
         .into_iter()
         .map(|(bytes, modules)| (bytes.clone(), modules.clone()))
@@ -27,8 +35,7 @@ fn test_move_release_flow() {
     let release_modules = release_modules();
 
     // Execute some random transactions to make sure a new block is created.
-    client.create_next_account(false).unwrap();
-    client.mint_coins(&["mb", "0", "100", "XUS"], true).unwrap();
+    let account = create_and_fund_account(&mut swarm, 100);
 
     // With no artifact for TESTING, creating a release should fail.
     assert!(create_release(chain_id, url.clone(), 1, false, &release_modules, None, "").is_err());
@@ -42,11 +49,15 @@ fn test_move_release_flow() {
     assert!(verify_release(chain_id, url.clone(), &payload_1, &old_modules, false).is_err());
 
     // Commit the release
+    let txn = swarm
+        .chain_info()
+        .root_account
+        .sign_with_transaction_builder(
+            transaction_factory.payload(TransactionPayload::WriteSet(payload_1.clone())),
+        );
+    client.submit(&txn).unwrap();
     client
-        .association_transaction_with_local_diem_root_account(
-            TransactionPayload::WriteSet(payload_1.clone()),
-            true,
-        )
+        .wait_for_signed_transaction(&txn, None, None)
         .unwrap();
 
     let latest_version = validator_interface.get_latest_version().unwrap();
@@ -66,7 +77,11 @@ fn test_move_release_flow() {
     );
 
     // Execute some random transactions to make sure a new block is created.
-    client.mint_coins(&["mb", "0", "100", "XUS"], true).unwrap();
+    swarm
+        .chain_info()
+        .fund(Currency::XUS, account.address(), 100)
+        .unwrap();
+    assert_balance(&client, &account, 200);
 
     let latest_version = validator_interface.get_latest_version().unwrap();
     // Now that we have artifact file checked in, we can get rid of the first_release flag
@@ -100,11 +115,15 @@ fn test_move_release_flow() {
     .is_err());
 
     // Commit the release
+    let txn = swarm
+        .chain_info()
+        .root_account
+        .sign_with_transaction_builder(
+            transaction_factory.payload(TransactionPayload::WriteSet(payload_2)),
+        );
+    client.submit(&txn).unwrap();
     client
-        .association_transaction_with_local_diem_root_account(
-            TransactionPayload::WriteSet(payload_2),
-            true,
-        )
+        .wait_for_signed_transaction(&txn, None, None)
         .unwrap();
 
     let latest_version = validator_interface.get_latest_version().unwrap();
@@ -114,7 +133,7 @@ fn test_move_release_flow() {
     // Assert the remote module is the same as the release modules.
 
     assert_eq!(
-        client.client.get_metadata().unwrap().diem_version,
+        client.get_metadata().unwrap().into_inner().diem_version,
         Some(DIEM_MAX_KNOWN_VERSION.major + 1)
     );
 

@@ -161,12 +161,6 @@ pub mod diem_swarm_utils {
         .unwrap()
     }
 
-    /// Returns the JSON RPC url pointing to a node at the given
-    /// node index.
-    pub fn get_json_rpc_url(swarm: &DiemSwarm, node_index: usize) -> String {
-        format!("http://127.0.0.1:{}", swarm.get_client_port(node_index))
-    }
-
     /// Returns an operational tool pointing to a validator node at the given node index.
     pub fn get_op_tool(swarm: &DiemSwarm, node_index: usize) -> OperationalTool {
         OperationalTool::new(
