@@ -307,6 +307,14 @@ impl LocalSwarm {
         self.chain_id
     }
 
+    pub fn validator(&self, peer_id: PeerId) -> Option<&LocalNode> {
+        self.validators.get(&peer_id)
+    }
+
+    pub fn validator_mut(&mut self, peer_id: PeerId) -> Option<&mut LocalNode> {
+        self.validators.get_mut(&peer_id)
+    }
+
     pub fn validators(&self) -> impl Iterator<Item = &LocalNode> {
         self.validators.values()
     }
