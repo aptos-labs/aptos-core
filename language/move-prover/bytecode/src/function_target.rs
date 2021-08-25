@@ -275,7 +275,7 @@ impl<'env> FunctionTarget<'env> {
     }
 
     /// Gets annotations.
-    pub fn get_annotations(&self) -> &Annotations {
+    pub fn get_annotations(&self) -> &'env Annotations {
         &self.data.annotations
     }
 

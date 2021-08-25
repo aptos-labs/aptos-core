@@ -120,7 +120,11 @@ impl Analyzer {
         // get memory (list of structs) read or written by the function target,
         // then find all invariants in loaded modules that refer to that memory.
         let mut invariants_for_used_memory = BTreeSet::new();
-        for mem in usage_analysis::get_used_memory_inst(target).iter() {
+        for mem in usage_analysis::get_memory_usage(target)
+            .accessed
+            .get_all()
+            .iter()
+        {
             invariants_for_used_memory.extend(env.get_global_invariants_for_memory(mem));
         }
 
@@ -144,7 +148,7 @@ impl Analyzer {
         // collect instantiations of this function that are needed to check this global invariant
         let mut func_insts = BTreeSet::new();
 
-        let fun_mems = usage_analysis::get_used_memory_inst(target);
+        let fun_mems = usage_analysis::get_memory_usage(target).accessed.get_all();
         let fun_arity = target.get_type_parameters().len();
         for inv_mem in &invariant.mem_usage {
             for fun_mem in fun_mems.iter() {
@@ -205,10 +209,9 @@ impl<'a> Instrumenter<'a> {
         let options = ProverOptions::get(global_env);
         let function_inst = data.get_type_instantiation(fun_env);
         let builder = FunctionDataBuilder::new(fun_env, data);
-        let used_memory: BTreeSet<_> = usage_analysis::get_used_memory_inst(&builder.get_target())
-            .iter()
-            .map(|mem| mem.instantiate_ref(&function_inst))
-            .collect();
+        let used_memory: BTreeSet<_> = usage_analysis::get_memory_usage(&builder.get_target())
+            .accessed
+            .get_all_inst(&function_inst);
 
         #[cfg(invariant_trace)]
         {

@@ -301,7 +301,10 @@ impl<'a> Instrumenter<'a> {
             }
 
             // Inject well-formedness assumption for used memory.
-            for mem in usage_analysis::get_used_memory_inst(&self.builder.get_target()).clone() {
+            for mem in usage_analysis::get_memory_usage(&self.builder.get_target())
+                .accessed
+                .get_all()
+            {
                 // If this is native or intrinsic memory, skip this.
                 let struct_env = self
                     .builder
@@ -1010,7 +1013,9 @@ fn check_caller_callee_modifies_relation(
             continue;
         }
         let callee_func_target = targets.get_target(&callee_fun_env, &FunctionVariant::Baseline);
-        let callee_modified_memory = usage_analysis::get_modified_memory(&callee_func_target);
+        let callee_modified_memory = usage_analysis::get_memory_usage(&callee_func_target)
+            .modified
+            .get_all_uninst();
         for target in caller_func_target.get_modify_targets().keys() {
             if callee_modified_memory.contains(target)
                 && callee_func_target
@@ -1047,7 +1052,11 @@ fn check_opaque_modifies_completeness(
     // a modifies clause. Otherwise we could introduce unsoundness.
     // TODO: we currently except Event::EventHandle from this, because this is treated as
     //   an immutable reference. We should find a better way how to deal with event handles.
-    for mem in usage_analysis::get_modified_memory_inst(&target).iter() {
+    for mem in usage_analysis::get_memory_usage(&target)
+        .modified
+        .get_all()
+        .iter()
+    {
         if env.is_wellknown_event_handle_type(&Type::Struct(mem.module_id, mem.id, vec![])) {
             continue;
         }

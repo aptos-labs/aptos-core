@@ -126,27 +126,52 @@ public fun Test::update_ints() {
 
 
 function Test::update [baseline] {
-  used = {Test::A<#0, #0>}
-  directly used = {Test::A<#0, #0>}
+  accessed = {Test::A<#0, #0>}
+  directly accessed = {Test::A<#0, #0>}
   modified = {Test::A<#0, #0>}
   directly modified = {Test::A<#0, #0>}
+  assumed = {}
+  directly assumed = {}
+  asserted = {}
+  directly asserted = {}
+}
 function Test::publish [baseline] {
-  used = {Test::A<#0, u8>}
-  directly used = {Test::A<#0, u8>}
+  accessed = {Test::A<#0, u8>}
+  directly accessed = {Test::A<#0, u8>}
   modified = {Test::A<#0, u8>}
   directly modified = {Test::A<#0, u8>}
+  assumed = {}
+  directly assumed = {}
+  asserted = {}
+  directly asserted = {}
+}
 function Test::test [baseline] {
-  used = {Test::A<u64, #0>}
-  directly used = {Test::A<u64, #0>}
+  accessed = {Test::A<u64, #0>}
+  directly accessed = {Test::A<u64, #0>}
   modified = {}
   directly modified = {}
+  assumed = {}
+  directly assumed = {}
+  asserted = {}
+  directly asserted = {}
+}
 function Test::update_caller [baseline] {
-  used = {Test::A<u8, u8>}
-  directly used = {}
+  accessed = {Test::A<u8, u8>}
+  directly accessed = {}
   modified = {Test::A<u8, u8>}
   directly modified = {}
+  assumed = {}
+  directly assumed = {}
+  asserted = {}
+  directly asserted = {}
+}
 function Test::update_ints [baseline] {
-  used = {Test::A<u64, u128>}
-  directly used = {Test::A<u64, u128>}
+  accessed = {Test::A<u64, u128>}
+  directly accessed = {Test::A<u64, u128>}
   modified = {Test::A<u64, u128>}
   directly modified = {Test::A<u64, u128>}
+  assumed = {}
+  directly assumed = {}
+  asserted = {}
+  directly asserted = {}
+}

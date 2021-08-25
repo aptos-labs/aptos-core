@@ -38,6 +38,7 @@ impl JoinResult {
 
 /// A trait to be implemented by domains which support a join.
 pub trait AbstractDomain {
+    // TODO: would be cool to add a derive(Join) macro for this
     fn join(&mut self, other: &Self) -> JoinResult;
 }
 
