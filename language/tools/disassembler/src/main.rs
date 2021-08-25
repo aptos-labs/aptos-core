@@ -3,10 +3,7 @@
 
 #![forbid(unsafe_code)]
 
-use bytecode_source_map::{
-    mapping::SourceMapping,
-    utils::{remap_owned_loc_to_loc, source_map_from_file, OwnedLoc},
-};
+use bytecode_source_map::{mapping::SourceMapping, utils::source_map_from_file};
 use disassembler::disassembler::{Disassembler, DisassemblerOptions};
 use move_binary_format::{
     binary_views::BinaryIndexedView,
@@ -16,7 +13,7 @@ use move_command_line_common::files::{
     MOVE_COMPILED_EXTENSION, MOVE_EXTENSION, SOURCE_MAP_EXTENSION,
 };
 use move_coverage::coverage_map::CoverageMap;
-use move_ir_types::location::Spanned;
+use move_ir_types::location::{Loc, Spanned};
 use std::{fs, path::Path};
 use structopt::StructOpt;
 
@@ -81,10 +78,9 @@ fn main() {
 
     let source_path = Path::new(&args.bytecode_file_path).with_extension(move_extension);
     let source = fs::read_to_string(&source_path).ok();
-    let source_map = source_map_from_file::<OwnedLoc>(
+    let source_map = source_map_from_file::<Loc>(
         &Path::new(&args.bytecode_file_path).with_extension(source_map_extension),
-    )
-    .map(remap_owned_loc_to_loc);
+    );
 
     let mut disassembler_options = DisassemblerOptions::new();
     disassembler_options.print_code = !args.skip_code;

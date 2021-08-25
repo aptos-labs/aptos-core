@@ -3,13 +3,14 @@
 
 #![forbid(unsafe_code)]
 
-use bytecode_source_map::utils::{remap_owned_loc_to_loc, source_map_from_file, OwnedLoc};
+use bytecode_source_map::utils::source_map_from_file;
 use move_binary_format::file_format::CompiledModule;
 use move_bytecode_viewer::{
     bytecode_viewer::BytecodeViewer, source_viewer::ModuleViewer,
     tui::tui_interface::start_tui_with_interface, viewer::Viewer,
 };
 use move_command_line_common::files::SOURCE_MAP_EXTENSION;
+use move_ir_types::location::Loc;
 use std::{fs, path::Path};
 use structopt::StructOpt;
 
@@ -36,10 +37,9 @@ pub fn main() {
     let compiled_module =
         CompiledModule::deserialize(&bytecode_bytes).expect("Module blob can't be deserialized");
 
-    let source_map = source_map_from_file::<OwnedLoc>(
+    let source_map = source_map_from_file::<Loc>(
         &Path::new(&args.module_binary_path).with_extension(source_map_extension),
     )
-    .map(remap_owned_loc_to_loc)
     .unwrap();
 
     let source_path = Path::new(&args.source_file_path);

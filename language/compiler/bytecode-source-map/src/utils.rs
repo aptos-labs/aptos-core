@@ -13,8 +13,7 @@ use codespan_reporting::{
     },
 };
 use move_ir_types::location::Loc;
-use move_symbol_pool::Symbol;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::de::DeserializeOwned;
 use std::{fs::File, io::Read, path::Path};
 
 type FileId = usize;
@@ -24,7 +23,7 @@ pub type Errors = Vec<Error>;
 
 pub fn source_map_from_file<Location>(file_path: &Path) -> Result<SourceMap<Location>>
 where
-    Location: Clone + Eq + Default + DeserializeOwned,
+    Location: Clone + Eq + DeserializeOwned,
 {
     let mut bytes = Vec::new();
     File::open(file_path)
@@ -54,23 +53,4 @@ pub fn render_errors(source_mapper: &SourceMapping<Loc>, errors: Errors) -> Resu
 
 pub fn create_diagnostic(id: FileId, (loc, msg): Error) -> Diagnostic<FileId> {
     Diagnostic::error().with_labels(vec![Label::primary(id, loc.usize_range()).with_message(msg)])
-}
-
-//***************************************************************************
-// Deserialization helper
-//***************************************************************************
-
-#[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
-pub struct OwnedLoc {
-    file: String,
-    start: u32,
-    end: u32,
-}
-
-pub fn remap_owned_loc_to_loc(m: SourceMap<OwnedLoc>) -> SourceMap<Loc> {
-    let mut f = |owned| {
-        let OwnedLoc { file, start, end } = owned;
-        Loc::new(Symbol::from(file), start, end)
-    };
-    m.remap_locations(&mut f)
 }
