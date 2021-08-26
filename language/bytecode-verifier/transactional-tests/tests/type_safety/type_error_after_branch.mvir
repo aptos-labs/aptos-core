@@ -1,0 +1,14 @@
+//# run
+
+main(b: bool) {
+  let x: u64;
+
+  if (move(b)) {
+    x = 2;
+  } else {
+    x = 3;
+  }
+  x = true; // type error here
+
+  return;
+}

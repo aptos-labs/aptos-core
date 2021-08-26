@@ -1,6 +1,0 @@
-module {{default}}.Test {
-    public no(r: &mut u64): &u64 {
-        return move(r);
-    }
-}
-// check: RET_TYPE_MISMATCH_ERROR

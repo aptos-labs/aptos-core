@@ -1,0 +1,9 @@
+//# publish
+module 0x42.Test {
+    struct T{fint: u64}
+
+    public t1(): Self.T {
+        // arg type mismatch
+        return T{fint: false};
+    }
+}

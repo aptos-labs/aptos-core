@@ -1,0 +1,15 @@
+//# publish
+module 0x42.Test {
+    public t(fr: u64) {
+        return;
+    }
+}
+
+//# run
+import 0x42.Test;
+
+main() {
+    // args type mismatch
+    Test.t(true);
+    return;
+}

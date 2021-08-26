@@ -1,6 +1,0 @@
-// check: DUPLICATE_ELEMENT
-
-module {{default}}.M {
-    f() {}
-    f() {}
-}

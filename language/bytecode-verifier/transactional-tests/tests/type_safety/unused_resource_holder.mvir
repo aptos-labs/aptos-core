@@ -1,0 +1,28 @@
+//# publish
+
+module 0x42.A {
+    struct Coin has store { value: u64 }
+    struct T { g: Self.Coin }
+
+    public zero(): Self.Coin {
+        return Coin { value: 0 };
+    }
+    public new(g: Self.Coin): Self.T {
+        return T {g: move(g)};
+    }
+
+}
+
+//# run
+
+import 0x42.A;
+
+main() {
+    let zero_resource: A.Coin;
+    let s: A.T;
+    zero_resource = A.zero();
+    // unused resources
+    s = A.new(move(zero_resource));
+
+    return;
+}

@@ -1,0 +1,5 @@
+//# publish
+module 0x42.M {
+    // cannot be a friend with a nonexistant module
+    friend 0x42.Nonexistent;
+}

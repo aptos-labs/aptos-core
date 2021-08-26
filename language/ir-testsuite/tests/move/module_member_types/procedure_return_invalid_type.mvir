@@ -1,6 +1,0 @@
-module {{default}}.Test {
-    public no(): u64 {
-        return false;
-    }
-}
-// check: RET_TYPE_MISMATCH_ERROR
