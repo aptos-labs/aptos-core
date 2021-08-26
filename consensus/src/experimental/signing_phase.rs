@@ -42,9 +42,7 @@ impl Display for SigningRequest {
     }
 }
 
-pub struct SigningResponse {
-    pub inner: Result<Ed25519Signature, Error>,
-}
+pub type SigningResponse = Result<Ed25519Signature, Error>;
 
 pub struct SigningPhase {
     safety_rule_handle: Arc<Mutex<MetricsSafetyRules>>,
@@ -65,11 +63,8 @@ impl StatelessPipeline for SigningPhase {
             ordered_ledger_info,
             commit_ledger_info,
         } = req;
-        SigningResponse {
-            inner: self
-                .safety_rule_handle
-                .lock()
-                .sign_commit_vote(ordered_ledger_info, commit_ledger_info),
-        }
+        self.safety_rule_handle
+            .lock()
+            .sign_commit_vote(ordered_ledger_info, commit_ledger_info)
     }
 }
