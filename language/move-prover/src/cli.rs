@@ -94,7 +94,15 @@ impl Default for Options {
             verbosity_level: LevelFilter::Info,
             move_sources: vec![],
             move_deps: vec![],
-            move_named_address_values: vec![],
+            move_named_address_values: vec![
+                // TODO: Remove this and this field when package support has landed
+                "Std=0x1".into(),
+                "DiemFramework=0x1".into(),
+                "DiemRoot=0xA550C18".into(),
+                "CurrencyInfo=0xA550C18".into(),
+                "TreasuryCompliance=0xB1E55ED".into(),
+                "VMReserved=0x0".into(),
+            ],
             model_builder: ModelBuilderOptions::default(),
             prover: ProverOptions::default(),
             backend: BoogieOptions::default(),
