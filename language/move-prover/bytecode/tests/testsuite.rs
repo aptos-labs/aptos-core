@@ -21,6 +21,7 @@ use bytecode::{
     read_write_set_analysis::ReadWriteSetProcessor,
     spec_instrumentation::SpecInstrumentationProcessor,
     usage_analysis::UsageProcessor,
+    verification_analysis::VerificationAnalysisProcessor,
     verification_analysis_v2::VerificationAnalysisProcessorV2,
 };
 use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
@@ -97,6 +98,19 @@ fn get_tested_transformation_pipeline(
             pipeline.add_processor(BorrowAnalysisProcessor::new());
             pipeline.add_processor(MemoryInstrumentationProcessor::new());
             pipeline.add_processor(CleanAndOptimizeProcessor::new());
+            Ok(Some(pipeline))
+        }
+        "verification_analysis" => {
+            let mut pipeline = FunctionTargetPipeline::default();
+            pipeline.add_processor(EliminateImmRefsProcessor::new());
+            pipeline.add_processor(MutRefInstrumenter::new());
+            pipeline.add_processor(ReachingDefProcessor::new());
+            pipeline.add_processor(LiveVarAnalysisProcessor::new());
+            pipeline.add_processor(BorrowAnalysisProcessor::new());
+            pipeline.add_processor(MemoryInstrumentationProcessor::new());
+            pipeline.add_processor(CleanAndOptimizeProcessor::new());
+            pipeline.add_processor(UsageProcessor::new());
+            pipeline.add_processor(VerificationAnalysisProcessor::new());
             Ok(Some(pipeline))
         }
         "spec_instrumentation" => {
