@@ -24,7 +24,10 @@ use move_model::{
 };
 
 use itertools::Itertools;
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt::{self, Formatter},
+};
 
 /// The annotation for information about verification.
 #[derive(Clone, Default)]
@@ -130,6 +133,95 @@ impl FunctionTargetProcessor for VerificationAnalysisProcessor {
 
     fn name(&self) -> String {
         "verification_analysis".to_string()
+    }
+
+    fn dump_result(
+        &self,
+        f: &mut Formatter<'_>,
+        env: &GlobalEnv,
+        targets: &FunctionTargetsHolder,
+    ) -> fmt::Result {
+        writeln!(f, "\n********* Result of verification analysis *********\n")?;
+
+        let analysis = env
+            .get_extension::<InvariantAnalysisData>()
+            .expect("Verification analysis not performed");
+
+        writeln!(f, "functions that defer invariant checking at return: [")?;
+        for fun_id in &analysis.fun_set_with_inv_check_on_exit {
+            writeln!(f, "  {}", env.get_function(*fun_id).get_full_name_str())?;
+        }
+        writeln!(f, "]\n")?;
+
+        writeln!(f, "functions that delegate invariants to its callers: [")?;
+        for fun_id in &analysis.fun_set_with_no_inv_check {
+            writeln!(f, "  {}", env.get_function(*fun_id).get_full_name_str())?;
+        }
+        writeln!(f, "]\n")?;
+
+        writeln!(f, "invariant applicability: [")?;
+        let target_invs: BTreeSet<_> = env
+            .get_target_modules()
+            .iter()
+            .map(|menv| env.get_global_invariants_by_module(menv.get_id()))
+            .flatten()
+            .collect();
+
+        let fmt_inv_ids = |ids: &BTreeSet<GlobalId>| -> String {
+            ids.iter()
+                .map(|i| {
+                    if target_invs.contains(i) {
+                        format!("{}*", i)
+                    } else {
+                        i.to_string()
+                    }
+                })
+                .join(", ")
+        };
+
+        for (fun_id, inv_relevance) in &analysis.fun_to_inv_map {
+            writeln!(f, "  {}: {{", env.get_function(*fun_id).get_full_name_str())?;
+            writeln!(
+                f,
+                "    accessed: [{}]",
+                fmt_inv_ids(&inv_relevance.accessed)
+            )?;
+            writeln!(
+                f,
+                "    modified: [{}]",
+                fmt_inv_ids(&inv_relevance.modified)
+            )?;
+            writeln!(
+                f,
+                "    directly accessed: [{}]",
+                fmt_inv_ids(&inv_relevance.direct_accessed)
+            )?;
+            writeln!(
+                f,
+                "    directly modified: [{}]",
+                fmt_inv_ids(&inv_relevance.direct_modified)
+            )?;
+            writeln!(f, "  }}")?;
+        }
+        writeln!(f, "]\n")?;
+
+        writeln!(f, "verification analysis: [")?;
+        for (fun_id, fun_variant) in targets.get_funs_and_variants() {
+            let fenv = env.get_function(fun_id);
+            let target = targets.get_target(&fenv, &fun_variant);
+            let result = get_info(&target);
+            write!(f, "  {}: ", fenv.get_full_name_str())?;
+            if result.verified {
+                if result.inlined {
+                    writeln!(f, "verified + inlined")?;
+                } else {
+                    writeln!(f, "verified")?;
+                }
+            } else {
+                writeln!(f, "inlined")?;
+            }
+        }
+        writeln!(f, "]")
     }
 
     fn initialize(&self, env: &GlobalEnv, targets: &mut FunctionTargetsHolder) {
