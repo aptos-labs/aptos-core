@@ -131,6 +131,10 @@ impl LocalNode {
         &self.config
     }
 
+    pub(crate) fn config_mut(&mut self) -> &mut NodeConfig {
+        &mut self.config
+    }
+
     pub fn upgrade(&mut self, version: LocalVersion) -> Result<()> {
         self.stop();
         self.version = version;

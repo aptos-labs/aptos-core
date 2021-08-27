@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    ChainInfo, FullNode, HealthCheckError, LocalNode, LocalVersion, Node, Swarm, SwarmExt,
+    ChainInfo, FullNode, HealthCheckError, LocalNode, LocalVersion, Node, NodeExt, Swarm, SwarmExt,
     Validator, Version,
 };
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
 use diem_config::config::NodeConfig;
 use diem_genesis_tool::{fullnode_builder::FullnodeConfig, validator_builder::ValidatorBuilder};
 use diem_sdk::{
@@ -275,6 +275,54 @@ impl LocalSwarm {
         }
 
         Err(anyhow!("Launching Swarm timed out"))
+    }
+
+    pub fn add_validator_fullnode(
+        &mut self,
+        version: &Version,
+        template: NodeConfig,
+        validator_peer_id: PeerId,
+    ) -> Result<PeerId> {
+        let validator = self
+            .validators
+            .get_mut(&validator_peer_id)
+            .ok_or_else(|| anyhow!("no validator with peer_id: {}", validator_peer_id))?;
+
+        if self.fullnodes.contains_key(&validator_peer_id) {
+            bail!("VFN for validator {} already configured", validator_peer_id);
+        }
+
+        let mut validator_config = validator.config().clone();
+        let name = self.node_name_counter.to_string();
+        self.node_name_counter += 1;
+        let fullnode_config = FullnodeConfig::validator_fullnode(
+            name,
+            self.dir.as_ref(),
+            template,
+            &mut validator_config,
+            &self.genesis_waypoint,
+            &self.genesis,
+        )?;
+
+        // Since the validator's config has changed we need to save it
+        validator_config.save(validator.config_path())?;
+        *validator.config_mut() = validator_config;
+        validator.restart()?;
+
+        let version = self.versions.get(version).unwrap();
+        let mut fullnode = LocalNode::new(
+            version.to_owned(),
+            fullnode_config.name,
+            fullnode_config.directory,
+        )?;
+
+        let peer_id = fullnode.peer_id();
+        assert_eq!(peer_id, validator_peer_id);
+        fullnode.start()?;
+
+        self.fullnodes.insert(peer_id, fullnode);
+
+        Ok(peer_id)
     }
 
     fn add_fullnode(&mut self, version: &Version, template: NodeConfig) -> Result<PeerId> {
