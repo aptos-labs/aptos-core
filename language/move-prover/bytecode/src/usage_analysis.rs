@@ -8,6 +8,7 @@ use crate::{
     function_target::{FunctionData, FunctionTarget},
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder, FunctionVariant},
     stackless_bytecode::{BorrowNode, Bytecode, Operation, PropKind},
+    verification_analysis,
 };
 
 use move_binary_format::file_format::CodeOffset;
@@ -155,6 +156,7 @@ macro_rules! generate_inserter {
     };
 }
 
+/// Generated functions
 impl UsageState {
     generate_inserter!(accessed, add_direct);
     generate_inserter!(accessed, add_transitive);
@@ -167,6 +169,23 @@ impl UsageState {
 
     generate_inserter!(asserted, add_direct);
     generate_inserter!(asserted, add_transitive);
+}
+
+/// Helpers for the abstract interpretation process
+impl UsageState {
+    fn subsume_callee_as_direct(&mut self, callee: &Self, inst: &[Type]) {
+        self.add_direct_accessed_iter(callee.accessed.get_all_inst(inst).into_iter());
+        self.add_direct_modified_iter(callee.modified.get_all_inst(inst).into_iter());
+        self.add_direct_assumed_iter(callee.assumed.get_all_inst(inst).into_iter());
+        self.add_direct_asserted_iter(callee.asserted.get_all_inst(inst).into_iter());
+    }
+
+    fn subsume_callee_as_transitive(&mut self, callee: &Self, inst: &[Type]) {
+        self.add_transitive_accessed_iter(callee.accessed.get_all_inst(inst).into_iter());
+        self.add_transitive_modified_iter(callee.modified.get_all_inst(inst).into_iter());
+        self.add_transitive_assumed_iter(callee.assumed.get_all_inst(inst).into_iter());
+        self.add_transitive_asserted_iter(callee.asserted.get_all_inst(inst).into_iter());
+    }
 }
 
 impl AbstractDomain for UsageState {
@@ -217,22 +236,30 @@ impl<'a> TransferFunctions for MemoryUsageAnalysis<'a> {
                 Function(mid, fid, inst)
                 | OpaqueCallBegin(mid, fid, inst)
                 | OpaqueCallEnd(mid, fid, inst) => {
+                    let callee_id = mid.qualified(*fid);
                     if let Some(summary) = self
                         .cache
-                        .get::<UsageState>(mid.qualified(*fid), &FunctionVariant::Baseline)
+                        .get::<UsageState>(callee_id, &FunctionVariant::Baseline)
                     {
-                        state.add_transitive_accessed_iter(
-                            summary.accessed.get_all_inst(inst).into_iter(),
-                        );
-                        state.add_transitive_modified_iter(
-                            summary.modified.get_all_inst(inst).into_iter(),
-                        );
-                        state.add_transitive_assumed_iter(
-                            summary.assumed.get_all_inst(inst).into_iter(),
-                        );
-                        state.add_transitive_asserted_iter(
-                            summary.asserted.get_all_inst(inst).into_iter(),
-                        );
+                        let callee_env = self.cache.global_env().get_function(callee_id);
+                        if verification_analysis::is_invariant_checking_delegated(&callee_env) {
+                            // NOTE: memories touched by callees, including opaque callees, are
+                            // considered as directly touched by the caller. We need this info in
+                            // global invariant instrumentation to calculate
+                            // 1) the correct set of invariants applicable (assumed/asserted) at the
+                            //    caller function, and
+                            // 2) the complete set of instantiations for each of the applicable
+                            //    invariant.
+                            //
+                            // An alternative is to keep these memory as transitive for now,
+                            // duplicate this information in invariant analysis and mark these
+                            // memory as direct in the duplicated copy. Given currently the global
+                            // invariant instrumentation pipeline is the only client of the
+                            // usage analysis pass, we encode the special treatment up here.
+                            state.subsume_callee_as_direct(summary, inst);
+                        } else {
+                            state.subsume_callee_as_transitive(summary, inst);
+                        }
                     }
                 }
                 MoveTo(mid, sid, inst)

@@ -673,15 +673,17 @@ impl InvariantRelevance {
 }
 
 // Helper functions
-fn is_invariant_checking_disabled(fun_env: &FunctionEnv) -> bool {
+// ----------------
+
+pub fn is_invariant_checking_disabled(fun_env: &FunctionEnv) -> bool {
     fun_env.is_pragma_true(DISABLE_INVARIANTS_IN_BODY_PRAGMA, || false)
 }
 
-fn is_invariant_checking_delegated(fun_env: &FunctionEnv) -> bool {
+pub fn is_invariant_checking_delegated(fun_env: &FunctionEnv) -> bool {
     fun_env.is_pragma_true(DELEGATE_INVARIANTS_TO_CALLER_PRAGMA, || false)
 }
 
-fn is_invariant_suspendable(env: &GlobalEnv, inv_id: GlobalId) -> bool {
+pub fn is_invariant_suspendable(env: &GlobalEnv, inv_id: GlobalId) -> bool {
     let inv = env.get_global_invariant(inv_id).unwrap();
     env.is_property_true(&inv.properties, CONDITION_SUSPENDABLE_PROP)
         .unwrap_or(false)

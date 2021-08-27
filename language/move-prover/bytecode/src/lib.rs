@@ -20,6 +20,7 @@ pub mod eliminate_imm_refs;
 pub mod function_data_builder;
 pub mod function_target;
 pub mod function_target_pipeline;
+pub mod global_invariant_analysis;
 pub mod global_invariant_instrumentation_v2;
 pub mod graph;
 pub mod inconsistency_check;
