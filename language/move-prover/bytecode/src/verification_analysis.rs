@@ -331,7 +331,7 @@ impl FunctionTargetProcessor for VerificationAnalysisProcessor {
     }
 }
 
-// This impl block contains functions on marking a function as verified or inlined
+/// This impl block contains functions on marking a function as verified or inlined
 impl VerificationAnalysisProcessor {
     /// Check whether the function falls within the verification scope given in the options
     fn is_within_verification_scope(fun_env: &FunctionEnv) -> bool {
@@ -391,16 +391,16 @@ impl VerificationAnalysisProcessor {
     }
 }
 
-// This impl block contains functions on global invariant applicability analysis
+/// This impl block contains functions on global invariant applicability analysis
 impl VerificationAnalysisProcessor {
-    // Build the E set and N set
-    //
-    // E set: f in E if declared pragma disable_invariant_in_body for f
-    // N set: f in N if f is called from a function in E or N
-    //        can also put f in N by pragma delegate_invariant_to_caller
-    //
-    // E set means: a suspendable invariant holds before, after, but NOT during the function body
-    // N set means: a suspendable invariant don’t hold at any point in the function
+    /// Build the E set and N set
+    ///
+    /// E set: f in E if declared pragma disable_invariant_in_body for f
+    /// N set: f in N if f is called from a function in E or N
+    ///        can also put f in N by pragma delegate_invariant_to_caller
+    ///
+    /// E set means: a suspendable invariant holds before, after, but NOT during the function body
+    /// N set means: a suspendable invariant doesn't hold at any point in the function
     fn probe_invariant_status_in_functions(
         env: &GlobalEnv,
     ) -> (BTreeSet<QualifiedId<FunId>>, BTreeSet<QualifiedId<FunId>>) {
@@ -442,8 +442,8 @@ impl VerificationAnalysisProcessor {
         (disabled_inv_fun_set, non_inv_fun_set)
     }
 
-    // Compute the chain of calls which leads to an implicit non-inv function, i.e., explain why
-    // a function appears in the N-set.
+    /// Compute the chain of calls which leads to an implicit non-inv function, i.e., explain why
+    /// a function appears in the N-set.
     fn compute_non_inv_cause_chain(fun_env: &FunctionEnv<'_>) -> Vec<String> {
         let global_env = fun_env.module_env.env;
         let mut worklist: BTreeSet<Vec<QualifiedId<FunId>>> = fun_env
@@ -492,9 +492,9 @@ impl VerificationAnalysisProcessor {
         result
     }
 
-    // Produce a Map[fun_id -> InvariantRelevance] ignoring the relevant pragmas on both
-    // function-side (i.e., `disable_invariants_in_body` and `delegate_invariants_to_caller`) and
-    // invariant-side (i.e., `suspendable`)
+    /// Produce a `Map[fun_id -> InvariantRelevance]` ignoring the relevant pragmas on both
+    /// function-side (i.e., `disable_invariants_in_body` and `delegate_invariants_to_caller`) and
+    /// invariant-side (i.e., `suspendable`)
     fn build_function_to_invariants_map(
         env: &GlobalEnv,
         targets: &FunctionTargetsHolder,
@@ -522,8 +522,8 @@ impl VerificationAnalysisProcessor {
         invariant_relevance
     }
 
-    // From the iterator of global invariants, find the ones that are relevant to the function as
-    // well as how/why the invariant is relevant.
+    /// From the iterator of global invariants, find the ones that are relevant to the function as
+    /// well as how/why the invariant is relevant.
     fn find_relevant_invariants<'a>(
         target: &FunctionTarget,
         invariants: impl Iterator<Item = &'a GlobalInvariant>,
@@ -573,8 +573,8 @@ impl VerificationAnalysisProcessor {
         }
     }
 
-    // Prune the Map[fun_id -> InvariantRelevance] returned from `build_function_to_invariants_map`
-    // after considering the invariant-related pragmas.
+    /// Prune the `Map[fun_id -> InvariantRelevance]` returned by `build_function_to_invariants_map`
+    /// after considering the invariant-related pragmas.
     fn prune_function_to_invariants_map(
         env: &GlobalEnv,
         original: BTreeMap<QualifiedId<FunId>, InvariantRelevance>,
@@ -633,11 +633,11 @@ impl VerificationAnalysisProcessor {
     }
 }
 
-// This impl block contains functions that are mostly utilities functions and are only relevant
-// within this file.
+/// This impl block contains functions that are mostly utilities functions and are only relevant
+/// within this file.
 impl InvariantRelevance {
-    // split off [suspendable] invariants from the sets and form a new InvariantRelevance for these
-    // suspendable invariants. This represents the invariants that will be deferred to the caller.
+    /// Split off `[suspendable]` invariants from the sets and form a new `InvariantRelevance` for
+    /// these suspended ones. This represents the invariants that will be deferred to the caller.
     fn prune_suspendable(&mut self, env: &GlobalEnv) -> Self {
         fn separate(holder: &mut BTreeSet<GlobalId>, env: &GlobalEnv) -> BTreeSet<GlobalId> {
             let mut split = BTreeSet::new();
@@ -664,13 +664,13 @@ impl InvariantRelevance {
         }
     }
 
-    // accept the invariants deferred from the callee and incorporate them into the callers' direct
-    // accessed/modified set if these invariants are also in the caller's transitive set.
-    //
-    // NOTE: it is possible that the deferred invariants are not in the caller's transitive set.
-    // For example, if the callee (C) is a generic function that modifies memory S<T> while the
-    // suspended invariant I is about S<bool>. The caller (F) calls a concrete instantiation of C
-    // which modifies S<u64>. In this case, I is applicable to C but not applicable to F.
+    /// Accept the invariants deferred from the callee and incorporate them into the callers' direct
+    /// accessed/modified set if these invariants are also in the caller's transitive set.
+    ///
+    /// NOTE: it is possible that the deferred invariants are not in the caller's transitive set.
+    /// For example, if the callee (C) is a generic function that modifies memory S<T> while the
+    /// suspended invariant I is about S<bool>. The caller (F) calls a concrete instantiation of C
+    /// which modifies S<u64>. In this case, I is applicable to C but not applicable to F.
     fn subsume_callee(&mut self, suspended: &InvariantRelevance) {
         self.direct_accessed
             .extend(suspended.accessed.intersection(&self.accessed));
