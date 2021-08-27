@@ -95,37 +95,3 @@ pub fn get_bin<S: AsRef<str>>(bin_name: S) -> PathBuf {
 
     bin_path
 }
-
-static DIEM_NODE: Lazy<bool> = Lazy::new(|| {
-    let args = vec!["build", "--features", "failpoints"];
-    let mut path = workspace_root();
-    path.push("diem-node/");
-    info!("Building diem-node binary with failpoints");
-    let cargo_build = Command::new("cargo")
-        .current_dir(path)
-        .args(&args)
-        .output()
-        .expect("Failed to build diem node");
-    if cargo_build.status.success() {
-        info!("Finished building diem-node with failpoints");
-        true
-    } else {
-        error!("Output: {:?}", cargo_build);
-        false
-    }
-});
-
-pub fn get_diem_node_with_failpoints() -> PathBuf {
-    if !*DIEM_NODE {
-        panic!("Failed to build diem node with failpoints");
-    }
-    let bin_path = build_dir().join(format!("{}{}", "diem-node", env::consts::EXE_SUFFIX));
-    if !bin_path.exists() {
-        panic!(
-            "Can't find binary diem-node in expected path {:?}",
-            bin_path
-        );
-    }
-
-    bin_path
-}

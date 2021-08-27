@@ -9,43 +9,7 @@ use diem_sdk::{
     types::{transaction::SignedTransaction, LocalAccount},
 };
 use forge::{LocalSwarm, Swarm};
-use rust_decimal::{prelude::FromPrimitive, Decimal};
-use std::{collections::BTreeMap, fs::File, io::Write, path::PathBuf, str::FromStr};
-
-// TODO(joshlind): Refactor all of these so that they can be contained within the calling
-// test files and not shared across all tests.
-pub fn compare_balances(
-    expected_balances: Vec<(f64, String)>,
-    extracted_balances: Vec<String>,
-) -> bool {
-    if extracted_balances.len() != extracted_balances.len() {
-        return false;
-    }
-
-    let extracted_balances_dec: BTreeMap<_, _> = extracted_balances
-        .into_iter()
-        .map(|balance_str| {
-            let (currency_code, stripped_str) = if balance_str.ends_with("XUS") {
-                ("XUS", balance_str.trim_end_matches("XUS"))
-            } else if balance_str.ends_with("XDX") {
-                ("XDX", balance_str.trim_end_matches("XDX"))
-            } else {
-                panic!("Unexpected currency type returned for balance")
-            };
-            (currency_code, Decimal::from_str(stripped_str).ok())
-        })
-        .collect();
-
-    expected_balances
-        .into_iter()
-        .all(|(balance, currency_code)| {
-            if let Some(extracted_balance) = extracted_balances_dec.get(currency_code.as_str()) {
-                Decimal::from_f64(balance) == *extracted_balance
-            } else {
-                false
-            }
-        })
-}
+use std::{fs::File, io::Write, path::PathBuf};
 
 pub fn create_and_fund_account(swarm: &mut LocalSwarm, amount: u64) -> LocalAccount {
     let account = LocalAccount::generate(&mut rand::rngs::OsRng);
@@ -115,47 +79,11 @@ pub fn assert_balance(client: &BlockingClient, account: &LocalAccount, balance: 
 /// node swarm, or a public full node swarm.
 pub mod diem_swarm_utils {
     use crate::test_utils::fetch_backend_storage;
-    use cli::client_proxy::ClientProxy;
     use diem_config::config::{NodeConfig, OnDiskStorageConfig, SecureBackend, WaypointConfig};
     use diem_global_constants::{DIEM_ROOT_KEY, TREASURY_COMPLIANCE_KEY};
     use diem_secure_storage::{CryptoStorage, KVStorage, OnDiskStorage, Storage};
-    use diem_swarm::swarm::DiemSwarm;
-    use diem_types::{chain_id::ChainId, waypoint::Waypoint};
+    use diem_types::waypoint::Waypoint;
     use forge::{LocalNode, LocalSwarm, Swarm};
-    use std::path::PathBuf;
-
-    /// Returns a new client proxy connected to the given swarm at the specified
-    /// node index.
-    pub fn get_client_proxy(
-        swarm: &DiemSwarm,
-        node_index: usize,
-        diem_root_key_path: &str,
-        mnemonic_file_path: PathBuf,
-        waypoint: Option<Waypoint>,
-    ) -> ClientProxy {
-        let port = swarm.get_client_port(node_index);
-
-        let mnemonic_file_path = mnemonic_file_path
-            .canonicalize()
-            .expect("Unable to get canonical path of mnemonic_file_path")
-            .to_str()
-            .unwrap()
-            .to_string();
-
-        ClientProxy::new(
-            ChainId::test(),
-            &format!("http://localhost:{}/v1", port),
-            diem_root_key_path,
-            diem_root_key_path,
-            diem_root_key_path,
-            false,
-            /* faucet server */ None,
-            Some(mnemonic_file_path),
-            waypoint.unwrap_or(swarm.config.waypoint),
-            true,
-        )
-        .unwrap()
-    }
 
     /// Loads the nodes's storage backend identified by the node index in the given swarm.
     pub fn load_validators_backend_storage(validator: &LocalNode) -> SecureBackend {
