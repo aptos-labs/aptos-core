@@ -28,6 +28,7 @@ use diem_secure_storage::Storage;
 use diem_time_service::TimeService;
 use diem_types::{chain_id::ChainId, network_address::NetworkAddress};
 use network::{
+    application::storage::PeerMetadataStorage,
     connectivity_manager::{builder::ConnectivityManagerBuilder, ConnectivityRequest},
     logging::NetworkSchema,
     peer_manager::{
@@ -70,6 +71,7 @@ pub struct NetworkBuilder {
     connectivity_manager_builder: Option<ConnectivityManagerBuilder>,
     health_checker_builder: Option<HealthCheckerBuilder>,
     peer_manager_builder: PeerManagerBuilder,
+    peer_metadata_storage: Arc<PeerMetadataStorage>,
 
     // (StateSync) ReconfigSubscriptions required by internal Network components.
     reconfig_subscriptions: Vec<ReconfigSubscription>,
@@ -121,6 +123,7 @@ impl NetworkBuilder {
             health_checker_builder: None,
             peer_manager_builder,
             reconfig_subscriptions: vec![],
+            peer_metadata_storage: Arc::new(PeerMetadataStorage::new()),
         }
     }
 
@@ -410,7 +413,6 @@ impl NetworkBuilder {
         // Initialize and start HealthChecker.
         let (hc_network_tx, hc_network_rx) =
             self.add_protocol_handler(health_checker::network_endpoint_config());
-
         self.health_checker_builder = Some(HealthCheckerBuilder::new(
             self.network_context(),
             self.time_service.clone(),
@@ -419,6 +421,7 @@ impl NetworkBuilder {
             ping_failures_tolerated,
             hc_network_tx,
             hc_network_rx,
+            self.peer_metadata_storage.clone(),
         ));
         debug!(
             NetworkSchema::new(&self.network_context),

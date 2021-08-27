@@ -26,8 +26,8 @@ impl HealthCheckerBuilder {
         ping_failures_tolerated: u64,
         network_tx: HealthCheckerNetworkSender,
         network_rx: HealthCheckerNetworkEvents,
+        peer_metadata_storage: Arc<PeerMetadataStorage>,
     ) -> Self {
-        let peer_metadata_storage = Arc::new(PeerMetadataStorage::new());
         let service = HealthChecker::new(
             network_context,
             time_service,
