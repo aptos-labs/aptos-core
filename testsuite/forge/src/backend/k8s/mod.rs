@@ -84,7 +84,11 @@ impl K8sFactory {
 
 impl Factory for K8sFactory {
     fn versions<'a>(&'a self) -> Box<dyn Iterator<Item = Version> + 'a> {
-        Box::new(std::iter::once(Version::new(0, self.image_tag.clone())))
+        let version = vec![
+            Version::new(0, self.base_image_tag.clone()),
+            Version::new(1, self.image_tag.clone()),
+        ];
+        Box::new(version.into_iter())
     }
 
     fn launch_swarm(
