@@ -376,6 +376,15 @@ impl LocalSwarm {
     }
 }
 
+impl Drop for LocalSwarm {
+    fn drop(&mut self) {
+        // If panicking, persist logs
+        if std::thread::panicking() {
+            eprintln!("Logs located at {}", self.logs_location());
+        }
+    }
+}
+
 impl Swarm for LocalSwarm {
     fn health_check(&mut self) -> Result<()> {
         Ok(())
