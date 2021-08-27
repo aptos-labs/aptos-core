@@ -18,7 +18,7 @@
 }
 
 \newenvironment{Figure}{
-  \begin{figure}[htb]
+  \begin{figure}[ht!b!]
 } {
   \end{figure}
 }
@@ -34,6 +34,10 @@
 
 
 %%%% Code
+
+%\usepackage[charter]{mathdesign}
+%\def\rmdefault{bch}
+%\def\ttdefault{blg}
 
 \lstdefinestyle{MoveStyle}{
   basicstyle=\ttfamily,
@@ -98,7 +102,6 @@
     store,
     struct,
     true,
-    u64,
     update,
     use,
     with,
@@ -118,7 +121,7 @@
   \lstset{
     language=Move,
     style=MoveStyle,
-    basicstyle=\footnotesize\ttfamily,
+    basicstyle=\small\ttfamily,
   }
 }{
 }
@@ -131,7 +134,7 @@
   \lstset{
     language=Move,
     style=MoveStyle,
-    basicstyle=\footnotesize\ttfamily,
+    basicstyle=\small\ttfamily,
     numbers=left,
     numberstyle=\scriptsize\color{gray},
     frame=single,

@@ -128,18 +128,18 @@ will be discussed for global update invariants in Sec.~\ref{sec:GlobalInvariants
   }
   @\transform@
   fun f(addr: address) {
-    let can_modify_T = {addr};         // modifies of f
-    spec assert addr in can_modify;    // permission check move_to @%
+    let can_modify_T = {addr};      // modifies of f
+    spec assert addr in can_modify; // permission check @%
                                             \label{line:modifies_permission}@
     move_to<T>(addr, T{});
   }
   fun g() {
-    let can_modify_T = {0x1, 0x2};     // modifies of g
-    spec assert {0x1} <= can_modify_T; // permission check call f @%
+    let can_modify_T = {0x1, 0x2};  // modifies of g
+    spec assert {0x1} <= can_modify_T; // permission check @%
                                             \label{line:modifies_call_permission}@
-    spec havoc global<T>(0x1);         // havoc memory modified by f @%
+    spec havoc global<T>(0x1);      // havoc modified memory @%
                                             \label{line:modifies_havoc}@
-    spec assume exists<T>(0x1);        // ensures of f
+    spec assume exists<T>(0x1);     // ensures of f
   }
 \end{MoveBox}
 \end{Figure}
@@ -181,14 +181,19 @@ subsequent assumptions, are further constraining the modified memory.
 \begin{MoveBox}
   struct S { a: u64, b: u64 }
   spec S { invariant a < b }
-  fun f(s: S): S { let r = &mut s; r.a = r.a + 1; r.b = r.b + 1; s }
+  fun f(s: S): S {
+    let r = &mut s;
+    r.a = r.a + 1;
+    r.b = r.b + 1;
+    s
+  }
   @\transform@
   fun f(s: S): S {
-    spec assume s.a < s.b;      // assume invariant for parameter
+    spec assume s.a < s.b;      // assume invariant for s
     let r = Mvp::local(s, F_s); // begin mutation of s
     r = Mvp::set(r, Mvp::get(r)[a = Mvp::get(r).a + 1]);
     r = Mvp::set(r, Mvp::get(r)[b = Mvp::get(r).b + 1]);
-    spec assert                 // end mutation: invariant enforced
+    spec assert                 // invariant enforced
       Mvp::get(r).a < Mvp::get(r).b;
     s = Mvp::get(r);            // write back to s
     s
@@ -242,8 +247,8 @@ and generics. We first discuss the basic model, then extend it step wise.
     r.value = r.value + 1
   }
   invariant [I1] forall a: address: global<S>(a).value > 0;
-  invariant [I2] update
-      forall a: address: global<S>(a).value > old(global<S>(a).value);
+  invariant [I2] update forall a: address:
+      global<S>(a).value > old(global<S>(a).value);
   @\transform@
   fun f(a: address) {
     spec assume I1;
@@ -348,7 +353,7 @@ injection of global invariants; those are discussed in Sec.~\ref{sec:Mono}.
   module Actor {
     use Store;
     invariant global<S>(0).x > 0;
-    public fun update(x: u64) {
+    public fun set(x: u64) {
       if (x == 0) then abort 1;
       Store::set(x);
     }
@@ -389,7 +394,9 @@ target (with exceptions as discussed in the next section).
   module Store {
     friend Actor;
     ...
-    public(friend) fun write(x: u64) { borrow_global_mut_<S>(0).x = x }
+    public(friend) fun write(x: u64) {
+      borrow_global_mut_<S>(0).x = x
+    }
     spec write { pragma suspend_invariants; }
   }
   module Actor {
@@ -411,15 +418,15 @@ such a declaration, ensuring the all call sites are known and the suspended
 invariants are actually verified in all call contexts.  An invariant needs to be
 explicitly marked via |[suspendable]| do be eligible for suspension.
 
-When an invariant |I| is suspended for a function |F|, the injection scheme changes
+When an invariant |I| is suspended for a function |f|, the injection scheme changes
 as follows:
 
 \begin{itemize}
-\item At the definition side of |F|, |I| is neither assumed nor asserted.
-\item At every call side of |F| (whether opaque or inlined), the invariant
+\item At the definition side of |f|, |I| is neither assumed nor asserted.
+\item At every call side of |f| (whether opaque or inlined), the invariant
   is asserted right after the call. It will also be assumed at the entry point
   of the caller.
-\item Instead of |F| becoming a target function because it modifies the memory
+\item Instead of |f| becoming a target function because it modifies the memory
   read in |I| (see above paragraph about modular verification), all callers will
   become target functions.
 \item If the caller is itself suspended, the process is instead continued with
@@ -452,8 +459,9 @@ marked to suspend invariants only in its body but ensure they hold at caller
 side. This is conceptually syntactic sugar for introducing a helper function:
 
 \begin{Move}
-  public fun f(P) { S } spec f { pragma suspend_invariants_in_body; }
-  @transform@
+  public fun f(P) { S }
+  spec f { pragma suspend_invariants_in_body; }
+  @\transform@
   public fun f(P) { f'(P) }
   fun f'(P) { S } spec f' { pragma suspend_invariants; }
 \end{Move}
