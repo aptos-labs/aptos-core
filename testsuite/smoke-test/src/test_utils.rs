@@ -60,7 +60,7 @@ pub fn create_and_fund_account(swarm: &mut LocalSwarm, amount: u64) -> LocalAcco
     account
 }
 
-pub fn transfer_coins(
+pub fn transfer_coins_non_blocking(
     client: &BlockingClient,
     transaction_factory: &TransactionFactory,
     sender: &mut LocalAccount,
@@ -74,6 +74,18 @@ pub fn transfer_coins(
     ));
 
     client.submit(&txn).unwrap();
+    txn
+}
+
+pub fn transfer_coins(
+    client: &BlockingClient,
+    transaction_factory: &TransactionFactory,
+    sender: &mut LocalAccount,
+    receiver: &LocalAccount,
+    amount: u64,
+) -> SignedTransaction {
+    let txn = transfer_coins_non_blocking(client, transaction_factory, sender, receiver, amount);
+
     client
         .wait_for_signed_transaction(&txn, None, None)
         .unwrap();

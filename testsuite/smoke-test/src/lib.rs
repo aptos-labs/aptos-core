@@ -15,6 +15,8 @@ mod client;
 #[cfg(test)]
 mod consensus;
 #[cfg(test)]
+mod full_nodes;
+#[cfg(test)]
 mod genesis;
 #[cfg(test)]
 mod key_manager;
@@ -28,9 +30,6 @@ mod state_sync;
 mod storage;
 
 // Left to convert
-
-#[cfg(test)]
-mod full_nodes;
 
 #[cfg(test)]
 mod network;
