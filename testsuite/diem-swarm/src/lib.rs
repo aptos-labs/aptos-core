@@ -3,6 +3,4 @@
 
 #![forbid(unsafe_code)]
 
-pub mod client;
 pub mod faucet;
-pub mod swarm;

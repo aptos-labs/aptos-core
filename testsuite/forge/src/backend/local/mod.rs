@@ -25,11 +25,19 @@ pub struct LocalVersion {
 }
 
 impl LocalVersion {
-    fn bin(&self) -> &Path {
+    pub fn new(revision: String, bin: PathBuf, version: Version) -> Self {
+        Self {
+            revision,
+            bin,
+            version,
+        }
+    }
+
+    pub fn bin(&self) -> &Path {
         &self.bin
     }
 
-    fn version(&self) -> Version {
+    pub fn version(&self) -> Version {
         self.version.clone()
     }
 }

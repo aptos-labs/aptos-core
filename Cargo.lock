@@ -2442,6 +2442,7 @@ name = "diem-swarm"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "bcs",
  "ctrlc",
  "debug-interface",
  "diem-config",
@@ -2451,6 +2452,8 @@ dependencies = [
  "diem-temppath",
  "diem-types",
  "diem-workspace-hack",
+ "forge",
+ "rand 0.8.3",
  "reqwest",
  "structopt 0.3.21",
  "thiserror",
