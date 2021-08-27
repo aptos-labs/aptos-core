@@ -1,7 +1,25 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-// TODO: add diagram
+/*
+ *         ┌──────────────────┐
+ *         │ 2. Signing Phase │
+ *         └──────────────▲─┬─┘
+ *                        │ │
+ * ┌────────────────────┐ │ │ ┌─────────────────────┐
+ * │ 1. Execution Phase │ │ │ │ 4. Persisting Phase │
+ * └─────────────────▲─┬┘ │ │ └┬─▲──────────────────┘
+ *                   │ │  │ │  │ │
+ *     0. Ordered  ┌─┴─▼──┴─▼──▼─┴────┐ 3. Commit Vote  ┌─────────┐
+ *        Blocks   │                  ├─────────────────►         │
+ *       ┌─────────►  Buffer Manager  │                 │ Network │
+ *       │         │                  ◄─────────────────┤         │
+ *  ┌────┴─────┐   └─────────▲────────┘    Commit Vote  └─────────┘
+ *  │ Ordering │             │
+ *  │ State    │   Sync Req  │
+ *  │ Computer ├─────────────┘
+ *  └──────────┘
+ */
 
 #![allow(dead_code)]
 pub mod buffer_manager;
