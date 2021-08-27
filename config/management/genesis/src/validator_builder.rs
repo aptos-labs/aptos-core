@@ -9,8 +9,8 @@ use anyhow::Result;
 use consensus_types::safety_data::SafetyData;
 use diem_config::{
     config::{
-        Identity, NetworkConfig, NodeConfig, OnDiskStorageConfig, SafetyRulesService,
-        SecureBackend, WaypointConfig,
+        DiscoveryMethod, Identity, NetworkConfig, NodeConfig, OnDiskStorageConfig,
+        SafetyRulesService, SecureBackend, WaypointConfig,
     },
     network_id::NetworkId,
 };
@@ -320,6 +320,7 @@ impl ValidatorBuilder {
             listen_address: fullnode_network_listen_address,
             network_id: NetworkId::Public,
             max_outbound_connections: 0,
+            discovery_method: DiscoveryMethod::Onchain,
             identity: Identity::from_storage(
                 FULLNODE_NETWORK_KEY.to_owned(),
                 OWNER_ACCOUNT.to_owned(),

@@ -3,7 +3,8 @@
 
 use anyhow::{ensure, Result};
 use diem_config::{
-    config::{Identity, NodeConfig, RoleType, WaypointConfig},
+    config::{Identity, NodeConfig, PeerRole, RoleType, WaypointConfig},
+    generator::build_seed_for_network,
     network_id::NetworkId,
 };
 use diem_crypto::{x25519, Uniform};
@@ -25,10 +26,42 @@ impl FullnodeConfig {
     pub fn public_fullnode(
         name: String,
         config_directory: &Path,
-        mut config: NodeConfig,
+        config: NodeConfig,
         waypoint: &Waypoint,
         genesis: &Transaction,
     ) -> Result<Self> {
+        let mut fullnode_config = Self::new(name, config_directory, config)?;
+
+        fullnode_config.insert_waypoint(waypoint);
+        fullnode_config.insert_genesis(genesis)?;
+        fullnode_config.set_identity();
+        fullnode_config.config.randomize_ports();
+        fullnode_config.save_config()?;
+
+        Ok(fullnode_config)
+    }
+
+    pub fn validator_fullnode(
+        name: String,
+        config_directory: &Path,
+        fullnode_config: NodeConfig,
+        validator_config: &mut NodeConfig,
+        waypoint: &Waypoint,
+        genesis: &Transaction,
+    ) -> Result<Self> {
+        let mut fullnode_config = Self::new(name, config_directory, fullnode_config)?;
+
+        fullnode_config.insert_waypoint(waypoint);
+        fullnode_config.insert_genesis(genesis)?;
+        fullnode_config.config.randomize_ports();
+
+        fullnode_config.attach_to_validator(validator_config)?;
+        fullnode_config.save_config()?;
+
+        Ok(fullnode_config)
+    }
+
+    fn new(name: String, config_directory: &Path, mut config: NodeConfig) -> Result<Self> {
         ensure!(
             matches!(config.base.role, RoleType::FullNode),
             "config must be a FullNode config"
@@ -39,19 +72,11 @@ impl FullnodeConfig {
 
         config.set_data_dir(directory.clone());
 
-        let mut fullnode_config = Self {
+        Ok(Self {
             name,
             config,
             directory,
-        };
-
-        fullnode_config.insert_waypoint(waypoint);
-        fullnode_config.insert_genesis(genesis)?;
-        fullnode_config.set_identity();
-        fullnode_config.config.randomize_ports();
-        fullnode_config.save_config()?;
-
-        Ok(fullnode_config)
+        })
     }
 
     fn insert_waypoint(&mut self, waypoint: &Waypoint) {
@@ -82,6 +107,58 @@ impl FullnodeConfig {
             let peer_id = diem_types::account_address::from_identity_public_key(key.public_key());
             network_config.identity = Identity::from_config(key, peer_id);
         }
+    }
+
+    fn attach_to_validator(&mut self, validator_config: &mut NodeConfig) -> Result<()> {
+        ensure!(
+            matches!(validator_config.base.role, RoleType::Validator),
+            "Validator config must be a Validator config"
+        );
+
+        // Grab the public network config from the validator and insert it into the VFN's config
+        let public_network = {
+            let (i, _) = validator_config
+                .full_node_networks
+                .iter()
+                .enumerate()
+                .find(|(_i, config)| config.network_id == NetworkId::Public)
+                .expect("Validator should have a public network");
+            validator_config.full_node_networks.remove(i)
+        };
+
+        let fullnode_public_network = self
+            .config
+            .full_node_networks
+            .iter_mut()
+            .find(|config| config.network_id == NetworkId::Public)
+            .expect("VFN should have a public network");
+        fullnode_public_network.identity = public_network.identity;
+        fullnode_public_network.listen_address = public_network.listen_address;
+
+        // Grab the validator's vfn network information and configure it as a seed for the VFN's
+        // vfn network
+        let validators_vfn_network = validator_config
+            .full_node_networks
+            .iter()
+            .find(|config| config.network_id.is_vfn_network())
+            .expect("Validator should have vfn network");
+
+        let fullnode_vfn_network = self
+            .config
+            .full_node_networks
+            .iter_mut()
+            .find(|config| config.network_id.is_vfn_network())
+            .expect("VFN should have a vfn network");
+        fullnode_vfn_network.seeds =
+            build_seed_for_network(validators_vfn_network, PeerRole::Validator);
+
+        if let Identity::None = fullnode_vfn_network.identity {
+            let key = x25519::PrivateKey::generate(&mut OsRng);
+            let peer_id = diem_types::account_address::from_identity_public_key(key.public_key());
+            fullnode_vfn_network.identity = Identity::from_config(key, peer_id);
+        }
+
+        Ok(())
     }
 
     pub fn config_path(&self) -> PathBuf {
