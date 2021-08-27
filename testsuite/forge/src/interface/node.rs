@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{Result, Version};
+use anyhow::anyhow;
 use debug_interface::NodeDebugClient;
 use diem_config::{config::NodeConfig, network_id::NetworkId};
 use diem_sdk::{
@@ -75,6 +76,18 @@ pub trait Validator: Node {
         self.get_connected_peers(NetworkId::Validator, None)
             .map(|maybe_n| maybe_n.map(|n| n >= expected_peers as i64).unwrap_or(false))
     }
+
+    fn wait_for_connectivity(&self, expected_peers: usize, deadline: Instant) -> Result<()> {
+        while !self.check_connectivity(expected_peers)? {
+            if Instant::now() > deadline {
+                return Err(anyhow!("waiting for connectivity timed out"));
+            }
+
+            thread::sleep(Duration::from_millis(500));
+        }
+
+        Ok(())
+    }
 }
 
 /// Trait used to represent a running FullNode
@@ -86,6 +99,18 @@ pub trait FullNode: Node {
 
         self.get_connected_peers(NetworkId::Public, DIRECTION)
             .map(|maybe_n| maybe_n.map(|n| n >= EXPECTED_PEERS as i64).unwrap_or(false))
+    }
+
+    fn wait_for_connectivity(&self, deadline: Instant) -> Result<()> {
+        while !self.check_connectivity()? {
+            if Instant::now() > deadline {
+                return Err(anyhow!("waiting for connectivity timed out"));
+            }
+
+            thread::sleep(Duration::from_millis(500));
+        }
+
+        Ok(())
     }
 }
 

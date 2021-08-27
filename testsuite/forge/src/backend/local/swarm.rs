@@ -371,6 +371,14 @@ impl LocalSwarm {
         self.validators.values_mut()
     }
 
+    pub fn fullnode(&self, peer_id: PeerId) -> Option<&LocalNode> {
+        self.fullnodes.get(&peer_id)
+    }
+
+    pub fn fullnode_mut(&mut self, peer_id: PeerId) -> Option<&mut LocalNode> {
+        self.fullnodes.get_mut(&peer_id)
+    }
+
     pub fn dir(&self) -> &Path {
         self.dir.as_ref()
     }
