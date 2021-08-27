@@ -18,12 +18,14 @@
 //! - Use successful inbound pings as a sign of remote note being healthy
 //! - Ping a peer only in periods of no application-level communication with the peer
 use crate::{
+    application::interface::NetworkInterface,
     constants::NETWORK_CHANNEL_SIZE,
     counters,
     error::NetworkError,
     logging::NetworkSchema,
     peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
     protocols::{
+        health_checker::interface::{HealthCheckData, HealthCheckNetworkInterface},
         network::{Event, NetworkEvents, NetworkSender, NewNetworkSender},
         rpc::error::RpcError,
     },
@@ -43,9 +45,10 @@ use futures::{
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use short_hex_str::AsShortHexStr;
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::hash_map::Entry, sync::Arc, time::Duration};
 
 pub mod builder;
+mod interface;
 #[cfg(test)]
 mod test;
 
@@ -138,13 +141,8 @@ pub struct HealthChecker {
     network_context: Arc<NetworkContext>,
     /// A handle to a time service for easily mocking time-related operations.
     time_service: TimeService,
-    /// Channel to send requests to Network layer.
-    network_tx: HealthCheckerNetworkSender,
-    /// Channel to receive notifications from Network layer about new/lost connections.
-    network_rx: HealthCheckerNetworkEvents,
-    /// Map from connected peer to last round of successful ping, and number of failures since
-    /// then.
-    connected: HashMap<PeerId, (u64, u64)>,
+    /// Network interface to send requests to the Network Layer
+    network_interface: HealthCheckNetworkInterface,
     /// Random-number generator.
     rng: SmallRng,
     /// Time we wait between each set of pings.
@@ -164,8 +162,7 @@ impl HealthChecker {
     pub fn new(
         network_context: Arc<NetworkContext>,
         time_service: TimeService,
-        network_tx: HealthCheckerNetworkSender,
-        network_rx: HealthCheckerNetworkEvents,
+        network_interface: HealthCheckNetworkInterface,
         ping_interval: Duration,
         ping_timeout: Duration,
         ping_failures_tolerated: u64,
@@ -173,9 +170,7 @@ impl HealthChecker {
         HealthChecker {
             network_context,
             time_service,
-            network_tx,
-            network_rx,
-            connected: HashMap::new(),
+            network_interface,
             rng: SmallRng::from_entropy(),
             ping_interval,
             ping_timeout,
@@ -196,7 +191,7 @@ impl HealthChecker {
 
         loop {
             futures::select! {
-                maybe_event = self.network_rx.next() => {
+                maybe_event = self.network_interface.next() => {
                     // Shutdown the HealthChecker when this network instance shuts
                     // down. This happens when the `PeerManager` drops.
                     let event = match maybe_event {
@@ -206,10 +201,15 @@ impl HealthChecker {
 
                     match event {
                         Event::NewPeer(metadata) => {
-                            self.connected.insert(metadata.remote_peer_id, (self.round, 0));
+                            self.network_interface.insert_app_data(
+                                metadata.remote_peer_id,
+                                HealthCheckData::new(self.round)
+                            );
                         }
                         Event::LostPeer(metadata) => {
-                            self.connected.remove(&metadata.remote_peer_id);
+                            self.network_interface.remove_app_data(
+                                &metadata.remote_peer_id
+                            );
                         }
                         Event::RpcRequest(peer_id, msg, res_tx) => {
                             match msg {
@@ -242,8 +242,8 @@ impl HealthChecker {
                 }
                 _ = ticker.select_next_some() => {
                     self.round += 1;
-
-                    if self.connected.is_empty() {
+                    let connected = self.network_interface.connected_peers();
+                    if connected.is_empty() {
                         trace!(
                             NetworkSchema::new(&self.network_context),
                             round = self.round,
@@ -254,7 +254,7 @@ impl HealthChecker {
                         continue
                     }
 
-                    for &peer_id in self.connected.keys() {
+                    for peer_id in connected {
                         let nonce = self.rng.gen::<u32>();
                         trace!(
                             NetworkSchema::new(&self.network_context),
@@ -268,7 +268,7 @@ impl HealthChecker {
 
                         tick_handlers.push(Self::ping_peer(
                             self.network_context.clone(),
-                            self.network_tx.clone(),
+                            self.network_interface.sender(),
                             peer_id,
                             self.round,
                             nonce,
@@ -334,14 +334,23 @@ impl HealthChecker {
                         round
                     );
                     // Update last successful ping to current round.
-                    self.connected
-                        .entry(peer_id)
-                        .and_modify(|(ref mut r, ref mut count)| {
-                            if round > *r {
-                                *r = round;
-                                *count = 0;
+                    // If it's not in storage, don't bother updating it
+                    let _ = self.network_interface.write_app_data(peer_id, |entry| {
+                        match entry {
+                            Entry::Vacant(..) => {
+                                // Don't do anything if there isn't an entry
                             }
-                        });
+                            Entry::Occupied(inner) => {
+                                let data = inner.get_mut();
+                                // Update state if it's a newer round
+                                if round > data.round {
+                                    data.round = round;
+                                    data.failures = 0;
+                                }
+                            }
+                        };
+                        Ok(())
+                    });
                 } else {
                     warn!(
                         SecurityEvent::InvalidHealthCheckerMsg,
@@ -367,40 +376,50 @@ impl HealthChecker {
                     round,
                     err
                 );
-                match self.connected.get_mut(&peer_id) {
-                    None => {
-                        // If we are no longer connected to the peer, we ignore ping
-                        // failure.
-                    }
-                    Some((ref mut prev, ref mut failures)) => {
-                        // If this is the result of an older ping, we ignore it.
-                        if *prev > round {
-                            return;
+                let _ = self.network_interface.write_app_data(peer_id, |entry| {
+                    // Don't add in a default in case it's already disconnected
+                    match entry {
+                        Entry::Vacant(..) => {
+                            // Don't do anything if there isn't an entry
                         }
-                        // Increment num of failures. If the ping failures are now more than
-                        // `self.ping_failures_tolerated`, we disconnect from the node.
-                        // The HealthChecker only performs the disconnect. It relies on
-                        // ConnectivityManager or the remote peer to re-establish the connection.
-                        *failures += 1;
-                        if *failures > self.ping_failures_tolerated {
-                            info!(
-                                NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
-                                "{} Disconnecting from peer: {}",
-                                self.network_context,
-                                peer_id.short_str()
-                            );
-                            if let Err(err) = self.network_tx.disconnect_peer(peer_id).await {
-                                warn!(
-                                    NetworkSchema::new(&self.network_context)
-                                        .remote_peer(&peer_id),
-                                    error = ?err,
-                                    "{} Failed to disconnect from peer: {} with error: {:?}",
-                                    self.network_context,
-                                    peer_id.short_str(),
-                                    err
-                                );
+                        Entry::Occupied(inner) => {
+                            // If this is the result of an older ping, we ignore it.
+                            // Increment num of failures.
+                            let data = inner.get_mut();
+                            if data.round <= round {
+                                data.failures += 1;
                             }
                         }
+                    }
+                    Ok(())
+                });
+
+                // If the ping failures are now more than
+                // `self.ping_failures_tolerated`, we disconnect from the node.
+                // The HealthChecker only performs the disconnect. It relies on
+                // ConnectivityManager or the remote peer to re-establish the connection.
+                let failures = self
+                    .network_interface
+                    .read_app_data(&peer_id)
+                    .map(|data| data.failures)
+                    .unwrap_or(0);
+                if failures > self.ping_failures_tolerated {
+                    info!(
+                        NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
+                        "{} Disconnecting from peer: {}",
+                        self.network_context,
+                        peer_id.short_str()
+                    );
+                    if let Err(err) = self.network_interface.disconnect_peer(peer_id).await {
+                        warn!(
+                            NetworkSchema::new(&self.network_context)
+                                .remote_peer(&peer_id),
+                            error = ?err,
+                            "{} Failed to disconnect from peer: {} with error: {:?}",
+                            self.network_context,
+                            peer_id.short_str(),
+                            err
+                        );
                     }
                 }
             }

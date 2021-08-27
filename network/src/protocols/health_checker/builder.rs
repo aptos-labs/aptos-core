@@ -1,8 +1,12 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::protocols::health_checker::{
-    HealthChecker, HealthCheckerNetworkEvents, HealthCheckerNetworkSender,
+use crate::{
+    application::storage::PeerMetadataStorage,
+    protocols::health_checker::{
+        interface::HealthCheckNetworkInterface, HealthChecker, HealthCheckerNetworkEvents,
+        HealthCheckerNetworkSender,
+    },
 };
 use diem_config::network_id::NetworkContext;
 use diem_time_service::TimeService;
@@ -23,11 +27,11 @@ impl HealthCheckerBuilder {
         network_tx: HealthCheckerNetworkSender,
         network_rx: HealthCheckerNetworkEvents,
     ) -> Self {
+        let peer_metadata_storage = Arc::new(PeerMetadataStorage::new());
         let service = HealthChecker::new(
             network_context,
             time_service,
-            network_tx,
-            network_rx,
+            HealthCheckNetworkInterface::new(peer_metadata_storage, network_tx, network_rx),
             Duration::from_millis(ping_interval_ms),
             Duration::from_millis(ping_timeout_ms),
             ping_failures_tolerated,
