@@ -23,7 +23,11 @@ use move_model::{
     code_writer::CodeWriter, model::GlobalEnv, parse_addresses_from_options,
     run_model_builder_with_options,
 };
-use std::{fs, path::PathBuf, time::Instant};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    time::Instant,
+};
 
 pub mod cli;
 
@@ -181,18 +185,18 @@ pub fn verify_boogie(
 /// Create bytecode and process it.
 pub fn create_and_process_bytecode(options: &Options, env: &GlobalEnv) -> FunctionTargetsHolder {
     let mut targets = FunctionTargetsHolder::default();
+    let output_dir = Path::new(&options.output_path)
+        .parent()
+        .expect("expect the parent directory of the output path to exist");
+    let output_prefix = options.move_sources.get(0).map_or("bytecode", |s| {
+        Path::new(s).file_name().unwrap().to_str().unwrap()
+    });
 
     // Add function targets for all functions in the environment.
     for module_env in env.get_modules() {
         if options.prover.dump_bytecode {
-            let output_file = options
-                .move_sources
-                .get(0)
-                .cloned()
-                .unwrap_or_else(|| "bytecode".to_string())
-                .replace(".move", ".mv.disas");
-            fs::write(&output_file, &module_env.disassemble())
-                .expect("dumping disassembled module");
+            let dump_file = output_dir.join(format!("{}.mv.disas", output_prefix));
+            fs::write(&dump_file, &module_env.disassemble()).expect("dumping disassembled module");
         }
         for func_env in module_env.get_functions() {
             targets.add_target(&func_env)
@@ -207,13 +211,12 @@ pub fn create_and_process_bytecode(options: &Options, env: &GlobalEnv) -> Functi
     };
 
     if options.prover.dump_bytecode {
-        let dump_file = options
-            .move_sources
-            .get(0)
-            .cloned()
-            .unwrap_or_else(|| "bytecode".to_string())
-            .replace(".move", "");
-        pipeline.run_with_dump(env, &mut targets, &dump_file, options.prover.dump_cfg)
+        let dump_file_base = output_dir
+            .join(output_prefix)
+            .into_os_string()
+            .into_string()
+            .unwrap();
+        pipeline.run_with_dump(env, &mut targets, &dump_file_base, options.prover.dump_cfg)
     } else {
         pipeline.run(env, &mut targets);
     }
