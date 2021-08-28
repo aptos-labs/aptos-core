@@ -30,6 +30,7 @@ use state_sync_v1::bootstrapper::StateSyncBootstrapper;
 use std::{
     boxed::Box,
     convert::TryFrom,
+    io::Write,
     net::ToSocketAddrs,
     path::PathBuf,
     sync::{
@@ -125,31 +126,33 @@ pub fn load_test_environment<R>(
     if let Some(publishing_option) = publishing_option {
         builder = builder.publishing_option(publishing_option);
     }
-    let test_config =
-        diem_genesis_tool::swarm_config::SwarmConfig::build_with_rng(&builder, &config_path, rng)
-            .unwrap();
+    let (root_keys, _genesis, genesis_waypoint, validators) = builder.build(rng).unwrap();
+
+    let diem_root_key_path = config_path.join("mint.key");
+    let serialized_keys = bcs::to_bytes(&root_keys.root_key).unwrap();
+    let mut key_file = std::fs::File::create(&diem_root_key_path).unwrap();
+    key_file.write_all(&serialized_keys).unwrap();
 
     // Prepare log file since we cannot automatically route logs to stderr
     let mut log_file = config_path.clone();
     log_file.push("validator.log");
 
     // Build a waypoint file so that clients / docker can grab it easily
-    let mut waypoint_file_path = config_path;
-    waypoint_file_path.push("waypoint.txt");
+    let waypoint_file_path = config_path.join("waypoint.txt");
     std::io::Write::write_all(
         &mut std::fs::File::create(&waypoint_file_path).unwrap(),
-        test_config.waypoint.to_string().as_bytes(),
+        genesis_waypoint.to_string().as_bytes(),
     )
     .unwrap();
 
     // Intentionally leave out instructions on how to connect with different applications
     println!("Completed generating configuration:");
     println!("\tLog file: {:?}", log_file);
-    println!("\tConfig path: {:?}", test_config.config_files[0]);
-    println!("\tDiem root key path: {:?}", test_config.diem_root_key_path);
-    println!("\tWaypoint: {}", test_config.waypoint);
+    println!("\tConfig path: {:?}", validators[0].config_path());
+    println!("\tDiem root key path: {:?}", diem_root_key_path);
+    println!("\tWaypoint: {}", genesis_waypoint);
     // Configure json rpc to bind on 0.0.0.0
-    let mut config = NodeConfig::load(&test_config.config_files[0]).unwrap();
+    let mut config = NodeConfig::load(validators[0].config_path()).unwrap();
     config.json_rpc.address = format!("0.0.0.0:{}", config.json_rpc.address.port())
         .parse()
         .unwrap();

@@ -10,7 +10,7 @@ use nix::{
     sys::signal::{kill, SIGKILL},
     unistd::Pid,
 };
-use std::{fmt, fs::File, path::PathBuf, process::Stdio, time::Duration};
+use std::{fmt, fs::File, io::Write, path::PathBuf, process::Stdio, time::Duration};
 
 #[derive(Debug)]
 pub struct NodeInfo {
@@ -64,8 +64,13 @@ impl NodeInfo {
         )
         .template(template)
         .randomize_first_validator_ports(true);
-        let test_config =
-            diem_genesis_tool::swarm_config::SwarmConfig::build(&builder, &config_path).unwrap();
+        let (root_keys, _genesis, genesis_waypoint, validators) =
+            builder.build(rand::rngs::OsRng).unwrap();
+
+        let diem_root_key_path = config_path.join("mint.key");
+        let serialized_keys = bcs::to_bytes(&root_keys.root_key).unwrap();
+        let mut key_file = std::fs::File::create(&diem_root_key_path).unwrap();
+        key_file.write_all(&serialized_keys).unwrap();
 
         let mut log_file = config_path;
         log_file.push("validator.log");
@@ -78,7 +83,7 @@ impl NodeInfo {
                 "diem-node",
                 "--",
                 "--config",
-                test_config.config_files[0].as_os_str().to_str().unwrap(),
+                validators[0].config_path().to_str().unwrap(),
             ])
             .current_dir(diem_root_folder())
             .stderr(log)
@@ -87,7 +92,7 @@ impl NodeInfo {
             .unwrap()
             .id();
 
-        let config = NodeConfig::load(&test_config.config_files[0]).unwrap();
+        let config = NodeConfig::load(validators[0].config_path()).unwrap();
         let json_rpc = format!("http://localhost:{}", config.json_rpc.address.port());
 
         wait_till_healthy(json_rpc.as_str());
@@ -95,8 +100,8 @@ impl NodeInfo {
         NodeInfo {
             chain_id: ChainId::test(),
             json_rpc,
-            root_key_path: test_config.diem_root_key_path,
-            waypoint: test_config.waypoint,
+            root_key_path: diem_root_key_path,
+            waypoint: genesis_waypoint,
             local_node_info: Some(LocalNodeInfo {
                 log_path: log_file,
                 config_path: config_temp_path,

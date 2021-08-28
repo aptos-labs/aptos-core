@@ -20,8 +20,6 @@ mod waypoint;
 pub mod config_builder;
 #[cfg(test)]
 mod storage_helper;
-#[cfg(any(test, feature = "testing"))]
-pub mod swarm_config;
 
 #[cfg(any(test, feature = "testing"))]
 pub use crate::config_builder::test_config;
