@@ -29,7 +29,7 @@ pub enum Error {
 pub trait MempoolNotificationSender: Send {
     /// Notify mempool of the newly committed transactions at the specified block timestamp.
     async fn notify_new_commit(
-        &mut self,
+        &self,
         committed_transactions: Vec<Transaction>,
         block_timestamp_usecs: u64,
         notification_timeout_ms: u64,
@@ -63,7 +63,7 @@ impl MempoolNotifier {
 #[async_trait]
 impl MempoolNotificationSender for MempoolNotifier {
     async fn notify_new_commit(
-        &mut self,
+        &self,
         transactions: Vec<Transaction>,
         block_timestamp_usecs: u64,
         notification_timeout_ms: u64,
@@ -94,7 +94,11 @@ impl MempoolNotificationSender for MempoolNotifier {
         };
 
         // Send the notification to mempool
-        if let Err(error) = self.notification_sender.try_send(commit_notification) {
+        if let Err(error) = self
+            .notification_sender
+            .clone()
+            .try_send(commit_notification)
+        {
             return Err(Error::CommitNotificationError(format!(
                 "Failed to notify mempool of committed transactions! Error: {:?}",
                 error
@@ -204,7 +208,7 @@ mod tests {
         // Create runtime and mempool notifier
         let runtime = create_runtime();
         let _enter = runtime.enter();
-        let (mut mempool_notifier, mut mempool_listener) = MempoolNotifier::new();
+        let (mempool_notifier, mut mempool_listener) = MempoolNotifier::new();
 
         // Send a notification and expect a timeout (no listener)
         let notify_result =
@@ -229,7 +233,7 @@ mod tests {
         // Create runtime and mempool notifier
         let runtime = create_runtime();
         let _enter = runtime.enter();
-        let (mut mempool_notifier, mut _mempool_listener) = MempoolNotifier::new();
+        let (mempool_notifier, mut _mempool_listener) = MempoolNotifier::new();
 
         // Send a notification and expect a timeout (zero timeout)
         let notify_result =
@@ -245,7 +249,7 @@ mod tests {
         // Create runtime and mempool notifier
         let runtime = create_runtime();
         let _enter = runtime.enter();
-        let (mut mempool_notifier, mut _mempool_listener) = MempoolNotifier::new();
+        let (mempool_notifier, mut _mempool_listener) = MempoolNotifier::new();
 
         // Send a notification and verify no timeout because no notification was sent!
         let notify_result = block_on(mempool_notifier.notify_new_commit(vec![], 0, 1000));
@@ -257,7 +261,7 @@ mod tests {
         // Create runtime and mempool notifier
         let runtime = create_runtime();
         let _enter = runtime.enter();
-        let (mut mempool_notifier, mut _mempool_listener) = MempoolNotifier::new();
+        let (mempool_notifier, mut _mempool_listener) = MempoolNotifier::new();
 
         // Create several transactions that should be filtered out
         let mut transactions = vec![];
@@ -287,7 +291,7 @@ mod tests {
         // Create runtime and mempool notifier
         let runtime = create_runtime();
         let _enter = runtime.enter();
-        let (mut mempool_notifier, mut mempool_listener) = MempoolNotifier::new();
+        let (mempool_notifier, mut mempool_listener) = MempoolNotifier::new();
 
         // Send a notification
         let user_transaction = create_user_transaction();
@@ -323,7 +327,7 @@ mod tests {
         // Create runtime and mempool notifier
         let runtime = create_runtime();
         let _enter = runtime.enter();
-        let (mut mempool_notifier, mut mempool_listener) = MempoolNotifier::new();
+        let (mempool_notifier, mut mempool_listener) = MempoolNotifier::new();
 
         // Spawn a new thread to handle any messages on the receiver
         let _handler = std::thread::spawn(move || loop {

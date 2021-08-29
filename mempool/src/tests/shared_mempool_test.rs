@@ -58,7 +58,7 @@ fn test_mempool_notify_committed_txns() {
     let _enter = runtime.enter();
 
     // Create a new mempool notifier, listener and shared mempool
-    let (mut mempool_notifier, mempool_listener) = MempoolNotifier::new();
+    let (mempool_notifier, mempool_listener) = MempoolNotifier::new();
     let smp = MockSharedMempool::new(Some(mempool_listener));
 
     // Add txns 1, 2, 3, 4

@@ -536,21 +536,19 @@ impl<T: ExecutorProxyTrait, M: MempoolNotificationSender> StateSyncCoordinator<T
         &mut self,
         committed_transactions: Vec<Transaction>,
     ) -> Result<(), Error> {
-        // Notify mempool of committed transactions
         let block_timestamp_usecs = self
             .local_state
             .committed_ledger_info()
             .ledger_info()
             .timestamp_usecs();
-        if let Err(error) = self
-            .mempool_notifier
-            .notify_new_commit(
-                committed_transactions,
-                block_timestamp_usecs,
-                self.config.mempool_commit_timeout_ms,
-            )
-            .await
-        {
+
+        // Notify mempool of committed transactions
+        let send_notification = self.mempool_notifier.notify_new_commit(
+            committed_transactions,
+            block_timestamp_usecs,
+            self.config.mempool_commit_timeout_ms,
+        );
+        if let Err(error) = send_notification.await {
             counters::COMMIT_FLOW_FAIL
                 .with_label_values(&[counters::MEMPOOL_LABEL])
                 .inc();
