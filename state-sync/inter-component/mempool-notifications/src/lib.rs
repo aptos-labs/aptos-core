@@ -109,11 +109,7 @@ impl MempoolNotificationSender for MempoolNotifier {
         .await
         {
             match response {
-                Ok(Ok(MempoolNotificationResponse::Success)) => Ok(()),
-                Ok(Err(error)) => Err(Error::UnexpectedErrorEncountered(format!(
-                    "Unexpected response from mempool! Error: {:?}",
-                    error
-                ))),
+                Ok(MempoolNotificationResponse::Success) => Ok(()),
                 Err(error) => Err(Error::UnexpectedErrorEncountered(format!("{:?}", error))),
             }
         } else {
@@ -127,7 +123,7 @@ impl MempoolNotificationSender for MempoolNotifier {
 pub struct MempoolCommitNotification {
     pub transactions: Vec<CommittedTransaction>,
     pub block_timestamp_usecs: u64, // The timestamp of the committed block.
-    pub(crate) callback: oneshot::Sender<Result<MempoolNotificationResponse, Error>>,
+    pub(crate) callback: oneshot::Sender<MempoolNotificationResponse>,
 }
 
 impl fmt::Display for MempoolCommitNotification {
@@ -173,7 +169,7 @@ impl MempoolNotificationListener {
     ) -> Result<(), Error> {
         mempool_commit_notification
             .callback
-            .send(Ok(MempoolNotificationResponse::Success))
+            .send(MempoolNotificationResponse::Success)
             .map_err(|error| Error::UnexpectedErrorEncountered(format!("{:?}", error)))
     }
 }
