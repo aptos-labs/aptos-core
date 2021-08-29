@@ -64,8 +64,6 @@ pub struct Options {
     pub move_named_address_values: Vec<String>,
     /// Whether to run experimental pipeline
     pub experimental_pipeline: bool,
-    /// Whether to use the old polymorphic boogie backend.
-    pub boogie_poly: bool,
     /// BEGIN OF STRUCTURED OPTIONS
     /// Options for the model builder.
     pub model_builder: ModelBuilderOptions,
@@ -110,7 +108,6 @@ impl Default for Options {
             abigen: AbigenOptions::default(),
             errmapgen: ErrmapOptions::default(),
             experimental_pipeline: false,
-            boogie_poly: false,
         }
     }
 }
@@ -680,7 +677,7 @@ impl Options {
             options.backend.keep_artifacts = true;
         }
         if matches.is_present("boogie-poly") {
-            options.boogie_poly = true;
+            options.prover.boogie_poly = true;
         }
         if matches.is_present("seed") {
             options.backend.random_seed = matches.value_of("seed").unwrap().parse::<usize>()?;

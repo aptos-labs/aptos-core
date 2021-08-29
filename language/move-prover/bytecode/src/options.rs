@@ -59,10 +59,8 @@ pub struct ProverOptions {
     pub mutation_mul_div: usize,
     /// Indicates that we should use the divide-multiply mutation on the given block
     pub mutation_div_mul: usize,
-    /// Whether to assume a global invariant when the related memory
-    /// is accessed, instead of on function entry. This is currently known to be slower
-    /// if one than off, so off by default.
-    pub assume_invariant_on_access: bool,
+    /// Whether to use the polymorphic boogie backend.
+    pub boogie_poly: bool,
     /// Whether pack/unpack should recurse over the structure.
     pub deep_pack_unpack: bool,
     /// Auto trace level.
@@ -103,10 +101,10 @@ impl Default for ProverOptions {
             mutation_sub_add: 0,
             mutation_mul_div: 0,
             mutation_div_mul: 0,
+            boogie_poly: false,
             deep_pack_unpack: false,
             auto_trace_level: AutoTraceLevel::Off,
             report_severity: Severity::Warning,
-            assume_invariant_on_access: false,
             dump_bytecode: false,
             dump_cfg: false,
             num_instances: 1,

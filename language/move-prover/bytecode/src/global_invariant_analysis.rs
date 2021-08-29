@@ -27,25 +27,33 @@ use std::{
 
 /// A named struct for holding the information on how an invariant is relevant to a bytecode.
 #[derive(Default, Clone)]
-struct PerBytecodeRelevance {
+pub struct PerBytecodeRelevance {
     /// for each `inst_fun` (instantiation of function type parameters) in the key set, the
     /// associated value is a set of `inst_inv` (instantiation of invariant type parameters) that
     /// are applicable to the concrete function instance `F<inst_fun>`.
-    insts: BTreeMap<Vec<Type>, BTreeSet<Vec<Type>>>,
+    pub insts: BTreeMap<Vec<Type>, BTreeSet<Vec<Type>>>,
 }
 
 /// A named struct for holding the information on how invariants are relevant to a function.
 #[derive(Clone)]
-struct PerFunctionRelevance {
+pub struct PerFunctionRelevance {
     /// Invariants that needs to be assumed at function entrypoint
     /// - Key: global invariants that needs to be assumed before the first instruction,
     /// - Value: the instantiation information per each related invariant.
-    entrypoint_assumptions: BTreeMap<GlobalId, PerBytecodeRelevance>,
+    pub entrypoint_assumptions: BTreeMap<GlobalId, PerBytecodeRelevance>,
 
     /// For each bytecode at given code offset, the associated value is a map of
     /// - Key: global invariants that needs to be asserted after the bytecode instruction and
     /// - Value: the instantiation information per each related invariant.
-    per_bytecode_assertions: BTreeMap<CodeOffset, BTreeMap<GlobalId, PerBytecodeRelevance>>,
+    pub per_bytecode_assertions: BTreeMap<CodeOffset, BTreeMap<GlobalId, PerBytecodeRelevance>>,
+}
+
+/// Get verification information for this function.
+pub fn get_info<'env>(target: &FunctionTarget<'env>) -> &'env PerFunctionRelevance {
+    target
+        .get_annotations()
+        .get::<PerFunctionRelevance>()
+        .expect("Global invariant analysis not performed")
 }
 
 // The function target processor
@@ -78,7 +86,7 @@ impl FunctionTargetProcessor for GlobalInvariantAnalysisProcessor {
         let analysis_result = PerFunctionRelevance::analyze(&target, targets);
         data.annotations.set(analysis_result);
 
-        // TODO: the instrumentation pass
+        // This is an analysis pass, nothing gets changed
         data
     }
 
