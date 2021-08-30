@@ -108,8 +108,9 @@ impl FunctionTargetProcessor for VerificationAnalysisProcessor {
         }
 
         // Rule 3: verify the function if a global invariant (including update invariant) that is
-        // defined in the target modules (a.k.a. a target invariant) are considered applicable in
-        // the function.
+        // defined in the target modules (a.k.a. a target invariant) need to be checked in the
+        // function, i.e., the function directly modifies some memory that are covered by at least
+        // one of the target invariants.
         let inv_analysis = env.get_extension::<InvariantAnalysisData>().unwrap();
         let target_invs: BTreeSet<_> = target_modules
             .iter()
@@ -120,7 +121,7 @@ impl FunctionTargetProcessor for VerificationAnalysisProcessor {
             .fun_to_inv_map
             .get(&fun_env.get_qualified_id())
             .unwrap();
-        if !inv_relevance.direct_accessed.is_disjoint(&target_invs) {
+        if !inv_relevance.direct_modified.is_disjoint(&target_invs) {
             if Self::is_within_verification_scope(fun_env) {
                 Self::mark_verified(fun_env, &mut data, targets);
             }
