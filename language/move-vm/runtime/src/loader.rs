@@ -1301,13 +1301,13 @@ impl<'a> Resolver<'a> {
     }
 
     //
-    // Constant resolution
+    // Type resolution
     //
 
-    pub(crate) fn vec_instantiation_at(&self, idx: SignatureIndex) -> &Type {
+    pub(crate) fn single_type_at(&self, idx: SignatureIndex) -> &Type {
         match &self.binary {
-            BinaryType::Module(module) => module.vec_instantiation_at(idx),
-            BinaryType::Script(script) => script.vec_instantiation_at(idx),
+            BinaryType::Module(module) => module.single_type_at(idx),
+            BinaryType::Script(script) => script.single_type_at(idx),
         }
     }
 
@@ -1361,8 +1361,11 @@ pub(crate) struct Module {
     // This allows a direct access from struct name to `Struct`
     struct_map: HashMap<Identifier, usize>,
 
-    // vector instantiations
-    vec_instantiations: BTreeMap<SignatureIndex, Type>,
+    // a map of single-token signature indices to type.
+    // Single-token signatures are usually indexed by the `SignatureIndex` in bytecode. For example,
+    // `VecMutBorrow(SignatureIndex)`, the `SignatureIndex` maps to a single `SignatureToken`, and
+    // hence, a single type.
+    single_signature_token_map: BTreeMap<SignatureIndex, Type>,
 }
 
 impl Module {
@@ -1381,7 +1384,7 @@ impl Module {
         let mut field_instantiations: Vec<FieldInstantiation> = vec![];
         let mut function_map = HashMap::new();
         let mut struct_map = HashMap::new();
-        let mut vec_instantiations = BTreeMap::new();
+        let mut single_signature_token_map = BTreeMap::new();
 
         let mut create = || {
             for struct_handle in module.struct_handles() {
@@ -1478,7 +1481,7 @@ impl Module {
                             | Bytecode::VecPopBack(si)
                             | Bytecode::VecUnpack(si, _)
                             | Bytecode::VecSwap(si) => {
-                                if !vec_instantiations.contains_key(si) {
+                                if !single_signature_token_map.contains_key(si) {
                                     let ty = match module.signature_at(*si).0.get(0) {
                                         None => {
                                             return Err(PartialVMError::new(
@@ -1492,7 +1495,7 @@ impl Module {
                                         }
                                         Some(sig_token) => sig_token,
                                     };
-                                    vec_instantiations
+                                    single_signature_token_map
                                         .insert(*si, cache.make_type_while_loading(&module, ty)?);
                                 }
                             }
@@ -1544,7 +1547,7 @@ impl Module {
                 field_instantiations,
                 function_map,
                 struct_map,
-                vec_instantiations,
+                single_signature_token_map,
             }),
             Err(err) => Err((err, module)),
         }
@@ -1586,8 +1589,8 @@ impl Module {
         self.field_instantiations[idx.0 as usize].offset
     }
 
-    fn vec_instantiation_at(&self, idx: SignatureIndex) -> &Type {
-        self.vec_instantiations.get(&idx).unwrap()
+    fn single_type_at(&self, idx: SignatureIndex) -> &Type {
+        self.single_signature_token_map.get(&idx).unwrap()
     }
 }
 
@@ -1616,8 +1619,8 @@ struct Script {
     // parameters of main
     parameter_tys: Vec<Type>,
 
-    // vector instantiations
-    vec_instantiations: BTreeMap<SignatureIndex, Type>,
+    // a map of single-token signature indices to type
+    single_signature_token_map: BTreeMap<SignatureIndex, Type>,
 }
 
 impl Script {
@@ -1710,7 +1713,7 @@ impl Script {
             name,
         });
 
-        let mut vec_instantiations = BTreeMap::new();
+        let mut single_signature_token_map = BTreeMap::new();
         for bc in &script.code.code {
             match bc {
                 Bytecode::VecPack(si, _)
@@ -1721,7 +1724,7 @@ impl Script {
                 | Bytecode::VecPopBack(si)
                 | Bytecode::VecUnpack(si, _)
                 | Bytecode::VecSwap(si) => {
-                    if !vec_instantiations.contains_key(si) {
+                    if !single_signature_token_map.contains_key(si) {
                         let ty = match script.signature_at(*si).0.get(0) {
                             None => {
                                 return Err(PartialVMError::new(
@@ -1736,7 +1739,7 @@ impl Script {
                             }
                             Some(sig_token) => sig_token,
                         };
-                        vec_instantiations.insert(
+                        single_signature_token_map.insert(
                             *si,
                             cache
                                 .make_type(BinaryIndexedView::Script(&script), ty)
@@ -1755,7 +1758,7 @@ impl Script {
             function_instantiations,
             main,
             parameter_tys,
-            vec_instantiations,
+            single_signature_token_map,
         })
     }
 
@@ -1771,8 +1774,8 @@ impl Script {
         &self.function_instantiations[idx as usize]
     }
 
-    fn vec_instantiation_at(&self, idx: SignatureIndex) -> &Type {
-        self.vec_instantiations.get(&idx).unwrap()
+    fn single_type_at(&self, idx: SignatureIndex) -> &Type {
+        self.single_signature_token_map.get(&idx).unwrap()
     }
 }
 
