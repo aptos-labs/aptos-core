@@ -1073,6 +1073,7 @@ dependencies = [
  "byteorder",
  "bytes",
  "channel",
+ "consensus-notifications",
  "consensus-types",
  "diem-config",
  "diem-crypto",
@@ -1106,7 +1107,6 @@ dependencies = [
  "serde",
  "serde_json",
  "short-hex-str",
- "state-sync-v1",
  "storage-interface",
  "subscription-service",
  "tempfile",
@@ -1115,6 +1115,21 @@ dependencies = [
  "tokio",
  "vm-genesis",
  "vm-validator",
+]
+
+[[package]]
+name = "consensus-notifications"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "diem-crypto",
+ "diem-types",
+ "diem-workspace-hack",
+ "futures",
+ "move-core-types",
+ "serde",
+ "thiserror",
+ "tokio",
 ]
 
 [[package]]
@@ -2187,6 +2202,7 @@ version = "0.1.0"
 dependencies = [
  "backup-service",
  "consensus",
+ "consensus-notifications",
  "crash-handler",
  "debug-interface",
  "diem-config",
@@ -7560,6 +7576,7 @@ dependencies = [
  "bcs",
  "bytes",
  "channel",
+ "consensus-notifications",
  "diem-config",
  "diem-crypto",
  "diem-framework-releases",
