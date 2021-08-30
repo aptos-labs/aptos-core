@@ -272,7 +272,6 @@ impl FunctionTargetProcessor for VerificationAnalysisProcessor {
         // rules depends on information in that map.
         for fun_id in &fun_set_with_no_inv_check {
             let fun_env = env.get_function(*fun_id);
-            let mut error_message = None;
 
             // Rule 1: external-facing functions are not allowed in the N set (i.e., have invariant
             // checking completely turned-off), UNLESS they don't modify any memory that are checked
@@ -285,15 +284,15 @@ impl FunctionTargetProcessor for VerificationAnalysisProcessor {
                     .filter(|inv_id| is_invariant_suspendable(env, **inv_id))
                     .count();
                 if num_suspendable_inv_modified != 0 {
-                    error_message = if is_invariant_checking_delegated(&fun_env) {
-                        Some("Public or script functions cannot delegate invariants".to_owned())
+                    if is_invariant_checking_delegated(&fun_env) {
+                        let message = "Public or script functions cannot delegate invariants";
+                        env.error(&fun_env.get_loc(), message);
                     } else {
-                        Some(
-                            "Public or script functions cannot be transitively called by functions \
-                            disabling or delegating invariants"
-                                .to_owned(),
-                        )
-                    }
+                        let message = "Public or script functions cannot be transitively \
+                        called by functions disabling or delegating invariants";
+                        let trace = Self::compute_non_inv_cause_chain(&fun_env);
+                        env.error_with_notes(&fun_env.get_loc(), message, trace);
+                    };
                 }
             }
 
@@ -301,18 +300,11 @@ impl FunctionTargetProcessor for VerificationAnalysisProcessor {
             // have invariant checking turned-off completely while also checking the invariant at
             // the function return.
             if fun_set_with_inv_check_on_exit.contains(fun_id) {
-                error_message = Some(format!(
+                let message = format!(
                     "Functions must not have `pragma {}` when invariant checking is turned-off on \
-                    this function. This might be caused by either \
-                        1) a transitive caller of this function having `pragma {}` or \
-                        2) the `pragma {}` being applied on this function",
+                    this function",
                     DISABLE_INVARIANTS_IN_BODY_PRAGMA,
-                    DISABLE_INVARIANTS_IN_BODY_PRAGMA,
-                    DELEGATE_INVARIANTS_TO_CALLER_PRAGMA
-                ));
-            }
-
-            if let Some(message) = error_message {
+                );
                 let trace = Self::compute_non_inv_cause_chain(&fun_env);
                 env.error_with_notes(&fun_env.get_loc(), &message, trace);
             }
