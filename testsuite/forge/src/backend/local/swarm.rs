@@ -330,7 +330,7 @@ impl LocalSwarm {
 
 impl Swarm for LocalSwarm {
     fn health_check(&mut self) -> Result<()> {
-        todo!()
+        Ok(())
     }
 
     fn validators<'a>(&'a self) -> Box<dyn Iterator<Item = &'a dyn Validator> + 'a> {

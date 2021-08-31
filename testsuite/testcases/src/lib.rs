@@ -26,6 +26,7 @@ fn batch_update<'t>(
             .unwrap()
             .wait_until_healthy(deadline)?;
     }
+    ctx.swarm().health_check()?;
 
     Ok(())
 }

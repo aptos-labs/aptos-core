@@ -17,32 +17,52 @@ use url::Url;
 
 #[derive(StructOpt, Debug)]
 struct Args {
-    #[structopt(
-        long,
-        help = "If set, tries to connect to a local swarm instead of testnet"
-    )]
-    local_swarm: bool,
-
-    // emit_tx options
+    // general options
     #[structopt(long, default_value = "15")]
     accounts_per_client: usize,
     #[structopt(long)]
     workers_per_ac: Option<usize>,
+    #[structopt(flatten)]
+    options: Options,
+    #[structopt(long, help = "Specify a test suite to run")]
+    suite: Option<String>,
+
+    // subcommand groups
+    #[structopt(flatten)]
+    cli_cmd: CliCommand,
+}
+
+#[derive(StructOpt, Debug)]
+enum CliCommand {
+    Test(TestCommand),
+    Operator(OperatorCommand),
+}
+
+#[derive(StructOpt, Debug)]
+enum TestCommand {
+    LocalSwarm(LocalSwarm),
+    K8sSwarm(K8sSwarm),
+}
+
+#[derive(StructOpt, Debug)]
+enum OperatorCommand {
+    SetValidator(SetValidator),
+    CleanUp(CleanUp),
+    Resize(Resize),
+}
+
+#[derive(StructOpt, Debug)]
+struct LocalSwarm {
     #[structopt(
         long,
         help = "Time to run --emit-tx for in seconds",
         default_value = "60"
     )]
     duration: u64,
+}
 
-    #[structopt(flatten)]
-    options: Options,
-
-    #[structopt(subcommand)]
-    ops_cmd: Option<OperatorCommand>,
-
-    #[structopt(long, help = "Name of the EKS cluster")]
-    cluster_name: String,
+#[derive(StructOpt, Debug)]
+struct K8sSwarm {
     #[structopt(
         long,
         help = "Override the helm repo used for k8s tests",
@@ -61,15 +81,8 @@ struct Args {
         default_value = "devnet"
     )]
     base_image_tag: String,
-    #[structopt(long, help = "Specify a test suite to run")]
-    suite: Option<String>,
-}
-
-#[derive(StructOpt, Debug)]
-enum OperatorCommand {
-    SetValidator(SetValidator),
-    CleanUp(CleanUp),
-    Resize(Resize),
+    #[structopt(long, help = "Name of the EKS cluster")]
+    cluster_name: String,
 }
 
 #[derive(StructOpt, Debug)]
@@ -77,12 +90,20 @@ struct SetValidator {
     validator_name: String,
     #[structopt(long, help = "Override the image tag used for upgrade validators")]
     image_tag: String,
+    #[structopt(
+        long,
+        help = "Override the helm repo used for k8s tests",
+        default_value = "testnet-internal"
+    )]
+    helm_repo: String,
 }
 
 #[derive(StructOpt, Debug)]
 struct CleanUp {
     #[structopt(long, help = "If set, uses k8s service account to auth with AWS")]
     auth_with_k8s_env: bool,
+    #[structopt(long, help = "Name of the EKS cluster")]
+    cluster_name: String,
 }
 
 #[derive(StructOpt, Debug)]
@@ -108,64 +129,72 @@ struct Resize {
     require_validator_healthcheck: bool,
     #[structopt(long, help = "If set, uses k8s service account to auth with AWS")]
     auth_with_k8s_env: bool,
+    #[structopt(
+        long,
+        help = "Override the helm repo used for k8s tests",
+        default_value = "testnet-internal"
+    )]
+    helm_repo: String,
+    #[structopt(long, help = "Name of the EKS cluster")]
+    cluster_name: String,
 }
 
 fn main() -> Result<()> {
     let args = Args::from_args();
 
-    if let Some(ops_cmd) = args.ops_cmd {
-        match ops_cmd {
-            OperatorCommand::SetValidator(set_validator) => {
-                return set_validator_image_tag(
-                    &set_validator.validator_name,
-                    &set_validator.image_tag,
-                    &args.helm_repo,
+    match args.cli_cmd {
+        // cmd input for test
+        CliCommand::Test(test_cmd) => match test_cmd {
+            TestCommand::LocalSwarm(..) => run_forge(
+                local_test_suite(),
+                LocalFactory::from_workspace()?,
+                &args.options,
+            ),
+            TestCommand::K8sSwarm(k8s) => {
+                let mut test_suite = k8s_test_suite();
+                if let Some(suite) = args.suite.as_ref() {
+                    test_suite = get_test_suite(suite);
+                }
+                run_forge(
+                    test_suite,
+                    K8sFactory::new(
+                        k8s.cluster_name,
+                        k8s.helm_repo,
+                        k8s.image_tag,
+                        k8s.base_image_tag,
+                    )
+                    .unwrap(),
+                    &args.options,
                 )
+            }
+        },
+        // cmd input for cluster operations
+        CliCommand::Operator(op_cmd) => match op_cmd {
+            OperatorCommand::SetValidator(set_validator) => set_validator_image_tag(
+                &set_validator.validator_name,
+                &set_validator.image_tag,
+                &set_validator.helm_repo,
+            ),
+            OperatorCommand::CleanUp(cleanup) => {
+                uninstall_from_k8s_cluster()?;
+                set_eks_nodegroup_size(cleanup.cluster_name, 0, cleanup.auth_with_k8s_env)
             }
             OperatorCommand::Resize(resize) => {
                 set_eks_nodegroup_size(
-                    args.cluster_name,
+                    resize.cluster_name,
                     resize.num_validators,
                     resize.auth_with_k8s_env,
                 )?;
                 uninstall_from_k8s_cluster()?;
-                return clean_k8s_cluster(
-                    args.helm_repo,
+                clean_k8s_cluster(
+                    resize.helm_repo,
                     resize.num_validators,
                     resize.validator_image_tag,
                     resize.testnet_image_tag,
                     resize.require_validator_healthcheck,
-                );
+                )
             }
-            OperatorCommand::CleanUp(cleanup) => {
-                uninstall_from_k8s_cluster()?;
-                return set_eks_nodegroup_size(args.cluster_name, 0, cleanup.auth_with_k8s_env);
-            }
-        }
-    }
-
-    if args.local_swarm {
-        run_forge(
-            local_test_suite(),
-            LocalFactory::from_workspace()?,
-            &args.options,
-        )
-    } else {
-        let mut test_suite = k8s_test_suite();
-        if let Some(suite) = args.suite.as_ref() {
-            test_suite = get_test_suite(suite);
-        }
-        run_forge(
-            test_suite,
-            K8sFactory::new(
-                args.cluster_name,
-                args.helm_repo,
-                args.image_tag,
-                args.base_image_tag,
-            )
-            .unwrap(),
-            &args.options,
-        )
+        },
     }
 }
 
