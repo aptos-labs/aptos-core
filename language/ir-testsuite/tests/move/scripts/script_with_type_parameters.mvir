@@ -1,5 +1,0 @@
-//! type-args: u64, u8, 0x1::DiemAccount::DiemAccount
-main<T1, T2: copy + drop, T3: key>() {
-    return;
-}
-// check: "Keep(EXECUTED)"

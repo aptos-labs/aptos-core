@@ -1,0 +1,70 @@
+//# publish
+module 0x1.Coin {
+    struct Coin has store { value: u64 }
+    public value(c: &Self.Coin): u64 {
+        return *&move(c).value;
+    }
+    public zero(): Self.Coin {
+        return Coin { value: 0 };
+    }
+}
+
+//# publish
+module 0x42.M {
+    import 0x1.Coin;
+    import 0x1.Vector;
+    import 0x1.Signer;
+    struct Coins has key { f: vector<Coin.Coin> }
+
+    public new(account: &signer) {
+        let coin_vec: vector<Coin.Coin>;
+        let coins: Self.Coins;
+        coin_vec = Vector.empty<Coin.Coin>();
+        coins = Coins { f: move(coin_vec)};
+
+        move_to<Coins>(move(account), move(coins));
+        return;
+    }
+
+    public put_coin(account: &signer, coin: Coin.Coin) acquires Coins {
+        let coins_ref: &mut Self.Coins;
+        let v_ref: &mut vector<Coin.Coin>;
+
+        coins_ref = borrow_global_mut<Coins>(Signer.address_of(move(account)));
+        v_ref = &mut move(coins_ref).f;
+        Vector.push_back<Coin.Coin>(move(v_ref), move(coin));
+        return;
+    }
+
+    public get_value(account: &signer, i: u64): u64 acquires Coins {
+        let coins_ref: &Self.Coins;
+        let v_ref: &vector<Coin.Coin>;
+        let coin_ref: &Coin.Coin;
+
+        coins_ref = borrow_global<Coins>(Signer.address_of(move(account)));
+        v_ref = &move(coins_ref).f;
+        coin_ref = Vector.borrow<Coin.Coin>(move(v_ref), move(i));
+
+        return Coin.value(move(coin_ref));
+    }
+
+    public pop(account: &signer): Coin.Coin acquires Coins {
+        let coins_ref: &mut Self.Coins;
+        let v_ref: &mut vector<Coin.Coin>;
+
+        coins_ref = borrow_global_mut<Coins>(Signer.address_of(move(account)));
+        v_ref = &mut move(coins_ref).f;
+        return Vector.pop_back<Coin.Coin>(move(v_ref));
+    }
+}
+
+//# run --signers 0x1
+import 0x42.M;
+import 0x1.Coin;
+
+main(account: signer) {
+    M.new(&account);
+    M.put_coin(&account, Coin.zero());
+
+    return;
+}

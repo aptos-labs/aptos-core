@@ -1,0 +1,4 @@
+//# run --type-args u64
+main() { // too many type args
+    return;
+}

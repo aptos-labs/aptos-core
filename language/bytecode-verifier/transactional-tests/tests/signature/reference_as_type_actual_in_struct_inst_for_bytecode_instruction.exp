@@ -1,4 +1,4 @@
-processed 8 tasks
+processed 9 tasks
 
 task 0 'publish'. lines 1-12:
 Error: Unable to publish module '00000000000000000000000000000001::M'. Got VMError: {
@@ -27,7 +27,7 @@ Error: Unable to publish module '00000000000000000000000000000001::M'. Got VMErr
     offsets: [],
 }
 
-task 3 'publish'. lines 41-65:
+task 3 'publish'. lines 41-53:
 Error: Unable to publish module '00000000000000000000000000000001::M'. Got VMError: {
     major_status: INVALID_SIGNATURE_TOKEN,
     sub_status: None,
@@ -36,7 +36,7 @@ Error: Unable to publish module '00000000000000000000000000000001::M'. Got VMErr
     offsets: [],
 }
 
-task 4 'publish'. lines 67-81:
+task 4 'publish'. lines 55-65:
 Error: Unable to publish module '00000000000000000000000000000001::M'. Got VMError: {
     major_status: INVALID_SIGNATURE_TOKEN,
     sub_status: None,
@@ -45,7 +45,7 @@ Error: Unable to publish module '00000000000000000000000000000001::M'. Got VMErr
     offsets: [],
 }
 
-task 5 'publish'. lines 83-95:
+task 5 'publish'. lines 67-81:
 Error: Unable to publish module '00000000000000000000000000000001::M'. Got VMError: {
     major_status: INVALID_SIGNATURE_TOKEN,
     sub_status: None,
@@ -54,7 +54,16 @@ Error: Unable to publish module '00000000000000000000000000000001::M'. Got VMErr
     offsets: [],
 }
 
-task 6 'publish'. lines 97-105:
+task 6 'publish'. lines 83-95:
+Error: Unable to publish module '00000000000000000000000000000001::M'. Got VMError: {
+    major_status: INVALID_SIGNATURE_TOKEN,
+    sub_status: None,
+    location: 0x1::M,
+    indices: [(Signature, 1), (FunctionDefinition, 0)],
+    offsets: [],
+}
+
+task 7 'publish'. lines 97-105:
 Error: Unable to publish module '00000000000000000000000000000001::M'. Got VMError: {
     major_status: INVALID_SIGNATURE_TOKEN,
     sub_status: None,
@@ -63,7 +72,7 @@ Error: Unable to publish module '00000000000000000000000000000001::M'. Got VMErr
     offsets: [],
 }
 
-task 7 'publish'. lines 107-115:
+task 8 'publish'. lines 107-115:
 Error: Unable to publish module '00000000000000000000000000000001::M'. Got VMError: {
     major_status: INVALID_SIGNATURE_TOKEN,
     sub_status: None,

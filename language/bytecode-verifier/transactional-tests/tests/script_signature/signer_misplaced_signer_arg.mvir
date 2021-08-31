@@ -1,0 +1,11 @@
+//# run --signers 0x1 --args 0
+// invalid signature
+main(u: u64, s: &signer) {
+    return;
+}
+
+//# run --signers 0x1 --args 0 1
+// invalid signature
+main(u: u64, s: &signer, u2: u64) {
+    return;
+}

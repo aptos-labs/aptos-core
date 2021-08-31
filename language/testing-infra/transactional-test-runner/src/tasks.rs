@@ -101,7 +101,7 @@ pub fn taskify<Command: Debug + StructOpt>(filename: &Path) -> Result<Vec<TaskIn
         let name_opt = command_split.get(1).map(|s| (*s).to_owned());
         let command = match Command::from_iter_safe(command_split) {
             Ok(command) => command,
-            Err(_e) => {
+            Err(e) => {
                 let mut spit_iter = command_text.split_ascii_whitespace();
                 // skip 'task'
                 spit_iter.next();
@@ -114,7 +114,8 @@ pub fn taskify<Command: Debug + StructOpt>(filename: &Path) -> Result<Vec<TaskIn
                     Err(e) => e,
                 };
                 bail!(
-                    "Invalid command. Lines {} - {}.\n{}",
+                    "Invalid command. Got error {}\nLines {} - {}.\n{}",
+                    e,
                     start_line,
                     command_lines_stop,
                     help

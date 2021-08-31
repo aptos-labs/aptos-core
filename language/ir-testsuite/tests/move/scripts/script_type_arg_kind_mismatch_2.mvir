@@ -1,5 +1,0 @@
-//! type-args: bool
-main<T: key>() {
-    return;
-}
-// check: CONSTRAINT_NOT_SATISFIED

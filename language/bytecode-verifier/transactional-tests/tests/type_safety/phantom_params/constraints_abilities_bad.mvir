@@ -14,8 +14,7 @@ module 0x1.M2 {
     }
 }
 
-//! new-transaction
-
+//# publish
 module 0x1.M3 {
     import 0x1.M1;
 

@@ -1,5 +1,0 @@
-main(s: signer) {
-    assert(&s == &s, 42);
-    assert(!(&s != &s), 42);
-    return;
-}

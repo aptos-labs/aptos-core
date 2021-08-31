@@ -52,7 +52,7 @@ module 0x1.M {
 }
 // check: INVALID_SIGNATURE_TOKEN
 
-//! new-transaction
+//# publish
 module 0x1.M {
     import 0x1.Signer;
 

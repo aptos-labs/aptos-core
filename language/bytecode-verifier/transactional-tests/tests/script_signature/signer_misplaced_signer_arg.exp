@@ -1,0 +1,19 @@
+processed 2 tasks
+
+task 0 'run'. lines 1-5:
+Error: Script execution failed with VMError: {
+    major_status: INVALID_MAIN_FUNCTION_SIGNATURE,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [],
+}
+
+task 1 'run'. lines 7-11:
+Error: Script execution failed with VMError: {
+    major_status: INVALID_MAIN_FUNCTION_SIGNATURE,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [],
+}

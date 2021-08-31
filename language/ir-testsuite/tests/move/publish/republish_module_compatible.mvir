@@ -1,8 +1,0 @@
-// Publishing a compatible module should be allowed
-
-module {{default}}.Currency {
-}
-
-//! new-transaction
-module {{default}}.Currency {
-}

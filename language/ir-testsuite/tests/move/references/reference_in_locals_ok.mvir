@@ -1,6 +1,0 @@
-module {{default}}.M {
-    foo() {
-        let x: &u64;
-        return;
-    }
-}

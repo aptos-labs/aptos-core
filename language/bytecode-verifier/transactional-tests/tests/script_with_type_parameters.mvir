@@ -1,0 +1,20 @@
+//# publish
+module 0x1.Coin {
+    struct Coin { value: u64 }
+    public value(c: &Self.Coin): u64 {
+        return *&move(c).value;
+    }
+    public zero(): Self.Coin {
+        return Coin { value: 0 };
+    }
+    public destroy_zero(c: Self.Coin) {
+        Coin {} = move(c);
+        assert(() == 0, 42);
+        return;
+    }
+}
+
+//# run --type-args u64 u8 0x1::Coin::Coin
+main<T1, T2: copy + drop, T3: key>() {
+    return;
+}

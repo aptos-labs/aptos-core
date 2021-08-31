@@ -1,0 +1,21 @@
+//# publish
+module 0x42.M {
+    struct S<T> { s: T }
+    t(s: signer): Self.S<signer> {
+        let x: Self.S<signer>;
+        x = S<signer> { s: move(s) };
+        // cannot copy signer
+        return *&x;
+    }
+}
+
+//# publish
+module 0x42.M {
+    struct S<T> { s: T }
+    t(s: signer): signer {
+        let x: Self.S<signer>;
+        x = S<signer> { s: move(s) };
+        // cannot copy signer
+        return *(&(&x).s);
+    }
+}

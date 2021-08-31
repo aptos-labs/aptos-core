@@ -1,5 +1,0 @@
-module {{default}}.M {
-    struct Foo { x: &u64 }
-}
-
-// check: INVALID_SIGNATURE_TOKEN

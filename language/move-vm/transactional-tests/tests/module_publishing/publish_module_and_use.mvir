@@ -1,0 +1,61 @@
+//# publish
+module 0x1.Coin {
+    struct Coin { value: u64 }
+    public value(c: &Self.Coin): u64 {
+        return *&move(c).value;
+    }
+    public zero(): Self.Coin {
+        return Coin { value: 0 };
+    }
+    public destroy_zero(c: Self.Coin) {
+        Coin {} = move(c);
+        assert(() == 0, 42);
+        return;
+    }
+}
+
+//# publish
+module 0x42.MoneyHolder {
+    import 0x1.Coin;
+
+    struct T { money: Coin.Coin }
+
+    public new(m: Coin.Coin): Self.T {
+        return T{ money: move(m) };
+    }
+
+    public value(this :&Self.T): u64 {
+        let ref: &Coin.Coin;
+        let val: u64;
+        ref = &copy(this).money;
+        val = Coin.value(move(ref));
+        _ = move(this);
+        return move(val);
+    }
+
+    public destroy_t(t: Self.T) {
+        let money: Coin.Coin;
+        T{ money } = move(t);
+        Coin.destroy_zero(move(money));
+        return;
+    }
+}
+
+//# run
+import 0x42.MoneyHolder;
+import 0x1.Coin;
+
+main() {
+    let coin: Coin.Coin;
+    let money_holder: MoneyHolder.T;
+    let money_holder_ref: &MoneyHolder.T;
+    let value: u64;
+    coin = Coin.zero();
+    money_holder = MoneyHolder.new(move(coin));
+    money_holder_ref = &money_holder;
+    value = MoneyHolder.value(move(money_holder_ref));
+    assert(copy(value) == 0, 42);
+    MoneyHolder.destroy_t(move(money_holder));
+
+    return;
+}

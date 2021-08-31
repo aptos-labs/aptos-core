@@ -1,0 +1,136 @@
+processed 26 tasks
+
+task 2 'run'. lines 257-265:
+Error: Script execution failed with VMError: {
+    major_status: ABORTED,
+    sub_status: Some(1),
+    location: 0x1::SortedLinkedList,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(3), 9)],
+}
+
+task 4 'run'. lines 275-282:
+Error: Script execution failed with VMError: {
+    major_status: ABORTED,
+    sub_status: Some(3),
+    location: 0x1::SortedLinkedList,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(4), 9)],
+}
+
+task 5 'run'. lines 284-291:
+Error: Script execution failed with VMError: {
+    major_status: ABORTED,
+    sub_status: Some(7),
+    location: 0x1::SortedLinkedList,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(4), 61)],
+}
+
+task 7 'run'. lines 301-308:
+Error: Script execution failed with VMError: {
+    major_status: ABORTED,
+    sub_status: Some(6),
+    location: 0x1::SortedLinkedList,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(4), 52)],
+}
+
+task 9 'run'. lines 318-325:
+Error: Script execution failed with VMError: {
+    major_status: ABORTED,
+    sub_status: Some(5),
+    location: 0x1::SortedLinkedList,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(4), 15)],
+}
+
+task 10 'run'. lines 327-334:
+Error: Script execution failed with VMError: {
+    major_status: ABORTED,
+    sub_status: Some(6),
+    location: 0x1::SortedLinkedList,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(4), 52)],
+}
+
+task 11 'run'. lines 336-343:
+Error: Script execution failed with VMError: {
+    major_status: ABORTED,
+    sub_status: Some(3),
+    location: 0x1::SortedLinkedList,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(4), 9)],
+}
+
+task 14 'run'. lines 361-368:
+Error: Script execution failed with VMError: {
+    major_status: ABORTED,
+    sub_status: Some(11),
+    location: 0x1::SortedLinkedList,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(6), 8)],
+}
+
+task 17 'run'. lines 386-393:
+Error: Script execution failed with VMError: {
+    major_status: ABORTED,
+    sub_status: Some(11),
+    location: 0x1::SortedLinkedList,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(6), 8)],
+}
+
+task 18 'run'. lines 395-402:
+Error: Script execution failed with VMError: {
+    major_status: ABORTED,
+    sub_status: Some(15),
+    location: 0x1::SortedLinkedList,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(7), 27)],
+}
+
+task 19 'run'. lines 404-411:
+Error: Script execution failed with VMError: {
+    major_status: ABORTED,
+    sub_status: Some(14),
+    location: 0x1::SortedLinkedList,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(7), 12)],
+}
+
+task 20 'run'. lines 413-420:
+Error: Script execution failed with VMError: {
+    major_status: ABORTED,
+    sub_status: Some(12),
+    location: 0x1::SortedLinkedList,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(6), 15)],
+}
+
+task 21 'run'. lines 422-429:
+Error: Script execution failed with VMError: {
+    major_status: ABORTED,
+    sub_status: Some(9),
+    location: 0x1::SortedLinkedList,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(5), 32)],
+}
+
+task 22 'run'. lines 431-441:
+Error: Script execution failed with VMError: {
+    major_status: ABORTED,
+    sub_status: Some(14),
+    location: 0x1::SortedLinkedList,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(7), 12)],
+}
+
+task 23 'run'. lines 443-453:
+Error: Script execution failed with VMError: {
+    major_status: ABORTED,
+    sub_status: Some(12),
+    location: 0x1::SortedLinkedList,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(6), 15)],
+}
