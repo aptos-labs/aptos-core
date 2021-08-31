@@ -7,6 +7,7 @@ use crate::{
     account_state::AccountState,
     ledger_info::LedgerInfo,
     proof::AccountStateProof,
+    protocol_spec::ProtocolSpec,
     transaction::Version,
 };
 use anyhow::{anyhow, ensure, Error, Result};
@@ -139,19 +140,24 @@ impl Arbitrary for AccountStateBlob {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
-pub struct AccountStateWithProof {
+#[serde(bound = "for<'a> PS: Deserialize<'a>")]
+pub struct AccountStateWithProof<PS: ProtocolSpec> {
     /// The transaction version at which this account state is seen.
     pub version: Version,
     /// Blob value representing the account state. If this field is not set, it
     /// means the account does not exist.
     pub blob: Option<AccountStateBlob>,
     /// The proof the client can use to authenticate the value.
-    pub proof: AccountStateProof,
+    pub proof: AccountStateProof<PS>,
 }
 
-impl AccountStateWithProof {
+impl<PS: ProtocolSpec> AccountStateWithProof<PS> {
     /// Constructor.
-    pub fn new(version: Version, blob: Option<AccountStateBlob>, proof: AccountStateProof) -> Self {
+    pub fn new(
+        version: Version,
+        blob: Option<AccountStateBlob>,
+        proof: AccountStateProof<PS>,
+    ) -> Self {
         Self {
             version,
             blob,
@@ -184,9 +190,15 @@ impl AccountStateWithProof {
     }
 }
 
+pub mod default_protocol {
+    use crate::protocol_spec::DpnProto;
+
+    pub type AccountStateWithProof = super::AccountStateWithProof<DpnProto>;
+}
+
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{default_protocol::AccountStateWithProof, *};
     use bcs::test_helpers::assert_canonical_encode_decode;
     use proptest::collection::vec;
 

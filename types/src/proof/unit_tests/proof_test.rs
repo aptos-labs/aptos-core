@@ -12,15 +12,21 @@ use crate::{
     event::EventKey,
     ledger_info::LedgerInfo,
     proof::{
-        definition::MAX_ACCUMULATOR_PROOF_DEPTH, AccountStateProof, AccumulatorExtensionProof,
-        AccumulatorRangeProof, EventAccumulatorInternalNode, EventAccumulatorProof, EventProof,
-        SparseMerkleInternalNode, SparseMerkleLeafNode, TestAccumulatorInternalNode,
-        TestAccumulatorProof, TransactionAccumulatorInternalNode, TransactionAccumulatorProof,
-        TransactionInfoListWithProof, TransactionInfoWithProof,
+        default_protocol::TransactionInfoListWithProof,
+        definition::{
+            default_protocol::{AccountStateProof, EventProof},
+            MAX_ACCUMULATOR_PROOF_DEPTH,
+        },
+        AccumulatorExtensionProof, AccumulatorRangeProof, EventAccumulatorInternalNode,
+        EventAccumulatorProof, SparseMerkleInternalNode, SparseMerkleLeafNode,
+        TestAccumulatorInternalNode, TestAccumulatorProof, TransactionAccumulatorInternalNode,
+        TransactionAccumulatorProof, TransactionInfoWithProof,
     },
+    protocol_spec::DpnProto,
     transaction::{
-        RawTransaction, Script, Transaction, TransactionInfo, TransactionListWithProof,
-        TransactionOutput, TransactionOutputListWithProof, TransactionStatus,
+        RawTransaction, Script, Transaction, TransactionInfo, TransactionInfoTrait,
+        TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
+        TransactionStatus,
     },
     vm_status::KeptVMStatus,
     write_set::WriteSet,
@@ -294,8 +300,10 @@ fn test_verify_transaction() {
 
     let ledger_info_to_transaction_info_proof =
         TransactionAccumulatorProof::new(vec![txn_info0_hash, internal_b_hash]);
-    let proof =
-        TransactionInfoWithProof::new(ledger_info_to_transaction_info_proof.clone(), txn_info1);
+    let proof = TransactionInfoWithProof::<DpnProto>::new(
+        ledger_info_to_transaction_info_proof.clone(),
+        txn_info1,
+    );
 
     // The proof can be used to verify txn1.
     assert!(proof.verify(&ledger_info, 1).is_ok());
@@ -309,7 +317,10 @@ fn test_verify_transaction() {
         /* gas_used = */ 0,
         /* major_status = */ KeptVMStatus::Executed,
     );
-    let proof = TransactionInfoWithProof::new(ledger_info_to_transaction_info_proof, fake_txn_info);
+    let proof = TransactionInfoWithProof::<DpnProto>::new(
+        ledger_info_to_transaction_info_proof,
+        fake_txn_info,
+    );
     assert!(proof.verify(&ledger_info, 1).is_err());
 }
 

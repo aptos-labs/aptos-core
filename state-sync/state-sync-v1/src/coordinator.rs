@@ -25,7 +25,7 @@ use diem_logger::prelude::*;
 use diem_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
-    transaction::{Transaction, TransactionListWithProof, Version},
+    transaction::{default_protocol::TransactionListWithProof, Transaction, Version},
     waypoint::Waypoint,
     PeerId,
 };
@@ -1743,8 +1743,8 @@ mod tests {
         ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
         proof::TransactionInfoListWithProof,
         transaction::{
-            RawTransaction, Script, SignedTransaction, Transaction, TransactionListWithProof,
-            TransactionPayload, Version,
+            default_protocol::TransactionListWithProof, RawTransaction, Script, SignedTransaction,
+            Transaction, TransactionPayload, Version,
         },
         waypoint::Waypoint,
         PeerId,

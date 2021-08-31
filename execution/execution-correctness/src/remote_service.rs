@@ -13,6 +13,7 @@ use executor::Executor;
 use executor_types::Error;
 use std::net::SocketAddr;
 use storage_client::StorageClient;
+use storage_interface::default_protocol::DbReaderWriter;
 
 pub trait RemoteService {
     fn client(&self) -> SerializerClient {
@@ -32,9 +33,9 @@ pub fn execute(
     prikey: Option<Ed25519PrivateKey>,
     network_timeout: u64,
 ) {
-    let block_executor = Box::new(Executor::<DiemVM>::new(
-        StorageClient::new(&storage_addr, network_timeout).into(),
-    ));
+    let block_executor = Box::new(Executor::<DiemVM>::new(DbReaderWriter::new(
+        StorageClient::new(&storage_addr, network_timeout),
+    )));
     let serializer_service = SerializerService::new(block_executor, prikey);
     let mut network_server = NetworkServer::new("execution", listen_addr, network_timeout);
 

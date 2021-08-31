@@ -11,6 +11,7 @@ use diem_types::{
     account_state::AccountState,
     account_state_blob::AccountStateBlob,
     proof::SparseMerkleProof,
+    protocol_spec::ProtocolSpec,
     transaction::{Version, PRE_GENESIS_VERSION},
 };
 use parking_lot::RwLock;
@@ -23,13 +24,13 @@ use std::{
 
 /// `VerifiedStateView` is like a snapshot of the global state comprised of state view at two
 /// levels, persistent storage and memory.
-pub struct VerifiedStateView<'a> {
+pub struct VerifiedStateView<'a, PS: ProtocolSpec> {
     /// For logging and debugging purpose, identifies what this view is for.
     id: StateViewId,
 
     /// A gateway implementing persistent storage interface, which can be a RPC client or direct
     /// accessor.
-    reader: Arc<dyn DbReader>,
+    reader: Arc<dyn DbReader<PS>>,
 
     /// The most recent version in persistent storage.
     latest_persistent_version: Option<Version>,
@@ -80,13 +81,13 @@ pub struct VerifiedStateView<'a> {
     account_to_proof_cache: RwLock<HashMap<HashValue, SparseMerkleProof<AccountStateBlob>>>,
 }
 
-impl<'a> VerifiedStateView<'a> {
+impl<'a, PS: ProtocolSpec> VerifiedStateView<'a, PS> {
     /// Constructs a [`VerifiedStateView`] with persistent state view represented by
     /// `latest_persistent_state_root` plus a storage reader, and the in-memory speculative state
     /// on top of it represented by `speculative_state`.
     pub fn new(
         id: StateViewId,
-        reader: Arc<dyn DbReader>,
+        reader: Arc<dyn DbReader<PS>>,
         latest_persistent_version: Option<Version>,
         latest_persistent_state_root: HashValue,
         speculative_state: &'a SparseMerkleTree<AccountStateBlob>,
@@ -112,13 +113,13 @@ impl<'a> VerifiedStateView<'a> {
     }
 }
 
-impl<'a> From<VerifiedStateView<'a>>
+impl<'a, PS: ProtocolSpec> From<VerifiedStateView<'a, PS>>
     for (
         HashMap<AccountAddress, AccountState>,
         HashMap<HashValue, SparseMerkleProof<AccountStateBlob>>,
     )
 {
-    fn from(view: VerifiedStateView<'a>) -> Self {
+    fn from(view: VerifiedStateView<'a, PS>) -> Self {
         (
             view.account_to_state_cache.into_inner(),
             view.account_to_proof_cache.into_inner(),
@@ -126,7 +127,7 @@ impl<'a> From<VerifiedStateView<'a>>
     }
 }
 
-impl<'a> StateView for VerifiedStateView<'a> {
+impl<'a, PS: ProtocolSpec> StateView for VerifiedStateView<'a, PS> {
     fn id(&self) -> StateViewId {
         self.id
     }
@@ -195,4 +196,10 @@ impl<'a> StateView for VerifiedStateView<'a> {
     fn is_genesis(&self) -> bool {
         self.latest_persistent_version.is_none()
     }
+}
+
+pub mod default_protocol {
+    use diem_types::protocol_spec::DpnProto;
+
+    pub type VerifiedStateView<'a> = super::VerifiedStateView<'a, DpnProto>;
 }

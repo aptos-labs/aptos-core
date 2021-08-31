@@ -10,7 +10,8 @@ use crate::{
 use diem_logger::prelude::*;
 use diem_types::{
     contract_event::ContractEvent, ledger_info::LedgerInfoWithSignatures,
-    move_resource::MoveStorage, transaction::TransactionListWithProof,
+    move_resource::MoveStorage, protocol_spec::DpnProto,
+    transaction::default_protocol::TransactionListWithProof,
 };
 use event_notifications::{EventNotificationSender, EventSubscriptionService};
 use executor_types::{ChunkExecutor, ExecutedTrees};
@@ -53,14 +54,14 @@ pub trait ExecutorProxyTrait: Send {
 }
 
 pub(crate) struct ExecutorProxy {
-    storage: Arc<dyn DbReader>,
+    storage: Arc<dyn DbReader<DpnProto>>,
     executor: Box<dyn ChunkExecutor>,
     event_subscription_service: EventSubscriptionService,
 }
 
 impl ExecutorProxy {
     pub(crate) fn new(
-        storage: Arc<dyn DbReader>,
+        storage: Arc<dyn DbReader<DpnProto>>,
         executor: Box<dyn ChunkExecutor>,
         event_subscription_service: EventSubscriptionService,
     ) -> Self {

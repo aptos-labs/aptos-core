@@ -7,22 +7,30 @@ use diem_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
 use diem_state_view::StateView;
 use diem_types::{
     account_address::AccountAddress,
-    account_state_blob::{AccountStateBlob, AccountStateWithProof},
-    contract_event::{ContractEvent, EventByVersionWithProof, EventWithProof},
+    account_state_blob::{default_protocol::AccountStateWithProof, AccountStateBlob},
+    contract_event::{
+        default_protocol::{EventByVersionWithProof, EventWithProof},
+        ContractEvent,
+    },
     epoch_change::EpochChangeProof,
     event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
     proof::SparseMerkleProof,
+    protocol_spec::DpnProto,
     state_proof::StateProof,
     transaction::{
-        AccountTransactionsWithProof, Transaction, TransactionListWithProof, TransactionOutput,
-        TransactionToCommit, TransactionWithProof, Version,
+        default_protocol::{
+            AccountTransactionsWithProof, TransactionListWithProof, TransactionWithProof,
+        },
+        Transaction, TransactionOutput, TransactionToCommit, Version,
     },
     vm_status::VMStatus,
 };
 use diem_vm::VMExecutor;
 use executor_types::{BlockExecutor, ChunkExecutor};
-use storage_interface::{DbReader, DbReaderWriter, DbWriter, Order, StartupInfo, TreeState};
+use storage_interface::{
+    default_protocol::DbReaderWriter, DbReader, DbWriter, Order, StartupInfo, TreeState,
+};
 
 fn create_test_executor() -> Executor<FakeVM> {
     // setup fake db
@@ -71,7 +79,7 @@ impl VMExecutor for FakeVM {
 /// A fake database implementing DbReader and DbWriter
 pub struct FakeDb;
 
-impl DbReader for FakeDb {
+impl DbReader<DpnProto> for FakeDb {
     fn get_block_timestamp(&self, _version: u64) -> Result<u64> {
         unimplemented!();
     }
@@ -218,7 +226,7 @@ impl DbReader for FakeDb {
     }
 }
 
-impl DbWriter for FakeDb {
+impl DbWriter<DpnProto> for FakeDb {
     fn save_transactions(
         &self,
         _txns_to_commit: &[TransactionToCommit],

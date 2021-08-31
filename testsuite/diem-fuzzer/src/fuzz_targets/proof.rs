@@ -8,8 +8,10 @@ use diem_types::{
     account_state_blob::AccountStateBlob,
     ledger_info::LedgerInfo,
     proof::{
-        AccountStateProof, EventProof, SparseMerkleProof, TestAccumulatorProof,
-        TestAccumulatorRangeProof, TransactionInfoListWithProof, TransactionInfoWithProof,
+        default_protocol::{
+            AccountStateProof, EventProof, TransactionInfoListWithProof, TransactionInfoWithProof,
+        },
+        SparseMerkleProof, TestAccumulatorProof, TestAccumulatorRangeProof,
     },
     transaction::Version,
 };

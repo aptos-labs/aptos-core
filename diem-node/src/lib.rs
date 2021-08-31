@@ -43,7 +43,7 @@ use std::{
     thread,
     time::Instant,
 };
-use storage_interface::DbReaderWriter;
+use storage_interface::default_protocol::DbReaderWriter;
 use storage_service::start_storage_service_with_db;
 use tokio::runtime::{Builder, Runtime};
 use tokio_stream::wrappers::IntervalStream;

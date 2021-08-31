@@ -4,7 +4,7 @@
 use crate::{context::Context, index};
 
 use diem_config::config::ApiConfig;
-use diem_types::chain_id::ChainId;
+use diem_types::{chain_id::ChainId, protocol_spec::DpnProto};
 use storage_interface::MoveDbReader;
 
 use std::sync::Arc;
@@ -12,7 +12,11 @@ use tokio::runtime::{Builder, Runtime};
 
 /// Creates HTTP server (warp-based)
 /// Returns handle to corresponding Tokio runtime
-pub fn bootstrap(chain_id: ChainId, db: Arc<dyn MoveDbReader>, config: &ApiConfig) -> Runtime {
+pub fn bootstrap(
+    chain_id: ChainId,
+    db: Arc<dyn MoveDbReader<DpnProto>>,
+    config: &ApiConfig,
+) -> Runtime {
     let runtime = Builder::new_multi_thread()
         .thread_name("api")
         .enable_all()

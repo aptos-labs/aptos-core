@@ -4,7 +4,7 @@
 use diem_api_types::{Address, Error, LedgerInfo};
 use diem_types::{
     account_address::AccountAddress, account_state::AccountState,
-    account_state_blob::AccountStateBlob, chain_id::ChainId,
+    account_state_blob::AccountStateBlob, chain_id::ChainId, protocol_spec::DpnProto,
 };
 use storage_interface::MoveDbReader;
 
@@ -21,15 +21,15 @@ use warp::Filter;
 #[derive(Clone)]
 pub struct Context {
     chain_id: ChainId,
-    db: Arc<dyn MoveDbReader>,
+    db: Arc<dyn MoveDbReader<DpnProto>>,
 }
 
 impl Context {
-    pub fn new(chain_id: ChainId, db: Arc<dyn MoveDbReader>) -> Self {
+    pub fn new(chain_id: ChainId, db: Arc<dyn MoveDbReader<DpnProto>>) -> Self {
         Self { chain_id, db }
     }
 
-    pub fn db(&self) -> &dyn MoveDbReader {
+    pub fn db(&self) -> &dyn MoveDbReader<DpnProto> {
         self.db.borrow()
     }
 

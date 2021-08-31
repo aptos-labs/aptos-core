@@ -8,6 +8,7 @@ use diem_types::{
     account_config::{AccountResource, AccountSequenceInfo},
     account_state::AccountState,
     on_chain_config::{DiemVersion, OnChainConfigPayload, VMConfig, VMPublishingOption},
+    protocol_spec::DpnProto,
     transaction::{SignedTransaction, VMValidatorResult},
 };
 use diem_vm::DiemVM;
@@ -32,12 +33,12 @@ pub trait TransactionValidation: Send + Sync + Clone {
 
 #[derive(Clone)]
 pub struct VMValidator {
-    db_reader: Arc<dyn DbReader>,
+    db_reader: Arc<dyn DbReader<DpnProto>>,
     vm: DiemVM,
 }
 
 impl VMValidator {
-    pub fn new(db_reader: Arc<dyn DbReader>) -> Self {
+    pub fn new(db_reader: Arc<dyn DbReader<DpnProto>>) -> Self {
         let (version, state_root) = db_reader.get_latest_state_root().expect("Should not fail.");
         let smt = SparseMerkleTree::new(state_root);
         let state_view = VerifiedStateView::new(
@@ -94,7 +95,7 @@ impl TransactionValidation for VMValidator {
 
 /// returns account's sequence number from storage
 pub fn get_account_sequence_number(
-    storage: &dyn DbReader,
+    storage: &dyn DbReader<DpnProto>,
     address: AccountAddress,
 ) -> Result<AccountSequenceInfo> {
     fail_point!("vm_validator::get_account_sequence_number", |_| {

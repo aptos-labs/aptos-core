@@ -22,7 +22,9 @@ use diem_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
     proof::{TransactionAccumulatorRangeProof, TransactionInfoListWithProof},
-    transaction::{Transaction, TransactionInfo, TransactionListWithProof, Version},
+    transaction::{
+        default_protocol::TransactionListWithProof, Transaction, TransactionInfo, Version,
+    },
 };
 use diem_vm::DiemVM;
 use executor::Executor;

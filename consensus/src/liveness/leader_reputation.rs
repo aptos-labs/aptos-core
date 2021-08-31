@@ -12,7 +12,10 @@ use consensus_types::{
 use diem_crypto::HashValue;
 use diem_infallible::Mutex;
 use diem_logger::prelude::*;
-use diem_types::block_metadata::{new_block_event_key, NewBlockEvent};
+use diem_types::{
+    block_metadata::{new_block_event_key, NewBlockEvent},
+    protocol_spec::DpnProto,
+};
 use std::{
     cmp::Ordering,
     collections::{HashMap, HashSet},
@@ -29,12 +32,12 @@ pub trait MetadataBackend: Send + Sync {
 
 pub struct DiemDBBackend {
     window_size: usize,
-    diem_db: Arc<dyn DbReader>,
+    diem_db: Arc<dyn DbReader<DpnProto>>,
     window: Mutex<Vec<(u64, NewBlockEvent)>>,
 }
 
 impl DiemDBBackend {
-    pub fn new(window_size: usize, diem_db: Arc<dyn DbReader>) -> Self {
+    pub fn new(window_size: usize, diem_db: Arc<dyn DbReader<DpnProto>>) -> Self {
         Self {
             window_size,
             diem_db,

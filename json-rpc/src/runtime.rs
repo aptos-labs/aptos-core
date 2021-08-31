@@ -14,7 +14,9 @@ use diem_config::config::{NodeConfig, RoleType, StreamConfig};
 use diem_json_rpc_types::Method;
 use diem_logger::{debug, Schema};
 use diem_mempool::MempoolClientSender;
-use diem_types::{chain_id::ChainId, ledger_info::LedgerInfoWithSignatures};
+use diem_types::{
+    chain_id::ChainId, ledger_info::LedgerInfoWithSignatures, protocol_spec::DpnProto,
+};
 use futures::future::{join_all, Either};
 use rand::{rngs::OsRng, RngCore};
 use serde_json::Value;
@@ -102,7 +104,7 @@ pub fn bootstrap(
     content_len_limit: usize,
     tls_cert_path: &Option<String>,
     tls_key_path: &Option<String>,
-    diem_db: Arc<dyn MoveDbReader>,
+    diem_db: Arc<dyn MoveDbReader<DpnProto>>,
     mp_sender: MempoolClientSender,
     role: RoleType,
     chain_id: ChainId,
@@ -209,7 +211,7 @@ pub fn bootstrap(
 pub fn bootstrap_from_config(
     config: &NodeConfig,
     chain_id: ChainId,
-    diem_db: Arc<dyn MoveDbReader>,
+    diem_db: Arc<dyn MoveDbReader<DpnProto>>,
     mp_sender: MempoolClientSender,
 ) -> Runtime {
     bootstrap(
@@ -229,7 +231,7 @@ pub fn bootstrap_from_config(
 
 async fn health_check(
     params: HealthCheckParams,
-    db: Arc<dyn MoveDbReader>,
+    db: Arc<dyn MoveDbReader<DpnProto>>,
     now: SystemTime,
 ) -> Result<Box<dyn warp::Reply>, warp::Rejection> {
     if let Some(duration) = params.duration_secs {

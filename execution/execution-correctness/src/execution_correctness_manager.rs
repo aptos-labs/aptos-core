@@ -17,6 +17,7 @@ use diem_vm::DiemVM;
 use executor::Executor;
 use std::{convert::TryInto, net::SocketAddr, sync::Arc};
 use storage_client::StorageClient;
+use storage_interface::default_protocol::DbReaderWriter;
 
 pub fn extract_execution_prikey(config: &NodeConfig) -> Option<Ed25519PrivateKey> {
     let backend = &config.execution.backend;
@@ -88,9 +89,9 @@ impl ExecutionCorrectnessManager {
         execution_prikey: Option<Ed25519PrivateKey>,
         timeout: u64,
     ) -> Self {
-        let block_executor = Box::new(Executor::<DiemVM>::new(
-            StorageClient::new(&storage_address, timeout).into(),
-        ));
+        let block_executor = Box::new(Executor::<DiemVM>::new(DbReaderWriter::new(
+            StorageClient::new(&storage_address, timeout),
+        )));
         Self {
             internal_execution_correctness: ExecutionCorrectnessWrapper::Local(Arc::new(
                 LocalService::new(block_executor, execution_prikey),
@@ -110,9 +111,9 @@ impl ExecutionCorrectnessManager {
         execution_prikey: Option<Ed25519PrivateKey>,
         timeout: u64,
     ) -> Self {
-        let block_executor = Box::new(Executor::<DiemVM>::new(
-            StorageClient::new(&storage_address, timeout).into(),
-        ));
+        let block_executor = Box::new(Executor::<DiemVM>::new(DbReaderWriter::new(
+            StorageClient::new(&storage_address, timeout),
+        )));
         let serializer_service = SerializerService::new(block_executor, execution_prikey);
         Self {
             internal_execution_correctness: ExecutionCorrectnessWrapper::Serializer(Arc::new(

@@ -44,9 +44,11 @@ use diem_types::{
     ledger_info::LedgerInfoWithSignatures,
     on_chain_config,
     proof::accumulator::InMemoryAccumulator,
+    protocol_spec::DpnProto,
     transaction::{
-        Transaction, TransactionInfo, TransactionListWithProof, TransactionOutput,
-        TransactionPayload, TransactionStatus, TransactionToCommit, Version,
+        default_protocol::TransactionListWithProof, Transaction, TransactionInfo,
+        TransactionInfoTrait, TransactionOutput, TransactionPayload, TransactionStatus,
+        TransactionToCommit, Version,
     },
     write_set::{WriteOp, WriteSet},
 };
@@ -62,7 +64,9 @@ use std::{
     marker::PhantomData,
     sync::Arc,
 };
-use storage_interface::{state_view::VerifiedStateView, DbReaderWriter, TreeState};
+use storage_interface::{
+    default_protocol::DbReaderWriter, state_view::VerifiedStateView, TreeState,
+};
 
 type SparseMerkleProof = diem_types::proof::SparseMerkleProof<AccountStateBlob>;
 
@@ -441,7 +445,7 @@ where
         cache: &RwLockReadGuard<SpeculationCache>,
         id: StateViewId,
         executed_trees: &'a ExecutedTrees,
-    ) -> VerifiedStateView<'a> {
+    ) -> VerifiedStateView<'a, DpnProto> {
         VerifiedStateView::new(
             id,
             Arc::clone(&self.db.reader),
@@ -460,7 +464,7 @@ where
         &self,
         id: StateViewId,
         executed_trees: &'a ExecutedTrees,
-    ) -> VerifiedStateView<'a> {
+    ) -> VerifiedStateView<'a, DpnProto> {
         let read_lock = self.cache.read();
         self.get_executed_state_view_from_lock(&read_lock, id, executed_trees)
     }

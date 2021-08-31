@@ -13,18 +13,22 @@ use diem_types::{
         SentPaymentEvent, ToXDXExchangeRateUpdateEvent, VASPDomainEvent,
     },
     account_state::AccountState,
-    account_state_blob::{AccountStateBlob, AccountStateWithProof},
-    contract_event::{ContractEvent, EventByVersionWithProof, EventWithProof},
+    account_state_blob::{default_protocol::AccountStateWithProof, AccountStateBlob},
+    contract_event::{
+        default_protocol::{EventByVersionWithProof, EventWithProof},
+        ContractEvent,
+    },
     diem_id_identifier::DiemIdVaspDomainIdentifier,
     event::EventKey,
-    proof::{
+    proof::default_protocol::{
         AccountStateProof, AccumulatorConsistencyProof, SparseMerkleProof,
         TransactionAccumulatorProof, TransactionInfoListWithProof, TransactionInfoWithProof,
     },
     state_proof::StateProof,
     transaction::{
-        AccountTransactionsWithProof, Script, ScriptFunction, Transaction, TransactionArgument,
-        TransactionInfo, TransactionListWithProof, TransactionPayload,
+        default_protocol::{AccountTransactionsWithProof, TransactionListWithProof},
+        Script, ScriptFunction, Transaction, TransactionArgument, TransactionInfoTrait,
+        TransactionPayload,
     },
     vm_status::KeptVMStatus,
 };
@@ -827,10 +831,10 @@ pub struct TransactionView {
 }
 
 impl TransactionView {
-    pub fn try_from_tx_and_events(
+    pub fn try_from_tx_and_events<T: TransactionInfoTrait>(
         version: u64,
         tx: Transaction,
-        tx_info: TransactionInfo,
+        tx_info: T,
         events: Vec<ContractEvent>,
     ) -> Result<Self> {
         let events = events
@@ -1524,8 +1528,7 @@ impl TryFrom<&AccountStateProofView> for AccountStateProof {
                 .ledger_info_to_transaction_info_proof
                 .as_ref(),
         )?;
-        let transaction_info: TransactionInfo =
-            bcs::from_bytes(account_state_proof_view.transaction_info.as_ref())?;
+        let transaction_info = bcs::from_bytes(account_state_proof_view.transaction_info.as_ref())?;
         let transaction_info_with_proof =
             TransactionInfoWithProof::new(ledger_info_to_transaction_info_proof, transaction_info);
         let transaction_info_to_account_proof: SparseMerkleProof<AccountStateBlob> =

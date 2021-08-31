@@ -16,6 +16,7 @@ use diem_config::config::NodeConfig;
 use diem_infallible::RwLock;
 use diem_logger::prelude::*;
 use diem_mempool::ConsensusRequest;
+use diem_types::protocol_spec::DpnProto;
 use event_notifications::ReconfigNotificationListener;
 use execution_correctness::ExecutionCorrectnessManager;
 use futures::channel::mpsc;
@@ -30,7 +31,7 @@ pub fn start_consensus(
     network_events: ConsensusNetworkEvents,
     state_sync_notifier: Box<dyn ConsensusNotificationSender>,
     consensus_to_mempool_sender: mpsc::Sender<ConsensusRequest>,
-    diem_db: Arc<dyn DbReader>,
+    diem_db: Arc<dyn DbReader<DpnProto>>,
     reconfig_events: ReconfigNotificationListener,
 ) -> Runtime {
     let runtime = runtime::Builder::new_multi_thread()

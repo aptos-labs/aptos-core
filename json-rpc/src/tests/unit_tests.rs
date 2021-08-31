@@ -19,7 +19,7 @@ use diem_types::{
     account_address::AccountAddress,
     account_config::AccountResource,
     account_state::AccountState,
-    account_state_blob::{AccountStateBlob, AccountStateWithProof},
+    account_state_blob::{default_protocol::AccountStateWithProof, AccountStateBlob},
     chain_id::ChainId,
     event::EventKey,
     ledger_info::LedgerInfoWithSignatures,

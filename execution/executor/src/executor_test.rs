@@ -15,7 +15,7 @@ use diem_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    transaction::{Transaction, TransactionListWithProof, Version},
+    transaction::{default_protocol::TransactionListWithProof, Transaction, Version},
 };
 use diemdb::DiemDB;
 use proptest::prelude::*;

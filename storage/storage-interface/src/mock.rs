@@ -16,10 +16,13 @@ use diem_types::{
     event::{EventHandle, EventKey},
     ledger_info::LedgerInfoWithSignatures,
     proof::SparseMerkleProof,
+    protocol_spec::DpnProto,
     state_proof::StateProof,
     transaction::{
-        AccountTransactionsWithProof, TransactionListWithProof, TransactionToCommit,
-        TransactionWithProof, Version,
+        default_protocol::{
+            AccountTransactionsWithProof, TransactionListWithProof, TransactionWithProof,
+        },
+        TransactionToCommit, Version,
     },
 };
 use move_core_types::move_resource::MoveResource;
@@ -28,7 +31,7 @@ use std::convert::TryFrom;
 /// This is a mock of the DbReaderWriter in tests.
 pub struct MockDbReaderWriter;
 
-impl DbReader for MockDbReaderWriter {
+impl DbReader<DpnProto> for MockDbReaderWriter {
     fn get_epoch_ending_ledger_infos(
         &self,
         _start_epoch: u64,
@@ -66,7 +69,7 @@ impl DbReader for MockDbReaderWriter {
         _order: Order,
         _limit: u64,
         _known_version: Option<u64>,
-    ) -> Result<Vec<EventWithProof>> {
+    ) -> Result<Vec<EventWithProof<DpnProto>>> {
         unimplemented!()
     }
 
@@ -75,7 +78,7 @@ impl DbReader for MockDbReaderWriter {
         _event_key: &EventKey,
         _version: u64,
         _proof_version: u64,
-    ) -> Result<EventByVersionWithProof> {
+    ) -> Result<EventByVersionWithProof<DpnProto>> {
         unimplemented!()
     }
 
@@ -137,7 +140,7 @@ impl DbReader for MockDbReaderWriter {
         _address: AccountAddress,
         _version: Version,
         _ledger_version: Version,
-    ) -> Result<AccountStateWithProof> {
+    ) -> Result<AccountStateWithProof<DpnProto>> {
         unimplemented!()
     }
 
@@ -187,7 +190,7 @@ fn get_mock_account_state_blob() -> AccountStateBlob {
     AccountStateBlob::try_from(&account_state).unwrap()
 }
 
-impl DbWriter for MockDbReaderWriter {
+impl DbWriter<DpnProto> for MockDbReaderWriter {
     fn save_transactions(
         &self,
         _txns_to_commit: &[TransactionToCommit],

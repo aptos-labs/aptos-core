@@ -4,9 +4,11 @@
 use crate::{
     account_state_blob::AccountStateBlob,
     proof::{
-        AccountStateProof, AccumulatorConsistencyProof, EventProof, SparseMerkleRangeProof,
-        TestAccumulatorProof, TestAccumulatorRangeProof, TransactionInfoListWithProof,
-        TransactionInfoWithProof,
+        definition::default_protocol::{
+            AccountStateProof, EventProof, TransactionInfoListWithProof, TransactionInfoWithProof,
+        },
+        AccumulatorConsistencyProof, SparseMerkleRangeProof, TestAccumulatorProof,
+        TestAccumulatorRangeProof,
     },
 };
 use bcs::test_helpers::assert_canonical_encode_decode;

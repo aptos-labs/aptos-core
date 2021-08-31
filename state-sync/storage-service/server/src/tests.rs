@@ -10,19 +10,25 @@ use diem_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey,
 use diem_infallible::RwLock;
 use diem_types::{
     account_address::AccountAddress,
-    account_state_blob::{AccountStateBlob, AccountStateWithProof},
+    account_state_blob::{default_protocol::AccountStateWithProof, AccountStateBlob},
     block_info::BlockInfo,
     chain_id::ChainId,
-    contract_event::{ContractEvent, EventByVersionWithProof, EventWithProof},
+    contract_event::{
+        default_protocol::{EventByVersionWithProof, EventWithProof},
+        ContractEvent,
+    },
     epoch_change::EpochChangeProof,
     event::EventKey,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     proof::{SparseMerkleProof, TransactionInfoListWithProof},
+    protocol_spec::DpnProto,
     state_proof::StateProof,
     transaction::{
-        AccountTransactionsWithProof, RawTransaction, Script, SignedTransaction, Transaction,
-        TransactionListWithProof, TransactionPayload, TransactionToCommit, TransactionWithProof,
-        Version,
+        default_protocol::{
+            AccountTransactionsWithProof, TransactionListWithProof, TransactionWithProof,
+        },
+        RawTransaction, Script, SignedTransaction, Transaction, TransactionPayload,
+        TransactionToCommit, Version,
     },
 };
 use move_core_types::language_storage::TypeTag;
@@ -264,7 +270,7 @@ fn create_test_ledger_info_with_sigs(epoch: u64, version: u64) -> LedgerInfoWith
 /// This is a mock of the DbReader and DbWriter for unit testing.
 struct MockDbReaderWriter;
 
-impl DbReader for MockDbReaderWriter {
+impl DbReader<DpnProto> for MockDbReaderWriter {
     fn get_epoch_ending_ledger_infos(
         &self,
         start_epoch: u64,
@@ -434,7 +440,7 @@ impl DbReader for MockDbReaderWriter {
     }
 }
 
-impl DbWriter for MockDbReaderWriter {
+impl DbWriter<DpnProto> for MockDbReaderWriter {
     fn save_transactions(
         &self,
         _txns_to_commit: &[TransactionToCommit],

@@ -3242,6 +3242,7 @@ dependencies = [
  "rand 0.8.3",
  "serde",
  "storage-client",
+ "storage-interface",
  "thiserror",
 ]
 

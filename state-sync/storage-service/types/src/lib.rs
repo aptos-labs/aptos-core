@@ -3,7 +3,9 @@
 
 #![forbid(unsafe_code)]
 
-use diem_types::{epoch_change::EpochChangeProof, transaction::TransactionListWithProof};
+use diem_types::{
+    epoch_change::EpochChangeProof, transaction::default_protocol::TransactionListWithProof,
+};
 
 /// A storage service request.
 #[derive(Clone, Debug, Eq, PartialEq)]

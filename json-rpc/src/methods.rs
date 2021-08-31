@@ -25,7 +25,7 @@ use diem_json_rpc_types::request::{
 use diem_mempool::{MempoolClientSender, SubmissionStatus};
 use diem_types::{
     chain_id::ChainId, ledger_info::LedgerInfoWithSignatures, mempool_status::MempoolStatusCode,
-    transaction::SignedTransaction,
+    protocol_spec::DpnProto, transaction::SignedTransaction,
 };
 use fail::fail_point;
 use futures::{channel::oneshot, SinkExt};
@@ -36,7 +36,7 @@ use storage_interface::MoveDbReader;
 
 #[derive(Clone)]
 pub(crate) struct JsonRpcService {
-    db: Arc<dyn MoveDbReader>,
+    db: Arc<dyn MoveDbReader<DpnProto>>,
     mempool_sender: MempoolClientSender,
     role: RoleType,
     chain_id: ChainId,
@@ -46,7 +46,7 @@ pub(crate) struct JsonRpcService {
 
 impl JsonRpcService {
     pub fn new(
-        db: Arc<dyn MoveDbReader>,
+        db: Arc<dyn MoveDbReader<DpnProto>>,
         mempool_sender: MempoolClientSender,
         role: RoleType,
         chain_id: ChainId,

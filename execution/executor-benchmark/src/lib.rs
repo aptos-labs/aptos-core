@@ -23,6 +23,7 @@ use diem_types::{
     block_info::BlockInfo,
     chain_id::ChainId,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    protocol_spec::DpnProto,
     transaction::{
         authenticator::AuthenticationKey, RawTransaction, Script, SignedTransaction, Transaction,
         Version,
@@ -48,7 +49,7 @@ use std::{
     time::{Duration, Instant},
 };
 use storage_client::StorageClient;
-use storage_interface::{DbReader, DbReaderWriter};
+use storage_interface::{default_protocol::DbReaderWriter, DbReader};
 use storage_service::start_storage_service_with_db;
 
 fn report_block(
@@ -287,7 +288,7 @@ impl TransactionGenerator {
     }
 
     /// Verifies the sequence numbers in storage match what we have locally.
-    fn verify_sequence_number(&self, db: &dyn DbReader) {
+    fn verify_sequence_number(&self, db: &dyn DbReader<DpnProto>) {
         for account in &self.accounts {
             let address = account.address;
             let blob = db
@@ -416,7 +417,7 @@ impl TransactionExecutor {
 
 pub fn create_storage_service_and_executor(
     config: &NodeConfig,
-) -> (Arc<dyn DbReader>, Executor<DiemVM>) {
+) -> (Arc<dyn DbReader<DpnProto>>, Executor<DiemVM>) {
     let (db, db_rw) = DbReaderWriter::wrap(
         DiemDB::open(
             &config.storage.dir(),
@@ -430,9 +431,10 @@ pub fn create_storage_service_and_executor(
     maybe_bootstrap::<DiemVM>(&db_rw, get_genesis_txn(config).unwrap(), waypoint).unwrap();
 
     let _handle = start_storage_service_with_db(config, db.clone());
-    let executor = Executor::new(
-        StorageClient::new(&config.storage.address, config.storage.timeout_ms).into(),
-    );
+    let executor = Executor::new(DbReaderWriter::new(StorageClient::new(
+        &config.storage.address,
+        config.storage.timeout_ms,
+    )));
 
     (db, executor)
 }

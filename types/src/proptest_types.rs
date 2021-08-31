@@ -17,6 +17,7 @@ use crate::{
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::ValidatorSet,
     proof::TransactionInfoListWithProof,
+    protocol_spec::DpnProto,
     transaction::{
         ChangeSet, Module, RawTransaction, Script, SignatureCheckedTransaction, SignedTransaction,
         Transaction, TransactionArgument, TransactionListWithProof, TransactionPayload,
@@ -883,7 +884,7 @@ impl Arbitrary for TransactionToCommitGen {
     type Strategy = BoxedStrategy<Self>;
 }
 
-fn arb_transaction_list_with_proof() -> impl Strategy<Value = TransactionListWithProof> {
+fn arb_transaction_list_with_proof() -> impl Strategy<Value = TransactionListWithProof<DpnProto>> {
     (
         vec(
             (
@@ -892,7 +893,7 @@ fn arb_transaction_list_with_proof() -> impl Strategy<Value = TransactionListWit
             ),
             0..10,
         ),
-        any::<TransactionInfoListWithProof>(),
+        any::<TransactionInfoListWithProof<DpnProto>>(),
     )
         .prop_flat_map(|(transaction_and_events, proof)| {
             let transactions: Vec<_> = transaction_and_events
@@ -921,7 +922,7 @@ fn arb_transaction_list_with_proof() -> impl Strategy<Value = TransactionListWit
         })
 }
 
-impl Arbitrary for TransactionListWithProof {
+impl Arbitrary for TransactionListWithProof<DpnProto> {
     type Parameters = ();
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
         arb_transaction_list_with_proof().boxed()

@@ -10,16 +10,22 @@ use diem_logger::warn;
 use diem_secure_net::NetworkClient;
 use diem_types::{
     account_address::AccountAddress,
-    account_state_blob::{AccountStateBlob, AccountStateWithProof},
-    contract_event::{ContractEvent, EventByVersionWithProof, EventWithProof},
+    account_state_blob::{default_protocol::AccountStateWithProof, AccountStateBlob},
+    contract_event::{
+        default_protocol::{EventByVersionWithProof, EventWithProof},
+        ContractEvent,
+    },
     epoch_change::EpochChangeProof,
     event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
     proof::SparseMerkleProof,
+    protocol_spec::DpnProto,
     state_proof::StateProof,
     transaction::{
-        AccountTransactionsWithProof, TransactionListWithProof, TransactionToCommit,
-        TransactionWithProof, Version,
+        default_protocol::{
+            AccountTransactionsWithProof, TransactionListWithProof, TransactionWithProof,
+        },
+        TransactionToCommit, Version,
     },
 };
 use serde::de::DeserializeOwned;
@@ -95,7 +101,7 @@ impl StorageClient {
     }
 }
 
-impl DbReader for StorageClient {
+impl DbReader<DpnProto> for StorageClient {
     fn get_account_state_with_proof_by_version(
         &self,
         address: AccountAddress,
@@ -231,7 +237,7 @@ impl DbReader for StorageClient {
     }
 }
 
-impl DbWriter for StorageClient {
+impl DbWriter<DpnProto> for StorageClient {
     fn save_transactions(
         &self,
         txns_to_commit: &[TransactionToCommit],

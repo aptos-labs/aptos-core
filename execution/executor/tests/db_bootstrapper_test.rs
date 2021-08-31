@@ -44,7 +44,7 @@ use executor_types::BlockExecutor;
 use move_core_types::move_resource::MoveResource;
 use rand::SeedableRng;
 use std::{convert::TryFrom, sync::Arc};
-use storage_interface::{DbReader, DbReaderWriter};
+use storage_interface::{default_protocol::DbReaderWriter, DbReader};
 
 #[test]
 fn test_empty_db() {

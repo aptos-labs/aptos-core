@@ -34,7 +34,7 @@ use std::{
     collections::HashMap,
     convert::TryFrom,
     fmt,
-    fmt::{Display, Formatter},
+    fmt::{Debug, Display, Formatter},
 };
 
 pub mod authenticator;
@@ -52,7 +52,8 @@ pub use script::{
     TypeArgumentABI,
 };
 
-use std::{collections::BTreeSet, ops::Deref};
+use crate::protocol_spec::ProtocolSpec;
+use std::{collections::BTreeSet, hash::Hash, ops::Deref};
 pub use transaction_argument::{parse_transaction_argument, TransactionArgument, VecBytes};
 
 pub type Version = u64; // Height - also used for MVCC in StateDB
@@ -633,19 +634,20 @@ impl SignedTransaction {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
-pub struct TransactionWithProof {
+#[serde(bound = "for<'a> PS: Deserialize<'a>")]
+pub struct TransactionWithProof<PS: ProtocolSpec> {
     pub version: Version,
     pub transaction: Transaction,
     pub events: Option<Vec<ContractEvent>>,
-    pub proof: TransactionInfoWithProof,
+    pub proof: TransactionInfoWithProof<PS>,
 }
 
-impl TransactionWithProof {
+impl<PS: ProtocolSpec> TransactionWithProof<PS> {
     pub fn new(
         version: Version,
         transaction: Transaction,
         events: Option<Vec<ContractEvent>>,
-        proof: TransactionInfoWithProof,
+        proof: TransactionInfoWithProof<PS>,
     ) -> Self {
         Self {
             version,
@@ -693,22 +695,22 @@ impl TransactionWithProof {
 
         let txn_hash = self.transaction.hash();
         ensure!(
-            txn_hash == self.proof.transaction_info().transaction_hash,
+            txn_hash == self.proof.transaction_info().transaction_hash(),
             "Transaction hash ({}) not expected ({}).",
             txn_hash,
-            self.proof.transaction_info().transaction_hash,
+            self.proof.transaction_info().transaction_hash(),
         );
 
         if let Some(events) = &self.events {
-            let event_hashes: Vec<_> = events.iter().map(ContractEvent::hash).collect();
+            let event_hashes: Vec<_> = events.iter().map(CryptoHash::hash).collect();
             let event_root_hash =
                 InMemoryAccumulator::<EventAccumulatorHasher>::from_leaves(&event_hashes[..])
                     .root_hash();
             ensure!(
-                event_root_hash == self.proof.transaction_info().event_root_hash,
+                event_root_hash == self.proof.transaction_info().event_root_hash(),
                 "Event root hash ({}) not expected ({}).",
                 event_root_hash,
-                self.proof.transaction_info().event_root_hash,
+                self.proof.transaction_info().event_root_hash(),
             );
         }
 
@@ -910,6 +912,37 @@ impl TransactionOutput {
     }
 }
 
+pub trait TransactionInfoTrait:
+    Clone + CryptoHash + Debug + Eq + Serialize + for<'de> Deserialize<'de>
+{
+    /// Constructs a new `TransactionInfo` object using transaction hash, state root hash and event
+    /// root hash.
+    fn new(
+        transaction_hash: HashValue,
+        state_root_hash: HashValue,
+        event_root_hash: HashValue,
+        gas_used: u64,
+        status: KeptVMStatus,
+    ) -> Self;
+
+    /// Returns the hash of this transaction.
+    fn transaction_hash(&self) -> HashValue;
+
+    /// Returns root hash of Sparse Merkle Tree describing the world state at the end of this
+    /// transaction.
+    fn state_root_hash(&self) -> HashValue;
+
+    /// Returns the root hash of Merkle Accumulator storing all events emitted during this
+    /// transaction.
+    fn event_root_hash(&self) -> HashValue;
+
+    /// Returns the amount of gas used by this transaction.
+    fn gas_used(&self) -> u64;
+
+    /// Resturns the Status from the VM for this transaction.
+    fn status(&self) -> &KeptVMStatus;
+}
+
 /// `TransactionInfo` is the object we store in the transaction accumulator. It consists of the
 /// transaction as well as the execution result of this transaction.
 #[derive(Clone, CryptoHasher, BCSCryptoHash, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -934,10 +967,8 @@ pub struct TransactionInfo {
     status: KeptVMStatus,
 }
 
-impl TransactionInfo {
-    /// Constructs a new `TransactionInfo` object using transaction hash, state root hash and event
-    /// root hash.
-    pub fn new(
+impl TransactionInfoTrait for TransactionInfo {
+    fn new(
         transaction_hash: HashValue,
         state_root_hash: HashValue,
         event_root_hash: HashValue,
@@ -953,29 +984,23 @@ impl TransactionInfo {
         }
     }
 
-    /// Returns the hash of this transaction.
-    pub fn transaction_hash(&self) -> HashValue {
+    fn transaction_hash(&self) -> HashValue {
         self.transaction_hash
     }
 
-    /// Returns root hash of Sparse Merkle Tree describing the world state at the end of this
-    /// transaction.
-    pub fn state_root_hash(&self) -> HashValue {
+    fn state_root_hash(&self) -> HashValue {
         self.state_root_hash
     }
 
-    /// Returns the root hash of Merkle Accumulator storing all events emitted during this
-    /// transaction.
-    pub fn event_root_hash(&self) -> HashValue {
+    fn event_root_hash(&self) -> HashValue {
         self.event_root_hash
     }
 
-    /// Returns the amount of gas used by this transaction.
-    pub fn gas_used(&self) -> u64 {
+    fn gas_used(&self) -> u64 {
         self.gas_used
     }
 
-    pub fn status(&self) -> &KeptVMStatus {
+    fn status(&self) -> &KeptVMStatus {
         &self.status
     }
 }
@@ -1045,19 +1070,21 @@ impl TransactionToCommit {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
-pub struct TransactionListWithProof {
+#[serde(bound = "for<'a> PS: Deserialize<'a>")]
+pub struct TransactionListWithProof<PS: ProtocolSpec> {
     pub transactions: Vec<Transaction>,
     pub events: Option<Vec<Vec<ContractEvent>>>,
     pub first_transaction_version: Option<Version>,
-    pub proof: TransactionInfoListWithProof,
+    pub proof: TransactionInfoListWithProof<PS>,
 }
 
-impl TransactionListWithProof {
+impl<PS: ProtocolSpec> TransactionListWithProof<PS> {
+    /// Constructor.
     pub fn new(
         transactions: Vec<Transaction>,
         events: Option<Vec<Vec<ContractEvent>>>,
         first_transaction_version: Option<Version>,
-        proof: TransactionInfoListWithProof,
+        proof: TransactionInfoListWithProof<PS>,
     ) -> Self {
         Self {
             transactions,
@@ -1134,7 +1161,7 @@ impl TransactionListWithProof {
                 self.transactions.len(),
             );
             itertools::zip_eq(event_lists, &self.proof.transaction_infos)
-                .map(|(events, txn_info)| verify_events_against_root_hash(events, txn_info))
+                .map(|(events, txn_info)| verify_events_against_root_hash::<PS>(events, txn_info))
                 .collect::<Result<Vec<_>>>()?;
         }
 
@@ -1149,17 +1176,18 @@ impl TransactionListWithProof {
 /// requires speculative execution of each TransactionOutput to verify that the
 /// resulting state matches the expected state in the proof (for each version).
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
-pub struct TransactionOutputListWithProof {
+#[serde(bound = "for<'a> PS: Deserialize<'a>")]
+pub struct TransactionOutputListWithProof<PS: ProtocolSpec> {
     pub transaction_outputs: Vec<TransactionOutput>,
     pub first_transaction_output_version: Option<Version>,
-    pub proof: TransactionInfoListWithProof,
+    pub proof: TransactionInfoListWithProof<PS>,
 }
 
-impl TransactionOutputListWithProof {
+impl<PS: ProtocolSpec> TransactionOutputListWithProof<PS> {
     pub fn new(
         transaction_outputs: Vec<TransactionOutput>,
         first_transaction_output_version: Option<Version>,
-        proof: TransactionInfoListWithProof,
+        proof: TransactionInfoListWithProof<PS>,
     ) -> Self {
         Self {
             transaction_outputs,
@@ -1203,7 +1231,7 @@ impl TransactionOutputListWithProof {
         // Verify the events
         itertools::zip_eq(&self.transaction_outputs, &self.proof.transaction_infos)
             .map(|(txn_output, txn_info)| {
-                verify_events_against_root_hash(&txn_output.events, txn_info)
+                verify_events_against_root_hash::<PS>(&txn_output.events, txn_info)
             })
             .collect::<Result<Vec<_>>>()?;
 
@@ -1213,11 +1241,11 @@ impl TransactionOutputListWithProof {
 
 /// Verifies a list of events against an expected event root hash. This is done
 /// by calculating the hash of the events using an event accumulator hasher.
-fn verify_events_against_root_hash(
+fn verify_events_against_root_hash<PS: ProtocolSpec>(
     events: &[ContractEvent],
-    transaction_info: &TransactionInfo,
+    transaction_info: &PS::TransactionInfo,
 ) -> Result<()> {
-    let event_hashes: Vec<_> = events.iter().map(ContractEvent::hash).collect();
+    let event_hashes: Vec<_> = events.iter().map(CryptoHash::hash).collect();
     let event_root_hash =
         InMemoryAccumulator::<EventAccumulatorHasher>::from_leaves(&event_hashes).root_hash();
     ensure!(
@@ -1234,10 +1262,11 @@ fn verify_events_against_root_hash(
 /// and include proofs.
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
-pub struct AccountTransactionsWithProof(pub Vec<TransactionWithProof>);
+#[serde(bound = "for<'a> PS: Deserialize<'a>")]
+pub struct AccountTransactionsWithProof<PS: ProtocolSpec>(pub Vec<TransactionWithProof<PS>>);
 
-impl AccountTransactionsWithProof {
-    pub fn new(txns_with_proofs: Vec<TransactionWithProof>) -> Self {
+impl<PS: ProtocolSpec> AccountTransactionsWithProof<PS> {
+    pub fn new(txns_with_proofs: Vec<TransactionWithProof<PS>>) -> Self {
         Self(txns_with_proofs)
     }
 
@@ -1253,11 +1282,11 @@ impl AccountTransactionsWithProof {
         self.0.len()
     }
 
-    pub fn inner(&self) -> &[TransactionWithProof] {
+    pub fn inner(&self) -> &[TransactionWithProof<PS>] {
         &self.0
     }
 
-    pub fn into_inner(self) -> Vec<TransactionWithProof> {
+    pub fn into_inner(self) -> Vec<TransactionWithProof<PS>> {
         self.0
     }
 
@@ -1365,4 +1394,13 @@ impl TryFrom<Transaction> for SignedTransaction {
             _ => Err(format_err!("Not a user transaction.")),
         }
     }
+}
+
+pub mod default_protocol {
+    use crate::protocol_spec::DpnProto;
+
+    pub type AccountTransactionsWithProof = super::AccountTransactionsWithProof<DpnProto>;
+    pub type TransactionInfoWithProof = super::TransactionInfoWithProof<DpnProto>;
+    pub type TransactionListWithProof = super::TransactionListWithProof<DpnProto>;
+    pub type TransactionWithProof = super::TransactionWithProof<DpnProto>;
 }

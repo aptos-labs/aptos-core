@@ -24,8 +24,10 @@ use anyhow::{anyhow, ensure, Result};
 use diem_crypto::HashValue;
 use diem_logger::prelude::*;
 use diem_types::{
-    account_state_blob::AccountStateBlob, ledger_info::LedgerInfoWithSignatures,
-    proof::TransactionInfoWithProof, transaction::Version,
+    account_state_blob::AccountStateBlob,
+    ledger_info::LedgerInfoWithSignatures,
+    proof::default_protocol::TransactionInfoWithProof,
+    transaction::{TransactionInfoTrait, Version},
 };
 use std::sync::Arc;
 use structopt::StructOpt;

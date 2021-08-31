@@ -22,7 +22,9 @@ use diem_vm::VMExecutor;
 use executor_types::BlockExecutor;
 use move_core_types::move_resource::MoveResource;
 use std::collections::btree_map::BTreeMap;
-use storage_interface::{state_view::VerifiedStateView, DbReaderWriter, TreeState};
+use storage_interface::{
+    default_protocol::DbReaderWriter, state_view::default_protocol::VerifiedStateView, TreeState,
+};
 
 pub fn generate_waypoint<V: VMExecutor>(
     db: &DbReaderWriter,

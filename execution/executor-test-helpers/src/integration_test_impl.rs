@@ -15,11 +15,12 @@ use diem_types::{
         xus_tag, XUS_NAME,
     },
     account_state::AccountState,
-    account_state_blob::AccountStateWithProof,
+    account_state_blob::default_protocol::AccountStateWithProof,
     event::EventKey,
     transaction::{
-        authenticator::AuthenticationKey, Transaction, TransactionListWithProof,
-        TransactionPayload, TransactionWithProof, WriteSetPayload,
+        authenticator::AuthenticationKey,
+        default_protocol::{TransactionListWithProof, TransactionWithProof},
+        Transaction, TransactionPayload, WriteSetPayload,
     },
     trusted_state::{TrustedState, TrustedStateChange},
     waypoint::Waypoint,
@@ -30,7 +31,7 @@ use executor::Executor;
 use executor_types::BlockExecutor;
 use rand::SeedableRng;
 use std::{convert::TryFrom, sync::Arc};
-use storage_interface::{DbReaderWriter, Order};
+use storage_interface::{default_protocol::DbReaderWriter, Order};
 
 pub fn test_execution_with_storage_impl() -> Arc<DiemDB> {
     let (genesis, validators) = vm_genesis::test_genesis_change_set_and_validators(Some(1));

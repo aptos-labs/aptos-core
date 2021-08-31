@@ -4,10 +4,12 @@
 #![forbid(unsafe_code)]
 
 use diem_infallible::RwLock;
-use diem_types::{epoch_change::EpochChangeProof, transaction::TransactionListWithProof};
+use diem_types::{
+    epoch_change::EpochChangeProof, transaction::default_protocol::TransactionListWithProof,
+};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use storage_interface::DbReaderWriter;
+use storage_interface::default_protocol::DbReaderWriter;
 use storage_service_types::{
     DataSummary, EpochEndingLedgerInfoRequest, ProtocolMetadata, ServerProtocolVersion,
     StorageServerSummary, StorageServiceError, StorageServiceRequest, StorageServiceResponse,

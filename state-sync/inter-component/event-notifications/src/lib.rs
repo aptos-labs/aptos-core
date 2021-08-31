@@ -28,7 +28,7 @@ use std::{
     },
     task::{Context, Poll},
 };
-use storage_interface::DbReaderWriter;
+use storage_interface::default_protocol::DbReaderWriter;
 use thiserror::Error;
 
 #[cfg(test)]

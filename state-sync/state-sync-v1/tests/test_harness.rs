@@ -31,8 +31,8 @@ use diem_types::{
     proof::TransactionInfoListWithProof,
     test_helpers::transaction_test_helpers::get_test_signed_txn,
     transaction::{
-        authenticator::AuthenticationKey, SignedTransaction, Transaction, TransactionListWithProof,
-        TransactionPayload,
+        authenticator::AuthenticationKey, default_protocol::TransactionListWithProof,
+        SignedTransaction, Transaction, TransactionPayload,
     },
     validator_config::ValidatorConfig,
     validator_info::ValidatorInfo,

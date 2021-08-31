@@ -21,7 +21,8 @@ use diem_types::{
     ledger_info::LedgerInfoWithSignatures,
     proof::{accumulator::InMemoryAccumulator, AccumulatorExtensionProof},
     transaction::{
-        Transaction, TransactionInfo, TransactionListWithProof, TransactionStatus, Version,
+        default_protocol::TransactionListWithProof, Transaction, TransactionInfo,
+        TransactionStatus, Version,
     },
 };
 use scratchpad::ProofRead;

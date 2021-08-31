@@ -17,19 +17,20 @@ use std::{
     },
 };
 
+use diem_types::protocol_spec::DpnProto;
 use storage_interface::MoveDbReader;
 
 #[derive(Clone)]
 pub struct ConnectionManager {
     pub clients: Arc<RwLock<HashMap<u64, ClientConnection>>>,
-    pub diem_db: Arc<dyn MoveDbReader>,
+    pub diem_db: Arc<dyn MoveDbReader<DpnProto>>,
     pub config: Arc<SubscriptionConfig>,
     /// Our unique user id counter.
     next_user_id: Arc<AtomicU64>,
 }
 
 impl ConnectionManager {
-    pub fn new(diem_db: Arc<dyn MoveDbReader>, config: Arc<SubscriptionConfig>) -> Self {
+    pub fn new(diem_db: Arc<dyn MoveDbReader<DpnProto>>, config: Arc<SubscriptionConfig>) -> Self {
         Self {
             clients: Arc::new(RwLock::new(HashMap::new())),
             diem_db,
@@ -38,7 +39,7 @@ impl ConnectionManager {
         }
     }
 
-    fn get_db(&self) -> Arc<dyn MoveDbReader> {
+    fn get_db(&self) -> Arc<dyn MoveDbReader<DpnProto>> {
         self.diem_db.clone()
     }
 

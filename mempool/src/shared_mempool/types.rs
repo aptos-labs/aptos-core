@@ -14,8 +14,8 @@ use diem_config::{
 };
 use diem_infallible::{Mutex, RwLock};
 use diem_types::{
-    account_address::AccountAddress, mempool_status::MempoolStatus, transaction::SignedTransaction,
-    vm_status::DiscardedVMStatus,
+    account_address::AccountAddress, mempool_status::MempoolStatus, protocol_spec::DpnProto,
+    transaction::SignedTransaction, vm_status::DiscardedVMStatus,
 };
 use futures::{
     channel::{mpsc, mpsc::UnboundedSender, oneshot},
@@ -36,7 +36,7 @@ where
     pub mempool: Arc<Mutex<CoreMempool>>,
     pub config: MempoolConfig,
     pub network_senders: HashMap<NetworkId, MempoolNetworkSender>,
-    pub db: Arc<dyn DbReader>,
+    pub db: Arc<dyn DbReader<DpnProto>>,
     pub validator: Arc<RwLock<V>>,
     pub peer_manager: Arc<PeerManager>,
     pub subscribers: Vec<UnboundedSender<SharedMempoolNotification>>,
