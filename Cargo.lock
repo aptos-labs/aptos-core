@@ -1094,7 +1094,6 @@ dependencies = [
  "fallible",
  "futures",
  "itertools 0.10.0",
- "mempool-notifications",
  "mirai-annotations",
  "network",
  "num-derive",
