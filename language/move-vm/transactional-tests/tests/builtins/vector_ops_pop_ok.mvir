@@ -2,7 +2,7 @@
 main() {
     let v: vector<u64>;
 
-    v = vec_pack_0<u64>();
+    v = vec_pack_1<u64>(42);
     _ = vec_pop_back<u64>(&mut v);
 
     return;
@@ -12,7 +12,7 @@ main() {
 main() {
     let v: vector<u64>;
 
-    v = vec_pack_1<u64>(42);
+    v = vec_pack_2<u64>(42, 43);
     _ = vec_pop_back<u64>(&mut v);
     _ = vec_pop_back<u64>(&mut v);
 
