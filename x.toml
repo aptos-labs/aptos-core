@@ -213,6 +213,7 @@ members = [
     "language-e2e-testsuite",
     "many-keys-stress-test",
     "memsocket",
+    "mirai-dataflow-analysis",
     "module-generation",
     "move-lang-functional-tests",
     "move-oncall-trainer",

@@ -1,0 +1,16 @@
+start;
+
+insert Edge(1,1,2);
+insert Edge(2,2,3);
+insert Edge(3,3,4);
+insert Edge(4,1,5);
+
+insert Dom(2,5);
+
+commit;
+
+dump Dominates;
+
+# expect Dominates{.node1 = 2, .node2 = 5}
+# expect Dominates{.node1 = 3, .node2 = 5}
+# expect Dominates{.node1 = 4, .node2 = 5}

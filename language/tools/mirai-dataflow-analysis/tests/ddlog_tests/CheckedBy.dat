@@ -1,0 +1,20 @@
+start;
+
+insert Edge(1,1,2);
+insert Edge(2,2,3);
+insert Edge(3,3,4);
+insert Edge(4,1,5);
+insert Edge(5,1,6);
+
+insert Dom(5,6);
+
+insert NodeType(1,Entry);
+insert NodeType(3,Checker);
+insert NodeType(4,Exit);
+insert NodeType(6,Exit);
+
+commit;
+
+dump CheckedBy;
+
+# expect CheckedBy{.node = 2, .checker = 3}

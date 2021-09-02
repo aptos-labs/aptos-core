@@ -1,0 +1,14 @@
+start;
+
+insert Edge(1,1,2);
+insert Edge(2,2,3);
+
+insert EdgeType(1,1);
+insert EdgeType(2,2);
+
+commit;
+
+dump ValidType;
+
+# expect ValidType{.rtype = 1}
+# expect ValidType{.rtype = 2}

@@ -1,0 +1,14 @@
+start;
+
+insert Edge(1,1,2);
+insert Edge(2,2,3);
+insert Edge(3,3,4);
+insert Edge(4,1,5);
+
+insert Dom(2,5);
+
+commit;
+
+dump DominatesNT;
+
+# expect DominatesNT{.node1 = 2, .node2 = 5}

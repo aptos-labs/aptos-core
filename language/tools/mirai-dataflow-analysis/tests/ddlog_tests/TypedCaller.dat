@@ -1,0 +1,21 @@
+start;
+
+insert Edge(1,1,2);
+insert Edge(2,2,3);
+insert Edge(3,3,4);
+
+insert EdgeType(1,1);
+insert EdgeType(2,2);
+insert EdgeType(3,3);
+
+insert Member(1,2);
+
+commit;
+
+dump TypedCaller;
+
+# expect TypedCaller{.node1 = 1, .node2 = 2, .t = 1}
+# expect TypedCaller{.node1 = 1, .node2 = 2, .t = 2}
+# expect TypedCaller{.node1 = 1, .node2 = 3, .t = 2}
+# expect TypedCaller{.node1 = 2, .node2 = 3, .t = 2}
+# expect TypedCaller{.node1 = 3, .node2 = 4, .t = 3}

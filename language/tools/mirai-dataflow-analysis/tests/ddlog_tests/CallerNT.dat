@@ -1,0 +1,11 @@
+start;
+
+insert Edge(1,1,2);
+insert Edge(2,2,3);
+
+commit;
+
+dump CallerNT;
+
+# expect CallerNT{.node1 = 1, .node2 = 2}
+# expect CallerNT{.node1 = 2, .node2 = 3}

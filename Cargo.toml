@@ -119,6 +119,7 @@ members = [
     "language/tools/diem-resource-viewer",
     "language/tools/disassembler",
     "language/tools/genesis-viewer",
+    "language/tools/mirai-dataflow-analysis",
     "language/tools/move-bytecode-utils",
     "language/tools/move-bytecode-viewer",
     "language/tools/move-cli",

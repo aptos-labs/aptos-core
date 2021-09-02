@@ -1,0 +1,32 @@
+start;
+
+insert Edge(1,1,2);
+insert Edge(2,2,3);
+insert Edge(3,1,4);
+insert Edge(4,1,5);
+
+insert Dom(4,5);
+
+commit;
+
+dump DataflowNotVia;
+
+# expect DataflowNotVia{.node1 = 1, .node2 = 2, .node3 = 4}
+# expect DataflowNotVia{.node1 = 1, .node2 = 2, .node3 = 5}
+# expect DataflowNotVia{.node1 = 1, .node2 = 3, .node3 = 2}
+# expect DataflowNotVia{.node1 = 1, .node2 = 3, .node3 = 4}
+# expect DataflowNotVia{.node1 = 1, .node2 = 3, .node3 = 5}
+# expect DataflowNotVia{.node1 = 1, .node2 = 4, .node3 = 2}
+# expect DataflowNotVia{.node1 = 1, .node2 = 4, .node3 = 3}
+# expect DataflowNotVia{.node1 = 1, .node2 = 4, .node3 = 5}
+# expect DataflowNotVia{.node1 = 1, .node2 = 5, .node3 = 2}
+# expect DataflowNotVia{.node1 = 1, .node2 = 5, .node3 = 3}
+# expect DataflowNotVia{.node1 = 1, .node2 = 5, .node3 = 4}
+
+# expect DataflowNotVia{.node1 = 2, .node2 = 1, .node3 = 3}
+# expect DataflowNotVia{.node1 = 2, .node2 = 4, .node3 = 3}
+# expect DataflowNotVia{.node1 = 2, .node2 = 5, .node3 = 3}
+
+# expect DataflowNotVia{.node1 = 4, .node2 = 1, .node3 = 5}
+# expect DataflowNotVia{.node1 = 4, .node2 = 2, .node3 = 5}
+# expect DataflowNotVia{.node1 = 4, .node2 = 3, .node3 = 5}

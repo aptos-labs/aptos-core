@@ -1,0 +1,11 @@
+start;
+
+insert Edge(1,1,2);
+insert Edge(2,2,1);
+
+commit;
+
+dump NotEqual;
+
+# expect NotEqual{.node1 = 1, .node2 = 2}
+# expect NotEqual{.node1 = 2, .node2 = 1}

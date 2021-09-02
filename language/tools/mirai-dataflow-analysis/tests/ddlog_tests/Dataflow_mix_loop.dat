@@ -1,0 +1,45 @@
+# Dataflow loop formed by a mix of caller edges and dominance.
+
+start;
+
+insert Edge(1,1,2);
+insert Edge(2,2,3);
+insert Edge(3,3,4);
+insert Edge(4,1,5);
+insert Edge(5,5,1);
+
+insert Dom(2,5);
+
+commit;
+
+dump Dataflow;
+
+# expect Dataflow{.node1 = 1, .node2 = 1}
+# expect Dataflow{.node1 = 1, .node2 = 2}
+# expect Dataflow{.node1 = 1, .node2 = 3}
+# expect Dataflow{.node1 = 1, .node2 = 4}
+# expect Dataflow{.node1 = 1, .node2 = 5}
+
+# expect Dataflow{.node1 = 2, .node2 = 1}
+# expect Dataflow{.node1 = 2, .node2 = 2}
+# expect Dataflow{.node1 = 2, .node2 = 3}
+# expect Dataflow{.node1 = 2, .node2 = 4}
+# expect Dataflow{.node1 = 2, .node2 = 5}
+
+# expect Dataflow{.node1 = 3, .node2 = 1}
+# expect Dataflow{.node1 = 3, .node2 = 2}
+# expect Dataflow{.node1 = 3, .node2 = 3}
+# expect Dataflow{.node1 = 3, .node2 = 4}
+# expect Dataflow{.node1 = 3, .node2 = 5}
+
+# expect Dataflow{.node1 = 4, .node2 = 1}
+# expect Dataflow{.node1 = 4, .node2 = 2}
+# expect Dataflow{.node1 = 4, .node2 = 3}
+# expect Dataflow{.node1 = 4, .node2 = 4}
+# expect Dataflow{.node1 = 4, .node2 = 5}
+
+# expect Dataflow{.node1 = 5, .node2 = 1}
+# expect Dataflow{.node1 = 5, .node2 = 2}
+# expect Dataflow{.node1 = 5, .node2 = 3}
+# expect Dataflow{.node1 = 5, .node2 = 4}
+# expect Dataflow{.node1 = 5, .node2 = 5}

@@ -1,0 +1,26 @@
+start;
+
+insert Edge(1,1,2);
+insert Edge(2,2,3);
+insert Edge(3,3,4);
+insert Edge(4,1,5);
+
+insert NodeType(1,Entry);
+insert NodeType(3,Checker);
+insert NodeType(4,Exit);
+insert NodeType(5,Exit);
+
+insert EdgeType(1,1);
+insert EdgeType(2,2);
+insert EdgeType(3,3);
+insert EdgeType(4,1);
+
+insert Member(1,2);
+insert Member(2,3);
+
+commit;
+
+dump CheckedAtTypeBy;
+
+# expect CheckedAtTypeBy{.node = 2, .checker = 3, .t = 2}
+# expect CheckedAtTypeBy{.node = 2, .checker = 3, .t = 3}

@@ -1,0 +1,35 @@
+start;
+
+insert Edge(1,1,2);
+insert Edge(2,2,3);
+insert Edge(3,3,1);
+
+insert EdgeType(1,1);
+insert EdgeType(2,2);
+insert EdgeType(3,3);
+
+insert Member(1,2);
+insert Member(2,3);
+
+commit;
+
+dump TypedDataflowVia;
+
+# expect TypedDataflowVia{.node1 = 1, .node2 = 2, .node3 = 1, .t = 3}
+# expect TypedDataflowVia{.node1 = 1, .node2 = 2, .node3 = 3, .t = 2}
+# expect TypedDataflowVia{.node1 = 1, .node2 = 2, .node3 = 3, .t = 3}
+
+# expect TypedDataflowVia{.node1 = 1, .node2 = 3, .node3 = 1, .t = 3}
+# expect TypedDataflowVia{.node1 = 1, .node2 = 3, .node3 = 2, .t = 3}
+
+# expect TypedDataflowVia{.node1 = 2, .node2 = 1, .node3 = 2, .t = 3}
+# expect TypedDataflowVia{.node1 = 2, .node2 = 1, .node3 = 3, .t = 3}
+
+# expect TypedDataflowVia{.node1 = 2, .node2 = 3, .node3 = 1, .t = 3}
+# expect TypedDataflowVia{.node1 = 2, .node2 = 3, .node3 = 2, .t = 3}
+
+# expect TypedDataflowVia{.node1 = 3, .node2 = 1, .node3 = 2, .t = 3}
+# expect TypedDataflowVia{.node1 = 3, .node2 = 1, .node3 = 3, .t = 3}
+
+# expect TypedDataflowVia{.node1 = 3, .node2 = 2, .node3 = 1, .t = 3}
+# expect TypedDataflowVia{.node1 = 3, .node2 = 2, .node3 = 3, .t = 3}

@@ -1,0 +1,17 @@
+start;
+
+insert Edge(1,1,2);
+insert Edge(2,2,3);
+
+insert EdgeType(1,1);
+insert EdgeType(2,2);
+
+insert Member(1,2);
+
+commit;
+
+dump MemberTrans;
+
+# expect MemberTrans{.rtype1 = 1, .rtype2 = 1}
+# expect MemberTrans{.rtype1 = 1, .rtype2 = 2}
+# expect MemberTrans{.rtype1 = 2, .rtype2 = 2}
