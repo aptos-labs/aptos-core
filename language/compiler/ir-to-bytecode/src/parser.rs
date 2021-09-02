@@ -13,7 +13,6 @@ use codespan_reporting::{
 };
 use ir_to_bytecode_syntax::syntax::{self, ParseError};
 use move_command_line_common::character_sets::is_permitted_char;
-use move_core_types::account_address::AccountAddress;
 use move_ir_types::{ast, location::*};
 use move_symbol_pool::Symbol;
 
@@ -54,17 +53,6 @@ pub fn parse_script(file_name: Symbol, script_str: &str) -> Result<ast::Script> 
 pub fn parse_module(file_name: Symbol, modules_str: &str) -> Result<ast::ModuleDefinition> {
     verify_string(modules_str)?;
     syntax::parse_module_string(file_name, modules_str).or_else(|e| handle_error(e, modules_str))
-}
-
-/// Given the raw input of a file, creates a single `Cmd_` struct
-/// Fails with `Err(_)` if the text cannot be parsed
-pub fn parse_cmd_(
-    file_name: Symbol,
-    cmd_str: &str,
-    _sender_address: AccountAddress,
-) -> Result<ast::Cmd_> {
-    verify_string(cmd_str)?;
-    syntax::parse_cmd_string(file_name, cmd_str).or_else(|e| handle_error(e, cmd_str))
 }
 
 fn handle_error<T>(e: syntax::ParseError<Loc, anyhow::Error>, code_str: &str) -> Result<T> {

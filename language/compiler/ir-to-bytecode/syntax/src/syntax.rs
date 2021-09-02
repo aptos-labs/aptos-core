@@ -2123,19 +2123,15 @@ fn parse_script_or_module(
     }
 }
 
-pub fn parse_cmd_string(file: Symbol, input: &str) -> Result<Cmd_, ParseError<Loc, anyhow::Error>> {
-    let mut tokens = Lexer::new(file, input);
-    tokens.advance()?;
-    parse_cmd_(&mut tokens)
-}
-
 pub fn parse_module_string(
     file: Symbol,
     input: &str,
 ) -> Result<ModuleDefinition, ParseError<Loc, anyhow::Error>> {
     let mut tokens = Lexer::new(file, input);
     tokens.advance()?;
-    parse_module(&mut tokens)
+    let unit = parse_module(&mut tokens)?;
+    consume_token(&mut tokens, Tok::EOF)?;
+    Ok(unit)
 }
 
 pub fn parse_script_string(
@@ -2144,7 +2140,9 @@ pub fn parse_script_string(
 ) -> Result<Script, ParseError<Loc, anyhow::Error>> {
     let mut tokens = Lexer::new(file, input);
     tokens.advance()?;
-    parse_script(&mut tokens)
+    let unit = parse_script(&mut tokens)?;
+    consume_token(&mut tokens, Tok::EOF)?;
+    Ok(unit)
 }
 
 pub fn parse_script_or_module_string(
@@ -2153,5 +2151,7 @@ pub fn parse_script_or_module_string(
 ) -> Result<ScriptOrModule, ParseError<Loc, anyhow::Error>> {
     let mut tokens = Lexer::new(file, input);
     tokens.advance()?;
-    parse_script_or_module(&mut tokens)
+    let unit = parse_script_or_module(&mut tokens)?;
+    consume_token(&mut tokens, Tok::EOF)?;
+    Ok(unit)
 }
