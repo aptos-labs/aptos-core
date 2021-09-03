@@ -20,24 +20,24 @@ Read our [Contributing guide](https://developers.diem.com/docs/community/contrib
 ## Getting started
 
 ### Explore the basics of the Diem Blockchain
-* [Welcome](/docs/welcome-to-diem.mdx)
-* [Transactions and States](docs/basics/basics-txns-states.md)
-* [Life of a Transaction](/docs/transactions/basics-life-of-txn.md)
+* [Welcome](https://developers.diem.com//docs/welcome-to-diem)
+* [Transactions and States](https://developers.diem.com/docs/basics/basics-txns-states)
+* [Life of a Transaction](https://developers.diem.com//docs/transactions/basics-life-of-txn)
 
 ### Use the Diem reference projects
-* [Diem Reference Wallet](/docs/wallets-and-merchant-stores/diem-reference-wallet.md)
-* [Diem Reference Merchant Store](/docs/wallets-and-merchant-stores/diem-reference-merchant-store.md)
+* [Diem Reference Wallet](https://developers.diem.com//docs/wallets-and-merchant-stores/diem-reference-wallet)
+* [Diem Reference Merchant Store](https://developers.diem.com//docs/wallets-and-merchant-stores/diem-reference-merchant-store)
 
 ### Read technical papers
-* [The Diem Blockchain](/docs/technical-papers/the-diem-blockchain-paper.md)
-* [Move: A Language With Programmable Resources](/docs/technical-papers/move-paper.md)
-* [State Machine Replication in the Diem Blockchain](/docs/technical-papers/state-machine-replication-paper.md)
+* [The Diem Blockchain](https://developers.diem.com/docs/technical-papers/the-diem-blockchain-paper)
+* [Move: A Language With Programmable Resources](https://developers.diem.com/docs/technical-papers/move-paper)
+* [State Machine Replication in the Diem Blockchain](https://developers.diem.com/docs/technical-papers/state-machine-replication-paper)
 
 ## Community
 
 Join us on the [Diem Discourse](https://community.diem.com).
 
-Get the latest updates to our project by signing up to our [newsletter](/newsletter_form).
+Get the latest updates to our project by signing up to our [newsletter](https://developers.diem.com/newsletter_form).
 
 ## License
 
