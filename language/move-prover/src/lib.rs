@@ -179,15 +179,17 @@ pub fn verify_boogie(
     let output_existed = std::path::Path::new(&options.output_path).exists();
     debug!("writing boogie to `{}`", &options.output_path);
     writer.process_result(|result| fs::write(&options.output_path, result))?;
-    let boogie = BoogieWrapper {
-        env,
-        targets,
-        writer: &writer,
-        options: &options.backend,
-    };
-    boogie.call_boogie_and_verify_output(&options.output_path)?;
-    if !output_existed && !options.backend.keep_artifacts {
-        std::fs::remove_file(&options.output_path).unwrap_or_default();
+    if !options.prover.generate_only {
+        let boogie = BoogieWrapper {
+            env,
+            targets,
+            writer: &writer,
+            options: &options.backend,
+        };
+        boogie.call_boogie_and_verify_output(&options.output_path)?;
+        if !output_existed && !options.backend.keep_artifacts {
+            std::fs::remove_file(&options.output_path).unwrap_or_default();
+        }
     }
     Ok(())
 }
