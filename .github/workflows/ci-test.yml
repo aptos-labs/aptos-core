@@ -507,11 +507,9 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
       - uses: ./.github/actions/build-setup
-      - uses: actions/cache@v2.1.6
+      - uses: Swatinem/rust-cache@c5ed9ba6b7e1bb8aff90d43acd2f0af4990fa57c
         with:
-          path: "/opt/cargo/git\n/opt/cargo/registry\n/opt/cargo/.package-cache"
-          key: crates-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
-          restore-keys: "crates-${{ runner.os }}"
+          key: ${{ needs.prepare.outputs.changes-target-branch }}
       - name: cargo lint
         run: $pre_command && cargo x lint
       - name: cargo clippy
@@ -524,7 +522,7 @@ jobs:
 
   unit-test:
     runs-on: ubuntu-latest-xl
-    timeout-minutes: 50
+    timeout-minutes: 60
     needs: prepare
     if: ${{ needs.prepare.outputs.test-rust == 'true' }}
     container:
@@ -537,11 +535,9 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0 #get all the history!!!
       - uses: ./.github/actions/build-setup
-      - uses: actions/cache@v2.1.6
+      - uses: Swatinem/rust-cache@c5ed9ba6b7e1bb8aff90d43acd2f0af4990fa57c
         with:
-          path: "/opt/cargo/git\n/opt/cargo/registry\n/opt/cargo/.package-cache"
-          key: crates-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
-          restore-keys: "crates-${{ runner.os }}"
+          key: ${{ needs.prepare.outputs.changes-target-branch }}
       - name: run unit tests
         run: |
           $pre_command && mkdir -p target/junit-reports && cargo nextest --jobs ${max_threads} --tries ${nextest_tries} --unit --failure-output=immediate-final --changed-since "origin/$TARGET_BRANCH" --junit target/junit-reports/unit-test.xml
@@ -580,13 +576,12 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0 #get all the history!!!
       - uses: ./.github/actions/build-setup
-      - uses: actions/cache@v2.1.6
+      - uses: Swatinem/rust-cache@c5ed9ba6b7e1bb8aff90d43acd2f0af4990fa57c
         with:
-          path: "/opt/cargo/git\n/opt/cargo/registry\n/opt/cargo/.package-cache"
-          key: crates-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
-          restore-keys: "crates-${{ runner.os }}"
+          key: ${{ needs.prepare.outputs.changes-target-branch }}
       - name: run codegen unit tests
-        run: $pre_command && mkdir -p target/junit-reports && cargo nextest --jobs ${max_threads} --tries ${nextest_tries} --failure-output=immediate-final -p transaction-builder-generator --unit --changed-since "origin/$TARGET_BRANCH" --run-ignored=ignored-only --junit target/junit-reports/codegen-unit-test.xml
+        run: |
+          $pre_command && mkdir -p target/junit-reports && cargo nextest --jobs ${max_threads} --tries ${nextest_tries} --failure-output=immediate-final -p transaction-builder-generator --unit --changed-since "origin/$TARGET_BRANCH" --run-ignored=ignored-only --junit target/junit-reports/codegen-unit-test.xml
         env:
           TARGET_BRANCH: ${{ needs.prepare.outputs.changes-target-branch }}
       - name: upload codegen test results
@@ -621,11 +616,9 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0 #get all the history!!!
       - uses: ./.github/actions/build-setup
-      - uses: actions/cache@v2.1.6
+      - uses: Swatinem/rust-cache@c5ed9ba6b7e1bb8aff90d43acd2f0af4990fa57c
         with:
-          path: "/opt/cargo/git\n/opt/cargo/registry\n/opt/cargo/.package-cache"
-          key: crates-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
-          restore-keys: "crates-${{ runner.os }}"
+          key: ${{ needs.prepare.outputs.changes-target-branch }}
       - name: split tests
         run: |
           cd /opt/git/diem/
@@ -705,6 +698,7 @@ jobs:
       - name: compatibility tests
         run: |
           cargo test -p testcases --test forge-local-compatibility
+      - uses: ./.github/actions/build-teardown
 
   docker-compose-test:
     runs-on: ubuntu-latest-xl
@@ -744,6 +738,7 @@ jobs:
         env:
           JSON_RPC_URL: "http://127.0.0.1:8080"
           FAUCET_URL: "http://127.0.0.1:8000"
+      - uses: ./.github/actions/build-teardown
 
   crypto-unit-test:
     runs-on: ubuntu-latest
@@ -759,11 +754,9 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
       - uses: ./.github/actions/build-setup
-      - uses: actions/cache@v2.1.6
+      - uses: Swatinem/rust-cache@c5ed9ba6b7e1bb8aff90d43acd2f0af4990fa57c
         with:
-          path: "/opt/cargo/git\n/opt/cargo/registry\n/opt/cargo/.package-cache"
-          key: crates-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
-          restore-keys: "crates-${{ runner.os }}"
+          key: ${{ needs.prepare.outputs.changes-target-branch }}
       - name: run crypto unit tests
         run: |
           cd /opt/git/diem/crypto/crypto
@@ -785,11 +778,9 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
       - uses: ./.github/actions/build-setup
-      - uses: actions/cache@v2.1.6
+      - uses: Swatinem/rust-cache@c5ed9ba6b7e1bb8aff90d43acd2f0af4990fa57c
         with:
-          path: "/opt/cargo/git\n/opt/cargo/registry\n/opt/cargo/.package-cache"
-          key: crates-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
-          restore-keys: "crates-${{ runner.os }}"
+          key: ${{ needs.prepare.outputs.changes-target-branch }}
       - name: run coverage tests and verify coverage is calculated.
         run: |
           cargo xtest --html-cov-dir=/tmp/results/ -p diem-logger
@@ -908,11 +899,9 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
       - uses: ./.github/actions/build-setup
-      - uses: actions/cache@v2.1.6
+      - uses: Swatinem/rust-cache@c5ed9ba6b7e1bb8aff90d43acd2f0af4990fa57c
         with:
-          path: "/opt/cargo/git\n/opt/cargo/registry\n/opt/cargo/.package-cache"
-          key: crates-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
-          restore-keys: "crates-${{ runner.os }}"
+          key: ${{ needs.prepare.outputs.changes-target-branch }}
       - run: cd /opt/git/diem/ && cargo xcheck -j ${max_threads} --members production
       - run: cd /opt/git/diem/ && cargo xcheck -j ${max_threads} --workspace --all-targets
       - run: |
