@@ -226,7 +226,7 @@ mod tests {
         },
         write_set::WriteSetMut,
     };
-    use futures::executor::block_on;
+    use futures::{executor::block_on, FutureExt, StreamExt};
     use tokio::runtime::{Builder, Runtime};
 
     #[test]
@@ -327,8 +327,8 @@ mod tests {
             block_on(mempool_notifier.notify_new_commit(transactions, block_timestamp_usecs, 1000));
 
         // Verify the notification arrives at the receiver
-        match mempool_listener.notification_receiver.try_next() {
-            Ok(Some(mempool_commit_notification)) => match user_transaction {
+        match mempool_listener.select_next_some().now_or_never() {
+            Some(mempool_commit_notification) => match user_transaction {
                 Transaction::UserTransaction(signed_transaction) => {
                     assert_eq!(
                         mempool_commit_notification.transactions,
@@ -357,8 +357,8 @@ mod tests {
 
         // Spawn a new thread to handle any messages on the receiver
         let _handler = std::thread::spawn(move || loop {
-            if let Ok(Some(mempool_commit_notification)) =
-                mempool_listener.notification_receiver.try_next()
+            if let Some(mempool_commit_notification) =
+                mempool_listener.select_next_some().now_or_never()
             {
                 let _result =
                     block_on(mempool_listener.ack_commit_notification(mempool_commit_notification));

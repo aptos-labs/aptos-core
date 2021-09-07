@@ -281,7 +281,7 @@ mod tests {
         ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
         transaction::{RawTransaction, Script, SignedTransaction, Transaction, TransactionPayload},
     };
-    use futures::executor::block_on;
+    use futures::{executor::block_on, FutureExt, StreamExt};
     use move_core_types::language_storage::TypeTag;
     use std::{collections::BTreeMap, time::Duration};
     use tokio::runtime::{Builder, Runtime};
@@ -341,8 +341,8 @@ mod tests {
         );
 
         // Verify the notification arrives at the receiver
-        match consensus_listener.notification_receiver.try_next() {
-            Ok(Some(consensus_notification)) => match consensus_notification {
+        match consensus_listener.select_next_some().now_or_never() {
+            Some(consensus_notification) => match consensus_notification {
                 ConsensusNotification::NotifyCommit(commit_notification) => {
                     assert_eq!(transactions, commit_notification.transactions);
                     assert_eq!(
@@ -367,8 +367,8 @@ mod tests {
         std::thread::sleep(Duration::from_millis(1000));
 
         // Verify the notification arrives at the receiver
-        match consensus_listener.notification_receiver.try_next() {
-            Ok(Some(consensus_notification)) => match consensus_notification {
+        match consensus_listener.select_next_some().now_or_never() {
+            Some(consensus_notification) => match consensus_notification {
                 ConsensusNotification::SyncToTarget(sync_notification) => {
                     assert_eq!(create_ledger_info(), sync_notification.target);
                 }
@@ -388,14 +388,14 @@ mod tests {
 
         // Spawn a new thread to handle any messages on the receiver
         let _handler = std::thread::spawn(move || loop {
-            match consensus_listener.notification_receiver.try_next() {
-                Ok(Some(ConsensusNotification::NotifyCommit(commit_notification))) => {
+            match consensus_listener.select_next_some().now_or_never() {
+                Some(ConsensusNotification::NotifyCommit(commit_notification)) => {
                     let _result = block_on(
                         consensus_listener
                             .respond_to_commit_notification(commit_notification, Ok(())),
                     );
                 }
-                Ok(Some(ConsensusNotification::SyncToTarget(sync_notification))) => {
+                Some(ConsensusNotification::SyncToTarget(sync_notification)) => {
                     let _result = block_on(consensus_listener.respond_to_sync_notification(
                         sync_notification,
                         Err(Error::UnexpectedErrorEncountered("Oops?".into())),
