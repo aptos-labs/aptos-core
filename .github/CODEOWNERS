@@ -1,8 +1,20 @@
 # Substribe to CI changes
 /.github/ @diem/diem-oss-admin-team
 
+# Subscribe to diem-core changes
+/config @diem/diem-core
+/consensus @diem/diem-core
+/diem-node @diem/diem-core
+/execution @diem/diem-core
+/mempool @diem/diem-core
+/network @diem/diem-core
+/secure @diem/diem-core
+/state-sync @diem/diem-core
+/storage @diem/diem-core
+/types @diem/diem-core
+
 # Subscribe to crypto crate changing PRs
-/crypto @kchalkias @huitseeker @valerini
+/crypto @kchalkias @valerini
 
 # Subscribe to potential JSON API changing PRs
 /json-rpc/json-rpc-spec.md @xli
