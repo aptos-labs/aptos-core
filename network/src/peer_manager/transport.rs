@@ -211,6 +211,7 @@ where
         counters::pending_connection_upgrades(&self.network_context, ConnectionOrigin::Outbound)
             .dec();
 
+        // Ensure that the connection matches the expected `PeerId`
         let elapsed_time = (self.time_service.now() - start_time).as_secs_f64();
         let upgrade = match upgrade {
             Ok(connection) => {
@@ -230,28 +231,8 @@ where
 
         let response = match upgrade {
             Ok(connection) => {
-                debug!(
-                    NetworkSchema::new(&self.network_context)
-                        .connection_metadata(&connection.metadata)
-                        .network_address(&addr),
-                    "{} Outbound connection '{}' at '{}' successfully upgraded after {:.3} secs",
-                    self.network_context,
-                    peer_id.short_str(),
-                    addr,
-                    elapsed_time,
-                );
-
-                counters::connection_upgrade_time(
-                    &self.network_context,
-                    ConnectionOrigin::Outbound,
-                    SUCCEEDED_LABEL,
-                )
-                .observe(elapsed_time);
-
-                // Send the new connection to PeerManager
-                let event = TransportNotification::NewConnection(connection);
-                self.transport_notifs_tx.send(event).await.unwrap();
-
+                self.send_connection_to_peer_manager(connection, &addr, elapsed_time)
+                    .await;
                 Ok(())
             }
             Err(err) => {
@@ -301,26 +282,8 @@ where
         let elapsed_time = (self.time_service.now() - start_time).as_secs_f64();
         match upgrade {
             Ok(connection) => {
-                debug!(
-                    NetworkSchema::new(&self.network_context)
-                        .connection_metadata_with_address(&connection.metadata),
-                    "{} Inbound connection from {} at {} successfully upgraded after {:.3} secs",
-                    self.network_context,
-                    connection.metadata.remote_peer_id.short_str(),
-                    connection.metadata.addr,
-                    elapsed_time,
-                );
-
-                counters::connection_upgrade_time(
-                    &self.network_context,
-                    ConnectionOrigin::Inbound,
-                    SUCCEEDED_LABEL,
-                )
-                .observe(elapsed_time);
-
-                // Send the new connection to PeerManager
-                let event = TransportNotification::NewConnection(connection);
-                self.transport_notifs_tx.send(event).await.unwrap();
+                self.send_connection_to_peer_manager(connection, &addr, elapsed_time)
+                    .await;
             }
             Err(err) => {
                 warn!(
@@ -341,6 +304,41 @@ where
                 )
                 .observe(elapsed_time);
             }
+        }
+    }
+
+    /// Send a newly completed connection to `PeerManager`
+    async fn send_connection_to_peer_manager(
+        &mut self,
+        connection: Connection<TSocket>,
+        addr: &NetworkAddress,
+        elapsed_time: f64,
+    ) {
+        let metadata = connection.metadata.clone();
+        debug!(
+            NetworkSchema::new(&self.network_context)
+                .connection_metadata_with_address(&metadata)
+                .network_address(addr),
+            "{} {} connection from {} at {} successfully upgraded after {:.3} secs",
+            self.network_context,
+            metadata.origin,
+            metadata.remote_peer_id.short_str(),
+            metadata.addr,
+            elapsed_time,
+        );
+
+        counters::connection_upgrade_time(&self.network_context, metadata.origin, SUCCEEDED_LABEL)
+            .observe(elapsed_time);
+
+        // Send the new connection to PeerManager
+        let event = TransportNotification::NewConnection(connection);
+        if let Err(err) = self.transport_notifs_tx.send(event).await {
+            error!(
+                NetworkSchema::new(&self.network_context)
+                    .connection_metadata_with_address(&metadata),
+                error = %err,
+                "Failed to notify PeerManager of new connection"
+            );
         }
     }
 }
