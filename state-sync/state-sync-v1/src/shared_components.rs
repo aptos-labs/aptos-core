@@ -92,6 +92,7 @@ pub(crate) mod test_utils {
     use diem_infallible::RwLock;
     use diem_types::{
         on_chain_config::ON_CHAIN_CONFIG_REGISTRY,
+        protocol_spec::DpnProto,
         transaction::{Transaction, WriteSetPayload},
     };
     use diem_vm::DiemVM;
@@ -150,7 +151,7 @@ pub(crate) mod test_utils {
         bootstrap_genesis::<DiemVM>(&db_rw, &genesis_txn).unwrap();
 
         // Create executor proxy
-        let chunk_executor = Box::new(Executor::<DiemVM>::new(db_rw.clone()));
+        let chunk_executor = Box::new(Executor::<DpnProto, DiemVM>::new(db_rw.clone()));
         let event_subscription_service =
             EventSubscriptionService::new(ON_CHAIN_CONFIG_REGISTRY, Arc::new(RwLock::new(db_rw)));
         let mut executor_proxy = ExecutorProxy::new(db, chunk_executor, event_subscription_service);

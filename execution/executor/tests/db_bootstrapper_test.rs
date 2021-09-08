@@ -22,6 +22,7 @@ use diem_types::{
     on_chain_config,
     on_chain_config::{config_address, ConfigurationResource, OnChainConfig, ValidatorSet},
     proof::SparseMerkleRangeProof,
+    protocol_spec::DpnProto,
     transaction::{
         authenticator::AuthenticationKey, ChangeSet, Transaction, TransactionPayload, Version,
         WriteSetPayload, PRE_GENESIS_VERSION,
@@ -93,7 +94,7 @@ fn execute_and_commit(txns: Vec<Transaction>, db: &DbReaderWriter, signer: &Vali
     let version = li.ledger_info().version();
     let epoch = li.ledger_info().next_block_epoch();
     let target_version = version + txns.len() as u64;
-    let executor = Executor::<DiemVM>::new(db.clone());
+    let executor = Executor::<DpnProto, DiemVM>::new(db.clone());
     let output = executor
         .execute_block((block_id, txns), executor.committed_block_id())
         .unwrap();

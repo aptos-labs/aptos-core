@@ -43,7 +43,7 @@ fn execute_and_commit_block(
 struct TestExecutor {
     _path: diem_temppath::TempPath,
     db: DbReaderWriter,
-    executor: Executor<MockVM>,
+    executor: Executor<DpnProto, MockVM>,
 }
 
 impl TestExecutor {
@@ -54,7 +54,7 @@ impl TestExecutor {
         let genesis = vm_genesis::test_genesis_transaction();
         let waypoint = generate_waypoint::<MockVM>(&db, &genesis).unwrap();
         maybe_bootstrap::<MockVM>(&db, &genesis, waypoint).unwrap();
-        let executor = Executor::<MockVM>::new(db.clone());
+        let executor = Executor::new(db.clone());
 
         TestExecutor {
             _path: path,
@@ -65,7 +65,7 @@ impl TestExecutor {
 }
 
 impl std::ops::Deref for TestExecutor {
-    type Target = Executor<MockVM>;
+    type Target = Executor<DpnProto, MockVM>;
 
     fn deref(&self) -> &Self::Target {
         &self.executor
@@ -401,7 +401,7 @@ fn test_executor_execute_and_commit_chunk_restart() {
 
     // Then we restart executor and resume to the next chunk.
     {
-        let executor = Executor::<MockVM>::new(db.clone());
+        let executor = Executor::<DpnProto, MockVM>::new(db.clone());
 
         executor
             .execute_and_commit_chunk(chunks[1].clone(), ledger_info.clone(), None)
@@ -649,7 +649,7 @@ proptest! {
 
         // Now we construct a new executor and run one more block.
         {
-            let executor = Executor::<MockVM>::new(db);
+            let executor = Executor::<DpnProto, MockVM>::new(db);
             let output_b = executor.execute_block((block_b.id, block_b.txns.clone()), parent_block_id).unwrap();
             root_hash = output_b.root_hash();
             let ledger_info = gen_ledger_info(

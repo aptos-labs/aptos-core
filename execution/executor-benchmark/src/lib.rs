@@ -307,13 +307,13 @@ impl TransactionGenerator {
 }
 
 pub struct TransactionCommitter {
-    executor: Arc<Executor<DiemVM>>,
+    executor: Arc<Executor<DpnProto, DiemVM>>,
     block_receiver: mpsc::Receiver<(HashValue, HashValue, Instant, Instant, Duration, usize)>,
 }
 
 impl TransactionCommitter {
     fn new(
-        executor: Arc<Executor<DiemVM>>,
+        executor: Arc<Executor<DpnProto, DiemVM>>,
         block_receiver: mpsc::Receiver<(HashValue, HashValue, Instant, Instant, Duration, usize)>,
     ) -> Self {
         Self {
@@ -366,7 +366,7 @@ impl TransactionCommitter {
 }
 
 pub struct TransactionExecutor {
-    executor: Arc<Executor<DiemVM>>,
+    executor: Arc<Executor<DpnProto, DiemVM>>,
     parent_block_id: HashValue,
     start_time: Instant,
     version: u64,
@@ -375,7 +375,7 @@ pub struct TransactionExecutor {
 
 impl TransactionExecutor {
     pub fn new(
-        executor: Arc<Executor<DiemVM>>,
+        executor: Arc<Executor<DpnProto, DiemVM>>,
         parent_block_id: HashValue,
         commit_sender: mpsc::Sender<(HashValue, HashValue, Instant, Instant, Duration, usize)>,
     ) -> Self {
@@ -417,7 +417,7 @@ impl TransactionExecutor {
 
 pub fn create_storage_service_and_executor(
     config: &NodeConfig,
-) -> (Arc<dyn DbReader<DpnProto>>, Executor<DiemVM>) {
+) -> (Arc<dyn DbReader<DpnProto>>, Executor<DpnProto, DiemVM>) {
     let (db, db_rw) = DbReaderWriter::wrap(
         DiemDB::open(
             &config.storage.dir(),

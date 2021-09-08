@@ -22,6 +22,7 @@ use diem_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
     proof::{TransactionAccumulatorRangeProof, TransactionInfoListWithProof},
+    protocol_spec::DpnProto,
     transaction::{
         default_protocol::TransactionListWithProof, Transaction, TransactionInfo, Version,
     },
@@ -273,7 +274,10 @@ impl TransactionRestoreController {
         Ok(())
     }
 
-    fn transaction_replayer(&mut self, first_version: Version) -> Result<&mut Executor<DiemVM>> {
+    fn transaction_replayer(
+        &mut self,
+        first_version: Version,
+    ) -> Result<&mut Executor<DpnProto, DiemVM>> {
         if self.state.transaction_replayer.is_none() {
             if let RestoreRunMode::Restore { restore_handler } = self.run_mode.as_ref() {
                 let replayer = Executor::new_on_unbootstrapped_db(
@@ -302,7 +306,7 @@ impl TransactionRestoreController {
 #[derive(Default)]
 struct State {
     frozen_subtree_confirmed: bool,
-    transaction_replayer: Option<Executor<DiemVM>>,
+    transaction_replayer: Option<Executor<DpnProto, DiemVM>>,
 }
 
 struct TransactionRestorePreheatData {

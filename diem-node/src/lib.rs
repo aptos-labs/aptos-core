@@ -20,6 +20,7 @@ use diem_types::{
     chain_id::ChainId,
     move_resource::MoveStorage,
     on_chain_config::{VMPublishingOption, ON_CHAIN_CONFIG_REGISTRY},
+    protocol_spec::DpnProto,
 };
 use diem_vm::DiemVM;
 use diemdb::DiemDB;
@@ -200,7 +201,7 @@ fn fetch_chain_id(db: &DbReaderWriter) -> ChainId {
 }
 
 fn setup_chunk_executor(db: DbReaderWriter) -> Box<dyn ChunkExecutor> {
-    Box::new(Executor::<DiemVM>::new(db))
+    Box::new(Executor::<DpnProto, DiemVM>::new(db))
 }
 
 fn setup_debug_interface(config: &NodeConfig, logger: Option<Arc<Logger>>) -> NodeDebugService {

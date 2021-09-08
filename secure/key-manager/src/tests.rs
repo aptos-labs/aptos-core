@@ -48,7 +48,7 @@ use vm_validator::{
 const TXN_EXPIRATION_SECS: u64 = 100;
 
 struct Node<T: DiemInterface> {
-    executor: Executor<DiemVM>,
+    executor: Executor<DpnProto, DiemVM>,
     diem: DiemInterfaceTestHarness<T>,
     key_manager: KeyManager<DiemInterfaceTestHarness<T>, InMemoryStorage>,
     time: MockTimeService,
@@ -56,7 +56,7 @@ struct Node<T: DiemInterface> {
 
 impl<T: DiemInterface> Node<T> {
     pub fn new(
-        executor: Executor<DiemVM>,
+        executor: Executor<DpnProto, DiemVM>,
         diem: DiemInterfaceTestHarness<T>,
         key_manager: KeyManager<DiemInterfaceTestHarness<T>, InMemoryStorage>,
         time: MockTimeService,
@@ -349,7 +349,7 @@ fn setup_diem_db(config: &NodeConfig) -> (Arc<DiemDB>, DbReaderWriter) {
 fn setup_node<T: DiemInterface + Clone>(
     node_config: &NodeConfig,
     key_manager_config: &KeyManagerConfig,
-    executor: Executor<DiemVM>,
+    executor: Executor<DpnProto, DiemVM>,
     diem: T,
 ) -> Node<T> {
     let time = TimeService::mock();

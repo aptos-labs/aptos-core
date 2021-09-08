@@ -9,7 +9,7 @@ use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
-pub trait ProtocolSpec: Clone + Debug {
+pub trait ProtocolSpec: Clone + Debug + Sync + Send {
     const NAME: &'static str;
     #[cfg(not(any(test, feature = "fuzzing")))]
     type TransactionInfo: TransactionInfoTrait;

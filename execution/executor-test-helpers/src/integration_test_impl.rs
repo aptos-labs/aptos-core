@@ -17,6 +17,7 @@ use diem_types::{
     account_state::AccountState,
     account_state_blob::default_protocol::AccountStateWithProof,
     event::EventKey,
+    protocol_spec::DpnProto,
     transaction::{
         authenticator::AuthenticationKey,
         default_protocol::{TransactionListWithProof, TransactionWithProof},
@@ -513,10 +514,15 @@ pub fn test_execution_with_storage_impl() -> Arc<DiemDB> {
 pub fn create_db_and_executor<P: AsRef<std::path::Path>>(
     path: P,
     genesis: &Transaction,
-) -> (Arc<DiemDB>, DbReaderWriter, Executor<DiemVM>, Waypoint) {
+) -> (
+    Arc<DiemDB>,
+    DbReaderWriter,
+    Executor<DpnProto, DiemVM>,
+    Waypoint,
+) {
     let (db, dbrw) = DbReaderWriter::wrap(DiemDB::new_for_test(&path));
     let waypoint = bootstrap_genesis::<DiemVM>(&dbrw, genesis).unwrap();
-    let executor = Executor::<DiemVM>::new(dbrw.clone());
+    let executor = Executor::new(dbrw.clone());
 
     (db, dbrw, executor, waypoint)
 }

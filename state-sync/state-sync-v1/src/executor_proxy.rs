@@ -392,7 +392,7 @@ mod tests {
             .unwrap();
 
         // Create an executor proxy
-        let chunk_executor = Box::new(Executor::<DiemVM>::new(db_rw));
+        let chunk_executor = Box::new(Executor::<DpnProto, DiemVM>::new(db_rw));
         let mut executor_proxy = ExecutorProxy::new(db, chunk_executor, event_subscription_service);
 
         // Publish a subscribed event
@@ -587,7 +587,7 @@ mod tests {
 
         // Initialize the executor proxy and verify that the node doesn't panic
         // (even though it can't find the TestOnChainConfig on the blockchain!).
-        let chunk_executor = Box::new(Executor::<DiemVM>::new(db_rw.clone()));
+        let chunk_executor = Box::new(Executor::<DpnProto, DiemVM>::new(db_rw.clone()));
         let mut executor_proxy = ExecutorProxy::new(db, chunk_executor, event_subscription_service);
         executor_proxy.notify_initial_configs().unwrap();
 
@@ -606,7 +606,7 @@ mod tests {
         let allowlist_txn = create_new_update_consensus_config_transaction(1);
 
         // Execute and commit the reconfig block
-        let mut block_executor = Box::new(Executor::<DiemVM>::new(db_rw));
+        let mut block_executor = Box::new(Executor::<DpnProto, DiemVM>::new(db_rw));
         let block = vec![dummy_txn, allowlist_txn];
         let (reconfig_events, _) = execute_and_commit_block(&mut block_executor, block, 1);
 
@@ -630,7 +630,7 @@ mod tests {
         verify_initial_config: bool,
     ) -> (
         Vec<TestValidator>,
-        Box<Executor<DiemVM>>,
+        Box<Executor<DpnProto, DiemVM>>,
         ExecutorProxy,
         ReconfigNotificationListener,
     ) {
@@ -647,8 +647,8 @@ mod tests {
         assert_ok!(bootstrap_genesis::<DiemVM>(&db_rw, &genesis_txn));
 
         // Create executor proxy with given subscription
-        let block_executor = Box::new(Executor::<DiemVM>::new(db_rw.clone()));
-        let chunk_executor = Box::new(Executor::<DiemVM>::new(db_rw.clone()));
+        let block_executor = Box::new(Executor::<DpnProto, DiemVM>::new(db_rw.clone()));
+        let chunk_executor = Box::new(Executor::<DpnProto, DiemVM>::new(db_rw.clone()));
         let mut event_subscription_service =
             EventSubscriptionService::new(ON_CHAIN_CONFIG_REGISTRY, Arc::new(RwLock::new(db_rw)));
         let mut reconfig_receiver = event_subscription_service
@@ -771,7 +771,7 @@ mod tests {
 
     /// Executes and commits a given block that will cause a reconfiguration event.
     fn execute_and_commit_block(
-        block_executor: &mut Box<Executor<DiemVM>>,
+        block_executor: &mut Box<Executor<DpnProto, DiemVM>>,
         block: Vec<Transaction>,
         block_id: u8,
     ) -> (Vec<ContractEvent>, LedgerInfoWithSignatures) {

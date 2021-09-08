@@ -15,6 +15,7 @@ use diem_types::{
     diem_timestamp::DiemTimestampResource,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::{config_address, ConfigurationResource},
+    protocol_spec::DpnProto,
     transaction::Transaction,
     waypoint::Waypoint,
 };
@@ -64,14 +65,14 @@ pub fn maybe_bootstrap<V: VMExecutor>(
 }
 
 pub struct GenesisCommitter<V: VMExecutor> {
-    executor: Executor<V>,
+    executor: Executor<DpnProto, V>,
     ledger_info_with_sigs: LedgerInfoWithSignatures,
     waypoint: Waypoint,
 }
 
 impl<V: VMExecutor> GenesisCommitter<V> {
     pub fn new(
-        executor: Executor<V>,
+        executor: Executor<DpnProto, V>,
         ledger_info_with_sigs: LedgerInfoWithSignatures,
     ) -> Result<Self> {
         let waypoint = Waypoint::new_epoch_boundary(ledger_info_with_sigs.ledger_info())?;
@@ -106,7 +107,7 @@ pub fn calculate_genesis<V: VMExecutor>(
     // In the very extreme and sad situation of losing quorum among validators, we refer to the
     // second use case said above.
     let genesis_version = tree_state.num_transactions;
-    let executor = Executor::<V>::new_on_unbootstrapped_db(db.clone(), tree_state);
+    let executor = Executor::<DpnProto, V>::new_on_unbootstrapped_db(db.clone(), tree_state);
 
     let block_id = HashValue::zero();
     let epoch = if genesis_version == 0 {

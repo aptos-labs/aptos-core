@@ -44,7 +44,7 @@ use diem_types::{
     ledger_info::LedgerInfoWithSignatures,
     on_chain_config,
     proof::accumulator::InMemoryAccumulator,
-    protocol_spec::DpnProto,
+    protocol_spec::{DpnProto, ProtocolSpec},
     transaction::{
         default_protocol::TransactionListWithProof, Transaction, TransactionInfo,
         TransactionInfoTrait, TransactionOutput, TransactionPayload, TransactionStatus,
@@ -71,14 +71,15 @@ use storage_interface::{
 type SparseMerkleProof = diem_types::proof::SparseMerkleProof<AccountStateBlob>;
 
 /// `Executor` implements all functionalities the execution module needs to provide.
-pub struct Executor<V> {
+pub struct Executor<PS, V> {
     db: DbReaderWriter,
     cache: RwLock<SpeculationCache>,
-    phantom: PhantomData<V>,
+    phantom: PhantomData<(PS, V)>,
 }
 
-impl<V> Executor<V>
+impl<PS, V> Executor<PS, V>
 where
+    PS: ProtocolSpec,
     V: VMExecutor,
 {
     pub fn committed_block_id(&self) -> HashValue {
@@ -603,7 +604,7 @@ where
     }
 }
 
-impl<V: VMExecutor> ChunkExecutor for Executor<V> {
+impl<V: VMExecutor> ChunkExecutor for Executor<DpnProto, V> {
     fn execute_and_commit_chunk(
         &self,
         txn_list_with_proof: TransactionListWithProof,
@@ -677,7 +678,7 @@ impl<V: VMExecutor> ChunkExecutor for Executor<V> {
     }
 }
 
-impl<V: VMExecutor> TransactionReplayer for Executor<V> {
+impl<V: VMExecutor> TransactionReplayer for Executor<DpnProto, V> {
     fn replay_chunk(
         &self,
         mut first_version: Version,
@@ -723,7 +724,7 @@ impl<V: VMExecutor> TransactionReplayer for Executor<V> {
     }
 }
 
-impl<V: VMExecutor> BlockExecutor for Executor<V> {
+impl<V: VMExecutor> BlockExecutor for Executor<DpnProto, V> {
     fn committed_block_id(&self) -> Result<HashValue, Error> {
         Ok(Self::committed_block_id(self))
     }

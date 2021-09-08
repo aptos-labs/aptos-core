@@ -32,11 +32,11 @@ use storage_interface::{
     default_protocol::DbReaderWriter, DbReader, DbWriter, Order, StartupInfo, TreeState,
 };
 
-fn create_test_executor() -> Executor<FakeVM> {
+fn create_test_executor() -> Executor<DpnProto, FakeVM> {
     // setup fake db
     let fake_db = FakeDb {};
     let db_reader_writer = DbReaderWriter::new(fake_db);
-    Executor::<FakeVM>::new(db_reader_writer)
+    Executor::<DpnProto, FakeVM>::new(db_reader_writer)
 }
 
 pub fn fuzz_execute_and_commit_chunk(
