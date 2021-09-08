@@ -31,9 +31,8 @@ use diem_types::{
     proof::accumulator::InMemoryAccumulator,
     protocol_spec::{DpnProto, ProtocolSpec},
     transaction::{
-        default_protocol::TransactionListWithProof, Transaction, TransactionInfo,
-        TransactionInfoTrait, TransactionOutput, TransactionPayload, TransactionStatus,
-        TransactionToCommit, Version,
+        Transaction, TransactionInfoTrait, TransactionListWithProof, TransactionOutput,
+        TransactionPayload, TransactionStatus, TransactionToCommit, Version,
     },
     write_set::{WriteOp, WriteSet},
 };
@@ -172,9 +171,9 @@ where
     ///  3. Return Transactions to be applied.
     fn verify_chunk(
         &self,
-        txn_list_with_proof: TransactionListWithProof,
+        txn_list_with_proof: TransactionListWithProof<PS>,
         verified_target_li: &LedgerInfoWithSignatures,
-    ) -> Result<(Vec<Transaction>, Vec<TransactionInfo>)> {
+    ) -> Result<(Vec<Transaction>, Vec<PS::TransactionInfo>)> {
         // 1. Verify that input transactions belongs to the ledger represented by the ledger info.
         txn_list_with_proof.verify(
             verified_target_li.ledger_info(),
@@ -268,7 +267,7 @@ where
         // transactions that will be discarded, we will compute its in-memory Sparse Merkle Tree
         // (it will be identical to the previous one).
         let mut txn_data = vec![];
-        // The hash of each individual TransactionInfo object. This will not include the
+        // The hash of each individual PS::TransactionInfo object. This will not include the
         // transactions that will be discarded, since they do not go into the transaction
         // accumulator.
         let mut txn_info_hashes = vec![];
@@ -328,9 +327,9 @@ where
                         !vm_output.write_set().is_empty(),
                         "Transaction with empty write set should be discarded.",
                     );
-                    // Compute hash for the TransactionInfo object. We need the hash of the
+                    // Compute hash for the PS::TransactionInfo object. We need the hash of the
                     // transaction itself, the state root hash as well as the event root hash.
-                    let txn_info = TransactionInfo::new(
+                    let txn_info = PS::TransactionInfo::new(
                         txn.hash(),
                         state_tree_hash,
                         event_tree.root_hash(),
@@ -472,13 +471,13 @@ where
         &self,
         first_version: u64,
         transactions: Vec<Transaction>,
-        transaction_infos: Vec<TransactionInfo>,
+        transaction_infos: Vec<PS::TransactionInfo>,
     ) -> Result<(
         ProcessedVMOutput,
         Vec<TransactionToCommit>,
         Vec<ContractEvent>,
         Vec<Transaction>,
-        Vec<TransactionInfo>,
+        Vec<PS::TransactionInfo>,
     )> {
         let read_lock = self.cache.read();
         // Construct a StateView and pass the transactions to VM.
@@ -513,7 +512,7 @@ where
             read_lock.synced_trees(),
         )?;
 
-        // Since we have verified the proofs, we just need to verify that each TransactionInfo
+        // Since we have verified the proofs, we just need to verify that each PS::TransactionInfo
         // object matches what we have computed locally.
         let mut txns_to_commit = vec![];
         let mut events = vec![];
@@ -541,7 +540,7 @@ where
                 }
             };
             assert!(!seen_retry);
-            let generated_txn_info = TransactionInfo::new(
+            let generated_txn_info = PS::TransactionInfo::new(
                 txn.hash(),
                 txn_data.state_root_hash(),
                 txn_data.event_root_hash(),
@@ -577,7 +576,7 @@ where
         &self,
         first_version: u64,
         transactions: Vec<Transaction>,
-        transaction_infos: Vec<TransactionInfo>,
+        transaction_infos: Vec<PS::TransactionInfo>,
     ) -> Result<(
         ProcessedVMOutput,
         Vec<TransactionToCommit>,

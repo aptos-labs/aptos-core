@@ -10,7 +10,6 @@ use diem_logger::prelude::*;
 use diem_state_view::StateViewId;
 use diem_types::{
     ledger_info::LedgerInfoWithSignatures,
-    protocol_spec::DpnProto,
     transaction::{
         Transaction, TransactionOutput, TransactionStatus, TransactionToCommit, Version,
     },
@@ -28,8 +27,13 @@ use crate::{
     types::ProcessedVMOutput,
     Executor,
 };
+use diem_types::protocol_spec::ProtocolSpec;
 
-impl<V: VMExecutor> BlockExecutor for Executor<DpnProto, V> {
+impl<PS, V> BlockExecutor for Executor<PS, V>
+where
+    PS: ProtocolSpec,
+    V: VMExecutor,
+{
     fn committed_block_id(&self) -> anyhow::Result<HashValue, Error> {
         Ok(Self::committed_block_id(self))
     }

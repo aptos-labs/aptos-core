@@ -913,7 +913,7 @@ impl TransactionOutput {
 }
 
 pub trait TransactionInfoTrait:
-    Clone + CryptoHash + Debug + Eq + Serialize + for<'de> Deserialize<'de>
+    Clone + CryptoHash + Debug + Display + Eq + Serialize + for<'de> Deserialize<'de>
 {
     /// Constructs a new `TransactionInfo` object using transaction hash, state root hash and event
     /// root hash.
