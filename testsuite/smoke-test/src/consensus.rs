@@ -6,15 +6,18 @@ use crate::{
         launch_swarm_with_op_tool_and_backend, wait_for_transaction_on_all_nodes,
     },
     smoke_test_environment::new_local_swarm,
-    test_utils::diem_swarm_utils::load_validators_backend_storage,
+    test_utils::{check_create_mint_transfer, diem_swarm_utils::load_validators_backend_storage},
 };
 use diem_config::config::SecureBackend;
 use diem_global_constants::OWNER_ACCOUNT;
 use diem_operational_tool::test_helper::OperationalTool;
-use diem_sdk::client::views::VMStatusView;
+use diem_sdk::{client::views::VMStatusView, types::on_chain_config::OnChainConsensusConfig};
 use diem_secure_storage::{KVStorage, Storage};
-use diem_types::{account_address::AccountAddress, network_address::NetworkAddress};
-use forge::{LocalSwarm, NodeExt};
+use diem_types::{
+    account_address::AccountAddress, network_address::NetworkAddress,
+    on_chain_config::ConsensusConfigV1,
+};
+use forge::{LocalSwarm, Node, NodeExt, Swarm};
 use std::{convert::TryInto, str::FromStr};
 
 #[test]
@@ -105,9 +108,36 @@ fn test_safety_rules_export_consensus_compatibility() {
     rotate_operator_and_consensus_key(swarm);
 }
 
-fn rotate_operator_and_consensus_key(swarm: LocalSwarm) {
-    use forge::Node;
+#[test]
+fn test_2chain_upgrade() {
+    let num_nodes = 4;
+    let (mut swarm, _, _, _) = launch_swarm_with_op_tool_and_backend(num_nodes);
 
+    // should work before upgrade.
+    check_create_mint_transfer(&mut swarm);
+
+    // send upgrade txn
+    let transaction_factory = swarm.chain_info().transaction_factory();
+    let two_chain_config = OnChainConsensusConfig::V1(ConsensusConfigV1 { two_chain: true });
+    let upgrade_txn = swarm
+        .chain_info()
+        .root_account
+        .sign_with_transaction_builder(
+            transaction_factory
+                .update_diem_consensus_config(0, bcs::to_bytes(&two_chain_config).unwrap()),
+        );
+
+    let client = swarm.validators().next().unwrap().json_rpc_client();
+    client.submit(&upgrade_txn).unwrap();
+    client
+        .wait_for_signed_transaction(&upgrade_txn, None, None)
+        .unwrap();
+
+    // should work after upgrade.
+    check_create_mint_transfer(&mut swarm);
+}
+
+fn rotate_operator_and_consensus_key(swarm: LocalSwarm) {
     let validator = swarm.validators().next().unwrap();
     let json_rpc_endpoint = validator.json_rpc_endpoint().to_string();
 

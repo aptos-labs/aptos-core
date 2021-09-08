@@ -3,14 +3,16 @@
 
 use crate::{
     smoke_test_environment::new_local_swarm,
-    test_utils::{assert_balance, create_and_fund_account, transfer_coins},
+    test_utils::{
+        assert_balance, check_create_mint_transfer, create_and_fund_account, transfer_coins,
+    },
 };
 use diem_json_rpc_types::Id;
 use diem_sdk::client::stream::{
     request::StreamMethod, response::StreamJsonRpcResponseView, StreamingClient,
     StreamingClientConfig,
 };
-use forge::{LocalSwarm, Node, NodeExt, Swarm};
+use forge::{Node, NodeExt, Swarm};
 use futures::StreamExt;
 use std::time::{Duration, Instant};
 use tokio::{
@@ -219,26 +221,4 @@ fn test_concurrent_transfers_single_node() {
     transfer_coins(&client, &transaction_factory, &mut account_0, &account_1, 1);
     assert_balance(&client, &account_0, 79);
     assert_balance(&client, &account_1, 31);
-}
-
-/// This helper function creates 3 new accounts, mints funds, transfers funds
-/// between the accounts and verifies that these operations succeed.
-fn check_create_mint_transfer(swarm: &mut LocalSwarm) {
-    let client = swarm.validators().next().unwrap().json_rpc_client();
-    let transaction_factory = swarm.chain_info().transaction_factory();
-
-    // Create account 0, mint 10 coins and check balance
-    let mut account_0 = create_and_fund_account(swarm, 10);
-    assert_balance(&client, &account_0, 10);
-
-    // Create account 1, mint 1 coin, transfer 3 coins from account 0 to 1, check balances
-    let account_1 = create_and_fund_account(swarm, 1);
-    transfer_coins(&client, &transaction_factory, &mut account_0, &account_1, 3);
-
-    assert_balance(&client, &account_0, 7);
-    assert_balance(&client, &account_1, 4);
-
-    // Create account 2, mint 15 coins and check balance
-    let account_2 = create_and_fund_account(swarm, 15);
-    assert_balance(&client, &account_2, 15);
 }

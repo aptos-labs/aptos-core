@@ -8,7 +8,7 @@ use diem_sdk::{
     transaction_builder::{Currency, TransactionFactory},
     types::{transaction::SignedTransaction, LocalAccount},
 };
-use forge::{LocalSwarm, Swarm};
+use forge::{LocalSwarm, NodeExt, Swarm};
 use std::{fs::File, io::Write, path::PathBuf};
 
 pub fn create_and_fund_account(swarm: &mut LocalSwarm, amount: u64) -> LocalAccount {
@@ -172,4 +172,26 @@ pub fn write_key_to_file_bcs_format(key: &Ed25519PublicKey, key_file_path: PathB
     let bcs_encoded_key = bcs::to_bytes(&key).unwrap();
     let mut file = File::create(key_file_path).unwrap();
     file.write_all(&bcs_encoded_key).unwrap();
+}
+
+/// This helper function creates 3 new accounts, mints funds, transfers funds
+/// between the accounts and verifies that these operations succeed.
+pub fn check_create_mint_transfer(swarm: &mut LocalSwarm) {
+    let client = swarm.validators().next().unwrap().json_rpc_client();
+    let transaction_factory = swarm.chain_info().transaction_factory();
+
+    // Create account 0, mint 10 coins and check balance
+    let mut account_0 = create_and_fund_account(swarm, 10);
+    assert_balance(&client, &account_0, 10);
+
+    // Create account 1, mint 1 coin, transfer 3 coins from account 0 to 1, check balances
+    let account_1 = create_and_fund_account(swarm, 1);
+    transfer_coins(&client, &transaction_factory, &mut account_0, &account_1, 3);
+
+    assert_balance(&client, &account_0, 7);
+    assert_balance(&client, &account_1, 4);
+
+    // Create account 2, mint 15 coins and check balance
+    let account_2 = create_and_fund_account(swarm, 15);
+    assert_balance(&client, &account_2, 15);
 }
