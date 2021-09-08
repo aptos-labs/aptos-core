@@ -109,17 +109,17 @@ impl StateSyncPeer {
             .write()
             .commit_new_txns(num_txns);
         let mempool = self.mempool.as_ref().unwrap();
-        assert!(mempool.add_txns(signed_txns.clone()).is_ok());
+        mempool.add_txns(signed_txns.clone()).unwrap();
 
-        assert!(Runtime::new()
+        Runtime::new()
             .unwrap()
             .block_on(
                 self.consensus_notifier
                     .as_ref()
                     .unwrap()
-                    .notify_new_commit(committed_txns, vec![])
+                    .notify_new_commit(committed_txns, vec![]),
             )
-            .is_ok());
+            .unwrap();
         let mempool_txns = mempool.read_timeline(0, signed_txns.len());
         for txn in signed_txns.iter() {
             assert!(!mempool_txns.contains(txn));

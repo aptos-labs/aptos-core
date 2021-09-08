@@ -321,7 +321,7 @@ mod tests {
 
         // Send a notification
         let notify_result = block_on(consensus_notifier.notify_new_commit(vec![], vec![]));
-        assert!(notify_result.is_ok());
+        notify_result.unwrap();
     }
 
     #[test]
@@ -408,7 +408,7 @@ mod tests {
         // Send a commit notification and verify a successful response
         let notify_result =
             block_on(consensus_notifier.notify_new_commit(vec![create_user_transaction()], vec![]));
-        assert!(notify_result.is_ok());
+        notify_result.unwrap();
 
         // Send a sync notification and very an error response
         let notify_result = block_on(consensus_notifier.sync_to_target(create_ledger_info()));

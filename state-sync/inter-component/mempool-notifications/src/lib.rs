@@ -279,7 +279,7 @@ mod tests {
 
         // Send a notification and verify no timeout because no notification was sent!
         let notify_result = block_on(mempool_notifier.notify_new_commit(vec![], 0, 1000));
-        assert!(notify_result.is_ok());
+        notify_result.unwrap();
     }
 
     #[test]
@@ -301,7 +301,7 @@ mod tests {
         // Send a notification and verify no timeout because no notification was sent!
         let notify_result =
             block_on(mempool_notifier.notify_new_commit(transactions.clone(), 0, 1000));
-        assert!(notify_result.is_ok());
+        notify_result.unwrap();
 
         // Send another notification with a single user transaction now included.
         transactions.push(create_user_transaction());
@@ -371,7 +371,7 @@ mod tests {
             101,
             1000,
         ));
-        assert!(notify_result.is_ok());
+        notify_result.unwrap();
     }
 
     fn create_user_transaction() -> Transaction {

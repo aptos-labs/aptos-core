@@ -554,9 +554,9 @@ mod tests {
         // Grab the first two executed transactions and verify responses
         let txns = executor_proxy.get_chunk(0, 2, 2).unwrap();
         assert_eq!(txns.transactions, vec![dummy_txn_1, reconfig_txn]);
-        assert!(executor_proxy
+        executor_proxy
             .execute_chunk(txns, ledger_info_epoch_1.clone(), None)
-            .is_ok());
+            .unwrap();
         assert_eq!(
             ledger_info_epoch_1,
             executor_proxy.get_epoch_change_ledger_info(1).unwrap()
@@ -574,9 +574,9 @@ mod tests {
         // Grab the last transaction and verify responses
         let txns = executor_proxy.get_chunk(4, 1, 5).unwrap();
         assert_eq!(txns.transactions, vec![rotation_txn]);
-        assert!(executor_proxy
+        executor_proxy
             .execute_chunk(txns, ledger_info_epoch_2.clone(), None)
-            .is_ok());
+            .unwrap();
         assert_eq!(
             ledger_info_epoch_2,
             executor_proxy.get_epoch_change_ledger_info(2).unwrap()

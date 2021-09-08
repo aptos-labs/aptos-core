@@ -1779,9 +1779,7 @@ mod tests {
         let (sync_request, mut callback_receiver) = create_sync_notification_at_version(0);
         block_on(validator_coordinator.process_sync_request(sync_request)).unwrap();
         match callback_receiver.try_recv() {
-            Ok(Some(notification_result)) => {
-                assert!(notification_result.result.is_ok())
-            }
+            Ok(Some(notification_result)) => notification_result.result.unwrap(),
             result => panic!("Expected okay but got: {:?}", result),
         };
 
@@ -1846,9 +1844,7 @@ mod tests {
             .wait_for_initialization(callback_sender)
             .unwrap();
         match callback_receiver.try_recv() {
-            Ok(Some(result)) => {
-                assert!(result.is_ok())
-            }
+            Ok(Some(result)) => result.unwrap(),
             result => panic!("Expected okay but got: {:?}", result),
         };
 
@@ -1901,7 +1897,7 @@ mod tests {
         .unwrap();
         match callback_receiver.try_recv() {
             Ok(Some(notification_result)) => {
-                assert!(notification_result.result.is_ok());
+                notification_result.result.unwrap();
             }
             callback_result => panic!("Expected an okay result but got: {:?}", callback_result),
         };
