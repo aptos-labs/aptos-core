@@ -16,7 +16,10 @@ use diem_logger::prelude::*;
 use diem_operational_tool::json_rpc::JsonRpcClientWrapper;
 use diem_sdk::transaction_builder::TransactionFactory;
 use diem_types::{
-    account_address::AccountAddress, chain_id::ChainId, ledger_info::LedgerInfoWithSignatures,
+    account_address::AccountAddress,
+    chain_id::ChainId,
+    ledger_info::LedgerInfoWithSignatures,
+    on_chain_config::{ConsensusConfigV1, OnChainConsensusConfig},
 };
 use std::{
     collections::HashSet,
@@ -123,14 +126,11 @@ impl Experiment for Reconfiguration {
             None
         };
 
-        info!(
-            "Remove and add back {} repetitively",
-            self.affected_pod_name
-        );
-        let mut version = expect_epoch(&full_node_client, 0, 1).await?;
-        let validator_name = self.affected_pod_name.as_bytes().to_vec();
         let timer = Instant::now();
-        for i in 0..self.count / 2 {
+        let mut version = expect_epoch(&full_node_client, 0, 1).await?;
+        {
+            info!("Remove and add back {}.", self.affected_pod_name);
+            let validator_name = self.affected_pod_name.as_bytes().to_vec();
             let remove_txn = diem_root_account.sign_with_transaction_builder(
                 tx_factory.remove_validator_and_reconfigure(
                     allowed_nonce,
@@ -144,7 +144,7 @@ impl Experiment for Reconfiguration {
                 vec![remove_txn],
             )
             .await?;
-            version = expect_epoch(&full_node_client, version, (i + 1) * 2).await?;
+            version = expect_epoch(&full_node_client, version, 2).await?;
             let add_txn = diem_root_account.sign_with_transaction_builder(
                 tx_factory.add_validator_and_reconfigure(
                     allowed_nonce,
@@ -158,7 +158,42 @@ impl Experiment for Reconfiguration {
                 vec![add_txn],
             )
             .await?;
-            version = expect_epoch(&full_node_client, version, (i + 1) * 2 + 1).await?;
+            version = expect_epoch(&full_node_client, version, 3).await?;
+        }
+
+        {
+            info!("Switch from 2-chain and 3-chain repetitively.");
+            let two_chain_config =
+                OnChainConsensusConfig::V1(ConsensusConfigV1 { two_chain: true });
+            let three_chain_config = OnChainConsensusConfig::default();
+            for i in 1..self.count / 2 {
+                let two_chain_txn = diem_root_account.sign_with_transaction_builder(
+                    tx_factory.update_diem_consensus_config(
+                        allowed_nonce,
+                        bcs::to_bytes(&two_chain_config).unwrap(),
+                    ),
+                );
+                execute_and_wait_transactions(
+                    &mut full_node_client,
+                    &mut diem_root_account,
+                    vec![two_chain_txn],
+                )
+                .await?;
+                version = expect_epoch(&full_node_client, version, (i + 1) * 2).await?;
+                let three_chain_txn = diem_root_account.sign_with_transaction_builder(
+                    tx_factory.update_diem_consensus_config(
+                        allowed_nonce,
+                        bcs::to_bytes(&three_chain_config).unwrap(),
+                    ),
+                );
+                execute_and_wait_transactions(
+                    &mut full_node_client,
+                    &mut diem_root_account,
+                    vec![three_chain_txn],
+                )
+                .await?;
+                version = expect_epoch(&full_node_client, version, (i + 1) * 2 + 1).await?;
+            }
         }
 
         if self.count % 2 == 1 {
