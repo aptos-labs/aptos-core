@@ -8,7 +8,7 @@ use crate::{
         encode_mint_transaction, encode_reconfiguration_transaction, encode_transfer_transaction,
         MockVM, DISCARD_STATUS, KEEP_STATUS,
     },
-    BlockExecutor, Executor,
+    Executor,
 };
 use diem_crypto::HashValue;
 use diem_types::{
@@ -18,6 +18,7 @@ use diem_types::{
     transaction::{default_protocol::TransactionListWithProof, Transaction, Version},
 };
 use diemdb::DiemDB;
+use executor_types::{BlockExecutor, ChunkExecutor, TransactionReplayer};
 use proptest::prelude::*;
 use rand::Rng;
 use std::collections::BTreeMap;
