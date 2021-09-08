@@ -32,7 +32,7 @@ pub enum TransportRequest {
     ),
 }
 
-/// Responsible for listening for new incoming connections
+/// Responsible for listening for new incoming connections and making outbound connections
 pub struct TransportHandler<TTransport, TSocket>
 where
     TTransport: Transport,
@@ -102,35 +102,9 @@ where
                         pending_outbound_connections.push(fut);
                     }
                 },
-                incoming_connection = self.listener.select_next_some() => {
-                    match incoming_connection {
-                        Ok((upgrade, addr)) => {
-                            debug!(
-                                NetworkSchema::new(&self.network_context)
-                                    .network_address(&addr),
-                                "{} Incoming connection from {}",
-                                self.network_context,
-                                addr
-                            );
-
-                            counters::pending_connection_upgrades(
-                                &self.network_context,
-                                ConnectionOrigin::Inbound,
-                            )
-                            .inc();
-
-                            let start_time = self.time_service.now();
-                            pending_inbound_connections.push(upgrade.map(move |out| (out, addr, start_time)));
-                        }
-                        Err(e) => {
-                            info!(
-                                NetworkSchema::new(&self.network_context),
-                                error = %e,
-                                "{} Incoming connection error {}",
-                                self.network_context,
-                                e
-                            );
-                        }
+                inbound_connection = self.listener.select_next_some() => {
+                    if let Some(fut) = self.upgrade_inbound_connection(inbound_connection) {
+                        pending_inbound_connections.push(fut);
                     }
                 },
                 (upgrade, addr, peer_id, start_time, response_tx) = pending_outbound_connections.select_next_some() => {
@@ -149,6 +123,50 @@ where
         );
     }
 
+    /// Make an inbound request upgrade future e.g. Noise handshakes
+    fn upgrade_inbound_connection(
+        &self,
+        incoming_connection: Result<(TTransport::Inbound, NetworkAddress), TTransport::Error>,
+    ) -> Option<
+        BoxFuture<
+            'static,
+            (
+                Result<Connection<TSocket>, TTransport::Error>,
+                NetworkAddress,
+                Instant,
+            ),
+        >,
+    > {
+        match incoming_connection {
+            Ok((upgrade, addr)) => {
+                debug!(
+                    NetworkSchema::new(&self.network_context).network_address(&addr),
+                    "{} Incoming connection from {}", self.network_context, addr
+                );
+
+                counters::pending_connection_upgrades(
+                    &self.network_context,
+                    ConnectionOrigin::Inbound,
+                )
+                .inc();
+
+                let start_time = self.time_service.now();
+                Some(upgrade.map(move |out| (out, addr, start_time)).boxed())
+            }
+            Err(e) => {
+                info!(
+                    NetworkSchema::new(&self.network_context),
+                    error = %e,
+                    "{} Incoming connection error {}",
+                    self.network_context,
+                    e
+                );
+                None
+            }
+        }
+    }
+
+    /// Make an outbound request upgrade future e.g. Noise handshakes
     fn dial_peer(
         &self,
         dial_peer_request: TransportRequest,
@@ -200,6 +218,7 @@ where
         }
     }
 
+    /// Notifies `PeerManager` of a completed or failed outbound connection
     async fn handle_completed_outbound_upgrade(
         &mut self,
         upgrade: Result<Connection<TSocket>, TTransport::Error>,
@@ -270,6 +289,7 @@ where
         }
     }
 
+    /// Notifies `PeerManager` of a completed or failed inbound connection
     async fn handle_completed_inbound_upgrade(
         &mut self,
         upgrade: Result<Connection<TSocket>, TTransport::Error>,
