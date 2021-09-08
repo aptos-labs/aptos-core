@@ -12,8 +12,7 @@ pub enum OnChainConsensusConfig {
 }
 
 impl OnChainConsensusConfig {
-    #[allow(dead_code)]
-    fn two_chain(&self) -> bool {
+    pub fn two_chain(&self) -> bool {
         match &self {
             OnChainConsensusConfig::V1(config) => config.two_chain,
         }

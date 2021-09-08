@@ -39,7 +39,10 @@ use consensus_types::{
 use core::sync::atomic::Ordering;
 use diem_infallible::{checked, Mutex};
 use diem_logger::prelude::*;
-use diem_types::{epoch_state::EpochState, validator_verifier::ValidatorVerifier};
+use diem_types::{
+    epoch_state::EpochState, on_chain_config::OnChainConsensusConfig,
+    validator_verifier::ValidatorVerifier,
+};
 use fail::fail_point;
 #[cfg(test)]
 use safety_rules::ConsensusState;
@@ -135,6 +138,7 @@ pub struct RecoveryManager {
     storage: Arc<dyn PersistentLivenessStorage>,
     state_computer: Arc<dyn StateComputer>,
     last_committed_round: Round,
+    onchain_config: OnChainConsensusConfig,
 }
 
 impl RecoveryManager {
@@ -144,6 +148,7 @@ impl RecoveryManager {
         storage: Arc<dyn PersistentLivenessStorage>,
         state_computer: Arc<dyn StateComputer>,
         last_committed_round: Round,
+        onchain_config: OnChainConsensusConfig,
     ) -> Self {
         RecoveryManager {
             epoch_state,
@@ -151,6 +156,7 @@ impl RecoveryManager {
             storage,
             state_computer,
             last_committed_round,
+            onchain_config,
         }
     }
 
@@ -197,6 +203,10 @@ impl RecoveryManager {
     pub fn epoch_state(&self) -> &EpochState {
         &self.epoch_state
     }
+
+    pub fn onchain_config(&self) -> &OnChainConsensusConfig {
+        &self.onchain_config
+    }
 }
 
 /// Consensus SMR is working in an event based fashion: RoundManager is responsible for
@@ -218,7 +228,7 @@ pub struct RoundManager {
     back_pressure: Arc<AtomicU64>,
     decoupled_execution: bool,
     back_pressure_limit: u64,
-    two_chain: bool,
+    onchain_config: OnChainConsensusConfig,
 }
 
 impl RoundManager {
@@ -233,7 +243,7 @@ impl RoundManager {
         txn_manager: Arc<dyn TxnManager>,
         storage: Arc<dyn PersistentLivenessStorage>,
         sync_only: bool,
-        two_chain: bool,
+        onchain_config: OnChainConsensusConfig,
     ) -> Self {
         // when decoupled execution is false,
         // the counter is still static.
@@ -242,7 +252,7 @@ impl RoundManager {
             .set(sync_only as i64);
         counters::OP_COUNTERS
             .gauge("two_chain")
-            .set(two_chain as i64);
+            .set(onchain_config.two_chain() as i64);
         Self {
             epoch_state,
             block_store,
@@ -257,7 +267,7 @@ impl RoundManager {
             back_pressure: Arc::new(AtomicU64::new(0)), // dummy value
             decoupled_execution: false,
             back_pressure_limit: 1, // arbitrary dummy value
-            two_chain,
+            onchain_config,
         }
     }
 
@@ -274,7 +284,7 @@ impl RoundManager {
         sync_only: bool,
         back_pressure: Arc<AtomicU64>,
         back_pressure_limit: u64,
-        two_chain: bool,
+        onchain_config: OnChainConsensusConfig,
     ) -> Self {
         Self {
             epoch_state,
@@ -290,8 +300,12 @@ impl RoundManager {
             back_pressure,
             decoupled_execution: true,
             back_pressure_limit,
-            two_chain,
+            onchain_config,
         }
+    }
+
+    fn two_chain(&self) -> bool {
+        self.onchain_config.two_chain()
     }
 
     fn create_block_retriever(&self, author: Author) -> BlockRetriever {
@@ -567,7 +581,7 @@ impl RoundManager {
         };
 
         if !timeout_vote.is_timeout() {
-            if self.two_chain {
+            if self.two_chain() {
                 let timeout = timeout_vote.generate_2chain_timeout(
                     self.block_store.highest_quorum_cert().as_ref().clone(),
                 );
@@ -706,7 +720,7 @@ impl RoundManager {
         );
 
         let maybe_signed_vote_proposal = executed_block.maybe_signed_vote_proposal();
-        let vote_result = if self.two_chain {
+        let vote_result = if self.two_chain() {
             self.safety_rules.lock().construct_and_sign_vote_two_chain(
                 &maybe_signed_vote_proposal,
                 self.block_store.highest_2chain_timeout_cert().as_deref(),

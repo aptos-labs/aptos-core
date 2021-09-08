@@ -23,7 +23,7 @@ use diem_types::{
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    on_chain_config::ValidatorSet,
+    on_chain_config::{OnChainConsensusConfig, ValidatorSet},
     validator_info::ValidatorInfo,
     validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
@@ -167,7 +167,7 @@ fn create_node_for_fuzzing() -> RoundManager {
         Arc::new(MockTransactionManager::new(None)),
         storage,
         false,
-        false,
+        OnChainConsensusConfig::default(),
     )
 }
 

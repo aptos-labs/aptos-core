@@ -36,7 +36,7 @@ use diem_types::{
     account_address::AccountAddress,
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
-    on_chain_config::{OnChainConfigPayload, ValidatorSet},
+    on_chain_config::{OnChainConfigPayload, OnChainConsensusConfig, ValidatorSet},
 };
 use futures::{select, SinkExt, StreamExt};
 use network::protocols::network::Event;
@@ -288,7 +288,12 @@ impl EpochManager {
     }
 
     // TODO: prepare_decoupled_execution
-    async fn start_round_manager(&mut self, recovery_data: RecoveryData, epoch_state: EpochState) {
+    async fn start_round_manager(
+        &mut self,
+        recovery_data: RecoveryData,
+        epoch_state: EpochState,
+        onchain_config: OnChainConsensusConfig,
+    ) {
         // Release the previous RoundManager, especially the SafetyRule client
         self.processor = None;
         let epoch = epoch_state.epoch;
@@ -362,7 +367,7 @@ impl EpochManager {
                 self.txn_manager.clone(),
                 self.storage.clone(),
                 self.config.sync_only,
-                false,
+                onchain_config,
             )
         };
 
@@ -379,6 +384,7 @@ impl EpochManager {
         &mut self,
         ledger_recovery_data: LedgerRecoveryData,
         epoch_state: EpochState,
+        onchain_config: OnChainConsensusConfig,
     ) {
         let epoch = epoch_state.epoch;
         let network_sender = NetworkSender::new(
@@ -396,6 +402,7 @@ impl EpochManager {
             self.storage.clone(),
             self.commit_state_computer.clone(),
             ledger_recovery_data.commit_round(),
+            onchain_config,
         )));
         info!(epoch = epoch, "SyncProcessor started");
     }
@@ -408,13 +415,15 @@ impl EpochManager {
             epoch: payload.epoch(),
             verifier: (&validator_set).into(),
         };
+        let onchain_config: OnChainConsensusConfig = payload.get().unwrap_or_default();
 
         match self.storage.start() {
             LivenessStorageData::RecoveryData(initial_data) => {
-                self.start_round_manager(initial_data, epoch_state).await
+                self.start_round_manager(initial_data, epoch_state, onchain_config)
+                    .await
             }
             LivenessStorageData::LedgerRecoveryData(ledger_recovery_data) => {
-                self.start_recovery_manager(ledger_recovery_data, epoch_state)
+                self.start_recovery_manager(ledger_recovery_data, epoch_state, onchain_config)
                     .await
             }
         }
@@ -520,12 +529,14 @@ impl EpochManager {
                     VerifiedEvent::CommitVote(_) | VerifiedEvent::CommitDecision(_) => {
                         return Err(anyhow!(
                             "Ignoring commit vote/decision message during recovery"
-                        )); //ignore
+                        ));
                     }
                 }?;
                 let epoch_state = p.epoch_state().clone();
+                let onchain_config = p.onchain_config().clone();
                 info!("Recovered from SyncProcessor");
-                self.start_round_manager(recovery_data, epoch_state).await;
+                self.start_round_manager(recovery_data, epoch_state, onchain_config)
+                    .await;
                 Ok(())
             }
             RoundProcessor::Normal(p) => match event {

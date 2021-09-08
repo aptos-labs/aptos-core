@@ -41,6 +41,7 @@ use diem_secure_storage::Storage;
 use diem_types::{
     epoch_state::EpochState,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    on_chain_config::OnChainConsensusConfig,
     validator_signer::ValidatorSigner,
     validator_verifier::random_validator_verifier,
     waypoint::Waypoint,
@@ -220,7 +221,7 @@ impl NodeSetup {
             Arc::new(MockTransactionManager::new(None)),
             storage.clone(),
             false,
-            false,
+            OnChainConsensusConfig::default(),
         );
         block_on(round_manager.start(last_vote_sent));
         Self {
