@@ -604,7 +604,7 @@ fn test_dial_disconnect() {
         // Send DisconnectPeer request to PeerManager.
         let (disconnect_resp_tx, disconnect_resp_rx) = oneshot::channel();
         peer_manager
-            .handle_connection_request(ConnectionRequest::DisconnectPeer(
+            .handle_outbound_connection_request(ConnectionRequest::DisconnectPeer(
                 ids[0],
                 disconnect_resp_tx,
             ))

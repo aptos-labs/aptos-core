@@ -249,11 +249,11 @@ where
                 connection_event = self.transport_notifs_rx.select_next_some() => {
                     self.handle_connection_event(connection_event);
                 }
-                request = self.requests_rx.select_next_some() => {
-                    self.handle_request(request).await;
-                }
                 connection_request = self.connection_reqs_rx.select_next_some() => {
-                    self.handle_connection_request(connection_request).await;
+                    self.handle_outbound_connection_request(connection_request).await;
+                }
+                request = self.requests_rx.select_next_some() => {
+                    self.handle_outbound_request(request).await;
                 }
                 complete => {
                     break;
@@ -417,7 +417,7 @@ where
         }
     }
 
-    async fn handle_connection_request(&mut self, request: ConnectionRequest) {
+    async fn handle_outbound_connection_request(&mut self, request: ConnectionRequest) {
         trace!(
             NetworkSchema::new(&self.network_context),
             peer_manager_request = request,
@@ -486,7 +486,7 @@ where
         }
     }
 
-    async fn handle_request(&mut self, request: PeerManagerRequest) {
+    async fn handle_outbound_request(&mut self, request: PeerManagerRequest) {
         trace!(
             NetworkSchema::new(&self.network_context),
             peer_manager_request = request,
