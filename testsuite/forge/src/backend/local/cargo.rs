@@ -155,7 +155,7 @@ where
     let output = Command::new("cargo")
         .current_dir(directory)
         .env("CARGO_TARGET_DIR", target_directory)
-        .args(&["build", "--bin=diem-node"])
+        .args(&["build", "--bin=diem-node", "--features=failpoints"])
         .output()
         .context("Failed to build diem-node")?;
 

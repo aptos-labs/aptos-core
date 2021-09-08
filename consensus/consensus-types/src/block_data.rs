@@ -200,4 +200,39 @@ impl BlockData {
             block_type: BlockType::Proposal { payload, author },
         }
     }
+
+    /// It's a reconfiguration suffix block if the parent block's executed state indicates next epoch.
+    pub fn is_reconfiguration_suffix(&self) -> bool {
+        self.quorum_cert.certified_block().has_reconfiguration()
+    }
+}
+
+#[test]
+fn test_reconfiguration_suffix() {
+    use diem_types::{
+        account_address::AccountAddress, epoch_state::EpochState, on_chain_config::ValidatorSet,
+    };
+
+    let reconfig_block_info = BlockInfo::new(
+        1,
+        1,
+        HashValue::random(),
+        HashValue::random(),
+        100,
+        1,
+        Some(EpochState::empty()),
+    );
+    let quorum_cert = QuorumCert::new(
+        VoteData::new(reconfig_block_info, BlockInfo::random(0)),
+        LedgerInfoWithSignatures::new(
+            LedgerInfo::new(
+                BlockInfo::genesis(HashValue::random(), ValidatorSet::empty()),
+                HashValue::zero(),
+            ),
+            BTreeMap::new(),
+        ),
+    );
+    let reconfig_suffix_block =
+        BlockData::new_proposal(vec![], AccountAddress::random(), 2, 2, quorum_cert);
+    assert!(reconfig_suffix_block.is_reconfiguration_suffix());
 }

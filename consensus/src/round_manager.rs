@@ -24,6 +24,7 @@ use crate::{
 use anyhow::{bail, ensure, Context, Result};
 use consensus_types::{
     block::Block,
+    block_data::BlockData,
     block_retrieval::{BlockRetrievalResponse, BlockRetrievalStatus},
     common::{Author, Round},
     experimental::{commit_decision::CommitDecision, commit_vote::CommitVote},
@@ -331,11 +332,26 @@ impl RoundManager {
             .proposer_election
             .is_valid_proposer(self.proposal_generator.author(), new_round_event.round)
         {
-            let proposal_msg =
-                ConsensusMsg::ProposalMsg(Box::new(self.generate_proposal(new_round_event).await?));
+            let proposal_msg = Box::new(self.generate_proposal(new_round_event).await?);
             let mut network = self.network.clone();
-            network.broadcast(proposal_msg).await;
-            counters::PROPOSALS_COUNT.inc();
+            if Self::should_inject_reconfiguration_error(proposal_msg.proposal().block_data()) {
+                // We send the proposal to half of the validators to force a timeout.
+                let mut half_peers: Vec<_> = self
+                    .epoch_state
+                    .verifier
+                    .get_ordered_account_addresses_iter()
+                    .collect();
+                half_peers.truncate(half_peers.len() / 2);
+                network
+                    .send(ConsensusMsg::ProposalMsg(proposal_msg), half_peers)
+                    .await;
+                return Err(anyhow::anyhow!("Injected error in reconfiguration suffix"));
+            } else {
+                network
+                    .broadcast(ConsensusMsg::ProposalMsg(proposal_msg))
+                    .await;
+                counters::PROPOSALS_COUNT.inc();
+            }
         }
         Ok(())
     }
@@ -354,7 +370,6 @@ impl RoundManager {
             Block::new_proposal_from_block_data_and_signature(proposal, signature);
         observe_block(signed_proposal.timestamp_usecs(), BlockStage::SIGNED);
         debug!(self.new_log(LogEvent::Propose), "{}", signed_proposal);
-        // return proposal
         Ok(ProposalMsg::new(
             signed_proposal,
             self.block_store.sync_info(),
@@ -408,7 +423,9 @@ impl RoundManager {
                 self.new_log(LogEvent::HelpPeerSync).remote_peer(author),
                 "Remote peer has stale state {}, send it back {}", sync_info, local_sync_info,
             );
-            self.network.send_sync_info(local_sync_info.clone(), author);
+            self.network
+                .send_sync_info(local_sync_info.clone(), author)
+                .await;
         }
         if sync_info.has_newer_certificates(&local_sync_info) {
             debug!(
@@ -912,5 +929,26 @@ impl RoundManager {
         LogSchema::new(event)
             .round(self.round_state.current_round())
             .epoch(self.epoch_state.epoch)
+    }
+
+    /// Given R1 <- B2 if R1 has the reconfiguration txn, we inject error on B2 if R1.round + 1 = B2.round
+    /// Direct suffix is checked by parent.has_reconfiguration && !parent.parent.has_reconfiguration
+    ///
+    /// It's only enabled with fault injection (failpoints feature).
+    #[allow(unused_variables)]
+    fn should_inject_reconfiguration_error(block_data: &BlockData) -> bool {
+        #[cfg(feature = "failpoints")]
+        {
+            let direct_suffix = block_data.is_reconfiguration_suffix()
+                && !block_data
+                    .quorum_cert()
+                    .parent_block()
+                    .has_reconfiguration();
+            let continuous_round =
+                block_data.round() == block_data.quorum_cert().certified_block().round() + 1;
+            direct_suffix && continuous_round
+        }
+        #[cfg(not(feature = "failpoints"))]
+        false
     }
 }
