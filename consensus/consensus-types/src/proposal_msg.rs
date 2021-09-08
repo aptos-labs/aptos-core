@@ -63,9 +63,7 @@ impl ProposalMsg {
 
         let highest_certified_round = std::cmp::max(
             self.proposal.quorum_cert().certified_block().round(),
-            self.sync_info
-                .highest_timeout_certificate()
-                .map_or(0, |tc| tc.round()),
+            self.sync_info.highest_timeout_round(),
         );
         ensure!(
             previous_round == highest_certified_round,
@@ -87,6 +85,9 @@ impl ProposalMsg {
             .map_err(|e| format_err!("{:?}", e))?;
         // if there is a timeout certificate, verify its signatures
         if let Some(tc) = self.sync_info.highest_timeout_certificate() {
+            tc.verify(validator).map_err(|e| format_err!("{:?}", e))?;
+        }
+        if let Some(tc) = self.sync_info.highest_2chain_timeout_cert() {
             tc.verify(validator).map_err(|e| format_err!("{:?}", e))?;
         }
         // Note that we postpone the verification of SyncInfo until it's being used.
