@@ -54,7 +54,10 @@ mod transport;
 mod types;
 
 pub use self::error::PeerManagerError;
-use crate::peer_manager::transport::{TransportHandler, TransportRequest};
+use crate::{
+    application::storage::PeerMetadataStorage,
+    peer_manager::transport::{TransportHandler, TransportRequest},
+};
 use diem_config::config::{PeerRole, PeerSet};
 use diem_infallible::RwLock;
 pub use senders::*;
@@ -85,6 +88,8 @@ where
             diem_channel::Sender<ProtocolId, PeerRequest>,
         ),
     >,
+    /// Shared metadata storage about peers
+    peer_metadata_storage: Arc<PeerMetadataStorage>,
     /// Known trusted peers from discovery
     trusted_peers: Arc<RwLock<PeerSet>>,
     /// Channel to receive requests from other actors.
@@ -135,6 +140,7 @@ where
         transport: TTransport,
         network_context: Arc<NetworkContext>,
         listen_addr: NetworkAddress,
+        peer_metadata_storage: Arc<PeerMetadataStorage>,
         trusted_peers: Arc<RwLock<PeerSet>>,
         requests_rx: diem_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
         connection_reqs_rx: diem_channel::Receiver<PeerId, ConnectionRequest>,
@@ -176,6 +182,7 @@ where
             listen_addr,
             transport_handler: Some(transport_handler),
             active_peers: HashMap::new(),
+            peer_metadata_storage,
             trusted_peers,
             requests_rx,
             connection_reqs_rx,
@@ -371,6 +378,8 @@ where
                     if conn_metadata.connection_id == lost_conn_metadata.connection_id {
                         // We lost an active connection.
                         entry.remove();
+                        self.peer_metadata_storage
+                            .remove_connection(&lost_conn_metadata)
                     }
                 }
                 self.update_connected_peers_metrics();
@@ -459,11 +468,14 @@ where
                 // Send a CloseConnection request to Peer and drop the send end of the
                 // PeerRequest channel.
                 if let Some((conn_metadata, sender)) = self.active_peers.remove(&peer_id) {
+                    let connection_id = conn_metadata.connection_id;
+                    self.peer_metadata_storage.remove_connection(&conn_metadata);
+
                     // This triggers a disconnect.
                     drop(sender);
                     // Add to outstanding disconnect requests.
                     self.outstanding_disconnect_requests
-                        .insert(conn_metadata.connection_id, resp_tx);
+                        .insert(connection_id, resp_tx);
                 } else {
                     info!(
                         NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
@@ -699,6 +711,8 @@ where
         // Save PeerRequest sender to `active_peers`.
         self.active_peers
             .insert(peer_id, (conn_meta.clone(), peer_reqs_tx));
+        self.peer_metadata_storage
+            .insert_connection(conn_meta.clone());
         // Send NewPeer notification to connection event handlers.
         if send_new_peer_notification {
             let notif = ConnectionNotification::NewPeer(conn_meta, self.network_context.clone());

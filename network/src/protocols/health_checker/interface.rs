@@ -3,7 +3,7 @@
 
 use crate::{
     application::{
-        interface::{NetworkInterface, PeerStateChange},
+        interface::NetworkInterface,
         storage::{LockingHashMap, PeerMetadataStorage},
         types::{PeerError, PeerState},
     },
@@ -74,6 +74,18 @@ impl HealthCheckNetworkInterface {
     pub fn connected_peers(&self) -> Vec<PeerId> {
         self.app_data.keys()
     }
+
+    /// Update state of peer globally
+    fn update_state(&self, peer_id: PeerId, state: PeerState) -> Result<(), PeerError> {
+        self.peer_metadata_storage()
+            .write(peer_id, |entry| match entry {
+                Entry::Vacant(..) => Err(PeerError::NotFound),
+                Entry::Occupied(inner) => {
+                    inner.get_mut().status = state;
+                    Ok(())
+                }
+            })
+    }
 }
 
 #[async_trait]
@@ -107,12 +119,6 @@ impl NetworkInterface for HealthCheckNetworkInterface {
         modifier: F,
     ) -> Result<(), PeerError> {
         self.app_data.write(peer_id, modifier)
-    }
-}
-
-impl PeerStateChange for HealthCheckNetworkInterface {
-    fn peer_metadata_storage(&self) -> &PeerMetadataStorage {
-        &self.peer_metadata_storage
     }
 }
 

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    application::storage::PeerMetadataStorage,
     constants,
     peer::DisconnectReason,
     peer_manager::{
@@ -103,6 +104,7 @@ fn build_test_peer_manager(
         build_test_transport(),
         NetworkContext::mock_with_peer_id(peer_id),
         "/memory/0".parse().unwrap(),
+        Arc::new(PeerMetadataStorage::new()),
         Arc::new(RwLock::new(HashMap::new())),
         peer_manager_request_rx,
         connection_reqs_rx,

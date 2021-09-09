@@ -95,6 +95,7 @@ impl NetworkBuilder {
         inbound_rate_limit_config: Option<RateLimitConfig>,
         outbound_rate_limit_config: Option<RateLimitConfig>,
     ) -> Self {
+        let peer_metadata_storage = Arc::new(PeerMetadataStorage::new());
         // A network cannot exist without a PeerManager
         // TODO:  construct this in create and pass it to new() as a parameter. The complication is manual construction of NetworkBuilder in various tests.
         let peer_manager_builder = PeerManagerBuilder::create(
@@ -102,6 +103,7 @@ impl NetworkBuilder {
             network_context.clone(),
             time_service.clone(),
             listen_address,
+            peer_metadata_storage.clone(),
             trusted_peers,
             authentication_mode,
             network_channel_size,
@@ -123,7 +125,7 @@ impl NetworkBuilder {
             health_checker_builder: None,
             peer_manager_builder,
             reconfig_subscriptions: vec![],
-            peer_metadata_storage: Arc::new(PeerMetadataStorage::new()),
+            peer_metadata_storage,
         }
     }
 

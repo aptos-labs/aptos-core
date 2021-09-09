@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    application::storage::PeerMetadataStorage,
     counters,
     counters::NETWORK_RATE_LIMIT_METRICS,
     noise::{stream::NoiseStream, HandshakeAuthMode},
@@ -104,6 +105,7 @@ struct PeerManagerContext {
     connection_reqs_tx: diem_channel::Sender<PeerId, ConnectionRequest>,
     connection_reqs_rx: diem_channel::Receiver<PeerId, ConnectionRequest>,
 
+    peer_metadata_storage: Arc<PeerMetadataStorage>,
     trusted_peers: Arc<RwLock<PeerSet>>,
     upstream_handlers:
         HashMap<ProtocolId, diem_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>>,
@@ -118,12 +120,14 @@ struct PeerManagerContext {
 }
 
 impl PeerManagerContext {
+    #[allow(clippy::too_many_arguments)]
     fn new(
         pm_reqs_tx: diem_channel::Sender<(PeerId, ProtocolId), PeerManagerRequest>,
         pm_reqs_rx: diem_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
         connection_reqs_tx: diem_channel::Sender<PeerId, ConnectionRequest>,
         connection_reqs_rx: diem_channel::Receiver<PeerId, ConnectionRequest>,
 
+        peer_metadata_storage: Arc<PeerMetadataStorage>,
         trusted_peers: Arc<RwLock<PeerSet>>,
         upstream_handlers: HashMap<
             ProtocolId,
@@ -144,6 +148,7 @@ impl PeerManagerContext {
             connection_reqs_tx,
             connection_reqs_rx,
 
+            peer_metadata_storage,
             trusted_peers,
             upstream_handlers,
             connection_event_handlers,
@@ -196,12 +201,14 @@ pub struct PeerManagerBuilder {
 }
 
 impl PeerManagerBuilder {
+    #[allow(clippy::too_many_arguments)]
     pub fn create(
         chain_id: ChainId,
         network_context: Arc<NetworkContext>,
         time_service: TimeService,
         // TODO(philiphayes): better support multiple listening addrs
         listen_address: NetworkAddress,
+        peer_metadata_storage: Arc<PeerMetadataStorage>,
         trusted_peers: Arc<RwLock<PeerSet>>,
         authentication_mode: AuthenticationMode,
         channel_size: usize,
@@ -238,6 +245,7 @@ impl PeerManagerBuilder {
                 pm_reqs_rx,
                 connection_reqs_tx,
                 connection_reqs_rx,
+                peer_metadata_storage,
                 trusted_peers,
                 HashMap::new(),
                 Vec::new(),
@@ -365,6 +373,7 @@ impl PeerManagerBuilder {
             // TODO(philiphayes): peer manager should take `Vec<NetworkAddress>`
             // (which could be empty, like in client use case)
             self.listen_address.clone(),
+            pm_context.peer_metadata_storage,
             pm_context.trusted_peers,
             pm_context.pm_reqs_rx,
             pm_context.connection_reqs_rx,

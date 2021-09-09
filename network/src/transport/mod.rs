@@ -147,7 +147,7 @@ impl ConnectionMetadata {
             remote_peer_id,
             role,
             origin,
-            connection_id: ConnectionId::default(),
+            connection_id: CONNECTION_ID_GENERATOR.next(),
             addr: NetworkAddress::mock(),
             messaging_protocol: MessagingProtocolVersion::V1,
             application_protocols: [].iter().into(),

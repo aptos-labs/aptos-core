@@ -1,10 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 use crate::{
-    application::{
-        management::ConnectionStorage,
-        types::{PeerError, PeerInfo},
-    },
+    application::types::{PeerError, PeerInfo},
     transport::ConnectionMetadata,
 };
 use diem_infallible::RwLock;
@@ -39,8 +36,16 @@ where
     }
 
     /// Filtered read clone based on keys or values
-    pub fn read_filtered<F: FnMut(&(Key, Value)) -> bool>(&self, filter: F) -> HashMap<Key, Value> {
-        self.map.read().clone().into_iter().filter(filter).collect()
+    pub fn read_filtered<F: FnMut(&(&Key, &Value)) -> bool>(
+        &self,
+        filter: F,
+    ) -> HashMap<Key, Value> {
+        self.map
+            .read()
+            .iter()
+            .filter(filter)
+            .map(|(key, value)| (key.clone(), value.clone()))
+            .collect()
     }
 
     /// All keys of the hash map
@@ -78,8 +83,8 @@ where
     }
 }
 
-impl ConnectionStorage for PeerMetadataStorage {
-    fn insert_connection(&self, connection_metadata: ConnectionMetadata) {
+impl PeerMetadataStorage {
+    pub fn insert_connection(&self, connection_metadata: ConnectionMetadata) {
         let peer_id = connection_metadata.remote_peer_id;
         self.map
             .write()
@@ -88,18 +93,16 @@ impl ConnectionStorage for PeerMetadataStorage {
             .or_insert_with(|| PeerInfo::new(connection_metadata));
     }
 
-    fn remove_connection(&self, connection_metadata: ConnectionMetadata) {
+    pub fn remove_connection(&self, connection_metadata: &ConnectionMetadata) {
         let peer_id = connection_metadata.remote_peer_id;
-        let mut remove = true;
         let mut map = self.map.write();
 
         // Don't remove the peer if the connection doesn't match!
-        if let Some(peer_info) = map.get(&peer_id) {
-            remove = peer_info.active_connection == connection_metadata;
-        }
-        // For now, remove the peer entirely, we could in the future have multiple connections for a peer
-        if remove {
-            map.remove(&peer_id);
+        if let Entry::Occupied(entry) = map.entry(peer_id) {
+            // For now, remove the peer entirely, we could in the future have multiple connections for a peer
+            if entry.get().active_connection.connection_id == connection_metadata.connection_id {
+                entry.remove();
+            }
         }
     }
 }

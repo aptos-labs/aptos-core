@@ -18,7 +18,7 @@ pub trait NetworkInterface {
     type Sender;
     type AppData;
 
-    /// Provides the PeerDb for other functions.  Not expected to be used externally.
+    /// Provides the `PeerMetadataStorage` for other functions.  Not expected to be used externally.
     fn peer_metadata_storage(&self) -> &PeerMetadataStorage;
 
     /// Give a copy of the sender for the network
@@ -30,7 +30,7 @@ pub trait NetworkInterface {
     }
 
     /// Filter peers with according `filter`
-    fn filtered_peers<F: FnMut(&(PeerId, PeerInfo)) -> bool>(
+    fn filtered_peers<F: FnMut(&(&PeerId, &PeerInfo)) -> bool>(
         &self,
         filter: F,
     ) -> HashMap<PeerId, PeerInfo> {
@@ -57,21 +57,4 @@ pub trait NetworkInterface {
         peer_id: PeerId,
         modifier: F,
     ) -> Result<(), PeerError>;
-}
-
-/// Trait around changing state of peers
-pub trait PeerStateChange {
-    fn peer_metadata_storage(&self) -> &PeerMetadataStorage;
-
-    /// Update state in `PeerDb`
-    fn update_state(&self, peer_id: PeerId, state: PeerState) -> Result<(), PeerError> {
-        self.peer_metadata_storage()
-            .write(peer_id, |entry| match entry {
-                Entry::Vacant(..) => Err(PeerError::NotFound),
-                Entry::Occupied(inner) => {
-                    inner.get_mut().status = state;
-                    Ok(())
-                }
-            })
-    }
 }
