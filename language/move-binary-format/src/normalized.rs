@@ -237,7 +237,7 @@ impl Type {
                 name: name.clone(),
                 type_arguments: type_arguments
                     .iter()
-                    .map(|t| t.subst(type_arguments))
+                    .map(|t| t.subst(type_args))
                     .collect::<Vec<_>>(),
             },
             TypeParameter(i) => type_args

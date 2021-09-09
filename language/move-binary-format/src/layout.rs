@@ -132,7 +132,7 @@ impl TypeLayoutBuilder {
             Struct(shi) => MoveTypeLayout::Struct(StructLayoutBuilder::build_from_handle_idx(
                 m,
                 *shi,
-                type_arguments.to_vec(),
+                vec![],
                 resolver,
                 layout_type,
             )?),
