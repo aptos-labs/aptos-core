@@ -34,10 +34,16 @@ pub struct TrieNode {
     children: BTreeMap<Offset, TrieNode>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum Root {
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum RootAddress {
     Const(AccountAddress),
     Formal(usize),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Root {
+    pub root: RootAddress,
+    pub type_: Type,
 }
 
 #[derive(Debug, Clone)]
@@ -48,6 +54,25 @@ pub struct AccessPath {
 
 #[derive(Debug, Clone)]
 pub struct ReadWriteSet(BTreeMap<Root, TrieNode>);
+
+impl Root {
+    fn subst_actuals(&self, type_actuals: &[Type], actuals: &[Option<AccountAddress>]) -> Self {
+        let root_address = match &self.root {
+            RootAddress::Const(addr) => RootAddress::Const(*addr),
+            RootAddress::Formal(i) => {
+                if let Some(addr) = actuals.get(*i).and_then(|v| *v) {
+                    RootAddress::Const(addr)
+                } else {
+                    panic!("Type parameter index out of bound")
+                }
+            }
+        };
+        Self {
+            root: root_address,
+            type_: self.type_.subst(type_actuals),
+        }
+    }
+}
 
 impl AccessPath {
     pub fn offset(&self) -> &[Offset] {
@@ -61,26 +86,18 @@ impl AccessPath {
     }
     pub fn new_global_constant(addr: AccountAddress, ty: Type) -> Self {
         Self {
-            root: Root::Const(addr),
-            offsets: vec![Offset::Global(ty)],
+            root: Root {
+                root: RootAddress::Const(addr),
+                type_: ty,
+            },
+            offsets: vec![],
         }
     }
     pub fn has_secondary_index(&self) -> bool {
-        self.offsets.iter().skip(1).any(|offset| match offset {
+        self.offsets.iter().any(|offset| match offset {
             Offset::Global(_) => true,
             Offset::Field(_) | Offset::VectorIndex => false,
         })
-    }
-
-    pub fn to_resource_key(&self) -> Option<ResourceKey> {
-        if self.offsets.is_empty() || self.has_secondary_index() {
-            return None;
-        }
-        if let (Root::Const(addr), Some(Offset::Global(ty))) = (&self.root, self.offsets.first()) {
-            Some(ResourceKey::new(*addr, ty.clone().into_struct_tag()?))
-        } else {
-            None
-        }
     }
 }
 
@@ -130,6 +147,28 @@ impl TrieNode {
                 .collect::<BTreeMap<_, _>>(),
         }
     }
+
+    fn get_access(&self) -> Option<Access> {
+        self.get_access_impl(None)
+    }
+
+    fn get_access_impl(&self, mut acc: Option<Access>) -> Option<Access> {
+        acc = match (self.data, acc) {
+            (Some(lhs), Some(rhs)) => {
+                if lhs != rhs {
+                    Some(Access::ReadWrite)
+                } else {
+                    Some(lhs)
+                }
+            }
+            (Some(_), None) => self.data,
+            (None, _) => acc,
+        };
+        for (_, children) in self.children.iter() {
+            acc = children.get_access_impl(acc)
+        }
+        acc
+    }
 }
 
 impl ReadWriteSet {
@@ -172,6 +211,39 @@ impl ReadWriteSet {
         self.iter_paths_impl(f)
     }
 
+    fn get_keys_(&self, is_write: bool) -> Option<Vec<ResourceKey>> {
+        let mut results = vec![];
+        for (key, node) in self.0.iter() {
+            let keep = match node.get_access() {
+                Some(access) => {
+                    if is_write {
+                        access.is_write()
+                    } else {
+                        access.is_read()
+                    }
+                }
+                None => false,
+            };
+            if keep {
+                match key.root {
+                    RootAddress::Const(addr) => {
+                        results.push(ResourceKey::new(addr, key.type_.clone().into_struct_tag()?))
+                    }
+                    RootAddress::Formal(_) => return None,
+                }
+            }
+        }
+        Some(results)
+    }
+
+    pub fn get_keys_written(&self) -> Option<Vec<ResourceKey>> {
+        self.get_keys_(true)
+    }
+
+    pub fn get_keys_read(&self) -> Option<Vec<ResourceKey>> {
+        self.get_keys_(false)
+    }
+
     pub fn sub_actuals(
         &self,
         actuals: &[Option<AccountAddress>],
@@ -185,17 +257,10 @@ impl ReadWriteSet {
             self.0
                 .iter()
                 .map(|(root, node)| {
-                    let root = match root {
-                        Root::Const(addr) => Root::Const(*addr),
-                        Root::Formal(i) => {
-                            if let Some(addr) = actuals.get(*i).and_then(|v| *v) {
-                                Root::Const(addr)
-                            } else {
-                                Root::Formal(*i)
-                            }
-                        }
-                    };
-                    (root, node.sub_type_actuals(&types))
+                    (
+                        root.subst_actuals(&types, actuals),
+                        node.sub_type_actuals(&types),
+                    )
                 })
                 .collect::<BTreeMap<_, _>>(),
         )
@@ -204,10 +269,11 @@ impl ReadWriteSet {
 
 impl fmt::Display for Root {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            Root::Const(addr) => write!(f, "0x{}", addr.short_str_lossless()),
-            Root::Formal(i) => write!(f, "Formal({})", i),
-        }
+        match self.root {
+            RootAddress::Const(addr) => write!(f, "0x{}", addr.short_str_lossless())?,
+            RootAddress::Formal(i) => write!(f, "Formal({})", i)?,
+        };
+        write!(f, "/{}", self.type_)
     }
 }
 impl fmt::Display for Offset {
