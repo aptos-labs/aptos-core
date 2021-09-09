@@ -54,7 +54,7 @@ impl ProtocolId {
             StateSyncDirectSend => "StateSyncDirectSend",
             DiscoveryDirectSend => "DiscoveryDirectSend",
             HealthCheckerRpc => "HealthCheckerRpc",
-            ConsensusDirectSendJSON => "ConsensusDirectSendCbor",
+            ConsensusDirectSendJSON => "ConsensusDirectSendJson",
         }
     }
 
