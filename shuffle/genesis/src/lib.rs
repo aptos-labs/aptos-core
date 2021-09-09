@@ -5,6 +5,7 @@ use anyhow::Result;
 use diem_config::config::NodeConfig;
 use diem_genesis_tool::validator_builder::ValidatorConfig;
 use diem_types::on_chain_config::VMPublishingOption;
+use move_command_line_common::files::{extension_equals, find_filenames};
 use std::{
     fs,
     io::{self, Write},
@@ -18,14 +19,12 @@ pub mod utils;
 
 pub const MOVE_EXTENSION: &str = "move";
 const MOVE_MODULES_DIR: &str = "../move/src/modules";
-const DIEM_MODULES_DIR: &str = "../../language/diem-framework/modules";
-const MOVE_STDLIB_DIR: &str = "../../language/move-stdlib/modules";
 
 /// The output path for transaction script ABIs.
 const COMPILED_SCRIPTS_ABI_DIR: &str = "compiled/script_abis";
 /// The path for Diem Framework transaction script ABIs.
 const DF_COMPILED_SCRIPTS_ABI_DIR: &str =
-    "../../language/diem-framework/releases/artifacts/current/script_abis";
+    "../../language/diem-framework/DPN/releases/artifacts/current/script_abis";
 /// The output path for generated transaction builders
 const TRANSACTION_BUILDERS_GENERATED_SOURCE_PATH: &str = "../transaction-builder/src/framework.rs";
 /// Directory where Move source code lives
@@ -110,20 +109,9 @@ fn custom_move_modules_full_path() -> String {
     format!("{}/{}", env!("CARGO_MANIFEST_DIR"), MOVE_MODULES_DIR)
 }
 
-fn diem_framework_modules_full_path() -> String {
-    format!("{}/{}", env!("CARGO_MANIFEST_DIR"), DIEM_MODULES_DIR)
-}
-
-fn move_stdlib_modules_full_path() -> String {
-    format!("{}/{}", env!("CARGO_MANIFEST_DIR"), MOVE_STDLIB_DIR)
-}
-
 fn move_files() -> Vec<String> {
     let path = path_in_crate(MOVE_MODULES_DIR);
-    let dirfiles = utils::iterate_directory(&path);
-    filter_move_files(dirfiles)
-        .flat_map(|path| path.into_os_string().into_string())
-        .collect()
+    find_filenames(&[path], |p| extension_equals(p, MOVE_EXTENSION)).unwrap()
 }
 
 fn path_in_crate<S>(relative: S) -> PathBuf
@@ -133,14 +121,4 @@ where
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     path.push(relative.into());
     path
-}
-
-fn filter_move_files(dir_iter: impl Iterator<Item = PathBuf>) -> impl Iterator<Item = PathBuf> {
-    dir_iter.flat_map(|path| {
-        if path.extension()?.to_str()? == MOVE_EXTENSION {
-            Some(path)
-        } else {
-            None
-        }
-    })
 }

@@ -27,7 +27,7 @@ const DIR_MOVE_STDLIB: Dir = include_dir!("../../move-stdlib/sources");
 /// Content for the nursery directory
 const DIR_MOVE_STDLIB_NURSERY: Dir = include_dir!("../../move-stdlib/Nursery/sources");
 /// Content for diem framework directory
-const DIR_DIEM_FRAMEWORK: Dir = include_dir!("../../diem-framework/modules");
+const DIR_DIEM_FRAMEWORK: Dir = include_dir!("../../diem-framework/core/modules");
 
 /// Pre-defined stdlib package
 static PACKAGE_MOVE_STDLIB: Lazy<MovePackage> = Lazy::new(|| {

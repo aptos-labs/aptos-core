@@ -357,7 +357,7 @@ mark-changed = []
 
 [[determinator.path-rule]]
 # Required by get_stdlib_script_abis in transaction-builder-generator.
-globs = ["language/diem-framework/releases/artifacts/current/script_abis/**/*"]
+globs = ["language/diem-framework/DPN/releases/artifacts/current/script_abis/**/*"]
 mark-changed = ["transaction-builder-generator"]
 post-rule = "skip-rules"
 

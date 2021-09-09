@@ -38,7 +38,7 @@ serde = { version = "1.0.124", default-features = false }
 proptest = "1.0.0"
 
 diem-types = { path = "../../types", features = ["fuzzing"] }
-diem-framework-releases = { path = "../diem-framework/releases" }
+diem-framework-releases = { path = "../diem-framework/DPN/releases" }
 
 [features]
 default = []

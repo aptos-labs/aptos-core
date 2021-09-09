@@ -131,7 +131,7 @@ configurable static timeout.
 
 [`ConnectivityManager`]: ./src/connectivity_manager/mod.rs
 [DiemNet Handshake Protocol]: ../specifications/network/handshake-v1.md
-[`DiemSystem::validators`]: ../language/diem-framework/modules/doc/DiemSystem.md#struct-diemsystem
+[`DiemSystem::validators`]: ../language/diem-framework/core/doc/DiemSystem.md#struct-diemsystem
 [`DiemTransport`]: ./src/transport/mod.rs
 [`HealthChecker`]: ./src/protocols/health_checker/mod.rs
 [`Network Interface`]: ./src/protocols/network/mod.rs
@@ -139,5 +139,5 @@ configurable static timeout.
 [NoiseIK]: ../specifications/network/noise.md
 [`PeerManager`]: ./src/peer_manager/mod.rs
 [`Peer`]: ./src/peer/mod.rs
-[`ValidatorConfig`]: ../language/diem-framework/modules/doc/ValidatorConfig.md#struct-config
+[`ValidatorConfig`]: ../language/diem-framework/core/doc/ValidatorConfig.md#struct-config
 [`validator-set-discovery`]: discovery/src/lib.rs

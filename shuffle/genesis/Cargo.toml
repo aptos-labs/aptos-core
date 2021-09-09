@@ -14,7 +14,7 @@ diemdb = { path = "../../storage/diemdb" }
 diem-config = { path = "../../config" }
 diem-crypto = { path = "../../crypto/crypto" }
 diem-framework = { path = "../../language/diem-framework" }
-diem-framework-releases = { path = "../../language/diem-framework/releases" }
+diem-framework-releases = { path = "../../language/diem-framework/DPN/releases" }
 diem-genesis-tool = { path = "../../config/management/genesis" }
 diem-json-rpc-types = { path = "../../json-rpc/types" }
 diem-node = { path = "../../diem-node" }
@@ -23,7 +23,9 @@ diem-temppath = { path = "../../common/temppath" }
 diem-types = { path = "../../types" }
 diem-workspace-hack = { path = "../../common/workspace-hack" }
 generate-key = { path = "../../config/generate-key" }
+move-command-line-common = { path = "../../language/move-command-line-common" }
 move-prover = { path = "../../language/move-prover" }
+move-stdlib = { path = "../../language/move-stdlib" }
 transaction-builder-generator = { path = "../../language/transaction-builder/generator" }
 
 anyhow = "1.0.38"

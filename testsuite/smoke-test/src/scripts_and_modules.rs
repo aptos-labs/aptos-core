@@ -51,8 +51,13 @@ impl AdminTest for MalformedScript {
             .join("testsuite/smoke-test/src/dev_modules/test_script.move")
             .canonicalize()?;
         let move_stdlib_dir = move_stdlib::move_stdlib_modules_full_path();
-        let diem_framework_dir = diem_framework::diem_stdlib_modules_full_path();
-        let dependencies = &[move_stdlib_dir.as_str(), diem_framework_dir.as_str()];
+        let diem_core_framework_dir = diem_framework::diem_core_modules_full_path();
+        let diem_payment_framework_dir = diem_framework::diem_payment_modules_full_path();
+        let dependencies = &[
+            move_stdlib_dir.as_str(),
+            diem_core_framework_dir.as_str(),
+            diem_payment_framework_dir.as_str(),
+        ];
         let compiled_script = compile_program(script_path.to_str().unwrap(), dependencies)?;
 
         // the script expects two arguments. Passing only one in the test, which will cause a failure.
@@ -118,7 +123,8 @@ impl AdminTest for ExecuteCustomModuleAndScript {
 
         // Get the path to the Move stdlib sources
         let move_stdlib_dir = move_stdlib::move_stdlib_modules_full_path();
-        let diem_framework_dir = diem_framework::diem_stdlib_modules_full_path();
+        let diem_core_framework_dir = diem_framework::diem_core_modules_full_path();
+        let diem_payment_framework_dir = diem_framework::diem_payment_modules_full_path();
 
         // Make a copy of module.move with "{{sender}}" substituted.
         let module_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -131,7 +137,11 @@ impl AdminTest for ExecuteCustomModuleAndScript {
 
         let compiled_module = compile_program(
             unwrapped_module_path,
-            &[move_stdlib_dir.as_str(), diem_framework_dir.as_str()],
+            &[
+                move_stdlib_dir.as_str(),
+                diem_core_framework_dir.as_str(),
+                diem_payment_framework_dir.as_str(),
+            ],
         )?;
 
         let publish_txn = account1.sign_with_transaction_builder(
@@ -154,7 +164,8 @@ impl AdminTest for ExecuteCustomModuleAndScript {
             &[
                 unwrapped_module_path,
                 move_stdlib_dir.as_str(),
-                diem_framework_dir.as_str(),
+                diem_core_framework_dir.as_str(),
+                diem_payment_framework_dir.as_str(),
             ],
         )?;
 

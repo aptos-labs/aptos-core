@@ -49,7 +49,7 @@ COPY --from=builder /diem/target/release/diem-writeset-generator /usr/local/bin
 
 ### Get Move modules bytecodes for genesis ceremony
 RUN mkdir -p /diem/move
-COPY --from=builder /diem/language/diem-framework/releases/artifacts/current /diem/move
+COPY --from=builder /diem/language/diem-framework/DPN/releases/artifacts/current /diem/move
 
 ARG BUILD_DATE
 ARG GIT_REV

@@ -1,8 +1,9 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_framework::diem_framework_named_addresses;
+use diem_framework::{diem_core_modules_full_path, diem_framework_named_addresses};
 use log::LevelFilter;
+use move_stdlib::move_stdlib_modules_full_path;
 use std::{
     fs::{create_dir_all, remove_dir_all},
     path::Path,
@@ -14,8 +15,8 @@ pub fn generate_script_abis(output_path: &Path) {
     let options = move_prover::cli::Options {
         move_sources: crate::move_files(),
         move_deps: vec![
-            crate::move_stdlib_modules_full_path(),
-            crate::diem_framework_modules_full_path(),
+            move_stdlib_modules_full_path(),
+            diem_core_modules_full_path(),
             crate::custom_move_modules_full_path(),
         ],
         move_named_address_values: move_prover::cli::named_addresses_for_options(

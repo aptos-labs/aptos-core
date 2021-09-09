@@ -34,6 +34,6 @@ rand = "0.8.3"
 diemdb = { path = "../storage/diemdb", features = ["fuzzing"] }
 diem-temppath = { path = "../common/temppath" }
 diem-genesis-tool = {path = "../config/management/genesis", features = ["testing"] }
-diem-framework-releases = { path = "../language/diem-framework/releases" }
+diem-framework-releases = { path = "../language/diem-framework/DPN/releases" }
 diem-vm = { path = "../language/diem-vm" }
 executor = { path = "../execution/executor" }

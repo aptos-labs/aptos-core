@@ -21,7 +21,7 @@ compiler = { path = "../../language/compiler" }
 diem-config = { path = "../../config" }
 diem-events-fetcher = { path = "../../language/diem-tools/diem-events-fetcher" }
 diem-framework = { path = "../../language/diem-framework" }
-diem-framework-releases = { path = "../../language/diem-framework/releases" }
+diem-framework-releases = { path = "../../language/diem-framework/DPN/releases" }
 diem-sdk = { path = "../../sdk" }
 diem-temppath = { path = "../../common/temppath" }
 diem-transaction-replay = { path = "../../language/diem-tools/transaction-replay" }

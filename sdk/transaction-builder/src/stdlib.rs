@@ -1,1 +1,1 @@
-../../../language/diem-framework/releases/artifacts/current/transaction_script_builder.rs
+../../../language/diem-framework/DPN/releases/artifacts/current/transaction_script_builder.rs

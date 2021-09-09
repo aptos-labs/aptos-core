@@ -93,10 +93,10 @@ where
 }
 
 /// The documentation root template for the Diem Framework modules.
-const MODULE_DOC_TEMPLATE: &str = "modules/overview_template.md";
+const MODULE_DOC_TEMPLATE: &str = "core/overview_template.md";
 
 /// Path to the references template.
-const REFERENCES_DOC_TEMPLATE: &str = "modules/references_template.md";
+const REFERENCES_DOC_TEMPLATE: &str = "core/references_template.md";
 
 fn generate_module_docs(output_path: impl AsRef<Path>, with_diagram: bool) {
     let output_path = output_path.as_ref();
@@ -158,34 +158,35 @@ fn generate_script_docs(
                 .to_string(),
         ),
         &[
-            path_in_crate("modules/AccountAdministrationScripts.move")
+            path_in_crate("core/modules/AccountAdministrationScripts.move")
                 .to_str()
                 .unwrap()
                 .to_string(),
-            path_in_crate("modules/AccountCreationScripts.move")
+            path_in_crate("core/modules/AccountCreationScripts.move")
                 .to_str()
                 .unwrap()
                 .to_string(),
-            path_in_crate("modules/PaymentScripts.move")
+            path_in_crate("core/modules/PaymentScripts.move")
                 .to_str()
                 .unwrap()
                 .to_string(),
-            path_in_crate("modules/SystemAdministrationScripts.move")
+            path_in_crate("core/modules/SystemAdministrationScripts.move")
                 .to_str()
                 .unwrap()
                 .to_string(),
-            path_in_crate("modules/TreasuryComplianceScripts.move")
+            path_in_crate("core/modules/TreasuryComplianceScripts.move")
                 .to_str()
                 .unwrap()
                 .to_string(),
-            path_in_crate("modules/ValidatorAdministrationScripts.move")
+            path_in_crate("core/modules/ValidatorAdministrationScripts.move")
                 .to_str()
                 .unwrap()
                 .to_string(),
         ],
         vec![
             move_stdlib::move_stdlib_modules_full_path(),
-            crate::diem_stdlib_modules_full_path(),
+            crate::diem_core_modules_full_path(),
+            crate::diem_payment_modules_full_path(),
         ],
         with_diagram,
         diem_framework_named_addresses(),
@@ -203,7 +204,8 @@ fn generate_script_abis(
         move_sources: crate::diem_stdlib_files(),
         move_deps: vec![
             move_stdlib::move_stdlib_modules_full_path(),
-            crate::diem_stdlib_modules_full_path(),
+            crate::diem_core_modules_full_path(),
+            crate::diem_payment_modules_full_path(),
         ],
         verbosity_level: LevelFilter::Warn,
         move_named_address_values: move_prover::cli::named_addresses_for_options(
@@ -366,7 +368,7 @@ pub fn create_release(output_path: impl AsRef<Path>, options: &ReleaseOptions) {
     if options.script_abis {
         let script_abis_path = output_path.join("script_abis");
         run_step(msg("Generating script ABIs"), || {
-            generate_script_abis(&script_abis_path, &Path::new("releases/legacy/scripts"))
+            generate_script_abis(&script_abis_path, &Path::new("DPN/releases/legacy/scripts"))
         });
         if options.script_builder {
             run_step(msg("Generating Rust script builder"), || {
@@ -374,7 +376,7 @@ pub fn create_release(output_path: impl AsRef<Path>, options: &ReleaseOptions) {
                     &output_path.join("transaction_script_builder.rs"),
                     &[
                         script_abis_path,
-                        Path::new("releases/legacy/script_abis").into(),
+                        Path::new("DPN/releases/legacy/script_abis").into(),
                     ],
                 )
             });
@@ -404,7 +406,7 @@ pub fn sync_doc_files(output_path: &str) {
 
     sync(
         &Path::new(output_path).join("docs").join("modules"),
-        &Path::new("modules").join("doc"),
+        &Path::new("core").join("doc"),
     );
 
     sync(

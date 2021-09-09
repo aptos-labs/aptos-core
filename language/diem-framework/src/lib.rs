@@ -22,7 +22,8 @@ use std::{
 pub mod natives;
 pub mod release;
 
-const MODULES_DIR: &str = "modules";
+const CORE_MODULES_DIR: &str = "core/modules";
+const DPN_MODULES_DIR: &str = "DPN/modules";
 
 /// The output path under which compiled files will be put
 pub const COMPILED_OUTPUT_PATH: &str = "compiled";
@@ -36,13 +37,21 @@ where
     path
 }
 
-pub fn diem_stdlib_modules_full_path() -> String {
-    format!("{}/{}", env!("CARGO_MANIFEST_DIR"), MODULES_DIR)
+pub fn diem_core_modules_full_path() -> String {
+    format!("{}/{}", env!("CARGO_MANIFEST_DIR"), CORE_MODULES_DIR)
+}
+
+pub fn diem_payment_modules_full_path() -> String {
+    format!("{}/{}", env!("CARGO_MANIFEST_DIR"), DPN_MODULES_DIR)
 }
 
 pub fn diem_stdlib_files_no_dependencies() -> Vec<String> {
-    let path = path_in_crate(MODULES_DIR);
-    find_filenames(&[path], |p| extension_equals(p, MOVE_EXTENSION)).unwrap()
+    let diem_core_modules_path = path_in_crate(CORE_MODULES_DIR);
+    let diem_payment_modules_path = path_in_crate(DPN_MODULES_DIR);
+    find_filenames(&[diem_core_modules_path, diem_payment_modules_path], |p| {
+        extension_equals(p, MOVE_EXTENSION)
+    })
+    .unwrap()
 }
 
 pub fn diem_stdlib_files() -> Vec<String> {

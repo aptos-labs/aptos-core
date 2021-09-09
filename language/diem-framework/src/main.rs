@@ -75,7 +75,7 @@ fn main() {
 
     let output_path = matches
         .value_of("output")
-        .unwrap_or("releases/artifacts/current");
+        .unwrap_or("DPN/releases/artifacts/current");
 
     release::create_release(&Path::new(output_path), &options);
 
