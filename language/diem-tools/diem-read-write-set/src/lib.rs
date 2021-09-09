@@ -6,25 +6,41 @@ use diem_types::{
     account_config,
     transaction::{SignedTransaction, TransactionPayload},
 };
-use diem_vm::system_module_names::{SCRIPT_PROLOGUE_NAME, USER_EPILOGUE_NAME};
+use diem_vm::system_module_names::{
+    BLOCK_PROLOGUE, DIEM_BLOCK_MODULE, SCRIPT_PROLOGUE_NAME, USER_EPILOGUE_NAME,
+};
 use move_core_types::{
     ident_str,
-    identifier::IdentStr,
-    language_storage::{ResourceKey, StructTag},
+    identifier::{IdentStr, Identifier},
+    language_storage::{ModuleId, ResourceKey, StructTag},
     resolver::MoveResolver,
     value::{serialize_values, MoveValue},
 };
 use std::ops::Deref;
 
-pub struct ReadWriteSetAnalysis(read_write_set::ReadWriteSetAnalysis);
+pub struct ReadWriteSetAnalysis(read_write_set::normalize::NormalizedReadWriteSetAnalysis);
 
 const TRANSACTION_FEES_NAME: &IdentStr = ident_str!("TransactionFee");
+
+pub fn add_on_functions_list() -> Vec<(ModuleId, Identifier)> {
+    vec![
+        (DIEM_BLOCK_MODULE.clone(), BLOCK_PROLOGUE.to_owned()),
+        (
+            account_config::constants::ACCOUNT_MODULE.clone(),
+            SCRIPT_PROLOGUE_NAME.to_owned(),
+        ),
+        (
+            account_config::constants::ACCOUNT_MODULE.clone(),
+            USER_EPILOGUE_NAME.to_owned(),
+        ),
+    ]
+}
 
 impl ReadWriteSetAnalysis {
     /// Create a Diem transaction read/write set analysis from a generic Move module read/write set
     /// analysis
     pub fn new(rw: read_write_set::ReadWriteSetAnalysis) -> Self {
-        ReadWriteSetAnalysis(rw)
+        ReadWriteSetAnalysis(rw.normalize_all_scripts(add_on_functions_list()))
     }
 
     /// Returns an overapproximation of the `ResourceKey`'s in global storage that will be written
@@ -80,7 +96,7 @@ impl ReadWriteSetAnalysis {
                     blockchain_view,
                     is_write,
                 )?;
-                let epilogue_accesses = self.get_concretized_keys(
+                let mut epilogue_accesses = self.get_concretized_keys(
                     &account_config::constants::ACCOUNT_MODULE,
                     USER_EPILOGUE_NAME,
                     &signers,
@@ -104,7 +120,7 @@ impl ReadWriteSetAnalysis {
                     is_write,
                 )?;
                 // Hack: remove GasFees accesses from epilogue if gas_price is zero. This is sound
-                // to do as of Diem 1.3, but should be re-evaluated if the epilogue changes
+                // to do as of Diem 1.4, but should be re-evaluated if the epilogue changes
                 if tx.gas_unit_price() == 0 {
                     let tx_fees_tag = StructTag {
                         address: account_config::CORE_CODE_ADDRESS,
@@ -112,7 +128,7 @@ impl ReadWriteSetAnalysis {
                         name: TRANSACTION_FEES_NAME.to_owned(),
                         type_params: vec![gas_currency],
                     };
-                    script_accesses.retain(|r| r.type_() != &tx_fees_tag);
+                    epilogue_accesses.retain(|r| r.type_() != &tx_fees_tag);
                 }
                 // combine prologue, epilogue, and script accesses, then dedup and return result
                 script_accesses.extend(prologue_accesses);
@@ -131,7 +147,7 @@ impl ReadWriteSetAnalysis {
 }
 
 impl Deref for ReadWriteSetAnalysis {
-    type Target = read_write_set::ReadWriteSetAnalysis;
+    type Target = read_write_set::normalize::NormalizedReadWriteSetAnalysis;
 
     fn deref(&self) -> &Self::Target {
         &self.0
