@@ -91,6 +91,7 @@ members = [
     "language/move-ir/types",
     "language/move-lang",
     "language/move-lang/functional-tests",
+    "language/move-lang/transactional-tests",
     "language/move-model",
     "language/move-prover",
     "language/move-prover/abigen",

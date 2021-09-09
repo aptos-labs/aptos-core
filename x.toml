@@ -216,6 +216,7 @@ members = [
     "mirai-dataflow-analysis",
     "module-generation",
     "move-lang-functional-tests",
+    "move-lang-transactional-tests",
     "move-oncall-trainer",
     "move-prover-test-utils",
     "move-transactional-test-runner",

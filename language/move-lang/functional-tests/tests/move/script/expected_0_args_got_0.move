@@ -1,5 +1,0 @@
-//! args:
-
-script {
-fun main() {}
-}
