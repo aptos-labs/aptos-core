@@ -190,13 +190,11 @@ impl GitCli {
         let mut scratch_dir = self.root.join("target");
         scratch_dir.extend(&["x-scratch", "tree"]);
 
-        if scratch_dir.is_dir() {
+        if scratch_dir.is_dir() && self.is_git_repo(&scratch_dir)? {
             debug!(
                 "Using existing scratch worktree at {}",
                 scratch_dir.display()
             );
-
-            // TODO: check if the directory is actually a Git worktree.
 
             // Check out the given hash in the scratch worktree.
             let output = self
@@ -213,6 +211,11 @@ impl GitCli {
                 });
             }
         } else {
+            if scratch_dir.is_dir() {
+                std::fs::remove_dir_all(&scratch_dir)
+                    .map_err(|err| SystemError::io("cleaning old scratch_dir", err))?;
+            }
+
             // Try creating a scratch worktree at that location.
             info!("Setting up scratch worktree in {}", scratch_dir.display());
             let output = self
@@ -233,6 +236,17 @@ impl GitCli {
         // TODO: some sort of cross-process locking may be necessary in the future. Don't worry
         // about it for now.
         Ok(scratch_dir)
+    }
+
+    pub fn is_git_repo(&self, dir: &Path) -> Result<bool> {
+        let output = self
+            .git_command()
+            .current_dir(dir)
+            .args(&["rev-parse", "--git-dir"])
+            .output()
+            .map_err(|err| SystemError::io("checking if a directory is a git repo", err))?;
+
+        Ok(output.status.success())
     }
 }
 
