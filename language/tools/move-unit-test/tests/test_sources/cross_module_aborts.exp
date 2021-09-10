@@ -8,7 +8,7 @@ Failures in 0x1::B:
 
 ┌── failing_test ──────
 │ error[E11001]: test failure
-│   ┌─ tests/test_sources/cross_module_aborts.move:5:9
+│   ┌─ cross_module_aborts.move:5:9
 │   │
 │ 4 │     public fun this_aborts() {
 │   │                ----------- In this function in 0x1::M

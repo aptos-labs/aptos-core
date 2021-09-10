@@ -49,7 +49,6 @@ pub struct FunctionSourceMap {
 
     pub parameters: Vec<SourceName>,
 
-    // pub parameters: Vec<SourceName<Location>>,
     /// The index into the vector is the locals index. The corresponding `(Identifier, Location)` tuple
     /// is the name and location of the local.
     pub locals: Vec<SourceName>,
@@ -60,6 +59,9 @@ pub struct FunctionSourceMap {
 
     /// The source location map for the function body.
     pub code_map: BTreeMap<CodeOffset, Loc>,
+
+    /// Whether this function is a native function or not.
+    pub is_native: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -126,13 +128,14 @@ impl StructSourceMap {
 }
 
 impl FunctionSourceMap {
-    pub fn new(decl_location: Loc) -> Self {
+    pub fn new(decl_location: Loc, is_native: bool) -> Self {
         Self {
             decl_location,
             type_parameters: Vec::new(),
             parameters: Vec::new(),
             locals: Vec::new(),
             code_map: BTreeMap::new(),
+            is_native,
             nops: BTreeMap::new(),
         }
     }
@@ -180,10 +183,21 @@ impl FunctionSourceMap {
     /// offset by performing a range query for the largest number less than or equal to the code
     /// offset passed in.
     pub fn get_code_location(&self, code_offset: CodeOffset) -> Option<Loc> {
-        self.code_map
-            .range((Bound::Unbounded, Bound::Included(&code_offset)))
-            .next_back()
-            .map(|(_, vl)| *vl)
+        // If the function is a native, and we are asking for the "first bytecode offset in it"
+        // return the location of the declaration of the function. Otherwise, we will return
+        // `None`.
+        if self.is_native {
+            if code_offset == 0 {
+                Some(self.decl_location)
+            } else {
+                None
+            }
+        } else {
+            self.code_map
+                .range((Bound::Unbounded, Bound::Included(&code_offset)))
+                .next_back()
+                .map(|(_, vl)| *vl)
+        }
     }
 
     pub fn get_parameter_or_local_name(&self, idx: u64) -> Option<SourceName> {
@@ -259,8 +273,9 @@ impl SourceMap {
         &mut self,
         fdef_idx: FunctionDefinitionIndex,
         location: Loc,
+        is_native: bool,
     ) -> Result<()> {
-        self.function_map.insert(fdef_idx.0, FunctionSourceMap::new(location)).map_or(Ok(()), |_| { Err(format_err!(
+        self.function_map.insert(fdef_idx.0, FunctionSourceMap::new(location, is_native)).map_or(Ok(()), |_| { Err(format_err!(
                     "Multiple functions at same function definition index encountered when constructing source map"
                 )) })
     }
@@ -477,6 +492,7 @@ impl SourceMap {
             empty_source_map.add_top_level_function_mapping(
                 FunctionDefinitionIndex(function_idx as TableIndex),
                 default_loc,
+                false,
             )?;
             empty_source_map
                 .function_map

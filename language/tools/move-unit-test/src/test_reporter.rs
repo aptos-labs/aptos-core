@@ -231,7 +231,7 @@ impl TestFailure {
                             .source_map
                             .get_function_source_map(*fdef_idx)
                             .ok()?;
-                        let loc = function_source_map.get_code_location(*offset)?;
+                        let loc = function_source_map.get_code_location(*offset).unwrap();
                         let msg = format!("In this function in {}", format_module_id(module_id));
                         // TODO(tzakian) maybe migrate off of move-langs diagnostics?
                         Some(Diagnostic::new(

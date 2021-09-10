@@ -3,6 +3,7 @@
 
 use move_command_line_common::testing::{format_diff, read_env_update_baseline, EXP_EXT};
 use move_unit_test::{self, UnitTestingConfig};
+use regex::RegexBuilder;
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -86,21 +87,27 @@ fn run_test_impl(path: &Path) -> anyhow::Result<()> {
             .collect(),
     };
 
+    let regex = RegexBuilder::new(r"(┌─ ).+/([^/]+)$")
+        .multi_line(true)
+        .build()
+        .unwrap();
+
     for ((buffer, _), exp_path) in run_test_with_modifiers(unit_test_config, path)? {
+        let base_output = String::from_utf8(buffer)?;
+        let cleaned_output = regex.replacen(&base_output, 0, r"$1$2");
         if update_baseline {
-            fs::write(&exp_path, &buffer)?
+            fs::write(&exp_path, &*cleaned_output)?
         }
 
         let exp_exists = exp_path.is_file();
 
         if exp_exists {
             let expected = fs::read_to_string(&exp_path)?;
-            let output = String::from_utf8(buffer)?;
-            if expected != output {
+            if expected != cleaned_output {
                 anyhow::bail!(
                     "Expected outputs differ for {:?}:\n{}",
                     exp_path,
-                    format_diff(expected, output)
+                    format_diff(expected, cleaned_output)
                 );
             }
         } else {

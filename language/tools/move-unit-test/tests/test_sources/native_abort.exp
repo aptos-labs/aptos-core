@@ -1,0 +1,37 @@
+Running Move unit tests
+[ PASS    ] 0x1::A::native_abort_good_right_code
+[ FAIL    ] 0x1::A::native_abort_good_wrong_code
+[ FAIL    ] 0x1::A::native_abort_unexpected_abort
+
+Test failures:
+
+Failures in 0x1::A:
+
+┌── native_abort_good_wrong_code ──────
+│ error[E11001]: test failure
+│    ┌─ Vector.move:24:23
+│    │
+│ 24 │     native public fun borrow<Element>(v: &vector<Element>, i: u64): &Element;
+│    │                       ^^^^^^
+│    │                       │
+│    │                       Test did not abort with expected code. Expected test to abort with 0 but instead it aborted with 1 here
+│    │                       In this function in 0x1::Vector
+│ 
+│ 
+└──────────────────
+
+
+┌── native_abort_unexpected_abort ──────
+│ error[E11001]: test failure
+│    ┌─ Vector.move:24:23
+│    │
+│ 24 │     native public fun borrow<Element>(v: &vector<Element>, i: u64): &Element;
+│    │                       ^^^^^^
+│    │                       │
+│    │                       Test was not expected to abort but it aborted with 1 here
+│    │                       In this function in 0x1::Vector
+│ 
+│ 
+└──────────────────
+
+Test result: FAILED. Total tests: 3; passed: 1; failed: 2

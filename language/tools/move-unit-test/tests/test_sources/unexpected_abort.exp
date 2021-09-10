@@ -11,7 +11,7 @@ Failures in 0x1::M:
 
 ┌── unexpected_abort ──────
 │ error[E11001]: test failure
-│   ┌─ tests/test_sources/unexpected_abort.move:5:9
+│   ┌─ unexpected_abort.move:5:9
 │   │
 │ 4 │     public fun unexpected_abort() {
 │   │                ---------------- In this function in 0x1::M
@@ -24,7 +24,7 @@ Failures in 0x1::M:
 
 ┌── unexpected_abort_in_other_function ──────
 │ error[E11001]: test failure
-│    ┌─ tests/test_sources/unexpected_abort.move:28:9
+│    ┌─ unexpected_abort.move:28:9
 │    │
 │ 27 │     fun abort_in_other_function() {
 │    │         ----------------------- In this function in 0x1::M
@@ -37,7 +37,7 @@ Failures in 0x1::M:
 
 ┌── wrong_abort_code ──────
 │ error[E11001]: test failure
-│    ┌─ tests/test_sources/unexpected_abort.move:11:9
+│    ┌─ unexpected_abort.move:11:9
 │    │
 │ 10 │     public fun wrong_abort_code() {
 │    │                ---------------- In this function in 0x1::M

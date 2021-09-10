@@ -54,11 +54,12 @@ macro_rules! record_src_loc {
             )?;
         }
     };
-    (function_decl: $context:expr, $location:expr, $function_index:expr) => {{
+    (function_decl: $context:expr, $location:expr, $function_index:expr, $is_native:expr) => {{
         $context.set_function_index($function_index as TableIndex);
         $context.source_map.add_top_level_function_mapping(
             $context.current_function_definition_index(),
             $location,
+            $is_native,
         )?;
     }};
     (struct_type_formals: $context:expr, $var:expr) => {
@@ -290,7 +291,12 @@ pub fn compile_script<'a>(
     let sig = function_signature(&mut context, &function.value.signature)?;
     let parameters_sig_idx = context.signature_index(Signature(sig.parameters))?;
 
-    record_src_loc!(function_decl: context, function.loc, 0);
+    record_src_loc!(
+        function_decl: context,
+        function.loc,
+        0,
+        matches!(function.value.body, FunctionBody::Native)
+    );
     record_src_loc!(
         function_type_formals: context,
         &function.value.signature.type_formals
@@ -759,7 +765,12 @@ fn compile_function(
     ast_function: Function,
     function_index: usize,
 ) -> Result<FunctionDefinition> {
-    record_src_loc!(function_decl: context, ast_function.loc, function_index);
+    record_src_loc!(
+        function_decl: context,
+        ast_function.loc,
+        function_index,
+        matches!(ast_function.value.body, FunctionBody::Native)
+    );
     record_src_loc!(
         function_type_formals: context,
         &ast_function.value.signature.type_formals

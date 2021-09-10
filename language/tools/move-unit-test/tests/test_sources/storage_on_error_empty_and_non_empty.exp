@@ -11,7 +11,7 @@ Failures in 0x1::A:
 
 ┌── x ──────
 │ error[E11001]: test failure
-│   ┌─ tests/test_sources/storage_on_error_empty_and_non_empty.move:6:9
+│   ┌─ storage_on_error_empty_and_non_empty.move:6:9
 │   │
 │ 5 │     fun x() {
 │   │         - In this function in 0x1::A
@@ -24,7 +24,7 @@ Failures in 0x1::A:
 
 ┌── y ──────
 │ error[E11001]: test failure
-│    ┌─ tests/test_sources/storage_on_error_empty_and_non_empty.move:12:9
+│    ┌─ storage_on_error_empty_and_non_empty.move:12:9
 │    │
 │ 10 │     fun y(a: signer) {
 │    │         - In this function in 0x1::A

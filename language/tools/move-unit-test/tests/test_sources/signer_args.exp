@@ -17,7 +17,7 @@ Failures in 0x1::M:
 
 ┌── single_signer_fail ──────
 │ error[E11001]: test failure
-│   ┌─ tests/test_sources/signer_args.move:9:9
+│   ┌─ signer_args.move:9:9
 │   │
 │ 8 │     fun single_signer_fail(_a: signer) {
 │   │         ------------------ In this function in 0x1::M

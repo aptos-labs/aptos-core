@@ -9,7 +9,7 @@ Failures in 0x1::M:
 
 ┌── test_doesnt_exist ──────
 │ error[E11001]: test failure
-│    ┌─ tests/test_sources/native_signer_creation.move:47:9
+│    ┌─ native_signer_creation.move:47:9
 │    │
 │ 36 │     fun test_doesnt_exist() {
 │    │         ----------------- In this function in 0x1::M

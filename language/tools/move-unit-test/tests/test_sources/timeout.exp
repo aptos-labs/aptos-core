@@ -11,7 +11,7 @@ Failures in 0x1::M:
 
 ┌── no_timeout_fail ──────
 │ error[E11001]: test failure
-│    ┌─ tests/test_sources/timeout.move:18:29
+│    ┌─ timeout.move:18:29
 │    │
 │ 18 │     fun no_timeout_fail() { abort 0 }
 │    │         ---------------     ^^^^^^^ Test was not expected to abort but it aborted with 0 here
