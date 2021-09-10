@@ -186,6 +186,8 @@ members = [
     "testsuite/testcases",
     "types",
     "vm-validator",
+    "api",
+    "api/types",
 ]
 
 # NOTE: default-members is the complete list of binaries that form the "production Diem codebase". These members should
