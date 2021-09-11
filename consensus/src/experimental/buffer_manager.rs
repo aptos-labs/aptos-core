@@ -1,33 +1,41 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    experimental::{
-        buffer_item::BufferItem,
-        execution_phase::{ExecutionRequest, ExecutionResponse},
-        linkedlist::{get_elem, get_next, link_eq, set_elem, take_elem, Link, List},
-        persisting_phase::{PersistingRequest, PersistingResponse},
-        signing_phase::{SigningRequest, SigningResponse},
-    },
-    network::NetworkSender,
-    round_manager::VerifiedEvent,
-    state_replication::StateComputerCommitCallBackType,
-};
-use consensus_types::{common::Author, executed_block::ExecutedBlock};
-use diem_types::{
-    account_address::AccountAddress,
-    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    validator_verifier::ValidatorVerifier,
-};
+use std::sync::Arc;
+
 use futures::{
     channel::{
         mpsc::{UnboundedReceiver, UnboundedSender},
         oneshot,
     },
+    executor::block_on,
     SinkExt,
 };
 
+use consensus_types::{common::Author, executed_block::ExecutedBlock};
+use diem_crypto::ed25519::Ed25519Signature;
+use diem_types::{
+    account_address::AccountAddress,
+    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    validator_verifier::ValidatorVerifier,
+};
+
+use crate::{
+    experimental::{
+        buffer_item::BufferItem,
+        execution_phase::{ExecutionRequest, ExecutionResponse},
+        linkedlist::{get_elem, get_elem_mut, get_next, link_eq, set_elem, take_elem, Link, List},
+        persisting_phase::{PersistingRequest, PersistingResponse},
+        signing_phase::{SigningRequest, SigningResponse},
+    },
+    network::NetworkSender,
+    network_interface::ConsensusMsg,
+    round_manager::VerifiedEvent,
+    state_replication::StateComputerCommitCallBackType,
+};
+
 pub type SyncAck = ();
+
 pub fn sync_ack_new() -> SyncAck {}
 
 pub struct SyncRequest {
@@ -54,6 +62,7 @@ pub struct StateManager {
 
     buffer: List<BufferItem>,
 
+    // the roots point to the first *unprocessed* item.
     execution_root: BufferItemRootType,
     execution_phase_tx: Sender<ExecutionRequest>,
     execution_phase_rx: Receiver<ExecutionResponse>,
@@ -62,7 +71,6 @@ pub struct StateManager {
     signing_phase_tx: Sender<SigningRequest>,
     signing_phase_rx: Receiver<SigningResponse>,
 
-    aggregation_root: BufferItemRootType,
     commit_msg_tx: NetworkSender,
     commit_msg_rx: channel::diem_channel::Receiver<AccountAddress, VerifiedEvent>,
 
@@ -96,7 +104,6 @@ impl StateManager {
         // point the roots to the head
         let execution_root = buffer.head.as_ref().cloned();
         let signing_root = buffer.head.as_ref().cloned();
-        let aggregation_root = buffer.head.as_ref().cloned();
 
         Self {
             author,
@@ -111,7 +118,6 @@ impl StateManager {
             signing_phase_tx,
             signing_phase_rx,
 
-            aggregation_root,
             commit_msg_tx,
             commit_msg_rx,
 
@@ -143,11 +149,85 @@ impl StateManager {
             callback,
         ));
 
+        // when all the previous items are processed..
+        if self.execution_root.is_none() {
+            self.execution_root = self.buffer.tail.clone();
+        }
+        if self.signing_root.is_none() {
+            self.signing_root = self.buffer.tail.clone();
+        }
+
         // send blocks to execution phase
         self.execution_phase_tx
             .send(ExecutionRequest { ordered_blocks })
             .await?;
         Ok(())
+    }
+
+    fn try_advance_executed_root(&mut self) {
+        let mut cursor = self.execution_root.clone();
+        while cursor.is_some() {
+            {
+                let buffer_item = get_elem(&cursor);
+                if !matches!(&*buffer_item, BufferItem::Executed(_)) {
+                    break;
+                }
+            }
+            cursor = get_next(&cursor);
+        }
+        self.execution_root = cursor;
+    }
+
+    fn try_advance_signing_root(&mut self) {
+        let mut cursor = self.signing_root.clone();
+        while cursor.is_some() {
+            {
+                let buffer_item = get_elem(&cursor);
+                if !matches!(
+                    &*buffer_item,
+                    BufferItem::Signed(_) | BufferItem::Aggregated(_)
+                ) {
+                    break;
+                }
+            }
+            cursor = get_next(&cursor);
+        }
+        self.signing_root = cursor;
+    }
+
+    fn try_persisting_blocks(&mut self) {
+        let mut cursor = self.buffer.head.as_ref().cloned();
+        while cursor.is_some() {
+            let buffer_item = take_elem(&cursor);
+            if let BufferItem::Aggregated(aggregated) = buffer_item {
+                let blocks: Vec<Arc<ExecutedBlock>> = aggregated
+                    .executed_blocks
+                    .into_iter()
+                    .map(Arc::new)
+                    .collect();
+                // send to persisting phase
+                block_on(self.persisting_phase_tx.send(PersistingRequest {
+                    blocks,
+                    commit_ledger_info: aggregated.aggregated_proof,
+                    callback: aggregated.callback,
+                }))
+                .ok();
+                cursor = get_next(&cursor);
+                self.buffer.pop_front();
+            } else {
+                // we put the item back
+                set_elem(&cursor, buffer_item);
+                break;
+            }
+        }
+    }
+
+    fn reset_all_roots(&mut self) {
+        // reset all the roots (in a better way)
+        self.signing_root = self.buffer.head.clone();
+        self.try_advance_signing_root();
+        self.execution_root = self.signing_root.clone();
+        self.try_advance_executed_root();
     }
 
     async fn process_sync_req(&mut self, sync_event: SyncRequest) -> anyhow::Result<()> {
@@ -172,9 +252,7 @@ impl StateManager {
             }
 
             // reset roots
-            self.execution_root = self.buffer.head.as_ref().cloned();
-            self.signing_root = self.buffer.head.as_ref().cloned();
-            self.aggregation_root = self.buffer.head.as_ref().cloned();
+            self.reset_all_roots();
         }
 
         // ack reset
@@ -193,14 +271,17 @@ impl StateManager {
             return Ok(());
         }
 
-        let current_cursor = get_next(&self.execution_root);
+        let current_cursor = self.execution_root.clone();
 
         if current_cursor.is_some() {
             // update buffer
             let buffer_item = take_elem(&current_cursor);
             if let BufferItem::Ordered(ordered_box) = &buffer_item {
-                if ordered_box.ordered_blocks.first().unwrap().id()
-                    != executed_blocks.first().unwrap().id()
+                // the block batch in the response might be a single large batch due
+                // to a previous re-try, so we compare the id of the last blocks of the
+                // two batches.
+                if ordered_box.ordered_blocks.last().unwrap().id()
+                    != executed_blocks.last().unwrap().id()
                 {
                     // an sync req happened before the response
                     // we do nothing except putting the item back
@@ -225,11 +306,17 @@ impl StateManager {
                     })
                     .await?;
 
+                // it is possible that executed_blocks is a large batch from a retry.
+                // ordered_box.ordered_blocks should always be a suffix of executed_blocks.
+                let trimmed_executed_blocks = executed_blocks
+                    [executed_blocks.len() - ordered_box.ordered_blocks.len()..]
+                    .to_vec();
+
                 set_elem(
                     &current_cursor,
-                    buffer_item.advance_to_executed(executed_blocks),
+                    buffer_item.advance_to_executed(trimmed_executed_blocks),
                 );
-                self.execution_root = current_cursor;
+                self.execution_root = get_next(&current_cursor);
             } else {
                 // even if there is a sync happened before the response
                 // the buffer item right after execution root should be an ordered buffer item
@@ -251,21 +338,12 @@ impl StateManager {
         let ExecutionResponse { inner } = execution_resp;
 
         if let Ok(executed_blocks) = inner {
-            let res = self
-                .process_successful_execution_response(executed_blocks)
-                .await;
-            // try the next item (even if sending to signing phase failed)
-            let cursor = get_next(&self.execution_root);
-            let buffer_item = get_elem(&cursor);
-            self.execution_phase_tx
-                .send(ExecutionRequest {
-                    ordered_blocks: buffer_item.get_blocks().clone(),
-                })
-                .await?;
-            res
+            self.process_successful_execution_response(executed_blocks)
+                .await
+            // we try the next one only when the last req failed
         } else {
             // it might be possible that the buffer is already reset
-            // in which case we are retrying an irrelevant large batch
+            // in which case we are iterating an irrelevant large batch
             // this is ok as blocks can be executed more than once
             let mut cursor = self.buffer.head.clone();
             let mut ordered_blocks: Vec<ExecutedBlock> = vec![];
@@ -274,6 +352,11 @@ impl StateManager {
                 if link_eq(&cursor, &self.execution_root) {
                     // there must be a successor since the last execution failed
                     cursor = get_next(&cursor);
+                    if cursor.is_none() {
+                        // at this moment we are certain that a reset has happened
+                        // so we do not need to retry the batch
+                        break;
+                    }
                     ordered_blocks.extend(get_elem(&cursor).get_blocks().clone());
                     // retry execution with the larger batch
                     // send blocks to execution phase
@@ -288,6 +371,135 @@ impl StateManager {
             // in which case we do nothing
             Ok(())
         }
+    }
+
+    async fn process_successful_signing_resp(
+        &mut self,
+        sig: Ed25519Signature,
+        commit_ledger_info: LedgerInfo,
+    ) -> anyhow::Result<()> {
+        let mut current_cursor = self.signing_root.clone();
+        if current_cursor.is_some() {
+            // this is important because the responses might not come in order because
+            // retrying a failed signature and finishing execution will incur requests
+            // to signing phase
+            while current_cursor.is_some() {
+                // update signature
+                let buffer_item = take_elem(&current_cursor);
+                if !buffer_item.has_been_executed() {
+                    // a reset has happened
+                    // we do nothing except put it back
+                    set_elem(&current_cursor, buffer_item);
+                    break;
+                }
+
+                if buffer_item.get_commit_info() == commit_ledger_info.commit_info() {
+                    // it is possible that we already signed this buffer item (double check after the final integration)
+                    if matches!(buffer_item, BufferItem::Executed(_)) {
+                        // we have found the buffer item
+                        let (signed_buffer_item, commit_vote) =
+                            buffer_item.advance_to_signed(self.author, sig.clone(), &self.verifier);
+
+                        set_elem(&current_cursor, signed_buffer_item);
+
+                        // send out commit vote
+                        self.commit_msg_tx
+                            .broadcast(ConsensusMsg::CommitVoteMsg(Box::new(commit_vote)))
+                            .await;
+
+                        self.try_advance_signing_root();
+                    }
+                    break;
+                }
+                current_cursor = get_next(&current_cursor);
+            }
+        }
+        // otherwise, a reset happened, we do nothing
+        Ok(())
+    }
+
+    async fn process_signing_response(
+        &mut self,
+        signing_resp: SigningResponse,
+    ) -> anyhow::Result<()> {
+        let SigningResponse {
+            signature_result,
+            commit_ledger_info,
+        } = signing_resp;
+        if let Ok(sig) = signature_result {
+            self.process_successful_signing_resp(sig, commit_ledger_info)
+                .await
+        } else {
+            // try next signature if signing failure
+            // note that we are not retrying exactly the failed sig
+            // the failed sig will be re-tried in the future, unless a reset happens
+
+            /*
+            Signing root points to the first unprocessed item.
+            But there might be Signed item scattered after the signing root.
+            Below situation is possible:
+
+            [Signed] -> [Signed] -> [Executed] -> [Signed] -> [Executed] -> [Signed] -> [Executed] ...
+            And the signing root points to the third item.
+            The failure could be related to the 5-th item.
+
+            This might happen because signing phase might not see the items in order
+            (success execution response and failed signing response will both push
+            an item to signing phase)
+             */
+
+            let current_cursor = self.signing_root.clone();
+            if current_cursor.is_some() {
+                let buffer_item = get_elem(&current_cursor);
+                if let BufferItem::Executed(executed) = &(*buffer_item) {
+                    self.signing_phase_tx
+                        .send(SigningRequest {
+                            ordered_ledger_info: executed.ordered_proof.clone(),
+                            commit_ledger_info: executed.generate_commit_ledger_info(),
+                        })
+                        .await?;
+                }
+            }
+            Ok(())
+        }
+    }
+
+    async fn process_commit_msg(&mut self, commit_msg: VerifiedEvent) -> anyhow::Result<()> {
+        match commit_msg {
+            VerifiedEvent::CommitVote(cv) => {
+                // travel the whole buffer (including ordered items)
+                let mut current_cursor = self.buffer.head.clone();
+                while current_cursor.is_some() {
+                    {
+                        let mut buffer_item = get_elem_mut(&current_cursor);
+                        if buffer_item
+                            .add_signature_if_matched(
+                                cv.commit_info(),
+                                cv.author(),
+                                cv.signature().clone(),
+                            )
+                            .is_ok()
+                        {
+                            // try advance to aggregated
+                            let taken_buffer_item = take_elem(&current_cursor);
+                            let (new_buffer_item, success) =
+                                taken_buffer_item.try_advance_to_aggregated(&self.verifier);
+                            set_elem(&current_cursor, new_buffer_item);
+                            // if successfully advanced to an aggregated item
+                            if success {
+                                self.try_persisting_blocks();
+                            }
+                            break;
+                        }
+                    }
+                    current_cursor = get_next(&current_cursor);
+                }
+            }
+            _ => {
+                unreachable!();
+            }
+        }
+        Ok(())
     }
 
     async fn start(self) {

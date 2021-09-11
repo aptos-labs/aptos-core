@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    experimental::pipeline_phase::{ResponseWithInstruction, StatelessPipeline},
+    experimental::pipeline_phase::{Instruction, ResponseWithInstruction, StatelessPipeline},
     state_replication::StateComputer,
 };
 use anyhow::Result;
@@ -67,8 +67,15 @@ impl StatelessPipeline for ExecutionPhase {
             })
             .collect::<Result<Vec<ExecutedBlock>, ExecutionError>>();
 
-        // TODO: empty the request channel non-blockingly as they will also fail
+        let instruction = if resp_inner.is_ok() {
+            Instruction::Ok
+        } else {
+            Instruction::Clear
+        };
 
-        ResponseWithInstruction::from(ExecutionResponse { inner: resp_inner })
+        ResponseWithInstruction {
+            resp: ExecutionResponse { inner: resp_inner },
+            instruction,
+        }
     }
 }
