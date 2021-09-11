@@ -5452,7 +5452,7 @@ dependencies = [
 [[package]]
 name = "nextest-runner"
 version = "0.1.0"
-source = "git+https://github.com/diem/diem-devtools?rev=1bdcf1b214119a6377fc0a8c3cf2de2ea5d8b27b#1bdcf1b214119a6377fc0a8c3cf2de2ea5d8b27b"
+source = "git+https://github.com/diem/diem-devtools?rev=878ad31ea3268e7496e6e2406329fbd005685a9e#878ad31ea3268e7496e6e2406329fbd005685a9e"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -6320,7 +6320,7 @@ checksum = "3ac73b1112776fc109b2e61909bc46c7e1bf0d7f690ffb1676553acce16d5cda"
 [[package]]
 name = "quick-junit"
 version = "0.1.0"
-source = "git+https://github.com/diem/diem-devtools?rev=1bdcf1b214119a6377fc0a8c3cf2de2ea5d8b27b#1bdcf1b214119a6377fc0a8c3cf2de2ea5d8b27b"
+source = "git+https://github.com/diem/diem-devtools?rev=878ad31ea3268e7496e6e2406329fbd005685a9e#878ad31ea3268e7496e6e2406329fbd005685a9e"
 dependencies = [
  "chrono",
  "indexmap",
@@ -6471,9 +6471,9 @@ dependencies = [
 
 [[package]]
 name = "rayon"
-version = "1.5.0"
+version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b0d8e0819fadc20c74ea8373106ead0600e3a67ef1fe8da56e39b9ae7275674"
+checksum = "c06aca804d41dbc8ba42dfd964f0d01334eceb64314b9ecf7c5fad5188a06d90"
 dependencies = [
  "autocfg",
  "crossbeam-deque",
@@ -6483,9 +6483,9 @@ dependencies = [
 
 [[package]]
 name = "rayon-core"
-version = "1.9.0"
+version = "1.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9ab346ac5921dc62ffa9f89b7a773907511cdfa5490c572ae9be1be33e8afa4a"
+checksum = "d78120e2c850279833f1dd3582f730c4ab53ed95aeaaaa862a2a5c71b1656d8e"
 dependencies = [
  "crossbeam-channel",
  "crossbeam-deque",
