@@ -44,21 +44,12 @@ pub fn default_pipeline_with_options(options: &ProverOptions) -> FunctionTargetP
         DataInvariantInstrumentationProcessor::new(),
         GlobalInvariantAnalysisProcessor::new(),
         GlobalInvariantInstrumentationProcessor::new(),
+        MonoAnalysisProcessor::new(),
     ];
 
     if options.mutation {
         // pass which may do nothing
         processors.push(MutationTester::new());
-    }
-
-    // run monomorphization when the backend does not have mono support.else
-    //
-    // TODO: not running the MonoAnalysisProcessor does not break the
-    // transformation pipeline but will output a bpl file that is uncompilable
-    // in Boogie. Solving this issue will require some deep understanding of
-    // the mono backend on both sides, which we defer to a later stage.
-    if !options.boogie_poly {
-        processors.push(MonoAnalysisProcessor::new());
     }
 
     // inconsistency check instrumentation should be the last one in the pipeline
