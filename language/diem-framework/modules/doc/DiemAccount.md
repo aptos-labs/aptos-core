@@ -64,6 +64,7 @@ before and after every transaction.
 -  [Function `module_prologue`](#0x1_DiemAccount_module_prologue)
 -  [Function `script_prologue`](#0x1_DiemAccount_script_prologue)
 -  [Function `writeset_prologue`](#0x1_DiemAccount_writeset_prologue)
+-  [Function `check_secondary_signers`](#0x1_DiemAccount_check_secondary_signers)
 -  [Function `multi_agent_script_prologue`](#0x1_DiemAccount_multi_agent_script_prologue)
 -  [Function `prologue_common`](#0x1_DiemAccount_prologue_common)
 -  [Function `epilogue`](#0x1_DiemAccount_epilogue)
@@ -4065,6 +4066,103 @@ Covered: L146 (Match 0)
 
 </details>
 
+<a name="0x1_DiemAccount_check_secondary_signers"></a>
+
+## Function `check_secondary_signers`
+
+
+
+<pre><code><b>fun</b> <a href="DiemAccount.md#0x1_DiemAccount_check_secondary_signers">check_secondary_signers</a>(secondary_signer_addresses: vector&lt;address&gt;, secondary_signer_public_key_hashes: vector&lt;vector&lt;u8&gt;&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="DiemAccount.md#0x1_DiemAccount_check_secondary_signers">check_secondary_signers</a>(
+    secondary_signer_addresses: vector&lt;address&gt;,
+    secondary_signer_public_key_hashes: vector&lt;vector&lt;u8&gt;&gt;,
+) <b>acquires</b> <a href="DiemAccount.md#0x1_DiemAccount">DiemAccount</a> {
+    <b>let</b> num_secondary_signers = <a href="../../../../../../move-stdlib/docs/Vector.md#0x1_Vector_length">Vector::length</a>(&secondary_signer_addresses);
+
+    // Number of <b>public</b> key hashes must match the number of secondary signers.
+    <b>assert</b>(
+        <a href="../../../../../../move-stdlib/docs/Vector.md#0x1_Vector_length">Vector::length</a>(&secondary_signer_public_key_hashes) == num_secondary_signers,
+        <a href="../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="DiemAccount.md#0x1_DiemAccount_PROLOGUE_ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH">PROLOGUE_ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH</a>),
+    );
+
+    // Check validity of the secondary signers' addresses and <b>public</b> keys
+    <b>let</b> i = 0;
+    <b>while</b> ({
+        <b>spec</b> {
+            <b>invariant</b> <b>forall</b> j in 0..i: <a href="DiemAccount.md#0x1_DiemAccount_exists_at">exists_at</a>(secondary_signer_addresses[j]);
+            <b>invariant</b> <b>forall</b> j in 0..i: secondary_signer_public_key_hashes[j]
+                == <b>global</b>&lt;<a href="DiemAccount.md#0x1_DiemAccount">DiemAccount</a>&gt;(secondary_signer_addresses[j]).authentication_key;
+        };
+        (i &lt; num_secondary_signers)
+    })
+    {
+        // Check that all secondary signers have accounts.
+        <b>let</b> secondary_address = *<a href="../../../../../../move-stdlib/docs/Vector.md#0x1_Vector_borrow">Vector::borrow</a>(&secondary_signer_addresses, i);
+        <b>assert</b>(<a href="DiemAccount.md#0x1_DiemAccount_exists_at">exists_at</a>(secondary_address), <a href="../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="DiemAccount.md#0x1_DiemAccount_PROLOGUE_EACCOUNT_DNE">PROLOGUE_EACCOUNT_DNE</a>));
+
+        // Check that for each secondary signer, the provided <b>public</b> key hash is equal <b>to</b> the
+        // authentication key stored on-chain.
+        <b>let</b> signer_account = borrow_global&lt;<a href="DiemAccount.md#0x1_DiemAccount">DiemAccount</a>&gt;(secondary_address);
+        <b>let</b> signer_public_key_hash = *<a href="../../../../../../move-stdlib/docs/Vector.md#0x1_Vector_borrow">Vector::borrow</a>(&secondary_signer_public_key_hashes, i);
+        <b>assert</b>(
+            signer_public_key_hash == *&signer_account.authentication_key,
+            <a href="../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="DiemAccount.md#0x1_DiemAccount_PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY">PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY</a>),
+        );
+        i = i + 1;
+    };
+}
+</code></pre>
+
+
+
+</details>
+
+<details>
+<summary>Specification</summary>
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>ensures</b> [concrete] <b>true</b>;
+<b>include</b> <a href="DiemAccount.md#0x1_DiemAccount_CheckSecondarySignersAbortsIf">CheckSecondarySignersAbortsIf</a>;
+<b>let</b> num_secondary_signers = len(secondary_signer_addresses);
+<b>ensures</b> <b>forall</b> j in 0..num_secondary_signers: <a href="DiemAccount.md#0x1_DiemAccount_exists_at">exists_at</a>(secondary_signer_addresses[j]);
+<b>ensures</b> <b>forall</b> j in 0..num_secondary_signers: secondary_signer_public_key_hashes[j]
+    == <b>global</b>&lt;<a href="DiemAccount.md#0x1_DiemAccount">DiemAccount</a>&gt;(secondary_signer_addresses[j]).authentication_key;
+</code></pre>
+
+
+
+
+<a name="0x1_DiemAccount_CheckSecondarySignersAbortsIf"></a>
+
+
+<pre><code><b>schema</b> <a href="DiemAccount.md#0x1_DiemAccount_CheckSecondarySignersAbortsIf">CheckSecondarySignersAbortsIf</a> {
+    secondary_signer_addresses: vector&lt;address&gt;;
+    secondary_signer_public_key_hashes: vector&lt;vector&lt;u8&gt;&gt;;
+    <b>let</b> num_secondary_signers = len(secondary_signer_addresses);
+    <b>aborts_if</b> len(secondary_signer_public_key_hashes) != num_secondary_signers
+        <b>with</b> <a href="../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>;
+    <b>aborts_if</b> <b>exists</b> i in 0..num_secondary_signers: !<a href="DiemAccount.md#0x1_DiemAccount_exists_at">exists_at</a>(secondary_signer_addresses[i])
+        <b>with</b> <a href="../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>;
+    <b>aborts_if</b> <b>exists</b> i in 0..num_secondary_signers:
+        secondary_signer_public_key_hashes[i] != <b>global</b>&lt;<a href="DiemAccount.md#0x1_DiemAccount">DiemAccount</a>&gt;(secondary_signer_addresses[i]).authentication_key
+        <b>with</b> <a href="../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>;
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_DiemAccount_multi_agent_script_prologue"></a>
 
 ## Function `multi_agent_script_prologue`
@@ -4092,46 +4190,10 @@ The prologue for multi-agent user transactions
     txn_expiration_time: u64,
     chain_id: u8,
 ) <b>acquires</b> <a href="DiemAccount.md#0x1_DiemAccount">DiemAccount</a>, <a href="DiemAccount.md#0x1_DiemAccount_Balance">Balance</a> {
-
-    <b>let</b> num_secondary_signers = <a href="../../../../../../move-stdlib/docs/Vector.md#0x1_Vector_length">Vector::length</a>(&secondary_signer_addresses);
-
-    // Number of <b>public</b> key hashes must match the number of secondary signers.
-    <b>assert</b>(
-        <a href="../../../../../../move-stdlib/docs/Vector.md#0x1_Vector_length">Vector::length</a>(&secondary_signer_public_key_hashes) == num_secondary_signers,
-        <a href="../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="DiemAccount.md#0x1_DiemAccount_PROLOGUE_ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH">PROLOGUE_ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH</a>),
+    <a href="DiemAccount.md#0x1_DiemAccount_check_secondary_signers">check_secondary_signers</a>(
+        secondary_signer_addresses,
+        secondary_signer_public_key_hashes
     );
-
-    <b>let</b> i = 0;
-    <b>while</b> ({
-        <b>spec</b> {
-            <b>invariant</b> <b>forall</b> j in 0..i: <a href="DiemAccount.md#0x1_DiemAccount_exists_at">exists_at</a>(secondary_signer_addresses[j]);
-            <b>invariant</b> <b>forall</b> j in 0..i: secondary_signer_public_key_hashes[j]
-                == <b>global</b>&lt;<a href="DiemAccount.md#0x1_DiemAccount">DiemAccount</a>&gt;(secondary_signer_addresses[j]).authentication_key;
-        };
-        (i &lt; num_secondary_signers)
-    })
-    {
-        // Check that all secondary signers have accounts.
-        <b>let</b> secondary_address = *<a href="../../../../../../move-stdlib/docs/Vector.md#0x1_Vector_borrow">Vector::borrow</a>(&secondary_signer_addresses, i);
-        <b>assert</b>(<a href="DiemAccount.md#0x1_DiemAccount_exists_at">exists_at</a>(secondary_address), <a href="../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="DiemAccount.md#0x1_DiemAccount_PROLOGUE_EACCOUNT_DNE">PROLOGUE_EACCOUNT_DNE</a>));
-
-        // Check that for each secondary signer, the provided <b>public</b> key hash
-        // is equal <b>to</b> the authentication key stored on-chain.
-        <b>let</b> signer_account = borrow_global&lt;<a href="DiemAccount.md#0x1_DiemAccount">DiemAccount</a>&gt;(secondary_address);
-        <b>let</b> signer_public_key_hash = *<a href="../../../../../../move-stdlib/docs/Vector.md#0x1_Vector_borrow">Vector::borrow</a>(&secondary_signer_public_key_hashes, i);
-        <b>assert</b>(
-            signer_public_key_hash == *&signer_account.authentication_key,
-            <a href="../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="DiemAccount.md#0x1_DiemAccount_PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY">PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY</a>),
-        );
-        i = i + 1;
-    };
-
-    <b>spec</b> {
-        <b>assert</b> <b>forall</b> j in 0..num_secondary_signers: <a href="DiemAccount.md#0x1_DiemAccount_exists_at">exists_at</a>(secondary_signer_addresses[j]);
-        <b>assert</b> <b>forall</b> j in 0..num_secondary_signers: secondary_signer_public_key_hashes[j]
-            == <b>global</b>&lt;<a href="DiemAccount.md#0x1_DiemAccount">DiemAccount</a>&gt;(secondary_signer_addresses[j]).authentication_key;
-    };
-
     <a href="DiemAccount.md#0x1_DiemAccount_prologue_common">prologue_common</a>&lt;Token&gt;(
         &sender,
         txn_sequence_number,
@@ -4177,16 +4239,9 @@ The prologue for multi-agent user transactions
     chain_id: u8;
     max_transaction_fee: u128;
     txn_expiration_time_seconds: u64;
+    <b>include</b> <a href="DiemAccount.md#0x1_DiemAccount_CheckSecondarySignersAbortsIf">CheckSecondarySignersAbortsIf</a>;
     <b>let</b> transaction_sender = <a href="../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(sender);
     <b>include</b> <a href="DiemAccount.md#0x1_DiemAccount_PrologueCommonAbortsIf">PrologueCommonAbortsIf</a>&lt;Token&gt; {transaction_sender, txn_public_key: txn_sender_public_key};
-    <b>aborts_if</b> len(secondary_signer_addresses) != len(secondary_signer_public_key_hashes)
-        <b>with</b> <a href="../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>;
-    <b>let</b> num_secondary_signers = len(secondary_signer_addresses);
-    <b>aborts_if</b> <b>exists</b> i in 0..num_secondary_signers: !<a href="DiemAccount.md#0x1_DiemAccount_exists_at">exists_at</a>(secondary_signer_addresses[i])
-        <b>with</b> <a href="../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>;
-    <b>aborts_if</b> <b>exists</b> i in 0..num_secondary_signers:
-        secondary_signer_public_key_hashes[i] != <b>global</b>&lt;<a href="DiemAccount.md#0x1_DiemAccount">DiemAccount</a>&gt;(secondary_signer_addresses[i]).authentication_key
-    <b>with</b> <a href="../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>;
 }
 </code></pre>
 
