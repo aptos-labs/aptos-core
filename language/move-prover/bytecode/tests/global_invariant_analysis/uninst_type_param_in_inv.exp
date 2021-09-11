@@ -115,6 +115,7 @@ Demo::f1: [
       ]
     ]
   }
+  exitpoint {}
 ]
 
 ********* Global invariants by ID *********

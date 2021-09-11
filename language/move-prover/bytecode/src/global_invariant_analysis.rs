@@ -46,6 +46,11 @@ pub struct PerFunctionRelevance {
     /// - Key: global invariants that needs to be asserted after the bytecode instruction and
     /// - Value: the instantiation information per each related invariant.
     pub per_bytecode_assertions: BTreeMap<CodeOffset, BTreeMap<GlobalId, PerBytecodeRelevance>>,
+
+    /// Invariants that needs to be asserted at function exitpoint
+    /// - Key: global invariants that needs to be assumed before the first instruction,
+    /// - Value: the instantiation information per each related invariant.
+    pub exitpoint_assertions: BTreeMap<GlobalId, PerBytecodeRelevance>,
 }
 
 /// Get verification information for this function.
@@ -199,6 +204,9 @@ impl FunctionTargetProcessor for GlobalInvariantAnalysisProcessor {
                 display_inv_relevance(f, code_invs, &header, "assert")?;
             }
 
+            // display exitpoint assertions
+            display_inv_relevance(f, &result.exitpoint_assertions, "exitpoint", "assert")?;
+
             writeln!(f, "]")?;
         }
 
@@ -314,6 +322,7 @@ impl PerFunctionRelevance {
         // - per each invariant applicable, how to instantiate them.
         let mut per_bytecode_assertions = BTreeMap::new();
         let mut mem_related_on_return = BTreeSet::new();
+        let mut exitpoint_assertions = None;
 
         for (code_offset, bc) in target.data.code.iter().enumerate() {
             let code_offset = code_offset as CodeOffset;
@@ -381,11 +390,21 @@ impl PerFunctionRelevance {
                 inv_related,
                 fun_type_params_arity,
             );
-            per_bytecode_assertions.insert(code_offset, relevance);
 
-            // save the related memories for return point if the function defers that
-            if check_suspendable_inv_on_return && !is_return {
-                mem_related_on_return.extend(mem_related);
+            if is_return {
+                // capture invariants asserted before return
+                if exitpoint_assertions.is_some() {
+                    panic!("Expect at most one return instruction in the function body");
+                }
+                exitpoint_assertions = Some(relevance);
+            } else {
+                // capture invariants asserted after the bytecode
+                per_bytecode_assertions.insert(code_offset, relevance);
+
+                // save the related memories for return point if the function defers that
+                if check_suspendable_inv_on_return {
+                    mem_related_on_return.extend(mem_related);
+                }
             }
         }
 
@@ -425,6 +444,7 @@ impl PerFunctionRelevance {
         Self {
             entrypoint_assumptions,
             per_bytecode_assertions,
+            exitpoint_assertions: exitpoint_assertions.unwrap_or_default(),
         }
     }
 

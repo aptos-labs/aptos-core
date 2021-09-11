@@ -250,6 +250,7 @@ S::publish_u64_bool: [
       ]
     ]
   }
+  exitpoint {}
 ]
 S::publish_u64_y: [
   entrypoint {
@@ -296,6 +297,7 @@ S::publish_u64_y: [
       ]
     ]
   }
+  exitpoint {}
 ]
 S::publish_x_bool: [
   entrypoint {
@@ -342,6 +344,7 @@ S::publish_x_bool: [
       ]
     ]
   }
+  exitpoint {}
 ]
 S::publish_x_y: [
   entrypoint {
@@ -388,6 +391,7 @@ S::publish_x_y: [
       ]
     ]
   }
+  exitpoint {}
 ]
 A::good: [
   entrypoint {
@@ -412,6 +416,7 @@ A::good: [
       ]
     ]
   }
+  exitpoint {}
 ]
 
 ********* Global invariants by ID *********

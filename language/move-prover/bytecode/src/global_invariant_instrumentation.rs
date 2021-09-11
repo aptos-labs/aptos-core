@@ -39,6 +39,11 @@ struct InstrumentationPack {
     /// - Key: global invariants that needs to be asserted after the bytecode instruction and
     /// - Value: the instantiation information per each related invariant.
     per_bytecode_assertions: BTreeMap<CodeOffset, BTreeMap<GlobalId, BTreeSet<Vec<Type>>>>,
+
+    /// Invariants that needs to be asserted at function exitpoint
+    /// - Key: global invariants that needs to be assumed before the first instruction,
+    /// - Value: the instantiation information per each related invariant.
+    exitpoint_assertions: BTreeMap<GlobalId, BTreeSet<Vec<Type>>>,
 }
 
 impl InstrumentationPack {
@@ -75,11 +80,13 @@ impl InstrumentationPack {
     fn join_pack(&mut self, pack: &InstrumentationPack, inst: &[Type]) -> bool {
         let mut changed = false;
 
-        Self::join_mapping(
+        if Self::join_mapping(
             &mut self.entrypoint_assumptions,
             &pack.entrypoint_assumptions,
             inst,
-        );
+        ) {
+            changed = true;
+        }
 
         for (code_offset, pack_mapping) in &pack.per_bytecode_assertions {
             if self.per_bytecode_assertions.contains_key(code_offset) {
@@ -101,6 +108,14 @@ impl InstrumentationPack {
                 self.per_bytecode_assertions.insert(*code_offset, new_insts);
                 changed = true;
             }
+        }
+
+        if Self::join_mapping(
+            &mut self.exitpoint_assertions,
+            &pack.exitpoint_assertions,
+            inst,
+        ) {
+            changed = true;
         }
 
         changed
@@ -195,6 +210,27 @@ impl InstrumentationSummary {
                         .or_default()
                         .extend(inv_insts);
                 }
+            }
+        }
+
+        // transpose the `exitpoint_assertions`
+        for (inv_id, inv_rel) in &relevance.exitpoint_assertions {
+            for (fun_inst, inv_insts) in &inv_rel.insts {
+                let inv_insts = filter_uninst_params(inv_insts);
+                result
+                    .by_function_instantiation
+                    .entry(fun_inst.clone())
+                    .or_default()
+                    .exitpoint_assertions
+                    .entry(*inv_id)
+                    .or_default()
+                    .extend(inv_insts.clone());
+                result
+                    .generic_condensation
+                    .exitpoint_assertions
+                    .entry(*inv_id)
+                    .or_default()
+                    .extend(inv_insts);
             }
         }
 
@@ -359,33 +395,31 @@ impl<'env> Instrumenter<'env> {
         // - For a Return, we need to emit the state snapshotting instructions at the entry point,
         //   after the entry point assumptions.
         let xlated_entrypoint = self.translate_invariants(&pack.entrypoint_assumptions);
+        let xlated_exitpoint = self.translate_invariants(&pack.exitpoint_assertions);
+
         let mut xlated_inlined = BTreeMap::new();
         let mut xlated_for_opaque_begin = BTreeMap::new();
         let mut xlated_for_opaque_end = BTreeMap::new();
-        let mut xlated_for_return_point = None;
         for (&code_offset, related_invs) in &pack.per_bytecode_assertions {
             let xlated = self.translate_invariants(related_invs);
             xlated_inlined.insert(code_offset, xlated);
 
-            match old_code.get(code_offset as usize).unwrap() {
-                Bytecode::Call(_, _, Operation::OpaqueCallEnd(..), ..) => {
-                    // find the matching OpaqueCallBegin
-                    for needle in (0..(code_offset.wrapping_sub(1) as usize)).rev() {
-                        if matches!(
-                            old_code.get(needle).unwrap(),
-                            Bytecode::Call(_, _, Operation::OpaqueCallBegin(..), ..)
-                        ) {
-                            let needle = needle as CodeOffset;
-                            xlated_for_opaque_begin.insert(needle, code_offset);
-                            xlated_for_opaque_end.insert(code_offset, needle);
-                            break;
-                        }
+            // for OpaqueCallEnd, we need to place assumptions about update invariants at the
+            // matching OpaqueCallBegin
+            if let Bytecode::Call(_, _, Operation::OpaqueCallEnd(..), ..) =
+                old_code.get(code_offset as usize).unwrap()
+            {
+                for needle in (0..(code_offset.wrapping_sub(1) as usize)).rev() {
+                    if matches!(
+                        old_code.get(needle).unwrap(),
+                        Bytecode::Call(_, _, Operation::OpaqueCallBegin(..), ..)
+                    ) {
+                        let needle = needle as CodeOffset;
+                        xlated_for_opaque_begin.insert(needle, code_offset);
+                        xlated_for_opaque_end.insert(code_offset, needle);
+                        break;
                     }
                 }
-                Bytecode::Ret(..) => {
-                    xlated_for_return_point = Some(code_offset);
-                }
-                _ => (),
             }
         }
 
@@ -394,10 +428,7 @@ impl<'env> Instrumenter<'env> {
 
         // Step 2: emit entrypoint snapshots. This can happen if this function defers invariant
         // checking to the return point and one of the suspended invariant is an update invariant.
-        if let Some(offset) = xlated_for_return_point {
-            let xlated = xlated_inlined.get(&offset).unwrap();
-            self.emit_state_saves_for_update_invs(xlated);
-        }
+        self.emit_state_saves_for_update_invs(&xlated_exitpoint);
 
         // Step 3: go over the bytecode and instrument assertions.
         //         For update invariants, instrument state snapshots before the bytecode.
@@ -417,6 +448,11 @@ impl<'env> Instrumenter<'env> {
                 if !xlated_for_opaque_end.contains_key(&code_offset) {
                     self.emit_state_saves_for_update_invs(xlated);
                 }
+            }
+
+            // for the return bytecode, the assertion comes before the bytecode
+            if matches!(bc, Bytecode::Ret(..)) {
+                self.assert_or_assume_translated_invariants(&xlated_exitpoint, PropKind::Assert);
             }
 
             // the bytecode itself
