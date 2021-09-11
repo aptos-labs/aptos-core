@@ -4,6 +4,7 @@
 use backup_service::start_backup_service;
 use consensus::consensus_provider::start_consensus;
 use debug_interface::node_debug_service::NodeDebugService;
+use diem_api::runtime::bootstrap as bootstrap_api;
 use diem_config::{
     config::{NetworkConfig, NodeConfig, PersistableConfig},
     network_id::NodeNetworkId,
@@ -52,6 +53,7 @@ const INTRA_NODE_CHANNEL_BUFFER_SIZE: usize = 1;
 const MEMPOOL_NETWORK_CHANNEL_BUFFER_SIZE: usize = 1_024;
 
 pub struct DiemHandle {
+    _api: Option<Runtime>,
     _rpc: Runtime,
     _mempool: Runtime,
     _state_sync_bootstrapper: StateSyncBootstrapper,
@@ -160,6 +162,9 @@ pub fn load_test_environment<R>(
     println!("\tJSON-RPC endpoint: {}", config.json_rpc.address);
     config.json_rpc.stream_rpc.enabled = true;
     println!("\tStream-RPC enabled!");
+    config.api.enabled = true;
+    println!("\tREST API enabled!");
+    println!("\tREST API: {}", config.api.address);
 
     println!(
         "\tFullNode network: {}",
@@ -422,6 +427,10 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
     let (mp_client_sender, mp_client_events) = channel(AC_SMP_CHANNEL_BUFFER_SIZE);
 
     let rpc_runtime = bootstrap_rpc(node_config, chain_id, diem_db.clone(), mp_client_sender);
+    let api_runtime = match node_config.api.enabled {
+        true => Some(bootstrap_api(chain_id, diem_db.clone(), &node_config.api)),
+        false => None,
+    };
 
     let mut consensus_runtime = None;
     let (consensus_to_mempool_sender, consensus_requests) = channel(INTRA_NODE_CHANNEL_BUFFER_SIZE);
@@ -482,5 +491,6 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
         _consensus_runtime: consensus_runtime,
         _debug: debug_if,
         _backup: backup_service,
+        _api: api_runtime,
     }
 }

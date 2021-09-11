@@ -19,6 +19,7 @@ pub struct K8sNode {
     pub(crate) dns: String,
     pub(crate) ip: String,
     pub(crate) port: u32,
+    pub(crate) rest_api_port: u32,
     pub(crate) runtime: Runtime,
     pub version: Version,
 }
@@ -26,6 +27,10 @@ pub struct K8sNode {
 impl K8sNode {
     fn port(&self) -> u32 {
         self.port
+    }
+
+    fn rest_api_port(&self) -> u32 {
+        self.rest_api_port
     }
 
     #[allow(dead_code)]
@@ -58,6 +63,11 @@ impl Node for K8sNode {
 
     fn version(&self) -> Version {
         self.version.clone()
+    }
+
+    fn rest_api_endpoint(&self) -> Url {
+        Url::from_str(&format!("http://{}:{}", self.ip(), self.rest_api_port()))
+            .expect("Invalid URL.")
     }
 
     fn json_rpc_endpoint(&self) -> Url {

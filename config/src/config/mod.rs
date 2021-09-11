@@ -47,6 +47,8 @@ use crate::network_id::NetworkId;
 use diem_secure_storage::{KVStorage, Storage};
 use diem_types::waypoint::Waypoint;
 pub use test_config::*;
+mod api_config;
+pub use api_config::*;
 
 /// Represents a deprecated config that provides no field verification.
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
@@ -77,6 +79,8 @@ pub struct NodeConfig {
     pub metrics: DeprecatedConfig,
     #[serde(default)]
     pub json_rpc: JsonRpcConfig,
+    #[serde(default)]
+    pub api: ApiConfig,
     #[serde(default)]
     pub state_sync: StateSyncConfig,
     #[serde(default)]
@@ -293,6 +297,7 @@ impl NodeConfig {
     pub fn randomize_ports(&mut self) {
         self.debug_interface.randomize_ports();
         self.json_rpc.randomize_ports();
+        self.api.randomize_ports();
         self.storage.randomize_ports();
 
         if let Some(network) = self.validator_network.as_mut() {

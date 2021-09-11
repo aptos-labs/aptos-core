@@ -45,6 +45,9 @@ pub trait Node {
     /// Return the URL for the JSON-RPC endpoint of this Node
     fn json_rpc_endpoint(&self) -> Url;
 
+    /// Return the URL for the REST API endpoint of this Node
+    fn rest_api_endpoint(&self) -> Url;
+
     /// Return the URL for the debug-interface for this Node
     fn debug_endpoint(&self) -> Url;
 

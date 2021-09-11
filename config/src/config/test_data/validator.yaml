@@ -55,3 +55,5 @@ validator_network:
         ca_certificate: "/full/path/to/certificate"
         token:
             from_disk: "/full/path/to/token"
+api:
+    enabled: true

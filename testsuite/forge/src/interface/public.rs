@@ -42,6 +42,10 @@ impl<'t> PublicUsageContext<'t> {
         &self.public_info.json_rpc_url
     }
 
+    pub fn rest_api_url(&self) -> &str {
+        &self.public_info.rest_api_url
+    }
+
     pub fn core(&self) -> &CoreContext {
         &self.core
     }
@@ -204,14 +208,21 @@ pub struct PublicInfo<'t> {
     json_rpc_url: String,
     chain_id: ChainId,
     coffer: Coffer<'t>,
+    rest_api_url: String,
 }
 
 impl<'t> PublicInfo<'t> {
-    pub fn new(json_rpc_url: String, chain_id: ChainId, coffer: Coffer<'t>) -> Self {
+    pub fn new(
+        json_rpc_url: String,
+        chain_id: ChainId,
+        coffer: Coffer<'t>,
+        rest_api_url: String,
+    ) -> Self {
         Self {
             json_rpc_url,
             chain_id,
             coffer,
+            rest_api_url,
         }
     }
 }

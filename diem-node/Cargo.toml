@@ -29,6 +29,7 @@ debug-interface = { path = "../common/debug-interface" }
 event-notifications = { path = "../state-sync/inter-component/event-notifications" }
 executor = { path = "../execution/executor" }
 executor-types = { path = "../execution/executor-types" }
+diem-api = { path = "../api" }
 diem-config = { path = "../config" }
 diem-crypto = { path = "../crypto/crypto" }
 diem-framework-releases = { path = "../language/diem-framework/releases" }

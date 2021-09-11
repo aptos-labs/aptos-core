@@ -173,6 +173,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "api-integration-tests"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "bcs",
+ "diem-workspace-hack",
+ "forge",
+ "hex",
+ "reqwest",
+ "serde_json",
+]
+
+[[package]]
 name = "arbitrary"
 version = "0.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2322,6 +2335,7 @@ dependencies = [
  "consensus-notifications",
  "crash-handler",
  "debug-interface",
+ "diem-api",
  "diem-config",
  "diem-crypto",
  "diem-framework-releases",

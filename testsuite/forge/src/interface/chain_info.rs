@@ -17,6 +17,7 @@ pub struct ChainInfo<'t> {
     pub treasury_compliance_account: &'t mut LocalAccount,
     pub designated_dealer_account: &'t mut LocalAccount,
     pub json_rpc_url: String,
+    pub rest_api_url: String,
     pub chain_id: ChainId,
 }
 
@@ -26,6 +27,7 @@ impl<'t> ChainInfo<'t> {
         treasury_compliance_account: &'t mut LocalAccount,
         designated_dealer_account: &'t mut LocalAccount,
         json_rpc_url: String,
+        rest_api_url: String,
         chain_id: ChainId,
     ) -> Self {
         Self {
@@ -33,6 +35,7 @@ impl<'t> ChainInfo<'t> {
             treasury_compliance_account,
             designated_dealer_account,
             json_rpc_url,
+            rest_api_url,
             chain_id,
         }
     }
@@ -132,6 +135,7 @@ impl<'t> ChainInfo<'t> {
                 treasury_compliance_account: self.treasury_compliance_account,
                 designated_dealer_account: self.designated_dealer_account,
             },
+            self.rest_api_url.clone(),
         )
     }
 }

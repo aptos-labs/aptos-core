@@ -25,6 +25,7 @@ use std::{collections::HashMap, convert::TryFrom, env, process::Command, str, sy
 use tokio::{runtime::Runtime, time::Duration};
 
 const JSON_RPC_PORT: u32 = 80;
+const REST_API_PORT: u32 = 8081;
 const VALIDATOR_LB: &str = "validator-fullnode-lb";
 
 pub struct K8sSwarm {
@@ -122,6 +123,15 @@ impl K8sSwarm {
             .next()
             .unwrap()
             .json_rpc_endpoint()
+            .to_string()
+    }
+
+    fn get_rest_api_url(&self) -> String {
+        self.validators
+            .values()
+            .next()
+            .unwrap()
+            .rest_api_endpoint()
             .to_string()
     }
 
@@ -224,12 +234,14 @@ impl Swarm for K8sSwarm {
     }
 
     fn chain_info(&mut self) -> ChainInfo<'_> {
-        let url = self.get_url();
+        let json_rpc_url = self.get_url();
+        let rest_api_url = self.get_rest_api_url();
         ChainInfo::new(
             &mut self.root_account,
             &mut self.treasury_compliance_account,
             &mut self.designated_dealer_account,
-            url,
+            json_rpc_url,
+            rest_api_url,
             self.chain_id,
         )
     }
@@ -302,6 +314,7 @@ pub(crate) async fn get_validators(
                 node_id,
                 ip: s.host_ip.clone(),
                 port: JSON_RPC_PORT,
+                rest_api_port: REST_API_PORT,
                 dns: s.name,
                 version: Version::new(0, image_tag.to_string()),
                 runtime: Runtime::new().unwrap(),

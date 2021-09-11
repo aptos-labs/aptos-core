@@ -487,6 +487,11 @@ impl Swarm for LocalSwarm {
                 .map(|v| v.json_rpc_endpoint().to_string())
                 .next()
                 .unwrap(),
+            self.validators
+                .values()
+                .map(|v| v.rest_api_endpoint().to_string())
+                .next()
+                .unwrap(),
             self.chain_id,
         )
     }

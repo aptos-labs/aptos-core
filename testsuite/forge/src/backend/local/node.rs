@@ -200,6 +200,12 @@ impl Node for LocalNode {
         Url::from_str(&format!("http://{}:{}/v1", ip, port)).expect("Invalid URL.")
     }
 
+    fn rest_api_endpoint(&self) -> Url {
+        let ip = self.config().api.address.ip();
+        let port = self.config().api.address.port();
+        Url::from_str(&format!("http://{}:{}", ip, port)).expect("Invalid URL.")
+    }
+
     fn debug_endpoint(&self) -> Url {
         Url::parse(&format!("http://localhost:{}", self.debug_port())).unwrap()
     }

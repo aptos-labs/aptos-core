@@ -188,6 +188,7 @@ members = [
     "vm-validator",
     "api",
     "api/types",
+    "api/integration-tests",
 ]
 
 # NOTE: default-members is the complete list of binaries that form the "production Diem codebase". These members should
