@@ -966,9 +966,9 @@ impl TypeInstantiationDerivation {
     ) -> BTreeSet<Type> {
         // progressively increase the boundary
         let treat_lhs_type_param_as_var_after_index =
-            treat_lhs_type_param_as_var.then(|| target_param_index);
+            treat_lhs_type_param_as_var.then(|| if target_lhs { target_param_index } else { 0 });
         let treat_rhs_type_param_as_var_after_index =
-            treat_rhs_type_param_as_var.then(|| target_param_index);
+            treat_rhs_type_param_as_var.then(|| if target_lhs { 0 } else { target_param_index });
 
         let mut target_param_insts = BTreeSet::new();
         for t_lhs in lhs_types {
