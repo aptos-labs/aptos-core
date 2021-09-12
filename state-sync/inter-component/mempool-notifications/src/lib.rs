@@ -215,6 +215,7 @@ enum MempoolNotificationResponse {
 #[cfg(test)]
 mod tests {
     use crate::{CommittedTransaction, Error, MempoolNotificationSender};
+    use claim::{assert_matches, assert_ok};
     use diem_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
     use diem_types::{
         account_address::AccountAddress,
@@ -239,19 +240,13 @@ mod tests {
         // Send a notification and expect a timeout (no listener)
         let notify_result =
             block_on(mempool_notifier.notify_new_commit(vec![create_user_transaction()], 0, 1000));
-        assert!(matches!(
-            notify_result,
-            Err(Error::TimeoutWaitingForMempool)
-        ));
+        assert_matches!(notify_result, Err(Error::TimeoutWaitingForMempool));
 
         // Drop the receiver and try again
         mempool_listener.notification_receiver.close();
         let notify_result =
             block_on(mempool_notifier.notify_new_commit(vec![create_user_transaction()], 0, 1000));
-        assert!(matches!(
-            notify_result,
-            Err(Error::CommitNotificationError(_))
-        ));
+        assert_matches!(notify_result, Err(Error::CommitNotificationError(_)));
     }
 
     #[test]
@@ -264,10 +259,7 @@ mod tests {
         // Send a notification and expect a timeout (zero timeout)
         let notify_result =
             block_on(mempool_notifier.notify_new_commit(vec![create_user_transaction()], 0, 0));
-        assert!(matches!(
-            notify_result,
-            Err(Error::TimeoutWaitingForMempool)
-        ));
+        assert_matches!(notify_result, Err(Error::TimeoutWaitingForMempool));
     }
 
     #[test]
@@ -279,7 +271,7 @@ mod tests {
 
         // Send a notification and verify no timeout because no notification was sent!
         let notify_result = block_on(mempool_notifier.notify_new_commit(vec![], 0, 1000));
-        notify_result.unwrap();
+        assert_ok!(notify_result);
     }
 
     #[test]
@@ -292,24 +284,19 @@ mod tests {
         // Create several transactions that should be filtered out
         let mut transactions = vec![];
         for _ in 0..5 {
-            transactions.push(create_block_metadata_transaction())
-        }
-        for _ in 0..5 {
-            transactions.push(create_genesis_transaction())
+            transactions.push(create_block_metadata_transaction());
+            transactions.push(create_genesis_transaction());
         }
 
         // Send a notification and verify no timeout because no notification was sent!
         let notify_result =
             block_on(mempool_notifier.notify_new_commit(transactions.clone(), 0, 1000));
-        notify_result.unwrap();
+        assert_ok!(notify_result);
 
         // Send another notification with a single user transaction now included.
         transactions.push(create_user_transaction());
         let notify_result = block_on(mempool_notifier.notify_new_commit(transactions, 0, 1000));
-        assert!(matches!(
-            notify_result,
-            Err(Error::TimeoutWaitingForMempool)
-        ));
+        assert_matches!(notify_result, Err(Error::TimeoutWaitingForMempool));
     }
 
     #[test]
@@ -371,7 +358,7 @@ mod tests {
             101,
             1000,
         ));
-        notify_result.unwrap();
+        assert_ok!(notify_result);
     }
 
     fn create_user_transaction() -> Transaction {
