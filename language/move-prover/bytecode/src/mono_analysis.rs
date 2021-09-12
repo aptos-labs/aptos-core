@@ -20,14 +20,15 @@ use move_model::{
         FunId, FunctionEnv, GlobalEnv, ModuleId, QualifiedId, QualifiedInstId, SpecFunId,
         SpecVarId, StructEnv, StructId,
     },
-    ty::{Type, TypeDisplayContext},
+    ty::{Type, TypeDisplayContext, TypeInstantiationDerivation, TypeUnificationAdapter, Variance},
 };
 
 use crate::{
     function_target::{FunctionData, FunctionTarget},
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder, FunctionVariant},
+    options::ProverOptions,
     stackless_bytecode::{Bytecode, Operation},
-    verification_analysis,
+    usage_analysis::UsageProcessor,
 };
 
 /// The environment extension computed by this analysis.
@@ -194,8 +195,8 @@ struct Analyzer<'a> {
     env: &'a GlobalEnv,
     targets: &'a FunctionTargetsHolder,
     info: MonoInfo,
-    todo_funs: Vec<(QualifiedId<FunId>, Vec<Type>)>,
-    done_funs: BTreeSet<(QualifiedId<FunId>, Vec<Type>)>,
+    todo_funs: Vec<(QualifiedId<FunId>, FunctionVariant, Vec<Type>)>,
+    done_funs: BTreeSet<(QualifiedId<FunId>, FunctionVariant, Vec<Type>)>,
     todo_spec_funs: Vec<(QualifiedId<SpecFunId>, Vec<Type>)>,
     done_spec_funs: BTreeSet<(QualifiedId<SpecFunId>, Vec<Type>)>,
     done_types: BTreeSet<Type>,
@@ -208,17 +209,17 @@ impl<'a> Analyzer<'a> {
         // in self.todo_targets for later analysis. During this phase, self.inst_opt is None.
         for module in self.env.get_modules() {
             for fun in module.get_functions() {
-                for (_, target) in self.targets.get_targets(&fun) {
-                    let is_verified = verification_analysis::get_info(&target).verified;
-                    if is_verified {
-                        self.analyze_fun(target.clone());
+                for (variant, target) in self.targets.get_targets(&fun) {
+                    if !variant.is_verified() {
+                        continue;
+                    }
+                    self.analyze_fun(target.clone());
 
-                        // We also need to analyze all modify targets because they are not
-                        // included in the bytecode.
-                        for (_, exps) in target.get_modify_ids_and_exps() {
-                            for exp in exps {
-                                self.analyze_exp(exp);
-                            }
+                    // We also need to analyze all modify targets because they are not
+                    // included in the bytecode.
+                    for (_, exps) in target.get_modify_ids_and_exps() {
+                        for exp in exps {
+                            self.analyze_exp(exp);
                         }
                     }
                 }
@@ -228,16 +229,16 @@ impl<'a> Analyzer<'a> {
         // contains the specific instantiation. We can first do regular functions,
         // then the spec functions; the later can never add new regular functions.
         while !self.todo_funs.is_empty() {
-            let (fun, inst) = self.todo_funs.pop().unwrap();
+            let (fun, variant, inst) = self.todo_funs.pop().unwrap();
             self.inst_opt = Some(inst);
             self.analyze_fun(
                 self.targets
-                    .get_target(&self.env.get_function(fun), &FunctionVariant::Baseline),
+                    .get_target(&self.env.get_function(fun), &variant),
             );
             let inst = std::mem::take(&mut self.inst_opt).unwrap();
             // Insert it into final analysis result.
             self.info.funs.entry(fun).or_default().insert(inst.clone());
-            self.done_funs.insert((fun, inst));
+            self.done_funs.insert((fun, variant, inst));
         }
         while !self.todo_spec_funs.is_empty() {
             let (fun, inst) = self.todo_spec_funs.pop().unwrap();
@@ -268,6 +269,52 @@ impl<'a> Analyzer<'a> {
                 self.analyze_bytecode(&target, bc);
             }
         }
+        // Analyze instantiations (when this function is a verification target)
+        let options = ProverOptions::get(self.env);
+        if options.boogie_poly && self.inst_opt.is_none() {
+            // collect information
+            let fun_type_params = target.get_type_parameters();
+            let fun_type_params_arity = fun_type_params.len();
+            let usage_state = UsageProcessor::analyze(self.targets, target.func_env, target.data);
+
+            // collect instantiations
+            let mut all_insts = BTreeSet::new();
+            for lhs_m in usage_state.accessed.all.iter() {
+                let lhs_ty = lhs_m.to_type();
+                for rhs_m in usage_state.accessed.all.iter() {
+                    let rhs_ty = rhs_m.to_type();
+
+                    // make sure these two types unify before trying to instantiate them
+                    let adapter = TypeUnificationAdapter::new_pair(&lhs_ty, &rhs_ty, true, true);
+                    if adapter.unify(Variance::Allow, false).is_none() {
+                        continue;
+                    }
+
+                    // find all instantiation combinations given by this unification
+                    let fun_insts = TypeInstantiationDerivation::progressive_instantiation(
+                        std::iter::once(&lhs_ty),
+                        std::iter::once(&rhs_ty),
+                        true,
+                        false,
+                        true,
+                        false,
+                        fun_type_params_arity,
+                        true,
+                        false,
+                    );
+                    all_insts.extend(fun_insts);
+                }
+            }
+
+            // mark all the instantiated targets as todo
+            for fun_inst in all_insts {
+                self.todo_funs.push((
+                    target.func_env.get_qualified_id(),
+                    target.data.variant.clone(),
+                    fun_inst,
+                ));
+            }
+        }
     }
 
     fn analyze_bytecode(&mut self, _target: &FunctionTarget<'_>, bc: &Bytecode) {
@@ -292,7 +339,7 @@ impl<'a> Analyzer<'a> {
                 } else if !callee.is_opaque() {
                     // This call needs to be inlined, with targs instantiated by self.inst_opt.
                     // Schedule for later processing if this instance has not been processed yet.
-                    let entry = (mid.qualified(*fid), actuals);
+                    let entry = (mid.qualified(*fid), FunctionVariant::Baseline, actuals);
                     if !self.done_funs.contains(&entry) {
                         self.todo_funs.push(entry);
                     }

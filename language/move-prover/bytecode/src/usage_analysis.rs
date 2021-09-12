@@ -333,6 +333,19 @@ impl UsageProcessor {
     pub fn new() -> Box<Self> {
         Box::new(UsageProcessor())
     }
+
+    pub fn analyze(
+        targets: &FunctionTargetsHolder,
+        func_env: &FunctionEnv,
+        data: &FunctionData,
+    ) -> UsageState {
+        let func_target = FunctionTarget::new(func_env, data);
+        let cache = SummaryCache::new(targets, func_env.module_env.env);
+        let analysis = MemoryUsageAnalysis { cache };
+        let mut summary = analysis.summarize(&func_target, UsageState::default());
+        analysis.compute_spec_usage(func_env.get_spec(), &mut summary);
+        summary
+    }
 }
 
 impl FunctionTargetProcessor for UsageProcessor {
@@ -342,11 +355,7 @@ impl FunctionTargetProcessor for UsageProcessor {
         func_env: &FunctionEnv<'_>,
         mut data: FunctionData,
     ) -> FunctionData {
-        let func_target = FunctionTarget::new(func_env, &data);
-        let cache = SummaryCache::new(targets, func_env.module_env.env);
-        let analysis = MemoryUsageAnalysis { cache };
-        let mut summary = analysis.summarize(&func_target, UsageState::default());
-        analysis.compute_spec_usage(func_env.get_spec(), &mut summary);
+        let summary = Self::analyze(targets, func_env, &data);
         data.annotations.set(summary);
         data
     }
