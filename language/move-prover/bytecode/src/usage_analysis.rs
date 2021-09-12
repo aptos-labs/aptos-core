@@ -288,7 +288,7 @@ impl<'a> TransferFunctions for MemoryUsageAnalysis<'a> {
                         .map(|(usage, _)| usage),
                 ),
                 Modifies => {
-                    unreachable!("`modifies` expressions are not expected in the function body")
+                    // do nothing, as the `modifies` memories are captured by other sets
                 }
             },
             _ => {}
