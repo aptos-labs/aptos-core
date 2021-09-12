@@ -1,3 +1,4 @@
+// separate_baseline: boogie_poly
 address 0x1 {
 
 module Escape {
