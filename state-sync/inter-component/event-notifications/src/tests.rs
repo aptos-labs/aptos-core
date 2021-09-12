@@ -98,6 +98,60 @@ fn test_reconfig_notification_no_queuing() {
 }
 
 #[test]
+fn test_dynamic_subscribers() {
+    // Create subscription service and mock database
+    let mut event_service = EventSubscriptionService::new(create_database());
+
+    // Create several event keys
+    let event_key_1 = create_random_event_key();
+    let reconfig_event_key = on_chain_config::new_epoch_event_key();
+
+    // Create a subscriber for event_key_1 and a reconfiguration subscriber
+    let mut event_listener_1 = event_service
+        .subscribe_to_events(vec![event_key_1])
+        .unwrap();
+    let mut reconfig_listener_1 = event_service.subscribe_to_reconfigurations().unwrap();
+
+    // Notify the service of an event with event_key_1
+    let event_1 = create_test_event(event_key_1);
+    notify_events(&mut event_service, 0, vec![event_1.clone()]);
+    verify_event_notification_received(vec![&mut event_listener_1], 0, vec![event_1.clone()]);
+
+    // Add another subscriber for event_key_1 and the reconfig_event_key
+    let mut event_listener_2 = event_service
+        .subscribe_to_events(vec![event_key_1, reconfig_event_key])
+        .unwrap();
+
+    // Notify the service of several events
+    let reconfig_event = create_test_event(reconfig_event_key);
+    notify_events(
+        &mut event_service,
+        0,
+        vec![event_1.clone(), reconfig_event.clone()],
+    );
+    verify_event_notification_received(vec![&mut event_listener_1], 0, vec![event_1.clone()]);
+    verify_event_notification_received(
+        vec![&mut event_listener_2],
+        0,
+        vec![event_1, reconfig_event.clone()],
+    );
+    verify_reconfig_notifications_received(vec![&mut reconfig_listener_1], 0, 1);
+
+    // Add another reconfiguration subscriber
+    let mut reconfig_listener_2 = event_service.subscribe_to_reconfigurations().unwrap();
+
+    // Notify the service of a reconfiguration event
+    notify_events(&mut event_service, 0, vec![reconfig_event.clone()]);
+    verify_event_notification_received(vec![&mut event_listener_2], 0, vec![reconfig_event]);
+    verify_reconfig_notifications_received(
+        vec![&mut reconfig_listener_1, &mut reconfig_listener_2],
+        0,
+        1,
+    );
+    verify_no_event_notifications(vec![&mut event_listener_1]);
+}
+
+#[test]
 fn test_event_and_reconfig_subscribers() {
     // Create subscription service and mock database
     let mut event_service = EventSubscriptionService::new(create_database());
@@ -346,7 +400,10 @@ fn test_missing_configs() {
     // Verify the reconfiguration notification contains everything except the missing config
     if let Some(reconfig_notification) = reconfig_listener.select_next_some().now_or_never() {
         let returned_configs = reconfig_notification.on_chain_configs.configs();
-        assert_eq!(returned_configs.keys().len(), ON_CHAIN_CONFIG_REGISTRY.len());
+        assert_eq!(
+            returned_configs.keys().len(),
+            ON_CHAIN_CONFIG_REGISTRY.len()
+        );
         for config in ON_CHAIN_CONFIG_REGISTRY {
             assert!(returned_configs.contains_key(config));
         }
