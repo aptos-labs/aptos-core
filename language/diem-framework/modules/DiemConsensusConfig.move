@@ -50,7 +50,7 @@ module DiemFramework::DiemConsensusConfig {
 
     /// The permission "UpdateDiemConsensusConfig" is granted to DiemRoot [[H12]][PERMISSION].
     spec module {
-        invariant forall addr: address
+        invariant [suspendable] forall addr: address
             where exists<DiemConfig<DiemConsensusConfig>>(addr): addr == @DiemRoot;
 
         invariant update [suspendable] old(DiemConfig::spec_is_published<DiemConsensusConfig>())

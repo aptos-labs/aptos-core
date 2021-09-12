@@ -349,7 +349,7 @@ it does not hold for all types (but does hold for XDX).
 <code>LimitsDefinition&lt;<a href="XDX.md#0x1_XDX">XDX</a>&gt;</code> is not published at any other address
 
 
-<pre><code><b>invariant</b> <b>forall</b> addr: address <b>where</b> <b>exists</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">AccountLimits::LimitsDefinition</a>&lt;<a href="XDX.md#0x1_XDX">XDX</a>&gt;&gt;(addr):
+<pre><code><b>invariant</b> [suspendable] <b>forall</b> addr: address <b>where</b> <b>exists</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">AccountLimits::LimitsDefinition</a>&lt;<a href="XDX.md#0x1_XDX">XDX</a>&gt;&gt;(addr):
     addr == @DiemRoot;
 </code></pre>
 

@@ -141,7 +141,7 @@ module DiemFramework::XDX {
             ==> exists<AccountLimits::LimitsDefinition<XDX>>(@DiemRoot);
 
         /// `LimitsDefinition<XDX>` is not published at any other address
-        invariant forall addr: address where exists<AccountLimits::LimitsDefinition<XDX>>(addr):
+        invariant [suspendable] forall addr: address where exists<AccountLimits::LimitsDefinition<XDX>>(addr):
             addr == @DiemRoot;
 
         /// `Reserve` is persistent

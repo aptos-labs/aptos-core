@@ -32,7 +32,7 @@ fn encode_add_account_limits_admin_script(execute_as: AccountAddress) -> WriteSe
     import 0x1.Signer;
 
     main(dr_account: signer, vasp: signer) {
-        AccountLimits.publish_unrestricted_limits<XUS.XUS>(&vasp);
+        AccountLimits.publish_unrestricted_limits_for_testing<XUS.XUS>(&vasp);
         AccountLimits.publish_window<XUS.XUS>(
             &dr_account,
             &vasp,

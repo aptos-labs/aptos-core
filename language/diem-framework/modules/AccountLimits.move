@@ -5,6 +5,8 @@ module DiemFramework::AccountLimits {
     use DiemFramework::Roles;
     use Std::Errors;
     use Std::Signer;
+    friend DiemFramework::XDX;
+    friend DiemFramework::XUS;
 
     /// An operations capability that restricts callers of this module since
     /// the operations can mutate account states.
@@ -184,7 +186,7 @@ module DiemFramework::AccountLimits {
     /// TC account, or a caller with access to a `&AccountLimitMutationCapability` points a
     /// window to it. Additionally, the TC controls the values held within this
     /// resource once it's published.
-    public fun publish_unrestricted_limits<CoinType>(publish_account: &signer) {
+    public(friend) fun publish_unrestricted_limits<CoinType>(publish_account: &signer) {
         assert(
             !exists<LimitsDefinition<CoinType>>(Signer::address_of(publish_account)),
             Errors::already_published(ELIMITS_DEFINITION)
@@ -200,11 +202,7 @@ module DiemFramework::AccountLimits {
         )
     }
     spec publish_unrestricted_limits {
-        /// TODO: turned off verification until we solve the
-        /// generic type/specific invariant issue. Similar to
-        /// in DiemConfig, this function violates an invariant in
-        /// XUS about LimitsDefinition<XUS>.
-        pragma verify = false;
+        pragma delegate_invariants_to_caller;
         include PublishUnrestrictedLimitsAbortsIf<CoinType>;
     }
     spec schema PublishUnrestrictedLimitsAbortsIf<CoinType> {
@@ -217,10 +215,18 @@ module DiemFramework::AccountLimits {
         ensures exists<LimitsDefinition<CoinType>>(Signer::spec_address_of(publish_account));
     }
 
+    // #[test_only]
+    // TODO: remove this comment when the relevant tests in functional and language-e2e testsuites
+    // are ported to the unit testing framework
+    public fun publish_unrestricted_limits_for_testing<CoinType>(publish_account: &signer) {
+        publish_unrestricted_limits<CoinType>(publish_account);
+    }
+    spec publish_unrestricted_limits_for_testing {
+        pragma verify = false;
+    }
+
     /// Updates the `LimitsDefinition<CoinType>` resource at `limit_address`.
     /// If any of the field arguments is `0` the corresponding field is not updated.
-    ///
-    /// TODO: This should be specified.
     public fun update_limits_definition<CoinType>(
         tc_account: &signer,
         limit_address: address,
@@ -230,14 +236,31 @@ module DiemFramework::AccountLimits {
         new_time_period: u64,
     ) acquires LimitsDefinition {
         Roles::assert_treasury_compliance(tc_account);
+        assert(exists<LimitsDefinition<CoinType>>(limit_address), Errors::not_published(ELIMITS_DEFINITION));
+
         // As we don't have Optionals for txn scripts, in update_account_limit_definition.move
         // we use 0 value to represent a None (ie no update to that variable)
-        assert(exists<LimitsDefinition<CoinType>>(limit_address), Errors::not_published(ELIMITS_DEFINITION));
         let limits_def = borrow_global_mut<LimitsDefinition<CoinType>>(limit_address);
         if (new_max_inflow > 0) { limits_def.max_inflow = new_max_inflow };
         if (new_max_outflow > 0) { limits_def.max_outflow = new_max_outflow };
         if (new_max_holding_balance > 0) { limits_def.max_holding = new_max_holding_balance };
         if (new_time_period > 0) { limits_def.time_period = new_time_period };
+    }
+    spec update_limits_definition {
+        modifies global<LimitsDefinition<CoinType>>(limit_address);
+        include Roles::AbortsIfNotTreasuryCompliance{account: tc_account};
+        aborts_if !exists<LimitsDefinition<CoinType>>(limit_address) with Errors::NOT_PUBLISHED;
+        ensures exists<LimitsDefinition<CoinType>>(limit_address);
+        let old_limits_def = global<LimitsDefinition<CoinType>>(limit_address);
+        let post new_limits_def = global<LimitsDefinition<CoinType>>(limit_address);
+        ensures new_max_inflow > 0 ==> new_limits_def.max_inflow == new_max_inflow;
+        ensures new_max_inflow == 0 ==> new_limits_def.max_inflow == old_limits_def.max_inflow;
+        ensures new_max_outflow > 0 ==> new_limits_def.max_outflow == new_max_outflow;
+        ensures new_max_outflow == 0 ==> new_limits_def.max_outflow == old_limits_def.max_outflow;
+        ensures new_max_holding_balance > 0 ==> new_limits_def.max_holding == new_max_holding_balance;
+        ensures new_max_holding_balance == 0 ==> new_limits_def.max_holding == old_limits_def.max_holding;
+        ensures new_time_period > 0 ==> new_limits_def.time_period == new_time_period;
+        ensures new_time_period == 0 ==> new_limits_def.time_period == old_limits_def.time_period;
     }
 
     /// Update either the `tracked_balance` or `limit_address` fields of the
@@ -250,7 +273,6 @@ module DiemFramework::AccountLimits {
     ///   `new_limit_address`. If the `aggregate_balance` needs to be updated
     ///   but the `limit_address` should remain the same, the current
     ///   `limit_address` needs to be passed in for `new_limit_address`.
-    /// TODO(wrwg): specify
     public fun update_window_info<CoinType>(
         tc_account: &signer,
         window_address: address,
@@ -262,6 +284,21 @@ module DiemFramework::AccountLimits {
         if (aggregate_balance != 0)  { window.tracked_balance = aggregate_balance };
         assert(exists<LimitsDefinition<CoinType>>(new_limit_address), Errors::not_published(ELIMITS_DEFINITION));
         window.limit_address = new_limit_address;
+    }
+    spec update_window_info {
+        modifies global<Window<CoinType>>(window_address);
+        include Roles::AbortsIfNotTreasuryCompliance{account: tc_account};
+        aborts_if !exists<Window<CoinType>>(window_address);
+        aborts_if !exists<LimitsDefinition<CoinType>>(new_limit_address) with Errors::NOT_PUBLISHED;
+        ensures exists<Window<CoinType>>(window_address);
+        let old_window = global<Window<CoinType>>(window_address);
+        let post new_window = global<Window<CoinType>>(window_address);
+        ensures aggregate_balance != 0 ==> new_window.tracked_balance == aggregate_balance;
+        ensures aggregate_balance == 0 ==> new_window.tracked_balance == old_window.tracked_balance;
+        ensures new_window.limit_address == new_limit_address;
+        ensures new_window.window_start == old_window.window_start;
+        ensures new_window.window_inflow == old_window.window_inflow;
+        ensures new_window.window_outflow == old_window.window_outflow;
     }
 
     ///////////////////////////////////////////////////////////////////////////

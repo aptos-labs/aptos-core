@@ -16,6 +16,7 @@ a given time period.
 -  [Function `update_withdrawal_limits`](#0x1_AccountLimits_update_withdrawal_limits)
 -  [Function `publish_window`](#0x1_AccountLimits_publish_window)
 -  [Function `publish_unrestricted_limits`](#0x1_AccountLimits_publish_unrestricted_limits)
+-  [Function `publish_unrestricted_limits_for_testing`](#0x1_AccountLimits_publish_unrestricted_limits_for_testing)
 -  [Function `update_limits_definition`](#0x1_AccountLimits_update_limits_definition)
 -  [Function `update_window_info`](#0x1_AccountLimits_update_window_info)
 -  [Function `reset_window`](#0x1_AccountLimits_reset_window)
@@ -533,7 +534,7 @@ window to it. Additionally, the TC controls the values held within this
 resource once it's published.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="AccountLimits.md#0x1_AccountLimits_publish_unrestricted_limits">publish_unrestricted_limits</a>&lt;CoinType&gt;(publish_account: &signer)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="AccountLimits.md#0x1_AccountLimits_publish_unrestricted_limits">publish_unrestricted_limits</a>&lt;CoinType&gt;(publish_account: &signer)
 </code></pre>
 
 
@@ -542,7 +543,7 @@ resource once it's published.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="AccountLimits.md#0x1_AccountLimits_publish_unrestricted_limits">publish_unrestricted_limits</a>&lt;CoinType&gt;(publish_account: &signer) {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="AccountLimits.md#0x1_AccountLimits_publish_unrestricted_limits">publish_unrestricted_limits</a>&lt;CoinType&gt;(publish_account: &signer) {
     <b>assert</b>(
         !<b>exists</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">LimitsDefinition</a>&lt;CoinType&gt;&gt;(<a href="../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(publish_account)),
         <a href="../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_already_published">Errors::already_published</a>(<a href="AccountLimits.md#0x1_AccountLimits_ELIMITS_DEFINITION">ELIMITS_DEFINITION</a>)
@@ -567,13 +568,8 @@ resource once it's published.
 <summary>Specification</summary>
 
 
-TODO: turned off verification until we solve the
-generic type/specific invariant issue. Similar to
-in DiemConfig, this function violates an invariant in
-XUS about LimitsDefinition<XUS>.
 
-
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> delegate_invariants_to_caller;
 <b>include</b> <a href="AccountLimits.md#0x1_AccountLimits_PublishUnrestrictedLimitsAbortsIf">PublishUnrestrictedLimitsAbortsIf</a>&lt;CoinType&gt;;
 </code></pre>
 
@@ -606,14 +602,48 @@ XUS about LimitsDefinition<XUS>.
 
 </details>
 
+<a name="0x1_AccountLimits_publish_unrestricted_limits_for_testing"></a>
+
+## Function `publish_unrestricted_limits_for_testing`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="AccountLimits.md#0x1_AccountLimits_publish_unrestricted_limits_for_testing">publish_unrestricted_limits_for_testing</a>&lt;CoinType&gt;(publish_account: &signer)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="AccountLimits.md#0x1_AccountLimits_publish_unrestricted_limits_for_testing">publish_unrestricted_limits_for_testing</a>&lt;CoinType&gt;(publish_account: &signer) {
+    <a href="AccountLimits.md#0x1_AccountLimits_publish_unrestricted_limits">publish_unrestricted_limits</a>&lt;CoinType&gt;(publish_account);
+}
+</code></pre>
+
+
+
+</details>
+
+<details>
+<summary>Specification</summary>
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_AccountLimits_update_limits_definition"></a>
 
 ## Function `update_limits_definition`
 
 Updates the <code><a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">LimitsDefinition</a>&lt;CoinType&gt;</code> resource at <code>limit_address</code>.
 If any of the field arguments is <code>0</code> the corresponding field is not updated.
-
-TODO: This should be specified.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="AccountLimits.md#0x1_AccountLimits_update_limits_definition">update_limits_definition</a>&lt;CoinType&gt;(tc_account: &signer, limit_address: address, new_max_inflow: u64, new_max_outflow: u64, new_max_holding_balance: u64, new_time_period: u64)
@@ -634,15 +664,41 @@ TODO: This should be specified.
     new_time_period: u64,
 ) <b>acquires</b> <a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">LimitsDefinition</a> {
     <a href="Roles.md#0x1_Roles_assert_treasury_compliance">Roles::assert_treasury_compliance</a>(tc_account);
+    <b>assert</b>(<b>exists</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">LimitsDefinition</a>&lt;CoinType&gt;&gt;(limit_address), <a href="../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="AccountLimits.md#0x1_AccountLimits_ELIMITS_DEFINITION">ELIMITS_DEFINITION</a>));
+
     // As we don't have Optionals for txn scripts, in update_account_limit_definition.<b>move</b>
     // we <b>use</b> 0 value <b>to</b> represent a None (ie no <b>update</b> <b>to</b> that variable)
-    <b>assert</b>(<b>exists</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">LimitsDefinition</a>&lt;CoinType&gt;&gt;(limit_address), <a href="../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="AccountLimits.md#0x1_AccountLimits_ELIMITS_DEFINITION">ELIMITS_DEFINITION</a>));
     <b>let</b> limits_def = borrow_global_mut&lt;<a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">LimitsDefinition</a>&lt;CoinType&gt;&gt;(limit_address);
     <b>if</b> (new_max_inflow &gt; 0) { limits_def.max_inflow = new_max_inflow };
     <b>if</b> (new_max_outflow &gt; 0) { limits_def.max_outflow = new_max_outflow };
     <b>if</b> (new_max_holding_balance &gt; 0) { limits_def.max_holding = new_max_holding_balance };
     <b>if</b> (new_time_period &gt; 0) { limits_def.time_period = new_time_period };
 }
+</code></pre>
+
+
+
+</details>
+
+<details>
+<summary>Specification</summary>
+
+
+
+<pre><code><b>modifies</b> <b>global</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">LimitsDefinition</a>&lt;CoinType&gt;&gt;(limit_address);
+<b>include</b> <a href="Roles.md#0x1_Roles_AbortsIfNotTreasuryCompliance">Roles::AbortsIfNotTreasuryCompliance</a>{account: tc_account};
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">LimitsDefinition</a>&lt;CoinType&gt;&gt;(limit_address) <b>with</b> <a href="../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a>;
+<b>ensures</b> <b>exists</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">LimitsDefinition</a>&lt;CoinType&gt;&gt;(limit_address);
+<b>let</b> old_limits_def = <b>global</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">LimitsDefinition</a>&lt;CoinType&gt;&gt;(limit_address);
+<b>let</b> post new_limits_def = <b>global</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">LimitsDefinition</a>&lt;CoinType&gt;&gt;(limit_address);
+<b>ensures</b> new_max_inflow &gt; 0 ==&gt; new_limits_def.max_inflow == new_max_inflow;
+<b>ensures</b> new_max_inflow == 0 ==&gt; new_limits_def.max_inflow == old_limits_def.max_inflow;
+<b>ensures</b> new_max_outflow &gt; 0 ==&gt; new_limits_def.max_outflow == new_max_outflow;
+<b>ensures</b> new_max_outflow == 0 ==&gt; new_limits_def.max_outflow == old_limits_def.max_outflow;
+<b>ensures</b> new_max_holding_balance &gt; 0 ==&gt; new_limits_def.max_holding == new_max_holding_balance;
+<b>ensures</b> new_max_holding_balance == 0 ==&gt; new_limits_def.max_holding == old_limits_def.max_holding;
+<b>ensures</b> new_time_period &gt; 0 ==&gt; new_limits_def.time_period == new_time_period;
+<b>ensures</b> new_time_period == 0 ==&gt; new_limits_def.time_period == old_limits_def.time_period;
 </code></pre>
 
 
@@ -663,7 +719,6 @@ if <code>aggregate_balance</code> is set to zero the field is not updated.
 <code>new_limit_address</code>. If the <code>aggregate_balance</code> needs to be updated
 but the <code>limit_address</code> should remain the same, the current
 <code>limit_address</code> needs to be passed in for <code>new_limit_address</code>.
-TODO(wrwg): specify
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="AccountLimits.md#0x1_AccountLimits_update_window_info">update_window_info</a>&lt;CoinType&gt;(tc_account: &signer, window_address: address, aggregate_balance: u64, new_limit_address: address)
@@ -687,6 +742,30 @@ TODO(wrwg): specify
     <b>assert</b>(<b>exists</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">LimitsDefinition</a>&lt;CoinType&gt;&gt;(new_limit_address), <a href="../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="AccountLimits.md#0x1_AccountLimits_ELIMITS_DEFINITION">ELIMITS_DEFINITION</a>));
     window.limit_address = new_limit_address;
 }
+</code></pre>
+
+
+
+</details>
+
+<details>
+<summary>Specification</summary>
+
+
+
+<pre><code><b>modifies</b> <b>global</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a>&lt;CoinType&gt;&gt;(window_address);
+<b>include</b> <a href="Roles.md#0x1_Roles_AbortsIfNotTreasuryCompliance">Roles::AbortsIfNotTreasuryCompliance</a>{account: tc_account};
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a>&lt;CoinType&gt;&gt;(window_address);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">LimitsDefinition</a>&lt;CoinType&gt;&gt;(new_limit_address) <b>with</b> <a href="../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a>;
+<b>ensures</b> <b>exists</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a>&lt;CoinType&gt;&gt;(window_address);
+<b>let</b> old_window = <b>global</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a>&lt;CoinType&gt;&gt;(window_address);
+<b>let</b> post new_window = <b>global</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a>&lt;CoinType&gt;&gt;(window_address);
+<b>ensures</b> aggregate_balance != 0 ==&gt; new_window.tracked_balance == aggregate_balance;
+<b>ensures</b> aggregate_balance == 0 ==&gt; new_window.tracked_balance == old_window.tracked_balance;
+<b>ensures</b> new_window.limit_address == new_limit_address;
+<b>ensures</b> new_window.window_start == old_window.window_start;
+<b>ensures</b> new_window.window_inflow == old_window.window_inflow;
+<b>ensures</b> new_window.window_outflow == old_window.window_outflow;
 </code></pre>
 
 

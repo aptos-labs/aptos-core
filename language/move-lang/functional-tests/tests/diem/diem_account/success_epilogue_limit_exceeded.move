@@ -17,7 +17,7 @@ use Std::Signer;
 fun main(dr_account: signer, vasp: signer) {
     let dr_account = &dr_account;
     let vasp = &vasp;
-    AccountLimits::publish_unrestricted_limits<XUS::XUS>(vasp);
+    AccountLimits::publish_unrestricted_limits_for_testing<XUS::XUS>(vasp);
     AccountLimits::publish_window<XUS::XUS>(
         dr_account,
         vasp,

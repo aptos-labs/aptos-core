@@ -62,7 +62,7 @@ module DiemFramework::XUS {
             ==> exists<AccountLimits::LimitsDefinition<XUS>>(@DiemRoot);
 
         /// `LimitsDefinition<XUS>` is not published at any other address
-        invariant forall addr: address where exists<AccountLimits::LimitsDefinition<XUS>>(addr):
+        invariant [suspendable] forall addr: address where exists<AccountLimits::LimitsDefinition<XUS>>(addr):
             addr == @DiemRoot;
 
     }

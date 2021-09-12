@@ -220,7 +220,7 @@ module DiemFramework::DiemVMConfig {
 
     /// The permission "UpdateVMConfig" is granted to DiemRoot [[H11]][PERMISSION].
     spec module {
-        invariant forall addr: address
+        invariant [suspendable] forall addr: address
             where exists<DiemConfig<DiemVMConfig>>(addr): addr == @DiemRoot;
 
         invariant update [suspendable] old(DiemConfig::spec_is_published<DiemVMConfig>())

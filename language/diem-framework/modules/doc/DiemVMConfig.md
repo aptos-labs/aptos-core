@@ -442,7 +442,7 @@ No one can update DiemVMConfig except for the Diem Root account [[H11]][PERMISSI
 The permission "UpdateVMConfig" is granted to DiemRoot [[H11]][PERMISSION].
 
 
-<pre><code><b>invariant</b> <b>forall</b> addr: address
+<pre><code><b>invariant</b> [suspendable] <b>forall</b> addr: address
     <b>where</b> <b>exists</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig">DiemConfig</a>&lt;<a href="DiemVMConfig.md#0x1_DiemVMConfig">DiemVMConfig</a>&gt;&gt;(addr): addr == @DiemRoot;
 <b>invariant</b> <b>update</b> [suspendable] <b>old</b>(<a href="DiemConfig.md#0x1_DiemConfig_spec_is_published">DiemConfig::spec_is_published</a>&lt;<a href="DiemVMConfig.md#0x1_DiemVMConfig">DiemVMConfig</a>&gt;())
     && <a href="DiemConfig.md#0x1_DiemConfig_spec_is_published">DiemConfig::spec_is_published</a>&lt;<a href="DiemVMConfig.md#0x1_DiemVMConfig">DiemVMConfig</a>&gt;()

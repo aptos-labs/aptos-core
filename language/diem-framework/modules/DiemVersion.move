@@ -74,7 +74,7 @@ module DiemFramework::DiemVersion {
 
     /// The permission "UpdateDiemProtocolVersion" is granted to DiemRoot [[H10]][PERMISSION].
     spec module {
-        invariant forall addr: address
+        invariant [suspendable] forall addr: address
             where exists<DiemConfig<DiemVersion>>(addr): addr == @DiemRoot;
 
         invariant update [suspendable] old(DiemConfig::spec_is_published<DiemVersion>())

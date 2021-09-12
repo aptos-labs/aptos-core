@@ -31,7 +31,7 @@ use DiemFramework::XUS::XUS;
 fun main(dr: signer, bob_account: signer) {
     let dr = &dr;
     let bob_account = &bob_account;
-    AccountLimits::publish_unrestricted_limits<XUS>(bob_account);
+    AccountLimits::publish_unrestricted_limits_for_testing<XUS>(bob_account);
     AccountLimits::publish_window<XUS>(dr, bob_account, @{{bob}});
 }
 }
@@ -67,7 +67,7 @@ use DiemFramework::AccountLimits;
 use DiemFramework::XUS::XUS;
 fun main(bob_account: signer) {
     let bob_account = &bob_account;
-    AccountLimits::publish_unrestricted_limits<XUS>(bob_account);
+    AccountLimits::publish_unrestricted_limits_for_testing<XUS>(bob_account);
 }
 }
 
