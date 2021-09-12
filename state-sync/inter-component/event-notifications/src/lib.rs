@@ -12,11 +12,10 @@ use diem_types::{
     event::EventKey,
     move_resource::MoveStorage,
     on_chain_config,
-    on_chain_config::{config_address, OnChainConfigPayload, ON_CHAIN_CONFIG_REGISTRY},
+    on_chain_config::{config_address, ConfigID, OnChainConfigPayload, ON_CHAIN_CONFIG_REGISTRY},
     transaction::Version,
 };
 use futures::{channel::mpsc::SendError, stream::FusedStream, Stream};
-use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
@@ -250,12 +249,16 @@ impl EventSubscriptionService {
 
     /// This notifies all the reconfiguration subscribers of the on-chain
     /// configurations at the specified version.
-    fn notify_reconfiguration_subscribers(&mut self, version: Version) -> Result<(), Error> {
+    fn notify_reconfiguration_subscribers(
+        &mut self,
+        config_registry: &[ConfigID],
+        version: Version,
+    ) -> Result<(), Error> {
         if self.reconfig_subscriptions.is_empty() {
             return Ok(()); // No reconfiguration subscribers!
         }
 
-        let new_configs = self.read_on_chain_configs(version)?;
+        let new_configs = self.read_on_chain_configs(config_registry, version)?;
         for (_, reconfig_subscription) in self.reconfig_subscriptions.iter_mut() {
             reconfig_subscription.notify_subscriber_of_configs(version, new_configs.clone())?;
         }
@@ -263,27 +266,45 @@ impl EventSubscriptionService {
         Ok(())
     }
 
-    /// Reads the values of all on-chain configs at the specified version.
-    fn read_on_chain_configs(&self, version: Version) -> Result<OnChainConfigPayload, Error> {
-        // Get the access paths for all the configs in the registry
-        let config_access_paths = ON_CHAIN_CONFIG_REGISTRY
-            .iter()
-            .map(|config_id| config_id.access_path())
-            .collect();
-
-        // Read the config values
-        let on_chain_configs = self
-            .storage
-            .read()
-            .reader
-            .deref()
-            .batch_fetch_resources_by_version(config_access_paths, version)
-            .map_err(|error| {
-                Error::UnexpectedErrorEncountered(format!(
-                    "Failed to batch fetch resources at version: {:?}. Error: {:?}",
-                    version, error
-                ))
-            })?;
+    /// Fetches the given config IDs on-chain at the specified version.
+    /// Note: We cannot assume that all configs will exist on-chain. As such, we
+    /// must fetch each resource one at a time. Reconfig subscribers must be able
+    /// to handle on-chain configs not existing in a reconfiguration notification.
+    fn read_on_chain_configs(
+        &self,
+        config_registry: &[ConfigID],
+        version: Version,
+    ) -> Result<OnChainConfigPayload, Error> {
+        // Build a map from config ID to the config value found on-chain
+        let mut config_id_to_config = HashMap::new();
+        for config_id in config_registry.iter() {
+            if let Ok(config_list) = self
+                .storage
+                .read()
+                .reader
+                .deref()
+                .batch_fetch_resources_by_version(vec![config_id.access_path()], version)
+            {
+                match &config_list[..] {
+                    [config] => {
+                        if let Some(old_entry) =
+                            config_id_to_config.insert(*config_id, config.clone())
+                        {
+                            panic!(
+                                "Unexpected config values for duplicate config id found! Key: {}, Value: {:?}!",
+                                config_id, old_entry
+                            );
+                        }
+                    }
+                    _ => {
+                        panic!(
+                            "Expected a single on-chain config, but found: {:?}",
+                            config_list
+                        );
+                    }
+                }
+            }
+        }
 
         // Fetch the account state blob
         let (account_state_blob, _) = self
@@ -320,16 +341,10 @@ impl EventSubscriptionService {
                 ))
             })?;
 
-        // Return the config payload
+        // Return the new on-chain config payload (containing all found configs at this version).
         Ok(OnChainConfigPayload::new(
             epoch,
-            Arc::new(
-                ON_CHAIN_CONFIG_REGISTRY
-                    .iter()
-                    .cloned()
-                    .zip_eq(on_chain_configs)
-                    .collect(),
-            ),
+            Arc::new(config_id_to_config),
         ))
     }
 }
@@ -351,14 +366,14 @@ impl EventNotificationSender for EventSubscriptionService {
         // If a reconfiguration event was found, also notify the reconfig subscribers
         // of the new configuration values.
         if reconfig_event_processed {
-            self.notify_reconfiguration_subscribers(version)
+            self.notify_reconfiguration_subscribers(ON_CHAIN_CONFIG_REGISTRY, version)
         } else {
             Ok(())
         }
     }
 
     async fn notify_initial_configs(&mut self, version: Version) -> Result<(), Error> {
-        self.notify_reconfiguration_subscribers(version)
+        self.notify_reconfiguration_subscribers(ON_CHAIN_CONFIG_REGISTRY, version)
     }
 }
 
