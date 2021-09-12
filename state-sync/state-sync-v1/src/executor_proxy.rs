@@ -398,6 +398,7 @@ fn extract_reconfig_events(events: Vec<ContractEvent>) -> Vec<ContractEvent> {
 mod tests {
     use super::*;
     use channel::diem_channel::Receiver;
+    use claim::{assert_err, assert_ok};
     use diem_crypto::{ed25519::*, PrivateKey, Uniform};
     use diem_transaction_builder::stdlib::{
         encode_peer_to_peer_with_metadata_script,
@@ -449,9 +450,7 @@ mod tests {
         let (reconfig_events, _) = execute_and_commit_block(&mut block_executor, block, 1);
 
         // Publish the on chain config updates
-        executor_proxy
-            .publish_on_chain_config_updates(reconfig_events)
-            .unwrap();
+        assert_ok!(executor_proxy.publish_on_chain_config_updates(reconfig_events));
 
         // Verify no reconfig notification is sent (we only subscribed to VMConfig)
         assert!(reconfig_receiver
@@ -480,9 +479,7 @@ mod tests {
         drop(reconfig_receiver);
 
         // Verify publishing on-chain config updates fails due to dropped receiver
-        assert!(executor_proxy
-            .publish_on_chain_config_updates(reconfig_events)
-            .is_err());
+        assert_err!(executor_proxy.publish_on_chain_config_updates(reconfig_events));
     }
 
     #[test]
@@ -509,9 +506,7 @@ mod tests {
         let (reconfig_events, _) = execute_and_commit_block(&mut block_executor, block, 1);
 
         // Publish the on chain config updates
-        executor_proxy
-            .publish_on_chain_config_updates(reconfig_events)
-            .unwrap();
+        assert_ok!(executor_proxy.publish_on_chain_config_updates(reconfig_events));
 
         // Verify reconfig notification is sent
         assert!(reconfig_receiver
@@ -528,9 +523,7 @@ mod tests {
             bootstrap_genesis_and_set_subscription(subscription, &mut reconfig_receiver);
 
         // Publish no on chain config updates
-        executor_proxy
-            .publish_on_chain_config_updates(vec![])
-            .unwrap();
+        assert_ok!(executor_proxy.publish_on_chain_config_updates(vec![]));
 
         // Verify no reconfig notification is sent
         assert!(reconfig_receiver
@@ -556,9 +549,7 @@ mod tests {
         let (reconfig_events, _) = execute_and_commit_block(&mut block_executor, block, 1);
 
         // Publish the on chain config updates
-        executor_proxy
-            .publish_on_chain_config_updates(reconfig_events)
-            .unwrap();
+        assert_ok!(executor_proxy.publish_on_chain_config_updates(reconfig_events));
 
         // Verify no reconfig notification is sent
         assert!(reconfig_receiver
@@ -584,9 +575,7 @@ mod tests {
         let (reconfig_events, _) = execute_and_commit_block(&mut block_executor, block, 1);
 
         // Publish the on chain config updates
-        executor_proxy
-            .publish_on_chain_config_updates(reconfig_events)
-            .unwrap();
+        assert_ok!(executor_proxy.publish_on_chain_config_updates(reconfig_events));
 
         // Verify the correct reconfig notification is sent
         let payload = reconfig_receiver.select_next_some().now_or_never().unwrap();
@@ -626,9 +615,7 @@ mod tests {
         // Grab the first two executed transactions and verify responses
         let txns = executor_proxy.get_chunk(0, 2, 2).unwrap();
         assert_eq!(txns.transactions, vec![dummy_txn_1, reconfig_txn]);
-        executor_proxy
-            .execute_chunk(txns, ledger_info_epoch_1.clone(), None)
-            .unwrap();
+        assert_ok!(executor_proxy.execute_chunk(txns, ledger_info_epoch_1.clone(), None));
         assert_eq!(
             ledger_info_epoch_1,
             executor_proxy.get_epoch_change_ledger_info(1).unwrap()
@@ -641,14 +628,12 @@ mod tests {
         // Grab the next two executed transactions (forced by limit) and verify responses
         let txns = executor_proxy.get_chunk(2, 2, 5).unwrap();
         assert_eq!(txns.transactions, vec![money_txn, dummy_txn_2]);
-        executor_proxy.get_epoch_ending_ledger_info(4).unwrap_err();
+        assert_err!(executor_proxy.get_epoch_ending_ledger_info(4));
 
         // Grab the last transaction and verify responses
         let txns = executor_proxy.get_chunk(4, 1, 5).unwrap();
         assert_eq!(txns.transactions, vec![rotation_txn]);
-        executor_proxy
-            .execute_chunk(txns, ledger_info_epoch_2.clone(), None)
-            .unwrap();
+        assert_ok!(executor_proxy.execute_chunk(txns, ledger_info_epoch_2.clone(), None));
         assert_eq!(
             ledger_info_epoch_2,
             executor_proxy.get_epoch_change_ledger_info(2).unwrap()
@@ -711,10 +696,9 @@ mod tests {
         let (validators, mut block_executor, mut executor_proxy) =
             bootstrap_genesis_and_set_subscription(subscription, &mut reconfig_receiver);
         // it's initialized in genesis
-        assert!(executor_proxy
+        assert_ok!(executor_proxy
             .on_chain_configs
-            .get::<OnChainConsensusConfig>()
-            .is_ok());
+            .get::<OnChainConsensusConfig>());
 
         // Create a dummy prologue transaction that will bump the timer, and update the Diem version
         let validator_account = validators[0].data.address;
@@ -726,9 +710,7 @@ mod tests {
         let (reconfig_events, _) = execute_and_commit_block(&mut block_executor, block, 1);
 
         // Publish the on chain config updates
-        executor_proxy
-            .publish_on_chain_config_updates(reconfig_events)
-            .unwrap();
+        assert_ok!(executor_proxy.publish_on_chain_config_updates(reconfig_events));
 
         // Verify the correct reconfig notification is sent
         let payload = reconfig_receiver.select_next_some().now_or_never().unwrap();
@@ -760,7 +742,7 @@ mod tests {
         // Bootstrap the database with regular genesis
         let (genesis, validators) = vm_genesis::test_genesis_change_set_and_validators(Some(1));
         let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis));
-        bootstrap_genesis::<DiemVM>(&db_rw, &genesis_txn).unwrap();
+        assert_ok!(bootstrap_genesis::<DiemVM>(&db_rw, &genesis_txn));
 
         // Initialize the executor proxy and verify that the node doesn't panic
         // (even though it can't find the TestOnChainConfig on the blockchain!).
@@ -772,8 +754,8 @@ mod tests {
 
         // Verify that the initial configs returned to the subscriber don't contain the unknown on-chain config
         let payload = reconfig_receiver.select_next_some().now_or_never().unwrap();
-        payload.get::<DiemVersion>().unwrap();
-        assert!(payload.get::<TestOnChainConfig>().is_err());
+        assert_ok!(payload.get::<DiemVersion>());
+        assert_err!(payload.get::<TestOnChainConfig>());
 
         // Create a dummy prologue transaction that will bump the timer, and update the Diem version
         let validator_account = validators[0].data.address;
@@ -786,15 +768,13 @@ mod tests {
         let (reconfig_events, _) = execute_and_commit_block(&mut block_executor, block, 1);
 
         // Publish the on chain config updates
-        executor_proxy
-            .publish_on_chain_config_updates(reconfig_events)
-            .unwrap();
+        assert_ok!(executor_proxy.publish_on_chain_config_updates(reconfig_events));
 
         // Verify the reconfig notification still doesn't contain the unknown config
         let payload = reconfig_receiver.select_next_some().now_or_never().unwrap();
-        payload.get::<DiemVersion>().unwrap();
-        payload.get::<OnChainConsensusConfig>().unwrap();
-        assert!(payload.get::<TestOnChainConfig>().is_err());
+        assert_ok!(payload.get::<DiemVersion>());
+        assert_ok!(payload.get::<OnChainConsensusConfig>());
+        assert_err!(payload.get::<TestOnChainConfig>());
     }
 
     /// Executes a genesis transaction, creates the executor proxy and sets the given reconfig
@@ -808,12 +788,12 @@ mod tests {
 
         // Create test diem database
         let db_path = diem_temppath::TempPath::new();
-        db_path.create_as_dir().unwrap();
+        assert_ok!(db_path.create_as_dir());
         let (db, db_rw) = DbReaderWriter::wrap(DiemDB::new_for_test(db_path.path()));
 
         // Boostrap the genesis transaction
         let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis));
-        bootstrap_genesis::<DiemVM>(&db_rw, &genesis_txn).unwrap();
+        assert_ok!(bootstrap_genesis::<DiemVM>(&db_rw, &genesis_txn));
 
         // Create executor proxy with given subscription
         let block_executor = Box::new(Executor::<DiemVM>::new(db_rw.clone()));
@@ -945,9 +925,7 @@ mod tests {
         // Commit block
         let ledger_info_with_sigs =
             gen_ledger_info_with_sigs(block_id.into(), &output, block_hash, vec![]);
-        block_executor
-            .commit_blocks(vec![block_hash], ledger_info_with_sigs.clone())
-            .unwrap();
+        assert_ok!(block_executor.commit_blocks(vec![block_hash], ledger_info_with_sigs.clone()));
 
         (output.reconfig_events().to_vec(), ledger_info_with_sigs)
     }

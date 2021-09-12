@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use channel::{diem_channel, message_queues::QueueStyle};
+use claim::assert_ok;
 use consensus_notifications::{ConsensusNotificationSender, ConsensusNotifier};
 use diem_config::{
     config::{NodeConfig, Peer, PeerRole, RoleType, HANDSHAKE_VERSION},
@@ -109,17 +110,14 @@ impl StateSyncPeer {
             .write()
             .commit_new_txns(num_txns);
         let mempool = self.mempool.as_ref().unwrap();
-        mempool.add_txns(signed_txns.clone()).unwrap();
+        assert_ok!(mempool.add_txns(signed_txns.clone()));
 
-        Runtime::new()
-            .unwrap()
-            .block_on(
-                self.consensus_notifier
-                    .as_ref()
-                    .unwrap()
-                    .notify_new_commit(committed_txns, vec![]),
-            )
-            .unwrap();
+        assert_ok!(Runtime::new().unwrap().block_on(
+            self.consensus_notifier
+                .as_ref()
+                .unwrap()
+                .notify_new_commit(committed_txns, vec![]),
+        ));
         let mempool_txns = mempool.read_timeline(0, signed_txns.len());
         for txn in signed_txns.iter() {
             assert!(!mempool_txns.contains(txn));

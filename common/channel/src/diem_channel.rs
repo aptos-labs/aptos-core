@@ -140,6 +140,7 @@ impl<K: Eq + Hash + Clone, M> Drop for Sender<K, M> {
 }
 
 /// The receiving end of the diem_channel.
+#[derive(Debug)]
 pub struct Receiver<K: Eq + Hash + Clone, M> {
     shared_state: Arc<Mutex<SharedState<K, M>>>,
 }

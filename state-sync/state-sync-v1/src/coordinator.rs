@@ -1726,6 +1726,7 @@ mod tests {
         network::StateSyncMessage,
         shared_components::{test_utils, test_utils::create_coordinator_with_config_and_waypoint},
     };
+    use claim::{assert_err, assert_matches, assert_ok};
     use consensus_notifications::{
         ConsensusCommitNotification, ConsensusNotificationResponse, ConsensusSyncNotification,
     };
@@ -1765,21 +1766,18 @@ mod tests {
         // Verify that fullnodes can't process sync requests
         let (sync_request, _) = create_sync_notification_at_version(0);
         let process_result = block_on(full_node_coordinator.process_sync_request(sync_request));
-        if !matches!(process_result, Err(Error::FullNodeSyncRequest)) {
-            panic!(
-                "Expected an full node sync request error, but got: {:?}",
-                process_result
-            );
-        }
+        assert_matches!(process_result, Err(Error::FullNodeSyncRequest));
 
         // Create a coordinator for a validator node
         let mut validator_coordinator = test_utils::create_validator_coordinator();
 
         // Perform sync request for version that matches initial waypoint version
         let (sync_request, mut callback_receiver) = create_sync_notification_at_version(0);
-        block_on(validator_coordinator.process_sync_request(sync_request)).unwrap();
+        assert_ok!(block_on(
+            validator_coordinator.process_sync_request(sync_request)
+        ));
         match callback_receiver.try_recv() {
-            Ok(Some(notification_result)) => notification_result.result.unwrap(),
+            Ok(Some(notification_result)) => assert_ok!(notification_result.result),
             result => panic!("Expected okay but got: {:?}", result),
         };
 
@@ -1793,16 +1791,9 @@ mod tests {
         // Verify coordinator won't process sync requests as it's not yet initialized
         let (sync_request, mut callback_receiver) = create_sync_notification_at_version(10);
         let process_result = block_on(validator_coordinator.process_sync_request(sync_request));
-        if !matches!(process_result, Err(Error::UninitializedError(..))) {
-            panic!(
-                "Expected an uninitialized error, but got: {:?}",
-                process_result
-            );
-        }
+        assert_matches!(process_result, Err(Error::UninitializedError(_)));
         let callback_result = callback_receiver.try_recv();
-        if !matches!(callback_result, Err(_)) {
-            panic!("Expected error but got: {:?}", callback_result);
-        }
+        assert_err!(callback_result);
 
         // TODO(joshlind): add a check for syncing to old versions once we support storage
         // modifications in unit tests.
@@ -1815,9 +1806,7 @@ mod tests {
 
         // Get the sync state from state sync
         let (callback_sender, mut callback_receiver) = oneshot::channel();
-        validator_coordinator
-            .get_sync_state(callback_sender)
-            .unwrap();
+        assert_ok!(validator_coordinator.get_sync_state(callback_sender));
         match callback_receiver.try_recv() {
             Ok(Some(sync_state)) => {
                 assert_eq!(sync_state.committed_version(), 0);
@@ -1828,9 +1817,7 @@ mod tests {
         // Drop the callback receiver and verify error
         let (callback_sender, _) = oneshot::channel();
         let sync_state_result = validator_coordinator.get_sync_state(callback_sender);
-        if !matches!(sync_state_result, Err(Error::CallbackSendFailed(..))) {
-            panic!("Expected error but got: {:?}", sync_state_result);
-        }
+        assert_matches!(sync_state_result, Err(Error::CallbackSendFailed(_)));
     }
 
     #[test]
@@ -1840,20 +1827,16 @@ mod tests {
 
         // Check already initialized returns immediately
         let (callback_sender, mut callback_receiver) = oneshot::channel();
-        validator_coordinator
-            .wait_for_initialization(callback_sender)
-            .unwrap();
+        assert_ok!(validator_coordinator.wait_for_initialization(callback_sender));
         match callback_receiver.try_recv() {
-            Ok(Some(result)) => result.unwrap(),
+            Ok(Some(result)) => assert_ok!(result),
             result => panic!("Expected okay but got: {:?}", result),
         };
 
         // Drop the callback receiver and verify error
         let (callback_sender, _) = oneshot::channel();
         let initialization_result = validator_coordinator.wait_for_initialization(callback_sender);
-        if !matches!(initialization_result, Err(Error::CallbackSendFailed(..))) {
-            panic!("Expected error but got: {:?}", initialization_result);
-        }
+        assert_matches!(initialization_result, Err(Error::CallbackSendFailed(_)));
 
         // Create a coordinator with the waypoint version higher than 0
         let waypoint_version = 10;
@@ -1864,13 +1847,9 @@ mod tests {
 
         // Verify callback is not executed as state sync is not yet initialized
         let (callback_sender, mut callback_receiver) = oneshot::channel();
-        validator_coordinator
-            .wait_for_initialization(callback_sender)
-            .unwrap();
+        assert_ok!(validator_coordinator.wait_for_initialization(callback_sender));
         let callback_result = callback_receiver.try_recv();
-        if !matches!(callback_result, Ok(None)) {
-            panic!("Expected none but got: {:?}", callback_result);
-        }
+        assert_matches!(callback_result, Ok(None));
 
         // TODO(joshlind): add a check that verifies the callback is executed once we can
         // update storage in the unit tests.
@@ -1882,22 +1861,25 @@ mod tests {
         let mut validator_coordinator = test_utils::create_validator_coordinator();
 
         // Verify that a commit notification with no transactions doesn't error!
-        block_on(validator_coordinator.process_commit_notification(vec![], vec![], None, None))
-            .unwrap();
+        assert_ok!(block_on(validator_coordinator.process_commit_notification(
+            vec![],
+            vec![],
+            None,
+            None
+        )));
 
         // Verify that consensus is sent a commit ack when everything works
         let (commit_notification, mut callback_receiver) =
             create_commit_notification(vec![], vec![]);
-        block_on(validator_coordinator.process_commit_notification(
+        assert_ok!(block_on(validator_coordinator.process_commit_notification(
             vec![],
             vec![],
             Some(commit_notification),
             None,
-        ))
-        .unwrap();
+        )));
         match callback_receiver.try_recv() {
             Ok(Some(notification_result)) => {
-                notification_result.result.unwrap();
+                assert_ok!(notification_result.result);
             }
             callback_result => panic!("Expected an okay result but got: {:?}", callback_result),
         };
@@ -1906,13 +1888,12 @@ mod tests {
         let committed_transactions = vec![create_test_transaction()];
         let (commit_notification, _callback_receiver) =
             create_commit_notification(committed_transactions.clone(), vec![]);
-        block_on(validator_coordinator.process_commit_notification(
+        assert_ok!(block_on(validator_coordinator.process_commit_notification(
             committed_transactions,
             vec![],
             Some(commit_notification),
             None,
-        ))
-        .unwrap();
+        )));
 
         // TODO(joshlind): check initialized is fired when unit tests support storage
         // modifications.
@@ -1933,7 +1914,7 @@ mod tests {
         let mut validator_coordinator = test_utils::create_validator_coordinator();
 
         // Verify no error is returned when consensus is running
-        validator_coordinator.check_progress().unwrap();
+        assert_ok!(validator_coordinator.check_progress());
 
         // Send a sync request to state sync (to mark that consensus is no longer running)
         let (sync_request, _) = create_sync_notification_at_version(1);
@@ -1941,9 +1922,7 @@ mod tests {
 
         // Verify the no available peers error is returned
         let progress_result = validator_coordinator.check_progress();
-        if !matches!(progress_result, Err(Error::NoAvailablePeers(..))) {
-            panic!("Expected an err result but got: {:?}", progress_result);
-        }
+        assert_matches!(progress_result, Err(Error::NoAvailablePeers(_)));
 
         // Create validator coordinator with tiny state sync timeout
         let mut node_config = NodeConfig::default();
@@ -1957,10 +1936,10 @@ mod tests {
         let _ = block_on(validator_coordinator.process_sync_request(sync_request));
 
         // Verify sync request timeout notifies the callback
-        validator_coordinator.check_progress().unwrap_err();
+        assert_err!(validator_coordinator.check_progress());
         match callback_receiver.try_recv() {
             Ok(Some(notification_result)) => {
-                assert!(notification_result.result.is_err());
+                assert_err!(notification_result.result);
             }
             callback_result => panic!("Expected an error result but got: {:?}", callback_result),
         };
@@ -1989,28 +1968,16 @@ mod tests {
         // Verify error is returned when adding peer that is not a valid peer
         let new_peer_result =
             validator_coordinator.process_new_peer(node_network_id, connection_metadata.clone());
-        if !matches!(new_peer_result, Err(Error::InvalidStateSyncPeer(..))) {
-            panic!(
-                "Expected an invalid peer error but got: {:?}",
-                new_peer_result
-            );
-        }
+        assert_matches!(new_peer_result, Err(Error::InvalidStateSyncPeer(..)));
 
         // Verify the same error is not returned when adding a validator node
         let node_network_id = NodeNetworkId::new(NetworkId::Validator, 0);
-        let new_peer_result =
-            validator_coordinator.process_new_peer(node_network_id.clone(), connection_metadata);
-        if matches!(new_peer_result, Err(Error::InvalidStateSyncPeer(..))) {
-            panic!(
-                "Expected not to receive an invalid peer error but got: {:?}",
-                new_peer_result
-            );
-        }
+        assert_ok!(
+            validator_coordinator.process_new_peer(node_network_id.clone(), connection_metadata)
+        );
 
         // Verify no error is returned when removing the node
-        validator_coordinator
-            .process_lost_peer(node_network_id, peer_id)
-            .unwrap();
+        assert_ok!(validator_coordinator.process_lost_peer(node_network_id, peer_id));
     }
 
     #[test]
@@ -2111,9 +2078,7 @@ mod tests {
                 peer_network_id.peer_id(),
                 chunk_response.clone(),
             ));
-            if !matches!(result, Err(Error::ConsensusIsExecuting)) {
-                panic!("Expected consensus executing error, got: {:?}", result);
-            }
+            assert_matches!(result, Err(Error::ConsensusIsExecuting));
         }
 
         // Make a sync request (to force consensus to yield)
@@ -2127,9 +2092,7 @@ mod tests {
                 peer_network_id.peer_id(),
                 chunk_response.clone(),
             ));
-            if !matches!(result, Err(Error::ReceivedChunkFromDownstream(..))) {
-                panic!("Expected a downstream error, but got: {:?}", result);
-            }
+            assert_matches!(result, Err(Error::ReceivedChunkFromDownstream(_)));
         }
 
         // Add the peer to our known peers
@@ -2142,9 +2105,7 @@ mod tests {
                 peer_network_id.peer_id(),
                 chunk_response.clone(),
             ));
-            if !matches!(result, Err(Error::ReceivedEmptyChunk(..))) {
-                panic!("Expected an empty chunk error, got: {:?}", result);
-            }
+            assert_matches!(result, Err(Error::ReceivedEmptyChunk(_)));
         }
 
         // Send a non-empty chunk with a version mismatch and verify a mismatch error is returned
@@ -2155,9 +2116,7 @@ mod tests {
                 peer_network_id.peer_id(),
                 chunk_response.clone(),
             ));
-            if !matches!(result, Err(Error::ReceivedNonSequentialChunk(..))) {
-                panic!("Expected a non-sequential error, but got: {:?}", result);
-            }
+            assert_matches!(result, Err(Error::ReceivedNonSequentialChunk(..)));
         }
     }
 
@@ -2480,9 +2439,7 @@ mod tests {
                 peer_network_id.peer_id(),
                 request.clone(),
             ));
-            if !matches!(result, Err(Error::InvalidChunkRequest(..))) {
-                panic!("Expected an invalid chunk request, but got: {:?}", result);
-            }
+            assert_matches!(result, Err(Error::InvalidChunkRequest(_)));
         }
     }
 
@@ -2497,9 +2454,7 @@ mod tests {
                 peer_network_id.peer_id(),
                 response.clone(),
             ));
-            if !matches!(result, Err(Error::ProcessInvalidChunk(..))) {
-                panic!("Expected invalid chunk error, but got: {:?}", result);
-            }
+            assert_matches!(result, Err(Error::ProcessInvalidChunk(_)));
         }
     }
 
@@ -2514,9 +2469,7 @@ mod tests {
                 peer_network_id.peer_id(),
                 response.clone(),
             ));
-            if !matches!(result, Err(Error::ReceivedWrongChunkType(..))) {
-                panic!("Expected wrong type error, but got: {:?}", result);
-            }
+            assert_matches!(result, Err(Error::ReceivedWrongChunkType(_)));
         }
     }
 
