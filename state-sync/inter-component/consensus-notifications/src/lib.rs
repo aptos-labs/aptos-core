@@ -271,6 +271,7 @@ impl ConsensusSyncNotification {
 #[cfg(test)]
 mod tests {
     use crate::{ConsensusNotification, ConsensusNotificationSender, Error};
+    use claim::{assert_err, assert_matches, assert_ok};
     use diem_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
     use diem_types::{
         account_address::AccountAddress,
@@ -299,16 +300,13 @@ mod tests {
         // Send a notification and expect a timeout (no listener)
         let notify_result =
             block_on(consensus_notifier.notify_new_commit(vec![create_user_transaction()], vec![]));
-        assert!(matches!(
-            notify_result,
-            Err(Error::TimeoutWaitingForStateSync)
-        ));
+        assert_matches!(notify_result, Err(Error::TimeoutWaitingForStateSync));
 
         // Drop the receiver and try again
         consensus_listener.notification_receiver.close();
         let notify_result =
             block_on(consensus_notifier.notify_new_commit(vec![create_user_transaction()], vec![]));
-        assert!(matches!(notify_result, Err(Error::NotificationError(_))));
+        assert_matches!(notify_result, Err(Error::NotificationError(_)));
     }
 
     #[test]
@@ -321,7 +319,7 @@ mod tests {
 
         // Send a notification
         let notify_result = block_on(consensus_notifier.notify_new_commit(vec![], vec![]));
-        notify_result.unwrap();
+        assert_ok!(notify_result);
     }
 
     #[test]
@@ -408,11 +406,11 @@ mod tests {
         // Send a commit notification and verify a successful response
         let notify_result =
             block_on(consensus_notifier.notify_new_commit(vec![create_user_transaction()], vec![]));
-        notify_result.unwrap();
+        assert_ok!(notify_result);
 
         // Send a sync notification and very an error response
         let notify_result = block_on(consensus_notifier.sync_to_target(create_ledger_info()));
-        assert!(notify_result.is_err());
+        assert_err!(notify_result);
     }
 
     fn create_user_transaction() -> Transaction {

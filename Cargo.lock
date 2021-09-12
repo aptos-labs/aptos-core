@@ -905,6 +905,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "claim"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f81099d6bb72e1df6d50bb2347224b666a670912bb7f06dbe867a4a070ab3ce8"
+dependencies = [
+ "autocfg",
+]
+
+[[package]]
 name = "clang-sys"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1153,6 +1162,7 @@ name = "consensus-notifications"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "claim",
  "diem-crypto",
  "diem-types",
  "diem-workspace-hack",
@@ -4666,6 +4676,7 @@ name = "mempool-notifications"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "claim",
  "diem-crypto",
  "diem-types",
  "diem-workspace-hack",
@@ -7751,6 +7762,7 @@ dependencies = [
  "bcs",
  "bytes",
  "channel",
+ "claim",
  "consensus-notifications",
  "diem-config",
  "diem-crypto",
