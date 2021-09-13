@@ -26,12 +26,12 @@ const ENV_TEST_INCONSISTENCY: &str = "MVP_TEST_INCONSISTENCY";
 const ENV_TEST_FEATURE: &str = "MVP_TEST_FEATURE";
 const ENV_TEST_ON_CI: &str = "MVP_TEST_ON_CI";
 const INCONSISTENCY_TEST_FLAGS: &[&str] = &[
-    "--dependency=../move-stdlib/modules",
+    "--dependency=../move-stdlib/sources",
     "--dependency=../diem-framework/modules",
     "--check-inconsistency",
 ];
 const REGULAR_TEST_FLAGS: &[&str] = &[
-    "--dependency=../move-stdlib/modules",
+    "--dependency=../move-stdlib/sources",
     "--dependency=../diem-framework/modules",
 ];
 

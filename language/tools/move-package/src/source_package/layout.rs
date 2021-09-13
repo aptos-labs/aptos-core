@@ -11,6 +11,7 @@ pub enum SourcePackageLayout {
     Scripts,
     Examples,
     Manifest,
+    DocTemplates,
 }
 
 impl SourcePackageLayout {
@@ -21,6 +22,7 @@ impl SourcePackageLayout {
     /// ├── examples       (optional, dev mode)
     /// ├── scripts        (optional)
     /// ├── specifications (optional)
+    /// ├── doc_templates      (optional)
     /// └── tests          (optional, test mode)
     pub fn path(&self) -> &Path {
         Path::new(self.location_str())
@@ -34,13 +36,18 @@ impl SourcePackageLayout {
             Self::Scripts => "scripts",
             Self::Examples => "examples",
             Self::Specifications => "specifications",
+            Self::DocTemplates => "doc_templates",
         }
     }
 
     pub fn is_optional(&self) -> bool {
         match self {
             Self::Sources | Self::Manifest => false,
-            Self::Tests | Self::Scripts | Self::Examples | Self::Specifications => true,
+            Self::Tests
+            | Self::Scripts
+            | Self::Examples
+            | Self::Specifications
+            | Self::DocTemplates => true,
         }
     }
 }

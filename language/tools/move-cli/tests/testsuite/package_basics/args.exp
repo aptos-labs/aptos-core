@@ -1,0 +1,13 @@
+Command `package build`:
+BUILDING MoveStdlib
+BUILDING PackageBasics
+Command `package test`:
+BUILDING MoveStdlib
+BUILDING PackageBasics
+Running Move unit tests
+[ PASS    ] 0x1::AModuleTests::double_one_one
+[ PASS    ] 0x1::AModuleTests::double_three
+[ PASS    ] 0x1::AModuleTests::double_zero_zero
+[ PASS    ] 0x1::AModuleTests::double_zero_zero_wrong
+Test result: OK. Total tests: 4; passed: 4; failed: 0
+Command `package errmap`:

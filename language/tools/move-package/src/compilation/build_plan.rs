@@ -6,6 +6,7 @@ use crate::{
     source_package::parsed_manifest::PackageName,
 };
 use anyhow::Result;
+use move_lang::{compiled_unit::AnnotatedCompiledUnit, diagnostics::FilesSourceText, Compiler};
 use petgraph::algo::toposort;
 use std::{collections::BTreeMap, io::Write};
 
@@ -36,6 +37,18 @@ impl BuildPlan {
     }
 
     pub fn compile<W: Write>(&self, writer: &mut W) -> Result<CompiledPackage> {
+        self.compile_with_driver(writer, |compiler, _| compiler.build_and_report())
+    }
+
+    pub fn compile_with_driver<W: Write>(
+        &self,
+        writer: &mut W,
+        mut compiler_driver: impl FnMut(
+            Compiler,
+            bool,
+        )
+            -> anyhow::Result<(FilesSourceText, Vec<AnnotatedCompiledUnit>)>,
+    ) -> Result<CompiledPackage> {
         let package_root = &self.resolution_graph.package_table[&self.root];
         let project_root = &package_root.package_path;
         let mut compiled: BTreeMap<PackageName, CompiledPackage> = BTreeMap::new();
@@ -52,6 +65,8 @@ impl BuildPlan {
                 resolved_package.clone(),
                 dependencies,
                 &self.resolution_graph,
+                package_ident == &package_root.source_package.package.name,
+                &mut compiler_driver,
             )?;
             compiled.insert(*package_ident, compiled_package);
         }

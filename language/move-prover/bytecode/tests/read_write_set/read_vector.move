@@ -1,4 +1,4 @@
-// dep: ../../move-stdlib/modules/Vector.move
+// dep: ../../move-stdlib/sources/Vector.move
 
 module 0x2::ReadVector {
     use Std::Vector;

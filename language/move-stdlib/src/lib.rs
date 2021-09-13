@@ -12,17 +12,17 @@ pub mod utils;
 
 pub mod natives;
 
-const MODULES_DIR: &str = "modules";
+const MODULES_DIR: &str = "sources";
 const NURSERY_DIR: &str = "nursery";
 const DOCS_DIR: &str = "docs";
 const NURSERY_DOCS_DIR: &str = "nursery/docs";
 const ERRMAP_FILE: &str = "error_description.errmap";
 
-const REFERENCES_TEMPLATE: &str = "templates/references.md";
-const OVERVIEW_TEMPLATE: &str = "templates/overview.md";
+const REFERENCES_TEMPLATE: &str = "doc_templates/references.md";
+const OVERVIEW_TEMPLATE: &str = "doc_templates/overview.md";
 
 pub fn unit_testing_files() -> Vec<String> {
-    vec![path_in_crate("nursery/UnitTest.move")]
+    vec![path_in_crate("sources/UnitTest.move")]
         .into_iter()
         .map(|p| p.into_os_string().into_string().unwrap())
         .collect()

@@ -7,7 +7,7 @@ exit 1
 
 DIEM="$(git rev-parse --show-toplevel)"
 FRAMEWORK="$DIEM/language/diem-framework/modules"
-STDLIB="$DIEM/language/move-stdlib/modules"
+STDLIB="$DIEM/language/move-stdlib/sources"
 
 for config in *.toml ; do
   # Benchmark per function

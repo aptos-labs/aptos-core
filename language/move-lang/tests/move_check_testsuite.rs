@@ -63,13 +63,12 @@ fn move_check_testsuite(path: &Path) -> datatest_stable::Result<()> {
 // Runs all tests under the test/testsuite directory.
 fn run_test(path: &Path, exp_path: &Path, out_path: &Path, flags: Flags) -> anyhow::Result<()> {
     let targets: Vec<String> = vec![path.to_str().unwrap().to_owned()];
-    let mut deps = move_stdlib::move_stdlib_files();
-    deps.extend(move_stdlib::unit_testing_files());
 
-    let (files, comments_and_compiler_res) = Compiler::new(&targets, &deps)
-        .set_flags(flags)
-        .set_named_address_values(default_testing_addresses())
-        .run::<PASS_PARSER>()?;
+    let (files, comments_and_compiler_res) =
+        Compiler::new(&targets, &move_stdlib::move_stdlib_files())
+            .set_flags(flags)
+            .set_named_address_values(default_testing_addresses())
+            .run::<PASS_PARSER>()?;
     let diags = move_check_for_errors(comments_and_compiler_res);
 
     let has_diags = !diags.is_empty();

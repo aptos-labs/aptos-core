@@ -151,9 +151,7 @@ impl UnitTestingConfig {
 
     /// Build a test plan from a unit test config
     pub fn build_test_plan(&self) -> Option<TestPlan> {
-        let mut deps = self.dep_files.clone();
-
-        deps.extend(move_stdlib::unit_testing_files());
+        let deps = self.dep_files.clone();
 
         let TestPlan {
             files, module_info, ..

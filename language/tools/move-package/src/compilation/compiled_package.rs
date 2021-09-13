@@ -4,7 +4,10 @@
 use crate::{
     compilation::package_layout::CompiledPackageLayout,
     resolution::resolution_graph::{Renaming, ResolvedGraph, ResolvedPackage, ResolvedTable},
-    source_package::parsed_manifest::{FileName, NamedAddress, PackageName},
+    source_package::{
+        layout::SourcePackageLayout,
+        parsed_manifest::{FileName, NamedAddress, PackageName},
+    },
     BuildConfig,
 };
 use abigen::{Abigen, AbigenOptions};
@@ -22,6 +25,7 @@ use move_lang::{
     compiled_unit::{
         AnnotatedCompiledUnit, CompiledUnit, NamedCompiledModule, NamedCompiledScript,
     },
+    diagnostics::FilesSourceText,
     shared::{AddressBytes, Flags},
     Compiler,
 };
@@ -293,13 +297,18 @@ impl CompiledPackage {
         resolved_package: ResolvedPackage,
         dependencies: Vec<CompiledPackage>,
         resolution_graph: &ResolvedGraph,
+        is_root_package: bool,
+        mut compiler_driver: impl FnMut(
+            Compiler,
+            bool,
+        )
+            -> Result<(FilesSourceText, Vec<AnnotatedCompiledUnit>)>,
     ) -> Result<CompiledPackage> {
         writeln!(
             w,
-            "{} {} [{:?}]",
+            "{} {}",
             "BUILDING".bold().green(),
             resolved_package.source_package.package.name,
-            resolved_package.package_path
         )?;
 
         let mut module_resolution_metadata = BTreeMap::new();
@@ -363,7 +372,7 @@ impl CompiledPackage {
             Flags::empty()
         };
 
-        let (_, compiled_units) = Compiler::new(&sources, &dep_paths)
+        let compiler = Compiler::new(&sources, &dep_paths)
             .set_compiled_module_named_address_mapping(
                 module_resolution_metadata
                     .clone()
@@ -373,8 +382,8 @@ impl CompiledPackage {
             )
             .set_named_address_values(in_scope_named_addrs.clone())
             .set_interface_files_dir(tmp_interface_dir.path().to_string_lossy().to_string())
-            .set_flags(flags)
-            .build_and_report()?;
+            .set_flags(flags);
+        let (_, compiled_units) = compiler_driver(compiler, is_root_package)?;
 
         let (compiled_units, resolutions): (Vec<_>, Vec<_>) = compiled_units
             .into_iter()
@@ -408,7 +417,7 @@ impl CompiledPackage {
             )?;
 
             if resolution_graph.build_options.generate_docs {
-                compiled_docs = Some(Self::build_docs(&model, &build_root_path, &dependencies));
+                compiled_docs = Some(Self::build_docs(&model, project_root, &dependencies));
             }
 
             if resolution_graph.build_options.generate_abis {
@@ -557,14 +566,23 @@ impl CompiledPackage {
 
     fn build_docs(
         model: &GlobalEnv,
-        build_root_path: &Path,
+        project_root: &Path,
         deps: &[CompiledPackage],
     ) -> Vec<(String, String)> {
+        let root_doc_templates = find_filenames(
+            &[project_root
+                .join(SourcePackageLayout::DocTemplates.path())
+                .to_string_lossy()
+                .to_string()],
+            |path| extension_equals(path, "md"),
+        )
+        .unwrap();
         let doc_options = DocgenOptions {
             doc_path: deps
                 .iter()
                 .map(|dep| {
-                    build_root_path
+                    project_root
+                        .join(CompiledPackageLayout::Root.path())
                         .join(dep.compiled_package_info.package_name.as_str())
                         .join(CompiledPackageLayout::CompiledDocs.path())
                         .to_string_lossy()
@@ -572,6 +590,7 @@ impl CompiledPackage {
                 })
                 .collect(),
             output_directory: "".to_string(),
+            root_doc_templates,
             ..DocgenOptions::default()
         };
         let docgen = Docgen::new(model, &doc_options);

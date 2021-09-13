@@ -194,7 +194,7 @@ impl ResolvingGraph {
         let mut resolution_table = BTreeMap::new();
 
         // include dev dependencies if in dev mode
-        let additional_deps = if !self.build_options.dev_mode {
+        let additional_deps = if self.build_options.dev_mode {
             package.dev_dependencies.clone()
         } else {
             BTreeMap::new()
