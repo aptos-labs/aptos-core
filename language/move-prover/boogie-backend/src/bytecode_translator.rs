@@ -37,6 +37,7 @@ use crate::{
 };
 use bytecode::{
     function_target_pipeline::FunctionVariant,
+    options::ProverOptions,
     stackless_bytecode::{AbortAction, PropKind},
 };
 use codespan::LineIndex;
@@ -87,6 +88,7 @@ impl<'env> BoogieTranslator<'env> {
         let env = self.env;
         let spec_translator = &self.spec_translator;
 
+        let prover_options = ProverOptions::get(env);
         let mono_info = mono_analysis::get_info(self.env);
         let empty = &BTreeSet::new();
 
@@ -164,14 +166,42 @@ impl<'env> BoogieTranslator<'env> {
                 }
                 for (variant, ref fun_target) in self.targets.get_targets(fun_env) {
                     if variant.is_verified() {
-                        // Verified functions are translated with an empty instantiation, as they
-                        // are the top-level entry points for a VC.
+                        // Always produce a verified functions with an empty instantiation such that
+                        // there is at least one top-level entry points for a VC.
                         FunctionTranslator {
                             parent: self,
                             fun_target,
                             type_inst: &[],
                         }
                         .translate();
+
+                        // There maybe more verification targets that needs to be produced if we
+                        // defer the function instantiation to this stage
+                        if prover_options.boogie_poly {
+                            for type_inst in mono_info
+                                .funs
+                                .get(&fun_target.func_env.get_qualified_id())
+                                .unwrap_or(empty)
+                            {
+                                // Skip the none instantiation (i.e., each type parameter is
+                                // instantiated to itself as a concrete type). This has the same
+                                // effect as `type_inst: &[]` and is already captured above.
+                                let is_none_inst = type_inst
+                                    .iter()
+                                    .enumerate()
+                                    .all(|(i, t)| matches!(t, Type::TypeParameter(idx) if *idx == i as u16));
+                                if is_none_inst {
+                                    continue;
+                                }
+
+                                FunctionTranslator {
+                                    parent: self,
+                                    fun_target,
+                                    type_inst,
+                                }
+                                .translate();
+                            }
+                        }
                     } else {
                         // This variant is inlined, so translate for all type instantiations.
                         for type_inst in mono_info
@@ -407,10 +437,6 @@ impl<'env> FunctionTranslator<'env> {
         let (suffix, attribs) = match &fun_target.data.variant {
             FunctionVariant::Baseline => ("".to_string(), "{:inline 1} ".to_string()),
             FunctionVariant::Verification(flavor) => {
-                assert!(
-                    self.type_inst.is_empty(),
-                    "verification variant cannot have an instantiation"
-                );
                 let timeout = fun_target
                     .func_env
                     .get_num_pragma(TIMEOUT_PRAGMA, || options.vc_timeout);
