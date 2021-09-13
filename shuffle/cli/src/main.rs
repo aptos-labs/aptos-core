@@ -5,6 +5,7 @@ use anyhow::Result;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
+mod deploy;
 mod new;
 mod node;
 
@@ -13,6 +14,10 @@ pub fn main() -> Result<()> {
     match subcommand {
         Subcommand::New { blockchain, path } => new::handle(blockchain, path),
         Subcommand::Node { project_path } => node::handle(project_path.as_path()),
+        Subcommand::Deploy {
+            project_path,
+            account_key_path,
+        } => deploy::handle(project_path, account_key_path),
     }
 }
 
@@ -30,4 +35,9 @@ pub enum Subcommand {
     },
     #[structopt(about = "Runs a local devnet with prefunded accounts")]
     Node { project_path: PathBuf },
+    #[structopt(about = "Publishes a move module under an account")]
+    Deploy {
+        project_path: PathBuf,
+        account_key_path: PathBuf,
+    },
 }

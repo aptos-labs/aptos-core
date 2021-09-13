@@ -7560,25 +7560,39 @@ dependencies = [
 name = "shuffle"
 version = "0.1.0"
 dependencies = [
+ "abigen",
  "anyhow",
+ "bcs",
  "diem-config",
+ "diem-crypto",
  "diem-framework",
  "diem-framework-releases",
  "diem-genesis-tool",
+ "diem-json-rpc-types",
  "diem-node",
+ "diem-sdk",
+ "diem-temppath",
  "diem-types",
  "diem-workspace-hack",
+ "diemdb",
+ "generate-key",
+ "move-binary-format",
  "move-cli",
+ "move-command-line-common",
  "move-lang",
  "move-package",
+ "move-prover",
  "move-stdlib",
  "once_cell",
  "serde",
  "serde_json",
  "shuffle-custom-node",
+ "shuffle-transaction-builder",
  "structopt 0.3.21",
  "tempfile",
  "toml",
+ "transaction-builder-generator",
+ "walkdir",
 ]
 
 [[package]]
@@ -7617,33 +7631,6 @@ dependencies = [
  "move-prover",
  "move-stdlib",
  "rand 0.8.3",
- "structopt 0.3.21",
- "transaction-builder-generator",
- "walkdir",
-]
-
-[[package]]
-name = "shuffle-sample-custom-app"
-version = "0.1.0"
-dependencies = [
- "abigen",
- "anyhow",
- "bcs",
- "diem-config",
- "diem-crypto",
- "diem-genesis-tool",
- "diem-json-rpc-types",
- "diem-node",
- "diem-sdk",
- "diem-temppath",
- "diem-types",
- "diem-workspace-hack",
- "diemdb",
- "generate-key",
- "log",
- "move-prover",
- "rand 0.8.3",
- "shuffle-transaction-builder",
  "structopt 0.3.21",
  "transaction-builder-generator",
  "walkdir",

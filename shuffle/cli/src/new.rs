@@ -98,7 +98,7 @@ macro_rules! include_files(
 /// at compilation time, for reference during project generation.
 static EMBEDDED_MOVE_STARTER_FILES: Lazy<HashMap<&str, &[u8]>> = Lazy::new(|| {
     include_files! {
-        "move/src/modules/SampleModule.move"
+        "move/src/SampleModule.move"
     }
 });
 
@@ -179,7 +179,7 @@ mod test {
 
         // spot check move starter files
         let expected_starter_content =
-            String::from_utf8_lossy(include_bytes!("../../move/src/modules/SampleModule.move"));
+            String::from_utf8_lossy(include_bytes!("../../move/src/SampleModule.move"));
         let actual_starter_content =
             fs::read_to_string(dir.path().join("helloblockchain/sources/SampleModule.move"))
                 .unwrap();

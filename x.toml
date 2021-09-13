@@ -230,7 +230,6 @@ members = [
     "shuffle",
     "shuffle-custom-move-code",
     "shuffle-custom-node",
-    "shuffle-sample-custom-app",
     "shuffle-transaction-builder",
     "smoke-test",
     "socket-bench-server",

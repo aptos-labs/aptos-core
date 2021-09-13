@@ -14,6 +14,7 @@ Please run `cargo run -p shuffle -- help`. Ultimately, this will become
 
 1. `cargo run -p shuffle -- new /tmp/helloblockchain` creates a new shuffle project
 2. `cargo run -p shuffle -- node /tmp/helloblockchain` runs node based on project
+3. `cargo run -p shuffle -- deploy /tmp/helloblockchain` publishes a module to the created node
 
 ## Development
 

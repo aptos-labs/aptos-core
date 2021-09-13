@@ -155,7 +155,6 @@ members = [
     "shuffle/cli",
     "shuffle/genesis",
     "shuffle/move",
-    "shuffle/sample-app",
     "shuffle/transaction-builder",
     "state-sync/inter-component/consensus-notifications",
     "state-sync/inter-component/event-notifications",

@@ -14,7 +14,6 @@ just started.
 ├── move/src                  # Move source code
 │   ├── diem                  # Diem Framework code
 │   ├── SampleModule.move     # A sample Move module
-├── sample-app                # A sample app talking to the blockchain
 ├── transaction-builder       # Auto-generated transaction builders in Rust
 ```
 ## Step 0: Install Dependencies
@@ -77,29 +76,3 @@ Building Move code ... thread 'main' panicked at 'Automatically building Move co
 Need to manually resolve the issue using the CLI', shuffle/genesis/src/lib.rs:75:13
 ```
 Go back to `./move` folder and recompile by running `compile.sh` again.
-
-## Step 3: Send Transactions to the Validator
-
-Make sure your node from step 2 is running before starting this step.
-
-Inside `./sample-app`, run the following command:
-```bash
-cargo run -- --node-config-dir <config-dir-from-previous-step> --account-key-path new_account.key
-```
-
-The output of this command should look like this:
-```
-Connecting to http://0.0.0.0:8080...
-Create a new account...Success!
-Mint a coin to the new account...Success!
-Mint another coin to the new account (this should fail)...
-Error: TransactionExecutionFailed(
-.... some detailed error message
-```
-
-This sample app submits three transactions to the validator node:
-(1) creates a new account with the specified key at `account-key-path`, (2) publishes a `SampleModule::Coin` resource under the address of the
-newly created account, (3) publish another `SampleModule::Coin` resource to the address of the same account.
-
-The first two transactions should succeed and the last one should fail because you can only publish
-one resource of each type under an address.
