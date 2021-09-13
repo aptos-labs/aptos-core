@@ -27,6 +27,7 @@ use diem_network_address_encryption::Encryptor;
 use diem_secure_storage::Storage;
 use diem_time_service::TimeService;
 use diem_types::{chain_id::ChainId, network_address::NetworkAddress};
+use event_notifications::{EventSubscriptionService, ReconfigNotificationListener};
 use network::{
     application::storage::PeerMetadataStorage,
     connectivity_manager::{builder::ConnectivityManagerBuilder, ConnectivityRequest},
@@ -41,13 +42,12 @@ use network::{
     },
     ProtocolId,
 };
-use network_discovery::{gen_simple_discovery_reconfig_subscription, DiscoveryChangeListener};
+use network_discovery::DiscoveryChangeListener;
 use std::{
     clone::Clone,
     collections::{HashMap, HashSet},
     sync::Arc,
 };
-use subscription_service::ReconfigSubscription;
 use tokio::runtime::Handle;
 
 #[derive(Debug, PartialEq, PartialOrd)]
@@ -72,9 +72,6 @@ pub struct NetworkBuilder {
     health_checker_builder: Option<HealthCheckerBuilder>,
     peer_manager_builder: PeerManagerBuilder,
     peer_metadata_storage: Arc<PeerMetadataStorage>,
-
-    // (StateSync) ReconfigSubscriptions required by internal Network components.
-    reconfig_subscriptions: Vec<ReconfigSubscription>,
 }
 
 impl NetworkBuilder {
@@ -124,7 +121,6 @@ impl NetworkBuilder {
             connectivity_manager_builder: None,
             health_checker_builder: None,
             peer_manager_builder,
-            reconfig_subscriptions: vec![],
             peer_metadata_storage,
         }
     }
@@ -176,6 +172,7 @@ impl NetworkBuilder {
         role: RoleType,
         config: &NetworkConfig,
         time_service: TimeService,
+        mut reconfig_subscription_service: Option<&mut EventSubscriptionService>,
     ) -> NetworkBuilder {
         let peer_id = config.peer_id();
         let identity_key = config.identity_key();
@@ -233,10 +230,23 @@ impl NetworkBuilder {
 
         network_builder.discovery_listeners = Some(Vec::new());
         for discovery_method in config.discovery_methods() {
+            let reconfig_listener = if *discovery_method == DiscoveryMethod::Onchain {
+                Some(
+                    reconfig_subscription_service
+                        .as_deref_mut()
+                        .expect("An event subscription service is required for on-chain discovery!")
+                        .subscribe_to_reconfigurations()
+                        .expect("On-chain discovery is unable to subscribe to reconfigurations!"),
+                )
+            } else {
+                None
+            };
+
             network_builder.add_discovery_change_listener(
                 discovery_method,
                 pubkey,
                 config.encryptor(),
+                reconfig_listener,
             );
         }
 
@@ -300,10 +310,6 @@ impl NetworkBuilder {
                 .for_each(|listener| listener.start(executor))
         }
         self
-    }
-
-    pub fn reconfig_subscriptions(&mut self) -> &mut Vec<ReconfigSubscription> {
-        &mut self.reconfig_subscriptions
     }
 
     pub fn network_context(&self) -> Arc<NetworkContext> {
@@ -370,6 +376,7 @@ impl NetworkBuilder {
         discovery_method: &DiscoveryMethod,
         pubkey: PublicKey,
         encryptor: Encryptor<Storage>,
+        reconfig_events: Option<ReconfigNotificationListener>,
     ) {
         let conn_mgr_reqs_tx = self
             .conn_mgr_reqs_tx()
@@ -377,16 +384,14 @@ impl NetworkBuilder {
 
         let listener = match discovery_method {
             DiscoveryMethod::Onchain => {
-                let (simple_discovery_reconfig_subscription, simple_discovery_reconfig_rx) =
-                    gen_simple_discovery_reconfig_subscription();
-                self.reconfig_subscriptions
-                    .push(simple_discovery_reconfig_subscription);
+                let reconfig_events =
+                    reconfig_events.expect("Reconfiguration listener is expected!");
                 DiscoveryChangeListener::validator_set(
                     self.network_context.clone(),
                     conn_mgr_reqs_tx,
                     pubkey,
                     encryptor,
-                    simple_discovery_reconfig_rx,
+                    reconfig_events,
                 )
             }
             DiscoveryMethod::File(path, interval_duration) => DiscoveryChangeListener::file(
