@@ -10,7 +10,7 @@ pub(crate) mod merge_spec_modules;
 pub(crate) mod sources_shadow_deps;
 
 use crate::{
-    diagnostics::{Diagnostics, FilesSourceText},
+    diagnostics::{codes::Severity, Diagnostics, FilesSourceText},
     parser,
     parser::syntax::parse_file_string,
     shared::CompilationEnv,
@@ -26,7 +26,7 @@ use std::{
 };
 
 pub(crate) fn parse_program(
-    compilation_env: &CompilationEnv,
+    compilation_env: &mut CompilationEnv,
     targets: &[String],
     deps: &[String],
 ) -> anyhow::Result<(
@@ -49,19 +49,24 @@ pub(crate) fn parse_program(
     let mut diags: Diagnostics = Diagnostics::new();
 
     for fname in targets {
-        let (defs, comments, ds) = parse_file(&mut files, fname)?;
+        let (defs, comments, ds) = parse_file(compilation_env, &mut files, fname)?;
         source_definitions.extend(defs);
         source_comments.insert(fname, comments);
         diags.extend(ds);
     }
 
     for fname in deps {
-        let (defs, _, ds) = parse_file(&mut files, fname)?;
+        let (defs, _, ds) = parse_file(compilation_env, &mut files, fname)?;
         lib_definitions.extend(defs);
         diags.extend(ds);
     }
 
-    // TODO fix this to allow warnings
+    // TODO fix this so it works likes other passes and the handling of errors is done outside of
+    // this function
+    let env_result = compilation_env.check_diags_at_or_above_severity(Severity::BlockingError);
+    if let Err(env_diags) = env_result {
+        diags.extend(env_diags)
+    }
     let res = if diags.is_empty() {
         let pprog = parser::ast::Program {
             source_definitions,
@@ -115,6 +120,7 @@ fn ensure_targets_deps_dont_intersect(
 }
 
 fn parse_file(
+    compilation_env: &mut CompilationEnv,
     files: &mut FilesSourceText,
     fname: Symbol,
 ) -> anyhow::Result<(
@@ -135,7 +141,7 @@ fn parse_file(
         }
         Ok(()) => &source_buffer,
     };
-    let (defs, comments) = match parse_file_string(fname, buffer) {
+    let (defs, comments) = match parse_file_string(compilation_env, fname, buffer) {
         Ok(defs_and_comments) => defs_and_comments,
         Err(ds) => {
             diags.extend(ds);

@@ -172,9 +172,9 @@ impl<'a, 'b> Compiler<'a, 'b> {
             interface_files_dir_opt,
             &compiled_module_named_address_mapping,
         )?;
-        let compilation_env = CompilationEnv::new(flags, named_address_mapping);
+        let mut compilation_env = CompilationEnv::new(flags, named_address_mapping);
         let (source_text, pprog_and_comments_res) =
-            parse_program(&compilation_env, targets, &deps)?;
+            parse_program(&mut compilation_env, targets, &deps)?;
         let res: Result<_, Diagnostics> = pprog_and_comments_res.and_then(|(pprog, comments)| {
             SteppedCompiler::new_at_parser(compilation_env, pre_compiled_lib, pprog)
                 .run::<TARGET>()

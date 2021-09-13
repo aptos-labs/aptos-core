@@ -1,3 +1,15 @@
+warning[W09003]: unused assignment
+   ┌─ tests/move_check/expansion/unpack_all_field_cases.move:10:13
+   │
+10 │         S { f, g } = copy s;
+   │             ^ Unused assignment or binding for local 'f'. Consider removing, replacing with '_', or prefixing with '_' (e.g., '_f')
+
+warning[W09003]: unused assignment
+   ┌─ tests/move_check/expansion/unpack_all_field_cases.move:10:16
+   │
+10 │         S { f, g } = copy s;
+   │                ^ Unused assignment or binding for local 'g'. Consider removing, replacing with '_', or prefixing with '_' (e.g., '_g')
+
 error[E01009]: invalid assignment
    ┌─ tests/move_check/expansion/unpack_all_field_cases.move:11:16
    │

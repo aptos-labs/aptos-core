@@ -2,9 +2,9 @@
 
 /// Documentation comments can have multiple blocks.
 /** They may use different limiters. */
-module M {
+module 0x42::M {
     /** There can be no doc comment on uses. */
-    use DiemFramework::DiemAccount;
+    use Std::Option::Option;
 
     /// This is f.
     fun f() { }
@@ -12,7 +12,7 @@ module M {
     /// This is T
     struct T {
         /// This is a field of T.
-        f: u64,
+        f: Option<u64>,
         /// There can be no doc comment after last field.
     }
 

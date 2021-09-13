@@ -99,15 +99,15 @@ codes!(
     Uncategorized: [],
     // syntax errors
     Syntax: [
-        InvalidCharacter: { msg: "invalid character", severity: BlockingError },
-        UnexpectedToken: { msg: "unexpected token", severity: BlockingError },
-        InvalidModifier: { msg: "invalid modifier", severity: BlockingError },
+        InvalidCharacter: { msg: "invalid character", severity: NonblockingError },
+        UnexpectedToken: { msg: "unexpected token", severity: NonblockingError },
+        InvalidModifier: { msg: "invalid modifier", severity: NonblockingError },
         InvalidDocComment: { msg: "invalid documentation comment", severity: Warning },
-        InvalidAddress: { msg: "invalid address", severity: BlockingError },
-        InvalidNumber: { msg: "invalid number literal", severity: BlockingError },
-        InvalidByteString: { msg: "invalid byte string", severity: BlockingError },
-        InvalidHexString: { msg: "invalid hex string", severity: BlockingError },
-        InvalidLValue: { msg: "invalid assignment", severity: BlockingError },
+        InvalidAddress: { msg: "invalid address", severity: NonblockingError },
+        InvalidNumber: { msg: "invalid number literal", severity: NonblockingError },
+        InvalidByteString: { msg: "invalid byte string", severity: NonblockingError },
+        InvalidHexString: { msg: "invalid hex string", severity: NonblockingError },
+        InvalidLValue: { msg: "invalid assignment", severity: NonblockingError },
         SpecContextRestricted:
             { msg: "syntax item restricted to spec contexts", severity: BlockingError },
     ],

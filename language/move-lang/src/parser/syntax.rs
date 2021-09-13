@@ -1,6 +1,10 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+// In the informal grammar comments in this file, Comma<T> is shorthand for:
+//      (<T> ",")* <T>?
+// Note that this allows an optional trailing comma.
+
 use move_ir_types::location::*;
 use move_symbol_pool::Symbol;
 
@@ -12,9 +16,16 @@ use crate::{
     MatchedFileCommentMap,
 };
 
-// In the informal grammar comments in this file, Comma<T> is shorthand for:
-//      (<T> ",")* <T>?
-// Note that this allows an optional trailing comma.
+struct Context<'env, 'lexer, 'input> {
+    env: &'env mut CompilationEnv,
+    tokens: &'lexer mut Lexer<'input>,
+}
+
+impl<'env, 'lexer, 'input> Context<'env, 'lexer, 'input> {
+    fn new(env: &'env mut CompilationEnv, tokens: &'lexer mut Lexer<'input>) -> Self {
+        Self { env, tokens }
+    }
+}
 
 //**************************************************************************************************
 // Error Handling
@@ -161,19 +172,19 @@ fn adjust_token(tokens: &mut Lexer, end_token: Tok) {
 // Parse a comma-separated list of items, including the specified starting and
 // ending tokens.
 fn parse_comma_list<F, R>(
-    tokens: &mut Lexer,
+    context: &mut Context,
     start_token: Tok,
     end_token: Tok,
     parse_list_item: F,
     item_description: &str,
 ) -> Result<Vec<R>, Diagnostic>
 where
-    F: Fn(&mut Lexer) -> Result<R, Diagnostic>,
+    F: Fn(&mut Context) -> Result<R, Diagnostic>,
 {
-    let start_loc = tokens.start_loc();
-    consume_token(tokens, start_token)?;
+    let start_loc = context.tokens.start_loc();
+    consume_token(context.tokens, start_token)?;
     parse_comma_list_after_start(
-        tokens,
+        context,
         start_loc,
         start_token,
         end_token,
@@ -185,7 +196,7 @@ where
 // Parse a comma-separated list of items, including the specified ending token, but
 // assuming that the starting token has already been consumed.
 fn parse_comma_list_after_start<F, R>(
-    tokens: &mut Lexer,
+    context: &mut Context,
     start_loc: usize,
     start_token: Tok,
     end_token: Tok,
@@ -193,39 +204,39 @@ fn parse_comma_list_after_start<F, R>(
     item_description: &str,
 ) -> Result<Vec<R>, Diagnostic>
 where
-    F: Fn(&mut Lexer) -> Result<R, Diagnostic>,
+    F: Fn(&mut Context) -> Result<R, Diagnostic>,
 {
-    adjust_token(tokens, end_token);
-    if match_token(tokens, end_token)? {
+    adjust_token(context.tokens, end_token);
+    if match_token(context.tokens, end_token)? {
         return Ok(vec![]);
     }
     let mut v = vec![];
     loop {
-        if tokens.peek() == Tok::Comma {
-            let current_loc = tokens.start_loc();
-            let loc = make_loc(tokens.file_name(), current_loc, current_loc);
+        if context.tokens.peek() == Tok::Comma {
+            let current_loc = context.tokens.start_loc();
+            let loc = make_loc(context.tokens.file_name(), current_loc, current_loc);
             return Err(diag!(
                 Syntax::UnexpectedToken,
                 (loc, format!("Expected {}", item_description))
             ));
         }
-        v.push(parse_list_item(tokens)?);
-        adjust_token(tokens, end_token);
-        if match_token(tokens, end_token)? {
+        v.push(parse_list_item(context)?);
+        adjust_token(&mut context.tokens, end_token);
+        if match_token(&mut context.tokens, end_token)? {
             break Ok(v);
         }
-        if !match_token(tokens, Tok::Comma)? {
-            let current_loc = tokens.start_loc();
-            let loc = make_loc(tokens.file_name(), current_loc, current_loc);
-            let loc2 = make_loc(tokens.file_name(), start_loc, start_loc);
+        if !match_token(&mut context.tokens, Tok::Comma)? {
+            let current_loc = context.tokens.start_loc();
+            let loc = make_loc(context.tokens.file_name(), current_loc, current_loc);
+            let loc2 = make_loc(context.tokens.file_name(), start_loc, start_loc);
             return Err(diag!(
                 Syntax::UnexpectedToken,
                 (loc, format!("Expected '{}'", end_token)),
                 (loc2, format!("To match this '{}'", start_token)),
             ));
         }
-        adjust_token(tokens, end_token);
-        if match_token(tokens, end_token)? {
+        adjust_token(context.tokens, end_token);
+        if match_token(context.tokens, end_token)? {
             break Ok(v);
         }
     }
@@ -234,18 +245,18 @@ where
 // Parse a list of items, without specified start and end tokens, and the separator determined by
 // the passed function `parse_list_continue`.
 fn parse_list<C, F, R>(
-    tokens: &mut Lexer,
+    context: &mut Context,
     mut parse_list_continue: C,
     parse_list_item: F,
 ) -> Result<Vec<R>, Diagnostic>
 where
-    C: FnMut(&mut Lexer) -> Result<bool, Diagnostic>,
-    F: Fn(&mut Lexer) -> Result<R, Diagnostic>,
+    C: FnMut(&mut Context) -> Result<bool, Diagnostic>,
+    F: Fn(&mut Context) -> Result<R, Diagnostic>,
 {
     let mut v = vec![];
     loop {
-        v.push(parse_list_item(tokens)?);
-        if !parse_list_continue(tokens)? {
+        v.push(parse_list_item(context)?);
+        if !parse_list_continue(context)? {
             break Ok(v);
         }
     }
@@ -257,130 +268,145 @@ where
 
 // Parse an identifier:
 //      Identifier = <IdentifierValue>
-fn parse_identifier(tokens: &mut Lexer) -> Result<Name, Diagnostic> {
-    if tokens.peek() != Tok::IdentifierValue {
-        return Err(unexpected_token_error(tokens, "an identifier"));
+fn parse_identifier(context: &mut Context) -> Result<Name, Diagnostic> {
+    if context.tokens.peek() != Tok::IdentifierValue {
+        return Err(unexpected_token_error(context.tokens, "an identifier"));
     }
-    let start_loc = tokens.start_loc();
-    let id = tokens.content().into();
-    tokens.advance()?;
-    let end_loc = tokens.previous_end_loc();
-    Ok(spanned(tokens.file_name(), start_loc, end_loc, id))
+    let start_loc = context.tokens.start_loc();
+    let id = context.tokens.content().into();
+    context.tokens.advance()?;
+    let end_loc = context.tokens.previous_end_loc();
+    Ok(spanned(context.tokens.file_name(), start_loc, end_loc, id))
 }
 
 // Parse a numerical address value
 //     AddressBytes = <Number>
-fn parse_address_bytes(tokens: &mut Lexer) -> Result<Spanned<AddressBytes>, Diagnostic> {
-    let loc = current_token_loc(tokens);
-    let addr_res = AddressBytes::parse_str(tokens.content());
-    consume_token(tokens, Tok::NumValue)?;
-    match addr_res {
-        Ok(addr_) => Ok(sp(loc, addr_)),
-        Err(msg) => Err(diag!(Syntax::InvalidAddress, (loc, msg))),
-    }
+fn parse_address_bytes(context: &mut Context) -> Result<Spanned<AddressBytes>, Diagnostic> {
+    let loc = current_token_loc(context.tokens);
+    let addr_res = AddressBytes::parse_str(context.tokens.content());
+    consume_token(context.tokens, Tok::NumValue)?;
+    let addr_ = match addr_res {
+        Ok(addr_) => addr_,
+        Err(msg) => {
+            context
+                .env
+                .add_diag(diag!(Syntax::InvalidAddress, (loc, msg)));
+            AddressBytes::DEFAULT_ERROR_BYTES
+        }
+    };
+    Ok(sp(loc, addr_))
 }
 
 // Parse the beginning of an access, either an address or an identifier:
 //      LeadingNameAccess = <AddressBytes> | <Identifier>
-fn parse_leading_name_access(tokens: &mut Lexer) -> Result<LeadingNameAccess, Diagnostic> {
-    parse_leading_name_access_(tokens, || "an address or an identifier")
+fn parse_leading_name_access(context: &mut Context) -> Result<LeadingNameAccess, Diagnostic> {
+    parse_leading_name_access_(context, || "an address or an identifier")
 }
 
 // Parse the beginning of an access, either an address or an identifier with a specific description
 fn parse_leading_name_access_<'a, F: FnOnce() -> &'a str>(
-    tokens: &mut Lexer,
+    context: &mut Context,
     item_description: F,
 ) -> Result<LeadingNameAccess, Diagnostic> {
-    match tokens.peek() {
+    match context.tokens.peek() {
         Tok::IdentifierValue => {
-            let loc = current_token_loc(tokens);
-            let n = parse_identifier(tokens)?;
+            let loc = current_token_loc(context.tokens);
+            let n = parse_identifier(context)?;
             Ok(sp(loc, LeadingNameAccess_::Name(n)))
         }
         Tok::NumValue => {
-            let sp!(loc, addr) = parse_address_bytes(tokens)?;
+            let sp!(loc, addr) = parse_address_bytes(context)?;
             Ok(sp(loc, LeadingNameAccess_::AnonymousAddress(addr)))
         }
-        _ => Err(unexpected_token_error(tokens, item_description())),
+        _ => Err(unexpected_token_error(context.tokens, item_description())),
     }
 }
 
 // Parse a variable name:
 //      Var = <Identifier>
-fn parse_var(tokens: &mut Lexer) -> Result<Var, Diagnostic> {
-    Ok(Var(parse_identifier(tokens)?))
+fn parse_var(context: &mut Context) -> Result<Var, Diagnostic> {
+    Ok(Var(parse_identifier(context)?))
 }
 
 // Parse a field name:
 //      Field = <Identifier>
-fn parse_field(tokens: &mut Lexer) -> Result<Field, Diagnostic> {
-    Ok(Field(parse_identifier(tokens)?))
+fn parse_field(context: &mut Context) -> Result<Field, Diagnostic> {
+    Ok(Field(parse_identifier(context)?))
 }
 
 // Parse a module name:
 //      ModuleName = <Identifier>
-fn parse_module_name(tokens: &mut Lexer) -> Result<ModuleName, Diagnostic> {
-    Ok(ModuleName(parse_identifier(tokens)?))
+fn parse_module_name(context: &mut Context) -> Result<ModuleName, Diagnostic> {
+    Ok(ModuleName(parse_identifier(context)?))
 }
 
 // Parse a module identifier:
 //      ModuleIdent = <LeadingNameAccess> "::" <ModuleName>
-fn parse_module_ident(tokens: &mut Lexer) -> Result<ModuleIdent, Diagnostic> {
-    let start_loc = tokens.start_loc();
-    let address = parse_leading_name_access(tokens)?;
+fn parse_module_ident(context: &mut Context) -> Result<ModuleIdent, Diagnostic> {
+    let start_loc = context.tokens.start_loc();
+    let address = parse_leading_name_access(context)?;
 
     consume_token_(
-        tokens,
+        context.tokens,
         Tok::ColonColon,
         start_loc,
         " after an address in a module identifier",
     )?;
-    let module = parse_module_name(tokens)?;
-    let end_loc = tokens.previous_end_loc();
-    let loc = make_loc(tokens.file_name(), start_loc, end_loc);
+    let module = parse_module_name(context)?;
+    let end_loc = context.tokens.previous_end_loc();
+    let loc = make_loc(context.tokens.file_name(), start_loc, end_loc);
     Ok(sp(loc, ModuleIdent_ { address, module }))
 }
 
 // Parse a module access (a variable, struct type, or function):
 //      NameAccessChain = <LeadingNameAccess> ( "::" <Identifier> ( "::" <Identifier> )? )?
 fn parse_name_access_chain<'a, F: FnOnce() -> &'a str>(
-    tokens: &mut Lexer,
+    context: &mut Context,
     item_description: F,
 ) -> Result<NameAccessChain, Diagnostic> {
-    let start_loc = tokens.start_loc();
-    let access = parse_name_access_chain_(tokens, item_description)?;
-    let end_loc = tokens.previous_end_loc();
-    Ok(spanned(tokens.file_name(), start_loc, end_loc, access))
+    let start_loc = context.tokens.start_loc();
+    let access = parse_name_access_chain_(context, item_description)?;
+    let end_loc = context.tokens.previous_end_loc();
+    Ok(spanned(
+        context.tokens.file_name(),
+        start_loc,
+        end_loc,
+        access,
+    ))
 }
 
 // Parse a module access with a specific description
 fn parse_name_access_chain_<'a, F: FnOnce() -> &'a str>(
-    tokens: &mut Lexer,
+    context: &mut Context,
     item_description: F,
 ) -> Result<NameAccessChain_, Diagnostic> {
-    let start_loc = tokens.start_loc();
-    let ln = parse_leading_name_access_(tokens, item_description)?;
+    let start_loc = context.tokens.start_loc();
+    let ln = parse_leading_name_access_(context, item_description)?;
     let ln = match ln {
         // A name by itself is a valid access chain
-        sp!(_, LeadingNameAccess_::Name(n1)) if tokens.peek() != Tok::ColonColon => {
+        sp!(_, LeadingNameAccess_::Name(n1)) if context.tokens.peek() != Tok::ColonColon => {
             return Ok(NameAccessChain_::One(n1))
         }
         ln => ln,
     };
 
     consume_token_(
-        tokens,
+        context.tokens,
         Tok::ColonColon,
         start_loc,
         " after an address in a module access chain",
     )?;
-    let n2 = parse_identifier(tokens)?;
-    if tokens.peek() != Tok::ColonColon {
+    let n2 = parse_identifier(context)?;
+    if context.tokens.peek() != Tok::ColonColon {
         return Ok(NameAccessChain_::Two(ln, n2));
     }
-    let ln_n2_loc = make_loc(tokens.file_name(), start_loc, tokens.previous_end_loc());
-    consume_token(tokens, Tok::ColonColon)?;
-    let n3 = parse_identifier(tokens)?;
+    let ln_n2_loc = make_loc(
+        context.tokens.file_name(),
+        start_loc,
+        context.tokens.previous_end_loc(),
+    );
+    consume_token(context.tokens, Tok::ColonColon)?;
+    let n3 = parse_identifier(context)?;
     Ok(NameAccessChain_::Three(sp(ln_n2_loc, (ln, n2)), n3))
 }
 
@@ -408,16 +434,16 @@ impl Modifiers {
 //      ModuleMemberModifier = <Visibility> | "native"
 // ModuleMemberModifiers checks for uniqueness, meaning each individual ModuleMemberModifier can
 // appear only once
-fn parse_module_member_modifiers(tokens: &mut Lexer) -> Result<Modifiers, Diagnostic> {
+fn parse_module_member_modifiers(context: &mut Context) -> Result<Modifiers, Diagnostic> {
     let mut mods = Modifiers::empty();
     loop {
-        match tokens.peek() {
+        match context.tokens.peek() {
             Tok::Public => {
-                let vis = parse_visibility(tokens)?;
+                let vis = parse_visibility(context)?;
                 if let Some(prev_vis) = mods.visibility {
                     let msg = "Duplicate visibility modifier".to_string();
                     let prev_msg = "Visibility modifier previously given here".to_string();
-                    return Err(diag!(
+                    context.env.add_diag(diag!(
                         Declarations::DuplicateItem,
                         (vis.loc().unwrap(), msg),
                         (prev_vis.loc().unwrap(), prev_msg),
@@ -426,16 +452,16 @@ fn parse_module_member_modifiers(tokens: &mut Lexer) -> Result<Modifiers, Diagno
                 mods.visibility = Some(vis)
             }
             Tok::Native => {
-                let loc = current_token_loc(tokens);
-                tokens.advance()?;
+                let loc = current_token_loc(context.tokens);
+                context.tokens.advance()?;
                 if let Some(prev_loc) = mods.native {
                     let msg = "Duplicate 'native' modifier".to_string();
                     let prev_msg = "'native' modifier previously given here".to_string();
-                    return Err(diag!(
+                    context.env.add_diag(diag!(
                         Declarations::DuplicateItem,
                         (loc, msg),
                         (prev_loc, prev_msg)
-                    ));
+                    ))
                 }
                 mods.native = Some(loc)
             }
@@ -447,22 +473,22 @@ fn parse_module_member_modifiers(tokens: &mut Lexer) -> Result<Modifiers, Diagno
 
 // Parse a function visibility modifier:
 //      Visibility = "public" ( "(" "script" | "friend" ")" )?
-fn parse_visibility(tokens: &mut Lexer) -> Result<Visibility, Diagnostic> {
-    let start_loc = tokens.start_loc();
-    consume_token(tokens, Tok::Public)?;
-    let sub_public_vis = if match_token(tokens, Tok::LParen)? {
-        let sub_token = tokens.peek();
-        tokens.advance()?;
+fn parse_visibility(context: &mut Context) -> Result<Visibility, Diagnostic> {
+    let start_loc = context.tokens.start_loc();
+    consume_token(context.tokens, Tok::Public)?;
+    let sub_public_vis = if match_token(context.tokens, Tok::LParen)? {
+        let sub_token = context.tokens.peek();
+        context.tokens.advance()?;
         if sub_token != Tok::RParen {
-            consume_token(tokens, Tok::RParen)?;
+            consume_token(context.tokens, Tok::RParen)?;
         }
         Some(sub_token)
     } else {
         None
     };
-    let end_loc = tokens.previous_end_loc();
+    let end_loc = context.tokens.previous_end_loc();
     // this loc will cover the span of 'public' or 'public(...)' in entirety
-    let loc = make_loc(tokens.file_name(), start_loc, end_loc);
+    let loc = make_loc(context.tokens.file_name(), start_loc, end_loc);
     Ok(match sub_public_vis {
         None => Visibility::Public(loc),
         Some(Tok::Script) => Visibility::Script(loc),
@@ -483,12 +509,12 @@ fn parse_visibility(tokens: &mut Lexer) -> Result<Visibility, Diagnostic> {
 //      AttributeValue =
 //          <Value>
 //          | <NameAccessChain>
-fn parse_attribute_value(tokens: &mut Lexer) -> Result<AttributeValue, Diagnostic> {
-    if let Some(v) = maybe_parse_value(tokens)? {
+fn parse_attribute_value(context: &mut Context) -> Result<AttributeValue, Diagnostic> {
+    if let Some(v) = maybe_parse_value(context)? {
         return Ok(sp(v.loc, AttributeValue_::Value(v)));
     }
 
-    let ma = parse_name_access_chain(tokens, || "attribute name value")?;
+    let ma = parse_name_access_chain(context, || "attribute name value")?;
     Ok(sp(ma.loc, AttributeValue_::ModuleAccess(ma)))
 }
 
@@ -497,47 +523,60 @@ fn parse_attribute_value(tokens: &mut Lexer) -> Result<AttributeValue, Diagnosti
 //          <Identifier>
 //          | <Identifier> "=" <AttributeValue>
 //          | <Identifier> "(" Comma<Attribute> ")"
-fn parse_attribute(tokens: &mut Lexer) -> Result<Attribute, Diagnostic> {
-    let start_loc = tokens.start_loc();
-    let n = parse_identifier(tokens)?;
-    let attr_ = match tokens.peek() {
+fn parse_attribute(context: &mut Context) -> Result<Attribute, Diagnostic> {
+    let start_loc = context.tokens.start_loc();
+    let n = parse_identifier(context)?;
+    let attr_ = match context.tokens.peek() {
         Tok::Equal => {
-            tokens.advance()?;
-            Attribute_::Assigned(n, Box::new(parse_attribute_value(tokens)?))
+            context.tokens.advance()?;
+            Attribute_::Assigned(n, Box::new(parse_attribute_value(context)?))
         }
         Tok::LParen => {
             let args_ = parse_comma_list(
-                tokens,
+                context,
                 Tok::LParen,
                 Tok::RParen,
                 parse_attribute,
                 "attribute",
             )?;
-            let end_loc = tokens.previous_end_loc();
-            Attribute_::Parameterized(n, spanned(tokens.file_name(), start_loc, end_loc, args_))
+            let end_loc = context.tokens.previous_end_loc();
+            Attribute_::Parameterized(
+                n,
+                spanned(context.tokens.file_name(), start_loc, end_loc, args_),
+            )
         }
         _ => Attribute_::Name(n),
     };
-    let end_loc = tokens.previous_end_loc();
-    Ok(spanned(tokens.file_name(), start_loc, end_loc, attr_))
+    let end_loc = context.tokens.previous_end_loc();
+    Ok(spanned(
+        context.tokens.file_name(),
+        start_loc,
+        end_loc,
+        attr_,
+    ))
 }
 
 // Parse attributes. Used to annotate a variety of AST nodes
 //      Attributes = ("#" "[" Comma<Attribute> "]")*
-fn parse_attributes(tokens: &mut Lexer) -> Result<Vec<Attributes>, Diagnostic> {
+fn parse_attributes(context: &mut Context) -> Result<Vec<Attributes>, Diagnostic> {
     let mut attributes_vec = vec![];
-    while let Tok::NumSign = tokens.peek() {
-        let start_loc = tokens.start_loc();
-        tokens.advance()?;
+    while let Tok::NumSign = context.tokens.peek() {
+        let start_loc = context.tokens.start_loc();
+        context.tokens.advance()?;
         let attributes_ = parse_comma_list(
-            tokens,
+            context,
             Tok::LBracket,
             Tok::RBracket,
             parse_attribute,
             "attribute",
         )?;
-        let end_loc = tokens.previous_end_loc();
-        attributes_vec.push(spanned(tokens.file_name(), start_loc, end_loc, attributes_))
+        let end_loc = context.tokens.previous_end_loc();
+        attributes_vec.push(spanned(
+            context.tokens.file_name(),
+            start_loc,
+            end_loc,
+            attributes_,
+        ))
     }
     Ok(attributes_vec)
 }
@@ -548,10 +587,10 @@ fn parse_attributes(tokens: &mut Lexer) -> Result<Vec<Attributes>, Diagnostic> {
 
 // Parse a field name optionally followed by a colon and an expression argument:
 //      ExpField = <Field> <":" <Exp>>?
-fn parse_exp_field(tokens: &mut Lexer) -> Result<(Field, Exp), Diagnostic> {
-    let f = parse_field(tokens)?;
-    let arg = if match_token(tokens, Tok::Colon)? {
-        parse_exp(tokens)?
+fn parse_exp_field(context: &mut Context) -> Result<(Field, Exp), Diagnostic> {
+    let f = parse_field(context)?;
+    let arg = if match_token(context.tokens, Tok::Colon)? {
+        parse_exp(context)?
     } else {
         sp(
             f.loc(),
@@ -566,10 +605,10 @@ fn parse_exp_field(tokens: &mut Lexer) -> Result<(Field, Exp), Diagnostic> {
 //
 // If the binding is not specified, the default is to use a variable
 // with the same name as the field.
-fn parse_bind_field(tokens: &mut Lexer) -> Result<(Field, Bind), Diagnostic> {
-    let f = parse_field(tokens)?;
-    let arg = if match_token(tokens, Tok::Colon)? {
-        parse_bind(tokens)?
+fn parse_bind_field(context: &mut Context) -> Result<(Field, Bind), Diagnostic> {
+    let f = parse_field(context)?;
+    let arg = if match_token(context.tokens, Tok::Colon)? {
+        parse_bind(context)?
     } else {
         let v = Var(f.0);
         sp(v.loc(), Bind_::Var(v))
@@ -581,31 +620,36 @@ fn parse_bind_field(tokens: &mut Lexer) -> Result<(Field, Bind), Diagnostic> {
 //      Bind =
 //          <Var>
 //          | <NameAccessChain> <OptionalTypeArgs> "{" Comma<BindField> "}"
-fn parse_bind(tokens: &mut Lexer) -> Result<Bind, Diagnostic> {
-    let start_loc = tokens.start_loc();
-    if tokens.peek() == Tok::IdentifierValue {
-        let next_tok = tokens.lookahead()?;
+fn parse_bind(context: &mut Context) -> Result<Bind, Diagnostic> {
+    let start_loc = context.tokens.start_loc();
+    if context.tokens.peek() == Tok::IdentifierValue {
+        let next_tok = context.tokens.lookahead()?;
         if next_tok != Tok::LBrace && next_tok != Tok::Less && next_tok != Tok::ColonColon {
-            let v = Bind_::Var(parse_var(tokens)?);
-            let end_loc = tokens.previous_end_loc();
-            return Ok(spanned(tokens.file_name(), start_loc, end_loc, v));
+            let v = Bind_::Var(parse_var(context)?);
+            let end_loc = context.tokens.previous_end_loc();
+            return Ok(spanned(context.tokens.file_name(), start_loc, end_loc, v));
         }
     }
     // The item description specified here should include the special case above for
-    // variable names, because if the current tokens cannot be parsed as a struct name
+    // variable names, because if the current context cannot be parsed as a struct name
     // it is possible that the user intention was to use a variable name.
-    let ty = parse_name_access_chain(tokens, || "a variable or struct name")?;
-    let ty_args = parse_optional_type_args(tokens)?;
+    let ty = parse_name_access_chain(context, || "a variable or struct name")?;
+    let ty_args = parse_optional_type_args(context)?;
     let args = parse_comma_list(
-        tokens,
+        context,
         Tok::LBrace,
         Tok::RBrace,
         parse_bind_field,
         "a field binding",
     )?;
-    let end_loc = tokens.previous_end_loc();
+    let end_loc = context.tokens.previous_end_loc();
     let unpack = Bind_::Unpack(Box::new(ty), ty_args, args);
-    Ok(spanned(tokens.file_name(), start_loc, end_loc, unpack))
+    Ok(spanned(
+        context.tokens.file_name(),
+        start_loc,
+        end_loc,
+        unpack,
+    ))
 }
 
 // Parse a list of bindings, which can be zero, one, or more bindings:
@@ -615,37 +659,37 @@ fn parse_bind(tokens: &mut Lexer) -> Result<Bind, Diagnostic> {
 //
 // The list is enclosed in parenthesis, except that the parenthesis are
 // optional if there is a single Bind.
-fn parse_bind_list(tokens: &mut Lexer) -> Result<BindList, Diagnostic> {
-    let start_loc = tokens.start_loc();
-    let b = if tokens.peek() != Tok::LParen {
-        vec![parse_bind(tokens)?]
+fn parse_bind_list(context: &mut Context) -> Result<BindList, Diagnostic> {
+    let start_loc = context.tokens.start_loc();
+    let b = if context.tokens.peek() != Tok::LParen {
+        vec![parse_bind(context)?]
     } else {
         parse_comma_list(
-            tokens,
+            context,
             Tok::LParen,
             Tok::RParen,
             parse_bind,
             "a variable or structure binding",
         )?
     };
-    let end_loc = tokens.previous_end_loc();
-    Ok(spanned(tokens.file_name(), start_loc, end_loc, b))
+    let end_loc = context.tokens.previous_end_loc();
+    Ok(spanned(context.tokens.file_name(), start_loc, end_loc, b))
 }
 
 // Parse a list of bindings for lambda.
 //      LambdaBindList =
 //          "|" Comma<Bind> "|"
-fn parse_lambda_bind_list(tokens: &mut Lexer) -> Result<BindList, Diagnostic> {
-    let start_loc = tokens.start_loc();
+fn parse_lambda_bind_list(context: &mut Context) -> Result<BindList, Diagnostic> {
+    let start_loc = context.tokens.start_loc();
     let b = parse_comma_list(
-        tokens,
+        context,
         Tok::Pipe,
         Tok::Pipe,
         parse_bind,
         "a variable or structure binding",
     )?;
-    let end_loc = tokens.previous_end_loc();
-    Ok(spanned(tokens.file_name(), start_loc, end_loc, b))
+    let end_loc = context.tokens.previous_end_loc();
+    Ok(spanned(context.tokens.file_name(), start_loc, end_loc, b))
 }
 
 //**************************************************************************************************
@@ -654,11 +698,14 @@ fn parse_lambda_bind_list(tokens: &mut Lexer) -> Result<BindList, Diagnostic> {
 
 // Parse a byte string:
 //      ByteString = <ByteStringValue>
-fn parse_byte_string(tokens: &mut Lexer) -> Result<Value_, Diagnostic> {
-    if tokens.peek() != Tok::ByteStringValue {
-        return Err(unexpected_token_error(tokens, "a byte string value"));
+fn parse_byte_string(context: &mut Context) -> Result<Value_, Diagnostic> {
+    if context.tokens.peek() != Tok::ByteStringValue {
+        return Err(unexpected_token_error(
+            context.tokens,
+            "a byte string value",
+        ));
     }
-    let s = tokens.content();
+    let s = context.tokens.content();
     let text = Symbol::from(&s[2..s.len() - 1]);
     let value_ = if s.starts_with("x\"") {
         Value_::HexString(text)
@@ -666,7 +713,7 @@ fn parse_byte_string(tokens: &mut Lexer) -> Result<Value_, Diagnostic> {
         assert!(s.starts_with("b\""));
         Value_::ByteString(text)
     };
-    tokens.advance()?;
+    context.tokens.advance()?;
     Ok(value_)
 }
 
@@ -678,46 +725,51 @@ fn parse_byte_string(tokens: &mut Lexer) -> Result<Value_, Diagnostic> {
 //          | <Number>
 //          | <NumberTyped>
 //          | <ByteString>
-fn maybe_parse_value(tokens: &mut Lexer) -> Result<Option<Value>, Diagnostic> {
-    let start_loc = tokens.start_loc();
-    let val = match tokens.peek() {
+fn maybe_parse_value(context: &mut Context) -> Result<Option<Value>, Diagnostic> {
+    let start_loc = context.tokens.start_loc();
+    let val = match context.tokens.peek() {
         Tok::AtSign => {
-            tokens.advance()?;
-            let addr = parse_leading_name_access(tokens)?;
+            context.tokens.advance()?;
+            let addr = parse_leading_name_access(context)?;
             Value_::Address(addr)
         }
         Tok::True => {
-            tokens.advance()?;
+            context.tokens.advance()?;
             Value_::Bool(true)
         }
         Tok::False => {
-            tokens.advance()?;
+            context.tokens.advance()?;
             Value_::Bool(false)
         }
         Tok::NumValue => {
             //  If the number is followed by "::", parse it as the beginning of an address access
-            if let Ok(Tok::ColonColon) = tokens.lookahead() {
+            if let Ok(Tok::ColonColon) = context.tokens.lookahead() {
                 return Ok(None);
             }
-            let num = tokens.content().into();
-            tokens.advance()?;
+            let num = context.tokens.content().into();
+            context.tokens.advance()?;
             Value_::Num(num)
         }
         Tok::NumTypedValue => {
-            let num = tokens.content().into();
-            tokens.advance()?;
+            let num = context.tokens.content().into();
+            context.tokens.advance()?;
             Value_::Num(num)
         }
 
-        Tok::ByteStringValue => parse_byte_string(tokens)?,
+        Tok::ByteStringValue => parse_byte_string(context)?,
         _ => return Ok(None),
     };
-    let end_loc = tokens.previous_end_loc();
-    Ok(Some(spanned(tokens.file_name(), start_loc, end_loc, val)))
+    let end_loc = context.tokens.previous_end_loc();
+    Ok(Some(spanned(
+        context.tokens.file_name(),
+        start_loc,
+        end_loc,
+        val,
+    )))
 }
 
-fn parse_value(tokens: &mut Lexer) -> Result<Value, Diagnostic> {
-    Ok(maybe_parse_value(tokens)?.expect("parse_value called with invalid token"))
+fn parse_value(context: &mut Context) -> Result<Value, Diagnostic> {
+    Ok(maybe_parse_value(context)?.expect("parse_value called with invalid token"))
 }
 
 //**************************************************************************************************
@@ -728,27 +780,32 @@ fn parse_value(tokens: &mut Lexer) -> Result<Value, Diagnostic> {
 //      SequenceItem =
 //          <Exp>
 //          | "let" <BindList> (":" <Type>)? ("=" <Exp>)?
-fn parse_sequence_item(tokens: &mut Lexer) -> Result<SequenceItem, Diagnostic> {
-    let start_loc = tokens.start_loc();
-    let item = if match_token(tokens, Tok::Let)? {
-        let b = parse_bind_list(tokens)?;
-        let ty_opt = if match_token(tokens, Tok::Colon)? {
-            Some(parse_type(tokens)?)
+fn parse_sequence_item(context: &mut Context) -> Result<SequenceItem, Diagnostic> {
+    let start_loc = context.tokens.start_loc();
+    let item = if match_token(context.tokens, Tok::Let)? {
+        let b = parse_bind_list(context)?;
+        let ty_opt = if match_token(context.tokens, Tok::Colon)? {
+            Some(parse_type(context)?)
         } else {
             None
         };
-        if match_token(tokens, Tok::Equal)? {
-            let e = parse_exp(tokens)?;
+        if match_token(context.tokens, Tok::Equal)? {
+            let e = parse_exp(context)?;
             SequenceItem_::Bind(b, ty_opt, Box::new(e))
         } else {
             SequenceItem_::Declare(b, ty_opt)
         }
     } else {
-        let e = parse_exp(tokens)?;
+        let e = parse_exp(context)?;
         SequenceItem_::Seq(Box::new(e))
     };
-    let end_loc = tokens.previous_end_loc();
-    Ok(spanned(tokens.file_name(), start_loc, end_loc, item))
+    let end_loc = context.tokens.previous_end_loc();
+    Ok(spanned(
+        context.tokens.file_name(),
+        start_loc,
+        end_loc,
+        item,
+    ))
 }
 
 // Parse a sequence:
@@ -756,18 +813,18 @@ fn parse_sequence_item(tokens: &mut Lexer) -> Result<SequenceItem, Diagnostic> {
 //
 // Note that this does not include the opening brace of a block but it
 // does consume the closing right brace.
-fn parse_sequence(tokens: &mut Lexer) -> Result<Sequence, Diagnostic> {
+fn parse_sequence(context: &mut Context) -> Result<Sequence, Diagnostic> {
     let mut uses = vec![];
-    while tokens.peek() == Tok::Use {
-        uses.push(parse_use_decl(vec![], tokens)?);
+    while context.tokens.peek() == Tok::Use {
+        uses.push(parse_use_decl(vec![], context)?);
     }
 
     let mut seq: Vec<SequenceItem> = vec![];
     let mut last_semicolon_loc = None;
     let mut eopt = None;
-    while tokens.peek() != Tok::RBrace {
-        let item = parse_sequence_item(tokens)?;
-        if tokens.peek() == Tok::RBrace {
+    while context.tokens.peek() != Tok::RBrace {
+        let item = parse_sequence_item(context)?;
+        if context.tokens.peek() == Tok::RBrace {
             // If the sequence ends with an expression that is not
             // followed by a semicolon, split out that expression
             // from the rest of the SequenceItems.
@@ -778,15 +835,15 @@ fn parse_sequence(tokens: &mut Lexer) -> Result<Sequence, Diagnostic> {
                         value: e.value,
                     });
                 }
-                _ => return Err(unexpected_token_error(tokens, "';'")),
+                _ => return Err(unexpected_token_error(context.tokens, "';'")),
             }
             break;
         }
         seq.push(item);
-        last_semicolon_loc = Some(current_token_loc(tokens));
-        consume_token(tokens, Tok::Semicolon)?;
+        last_semicolon_loc = Some(current_token_loc(context.tokens));
+        consume_token(context.tokens, Tok::Semicolon)?;
     }
-    tokens.advance()?; // consume the RBrace
+    context.tokens.advance()?; // consume the RBrace
     Ok((uses, seq, last_semicolon_loc, Box::new(eopt)))
 }
 
@@ -804,60 +861,60 @@ fn parse_sequence(tokens: &mut Lexer) -> Result<Sequence, Diagnostic> {
 //          | "(" <Exp> ":" <Type> ")"
 //          | "(" <Exp> "as" <Type> ")"
 //          | "{" <Sequence>
-fn parse_term(tokens: &mut Lexer) -> Result<Exp, Diagnostic> {
-    let start_loc = tokens.start_loc();
-    let term = match tokens.peek() {
+fn parse_term(context: &mut Context) -> Result<Exp, Diagnostic> {
+    let start_loc = context.tokens.start_loc();
+    let term = match context.tokens.peek() {
         Tok::Break => {
-            tokens.advance()?;
+            context.tokens.advance()?;
             Exp_::Break
         }
 
         Tok::Continue => {
-            tokens.advance()?;
+            context.tokens.advance()?;
             Exp_::Continue
         }
 
-        Tok::IdentifierValue => parse_name_exp(tokens)?,
+        Tok::IdentifierValue => parse_name_exp(context)?,
 
         Tok::NumValue => {
             // Check if this is a ModuleIdent (in a ModuleAccess).
-            if tokens.lookahead()? == Tok::ColonColon {
-                parse_name_exp(tokens)?
+            if context.tokens.lookahead()? == Tok::ColonColon {
+                parse_name_exp(context)?
             } else {
-                Exp_::Value(parse_value(tokens)?)
+                Exp_::Value(parse_value(context)?)
             }
         }
 
         Tok::AtSign | Tok::True | Tok::False | Tok::NumTypedValue | Tok::ByteStringValue => {
-            Exp_::Value(parse_value(tokens)?)
+            Exp_::Value(parse_value(context)?)
         }
 
         // "(" Comma<Exp> ")"
         // "(" <Exp> ":" <Type> ")"
         // "(" <Exp> "as" <Type> ")"
         Tok::LParen => {
-            let list_loc = tokens.start_loc();
-            tokens.advance()?; // consume the LParen
-            if match_token(tokens, Tok::RParen)? {
+            let list_loc = context.tokens.start_loc();
+            context.tokens.advance()?; // consume the LParen
+            if match_token(context.tokens, Tok::RParen)? {
                 Exp_::Unit
             } else {
                 // If there is a single expression inside the parens,
                 // then it may be followed by a colon and a type annotation.
-                let e = parse_exp(tokens)?;
-                if match_token(tokens, Tok::Colon)? {
-                    let ty = parse_type(tokens)?;
-                    consume_token(tokens, Tok::RParen)?;
+                let e = parse_exp(context)?;
+                if match_token(context.tokens, Tok::Colon)? {
+                    let ty = parse_type(context)?;
+                    consume_token(context.tokens, Tok::RParen)?;
                     Exp_::Annotate(Box::new(e), ty)
-                } else if match_token(tokens, Tok::As)? {
-                    let ty = parse_type(tokens)?;
-                    consume_token(tokens, Tok::RParen)?;
+                } else if match_token(context.tokens, Tok::As)? {
+                    let ty = parse_type(context)?;
+                    consume_token(context.tokens, Tok::RParen)?;
                     Exp_::Cast(Box::new(e), ty)
                 } else {
-                    if tokens.peek() != Tok::RParen {
-                        consume_token(tokens, Tok::Comma)?;
+                    if context.tokens.peek() != Tok::RParen {
+                        consume_token(context.tokens, Tok::Comma)?;
                     }
                     let mut es = parse_comma_list_after_start(
-                        tokens,
+                        context,
                         list_loc,
                         Tok::LParen,
                         Tok::RParen,
@@ -876,21 +933,26 @@ fn parse_term(tokens: &mut Lexer) -> Result<Exp, Diagnostic> {
 
         // "{" <Sequence>
         Tok::LBrace => {
-            tokens.advance()?; // consume the LBrace
-            Exp_::Block(parse_sequence(tokens)?)
+            context.tokens.advance()?; // consume the LBrace
+            Exp_::Block(parse_sequence(context)?)
         }
 
         Tok::Spec => {
-            let spec_block = parse_spec_block(vec![], tokens)?;
+            let spec_block = parse_spec_block(vec![], context)?;
             Exp_::Spec(spec_block)
         }
 
         _ => {
-            return Err(unexpected_token_error(tokens, "an expression term"));
+            return Err(unexpected_token_error(context.tokens, "an expression term"));
         }
     };
-    let end_loc = tokens.previous_end_loc();
-    Ok(spanned(tokens.file_name(), start_loc, end_loc, term))
+    let end_loc = context.tokens.previous_end_loc();
+    Ok(spanned(
+        context.tokens.file_name(),
+        start_loc,
+        end_loc,
+        term,
+    ))
 }
 
 // Parse a pack, call, or other reference to a name:
@@ -898,8 +960,8 @@ fn parse_term(tokens: &mut Lexer) -> Result<Exp, Diagnostic> {
 //          <NameAccessChain> <OptionalTypeArgs> "{" Comma<ExpField> "}"
 //          | <NameAccessChain> <OptionalTypeArgs> "(" Comma<Exp> ")"
 //          | <NameAccessChain> <OptionalTypeArgs>
-fn parse_name_exp(tokens: &mut Lexer) -> Result<Exp_, Diagnostic> {
-    let n = parse_name_access_chain(tokens, || {
+fn parse_name_exp(context: &mut Context) -> Result<Exp_, Diagnostic> {
+    let n = parse_name_access_chain(context, || {
         panic!("parse_name_exp with something other than a ModuleAccess")
     })?;
 
@@ -907,21 +969,21 @@ fn parse_name_exp(tokens: &mut Lexer) -> Result<Exp_, Diagnostic> {
     // after the name, treat it as the start of a list of type arguments. Otherwise
     // assume that the "<" is a boolean operator.
     let mut tys = None;
-    let start_loc = tokens.start_loc();
-    if tokens.peek() == Tok::Less && start_loc == n.loc.end() as usize {
-        let loc = make_loc(tokens.file_name(), start_loc, start_loc);
-        tys = parse_optional_type_args(tokens).map_err(|mut diag| {
+    let start_loc = context.tokens.start_loc();
+    if context.tokens.peek() == Tok::Less && start_loc == n.loc.end() as usize {
+        let loc = make_loc(context.tokens.file_name(), start_loc, start_loc);
+        tys = parse_optional_type_args(context).map_err(|mut diag| {
             let msg = "Perhaps you need a blank space before this '<' operator?";
             diag.add_secondary_label((loc, msg.to_owned()));
             diag
         })?;
     }
 
-    match tokens.peek() {
+    match context.tokens.peek() {
         // Pack: "{" Comma<ExpField> "}"
         Tok::LBrace => {
             let fs = parse_comma_list(
-                tokens,
+                context,
                 Tok::LBrace,
                 Tok::RBrace,
                 parse_exp_field,
@@ -932,7 +994,7 @@ fn parse_name_exp(tokens: &mut Lexer) -> Result<Exp_, Diagnostic> {
 
         // Call: "(" Comma<Exp> ")"
         Tok::LParen => {
-            let rhs = parse_call_args(tokens)?;
+            let rhs = parse_call_args(context)?;
             Ok(Exp_::Call(n, tys, rhs))
         }
 
@@ -942,25 +1004,30 @@ fn parse_name_exp(tokens: &mut Lexer) -> Result<Exp_, Diagnostic> {
 }
 
 // Parse the arguments to a call: "(" Comma<Exp> ")"
-fn parse_call_args(tokens: &mut Lexer) -> Result<Spanned<Vec<Exp>>, Diagnostic> {
-    let start_loc = tokens.start_loc();
+fn parse_call_args(context: &mut Context) -> Result<Spanned<Vec<Exp>>, Diagnostic> {
+    let start_loc = context.tokens.start_loc();
     let args = parse_comma_list(
-        tokens,
+        context,
         Tok::LParen,
         Tok::RParen,
         parse_exp,
         "a call argument expression",
     )?;
-    let end_loc = tokens.previous_end_loc();
-    Ok(spanned(tokens.file_name(), start_loc, end_loc, args))
+    let end_loc = context.tokens.previous_end_loc();
+    Ok(spanned(
+        context.tokens.file_name(),
+        start_loc,
+        end_loc,
+        args,
+    ))
 }
 
 // Return true if the current token is one that might occur after an Exp.
 // This is needed, for example, to check for the optional Exp argument to
 // a return (where "return" is itself an Exp).
-fn at_end_of_exp(tokens: &mut Lexer) -> bool {
+fn at_end_of_exp(context: &mut Context) -> bool {
     matches!(
-        tokens.peek(),
+        context.tokens.peek(),
         // These are the tokens that can occur after an Exp. If the grammar
         // changes, we need to make sure that these are kept up to date and that
         // none of these tokens can occur at the beginning of an Exp.
@@ -979,69 +1046,69 @@ fn at_end_of_exp(tokens: &mut Lexer) -> bool {
 //          | "abort" <Exp>
 //          | <BinOpExp>
 //          | <UnaryExp> "=" <Exp>
-fn parse_exp(tokens: &mut Lexer) -> Result<Exp, Diagnostic> {
-    let start_loc = tokens.start_loc();
-    let exp = match tokens.peek() {
+fn parse_exp(context: &mut Context) -> Result<Exp, Diagnostic> {
+    let start_loc = context.tokens.start_loc();
+    let exp = match context.tokens.peek() {
         Tok::Pipe => {
-            let bindings = parse_lambda_bind_list(tokens)?;
-            let body = Box::new(parse_exp(tokens)?);
+            let bindings = parse_lambda_bind_list(context)?;
+            let body = Box::new(parse_exp(context)?);
             Exp_::Lambda(bindings, body)
         }
-        Tok::IdentifierValue if is_quant(tokens) => parse_quant(tokens)?,
+        Tok::IdentifierValue if is_quant(context) => parse_quant(context)?,
         Tok::If => {
-            tokens.advance()?;
-            consume_token(tokens, Tok::LParen)?;
-            let eb = Box::new(parse_exp(tokens)?);
-            consume_token(tokens, Tok::RParen)?;
-            let et = Box::new(parse_exp(tokens)?);
-            let ef = if match_token(tokens, Tok::Else)? {
-                Some(Box::new(parse_exp(tokens)?))
+            context.tokens.advance()?;
+            consume_token(context.tokens, Tok::LParen)?;
+            let eb = Box::new(parse_exp(context)?);
+            consume_token(context.tokens, Tok::RParen)?;
+            let et = Box::new(parse_exp(context)?);
+            let ef = if match_token(context.tokens, Tok::Else)? {
+                Some(Box::new(parse_exp(context)?))
             } else {
                 None
             };
             Exp_::IfElse(eb, et, ef)
         }
         Tok::While => {
-            tokens.advance()?;
-            consume_token(tokens, Tok::LParen)?;
-            let eb = Box::new(parse_exp(tokens)?);
-            consume_token(tokens, Tok::RParen)?;
-            let eloop = Box::new(parse_exp(tokens)?);
+            context.tokens.advance()?;
+            consume_token(context.tokens, Tok::LParen)?;
+            let eb = Box::new(parse_exp(context)?);
+            consume_token(context.tokens, Tok::RParen)?;
+            let eloop = Box::new(parse_exp(context)?);
             Exp_::While(eb, eloop)
         }
         Tok::Loop => {
-            tokens.advance()?;
-            let eloop = Box::new(parse_exp(tokens)?);
+            context.tokens.advance()?;
+            let eloop = Box::new(parse_exp(context)?);
             Exp_::Loop(eloop)
         }
         Tok::Return => {
-            tokens.advance()?;
-            let e = if at_end_of_exp(tokens) {
+            context.tokens.advance()?;
+            let e = if at_end_of_exp(context) {
                 None
             } else {
-                Some(Box::new(parse_exp(tokens)?))
+                Some(Box::new(parse_exp(context)?))
             };
             Exp_::Return(e)
         }
         Tok::Abort => {
-            tokens.advance()?;
-            let e = Box::new(parse_exp(tokens)?);
+            context.tokens.advance()?;
+            let e = Box::new(parse_exp(context)?);
             Exp_::Abort(e)
         }
         _ => {
             // This could be either an assignment or a binary operator
             // expression.
-            let lhs = parse_unary_exp(tokens)?;
-            if tokens.peek() != Tok::Equal {
-                return parse_binop_exp(tokens, lhs, /* min_prec */ 1);
+            let lhs = parse_unary_exp(context)?;
+            if context.tokens.peek() != Tok::Equal {
+                return parse_binop_exp(context, lhs, /* min_prec */ 1);
             }
-            tokens.advance()?; // consume the "="
-            let rhs = Box::new(parse_exp(tokens)?);
+            context.tokens.advance()?; // consume the "="
+            let rhs = Box::new(parse_exp(context)?);
             Exp_::Assign(Box::new(lhs), rhs)
         }
     };
-    let end_loc = tokens.previous_end_loc();
-    Ok(spanned(tokens.file_name(), start_loc, end_loc, exp))
+    let end_loc = context.tokens.previous_end_loc();
+    Ok(spanned(context.tokens.file_name(), start_loc, end_loc, exp))
 }
 
 // Get the precedence of a binary operator. The minimum precedence value
@@ -1097,26 +1164,26 @@ fn get_precedence(token: Tok) -> u32 {
 // This function takes the LHS of the expression as an argument, and it
 // continues parsing binary expressions as long as they have at least the
 // specified "min_prec" minimum precedence.
-fn parse_binop_exp(tokens: &mut Lexer, lhs: Exp, min_prec: u32) -> Result<Exp, Diagnostic> {
+fn parse_binop_exp(context: &mut Context, lhs: Exp, min_prec: u32) -> Result<Exp, Diagnostic> {
     let mut result = lhs;
-    let mut next_tok_prec = get_precedence(tokens.peek());
+    let mut next_tok_prec = get_precedence(context.tokens.peek());
 
     while next_tok_prec >= min_prec {
         // Parse the operator.
-        let op_start_loc = tokens.start_loc();
-        let op_token = tokens.peek();
-        tokens.advance()?;
-        let op_end_loc = tokens.previous_end_loc();
+        let op_start_loc = context.tokens.start_loc();
+        let op_token = context.tokens.peek();
+        context.tokens.advance()?;
+        let op_end_loc = context.tokens.previous_end_loc();
 
-        let mut rhs = parse_unary_exp(tokens)?;
+        let mut rhs = parse_unary_exp(context)?;
 
         // If the next token is another binary operator with a higher
         // precedence, then recursively parse that expression as the RHS.
         let this_prec = next_tok_prec;
-        next_tok_prec = get_precedence(tokens.peek());
+        next_tok_prec = get_precedence(context.tokens.peek());
         if this_prec < next_tok_prec {
-            rhs = parse_binop_exp(tokens, rhs, this_prec + 1)?;
-            next_tok_prec = get_precedence(tokens.peek());
+            rhs = parse_binop_exp(context, rhs, this_prec + 1)?;
+            next_tok_prec = get_precedence(context.tokens.peek());
         }
 
         let op = match op_token {
@@ -1143,12 +1210,12 @@ fn parse_binop_exp(tokens: &mut Lexer, lhs: Exp, min_prec: u32) -> Result<Exp, D
             Tok::LessEqualEqualGreater => BinOp_::Iff,
             _ => panic!("Unexpected token that is not a binary operator"),
         };
-        let sp_op = spanned(tokens.file_name(), op_start_loc, op_end_loc, op);
+        let sp_op = spanned(context.tokens.file_name(), op_start_loc, op_end_loc, op);
 
         let start_loc = result.loc.start() as usize;
-        let end_loc = tokens.previous_end_loc();
+        let end_loc = context.tokens.previous_end_loc();
         let e = Exp_::BinopExp(Box::new(result), sp_op, Box::new(rhs));
-        result = spanned(tokens.file_name(), start_loc, end_loc, e);
+        result = spanned(context.tokens.file_name(), start_loc, end_loc, e);
     }
 
     Ok(result)
@@ -1163,45 +1230,50 @@ fn parse_binop_exp(tokens: &mut Lexer, lhs: Exp, min_prec: u32) -> Result<Exp, D
 //          | "move" <Var>
 //          | "copy" <Var>
 //          | <DotOrIndexChain>
-fn parse_unary_exp(tokens: &mut Lexer) -> Result<Exp, Diagnostic> {
-    let start_loc = tokens.start_loc();
-    let exp = match tokens.peek() {
+fn parse_unary_exp(context: &mut Context) -> Result<Exp, Diagnostic> {
+    let start_loc = context.tokens.start_loc();
+    let exp = match context.tokens.peek() {
         Tok::Exclaim => {
-            tokens.advance()?;
-            let op_end_loc = tokens.previous_end_loc();
-            let op = spanned(tokens.file_name(), start_loc, op_end_loc, UnaryOp_::Not);
-            let e = parse_unary_exp(tokens)?;
+            context.tokens.advance()?;
+            let op_end_loc = context.tokens.previous_end_loc();
+            let op = spanned(
+                context.tokens.file_name(),
+                start_loc,
+                op_end_loc,
+                UnaryOp_::Not,
+            );
+            let e = parse_unary_exp(context)?;
             Exp_::UnaryExp(op, Box::new(e))
         }
         Tok::AmpMut => {
-            tokens.advance()?;
-            let e = parse_unary_exp(tokens)?;
+            context.tokens.advance()?;
+            let e = parse_unary_exp(context)?;
             Exp_::Borrow(true, Box::new(e))
         }
         Tok::Amp => {
-            tokens.advance()?;
-            let e = parse_unary_exp(tokens)?;
+            context.tokens.advance()?;
+            let e = parse_unary_exp(context)?;
             Exp_::Borrow(false, Box::new(e))
         }
         Tok::Star => {
-            tokens.advance()?;
-            let e = parse_unary_exp(tokens)?;
+            context.tokens.advance()?;
+            let e = parse_unary_exp(context)?;
             Exp_::Dereference(Box::new(e))
         }
         Tok::Move => {
-            tokens.advance()?;
-            Exp_::Move(parse_var(tokens)?)
+            context.tokens.advance()?;
+            Exp_::Move(parse_var(context)?)
         }
         Tok::Copy => {
-            tokens.advance()?;
-            Exp_::Copy(parse_var(tokens)?)
+            context.tokens.advance()?;
+            Exp_::Copy(parse_var(context)?)
         }
         _ => {
-            return parse_dot_or_index_chain(tokens);
+            return parse_dot_or_index_chain(context);
         }
     };
-    let end_loc = tokens.previous_end_loc();
-    Ok(spanned(tokens.file_name(), start_loc, end_loc, exp))
+    let end_loc = context.tokens.previous_end_loc();
+    Ok(spanned(context.tokens.file_name(), start_loc, end_loc, exp))
 }
 
 // Parse an expression term optionally followed by a chain of dot or index accesses:
@@ -1209,27 +1281,27 @@ fn parse_unary_exp(tokens: &mut Lexer) -> Result<Exp, Diagnostic> {
 //          <DotOrIndexChain> "." <Identifier>
 //          | <DotOrIndexChain> "[" <Exp> "]"                      spec only
 //          | <Term>
-fn parse_dot_or_index_chain(tokens: &mut Lexer) -> Result<Exp, Diagnostic> {
-    let start_loc = tokens.start_loc();
-    let mut lhs = parse_term(tokens)?;
+fn parse_dot_or_index_chain(context: &mut Context) -> Result<Exp, Diagnostic> {
+    let start_loc = context.tokens.start_loc();
+    let mut lhs = parse_term(context)?;
     loop {
-        let exp = match tokens.peek() {
+        let exp = match context.tokens.peek() {
             Tok::Period => {
-                tokens.advance()?;
-                let n = parse_identifier(tokens)?;
+                context.tokens.advance()?;
+                let n = parse_identifier(context)?;
                 Exp_::Dot(Box::new(lhs), n)
             }
             Tok::LBracket => {
-                tokens.advance()?;
-                let index = parse_exp(tokens)?;
+                context.tokens.advance()?;
+                let index = parse_exp(context)?;
                 let exp = Exp_::Index(Box::new(lhs), Box::new(index));
-                consume_token(tokens, Tok::RBracket)?;
+                consume_token(context.tokens, Tok::RBracket)?;
                 exp
             }
             _ => break,
         };
-        let end_loc = tokens.previous_end_loc();
-        lhs = spanned(tokens.file_name(), start_loc, end_loc, exp);
+        let end_loc = context.tokens.previous_end_loc();
+        lhs = spanned(context.tokens.file_name(), start_loc, end_loc, exp);
     }
     Ok(lhs)
 }
@@ -1244,11 +1316,11 @@ fn parse_dot_or_index_chain(tokens: &mut Lexer) -> Result<Exp, Diagnostic> {
 // have affixed identifiers in expressions), we add another token
 // of lookahead to keep the result more precise in the presence of
 // syntax errors.
-fn is_quant(tokens: &mut Lexer) -> bool {
-    if !matches!(tokens.content(), "exists" | "forall" | "choose") {
+fn is_quant(context: &mut Context) -> bool {
+    if !matches!(context.tokens.content(), "exists" | "forall" | "choose") {
         return false;
     }
-    match tokens.lookahead2() {
+    match context.tokens.lookahead2() {
         Err(_) => false,
         Ok((tok1, tok2)) => {
             tok1 == Tok::IdentifierValue && matches!(tok2, Tok::Colon | Tok::IdentifierValue)
@@ -1256,7 +1328,7 @@ fn is_quant(tokens: &mut Lexer) -> bool {
     }
 }
 
-// Parses a quantifier expressions, assuming is_quant(tokens) is true.
+// Parses a quantifier expressions, assuming is_quant(context) is true.
 //
 //   <Quantifier> =
 //       ( "forall" | "exists" ) <QuantifierBindings> ({ (<Exp>)* })* ("where" <Exp>)? ":" Exp
@@ -1264,22 +1336,22 @@ fn is_quant(tokens: &mut Lexer) -> bool {
 //   <QuantifierBindings> = <QuantifierBind> ("," <QuantifierBind>)*
 //   <QuantifierBind> = <Identifier> ":" <Type> | <Identifier> "in" <Exp>
 //
-fn parse_quant(tokens: &mut Lexer) -> Result<Exp_, Diagnostic> {
-    let start_loc = tokens.start_loc();
-    let kind = match tokens.content() {
+fn parse_quant(context: &mut Context) -> Result<Exp_, Diagnostic> {
+    let start_loc = context.tokens.start_loc();
+    let kind = match context.tokens.content() {
         "exists" => {
-            tokens.advance()?;
+            context.tokens.advance()?;
             QuantKind_::Exists
         }
         "forall" => {
-            tokens.advance()?;
+            context.tokens.advance()?;
             QuantKind_::Forall
         }
         "choose" => {
-            tokens.advance()?;
-            match tokens.peek() {
-                Tok::IdentifierValue if tokens.content() == "min" => {
-                    tokens.advance()?;
+            context.tokens.advance()?;
+            match context.tokens.peek() {
+                Tok::IdentifierValue if context.tokens.content() == "min" => {
+                    context.tokens.advance()?;
                     QuantKind_::ChooseMin
                 }
                 _ => QuantKind_::Choose,
@@ -1288,16 +1360,16 @@ fn parse_quant(tokens: &mut Lexer) -> Result<Exp_, Diagnostic> {
         _ => unreachable!(),
     };
     let spanned_kind = spanned(
-        tokens.file_name(),
+        context.tokens.file_name(),
         start_loc,
-        tokens.previous_end_loc(),
+        context.tokens.previous_end_loc(),
         kind,
     );
 
     if matches!(kind, QuantKind_::Choose | QuantKind_::ChooseMin) {
-        let binding = parse_quant_binding(tokens)?;
-        consume_identifier(tokens, "where")?;
-        let body = parse_exp(tokens)?;
+        let binding = parse_quant_binding(context)?;
+        consume_identifier(context.tokens, "where")?;
+        let body = parse_exp(context)?;
         return Ok(Exp_::Quant(
             spanned_kind,
             Spanned {
@@ -1310,12 +1382,12 @@ fn parse_quant(tokens: &mut Lexer) -> Result<Exp_, Diagnostic> {
         ));
     }
 
-    let bindings_start_loc = tokens.start_loc();
+    let bindings_start_loc = context.tokens.start_loc();
     let binds_with_range_list = parse_list(
-        tokens,
-        |tokens| {
-            if tokens.peek() == Tok::Comma {
-                tokens.advance()?;
+        context,
+        |context| {
+            if context.tokens.peek() == Tok::Comma {
+                context.tokens.advance()?;
                 Ok(true)
             } else {
                 Ok(false)
@@ -1324,25 +1396,25 @@ fn parse_quant(tokens: &mut Lexer) -> Result<Exp_, Diagnostic> {
         parse_quant_binding,
     )?;
     let binds_with_range_list = spanned(
-        tokens.file_name(),
+        context.tokens.file_name(),
         bindings_start_loc,
-        tokens.previous_end_loc(),
+        context.tokens.previous_end_loc(),
         binds_with_range_list,
     );
 
-    let triggers = if tokens.peek() == Tok::LBrace {
+    let triggers = if context.tokens.peek() == Tok::LBrace {
         parse_list(
-            tokens,
-            |tokens| {
-                if tokens.peek() == Tok::LBrace {
+            context,
+            |context| {
+                if context.tokens.peek() == Tok::LBrace {
                     Ok(true)
                 } else {
                     Ok(false)
                 }
             },
-            |tokens| {
+            |context| {
                 parse_comma_list(
-                    tokens,
+                    context,
                     Tok::LBrace,
                     Tok::RBrace,
                     parse_exp,
@@ -1354,15 +1426,15 @@ fn parse_quant(tokens: &mut Lexer) -> Result<Exp_, Diagnostic> {
         Vec::new()
     };
 
-    let condition = match tokens.peek() {
-        Tok::IdentifierValue if tokens.content() == "where" => {
-            tokens.advance()?;
-            Some(Box::new(parse_exp(tokens)?))
+    let condition = match context.tokens.peek() {
+        Tok::IdentifierValue if context.tokens.content() == "where" => {
+            context.tokens.advance()?;
+            Some(Box::new(parse_exp(context)?))
         }
         _ => None,
     };
-    consume_token(tokens, Tok::Colon)?;
-    let body = parse_exp(tokens)?;
+    consume_token(context.tokens, Tok::Colon)?;
+    let body = parse_exp(context)?;
 
     Ok(Exp_::Quant(
         spanned_kind,
@@ -1374,29 +1446,29 @@ fn parse_quant(tokens: &mut Lexer) -> Result<Exp_, Diagnostic> {
 }
 
 // Parses one quantifier binding.
-fn parse_quant_binding(tokens: &mut Lexer) -> Result<Spanned<(Bind, Exp)>, Diagnostic> {
-    let start_loc = tokens.start_loc();
-    let ident = parse_identifier(tokens)?;
+fn parse_quant_binding(context: &mut Context) -> Result<Spanned<(Bind, Exp)>, Diagnostic> {
+    let start_loc = context.tokens.start_loc();
+    let ident = parse_identifier(context)?;
     let bind = spanned(
-        tokens.file_name(),
+        context.tokens.file_name(),
         start_loc,
-        tokens.previous_end_loc(),
+        context.tokens.previous_end_loc(),
         Bind_::Var(Var(ident)),
     );
-    let range = if tokens.peek() == Tok::Colon {
+    let range = if context.tokens.peek() == Tok::Colon {
         // This is a quantifier over the full domain of a type.
         // Built `domain<ty>()` expression.
-        tokens.advance()?;
-        let ty = parse_type(tokens)?;
+        context.tokens.advance()?;
+        let ty = parse_type(context)?;
         make_builtin_call(ty.loc, Symbol::from("$spec_domain"), Some(vec![ty]), vec![])
     } else {
         // This is a quantifier over a value, like a vector or a range.
-        consume_identifier(tokens, "in")?;
-        parse_exp(tokens)?
+        consume_identifier(context.tokens, "in")?;
+        parse_exp(context)?
     };
-    let end_loc = tokens.previous_end_loc();
+    let end_loc = context.tokens.previous_end_loc();
     Ok(spanned(
-        tokens.file_name(),
+        context.tokens.file_name(),
         start_loc,
         end_loc,
         (bind, range),
@@ -1419,11 +1491,11 @@ fn make_builtin_call(loc: Loc, name: Symbol, type_args: Option<Vec<Type>>, args:
 //          | "&mut" <Type>
 //          | "|" Comma<Type> "|" Type   (spec only)
 //          | "(" Comma<Type> ")"
-fn parse_type(tokens: &mut Lexer) -> Result<Type, Diagnostic> {
-    let start_loc = tokens.start_loc();
-    let t = match tokens.peek() {
+fn parse_type(context: &mut Context) -> Result<Type, Diagnostic> {
+    let start_loc = context.tokens.start_loc();
+    let t = match context.tokens.peek() {
         Tok::LParen => {
-            let mut ts = parse_comma_list(tokens, Tok::LParen, Tok::RParen, parse_type, "a type")?;
+            let mut ts = parse_comma_list(context, Tok::LParen, Tok::RParen, parse_type, "a type")?;
             match ts.len() {
                 0 => Type_::Unit,
                 1 => ts.pop().unwrap().value,
@@ -1431,45 +1503,45 @@ fn parse_type(tokens: &mut Lexer) -> Result<Type, Diagnostic> {
             }
         }
         Tok::Amp => {
-            tokens.advance()?;
-            let t = parse_type(tokens)?;
+            context.tokens.advance()?;
+            let t = parse_type(context)?;
             Type_::Ref(false, Box::new(t))
         }
         Tok::AmpMut => {
-            tokens.advance()?;
-            let t = parse_type(tokens)?;
+            context.tokens.advance()?;
+            let t = parse_type(context)?;
             Type_::Ref(true, Box::new(t))
         }
         Tok::Pipe => {
-            let args = parse_comma_list(tokens, Tok::Pipe, Tok::Pipe, parse_type, "a type")?;
-            let result = parse_type(tokens)?;
+            let args = parse_comma_list(context, Tok::Pipe, Tok::Pipe, parse_type, "a type")?;
+            let result = parse_type(context)?;
             return Ok(spanned(
-                tokens.file_name(),
+                context.tokens.file_name(),
                 start_loc,
-                tokens.previous_end_loc(),
+                context.tokens.previous_end_loc(),
                 Type_::Fun(args, Box::new(result)),
             ));
         }
         _ => {
-            let tn = parse_name_access_chain(tokens, || "a type name")?;
-            let tys = if tokens.peek() == Tok::Less {
-                parse_comma_list(tokens, Tok::Less, Tok::Greater, parse_type, "a type")?
+            let tn = parse_name_access_chain(context, || "a type name")?;
+            let tys = if context.tokens.peek() == Tok::Less {
+                parse_comma_list(context, Tok::Less, Tok::Greater, parse_type, "a type")?
             } else {
                 vec![]
             };
             Type_::Apply(Box::new(tn), tys)
         }
     };
-    let end_loc = tokens.previous_end_loc();
-    Ok(spanned(tokens.file_name(), start_loc, end_loc, t))
+    let end_loc = context.tokens.previous_end_loc();
+    Ok(spanned(context.tokens.file_name(), start_loc, end_loc, t))
 }
 
 // Parse an optional list of type arguments.
 //    OptionalTypeArgs = "<" Comma<Type> ">" | <empty>
-fn parse_optional_type_args(tokens: &mut Lexer) -> Result<Option<Vec<Type>>, Diagnostic> {
-    if tokens.peek() == Tok::Less {
+fn parse_optional_type_args(context: &mut Context) -> Result<Option<Vec<Type>>, Diagnostic> {
+    if context.tokens.peek() == Tok::Less {
         Ok(Some(parse_comma_list(
-            tokens,
+            context,
             Tok::Less,
             Tok::Greater,
             parse_type,
@@ -1496,17 +1568,17 @@ fn token_to_ability(token: Tok, content: &str) -> Option<Ability_> {
 //          | "drop"
 //          | "store"
 //          | "key"
-fn parse_ability(tokens: &mut Lexer) -> Result<Ability, Diagnostic> {
-    let loc = current_token_loc(tokens);
-    match token_to_ability(tokens.peek(), tokens.content()) {
+fn parse_ability(context: &mut Context) -> Result<Ability, Diagnostic> {
+    let loc = current_token_loc(context.tokens);
+    match token_to_ability(context.tokens.peek(), context.tokens.content()) {
         Some(ability) => {
-            tokens.advance()?;
+            context.tokens.advance()?;
             Ok(sp(loc, ability))
         }
         None => {
             let msg = format!(
                 "Unexpected {}. Expected a type ability, one of: 'copy', 'drop', 'store', or 'key'",
-                current_token_error_string(tokens)
+                current_token_error_string(context.tokens)
             );
             Err(diag!(Syntax::UnexpectedToken, (loc, msg),))
         }
@@ -1518,20 +1590,20 @@ fn parse_ability(tokens: &mut Lexer) -> Result<Ability, Diagnostic> {
 //          <Identifier> <Constraint>?
 //      Constraint =
 //          ":" <Ability> (+ <Ability>)*
-fn parse_type_parameter(tokens: &mut Lexer) -> Result<(Name, Vec<Ability>), Diagnostic> {
-    let n = parse_identifier(tokens)?;
+fn parse_type_parameter(context: &mut Context) -> Result<(Name, Vec<Ability>), Diagnostic> {
+    let n = parse_identifier(context)?;
 
-    let ability_constraints = if match_token(tokens, Tok::Colon)? {
+    let ability_constraints = if match_token(context.tokens, Tok::Colon)? {
         parse_list(
-            tokens,
-            |tokens| match tokens.peek() {
+            context,
+            |context| match context.tokens.peek() {
                 Tok::Plus => {
-                    tokens.advance()?;
+                    context.tokens.advance()?;
                     Ok(true)
                 }
                 Tok::Greater | Tok::Comma => Ok(false),
                 _ => Err(unexpected_token_error(
-                    tokens,
+                    context.tokens,
                     &format!(
                         "one of: '{}', '{}', or '{}'",
                         Tok::Plus,
@@ -1551,15 +1623,16 @@ fn parse_type_parameter(tokens: &mut Lexer) -> Result<(Name, Vec<Ability>), Diag
 // Parse type parameter with optional phantom declaration:
 //   TypeParameterWithPhantomDecl = "phantom"? <TypeParameter>
 fn parse_type_parameter_with_phantom_decl(
-    tokens: &mut Lexer,
+    context: &mut Context,
 ) -> Result<StructTypeParameter, Diagnostic> {
-    let is_phantom = if tokens.peek() == Tok::IdentifierValue && tokens.content() == "phantom" {
-        tokens.advance()?;
-        true
-    } else {
-        false
-    };
-    let (name, constraints) = parse_type_parameter(tokens)?;
+    let is_phantom =
+        if context.tokens.peek() == Tok::IdentifierValue && context.tokens.content() == "phantom" {
+            context.tokens.advance()?;
+            true
+        } else {
+            false
+        };
+    let (name, constraints) = parse_type_parameter(context)?;
     Ok(StructTypeParameter {
         is_phantom,
         name,
@@ -1570,11 +1643,11 @@ fn parse_type_parameter_with_phantom_decl(
 // Parse optional type parameter list.
 //    OptionalTypeParameters = "<" Comma<TypeParameter> ">" | <empty>
 fn parse_optional_type_parameters(
-    tokens: &mut Lexer,
+    context: &mut Context,
 ) -> Result<Vec<(Name, Vec<Ability>)>, Diagnostic> {
-    if tokens.peek() == Tok::Less {
+    if context.tokens.peek() == Tok::Less {
         parse_comma_list(
-            tokens,
+            context,
             Tok::Less,
             Tok::Greater,
             parse_type_parameter,
@@ -1588,11 +1661,11 @@ fn parse_optional_type_parameters(
 // Parse optional struct type parameters:
 //    StructTypeParameter = "<" Comma<TypeParameterWithPhantomDecl> ">" | <empty>
 fn parse_struct_type_parameters(
-    tokens: &mut Lexer,
+    context: &mut Context,
 ) -> Result<Vec<StructTypeParameter>, Diagnostic> {
-    if tokens.peek() == Tok::Less {
+    if context.tokens.peek() == Tok::Less {
         parse_comma_list(
-            tokens,
+            context,
             Tok::Less,
             Tok::Greater,
             parse_type_parameter_with_phantom_decl,
@@ -1619,18 +1692,18 @@ fn parse_function_decl(
     attributes: Vec<Attributes>,
     start_loc: usize,
     modifiers: Modifiers,
-    tokens: &mut Lexer,
+    context: &mut Context,
 ) -> Result<Function, Diagnostic> {
     let Modifiers { visibility, native } = modifiers;
 
     // "fun" <FunctionDefName>
-    consume_token(tokens, Tok::Fun)?;
-    let name = FunctionName(parse_identifier(tokens)?);
-    let type_parameters = parse_optional_type_parameters(tokens)?;
+    consume_token(context.tokens, Tok::Fun)?;
+    let name = FunctionName(parse_identifier(context)?);
+    let type_parameters = parse_optional_type_parameters(context)?;
 
     // "(" Comma<Parameter> ")"
     let parameters = parse_comma_list(
-        tokens,
+        context,
         Tok::LParen,
         Tok::RParen,
         parse_parameter,
@@ -1638,25 +1711,25 @@ fn parse_function_decl(
     )?;
 
     // (":" <Type>)?
-    let return_type = if match_token(tokens, Tok::Colon)? {
-        parse_type(tokens)?
+    let return_type = if match_token(context.tokens, Tok::Colon)? {
+        parse_type(context)?
     } else {
         sp(name.loc(), Type_::Unit)
     };
 
     // ("acquires" (<NameAccessChain> ",")* <NameAccessChain> ","?
     let mut acquires = vec![];
-    if match_token(tokens, Tok::Acquires)? {
+    if match_token(context.tokens, Tok::Acquires)? {
         let follows_acquire = |tok| matches!(tok, Tok::Semicolon | Tok::LBrace);
         loop {
-            acquires.push(parse_name_access_chain(tokens, || {
+            acquires.push(parse_name_access_chain(context, || {
                 "a resource struct name"
             })?);
-            if follows_acquire(tokens.peek()) {
+            if follows_acquire(context.tokens.peek()) {
                 break;
             }
-            consume_token(tokens, Tok::Comma)?;
-            if follows_acquire(tokens.peek()) {
+            consume_token(context.tokens, Tok::Comma)?;
+            if follows_acquire(context.tokens.peek()) {
                 break;
             }
         }
@@ -1664,16 +1737,16 @@ fn parse_function_decl(
 
     let body = match native {
         Some(loc) => {
-            consume_token(tokens, Tok::Semicolon)?;
+            consume_token(context.tokens, Tok::Semicolon)?;
             sp(loc, FunctionBody_::Native)
         }
         _ => {
-            let start_loc = tokens.start_loc();
-            consume_token(tokens, Tok::LBrace)?;
-            let seq = parse_sequence(tokens)?;
-            let end_loc = tokens.previous_end_loc();
+            let start_loc = context.tokens.start_loc();
+            consume_token(context.tokens, Tok::LBrace)?;
+            let seq = parse_sequence(context)?;
+            let end_loc = context.tokens.previous_end_loc();
             sp(
-                make_loc(tokens.file_name(), start_loc, end_loc),
+                make_loc(context.tokens.file_name(), start_loc, end_loc),
                 FunctionBody_::Defined(seq),
             )
         }
@@ -1685,7 +1758,11 @@ fn parse_function_decl(
         return_type,
     };
 
-    let loc = make_loc(tokens.file_name(), start_loc, tokens.previous_end_loc());
+    let loc = make_loc(
+        context.tokens.file_name(),
+        start_loc,
+        context.tokens.previous_end_loc(),
+    );
     Ok(Function {
         attributes,
         loc,
@@ -1699,10 +1776,10 @@ fn parse_function_decl(
 
 // Parse a function parameter:
 //      Parameter = <Var> ":" <Type>
-fn parse_parameter(tokens: &mut Lexer) -> Result<(Var, Type), Diagnostic> {
-    let v = parse_var(tokens)?;
-    consume_token(tokens, Tok::Colon)?;
-    let t = parse_type(tokens)?;
+fn parse_parameter(context: &mut Context) -> Result<(Var, Type), Diagnostic> {
+    let v = parse_var(context)?;
+    consume_token(context.tokens, Tok::Colon)?;
+    let t = parse_type(context)?;
     Ok((v, t))
 }
 
@@ -1720,7 +1797,7 @@ fn parse_struct_decl(
     attributes: Vec<Attributes>,
     start_loc: usize,
     modifiers: Modifiers,
-    tokens: &mut Lexer,
+    context: &mut Context,
 ) -> Result<StructDefinition, Diagnostic> {
     let Modifiers { visibility, native } = modifiers;
     if let Some(vis) = visibility {
@@ -1729,49 +1806,52 @@ fn parse_struct_decl(
              always '{}'",
             Visibility::PUBLIC
         );
-        return Err(diag!(Syntax::InvalidModifier, (vis.loc().unwrap(), msg)));
+        context
+            .env
+            .add_diag(diag!(Syntax::InvalidModifier, (vis.loc().unwrap(), msg)));
     }
 
-    consume_token(tokens, Tok::Struct)?;
+    consume_token(context.tokens, Tok::Struct)?;
 
     // <StructDefName>
-    let name = StructName(parse_identifier(tokens)?);
-    let type_parameters = parse_struct_type_parameters(tokens)?;
+    let name = StructName(parse_identifier(context)?);
+    let type_parameters = parse_struct_type_parameters(context)?;
 
-    let abilities = if tokens.peek() == Tok::IdentifierValue && tokens.content() == "has" {
-        tokens.advance()?;
-        parse_list(
-            tokens,
-            |tokens| match tokens.peek() {
-                Tok::Comma => {
-                    tokens.advance()?;
-                    Ok(true)
-                }
-                Tok::LBrace | Tok::Semicolon => Ok(false),
-                _ => Err(unexpected_token_error(
-                    tokens,
-                    &format!(
-                        "one of: '{}', '{}', or '{}'",
-                        Tok::Comma,
-                        Tok::LBrace,
-                        Tok::Semicolon
-                    ),
-                )),
-            },
-            parse_ability,
-        )?
-    } else {
-        vec![]
-    };
+    let abilities =
+        if context.tokens.peek() == Tok::IdentifierValue && context.tokens.content() == "has" {
+            context.tokens.advance()?;
+            parse_list(
+                context,
+                |context| match context.tokens.peek() {
+                    Tok::Comma => {
+                        context.tokens.advance()?;
+                        Ok(true)
+                    }
+                    Tok::LBrace | Tok::Semicolon => Ok(false),
+                    _ => Err(unexpected_token_error(
+                        context.tokens,
+                        &format!(
+                            "one of: '{}', '{}', or '{}'",
+                            Tok::Comma,
+                            Tok::LBrace,
+                            Tok::Semicolon
+                        ),
+                    )),
+                },
+                parse_ability,
+            )?
+        } else {
+            vec![]
+        };
 
     let fields = match native {
         Some(loc) => {
-            consume_token(tokens, Tok::Semicolon)?;
+            consume_token(context.tokens, Tok::Semicolon)?;
             StructFields::Native(loc)
         }
         _ => {
             let list = parse_comma_list(
-                tokens,
+                context,
                 Tok::LBrace,
                 Tok::RBrace,
                 parse_field_annot,
@@ -1781,7 +1861,11 @@ fn parse_struct_decl(
         }
     };
 
-    let loc = make_loc(tokens.file_name(), start_loc, tokens.previous_end_loc());
+    let loc = make_loc(
+        context.tokens.file_name(),
+        start_loc,
+        context.tokens.previous_end_loc(),
+    );
     Ok(StructDefinition {
         attributes,
         loc,
@@ -1794,11 +1878,11 @@ fn parse_struct_decl(
 
 // Parse a field annotated with a type:
 //      FieldAnnot = <DocComments> <Field> ":" <Type>
-fn parse_field_annot(tokens: &mut Lexer) -> Result<(Field, Type), Diagnostic> {
-    tokens.match_doc_comments();
-    let f = parse_field(tokens)?;
-    consume_token(tokens, Tok::Colon)?;
-    let st = parse_type(tokens)?;
+fn parse_field_annot(context: &mut Context) -> Result<(Field, Type), Diagnostic> {
+    context.tokens.match_doc_comments();
+    let f = parse_field(context)?;
+    consume_token(context.tokens, Tok::Colon)?;
+    let st = parse_type(context)?;
     Ok((f, st))
 }
 
@@ -1812,26 +1896,34 @@ fn parse_constant_decl(
     attributes: Vec<Attributes>,
     start_loc: usize,
     modifiers: Modifiers,
-    tokens: &mut Lexer,
+    context: &mut Context,
 ) -> Result<Constant, Diagnostic> {
     let Modifiers { visibility, native } = modifiers;
     if let Some(vis) = visibility {
         let msg = "Invalid constant declaration. Constants cannot have visibility modifiers as \
                    they are always internal";
-        return Err(diag!(Syntax::InvalidModifier, (vis.loc().unwrap(), msg)));
+        context
+            .env
+            .add_diag(diag!(Syntax::InvalidModifier, (vis.loc().unwrap(), msg)));
     }
     if let Some(loc) = native {
         let msg = "Invalid constant declaration. 'native' constants are not supported";
-        return Err(diag!(Syntax::InvalidModifier, (loc, msg)));
+        context
+            .env
+            .add_diag(diag!(Syntax::InvalidModifier, (loc, msg)));
     }
-    consume_token(tokens, Tok::Const)?;
-    let name = ConstantName(parse_identifier(tokens)?);
-    consume_token(tokens, Tok::Colon)?;
-    let signature = parse_type(tokens)?;
-    consume_token(tokens, Tok::Equal)?;
-    let value = parse_exp(tokens)?;
-    consume_token(tokens, Tok::Semicolon)?;
-    let loc = make_loc(tokens.file_name(), start_loc, tokens.previous_end_loc());
+    consume_token(context.tokens, Tok::Const)?;
+    let name = ConstantName(parse_identifier(context)?);
+    consume_token(context.tokens, Tok::Colon)?;
+    let signature = parse_type(context)?;
+    consume_token(context.tokens, Tok::Equal)?;
+    let value = parse_exp(context)?;
+    consume_token(context.tokens, Tok::Semicolon)?;
+    let loc = make_loc(
+        context.tokens.file_name(),
+        start_loc,
+        context.tokens.previous_end_loc(),
+    );
     Ok(Constant {
         attributes,
         loc,
@@ -1852,42 +1944,42 @@ fn parse_constant_decl(
 // Note that "address" is not a token.
 fn parse_address_block(
     attributes: Vec<Attributes>,
-    tokens: &mut Lexer,
+    context: &mut Context,
 ) -> Result<AddressDefinition, Diagnostic> {
     const UNEXPECTED_TOKEN: &str = "Invalid code unit. Expected 'address', 'module', or 'script'";
-    if tokens.peek() != Tok::IdentifierValue {
-        let start = tokens.start_loc();
-        let end = start + tokens.content().len();
-        let loc = make_loc(tokens.file_name(), start, end);
+    if context.tokens.peek() != Tok::IdentifierValue {
+        let start = context.tokens.start_loc();
+        let end = start + context.tokens.content().len();
+        let loc = make_loc(context.tokens.file_name(), start, end);
         let msg = format!(
             "{}. Got {}",
             UNEXPECTED_TOKEN,
-            current_token_error_string(tokens)
+            current_token_error_string(context.tokens)
         );
         return Err(diag!(Syntax::UnexpectedToken, (loc, msg)));
     }
-    let addr_name = parse_identifier(tokens)?;
+    let addr_name = parse_identifier(context)?;
     if addr_name.value.as_str() != "address" {
         let msg = format!("{}. Got '{}'", UNEXPECTED_TOKEN, addr_name.value);
         return Err(diag!(Syntax::UnexpectedToken, (addr_name.loc, msg)));
     }
-    let start_loc = tokens.start_loc();
-    let addr = parse_leading_name_access(tokens)?;
-    let end_loc = tokens.previous_end_loc();
-    let loc = make_loc(tokens.file_name(), start_loc, end_loc);
+    let start_loc = context.tokens.start_loc();
+    let addr = parse_leading_name_access(context)?;
+    let end_loc = context.tokens.previous_end_loc();
+    let loc = make_loc(context.tokens.file_name(), start_loc, end_loc);
 
-    let modules = match tokens.peek() {
+    let modules = match context.tokens.peek() {
         Tok::LBrace => {
-            tokens.advance()?;
+            context.tokens.advance()?;
             let mut modules = vec![];
-            while tokens.peek() != Tok::RBrace {
-                let attributes = parse_attributes(tokens)?;
-                modules.push(parse_module(attributes, tokens)?);
+            while context.tokens.peek() != Tok::RBrace {
+                let attributes = parse_attributes(context)?;
+                modules.push(parse_module(attributes, context)?);
             }
-            consume_token(tokens, Tok::RBrace)?;
+            consume_token(context.tokens, Tok::RBrace)?;
             modules
         }
-        _ => return Err(unexpected_token_error(tokens, "'{'")),
+        _ => return Err(unexpected_token_error(context.tokens, "'{'")),
     };
 
     Ok(AddressDefinition {
@@ -1907,13 +1999,17 @@ fn parse_address_block(
 //          "friend" <NameAccessChain> ";"
 fn parse_friend_decl(
     attributes: Vec<Attributes>,
-    tokens: &mut Lexer,
+    context: &mut Context,
 ) -> Result<FriendDecl, Diagnostic> {
-    let start_loc = tokens.start_loc();
-    consume_token(tokens, Tok::Friend)?;
-    let friend = parse_name_access_chain(tokens, || "a friend declaration")?;
-    consume_token(tokens, Tok::Semicolon)?;
-    let loc = make_loc(tokens.file_name(), start_loc, tokens.previous_end_loc());
+    let start_loc = context.tokens.start_loc();
+    consume_token(context.tokens, Tok::Friend)?;
+    let friend = parse_name_access_chain(context, || "a friend declaration")?;
+    consume_token(context.tokens, Tok::Semicolon)?;
+    let loc = make_loc(
+        context.tokens.file_name(),
+        start_loc,
+        context.tokens.previous_end_loc(),
+    );
     Ok(FriendDecl {
         attributes,
         loc,
@@ -1930,45 +2026,48 @@ fn parse_friend_decl(
 //          "use" <ModuleIdent> <UseAlias> ";" |
 //          "use" <ModuleIdent> :: <UseMember> ";" |
 //          "use" <ModuleIdent> :: "{" Comma<UseMember> "}" ";"
-fn parse_use_decl(attributes: Vec<Attributes>, tokens: &mut Lexer) -> Result<UseDecl, Diagnostic> {
-    consume_token(tokens, Tok::Use)?;
-    let ident = parse_module_ident(tokens)?;
-    let alias_opt = parse_use_alias(tokens)?;
-    let use_ = match (&alias_opt, tokens.peek()) {
+fn parse_use_decl(
+    attributes: Vec<Attributes>,
+    context: &mut Context,
+) -> Result<UseDecl, Diagnostic> {
+    consume_token(context.tokens, Tok::Use)?;
+    let ident = parse_module_ident(context)?;
+    let alias_opt = parse_use_alias(context)?;
+    let use_ = match (&alias_opt, context.tokens.peek()) {
         (None, Tok::ColonColon) => {
-            consume_token(tokens, Tok::ColonColon)?;
-            let sub_uses = match tokens.peek() {
+            consume_token(context.tokens, Tok::ColonColon)?;
+            let sub_uses = match context.tokens.peek() {
                 Tok::LBrace => parse_comma_list(
-                    tokens,
+                    context,
                     Tok::LBrace,
                     Tok::RBrace,
                     parse_use_member,
                     "a module member alias",
                 )?,
-                _ => vec![parse_use_member(tokens)?],
+                _ => vec![parse_use_member(context)?],
             };
             Use::Members(ident, sub_uses)
         }
         _ => Use::Module(ident, alias_opt.map(ModuleName)),
     };
-    consume_token(tokens, Tok::Semicolon)?;
+    consume_token(context.tokens, Tok::Semicolon)?;
     Ok(UseDecl { attributes, use_ })
 }
 
 // Parse an alias for a module member:
 //      UseMember = <Identifier> <UseAlias>
-fn parse_use_member(tokens: &mut Lexer) -> Result<(Name, Option<Name>), Diagnostic> {
-    let member = parse_identifier(tokens)?;
-    let alias_opt = parse_use_alias(tokens)?;
+fn parse_use_member(context: &mut Context) -> Result<(Name, Option<Name>), Diagnostic> {
+    let member = parse_identifier(context)?;
+    let alias_opt = parse_use_alias(context)?;
     Ok((member, alias_opt))
 }
 
 // Parse an 'as' use alias:
 //      UseAlias = ("as" <Identifier>)?
-fn parse_use_alias(tokens: &mut Lexer) -> Result<Option<Name>, Diagnostic> {
-    Ok(if tokens.peek() == Tok::As {
-        tokens.advance()?;
-        Some(parse_identifier(tokens)?)
+fn parse_use_alias(context: &mut Context) -> Result<Option<Name>, Diagnostic> {
+    Ok(if context.tokens.peek() == Tok::As {
+        context.tokens.advance()?;
+        Some(parse_identifier(context)?)
     } else {
         None
     })
@@ -1986,62 +2085,64 @@ fn parse_use_alias(tokens: &mut Lexer) -> Result<Option<Name>, Diagnostic> {
 //          "}"
 fn parse_module(
     attributes: Vec<Attributes>,
-    tokens: &mut Lexer,
+    context: &mut Context,
 ) -> Result<ModuleDefinition, Diagnostic> {
-    tokens.match_doc_comments();
-    let start_loc = tokens.start_loc();
+    context.tokens.match_doc_comments();
+    let start_loc = context.tokens.start_loc();
 
-    let is_spec_module = if tokens.peek() == Tok::Spec {
-        tokens.advance()?;
+    let is_spec_module = if context.tokens.peek() == Tok::Spec {
+        context.tokens.advance()?;
         true
     } else {
-        consume_token(tokens, Tok::Module)?;
+        consume_token(context.tokens, Tok::Module)?;
         false
     };
-    let sp!(n1_loc, n1_) = parse_leading_name_access(tokens)?;
-    let (address, name) = match (n1_, tokens.peek()) {
+    let sp!(n1_loc, n1_) = parse_leading_name_access(context)?;
+    let (address, name) = match (n1_, context.tokens.peek()) {
         (addr_ @ LeadingNameAccess_::AnonymousAddress(_), _)
         | (addr_ @ LeadingNameAccess_::Name(_), Tok::ColonColon) => {
             let addr = sp(n1_loc, addr_);
-            consume_token(tokens, Tok::ColonColon)?;
-            let name = parse_module_name(tokens)?;
+            consume_token(context.tokens, Tok::ColonColon)?;
+            let name = parse_module_name(context)?;
             (Some(addr), name)
         }
         (LeadingNameAccess_::Name(name), _) => (None, ModuleName(name)),
     };
-    consume_token(tokens, Tok::LBrace)?;
+    consume_token(context.tokens, Tok::LBrace)?;
 
     let mut members = vec![];
-    while tokens.peek() != Tok::RBrace {
+    while context.tokens.peek() != Tok::RBrace {
         members.push({
-            let attributes = parse_attributes(tokens)?;
-            match tokens.peek() {
+            let attributes = parse_attributes(context)?;
+            match context.tokens.peek() {
                 // Top-level specification constructs
                 Tok::Invariant => {
-                    tokens.match_doc_comments();
+                    context.tokens.match_doc_comments();
                     ModuleMember::Spec(singleton_module_spec_block(
-                        tokens,
-                        tokens.start_loc(),
+                        context,
+                        context.tokens.start_loc(),
                         attributes,
                         parse_invariant,
                     )?)
                 }
                 Tok::Spec => {
-                    match tokens.lookahead() {
+                    match context.tokens.lookahead() {
                         Ok(Tok::Fun) | Ok(Tok::Native) => {
-                            tokens.match_doc_comments();
-                            let start_loc = tokens.start_loc();
-                            tokens.advance()?;
+                            context.tokens.match_doc_comments();
+                            let start_loc = context.tokens.start_loc();
+                            context.tokens.advance()?;
                             // Add an extra check for better error message
                             // if old syntax is used
-                            if tokens.lookahead2() == Ok((Tok::IdentifierValue, Tok::LBrace)) {
+                            if context.tokens.lookahead2()
+                                == Ok((Tok::IdentifierValue, Tok::LBrace))
+                            {
                                 return Err(unexpected_token_error(
-                                    tokens,
+                                    context.tokens,
                                     "only 'spec', drop the 'fun' keyword",
                                 ));
                             }
                             ModuleMember::Spec(singleton_module_spec_block(
-                                tokens,
+                                context,
                                 start_loc,
                                 attributes,
                                 parse_spec_function,
@@ -2049,30 +2150,30 @@ fn parse_module(
                         }
                         _ => {
                             // Regular spec block
-                            ModuleMember::Spec(parse_spec_block(attributes, tokens)?)
+                            ModuleMember::Spec(parse_spec_block(attributes, context)?)
                         }
                     }
                 }
                 // Regular move constructs
-                Tok::Use => ModuleMember::Use(parse_use_decl(attributes, tokens)?),
-                Tok::Friend => ModuleMember::Friend(parse_friend_decl(attributes, tokens)?),
+                Tok::Use => ModuleMember::Use(parse_use_decl(attributes, context)?),
+                Tok::Friend => ModuleMember::Friend(parse_friend_decl(attributes, context)?),
                 _ => {
-                    tokens.match_doc_comments();
-                    let start_loc = tokens.start_loc();
-                    let modifiers = parse_module_member_modifiers(tokens)?;
-                    match tokens.peek() {
+                    context.tokens.match_doc_comments();
+                    let start_loc = context.tokens.start_loc();
+                    let modifiers = parse_module_member_modifiers(context)?;
+                    match context.tokens.peek() {
                         Tok::Const => ModuleMember::Constant(parse_constant_decl(
-                            attributes, start_loc, modifiers, tokens,
+                            attributes, start_loc, modifiers, context,
                         )?),
                         Tok::Fun => ModuleMember::Function(parse_function_decl(
-                            attributes, start_loc, modifiers, tokens,
+                            attributes, start_loc, modifiers, context,
                         )?),
                         Tok::Struct => ModuleMember::Struct(parse_struct_decl(
-                            attributes, start_loc, modifiers, tokens,
+                            attributes, start_loc, modifiers, context,
                         )?),
                         _ => {
                             return Err(unexpected_token_error(
-                                tokens,
+                                context.tokens,
                                 &format!(
                                     "a module member: '{}', '{}', '{}', '{}', '{}', or '{}'",
                                     Tok::Spec,
@@ -2089,8 +2190,12 @@ fn parse_module(
             }
         })
     }
-    consume_token(tokens, Tok::RBrace)?;
-    let loc = make_loc(tokens.file_name(), start_loc, tokens.previous_end_loc());
+    consume_token(context.tokens, Tok::RBrace)?;
+    let loc = make_loc(
+        context.tokens.file_name(),
+        start_loc,
+        context.tokens.previous_end_loc(),
+    );
     Ok(ModuleDefinition {
         attributes,
         loc,
@@ -2115,55 +2220,56 @@ fn parse_module(
 //          "}"
 fn parse_script(
     script_attributes: Vec<Attributes>,
-    tokens: &mut Lexer,
+    context: &mut Context,
 ) -> Result<Script, Diagnostic> {
-    let start_loc = tokens.start_loc();
+    let start_loc = context.tokens.start_loc();
 
-    consume_token(tokens, Tok::Script)?;
-    consume_token(tokens, Tok::LBrace)?;
+    consume_token(context.tokens, Tok::Script)?;
+    consume_token(context.tokens, Tok::LBrace)?;
 
     let mut uses = vec![];
-    let mut next_item_attributes = parse_attributes(tokens)?;
-    while tokens.peek() == Tok::Use {
-        uses.push(parse_use_decl(next_item_attributes, tokens)?);
-        next_item_attributes = parse_attributes(tokens)?;
+    let mut next_item_attributes = parse_attributes(context)?;
+    while context.tokens.peek() == Tok::Use {
+        uses.push(parse_use_decl(next_item_attributes, context)?);
+        next_item_attributes = parse_attributes(context)?;
     }
     let mut constants = vec![];
-    while tokens.peek() == Tok::Const {
-        let start_loc = tokens.start_loc();
+    while context.tokens.peek() == Tok::Const {
+        let start_loc = context.tokens.start_loc();
         constants.push(parse_constant_decl(
             next_item_attributes,
             start_loc,
             Modifiers::empty(),
-            tokens,
+            context,
         )?);
-        next_item_attributes = parse_attributes(tokens)?;
+        next_item_attributes = parse_attributes(context)?;
     }
 
-    tokens.match_doc_comments(); // match doc comments to script function
-    let function_start_loc = tokens.start_loc();
-    let modifiers = parse_module_member_modifiers(tokens)?;
-    if let Some(loc) = modifiers.native {
-        let msg = "'native' functions can only be declared inside a module";
-        return Err(diag!(Syntax::InvalidModifier, (loc, msg)));
-    }
+    context.tokens.match_doc_comments(); // match doc comments to script function
+    let function_start_loc = context.tokens.start_loc();
+    let modifiers = parse_module_member_modifiers(context)?;
+    // don't need to check native modifier, it is checked later
     let function =
-        parse_function_decl(next_item_attributes, function_start_loc, modifiers, tokens)?;
+        parse_function_decl(next_item_attributes, function_start_loc, modifiers, context)?;
 
     let mut specs = vec![];
-    while tokens.peek() == Tok::NumSign || tokens.peek() == Tok::Spec {
-        let attributes = parse_attributes(tokens)?;
-        specs.push(parse_spec_block(attributes, tokens)?);
+    while context.tokens.peek() == Tok::NumSign || context.tokens.peek() == Tok::Spec {
+        let attributes = parse_attributes(context)?;
+        specs.push(parse_spec_block(attributes, context)?);
     }
 
-    if tokens.peek() != Tok::RBrace {
-        let loc = current_token_loc(tokens);
+    if context.tokens.peek() != Tok::RBrace {
+        let loc = current_token_loc(context.tokens);
         let msg = "Unexpected characters after end of 'script' function";
         return Err(diag!(Syntax::UnexpectedToken, (loc, msg)));
     }
-    consume_token(tokens, Tok::RBrace)?;
+    consume_token(context.tokens, Tok::RBrace)?;
 
-    let loc = make_loc(tokens.file_name(), start_loc, tokens.previous_end_loc());
+    let loc = make_loc(
+        context.tokens.file_name(),
+        start_loc,
+        context.tokens.previous_end_loc(),
+    );
     Ok(Script {
         attributes: script_attributes,
         loc,
@@ -2188,72 +2294,72 @@ fn parse_script(
 //        <DocComments> "spec" ( <SpecFunction> | <SpecBlockTarget> "{" SpecBlockMember* "}" )
 fn parse_spec_block(
     attributes: Vec<Attributes>,
-    tokens: &mut Lexer,
+    context: &mut Context,
 ) -> Result<SpecBlock, Diagnostic> {
-    tokens.match_doc_comments();
-    let start_loc = tokens.start_loc();
-    consume_token(tokens, Tok::Spec)?;
-    let target_start_loc = tokens.start_loc();
-    let target_ = match tokens.peek() {
+    context.tokens.match_doc_comments();
+    let start_loc = context.tokens.start_loc();
+    consume_token(context.tokens, Tok::Spec)?;
+    let target_start_loc = context.tokens.start_loc();
+    let target_ = match context.tokens.peek() {
         Tok::Fun => {
             return Err(unexpected_token_error(
-                tokens,
+                context.tokens,
                 "only 'spec', drop the 'fun' keyword",
             ));
         }
         Tok::Struct => {
             return Err(unexpected_token_error(
-                tokens,
+                context.tokens,
                 "only 'spec', drop the 'struct' keyword",
             ));
         }
         Tok::Module => {
-            tokens.advance()?;
+            context.tokens.advance()?;
             SpecBlockTarget_::Module
         }
-        Tok::IdentifierValue if tokens.content() == "schema" => {
-            tokens.advance()?;
-            let name = parse_identifier(tokens)?;
-            let type_parameters = parse_optional_type_parameters(tokens)?;
+        Tok::IdentifierValue if context.tokens.content() == "schema" => {
+            context.tokens.advance()?;
+            let name = parse_identifier(context)?;
+            let type_parameters = parse_optional_type_parameters(context)?;
             SpecBlockTarget_::Schema(name, type_parameters)
         }
         Tok::IdentifierValue => {
-            let name = parse_identifier(tokens)?;
-            let signature = parse_spec_target_signature_opt(&name.loc, tokens)?;
+            let name = parse_identifier(context)?;
+            let signature = parse_spec_target_signature_opt(&name.loc, context)?;
             SpecBlockTarget_::Member(name, signature)
         }
         Tok::LBrace => SpecBlockTarget_::Code,
         _ => {
             return Err(unexpected_token_error(
-                tokens,
+                context.tokens,
                 "one of `module`, `struct`, `fun`, `schema`, or `{`",
             ));
         }
     };
     let target = spanned(
-        tokens.file_name(),
+        context.tokens.file_name(),
         target_start_loc,
         match target_ {
             SpecBlockTarget_::Code => target_start_loc,
-            _ => tokens.previous_end_loc(),
+            _ => context.tokens.previous_end_loc(),
         },
         target_,
     );
 
-    consume_token(tokens, Tok::LBrace)?;
+    consume_token(context.tokens, Tok::LBrace)?;
     let mut uses = vec![];
-    while tokens.peek() == Tok::Use {
-        uses.push(parse_use_decl(vec![], tokens)?);
+    while context.tokens.peek() == Tok::Use {
+        uses.push(parse_use_decl(vec![], context)?);
     }
     let mut members = vec![];
-    while tokens.peek() != Tok::RBrace {
-        members.push(parse_spec_block_member(tokens)?);
+    while context.tokens.peek() != Tok::RBrace {
+        members.push(parse_spec_block_member(context)?);
     }
-    consume_token(tokens, Tok::RBrace)?;
+    consume_token(context.tokens, Tok::RBrace)?;
     Ok(spanned(
-        tokens.file_name(),
+        context.tokens.file_name(),
         start_loc,
-        tokens.previous_end_loc(),
+        context.tokens.previous_end_loc(),
         SpecBlock_ {
             attributes,
             target,
@@ -2265,22 +2371,22 @@ fn parse_spec_block(
 
 fn parse_spec_target_signature_opt(
     loc: &Loc,
-    tokens: &mut Lexer,
+    context: &mut Context,
 ) -> Result<Option<Box<FunctionSignature>>, Diagnostic> {
-    match tokens.peek() {
+    match context.tokens.peek() {
         Tok::Less | Tok::LParen => {
-            let type_parameters = parse_optional_type_parameters(tokens)?;
+            let type_parameters = parse_optional_type_parameters(context)?;
             // "(" Comma<Parameter> ")"
             let parameters = parse_comma_list(
-                tokens,
+                context,
                 Tok::LParen,
                 Tok::RParen,
                 parse_parameter,
                 "a function parameter",
             )?;
             // (":" <Type>)?
-            let return_type = if match_token(tokens, Tok::Colon)? {
-                parse_type(tokens)?
+            let return_type = if match_token(context.tokens, Tok::Colon)? {
+                parse_type(context)?
             } else {
                 sp(*loc, Type_::Unit)
             };
@@ -2298,29 +2404,29 @@ fn parse_spec_target_signature_opt(
 //    SpecBlockMember = <DocComments> ( <Invariant> | <Condition> | <SpecFunction> | <SpecVariable>
 //                                   | <SpecInclude> | <SpecApply> | <SpecPragma> | <SpecLet>
 //                                   | <SpecUpdate> | <SpecAxiom> )
-fn parse_spec_block_member(tokens: &mut Lexer) -> Result<SpecBlockMember, Diagnostic> {
-    tokens.match_doc_comments();
-    match tokens.peek() {
-        Tok::Invariant => parse_invariant(tokens),
-        Tok::Let => parse_spec_let(tokens),
-        Tok::Fun | Tok::Native => parse_spec_function(tokens),
-        Tok::IdentifierValue => match tokens.content() {
+fn parse_spec_block_member(context: &mut Context) -> Result<SpecBlockMember, Diagnostic> {
+    context.tokens.match_doc_comments();
+    match context.tokens.peek() {
+        Tok::Invariant => parse_invariant(context),
+        Tok::Let => parse_spec_let(context),
+        Tok::Fun | Tok::Native => parse_spec_function(context),
+        Tok::IdentifierValue => match context.tokens.content() {
             "assert" | "assume" | "decreases" | "aborts_if" | "aborts_with" | "succeeds_if"
-            | "modifies" | "emits" | "ensures" | "requires" => parse_condition(tokens),
-            "axiom" => parse_axiom(tokens),
-            "include" => parse_spec_include(tokens),
-            "apply" => parse_spec_apply(tokens),
-            "pragma" => parse_spec_pragma(tokens),
-            "global" | "local" => parse_spec_variable(tokens),
-            "update" => parse_spec_update(tokens),
+            | "modifies" | "emits" | "ensures" | "requires" => parse_condition(context),
+            "axiom" => parse_axiom(context),
+            "include" => parse_spec_include(context),
+            "apply" => parse_spec_apply(context),
+            "pragma" => parse_spec_pragma(context),
+            "global" | "local" => parse_spec_variable(context),
+            "update" => parse_spec_update(context),
             _ => {
                 // local is optional but supported to be able to declare variables which are
                 // named like the weak keywords above
-                parse_spec_variable(tokens)
+                parse_spec_variable(context)
             }
         },
         _ => Err(unexpected_token_error(
-            tokens,
+            context.tokens,
             "one of `assert`, `assume`, `decreases`, `aborts_if`, `aborts_with`, `succeeds_if`, \
              `modifies`, `emits`, `ensures`, `requires`, `include`, `apply`, `pragma`, `global`, \
              or a name",
@@ -2335,9 +2441,9 @@ fn parse_spec_block_member(tokens: &mut Lexer) -> Result<SpecBlockMember, Diagno
 //      | "aborts_with" <ConditionProperties> <Exp> [Comma <Exp>]* ";"
 //      | "decreases" <ConditionProperties> <Exp> ";"
 //      | "emits" <ConditionProperties> <Exp> "to" <Exp> [If <Exp>] ";"
-fn parse_condition(tokens: &mut Lexer) -> Result<SpecBlockMember, Diagnostic> {
-    let start_loc = tokens.start_loc();
-    let kind_ = match tokens.content() {
+fn parse_condition(context: &mut Context) -> Result<SpecBlockMember, Diagnostic> {
+    let start_loc = context.tokens.start_loc();
+    let kind_ = match context.tokens.content() {
         "assert" => SpecConditionKind_::Assert,
         "assume" => SpecConditionKind_::Assume,
         "decreases" => SpecConditionKind_::Decreases,
@@ -2350,53 +2456,53 @@ fn parse_condition(tokens: &mut Lexer) -> Result<SpecBlockMember, Diagnostic> {
         "requires" => SpecConditionKind_::Requires,
         _ => unreachable!(),
     };
-    tokens.advance()?;
+    context.tokens.advance()?;
     let kind = spanned(
-        tokens.file_name(),
+        context.tokens.file_name(),
         start_loc,
-        tokens.previous_end_loc(),
+        context.tokens.previous_end_loc(),
         kind_.clone(),
     );
-    let properties = parse_condition_properties(tokens)?;
+    let properties = parse_condition_properties(context)?;
     let exp = if kind_ == SpecConditionKind_::AbortsWith || kind_ == SpecConditionKind_::Modifies {
         // Use a dummy expression as a placeholder for this field.
-        let loc = make_loc(tokens.file_name(), start_loc, start_loc + 1);
+        let loc = make_loc(context.tokens.file_name(), start_loc, start_loc + 1);
         sp(loc, Exp_::Value(sp(loc, Value_::Bool(false))))
     } else {
-        parse_exp(tokens)?
+        parse_exp(context)?
     };
     let additional_exps = if kind_ == SpecConditionKind_::AbortsIf
-        && tokens.peek() == Tok::IdentifierValue
-        && tokens.content() == "with"
+        && context.tokens.peek() == Tok::IdentifierValue
+        && context.tokens.content() == "with"
     {
-        tokens.advance()?;
-        let codes = vec![parse_exp(tokens)?];
-        consume_token(tokens, Tok::Semicolon)?;
+        context.tokens.advance()?;
+        let codes = vec![parse_exp(context)?];
+        consume_token(context.tokens, Tok::Semicolon)?;
         codes
     } else if kind_ == SpecConditionKind_::AbortsWith || kind_ == SpecConditionKind_::Modifies {
         parse_comma_list_after_start(
-            tokens,
-            tokens.start_loc(),
-            tokens.peek(),
+            context,
+            context.tokens.start_loc(),
+            context.tokens.peek(),
             Tok::Semicolon,
             parse_exp,
             "an aborts code or modifies target",
         )?
     } else if kind_ == SpecConditionKind_::Emits {
-        consume_identifier(tokens, "to")?;
-        let mut additional_exps = vec![parse_exp(tokens)?];
-        if match_token(tokens, Tok::If)? {
-            additional_exps.push(parse_exp(tokens)?);
+        consume_identifier(context.tokens, "to")?;
+        let mut additional_exps = vec![parse_exp(context)?];
+        if match_token(context.tokens, Tok::If)? {
+            additional_exps.push(parse_exp(context)?);
         }
-        consume_token(tokens, Tok::Semicolon)?;
+        consume_token(context.tokens, Tok::Semicolon)?;
         additional_exps
     } else {
-        consume_token(tokens, Tok::Semicolon)?;
+        consume_token(context.tokens, Tok::Semicolon)?;
         vec![]
     };
-    let end_loc = tokens.previous_end_loc();
+    let end_loc = context.tokens.previous_end_loc();
     Ok(spanned(
-        tokens.file_name(),
+        context.tokens.file_name(),
         start_loc,
         end_loc,
         SpecBlockMember_::Condition {
@@ -2410,10 +2516,10 @@ fn parse_condition(tokens: &mut Lexer) -> Result<SpecBlockMember, Diagnostic> {
 
 // Parse properties in a condition.
 //   ConditionProperties = ( "[" Comma<SpecPragmaProperty> "]" )?
-fn parse_condition_properties(tokens: &mut Lexer) -> Result<Vec<PragmaProperty>, Diagnostic> {
-    let properties = if tokens.peek() == Tok::LBracket {
+fn parse_condition_properties(context: &mut Context) -> Result<Vec<PragmaProperty>, Diagnostic> {
+    let properties = if context.tokens.peek() == Tok::LBracket {
         parse_comma_list(
-            tokens,
+            context,
             Tok::LBracket,
             Tok::RBracket,
             parse_spec_property,
@@ -2427,23 +2533,23 @@ fn parse_condition_properties(tokens: &mut Lexer) -> Result<Vec<PragmaProperty>,
 
 // Parse an axiom:
 //     a = "axiom" <OptionalTypeParameters> <ConditionProperties> <Exp> ";"
-fn parse_axiom(tokens: &mut Lexer) -> Result<SpecBlockMember, Diagnostic> {
-    let start_loc = tokens.start_loc();
-    consume_identifier(tokens, "axiom")?;
-    let type_parameters = parse_optional_type_parameters(tokens)?;
+fn parse_axiom(context: &mut Context) -> Result<SpecBlockMember, Diagnostic> {
+    let start_loc = context.tokens.start_loc();
+    consume_identifier(context.tokens, "axiom")?;
+    let type_parameters = parse_optional_type_parameters(context)?;
     let kind = spanned(
-        tokens.file_name(),
+        context.tokens.file_name(),
         start_loc,
-        tokens.previous_end_loc(),
+        context.tokens.previous_end_loc(),
         SpecConditionKind_::Axiom(type_parameters),
     );
-    let properties = parse_condition_properties(tokens)?;
-    let exp = parse_exp(tokens)?;
-    consume_token(tokens, Tok::Semicolon)?;
+    let properties = parse_condition_properties(context)?;
+    let exp = parse_exp(context)?;
+    consume_token(context.tokens, Tok::Semicolon)?;
     Ok(spanned(
-        tokens.file_name(),
+        context.tokens.file_name(),
         start_loc,
-        tokens.previous_end_loc(),
+        context.tokens.previous_end_loc(),
         SpecBlockMember_::Condition {
             kind,
             properties,
@@ -2455,30 +2561,30 @@ fn parse_axiom(tokens: &mut Lexer) -> Result<SpecBlockMember, Diagnostic> {
 
 // Parse an invariant:
 //     Invariant = "invariant" <OptionalTypeParameters> [ "update" ] <ConditionProperties> <Exp> ";"
-fn parse_invariant(tokens: &mut Lexer) -> Result<SpecBlockMember, Diagnostic> {
-    let start_loc = tokens.start_loc();
-    consume_token(tokens, Tok::Invariant)?;
-    let type_parameters = parse_optional_type_parameters(tokens)?;
-    let kind_ = match tokens.peek() {
-        Tok::IdentifierValue if tokens.content() == "update" => {
-            tokens.advance()?;
+fn parse_invariant(context: &mut Context) -> Result<SpecBlockMember, Diagnostic> {
+    let start_loc = context.tokens.start_loc();
+    consume_token(context.tokens, Tok::Invariant)?;
+    let type_parameters = parse_optional_type_parameters(context)?;
+    let kind_ = match context.tokens.peek() {
+        Tok::IdentifierValue if context.tokens.content() == "update" => {
+            context.tokens.advance()?;
             SpecConditionKind_::InvariantUpdate(type_parameters)
         }
         _ => SpecConditionKind_::Invariant(type_parameters),
     };
     let kind = spanned(
-        tokens.file_name(),
+        context.tokens.file_name(),
         start_loc,
-        tokens.previous_end_loc(),
+        context.tokens.previous_end_loc(),
         kind_,
     );
-    let properties = parse_condition_properties(tokens)?;
-    let exp = parse_exp(tokens)?;
-    consume_token(tokens, Tok::Semicolon)?;
+    let properties = parse_condition_properties(context)?;
+    let exp = parse_exp(context)?;
+    consume_token(context.tokens, Tok::Semicolon)?;
     Ok(spanned(
-        tokens.file_name(),
+        context.tokens.file_name(),
         start_loc,
-        tokens.previous_end_loc(),
+        context.tokens.previous_end_loc(),
         SpecBlockMember_::Condition {
             kind,
             properties,
@@ -2493,15 +2599,15 @@ fn parse_invariant(tokens: &mut Lexer) -> Result<SpecBlockMember, Diagnostic> {
 //                  | "native" "define" <SpecFunctionSignature> ";"
 //     SpecFunctionSignature =
 //         <Identifier> <OptionalTypeParameters> "(" Comma<Parameter> ")" ":" <Type>
-fn parse_spec_function(tokens: &mut Lexer) -> Result<SpecBlockMember, Diagnostic> {
-    let start_loc = tokens.start_loc();
-    let native_opt = consume_optional_token_with_loc(tokens, Tok::Native)?;
-    consume_token(tokens, Tok::Fun)?;
-    let name = FunctionName(parse_identifier(tokens)?);
-    let type_parameters = parse_optional_type_parameters(tokens)?;
+fn parse_spec_function(context: &mut Context) -> Result<SpecBlockMember, Diagnostic> {
+    let start_loc = context.tokens.start_loc();
+    let native_opt = consume_optional_token_with_loc(context.tokens, Tok::Native)?;
+    consume_token(context.tokens, Tok::Fun)?;
+    let name = FunctionName(parse_identifier(context)?);
+    let type_parameters = parse_optional_type_parameters(context)?;
     // "(" Comma<Parameter> ")"
     let parameters = parse_comma_list(
-        tokens,
+        context,
         Tok::LParen,
         Tok::RParen,
         parse_parameter,
@@ -2509,23 +2615,23 @@ fn parse_spec_function(tokens: &mut Lexer) -> Result<SpecBlockMember, Diagnostic
     )?;
 
     // ":" <Type>)
-    consume_token(tokens, Tok::Colon)?;
-    let return_type = parse_type(tokens)?;
+    consume_token(context.tokens, Tok::Colon)?;
+    let return_type = parse_type(context)?;
 
-    let body_start_loc = tokens.start_loc();
-    let no_body = tokens.peek() != Tok::LBrace;
+    let body_start_loc = context.tokens.start_loc();
+    let no_body = context.tokens.peek() != Tok::LBrace;
     let (uninterpreted, body_) = if native_opt.is_some() || no_body {
-        consume_token(tokens, Tok::Semicolon)?;
+        consume_token(context.tokens, Tok::Semicolon)?;
         (native_opt.is_none(), FunctionBody_::Native)
     } else {
-        consume_token(tokens, Tok::LBrace)?;
-        let seq = parse_sequence(tokens)?;
+        consume_token(context.tokens, Tok::LBrace)?;
+        let seq = parse_sequence(context)?;
         (false, FunctionBody_::Defined(seq))
     };
     let body = spanned(
-        tokens.file_name(),
+        context.tokens.file_name(),
         body_start_loc,
-        tokens.previous_end_loc(),
+        context.tokens.previous_end_loc(),
         body_,
     );
 
@@ -2536,9 +2642,9 @@ fn parse_spec_function(tokens: &mut Lexer) -> Result<SpecBlockMember, Diagnostic
     };
 
     Ok(spanned(
-        tokens.file_name(),
+        context.tokens.file_name(),
         start_loc,
-        tokens.previous_end_loc(),
+        context.tokens.previous_end_loc(),
         SpecBlockMember_::Function {
             signature,
             uninterpreted,
@@ -2554,35 +2660,35 @@ fn parse_spec_function(tokens: &mut Lexer) -> Result<SpecBlockMember, Diagnostic
 //                    ":" <Type>
 //                    [ "=" Exp ]  // global only
 //                    ";"
-fn parse_spec_variable(tokens: &mut Lexer) -> Result<SpecBlockMember, Diagnostic> {
-    let start_loc = tokens.start_loc();
-    let is_global = match tokens.content() {
+fn parse_spec_variable(context: &mut Context) -> Result<SpecBlockMember, Diagnostic> {
+    let start_loc = context.tokens.start_loc();
+    let is_global = match context.tokens.content() {
         "global" => {
-            consume_token(tokens, Tok::IdentifierValue)?;
+            consume_token(context.tokens, Tok::IdentifierValue)?;
             true
         }
         "local" => {
-            consume_token(tokens, Tok::IdentifierValue)?;
+            consume_token(context.tokens, Tok::IdentifierValue)?;
             false
         }
         _ => false,
     };
-    let name = parse_identifier(tokens)?;
-    let type_parameters = parse_optional_type_parameters(tokens)?;
-    consume_token(tokens, Tok::Colon)?;
-    let type_ = parse_type(tokens)?;
-    let init = if is_global && tokens.peek() == Tok::Equal {
-        tokens.advance()?;
-        Some(parse_exp(tokens)?)
+    let name = parse_identifier(context)?;
+    let type_parameters = parse_optional_type_parameters(context)?;
+    consume_token(context.tokens, Tok::Colon)?;
+    let type_ = parse_type(context)?;
+    let init = if is_global && context.tokens.peek() == Tok::Equal {
+        context.tokens.advance()?;
+        Some(parse_exp(context)?)
     } else {
         None
     };
 
-    consume_token(tokens, Tok::Semicolon)?;
+    consume_token(context.tokens, Tok::Semicolon)?;
     Ok(spanned(
-        tokens.file_name(),
+        context.tokens.file_name(),
         start_loc,
-        tokens.previous_end_loc(),
+        context.tokens.previous_end_loc(),
         SpecBlockMember_::Variable {
             is_global,
             name,
@@ -2595,40 +2701,41 @@ fn parse_spec_variable(tokens: &mut Lexer) -> Result<SpecBlockMember, Diagnostic
 
 // Parse a specification update.
 //     SpecUpdate = "update" <Exp> = <Exp> ";"
-fn parse_spec_update(tokens: &mut Lexer) -> Result<SpecBlockMember, Diagnostic> {
-    let start_loc = tokens.start_loc();
-    consume_token(tokens, Tok::IdentifierValue)?;
-    let lhs = parse_unary_exp(tokens)?;
-    consume_token(tokens, Tok::Equal)?;
-    let rhs = parse_exp(tokens)?;
-    consume_token(tokens, Tok::Semicolon)?;
+fn parse_spec_update(context: &mut Context) -> Result<SpecBlockMember, Diagnostic> {
+    let start_loc = context.tokens.start_loc();
+    consume_token(context.tokens, Tok::IdentifierValue)?;
+    let lhs = parse_unary_exp(context)?;
+    consume_token(context.tokens, Tok::Equal)?;
+    let rhs = parse_exp(context)?;
+    consume_token(context.tokens, Tok::Semicolon)?;
     Ok(spanned(
-        tokens.file_name(),
+        context.tokens.file_name(),
         start_loc,
-        tokens.previous_end_loc(),
+        context.tokens.previous_end_loc(),
         SpecBlockMember_::Update { lhs, rhs },
     ))
 }
 
 // Parse a specification let.
 //     SpecLet =  "let" [ "post" ] <Identifier> "=" <Exp> ";"
-fn parse_spec_let(tokens: &mut Lexer) -> Result<SpecBlockMember, Diagnostic> {
-    let start_loc = tokens.start_loc();
-    tokens.advance()?;
-    let post_state = if tokens.peek() == Tok::IdentifierValue && tokens.content() == "post" {
-        tokens.advance()?;
-        true
-    } else {
-        false
-    };
-    let name = parse_identifier(tokens)?;
-    consume_token(tokens, Tok::Equal)?;
-    let def = parse_exp(tokens)?;
-    consume_token(tokens, Tok::Semicolon)?;
+fn parse_spec_let(context: &mut Context) -> Result<SpecBlockMember, Diagnostic> {
+    let start_loc = context.tokens.start_loc();
+    context.tokens.advance()?;
+    let post_state =
+        if context.tokens.peek() == Tok::IdentifierValue && context.tokens.content() == "post" {
+            context.tokens.advance()?;
+            true
+        } else {
+            false
+        };
+    let name = parse_identifier(context)?;
+    consume_token(context.tokens, Tok::Equal)?;
+    let def = parse_exp(context)?;
+    consume_token(context.tokens, Tok::Semicolon)?;
     Ok(spanned(
-        tokens.file_name(),
+        context.tokens.file_name(),
         start_loc,
-        tokens.previous_end_loc(),
+        context.tokens.previous_end_loc(),
         SpecBlockMember_::Let {
             name,
             post_state,
@@ -2639,16 +2746,16 @@ fn parse_spec_let(tokens: &mut Lexer) -> Result<SpecBlockMember, Diagnostic> {
 
 // Parse a specification schema include.
 //    SpecInclude = "include" <Exp>
-fn parse_spec_include(tokens: &mut Lexer) -> Result<SpecBlockMember, Diagnostic> {
-    let start_loc = tokens.start_loc();
-    consume_identifier(tokens, "include")?;
-    let properties = parse_condition_properties(tokens)?;
-    let exp = parse_exp(tokens)?;
-    consume_token(tokens, Tok::Semicolon)?;
+fn parse_spec_include(context: &mut Context) -> Result<SpecBlockMember, Diagnostic> {
+    let start_loc = context.tokens.start_loc();
+    consume_identifier(context.tokens, "include")?;
+    let properties = parse_condition_properties(context)?;
+    let exp = parse_exp(context)?;
+    consume_token(context.tokens, Tok::Semicolon)?;
     Ok(spanned(
-        tokens.file_name(),
+        context.tokens.file_name(),
         start_loc,
-        tokens.previous_end_loc(),
+        context.tokens.previous_end_loc(),
         SpecBlockMember_::Include { properties, exp },
     ))
 }
@@ -2656,17 +2763,17 @@ fn parse_spec_include(tokens: &mut Lexer) -> Result<SpecBlockMember, Diagnostic>
 // Parse a specification schema apply.
 //    SpecApply = "apply" <Exp> "to" Comma<SpecApplyPattern>
 //                                   ( "except" Comma<SpecApplyPattern> )? ";"
-fn parse_spec_apply(tokens: &mut Lexer) -> Result<SpecBlockMember, Diagnostic> {
-    let start_loc = tokens.start_loc();
-    consume_identifier(tokens, "apply")?;
-    let exp = parse_exp(tokens)?;
-    consume_identifier(tokens, "to")?;
-    let parse_patterns = |tokens: &mut Lexer| {
+fn parse_spec_apply(context: &mut Context) -> Result<SpecBlockMember, Diagnostic> {
+    let start_loc = context.tokens.start_loc();
+    consume_identifier(context.tokens, "apply")?;
+    let exp = parse_exp(context)?;
+    consume_identifier(context.tokens, "to")?;
+    let parse_patterns = |context: &mut Context| {
         parse_list(
-            tokens,
-            |tokens| {
-                if tokens.peek() == Tok::Comma {
-                    tokens.advance()?;
+            context,
+            |context| {
+                if context.tokens.peek() == Tok::Comma {
+                    context.tokens.advance()?;
                     Ok(true)
                 } else {
                     Ok(false)
@@ -2675,19 +2782,19 @@ fn parse_spec_apply(tokens: &mut Lexer) -> Result<SpecBlockMember, Diagnostic> {
             parse_spec_apply_pattern,
         )
     };
-    let patterns = parse_patterns(tokens)?;
+    let patterns = parse_patterns(context)?;
     let exclusion_patterns =
-        if tokens.peek() == Tok::IdentifierValue && tokens.content() == "except" {
-            tokens.advance()?;
-            parse_patterns(tokens)?
+        if context.tokens.peek() == Tok::IdentifierValue && context.tokens.content() == "except" {
+            context.tokens.advance()?;
+            parse_patterns(context)?
         } else {
             vec![]
         };
-    consume_token(tokens, Tok::Semicolon)?;
+    consume_token(context.tokens, Tok::Semicolon)?;
     Ok(spanned(
-        tokens.file_name(),
+        context.tokens.file_name(),
         start_loc,
-        tokens.previous_end_loc(),
+        context.tokens.previous_end_loc(),
         SpecBlockMember_::Apply {
             exp,
             patterns,
@@ -2698,38 +2805,40 @@ fn parse_spec_apply(tokens: &mut Lexer) -> Result<SpecBlockMember, Diagnostic> {
 
 // Parse a function pattern:
 //     SpecApplyPattern = <SpecApplyFragment>+ <OptionalTypeArgs>
-fn parse_spec_apply_pattern(tokens: &mut Lexer) -> Result<SpecApplyPattern, Diagnostic> {
-    let start_loc = tokens.start_loc();
+fn parse_spec_apply_pattern(context: &mut Context) -> Result<SpecApplyPattern, Diagnostic> {
+    let start_loc = context.tokens.start_loc();
     // TODO: update the visibility parsing in the spec as well
-    let public_opt = consume_optional_token_with_loc(tokens, Tok::Public)?;
+    let public_opt = consume_optional_token_with_loc(context.tokens, Tok::Public)?;
     let visibility = if let Some(loc) = public_opt {
         Some(Visibility::Public(loc))
-    } else if tokens.peek() == Tok::IdentifierValue && tokens.content() == "internal" {
+    } else if context.tokens.peek() == Tok::IdentifierValue
+        && context.tokens.content() == "internal"
+    {
         // Its not ideal right now that we do not have a loc here, but acceptable for what
         // we are doing with this in specs.
-        tokens.advance()?;
+        context.tokens.advance()?;
         Some(Visibility::Internal)
     } else {
         None
     };
-    let mut last_end = tokens.start_loc() + tokens.content().len();
+    let mut last_end = context.tokens.start_loc() + context.tokens.content().len();
     let name_pattern = parse_list(
-        tokens,
-        |tokens| {
+        context,
+        |context| {
             // We need name fragments followed by each other without space. So we do some
             // magic here similar as with `>>` based on token distance.
-            let start_loc = tokens.start_loc();
+            let start_loc = context.tokens.start_loc();
             let adjacent = last_end == start_loc;
-            last_end = start_loc + tokens.content().len();
-            Ok(adjacent && [Tok::IdentifierValue, Tok::Star].contains(&tokens.peek()))
+            last_end = start_loc + context.tokens.content().len();
+            Ok(adjacent && [Tok::IdentifierValue, Tok::Star].contains(&context.tokens.peek()))
         },
         parse_spec_apply_fragment,
     )?;
-    let type_parameters = parse_optional_type_parameters(tokens)?;
+    let type_parameters = parse_optional_type_parameters(context)?;
     Ok(spanned(
-        tokens.file_name(),
+        context.tokens.file_name(),
         start_loc,
-        tokens.previous_end_loc(),
+        context.tokens.previous_end_loc(),
         SpecApplyPattern_ {
             visibility,
             name_pattern,
@@ -2740,31 +2849,36 @@ fn parse_spec_apply_pattern(tokens: &mut Lexer) -> Result<SpecApplyPattern, Diag
 
 // Parse a name pattern fragment
 //     SpecApplyFragment = <Identifier> | "*"
-fn parse_spec_apply_fragment(tokens: &mut Lexer) -> Result<SpecApplyFragment, Diagnostic> {
-    let start_loc = tokens.start_loc();
-    let fragment = match tokens.peek() {
-        Tok::IdentifierValue => SpecApplyFragment_::NamePart(parse_identifier(tokens)?),
+fn parse_spec_apply_fragment(context: &mut Context) -> Result<SpecApplyFragment, Diagnostic> {
+    let start_loc = context.tokens.start_loc();
+    let fragment = match context.tokens.peek() {
+        Tok::IdentifierValue => SpecApplyFragment_::NamePart(parse_identifier(context)?),
         Tok::Star => {
-            tokens.advance()?;
+            context.tokens.advance()?;
             SpecApplyFragment_::Wildcard
         }
-        _ => return Err(unexpected_token_error(tokens, "a name fragment or `*`")),
+        _ => {
+            return Err(unexpected_token_error(
+                context.tokens,
+                "a name fragment or `*`",
+            ))
+        }
     };
     Ok(spanned(
-        tokens.file_name(),
+        context.tokens.file_name(),
         start_loc,
-        tokens.previous_end_loc(),
+        context.tokens.previous_end_loc(),
         fragment,
     ))
 }
 
 // Parse a specification pragma:
 //    SpecPragma = "pragma" Comma<SpecPragmaProperty> ";"
-fn parse_spec_pragma(tokens: &mut Lexer) -> Result<SpecBlockMember, Diagnostic> {
-    let start_loc = tokens.start_loc();
-    consume_identifier(tokens, "pragma")?;
+fn parse_spec_pragma(context: &mut Context) -> Result<SpecBlockMember, Diagnostic> {
+    let start_loc = context.tokens.start_loc();
+    consume_identifier(context.tokens, "pragma")?;
     let properties = parse_comma_list_after_start(
-        tokens,
+        context,
         start_loc,
         Tok::IdentifierValue,
         Tok::Semicolon,
@@ -2772,72 +2886,74 @@ fn parse_spec_pragma(tokens: &mut Lexer) -> Result<SpecBlockMember, Diagnostic> 
         "a pragma property",
     )?;
     Ok(spanned(
-        tokens.file_name(),
+        context.tokens.file_name(),
         start_loc,
-        tokens.previous_end_loc(),
+        context.tokens.previous_end_loc(),
         SpecBlockMember_::Pragma { properties },
     ))
 }
 
 // Parse a specification pragma property:
 //    SpecPragmaProperty = <Identifier> ( "=" <Value> | <NameAccessChain> )?
-fn parse_spec_property(tokens: &mut Lexer) -> Result<PragmaProperty, Diagnostic> {
-    let start_loc = tokens.start_loc();
-    let name = match consume_optional_token_with_loc(tokens, Tok::Friend)? {
+fn parse_spec_property(context: &mut Context) -> Result<PragmaProperty, Diagnostic> {
+    let start_loc = context.tokens.start_loc();
+    let name = match consume_optional_token_with_loc(context.tokens, Tok::Friend)? {
         // special treatment for `pragma friend = ...` as friend is a keyword
         // TODO: this might violate the assumption that a keyword can never be a name.
         Some(loc) => Name::new(loc, Symbol::from("friend")),
-        None => parse_identifier(tokens)?,
+        None => parse_identifier(context)?,
     };
-    let value = if tokens.peek() == Tok::Equal {
-        tokens.advance()?;
-        match tokens.peek() {
+    let value = if context.tokens.peek() == Tok::Equal {
+        context.tokens.advance()?;
+        match context.tokens.peek() {
             Tok::AtSign | Tok::True | Tok::False | Tok::NumTypedValue | Tok::ByteStringValue => {
-                Some(PragmaValue::Literal(parse_value(tokens)?))
+                Some(PragmaValue::Literal(parse_value(context)?))
             }
             Tok::NumValue
-                if !tokens
+                if !context
+                    .tokens
                     .lookahead()
                     .map(|tok| tok == Tok::ColonColon)
                     .unwrap_or(false) =>
             {
-                Some(PragmaValue::Literal(parse_value(tokens)?))
+                Some(PragmaValue::Literal(parse_value(context)?))
             }
             _ => {
                 // Parse as a module access for a possibly qualified identifier
-                Some(PragmaValue::Ident(parse_name_access_chain(tokens, || {
-                    "an identifier as pragma value"
-                })?))
+                Some(PragmaValue::Ident(parse_name_access_chain(
+                    context,
+                    || "an identifier as pragma value",
+                )?))
             }
         }
     } else {
         None
     };
     Ok(spanned(
-        tokens.file_name(),
+        context.tokens.file_name(),
         start_loc,
-        tokens.previous_end_loc(),
+        context.tokens.previous_end_loc(),
         PragmaProperty_ { name, value },
     ))
 }
 
 /// Creates a module spec block for a single member.
 fn singleton_module_spec_block(
-    tokens: &mut Lexer,
+    context: &mut Context,
     start_loc: usize,
     attributes: Vec<Attributes>,
-    member_parser: impl Fn(&mut Lexer) -> Result<SpecBlockMember, Diagnostic>,
+    member_parser: impl Fn(&mut Context) -> Result<SpecBlockMember, Diagnostic>,
 ) -> Result<SpecBlock, Diagnostic> {
-    let member = member_parser(tokens)?;
-    let end_loc = tokens.previous_end_loc();
+    let member = member_parser(context)?;
+    let end_loc = context.tokens.previous_end_loc();
     Ok(spanned(
-        tokens.file_name(),
+        context.tokens.file_name(),
         start_loc,
         end_loc,
         SpecBlock_ {
             attributes,
             target: spanned(
-                tokens.file_name(),
+                context.tokens.file_name(),
                 start_loc,
                 start_loc,
                 SpecBlockTarget_::Module,
@@ -2855,14 +2971,14 @@ fn singleton_module_spec_block(
 // Parse a file:
 //      File =
 //          (<Attributes> (<AddressBlock> | <Module> | <Script>))*
-fn parse_file(tokens: &mut Lexer) -> Result<Vec<Definition>, Diagnostic> {
+fn parse_file(context: &mut Context) -> Result<Vec<Definition>, Diagnostic> {
     let mut defs = vec![];
-    while tokens.peek() != Tok::EOF {
-        let attributes = parse_attributes(tokens)?;
-        defs.push(match tokens.peek() {
-            Tok::Spec | Tok::Module => Definition::Module(parse_module(attributes, tokens)?),
-            Tok::Script => Definition::Script(parse_script(attributes, tokens)?),
-            _ => Definition::Address(parse_address_block(attributes, tokens)?),
+    while context.tokens.peek() != Tok::EOF {
+        let attributes = parse_attributes(context)?;
+        defs.push(match context.tokens.peek() {
+            Tok::Spec | Tok::Module => Definition::Module(parse_module(attributes, context)?),
+            Tok::Script => Definition::Script(parse_script(attributes, context)?),
+            _ => Definition::Address(parse_address_block(attributes, context)?),
         })
     }
     Ok(defs)
@@ -2872,6 +2988,7 @@ fn parse_file(tokens: &mut Lexer) -> Result<Vec<Definition>, Diagnostic> {
 /// result as either a pair of FileDefinition and doc comments or some Diagnostics. The `file` name
 /// is used to identify source locations in error messages.
 pub fn parse_file_string(
+    env: &mut CompilationEnv,
     file: Symbol,
     input: &str,
 ) -> Result<(Vec<Definition>, MatchedFileCommentMap), Diagnostics> {
@@ -2880,11 +2997,8 @@ pub fn parse_file_string(
         Err(err) => Err(Diagnostics::from(vec![err])),
         Ok(..) => Ok(()),
     }?;
-    match parse_file(&mut tokens) {
+    match parse_file(&mut Context::new(env, &mut tokens)) {
         Err(err) => Err(Diagnostics::from(vec![err])),
-        Ok(def) => {
-            let doc_comments = tokens.check_and_get_doc_comments()?;
-            Ok((def, doc_comments))
-        }
+        Ok(def) => Ok((def, tokens.check_and_get_doc_comments(env))),
     }
 }

@@ -2,9 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    diag,
-    diagnostics::{Diagnostic, Diagnostics},
-    parser::syntax::make_loc,
+    diag, diagnostics::Diagnostic, parser::syntax::make_loc, shared::CompilationEnv,
     FileCommentMap, MatchedFileCommentMap,
 };
 use move_ir_types::location::Loc;
@@ -362,21 +360,21 @@ impl<'input> Lexer<'input> {
     // At the end of parsing, checks whether there are any unmatched documentation comments,
     // producing errors if so. Otherwise returns a map from file position to associated
     // documentation.
-    pub fn check_and_get_doc_comments(&mut self) -> Result<MatchedFileCommentMap, Diagnostics> {
-        let msg = "documentation comment cannot be matched to a language item";
-        let errors = self
+    pub fn check_and_get_doc_comments(
+        &mut self,
+        env: &mut CompilationEnv,
+    ) -> MatchedFileCommentMap {
+        let msg = "Documentation comment cannot be matched to a language item";
+        let diags = self
             .doc_comments
             .iter()
             .map(|((start, end), _)| {
                 let loc = Loc::new(self.file, *start, *end);
                 diag!(Syntax::InvalidDocComment, (loc, msg))
             })
-            .collect::<Diagnostics>();
-        if errors.is_empty() {
-            Ok(std::mem::take(&mut self.matched_doc_comments))
-        } else {
-            Err(errors)
-        }
+            .collect();
+        env.add_diags(diags);
+        std::mem::take(&mut self.matched_doc_comments)
     }
 
     pub fn advance(&mut self) -> Result<(), Diagnostic> {
