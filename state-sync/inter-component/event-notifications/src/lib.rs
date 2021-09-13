@@ -452,6 +452,7 @@ pub type EventNotificationListener = NotificationListener<EventNotification>;
 pub type ReconfigNotificationListener = NotificationListener<ReconfigNotification>;
 
 /// The component responsible for listening to subscription notifications.
+#[derive(Debug)]
 pub struct NotificationListener<T> {
     pub notification_receiver: channel::diem_channel::Receiver<(), T>,
 }

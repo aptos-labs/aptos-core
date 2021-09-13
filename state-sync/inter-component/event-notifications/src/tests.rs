@@ -7,6 +7,7 @@ use crate::{
     Error, EventNotificationListener, EventNotificationSender, EventSubscriptionService,
     ReconfigNotificationListener,
 };
+use claim::{assert_lt, assert_matches, assert_ok};
 use diem_infallible::RwLock;
 use diem_types::{
     account_address::AccountAddress,
@@ -369,10 +370,10 @@ fn test_no_events_no_subscribers() {
     );
 
     // Attempt to subscribe to zero event keys
-    assert!(matches!(
+    assert_matches!(
         event_service.subscribe_to_events(vec![]),
         Err(Error::CannotSubscribeToZeroEventKeys)
-    ));
+    );
 
     // Add subscribers to the service
     let _event_listener = event_service.subscribe_to_events(vec![create_random_event_key()]);
@@ -393,9 +394,7 @@ fn test_missing_configs() {
     // Notify the subscriber of a reconfiguration (where 1 on-chain config is missing from genesis)
     let mut config_registry = ON_CHAIN_CONFIG_REGISTRY.to_owned();
     config_registry.push(TestOnChainConfig::CONFIG_ID);
-    event_service
-        .notify_reconfiguration_subscribers(&config_registry, 0)
-        .unwrap();
+    assert_ok!(event_service.notify_reconfiguration_subscribers(&config_registry, 0));
 
     // Verify the reconfiguration notification contains everything except the missing config
     if let Some(reconfig_notification) = reconfig_listener.select_next_some().now_or_never() {
@@ -433,7 +432,10 @@ fn count_event_notifications_and_ensure_ordering(listener: &mut EventNotificatio
     while notification_received {
         if let Some(event_notification) = listener.select_next_some().now_or_never() {
             notification_count += 1;
-            assert!(last_version_received < event_notification.version.try_into().unwrap());
+            assert_lt!(
+                last_version_received,
+                event_notification.version.try_into().unwrap()
+            );
             last_version_received = event_notification.version.try_into().unwrap();
         } else {
             notification_received = false;
@@ -515,7 +517,7 @@ fn verify_reconfig_notifications_received(
 }
 
 fn notify_initial_configs(event_service: &mut EventSubscriptionService, version: Version) {
-    block_on(event_service.notify_initial_configs(version)).unwrap();
+    assert_ok!(block_on(event_service.notify_initial_configs(version)));
 }
 
 fn notify_events(
@@ -523,7 +525,7 @@ fn notify_events(
     version: Version,
     events: Vec<ContractEvent>,
 ) {
-    block_on(event_service.notify_events(version, events)).unwrap();
+    assert_ok!(block_on(event_service.notify_events(version, events)));
 }
 
 fn create_test_event(event_key: EventKey) -> ContractEvent {
@@ -540,12 +542,12 @@ fn create_database() -> Arc<RwLock<DbReaderWriter>> {
 
     // Create test diem database
     let db_path = diem_temppath::TempPath::new();
-    db_path.create_as_dir().unwrap();
+    assert_ok!(db_path.create_as_dir());
     let (_, db_rw) = DbReaderWriter::wrap(DiemDB::new_for_test(db_path.path()));
 
     // Bootstrap the genesis transaction
     let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis));
-    bootstrap_genesis::<DiemVM>(&db_rw, &genesis_txn).unwrap();
+    assert_ok!(bootstrap_genesis::<DiemVM>(&db_rw, &genesis_txn));
 
     Arc::new(RwLock::new(db_rw))
 }

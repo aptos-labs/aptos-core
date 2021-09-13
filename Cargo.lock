@@ -3150,6 +3150,7 @@ dependencies = [
  "async-trait",
  "bcs",
  "channel",
+ "claim",
  "diem-crypto",
  "diem-infallible",
  "diem-temppath",
