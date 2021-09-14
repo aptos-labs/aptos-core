@@ -18,6 +18,7 @@ pub(crate) mod stale_node_index;
 pub(crate) mod transaction;
 pub(crate) mod transaction_accumulator;
 pub(crate) mod transaction_by_account;
+pub(crate) mod transaction_by_hash;
 pub(crate) mod transaction_info;
 
 use anyhow::{ensure, Result};
@@ -34,6 +35,7 @@ pub const STALE_NODE_INDEX_CF_NAME: ColumnFamilyName = "stale_node_index";
 pub const TRANSACTION_CF_NAME: ColumnFamilyName = "transaction";
 pub const TRANSACTION_ACCUMULATOR_CF_NAME: ColumnFamilyName = "transaction_accumulator";
 pub const TRANSACTION_BY_ACCOUNT_CF_NAME: ColumnFamilyName = "transaction_by_account";
+pub const TRANSACTION_BY_HASH_CF_NAME: ColumnFamilyName = "transaction_by_hash";
 pub const TRANSACTION_INFO_CF_NAME: ColumnFamilyName = "transaction_info";
 
 fn ensure_slice_len_eq(data: &[u8], len: usize) -> Result<()> {
@@ -91,6 +93,7 @@ pub mod fuzzing {
                 super::transaction_by_account::TransactionByAccountSchema,
                 data
             );
+            decode_key_value!(super::transaction_by_hash::TransactionByHashSchema, data);
             decode_key_value!(super::transaction_info::TransactionInfoSchema, data);
         }
     }

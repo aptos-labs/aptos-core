@@ -233,6 +233,7 @@ impl DiemDB {
             TRANSACTION_CF_NAME,
             TRANSACTION_ACCUMULATOR_CF_NAME,
             TRANSACTION_BY_ACCOUNT_CF_NAME,
+            TRANSACTION_BY_HASH_CF_NAME,
             TRANSACTION_INFO_CF_NAME,
         ]
     }
