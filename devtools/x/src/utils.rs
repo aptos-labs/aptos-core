@@ -5,7 +5,10 @@ use crate::{config::CargoConfig, installer::install_cargo_component_if_needed, R
 use anyhow::anyhow;
 use camino::Utf8Path;
 use log::{info, warn};
-use std::{env::var_os, process::{Command, Stdio}};
+use std::{
+    env::var_os,
+    process::{Command, Stdio},
+};
 
 /// The number of directories between the project root and the root of this crate.
 pub const X_DEPTH: usize = 2;
@@ -26,8 +29,7 @@ pub fn sccache_should_run(cargo_config: &CargoConfig, warn_if_not_correct_locati
         if let Some(sccache_config) = &cargo_config.sccache {
             // Are we work on items in the right location:
             // See: https://github.com/mozilla/sccache#known-caveats
-            let correct_location = var_os("CARGO_HOME")
-                .unwrap_or_default()
+            let correct_location = var_os("CARGO_HOME").unwrap_or_default()
                 == sccache_config.required_cargo_home.as_str()
                 && sccache_config.required_git_home == project_root();
             if !correct_location && warn_if_not_correct_location {

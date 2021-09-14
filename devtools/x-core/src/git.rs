@@ -162,7 +162,7 @@ impl GitCli {
                 ));
             }
         };
-        if self.root != &git_root {
+        if self.root != git_root {
             let msg = formatdoc!(
                 "git root expected to be at {}, but actually found at {}
                 (hint: did you download an archive from GitHub? x requires a git clone)",

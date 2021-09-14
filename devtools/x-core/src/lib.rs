@@ -117,7 +117,7 @@ impl XCoreContext {
     }
 
     /// Returns a Hakari builder for this workspace.
-    pub fn hakari_builder<'a>(&'a self) -> Result<HakariBuilder<'a, 'static>> {
+    pub fn hakari_builder(&self) -> Result<HakariBuilder<'_>> {
         let graph = self.package_graph()?;
         self.config
             .hakari

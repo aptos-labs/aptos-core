@@ -62,7 +62,7 @@ impl<'l> ProjectContext<'l> {
     }
 
     /// Returns Hakari information.
-    pub fn hakari(&self) -> Result<Hakari<'l, 'static>> {
+    pub fn hakari(&self) -> Result<Hakari<'l>> {
         Ok(self.core.hakari_builder()?.compute())
     }
 }
