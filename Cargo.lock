@@ -1149,7 +1149,6 @@ dependencies = [
  "serde_json",
  "short-hex-str",
  "storage-interface",
- "subscription-service",
  "tempfile",
  "termion",
  "thiserror",
@@ -2189,7 +2188,6 @@ dependencies = [
  "short-hex-str",
  "storage-interface",
  "storage-service",
- "subscription-service",
  "tokio",
  "tokio-stream",
  "vm-validator",
@@ -2279,7 +2277,6 @@ dependencies = [
  "storage-interface",
  "storage-service",
  "structopt 0.3.21",
- "subscription-service",
  "tokio",
  "tokio-stream",
 ]
@@ -5435,7 +5432,6 @@ dependencies = [
  "network-discovery",
  "rand 0.8.3",
  "serde",
- "subscription-service",
  "tokio",
 ]
 
@@ -5465,7 +5461,6 @@ dependencies = [
  "rand 0.8.3",
  "serde_yaml",
  "short-hex-str",
- "subscription-service",
  "tokio",
 ]
 
@@ -7811,7 +7806,6 @@ dependencies = [
  "serde",
  "storage-interface",
  "storage-service",
- "subscription-service",
  "thiserror",
  "tokio",
  "tokio-stream",
@@ -7992,16 +7986,6 @@ dependencies = [
  "proc-macro2 1.0.28",
  "quote 1.0.9",
  "syn 1.0.74",
-]
-
-[[package]]
-name = "subscription-service"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "channel",
- "diem-types",
- "diem-workspace-hack",
 ]
 
 [[package]]

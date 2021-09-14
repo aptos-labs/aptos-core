@@ -50,7 +50,6 @@ state-sync-v1 = { path = "../state-sync/state-sync-v1" }
 storage-client = { path = "../storage/storage-client" }
 storage-interface= { path = "../storage/storage-interface" }
 storage-service = { path = "../storage/storage-service" }
-subscription-service = { path = "../common/subscription-service" }
 
 [features]
 default = []

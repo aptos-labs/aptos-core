@@ -25,7 +25,6 @@ members = [
     "common/rate-limiter",
     "common/retrier",
     "common/short-hex-str",
-    "common/subscription-service",
     "common/temppath",
     "common/time-service",
     "common/workspace-hack",

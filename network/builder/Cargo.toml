@@ -33,4 +33,3 @@ event-notifications = { path = "../../state-sync/inter-component/event-notificat
 netcore = { path = "../netcore" }
 network = { path = "../." }
 network-discovery = { path = "../discovery" }
-subscription-service = { path = "../../common/subscription-service" }
