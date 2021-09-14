@@ -3,7 +3,6 @@
 
 #![forbid(unsafe_code)]
 
-use async_trait::async_trait;
 use channel::{diem_channel, message_queues::QueueStyle};
 use diem_infallible::RwLock;
 use diem_types::{
@@ -12,7 +11,7 @@ use diem_types::{
     event::EventKey,
     move_resource::MoveStorage,
     on_chain_config,
-    on_chain_config::{config_address, ConfigID, OnChainConfigPayload, ON_CHAIN_CONFIG_REGISTRY},
+    on_chain_config::{config_address, ConfigID, OnChainConfigPayload},
     transaction::Version,
 };
 use futures::{channel::mpsc::SendError, stream::FusedStream, Stream};
@@ -61,20 +60,15 @@ impl From<SendError> for Error {
 
 /// The interface between state sync and the subscription notification service,
 /// allowing state sync to notify the subscription service of new events.
-#[async_trait]
 pub trait EventNotificationSender: Send {
     /// Notify the subscription service of the events at the specified version.
-    async fn notify_events(
-        &mut self,
-        version: Version,
-        events: Vec<ContractEvent>,
-    ) -> Result<(), Error>;
+    fn notify_events(&mut self, version: Version, events: Vec<ContractEvent>) -> Result<(), Error>;
 
     /// Forces the subscription service to notify subscribers of the current
     /// on-chain configurations at the specified version.
     /// This is useful for forcing reconfiguration notifications even if no
     /// reconfiguration event was processed (e.g., on startup).
-    async fn notify_initial_configs(&mut self, version: Version) -> Result<(), Error>;
+    fn notify_initial_configs(&mut self, version: Version) -> Result<(), Error>;
 }
 
 /// The subscription service offered by state sync, responsible for notifying
@@ -90,16 +84,20 @@ pub struct EventSubscriptionService {
     // Database to fetch on-chain configuration data
     storage: Arc<RwLock<DbReaderWriter>>,
 
+    // The list of all on-chain configurations used to notify subscribers
+    config_registry: Vec<ConfigID>,
+
     // Internal subscription ID generator
     next_subscription_id: AtomicU64,
 }
 
 impl EventSubscriptionService {
-    pub fn new(storage: Arc<RwLock<DbReaderWriter>>) -> Self {
+    pub fn new(config_registry: &[ConfigID], storage: Arc<RwLock<DbReaderWriter>>) -> Self {
         Self {
             event_key_subscriptions: HashMap::new(),
             subscription_id_to_event_subscription: HashMap::new(),
             reconfig_subscriptions: HashMap::new(),
+            config_registry: config_registry.to_vec(),
             storage,
             next_subscription_id: AtomicU64::new(0),
         }
@@ -249,16 +247,12 @@ impl EventSubscriptionService {
 
     /// This notifies all the reconfiguration subscribers of the on-chain
     /// configurations at the specified version.
-    fn notify_reconfiguration_subscribers(
-        &mut self,
-        config_registry: &[ConfigID],
-        version: Version,
-    ) -> Result<(), Error> {
+    fn notify_reconfiguration_subscribers(&mut self, version: Version) -> Result<(), Error> {
         if self.reconfig_subscriptions.is_empty() {
             return Ok(()); // No reconfiguration subscribers!
         }
 
-        let new_configs = self.read_on_chain_configs(config_registry, version)?;
+        let new_configs = self.read_on_chain_configs(version)?;
         for (_, reconfig_subscription) in self.reconfig_subscriptions.iter_mut() {
             reconfig_subscription.notify_subscriber_of_configs(version, new_configs.clone())?;
         }
@@ -266,18 +260,14 @@ impl EventSubscriptionService {
         Ok(())
     }
 
-    /// Fetches the given config IDs on-chain at the specified version.
+    /// Fetches the configs on-chain at the specified version.
     /// Note: We cannot assume that all configs will exist on-chain. As such, we
     /// must fetch each resource one at a time. Reconfig subscribers must be able
     /// to handle on-chain configs not existing in a reconfiguration notification.
-    fn read_on_chain_configs(
-        &self,
-        config_registry: &[ConfigID],
-        version: Version,
-    ) -> Result<OnChainConfigPayload, Error> {
+    fn read_on_chain_configs(&self, version: Version) -> Result<OnChainConfigPayload, Error> {
         // Build a map from config ID to the config value found on-chain
         let mut config_id_to_config = HashMap::new();
-        for config_id in config_registry.iter() {
+        for config_id in self.config_registry.iter() {
             if let Ok(config_list) = self
                 .storage
                 .read()
@@ -349,13 +339,8 @@ impl EventSubscriptionService {
     }
 }
 
-#[async_trait]
 impl EventNotificationSender for EventSubscriptionService {
-    async fn notify_events(
-        &mut self,
-        version: Version,
-        events: Vec<ContractEvent>,
-    ) -> Result<(), Error> {
+    fn notify_events(&mut self, version: Version, events: Vec<ContractEvent>) -> Result<(), Error> {
         if events.is_empty() {
             return Ok(()); // No events!
         }
@@ -366,14 +351,14 @@ impl EventNotificationSender for EventSubscriptionService {
         // If a reconfiguration event was found, also notify the reconfig subscribers
         // of the new configuration values.
         if reconfig_event_processed {
-            self.notify_reconfiguration_subscribers(ON_CHAIN_CONFIG_REGISTRY, version)
+            self.notify_reconfiguration_subscribers(version)
         } else {
             Ok(())
         }
     }
 
-    async fn notify_initial_configs(&mut self, version: Version) -> Result<(), Error> {
-        self.notify_reconfiguration_subscribers(ON_CHAIN_CONFIG_REGISTRY, version)
+    fn notify_initial_configs(&mut self, version: Version) -> Result<(), Error> {
+        self.notify_reconfiguration_subscribers(version)
     }
 }
 

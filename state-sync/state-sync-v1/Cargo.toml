@@ -36,6 +36,7 @@ diem-types = { path = "../../types" }
 diem-vm = { path = "../../language/diem-vm" }
 diem-workspace-hack = { path = "../../common/workspace-hack" }
 diemdb = { path = "../../storage/diemdb", optional = true }
+event-notifications = { path = "../../state-sync/inter-component/event-notifications" }
 executor = { path = "../../execution/executor" }
 executor-test-helpers = { path = "../../execution/executor-test-helpers", optional = true }
 executor-types = { path = "../../execution/executor-types" }
@@ -61,6 +62,7 @@ diem-proptest-helpers = { path = "../../common/proptest-helpers" }
 diemdb = { path = "../../storage/diemdb" }
 executor-test-helpers = { path = "../../execution/executor-test-helpers" }
 memsocket = { path = "../../network/memsocket" }
+move-core-types = { path = "../../language/move-core/types" }
 network = { path = "../../network", features = ["fuzzing", "testing"] }
 network-builder = { path  = "../../network/builder" }
 storage-service = { path = "../../storage/storage-service" }

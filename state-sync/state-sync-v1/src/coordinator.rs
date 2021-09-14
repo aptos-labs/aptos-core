@@ -509,7 +509,7 @@ impl<T: ExecutorProxyTrait, M: MempoolNotificationSender> StateSyncCoordinator<T
         // Publish the on chain config updates
         if let Err(error) = self
             .executor_proxy
-            .publish_on_chain_config_updates(reconfiguration_events)
+            .publish_event_notifications(reconfiguration_events)
         {
             counters::RECONFIG_PUBLISH_COUNT
                 .with_label_values(&[counters::FAIL_LABEL])

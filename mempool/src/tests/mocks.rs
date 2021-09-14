@@ -17,6 +17,7 @@ use diem_infallible::{Mutex, RwLock};
 use diem_types::{
     account_config::AccountSequenceInfo,
     mempool_status::MempoolStatusCode,
+    on_chain_config::ON_CHAIN_CONFIG_REGISTRY,
     transaction::{GovernanceRole, SignedTransaction},
 };
 use event_notifications::EventSubscriptionService;
@@ -74,9 +75,10 @@ impl MockSharedMempool {
             }
             Some(mempool_listener) => (None, mempool_listener),
         };
-        let mut event_subscriber = EventSubscriptionService::new(Arc::new(RwLock::new(
-            DbReaderWriter::new(MockDbReaderWriter),
-        )));
+        let mut event_subscriber = EventSubscriptionService::new(
+            ON_CHAIN_CONFIG_REGISTRY,
+            Arc::new(RwLock::new(DbReaderWriter::new(MockDbReaderWriter))),
+        );
         let reconfig_event_subscriber = event_subscriber.subscribe_to_reconfigurations().unwrap();
         let network_handles = vec![(
             NodeNetworkId::new(NetworkId::Validator, 0),

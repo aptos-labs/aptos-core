@@ -17,7 +17,7 @@ use diem_config::{
 use diem_infallible::{Mutex, MutexGuard, RwLock};
 use diem_types::{
     account_address::AccountAddress, account_config::AccountSequenceInfo,
-    transaction::GovernanceRole, PeerId,
+    on_chain_config::ON_CHAIN_CONFIG_REGISTRY, transaction::GovernanceRole, PeerId,
 };
 use enum_dispatch::enum_dispatch;
 use event_notifications::EventSubscriptionService;
@@ -597,9 +597,10 @@ fn start_node_mempool(
     let (_consensus_sender, consensus_events) = mpsc::channel(1_024);
     let (_mempool_notifier, mempool_listener) =
         mempool_notifications::new_mempool_notifier_listener_pair();
-    let mut event_subscriber = EventSubscriptionService::new(Arc::new(RwLock::new(
-        DbReaderWriter::new(MockDbReaderWriter),
-    )));
+    let mut event_subscriber = EventSubscriptionService::new(
+        ON_CHAIN_CONFIG_REGISTRY,
+        Arc::new(RwLock::new(DbReaderWriter::new(MockDbReaderWriter))),
+    );
     let reconfig_event_subscriber = event_subscriber.subscribe_to_reconfigurations().unwrap();
 
     let runtime = Builder::new_multi_thread()

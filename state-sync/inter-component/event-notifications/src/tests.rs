@@ -20,7 +20,7 @@ use diem_types::{
 use diem_vm::DiemVM;
 use diemdb::DiemDB;
 use executor_test_helpers::bootstrap_genesis;
-use futures::{executor::block_on, FutureExt, StreamExt};
+use futures::{FutureExt, StreamExt};
 use move_core_types::language_storage::TypeTag;
 use serde::{Deserialize, Serialize};
 use std::{convert::TryInto, sync::Arc};
@@ -29,7 +29,7 @@ use storage_interface::DbReaderWriter;
 #[test]
 fn test_all_configs_returned() {
     // Create subscription service and mock database
-    let mut event_service = EventSubscriptionService::new(create_database());
+    let mut event_service = create_event_subscription_service();
 
     // Create reconfig subscribers
     let mut listener_1 = event_service.subscribe_to_reconfigurations().unwrap();
@@ -66,7 +66,7 @@ fn test_all_configs_returned() {
 #[test]
 fn test_reconfig_notification_no_queuing() {
     // Create subscription service and mock database
-    let mut event_service = EventSubscriptionService::new(create_database());
+    let mut event_service = create_event_subscription_service();
 
     // Create reconfig subscribers
     let mut listener_1 = event_service.subscribe_to_reconfigurations().unwrap();
@@ -101,7 +101,7 @@ fn test_reconfig_notification_no_queuing() {
 #[test]
 fn test_dynamic_subscribers() {
     // Create subscription service and mock database
-    let mut event_service = EventSubscriptionService::new(create_database());
+    let mut event_service = create_event_subscription_service();
 
     // Create several event keys
     let event_key_1 = create_random_event_key();
@@ -155,7 +155,7 @@ fn test_dynamic_subscribers() {
 #[test]
 fn test_event_and_reconfig_subscribers() {
     // Create subscription service and mock database
-    let mut event_service = EventSubscriptionService::new(create_database());
+    let mut event_service = create_event_subscription_service();
 
     // Create several event keys
     let event_key_1 = create_random_event_key();
@@ -240,7 +240,7 @@ fn test_event_and_reconfig_subscribers() {
 #[test]
 fn test_event_notification_queuing() {
     // Create subscription service and mock database
-    let mut event_service = EventSubscriptionService::new(create_database());
+    let mut event_service = create_event_subscription_service();
 
     // Create several event keys
     let event_key_1 = create_random_event_key();
@@ -296,7 +296,7 @@ fn test_event_notification_queuing() {
 #[test]
 fn test_event_subscribers() {
     // Create subscription service and mock database
-    let mut event_service = EventSubscriptionService::new(create_database());
+    let mut event_service = create_event_subscription_service();
 
     // Create several event keys
     let event_key_1 = create_random_event_key();
@@ -357,7 +357,7 @@ fn test_event_subscribers() {
 #[test]
 fn test_no_events_no_subscribers() {
     // Create subscription service and mock database
-    let mut event_service = EventSubscriptionService::new(create_database());
+    let mut event_service = create_event_subscription_service();
 
     // Verify a notification with zero events returns successfully
     notify_events(&mut event_service, 1, vec![]);
@@ -385,16 +385,17 @@ fn test_no_events_no_subscribers() {
 
 #[test]
 fn test_missing_configs() {
-    // Create subscription service and mock database
-    let mut event_service = EventSubscriptionService::new(create_database());
+    // Create a subscription service and mock database with a custom config registry that
+    // includes a config that does not exist on-chain (TestOnChainConfig).
+    let mut config_registry = ON_CHAIN_CONFIG_REGISTRY.to_owned();
+    config_registry.push(TestOnChainConfig::CONFIG_ID);
+    let mut event_service = EventSubscriptionService::new(&config_registry, create_database());
 
     // Create a reconfig subscriber
     let mut reconfig_listener = event_service.subscribe_to_reconfigurations().unwrap();
 
     // Notify the subscriber of a reconfiguration (where 1 on-chain config is missing from genesis)
-    let mut config_registry = ON_CHAIN_CONFIG_REGISTRY.to_owned();
-    config_registry.push(TestOnChainConfig::CONFIG_ID);
-    assert_ok!(event_service.notify_reconfiguration_subscribers(&config_registry, 0));
+    assert_ok!(event_service.notify_reconfiguration_subscribers(0));
 
     // Verify the reconfiguration notification contains everything except the missing config
     if let Some(reconfig_notification) = reconfig_listener.select_next_some().now_or_never() {
@@ -517,7 +518,7 @@ fn verify_reconfig_notifications_received(
 }
 
 fn notify_initial_configs(event_service: &mut EventSubscriptionService, version: Version) {
-    assert_ok!(block_on(event_service.notify_initial_configs(version)));
+    assert_ok!(event_service.notify_initial_configs(version));
 }
 
 fn notify_events(
@@ -525,7 +526,7 @@ fn notify_events(
     version: Version,
     events: Vec<ContractEvent>,
 ) {
-    assert_ok!(block_on(event_service.notify_events(version, events)));
+    assert_ok!(event_service.notify_events(version, events));
 }
 
 fn create_test_event(event_key: EventKey) -> ContractEvent {
@@ -534,6 +535,10 @@ fn create_test_event(event_key: EventKey) -> ContractEvent {
 
 fn create_random_event_key() -> EventKey {
     EventKey::new_from_address(&AccountAddress::random(), 0)
+}
+
+fn create_event_subscription_service() -> EventSubscriptionService {
+    EventSubscriptionService::new(ON_CHAIN_CONFIG_REGISTRY, create_database())
 }
 
 fn create_database() -> Arc<RwLock<DbReaderWriter>> {

@@ -897,10 +897,7 @@ impl ExecutorProxyTrait for MockExecutorProxy {
         Ok(0)
     }
 
-    fn publish_on_chain_config_updates(
-        &mut self,
-        _events: Vec<ContractEvent>,
-    ) -> Result<(), Error> {
+    fn publish_event_notifications(&mut self, _events: Vec<ContractEvent>) -> Result<(), Error> {
         Ok(())
     }
 }
