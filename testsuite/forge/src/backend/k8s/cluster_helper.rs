@@ -478,12 +478,11 @@ pub fn set_eks_nodegroup_size(
                         update_id: update_id.to_string(),
                     };
                     Box::pin(async move {
-                        let describe_update = client
-                            .describe_update(describe_update_request)
-                            .await
-                            .unwrap()
-                            .update
-                            .unwrap();
+                        let describe_update =
+                            match client.describe_update(describe_update_request).await {
+                                Ok(resp) => resp.update.unwrap(),
+                                Err(err) => bail!(err),
+                            };
                         if let Some(s) = describe_update.status {
                             match s.as_str() {
                                 "Failed" => bail!("Nodegroup update failed"),
