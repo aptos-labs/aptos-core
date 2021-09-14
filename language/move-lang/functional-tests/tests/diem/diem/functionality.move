@@ -86,38 +86,38 @@ script {
 }
 // check: "Keep(EXECUTED)"
 
-//! new-transaction
-//! sender: blessed
-script {
-    use DiemFramework::Diem;
-    use DiemFramework::XUS::XUS;
-    use {{default}}::Holder;
-    fun main(account: signer)  {
-    let account = &account;
-        Holder::hold(
-            account,
-            Diem::remove_burn_capability<XUS>(account)
-        );
-    }
-}
-// check: "Keep(EXECUTED)"
+// //! new-transaction
+// //! sender: blessed
+// script {
+//     use DiemFramework::Diem;
+//     use DiemFramework::XUS::XUS;
+//     use {{default}}::Holder;
+//     fun main(account: signer)  {
+//     let account = &account;
+//         Holder::hold(
+//             account,
+//             Diem::remove_burn_capability<XUS>(account)
+//         );
+//     }
+// }
+// // check: "Keep(EXECUTED)"
 
-//! new-transaction
-//! sender: diemroot
-script {
-use DiemFramework::Diem;
-use Std::FixedPoint32;
-use {{default}}::Holder;
-fun main(account: signer) {
-    let account = &account;
-    let (mint_cap, burn_cap) = Diem::register_currency<u64>(
-        account, FixedPoint32::create_from_rational(1, 1), true, 10, 10, b"wat"
-    );
-    Diem::publish_burn_capability(account, burn_cap);
-    Holder::hold(account, mint_cap);
-}
-}
-// check: "Keep(ABORTED { code: 258,"
+// //! new-transaction
+// //! sender: diemroot
+// script {
+// use DiemFramework::Diem;
+// use Std::FixedPoint32;
+// use {{default}}::Holder;
+// fun main(account: signer) {
+//     let account = &account;
+//     let (mint_cap, burn_cap) = Diem::register_currency<u64>(
+//         account, FixedPoint32::create_from_rational(1, 1), true, 10, 10, b"wat"
+//     );
+//     Diem::publish_burn_capability(account, burn_cap);
+//     Holder::hold(account, mint_cap);
+// }
+// }
+// // check: "Keep(ABORTED { code: 258,"
 
 //! new-transaction
 //! sender: blessed

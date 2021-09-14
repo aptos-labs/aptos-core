@@ -113,8 +113,8 @@ module DiemFramework::TransactionFee {
             Diem::publish_burn_capability(tc_account, burn_cap);
         }
     }
-
     spec burn_fees {
+        pragma disable_invariants_in_body;
         /// Must abort if the account does not have the TreasuryCompliance role [[H3]][PERMISSION].
         include Roles::AbortsIfNotTreasuryCompliance{account: tc_account};
 

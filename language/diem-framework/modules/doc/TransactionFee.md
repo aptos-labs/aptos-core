@@ -326,6 +326,11 @@ underlying fiat.
 <summary>Specification</summary>
 
 
+
+<pre><code><b>pragma</b> disable_invariants_in_body;
+</code></pre>
+
+
 Must abort if the account does not have the TreasuryCompliance role [[H3]][PERMISSION].
 
 

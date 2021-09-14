@@ -348,19 +348,19 @@ fun main(account: signer) {
 }
 // check: "Keep(EXECUTED)"
 
-//! new-transaction
-script {
-use DiemFramework::Diem;
-use DiemFramework::XUS::XUS;
-fun main(account: signer) {
-    let account = &account;
-    Diem::publish_burn_capability(
-        account,
-        Diem::remove_burn_capability<XUS>(account)
-    );
-}
-}
-// check: "Keep(ABORTED { code: 4,"
+// //! new-transaction
+// script {
+// use DiemFramework::Diem;
+// use DiemFramework::XUS::XUS;
+// fun main(account: signer) {
+//     let account = &account;
+//     Diem::publish_burn_capability(
+//         account,
+//         Diem::remove_burn_capability<XUS>(account)
+//     );
+// }
+// }
+// // check: "Keep(ABORTED { code: 4,"
 
 //! new-transaction
 //! sender: dd

@@ -10,6 +10,10 @@ This module defines the coin type XUS and its initialization function.
 -  [Function `initialize`](#0x1_XUS_initialize)
 -  [Module Specification](#@Module_Specification_0)
     -  [Persistence of Resources](#@Persistence_of_Resources_1)
+    -  [Access Control](#@Access_Control_2)
+        -  [Minting](#@Minting_3)
+        -  [Burning](#@Burning_4)
+        -  [Preburning](#@Preburning_5)
 
 
 <pre><code><b>use</b> <a href="AccountLimits.md#0x1_AccountLimits">0x1::AccountLimits</a>;
@@ -161,6 +165,159 @@ it does not hold for all types (but does hold for XUS).
 
 <pre><code><b>invariant</b> [suspendable] <b>forall</b> addr: address <b>where</b> <b>exists</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">AccountLimits::LimitsDefinition</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;&gt;(addr):
     addr == @DiemRoot;
+</code></pre>
+
+
+
+<a name="@Access_Control_2"></a>
+
+### Access Control
+
+
+<a name="@Minting_3"></a>
+
+#### Minting
+
+
+Only TreasuryCompliance can have MintCapability<XUS> [[H1]][PERMISSION].
+If an account has BurnCapability<XUS>, it is a TreasuryCompliance account.
+
+
+<pre><code><b>invariant</b>
+    <b>forall</b> a: address:
+        <a href="Diem.md#0x1_Diem_spec_has_mint_capability">Diem::spec_has_mint_capability</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;(a) ==&gt;
+            <a href="Roles.md#0x1_Roles_spec_has_treasury_compliance_role_addr">Roles::spec_has_treasury_compliance_role_addr</a>(a);
+</code></pre>
+
+
+Only the owner of MintCapability<XUS> can mint XUS [[H1]][PERMISSION].
+If the <code>total_value</code> for XUS is increased, the transaction should be
+signed by the owner of MintCapability<XUS>.
+
+
+<pre><code><b>invariant</b> <b>update</b> [suspendable] (
+        <b>old</b>(<a href="Diem.md#0x1_Diem_spec_is_currency">Diem::spec_is_currency</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;()) &&
+        <a href="Diem.md#0x1_Diem_spec_is_currency">Diem::spec_is_currency</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;() &&
+        <b>old</b>(<a href="Diem.md#0x1_Diem_spec_currency_info">Diem::spec_currency_info</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;().total_value) &lt; <a href="Diem.md#0x1_Diem_spec_currency_info">Diem::spec_currency_info</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;().total_value
+    ) ==&gt; <a href="Diem.md#0x1_Diem_spec_signed_by_mint_capability_owner">Diem::spec_signed_by_mint_capability_owner</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;();
+</code></pre>
+
+
+The permission to mint XUS is unique [[I1]][PERMISSION].
+At most one address has a MintCapability<XUS>.
+
+
+<pre><code><b>invariant</b>
+    <b>forall</b> a1: address, a2: address:
+        (<a href="Diem.md#0x1_Diem_spec_has_mint_capability">Diem::spec_has_mint_capability</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;(a1) && <a href="Diem.md#0x1_Diem_spec_has_mint_capability">Diem::spec_has_mint_capability</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;(a2)) ==&gt; a1 == a2;
+</code></pre>
+
+
+MintCapability<XUS> is not transferrable [[J1]][PERMISSION].
+MintCapability<XUS> is not copiable, and once it's published, it's not removed.
+
+
+<pre><code><b>invariant</b> <b>update</b>
+    <b>forall</b> a: address
+        <b>where</b> <b>old</b>(<b>exists</b>&lt;<a href="Diem.md#0x1_Diem_MintCapability">Diem::MintCapability</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;&gt;(a)):
+            <b>exists</b>&lt;<a href="Diem.md#0x1_Diem_MintCapability">Diem::MintCapability</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;&gt;(a);
+</code></pre>
+
+
+
+<a name="@Burning_4"></a>
+
+#### Burning
+
+
+Only TreasuryCompliance can have BurnCapability [[H3]][PERMISSION].
+If an account has BurnCapability<XUS>, it is a TreasuryCompliance account.
+
+
+<pre><code><b>invariant</b>
+    <b>forall</b> a: address:
+        <a href="Diem.md#0x1_Diem_spec_has_burn_capability">Diem::spec_has_burn_capability</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;(a) ==&gt;
+            <a href="Roles.md#0x1_Roles_spec_has_treasury_compliance_role_addr">Roles::spec_has_treasury_compliance_role_addr</a>(a);
+</code></pre>
+
+
+Only the owner of BurnCapability<XUS> can burn XUS [[H3]][PERMISSION].
+If the <code>total_value</code> or <code>preburn_value</code> for XUS is decreased, the
+transaction should be signed by the owner of BurnCapability<XUS>.
+
+
+<pre><code><b>invariant</b> <b>update</b> [suspendable] (
+        <b>old</b>(<a href="Diem.md#0x1_Diem_spec_is_currency">Diem::spec_is_currency</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;()) &&
+        <a href="Diem.md#0x1_Diem_spec_is_currency">Diem::spec_is_currency</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;() &&
+        <b>old</b>(<a href="Diem.md#0x1_Diem_spec_currency_info">Diem::spec_currency_info</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;().total_value) &gt; <a href="Diem.md#0x1_Diem_spec_currency_info">Diem::spec_currency_info</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;().total_value
+    ) ==&gt; <a href="Diem.md#0x1_Diem_spec_signed_by_burn_capability_owner">Diem::spec_signed_by_burn_capability_owner</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;();
+<b>invariant</b> <b>update</b> [suspendable] (
+        <b>old</b>(<a href="Diem.md#0x1_Diem_spec_is_currency">Diem::spec_is_currency</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;()) &&
+        <a href="Diem.md#0x1_Diem_spec_is_currency">Diem::spec_is_currency</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;() &&
+        <b>old</b>(<a href="Diem.md#0x1_Diem_spec_currency_info">Diem::spec_currency_info</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;().preburn_value) &gt; <a href="Diem.md#0x1_Diem_spec_currency_info">Diem::spec_currency_info</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;().preburn_value
+    ) ==&gt; <a href="Diem.md#0x1_Diem_spec_signed_by_burn_capability_owner">Diem::spec_signed_by_burn_capability_owner</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;();
+</code></pre>
+
+
+The permission to burn XUS is unique [[I3]][PERMISSION].
+At most one address has a BurnCapability<XUS>.
+
+
+<pre><code><b>invariant</b>
+    <b>forall</b> a1: address, a2: address:
+        (<a href="Diem.md#0x1_Diem_spec_has_burn_capability">Diem::spec_has_burn_capability</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;(a1) && <a href="Diem.md#0x1_Diem_spec_has_burn_capability">Diem::spec_has_burn_capability</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;(a2)) ==&gt; a1 == a2;
+</code></pre>
+
+
+BurnCapability<XUS> is not transferrable [[J3]][PERMISSION].
+BurnCapability<XUS> is not copiable, and once it's published, it's not removed.
+
+
+<pre><code><b>invariant</b> <b>update</b> [suspendable]
+    <b>forall</b> a: address
+        <b>where</b> <b>old</b>(<b>exists</b>&lt;<a href="Diem.md#0x1_Diem_BurnCapability">Diem::BurnCapability</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;&gt;(a)):
+            <b>exists</b>&lt;<a href="Diem.md#0x1_Diem_BurnCapability">Diem::BurnCapability</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;&gt;(a);
+</code></pre>
+
+
+
+<a name="@Preburning_5"></a>
+
+#### Preburning
+
+
+Only DesignatedDealer can has the "preburn" permission [[H4]][PERMISSION].
+If an account has PreburnQueue<XUS> or Preburn<XUS>, it is a DesignatedDealer account.
+
+
+<pre><code><b>invariant</b>
+    <b>forall</b> a: address:
+        (<a href="Diem.md#0x1_Diem_spec_has_preburn_queue">Diem::spec_has_preburn_queue</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;(a) || <a href="Diem.md#0x1_Diem_spec_has_preburn">Diem::spec_has_preburn</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;(a)) ==&gt;
+            <a href="Roles.md#0x1_Roles_spec_has_designated_dealer_role_addr">Roles::spec_has_designated_dealer_role_addr</a>(a);
+</code></pre>
+
+
+Only the owner of PreburnQueue<XUS> can preburn XUS [[H4]][PERMISSION].
+If the <code>preburn_value</code> for XUS is increased, the transaction should be
+signed by the owner of PreburnQueue<XUS> or Preburn<XUS>.
+
+
+<pre><code><b>invariant</b> <b>update</b> [suspendable] (
+        <b>old</b>(<a href="Diem.md#0x1_Diem_spec_is_currency">Diem::spec_is_currency</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;()) &&
+        <a href="Diem.md#0x1_Diem_spec_is_currency">Diem::spec_is_currency</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;() &&
+        <b>old</b>(<a href="Diem.md#0x1_Diem_spec_currency_info">Diem::spec_currency_info</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;().preburn_value) &lt; <a href="Diem.md#0x1_Diem_spec_currency_info">Diem::spec_currency_info</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;().preburn_value
+    ) ==&gt; (<a href="Diem.md#0x1_Diem_spec_signed_by_preburn_queue_owner">Diem::spec_signed_by_preburn_queue_owner</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;() || <a href="Diem.md#0x1_Diem_spec_signed_by_preburn_owner">Diem::spec_signed_by_preburn_owner</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;());
+</code></pre>
+
+
+PreburnQueue<XUS> is not transferrable [[J4]][PERMISSION].
+PreburnQueue<XUS> is not copiable, and once it's published, it's not removed.
+
+
+<pre><code><b>invariant</b> <b>update</b> [suspendable]
+    <b>forall</b> a: address
+        <b>where</b> <b>old</b>(<b>exists</b>&lt;<a href="Diem.md#0x1_Diem_PreburnQueue">Diem::PreburnQueue</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;&gt;(a)):
+            <b>exists</b>&lt;<a href="Diem.md#0x1_Diem_PreburnQueue">Diem::PreburnQueue</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;&gt;(a);
 </code></pre>
 
 

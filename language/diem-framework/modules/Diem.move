@@ -14,6 +14,8 @@ module DiemFramework::Diem {
     use Std::Vector;
 
     friend DiemFramework::DesignatedDealer;
+    friend DiemFramework::XDX;
+    friend DiemFramework::TransactionFee;
 
     /// The `Diem` resource defines the Diem coin for each currency in
     /// Diem. Each "coin" is coupled with a type `CoinType` specifying the
@@ -262,7 +264,7 @@ module DiemFramework::Diem {
 
     /// Publishes the `BurnCapability` `cap` for the `CoinType` currency under `account`. `CoinType`
     /// must be a registered currency type. The caller must pass a treasury compliance account.
-    public fun publish_burn_capability<CoinType>(
+    public(friend) fun publish_burn_capability<CoinType>(
         tc_account: &signer,
         cap: BurnCapability<CoinType>,
     ) {
@@ -275,6 +277,7 @@ module DiemFramework::Diem {
         move_to(tc_account, cap)
     }
     spec publish_burn_capability {
+        pragma delegate_invariants_to_caller;
         aborts_if !spec_is_currency<CoinType>();
         include PublishBurnCapAbortsIfs<CoinType>;
     }
@@ -407,7 +410,7 @@ module DiemFramework::Diem {
     /// caller must have a reference to a `MintCapability<CoinType>`. Only
     /// the treasury compliance account or the `DiemFramework::XDX` module can acquire such a
     /// reference.
-    public fun mint_with_capability<CoinType>(
+    public(friend) fun mint_with_capability<CoinType>(
         value: u64,
         _capability: &MintCapability<CoinType>
     ): Diem<CoinType> acquires CurrencyInfo {
@@ -434,6 +437,7 @@ module DiemFramework::Diem {
     }
     spec mint_with_capability {
         pragma opaque;
+        pragma delegate_invariants_to_caller;
         modifies global<CurrencyInfo<CoinType>>(@CurrencyInfo);
         ensures exists<CurrencyInfo<CoinType>>(@CurrencyInfo);
         include MintAbortsIf<CoinType>;
@@ -502,6 +506,7 @@ module DiemFramework::Diem {
         };
     }
     spec preburn_with_resource {
+        pragma delegate_invariants_to_caller;
         modifies global<CurrencyInfo<CoinType>>(@CurrencyInfo);
         ensures exists<CurrencyInfo<CoinType>>(@CurrencyInfo);
         include PreburnWithResourceAbortsIf<CoinType>{amount: coin.value};
@@ -778,6 +783,7 @@ module DiemFramework::Diem {
     }
     spec preburn_to {
         pragma opaque;
+        pragma disable_invariants_in_body;
         include PreburnToAbortsIf<CoinType>{amount: coin.value};
         include PreburnToEnsures<CoinType>{amount: coin.value};
         let account_addr = Signer::spec_address_of(account);
@@ -879,7 +885,7 @@ module DiemFramework::Diem {
     /// Calls to this function will fail if the there is no `PreburnQueue<CoinType>`
     /// resource under `preburn_address`, or, if there is no preburn request in
     /// the preburn queue with a `to_burn` amount equal to `amount`.
-    public fun burn_with_capability<CoinType>(
+    public(friend) fun burn_with_capability<CoinType>(
         preburn_address: address,
         capability: &BurnCapability<CoinType>,
         amount: u64,
@@ -895,6 +901,7 @@ module DiemFramework::Diem {
         destroy_zero(to_burn);
     }
     spec burn_with_capability {
+        pragma delegate_invariants_to_caller;
         include BurnWithResourceCapEmits<CoinType>{preburn: spec_make_preburn(amount)};
         include BurnWithCapabilityAbortsIf<CoinType>;
         include BurnWithCapabilityEnsures<CoinType>;
@@ -950,6 +957,7 @@ module DiemFramework::Diem {
         };
     }
     spec burn_with_resource_cap {
+        pragma delegate_invariants_to_caller;
         let pre_preburn = preburn;
         include BurnWithResourceCapAbortsIf<CoinType>{preburn: pre_preburn};
         include BurnWithResourceCapEnsures<CoinType>{preburn: pre_preburn};
@@ -990,7 +998,7 @@ module DiemFramework::Diem {
     /// This function can only be called by the holder of a
     /// `BurnCapability<CoinType>`, and will fail if the `PreburnQueue<CoinType>` resource
     /// at `preburn_address` does not contain a preburn request of the right amount.
-    public fun cancel_burn_with_capability<CoinType>(
+    fun cancel_burn_with_capability<CoinType>(
         preburn_address: address,
         _capability: &BurnCapability<CoinType>,
         amount: u64,
@@ -1020,6 +1028,7 @@ module DiemFramework::Diem {
         to_burn
     }
     spec cancel_burn_with_capability {
+        pragma delegate_invariants_to_caller;
         modifies global<PreburnQueue<CoinType>>(preburn_address);
         modifies global<CurrencyInfo<CoinType>>(@CurrencyInfo);
         include CancelBurnWithCapAbortsIf<CoinType>;
@@ -1061,7 +1070,7 @@ module DiemFramework::Diem {
 
     /// A shortcut for immediately burning a coin. This calls preburn followed by a subsequent burn, and is
     /// used for administrative burns, like unpacking an XDX coin or charging fees.
-    public fun burn_now<CoinType>(
+    public(friend) fun burn_now<CoinType>(
         coin: Diem<CoinType>,
         preburn: &mut Preburn<CoinType>,
         preburn_address: address,
@@ -1072,6 +1081,7 @@ module DiemFramework::Diem {
         burn_with_resource_cap(preburn, preburn_address, capability);
     }
     spec burn_now {
+        pragma delegate_invariants_to_caller;
         include BurnNowAbortsIf<CoinType>;
         let info = spec_currency_info<CoinType>();
         let post post_info = spec_currency_info<CoinType>();
@@ -1093,13 +1103,14 @@ module DiemFramework::Diem {
     /// Removes and returns the `BurnCapability<CoinType>` from `account`.
     /// Calls to this function will fail if `account` does  not have a
     /// published `BurnCapability<CoinType>` resource at the top-level.
-    public fun remove_burn_capability<CoinType>(account: &signer): BurnCapability<CoinType>
+    public(friend) fun remove_burn_capability<CoinType>(account: &signer): BurnCapability<CoinType>
     acquires BurnCapability {
         let addr = Signer::address_of(account);
         assert(exists<BurnCapability<CoinType>>(addr), Errors::requires_capability(EBURN_CAPABILITY));
         move_from<BurnCapability<CoinType>>(addr)
     }
     spec remove_burn_capability {
+        pragma delegate_invariants_to_caller;
         include AbortsIfNoBurnCapability<CoinType>;
     }
     spec schema AbortsIfNoBurnCapability<CoinType> {
@@ -1578,6 +1589,8 @@ module DiemFramework::Diem {
     spec module {} // switch documentation context back to module level
 
     /// # Access Control
+    // TODO: The XUS module now has the access control spec for XUS. The access
+    // control spec in this module can be removed when no longer necessary.
 
     spec module {
         /// Only mint functions can increase the total amount of currency [[H1]][PERMISSION].
@@ -1819,6 +1832,23 @@ module DiemFramework::Diem {
                 ==> Roles::spec_signed_by_diem_root_role();
     }
 
+
+    /// # Lemmas
+
+    spec module {
+        // These lemmas are needed to prove the uniqueness of MintCapability/BurnCapability.
+
+        /// If an address has a mint capability, it is a registered currency.
+        invariant<CoinType>
+            forall a: address where spec_has_mint_capability<CoinType>(a):
+                is_currency<CoinType>();
+
+        /// If an address has a burn capability, it is a registered currency.
+        invariant<CoinType>
+            forall a: address where spec_has_burn_capability<CoinType>(a):
+                is_currency<CoinType>();
+    }
+
     /// # Helper Functions
 
     spec module {
@@ -1847,20 +1877,51 @@ module DiemFramework::Diem {
             global<CurrencyInfo<CoinType>>(@CurrencyInfo).can_mint
         }
 
-        /// Checks whether the currency has a mint capability.  This is only relevant for
-        /// SCS coins
+        /// Checks whether the currency has a mint capability.
+        /// This is only relevant for SCS coins.
         fun spec_has_mint_capability<CoinType>(addr: address): bool {
             exists<MintCapability<CoinType>>(addr)
         }
 
         /// Returns true if a BurnCapability for CoinType exists at addr.
+        /// This is only relevant for SCS coins.
         fun spec_has_burn_capability<CoinType>(addr: address): bool {
             exists<BurnCapability<CoinType>>(addr)
+        }
+
+        /// Returns true if a PrebunQueue for CoinType exists at addr.
+        fun spec_has_preburn_queue<CoinType>(addr: address): bool {
+            exists<PreburnQueue<CoinType>>(addr)
+        }
+
+        /// Returns true if a Prebun for CoinType exists at addr.
+        fun spec_has_preburn<CoinType>(addr: address): bool {
+            exists<Preburn<CoinType>>(addr)
         }
 
         /// Returns the Preburn in the preburn queue.
         fun spec_make_preburn<CoinType>(amount: u64): Preburn<CoinType> {
             Preburn { to_burn: Diem { value: amount }}
+        }
+
+        fun spec_signed_by_mint_capability_owner<CoinType>(): bool {
+            (exists a: address: Signer::is_txn_signer_addr(a)
+                && spec_has_mint_capability<CoinType>(a))
+        }
+
+        fun spec_signed_by_burn_capability_owner<CoinType>(): bool {
+            (exists a: address: Signer::is_txn_signer_addr(a)
+                && spec_has_burn_capability<CoinType>(a))
+        }
+
+        fun spec_signed_by_preburn_queue_owner<CoinType>(): bool {
+            (exists a: address: Signer::is_txn_signer_addr(a)
+            && spec_has_preburn_queue<CoinType>(a))
+        }
+
+        fun spec_signed_by_preburn_owner<CoinType>(): bool {
+            (exists a: address: Signer::is_txn_signer_addr(a)
+            && spec_has_preburn<CoinType>(a))
         }
     }
 
