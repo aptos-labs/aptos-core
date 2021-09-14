@@ -1,6 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use diem_framework::diem_framework_named_addresses;
 use log::LevelFilter;
 use std::{
     fs::{create_dir_all, remove_dir_all},
@@ -17,14 +18,9 @@ pub fn generate_script_abis(output_path: &Path) {
             crate::diem_framework_modules_full_path(),
             crate::custom_move_modules_full_path(),
         ],
-        move_named_address_values: vec![
-            "Std=0x1".to_string(),
-            "DiemFramework=0x1".to_string(),
-            "DiemRoot=0xA550C18".to_string(),
-            "CurrencyInfo=0xA550C18".to_string(),
-            "TreasuryCompliance=0xB1E55ED".to_string(),
-            "VMReserved=0x0".to_string(),
-        ],
+        move_named_address_values: move_prover::cli::named_addresses_for_options(
+            &diem_framework_named_addresses(),
+        ),
         verbosity_level: LevelFilter::Warn,
         run_abigen: true,
         abigen: abigen::AbigenOptions {

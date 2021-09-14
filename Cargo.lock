@@ -7635,6 +7635,8 @@ dependencies = [
  "bcs",
  "diem-config",
  "diem-crypto",
+ "diem-framework",
+ "diem-framework-releases",
  "diem-genesis-tool",
  "diem-json-rpc-types",
  "diem-node",

@@ -18,11 +18,14 @@ pub mod utils;
 
 pub const MOVE_EXTENSION: &str = "move";
 const MOVE_MODULES_DIR: &str = "../move/src/modules";
-const DIEM_MODULES_DIR: &str = "../move/src/modules/diem";
-const MOVE_STDLIB_DIR: &str = "../move/build/package/stdlib/source_files";
+const DIEM_MODULES_DIR: &str = "../../language/diem-framework/modules";
+const MOVE_STDLIB_DIR: &str = "../../language/move-stdlib/modules";
 
 /// The output path for transaction script ABIs.
 const COMPILED_SCRIPTS_ABI_DIR: &str = "compiled/script_abis";
+/// The path for Diem Framework transaction script ABIs.
+const DF_COMPILED_SCRIPTS_ABI_DIR: &str =
+    "../../language/diem-framework/releases/artifacts/current/script_abis";
 /// The output path for generated transaction builders
 const TRANSACTION_BUILDERS_GENERATED_SOURCE_PATH: &str = "../transaction-builder/src/framework.rs";
 /// Directory where Move source code lives
@@ -40,9 +43,10 @@ pub fn generate_validator_config(
         node_config_dir
     );
     fs::create_dir(node_config_dir)?;
-    let genesis_modules: Vec<Vec<u8>> = fs::read_dir(MOVE_BYTECODE_DIR)?
+    let mut genesis_modules: Vec<Vec<u8>> = fs::read_dir(MOVE_BYTECODE_DIR)?
         .map(|f| fs::read(f.unwrap().path()).unwrap())
         .collect();
+    genesis_modules.extend(diem_framework_releases::current_module_blobs().to_vec());
     println!("Creating genesis with {} modules", genesis_modules.len());
     let template = NodeConfig::default_for_validator();
     std::fs::DirBuilder::new()
@@ -69,11 +73,12 @@ pub fn generate_validator_config(
     Ok(validators.pop().unwrap())
 }
 
+/// TODO: remove this code and use Move package manager to build sources when it is available
 pub fn build_move_sources() -> Result<()> {
     // Build the Move code to ensure we get the latest changes in script builders + the genesis WriteSet
     utils::time_it("Building Move code", || {
-        let output = Command::new("df-cli")
-            .args(&["sandbox", "publish"])
+        let output = Command::new("move")
+            .args(&["sandbox", "publish", "--mode=bare"])
             .current_dir(MOVE_CODE_DIR)
             .output()
             .expect("Failure building Move code");
@@ -82,12 +87,6 @@ pub fn build_move_sources() -> Result<()> {
             panic!("Automatically building Move code failed. Need to manually resolve the issue using the CLI");
         }
     });
-    // Hack: remove the Debug module because attempting to publish it in genesis will fail.
-    // The issue is that the module uses native functions that are only included in a VM built with
-    // certain flags enabled.
-    // TODO: better solution for this
-    let debug_module_path = Path::new(MOVE_BYTECODE_DIR);
-    fs::remove_file(debug_module_path.join("Debug.mv"))?;
 
     // Generate script ABIs
     utils::time_it("Generating script ABIs", || {
@@ -98,7 +97,10 @@ pub fn build_move_sources() -> Result<()> {
     utils::time_it("Generating Rust script builders", || {
         release::generate_script_builder(
             Path::new(TRANSACTION_BUILDERS_GENERATED_SOURCE_PATH),
-            &[Path::new(COMPILED_SCRIPTS_ABI_DIR)],
+            &[
+                Path::new(COMPILED_SCRIPTS_ABI_DIR),
+                Path::new(DF_COMPILED_SCRIPTS_ABI_DIR),
+            ],
         );
     });
     Ok(())

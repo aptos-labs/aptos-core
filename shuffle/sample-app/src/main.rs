@@ -14,7 +14,7 @@ use diem_types::{
 };
 use generate_key::load_key;
 use shuffle_transaction_builder::framework::{
-    encode_create_regular_account_script_function, encode_mint_coin_script_function,
+    encode_create_parent_vasp_account_script_function, encode_mint_coin_script_function,
 };
 use std::path::PathBuf;
 use structopt::StructOpt;
@@ -42,12 +42,12 @@ fn main() -> Result<()> {
 
     let client = BlockingClient::new(json_rpc_url);
     let root_seq_num = client
-        .get_account(account_config::diem_root_address())?
+        .get_account(account_config::treasury_compliance_account_address())?
         .into_inner()
         .unwrap()
         .sequence_number;
     let mut root_account = LocalAccount::new(
-        account_config::diem_root_address(),
+        account_config::treasury_compliance_account_address(),
         root_account_key,
         root_seq_num,
     );
@@ -58,13 +58,16 @@ fn main() -> Result<()> {
     );
 
     // Create a new account.
-    print!("Create a new account...");
+    print!("Create a new ParentVASP account (we cannot create a regular account right now)...");
     let create_new_account_txn = root_account.sign_with_transaction_builder(
         TransactionFactory::new(ChainId::test()).payload(
-            encode_create_regular_account_script_function(
+            encode_create_parent_vasp_account_script_function(
                 Currency::XUS.type_tag(),
+                0,
                 new_account.address(),
                 new_account.authentication_key().prefix().to_vec(),
+                vec![],
+                false,
             ),
         ),
     );
