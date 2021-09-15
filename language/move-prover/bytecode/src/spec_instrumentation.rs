@@ -552,10 +552,7 @@ impl<'a> Instrumenter<'a> {
         // function.
         if self.is_verified() || callee_opaque {
             for (loc, cond) in callee_spec.pre_conditions(&self.builder) {
-                // Note we need to emit this before type instantiations, because
-                // the node_ids in the TranslatedSpec are for the generic version.
-                self.emit_traces(&callee_spec, targs, &cond);
-                let cond = self.instantiate_exp(cond, targs);
+                self.emit_traces(&callee_spec, &[], &cond);
                 // Determine whether we want to emit this as an assertion or an assumption.
                 let prop_kind = match self.builder.data.variant {
                     FunctionVariant::Verification(..) => {
@@ -575,13 +572,13 @@ impl<'a> Instrumenter<'a> {
         if self.is_verified() {
             let loc = self.builder.get_loc(id);
             for (_, exp) in &callee_spec.modifies {
-                let rty = env.get_node_type(exp.node_id()).instantiate(targs);
-                let new_addr = self.instantiate_exp(exp.call_args()[0].clone(), targs);
+                let rty = env.get_node_type(exp.node_id());
+                let new_addr = exp.call_args()[0].clone();
                 self.generate_modifies_check(
                     PropKind::Assert,
                     &callee_spec,
                     &loc,
-                    targs,
+                    &[],
                     &rty,
                     exp,
                     new_addr,
@@ -621,7 +618,7 @@ impl<'a> Instrumenter<'a> {
             // Translate the abort condition. If the abort_cond_temp_opt is None, it indicates
             // that the abort condition is known to be false, so we can skip the abort handling.
             let (abort_cond_temp_opt, code_cond) =
-                self.generate_abort_opaque_cond(callee_aborts_if_is_partial, &callee_spec, targs);
+                self.generate_abort_opaque_cond(callee_aborts_if_is_partial, &callee_spec);
             if let Some(abort_cond_temp) = abort_cond_temp_opt {
                 let abort_local = self.abort_local;
                 let abort_label = self.abort_label;
@@ -631,7 +628,7 @@ impl<'a> Instrumenter<'a> {
                     .emit_with(|id| Branch(id, abort_here_label, no_abort_label, abort_cond_temp));
                 self.builder.emit_with(|id| Label(id, abort_here_label));
                 if let Some(cond) = code_cond {
-                    self.emit_traces(&callee_spec, targs, &cond);
+                    self.emit_traces(&callee_spec, &[], &cond);
                     self.builder.emit_with(move |id| Prop(id, Assume, cond));
                 }
                 self.builder.emit_with(move |id| {
@@ -644,18 +641,15 @@ impl<'a> Instrumenter<'a> {
 
             // Emit memory state saves
             for (mem, label) in std::mem::take(&mut callee_spec.saved_memory) {
-                let mem = mem.instantiate(targs);
                 self.builder.emit_with(|id| SaveMem(id, label, mem));
             }
             for (var, label) in std::mem::take(&mut callee_spec.saved_spec_vars) {
-                let var = var.instantiate(targs);
                 self.builder.emit_with(|id| SaveSpecVar(id, label, var));
             }
 
             // Emit modifies properties which havoc memory at the modified location.
             for (_, exp) in std::mem::take(&mut callee_spec.modifies) {
-                self.emit_traces(&callee_spec, targs, &exp);
-                let exp = self.instantiate_exp(exp, targs);
+                self.emit_traces(&callee_spec, &[], &exp);
                 self.builder.emit_with(|id| Prop(id, Modifies, exp));
             }
 
@@ -706,21 +700,17 @@ impl<'a> Instrumenter<'a> {
 
             // Emit post conditions as assumptions.
             for (_, cond) in std::mem::take(&mut callee_spec.post) {
-                self.emit_traces(&callee_spec, targs, &cond);
-                let cond = self.instantiate_exp(cond, targs);
+                self.emit_traces(&callee_spec, &[], &cond);
                 self.builder.emit_with(|id| Prop(id, Assume, cond));
             }
 
             // Emit the events in the `emits` specs of the callee.
             for (_, msg, handle, cond) in std::mem::take(&mut callee_spec.emits) {
-                self.emit_traces(&callee_spec, targs, &msg);
-                self.emit_traces(&callee_spec, targs, &handle);
+                self.emit_traces(&callee_spec, &[], &msg);
+                self.emit_traces(&callee_spec, &[], &handle);
                 if let Some(c) = &cond {
-                    self.emit_traces(&callee_spec, targs, c);
+                    self.emit_traces(&callee_spec, &[], c);
                 }
-                let msg = self.instantiate_exp(msg, targs);
-                let handle = self.instantiate_exp(handle, targs);
-                let cond = cond.map(|e| self.instantiate_exp(e, targs));
                 let temp_msg = self.builder.emit_let(msg).0;
                 let temp_handle = self.builder.emit_let(handle).0;
                 let mut temp_list = vec![temp_msg, temp_handle];
@@ -936,7 +926,6 @@ impl<'a> Instrumenter<'a> {
         &mut self,
         is_partial: bool,
         spec: &TranslatedSpec,
-        targs: &[Type],
     ) -> (Option<TempIndex>, Option<Exp>) {
         let aborts_cond = if is_partial {
             None
@@ -948,7 +937,6 @@ impl<'a> Instrumenter<'a> {
                 return (None, None);
             }
             // Introduce a temporary to hold the value of the aborts condition.
-            let cond = self.instantiate_exp(cond, targs);
             self.builder.emit_let(cond).0
         } else {
             // Introduce a havoced temporary to hold an arbitrary value for the aborts
@@ -958,7 +946,6 @@ impl<'a> Instrumenter<'a> {
         let aborts_code_cond = if spec.has_aborts_code_specs() {
             let actual_code = self.builder.mk_temporary(self.abort_local);
             spec.aborts_code_condition(&self.builder, &actual_code)
-                .map(|e| self.instantiate_exp(e, targs))
         } else {
             None
         };
