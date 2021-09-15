@@ -691,8 +691,11 @@ impl<'a> Instrumenter<'a> {
                 self.builder.emit_with(move |id| Prop(id, Assume, exp));
             }
 
-            // Emit `let update` assignments.
+            // Emit `let post` assignments.
             self.emit_lets(&callee_spec, true);
+
+            // Emit spec var updates.
+            self.emit_updates(&callee_spec);
 
             // Emit post conditions as assumptions.
             for (_, cond) in std::mem::take(&mut callee_spec.post) {
@@ -957,11 +960,19 @@ impl<'a> Instrumenter<'a> {
 
         // Emit specification variable updates. They are generated for both verified and inlined
         // function variants, as the evolution of state updates is always the same.
-        self.emit_updates(spec);
+        let lets_emitted = if !spec.updates.is_empty() {
+            self.emit_lets(spec, true);
+            self.emit_updates(spec);
+            true
+        } else {
+            false
+        };
 
         if self.is_verified() {
-            // Emit `let` bindings.
-            self.emit_lets(spec, true);
+            // Emit `let` bindings if not already emitted.
+            if !lets_emitted {
+                self.emit_lets(spec, true);
+            }
 
             // Emit the negation of all aborts conditions.
             for (loc, abort_cond, _) in &spec.aborts {
@@ -1147,6 +1158,9 @@ fn check_opaque_modifies_completeness(
         .iter()
     {
         if env.is_wellknown_event_handle_type(&Type::Struct(mem.module_id, mem.id, vec![])) {
+            continue;
+        }
+        if env.get_struct_qid(mem.to_qualified_id()).is_ghost_memory() {
             continue;
         }
         let found = target.get_modify_ids().iter().any(|id| mem == id);

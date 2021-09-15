@@ -1,5 +1,5 @@
+// separate_baseline: no_opaque
 module 0x42::TestGlobalVars {
-
     use Std::Signer;
 
     // ================================================================================
@@ -38,6 +38,41 @@ module 0x42::TestGlobalVars {
         add(); sub(); add();
     }
     spec call_add_sub_invalid {
+        ensures sum_of_T == 2;
+    }
+
+    // ================================================================================
+    // Counting (opaque)
+
+    fun opaque_add() acquires T {
+        borrow_global_mut<T>(@0).i = borrow_global_mut<T>(@0).i + 1
+    }
+    spec opaque_add {
+        pragma opaque;
+        modifies global<T>(@0);
+        update sum_of_T = sum_of_T + 1;
+    }
+
+    fun opaque_sub() acquires T {
+        borrow_global_mut<T>(@0).i = borrow_global_mut<T>(@0).i - 1
+    }
+    spec opaque_sub {
+        pragma opaque;
+        modifies global<T>(@0);
+        update sum_of_T = sum_of_T - 1;
+    }
+
+    fun opaque_call_add_sub() acquires T {
+        opaque_add(); opaque_add(); opaque_sub();
+    }
+    spec opaque_call_add_sub {
+        ensures sum_of_T == 1;
+    }
+
+    fun opaque_call_add_sub_invalid() acquires T {
+        opaque_add(); opaque_sub(); opaque_add();
+    }
+    spec opaque_call_add_sub_invalid {
         ensures sum_of_T == 2;
     }
 
@@ -103,6 +138,31 @@ module 0x42::TestGlobalVars {
     }
 
     // ================================================================================
+    // Generic spec vars (opaque)
+
+    fun opaque_give_property_to<X>() {
+    }
+    spec opaque_give_property_to {
+        pragma opaque;
+        update type_has_property<X> = true;
+    }
+
+    fun opaque_expect_property_of_bool() {
+        opaque_give_property_to<bool>();
+    }
+    spec opaque_expect_property_of_bool {
+        ensures type_has_property<bool>;
+    }
+
+    fun opaque_expect_property_of_u64_invalid() {
+        opaque_give_property_to<bool>();
+    }
+    spec opaque_expect_property_of_u64_invalid {
+        ensures type_has_property<u64>;
+    }
+
+
+    // ================================================================================
     // Invariants and spec vars
 
     spec module {
@@ -139,7 +199,4 @@ module 0x42::TestGlobalVars {
     spec limit_change_invalid {
         update limit = 1;
     }
-
-    // ================================================================================
-    // TODO: implement and test opaque
 }
