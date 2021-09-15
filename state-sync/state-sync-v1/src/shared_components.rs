@@ -87,7 +87,7 @@ pub(crate) mod test_utils {
     use channel::{diem_channel, message_queues::QueueStyle};
     use diem_config::{
         config::{NodeConfig, RoleType},
-        network_id::{NetworkId, NodeNetworkId},
+        network_id::NetworkId,
     };
     use diem_infallible::RwLock;
     use diem_types::{
@@ -166,8 +166,8 @@ pub(crate) mod test_utils {
             PeerManagerRequestSender::new(network_reqs_tx),
             ConnectionRequestSender::new(connection_reqs_tx),
         );
-        let node_network_id = NodeNetworkId::new(NetworkId::Validator, 0);
-        let network_senders = vec![(node_network_id, network_sender)]
+        let network_id = NetworkId::Validator;
+        let network_senders = vec![(network_id, network_sender)]
             .into_iter()
             .collect::<HashMap<_, _>>();
 

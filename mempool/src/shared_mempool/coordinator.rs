@@ -18,7 +18,7 @@ use crate::{
 use ::network::protocols::network::Event;
 use anyhow::Result;
 use bounded_executor::BoundedExecutor;
-use diem_config::{config::PeerNetworkId, network_id::NodeNetworkId};
+use diem_config::{config::PeerNetworkId, network_id::NetworkId};
 use diem_infallible::Mutex;
 use diem_logger::prelude::*;
 use diem_types::{
@@ -44,7 +44,7 @@ use vm_validator::vm_validator::TransactionValidation;
 pub(crate) async fn coordinator<V>(
     mut smp: SharedMempool<V>,
     executor: Handle,
-    network_events: Vec<(NodeNetworkId, MempoolNetworkEvents)>,
+    network_events: Vec<(NetworkId, MempoolNetworkEvents)>,
     mut client_events: mpsc::Receiver<(
         SignedTransaction,
         oneshot::Sender<Result<SubmissionStatus>>,
@@ -196,7 +196,7 @@ async fn handle_event<V>(
     bounded_executor: &BoundedExecutor,
     scheduled_broadcasts: &mut FuturesUnordered<ScheduledBroadcast>,
     smp: &mut SharedMempool<V>,
-    network_id: NodeNetworkId,
+    network_id: NetworkId,
     event: Event<MempoolSyncMsg>,
 ) where
     V: TransactionValidation,
@@ -277,7 +277,7 @@ async fn handle_event<V>(
             }
         }
         Event::RpcRequest(peer_id, _msg, _res_tx) => {
-            counters::unexpected_msg_count_inc(&network_id.network_id(), &peer_id);
+            counters::unexpected_msg_count_inc(&network_id, &peer_id);
             sample!(
                 SampleRate::Duration(Duration::from_secs(60)),
                 warn!(LogSchema::new(LogEntry::UnexpectedNetworkMsg)

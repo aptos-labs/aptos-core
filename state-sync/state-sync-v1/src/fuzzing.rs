@@ -9,7 +9,7 @@ use crate::{
     network::StateSyncMessage,
     shared_components::test_utils,
 };
-use diem_config::network_id::{NetworkId, NodeNetworkId};
+use diem_config::network_id::NetworkId;
 use diem_infallible::Mutex;
 use diem_types::{
     ledger_info::LedgerInfoWithSignatures, transaction::TransactionListWithProof, PeerId,
@@ -41,7 +41,7 @@ pub fn test_state_sync_msg_fuzzer_impl(message: StateSyncMessage) {
         let _ = STATE_SYNC_COORDINATOR
             .lock()
             .process_chunk_message(
-                NodeNetworkId::new(NetworkId::Validator, 0),
+                NetworkId::Validator,
                 PeerId::new([0u8; PeerId::LENGTH]),
                 message,
             )

@@ -124,35 +124,6 @@ impl PartialOrd for NetworkId {
     }
 }
 
-/// An intra-node identifier for a network of a node unique for a network
-/// This extra layer on top of `NetworkId` mainly exists for the application-layer (e.g. mempool,
-/// state sync) to differentiate between multiple public
-/// networks that a node may belong to
-#[derive(Clone, Deserialize, Eq, Hash, PartialEq, Serialize)]
-pub struct NodeNetworkId(NetworkId, usize);
-
-impl NodeNetworkId {
-    pub fn new(network_id: NetworkId, num_id: usize) -> Self {
-        Self(network_id, num_id)
-    }
-
-    pub fn network_id(&self) -> NetworkId {
-        self.0.clone()
-    }
-}
-
-impl fmt::Debug for NodeNetworkId {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self)
-    }
-}
-
-impl fmt::Display for NodeNetworkId {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}:{}", self.0, self.1)
-    }
-}
-
 /// Default needed to handle downstream structs that use `Default`
 impl Default for NetworkId {
     fn default() -> NetworkId {

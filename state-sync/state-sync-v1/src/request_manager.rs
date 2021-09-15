@@ -10,7 +10,7 @@ use crate::{
 };
 use diem_config::{
     config::{PeerNetworkId, PeerRole},
-    network_id::{NetworkId, NodeNetworkId},
+    network_id::NetworkId,
 };
 use diem_logger::prelude::*;
 use itertools::Itertools;
@@ -84,14 +84,14 @@ pub struct RequestManager {
     // the more networks this node will send multicast requests to. Network ordering is defined by
     // NetworkId.
     multicast_network_level: NetworkId,
-    network_senders: HashMap<NodeNetworkId, StateSyncSender>,
+    network_senders: HashMap<NetworkId, StateSyncSender>,
 }
 
 impl RequestManager {
     pub fn new(
         request_timeout: Duration,
         multicast_timeout: Duration,
-        network_senders: HashMap<NodeNetworkId, StateSyncSender>,
+        network_senders: HashMap<NetworkId, StateSyncSender>,
     ) -> Self {
         let multicast_network_level = NetworkId::Validator;
         update_multicast_network_counter(multicast_network_level.clone());
@@ -122,7 +122,7 @@ impl RequestManager {
             .peer(&peer)
             .is_valid_peer(true));
         counters::ACTIVE_UPSTREAM_PEERS
-            .with_label_values(&[&peer.raw_network_id().to_string()])
+            .with_label_values(&[&peer.network_id().to_string()])
             .inc();
 
         match self.peer_scores.entry(peer) {
@@ -147,7 +147,7 @@ impl RequestManager {
 
         if self.peer_scores.contains_key(peer) {
             counters::ACTIVE_UPSTREAM_PEERS
-                .with_label_values(&[&peer.raw_network_id().to_string()])
+                .with_label_values(&[&peer.network_id().to_string()])
                 .dec();
             self.peer_scores.remove(peer);
         } else {
@@ -194,7 +194,7 @@ impl RequestManager {
         let peers_by_network_level = self
             .peer_scores
             .iter()
-            .map(|(peer, peer_score)| (peer.raw_network_id(), (peer, peer_score)))
+            .map(|(peer, peer_score)| (peer.network_id(), (peer, peer_score)))
             .into_group_map();
 
         // For each network, compute the weighted index
@@ -290,7 +290,7 @@ impl RequestManager {
             };
             counters::REQUESTS_SENT
                 .with_label_values(&[
-                    &peer.raw_network_id().to_string(),
+                    &peer.network_id().to_string(),
                     &peer_id.to_string(),
                     result_label,
                 ])
@@ -365,7 +365,7 @@ impl RequestManager {
 
     pub fn process_success_response(&mut self, peer: &PeerNetworkId) {
         // Update the multicast level if appropriate
-        let peer_network_level = peer.raw_network_id();
+        let peer_network_level = peer.network_id();
         if peer_network_level < self.multicast_network_level {
             // Reduce the multicast network level as we received a chunk response from a
             // peer in a lower (that is, higher priority) network.
@@ -489,8 +489,8 @@ impl RequestManager {
     /// If the peer is on the public network, we only consider it a valid peer to send chunk
     /// requests to if we connected to it.
     fn is_valid_state_sync_peer(&self, peer: &PeerNetworkId, origin: ConnectionOrigin) -> bool {
-        peer.raw_network_id().is_validator_network()
-            || peer.raw_network_id().is_vfn_network()
+        peer.network_id().is_validator_network()
+            || peer.network_id().is_vfn_network()
             || origin == ConnectionOrigin::Outbound
     }
 

@@ -7,7 +7,7 @@ use crate::{
     network::{StateSyncEvents, StateSyncSender},
 };
 use consensus_notifications::ConsensusNotificationListener;
-use diem_config::{config::NodeConfig, network_id::NodeNetworkId};
+use diem_config::{config::NodeConfig, network_id::NetworkId};
 use diem_types::waypoint::Waypoint;
 use event_notifications::EventSubscriptionService;
 use executor_types::ChunkExecutor;
@@ -26,7 +26,7 @@ pub struct StateSyncBootstrapper {
 
 impl StateSyncBootstrapper {
     pub fn bootstrap<M: MempoolNotificationSender + 'static>(
-        network: Vec<(NodeNetworkId, StateSyncSender, StateSyncEvents)>,
+        network: Vec<(NetworkId, StateSyncSender, StateSyncEvents)>,
         mempool_notifier: M,
         consensus_listener: ConsensusNotificationListener,
         storage: Arc<dyn DbReader>,
@@ -63,7 +63,7 @@ impl StateSyncBootstrapper {
         M: MempoolNotificationSender + 'static,
     >(
         runtime: Runtime,
-        network: Vec<(NodeNetworkId, StateSyncSender, StateSyncEvents)>,
+        network: Vec<(NetworkId, StateSyncSender, StateSyncEvents)>,
         mempool_notifier: M,
         consensus_listener: ConsensusNotificationListener,
         node_config: &NodeConfig,

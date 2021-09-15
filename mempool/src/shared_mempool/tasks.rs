@@ -113,7 +113,7 @@ pub(crate) async fn process_transaction_broadcast<V>(
 {
     timer.stop_and_record();
     let _timer = counters::process_txn_submit_latency_timer(
-        peer.raw_network_id().as_str(),
+        peer.network_id().as_str(),
         peer.peer_id().short_str().as_str(),
     );
     let results = process_incoming_transactions(&smp, transactions.clone(), timeline_state).await;
@@ -295,10 +295,7 @@ where
 
 fn log_txn_process_results(results: &[SubmissionStatusBundle], sender: Option<PeerNetworkId>) {
     let (network, sender) = match sender {
-        Some(peer) => (
-            peer.raw_network_id().to_string(),
-            peer.peer_id().to_string(),
-        ),
+        Some(peer) => (peer.network_id().to_string(), peer.peer_id().to_string()),
         None => (
             counters::CLIENT_LABEL.to_string(),
             counters::CLIENT_LABEL.to_string(),

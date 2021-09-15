@@ -6,7 +6,7 @@ use claim::assert_ok;
 use consensus_notifications::{ConsensusNotificationSender, ConsensusNotifier};
 use diem_config::{
     config::{NodeConfig, Peer, PeerRole, RoleType, HANDSHAKE_VERSION},
-    network_id::{NetworkContext, NetworkId, NodeNetworkId},
+    network_id::{NetworkContext, NetworkId},
 };
 use diem_crypto::{
     hash::ACCUMULATOR_PLACEHOLDER_HASH, test_utils::TEST_SEED, x25519, HashValue, Uniform,
@@ -336,7 +336,7 @@ impl StateSyncEnvironment {
         role: &RoleType,
         mock_network: bool,
         network_id: NetworkId,
-    ) -> Vec<(NodeNetworkId, StateSyncSender, StateSyncEvents)> {
+    ) -> Vec<(NetworkId, StateSyncSender, StateSyncEvents)> {
         let mut network_handles = vec![];
         if mock_network {
             let networks = if role.is_validator() {
@@ -350,7 +350,7 @@ impl StateSyncEnvironment {
             };
 
             let mut peer = self.peers[index].borrow_mut();
-            for (idx, network) in networks.into_iter().enumerate() {
+            for network in networks.into_iter() {
                 let peer_id = PeerId::random();
                 peer.multi_peer_ids.insert(network.clone(), peer_id);
 
@@ -372,11 +372,7 @@ impl StateSyncEnvironment {
                 self.network_conn_event_notifs_txs
                     .insert(peer_id, conn_status_tx);
 
-                network_handles.push((
-                    NodeNetworkId::new(network, idx),
-                    network_sender,
-                    network_events,
-                ));
+                network_handles.push((network, network_sender, network_events));
             }
         } else {
             let peer = self.peers[index].borrow();
@@ -418,7 +414,7 @@ impl StateSyncEnvironment {
             let (sender, events) = network_builder
                 .add_protocol_handler(state_sync_v1::network::network_endpoint_config());
             network_builder.build(self.runtime.handle().clone()).start();
-            network_handles.push((NodeNetworkId::new(network_id, 0), sender, events));
+            network_handles.push((network_id, sender, events));
         };
         network_handles
     }

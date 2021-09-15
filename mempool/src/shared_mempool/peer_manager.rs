@@ -120,11 +120,11 @@ impl PeerManager {
         if self.is_upstream_peer(&peer, Some(&metadata)) {
             // If we have a new peer, let's insert new data, otherwise, let's just update the current state
             if is_new_peer {
-                counters::active_upstream_peers(&peer.raw_network_id()).inc();
+                counters::active_upstream_peers(&peer.network_id()).inc();
                 peer_states.insert(peer, PeerSyncState::new(metadata));
             } else if let Some(peer_state) = peer_states.get_mut(&peer) {
                 if !peer_state.is_alive {
-                    counters::active_upstream_peers(&peer.raw_network_id()).inc();
+                    counters::active_upstream_peers(&peer.network_id()).inc();
                 }
                 peer_state.is_alive = true;
                 peer_state.metadata = metadata;
@@ -142,16 +142,16 @@ impl PeerManager {
         // Validators can be restarted ata  later time
         // TODO: Determine why there's this optimization
         // TODO: What about garbage collection of validators
-        if peer.raw_network_id().is_validator_network() {
+        if peer.network_id().is_validator_network() {
             if let Some(state) = self.peer_states.lock().get_mut(&peer) {
-                counters::active_upstream_peers(&peer.raw_network_id()).dec();
+                counters::active_upstream_peers(&peer.network_id()).dec();
                 state.is_alive = false;
             }
         } else {
             // All other nodes have their state immediately restarted anyways, so let's free them
             // TODO: Why is the Validator optimization not applied here
             if self.peer_states.lock().remove(&peer).is_some() {
-                counters::active_upstream_peers(&peer.raw_network_id()).dec();
+                counters::active_upstream_peers(&peer.network_id()).dec();
             }
         }
 
@@ -328,7 +328,7 @@ impl PeerManager {
                 .backpressure(scheduled_backoff)
         );
         let peer_id = peer.peer_id().short_str();
-        let network_id = peer.raw_network_id();
+        let network_id = peer.network_id();
         counters::SHARED_MEMPOOL_TRANSACTION_BROADCAST_SIZE
             .with_label_values(&[network_id.as_str(), peer_id.as_str()])
             .observe(num_txns as f64);
@@ -410,7 +410,7 @@ impl PeerManager {
                 .duration_since(sent_timestamp)
                 .expect("failed to calculate mempool broadcast RTT");
 
-            let network_id = peer.raw_network_id();
+            let network_id = peer.network_id();
             let peer_id = peer.peer_id().short_str();
             counters::SHARED_MEMPOOL_BROADCAST_RTT
                 .with_label_values(&[network_id.as_str(), peer_id.as_str()])
@@ -457,7 +457,7 @@ impl PeerManager {
         metadata: Option<&ConnectionMetadata>,
     ) -> bool {
         // Validator network is always upstream
-        if peer.raw_network_id().is_validator_network() {
+        if peer.network_id().is_validator_network() {
             return true;
         }
 
@@ -477,8 +477,8 @@ fn compare_prioritized_peers(
     peer_a: &(PeerNetworkId, PeerRole),
     peer_b: &(PeerNetworkId, PeerRole),
 ) -> Ordering {
-    let network_a = peer_a.0.raw_network_id();
-    let network_b = peer_b.0.raw_network_id();
+    let network_a = peer_a.0.network_id();
+    let network_b = peer_b.0.network_id();
 
     // Sort by NetworkId
     match network_a.cmp(&network_b) {
@@ -503,11 +503,11 @@ fn compare_prioritized_peers(
 #[cfg(test)]
 mod test {
     use super::*;
-    use diem_config::network_id::{NetworkId, NodeNetworkId};
+    use diem_config::network_id::NetworkId;
     use diem_types::PeerId;
 
     fn peer_network_id(peer_id: PeerId, network: NetworkId) -> PeerNetworkId {
-        PeerNetworkId(NodeNetworkId::new(network, 0), peer_id)
+        PeerNetworkId(network, peer_id)
     }
 
     #[test]

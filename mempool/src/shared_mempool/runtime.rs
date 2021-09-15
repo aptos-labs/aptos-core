@@ -12,7 +12,7 @@ use crate::{
     ConsensusRequest, SubmissionStatus,
 };
 use anyhow::Result;
-use diem_config::{config::NodeConfig, network_id::NodeNetworkId};
+use diem_config::{config::NodeConfig, network_id::NetworkId};
 use diem_infallible::{Mutex, RwLock};
 use diem_types::transaction::SignedTransaction;
 use event_notifications::ReconfigNotificationListener;
@@ -37,7 +37,7 @@ pub(crate) fn start_shared_mempool<V>(
     mempool: Arc<Mutex<CoreMempool>>,
     // First element in tuple is the network ID.
     // See `NodeConfig::is_upstream_peer` for the definition of network ID.
-    mempool_network_handles: Vec<(NodeNetworkId, MempoolNetworkSender, MempoolNetworkEvents)>,
+    mempool_network_handles: Vec<(NetworkId, MempoolNetworkSender, MempoolNetworkEvents)>,
     client_events: mpsc::Receiver<(SignedTransaction, oneshot::Sender<Result<SubmissionStatus>>)>,
     consensus_requests: mpsc::Receiver<ConsensusRequest>,
     mempool_listener: MempoolNotificationListener,
@@ -93,7 +93,7 @@ pub fn bootstrap(
     db: Arc<dyn DbReader>,
     // The first element in the tuple is the ID of the network that this network is a handle to.
     // See `NodeConfig::is_upstream_peer` for the definition of network ID.
-    mempool_network_handles: Vec<(NodeNetworkId, MempoolNetworkSender, MempoolNetworkEvents)>,
+    mempool_network_handles: Vec<(NetworkId, MempoolNetworkSender, MempoolNetworkEvents)>,
     client_events: Receiver<(SignedTransaction, oneshot::Sender<Result<SubmissionStatus>>)>,
     consensus_requests: Receiver<ConsensusRequest>,
     mempool_listener: MempoolNotificationListener,

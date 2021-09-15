@@ -12,7 +12,7 @@ use crate::{
 use channel::{diem_channel, message_queues::QueueStyle};
 use diem_config::{
     config::{NodeConfig, PeerNetworkId, PeerRole, RoleType},
-    network_id::{NetworkContext, NetworkId, NodeNetworkId},
+    network_id::{NetworkContext, NetworkId},
 };
 use diem_infallible::{Mutex, MutexGuard, RwLock};
 use diem_types::{
@@ -42,7 +42,7 @@ use tokio::runtime::{Builder, Runtime};
 use vm_validator::mocks::mock_vm_validator::MockVMValidator;
 
 type MempoolNetworkHandle = (
-    NodeNetworkId,
+    NetworkId,
     MempoolNetworkSender,
     NetworkEvents<MempoolSyncMsg>,
 );
@@ -534,7 +534,7 @@ fn setup_node_network_interfaces(
     Vec<MempoolNetworkHandle>,
 ) {
     let (network_interface, network_handle) = setup_node_network_interface(PeerNetworkId(
-        NodeNetworkId::new(node.primary_network(), 0),
+        node.primary_network(),
         node.primary_peer_id(),
     ));
 
@@ -544,8 +544,14 @@ fn setup_node_network_interfaces(
 
     // Add Secondary network if the node has one
     if let Some(secondary_network_id) = node.secondary_network() {
+        if node.primary_network() == secondary_network_id {
+            panic!(
+                "Can't start a node with two of the same NetworkId: {}",
+                node.primary_network()
+            )
+        }
         let (network_interface, network_handle) = setup_node_network_interface(PeerNetworkId(
-            NodeNetworkId::new(secondary_network_id.clone(), 1),
+            secondary_network_id.clone(),
             node.secondary_peer_id().unwrap(),
         ));
         network_handles.push(network_handle);

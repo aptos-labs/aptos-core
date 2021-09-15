@@ -247,7 +247,7 @@ static SHARED_MEMPOOL_PENDING_BROADCASTS_COUNT: Lazy<IntGaugeVec> = Lazy::new(||
 
 pub fn shared_mempool_pending_broadcasts(peer: &PeerNetworkId) -> IntGauge {
     SHARED_MEMPOOL_PENDING_BROADCASTS_COUNT.with_label_values(&[
-        peer.raw_network_id().as_str(),
+        peer.network_id().as_str(),
         peer.peer_id().short_str().as_str(),
     ])
 }
@@ -302,7 +302,7 @@ static SHARED_MEMPOOL_ACK_TYPE_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
 pub fn shared_mempool_ack_inc(peer: &PeerNetworkId, direction: &str, label: &'static str) {
     SHARED_MEMPOOL_ACK_TYPE_COUNT
         .with_label_values(&[
-            peer.raw_network_id().as_str(),
+            peer.network_id().as_str(),
             peer.peer_id().short_str().as_str(),
             direction,
             label,
@@ -393,7 +393,7 @@ static INVALID_ACK_RECEIVED_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
 pub fn invalid_ack_inc(peer: &PeerNetworkId, label: &'static str) {
     INVALID_ACK_RECEIVED_COUNT
         .with_label_values(&[
-            peer.raw_network_id().as_str(),
+            peer.network_id().as_str(),
             peer.peer_id().short_str().as_str(),
             label,
         ])

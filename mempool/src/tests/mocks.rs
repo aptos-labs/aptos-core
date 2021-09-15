@@ -11,7 +11,7 @@ use anyhow::{format_err, Result};
 use channel::{self, diem_channel, message_queues::QueueStyle};
 use diem_config::{
     config::{NetworkConfig, NodeConfig},
-    network_id::{NetworkId, NodeNetworkId},
+    network_id::NetworkId,
 };
 use diem_infallible::{Mutex, RwLock};
 use diem_types::{
@@ -80,11 +80,7 @@ impl MockSharedMempool {
             Arc::new(RwLock::new(DbReaderWriter::new(MockDbReaderWriter))),
         );
         let reconfig_event_subscriber = event_subscriber.subscribe_to_reconfigurations().unwrap();
-        let network_handles = vec![(
-            NodeNetworkId::new(NetworkId::Validator, 0),
-            network_sender,
-            network_events,
-        )];
+        let network_handles = vec![(NetworkId::Validator, network_sender, network_events)];
 
         start_shared_mempool(
             runtime.handle(),

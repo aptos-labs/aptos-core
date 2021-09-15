@@ -19,7 +19,7 @@ use consensus_notifications::{
 };
 use diem_config::{
     config::{NodeConfig, PeerNetworkId, RoleType, StateSyncConfig},
-    network_id::NodeNetworkId,
+    network_id::NetworkId,
 };
 use diem_logger::prelude::*;
 use diem_types::{
@@ -110,7 +110,7 @@ impl<T: ExecutorProxyTrait, M: MempoolNotificationSender> StateSyncCoordinator<T
         client_events: mpsc::UnboundedReceiver<CoordinatorMessage>,
         mempool_notifier: M,
         consensus_listener: ConsensusNotificationListener,
-        network_senders: HashMap<NodeNetworkId, StateSyncSender>,
+        network_senders: HashMap<NetworkId, StateSyncSender>,
         node_config: &NodeConfig,
         waypoint: Waypoint,
         executor_proxy: T,
@@ -157,7 +157,7 @@ impl<T: ExecutorProxyTrait, M: MempoolNotificationSender> StateSyncCoordinator<T
     /// main routine. starts sync coordinator that listens for CoordinatorMsg
     pub async fn start(
         mut self,
-        network_handles: Vec<(NodeNetworkId, StateSyncSender, StateSyncEvents)>,
+        network_handles: Vec<(NetworkId, StateSyncSender, StateSyncEvents)>,
     ) {
         info!(LogSchema::new(LogEntry::RuntimeStart));
         let mut interval = IntervalStream::new(interval(Duration::from_millis(
@@ -244,7 +244,7 @@ impl<T: ExecutorProxyTrait, M: MempoolNotificationSender> StateSyncCoordinator<T
 
     fn process_new_peer(
         &mut self,
-        network_id: NodeNetworkId,
+        network_id: NetworkId,
         metadata: ConnectionMetadata,
     ) -> Result<(), Error> {
         let peer = PeerNetworkId(network_id, metadata.remote_peer_id);
@@ -252,18 +252,14 @@ impl<T: ExecutorProxyTrait, M: MempoolNotificationSender> StateSyncCoordinator<T
         self.check_progress()
     }
 
-    fn process_lost_peer(
-        &mut self,
-        network_id: NodeNetworkId,
-        peer_id: PeerId,
-    ) -> Result<(), Error> {
+    fn process_lost_peer(&mut self, network_id: NetworkId, peer_id: PeerId) -> Result<(), Error> {
         let peer = PeerNetworkId(network_id, peer_id);
         self.request_manager.disable_peer(&peer)
     }
 
     pub(crate) async fn process_chunk_message(
         &mut self,
-        network_id: NodeNetworkId,
+        network_id: NetworkId,
         peer_id: PeerId,
         msg: StateSyncMessage,
     ) -> Result<(), Error> {
@@ -273,7 +269,7 @@ impl<T: ExecutorProxyTrait, M: MempoolNotificationSender> StateSyncCoordinator<T
                 // Time request handling
                 let _timer = counters::PROCESS_MSG_LATENCY
                     .with_label_values(&[
-                        &peer.raw_network_id().to_string(),
+                        &peer.network_id().to_string(),
                         &peer.peer_id().to_string(),
                         counters::CHUNK_REQUEST_MSG_LABEL,
                     ])
@@ -291,7 +287,7 @@ impl<T: ExecutorProxyTrait, M: MempoolNotificationSender> StateSyncCoordinator<T
                     );
                     counters::PROCESS_CHUNK_REQUEST_COUNT
                         .with_label_values(&[
-                            &peer.raw_network_id().to_string(),
+                            &peer.network_id().to_string(),
                             &peer.peer_id().to_string(),
                             counters::FAIL_LABEL,
                         ])
@@ -299,7 +295,7 @@ impl<T: ExecutorProxyTrait, M: MempoolNotificationSender> StateSyncCoordinator<T
                 } else {
                     counters::PROCESS_CHUNK_REQUEST_COUNT
                         .with_label_values(&[
-                            &peer.raw_network_id().to_string(),
+                            &peer.network_id().to_string(),
                             &peer.peer_id().to_string(),
                             counters::SUCCESS_LABEL,
                         ])
@@ -311,7 +307,7 @@ impl<T: ExecutorProxyTrait, M: MempoolNotificationSender> StateSyncCoordinator<T
                 // Time response handling
                 let _timer = counters::PROCESS_MSG_LATENCY
                     .with_label_values(&[
-                        &peer.raw_network_id().to_string(),
+                        &peer.network_id().to_string(),
                         &peer.peer_id().to_string(),
                         counters::CHUNK_RESPONSE_MSG_LABEL,
                     ])
@@ -891,7 +887,7 @@ impl<T: ExecutorProxyTrait, M: MempoolNotificationSender> StateSyncCoordinator<T
         };
         counters::RESPONSES_SENT
             .with_label_values(&[
-                &peer.raw_network_id().to_string(),
+                &peer.network_id().to_string(),
                 &peer.peer_id().to_string(),
                 send_result_label,
             ])
@@ -984,10 +980,7 @@ impl<T: ExecutorProxyTrait, M: MempoolNotificationSender> StateSyncCoordinator<T
 
         // Update counters and logs with processed chunk information
         counters::STATE_SYNC_CHUNK_SIZE
-            .with_label_values(&[
-                &peer.raw_network_id().to_string(),
-                &peer.peer_id().to_string(),
-            ])
+            .with_label_values(&[&peer.network_id().to_string(), &peer.peer_id().to_string()])
             .observe(chunk_size as f64);
         let new_version = known_version
             .checked_add(chunk_size)
@@ -1046,7 +1039,7 @@ impl<T: ExecutorProxyTrait, M: MempoolNotificationSender> StateSyncCoordinator<T
             Ok(()) => {
                 counters::APPLY_CHUNK_COUNT
                     .with_label_values(&[
-                        &peer.raw_network_id().to_string(),
+                        &peer.network_id().to_string(),
                         &peer.peer_id().to_string(),
                         counters::SUCCESS_LABEL,
                     ])
@@ -1061,7 +1054,7 @@ impl<T: ExecutorProxyTrait, M: MempoolNotificationSender> StateSyncCoordinator<T
                 .error(&error));
                 counters::APPLY_CHUNK_COUNT
                     .with_label_values(&[
-                        &peer.raw_network_id().to_string(),
+                        &peer.network_id().to_string(),
                         &peer.peer_id().to_string(),
                         counters::FAIL_LABEL,
                     ])
@@ -1096,10 +1089,7 @@ impl<T: ExecutorProxyTrait, M: MempoolNotificationSender> StateSyncCoordinator<T
         // Verify response comes from known peer
         if !self.request_manager.is_known_state_sync_peer(peer) {
             counters::RESPONSE_FROM_DOWNSTREAM_COUNT
-                .with_label_values(&[
-                    &peer.raw_network_id().to_string(),
-                    &peer.peer_id().to_string(),
-                ])
+                .with_label_values(&[&peer.network_id().to_string(), &peer.peer_id().to_string()])
                 .inc();
             self.request_manager.process_chunk_from_downstream(peer);
             return Err(Error::ReceivedChunkFromDownstream(peer.to_string()));
@@ -1667,7 +1657,7 @@ impl<T: ExecutorProxyTrait, M: MempoolNotificationSender> StateSyncCoordinator<T
             };
             counters::SUBSCRIPTION_DELIVERY_COUNT
                 .with_label_values(&[
-                    &peer.raw_network_id().to_string(),
+                    &peer.network_id().to_string(),
                     &peer.peer_id().to_string(),
                     result_label,
                 ])
@@ -1732,7 +1722,7 @@ mod tests {
     };
     use diem_config::{
         config::{NodeConfig, PeerNetworkId, PeerRole, RoleType},
-        network_id::{NetworkId, NodeNetworkId},
+        network_id::NetworkId,
     };
     use diem_crypto::{
         ed25519::{Ed25519PrivateKey, Ed25519Signature},
@@ -1957,7 +1947,7 @@ mod tests {
         let mut validator_coordinator = test_utils::create_validator_coordinator();
 
         // Create a public peer
-        let node_network_id = NodeNetworkId::new(NetworkId::Public, 0);
+        let node_network_id = NetworkId::Public;
         let peer_id = PeerId::random();
         let connection_metadata = ConnectionMetadata::mock_with_role_and_origin(
             peer_id,
@@ -1971,7 +1961,7 @@ mod tests {
         assert_matches!(new_peer_result, Err(Error::InvalidStateSyncPeer(..)));
 
         // Verify the same error is not returned when adding a validator node
-        let node_network_id = NodeNetworkId::new(NetworkId::Validator, 0);
+        let node_network_id = NetworkId::Validator;
         assert_ok!(
             validator_coordinator.process_new_peer(node_network_id.clone(), connection_metadata)
         );

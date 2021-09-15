@@ -10,7 +10,7 @@ use crate::{
 use anyhow::Result;
 use diem_config::{
     config::{MempoolConfig, PeerNetworkId},
-    network_id::NodeNetworkId,
+    network_id::NetworkId,
 };
 use diem_infallible::{Mutex, RwLock};
 use diem_types::{
@@ -35,7 +35,7 @@ where
 {
     pub mempool: Arc<Mutex<CoreMempool>>,
     pub config: MempoolConfig,
-    pub network_senders: HashMap<NodeNetworkId, MempoolNetworkSender>,
+    pub network_senders: HashMap<NetworkId, MempoolNetworkSender>,
     pub db: Arc<dyn DbReader>,
     pub validator: Arc<RwLock<V>>,
     pub peer_manager: Arc<PeerManager>,
