@@ -533,7 +533,7 @@ fn setup_node_network_interfaces(
     HashMap<NetworkId, NodeNetworkInterface>,
     Vec<MempoolNetworkHandle>,
 ) {
-    let (network_interface, network_handle) = setup_node_network_interface(PeerNetworkId(
+    let (network_interface, network_handle) = setup_node_network_interface(PeerNetworkId::new(
         node.primary_network(),
         node.primary_peer_id(),
     ));
@@ -550,7 +550,7 @@ fn setup_node_network_interfaces(
                 node.primary_network()
             )
         }
-        let (network_interface, network_handle) = setup_node_network_interface(PeerNetworkId(
+        let (network_interface, network_handle) = setup_node_network_interface(PeerNetworkId::new(
             secondary_network_id.clone(),
             node.secondary_peer_id().unwrap(),
         ));

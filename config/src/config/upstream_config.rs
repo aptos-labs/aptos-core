@@ -9,25 +9,34 @@ use std::fmt;
 
 #[derive(Clone, Deserialize, Eq, Hash, PartialEq, Serialize)]
 /// Identifier of a node, represented as (network_id, peer_id)
-pub struct PeerNetworkId(pub NetworkId, pub PeerId);
+pub struct PeerNetworkId {
+    network_id: NetworkId,
+    peer_id: PeerId,
+}
 
 impl PeerNetworkId {
+    pub fn new(network_id: NetworkId, peer_id: PeerId) -> Self {
+        Self {
+            network_id,
+            peer_id,
+        }
+    }
     pub fn network_id(&self) -> NetworkId {
-        self.0.clone()
+        self.network_id.clone()
     }
 
     pub fn peer_id(&self) -> PeerId {
-        self.1
+        self.peer_id
     }
 
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn random() -> Self {
-        Self(NetworkId::Public, PeerId::random())
+        Self::new(NetworkId::Public, PeerId::random())
     }
 
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn random_validator() -> Self {
-        Self(NetworkId::Validator, PeerId::random())
+        Self::new(NetworkId::Validator, PeerId::random())
     }
 }
 

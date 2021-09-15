@@ -204,7 +204,7 @@ async fn handle_event<V>(
     match event {
         Event::NewPeer(metadata) => {
             counters::shared_mempool_event_inc("new_peer");
-            let peer = PeerNetworkId(network_id, metadata.remote_peer_id);
+            let peer = PeerNetworkId::new(network_id, metadata.remote_peer_id);
             let is_new_peer = smp.peer_manager.add_peer(peer.clone(), metadata.clone());
             let is_upstream_peer = smp.peer_manager.is_upstream_peer(&peer, Some(&metadata));
             debug!(LogSchema::new(LogEntry::NewPeer)
@@ -217,7 +217,7 @@ async fn handle_event<V>(
         }
         Event::LostPeer(metadata) => {
             counters::shared_mempool_event_inc("lost_peer");
-            let peer = PeerNetworkId(network_id, metadata.remote_peer_id);
+            let peer = PeerNetworkId::new(network_id, metadata.remote_peer_id);
             debug!(LogSchema::new(LogEntry::LostPeer)
                 .peer(&peer)
                 .is_upstream_peer(smp.peer_manager.is_upstream_peer(&peer, Some(&metadata))));
@@ -232,7 +232,7 @@ async fn handle_event<V>(
                     transactions,
                 } => {
                     let smp_clone = smp.clone();
-                    let peer = PeerNetworkId(network_id, peer_id);
+                    let peer = PeerNetworkId::new(network_id, peer_id);
                     let timeline_state = match smp.peer_manager.is_upstream_peer(&peer, None) {
                         true => TimelineState::NonQualified,
                         false => TimelineState::NotReady,
@@ -267,7 +267,7 @@ async fn handle_event<V>(
                 } => {
                     let ack_timestamp = SystemTime::now();
                     smp.peer_manager.process_broadcast_ack(
-                        PeerNetworkId(network_id, peer_id),
+                        PeerNetworkId::new(network_id, peer_id),
                         request_id,
                         retry,
                         backoff,
@@ -281,7 +281,7 @@ async fn handle_event<V>(
             sample!(
                 SampleRate::Duration(Duration::from_secs(60)),
                 warn!(LogSchema::new(LogEntry::UnexpectedNetworkMsg)
-                    .peer(&PeerNetworkId(network_id, peer_id)))
+                    .peer(&PeerNetworkId::new(network_id, peer_id)))
             );
         }
     }

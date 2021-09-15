@@ -507,7 +507,7 @@ mod test {
     use diem_types::PeerId;
 
     fn peer_network_id(peer_id: PeerId, network: NetworkId) -> PeerNetworkId {
-        PeerNetworkId(network, peer_id)
+        PeerNetworkId::new(network, peer_id)
     }
 
     #[test]

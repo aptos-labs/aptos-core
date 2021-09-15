@@ -248,13 +248,13 @@ impl<T: ExecutorProxyTrait, M: MempoolNotificationSender> StateSyncCoordinator<T
         network_id: NetworkId,
         metadata: ConnectionMetadata,
     ) -> Result<(), Error> {
-        let peer = PeerNetworkId(network_id, metadata.remote_peer_id);
+        let peer = PeerNetworkId::new(network_id, metadata.remote_peer_id);
         self.request_manager.enable_peer(peer, metadata)?;
         self.check_progress()
     }
 
     fn process_lost_peer(&mut self, network_id: NetworkId, peer_id: PeerId) -> Result<(), Error> {
-        let peer = PeerNetworkId(network_id, peer_id);
+        let peer = PeerNetworkId::new(network_id, peer_id);
         self.request_manager.disable_peer(&peer)
     }
 
@@ -264,7 +264,7 @@ impl<T: ExecutorProxyTrait, M: MempoolNotificationSender> StateSyncCoordinator<T
         peer_id: PeerId,
         msg: StateSyncMessage,
     ) -> Result<(), Error> {
-        let peer = PeerNetworkId(network_id, peer_id);
+        let peer = PeerNetworkId::new(network_id, peer_id);
         match msg {
             StateSyncMessage::GetChunkRequest(request) => {
                 // Time request handling
