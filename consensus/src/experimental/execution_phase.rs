@@ -74,7 +74,7 @@ impl StatelessPipeline for ExecutionPhase {
         };
 
         ResponseWithInstruction {
-            resp: ExecutionResponse { inner: resp_inner },
+            response: ExecutionResponse { inner: resp_inner },
             instruction,
         }
     }

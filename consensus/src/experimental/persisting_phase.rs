@@ -7,7 +7,7 @@ use std::{
 };
 
 use crate::{
-    experimental::pipeline_phase::{ResponseWithInstruction, StatelessPipeline},
+    experimental::pipeline_phase::{Instruction, ResponseWithInstruction, StatelessPipeline},
     state_replication::{StateComputer, StateComputerCommitCallBackType},
 };
 use async_trait::async_trait;
@@ -65,10 +65,14 @@ impl StatelessPipeline for PersistingPhase {
             callback,
         } = req;
 
-        ResponseWithInstruction::from(
-            self.persisting_handle
+        // we do not return a response
+        // assuming the commit function panicks if there is any error.
+        ResponseWithInstruction {
+            response: self
+                .persisting_handle
                 .commit(&blocks, commit_ledger_info, callback)
                 .await,
-        )
+            instruction: Instruction::NoResponse,
+        }
     }
 }

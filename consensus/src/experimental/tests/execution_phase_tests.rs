@@ -63,7 +63,7 @@ fn test_execution_phase_process() {
 
     timed_block_on(&mut runtime, async move {
         let ResponseWithInstruction {
-            resp,
+            response: resp,
             instruction: _,
         } = execution_phase
             .process(ExecutionRequest {

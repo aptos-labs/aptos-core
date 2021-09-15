@@ -11,17 +11,18 @@ use std::hint;
 pub enum Instruction {
     Ok,
     Clear,
+    NoResponse,
 }
 
 pub struct ResponseWithInstruction<T> {
-    pub resp: T,
+    pub response: T,
     pub instruction: Instruction,
 }
 
 impl<T> From<T> for ResponseWithInstruction<T> {
     fn from(val: T) -> Self {
         Self {
-            resp: val,
+            response: val,
             instruction: Instruction::Ok,
         }
     }
@@ -58,10 +59,14 @@ impl<T: StatelessPipeline> PipelinePhase<T> {
     pub async fn start(mut self) {
         // main loop
         while let Some(req) = self.rx.next().await {
-            let ResponseWithInstruction { resp, instruction } = self.processor.process(req).await;
+            let ResponseWithInstruction {
+                response: resp,
+                instruction,
+            } = self.processor.process(req).await;
             match instruction {
                 Instruction::Ok => {}
                 Instruction::Clear => self.exhaust_requests_non_blocking(),
+                Instruction::NoResponse => continue,
             }
             if self.tx.send(resp).await.is_err() {
                 break;
