@@ -366,7 +366,7 @@ impl<'a> Instrumenter<'a> {
         }
 
         // Emit `let` bindings.
-        self.emit_lets(spec, &[], false);
+        self.emit_lets(spec, false);
 
         // Inject preconditions as assumes. This is done for all self.variant values.
         self.builder
@@ -543,7 +543,7 @@ impl<'a> Instrumenter<'a> {
         self.builder.set_loc_from_attr(id);
 
         // Emit `let` assignments.
-        self.emit_lets(&callee_spec, targs, false);
+        self.emit_lets(&callee_spec, false);
         self.builder.set_loc_from_attr(id);
 
         // Emit pre conditions if this is the verification variant or if the callee
@@ -702,7 +702,7 @@ impl<'a> Instrumenter<'a> {
             }
 
             // Emit `let update` assignments.
-            self.emit_lets(&callee_spec, targs, true);
+            self.emit_lets(&callee_spec, true);
 
             // Emit post conditions as assumptions.
             for (_, cond) in std::mem::take(&mut callee_spec.post) {
@@ -836,19 +836,18 @@ impl<'a> Instrumenter<'a> {
         }
     }
 
-    fn emit_lets(&mut self, spec: &TranslatedSpec, targs: &[Type], post_state: bool) {
+    fn emit_lets(&mut self, spec: &TranslatedSpec, post_state: bool) {
         use Bytecode::*;
         let lets = spec
             .lets
             .iter()
             .filter(|(_, is_post, ..)| *is_post == post_state);
         for (loc, _, temp, exp) in lets {
-            self.emit_traces(spec, targs, exp);
-            let exp = self.instantiate_exp(exp.to_owned(), targs);
+            self.emit_traces(spec, &[], exp);
             self.builder.set_loc(loc.to_owned());
             let assign = self
                 .builder
-                .mk_identical(self.builder.mk_temporary(*temp), exp);
+                .mk_identical(self.builder.mk_temporary(*temp), exp.clone());
             self.builder
                 .emit_with(|id| Prop(id, PropKind::Assume, assign));
         }
@@ -982,7 +981,7 @@ impl<'a> Instrumenter<'a> {
 
         if self.is_verified() {
             // Emit `let` bindings.
-            self.emit_lets(spec, &[], true);
+            self.emit_lets(spec, true);
 
             // Emit the negation of all aborts conditions.
             for (loc, abort_cond, _) in &spec.aborts {
