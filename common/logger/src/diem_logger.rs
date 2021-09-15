@@ -30,6 +30,7 @@ use std::{
 };
 
 const RUST_LOG: &str = "RUST_LOG";
+const RUST_LOG_REMOTE: &str = "RUST_LOG_REMOTE";
 /// Default size of log write channel, if the channel is full, logs will be dropped
 pub const CHANNEL_SIZE: usize = 10000;
 const NUM_SEND_RETRIES: u8 = 1;
@@ -165,7 +166,7 @@ impl DiemLoggerBuilder {
         Self {
             channel_size: CHANNEL_SIZE,
             level: Level::Info,
-            remote_level: Level::Debug,
+            remote_level: Level::Info,
             address: None,
             printer: Some(Box::new(StderrWriter)),
             is_async: false,
@@ -239,7 +240,13 @@ impl DiemLoggerBuilder {
                 let mut filter_builder = Filter::builder();
 
                 if self.is_async && self.address.is_some() {
-                    filter_builder.filter_level(self.remote_level.into());
+                    if env::var(RUST_LOG_REMOTE).is_ok() {
+                        filter_builder.with_env(RUST_LOG_REMOTE);
+                    } else if env::var(RUST_LOG).is_ok() {
+                        filter_builder.with_env(RUST_LOG);
+                    } else {
+                        filter_builder.filter_level(self.remote_level.into());
+                    }
                 } else {
                     filter_builder.filter_level(LevelFilter::Off);
                 }
