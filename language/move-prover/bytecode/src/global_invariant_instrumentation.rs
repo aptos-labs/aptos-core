@@ -20,7 +20,7 @@ use move_model::{
     exp_generator::ExpGenerator,
     model::{FunctionEnv, GlobalId, Loc},
     spec_translator::{SpecTranslator, TranslatedSpec},
-    ty::{Type, TypeUnificationAdapter, Variance},
+    ty::Type,
 };
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -47,96 +47,6 @@ struct InstrumentationPack {
 }
 
 impl InstrumentationPack {
-    /// For each invariant and its associated instantiations in the `that` set, further refine the
-    /// instantiations and merge that with the `this` set. Return whether there is any update to the
-    /// `this` mapping.
-    fn join_mapping(
-        this: &mut BTreeMap<GlobalId, BTreeSet<Vec<Type>>>,
-        that: &BTreeMap<GlobalId, BTreeSet<Vec<Type>>>,
-        inst: &[Type],
-    ) -> bool {
-        let mut changed = false;
-        for (inv_id, inv_insts) in that {
-            let adapted: BTreeSet<_> = inv_insts
-                .iter()
-                .map(|inv_inst| Type::instantiate_slice(inv_inst, inst))
-                .collect();
-            if this.contains_key(inv_id) {
-                let existing = this.get_mut(inv_id).unwrap();
-                if !existing.is_superset(&adapted) {
-                    existing.extend(adapted);
-                    changed = true;
-                }
-            } else {
-                this.insert(*inv_id, adapted);
-                changed = true;
-            }
-        }
-        changed
-    }
-
-    /// Join the two `InstrumentationPack` by joining their corresponding invariant to instantiation
-    /// mappings individually. Return whether there is any update to the `self` pack.
-    fn join_pack(&mut self, pack: &InstrumentationPack, inst: &[Type]) -> bool {
-        let mut changed = false;
-
-        if Self::join_mapping(
-            &mut self.entrypoint_assumptions,
-            &pack.entrypoint_assumptions,
-            inst,
-        ) {
-            changed = true;
-        }
-
-        for (code_offset, pack_mapping) in &pack.per_bytecode_assertions {
-            if self.per_bytecode_assertions.contains_key(code_offset) {
-                let self_mapping = self.per_bytecode_assertions.get_mut(code_offset).unwrap();
-                if Self::join_mapping(self_mapping, pack_mapping, inst) {
-                    changed = true;
-                }
-            } else {
-                let new_insts = pack_mapping
-                    .iter()
-                    .map(|(inv_id, inv_insts)| {
-                        let adapted: BTreeSet<_> = inv_insts
-                            .iter()
-                            .map(|inv_inst| Type::instantiate_slice(inv_inst, inst))
-                            .collect();
-                        (*inv_id, adapted)
-                    })
-                    .collect();
-                self.per_bytecode_assertions.insert(*code_offset, new_insts);
-                changed = true;
-            }
-        }
-
-        if Self::join_mapping(
-            &mut self.exitpoint_assertions,
-            &pack.exitpoint_assertions,
-            inst,
-        ) {
-            changed = true;
-        }
-
-        changed
-    }
-}
-
-/// A transposed view of `PerFunctionRelevance` grouped by function instantiations
-#[derive(Default)]
-struct InstrumentationSummary {
-    /// A condensed view of the `by_function_instantiation` field. An invariant will show up in the
-    /// condensed pack as long as the instantiation of the invariant is applicable to any
-    /// instantiation of the function.
-    generic_condensation: InstrumentationPack,
-
-    /// For each `inst_fun` (instantiation of function type parameters) in the key set, the
-    /// associated value is a set of `inst_inv` (instantiation of invariant type parameters) that
-    /// are applicable to the concrete function instance `F<inst_fun>`.
-    by_function_instantiation: BTreeMap<Vec<Type>, InstrumentationPack>,
-}
-
-impl InstrumentationSummary {
     fn transpose(relevance: &PerFunctionRelevance) -> Self {
         // TODO(mengxu): this is needed here because we haven't finalized the approach to handle
         // uninstantiated type parameters in the invariant yet. An example is:
@@ -167,18 +77,9 @@ impl InstrumentationSummary {
 
         // transpose the `entrypoint_assumptions`
         for (inv_id, inv_rel) in &relevance.entrypoint_assumptions {
-            for (fun_inst, inv_insts) in &inv_rel.insts {
+            for inv_insts in inv_rel.insts.values() {
                 let inv_insts = filter_uninst_params(inv_insts);
                 result
-                    .by_function_instantiation
-                    .entry(fun_inst.clone())
-                    .or_default()
-                    .entrypoint_assumptions
-                    .entry(*inv_id)
-                    .or_default()
-                    .extend(inv_insts.clone());
-                result
-                    .generic_condensation
                     .entrypoint_assumptions
                     .entry(*inv_id)
                     .or_default()
@@ -189,20 +90,9 @@ impl InstrumentationSummary {
         // transpose the `per_bytecode_assertions`
         for (code_offset, per_code) in &relevance.per_bytecode_assertions {
             for (inv_id, inv_rel) in per_code {
-                for (fun_inst, inv_insts) in &inv_rel.insts {
+                for inv_insts in inv_rel.insts.values() {
                     let inv_insts = filter_uninst_params(inv_insts);
                     result
-                        .by_function_instantiation
-                        .entry(fun_inst.clone())
-                        .or_default()
-                        .per_bytecode_assertions
-                        .entry(*code_offset)
-                        .or_default()
-                        .entry(*inv_id)
-                        .or_default()
-                        .extend(inv_insts.clone());
-                    result
-                        .generic_condensation
                         .per_bytecode_assertions
                         .entry(*code_offset)
                         .or_default()
@@ -215,18 +105,9 @@ impl InstrumentationSummary {
 
         // transpose the `exitpoint_assertions`
         for (inv_id, inv_rel) in &relevance.exitpoint_assertions {
-            for (fun_inst, inv_insts) in &inv_rel.insts {
+            for inv_insts in inv_rel.insts.values() {
                 let inv_insts = filter_uninst_params(inv_insts);
                 result
-                    .by_function_instantiation
-                    .entry(fun_inst.clone())
-                    .or_default()
-                    .exitpoint_assertions
-                    .entry(*inv_id)
-                    .or_default()
-                    .extend(inv_insts.clone());
-                result
-                    .generic_condensation
                     .exitpoint_assertions
                     .entry(*inv_id)
                     .or_default()
@@ -234,44 +115,7 @@ impl InstrumentationSummary {
             }
         }
 
-        result.self_join()
-    }
-
-    /// Recursively refine the `by_function_instantiation` mapping until there are no more changes.
-    /// Once reaching a fixedpoint, we know that the `by_function_instantiation` captures all
-    /// invariants and their instantiations that are needed in that function instantiation.
-    fn self_join(self) -> Self {
-        let Self {
-            generic_condensation,
-            mut by_function_instantiation,
-        } = self;
-
-        let mut changed = true;
-        while changed {
-            changed = false;
-            let fun_insts: BTreeSet<_> = by_function_instantiation.keys().cloned().collect();
-
-            for lhs_inst in fun_insts {
-                let mut lhs_pack = by_function_instantiation.remove(&lhs_inst).unwrap();
-                for (rhs_inst, rhs_pack) in &by_function_instantiation {
-                    let adapter = TypeUnificationAdapter::new_vec(&lhs_inst, rhs_inst, false, true);
-                    if let Some((_, mut subst_rhs)) = adapter.unify(Variance::Allow, false) {
-                        let inst: Vec<_> = (0..rhs_inst.len() as u16)
-                            .map(|i| subst_rhs.remove(&i).unwrap_or(Type::TypeParameter(i)))
-                            .collect();
-                        if lhs_pack.join_pack(rhs_pack, &inst) {
-                            changed = true;
-                        }
-                    }
-                }
-                by_function_instantiation.insert(lhs_inst, lhs_pack);
-            }
-        }
-
-        Self {
-            generic_condensation,
-            by_function_instantiation,
-        }
+        result
     }
 }
 
@@ -287,7 +131,7 @@ impl GlobalInvariantInstrumentationProcessor {
 impl FunctionTargetProcessor for GlobalInvariantInstrumentationProcessor {
     fn process(
         &self,
-        targets: &mut FunctionTargetsHolder,
+        _targets: &mut FunctionTargetsHolder,
         fun_env: &FunctionEnv<'_>,
         data: FunctionData,
     ) -> FunctionData {
@@ -304,63 +148,13 @@ impl FunctionTargetProcessor for GlobalInvariantInstrumentationProcessor {
             FunctionVariant::Verification(VerificationFlavor::Regular)
         ));
 
-        let env = fun_env.module_env.env;
-        let options = ProverOptions::get(env);
-
         // retrieve and transpose the analysis result
         let target = FunctionTarget::new(fun_env, &data);
         let analysis_result = global_invariant_analysis::get_info(&target);
-        let summary = InstrumentationSummary::transpose(analysis_result);
+        let summary = InstrumentationPack::transpose(analysis_result);
 
-        // if the backend supports some form of monomorphization, instrument the invariants in
-        // the generic version of the function only.
-        if options.boogie_poly {
-            return Instrumenter::new(fun_env, data).instrument(&summary.generic_condensation);
-        }
-
-        // otherwise, specialize the function and instrument corresponding invariants in the
-        // specialized function instantiations.
-        let mut main_pack = None;
-        let mut variants = vec![];
-        for (fun_inst, pack) in &summary.by_function_instantiation {
-            let is_original = fun_inst
-                .iter()
-                .enumerate()
-                .all(|(i, ty)| matches!(ty, Type::TypeParameter(idx) if *idx as usize == i));
-            if is_original {
-                main_pack = Some(pack);
-            } else {
-                let variant_data = data.fork_with_instantiation(
-                    env,
-                    fun_inst,
-                    FunctionVariant::Verification(VerificationFlavor::Instantiated(variants.len())),
-                );
-                variants.push((variant_data, pack));
-            }
-        }
-
-        // instrument the main variant.
-        //
-        // NOTE: it is possible that the `main_pack` is None, this means that there are no
-        // invariants applicable to the generic form of the function.
-        let main = match main_pack {
-            None => data,
-            Some(pack) => Instrumenter::new(fun_env, data).instrument(pack),
-        };
-
-        // instrument the variants that represent different instantiations
-        for (variant_data, variant_pack) in variants {
-            let variant_instrumented =
-                Instrumenter::new(fun_env, variant_data).instrument(variant_pack);
-            targets.insert_target_data(
-                &fun_env.get_qualified_id(),
-                variant_instrumented.variant.clone(),
-                variant_instrumented,
-            );
-        }
-
-        // return the main variant
-        main
+        // instrument the invariants in the generic version of the function only.
+        Instrumenter::new(fun_env, data).instrument(&summary)
     }
 
     fn name(&self) -> String {

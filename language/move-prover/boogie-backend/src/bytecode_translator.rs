@@ -37,7 +37,6 @@ use crate::{
 };
 use bytecode::{
     function_target_pipeline::FunctionVariant,
-    options::ProverOptions,
     stackless_bytecode::{AbortAction, PropKind},
 };
 use codespan::LineIndex;
@@ -88,7 +87,6 @@ impl<'env> BoogieTranslator<'env> {
         let env = self.env;
         let spec_translator = &self.spec_translator;
 
-        let prover_options = ProverOptions::get(env);
         let mono_info = mono_analysis::get_info(self.env);
         let empty = &BTreeSet::new();
 
@@ -175,32 +173,29 @@ impl<'env> BoogieTranslator<'env> {
                         }
                         .translate();
 
-                        // There maybe more verification targets that needs to be produced if we
-                        // defer the function instantiation to this stage
-                        if prover_options.boogie_poly {
-                            for type_inst in mono_info
-                                .funs
-                                .get(&fun_target.func_env.get_qualified_id())
-                                .unwrap_or(empty)
-                            {
-                                // Skip the none instantiation (i.e., each type parameter is
-                                // instantiated to itself as a concrete type). This has the same
-                                // effect as `type_inst: &[]` and is already captured above.
-                                let is_none_inst = type_inst
-                                    .iter()
-                                    .enumerate()
-                                    .all(|(i, t)| matches!(t, Type::TypeParameter(idx) if *idx == i as u16));
-                                if is_none_inst {
-                                    continue;
-                                }
-
-                                FunctionTranslator {
-                                    parent: self,
-                                    fun_target,
-                                    type_inst,
-                                }
-                                .translate();
+                        // There maybe more verification targets that needs to be produced as we
+                        // defer the instantiation of verified functions to this stage
+                        for type_inst in mono_info
+                            .funs
+                            .get(&fun_target.func_env.get_qualified_id())
+                            .unwrap_or(empty)
+                        {
+                            // Skip the none instantiation (i.e., each type parameter is
+                            // instantiated to itself as a concrete type). This has the same
+                            // effect as `type_inst: &[]` and is already captured above.
+                            let is_none_inst = type_inst.iter().enumerate().all(
+                                |(i, t)| matches!(t, Type::TypeParameter(idx) if *idx == i as u16),
+                            );
+                            if is_none_inst {
+                                continue;
                             }
+
+                            FunctionTranslator {
+                                parent: self,
+                                fun_target,
+                                type_inst,
+                            }
+                            .translate();
                         }
                     } else {
                         // This variant is inlined, so translate for all type instantiations.

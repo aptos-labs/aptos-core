@@ -26,7 +26,6 @@ use move_model::{
 use crate::{
     function_target::{FunctionData, FunctionTarget},
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder, FunctionVariant},
-    options::ProverOptions,
     stackless_bytecode::{Bytecode, Operation},
     usage_analysis::UsageProcessor,
 };
@@ -270,8 +269,7 @@ impl<'a> Analyzer<'a> {
             }
         }
         // Analyze instantiations (when this function is a verification target)
-        let options = ProverOptions::get(self.env);
-        if options.boogie_poly && self.inst_opt.is_none() {
+        if self.inst_opt.is_none() {
             // collect information
             let fun_type_params = target.get_type_parameters();
             let fun_type_params_arity = fun_type_params.len();

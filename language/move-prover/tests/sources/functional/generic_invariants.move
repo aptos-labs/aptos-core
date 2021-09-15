@@ -1,4 +1,3 @@
-// separate_baseline: boogie_poly
 address 0x2 {
 module S {
     struct Storage<X: store, Y: store> has key {

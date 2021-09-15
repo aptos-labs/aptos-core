@@ -86,17 +86,6 @@ fn get_features() -> &'static [Feature] {
                 runner: |p| test_runner_for_feature(p, get_feature_by_name("default")),
                 enabling_condition: |_, _| true,
             },
-            // Tests with monomorphization deferred to the very end
-            Feature {
-                name: "boogie_poly",
-                flags: &["--boogie-poly"],
-                inclusion_mode: InclusionMode::Implicit,
-                enable_in_ci: true,
-                only_if_requested: false,
-                separate_baseline: false,
-                runner: |p| test_runner_for_feature(p, get_feature_by_name("boogie_poly")),
-                enabling_condition: |_, _| true,
-            },
             // Tests with pragma opaque ignored for internal functions
             Feature {
                 name: "no_opaque",
