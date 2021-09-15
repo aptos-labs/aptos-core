@@ -23,7 +23,7 @@ For example, if there is a module
 
 ```move=
 module 0x1::Foo {
-    resource struct Foo { }
+    struct Foo { }
     const CONST_FOO: u64 = 0;
     public fun do_foo(): Foo { Foo{} }
     ...
@@ -51,7 +51,7 @@ And, if there is a local name-clash when importing two modules:
 
 ```move=
 module OtherFoo {
-    resource struct Foo {}
+    struct Foo {}
     ...
 }
 
@@ -64,7 +64,7 @@ module 0x1::Importer {
 
 ## Comments
 
-- Each module, struct, resource, and public function declaration should be commented
+- Each module, struct, and public function declaration should be commented
 - Move has both doc comments `///`, regular single-line comments `//`, and block comments `/* */`
 
 ## Formatting
@@ -73,4 +73,4 @@ The Move team plans to write an autoformatter to enforce formatting conventions.
 
 - Four space indentation should be used except for `script` and `address` blocks whose contents should not be indented
 - Lines should be broken if they are longer than 100 characters
-- Resources, structs, and constants should be declared before all functions in a module
+- Structs and constants should be declared before all functions in a module
