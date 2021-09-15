@@ -682,11 +682,10 @@ pub enum Bytecode_ {
     CastU8,
     CastU64,
     CastU128,
-    LdByteArray(Vec<u8>),
-    LdAddr(AccountAddress),
     LdTrue,
     LdFalse,
-    LdConst(ConstantName),
+    LdConst(Type, MoveValue),
+    LdNamedConst(ConstantName),
     CopyLoc(Var),
     MoveLoc(Var),
     StLoc(Var),
@@ -725,6 +724,14 @@ pub enum Bytecode_ {
     MoveTo(StructName, Vec<Type>),
     Shl,
     Shr,
+    VecPack(Type, u64),
+    VecLen(Type),
+    VecImmBorrow(Type),
+    VecMutBorrow(Type),
+    VecPushBack(Type),
+    VecPopBack(Type),
+    VecUnpack(Type, u64),
+    VecSwap(Type),
 }
 pub type Bytecode = Spanned<Bytecode_>;
 
@@ -1355,8 +1362,10 @@ impl fmt::Display for Constant {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "const {}: {} = {:?}",
-            &self.name.0, self.signature, self.value
+            "const {}: {} = {}",
+            &self.name.0,
+            self.signature,
+            format_move_value(&self.value)
         )
     }
 }
@@ -1797,11 +1806,10 @@ impl fmt::Display for Bytecode_ {
             Bytecode_::CastU8 => write!(f, "CastU8"),
             Bytecode_::CastU64 => write!(f, "CastU64"),
             Bytecode_::CastU128 => write!(f, "CastU128"),
-            Bytecode_::LdByteArray(b) => write!(f, "LdByteArray 0b{}", hex::encode(b)),
-            Bytecode_::LdAddr(a) => write!(f, "LdAddr {}", a),
             Bytecode_::LdTrue => write!(f, "LdTrue"),
             Bytecode_::LdFalse => write!(f, "LdFalse"),
-            Bytecode_::LdConst(n) => write!(f, "LdConst({})", &n.0),
+            Bytecode_::LdConst(ty, v) => write!(f, "LdConst<{}> {}", ty, format_move_value(v)),
+            Bytecode_::LdNamedConst(n) => write!(f, "LdNamedConst {}", &n.0),
             Bytecode_::CopyLoc(v) => write!(f, "CopyLoc {}", v),
             Bytecode_::MoveLoc(v) => write!(f, "MoveLoc {}", v),
             Bytecode_::StLoc(v) => write!(f, "StLoc {}", v),
@@ -1856,6 +1864,36 @@ impl fmt::Display for Bytecode_ {
             Bytecode_::MoveTo(n, tys) => write!(f, "MoveTo {}{}", n, format_type_actuals(tys)),
             Bytecode_::Shl => write!(f, "Shl"),
             Bytecode_::Shr => write!(f, "Shr"),
+            Bytecode_::VecPack(ty, n) => write!(f, "VecPack {} {}", ty, n),
+            Bytecode_::VecLen(ty) => write!(f, "VecLen {}", ty),
+            Bytecode_::VecImmBorrow(ty) => write!(f, "VecImmBorrow {}", ty),
+            Bytecode_::VecMutBorrow(ty) => write!(f, "VecMutBorrow {}", ty),
+            Bytecode_::VecPushBack(ty) => write!(f, "VecPushBack {}", ty),
+            Bytecode_::VecPopBack(ty) => write!(f, "VecPopBack {}", ty),
+            Bytecode_::VecUnpack(ty, n) => write!(f, "VecUnpack {} {}", ty, n),
+            Bytecode_::VecSwap(ty) => write!(f, "VecSwap {}", ty),
+        }
+    }
+}
+
+fn format_move_value(v: &MoveValue) -> String {
+    match v {
+        MoveValue::U8(u) => format!("{}u8", u),
+        MoveValue::U64(u) => format!("{}u64", u),
+        MoveValue::U128(u) => format!("{}u128", u),
+        MoveValue::Bool(true) => "true".to_owned(),
+        MoveValue::Bool(false) => "false".to_owned(),
+        MoveValue::Address(a) => format!("0x{}", a.short_str_lossless()),
+        MoveValue::Vector(v) => {
+            let items = v
+                .iter()
+                .map(format_move_value)
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!("vector[{}]", items)
+        }
+        MoveValue::Struct(_) | MoveValue::Signer(_) => {
+            panic!("Should be inexpressible as a constant")
         }
     }
 }

@@ -3,7 +3,7 @@
 
 use super::{context::*, remove_fallthrough_jumps};
 use crate::{
-    cfgir::ast as G,
+    cfgir::{ast as G, translate::move_value_from_value_},
     compiled_unit::*,
     diag,
     expansion::ast::{AbilitySet, Address, ModuleIdent, ModuleIdent_, SpecId, Value_},
@@ -24,7 +24,10 @@ use move_binary_format::file_format as F;
 use move_core_types::account_address::AccountAddress as MoveAddress;
 use move_ir_types::{ast as IR, location::*};
 use move_symbol_pool::Symbol;
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::{
+    collections::{BTreeMap, BTreeSet, HashMap},
+    convert::TryInto,
+};
 
 type CollectedInfos = UniqueMap<FunctionName, CollectedInfo>;
 type CollectedInfo = (
@@ -914,35 +917,37 @@ fn exp_(context: &mut Context, code: &mut IR::BytecodeBlock, e: H::Exp) {
         E::Unit { .. } => (),
         // remember to switch to orig_name
         E::Spec(id, used_locals) => code.push(sp(loc, B::Nop(Some(context.spec(id, used_locals))))),
-        E::Value(v) => {
-            code.push(sp(
-                loc,
-                match v.value {
-                    V::InferredNum(_) => panic!("ICE inferred num should have been expanded"),
-                    V::Address(a) => {
-                        let addr_bytes = context.resolve_address(a);
-                        B::LdAddr(MoveAddress::new(addr_bytes.into_bytes()))
+        E::Value(sp!(_, v_)) => {
+            let ld_value = match v_ {
+                V::InferredNum(_) => panic!("ICE inferred num should have been expanded"),
+                V::U8(u) => B::LdU8(u),
+                V::U64(u) => B::LdU64(u),
+                V::U128(u) => B::LdU128(u),
+                V::Bool(b) => {
+                    if b {
+                        B::LdTrue
+                    } else {
+                        B::LdFalse
                     }
-                    V::Bytearray(bytes) => B::LdByteArray(bytes),
-                    V::U8(u) => B::LdU8(u),
-                    V::U64(u) => B::LdU64(u),
-                    V::U128(u) => B::LdU128(u),
-                    V::Bool(b) => {
-                        if b {
-                            B::LdTrue
-                        } else {
-                            B::LdFalse
-                        }
-                    }
-                },
-            ));
+                }
+                v_ @ V::Address(_) | v_ @ V::Bytearray(_) => {
+                    let [ty]: [IR::Type; 1] = types(context, e.ty)
+                        .try_into()
+                        .expect("ICE value type should have one element");
+                    B::LdConst(
+                        ty,
+                        move_value_from_value_(context.env.named_address_mapping(), v_),
+                    )
+                }
+            };
+            code.push(sp(loc, ld_value));
         }
         E::Move { var: v, .. } => {
             code.push(sp(loc, B::MoveLoc(var(v))));
         }
         E::Copy { var: v, .. } => code.push(sp(loc, B::CopyLoc(var(v)))),
 
-        E::Constant(c) => code.push(sp(loc, B::LdConst(context.constant_name(c)))),
+        E::Constant(c) => code.push(sp(loc, B::LdNamedConst(context.constant_name(c)))),
 
         E::ModuleCall(mcall) => {
             exp(context, code, mcall.arguments);

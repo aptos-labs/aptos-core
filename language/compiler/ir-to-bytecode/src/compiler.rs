@@ -1644,20 +1644,13 @@ fn compile_bytecode(
         IRBytecode_::CastU8 => Bytecode::CastU8,
         IRBytecode_::CastU64 => Bytecode::CastU64,
         IRBytecode_::CastU128 => Bytecode::CastU128,
-        IRBytecode_::LdByteArray(b) => {
-            let vec_value = MoveValue::vector_u8(b);
-            let ty = Type::Vector(Box::new(Type::U8));
-            let constant = compile_constant(context, ty, vec_value)?;
-            Bytecode::LdConst(context.constant_index(constant)?)
-        }
-        IRBytecode_::LdAddr(a) => {
-            let address_value = MoveValue::Address(a);
-            let constant = compile_constant(context, Type::Address, address_value)?;
-            Bytecode::LdConst(context.constant_index(constant)?)
-        }
         IRBytecode_::LdTrue => Bytecode::LdTrue,
         IRBytecode_::LdFalse => Bytecode::LdFalse,
-        IRBytecode_::LdConst(c) => Bytecode::LdConst(context.named_constant_index(&c)?),
+        IRBytecode_::LdConst(ty, v) => {
+            let constant = compile_constant(context, ty, v)?;
+            Bytecode::LdConst(context.constant_index(constant)?)
+        }
+        IRBytecode_::LdNamedConst(c) => Bytecode::LdConst(context.named_constant_index(&c)?),
         IRBytecode_::CopyLoc(sp!(_, v_)) => Bytecode::CopyLoc(function_frame.get_local(&v_)?),
         IRBytecode_::MoveLoc(sp!(_, v_)) => Bytecode::MoveLoc(function_frame.get_local(&v_)?),
         IRBytecode_::StLoc(sp!(_, v_)) => Bytecode::StLoc(function_frame.get_local(&v_)?),
@@ -1854,6 +1847,46 @@ fn compile_bytecode(
         }
         IRBytecode_::Shl => Bytecode::Shl,
         IRBytecode_::Shr => Bytecode::Shr,
+        IRBytecode_::VecPack(ty, n) => {
+            let tokens = compile_type(context, function_frame.type_parameters(), &ty)?;
+            let sig = Signature(vec![tokens]);
+            Bytecode::VecPack(context.signature_index(sig)?, n)
+        }
+        IRBytecode_::VecLen(ty) => {
+            let tokens = compile_type(context, function_frame.type_parameters(), &ty)?;
+            let sig = Signature(vec![tokens]);
+            Bytecode::VecLen(context.signature_index(sig)?)
+        }
+        IRBytecode_::VecImmBorrow(ty) => {
+            let tokens = compile_type(context, function_frame.type_parameters(), &ty)?;
+            let sig = Signature(vec![tokens]);
+            Bytecode::VecImmBorrow(context.signature_index(sig)?)
+        }
+        IRBytecode_::VecMutBorrow(ty) => {
+            let tokens = compile_type(context, function_frame.type_parameters(), &ty)?;
+            let sig = Signature(vec![tokens]);
+            Bytecode::VecMutBorrow(context.signature_index(sig)?)
+        }
+        IRBytecode_::VecPushBack(ty) => {
+            let tokens = compile_type(context, function_frame.type_parameters(), &ty)?;
+            let sig = Signature(vec![tokens]);
+            Bytecode::VecPushBack(context.signature_index(sig)?)
+        }
+        IRBytecode_::VecPopBack(ty) => {
+            let tokens = compile_type(context, function_frame.type_parameters(), &ty)?;
+            let sig = Signature(vec![tokens]);
+            Bytecode::VecPopBack(context.signature_index(sig)?)
+        }
+        IRBytecode_::VecUnpack(ty, n) => {
+            let tokens = compile_type(context, function_frame.type_parameters(), &ty)?;
+            let sig = Signature(vec![tokens]);
+            Bytecode::VecUnpack(context.signature_index(sig)?, n)
+        }
+        IRBytecode_::VecSwap(ty) => {
+            let tokens = compile_type(context, function_frame.type_parameters(), &ty)?;
+            let sig = Signature(vec![tokens]);
+            Bytecode::VecSwap(context.signature_index(sig)?)
+        }
     };
     push_instr!(loc, ff_instr);
     Ok(())
