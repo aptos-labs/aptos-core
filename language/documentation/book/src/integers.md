@@ -10,7 +10,7 @@ Move supports three unsigned integer types: `u8`, `u64`, and `u128`. Values of t
 
 ## Literals
 
-Literal values for these types are specified as a sequence of digits, e.g.,`112`. The type of the literal can optionally be added as a suffix, e.g., `112u8`. If the type is not specified, the compiler will try to infer the type from the context where the literal is used. If the type cannot be inferred, it is assumed to be `u64`.
+Literal values for these types are specified either as a sequence of digits (e.g.,`112`) or as hex literals, e.g., `0xFF`. The type of the literal can optionally be added as a suffix, e.g., `112u8`. If the type is not specified, the compiler will try to infer the type from the context where the literal is used. If the type cannot be inferred, it is assumed to be `u64`.
 
 If a literal is too large for its specified (or inferred) size range, an error is reported.
 
@@ -40,6 +40,11 @@ let _unused = x + complex_u8;
 let complex_u128 = 3; // inferred: u128
 // inferred from function argument type
 function_that_takes_u128(complex_u128);
+
+// literals can be written in hex
+let hex_u8: u8 = 0x1;
+let hex_u64: u64 = 0xCAFE;
+let hex_u128: u128 = 0xDEADBEEF;
 ```
 
 ## Operations

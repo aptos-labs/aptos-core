@@ -7,8 +7,8 @@ The `use` syntax can be used to create aliases to members in other modules. `use
 There are several different syntax cases for `use`. Starting with the most simple, we have the following for creating aliases to other modules
 
 ```move
-use <named_address|address>::<module name>;
-use <named_address|address>::<module name> as <module alias name>;
+use <address>::<module name>;
+use <address>::<module name> as <module alias name>;
 ```
 
 For example

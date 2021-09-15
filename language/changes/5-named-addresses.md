@@ -7,8 +7,8 @@
 Named addresses are a new source language only feature. (That is, the named address feature is
 compiled away and not present in the Move bytecode format). The feature allows names to be used in
 place of numerical values in any spot where addresses are used. Named addresses are declared as top
-level elements (outside of modules and scripts) with `address MyAddr;` and can be assigned like so
-`address MyAddr = 0x42;`
+level elements (outside of modules and scripts) in Move Packages, or passed as
+arguments to the Move compiler.
 
 With the landing of this feature, Move standard library modules now reside under the address `Std`,
 e.g. `Std::Vector`. Similarly, Diem Framework modules now reside under the address `DiemFramework`,

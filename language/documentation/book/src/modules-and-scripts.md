@@ -37,25 +37,24 @@ script {
 }
 ```
 
-Scripts have very limited power--they cannot declare friends, struct types or access global storage. Their primary purpose is invoke module functions.
+Scripts have very limited power—they cannot declare friends, struct types or access global storage. Their primary purpose is to invoke module functions.
 
 ### Modules
 
 A Module has the following syntax:
 
 ```text
-address <address_const> {
-module <identifier> {
+module <address>::<identifier> {
     (<use> | <friend> | <type> | <function> | <constant>)*
 }
-}
 ```
+
+where `<address>` is a valid [named or literal address](./address.md).
 
 For example:
 
 ```move
-address 0x42 {
-module Test {
+module 0x42::Test {
     struct Example has copy, drop { i: u64 }
 
     use Std::Debug;
@@ -69,19 +68,52 @@ module Test {
         Debug::print(&sum)
     }
 }
-}
 ```
 
-The `address 0x42` part specifies that the module will be published under the [account address](./address.md) 0x42 in [global storage](./global-storage-structure.md).
+The `module 0x42::Test` part specifies that the module `Test` will be published under the [account address](./address.md) `0x42` in [global storage](./global-storage-structure.md).
 
-Multiple modules can be declared in a single `address` block:
+Modules can also be declared using [named addresses](./address.md). For example:
 
 ```move
-address 0x42 {
-module M { ... }
-module N { ... }
+module TestAddr::Test {
+    struct Example has copy, drop { a: address}
+
+    use Std::Debug;
+    friend TestAddr::AnotherTest;
+
+    public fun print() {
+        let example = Example { a: @TestAddr};
+        Debug::print(&example)
+    }
 }
 ```
+
+Because named addresses only exist at the source language level and during compilation,
+named addresses will be fully substituted for their value at the bytecode
+level. For example if we had the following code:
+
+```move=
+script {
+    fun example() {
+        MyAddr::M::foo(@MyAddr);
+    }
+}
+```
+
+and we compiled it with `MyAddr` set to `0xC0FFEE`, then it would be equivalent
+to the following operationally:
+
+```move=
+script {
+    fun example() {
+        0xC0FFEE::M::foo(@0xC0FFEE);
+    }
+}
+```
+
+However at the source level, these _are not equivalent_—the function
+`M::foo` _must_ be accessed through the `MyAddr` named address, and not through
+the numerical value assigned to that address.
 
 Module names can start with letters `a` to `z` or letters `A` to `Z`. After the first character, module names can contain underscores `_`, letters `a` to `z`, letters `A` to `Z`, or digits `0` to `9`.
 
