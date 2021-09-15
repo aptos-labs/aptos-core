@@ -28,7 +28,7 @@ script {
 address 0x42 {
 module Example {
 
-    const MY_ADDRESS: address = 0x42;
+    const MY_ADDRESS: address = @0x42;
 
     public fun permissioned(s: &signer) {
         assert(Std::Signer::address_of(s) == MY_ADDRESS, 0);
@@ -45,7 +45,7 @@ Constants must start with a capital letter `A` to `Z`. After the first letter, c
 ```move
 const FLAG: bool = false;
 const MY_ERROR_CODE: u64 = 0;
-const ADDRESS_42: address = 0x42;
+const ADDRESS_42: address = @0x42;
 ```
 
 Even though you can use letters `a` to `z` in a constant. The  [general style guidelines](./coding-conventions.md) are to use just uppercase letters `A` to `Z`, with underscores `_` between each word.
@@ -67,7 +67,7 @@ For example
 
 ```move
 const MY_BOOL: bool = false;
-const MY_ADDRESS: address = 0x70DD;
+const MY_ADDRESS: address = @0x70DD;
 const BYTES: vector<u8> = b"hello world";
 const HEX_BYTES: vector<u8> = x"DEADBEEF";
 ```

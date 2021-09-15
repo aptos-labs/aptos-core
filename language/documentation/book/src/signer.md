@@ -13,8 +13,8 @@ A `signer` is somewhat similar to a Unix [UID](https://en.wikipedia.org/wiki/Use
 A Move program can create any `address` value without special permission using address literals:
 
 ```move
-let a1 = 0x1;
-let a2 = 0x2;
+let a1 = @0x1;
+let a2 = @0x2;
 // ... and so on for every other possible address
 ```
 
@@ -24,7 +24,7 @@ However, `signer` values are special because they cannot be created via literals
 script {
     use Std::Signer;
     fun main(s: signer) {
-        assert(Signer::address_of(&s) == 0x42, 0);
+        assert(Signer::address_of(&s) == @0x42, 0);
     }
 }
 ```

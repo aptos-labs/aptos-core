@@ -101,7 +101,7 @@ module Example {
     fun annotated() {
         let u: u8 = 0;
         let b: vector<u8> = b"hello";
-        let a: address = 0x0;
+        let a: address = @0x0;
         let (x, y): (&u64, &mut u64) = (&0, &mut 1);
         let S { f, g: f2 }: S = S { f: 0, g: 1 };
     }
@@ -677,13 +677,13 @@ let coin2 = coin; // move
 
 let x = 0;
 let b = false;
-let addr = 0x42;
+let addr = @0x42;
 let x_ref = &x;
 let coin_ref = &mut coin2;
 
 let x2 = x; // copy
 let b2 = b; // copy
-let addr2 = 0x42; // copy
+let addr2 = @0x42; // copy
 let x_ref2 = x_ref; // copy
 let coin_ref2 = coin_ref; // copy
 ```
