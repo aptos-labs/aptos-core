@@ -506,28 +506,24 @@ mod test {
     use diem_config::network_id::NetworkId;
     use diem_types::PeerId;
 
-    fn peer_network_id(peer_id: PeerId, network: NetworkId) -> PeerNetworkId {
-        PeerNetworkId::new(network, peer_id)
-    }
-
     #[test]
     fn check_peer_prioritization() {
         let peer_id_1 = PeerId::from_hex_literal("0x1").unwrap();
         let peer_id_2 = PeerId::from_hex_literal("0x2").unwrap();
         let val_1 = (
-            peer_network_id(peer_id_1, NetworkId::vfn_network()),
+            PeerNetworkId::new(NetworkId::vfn_network(), peer_id_1),
             PeerRole::Validator,
         );
         let val_2 = (
-            peer_network_id(peer_id_2, NetworkId::vfn_network()),
+            PeerNetworkId::new(NetworkId::vfn_network(), peer_id_2),
             PeerRole::Validator,
         );
         let vfn_1 = (
-            peer_network_id(peer_id_1, NetworkId::Public),
+            PeerNetworkId::new(NetworkId::Public, peer_id_1),
             PeerRole::ValidatorFullNode,
         );
         let preferred_1 = (
-            peer_network_id(peer_id_1, NetworkId::Public),
+            PeerNetworkId::new(NetworkId::Public, peer_id_1),
             PeerRole::PreferredUpstream,
         );
 
