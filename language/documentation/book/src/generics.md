@@ -104,7 +104,7 @@ Note: when the compiler is unable to infer the types, you'll need annotate them 
 ```move=
 address 0x2 {
 module M {
-    using 0x1::Vector;
+    using Std::Vector;
 
     fun foo() {
         // let v = Vector::new();
@@ -122,7 +122,7 @@ However, the compiler will be able to infer the type if that return value is use
 ```move=
 address 0x2 {
 module M {
-    using 0x1::Vector;
+    using Std::Vector;
 
     fun foo() {
         let v = Vector::new();

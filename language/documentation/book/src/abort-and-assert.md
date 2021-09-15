@@ -21,7 +21,7 @@ Similar to [`return`](./functions.md), `abort` is useful for exiting control flo
 In this example, the function will pop two items off of the vector, but will abort early if the vector does not have two items
 
 ```move=
-use 0x1::Vector;
+use Std::Vector;
 fun pop_twice<T>(v: &mut vector<T>): (T, T) {
     if (Vector::length(v) < 2) abort 42;
 
@@ -32,7 +32,7 @@ fun pop_twice<T>(v: &mut vector<T>): (T, T) {
 This is even more useful deep inside a control-flow construct. For example, this function checks that all numbers in the vector are less than the specified `bound`. And aborts otherwise
 
 ```move=
-use 0x1::Vector;
+use Std::Vector;
 fun check_vec(v: &vector<u64>, bound: u64) {
     let i = 0;
     let n = Vector::length(v);
@@ -61,7 +61,7 @@ if (condition) () else abort code
 The `abort` examples above can be rewritten using `assert`
 
 ```move=
-use 0x1::Vector;
+use Std::Vector;
 fun pop_twice<T>(v: &mut vector<T>): (T, T) {
     assert(Vector::length(v) >= 2, 42); // Now uses 'assert'
 
@@ -72,7 +72,7 @@ fun pop_twice<T>(v: &mut vector<T>): (T, T) {
 and
 
 ```move=
-use 0x1::Vector;
+use Std::Vector;
 fun check_vec(v: &vector<u64>, bound: u64) {
     let i = 0;
     let n = Vector::length(v);
@@ -123,7 +123,7 @@ In this example, the module has two separate error codes used in multiple functi
 address 0x42 {
 module Example {
 
-    use 0x1::Vector;
+    use Std::Vector;
 
     const EMPTY_VECTOR: u64 = 0;
     const INDEX_OUT_OF_BOUNDS: u64 = 1;

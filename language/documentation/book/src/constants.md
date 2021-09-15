@@ -31,7 +31,7 @@ module Example {
     const MY_ADDRESS: address = 0x42;
 
     public fun permissioned(s: &signer) {
-        assert(0x1::Signer::address_of(s) == MY_ADDRESS, 0);
+        assert(Std::Signer::address_of(s) == MY_ADDRESS, 0);
     }
 
 }

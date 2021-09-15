@@ -260,7 +260,7 @@ A function can `acquire` as many resources as it needs to
 ```move=
 address 0x42 {
 module Example {
-    use 0x1::Vector;
+    use Std::Vector;
 
     struct Balance has key { value: u64 }
     struct Box<T> has key { items: vector<T> }
@@ -341,11 +341,9 @@ Without modifying the VM source code, a programmer cannot add new native functio
 Most `native` functions you will likely see are in standard library code such as `Vector`
 
 ```move=
-address 0x1 {
-module Vector {
+module Std::Vector {
     native public fun empty<Element>(): vector<Element>;
     ...
-}
 }
 ```
 
@@ -460,8 +458,8 @@ Note that the body of this function could also have been written as `if (y > x) 
 However `return` really shines is in exiting deep within other control flow constructs. In this example, the function iterates through a vector to find the index of a given value:
 
 ```move=
-use 0x1::Vector;
-use 0x1::Option::{Self, Option};
+use Std::Vector;
+use Std::Option::{Self, Option};
 fun index_of<T>(v: &vector<T>, target: &T): Option<u64> {
     let i = 0;
     let n = Vector::length(v);

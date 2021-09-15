@@ -65,7 +65,7 @@ The simple `Counter` module below exercises each of the five global storage oper
 ```move
 address 0x42 {
 module Counter {
-    use 0x1::Signer;
+    use Std::Signer;
 
     /// Resource that wraps an integer counter
     struct Counter has key { i: u64 }

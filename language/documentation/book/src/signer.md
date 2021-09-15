@@ -22,7 +22,7 @@ However, `signer` values are special because they cannot be created via literals
 
 ```move=
 script {
-    use 0x1::Signer;
+    use Std::Signer;
     fun main(s: signer) {
         assert(Signer::address_of(&s) == 0x42, 0);
     }
@@ -35,7 +35,7 @@ A transaction script can have an arbitrary number of `signer`s as long as the si
 
 ```move=
 script {
-    use 0x1::Signer;
+    use Std::Signer;
     fun main(s1: signer, s2: signer, x: u64, y: u8) {
         // ...
     }
@@ -46,7 +46,7 @@ This is useful for implementing *multi-signer scripts* that atomically act with 
 
 ## `signer` Operators
 
-The `0x1::Signer` standard library module provides two utility functions over `signer` values:
+The `Std::Signer` standard library module provides two utility functions over `signer` values:
 
 | Function | Description
 | ---------- | ----------

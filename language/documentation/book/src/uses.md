@@ -7,27 +7,27 @@ The `use` syntax can be used to create aliases to members in other modules. `use
 There are several different syntax cases for `use`. Starting with the most simple, we have the following for creating aliases to other modules
 
 ```move
-use <address>::<module name>;
-use <address>::<module name> as <module alias name>;
+use <named_address|address>::<module name>;
+use <named_address|address>::<module name> as <module alias name>;
 ```
 
 For example
 
 ```move
-use 0x1::Vector;
-use 0x1::Vector as V;
+use Std::Vector;
+use Std::Vector as V;
 ```
 
-`use 0x1::Vector;` introduces an alias `Vector` for `0x1::Vector`. This means that anywhere you would want to use the module name `0x1::Vector` (assuming this `use` is in scope), you could use `Vector` instead. `use 0x1::Vector;`  is equivalent to `use 0x1::Vector as Vector;`
+`use Std::Vector;` introduces an alias `Vector` for `Std::Vector`. This means that anywhere you would want to use the module name `Std::Vector` (assuming this `use` is in scope), you could use `Vector` instead. `use Std::Vector;`  is equivalent to `use Std::Vector as Vector;`
 
-Similarly `use 0x1::Vector as V;` would let you use `V` instead of `0x1::Vector`
+Similarly `use Std::Vector as V;` would let you use `V` instead of `Std::Vector`
 
 ```move=
-use 0x1::Vector;
-use 0x1::Vector as V;
+use Std::Vector;
+use Std::Vector as V;
 
 fun new_vecs(): (vector<u8>, vector<u8>, vector<u8>) {
-    let v1 = 0x1::Vector::empty();
+    let v1 = Std::Vector::empty();
     let v2 = Vector::empty();
     let v3 = V::empty();
     (v1, v2, v3)
@@ -44,18 +44,18 @@ use <address>::<module name>::<module member> as <member alias>;
 For example
 
 ```move
-use 0x1::Vector::empty;
-use 0x1::Vector::empty as empty_vec;
+use Std::Vector::empty;
+use Std::Vector::empty as empty_vec;
 ```
 
-This would let you use the function `0x1::Vector::empty` without full qualification. Instead you could use `empty` and `empty_vec` respectively. Again, `use 0x1::Vector::empty;` is equivalent to `use 0x1::Vector::empty as empty;`
+This would let you use the function `Std::Vector::empty` without full qualification. Instead you could use `empty` and `empty_vec` respectively. Again, `use Std::Vector::empty;` is equivalent to `use Std::Vector::empty as empty;`
 
 ```move=
-use 0x1::Vector::empty;
-use 0x1::Vector::empty as empty_vec;
+use Std::Vector::empty;
+use Std::Vector::empty as empty_vec;
 
 fun new_vecs(): (vector<u8>, vector<u8>, vector<u8>) {
-    let v1 = 0x1::Vector::empty();
+    let v1 = Std::Vector::empty();
     let v2 = empty();
     let v3 = empty_vec();
     (v1, v2, v3)
@@ -71,7 +71,7 @@ use <address>::<module name>::{<module member>, <module member> as <member alias
 For example
 
 ```move=
-use 0x1::Vector::{push_back, length as len, pop_back};
+use Std::Vector::{push_back, length as len, pop_back};
 
 fun swap_last_two<T>(v: &mut vector<T>) {
     assert(len(v) >= 2, 42);
@@ -85,24 +85,24 @@ fun swap_last_two<T>(v: &mut vector<T>) {
 If you need to add an alias to the Module itself in addition to module members, you can do that in a single `use` using `Self`. `Self` is a member of sorts that refers to the module.
 
 ```move
-use 0x1::Vector::{Self, empty};
+use Std::Vector::{Self, empty};
 ```
 
 For clarity, all of the following are equivalent:
 
 ```move
-use 0x1::Vector;
-use 0x1::Vector as Vector;
-use 0x1::Vector::Self;
-use 0x1::Vector::Self as Vector;
-use 0x1::Vector::{Self};
-use 0x1::Vector::{Self as Vector};
+use Std::Vector;
+use Std::Vector as Vector;
+use Std::Vector::Self;
+use Std::Vector::Self as Vector;
+use Std::Vector::{Self};
+use Std::Vector::{Self as Vector};
 ```
 
 If needed, you can have as many aliases for any item as you like
 
 ```move=
-use 0x1::Vector::{
+use Std::Vector::{
     Self,
     Self as V,
     length,
@@ -127,7 +127,7 @@ Inside of a `module` all `use` declarations are usable regardless of the order o
 ```move=
 address 0x42 {
 module Example {
-    use 0x1::Vector;
+    use Std::Vector;
 
     fun example(): vector<u8> {
         let v = empty();
@@ -136,7 +136,7 @@ module Example {
         v
     }
 
-    use 0x1::Vector::empty;
+    use Std::Vector::empty;
 }
 }
 ```
@@ -154,7 +154,7 @@ address 0x42 {
 module Example {
 
     fun example(): vector<u8> {
-        use 0x1::Vector::{empty, push_back};
+        use Std::Vector::{empty, push_back};
 
         let v = empty();
         push_back(&mut v, 0);
@@ -173,7 +173,7 @@ module Example {
 
     fun example(): vector<u8> {
         let result = {
-            use 0x1::Vector::{empty, push_back};
+            use Std::Vector::{empty, push_back};
             let v = empty();
             push_back(&mut v, 0);
             push_back(&mut v, 10);
@@ -191,7 +191,7 @@ Attempting to use the alias after the block ends will result in an error
 ```move=
 fun example(): vector<u8> {
     let result = {
-        use 0x1::Vector::{empty, push_back};
+        use Std::Vector::{empty, push_back};
         let v = empty();
         push_back(&mut v, 0);
         push_back(&mut v, 10);
@@ -208,7 +208,7 @@ Any `use` must be the first item in the block. If the `use` comes after any expr
 ```move=
 {
     let x = 0;
-    use 0x1::Vector; // ERROR!
+    use Std::Vector; // ERROR!
     let v = Vector::empty();
 }
 ```
@@ -245,12 +245,12 @@ For a module, this means aliases introduced by `use` cannot overla
 address 0x42 {
 module Example {
 
-    use 0x1::Vector::{empty as foo, length as foo}; // ERROR!
+    use Std::Vector::{empty as foo, length as foo}; // ERROR!
     //                                        ^^^ duplicate 'foo'
 
-    use 0x1::Vector::empty as bar;
+    use Std::Vector::empty as bar;
 
-    use 0x1::Vector::length as bar; // ERROR!
+    use Std::Vector::length as bar; // ERROR!
     //                         ^^^ duplicate 'bar'
 
 }
@@ -286,13 +286,13 @@ module Example {
     struct WrappedVector { vec: vector<u64> }
 
     fun empty(): WrappedVector {
-        WrappedVector { vec: 0x1::Vector::empty() }
+        WrappedVector { vec: Std::Vector::empty() }
     }
 
     fun example1(): (WrappedVector, WrappedVector) {
         let vec = {
-            use 0x1::Vector::{empty, push_back};
-            // 'empty' now refers to 0x1::Vector::empty
+            use Std::Vector::{empty, push_back};
+            // 'empty' now refers to Std::Vector::empty
 
             let v = empty();
             push_back(&mut v, 0);
@@ -306,7 +306,7 @@ module Example {
     }
 
     fun example2(): (WrappedVector, WrappedVector) {
-        use 0x1::Vector::{empty, push_back};
+        use Std::Vector::{empty, push_back};
         let w: WrappedVector = {
             use 0x42::Example::empty;
             empty()
@@ -333,7 +333,7 @@ An unused `use` will result in an error
 ```move=
 address 0x42 {
 module Example {
-    use 0x1::Vector::{empty, push_back}; // ERROR!
+    use Std::Vector::{empty, push_back}; // ERROR!
     //                       ^^^^^^^^^ unused alias 'push_back'
 
     fun example(): vector<u8> {

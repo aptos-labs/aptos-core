@@ -10,7 +10,7 @@ The Move standard library exposes interfaces that implement the following functi
 
 The `Vector` module defines a number of operations over the primitive
 [`vector`](./vector.md) type. The module is published under the
-core code address at `0x1` and consists of a number of native functions, as
+named address `Std` and consists of a number of native functions, as
 well as functions defined in Move. The API for this module is as follows.
 
 ### Functions
@@ -168,7 +168,7 @@ Return whether the vector `v` is empty.
 ## Option
 
 The `Option` module defines a generic option type `Option<T>` that represents a
-value of type `T` that may, or may not, be present. It is published under the core code address at `0x1`.
+value of type `T` that may, or may not, be present. It is published under the named address `Std`.
 
 The Move option type is internally represented as a singleton vector, and may
 contain a value of `resource` or `copyable` kind.  If you are familiar with option

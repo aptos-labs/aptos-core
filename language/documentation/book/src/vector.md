@@ -6,7 +6,7 @@ A `vector<T>` can be instantiated with any type `T`. For example, `vector<u64>`,
 
 ## Operations
 
-`vector` supports the following operations via the `0x1::Vector` module in the Move standard library:
+`vector` supports the following operations via the `Std::Vector` module in the Move standard library:
 
 | Function | Description | Aborts?
 | ---------- | ----------|----------
@@ -24,7 +24,7 @@ More operations may be added overtime
 ## Example
 
 ```move
-use 0x1::Vector;
+use Std::Vector;
 
 let v = Vector::empty<u64>();
 Vector::push_back(&mut v, 5);

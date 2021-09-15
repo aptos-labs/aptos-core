@@ -8,15 +8,15 @@ You can use runtime address values (values of type `address`) to access resource
 
 ## Literals
 
-`address` literals are 16-byte hex literals, i.e. `0x<hex encoded value>`. For convenience, leading `0`s are added for literals that are too short.
+`address` literals are 16-byte hex literals, i.e. `@0x<hex encoded value>`. For convenience, leading `0`s are added for literals that are too short.
 
 ### Examples
 
 ```move
-let a1: address = 0x1; // shorthand for 0x00000000000000000000000000000001
-let a2: address = 0x42; // shorthand for 0x00000000000000000000000000000042
-let a3: address = 0xDEADBEEF; // // shorthand for 0x000000000000000000000000DEADBEEF
-let a4: address = 0x0000000000000000000000000000000A;
+let a1: address = @0x1; // shorthand for 0x00000000000000000000000000000001
+let a2: address = @0x42; // shorthand for 0x00000000000000000000000000000042
+let a3: address = @0xDEADBEEF; // // shorthand for 0x000000000000000000000000DEADBEEF
+let a4: address = @0x0000000000000000000000000000000A;
 ```
 
 ## Global Storage Operations

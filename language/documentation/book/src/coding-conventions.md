@@ -22,7 +22,7 @@ This section lays out some basic coding conventions for Move that the Move team 
 For example, if there is a module
 
 ```move=
-module Foo {
+module 0x1::Foo {
     resource struct Foo { }
     const CONST_FOO: u64 = 0;
     public fun do_foo(): Foo { Foo{} }
@@ -33,7 +33,7 @@ module Foo {
 this would be imported and used as:
 
 ```move=
-module Bar {
+module 0x1::Bar {
     use 0x1::Foo::{Self, Foo};
 
     public fun do_bar(x: u64): Foo {
@@ -55,7 +55,7 @@ module OtherFoo {
     ...
 }
 
-module Importer {
+module 0x1::Importer {
     use 0x1::OtherFoo::Foo as OtherFoo;
     use 0x1::Foo::Foo;
 ....

@@ -55,7 +55,7 @@ We've created a directory called `toycoin` which has a subdirectory `src` for th
 
 ## Creating Our Coin
 
-We'll call our module `Coin`, and we'll publish it at address `0x2`. By convention, the Move standard library is published at address `0x1`, and for simplicity we'll use `0x2` for our tutorial code. Any address will work, as long as the address the modules are published to and the address the modules are accessed from is the same.
+We'll call our module `Coin`, and we'll publish it at address `0x2`. The Move standard library is published at the named address `Std`, and for simplicity we'll use `0x2` for our tutorial code. Any address will work, as long as the address the modules are published to and the address the modules are accessed from is the same.
 
 In our module we'll define a new type `Coin`, which will be a structure with a single field `value`, containing the number of coins. The type of the `value` field is `u64`, which is, as you might have guessed, an unsigned 64-bit integer.
 
@@ -243,7 +243,7 @@ Now we can write a slightly more complicated script that tests our `Coin` module
 
 ```move=
 script {
-    use 0x1::Debug;
+    use Std::Debug;
     use 0x2::Coin;
 
     fun main() {

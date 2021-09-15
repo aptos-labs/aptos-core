@@ -25,10 +25,8 @@ arguments, and must not return a value. Here is an example with each of these co
 
 ```move
 script {
-    // Import the Debug module published at account address 0x1.
-    // 0x1 is shorthand for the fully qualified address
-    // 0x00000000000000000000000000000001.
-    use 0x1::Debug;
+    // Import the Debug module published at the named account address Std.
+    use Std::Debug;
 
     const ONE: u64 = 1;
 
@@ -60,7 +58,7 @@ address 0x42 {
 module Test {
     struct Example has copy, drop { i: u64 }
 
-    use 0x1::Debug;
+    use Std::Debug;
     friend 0x42::AnotherTest;
 
     const ONE: u64 = 1;
