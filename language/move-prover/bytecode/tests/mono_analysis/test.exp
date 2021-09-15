@@ -183,9 +183,9 @@ struct Test::B = {
   <u128>
   <#0>
 }
-fun Test::f1 = {
+fun Test::f1 [baseline] = {
   <u8>
 }
-fun Test::f4 = {
+fun Test::f4 [baseline] = {
   <u128>
 }

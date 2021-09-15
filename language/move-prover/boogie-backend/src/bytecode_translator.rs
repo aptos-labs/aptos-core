@@ -177,7 +177,7 @@ impl<'env> BoogieTranslator<'env> {
                         // defer the instantiation of verified functions to this stage
                         for type_inst in mono_info
                             .funs
-                            .get(&fun_target.func_env.get_qualified_id())
+                            .get(&(fun_target.func_env.get_qualified_id(), variant))
                             .unwrap_or(empty)
                         {
                             // Skip the none instantiation (i.e., each type parameter is
@@ -201,7 +201,10 @@ impl<'env> BoogieTranslator<'env> {
                         // This variant is inlined, so translate for all type instantiations.
                         for type_inst in mono_info
                             .funs
-                            .get(&fun_target.func_env.get_qualified_id())
+                            .get(&(
+                                fun_target.func_env.get_qualified_id(),
+                                FunctionVariant::Baseline,
+                            ))
                             .unwrap_or(empty)
                         {
                             let fun_name = boogie_function_name(fun_env, type_inst);

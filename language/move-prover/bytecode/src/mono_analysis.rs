@@ -34,7 +34,7 @@ use crate::{
 #[derive(Clone, Default, Debug)]
 pub struct MonoInfo {
     pub structs: BTreeMap<QualifiedId<StructId>, BTreeSet<Vec<Type>>>,
-    pub funs: BTreeMap<QualifiedId<FunId>, BTreeSet<Vec<Type>>>,
+    pub funs: BTreeMap<(QualifiedId<FunId>, FunctionVariant), BTreeSet<Vec<Type>>>,
     pub spec_funs: BTreeMap<QualifiedId<SpecFunId>, BTreeSet<Vec<Type>>>,
     pub spec_vars: BTreeMap<QualifiedId<SpecVarId>, BTreeSet<Vec<Type>>>,
     pub type_params: BTreeSet<u16>,
@@ -126,9 +126,9 @@ impl FunctionTargetProcessor for MonoAnalysisProcessor {
             }
             writeln!(f, "}}")?;
         }
-        for (fid, insts) in &info.funs {
+        for ((fid, variant), insts) in &info.funs {
             let fname = env.get_function(*fid).get_full_name_str();
-            writeln!(f, "fun {} = {{", fname)?;
+            writeln!(f, "fun {} [{}] = {{", fname, variant)?;
             for inst in insts {
                 writeln!(f, "  <{}>", display_inst(inst))?;
             }
@@ -236,7 +236,11 @@ impl<'a> Analyzer<'a> {
             );
             let inst = std::mem::take(&mut self.inst_opt).unwrap();
             // Insert it into final analysis result.
-            self.info.funs.entry(fun).or_default().insert(inst.clone());
+            self.info
+                .funs
+                .entry((fun, variant.clone()))
+                .or_default()
+                .insert(inst.clone());
             self.done_funs.insert((fun, variant, inst));
         }
         while !self.todo_spec_funs.is_empty() {
