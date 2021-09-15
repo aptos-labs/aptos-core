@@ -3,6 +3,7 @@ version = "0.8.0"
 
 [system-tests]
 smoke-test = { path = "smoke-test" }
+api-integration-tests = { path = "api/integration-tests" }
 jsonrpc-integration-tests = { path = "json-rpc/integration-tests" }
 testcases = { path = "testsuite/testcases" }
 
@@ -177,6 +178,7 @@ features = ["fuzzing"]
 members = [
     # Please keep this list in alphabetical order!
 
+    "api-integration-tests",
     "bytecode-interpreter-testsuite",
     "bytecode-verifier-tests",
     "bytecode-verifier-transactional-tests",
