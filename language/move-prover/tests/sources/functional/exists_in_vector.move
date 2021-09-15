@@ -68,9 +68,8 @@ module 0x42::VectorExists {
         ensures exists i: u64 : v[i] == 1; // FIXME: not verified, but should be.
         ensures e_in_v_u64(1, v); // FIXME: not verified, but should be.
 
-        // TODO: The followings are things to do next once the FIXMEs above are fixed:
-        // ensures old(e_in_v_vec(0, v)) ==> e_in_v_vec(0, v);
-        // ensures old(e_in_v_range(0, v)) ==> e_in_v_range(0, v);
-        // ensures old(e_in_v_u64(0, v)) ==> e_in_v_u64(0, v);
+        ensures old(e_in_v_vec(0, v)) ==> e_in_v_vec(0, v);
+        ensures old(e_in_v_range(0, v)) ==> e_in_v_range(0, v);
+        ensures old(e_in_v_u64(0, v)) ==> e_in_v_u64(0, v);
     }
 }
