@@ -21,7 +21,7 @@ use kube::{
     api::{Api, ListParams},
     client::Client as K8sClient,
 };
-use std::{collections::HashMap, convert::TryFrom, env, process::Command, str, sync::Arc};
+use std::{collections::HashMap, convert::TryFrom, env, process::Command, str, sync::Arc, thread};
 use tokio::{runtime::Runtime, time::Duration};
 
 const JSON_RPC_PORT: u32 = 80;
@@ -356,5 +356,8 @@ pub fn nodes_healthcheck<'a>(
         bail!("Unhealthy validators after cleanup: {:?}", unhealthy_nodes);
     }
     println!("All validators healthy after cleanup!");
+    println!("Wait for the instance to sync up with peers");
+    thread::sleep(Duration::from_secs(20));
+
     Ok(())
 }
