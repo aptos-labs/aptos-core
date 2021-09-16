@@ -9,11 +9,13 @@ use futures::{
         oneshot,
     },
     executor::block_on,
-    SinkExt,
+    SinkExt, StreamExt,
 };
+use tokio::time::Duration;
 
 use consensus_types::{common::Author, executed_block::ExecutedBlock};
 use diem_crypto::ed25519::Ed25519Signature;
+use diem_logger::prelude::*;
 use diem_types::{
     account_address::AccountAddress,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
@@ -34,8 +36,8 @@ use crate::{
     round_manager::VerifiedEvent,
     state_replication::StateComputerCommitCallBackType,
 };
-use diem_logger::prelude::*;
-use futures::StreamExt;
+
+pub const BUFFER_MANAGER_RETRY_INTERVAL: u64 = 1000;
 
 pub type SyncAck = ();
 
@@ -524,12 +526,40 @@ impl StateManager {
         Ok(())
     }
 
+    /// this function retries all the items until the signing root
+    /// note that there might be other signed items after the signing root
+    async fn retry_broadcasting_commit_votes(&mut self) -> anyhow::Result<()> {
+        let mut cursor = self.buffer.head.clone();
+        while cursor.is_some() && !link_eq(&cursor, &self.signing_root) {
+            // we move forward before sending the message
+            // just in case the buffer becomes empty during await.
+            let next_cursor = get_next(&cursor);
+            {
+                let buffer_item = get_elem(&cursor);
+                match &*buffer_item {
+                    BufferItem::Aggregated(_) => continue, // skip aggregated items
+                    BufferItem::Signed(signed) => {
+                        self.commit_msg_tx
+                            .broadcast(ConsensusMsg::CommitVoteMsg(Box::new(
+                                signed.commit_vote.clone(),
+                            )))
+                            .await;
+                    }
+                    _ => {
+                        unreachable!()
+                    }
+                }
+            }
+            cursor = next_cursor;
+        }
+        Ok(())
+    }
+
     async fn start(mut self) {
         info!("Buffer manager starts.");
-
+        let mut interval =
+            tokio::time::interval(Duration::from_millis(BUFFER_MANAGER_RETRY_INTERVAL));
         while !self.end_epoch {
-            // TODO: retry sending commit votes periodically
-
             // process new messages
             if let Err(e) = tokio::select! {
                 Some(blocks) = self.block_rx.next() => {
@@ -547,9 +577,10 @@ impl StateManager {
                 Some(commit_msg) = self.commit_msg_rx.next() => {
                     self.process_commit_msg(commit_msg).await
                 }
-                else => {
-                    break;
+                _ = interval.tick() => {
+                    self.retry_broadcasting_commit_votes().await
                 }
+                // no else branch here because interval.tick will always be available
             } {
                 counters::ERROR_COUNT.inc();
                 error!("BufferManager error: {}", e.to_string());
