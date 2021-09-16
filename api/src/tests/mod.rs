@@ -12,7 +12,6 @@ use executor::db_bootstrapper;
 use storage_interface::DbReaderWriter;
 
 use serde_json::{json, Value};
-use std::sync::Arc;
 
 #[tokio::test]
 async fn test_get_ledger_info() {
@@ -40,7 +39,7 @@ async fn test_get_ledger_info() {
     );
 }
 
-pub fn new_test_context() -> Arc<Context> {
+pub fn new_test_context() -> Context {
     let tmp_dir = TempPath::new();
     tmp_dir.create_as_dir().unwrap();
 
@@ -54,5 +53,5 @@ pub fn new_test_context() -> Arc<Context> {
     let (db, db_rw) = DbReaderWriter::wrap(DiemDB::new_for_test(&tmp_dir));
     db_bootstrapper::maybe_bootstrap::<DiemVM>(&db_rw, &genesis, genesis_waypoint).unwrap();
 
-    Arc::new(Context::new(ChainId::test(), db))
+    Context::new(ChainId::test(), db)
 }

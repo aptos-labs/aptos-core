@@ -21,7 +21,7 @@ pub fn bootstrap(chain_id: ChainId, db: Arc<dyn MoveDbReader>, config: &ApiConfi
 
     let address = config.address;
     runtime.spawn(async move {
-        let service = Arc::new(Context::new(chain_id, db));
+        let service = Context::new(chain_id, db);
         let routes = filters::routes(service);
         let server = warp::serve(routes).bind(address);
         server.await

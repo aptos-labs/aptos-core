@@ -8,6 +8,7 @@ use anyhow::Result;
 use std::{borrow::Borrow, sync::Arc};
 
 // Context holds application scope context
+#[derive(Clone)]
 pub struct Context {
     chain_id: ChainId,
     db: Arc<dyn MoveDbReader>,
