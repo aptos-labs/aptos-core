@@ -1077,12 +1077,9 @@ impl<'env> SpecTranslator<'env> {
                 let quant_ty = self.get_node_type(range.node_id());
                 if let Type::ResourceDomain(mid, sid, inst_opt) = quant_ty.skip_reference() {
                     let addr_var = resource_vars.get(&var.name).unwrap();
-                    let inst = self.inst_slice(inst_opt.as_ref().map(Vec::as_slice).unwrap_or(&[]));
-                    let resource_name = boogie_resource_memory_name(
-                        self.env,
-                        &mid.qualified_inst(*sid, inst),
-                        &None,
-                    );
+                    let memory =
+                        &mid.qualified_inst(*sid, inst_opt.to_owned().unwrap_or_else(Vec::new));
+                    let resource_name = boogie_resource_memory_name(self.env, memory, &None);
                     let resource_value = format!("$ResourceValue({}, {})", resource_name, addr_var);
                     emit!(self.writer, "{{{}}}", resource_value);
                 }
