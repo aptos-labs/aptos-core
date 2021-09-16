@@ -19,7 +19,7 @@ pub struct HealthCheckerBuilder {
 
 impl HealthCheckerBuilder {
     pub fn new(
-        network_context: Arc<NetworkContext>,
+        network_context: NetworkContext,
         time_service: TimeService,
         ping_interval_ms: u64,
         ping_timeout_ms: u64,

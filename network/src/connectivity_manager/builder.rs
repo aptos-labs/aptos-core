@@ -22,7 +22,7 @@ pub struct ConnectivityManagerBuilder {
 
 impl ConnectivityManagerBuilder {
     pub fn create(
-        network_context: Arc<NetworkContext>,
+        network_context: NetworkContext,
         time_service: TimeService,
         eligible: Arc<RwLock<PeerSet>>,
         seeds: PeerSet,

@@ -45,7 +45,7 @@ use futures::{
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use short_hex_str::AsShortHexStr;
-use std::{collections::hash_map::Entry, sync::Arc, time::Duration};
+use std::{collections::hash_map::Entry, time::Duration};
 
 pub mod builder;
 mod interface;
@@ -138,7 +138,7 @@ pub struct Pong(u32);
 
 /// The actor performing health checks by running the Ping protocol
 pub struct HealthChecker {
-    network_context: Arc<NetworkContext>,
+    network_context: NetworkContext,
     /// A handle to a time service for easily mocking time-related operations.
     time_service: TimeService,
     /// Network interface to send requests to the Network Layer
@@ -160,7 +160,7 @@ pub struct HealthChecker {
 impl HealthChecker {
     /// Create new instance of the [`HealthChecker`] actor.
     pub fn new(
-        network_context: Arc<NetworkContext>,
+        network_context: NetworkContext,
         time_service: TimeService,
         network_interface: HealthCheckNetworkInterface,
         ping_interval: Duration,
@@ -267,7 +267,7 @@ impl HealthChecker {
                         );
 
                         tick_handlers.push(Self::ping_peer(
-                            self.network_context.clone(),
+                            self.network_context,
                             self.network_interface.sender(),
                             peer_id,
                             self.round,
@@ -427,7 +427,7 @@ impl HealthChecker {
     }
 
     async fn ping_peer(
-        network_context: Arc<NetworkContext>,
+        network_context: NetworkContext,
         mut network_tx: HealthCheckerNetworkSender,
         peer_id: PeerId,
         round: u64,

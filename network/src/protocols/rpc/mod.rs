@@ -72,7 +72,7 @@ use futures::{
 };
 use serde::Serialize;
 use short_hex_str::AsShortHexStr;
-use std::{cmp::PartialEq, collections::HashMap, fmt::Debug, sync::Arc, time::Duration};
+use std::{cmp::PartialEq, collections::HashMap, fmt::Debug, time::Duration};
 
 pub mod error;
 
@@ -163,7 +163,7 @@ impl PartialEq for InboundRpcRequest {
 /// There is one `InboundRpcs` handler per [`Peer`](crate::peer::Peer).
 pub struct InboundRpcs {
     /// The network instance this Peer actor is running under.
-    network_context: Arc<NetworkContext>,
+    network_context: NetworkContext,
     /// A handle to a time service for easily mocking time-related operations.
     time_service: TimeService,
     /// The PeerId of this connection's remote peer. Used for logging.
@@ -182,7 +182,7 @@ pub struct InboundRpcs {
 
 impl InboundRpcs {
     pub fn new(
-        network_context: Arc<NetworkContext>,
+        network_context: NetworkContext,
         time_service: TimeService,
         remote_peer_id: PeerId,
         inbound_rpc_timeout: Duration,
@@ -331,7 +331,7 @@ impl InboundRpcs {
 /// There is one `OutboundRpcs` handler per [`Peer`](crate::peer::Peer).
 pub struct OutboundRpcs {
     /// The network instance this Peer actor is running under.
-    network_context: Arc<NetworkContext>,
+    network_context: NetworkContext,
     /// A handle to a time service for easily mocking time-related operations.
     time_service: TimeService,
     /// The PeerId of this connection's remote peer. Used for logging.
@@ -358,7 +358,7 @@ pub struct OutboundRpcs {
 
 impl OutboundRpcs {
     pub fn new(
-        network_context: Arc<NetworkContext>,
+        network_context: NetworkContext,
         time_service: TimeService,
         remote_peer_id: PeerId,
         max_concurrent_outbound_rpcs: u32,

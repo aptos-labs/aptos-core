@@ -9,7 +9,7 @@ use std::{fmt, str::FromStr};
 /// A grouping of common information between all networking code for logging.
 /// This should greatly reduce the groupings between these given everywhere, and will allow
 /// for logging accordingly.
-#[derive(Clone, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Eq, PartialEq, Serialize)]
 pub struct NetworkContext {
     /// The type of node
     role: RoleType,
@@ -58,21 +58,13 @@ impl NetworkContext {
     }
 
     #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
-    pub fn mock_with_peer_id(peer_id: PeerId) -> std::sync::Arc<Self> {
-        std::sync::Arc::new(Self::new(
-            RoleType::Validator,
-            NetworkId::Validator,
-            peer_id,
-        ))
+    pub fn mock_with_peer_id(peer_id: PeerId) -> Self {
+        Self::new(RoleType::Validator, NetworkId::Validator, peer_id)
     }
 
     #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
-    pub fn mock() -> std::sync::Arc<Self> {
-        std::sync::Arc::new(Self::new(
-            RoleType::Validator,
-            NetworkId::Validator,
-            PeerId::random(),
-        ))
+    pub fn mock() -> Self {
+        Self::new(RoleType::Validator, NetworkId::Validator, PeerId::random())
     }
 }
 

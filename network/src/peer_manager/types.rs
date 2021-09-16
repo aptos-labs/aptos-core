@@ -13,7 +13,7 @@ use diem_config::network_id::NetworkContext;
 use diem_types::{network_address::NetworkAddress, PeerId};
 use futures::channel::oneshot;
 use serde::Serialize;
-use std::{fmt, sync::Arc};
+use std::fmt;
 
 /// Request received by PeerManager from upstream actors.
 #[derive(Debug, Serialize)]
@@ -49,9 +49,9 @@ pub enum ConnectionRequest {
 #[derive(Clone, PartialEq, Serialize)]
 pub enum ConnectionNotification {
     /// Connection with a new peer has been established.
-    NewPeer(ConnectionMetadata, Arc<NetworkContext>),
+    NewPeer(ConnectionMetadata, NetworkContext),
     /// Connection to a peer has been terminated. This could have been triggered from either end.
-    LostPeer(ConnectionMetadata, Arc<NetworkContext>, DisconnectReason),
+    LostPeer(ConnectionMetadata, NetworkContext, DisconnectReason),
 }
 
 impl fmt::Debug for ConnectionNotification {

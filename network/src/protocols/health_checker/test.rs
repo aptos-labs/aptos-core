@@ -17,6 +17,7 @@ use crate::{
 use channel::{diem_channel, message_queues::QueueStyle};
 use diem_time_service::{MockTimeService, TimeService};
 use futures::{executor::block_on, future};
+use std::sync::Arc;
 
 const PING_INTERVAL: Duration = Duration::from_secs(1);
 const PING_TIMEOUT: Duration = Duration::from_millis(500);

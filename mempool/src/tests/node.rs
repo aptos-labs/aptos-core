@@ -405,7 +405,7 @@ impl Node {
     ) {
         let metadata = ConnectionMetadata::mock_with_role_and_origin(new_peer, peer_role, origin);
         let network_context = self.network_context(is_primary);
-        let notif = ConnectionNotification::NewPeer(metadata, Arc::new(network_context));
+        let notif = ConnectionNotification::NewPeer(metadata, network_context);
         self.send_connection_event(is_primary, notif)
     }
 

@@ -71,7 +71,7 @@ where
     TTransport: Transport,
     TSocket: AsyncRead + AsyncWrite,
 {
-    network_context: Arc<NetworkContext>,
+    network_context: NetworkContext,
     /// A handle to a tokio executor.
     executor: Handle,
     /// A handle to a time service for easily mocking time-related operations.
@@ -138,7 +138,7 @@ where
         executor: Handle,
         time_service: TimeService,
         transport: TTransport,
-        network_context: Arc<NetworkContext>,
+        network_context: NetworkContext,
         listen_addr: NetworkAddress,
         peer_metadata_storage: Arc<PeerMetadataStorage>,
         trusted_peers: Arc<RwLock<PeerSet>>,
@@ -167,7 +167,7 @@ where
         let transport_notifs_tx_clone = transport_notifs_tx.clone();
         let _guard = executor.enter();
         let (transport_handler, listen_addr) = TransportHandler::new(
-            network_context.clone(),
+            network_context,
             time_service.clone(),
             transport,
             listen_addr,
@@ -412,7 +412,7 @@ where
                 if !self.active_peers.contains_key(&peer_id) {
                     let notif = ConnectionNotification::LostPeer(
                         lost_conn_metadata,
-                        self.network_context.clone(),
+                        self.network_context,
                         reason,
                     );
                     self.send_conn_notification(peer_id, notif);
@@ -591,7 +591,7 @@ where
     }
 
     fn disconnect(&mut self, connection: Connection<TSocket>) {
-        let network_context = self.network_context.clone();
+        let network_context = self.network_context;
         let time_service = self.time_service.clone();
 
         // Close connection, and drop it
@@ -689,7 +689,7 @@ where
 
         // Initialize a new Peer actor for this connection.
         let peer = Peer::new(
-            self.network_context.clone(),
+            self.network_context,
             self.executor.clone(),
             self.time_service.clone(),
             connection,
@@ -715,7 +715,7 @@ where
             .insert_connection(conn_meta.clone());
         // Send NewPeer notification to connection event handlers.
         if send_new_peer_notification {
-            let notif = ConnectionNotification::NewPeer(conn_meta, self.network_context.clone());
+            let notif = ConnectionNotification::NewPeer(conn_meta, self.network_context);
             self.send_conn_notification(peer_id, notif);
         }
     }
@@ -745,12 +745,12 @@ where
         network_events: diem_channel::Receiver<ProtocolId, PeerNotification>,
     ) {
         let mut upstream_handlers = self.upstream_handlers.clone();
-        let network_context = self.network_context.clone();
+        let network_context = self.network_context;
         self.executor.spawn(network_events.for_each_concurrent(
             self.max_concurrent_network_reqs,
             move |inbound_event| {
                 Self::handle_inbound_event(
-                    network_context.clone(),
+                    network_context,
                     inbound_event,
                     peer_id,
                     &mut upstream_handlers,
@@ -761,7 +761,7 @@ where
     }
 
     fn handle_inbound_event(
-        network_context: Arc<NetworkContext>,
+        network_context: NetworkContext,
         inbound_event: PeerNotification,
         peer_id: PeerId,
         upstream_handlers: &mut HashMap<

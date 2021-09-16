@@ -140,7 +140,7 @@ pub fn setup_network() -> DummyNetwork {
     let authentication_mode = AuthenticationMode::Mutual(listener_identity_private_key);
 
     // Set up the listener network
-    let network_context = Arc::new(NetworkContext::new(role, network_id, listener_peer_id));
+    let network_context = NetworkContext::new(role, network_id, listener_peer_id);
     let mut network_builder = NetworkBuilder::new_for_test(
         chain_id,
         seeds.clone(),
@@ -165,7 +165,7 @@ pub fn setup_network() -> DummyNetwork {
     let authentication_mode = AuthenticationMode::Mutual(dialer_identity_private_key);
 
     // Set up the dialer network
-    let network_context = Arc::new(NetworkContext::new(role, network_id, dialer_peer_id));
+    let network_context = NetworkContext::new(role, network_id, dialer_peer_id);
 
     let trusted_peers = Arc::new(RwLock::new(HashMap::new()));
 

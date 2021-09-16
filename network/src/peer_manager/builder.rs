@@ -190,7 +190,7 @@ enum TransportPeerManager {
 }
 
 pub struct PeerManagerBuilder {
-    network_context: Arc<NetworkContext>,
+    network_context: NetworkContext,
     time_service: TimeService,
     transport_context: Option<TransportContext>,
     peer_manager_context: Option<PeerManagerContext>,
@@ -204,7 +204,7 @@ impl PeerManagerBuilder {
     #[allow(clippy::too_many_arguments)]
     pub fn create(
         chain_id: ChainId,
-        network_context: Arc<NetworkContext>,
+        network_context: NetworkContext,
         time_service: TimeService,
         // TODO(philiphayes): better support multiple listening addrs
         listen_address: NetworkAddress,
@@ -303,7 +303,7 @@ impl PeerManagerBuilder {
                 Some(TransportPeerManager::Tcp(self.build_with_transport(
                     DiemNetTransport::new(
                         DIEM_TCP_TRANSPORT.clone(),
-                        self.network_context.clone(),
+                        self.network_context,
                         self.time_service.clone(),
                         key,
                         auth_mode,
@@ -319,7 +319,7 @@ impl PeerManagerBuilder {
             [Memory(_)] => Some(TransportPeerManager::Memory(self.build_with_transport(
                 DiemNetTransport::new(
                     MemoryTransport,
-                    self.network_context.clone(),
+                    self.network_context,
                     self.time_service.clone(),
                     key,
                     auth_mode,
@@ -369,7 +369,7 @@ impl PeerManagerBuilder {
             executor.clone(),
             self.time_service.clone(),
             transport,
-            self.network_context.clone(),
+            self.network_context,
             // TODO(philiphayes): peer manager should take `Vec<NetworkAddress>`
             // (which could be empty, like in client use case)
             self.listen_address.clone(),
@@ -473,7 +473,7 @@ impl PeerManagerBuilder {
 
 /// Builds a token bucket rate limiter with attached metrics
 fn token_bucket_rate_limiter(
-    network_context: &Arc<NetworkContext>,
+    network_context: &NetworkContext,
     label: &'static str,
     input: Option<RateLimitConfig>,
 ) -> TokenBucketRateLimiter<IpAddr> {

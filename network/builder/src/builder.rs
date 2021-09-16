@@ -66,7 +66,7 @@ pub struct NetworkBuilder {
     state: State,
     executor: Option<Handle>,
     time_service: TimeService,
-    network_context: Arc<NetworkContext>,
+    network_context: NetworkContext,
     discovery_listeners: Option<Vec<DiscoveryChangeListener>>,
     connectivity_manager_builder: Option<ConnectivityManagerBuilder>,
     health_checker_builder: Option<HealthCheckerBuilder>,
@@ -80,7 +80,7 @@ impl NetworkBuilder {
     pub fn new(
         chain_id: ChainId,
         trusted_peers: Arc<RwLock<PeerSet>>,
-        network_context: Arc<NetworkContext>,
+        network_context: NetworkContext,
         time_service: TimeService,
         listen_address: NetworkAddress,
         authentication_mode: AuthenticationMode,
@@ -97,7 +97,7 @@ impl NetworkBuilder {
         // TODO:  construct this in create and pass it to new() as a parameter. The complication is manual construction of NetworkBuilder in various tests.
         let peer_manager_builder = PeerManagerBuilder::create(
             chain_id,
-            network_context.clone(),
+            network_context,
             time_service.clone(),
             listen_address,
             peer_metadata_storage.clone(),
@@ -129,7 +129,7 @@ impl NetworkBuilder {
         chain_id: ChainId,
         seeds: PeerSet,
         trusted_peers: Arc<RwLock<PeerSet>>,
-        network_context: Arc<NetworkContext>,
+        network_context: NetworkContext,
         time_service: TimeService,
         listen_address: NetworkAddress,
         authentication_mode: AuthenticationMode,
@@ -184,7 +184,7 @@ impl NetworkBuilder {
             AuthenticationMode::MaybeMutual(identity_key)
         };
 
-        let network_context = Arc::new(NetworkContext::new(role, config.network_id, peer_id));
+        let network_context = NetworkContext::new(role, config.network_id, peer_id);
 
         let trusted_peers = Arc::new(RwLock::new(HashMap::new()));
 
@@ -308,8 +308,8 @@ impl NetworkBuilder {
         self
     }
 
-    pub fn network_context(&self) -> Arc<NetworkContext> {
-        self.network_context.clone()
+    pub fn network_context(&self) -> NetworkContext {
+        self.network_context
     }
 
     pub fn conn_mgr_reqs_tx(&self) -> Option<channel::Sender<ConnectivityRequest>> {
@@ -383,7 +383,7 @@ impl NetworkBuilder {
                 let reconfig_events =
                     reconfig_events.expect("Reconfiguration listener is expected!");
                 DiscoveryChangeListener::validator_set(
-                    self.network_context.clone(),
+                    self.network_context,
                     conn_mgr_reqs_tx,
                     pubkey,
                     encryptor,
@@ -391,7 +391,7 @@ impl NetworkBuilder {
                 )
             }
             DiscoveryMethod::File(path, interval_duration) => DiscoveryChangeListener::file(
-                self.network_context.clone(),
+                self.network_context,
                 conn_mgr_reqs_tx,
                 path,
                 *interval_duration,

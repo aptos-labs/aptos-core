@@ -45,7 +45,7 @@ use futures::{
 };
 use serde::Serialize;
 use short_hex_str::AsShortHexStr;
-use std::{fmt, panic, sync::Arc, time::Duration};
+use std::{fmt, panic, time::Duration};
 use tokio::runtime::Handle;
 use tokio_util::compat::{
     FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt,
@@ -106,7 +106,7 @@ enum State {
 /// the initial connection establishment and handshake.
 pub struct Peer<TSocket> {
     /// The network instance this Peer actor is running under.
-    network_context: Arc<NetworkContext>,
+    network_context: NetworkContext,
     /// A handle to a tokio executor.
     executor: Handle,
     /// A handle to a time service for easily mocking time-related operations.
@@ -141,7 +141,7 @@ where
     TSocket: AsyncRead + AsyncWrite + Send + 'static,
 {
     pub fn new(
-        network_context: Arc<NetworkContext>,
+        network_context: NetworkContext,
         executor: Handle,
         time_service: TimeService,
         connection: Connection<TSocket>,
@@ -161,7 +161,7 @@ where
         } = connection;
         let remote_peer_id = connection_metadata.remote_peer_id;
         Self {
-            network_context: network_context.clone(),
+            network_context,
             executor,
             time_service: time_service.clone(),
             connection_metadata,
@@ -170,7 +170,7 @@ where
             peer_reqs_rx,
             peer_notifs_tx,
             inbound_rpcs: InboundRpcs::new(
-                network_context.clone(),
+                network_context,
                 time_service.clone(),
                 remote_peer_id,
                 inbound_rpc_timeout,
@@ -227,7 +227,7 @@ where
             &self.executor,
             self.time_service.clone(),
             self.connection_metadata.clone(),
-            self.network_context.clone(),
+            self.network_context,
             writer,
         );
 
@@ -303,7 +303,7 @@ where
         executor: &Handle,
         time_service: TimeService,
         connection_metadata: ConnectionMetadata,
-        network_context: Arc<NetworkContext>,
+        network_context: NetworkContext,
         mut writer: NetworkMessageSink<impl AsyncWrite + Unpin + Send + 'static>,
     ) -> (
         channel::Sender<(

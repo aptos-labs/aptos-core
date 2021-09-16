@@ -135,7 +135,7 @@ impl HandshakeAuthMode {
 /// The Noise configuration to be used to perform a protocol upgrade on an underlying socket.
 pub struct NoiseUpgrader {
     /// The validator's network context
-    pub network_context: Arc<NetworkContext>,
+    pub network_context: NetworkContext,
     /// Config for executing Noise handshakes. Includes our static private key.
     noise_config: noise::NoiseConfig,
     /// Handshake authentication can be either mutual or server-only authentication.
@@ -145,7 +145,7 @@ pub struct NoiseUpgrader {
 impl NoiseUpgrader {
     /// Create a new NoiseConfig with the provided keypair and authentication mode.
     pub fn new(
-        network_context: Arc<NetworkContext>,
+        network_context: NetworkContext,
         key: x25519::PrivateKey,
         auth_mode: HandshakeAuthMode,
     ) -> Self {

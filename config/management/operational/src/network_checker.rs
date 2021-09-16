@@ -213,7 +213,7 @@ fn build_upgrade_context(
     private_key: x25519::PrivateKey,
 ) -> Arc<UpgradeContext> {
     // RoleType doesn't matter, but the `NetworkId` and `PeerId` are used in handshakes
-    let network_context = Arc::new(NetworkContext::new(RoleType::FullNode, network_id, peer_id));
+    let network_context = NetworkContext::new(RoleType::FullNode, network_id, peer_id);
 
     // Let's make sure some protocol can be connected.  In the future we may want to allow for specifics
     let mut supported_protocols = BTreeMap::new();

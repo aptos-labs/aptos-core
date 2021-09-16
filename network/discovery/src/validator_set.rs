@@ -21,12 +21,11 @@ use short_hex_str::AsShortHexStr;
 use std::{
     collections::HashSet,
     pin::Pin,
-    sync::Arc,
     task::{Context, Poll},
 };
 
 pub struct ValidatorSetStream {
-    pub(crate) network_context: Arc<NetworkContext>,
+    pub(crate) network_context: NetworkContext,
     expected_pubkey: x25519::PublicKey,
     encryptor: Encryptor<Storage>,
     reconfig_events: ReconfigNotificationListener,
@@ -34,7 +33,7 @@ pub struct ValidatorSetStream {
 
 impl ValidatorSetStream {
     pub(crate) fn new(
-        network_context: Arc<NetworkContext>,
+        network_context: NetworkContext,
         expected_pubkey: x25519::PublicKey,
         encryptor: Encryptor<Storage>,
         reconfig_events: ReconfigNotificationListener,
@@ -79,7 +78,7 @@ impl ValidatorSetStream {
             .expect("failed to get ValidatorSet from payload");
 
         let peer_set =
-            extract_validator_set_updates(self.network_context.clone(), &self.encryptor, node_set);
+            extract_validator_set_updates(self.network_context, &self.encryptor, node_set);
         // Ensure that the public key matches what's onchain for this peer
         self.find_key_mismatches(
             peer_set
@@ -113,7 +112,7 @@ impl Stream for ValidatorSetStream {
 
 /// Extracts a set of ConnectivityRequests from a ValidatorSet which are appropriate for a network with type role.
 fn extract_validator_set_updates(
-    network_context: Arc<NetworkContext>,
+    network_context: NetworkContext,
     encryptor: &Encryptor<Storage>,
     node_set: ValidatorSet,
 ) -> PeerSet {
@@ -180,7 +179,7 @@ mod tests {
     use event_notifications::ReconfigNotification;
     use futures::executor::block_on;
     use rand::{rngs::StdRng, SeedableRng};
-    use std::{collections::HashMap, time::Instant};
+    use std::{collections::HashMap, sync::Arc, time::Instant};
     use tokio::{
         runtime::Runtime,
         time::{timeout_at, Duration},
@@ -204,7 +203,7 @@ mod tests {
         };
         let network_context = NetworkContext::mock_with_peer_id(peer_id);
         let listener = DiscoveryChangeListener::validator_set(
-            network_context.clone(),
+            network_context,
             conn_mgr_reqs_tx,
             pubkey,
             Encryptor::for_testing(),

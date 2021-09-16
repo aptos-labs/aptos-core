@@ -21,7 +21,7 @@ use futures::{
 };
 use netcore::transport::{ConnectionOrigin, Transport};
 use short_hex_str::AsShortHexStr;
-use std::{sync::Arc, time::Instant};
+use std::time::Instant;
 
 #[derive(Debug)]
 pub enum TransportRequest {
@@ -38,7 +38,7 @@ where
     TTransport: Transport,
     TSocket: AsyncRead + AsyncWrite,
 {
-    network_context: Arc<NetworkContext>,
+    network_context: NetworkContext,
     time_service: TimeService,
     /// [`Transport`] that is used to establish connections
     transport: TTransport,
@@ -56,7 +56,7 @@ where
     TSocket: AsyncRead + AsyncWrite + 'static,
 {
     pub fn new(
-        network_context: Arc<NetworkContext>,
+        network_context: NetworkContext,
         time_service: TimeService,
         transport: TTransport,
         listen_addr: NetworkAddress,

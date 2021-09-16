@@ -429,7 +429,7 @@ where
 {
     pub fn new(
         base_transport: TTransport,
-        network_context: Arc<NetworkContext>,
+        network_context: NetworkContext,
         time_service: TimeService,
         identity_key: x25519::PrivateKey,
         auth_mode: HandshakeAuthMode,

@@ -77,7 +77,7 @@ const MAX_CONNECTION_DELAY_JITTER: Duration = Duration::from_millis(100);
 
 /// The ConnectivityManager actor.
 pub struct ConnectivityManager<TBackoff> {
-    network_context: Arc<NetworkContext>,
+    network_context: NetworkContext,
     /// A handle to a time service for easily mocking time-related operations.
     time_service: TimeService,
     /// Nodes which are eligible to join the network.
@@ -251,7 +251,7 @@ where
 {
     /// Creates a new instance of the [`ConnectivityManager`] actor.
     pub fn new(
-        network_context: Arc<NetworkContext>,
+        network_context: NetworkContext,
         time_service: TimeService,
         eligible: Arc<RwLock<PeerSet>>,
         seeds: PeerSet,
@@ -528,7 +528,7 @@ where
             dial_delay
         );
 
-        let network_context = self.network_context.clone();
+        let network_context = self.network_context;
         // Create future which completes by either dialing after calculated
         // delay or on cancellation.
         let f = async move {
@@ -784,7 +784,7 @@ where
 }
 
 fn log_dial_result(
-    network_context: Arc<NetworkContext>,
+    network_context: NetworkContext,
     peer_id: PeerId,
     addr: NetworkAddress,
     dial_result: DialResult,

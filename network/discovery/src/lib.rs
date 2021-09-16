@@ -18,7 +18,6 @@ use network::{
 use std::{
     path::Path,
     pin::Pin,
-    sync::Arc,
     task::{Context, Poll},
     time::Duration,
 };
@@ -37,7 +36,7 @@ pub enum DiscoveryError {
 /// A union type for all implementations of `DiscoveryChangeListenerTrait`
 pub struct DiscoveryChangeListener {
     discovery_source: DiscoverySource,
-    network_context: Arc<NetworkContext>,
+    network_context: NetworkContext,
     update_channel: channel::Sender<ConnectivityRequest>,
     source_stream: DiscoveryChangeStream,
 }
@@ -60,14 +59,14 @@ impl Stream for DiscoveryChangeStream {
 
 impl DiscoveryChangeListener {
     pub fn validator_set(
-        network_context: Arc<NetworkContext>,
+        network_context: NetworkContext,
         update_channel: channel::Sender<ConnectivityRequest>,
         expected_pubkey: x25519::PublicKey,
         encryptor: Encryptor<Storage>,
         reconfig_events: ReconfigNotificationListener,
     ) -> Self {
         let source_stream = DiscoveryChangeStream::ValidatorSet(ValidatorSetStream::new(
-            network_context.clone(),
+            network_context,
             expected_pubkey,
             encryptor,
             reconfig_events,
@@ -81,7 +80,7 @@ impl DiscoveryChangeListener {
     }
 
     pub fn file(
-        network_context: Arc<NetworkContext>,
+        network_context: NetworkContext,
         update_channel: channel::Sender<ConnectivityRequest>,
         file_path: &Path,
         interval_duration: Duration,
@@ -105,7 +104,7 @@ impl DiscoveryChangeListener {
     }
 
     async fn run(mut self: Pin<Box<Self>>) {
-        let network_context = self.network_context.clone();
+        let network_context = self.network_context;
         let discovery_source = self.discovery_source;
         let mut update_channel = self.update_channel.clone();
         let source_stream = &mut self.source_stream;
