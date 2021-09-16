@@ -19,6 +19,7 @@ fn batch_update<'t>(
         ctx.swarm().upgrade_validator(*validator, version)?;
     }
 
+    ctx.swarm().health_check()?;
     let deadline = Instant::now() + Duration::from_secs(60);
     for validator in validators_to_update {
         ctx.swarm()
@@ -26,7 +27,6 @@ fn batch_update<'t>(
             .unwrap()
             .wait_until_healthy(deadline)?;
     }
-    ctx.swarm().health_check()?;
 
     Ok(())
 }
