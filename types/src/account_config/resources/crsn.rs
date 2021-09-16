@@ -11,6 +11,8 @@ use move_core_types::{
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
 
+use crate::event::EventHandle;
+
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub enum AccountSequenceInfo {
     Sequential(u64),
@@ -33,6 +35,7 @@ pub struct CRSNResource {
     size: u64,
     // NG: The length of these slots are not necessarily the size of the CRSN.
     slots: Vec<u8>,
+    force_shift_events: EventHandle,
 }
 
 impl CRSNResource {

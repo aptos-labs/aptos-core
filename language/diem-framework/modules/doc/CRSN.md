@@ -9,7 +9,10 @@ criteria, force expiration and window shifting of CRSNs are described in DIP-168
 
 
 -  [Resource `CRSN`](#0x1_CRSN_CRSN)
+-  [Struct `ForceShiftEvent`](#0x1_CRSN_ForceShiftEvent)
+-  [Resource `CRSNsAllowed`](#0x1_CRSN_CRSNsAllowed)
 -  [Constants](#@Constants_0)
+-  [Function `allow_crsns`](#0x1_CRSN_allow_crsns)
 -  [Function `publish`](#0x1_CRSN_publish)
 -  [Function `record`](#0x1_CRSN_record)
 -  [Function `check`](#0x1_CRSN_check)
@@ -20,6 +23,8 @@ criteria, force expiration and window shifting of CRSNs are described in DIP-168
 
 <pre><code><b>use</b> <a href="../../../../../../move-stdlib/docs/BitVector.md#0x1_BitVector">0x1::BitVector</a>;
 <b>use</b> <a href="../../../../../../move-stdlib/docs/Errors.md#0x1_Errors">0x1::Errors</a>;
+<b>use</b> <a href="../../../../../../move-stdlib/docs/Event.md#0x1_Event">0x1::Event</a>;
+<b>use</b> <a href="Roles.md#0x1_Roles">0x1::Roles</a>;
 <b>use</b> <a href="../../../../../../move-stdlib/docs/Signer.md#0x1_Signer">0x1::Signer</a>;
 </code></pre>
 
@@ -70,6 +75,86 @@ min_nonce                       min_nonce + k - 1
 <dd>
 
 </dd>
+<dt>
+<code>force_shift_events: <a href="../../../../../../move-stdlib/docs/Event.md#0x1_Event_EventHandle">Event::EventHandle</a>&lt;<a href="CRSN.md#0x1_CRSN_ForceShiftEvent">CRSN::ForceShiftEvent</a>&gt;</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_CRSN_ForceShiftEvent"></a>
+
+## Struct `ForceShiftEvent`
+
+Whenever a force shift is performed a <code><a href="CRSN.md#0x1_CRSN_ForceShiftEvent">ForceShiftEvent</a></code> is emitted.
+This is used to prove the absence of a transaction at a specific sequence nonce.
+
+
+<pre><code><b>struct</b> <a href="CRSN.md#0x1_CRSN_ForceShiftEvent">ForceShiftEvent</a> has drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>current_min_nonce: u64</code>
+</dt>
+<dd>
+ current LHS of the CRSN state
+</dd>
+<dt>
+<code>shift_amount: u64</code>
+</dt>
+<dd>
+ The amount the window is being shifted
+</dd>
+<dt>
+<code>bits_at_shift: <a href="../../../../../../move-stdlib/docs/BitVector.md#0x1_BitVector_BitVector">BitVector::BitVector</a></code>
+</dt>
+<dd>
+ The state of the bitvector just before the shift. The state of
+ the CRSN's bitvector is needed at the time of the shift to prove
+ that a CRSNs nonce was expired, and not already used by a transaction
+ in the past. This can be used to prove that a transaction can't
+ exist from an account because the slot was expired and not used.
+ Note: the sequence  nonce of the shifting transaction will not be set.
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_CRSN_CRSNsAllowed"></a>
+
+## Resource `CRSNsAllowed`
+
+Flag stored in memory to turn on CRSNs
+
+
+<pre><code><b>struct</b> <a href="CRSN.md#0x1_CRSN_CRSNsAllowed">CRSNsAllowed</a> has key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
+</dd>
 </dl>
 
 
@@ -78,6 +163,16 @@ min_nonce                       min_nonce + k - 1
 <a name="@Constants_0"></a>
 
 ## Constants
+
+
+<a name="0x1_CRSN_EALREADY_INITIALIZED"></a>
+
+CRSNs were already initialized
+
+
+<pre><code><b>const</b> <a href="CRSN.md#0x1_CRSN_EALREADY_INITIALIZED">EALREADY_INITIALIZED</a>: u64 = 6;
+</code></pre>
+
 
 
 <a name="0x1_CRSN_ECRSN_SIZE_TOO_LARGE"></a>
@@ -106,6 +201,16 @@ the amount to shift the CRSN window was zero
 
 
 <pre><code><b>const</b> <a href="CRSN.md#0x1_CRSN_EINVALID_SHIFT">EINVALID_SHIFT</a>: u64 = 4;
+</code></pre>
+
+
+
+<a name="0x1_CRSN_ENOT_INITIALIZED"></a>
+
+CRSNs are not yet permitted in the network
+
+
+<pre><code><b>const</b> <a href="CRSN.md#0x1_CRSN_ENOT_INITIALIZED">ENOT_INITIALIZED</a>: u64 = 5;
 </code></pre>
 
 
@@ -139,6 +244,32 @@ The size given to the CRSN at the time of publishing was zero, which is not supp
 
 
 
+<a name="0x1_CRSN_allow_crsns"></a>
+
+## Function `allow_crsns`
+
+
+
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="CRSN.md#0x1_CRSN_allow_crsns">allow_crsns</a>(account: &signer)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="CRSN.md#0x1_CRSN_allow_crsns">allow_crsns</a>(account: &signer) {
+    <a href="Roles.md#0x1_Roles_assert_diem_root">Roles::assert_diem_root</a>(account);
+    <b>assert</b>(!<b>exists</b>&lt;<a href="CRSN.md#0x1_CRSN_CRSNsAllowed">CRSNsAllowed</a>&gt;(<a href="../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account)), <a href="../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="CRSN.md#0x1_CRSN_EALREADY_INITIALIZED">EALREADY_INITIALIZED</a>));
+    move_to(account, <a href="CRSN.md#0x1_CRSN_CRSNsAllowed">CRSNsAllowed</a> { })
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_CRSN_publish"></a>
 
 ## Function `publish`
@@ -159,10 +290,12 @@ Publish a DSN under <code>account</code>. Cannot already have a DSN published.
     <b>assert</b>(!<a href="CRSN.md#0x1_CRSN_has_crsn">has_crsn</a>(<a href="../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account)), <a href="../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="CRSN.md#0x1_CRSN_EHAS_CRSN">EHAS_CRSN</a>));
     <b>assert</b>(size &gt; 0, <a href="../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="CRSN.md#0x1_CRSN_EZERO_SIZE_CRSN">EZERO_SIZE_CRSN</a>));
     <b>assert</b>(size &lt;= <a href="CRSN.md#0x1_CRSN_MAX_CRSN_SIZE">MAX_CRSN_SIZE</a>, <a href="../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="CRSN.md#0x1_CRSN_ECRSN_SIZE_TOO_LARGE">ECRSN_SIZE_TOO_LARGE</a>));
+    <b>assert</b>(<b>exists</b>&lt;<a href="CRSN.md#0x1_CRSN_CRSNsAllowed">CRSNsAllowed</a>&gt;(@DiemRoot), <a href="../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="CRSN.md#0x1_CRSN_ENOT_INITIALIZED">ENOT_INITIALIZED</a>));
     move_to(account, <a href="CRSN.md#0x1_CRSN">CRSN</a> {
         min_nonce,
         size,
         slots: <a href="../../../../../../move-stdlib/docs/BitVector.md#0x1_BitVector_new">BitVector::new</a>(size),
+        force_shift_events: <a href="../../../../../../move-stdlib/docs/Event.md#0x1_Event_new_event_handle">Event::new_event_handle</a>&lt;<a href="CRSN.md#0x1_CRSN_ForceShiftEvent">ForceShiftEvent</a>&gt;(account),
     })
 }
 </code></pre>
@@ -177,6 +310,7 @@ Publish a DSN under <code>account</code>. Cannot already have a DSN published.
 
 
 <pre><code><b>include</b> <a href="../../../../../../move-stdlib/docs/BitVector.md#0x1_BitVector_NewAbortsIf">BitVector::NewAbortsIf</a>{length: size};
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="CRSN.md#0x1_CRSN_CRSNsAllowed">CRSNsAllowed</a>&gt;(@DiemRoot) <b>with</b> <a href="../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_INVALID_STATE">Errors::INVALID_STATE</a>;
 <b>aborts_if</b> <a href="CRSN.md#0x1_CRSN_has_crsn">has_crsn</a>(<a href="../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account)) <b>with</b> <a href="../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_INVALID_STATE">Errors::INVALID_STATE</a>;
 <b>aborts_if</b> size == 0 <b>with</b> <a href="../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>;
 <b>aborts_if</b> size &gt; <a href="CRSN.md#0x1_CRSN_MAX_CRSN_SIZE">MAX_CRSN_SIZE</a> <b>with</b> <a href="../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>;
@@ -342,6 +476,12 @@ then shifted over set bits as define by the <code>shift_window_right</code> func
     <b>let</b> addr = <a href="../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
     <b>assert</b>(<a href="CRSN.md#0x1_CRSN_has_crsn">has_crsn</a>(addr), <a href="../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="CRSN.md#0x1_CRSN_ENO_CRSN">ENO_CRSN</a>));
     <b>let</b> crsn = borrow_global_mut&lt;<a href="CRSN.md#0x1_CRSN">CRSN</a>&gt;(addr);
+
+    <a href="../../../../../../move-stdlib/docs/Event.md#0x1_Event_emit_event">Event::emit_event</a>(&<b>mut</b> crsn.force_shift_events, <a href="CRSN.md#0x1_CRSN_ForceShiftEvent">ForceShiftEvent</a> {
+        current_min_nonce: crsn.min_nonce,
+        shift_amount: shift_amount,
+        bits_at_shift: *&crsn.slots,
+    });
 
     <a href="../../../../../../move-stdlib/docs/BitVector.md#0x1_BitVector_shift_left">BitVector::shift_left</a>(&<b>mut</b> crsn.slots, shift_amount);
 

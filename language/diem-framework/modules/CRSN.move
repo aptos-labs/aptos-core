@@ -3,7 +3,9 @@
 /// criteria, force expiration and window shifting of CRSNs are described in DIP-168.
 
 module DiemFramework::CRSN {
+    use DiemFramework::Roles;
     use Std::BitVector::{Self, BitVector};
+    use Std::Event::{Self, EventHandle};
     use Std::Signer;
     use Std::Errors;
 
@@ -24,7 +26,27 @@ module DiemFramework::CRSN {
         min_nonce: u64,
         size: u64,
         slots: BitVector,
+        force_shift_events: EventHandle<ForceShiftEvent>,
     }
+
+    /// Whenever a force shift is performed a `ForceShiftEvent` is emitted.
+    /// This is used to prove the absence of a transaction at a specific sequence nonce.
+    struct ForceShiftEvent has drop, store {
+        /// current LHS of the CRSN state
+        current_min_nonce: u64,
+        /// The amount the window is being shifted
+        shift_amount: u64,
+        /// The state of the bitvector just before the shift. The state of
+        /// the CRSN's bitvector is needed at the time of the shift to prove
+        /// that a CRSNs nonce was expired, and not already used by a transaction
+        /// in the past. This can be used to prove that a transaction can't
+        /// exist from an account because the slot was expired and not used.
+        /// Note: the sequence  nonce of the shifting transaction will not be set.
+        bits_at_shift: BitVector,
+    }
+
+    /// Flag stored in memory to turn on CRSNs
+    struct CRSNsAllowed has key { }
 
     /// No CRSN resource exists
     const ENO_CRSN: u64 = 0;
@@ -36,23 +58,35 @@ module DiemFramework::CRSN {
     const ECRSN_SIZE_TOO_LARGE: u64 = 3;
     /// the amount to shift the CRSN window was zero
     const EINVALID_SHIFT: u64 = 4;
+    /// CRSNs are not yet permitted in the network
+    const ENOT_INITIALIZED: u64 = 5;
+    /// CRSNs were already initialized
+    const EALREADY_INITIALIZED: u64 = 6;
 
     const MAX_CRSN_SIZE: u64 = 256;
 
+    public(script) fun allow_crsns(account: &signer) {
+        Roles::assert_diem_root(account);
+        assert(!exists<CRSNsAllowed>(Signer::address_of(account)), Errors::invalid_state(EALREADY_INITIALIZED));
+        move_to(account, CRSNsAllowed { })
+    }
 
     /// Publish a DSN under `account`. Cannot already have a DSN published.
     public(friend) fun publish(account: &signer, min_nonce: u64, size: u64) {
         assert(!has_crsn(Signer::address_of(account)), Errors::invalid_state(EHAS_CRSN));
         assert(size > 0, Errors::invalid_argument(EZERO_SIZE_CRSN));
         assert(size <= MAX_CRSN_SIZE, Errors::invalid_argument(ECRSN_SIZE_TOO_LARGE));
+        assert(exists<CRSNsAllowed>(@DiemRoot), Errors::invalid_state(ENOT_INITIALIZED));
         move_to(account, CRSN {
             min_nonce,
             size,
             slots: BitVector::new(size),
+            force_shift_events: Event::new_event_handle<ForceShiftEvent>(account),
         })
     }
     spec publish {
         include BitVector::NewAbortsIf{length: size};
+        aborts_if !exists<CRSNsAllowed>(@DiemRoot) with Errors::INVALID_STATE;
         aborts_if has_crsn(Signer::spec_address_of(account)) with Errors::INVALID_STATE;
         aborts_if size == 0 with Errors::INVALID_ARGUMENT;
         aborts_if size > MAX_CRSN_SIZE with Errors::INVALID_ARGUMENT;
@@ -134,6 +168,12 @@ module DiemFramework::CRSN {
         let addr = Signer::address_of(account);
         assert(has_crsn(addr), Errors::invalid_state(ENO_CRSN));
         let crsn = borrow_global_mut<CRSN>(addr);
+
+        Event::emit_event(&mut crsn.force_shift_events, ForceShiftEvent {
+            current_min_nonce: crsn.min_nonce,
+            shift_amount: shift_amount,
+            bits_at_shift: *&crsn.slots,
+        });
 
         BitVector::shift_left(&mut crsn.slots, shift_amount);
 
