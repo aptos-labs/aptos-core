@@ -45,7 +45,7 @@ public fun Test::incr($t0|a: address) {
   5: $t6 := +($t4, $t5) on_abort goto 14 with $t3
   6: $t7 := borrow_field<Test::R>.x($t2)
   7: write_ref($t7, $t6)
-  8: write_back[Reference($t2).x]($t7)
+  8: write_back[Reference($t2).x (u64)]($t7)
      # state save for global update invariants
   9: @1 := save_mem(Test::R)
  10: write_back[Test::R@]($t2)

@@ -1169,14 +1169,20 @@ pub struct BorrowEdgeDisplay<'a> {
 impl<'a> std::fmt::Display for BorrowEdgeDisplay<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use BorrowEdge::*;
+        let tctx = TypeDisplayContext::WithEnv {
+            env: self.env,
+            type_param_names: None,
+        };
         match self.edge {
             Field(qid, field) => {
                 let struct_env = self.env.get_struct(qid.to_qualified_id());
                 let field_env = struct_env.get_field_by_offset(*field);
+                let field_type = field_env.get_type().instantiate(&qid.inst);
                 write!(
                     f,
-                    ".{}",
-                    field_env.get_name().display(self.env.symbol_pool())
+                    ".{} ({})",
+                    field_env.get_name().display(self.env.symbol_pool()),
+                    field_type.display(&tctx),
                 )
             }
             Index => write!(f, "[]"),

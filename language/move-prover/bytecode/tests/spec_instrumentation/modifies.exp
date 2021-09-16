@@ -184,7 +184,7 @@ public fun A::mutate_at($t0|addr: address) {
   6: $t4 := 2
   7: $t5 := borrow_field<A::S>.x($t2)
   8: write_ref($t5, $t4)
-  9: write_back[Reference($t2).x]($t5)
+  9: write_back[Reference($t2).x (u64)]($t5)
  10: write_back[A::S@]($t2)
  11: label L1
      # VC: function does not abort under this condition at tests/spec_instrumentation/modifies.move:24:9+27
@@ -461,7 +461,7 @@ public fun B::mutate_at_test_incorrect($t0|addr1: address, $t1|addr2: address) {
  17: $t9 := 2
  18: $t10 := borrow_field<B::T>.x($t8)
  19: write_ref($t10, $t9)
- 20: write_back[Reference($t8).x]($t10)
+ 20: write_back[Reference($t8).x (u64)]($t10)
  21: write_back[B::T@]($t8)
  22: $t11 := opaque begin: A::read_at($t1)
  23: assume Identical($t12, Not(exists<A::S>($t1)))

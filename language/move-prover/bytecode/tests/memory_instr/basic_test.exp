@@ -273,7 +273,7 @@ fun TestPackref::test1(): TestPackref::R {
   3: $t5 := borrow_field<TestPackref::R>.x($t4)
   4: $t6 := 0
   5: write_ref($t5, $t6)
-  6: write_back[Reference($t4).x]($t5)
+  6: write_back[Reference($t4).x (u64)]($t5)
   7: write_back[LocalRoot($t0)@]($t4)
   8: $t7 := move($t0)
   9: return $t7
@@ -294,7 +294,7 @@ public fun TestPackref::test3($t0|r_ref: &mut TestPackref::R, $t1|v: u64) {
      var $t3: &mut u64
   0: $t3 := borrow_field<TestPackref::R>.x($t0)
   1: TestPackref::test2($t3, $t1)
-  2: write_back[Reference($t0).x]($t3)
+  2: write_back[Reference($t0).x (u64)]($t3)
   3: trace_local[r_ref]($t0)
   4: return ()
 }
@@ -324,7 +324,7 @@ public fun TestPackref::test5($t0|r_ref: &mut TestPackref::R): &mut u64 {
      var $t1: &mut u64
   0: $t1 := borrow_field<TestPackref::R>.x($t0)
   1: trace_local[r_ref]($t0)
-  2: write_back[Reference($t0).x]($t1)
+  2: write_back[Reference($t0).x (u64)]($t1)
   3: return $t1
 }
 
@@ -345,7 +345,7 @@ fun TestPackref::test6(): TestPackref::R {
   3: $t5 := TestPackref::test5($t4)
   4: $t6 := 0
   5: TestPackref::test2($t5, $t6)
-  6: write_back[Reference($t4).x]($t5)
+  6: write_back[Reference($t4).x (u64)]($t5)
   7: write_back[LocalRoot($t0)@]($t4)
   8: $t7 := move($t0)
   9: return $t7

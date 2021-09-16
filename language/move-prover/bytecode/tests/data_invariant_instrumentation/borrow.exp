@@ -130,12 +130,12 @@ public fun Test::test_borrow_mut<#0>(): u64 {
   4: $t5 := borrow_field<Test::R<#0>>.s($t2)
   5: $t6 := borrow_field<Test::S>.y($t5)
   6: write_ref($t6, $t4)
-  7: write_back[Reference($t5).y]($t6)
-  8: write_back[Reference($t2).s]($t5)
+  7: write_back[Reference($t5).y (u64)]($t6)
+  8: write_back[Reference($t2).s (Test::S)]($t5)
   9: $t7 := 3
  10: $t8 := borrow_field<Test::R<#0>>.x($t2)
  11: write_ref($t8, $t7)
- 12: write_back[Reference($t2).x]($t8)
+ 12: write_back[Reference($t2).x (u64)]($t8)
  13: $t9 := get_field<Test::R<#0>>.x($t2)
      # data invariant at tests/data_invariant_instrumentation/borrow.move:13:9+18
      # VC: data invariant does not hold at tests/data_invariant_instrumentation/borrow.move:13:9+18
@@ -182,12 +182,12 @@ public fun Test::test_borrow_mut_local(): Test::R<u64> {
   9: $t8 := borrow_field<Test::R<u64>>.s($t6)
  10: $t9 := borrow_field<Test::S>.y($t8)
  11: write_ref($t9, $t7)
- 12: write_back[Reference($t8).y]($t9)
- 13: write_back[Reference($t6).s]($t8)
+ 12: write_back[Reference($t8).y (u64)]($t9)
+ 13: write_back[Reference($t6).s (Test::S)]($t8)
  14: $t10 := 3
  15: $t11 := borrow_field<Test::R<u64>>.x($t6)
  16: write_ref($t11, $t10)
- 17: write_back[Reference($t6).x]($t11)
+ 17: write_back[Reference($t6).x (u64)]($t11)
      # data invariant at tests/data_invariant_instrumentation/borrow.move:13:9+18
      # VC: data invariant does not hold at tests/data_invariant_instrumentation/borrow.move:13:9+18
  18: assert Gt(select Test::R.x($t6), select Test::S.y(select Test::R.s($t6)))
