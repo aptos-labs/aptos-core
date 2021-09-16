@@ -19,20 +19,12 @@ pub fn bootstrap(chain_id: ChainId, db: Arc<dyn MoveDbReader>, config: &ApiConfi
         .build()
         .expect("[api] failed to create runtime");
 
-    let service = Arc::new(Context::new(chain_id, db));
-    let routes = filters::routes(service);
-
-    // Ensure that we actually bind to the socket first before spawning the
-    // server tasks. This helps in tests to prevent races where a client attempts
-    // to make a request before the server task is actually listening on the
-    // socket.
-    //
-    // Note: we need to enter the runtime context first to actually bind, since
-    //       tokio TcpListener can only be bound inside a tokio context.
-
-    let _guard = runtime.enter();
-
-    let server = warp::serve(routes).bind(config.address);
-    runtime.handle().spawn(server);
+    let address = config.address.clone();
+    runtime.spawn(async move {
+        let service = Arc::new(Context::new(chain_id, db));
+        let routes = filters::routes(service);
+        let server = warp::serve(routes).bind(address);
+        server.await
+    });
     runtime
 }
