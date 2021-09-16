@@ -3,7 +3,6 @@ resolver = "2"
 
 members = [
     "api",
-    "api/integration-tests",
     "api/types",
     "client/assets-proof",
     "client/faucet",
