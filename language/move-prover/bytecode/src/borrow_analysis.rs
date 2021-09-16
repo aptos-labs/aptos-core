@@ -18,6 +18,7 @@ use move_model::{
     ast::TempIndex,
     model::{FunctionEnv, GlobalEnv, QualifiedInstId},
     native::VECTOR_BORROW_MUT,
+    ty::Type,
 };
 use std::{
     borrow::BorrowMut,
@@ -284,6 +285,7 @@ impl BorrowInfo {
     fn instantiate(
         &mut self,
         callee_target: &FunctionTarget<'_>,
+        callee_targs: &[Type],
         callee_summary: &BorrowInfo,
         ins: &[TempIndex],
         outs: &[TempIndex],
@@ -305,7 +307,11 @@ impl BorrowInfo {
                 for (in_node, edge) in edges.iter() {
                     if let BorrowNode::Reference(in_idx) = in_node {
                         let actual_in_node = BorrowNode::Reference(get_in(*in_idx));
-                        self.add_edge(actual_in_node.clone(), out_node.clone(), edge.to_owned());
+                        self.add_edge(
+                            actual_in_node.clone(),
+                            out_node.clone(),
+                            edge.instantiate(callee_targs),
+                        );
                         self.moved_nodes.insert(actual_in_node);
                     }
                 }
@@ -579,7 +585,7 @@ impl<'a> TransferFunctions for BorrowAnalysis<'a> {
                             BorrowEdge::Field(mid.qualified_inst(*sid, inst.to_owned()), *field),
                         );
                     }
-                    Function(mid, fid, ..) => {
+                    Function(mid, fid, targs) => {
                         let callee_env = &self
                             .func_target
                             .global_env()
@@ -590,7 +596,13 @@ impl<'a> TransferFunctions for BorrowAnalysis<'a> {
                         if let Some(callee_an) =
                             callee_target.get_annotations().get::<BorrowAnnotation>()
                         {
-                            state.instantiate(callee_target, &callee_an.summary, srcs, dests);
+                            state.instantiate(
+                                callee_target,
+                                targs,
+                                &callee_an.summary,
+                                srcs,
+                                dests,
+                            );
                         } else {
                             // This can happen for recursive functions. Check whether the function
                             // has &mut returns, and report an error that we can't deal with it if

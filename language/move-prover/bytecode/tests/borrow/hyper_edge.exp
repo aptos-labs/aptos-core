@@ -267,23 +267,23 @@ public fun Test::foo<#0>($t0|i: u64) {
   2: $t4 := Collection::borrow_mut<Test::Token<#0>>($t3, $t0)
      # live_nodes: LocalRoot($t0), Reference($t4)
      # moved_nodes: Reference($t3)
-     # borrowed_by: LocalRoot($t1) -> {(@, Reference($t3))}, Reference($t3) -> {(.items (vector<#0>)/[], Reference($t4))}
-     # borrows_from: Reference($t3) -> {(@, LocalRoot($t1))}, Reference($t4) -> {(.items (vector<#0>)/[], Reference($t3))}
+     # borrowed_by: LocalRoot($t1) -> {(@, Reference($t3))}, Reference($t3) -> {(.items (vector<Test::Token<#0>>)/[], Reference($t4))}
+     # borrows_from: Reference($t3) -> {(@, LocalRoot($t1))}, Reference($t4) -> {(.items (vector<Test::Token<#0>>)/[], Reference($t3))}
   3: $t5 := 0
      # live_nodes: LocalRoot($t0), Reference($t4)
      # moved_nodes: Reference($t3)
-     # borrowed_by: LocalRoot($t1) -> {(@, Reference($t3))}, Reference($t3) -> {(.items (vector<#0>)/[], Reference($t4))}
-     # borrows_from: Reference($t3) -> {(@, LocalRoot($t1))}, Reference($t4) -> {(.items (vector<#0>)/[], Reference($t3))}
+     # borrowed_by: LocalRoot($t1) -> {(@, Reference($t3))}, Reference($t3) -> {(.items (vector<Test::Token<#0>>)/[], Reference($t4))}
+     # borrows_from: Reference($t3) -> {(@, LocalRoot($t1))}, Reference($t4) -> {(.items (vector<Test::Token<#0>>)/[], Reference($t3))}
   4: $t6 := borrow_field<Test::Token<#0>>.value($t4)
      # live_nodes: LocalRoot($t0), Reference($t6)
      # moved_nodes: Reference($t3)
-     # borrowed_by: LocalRoot($t1) -> {(@, Reference($t3))}, Reference($t3) -> {(.items (vector<#0>)/[], Reference($t4))}, Reference($t4) -> {(.value (u64), Reference($t6))}
-     # borrows_from: Reference($t3) -> {(@, LocalRoot($t1))}, Reference($t4) -> {(.items (vector<#0>)/[], Reference($t3))}, Reference($t6) -> {(.value (u64), Reference($t4))}
+     # borrowed_by: LocalRoot($t1) -> {(@, Reference($t3))}, Reference($t3) -> {(.items (vector<Test::Token<#0>>)/[], Reference($t4))}, Reference($t4) -> {(.value (u64), Reference($t6))}
+     # borrows_from: Reference($t3) -> {(@, LocalRoot($t1))}, Reference($t4) -> {(.items (vector<Test::Token<#0>>)/[], Reference($t3))}, Reference($t6) -> {(.value (u64), Reference($t4))}
   5: write_ref($t6, $t5)
      # live_nodes: LocalRoot($t0)
      # moved_nodes: Reference($t3)
-     # borrowed_by: LocalRoot($t1) -> {(@, Reference($t3))}, Reference($t3) -> {(.items (vector<#0>)/[], Reference($t4))}, Reference($t4) -> {(.value (u64), Reference($t6))}
-     # borrows_from: Reference($t3) -> {(@, LocalRoot($t1))}, Reference($t4) -> {(.items (vector<#0>)/[], Reference($t3))}, Reference($t6) -> {(.value (u64), Reference($t4))}
+     # borrowed_by: LocalRoot($t1) -> {(@, Reference($t3))}, Reference($t3) -> {(.items (vector<Test::Token<#0>>)/[], Reference($t4))}, Reference($t4) -> {(.value (u64), Reference($t6))}
+     # borrows_from: Reference($t3) -> {(@, LocalRoot($t1))}, Reference($t4) -> {(.items (vector<Test::Token<#0>>)/[], Reference($t3))}, Reference($t6) -> {(.value (u64), Reference($t4))}
   6: return ()
 }
 
