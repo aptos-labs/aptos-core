@@ -60,7 +60,7 @@ mutation steps which are represented as purely functional data updates.  Once
 the last reference for the data in |l| goes out of scope, the updated value is
 written back to |l|. This effectively turns an imperative program with references
 into an imperative program which only has state updates on global memory or
-variables on the stack, a class of programs which is known to have a significant
+variables on the stack, a class of programs which is known to have a significantly
 simpler semantics. We illustrate the basics of this approach by an example:
 
 \begin{Move}
@@ -73,7 +73,7 @@ simpler semantics. We illustrate the basics of this approach by an example:
   fun caller(): S { let s = S{f:0}; s = update(s); s }
 \end{Move}
 
-While the setup in this example covers a majority of the uses cases in every day
+While the setup in this example covers a majority of the use cases in every day
 Move code, there are more complex ones to consider, namely that the value of a
 reference depends on runtime decisions:
 
@@ -82,9 +82,13 @@ reference depends on runtime decisions:
   increment_field(r);
 \end{Move}
 
+%% Dave comment: It may be a bit confusing to talk about runtime information when we're talking
+%%  about a static prover?  Maybe we need to make clear that this is runtime information
+%%  in the Boogie model?  I'm not sure how to write it.
+
 \noindent Additional runtime information is required to deal with such cases. At
 the execution point a reference goes out of scope, we need to know from which
-location it was derived from, so we can write back the updated value
+location it was derived, so we can write back the updated value
 correctly. Fig.~\ref{fig:MutElim} illustrates the approach for doing this. A new
 Move prover internal type |Mut<T>| is introduced which carries the location from
 which |T| was derived together with the value. It supports the following

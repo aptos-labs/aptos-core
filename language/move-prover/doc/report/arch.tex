@@ -34,8 +34,8 @@ CVC5 \cite{CVC}; the default choice for the Move prover is currently Z3.
 
 When the SMT solver produces a |sat| or |unknown| result (of the negation of the
 verification condition Boogie generates), it produces a model witness. The Move
-Prover undertakes some effort to translate this model back into diagnosis which
-a user can associate it with the original Move code (as has been illustrated in
+Prover attempts to translate this model back into a diagnostic which
+a user can associate with the original Move code (as has been illustrated in
 Sec.~\ref{sec:RunningProver}.) For example, execution traces leading to the
 verification failure are shown, with assignments to variables used in this
 trace, extracted from the model. Also the Move Model will be consulted to

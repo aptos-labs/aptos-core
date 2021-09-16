@@ -10,12 +10,18 @@ we cover how \emph{function specification conditions} are injected.
 \SubSubSection{Modular Verification}
 \label{sec:ModularVerification}
 
+
+%% Dave comment: I don't think we need to assume that used modules are verified before
+%%  the modules that use them.  For inductive invariants, we just assume that every
+%%  invariant holds at time t, then prove that that implies that each invariant holds at time t+1.
+%%  So, it's induction on time, not the module dependency structure.}
+
 Modular verification applies to all types of injections, and its principles are
 therefore described first. When the Move prover is run, it takes as input a set
 of Move modules which is closed under the transitive dependency relation (module
 imports). However, only a subset of those modules are \emph{verification target}
 (typically just one module). It is assumed that the tool environment ensures
-that modules in the dependency relation which are not target of verification
+that modules in the dependency relation which are not a target of verification
 have already successfully verified. This is possible since Move has an acyclic
 import relation.
 
@@ -84,7 +90,7 @@ An aborts condition is translated into two different asserts: one where the
 function aborts and the condition must hold (line~\ref{line:aborts_holds}), and
 one where it returns and the condition must \emph{not} hold
 (line~\ref{line:aborts_holds_not}). If there are multiple |aborts_if|, they are
-or-ed. If there is no aborts condition, no asserts are generated. This means
+or-ed. If there is no abort condition, no asserts are generated. This means
 that once a user specifies aborts conditions, they must completely cover the
 abort behavior of the code. (The prover also provides an option to relax this
 behavior, where aborts conditions can be partial and are only enforced on
@@ -230,10 +236,115 @@ enforced when a struct value is directly constructed.
 \SubSection{Global Invariant Injection}
 \label{sec:GlobalInvariants}
 
-Global invariants appear on Move module level and constraint the content of the
-memory. While the basic injection of global invariants is relative simple, they
-cause significant complexity with features like modular verification, suspension,
-and generics. We first discuss the basic model, then extend it step wise.
+%% Dave comment: We discussed requiring update invariants to be transitive, but I don't think that's
+%% a great idea after thinking about it more.  Too long to write here
+
+
+Global invariants are properties declared in Move modules
+that must hold on all global states
+in which a transaction is not being executed.
+\textit{Inductive invariants} are properties that don't have the
+``old'' operator, so their truth can be evaluated in a single state.
+\textit{update invariants} contain the ``old'' operator, so they
+must be evaluated in two consecutive states: the current state (where
+the two-state invariant holds) and the immediately previous state
+(for simplicity, we define a two-state invariant to hold in the initial state).
+Regular invariants are proved by induction over time, while update
+invariants can be proved without induction.
+
+In some situations (such as blockchains), we would like
+users to be able to write transactions ``on-the-fly'' and submit
+them to the system, which does not allow time to run the Prover
+on individual transactions. The coarsest granularity we can
+practically achieve is to verify that each public and script function preserves
+inductive invariants.
+
+In the simplest case, the
+prover proves the much stronger condition that an invariant holds
+before and after every single instruction during transaction
+execution.  It is also possible a user to suspend checking of an
+invariant during intervals of execution of a transaction. We first
+discuss the basic model, then deal with additional issues from generics
+and invariant suspension.
+
+We wish to support open systems to which untrusted modules can be
+added to without invalidating invariants that have already been
+proved.  For each invariant, there is a defined subset of Move modules
+(called a \textit{cluster}).  If the invariant is proved for the
+modules in the cluster, it is guaranteed to hold in all other modules
+-- even those that were not yet defined when the invariant was proved.
+The cluster must contain every function that can invalidate the invariant,
+and, in some cases (explained in more detail below) callers to those
+functions.
+
+
+\TODO{dld}{We need consistent terminology for ``public'' functions that does
+not include public(friend) functions.}
+
+The soundness of the invariant proof method holds by an inductive
+argument over sequences of public and script function calls.  The base
+case is that the invariant must hold in the empty state that preceeds
+the genesis transaction, and the induction is that, if the invariant
+holds immediately before each public or script function, it continues
+to hold immediately after that function.  Note that the induction
+proof allows the assumption of \textit{all} invariants at the
+beginning of each public or script function to prove that an invariant
+holds after the function.  In practice, a subset of the available
+invariants are actually assumed on entry to a function. Some are not
+visible to the prover because they are specified outside of the
+cluster being verified, and others are excluded heuristically to
+reduce computational cost.
+
+% "modifies a type" is not defined precisely.
+
+The Prover verifies one module at a time.  The module being verified
+is called the \textit{target module}, and the global invariants to be
+verified are called \textit{target invariants}. The cluster of modules
+to be verified is computed from the target module.  it is necessary
+that every occurrence of an instruction that can potentially
+invalidate a target invariant be contained in some function in the
+cluster of modules for that invariant.  In the basic case in which
+invariants are not suspended, the cluster is the target module and all
+the modules it directly or indirectly uses, since the invariant can
+sonly refer to types defined in these modules, and the semantics of the
+Move language forbid a function from containing an instruction that
+modifies a type not appearing in the same module. Importantly,
+functions outside the cluster can never invalidate an invariant, so
+those functions trivially preserve the invariant, so it is only
+necessary to verify functions defined in the cluster.
+
+To ensure that invariants continue to hold after a public or script
+function returns, it is necessary to inject an assertion of the invariant at some
+point between each instruction that could invalidate it and the return
+points from the procedure.  In the simple case where invariants are
+not suspended, each target invariant is asserted after
+every instruction that could invalidate the invariant. So, by an
+obvious inductive argument, if the invariant holds in the initialy
+empty state, it holds after every instruction that is executed by
+every function.
+
+Update invariants are processed differently from inductive invariants.
+The value of an update invariant depends on two consecutive states, where
+``old'' expressions are evaluated in the first state, and expressions
+not in the context of an ``old'' operator are evaluated in the second
+state.
+To check an update invariant, the Prover first finds every
+instruction that can modify the truth of the invariant. A temporary
+value is generated to name the contents of the state before the
+instruction, and expressions involving this temporary are substituted
+for ``old'' expressions in the update invariant.
+Then, the prover injects an instruction to save the state in the
+temporary before the instruction, and injects an assert of
+the translated update after the instruction.
+
+%% Dave comment: I just noticed the next issue after writing the above paragraph.
+%% If we only want to instrument instructions that change the types in invariant,
+%% we need to make sure the invariant is valid when there are no changes.}
+
+We assume that an instruction that doesn't modify any of the types
+mentioned in an update invariant also does alter the validity of the invariant.
+Hence, an update invariant, regarded as a binary relation, must be reflexive.
+This property is not currently enforced by the prover.
 
 \SubSubSection{Basic Translation}
 
@@ -260,12 +371,33 @@ and generics. We first discuss the basic model, then extend it step wise.
 \end{MoveBox}
 \end{Figure}
 
+
+%% Dave comment: Do we have standard terminology for the state
+%%  variables upon which an invariant depends and that a function can
+%%  access or modify? We should explain the concepts and terminology
+%%  earlier and use them consistently throughout.
+
+The injection of assumes and asserts of global invariants into
+functions requires knowing whether a function reads or modifies types
+that are mentioned in the invariant.  Without generic type parameters,
+this is a relatively simple analysis. First, the prover collects the
+set of types mentioned in the invariant.
+For choosing the invariants to
+assume on entry to a function, the Prover collects all the types that
+are read or modified by the function or indirectly by functions that it
+calls, and intersects this set with the set of types in the invariant.
+For choosing the invariants to assert, the Prover collects types that
+are modified by the function or by an individual instruction or function
+call and intersects that set with the set of types in the invariant.
+
 Fig.~\ref{fig:GlobalInvariants} contains an example for the supported invariant
-types and their injection into code. The first invariant, |I1|, is a regular
-state invariant. It is assumed on function entry, and asserted after the state
-update. The second, |I2|, is a state update invariant, which relates pre and
+types and their injection into code. The first invariant, |I1|, is an inductive
+invariant. It is assumed on function entry, and asserted after the state
+update. The second, |I2|, is an update invariant, which relates pre and
 post states. For this a state snapshot is stored under some label |I2_BEFORE|,
 which is then used in an assertion.
+
+\TODO{dld}{Note that ``modifies'' won't help with reads in opaque functions.}
 
 Global invariant injection is optimized by knowledge of the prover, obtained
 by static analysis, about (transitively) accessed memory. For opaque functions
@@ -282,8 +414,8 @@ usage, it can determine which invariants to inject. Let |f| be a target function
   update invariant, before the update inject a memory snapshot save.
 \end{itemize}
 
-Notice that we do not inject any invariants in functions which are not
-verification target. However, the set of target functions may need to be
+Notice that we do not inject any invariants in functions that are not
+verification targets. However, the set of target functions may need to be
 extended because of invariants, as described later.
 
 
@@ -314,8 +446,20 @@ extended because of invariants, as described later.
 \end{MoveBox}
 \end{Figure}
 
-In the case of generic invariants and functions, we must use \emph{type
-  unification} to determine which invariants are injected. Consider the example
+Generic type parameters make the problem of determining whether a
+function can modify an invariant more difficult.
+For soundness, a property must hold for every possible instantiation
+of type parameters.
+So, rather than checking
+whether some of the types mentioned in the invariant are equal to some
+of the types accessed or modified by a function
+the Prover needs to
+discover whether there is any possible instantiation of type parameters
+that might allow the instantiated function to invalidate an instantiated invariant.
+In other words, it needs to know whether the
+each type in the invariant can be unified with a type accessed or modified by
+the function.
+Consider the example
 in Fig.~\ref{fig:Genericity}. Invariant |I1| holds for a specific type
 instantiation |S<u64>|, whereas |I2| is generic over all type instantiations for
 |S<T>|.
@@ -433,13 +577,14 @@ as follows:
   the parent callers.
 \end{itemize}
 
-Once a function is suspended, automatically all functions it calls which modify
-memory effected by the suspended invariants are suspended as well. This is
-because when those functions are called, the relevant invariants cannot be
-assumed to hold, and therefore it is likely not fruitful to try to verify
-something related to them.
+A function that is called from a suspended function cannot rely on a
+suspended invariants holding.  It would be unsound to assume those invariants
+in the function, and, since the invariants may not hold, asserting them would
+often yield failed proofs.  Therefore, the prover implicitly suspends all
+functions that are called from a suspended function.
+% *** error condition when the suspended function is public.
 
-For update invariants it should be noted that suspension may change their
+Suspending an update invariant may change its meaning,
 meaning, depending on the form of the predicate. Without suspension, an update
 invariant is implemented by snapshotting the memory before the update and then
 asserting a predicate after the update which refers to the previous state and

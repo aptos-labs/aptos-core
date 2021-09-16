@@ -194,7 +194,7 @@ Fig.~\ref{fig:AccountSpec} illustrates the specification language by extending
 the account example in Fig.~\ref{fig:AccountDef} (for the definition of the
 specification language see \cite{MOVE_SPEC_LANG_DEF}).
 \begin{itemize}
-\item The function specification blocks |spec withdraw| and |spec desposit|
+\item The function specification blocks |spec withdraw| and |spec deposit|
   specify when those functions abort, the expected effect on the global memory,
   and its return value (the return value is represented by the well-known name
   |result|).
@@ -266,7 +266,7 @@ error: abort not covered by any of the `aborts_if` clauses
 \noindent The prover has detected that an implicit aborts condition is missing
 in the specification of the |withdraw| function. It prints the context of the
 error, as well as an \emph{execution trace} which lead to the error. Values of
-variable assignments from the counter example found by the prover are printed
+variable assignments from the counterexample found by the prover are printed
 together with the execution trace. Logically, the counter example presents an
 instance of assignments to variables such that program and specification
 disagree. In general, the Move prover attempts to produce diagnostics readable
