@@ -477,7 +477,7 @@ impl RequestManager {
         if is_timeout(multicast_start_time, self.multicast_timeout) {
             // Move to the next multicast network level
             let new_multicast_network_level = match self.multicast_network_level {
-                NetworkId::Validator => NetworkId::vfn_network(),
+                NetworkId::Validator => NetworkId::Vfn,
                 _ => NetworkId::Public,
             };
             self.update_multicast_network_level(new_multicast_network_level, Some(version));

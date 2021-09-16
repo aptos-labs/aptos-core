@@ -511,11 +511,11 @@ mod test {
         let peer_id_1 = PeerId::from_hex_literal("0x1").unwrap();
         let peer_id_2 = PeerId::from_hex_literal("0x2").unwrap();
         let val_1 = (
-            PeerNetworkId::new(NetworkId::vfn_network(), peer_id_1),
+            PeerNetworkId::new(NetworkId::Vfn, peer_id_1),
             PeerRole::Validator,
         );
         let val_2 = (
-            PeerNetworkId::new(NetworkId::vfn_network(), peer_id_2),
+            PeerNetworkId::new(NetworkId::Vfn, peer_id_2),
             PeerRole::Validator,
         );
         let vfn_1 = (

@@ -182,7 +182,7 @@ impl NodeInfoTrait for ValidatorFullNodeInfo {
     }
 
     fn primary_network(&self) -> NetworkId {
-        NetworkId::vfn_network()
+        NetworkId::Vfn
     }
 
     fn role(&self) -> RoleType {

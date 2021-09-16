@@ -332,7 +332,7 @@ impl ValidatorBuilder {
 
         let vfn_network = NetworkConfig {
             listen_address: diem_config::utils::get_available_port_in_multiaddr(true),
-            network_id: NetworkId::vfn_network(),
+            network_id: NetworkId::Vfn,
             max_outbound_connections: 0,
             identity: Identity::from_storage(
                 FULLNODE_NETWORK_KEY.to_owned(),

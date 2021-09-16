@@ -163,11 +163,6 @@ impl fmt::Display for NetworkId {
 const VFN_NETWORK: &str = "vfn";
 
 impl NetworkId {
-    /// Convenience function to specify the VFN network
-    pub fn vfn_network() -> NetworkId {
-        NetworkId::Vfn
-    }
-
     pub fn is_vfn_network(&self) -> bool {
         self == &NetworkId::Vfn
     }
@@ -245,8 +240,8 @@ mod test {
 
     #[test]
     fn test_ensure_network_id_order() {
-        assert!(NetworkId::Validator < NetworkId::vfn_network());
-        assert!(NetworkId::vfn_network() < NetworkId::Public);
+        assert!(NetworkId::Validator < NetworkId::Vfn);
+        assert!(NetworkId::Vfn < NetworkId::Public);
         assert!(NetworkId::Validator < NetworkId::Public);
     }
 
@@ -265,7 +260,7 @@ mod test {
     #[test]
     fn test_network_context_serialization() {
         let peer_id = PeerId::random();
-        let context = NetworkContext::new(RoleType::Validator, NetworkId::vfn_network(), peer_id);
+        let context = NetworkContext::new(RoleType::Validator, NetworkId::Vfn, peer_id);
         let expected = format!(
             "---\nrole: {}\nnetwork_id: {}\npeer_id: {:x}\n",
             RoleType::Validator,
