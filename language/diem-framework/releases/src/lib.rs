@@ -6,7 +6,7 @@ use diem_types::transaction::ScriptFunction;
 use include_dir::{include_dir, Dir};
 use move_binary_format::file_format::CompiledModule;
 use move_command_line_common::files::{
-    extension_equals, MOVE_COMPILED_EXTENSION, MOVE_ERROR_DESC_EXTENSION,
+    extension_equals, find_filenames, MOVE_COMPILED_EXTENSION, MOVE_ERROR_DESC_EXTENSION,
 };
 use once_cell::sync::Lazy;
 use std::{convert::TryFrom, path::PathBuf};
@@ -54,6 +54,17 @@ pub fn load_modules_from_release(release_name: &str) -> Result<Vec<Vec<u8>>> {
         }
         None => bail!("release {} not found", release_name),
     }
+}
+
+/// Load the serialized modules from the specified paths.
+pub fn load_modules_from_paths(paths: &[PathBuf]) -> Vec<Vec<u8>> {
+    find_filenames(paths, |path| {
+        extension_equals(path, MOVE_COMPILED_EXTENSION)
+    })
+    .expect("module loading failed")
+    .iter()
+    .map(|file_name| std::fs::read(file_name).unwrap())
+    .collect::<Vec<_>>()
 }
 
 /// Load the error descriptions from the specified release.

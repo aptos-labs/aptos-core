@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
-
 use diem_config::config::NodeConfig;
 use diem_types::on_chain_config::VMPublishingOption;
 use hex::FromHex;
@@ -40,6 +39,13 @@ struct Args {
 
     #[structopt(long, help = "Enabling random ports for testnet", requires("test"))]
     random_ports: bool,
+
+    #[structopt(
+        long,
+        help = "Paths to module blobs to be included in genesis. Can include both files and directories",
+        requires("test")
+    )]
+    genesis_modules: Option<Vec<PathBuf>>,
 }
 
 #[global_allocator]
@@ -59,7 +65,18 @@ fn main() {
         } else {
             None
         };
-        diem_node::load_test_environment(args.config, args.random_ports, publishing_option, rng);
+        let genesis_modules = if let Some(module_paths) = args.genesis_modules {
+            diem_framework_releases::load_modules_from_paths(&module_paths)
+        } else {
+            diem_framework_releases::current_module_blobs().to_vec()
+        };
+        diem_node::load_test_environment(
+            args.config,
+            args.random_ports,
+            publishing_option,
+            genesis_modules,
+            rng,
+        );
     } else {
         let config = NodeConfig::load(args.config.unwrap()).expect("Failed to load node config");
         println!("Using node config {:?}", &config);

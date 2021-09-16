@@ -101,6 +101,7 @@ pub fn load_test_environment<R>(
     config_path: Option<PathBuf>,
     random_ports: bool,
     publishing_option: Option<VMPublishingOption>,
+    genesis_modules: Vec<Vec<u8>>,
     rng: R,
 ) where
     R: ::rand::RngCore + ::rand::CryptoRng,
@@ -119,12 +120,10 @@ pub fn load_test_environment<R>(
     maybe_config.push("validator_node_template.yaml");
     let template = NodeConfig::load_config(maybe_config)
         .unwrap_or_else(|_| NodeConfig::default_for_validator());
-    let mut builder = diem_genesis_tool::validator_builder::ValidatorBuilder::new(
-        &config_path,
-        diem_framework_releases::current_module_blobs().to_vec(),
-    )
-    .template(template)
-    .randomize_first_validator_ports(random_ports);
+    let mut builder =
+        diem_genesis_tool::validator_builder::ValidatorBuilder::new(&config_path, genesis_modules)
+            .template(template)
+            .randomize_first_validator_ports(random_ports);
     if let Some(publishing_option) = publishing_option {
         builder = builder.publishing_option(publishing_option);
     }
