@@ -8051,6 +8051,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "storage-service-server"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bcs",
+ "claim",
+ "diem-crypto",
+ "diem-infallible",
+ "diem-types",
+ "diem-workspace-hack",
+ "move-core-types",
+ "serde",
+ "storage-interface",
+ "storage-service-types",
+ "thiserror",
+]
+
+[[package]]
+name = "storage-service-types"
+version = "0.1.0"
+dependencies = [
+ "diem-types",
+ "diem-workspace-hack",
+]
+
+[[package]]
 name = "strsim"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
