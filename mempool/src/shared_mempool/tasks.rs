@@ -295,7 +295,10 @@ where
 
 fn log_txn_process_results(results: &[SubmissionStatusBundle], sender: Option<PeerNetworkId>) {
     let (network, sender) = match sender {
-        Some(peer) => (peer.network_id().to_string(), peer.peer_id().to_string()),
+        Some(peer) => (
+            peer.network_id().to_string(),
+            peer.peer_id().short_str().to_string(),
+        ),
         None => (
             counters::CLIENT_LABEL.to_string(),
             counters::CLIENT_LABEL.to_string(),

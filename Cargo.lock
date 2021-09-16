@@ -7917,6 +7917,7 @@ dependencies = [
  "proptest",
  "rand 0.8.3",
  "serde",
+ "short-hex-str",
  "storage-interface",
  "storage-service",
  "thiserror",

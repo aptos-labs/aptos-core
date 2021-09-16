@@ -38,6 +38,7 @@ use futures::{
 };
 use mempool_notifications::MempoolNotificationSender;
 use network::{protocols::network::Event, transport::ConnectionMetadata};
+use short_hex_str::AsShortHexStr;
 use std::{
     cmp,
     collections::HashMap,
@@ -269,8 +270,8 @@ impl<T: ExecutorProxyTrait, M: MempoolNotificationSender> StateSyncCoordinator<T
                 // Time request handling
                 let _timer = counters::PROCESS_MSG_LATENCY
                     .with_label_values(&[
-                        &peer.network_id().to_string(),
-                        &peer.peer_id().to_string(),
+                        peer.network_id().as_str(),
+                        peer.peer_id().short_str().as_str(),
                         counters::CHUNK_REQUEST_MSG_LABEL,
                     ])
                     .start_timer();
@@ -287,16 +288,16 @@ impl<T: ExecutorProxyTrait, M: MempoolNotificationSender> StateSyncCoordinator<T
                     );
                     counters::PROCESS_CHUNK_REQUEST_COUNT
                         .with_label_values(&[
-                            &peer.network_id().to_string(),
-                            &peer.peer_id().to_string(),
+                            peer.network_id().as_str(),
+                            peer.peer_id().short_str().as_str(),
                             counters::FAIL_LABEL,
                         ])
                         .inc();
                 } else {
                     counters::PROCESS_CHUNK_REQUEST_COUNT
                         .with_label_values(&[
-                            &peer.network_id().to_string(),
-                            &peer.peer_id().to_string(),
+                            peer.network_id().as_str(),
+                            peer.peer_id().short_str().as_str(),
                             counters::SUCCESS_LABEL,
                         ])
                         .inc();
@@ -307,8 +308,8 @@ impl<T: ExecutorProxyTrait, M: MempoolNotificationSender> StateSyncCoordinator<T
                 // Time response handling
                 let _timer = counters::PROCESS_MSG_LATENCY
                     .with_label_values(&[
-                        &peer.network_id().to_string(),
-                        &peer.peer_id().to_string(),
+                        peer.network_id().as_str(),
+                        peer.peer_id().short_str().as_str(),
                         counters::CHUNK_RESPONSE_MSG_LABEL,
                     ])
                     .start_timer();
@@ -887,8 +888,8 @@ impl<T: ExecutorProxyTrait, M: MempoolNotificationSender> StateSyncCoordinator<T
         };
         counters::RESPONSES_SENT
             .with_label_values(&[
-                &peer.network_id().to_string(),
-                &peer.peer_id().to_string(),
+                peer.network_id().as_str(),
+                peer.peer_id().short_str().as_str(),
                 send_result_label,
             ])
             .inc();
@@ -980,7 +981,10 @@ impl<T: ExecutorProxyTrait, M: MempoolNotificationSender> StateSyncCoordinator<T
 
         // Update counters and logs with processed chunk information
         counters::STATE_SYNC_CHUNK_SIZE
-            .with_label_values(&[&peer.network_id().to_string(), &peer.peer_id().to_string()])
+            .with_label_values(&[
+                peer.network_id().as_str(),
+                peer.peer_id().short_str().as_str(),
+            ])
             .observe(chunk_size as f64);
         let new_version = known_version
             .checked_add(chunk_size)
@@ -1039,8 +1043,8 @@ impl<T: ExecutorProxyTrait, M: MempoolNotificationSender> StateSyncCoordinator<T
             Ok(()) => {
                 counters::APPLY_CHUNK_COUNT
                     .with_label_values(&[
-                        &peer.network_id().to_string(),
-                        &peer.peer_id().to_string(),
+                        peer.network_id().as_str(),
+                        peer.peer_id().short_str().as_str(),
                         counters::SUCCESS_LABEL,
                     ])
                     .inc();
@@ -1054,8 +1058,8 @@ impl<T: ExecutorProxyTrait, M: MempoolNotificationSender> StateSyncCoordinator<T
                 .error(&error));
                 counters::APPLY_CHUNK_COUNT
                     .with_label_values(&[
-                        &peer.network_id().to_string(),
-                        &peer.peer_id().to_string(),
+                        peer.network_id().as_str(),
+                        peer.peer_id().short_str().as_str(),
                         counters::FAIL_LABEL,
                     ])
                     .inc();
@@ -1089,7 +1093,10 @@ impl<T: ExecutorProxyTrait, M: MempoolNotificationSender> StateSyncCoordinator<T
         // Verify response comes from known peer
         if !self.request_manager.is_known_state_sync_peer(peer) {
             counters::RESPONSE_FROM_DOWNSTREAM_COUNT
-                .with_label_values(&[&peer.network_id().to_string(), &peer.peer_id().to_string()])
+                .with_label_values(&[
+                    peer.network_id().as_str(),
+                    peer.peer_id().short_str().as_str(),
+                ])
                 .inc();
             self.request_manager.process_chunk_from_downstream(peer);
             return Err(Error::ReceivedChunkFromDownstream(peer.to_string()));
@@ -1657,8 +1664,8 @@ impl<T: ExecutorProxyTrait, M: MempoolNotificationSender> StateSyncCoordinator<T
             };
             counters::SUBSCRIPTION_DELIVERY_COUNT
                 .with_label_values(&[
-                    &peer.network_id().to_string(),
-                    &peer.peer_id().to_string(),
+                    peer.network_id().as_str(),
+                    peer.peer_id().short_str().as_str(),
                     result_label,
                 ])
                 .inc();

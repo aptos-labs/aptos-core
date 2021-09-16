@@ -20,6 +20,7 @@ use rand::{
     distributions::{Distribution, WeightedIndex},
     thread_rng,
 };
+use short_hex_str::AsShortHexStr;
 use std::{
     cmp::Ordering,
     collections::{
@@ -122,7 +123,7 @@ impl RequestManager {
             .peer(&peer)
             .is_valid_peer(true));
         counters::ACTIVE_UPSTREAM_PEERS
-            .with_label_values(&[&peer.network_id().to_string()])
+            .with_label_values(&[peer.network_id().as_str()])
             .inc();
 
         match self.peer_scores.entry(peer) {
@@ -147,7 +148,7 @@ impl RequestManager {
 
         if self.peer_scores.contains_key(peer) {
             counters::ACTIVE_UPSTREAM_PEERS
-                .with_label_values(&[&peer.network_id().to_string()])
+                .with_label_values(&[peer.network_id().as_str()])
                 .dec();
             self.peer_scores.remove(peer);
         } else {
@@ -290,8 +291,8 @@ impl RequestManager {
             };
             counters::REQUESTS_SENT
                 .with_label_values(&[
-                    &peer.network_id().to_string(),
-                    &peer_id.to_string(),
+                    peer.network_id().as_str(),
+                    peer_id.short_str().as_str(),
                     result_label,
                 ])
                 .inc();
