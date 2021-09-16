@@ -361,7 +361,7 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
             TimeService::real(),
             Some(&mut event_subscription_service),
         );
-        let network_id = network_config.network_id.clone();
+        let network_id = network_config.network_id;
         // Guarantee there is only one of this network
         if network_ids.contains(&network_id) {
             panic!(
@@ -369,18 +369,18 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
                 network_id
             );
         }
-        network_ids.insert(network_id.clone());
+        network_ids.insert(network_id);
 
         // Create the endpoints to connect the Network to State Sync.
         let (state_sync_sender, state_sync_events) =
             network_builder.add_protocol_handler(state_sync_v1::network::network_endpoint_config());
-        state_sync_network_handles.push((network_id.clone(), state_sync_sender, state_sync_events));
+        state_sync_network_handles.push((network_id, state_sync_sender, state_sync_events));
 
         // Create the endpoints to connect the Network to mempool.
         let (mempool_sender, mempool_events) = network_builder.add_protocol_handler(
             diem_mempool::network::network_endpoint_config(MEMPOOL_NETWORK_CHANNEL_BUFFER_SIZE),
         );
-        mempool_network_handles.push((network_id.clone(), mempool_sender, mempool_events));
+        mempool_network_handles.push((network_id, mempool_sender, mempool_events));
 
         // Perform steps relevant specifically to Validator networks.
         if network_id.is_validator_network() {

@@ -241,8 +241,8 @@ impl HandshakeMsg {
         // verify that both peers are on the same type of network
         if self.network_id != other.network_id {
             return Err(HandshakeError::InvalidNetworkId(
-                other.network_id.clone(),
-                self.network_id.clone(),
+                other.network_id,
+                self.network_id,
             ));
         }
 

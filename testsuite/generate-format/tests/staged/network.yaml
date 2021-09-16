@@ -51,6 +51,10 @@ NetworkId:
     2:
       private:
         NEWTYPE: STR
+    3:
+      vfn: UNIT
+    4:
+      new_public: UNIT
 NetworkMessage:
   ENUM:
     0:

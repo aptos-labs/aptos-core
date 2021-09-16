@@ -95,7 +95,7 @@ impl RequestManager {
         network_senders: HashMap<NetworkId, StateSyncSender>,
     ) -> Self {
         let multicast_network_level = NetworkId::Validator;
-        update_multicast_network_counter(multicast_network_level.clone());
+        update_multicast_network_counter(multicast_network_level);
 
         Self {
             peer_scores: HashMap::new(),
@@ -244,13 +244,13 @@ impl RequestManager {
             // If no peers are found for the current multicast level, continue doing
             // best effort search of the networks to failover to.
             if !chosen_peers.is_empty() && *network_level >= self.multicast_network_level {
-                new_multicast_network_level = Some(network_level.clone());
+                new_multicast_network_level = Some(network_level);
                 break;
             }
         }
 
         if let Some(network_level) = new_multicast_network_level {
-            self.update_multicast_network_level(network_level, None);
+            self.update_multicast_network_level(*network_level, None);
         }
 
         chosen_peers
@@ -334,7 +334,7 @@ impl RequestManager {
             let now = SystemTime::now();
             if self.multicast_network_level != prev_request.multicast_level {
                 // restart multicast timer for this request if multicast level changed
-                prev_request.multicast_level = self.multicast_network_level.clone();
+                prev_request.multicast_level = self.multicast_network_level;
                 prev_request.multicast_start_time = now;
             }
             prev_request.last_request_peers = peers;
@@ -342,7 +342,7 @@ impl RequestManager {
             prev_request.clone()
         } else {
             let chunk_request_info =
-                ChunkRequestInfo::new(version, peers, self.multicast_network_level.clone());
+                ChunkRequestInfo::new(version, peers, self.multicast_network_level);
             self.requests.insert(version, chunk_request_info.clone());
             chunk_request_info
         }
@@ -505,16 +505,16 @@ impl RequestManager {
         request_version: Option<u64>,
     ) {
         // Update level if the new level is different
-        let current_level = self.multicast_network_level.clone();
+        let current_level = self.multicast_network_level;
         let log_event = match new_level.cmp(&current_level) {
             Ordering::Equal => return,
             Ordering::Greater => LogEvent::Failover,
             Ordering::Less => LogEvent::Recover,
         };
-        self.multicast_network_level = new_level.clone();
+        self.multicast_network_level = new_level;
 
         // Update the counters and logs
-        update_multicast_network_counter(self.multicast_network_level.clone());
+        update_multicast_network_counter(self.multicast_network_level);
         let mut log_event = LogSchema::event_log(LogEntry::Multicast, log_event)
             .old_multicast_level(current_level)
             .new_multicast_level(new_level);

@@ -37,11 +37,6 @@ fn represents_same_network() {
     let h2 = handshake_msg.clone();
     h1.perform_handshake(&h2).unwrap();
 
-    // fails: another private network
-    let mut h2 = handshake_msg.clone();
-    h2.network_id = NetworkId::Private("h2".to_string());
-    h1.perform_handshake(&h2).unwrap_err();
-
     // fails: different network
     let mut h2 = handshake_msg.clone();
     h2.network_id = NetworkId::Public;
@@ -67,7 +62,7 @@ fn common_protocols() {
 
     let h1 = HandshakeMsg {
         chain_id,
-        network_id: network_id.clone(),
+        network_id,
         supported_protocols,
     };
 
@@ -81,7 +76,7 @@ fn common_protocols() {
     );
     let h2 = HandshakeMsg {
         chain_id,
-        network_id: network_id.clone(),
+        network_id,
         supported_protocols,
     };
 
@@ -96,7 +91,7 @@ fn common_protocols() {
     // Case 2: No intersecting messaging protocol version.
     let h2 = HandshakeMsg {
         chain_id,
-        network_id: network_id.clone(),
+        network_id,
         supported_protocols: BTreeMap::new(),
     };
     h1.perform_handshake(&h2).unwrap_err();

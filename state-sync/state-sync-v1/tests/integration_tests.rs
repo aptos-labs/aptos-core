@@ -1,10 +1,8 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::test_harness::{
-    default_handler, PFN_NETWORK, VALIDATOR_NETWORK, VFN_NETWORK, VFN_NETWORK_2,
-};
-use diem_config::config::RoleType;
+use crate::test_harness::default_handler;
+use diem_config::{config::RoleType, network_id::NetworkId};
 use diem_types::{transaction::TransactionListWithProof, waypoint::Waypoint, PeerId};
 use netcore::transport::ConnectionOrigin::*;
 use network::protocols::direct_send::Message;
@@ -259,11 +257,11 @@ fn test_lagging_upstream_long_poll() {
     let fullnode_1 = env.get_state_sync_peer(3);
 
     // Get peer ids of nodes (across different networks)
-    let validator_0_peer_id = validator_0.get_peer_id(VALIDATOR_NETWORK.clone());
-    let fullnode_0_peer_id_vfn = fullnode_0.get_peer_id(VFN_NETWORK.clone());
-    let fullnode_0_peer_id_pfn = fullnode_0.get_peer_id(PFN_NETWORK.clone());
-    let fullnode_1_peer_id_vfn = fullnode_1.get_peer_id(VFN_NETWORK.clone());
-    let fullnode_1_peer_id_pfn = fullnode_1.get_peer_id(PFN_NETWORK.clone());
+    let validator_0_peer_id = validator_0.get_peer_id(NetworkId::Validator);
+    let fullnode_0_peer_id_vfn = fullnode_0.get_peer_id(NetworkId::Vfn);
+    let fullnode_0_peer_id_pfn = fullnode_0.get_peer_id(NetworkId::Public);
+    let fullnode_1_peer_id_vfn = fullnode_1.get_peer_id(NetworkId::Vfn);
+    let fullnode_1_peer_id_pfn = fullnode_1.get_peer_id(NetworkId::Public);
 
     // Commit version 400 at the validator
     validator_0.commit(400);
@@ -331,10 +329,8 @@ fn test_fullnode_catch_up_moving_target_epochs() {
     env.start_fullnode_peer(1, true);
 
     // Get peer ids of nodes
-    let validator_peer_id = env
-        .get_state_sync_peer(0)
-        .get_peer_id(VALIDATOR_NETWORK.clone());
-    let fullnode_peer_id = env.get_state_sync_peer(1).get_peer_id(VFN_NETWORK.clone());
+    let validator_peer_id = env.get_state_sync_peer(0).get_peer_id(NetworkId::Validator);
+    let fullnode_peer_id = env.get_state_sync_peer(1).get_peer_id(NetworkId::Vfn);
 
     // Validator and fullnode discover each other.
     send_connection_notifications(&mut env, validator_peer_id, fullnode_peer_id, true);
@@ -404,10 +400,8 @@ fn test_fullnode_catch_up_moving_target() {
     env.start_fullnode_peer(1, true);
 
     // Get peer ids of nodes
-    let validator_peer_id = env
-        .get_state_sync_peer(0)
-        .get_peer_id(VALIDATOR_NETWORK.clone());
-    let fullnode_peer_id = env.get_state_sync_peer(1).get_peer_id(VFN_NETWORK.clone());
+    let validator_peer_id = env.get_state_sync_peer(0).get_peer_id(NetworkId::Validator);
+    let fullnode_peer_id = env.get_state_sync_peer(1).get_peer_id(NetworkId::Vfn);
 
     // Validator and fullnode discover each other.
     send_connection_notifications(&mut env, validator_peer_id, fullnode_peer_id, true);
@@ -488,12 +482,12 @@ fn test_fn_failover() {
     let fullnode_3 = env.get_state_sync_peer(4);
 
     // Grab the nodes peer id's
-    let validator_peer_id = validator.get_peer_id(VFN_NETWORK.clone());
-    let fn_0_vfn_peer_id = fullnode_0.get_peer_id(VFN_NETWORK.clone());
-    let fn_0_pfn_peer_id = fullnode_0.get_peer_id(PFN_NETWORK.clone());
-    let fn_1_pfn_peer_id = fullnode_1.get_peer_id(PFN_NETWORK.clone());
-    let fn_2_pfn_peer_id = fullnode_1.get_peer_id(PFN_NETWORK.clone());
-    let fn_3_pfn_peer_id = fullnode_3.get_peer_id(PFN_NETWORK.clone());
+    let validator_peer_id = validator.get_peer_id(NetworkId::Vfn);
+    let fn_0_vfn_peer_id = fullnode_0.get_peer_id(NetworkId::Vfn);
+    let fn_0_pfn_peer_id = fullnode_0.get_peer_id(NetworkId::Public);
+    let fn_1_pfn_peer_id = fullnode_1.get_peer_id(NetworkId::Public);
+    let fn_2_pfn_peer_id = fullnode_1.get_peer_id(NetworkId::Public);
+    let fn_3_pfn_peer_id = fullnode_3.get_peer_id(NetworkId::Public);
 
     drop(validator);
     drop(fullnode_0);
@@ -717,12 +711,10 @@ fn test_multicast_failover() {
     let fullnode_2 = env.get_state_sync_peer(3);
 
     // Grab the nodes peer id's
-    let validator_peer_id = validator.get_peer_id(VFN_NETWORK.clone());
-    let fn_0_vfn_peer_id = fullnode_0.get_peer_id(VFN_NETWORK.clone());
-    let fn_0_vfn_2_peer_id = fullnode_0.get_peer_id(VFN_NETWORK_2.clone());
-    let fn_0_pfn_peer_id = fullnode_0.get_peer_id(PFN_NETWORK.clone());
-    let fn_1_vfn_2_peer_id = fullnode_1.get_peer_id(VFN_NETWORK_2.clone());
-    let fn_2_pfn_peer_id = fullnode_2.get_peer_id(PFN_NETWORK.clone());
+    let validator_peer_id = validator.get_peer_id(NetworkId::Vfn);
+    let fn_0_vfn_peer_id = fullnode_0.get_peer_id(NetworkId::Vfn);
+    let fn_0_pfn_peer_id = fullnode_0.get_peer_id(NetworkId::Public);
+    let fn_2_pfn_peer_id = fullnode_2.get_peer_id(NetworkId::Public);
 
     drop(validator);
     drop(fullnode_0);
@@ -731,7 +723,6 @@ fn test_multicast_failover() {
 
     // Fullnode 0 discovers validator, fullnode 1 and fullnode 2
     send_connection_notifications(&mut env, validator_peer_id, fn_0_vfn_peer_id, true);
-    send_connection_notifications(&mut env, fn_1_vfn_2_peer_id, fn_0_vfn_2_peer_id, true);
     send_connection_notifications(&mut env, fn_2_pfn_peer_id, fn_0_pfn_peer_id, true);
 
     // Verify that fullnode 0 only broadcasts to the single validator peer
@@ -740,7 +731,7 @@ fn test_multicast_failover() {
         1,
         &[fn_0_vfn_peer_id],
         &[validator_peer_id],
-        &[fn_0_vfn_2_peer_id, fn_0_pfn_peer_id],
+        &[fn_0_pfn_peer_id],
         true,
     );
 
@@ -752,8 +743,8 @@ fn test_multicast_failover() {
     let _ = execute_commit_and_verify_chunk_requests(
         &mut env,
         2,
-        &[fn_0_vfn_2_peer_id, fn_0_vfn_peer_id, fn_0_pfn_peer_id],
-        &[validator_peer_id, fn_1_vfn_2_peer_id, fn_2_pfn_peer_id],
+        &[fn_0_vfn_peer_id, fn_0_pfn_peer_id],
+        &[validator_peer_id, fn_2_pfn_peer_id],
         &[],
         true,
     );
@@ -762,51 +753,47 @@ fn test_multicast_failover() {
     std::thread::sleep(std::time::Duration::from_millis(multicast_timeout_ms));
     env.deliver_msg(validator_peer_id);
     env.deliver_msg(fn_2_pfn_peer_id);
-    env.deliver_msg(fn_1_vfn_2_peer_id);
 
     // Verify that fullnode 0 broadcasts to the validator peer and both fallback peers
     let _ = execute_commit_and_verify_chunk_requests(
         &mut env,
         3,
-        &[fn_0_vfn_peer_id, fn_0_vfn_2_peer_id, fn_0_pfn_peer_id],
-        &[validator_peer_id, fn_1_vfn_2_peer_id, fn_2_pfn_peer_id],
+        &[fn_0_vfn_peer_id, fn_0_pfn_peer_id],
+        &[validator_peer_id, fn_2_pfn_peer_id],
         &[],
         true,
     );
 
     // Deliver chunks from the 3 nodes (PFN delivers before validator)
     env.deliver_msg(fn_2_pfn_peer_id);
-    env.deliver_msg(fn_1_vfn_2_peer_id);
     env.deliver_msg(validator_peer_id);
 
     // Verify that fullnode 0 still broadcasts to the validator peer and both fallback peers
     let _ = execute_commit_and_verify_chunk_requests(
         &mut env,
         4,
-        &[fn_0_vfn_peer_id, fn_0_vfn_2_peer_id, fn_0_pfn_peer_id],
-        &[validator_peer_id, fn_1_vfn_2_peer_id, fn_2_pfn_peer_id],
+        &[fn_0_vfn_peer_id, fn_0_pfn_peer_id],
+        &[validator_peer_id, fn_2_pfn_peer_id],
         &[],
         true,
     );
 
     // Deliver chunks from the 3 nodes (PFN delivers before validator)
     env.deliver_msg(fn_2_pfn_peer_id);
-    env.deliver_msg(fn_1_vfn_2_peer_id);
     env.deliver_msg(validator_peer_id);
 
     // Verify that fullnode 0 still broadcasts to the validator peer and both fallback peers
     let _ = execute_commit_and_verify_chunk_requests(
         &mut env,
         5,
-        &[fn_0_vfn_peer_id, fn_0_vfn_2_peer_id, fn_0_pfn_peer_id],
-        &[validator_peer_id, fn_1_vfn_2_peer_id, fn_2_pfn_peer_id],
+        &[fn_0_vfn_peer_id, fn_0_pfn_peer_id],
+        &[validator_peer_id, fn_2_pfn_peer_id],
         &[],
         true,
     );
 
     // Deliver chunks from all nodes (with the validator as the first responder)
     env.deliver_msg(validator_peer_id);
-    env.deliver_msg(fn_1_vfn_2_peer_id);
     env.deliver_msg(fn_2_pfn_peer_id);
 
     // Verify that fullnode 0 still broadcasts to the validator peer and both fallback peers
@@ -814,15 +801,14 @@ fn test_multicast_failover() {
     let _ = execute_commit_and_verify_chunk_requests(
         &mut env,
         6,
-        &[fn_0_vfn_peer_id, fn_0_vfn_2_peer_id, fn_0_pfn_peer_id],
-        &[validator_peer_id, fn_1_vfn_2_peer_id, fn_2_pfn_peer_id],
+        &[fn_0_vfn_peer_id, fn_0_pfn_peer_id],
+        &[validator_peer_id, fn_2_pfn_peer_id],
         &[],
         true,
     );
 
     // Deliver chunks from all nodes (with the validator as the first responder)
     env.deliver_msg(validator_peer_id);
-    env.deliver_msg(fn_1_vfn_2_peer_id);
     env.deliver_msg(fn_2_pfn_peer_id);
 
     // Verify that fullnode 0 now only broadcasts to the validator
@@ -831,7 +817,7 @@ fn test_multicast_failover() {
         7,
         &[fn_0_vfn_peer_id],
         &[validator_peer_id],
-        &[fn_0_vfn_2_peer_id, fn_0_pfn_peer_id],
+        &[fn_0_pfn_peer_id],
         true,
     );
 }

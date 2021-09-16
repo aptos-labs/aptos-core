@@ -76,7 +76,7 @@ impl StateSyncBootstrapper {
             .expect("[State Sync] Starting failure: cannot sync with storage!");
         let network_senders: HashMap<_, _> = network
             .iter()
-            .map(|(network_id, sender, _events)| (network_id.clone(), sender.clone()))
+            .map(|(network_id, sender, _events)| (*network_id, sender.clone()))
             .collect();
 
         let coordinator = StateSyncCoordinator::new(

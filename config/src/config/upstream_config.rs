@@ -22,7 +22,7 @@ impl PeerNetworkId {
         }
     }
     pub fn network_id(&self) -> NetworkId {
-        self.network_id.clone()
+        self.network_id
     }
 
     pub fn peer_id(&self) -> PeerId {

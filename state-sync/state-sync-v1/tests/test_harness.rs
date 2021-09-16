@@ -59,7 +59,6 @@ use network::{
     DisconnectReason, ProtocolId,
 };
 use network_builder::builder::NetworkBuilder;
-use once_cell::sync::Lazy;
 use rand::{rngs::StdRng, SeedableRng};
 use state_sync_v1::{
     bootstrapper::StateSyncBootstrapper,
@@ -79,10 +78,6 @@ use tokio::runtime::Runtime;
 use vm_genesis::GENESIS_KEYPAIR;
 
 // Networks for validators and fullnodes.
-pub static VALIDATOR_NETWORK: Lazy<NetworkId> = Lazy::new(|| NetworkId::Validator);
-pub static VFN_NETWORK: Lazy<NetworkId> = Lazy::new(NetworkId::vfn_network);
-pub static VFN_NETWORK_2: Lazy<NetworkId> = Lazy::new(|| NetworkId::Private("Second VFN".into()));
-pub static PFN_NETWORK: Lazy<NetworkId> = Lazy::new(|| NetworkId::Public);
 
 pub struct StateSyncPeer {
     bootstrapper: Option<StateSyncBootstrapper>,
@@ -340,19 +335,15 @@ impl StateSyncEnvironment {
         let mut network_handles = vec![];
         if mock_network {
             let networks = if role.is_validator() {
-                vec![VALIDATOR_NETWORK.clone(), VFN_NETWORK.clone()]
+                vec![NetworkId::Validator, NetworkId::Vfn]
             } else {
-                vec![
-                    VFN_NETWORK.clone(),
-                    VFN_NETWORK_2.clone(),
-                    PFN_NETWORK.clone(),
-                ]
+                vec![NetworkId::Vfn, NetworkId::Public]
             };
 
             let mut peer = self.peers[index].borrow_mut();
             for network in networks.into_iter() {
                 let peer_id = PeerId::random();
-                peer.multi_peer_ids.insert(network.clone(), peer_id);
+                peer.multi_peer_ids.insert(network, peer_id);
 
                 // mock the StateSyncEvents and StateSyncSender to allow manually controlling
                 // msg delivery in test
@@ -379,7 +370,7 @@ impl StateSyncEnvironment {
             let auth_mode = AuthenticationMode::Mutual(peer.network_key.clone());
             let network_context = Arc::new(NetworkContext::new(
                 *role,
-                VALIDATOR_NETWORK.clone(),
+                NetworkId::Validator,
                 peer.peer_id,
             ));
 
@@ -576,9 +567,9 @@ fn setup_state_sync_config(
     config.state_sync.chunk_limit = 250;
 
     let network_id = if role.is_validator() {
-        VALIDATOR_NETWORK.clone()
+        NetworkId::Validator
     } else {
-        VFN_NETWORK.clone()
+        NetworkId::Vfn
     };
 
     if !role.is_validator() {

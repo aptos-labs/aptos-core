@@ -61,7 +61,7 @@ pub(crate) async fn coordinator<V>(
     ));
     let smp_events: Vec<_> = network_events
         .into_iter()
-        .map(|(network_id, events)| events.map(move |e| (network_id.clone(), e)))
+        .map(|(network_id, events)| events.map(move |e| (network_id, e)))
         .collect();
     let mut events = select_all(smp_events).fuse();
     let mut scheduled_broadcasts = FuturesUnordered::new();

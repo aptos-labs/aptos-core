@@ -270,18 +270,18 @@ impl NodeConfig {
         let mut network_ids = HashSet::new();
         if let Some(network) = &mut self.validator_network {
             network.load_validator_network()?;
-            network_ids.insert(network.network_id.clone());
+            network_ids.insert(network.network_id);
         }
         for network in &mut self.full_node_networks {
             network.load_fullnode_network()?;
 
             // Check a validator network is not included in a list of full-node networks
-            let network_id = &network.network_id;
+            let network_id = network.network_id;
             invariant(
                 !matches!(network_id, NetworkId::Validator),
                 "Included a validator network in full_node_networks".into(),
             )?;
-            network_ids.insert(network_id.clone());
+            network_ids.insert(network_id);
         }
         Ok(self)
     }

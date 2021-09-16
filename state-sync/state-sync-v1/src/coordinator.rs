@@ -168,7 +168,7 @@ impl<T: ExecutorProxyTrait, M: MempoolNotificationSender> StateSyncCoordinator<T
 
         let events: Vec<_> = network_handles
             .into_iter()
-            .map(|(network_id, _sender, events)| events.map(move |e| (network_id.clone(), e)))
+            .map(|(network_id, _sender, events)| events.map(move |e| (network_id, e)))
             .collect();
         let mut network_events = select_all(events).fuse();
 
@@ -222,7 +222,7 @@ impl<T: ExecutorProxyTrait, M: MempoolNotificationSender> StateSyncCoordinator<T
                             }
                         }
                         Event::Message(peer_id, message) => {
-                            if let Err(e) = self.process_chunk_message(network_id.clone(), peer_id, message).await {
+                            if let Err(e) = self.process_chunk_message(network_id, peer_id, message).await {
                                 error!(LogSchema::new(LogEntry::ProcessChunkMessage).error(&e));
                             }
                         }
@@ -1954,7 +1954,7 @@ mod tests {
         let mut validator_coordinator = test_utils::create_validator_coordinator();
 
         // Create a public peer
-        let node_network_id = NetworkId::Public;
+        let network_id = NetworkId::Public;
         let peer_id = PeerId::random();
         let connection_metadata = ConnectionMetadata::mock_with_role_and_origin(
             peer_id,
@@ -1964,17 +1964,15 @@ mod tests {
 
         // Verify error is returned when adding peer that is not a valid peer
         let new_peer_result =
-            validator_coordinator.process_new_peer(node_network_id, connection_metadata.clone());
+            validator_coordinator.process_new_peer(network_id, connection_metadata.clone());
         assert_matches!(new_peer_result, Err(Error::InvalidStateSyncPeer(..)));
 
         // Verify the same error is not returned when adding a validator node
-        let node_network_id = NetworkId::Validator;
-        assert_ok!(
-            validator_coordinator.process_new_peer(node_network_id.clone(), connection_metadata)
-        );
+        let network_id = NetworkId::Validator;
+        assert_ok!(validator_coordinator.process_new_peer(network_id, connection_metadata));
 
         // Verify no error is returned when removing the node
-        assert_ok!(validator_coordinator.process_lost_peer(node_network_id, peer_id));
+        assert_ok!(validator_coordinator.process_lost_peer(network_id, peer_id));
     }
 
     #[test]

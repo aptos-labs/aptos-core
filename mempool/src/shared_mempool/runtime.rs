@@ -53,7 +53,7 @@ pub(crate) fn start_shared_mempool<V>(
     let mut all_network_events = vec![];
     let mut network_senders = HashMap::new();
     for (network_id, network_sender, network_events) in mempool_network_handles.into_iter() {
-        all_network_events.push((network_id.clone(), network_events));
+        all_network_events.push((network_id, network_events));
         network_senders.insert(network_id, network_sender);
     }
 

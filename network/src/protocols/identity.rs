@@ -77,7 +77,7 @@ mod tests {
         );
         let server_handshake = HandshakeMsg {
             chain_id,
-            network_id: network_id.clone(),
+            network_id,
             supported_protocols,
         };
         let mut supported_protocols = BTreeMap::new();

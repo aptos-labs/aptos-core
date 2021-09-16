@@ -551,7 +551,7 @@ fn setup_node_network_interfaces(
             )
         }
         let (network_interface, network_handle) = setup_node_network_interface(PeerNetworkId::new(
-            secondary_network_id.clone(),
+            secondary_network_id,
             node.secondary_peer_id().unwrap(),
         ));
         network_handles.push(network_handle);

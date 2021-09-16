@@ -292,7 +292,7 @@ async fn upgrade_inbound<T: TSocket>(
     let handshake_msg = HandshakeMsg {
         supported_protocols: ctxt.supported_protocols.clone(),
         chain_id: ctxt.chain_id,
-        network_id: ctxt.network_id.clone(),
+        network_id: ctxt.network_id,
     };
     let remote_handshake = exchange_handshake(&handshake_msg, &mut socket)
         .await
@@ -369,7 +369,7 @@ pub async fn upgrade_outbound<T: TSocket>(
     let handshake_msg = HandshakeMsg {
         supported_protocols: ctxt.supported_protocols.clone(),
         chain_id: ctxt.chain_id,
-        network_id: ctxt.network_id.clone(),
+        network_id: ctxt.network_id,
     };
     let remote_handshake = exchange_handshake(&handshake_msg, &mut socket).await?;
 
@@ -443,7 +443,7 @@ where
         supported_protocols.insert(SUPPORTED_MESSAGING_PROTOCOL, application_protocols);
 
         let identity_pubkey = identity_key.public_key();
-        let network_id = network_context.network_id().clone();
+        let network_id = *network_context.network_id();
 
         let upgrade_context = UpgradeContext::new(
             NoiseUpgrader::new(network_context, identity_key, auth_mode),

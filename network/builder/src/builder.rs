@@ -184,11 +184,7 @@ impl NetworkBuilder {
             AuthenticationMode::MaybeMutual(identity_key)
         };
 
-        let network_context = Arc::new(NetworkContext::new(
-            role,
-            config.network_id.clone(),
-            peer_id,
-        ));
+        let network_context = Arc::new(NetworkContext::new(role, config.network_id, peer_id));
 
         let trusted_peers = Arc::new(RwLock::new(HashMap::new()));
 
