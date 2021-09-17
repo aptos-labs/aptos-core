@@ -1,14 +1,12 @@
-// Check that the add_all_currencies flag does the expected thing
-//! new-transaction
-//! sender: blessed
 #[test_only]
-module DiemFramework::DiemCurrenciesTests {
+module DiemFramework::DiemDesignatedDealerTests {
     use DiemFramework::DualAttestation;
     use DiemFramework::DiemAccount;
     use DiemFramework::XUS::XUS;
     use DiemFramework::XDX::XDX;
     use DiemFramework::Genesis;
 
+    // Check that the add_all_currencies flag does the expected thing
     #[test(account = @TreasuryCompliance, dr = @DiemRoot)]
     fun currencies(account: signer, dr: signer) {
         Genesis::setup(&dr, &account);
