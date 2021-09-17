@@ -97,8 +97,9 @@ impl Factory for K8sFactory {
         node_num: NonZeroUsize,
         version: &Version,
     ) -> Result<Box<dyn Swarm>> {
-        set_eks_nodegroup_size(self.cluster_name.clone(), node_num.get(), true)?;
         uninstall_from_k8s_cluster()?;
+        set_eks_nodegroup_size(self.cluster_name.clone(), 0, true)?;
+        set_eks_nodegroup_size(self.cluster_name.clone(), node_num.get(), true)?;
         clean_k8s_cluster(
             self.helm_repo.clone(),
             node_num.get(),
