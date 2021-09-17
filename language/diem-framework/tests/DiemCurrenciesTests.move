@@ -1,15 +1,18 @@
 // Check that the add_all_currencies flag does the expected thing
-
-
 //! new-transaction
 //! sender: blessed
-script {
+#[test_only]
+module DiemFramework::DiemCurrenciesTests {
     use DiemFramework::DualAttestation;
     use DiemFramework::DiemAccount;
     use DiemFramework::XUS::XUS;
     use DiemFramework::XDX::XDX;
-    fun main(account: signer) {
-    let account = &account;
+    use DiemFramework::Genesis;
+
+    #[test(account = @TreasuryCompliance, dr = @DiemRoot)]
+    fun currencies(account: signer, dr: signer) {
+        Genesis::setup(&dr, &account);
+        let account = &account;
         let dummy_auth_key_prefix = x"00000000000000000000000000000001";
         DiemAccount::create_designated_dealer<XUS>(
             account, @0x2, copy dummy_auth_key_prefix, b"name", false
@@ -28,5 +31,3 @@ script {
         assert(DiemAccount::accepts_currency<XDX>(@0x3), 5);
     }
 }
-
-// check: "Keep(EXECUTED)"
