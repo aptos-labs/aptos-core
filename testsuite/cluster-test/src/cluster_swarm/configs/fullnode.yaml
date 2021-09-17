@@ -20,6 +20,7 @@ full_node_networks:
         - "/ip4/{seed_peer_ip}/tcp/6181/ln-noise-ik/f0274c2774519281a8332d0bb9d8101bd58bc7bb154b38039bc9096ce04e1237/ln-handshake/0"
       role: "Validator"
 - network_id: "public"
+  discovery_method: "onchain"
   listen_address: "/ip4/0.0.0.0/tcp/6182"
   identity:
     type: "from_storage"
@@ -31,9 +32,6 @@ full_node_networks:
       namespace: "{vault_ns}"
       token:
         from_config: root
-# This network connects to other validator-fullnodes for failover
-- network_id: "public"
-  discovery_method: "onchain"
 
 mempool:
   default_failovers: 0
