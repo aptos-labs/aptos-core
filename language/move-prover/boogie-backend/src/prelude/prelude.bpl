@@ -553,9 +553,9 @@ function {:inline} $1_Signer_spec_address_of(signer: $signer): int
     $addr#$signer(signer)
 }
 
-function {:inline} $1_Signer_is_txn_signer(s: $signer): bool;
+function $1_Signer_is_txn_signer(s: $signer): bool;
 
-function {:inline} $1_Signer_is_txn_signer_addr(a: int): bool;
+function $1_Signer_is_txn_signer_addr(a: int): bool;
 
 
 // ==================================================================================

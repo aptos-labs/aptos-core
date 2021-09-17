@@ -269,9 +269,11 @@ impl<'env> SpecTranslator<'env> {
         self.writer.set_location(&fun.loc);
         let boogie_name = boogie_spec_fun_name(module_env, id, &self.type_inst);
         let param_list = mem_params.chain(params).join(", ");
+        let attrs = if fun.uninterpreted { "" } else { "{:inline}" };
         emit!(
             self.writer,
-            "function {{:inline}} {}({}): {}",
+            "function {} {}({}): {}",
+            attrs,
             boogie_name,
             param_list,
             result_type
