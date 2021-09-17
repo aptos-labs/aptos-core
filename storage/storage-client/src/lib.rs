@@ -161,6 +161,15 @@ impl DbReader<DpnProto> for StorageClient {
         unimplemented!()
     }
 
+    fn get_transaction_by_hash(
+        &self,
+        _hash: HashValue,
+        _ledger_version: Version,
+        _fetch_events: bool,
+    ) -> Result<Option<TransactionWithProof>> {
+        unimplemented!()
+    }
+
     fn get_events(
         &self,
         _key: &EventKey,

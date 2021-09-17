@@ -482,6 +482,17 @@ fn verify_committed_transactions(
         // Fetch and verify transaction itself.
         let txn = txn_to_commit.transaction().as_signed_user_txn().unwrap();
         let txn_with_proof = db
+            .get_transaction_by_hash(txn_to_commit.transaction().hash(), ledger_version, true)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            txn_with_proof.transaction.hash(),
+            txn_to_commit.transaction().hash()
+        );
+        txn_with_proof
+            .verify_user_txn(ledger_info, cur_ver, txn.sender(), txn.sequence_number())
+            .unwrap();
+        let txn_with_proof = db
             .get_transaction_with_proof(cur_ver, ledger_version, true)
             .unwrap();
         txn_with_proof

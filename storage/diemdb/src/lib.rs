@@ -701,6 +701,19 @@ impl DbReader<DpnProto> for DiemDB {
         })
     }
 
+    /// This API is best-effort in that it CANNOT provide absense proof.
+    fn get_transaction_by_hash(
+        &self,
+        hash: HashValue,
+        ledger_version: Version,
+        fetch_events: bool,
+    ) -> Result<Option<TransactionWithProof>> {
+        self.transaction_store
+            .get_transaction_version_by_hash(&hash, ledger_version)?
+            .map(|v| self.get_transaction_with_proof(v, ledger_version, fetch_events))
+            .transpose()
+    }
+
     // ======================= State Synchronizer Internal APIs ===================================
     /// Gets a batch of transactions for the purpose of synchronizing state to another node.
     ///

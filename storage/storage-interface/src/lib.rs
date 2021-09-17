@@ -191,6 +191,16 @@ pub trait DbReader<PS: ProtocolSpec>: Send + Sync {
         fetch_events: bool,
     ) -> Result<TransactionListWithProof<PS::TransactionInfo>>;
 
+    /// See [`DiemDB::get_transaction_by_hash`].
+    ///
+    /// [`DiemDB::get_transaction_by_hash`]: ../diemdb/struct.DiemDB.html#method.get_transaction_by_hash
+    fn get_transaction_by_hash(
+        &self,
+        hash: HashValue,
+        ledger_version: Version,
+        fetch_events: bool,
+    ) -> Result<Option<TransactionWithProof<PS::TransactionInfo>>>;
+
     /// Returns events by given event key
     fn get_events(
         &self,

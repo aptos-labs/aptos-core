@@ -50,6 +50,15 @@ impl DbReader<DpnProto> for MockDbReaderWriter {
         unimplemented!()
     }
 
+    fn get_transaction_by_hash(
+        &self,
+        _hash: HashValue,
+        _ledger_version: Version,
+        _fetch_events: bool,
+    ) -> Result<Option<TransactionWithProof>> {
+        unimplemented!()
+    }
+
     /// Returns events by given event key
     fn get_events(
         &self,

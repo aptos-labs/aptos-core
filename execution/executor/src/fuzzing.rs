@@ -102,6 +102,15 @@ impl DbReader<DpnProto> for FakeDb {
         unimplemented!();
     }
 
+    fn get_transaction_by_hash(
+        &self,
+        _hash: HashValue,
+        _ledger_version: Version,
+        _fetch_events: bool,
+    ) -> Result<Option<TransactionWithProof>> {
+        unimplemented!()
+    }
+
     fn get_events(
         &self,
         _event_key: &EventKey,

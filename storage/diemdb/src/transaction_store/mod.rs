@@ -6,9 +6,13 @@
 use crate::{
     change_set::ChangeSet,
     errors::DiemDbError,
-    schema::{transaction::TransactionSchema, transaction_by_account::TransactionByAccountSchema},
+    schema::{
+        transaction::TransactionSchema, transaction_by_account::TransactionByAccountSchema,
+        transaction_by_hash::TransactionByHashSchema,
+    },
 };
 use anyhow::{ensure, format_err, Result};
+use diem_crypto::{hash::CryptoHash, HashValue};
 use diem_types::{
     account_address::AccountAddress,
     block_metadata::BlockMetadata,
@@ -44,6 +48,18 @@ impl TransactionStore {
         }
 
         Ok(None)
+    }
+
+    /// Gets the version of a transaction by its hash.
+    pub fn get_transaction_version_by_hash(
+        &self,
+        hash: &HashValue,
+        ledger_version: Version,
+    ) -> Result<Option<Version>> {
+        Ok(match self.db.get::<TransactionByHashSchema>(hash)? {
+            Some(version) if version <= ledger_version => Some(version),
+            _ => None,
+        })
     }
 
     /// Gets an iterator that yields `(sequence_number, version)` for each
@@ -137,6 +153,8 @@ impl TransactionStore {
                 &version,
             )?;
         }
+        cs.batch
+            .put::<TransactionByHashSchema>(&transaction.hash(), &version)?;
         cs.batch.put::<TransactionSchema>(&version, transaction)?;
 
         Ok(())
