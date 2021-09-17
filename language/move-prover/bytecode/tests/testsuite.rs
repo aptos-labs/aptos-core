@@ -23,6 +23,7 @@ use bytecode::{
     spec_instrumentation::SpecInstrumentationProcessor,
     usage_analysis::UsageProcessor,
     verification_analysis::VerificationAnalysisProcessor,
+    well_formed_instrumentation::WellFormedInstrumentationProcessor,
 };
 use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
 use move_command_line_common::testing::EXP_EXT;
@@ -139,6 +140,8 @@ fn get_tested_transformation_pipeline(
             pipeline.add_processor(UsageProcessor::new());
             pipeline.add_processor(VerificationAnalysisProcessor::new());
             pipeline.add_processor(SpecInstrumentationProcessor::new());
+            pipeline.add_processor(GlobalInvariantAnalysisProcessor::new());
+            pipeline.add_processor(WellFormedInstrumentationProcessor::new());
             pipeline.add_processor(DataInvariantInstrumentationProcessor::new());
             Ok(Some(pipeline))
         }
@@ -154,7 +157,6 @@ fn get_tested_transformation_pipeline(
             pipeline.add_processor(UsageProcessor::new());
             pipeline.add_processor(VerificationAnalysisProcessor::new());
             pipeline.add_processor(SpecInstrumentationProcessor::new());
-            pipeline.add_processor(DataInvariantInstrumentationProcessor::new());
             pipeline.add_processor(GlobalInvariantAnalysisProcessor::new());
             Ok(Some(pipeline))
         }
@@ -170,7 +172,6 @@ fn get_tested_transformation_pipeline(
             pipeline.add_processor(UsageProcessor::new());
             pipeline.add_processor(VerificationAnalysisProcessor::new());
             pipeline.add_processor(SpecInstrumentationProcessor::new());
-            pipeline.add_processor(DataInvariantInstrumentationProcessor::new());
             pipeline.add_processor(GlobalInvariantAnalysisProcessor::new());
             pipeline.add_processor(GlobalInvariantInstrumentationProcessor::new());
             Ok(Some(pipeline))
@@ -185,6 +186,9 @@ fn get_tested_transformation_pipeline(
             pipeline.add_processor(UsageProcessor::new());
             pipeline.add_processor(VerificationAnalysisProcessor::new());
             pipeline.add_processor(SpecInstrumentationProcessor::new());
+            pipeline.add_processor(GlobalInvariantAnalysisProcessor::new());
+            pipeline.add_processor(WellFormedInstrumentationProcessor::new());
+            pipeline.add_processor(DataInvariantInstrumentationProcessor::new());
             pipeline.add_processor(MonoAnalysisProcessor::new());
             Ok(Some(pipeline))
         }

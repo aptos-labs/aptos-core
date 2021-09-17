@@ -29,11 +29,10 @@ use crate::{
     usage_analysis, verification_analysis,
 };
 use move_model::{
-    ast::{Exp, QuantKind},
+    ast::Exp,
     exp_generator::ExpGenerator,
     spec_translator::{SpecTranslator, TranslatedSpec},
 };
-use num::{BigUint, Zero};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt,
@@ -290,80 +289,6 @@ impl<'a> Instrumenter<'a> {
 
         // Extract and clear current code
         let old_code = std::mem::take(&mut self.builder.data.code);
-
-        if self.is_verified() {
-            // Inject well-formedness assumptions for parameters.
-            for param in 0..self.builder.fun_env.get_parameter_count() {
-                let exp = self.builder.mk_call(
-                    &BOOL_TYPE,
-                    ast::Operation::WellFormed,
-                    vec![self.builder.mk_temporary(param)],
-                );
-                self.builder.emit_with(move |id| Prop(id, Assume, exp));
-            }
-
-            // Inject well-formedness assumption for used memory.
-            for mem in usage_analysis::get_memory_usage(&self.builder.get_target())
-                .accessed
-                .all
-                .clone()
-            {
-                // If this is native or intrinsic memory, skip this.
-                let struct_env = self
-                    .builder
-                    .global_env()
-                    .get_struct_qid(mem.to_qualified_id());
-                if struct_env.is_native_or_intrinsic() {
-                    continue;
-                }
-                let exp = self
-                    .builder
-                    .mk_inst_mem_quant_opt(QuantKind::Forall, &mem, &mut |val| {
-                        Some(self.builder.mk_call(
-                            &BOOL_TYPE,
-                            ast::Operation::WellFormed,
-                            vec![val],
-                        ))
-                    })
-                    .expect("quant defined");
-                self.builder.emit_with(move |id| Prop(id, Assume, exp));
-
-                // If this is ghost memory, assume it exists, and if it has an initializer,
-                // assume it has this value.
-                if let Some(spec_var) = struct_env.get_ghost_memory_spec_var() {
-                    let mem_ty = mem.to_type();
-                    let zero_addr = self.builder.mk_address_const(BigUint::zero());
-                    let exists = self.builder.mk_call_with_inst(
-                        &BOOL_TYPE,
-                        vec![mem_ty.clone()],
-                        ast::Operation::Exists(None),
-                        vec![zero_addr.clone()],
-                    );
-                    self.builder.emit_with(move |id| Prop(id, Assume, exists));
-                    let svar_module = self.builder.global_env().get_module(spec_var.module_id);
-                    let svar = svar_module.get_spec_var(spec_var.id);
-                    if let Some(init) = &svar.init {
-                        let mem_val = self.builder.mk_call_with_inst(
-                            &mem_ty,
-                            mem.inst.clone(),
-                            ast::Operation::Pack(mem.module_id, mem.id),
-                            vec![init.clone()],
-                        );
-                        let mem_access = self.builder.mk_call_with_inst(
-                            &mem_ty,
-                            vec![mem_ty.clone()],
-                            ast::Operation::Global(None),
-                            vec![zero_addr],
-                        );
-                        let eq_with_init = self
-                            .builder
-                            .mk_bool_call(ast::Operation::Identical, vec![mem_access, mem_val]);
-                        self.builder
-                            .emit_with(move |id| Prop(id, Assume, eq_with_init));
-                    }
-                }
-            }
-        }
 
         // Emit `let` bindings.
         self.emit_lets(spec, false);

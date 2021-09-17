@@ -19,15 +19,13 @@ fun DisableInv::foo($t0|s: signer) {
      var $t1: bool
      var $t2: DisableInv::R2
      var $t3: num
-  0: assume WellFormed($t0)
-  1: assume forall $rsc: ResourceDomain<DisableInv::R2>(): WellFormed($rsc)
-  2: $t1 := false
-  3: $t2 := pack DisableInv::R2($t1)
-  4: move_to<DisableInv::R2>($t2, $t0) on_abort goto 7 with $t3
-  5: label L1
-  6: return ()
-  7: label L2
-  8: abort($t3)
+  0: $t1 := false
+  1: $t2 := pack DisableInv::R2($t1)
+  2: move_to<DisableInv::R2>($t2, $t0) on_abort goto 5 with $t3
+  3: label L1
+  4: return ()
+  5: label L2
+  6: abort($t3)
 }
 
 
@@ -41,7 +39,7 @@ DisableInv::foo: [
       ]
     ]
   }
-  4: move_to<DisableInv::R2>($t2, $t0) on_abort goto L2 with $t3 {}
+  2: move_to<DisableInv::R2>($t2, $t0) on_abort goto L2 with $t3 {}
   exitpoint {
     assert @0 = [
       <> -> [

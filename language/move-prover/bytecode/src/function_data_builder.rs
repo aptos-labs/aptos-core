@@ -180,6 +180,11 @@ impl<'env> FunctionDataBuilder<'env> {
         self.emit(f(attr_id))
     }
 
+    /// Emits a Bytecode::Prop based on given kind and expression.
+    pub fn emit_prop(&mut self, kind: PropKind, exp: Exp) {
+        self.emit_with(move |id| Bytecode::Prop(id, kind, exp));
+    }
+
     /// Sets the debug comment which should be associated with the next instruction
     /// emitted with `self.emit_with(|id| ..)`.
     pub fn set_next_debug_comment(&mut self, comment: String) {

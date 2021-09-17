@@ -176,21 +176,9 @@ module 0x42::TestGlobalVars {
     fun publish(s: &signer) {
         move_to<R>(s, R{v: 2});
     }
-    spec publish {
-        // TODO: this hack is currently required because spec_instrumentation does not inject assumptions for
-        //   memory used only by invariants which are injected into the code, but not the original code.
-        //   This is a general bug not related to spec vars. Since the function `publish` does not directly
-        //   reference `limit, but only the invariant which is injected, memory usage analysis does not
-        //   report this dependency on limit. The below forces the analysis to see this dependency.
-        ensures limit == limit;
-    }
 
     fun update_invalid() acquires R {
         borrow_global_mut<R>(@0).v = 3;
-    }
-    spec update_invalid {
-        // TODO: see above
-        ensures limit == limit;
     }
 
     fun limit_change_invalid(s: &signer) {

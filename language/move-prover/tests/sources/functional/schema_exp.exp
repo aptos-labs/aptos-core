@@ -25,7 +25,6 @@ error: post-condition does not hold
 47 │         ensures result == i + 2;
    │         ^^^^^^^^^^^^^^^^^^^^^^^^
    │
-   =     at tests/sources/functional/schema_exp.move:58
    =     at tests/sources/functional/schema_exp.move:53: baz_incorrect
    =         i = <redacted>
    =     at tests/sources/functional/schema_exp.move:54: baz_incorrect

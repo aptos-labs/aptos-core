@@ -5,7 +5,6 @@ error: post-condition does not hold
 22 │         ensures len(result_1) > 0 ==> result_1[0] < max_u8(); // should be <=
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
-   =     at tests/sources/functional/hash_model_invalid.move:22
    =     at tests/sources/functional/hash_model_invalid.move:11: hash_test1
    =         v1 = <redacted>
    =         v2 = <redacted>
@@ -26,7 +25,6 @@ error: post-condition does not hold
 35 │         ensures len(result_1) > 0 ==> result_1[0] < max_u8();
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
-   =     at tests/sources/functional/hash_model_invalid.move:35
    =     at tests/sources/functional/hash_model_invalid.move:26: hash_test2
    =         v1 = <redacted>
    =         v2 = <redacted>

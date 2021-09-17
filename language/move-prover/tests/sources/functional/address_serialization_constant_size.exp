@@ -5,7 +5,6 @@ error: post-condition does not hold
 19 │         ensures len(BCS::serialize(mv1)) == len(BCS::serialize(mv2));
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
-   =     at tests/sources/functional/address_serialization_constant_size.move:20
    =     at tests/sources/functional/address_serialization_constant_size.move:15: serialized_move_values_diff_len_incorrect
    =         mv1 = <redacted>
    =         mv2 = <redacted>

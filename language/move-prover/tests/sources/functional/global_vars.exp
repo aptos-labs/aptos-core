@@ -48,15 +48,15 @@ error: global memory invariant does not hold
 174 │     invariant global<R>(@0).v <= limit;
     │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/global_vars.move:196: limit_change_invalid
+    =     at tests/sources/functional/global_vars.move:184: limit_change_invalid
     =         s = <redacted>
-    =     at tests/sources/functional/global_vars.move:197: limit_change_invalid
+    =     at tests/sources/functional/global_vars.move:185: limit_change_invalid
     =     at tests/sources/functional/global_vars.move:176: publish
     =         s = <redacted>
     =     at tests/sources/functional/global_vars.move:177: publish
     =     at tests/sources/functional/global_vars.move:178: publish
-    =     at tests/sources/functional/global_vars.move:198: limit_change_invalid
-    =     at tests/sources/functional/global_vars.move:200
+    =     at tests/sources/functional/global_vars.move:186: limit_change_invalid
+    =     at tests/sources/functional/global_vars.move:188
     =     at tests/sources/functional/global_vars.move:174
 
 error: post-condition does not hold
@@ -93,6 +93,6 @@ error: global memory invariant does not hold
 174 │     invariant global<R>(@0).v <= limit;
     │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/global_vars.move:188: update_invalid
-    =     at tests/sources/functional/global_vars.move:189: update_invalid
+    =     at tests/sources/functional/global_vars.move:180: update_invalid
+    =     at tests/sources/functional/global_vars.move:181: update_invalid
     =     at tests/sources/functional/global_vars.move:174

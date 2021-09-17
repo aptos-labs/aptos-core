@@ -167,7 +167,6 @@ error: unknown assertion failed
 234 │            assert !(exists x in v: x==e);
     │            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/verify_vector.move:240
     =     at tests/sources/functional/verify_vector.move:221: verify_contains
     =         v = <redacted>
     =         e = <redacted>
@@ -187,7 +186,6 @@ error: induction case of the loop invariant does not hold
 226 │                invariant !(exists j in 0..i: v[j]==e);
     │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/verify_vector.move:240
     =     at tests/sources/functional/verify_vector.move:221: verify_contains
     =         v = <redacted>
     =         e = <redacted>
@@ -208,7 +206,6 @@ error: induction case of the loop invariant does not hold
 192 │                 invariant !(exists j in 0..i: v[j]==e);
     │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/verify_vector.move:206
     =     at tests/sources/functional/verify_vector.move:187: verify_index_of
     =         v = <redacted>
     =         e = <redacted>
@@ -229,7 +226,6 @@ error: post-condition does not hold
 203 │         ensures result_1 == (exists x in v: x==e); // whether v contains e or not
     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/verify_vector.move:206
     =     at tests/sources/functional/verify_vector.move:187: verify_index_of
     =         v = <redacted>
     =         e = <redacted>
@@ -252,7 +248,6 @@ error: post-condition does not hold
 205 │         ensures result_1 ==> (forall i in 0..result_2: v[i]!=e); // ensure the smallest index
     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/verify_vector.move:206
     =     at tests/sources/functional/verify_vector.move:187: verify_index_of
     =         v = <redacted>
     =         e = <redacted>
@@ -277,7 +272,6 @@ error: post-condition does not hold
 216 │         ensures result_1 ==> (forall i in 0..result_2: v[i]!=e); // ensure the smallest index
     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/verify_vector.move:217
     =     at tests/sources/functional/verify_vector.move:209: verify_model_index_of
     =         v = <redacted>
     =         e = <redacted>
@@ -296,7 +290,6 @@ error: induction case of the loop invariant does not hold
 266 │                 invariant forall k in j..i: v[k] == old(v)[k+1];
     │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/verify_vector.move:282
     =     at tests/sources/functional/verify_vector.move:254: verify_remove
     =         v = <redacted>
     =         j = <redacted>
@@ -334,7 +327,6 @@ error: induction case of the loop invariant does not hold
 267 │                 invariant forall k in i+1..len(v): v[k] == old(v)[k];
     │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/verify_vector.move:282
     =     at tests/sources/functional/verify_vector.move:254: verify_remove
     =         v = <redacted>
     =         j = <redacted>

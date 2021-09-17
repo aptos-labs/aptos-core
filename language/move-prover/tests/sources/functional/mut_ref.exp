@@ -5,7 +5,6 @@ error: data invariant does not hold
 8 │     spec T { invariant value > 0; }
   │              ^^^^^^^^^^^^^^^^^^^^
   │
-  =     at tests/sources/functional/mut_ref.move:127
   =     at tests/sources/functional/mut_ref.move:113: call_return_ref_different_path_vec2_incorrect
   =         b = <redacted>
   =     at tests/sources/functional/mut_ref.move:114: call_return_ref_different_path_vec2_incorrect

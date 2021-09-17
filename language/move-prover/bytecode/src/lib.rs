@@ -43,6 +43,7 @@ pub mod stackless_control_flow_graph;
 pub mod usage_analysis;
 pub mod verification_analysis;
 pub mod verification_analysis_v2;
+pub mod well_formed_instrumentation;
 
 /// Print function targets for testing and debugging.
 pub fn print_targets_for_test(

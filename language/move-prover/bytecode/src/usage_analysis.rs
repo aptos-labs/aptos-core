@@ -297,7 +297,7 @@ impl<'a> TransferFunctions for MemoryUsageAnalysis<'a> {
 }
 
 impl<'a> MemoryUsageAnalysis<'a> {
-    /// Compute usage information for the given spec. This spec is injected in later
+    /// Compute usage information for the given spec. This spec maybe injected in later
     /// phases into the code, but we need to account for it's memory usage already here
     /// as spec injection itself depends on this information.
     fn compute_spec_usage(&self, spec: &Spec, state: &mut UsageState) {

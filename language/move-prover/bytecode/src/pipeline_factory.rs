@@ -22,6 +22,7 @@ use crate::{
     spec_instrumentation::SpecInstrumentationProcessor,
     usage_analysis::UsageProcessor,
     verification_analysis::VerificationAnalysisProcessor,
+    well_formed_instrumentation::WellFormedInstrumentationProcessor,
 };
 
 pub fn default_pipeline_with_options(options: &ProverOptions) -> FunctionTargetPipeline {
@@ -41,9 +42,11 @@ pub fn default_pipeline_with_options(options: &ProverOptions) -> FunctionTargetP
         LoopAnalysisProcessor::new(),
         // spec instrumentation
         SpecInstrumentationProcessor::new(),
-        DataInvariantInstrumentationProcessor::new(),
         GlobalInvariantAnalysisProcessor::new(),
         GlobalInvariantInstrumentationProcessor::new(),
+        WellFormedInstrumentationProcessor::new(),
+        DataInvariantInstrumentationProcessor::new(),
+        // monomorphization
         MonoAnalysisProcessor::new(),
     ];
 

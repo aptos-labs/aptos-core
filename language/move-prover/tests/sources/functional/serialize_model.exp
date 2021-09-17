@@ -5,7 +5,6 @@ error: post-condition does not hold
 34 │         ensures result_1 == result_2;
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
-   =     at tests/sources/functional/serialize_model.move:35
    =     at tests/sources/functional/serialize_model.move:26: bcs_test1_incorrect
    =         v1 = <redacted>
    =         v2 = <redacted>

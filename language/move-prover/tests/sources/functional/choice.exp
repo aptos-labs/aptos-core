@@ -24,7 +24,6 @@ error: post-condition does not hold
 21 │         ensures result == TRACE(choose x: u64 where x >= 4 && x <= 5);
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
-   =     at tests/sources/functional/choice.move:21
    =     at tests/sources/functional/choice.move:15: simple_incorrect
    =         b = <redacted>
    =     at tests/sources/functional/choice.move:16: simple_incorrect
@@ -40,7 +39,6 @@ error: post-condition does not hold
 98 │         ensures result == TRACE(choose y: u64 where y > x);
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
-   =     at tests/sources/functional/choice.move:98
    =     at tests/sources/functional/choice.move:93: test_choice_dup_expected_fail
    =         x = <redacted>
    =     at tests/sources/functional/choice.move:94: test_choice_dup_expected_fail
