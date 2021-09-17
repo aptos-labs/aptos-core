@@ -115,13 +115,7 @@ impl BufferItem {
                 let mut valid_sigs = BTreeMap::<AccountAddress, Ed25519Signature>::new();
                 valid_sigs.insert(author, signature.clone());
 
-                let commit_ledger_info = LedgerInfo::new(
-                    executed_item.commit_info,
-                    executed_item
-                        .ordered_proof
-                        .ledger_info()
-                        .consensus_data_hash(),
-                );
+                let commit_ledger_info = executed_item.generate_commit_ledger_info();
 
                 for (author, sig) in executed_item.pending_votes.iter() {
                     if verifier.verify(*author, &commit_ledger_info, sig).is_ok() {
@@ -151,12 +145,78 @@ impl BufferItem {
         }
     }
 
+    /// this function assumes validity of ledger_info and that it has the voting power
+    /// it returns an updated item, a bool indicating if aggregated, a bool indicating if matching the commit info
+    pub fn try_advance_to_aggregated_with_ledger_info(
+        self,
+        ledger_info: LedgerInfoWithSignatures,
+    ) -> (Self, bool, bool) {
+        match self {
+            Self::Signed(signed_item_box) => {
+                let signed_item = *signed_item_box;
+                if signed_item.commit_proof.commit_info() == ledger_info.commit_info() {
+                    (
+                        Self::Aggregated(Box::new(AggregatedBufferItem {
+                            executed_blocks: signed_item.executed_blocks,
+                            aggregated_proof: ledger_info,
+                            callback: signed_item.callback,
+                        })),
+                        true,
+                        true,
+                    )
+                } else {
+                    (Self::Signed(Box::new(signed_item)), false, false)
+                }
+            }
+            Self::Executed(executed_item_box) => {
+                let executed_item = *executed_item_box;
+                if &executed_item.commit_info == ledger_info.commit_info() {
+                    let aggregated_proof = LedgerInfoWithSignatures::new(
+                        executed_item.generate_commit_ledger_info(),
+                        executed_item.pending_votes.clone(),
+                    );
+                    (
+                        Self::Aggregated(Box::new(AggregatedBufferItem {
+                            executed_blocks: executed_item.executed_blocks,
+                            aggregated_proof,
+                            callback: executed_item.callback,
+                        })),
+                        true,
+                        true,
+                    )
+                } else {
+                    (Self::Executed(Box::new(executed_item)), false, false)
+                }
+            }
+            Self::Ordered(ordered_item_box) => {
+                let ordered = *ordered_item_box;
+                if ordered
+                    .ordered_proof
+                    .commit_info()
+                    .match_ordered_only(ledger_info.commit_info())
+                {
+                    // we just collect the signatures
+                    (
+                        Self::Ordered(Box::new(OrderedBufferItem {
+                            pending_votes: ledger_info.signatures().clone(),
+                            callback: ordered.callback,
+                            ordered_blocks: ordered.ordered_blocks,
+                            ordered_proof: ordered.ordered_proof,
+                        })),
+                        false,
+                        true,
+                    )
+                } else {
+                    (Self::Ordered(Box::new(ordered)), false, false)
+                }
+            }
+            Self::Aggregated(_) => {
+                unreachable!("Found aggregated buffer item but any aggregated buffer item should get dequeued right away.");
+            }
+        }
+    }
+
     pub fn try_advance_to_aggregated(self, validator: &ValidatorVerifier) -> (Self, bool) {
-        /*
-        TODO:
-            executed buffer item might also advance to aggregated if it received
-            enough signatures from peers
-         */
         match self {
             Self::Signed(signed_item_box) => {
                 let signed_item = *signed_item_box;
@@ -175,6 +235,28 @@ impl BufferItem {
                     )
                 } else {
                     (Self::Signed(Box::new(signed_item)), false)
+                }
+            }
+            Self::Executed(executed_item_box) => {
+                let executed_item = *executed_item_box;
+                if validator
+                    .check_voting_power(executed_item.pending_votes.keys())
+                    .is_ok()
+                {
+                    let aggregated_proof = LedgerInfoWithSignatures::new(
+                        executed_item.generate_commit_ledger_info(),
+                        executed_item.pending_votes,
+                    );
+                    (
+                        Self::Aggregated(Box::new(AggregatedBufferItem {
+                            executed_blocks: executed_item.executed_blocks,
+                            aggregated_proof,
+                            callback: executed_item.callback,
+                        })),
+                        true,
+                    )
+                } else {
+                    (Self::Executed(Box::new(executed_item)), false)
                 }
             }
             _ => {

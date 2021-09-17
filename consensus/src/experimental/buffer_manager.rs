@@ -45,7 +45,7 @@ pub fn sync_ack_new() -> SyncAck {}
 
 pub struct SyncRequest {
     tx: oneshot::Sender<SyncAck>,
-    ledger_info: LedgerInfo,
+    ledger_info: LedgerInfoWithSignatures,
     reconfig: bool,
 }
 
@@ -206,32 +206,51 @@ impl StateManager {
         self.signing_root = cursor;
     }
 
-    /// check if a prefix of the buffer is ready to persist,
-    /// if yes, send them to the persisting phase and dequeue the buffer items.
-    fn try_persisting_blocks(&mut self) {
+    /// Pop the prefix of buffer items until (including) aggregated_item_cursor
+    /// Prepare an aggregated item and send it to the persisting phase
+    fn try_persisting_blocks(&mut self, aggregated_item_cursor: BufferItemRootType) {
         let mut cursor = self.buffer.head.as_ref().cloned();
+        let mut blocks_to_persist: Vec<Arc<ExecutedBlock>> = vec![];
+
+        let mut found_item: Option<BufferItem> = None;
+
         while cursor.is_some() {
             let buffer_item = take_elem(&cursor);
+            blocks_to_persist.extend(
+                buffer_item
+                    .get_blocks()
+                    .iter()
+                    .map(|eb| Arc::new(eb.clone()))
+                    .collect::<Vec<Arc<ExecutedBlock>>>(),
+            );
+            if link_eq(&cursor, &aggregated_item_cursor) {
+                found_item.replace(buffer_item);
+                break;
+            }
+            cursor = get_next(&cursor);
+            self.buffer.pop_front();
+        }
+
+        if let Some(buffer_item) = found_item {
             if let BufferItem::Aggregated(aggregated) = buffer_item {
-                let blocks: Vec<Arc<ExecutedBlock>> = aggregated
-                    .executed_blocks
-                    .into_iter()
-                    .map(Arc::new)
-                    .collect();
                 // send to persisting phase
                 block_on(self.persisting_phase_tx.send(PersistingRequest {
-                    blocks,
+                    blocks: blocks_to_persist,
                     commit_ledger_info: aggregated.aggregated_proof,
+                    // we use the last callback
+                    // this is okay because the callback function (from BlockStore::commit)
+                    // takes in the actual blocks and ledger info from the state computer
+                    // the encoded values are references to the block_tree, storage, and a commit root
+                    // the block_tree and storage are the same for all the callbacks in the current epoch
+                    // the commit root is used in logging only.
                     callback: aggregated.callback,
                 }))
                 .ok();
-                cursor = get_next(&cursor);
-                self.buffer.pop_front();
             } else {
-                // we put the item back
-                set_elem(&cursor, buffer_item);
-                break;
+                panic!("Bad Aggregated Item Cursor: Item is not aggregated.");
             }
+        } else {
+            unreachable!("Bad Aggregated Item Cursor: Item not found in the buffer.");
         }
     }
 
@@ -246,7 +265,9 @@ impl StateManager {
 
     /// this function processes a sync request
     /// if reconfig flag is set, it stops the main loop
-    /// otherwise, it empties the buffer till ledger_info, and update the roots
+    /// otherwise, it looks for a matching buffer item.
+    /// If found and the item is executed/signed, advance it to aggregated and try_persisting
+    /// Otherwise, it adds the signature to cache, later it will get advanced to aggregated
     /// finally, it sends back an ack.
     async fn process_sync_request(&mut self, sync_event: SyncRequest) -> anyhow::Result<()> {
         let SyncRequest {
@@ -259,17 +280,29 @@ impl StateManager {
             // buffer manager will stop
             self.end_epoch = true;
         } else {
-            // clear the buffer until (including) the ledger_info
-            while let Some(buffer_item) = self.buffer.pop_front() {
-                if buffer_item
-                    .get_commit_info()
-                    .match_ordered_only(ledger_info.commit_info())
+            let mut cursor = self.buffer.head.clone();
+            // look for the target ledger info:
+            // if found: we try to advance it to aggregated, if succeeded, we try persisting the items.
+            // if not found: it means the block is in BlockStore but not in the buffer
+            // either the block is just persisted, or has not been added to the buffer
+            // in either cases, we do nothing.
+            while cursor.is_some() {
                 {
-                    break;
+                    let buffer_item = take_elem(&cursor);
+                    let (attempted_item, aggregated, matching) =
+                        buffer_item.try_advance_to_aggregated_with_ledger_info(ledger_info.clone());
+                    set_elem(&cursor, attempted_item);
+                    if matching {
+                        if aggregated {
+                            self.try_persisting_blocks(cursor);
+                        }
+                        break;
+                    }
                 }
+                cursor = get_next(&cursor);
             }
 
-            // reset roots
+            // reset roots because the item pointed by them might no longer exist
             self.reset_all_roots();
         }
 
@@ -511,7 +544,7 @@ impl StateManager {
                             set_elem(&current_cursor, new_buffer_item);
                             // if successfully advanced to an aggregated item
                             if success {
-                                self.try_persisting_blocks();
+                                self.try_persisting_blocks(current_cursor.clone());
                             }
                             break;
                         }
