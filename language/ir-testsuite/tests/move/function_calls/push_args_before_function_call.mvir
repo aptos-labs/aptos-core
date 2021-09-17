@@ -1,15 +1,21 @@
 module {{default}}.A {
     public push_u64(): u64  {
+    label b0:
         return 42;
     }
 
     public push_bool(): bool {
+    label b0:
         return true;
     }
 
     public foo(u: u64, b: bool): u64 {
-        if (move(b)) { return move(u) + 1;}
-        else { return 0;}
+    label b0:
+        jump_if (move(b)) b2;
+    label b1:
+        return 0;
+    label b2:
+        return move(u) + 1;
     }
 }
 
@@ -18,6 +24,7 @@ import {{default}}.A;
 
 main() {
     let ans: u64;
+label b0:
     (A.push_u64(), A.push_bool());
     ans = A.foo();
     return;

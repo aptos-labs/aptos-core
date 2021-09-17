@@ -13,7 +13,7 @@ import 0x1.Diem;
 main(account: signer, receiver: address) {
     let coins: Diem.Diem<XUS.XUS>;
     let with_cap: DiemAccount.WithdrawCapability;
-
+label b0:
     with_cap = DiemAccount.extract_withdraw_capability(&account);
     DiemAccount.pay_from<XUS.XUS>(&with_cap, move(receiver), 200, h"", h"");
     DiemAccount.restore_withdraw_capability(move(with_cap));
@@ -34,7 +34,7 @@ import 0x1.Signer;
 main(account: signer) {
     let balance: u64;
     let sender: address;
-
+label b0:
     sender = Signer.address_of(&account);
     balance = DiemAccount.balance<XUS.XUS>(move(sender));
     assert(move(balance) <= 999800, 42);
@@ -54,7 +54,7 @@ import 0x1.Signer;
 main(account: signer) {
     let balance: u64;
     let sender: address;
-
+label b0:
     sender = Signer.address_of(&account);
     balance = DiemAccount.balance<XUS.XUS>(move(sender));
     assert(move(balance) == 900200, 42);

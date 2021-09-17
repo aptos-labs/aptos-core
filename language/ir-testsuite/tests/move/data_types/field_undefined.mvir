@@ -5,6 +5,7 @@ module {{default}}.M {
         x: u64
     }
     public new(): Self.T {
+    label b0:
         return T { y: 1 };
     }
 }

@@ -5,12 +5,14 @@ module {{default}}.MoneyHolder {
         struct T { money: Diem.Diem<XUS.XUS> }
 
         public new(m: Diem.Diem<XUS.XUS>): Self.T {
+        label b0:
             return T{ money: move(m) };
         }
 
         public value(this :&Self.T): u64 {
             let ref: &Diem.Diem<XUS.XUS>;
             let val: u64;
+        label b0:
             ref = &copy(this).T::money;
             val = Diem.value<XUS.XUS>(move(ref));
             _ = move(this);
@@ -19,6 +21,7 @@ module {{default}}.MoneyHolder {
 
         public destroy_t(t: Self.T) {
             let money: Diem.Diem<XUS.XUS>;
+        label b0:
             T{ money } = move(t);
             Diem.destroy_zero<XUS.XUS>(move(money));
             return;
@@ -30,10 +33,12 @@ module {{default}}.MoneyHolder {
 module {{default}}.Bar {
         struct T has drop {baz: u64}
         public new(m: u64): Self.T {
+        label b0:
             return T{baz: move(m)};
         }
         public value(this: &Self.T): u64 {
             let ref: &u64;
+        label b0:
             ref = &move(this).T::baz;
             return *move(ref);
         }
@@ -55,7 +60,7 @@ main() {
     let bar: Bar.T;
     let bar_ref: &Bar.T;
     let v2: u64;
-
+label b0:
     coin = Diem.zero<XUS.XUS>();
     money_holder = MoneyHolder.new(move(coin));
     money_holder_ref = &money_holder;

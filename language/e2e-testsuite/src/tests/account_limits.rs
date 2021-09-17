@@ -32,6 +32,7 @@ fn encode_add_account_limits_admin_script(execute_as: AccountAddress) -> WriteSe
     import 0x1.Signer;
 
     main(dr_account: signer, vasp: signer) {
+    label b0:
         AccountLimits.publish_unrestricted_limits_for_testing<XUS.XUS>(&vasp);
         AccountLimits.publish_window<XUS.XUS>(
             &dr_account,
@@ -73,6 +74,7 @@ fn encode_update_account_limit_definition_script(
         new_max_holding_balance: u64,
         new_time_period: u64
     ) {
+    label b0:
         AccountLimits.update_limits_definition<XUS.XUS>(
             &account,
             move(limit_addr),
@@ -118,6 +120,7 @@ fn encode_update_account_limit_window_info_script(
         aggregate_balance: u64,
         new_limit_address: address
     ) {
+    label b0:
         AccountLimits.update_window_info<XUS.XUS>(
             &account,
             move(window_addr),

@@ -1,14 +1,17 @@
 //# publish
 module 0x42.M {
     consume(s: signer) {
+    label b0:
         Self.consume(move(s));
         return;
     }
 
     t(cond: bool, s1: signer, s2: signer) {
-        if (move(cond)) {
-            Self.consume(move(s1));
-        }
+    label b0:
+        jump_if_false (move(cond)) b2;
+    label b1:
+        Self.consume(move(s1));
+    label b2:
         s1 = move(s2);
         Self.consume(move(s1));
         return;

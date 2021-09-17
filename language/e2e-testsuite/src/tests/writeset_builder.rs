@@ -25,7 +25,7 @@ fn build_upgrade_writeset() {
     let program = String::from(
         "
         module 0x1.M {
-            public magic(): u64 { return 42; }
+            public magic(): u64 { label b0: return 42; }
         }
         ",
     );
@@ -75,6 +75,7 @@ fn build_upgrade_writeset() {
 import 0x1.M;
 
 main(lr_account: signer) {
+label b0:
   assert(M.magic() == 42, 100);
   return;
 }

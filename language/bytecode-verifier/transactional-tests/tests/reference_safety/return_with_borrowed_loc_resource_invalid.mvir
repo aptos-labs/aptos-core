@@ -5,9 +5,9 @@ module 0x1.M {
     t() {
         let s: Self.X;
         let u: &u64;
+    label b0:
         s = X { u: 0 };
         u = &(&s).X::u;
-        // unused resource even though it is "used" via a borrow
-        return;
+        return; // unused resource even though it is "used" via a borrow
     }
 }

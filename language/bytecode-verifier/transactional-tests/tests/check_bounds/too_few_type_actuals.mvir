@@ -5,6 +5,7 @@ module 0x1.M {
     foo() {
         // missing type arg
         let x: Self.S<>;
+    label b0:
         return;
     }
 }

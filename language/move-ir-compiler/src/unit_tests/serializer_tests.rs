@@ -8,6 +8,7 @@ fn serialize_script_ret() {
     let code = String::from(
         "
         main() {
+        label b0:
             return;
         }
         ",

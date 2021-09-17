@@ -1,6 +1,6 @@
 processed 2 tasks
 
-task 1 'run'. lines 9-18:
+task 1 'run'. lines 10-20:
 Error: Script execution failed with VMError: {
     major_status: STLOC_UNSAFE_TO_DESTROY_ERROR,
     sub_status: None,

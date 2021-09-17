@@ -1,6 +1,7 @@
 main() {
     let x: u64;
     let x: u64;
+label b0:
     return;
 }
 

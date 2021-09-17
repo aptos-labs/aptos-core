@@ -5,12 +5,14 @@ module 0x42.Token {
     struct T has key {balance: u64}
 
     public new(balance: u64): Self.T  {
+    label b0:
         return T{balance: copy(balance)};
     }
 
     public value(this: &Self.T): u64 {
         let b: u64;
         let b_ref: &u64;
+    label b0:
         b_ref = &move(this).T::balance;
         b = *move(b_ref);
         return move(b);
@@ -19,6 +21,7 @@ module 0x42.Token {
     public bump(this: &mut Self.T) {
         let val: &mut u64;
         let x: u64;
+    label b0:
         val = &mut move(this).T::balance;
         x = *copy(val) + 1;
         *move(val) = copy(x);
@@ -26,6 +29,7 @@ module 0x42.Token {
     }
 
     public publish(account: &signer, t: Self.T) {
+    label b0:
         move_to<T>(move(account), move(t));
         return;
     }
@@ -37,7 +41,7 @@ module 0x42.Token {
         let imm_struct1: &Self.T;
         let struct1_original_balance: u64;
         let struct1_new_balance: u64;
-
+    label b0:
         z = Self.new(0);
         Self.publish(copy(account), move(z));
 
@@ -47,13 +51,13 @@ module 0x42.Token {
 
         imm_struct1 = freeze(copy(struct1));
         struct1_original_balance = Self.value(move(imm_struct1));
-        if (move(struct1_original_balance) != 0) { abort 42; }
+        assert(move(struct1_original_balance) == 0, 42);
 
         Self.bump(copy(struct1));
 
         imm_struct1 = freeze(move(struct1));
         struct1_new_balance = Self.value(move(imm_struct1));
-        if (move(struct1_new_balance) != 1) { abort 42; }
+        assert(move(struct1_new_balance) == 1, 43);
 
         return;
     }
@@ -63,6 +67,7 @@ module 0x42.Token {
 import 0x42.Token;
 
 main(account: signer) {
+label b0:
     Token.test(&account);
     return;
 }

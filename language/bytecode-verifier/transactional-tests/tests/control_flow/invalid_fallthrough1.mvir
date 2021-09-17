@@ -1,4 +1,4 @@
 //# run
 main() {
-    // empty functions not allowed
+label b0: // empty functions not allowed
 }

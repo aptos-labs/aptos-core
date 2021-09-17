@@ -2,6 +2,7 @@
 main() {
     let a: u64;
     let b: u64;
+label b0:
     a = 2 + 3;
     assert(copy(a) == 5, 42);
     b = copy(a) - 1;

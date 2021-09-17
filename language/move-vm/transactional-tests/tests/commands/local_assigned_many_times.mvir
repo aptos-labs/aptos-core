@@ -4,7 +4,7 @@ main() {
     let y: u64;
     let x_ref: &u64;
     let y_ref: &u64;
-
+label b0:
     x = 5;
     y = 2;
 
@@ -16,16 +16,18 @@ main() {
     x_ref = &x;
     y_ref = move(x_ref);
 
-    if (true) {
-        _ = move(y_ref);
-        x_ref = &y;
-        y_ref = &x;
-    } else {
-        _ = move(y_ref);
-        x_ref = &x;
-        y_ref = &y;
-    }
-
+    jump_if (true) b2;
+label b1:
+    _ = move(y_ref);
+    x_ref = &x;
+    y_ref = &y;
+    jump b3;
+label b2:
+    _ = move(y_ref);
+    x_ref = &y;
+    y_ref = &x;
+    jump b3;
+label b3:
     assert(*move(x_ref) == 2, 42);
     _ = move(y_ref);
     return;

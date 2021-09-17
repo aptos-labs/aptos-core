@@ -52,6 +52,7 @@ script {
 
 import 0x42.N;
 main(s: signer) {
+label b0:
     _ = N.take(&s);
     return;
 }

@@ -8,6 +8,7 @@ module 0x1.A {
         let t: Self.T;
         let t_ref: &mut Self.T;
         let v: u64;
+    label b0:
         sender = Signer.address_of(move(account));
         t_ref = borrow_global_mut<T>(copy(sender));
         // cannot move_from, still acquired

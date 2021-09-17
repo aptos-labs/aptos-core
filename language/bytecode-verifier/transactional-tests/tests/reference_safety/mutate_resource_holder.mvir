@@ -4,8 +4,8 @@ module 0x42.A {
     struct T { f: Self.Coin }
 
     public t(this: &mut Self.T, y: Self.T) {
-        // cannot assign/mutate without drop ability
-        *move(this) = move(y);
+    label b0:
+        *move(this) = move(y); // cannot assign/mutate without drop ability
         return;
     }
 }

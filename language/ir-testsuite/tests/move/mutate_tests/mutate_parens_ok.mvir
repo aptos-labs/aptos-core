@@ -1,6 +1,7 @@
 main() {
     let v: u64;
     let ref_v: &mut u64;
+label b0:
     v = 0;
     *(&mut v) = 5;
     ref_v = &mut v;

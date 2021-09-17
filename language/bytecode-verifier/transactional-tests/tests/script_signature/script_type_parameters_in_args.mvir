@@ -1,18 +1,21 @@
 //# run
 // all invalid signatures
 main<T: copy + drop>(x: T) {
+label b0:
     return;
 }
 
 
 //# run
 main<T>(x: &T) {
+label b0:
     return;
 }
 
 
 //# run
 main<T: copy + drop>(v: vector<T>) {
+label b0:
     return;
 }
 
@@ -27,5 +30,6 @@ module 0x42.M {
 import 0x42.M;
 
 main<T: copy + drop>(x: M.Box<M.Box<T>>) {
+label b0:
     return;
 }

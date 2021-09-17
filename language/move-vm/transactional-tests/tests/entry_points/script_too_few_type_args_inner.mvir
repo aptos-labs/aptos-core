@@ -5,5 +5,6 @@ module 0x1.M {
 
 //# run --type-args 0x1::M::Ex
 main<T>() { // too few type args for inner type
+label b0:
     return;
 }

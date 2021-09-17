@@ -1,14 +1,16 @@
 module {{default}}.A {
     public foo(t: u64): u64 * u64 {
+    label b0:
        return (copy(t), 2 * move(t));
     }
 
     public bar(k: u64): u64 * u64 {
-        if (copy(k) != 1) {
-            return Self.foo(copy(k));
-        } else {
-            return 3 * Self.foo(move(k));
-        }
+    label b0:
+        jump_if (copy(k) != 1) b2;
+    label b1:
+        return 3 * Self.foo(move(k));
+    label b2:
+        return Self.foo(copy(k));
     }
 }
 
@@ -21,7 +23,7 @@ main() {
 
     let u: u64;
     let v: u64;
-
+label b0:
     x, y = A.bar(10);
     u, v = A.bar(1);
 

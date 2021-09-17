@@ -2,12 +2,15 @@
 module 0x1.Coin {
     struct Coin { value: u64 }
     public value(c: &Self.Coin): u64 {
+    label b0:
         return *&move(c).Coin::value;
     }
     public zero(): Self.Coin {
+    label b0:
         return Coin { value: 0 };
     }
     public destroy_zero(c: Self.Coin) {
+    label b0:
         Coin {} = move(c);
         assert(() == 0, 42);
         return;
@@ -21,12 +24,14 @@ module 0x42.MoneyHolder {
     struct T { money: Coin.Coin }
 
     public new(m: Coin.Coin): Self.T {
+    label b0:
         return T{ money: move(m) };
     }
 
     public value(this :&Self.T): u64 {
         let ref: &Coin.Coin;
         let val: u64;
+    label b0:
         ref = &copy(this).T::money;
         val = Coin.value(move(ref));
         _ = move(this);
@@ -35,6 +40,7 @@ module 0x42.MoneyHolder {
 
     public destroy_t(t: Self.T) {
         let money: Coin.Coin;
+    label b0:
         T{ money } = move(t);
         Coin.destroy_zero(move(money));
         return;
@@ -50,6 +56,7 @@ main() {
     let money_holder: MoneyHolder.T;
     let money_holder_ref: &MoneyHolder.T;
     let value: u64;
+label b0:
     coin = Coin.zero();
     money_holder = MoneyHolder.new(move(coin));
     money_holder_ref = &money_holder;

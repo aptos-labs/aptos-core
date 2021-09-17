@@ -1,5 +1,6 @@
 module {{default}}.M {
     foo(signer: address) {
+    label b0:
         return;
     }
 }

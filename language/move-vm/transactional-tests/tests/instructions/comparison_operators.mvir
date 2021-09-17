@@ -1,5 +1,6 @@
 //# run
 main() {
+label b0:
     assert(0u8 == 0u8, 1000);
     assert(0u64 == 0u64, 1001);
     assert(0u128 == 0u128, 1002);
@@ -16,6 +17,7 @@ main() {
 
 //# run
 main() {
+label b0:
     assert(0u8 != 1u8, 2000);
     assert(0u64 != 1u64, 2001);
     assert(0u128 != 1u128, 2001);
@@ -32,6 +34,7 @@ main() {
 
 //# run
 main() {
+label b0:
     assert(0u8 < 1u8, 3000);
     assert(0u64 < 1u64, 3001);
     assert(0u128 < 1u128, 3002);
@@ -48,6 +51,7 @@ main() {
 
 //# run
 main() {
+label b0:
     assert(1u8 > 0u8, 4000);
     assert(1u64 > 0u64, 4001);
     assert(1u128 > 0u128, 4002);
@@ -64,6 +68,7 @@ main() {
 
 //# run
 main() {
+label b0:
     assert(0u8 <= 1u8, 5000);
     assert(0u64 <= 1u64, 5001);
     assert(0u128 <= 1u128, 5002);
@@ -80,6 +85,7 @@ main() {
 
 //# run
 main() {
+label b0:
     assert(1u8 >= 0u8, 6000);
     assert(1u64 >= 0u64, 6001);
     assert(1u128 >= 0u128, 6002);

@@ -3,6 +3,7 @@
 module {{default}}.Token {
     struct T has key { b: bool }
     public new(): Self.T {
+    label b0:
         return T{ b: true };
     }
 }
@@ -15,7 +16,7 @@ import {{default}}.Token;
 main(account: &signer) {
     let sender: address;
     let yes: &mut Token.T;
-
+label b0:
     sender = Signer.address_of(move(account));
     yes = borrow_global_mut<T>(copy(sender));
     _ = move(yes);

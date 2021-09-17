@@ -1,6 +1,6 @@
 processed 1 task
 
-task 0 'publish'. lines 1-13:
+task 0 'publish'. lines 1-14:
 Error: Unable to publish module '00000000000000000000000000000042::RTest'. Got VMError: {
     major_status: WRITEREF_WITHOUT_DROP_ABILITY,
     sub_status: None,

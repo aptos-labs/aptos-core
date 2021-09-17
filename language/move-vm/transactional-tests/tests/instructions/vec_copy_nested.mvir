@@ -8,7 +8,7 @@ module 0x42.DeepCopy {
     public test_struct_shallow() {
         let c1: Self.Config;
         let c2: Self.Config;
-
+    label b0:
         c1 = Config { i: 0 };
         c2 = copy(c1);
 
@@ -28,7 +28,7 @@ module 0x42.DeepCopy {
     public test_struct_deep() {
         let n1: Self.Nested;
         let n2: Self.Nested;
-
+    label b0:
         n1 = Nested { c: Config { i: 0 } };
         n2 = copy(n1);
 
@@ -52,7 +52,7 @@ module 0x42.DeepCopy {
     public test_vector() {
         let v1: vector<u64>;
         let v2: vector<u64>;
-
+    label b0:
         v1 = Vector.empty<u64>();
         Vector.push_back<u64>(&mut v1, 0);
         v2 = copy(v1);
@@ -73,7 +73,7 @@ module 0x42.DeepCopy {
         let r1: &mut Self.Config;
         let r2: &mut Self.Config;
         let ri1: &mut u64;
-
+    label b0:
         c1 = Config { i: 0 };
         c2 = copy(c1);
         *(&mut (&mut c2).Config::i) = 1;
@@ -101,6 +101,7 @@ module 0x42.DeepCopy {
 import 0x42.DeepCopy;
 
 main() {
+label b0:
     DeepCopy.test_struct_shallow();
     DeepCopy.test_struct_deep();
     DeepCopy.test_vector();

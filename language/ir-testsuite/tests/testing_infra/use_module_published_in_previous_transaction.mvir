@@ -4,10 +4,12 @@
 //! sender: alice
 module {{alice}}.M {
     public foo(x: u64): u64 {
+    label b0:
         return move(x)*2;
     }
 
     public bar(x: u64, y: u64): u64 {
+    label b0:
         return move(x) + move(y);
     }
 }
@@ -16,6 +18,7 @@ module {{alice}}.M {
 //! sender: alice
 
 main() {
+label b0:
     return;
 }
 
@@ -28,6 +31,7 @@ import {{alice}}.M;
 
 main() {
     let x: u64;
+label b0:
     x = M.foo(3);
     assert(move(x) == 6, 42);
     return;
@@ -42,6 +46,7 @@ import {{alice}}.M;
 
 main() {
     let x: u64;
+label b0:
     x = M.bar(1, 2);
     assert(move(x) == 3, 42);
     return;

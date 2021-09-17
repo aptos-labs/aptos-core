@@ -6,6 +6,7 @@ module 0x1.M1 {
 
     // verifer should reject; didn't move resource;
     public p(s: Self.S<Self.MyResource>) {
+    label b0:
         return;
     }
 }
@@ -17,6 +18,7 @@ module 0x1.M2 {
 
     // verifier should reject; drops s2 on the floor
     public p(s1: Self.S<Self.MyResource>, s2: Self.S<Self.MyResource>): Self.S<Self.MyResource> {
+    label b0:
         s1 = move(s2);
         return move(s1);
     }
@@ -29,6 +31,7 @@ module 0x1.M3 {
 
     // verifier should reject; copies s
     public p(s: &Self.S<Self.MyResource>): Self.S<Self.MyResource> {
+    label b0:
         return *move(s);
     }
 }
@@ -40,6 +43,7 @@ module 0x1.M4 {
 
     // verifier should reject; drops s1 on the floor
     public p(s1: &mut Self.S<Self.MyResource>, s2: Self.S<Self.MyResource>) {
+    label b0:
         *move(s1) = move(s2);
         return;
     }
@@ -52,6 +56,7 @@ module 0x1.M5 {
 
     // verifier should reject; copies s
     public p(s: Self.S<Self.MyResource>): Self.S<Self.MyResource> * Self.S<Self.MyResource> {
+    label b0:
         return (copy(s), move(s));
     }
 }

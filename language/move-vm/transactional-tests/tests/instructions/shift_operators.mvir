@@ -1,36 +1,42 @@
 //# run
 // Number of bits shifted >= total number of bits in the number.
 main() {
+label b0:
     _ = 0u8 << 8u8;
     return;
 }
 
 //# run
 main() {
+label b0:
     _ = 0u64 << 64u8;
     return;
 }
 
 //# run
 main() {
+label b0:
     _ = 0u128 << 128u8;
     return;
 }
 
 //# run
 main() {
+label b0:
     _ = 0u8 >> 8u8;
     return;
 }
 
 //# run
 main() {
+label b0:
     _ = 0u64 >> 64u8;
     return;
 }
 
 //# run
 main() {
+label b0:
     _ = 0u128 >> 128u8;
     return;
 }
@@ -39,6 +45,7 @@ main() {
 // Shifting 0 results in 0.
 //# run
 main() {
+label b0:
     assert(0u8 << 4u8 == 0u8, 1000);
     assert(0u64 << 1u8 == 0u64, 1001);
     assert(0u128 << 127u8 == 0u128, 1002);
@@ -54,6 +61,7 @@ main() {
 // Shifting by 0 bits results in the same number.
 //# run
 main() {
+label b0:
     assert(100u8 << 0u8 == 100u8, 2000);
     assert(43u64 << 0u8 == 43u64, 2001);
     assert(57348765484584586725315342563424u128 << 0u8 == 57348765484584586725315342563424u128, 2002);
@@ -69,6 +77,7 @@ main() {
 // shl/shr by 1 equivalent to mul/div by 2.
 //# run
 main() {
+label b0:
     assert(1u8 << 1u8 == 2u8, 3000);
     assert(7u64 << 1u8 == 14u64, 3001);
     assert(1000u128 << 1u8 == 2000u128, 3002);
@@ -84,6 +93,7 @@ main() {
 // Underflowing results in 0.
 //# run
 main() {
+label b0:
     assert(1234u64 >> 63u8 == 0u64, 4000);
     assert(3u8 >> 5u8 == 0u8, 4001);
     assert(43152365326753472145312542634526753u128 >> 127u8 == 0u128, 4002);
@@ -95,6 +105,7 @@ main() {
 // Overflowing results are truncated.
 //# run
 main() {
+label b0:
     assert(7u8 << 7u8 == 128u8, 5000);
     assert(7u64 << 62u8 == 13835058055282163712u64, 5001);
     assert(2u128 << 127u8 == 0u128, 5002);
@@ -106,6 +117,7 @@ main() {
 // Some random tests.
 //# run
 main() {
+label b0:
     assert(54u8 << 3u8 == 176u8, 6000);
     assert(5u8 << 2u8 == 20u8, 6001);
     assert(124u8 << 5u8 == 128u8, 6002);

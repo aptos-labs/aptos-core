@@ -264,6 +264,7 @@ fn parallel_execution_with_bad_config() {
 import 0x1.ParallelExecutionConfig;
 
 main(dr_account: signer, account: signer, payload: vector<u8>) {
+label b0:
   ParallelExecutionConfig.enable_parallel_execution_with_config(&dr_account, move(payload));
   return;
 }

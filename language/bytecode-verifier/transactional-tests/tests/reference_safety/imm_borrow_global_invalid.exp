@@ -1,6 +1,6 @@
 processed 4 tasks
 
-task 1 'publish'. lines 28-43:
+task 1 'publish'. lines 31-46:
 Error: Unable to publish module '00000000000000000000000000000001::Tester'. Got VMError: {
     major_status: GLOBAL_REFERENCE_ERROR,
     sub_status: None,
@@ -9,7 +9,7 @@ Error: Unable to publish module '00000000000000000000000000000001::Tester'. Got 
     offsets: [(FunctionDefinitionIndex(0), 4)],
 }
 
-task 2 'publish'. lines 45-59:
+task 2 'publish'. lines 48-62:
 Error: Unable to publish module '00000000000000000000000000000001::Tester'. Got VMError: {
     major_status: GLOBAL_REFERENCE_ERROR,
     sub_status: None,
@@ -18,7 +18,7 @@ Error: Unable to publish module '00000000000000000000000000000001::Tester'. Got 
     offsets: [(FunctionDefinitionIndex(0), 5)],
 }
 
-task 3 'publish'. lines 61-79:
+task 3 'publish'. lines 64-82:
 Error: Unable to publish module '00000000000000000000000000000001::Tester'. Got VMError: {
     major_status: GLOBAL_REFERENCE_ERROR,
     sub_status: None,

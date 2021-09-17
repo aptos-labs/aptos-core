@@ -12,6 +12,7 @@ fn cfg_compile_script_ret() {
     let code = String::from(
         "
         main() {
+        label b0:
             return;
         }
         ",
@@ -33,6 +34,7 @@ fn cfg_compile_script_let() {
             let x: u64;
             let y: u64;
             let z: u64;
+        label b0:
             x = 3;
             y = 5;
             z = move(x) + copy(y) * 5 - copy(y);
@@ -56,10 +58,15 @@ fn cfg_compile_if() {
         "
         main() {
             let x: u64;
+        label b0:
             x = 0;
-            if (42 > 0) {
-                x = 1;
-            }
+            jump_if (42 > 0) b2;
+        label b1:
+            jump b3;
+        label b2:
+            x = 1;
+            jump b3;
+        label b3:
             return;
         }
         ",
@@ -70,9 +77,9 @@ fn cfg_compile_if() {
     let cfg: VMControlFlowGraph = VMControlFlowGraph::new(&compiled_script.code().code);
     println!("SCRIPT:\n {:?}", compiled_script);
     cfg.display();
-    assert_eq!(cfg.blocks().len(), 3);
-    assert_eq!(cfg.num_blocks(), 3);
-    assert_eq!(cfg.reachable_from(0).len(), 3);
+    assert_eq!(cfg.blocks().len(), 4);
+    assert_eq!(cfg.num_blocks(), 4);
+    assert_eq!(cfg.reachable_from(0).len(), 4);
 }
 
 #[test]
@@ -82,13 +89,17 @@ fn cfg_compile_if_else() {
         main() {
             let x: u64;
             let y: u64;
-            if (42 > 0) {
-                x = 1;
-                y = 2;
-            } else {
-                y = 2;
-                x = 1;
-            }
+        label b0:
+            jump_if (42 > 0) b2;
+        label b1:
+            y = 2;
+            x = 1;
+            jump b3;
+        label b2:
+            x = 1;
+            y = 2;
+            jump b3;
+        label b3:
             return;
         }
         ",
@@ -109,11 +120,14 @@ fn cfg_compile_if_else_with_else_return() {
         "
         main() {
             let x: u64;
-            if (42 > 0) {
-                x = 1;
-            } else {
-                return;
-            }
+        label b0:
+            jump_if (42 > 0) b2;
+        label b1:
+            return;
+        label b2:
+            x = 1;
+            jump b3;
+        label b3:
             return;
         }
         ",
@@ -135,15 +149,22 @@ fn cfg_compile_nested_if() {
         "
         main() {
             let x: u64;
-            if (42 > 0) {
-                x = 1;
-            } else {
-                if (5 > 10) {
-                    x = 2;
-                } else {
-                    x = 3;
-                }
-            }
+        label entry:
+            jump_if (42 > 0) if_0_then;
+        label if_0_else:
+            jump_if (5 > 10) if_1_then;
+        label if_1_else:
+            x = 3;
+            jump if_1_cont;
+        label if_1_then:
+            x = 2;
+            jump if_1_cont;
+        label if_1_cont:
+            jump if_0_cont;
+        label if_0_then:
+            x = 1;
+            jump if_0_cont;
+        label if_0_cont:
             return;
         }
         ",
@@ -153,9 +174,9 @@ fn cfg_compile_nested_if() {
     let cfg: VMControlFlowGraph = VMControlFlowGraph::new(&compiled_script.code().code);
     println!("SCRIPT:\n {:?}", compiled_script);
     cfg.display();
-    assert_eq!(cfg.blocks().len(), 6);
-    assert_eq!(cfg.num_blocks(), 6);
-    assert_eq!(cfg.reachable_from(7).len(), 4);
+    assert_eq!(cfg.blocks().len(), 7);
+    assert_eq!(cfg.num_blocks(), 7);
+    assert_eq!(cfg.reachable_from(8).len(), 3);
 }
 
 #[test]
@@ -164,11 +185,14 @@ fn cfg_compile_if_else_with_if_return() {
         "
         main() {
             let x: u64;
-            if (42 > 0) {
-                return;
-            } else {
-                x = 1;
-            }
+        label b0:
+            jump_if (42 > 0) b2;
+        label b1:
+            x = 1;
+            jump b3;
+        label b2:
+            return;
+        label b3:
             return;
         }
         ",
@@ -178,11 +202,11 @@ fn cfg_compile_if_else_with_if_return() {
     let cfg: VMControlFlowGraph = VMControlFlowGraph::new(&compiled_script.code().code);
     println!("SCRIPT:\n {:?}", compiled_script);
     cfg.display();
-    assert_eq!(cfg.blocks().len(), 3);
-    assert_eq!(cfg.num_blocks(), 3);
-    assert_eq!(cfg.reachable_from(0).len(), 3);
-    assert_eq!(cfg.reachable_from(4).len(), 1);
-    assert_eq!(cfg.reachable_from(5).len(), 1);
+    assert_eq!(cfg.blocks().len(), 4);
+    assert_eq!(cfg.num_blocks(), 4);
+    assert_eq!(cfg.reachable_from(0).len(), 4);
+    assert_eq!(cfg.reachable_from(4).len(), 2);
+    assert_eq!(cfg.reachable_from(8).len(), 1);
 }
 
 #[test]
@@ -190,11 +214,13 @@ fn cfg_compile_if_else_with_two_returns() {
     let code = String::from(
         "
         main() {
-            if (42 > 0) {
-                return;
-            } else {
-                return;
-            }
+        label b0:
+            jump_if (42 > 0) b2;
+        label b1:
+            return;
+        label b2:
+            return;
+        label b3:
             return;
         }
         ",
@@ -218,11 +244,14 @@ fn cfg_compile_if_else_with_else_abort() {
         "
         main() {
             let x: u64;
-            if (42 > 0) {
-                x = 1;
-            } else {
-                abort 0;
-            }
+        label b0:
+            jump_if (42 > 0) b2;
+        label b1:
+            abort 0;
+        label b2:
+            x = 1;
+            jump b3;
+        label b3:
             abort 0;
         }
         ",
@@ -244,11 +273,14 @@ fn cfg_compile_if_else_with_if_abort() {
         "
         main() {
             let x: u64;
-            if (42 > 0) {
-                abort 0;
-            } else {
-                x = 1;
-            }
+        label b0:
+            jump_if (42 > 0) b2;
+        label b1:
+            x = 1;
+            jump b3;
+        label b2:
+            abort 0;
+        label b3:
             abort 0;
         }
         ",
@@ -258,11 +290,11 @@ fn cfg_compile_if_else_with_if_abort() {
     let cfg: VMControlFlowGraph = VMControlFlowGraph::new(&compiled_script.code().code);
     println!("SCRIPT:\n {:?}", compiled_script);
     cfg.display();
-    assert_eq!(cfg.blocks().len(), 3);
-    assert_eq!(cfg.num_blocks(), 3);
-    assert_eq!(cfg.reachable_from(0).len(), 3);
-    assert_eq!(cfg.reachable_from(4).len(), 1);
-    assert_eq!(cfg.reachable_from(6).len(), 1);
+    assert_eq!(cfg.blocks().len(), 4);
+    assert_eq!(cfg.num_blocks(), 4);
+    assert_eq!(cfg.reachable_from(0).len(), 4);
+    assert_eq!(cfg.reachable_from(4).len(), 2);
+    assert_eq!(cfg.reachable_from(7).len(), 1);
 }
 
 #[test]
@@ -270,11 +302,13 @@ fn cfg_compile_if_else_with_two_aborts() {
     let code = String::from(
         "
         main() {
-            if (42 > 0) {
-                abort 0;
-            } else {
-                abort 0;
-            }
+        label b0:
+            jump_if (42 > 0) b2;
+        label b1:
+            abort 0;
+        label b2:
+            abort 0;
+        label b3:
             abort 0;
         }
         ",

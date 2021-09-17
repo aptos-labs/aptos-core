@@ -20,6 +20,7 @@ pub fn close_module_publishing(
         let script = "
             import 0x1.DiemTransactionPublishingOption;
         main(config: signer) {
+        label b0:
             DiemTransactionPublishingOption.set_open_module(&config, false);
             return;
         }

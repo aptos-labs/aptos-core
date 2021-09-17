@@ -1,6 +1,7 @@
 //# run
 // Casting to u8.
 main() {
+label b0:
     // 0 remains unchanged.
     assert(to_u8(0u8) == 0u8, 1000);
     assert(to_u8(0u64) == 0u8, 1001);
@@ -23,6 +24,7 @@ main() {
 // Casting to u64.
 //# run
 main() {
+label b0:
     // 0 remains unchanged.
     assert(to_u64(0u8) == 0u64, 2000);
     assert(to_u64(0u64) == 0u64, 2001);
@@ -44,6 +46,7 @@ main() {
 // Casting to u128.
 //# run
 main() {
+label b0:
     // 0 remains unchanged.
     assert(to_u128(0u8) == 0u128, 3000);
     assert(to_u128(0u64) == 0u128, 3001);
@@ -66,6 +69,7 @@ main() {
 // Casting to u8, overflowing.
 //# run
 main() {
+label b0:
     _ = to_u8(256u64);
     return;
 }
@@ -73,6 +77,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = to_u8(303u64);
     return;
 }
@@ -80,6 +85,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = to_u8(256u128);
     return;
 }
@@ -87,6 +93,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = to_u8(56432u128);
     return;
 }
@@ -94,6 +101,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = to_u8(18446744073709551615u64);
     return;
 }
@@ -101,6 +109,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = to_u8(340282366920938463463374607431768211455u128);
     return;
 }
@@ -110,6 +119,7 @@ main() {
 // Casting to u64, overflowing.
 //# run
 main() {
+label b0:
     _ = to_u64(18446744073709551616u128);
     return;
 }
@@ -117,6 +127,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = to_u64(18446744073709551647u128);
     return;
 }
@@ -124,6 +135,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = to_u64(340282366920938463463374607431768211455u128);
     return;
 }

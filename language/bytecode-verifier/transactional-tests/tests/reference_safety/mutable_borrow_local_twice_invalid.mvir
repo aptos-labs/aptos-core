@@ -4,6 +4,7 @@ module 0x1.M {
         let a: u64;
         let r1: &mut u64;
         let r2: &mut u64;
+    label b0:
         a = 0;
         r1 = &mut a;
         r2 = &mut a;

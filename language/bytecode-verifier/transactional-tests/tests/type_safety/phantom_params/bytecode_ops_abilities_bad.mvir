@@ -15,6 +15,7 @@ module 0x1.M2 {
 
     // `WriteRef` requires drop
     f(ref: &mut Self.HasDrop<M1.NoAbilities, M1.NoAbilities>) {
+    label b0:
         *move(ref) = HasDrop<M1.NoAbilities, M1.NoAbilities> { a : true };
         return;
     }
@@ -28,6 +29,7 @@ module 0x1.M3 {
 
     // `Pop` requires drop
     f() {
+    label b0:
         _ = HasDrop<M1.NoAbilities, M1.NoAbilities> { a: true };
         return;
     }
@@ -41,6 +43,7 @@ module 0x1.M3 {
 
     // Leaving value in local requires drop
     f(x: Self.HasDrop<M1.NoAbilities, M1.NoAbilities>) {
+    label b0:
         return;
     }
  }
@@ -52,6 +55,7 @@ module 0x1.M3 {
 
     // `CopyLoc` requires copy
     f(x: Self.HasCopy<M1.NoAbilities, M1.NoAbilities>): Self.HasCopy<M1.NoAbilities, M1.NoAbilities> * Self.HasCopy<M1.NoAbilities, M1.NoAbilities> {
+    label b0:
         return (copy(x), move(x));
     }
  }
@@ -64,6 +68,7 @@ module 0x1.M3 {
 
     // `MoveTo` requires key
     f(s: &signer, x: Self.HasKey<M1.NoAbilities, M1.NoAbilities>) {
+    label b0:
         move_to<HasKey<M1.NoAbilities, M1.NoAbilities>>(move(s), move(x));
         return;
     }
@@ -78,6 +83,7 @@ module 0x1.M3 {
 
     // `MoveFrom` requires key
     f(): Self.HasKey<M1.NoAbilities, M1.NoAbilities> acquires HasKey {
+    label b0:
         return move_from<HasKey<M1.NoAbilities, M1.NoAbilities>>(0x0);
     }
  }
@@ -90,6 +96,7 @@ module 0x1.M3 {
 
     // `Exists` requires key
     f(): bool {
+    label b0:
         return exists<HasKey<M1.NoAbilities, M1.NoAbilities>>(0x0);
     }
 }
@@ -102,6 +109,7 @@ module 0x1.M9 {
     struct RequireStore<T: store> { a: bool }
 
     f(): Self.RequireStore<Self.HasStore<M1.NoAbilities, M1.NoAbilities>> {
+    label b0:
         return RequireStore<Self.HasStore<M1.NoAbilities, M1.NoAbilities>> { a: true };
     }
 }

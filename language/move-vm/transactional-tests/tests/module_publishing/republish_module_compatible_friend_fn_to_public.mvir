@@ -1,6 +1,7 @@
 //# publish
 module 0x42.N {
     foo() {
+    label b0:
         return;
     }
 }
@@ -9,6 +10,7 @@ module 0x42.N {
 module 0x42.M {
     friend 0x42.N;
     public(friend) foo() {
+    label b0:
         return;
     }
 }
@@ -17,6 +19,7 @@ module 0x42.M {
 module 0x42.N {
     import 0x42.M;
     foo() {
+    label b0:
         M.foo();
         return;
     }
@@ -27,6 +30,7 @@ module 0x42.M {
     friend 0x42.N;
     // okay to increase visibility
     public foo() {
+    label b0:
         return;
     }
 }

@@ -2,6 +2,7 @@
 main() {
     let x: u64;
     let y: u64;
+label b0:
     // invalid copy
     y = copy(x);
     return;

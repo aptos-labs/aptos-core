@@ -1,15 +1,14 @@
 main() {
     let ret_if_val: bool;
+label b0:
     ret_if_val = true;
-    if (move(ret_if_val)) {
-        // This must index out-of-bounds
-        // - We will not insert a return, it is not the job of the IR to do so
-        // - It must jump somewhere, or it will fall through to the else branch
-        // - As such, the jump here is to the 'end of the else' which is an invalid jump
-        loop { break; }
-    } else {
-        assert(false, 42);
-        return;
-    }
+    jump_if (move(ret_if_val)) loop;
+label b1:
+    assert(false, 42);
+    return;
+label loop:
+    jump loop_cont;
+    jump loop;
+label loop_cont:
 }
 // check: INDEX_OUT_OF_BOUNDS

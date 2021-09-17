@@ -17,6 +17,7 @@ pub fn add_currency_to_system(
             let script = "
             import 0x1.DiemTransactionPublishingOption;
             main(config: signer) {
+            label b0:
                 DiemTransactionPublishingOption.set_open_module(&config, false);
                 return;
             }
@@ -45,6 +46,7 @@ pub fn add_currency_to_system(
                 import 0x1.FixedPoint32;
                 struct {currency_code} has store {{ x: bool }}
                 public init(dr_account: &signer, tc_account: &signer) {{
+                label b0:
                     Diem.register_SCS_currency<Self.{currency_code}>(
                         move(dr_account),
                         move(tc_account),
@@ -80,6 +82,7 @@ pub fn add_currency_to_system(
                 r#"
             import 0x1.{currency_code};
             main(dr_account: signer, tc_account: signer) {{
+            label b0:
                 {currency_code}.init(&dr_account, &tc_account);
                 return;
             }}

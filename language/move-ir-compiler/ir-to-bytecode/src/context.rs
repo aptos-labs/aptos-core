@@ -21,7 +21,7 @@ use move_core_types::{
 };
 use move_ir_types::{
     ast::{
-        BlockLabel, ConstantName, Field_, FunctionName, ModuleIdent, ModuleName,
+        BlockLabel_, ConstantName, Field_, FunctionName, ModuleIdent, ModuleName,
         QualifiedStructIdent, StructName,
     },
     location::Loc,
@@ -244,7 +244,7 @@ pub(crate) struct Context<'a> {
     structs: HashMap<QualifiedStructIdent, StructHandle>,
     struct_defs: HashMap<StructName, TableIndex>,
     named_constants: HashMap<ConstantName, TableIndex>,
-    labels: HashMap<BlockLabel, u16>,
+    labels: HashMap<BlockLabel_, u16>,
 
     // queryable pools
     // TODO: lookup for Fields is not that seemless after binary format changes
@@ -376,7 +376,7 @@ impl<'a> Context<'a> {
 
     pub fn build_index_remapping(
         &mut self,
-        label_to_index: HashMap<BlockLabel, u16>,
+        label_to_index: HashMap<BlockLabel_, u16>,
     ) -> HashMap<u16, u16> {
         let labels = std::mem::take(&mut self.labels);
         label_to_index
@@ -484,7 +484,7 @@ impl<'a> Context<'a> {
     }
 
     /// Get the fake offset for the label. Labels will be fixed to real offsets after compilation
-    pub fn label_index(&mut self, label: BlockLabel) -> Result<CodeOffset> {
+    pub fn label_index(&mut self, label: BlockLabel_) -> Result<CodeOffset> {
         get_or_add_item(&mut self.labels, label)
     }
 

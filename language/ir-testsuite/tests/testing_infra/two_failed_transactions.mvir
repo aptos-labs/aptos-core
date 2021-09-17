@@ -1,4 +1,5 @@
 main() {
+label b0:
     assert(false, 42);
     return;
 }
@@ -8,6 +9,7 @@ main() {
 
 //! new-transaction
 main() {
+label b0:
     assert(false, 43);
     return;
 }

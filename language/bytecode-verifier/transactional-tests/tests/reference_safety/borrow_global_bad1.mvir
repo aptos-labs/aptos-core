@@ -7,10 +7,10 @@ module 0x1.A {
         let x: &mut Self.T;
         let y: &mut Self.T;
         let sender: address;
+    label b0:
         sender = Signer.address_of(move(account));
         x = borrow_global_mut<T>(move(sender));
-        // cannot acquire T, still borrowed
-        y = borrow_global_mut<T>(move(addr));
+        y = borrow_global_mut<T>(move(addr)); // cannot acquire T, still borrowed
         _ = move(x);
         _ = move(y);
         return;

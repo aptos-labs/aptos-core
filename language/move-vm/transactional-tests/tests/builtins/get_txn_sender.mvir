@@ -4,7 +4,7 @@ import 0x1.Signer;
 main(account: signer) {
     let sender: address;
     let addr: address;
-
+label b0:
     sender = Signer.address_of(&account);
     addr = 0x1;
     assert(copy(sender) == copy(addr), 42);

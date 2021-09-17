@@ -815,8 +815,8 @@ fn types(context: &mut Context, sp!(_, t_): H::Type) -> Vec<IR::Type> {
 // Commands
 //**************************************************************************************************
 
-fn label(lbl: H::Label) -> IR::BlockLabel {
-    IR::BlockLabel(format!("{}", lbl).into())
+fn label(lbl: H::Label) -> IR::BlockLabel_ {
+    IR::BlockLabel_(format!("{}", lbl).into())
 }
 
 fn command(context: &mut Context, code: &mut IR::BytecodeBlock, sp!(loc, cmd_): H::Command) {

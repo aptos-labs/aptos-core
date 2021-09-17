@@ -3,17 +3,19 @@ module 0x1.A {
     struct T has drop {f: u64}
 
     public new(f: u64): Self.T {
+    label b0:
         return T{f: move(f)};
     }
 
     public t(this: &Self.T) {
-      let f: &u64;
-      let y: u64;
-      f = &copy(this).T::f;
-      y = *move(f);
-      assert(copy(y) == 2, 42);
-      _ = move(this);
-      return;
+        let f: &u64;
+        let y: u64;
+    label b0:
+        f = &copy(this).T::f;
+        y = *move(f);
+        assert(copy(y) == 2, 42);
+        _ = move(this);
+        return;
     }
 }
 
@@ -23,7 +25,7 @@ import 0x1.A;
 main() {
     let x: A.T;
     let x_ref: &A.T;
-
+label b0:
     x = A.new(2);
     x_ref = &x;
     A.t(move(x_ref));

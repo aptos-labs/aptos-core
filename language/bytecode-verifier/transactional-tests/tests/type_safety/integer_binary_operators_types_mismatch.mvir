@@ -5,6 +5,7 @@
 
 // operator +
 main() {
+label b0:
     _ = 0u8 + 0u64;
     return;
 }
@@ -12,6 +13,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u8 + 0u128;
     return;
 }
@@ -19,6 +21,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u64 + 0u8;
     return;
 }
@@ -26,6 +29,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u64 + 0u128;
     return;
 }
@@ -33,6 +37,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u128 + 0u8;
     return;
 }
@@ -40,6 +45,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u128 + 0u64;
     return;
 }
@@ -47,6 +53,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0 + true;
     return;
 }
@@ -54,6 +61,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = true + 0;
     return;
 }
@@ -61,6 +69,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = true + true;
     return;
 }
@@ -68,6 +77,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0 + 0x0;
     return;
 }
@@ -75,6 +85,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0x0 + 0;
     return;
 }
@@ -82,6 +93,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0x0 + 0x0;
     return;
 }
@@ -91,6 +103,7 @@ main() {
 module 0x42.M {
     struct R { x: bool }
     f() {
+    label b0:
         _ = 0 + (R { x: true });
         return;
     }
@@ -100,6 +113,7 @@ module 0x42.M {
 module 0x42.M {
     struct R { x: bool }
     g() {
+    label b0:
         _ = (R { x: true }) + 0;
         return;
     }
@@ -109,6 +123,7 @@ module 0x42.M {
 module 0x42.M {
     struct R { x: bool }
     h() {
+    label b0:
         _ = (R { x: true }) + (R { x: true });
         return;
     }
@@ -119,6 +134,7 @@ module 0x42.M {
 // operator -
 //# run
 main() {
+label b0:
     _ = 0u8 - 0u64;
     return;
 }
@@ -126,6 +142,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u8 - 0u128;
     return;
 }
@@ -133,6 +150,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u64 - 0u8;
     return;
 }
@@ -140,6 +158,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u64 - 0u128;
     return;
 }
@@ -147,6 +166,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u128 - 0u8;
     return;
 }
@@ -154,6 +174,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u128 - 0u64;
     return;
 }
@@ -161,6 +182,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0 - true;
     return;
 }
@@ -168,6 +190,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = true - 0;
     return;
 }
@@ -175,6 +198,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = true - true;
     return;
 }
@@ -182,6 +206,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0 - 0x0;
     return;
 }
@@ -189,6 +214,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0x0 - 0;
     return;
 }
@@ -196,6 +222,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0x0 - 0x0;
     return;
 }
@@ -205,6 +232,7 @@ main() {
 module 0x42.M {
     struct R { x: bool }
     f() {
+    label b0:
         _ = 0 - (R { x: true });
         return;
     }
@@ -214,6 +242,7 @@ module 0x42.M {
 module 0x42.M {
     struct R { x: bool }
     g() {
+    label b0:
         _ = (R { x: true }) - 0;
         return;
     }
@@ -223,6 +252,7 @@ module 0x42.M {
 module 0x42.M {
     struct R { x: bool }
     h() {
+    label b0:
         _ = (R { x: true }) - (R { x: true });
         return;
     }
@@ -233,6 +263,7 @@ module 0x42.M {
 // operator *
 //# run
 main() {
+label b0:
     _ = 0u8 * 0u64;
     return;
 }
@@ -240,6 +271,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u8 * 0u128;
     return;
 }
@@ -247,6 +279,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u64 * 0u8;
     return;
 }
@@ -254,6 +287,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u64 * 0u128;
     return;
 }
@@ -261,6 +295,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u128 * 0u8;
     return;
 }
@@ -268,6 +303,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u128 * 0u64;
     return;
 }
@@ -275,6 +311,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0 * true;
     return;
 }
@@ -282,6 +319,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = true * 0;
     return;
 }
@@ -289,6 +327,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = true * true;
     return;
 }
@@ -296,6 +335,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0 * 0x0;
     return;
 }
@@ -303,6 +343,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0x0 * 0;
     return;
 }
@@ -310,6 +351,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0x0 * 0x0;
     return;
 }
@@ -319,6 +361,7 @@ main() {
 module 0x42.M {
     struct R { x: bool }
     f() {
+    label b0:
         _ = 0 * (R { x: true });
         return;
     }
@@ -328,6 +371,7 @@ module 0x42.M {
 module 0x42.M {
     struct R { x: bool }
     g() {
+    label b0:
         _ = (R { x: true }) * 0;
         return;
     }
@@ -337,6 +381,7 @@ module 0x42.M {
 module 0x42.M {
     struct R { x: bool }
     h() {
+    label b0:
         _ = (R { x: true }) * (R { x: true });
         return;
     }
@@ -347,6 +392,7 @@ module 0x42.M {
 // operator /
 //# run
 main() {
+label b0:
     _ = 0u8 / 0u64;
     return;
 }
@@ -354,6 +400,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u8 / 0u128;
     return;
 }
@@ -361,6 +408,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u64 / 0u8;
     return;
 }
@@ -368,6 +416,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u64 / 0u128;
     return;
 }
@@ -375,6 +424,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u128 / 0u8;
     return;
 }
@@ -382,6 +432,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u128 / 0u64;
     return;
 }
@@ -389,6 +440,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0 / true;
     return;
 }
@@ -396,6 +448,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = true / 0;
     return;
 }
@@ -403,6 +456,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = true / true;
     return;
 }
@@ -410,6 +464,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0 / 0x0;
     return;
 }
@@ -417,6 +472,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0x0 / 0;
     return;
 }
@@ -424,6 +480,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0x0 / 0x0;
     return;
 }
@@ -433,6 +490,7 @@ main() {
 module 0x42.M {
     struct R { x: bool }
     f() {
+    label b0:
         _ = 0 / (R { x: true });
         return;
     }
@@ -442,6 +500,7 @@ module 0x42.M {
 module 0x42.M {
     struct R { x: bool }
     g() {
+    label b0:
         _ = (R { x: true }) / 0;
         return;
     }
@@ -451,6 +510,7 @@ module 0x42.M {
 module 0x42.M {
     struct R { x: bool }
     h() {
+    label b0:
         _ = (R { x: true }) / (R { x: true });
         return;
     }
@@ -461,6 +521,7 @@ module 0x42.M {
 // operator &
 //# run
 main() {
+label b0:
     _ = 0u8 & 0u64;
     return;
 }
@@ -468,6 +529,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u8 & 0u128;
     return;
 }
@@ -475,6 +537,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u64 & 0u8;
     return;
 }
@@ -482,6 +545,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u64 & 0u128;
     return;
 }
@@ -489,6 +553,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u128 & 0u8;
     return;
 }
@@ -496,6 +561,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u128 & 0u64;
     return;
 }
@@ -503,6 +569,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0 & true;
     return;
 }
@@ -510,6 +577,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = true & 0;
     return;
 }
@@ -517,6 +585,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = true & true;
     return;
 }
@@ -524,6 +593,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0 & 0x0;
     return;
 }
@@ -531,6 +601,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0x0 & 0;
     return;
 }
@@ -538,6 +609,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0x0 & 0x0;
     return;
 }
@@ -547,6 +619,7 @@ main() {
 module 0x42.M {
     struct R { x: bool }
     f() {
+    label b0:
         _ = 0 & (R { x: true });
         return;
     }
@@ -556,6 +629,7 @@ module 0x42.M {
 module 0x42.M {
     struct R { x: bool }
     g() {
+    label b0:
         _ = (R { x: true }) & 0;
         return;
     }
@@ -565,6 +639,7 @@ module 0x42.M {
 module 0x42.M {
     struct R { x: bool }
     h() {
+    label b0:
         _ = (R { x: true }) & (R { x: true });
         return;
     }
@@ -575,6 +650,7 @@ module 0x42.M {
 // operator |
 //# run
 main() {
+label b0:
     _ = 0u8 | 0u64;
     return;
 }
@@ -582,6 +658,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u8 | 0u128;
     return;
 }
@@ -589,6 +666,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u64 | 0u8;
     return;
 }
@@ -596,6 +674,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u64 | 0u128;
     return;
 }
@@ -603,6 +682,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u128 | 0u8;
     return;
 }
@@ -610,6 +690,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u128 | 0u64;
     return;
 }
@@ -617,6 +698,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0 | true;
     return;
 }
@@ -624,6 +706,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = true | 0;
     return;
 }
@@ -631,6 +714,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = true | true;
     return;
 }
@@ -638,6 +722,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0 | 0x0;
     return;
 }
@@ -645,6 +730,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0x0 | 0;
     return;
 }
@@ -652,6 +738,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0x0 | 0x0;
     return;
 }
@@ -661,6 +748,7 @@ main() {
 module 0x42.M {
     struct R { x: bool }
     f() {
+    label b0:
         _ = 0 | (R { x: true });
         return;
     }
@@ -670,6 +758,7 @@ module 0x42.M {
 module 0x42.M {
     struct R { x: bool }
     g() {
+    label b0:
         _ = (R { x: true }) | 0;
         return;
     }
@@ -679,6 +768,7 @@ module 0x42.M {
 module 0x42.M {
     struct R { x: bool }
     h() {
+    label b0:
         _ = (R { x: true }) | (R { x: true });
         return;
     }
@@ -689,6 +779,7 @@ module 0x42.M {
 // operator ^
 //# run
 main() {
+label b0:
     _ = 0u8 ^ 0u64;
     return;
 }
@@ -696,6 +787,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u8 ^ 0u128;
     return;
 }
@@ -703,6 +795,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u64 ^ 0u8;
     return;
 }
@@ -710,6 +803,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u64 ^ 0u128;
     return;
 }
@@ -717,6 +811,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u128 ^ 0u8;
     return;
 }
@@ -724,6 +819,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u128 ^ 0u64;
     return;
 }
@@ -731,6 +827,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0 ^ true;
     return;
 }
@@ -738,6 +835,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = true ^ 0;
     return;
 }
@@ -745,6 +843,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = true ^ true;
     return;
 }
@@ -752,6 +851,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0 ^ 0x0;
     return;
 }
@@ -759,6 +859,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0x0 ^ 0;
     return;
 }
@@ -766,6 +867,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0x0 ^ 0x0;
     return;
 }
@@ -775,6 +877,7 @@ main() {
 module 0x42.M {
     struct R { x: bool }
     f() {
+    label b0:
         _ = 0 ^ (R { x: true });
         return;
     }
@@ -784,6 +887,7 @@ module 0x42.M {
 module 0x42.M {
     struct R { x: bool }
     g() {
+    label b0:
         _ = (R { x: true }) ^ 0;
         return;
     }
@@ -793,6 +897,7 @@ module 0x42.M {
 module 0x42.M {
     struct R { x: bool }
     h() {
+    label b0:
         _ = (R { x: true }) ^ (R { x: true });
         return;
     }
@@ -803,6 +908,7 @@ module 0x42.M {
 // operator ==
 //# run
 main() {
+label b0:
     _ = 0u8 == 0u64;
     return;
 }
@@ -810,6 +916,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u8 == 0u128;
     return;
 }
@@ -817,6 +924,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u64 == 0u8;
     return;
 }
@@ -824,6 +932,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u64 == 0u128;
     return;
 }
@@ -831,6 +940,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u128 == 0u8;
     return;
 }
@@ -838,6 +948,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u128 == 0u64;
     return;
 }
@@ -845,6 +956,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0 == true;
     return;
 }
@@ -852,6 +964,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = true == 0;
     return;
 }
@@ -859,6 +972,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0 == 0x0;
     return;
 }
@@ -866,6 +980,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0x0 == 0;
     return;
 }
@@ -875,6 +990,7 @@ main() {
 module 0x42.M {
     struct R { x: bool }
     f() {
+    label b0:
         _ = 0 == (R { x: true });
         return;
     }
@@ -884,6 +1000,7 @@ module 0x42.M {
 module 0x42.M {
     struct R { x: bool }
     g() {
+    label b0:
         _ = (R { x: true }) == 0;
         return;
     }
@@ -893,6 +1010,7 @@ module 0x42.M {
 // operator !=
 //# run
 main() {
+label b0:
     _ = 0u8 != 0u64;
     return;
 }
@@ -900,6 +1018,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u8 != 0u128;
     return;
 }
@@ -907,6 +1026,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u64 != 0u8;
     return;
 }
@@ -914,6 +1034,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u64 != 0u128;
     return;
 }
@@ -921,6 +1042,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u128 != 0u8;
     return;
 }
@@ -928,6 +1050,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u128 != 0u64;
     return;
 }
@@ -935,6 +1058,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0 != true;
     return;
 }
@@ -942,6 +1066,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = true != 0;
     return;
 }
@@ -949,6 +1074,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0 != 0x0;
     return;
 }
@@ -956,6 +1082,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0x0 != 0;
     return;
 }
@@ -965,6 +1092,7 @@ main() {
 module 0x42.M {
     struct R { x: bool }
     f() {
+    label b0:
         _ = 0 != (R { x: true });
         return;
     }
@@ -974,6 +1102,7 @@ module 0x42.M {
 module 0x42.M {
     struct R { x: bool }
     g() {
+    label b0:
         _ = (R { x: true }) != 0;
         return;
     }
@@ -984,6 +1113,7 @@ module 0x42.M {
 // operator <
 //# run
 main() {
+label b0:
     _ = 0u8 < 0u64;
     return;
 }
@@ -991,6 +1121,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u8 < 0u128;
     return;
 }
@@ -998,6 +1129,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u64 < 0u8;
     return;
 }
@@ -1005,6 +1137,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u64 < 0u128;
     return;
 }
@@ -1012,6 +1145,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u128 < 0u8;
     return;
 }
@@ -1019,6 +1153,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u128 < 0u64;
     return;
 }
@@ -1026,6 +1161,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0 < true;
     return;
 }
@@ -1033,6 +1169,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = true < 0;
     return;
 }
@@ -1040,6 +1177,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0 < 0x0;
     return;
 }
@@ -1047,6 +1185,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0x0 < 0;
     return;
 }
@@ -1055,6 +1194,7 @@ main() {
 // operator >
 //# run
 main() {
+label b0:
     _ = 0u8 > 0u64;
     return;
 }
@@ -1062,6 +1202,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u8 > 0u128;
     return;
 }
@@ -1069,6 +1210,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u64 > 0u8;
     return;
 }
@@ -1076,6 +1218,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u64 > 0u128;
     return;
 }
@@ -1083,6 +1226,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u128 > 0u8;
     return;
 }
@@ -1090,6 +1234,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u128 > 0u64;
     return;
 }
@@ -1097,6 +1242,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0 > true;
     return;
 }
@@ -1104,6 +1250,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = true > 0;
     return;
 }
@@ -1111,6 +1258,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0 > 0x0;
     return;
 }
@@ -1118,6 +1266,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0x0 > 0;
     return;
 }
@@ -1126,6 +1275,7 @@ main() {
 // operator <=
 //# run
 main() {
+label b0:
     _ = 0u8 <= 0u64;
     return;
 }
@@ -1133,6 +1283,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u8 <= 0u128;
     return;
 }
@@ -1140,6 +1291,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u64 <= 0u8;
     return;
 }
@@ -1147,6 +1299,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u64 <= 0u128;
     return;
 }
@@ -1154,6 +1307,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u128 <= 0u8;
     return;
 }
@@ -1161,6 +1315,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u128 <= 0u64;
     return;
 }
@@ -1168,6 +1323,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0 <= true;
     return;
 }
@@ -1175,6 +1331,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = true <= 0;
     return;
 }
@@ -1182,6 +1339,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0 <= 0x0;
     return;
 }
@@ -1189,6 +1347,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0x0 <= 0;
     return;
 }
@@ -1197,6 +1356,7 @@ main() {
 // operator >=
 //# run
 main() {
+label b0:
     _ = 0u8 >= 0u64;
     return;
 }
@@ -1204,6 +1364,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u8 >= 0u128;
     return;
 }
@@ -1211,6 +1372,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u64 >= 0u8;
     return;
 }
@@ -1218,6 +1380,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u64 >= 0u128;
     return;
 }
@@ -1225,6 +1388,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u128 >= 0u8;
     return;
 }
@@ -1232,6 +1396,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u128 >= 0u64;
     return;
 }
@@ -1239,6 +1404,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0 >= true;
     return;
 }
@@ -1246,6 +1412,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = true >= 0;
     return;
 }
@@ -1253,6 +1420,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0 >= 0x0;
     return;
 }
@@ -1260,6 +1428,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0x0 >= 0;
     return;
 }
@@ -1268,6 +1437,7 @@ main() {
 // operator <<
 //# run
 main() {
+label b0:
     _ = 0 << true;
     return;
 }
@@ -1275,6 +1445,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0 << 0x0;
     return;
 }
@@ -1282,6 +1453,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0 << 0u64;
     return;
 }
@@ -1289,6 +1461,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0 << 0u128;
     return;
 }
@@ -1296,6 +1469,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = true << 0u8;
     return;
 }
@@ -1303,6 +1477,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = true << true;
     return;
 }
@@ -1310,6 +1485,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0x0 << 0u8;
     return;
 }
@@ -1317,6 +1493,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0x0 << 0x0;
     return;
 }
@@ -1326,6 +1503,7 @@ main() {
 module 0x42.M {
     struct R { x: bool }
     f() {
+    label b0:
         _ = 0 << (R { x: true });
         return;
     }
@@ -1335,6 +1513,7 @@ module 0x42.M {
 module 0x42.M {
     struct R { x: bool }
     g() {
+    label b0:
         _ = (R { x: true }) << 0;
         return;
     }
@@ -1344,6 +1523,7 @@ module 0x42.M {
 module 0x42.M {
     struct R { x: bool }
     h() {
+    label b0:
         _ = (R { x: true }) << (R { x: true });
         return;
     }
@@ -1354,6 +1534,7 @@ module 0x42.M {
 // operator >>
 //# run
 main() {
+label b0:
     _ = 0 >> true;
     return;
 }
@@ -1361,6 +1542,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0 >> 0x0;
     return;
 }
@@ -1368,6 +1550,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0 >> 0u64;
     return;
 }
@@ -1375,6 +1558,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0 >> 0u128;
     return;
 }
@@ -1382,6 +1566,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = true >> 0u8;
     return;
 }
@@ -1389,6 +1574,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = true >> true;
     return;
 }
@@ -1396,6 +1582,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0x0 >> 0u8;
     return;
 }
@@ -1403,6 +1590,7 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0x0 >> 0x0;
     return;
 }
@@ -1412,6 +1600,7 @@ main() {
 module 0x42.M {
     struct R { x: bool }
     f() {
+    label b0:
         _ = 0 >> (R { x: true });
         return;
     }
@@ -1421,6 +1610,7 @@ module 0x42.M {
 module 0x42.M {
     struct R { x: bool }
     g() {
+    label b0:
         _ = (R { x: true }) >> 0;
         return;
     }
@@ -1430,6 +1620,7 @@ module 0x42.M {
 module 0x42.M {
     struct R { x: bool }
     h() {
+    label b0:
         _ = (R { x: true }) >> (R { x: true });
         return;
     }

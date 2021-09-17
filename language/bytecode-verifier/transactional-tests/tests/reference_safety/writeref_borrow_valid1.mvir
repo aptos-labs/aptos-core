@@ -7,7 +7,7 @@ module 0x1.M {
         let v1_mut: &mut u64;
         let v2_mut: &mut u64;
         let g2_mut: &mut Self.G;
-
+    label b0:
         v1_mut = &mut (&mut copy(root).S::g1).G::v1;
         v2_mut = &mut (&mut copy(root).S::g1).G::v2;
 

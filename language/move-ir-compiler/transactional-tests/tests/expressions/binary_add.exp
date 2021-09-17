@@ -1,6 +1,6 @@
 processed 1 task
 
-task 0 'print-bytecode'. lines 1-12:
+task 0 'print-bytecode'. lines 1-13:
 // Move bytecode v4
 module e.Expressions {
 

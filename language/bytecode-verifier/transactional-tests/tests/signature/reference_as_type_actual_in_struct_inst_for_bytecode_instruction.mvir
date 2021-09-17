@@ -5,6 +5,7 @@ module 0x1.M {
     struct Some<T> has key { item: T }
 
     foo(account: &signer) acquires Some {
+    label b0:
         // cannot use refs in generics
         move_from<Some<&u64>>(Signer.address_of(move(account)));
         return;
@@ -19,6 +20,7 @@ module 0x1.M {
 
     foo(account: &signer) {
         let v: Self.Some<u64>;
+    label b0:
         // cannot use refs in generics
         move_to<Some<&u64>>(copy(account), move(v));
         return;
@@ -32,6 +34,7 @@ module 0x1.M {
     struct Some<T> has key { item: T }
 
     foo(account: &signer) {
+    label b0:
         // cannot use refs in generics
         exists<Some<&u64>>(Signer.address_of(move(account)));
         return;
@@ -45,6 +48,7 @@ module 0x1.M {
     struct Some<T> has key { item: T }
 
     foo(account: &signer) {
+    label b0:
         // cannot use refs in generics
         borrow_global<Some<&u64>>(Signer.address_of(move(account)));
         return;
@@ -59,6 +63,7 @@ module 0x1.M {
     struct Some<T> has key { item: T }
 
     foo(account: &signer) {
+    label b0:
         borrow_global_mut<Some<&u64>>(Signer.address_of(move(account)));
         return;
     }
@@ -72,7 +77,7 @@ module 0x1.M {
         let x: u64;
         let y: &u64;
         let v: Self.Some<u64>;
-
+    label b0:
         y = &x;
         // cannot use refs in generics
         v = Some<&u64> { item: move(y) };
@@ -87,7 +92,7 @@ module 0x1.M {
     foo() {
         let x: &u64;
         let v: Self.Some<u64>;
-
+    label b0:
         // cannot use refs in generics
         Some<&u64> { item: x } = move(v);
         return;
@@ -100,6 +105,7 @@ module 0x1.M {
 
     // cannot use refs in generics
     foo(s: Self.S<&u64>): u64 {
+    label b0:
         return *(*(&(&s).S::v));
     }
 }
@@ -110,6 +116,7 @@ module 0x1.M {
 
     // cannot use refs in generics
     foo(s: Self.S<&u64>): u64 {
+    label b0:
         return *(*(&mut (&mut s).S::v));
     }
 }

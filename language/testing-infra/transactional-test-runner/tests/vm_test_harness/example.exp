@@ -17,5 +17,5 @@ key 0x42::N::R<u64> {
     v: 0
 }
 
-task 9 'view'. lines 59-61:
+task 9 'view'. lines 60-62:
 [No Resource Exists]

@@ -9,7 +9,7 @@ pub mod translate;
 use move_ir_types::ast as IR;
 use std::collections::HashMap;
 
-fn remap_labels(blocks: &mut IR::BytecodeBlocks, map: &HashMap<IR::BlockLabel, IR::BlockLabel>) {
+fn remap_labels(blocks: &mut IR::BytecodeBlocks, map: &HashMap<IR::BlockLabel_, IR::BlockLabel_>) {
     use IR::Bytecode_ as B;
     for (_, block) in blocks {
         for instr in block {

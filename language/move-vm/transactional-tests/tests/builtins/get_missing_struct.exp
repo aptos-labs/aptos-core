@@ -1,6 +1,6 @@
 processed 2 tasks
 
-task 1 'run'. lines 29-35:
+task 1 'run'. lines 31-38:
 Error: Script execution failed with VMError: {
     major_status: MISSING_DATA,
     sub_status: None,

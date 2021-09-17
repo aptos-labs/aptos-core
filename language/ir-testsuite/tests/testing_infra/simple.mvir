@@ -1,6 +1,7 @@
 main() {
     let x: u64;
     let y: u64;
+label b0:
     x = 3;
     y = move(x);
     return move(x);

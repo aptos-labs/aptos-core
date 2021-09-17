@@ -3,6 +3,7 @@
 module {{default}}.Token {
     struct T has key { b: bool }
     public new(): Self.T {
+    label b0:
         return T{ b: true };
     }
 }
@@ -15,6 +16,7 @@ import 0x1.Signer;
 main(account: &signer) {
     let addr1: address;
     let t: Token.T;
+label b0:
     addr1 = Signer.address_of(copy(account));
     t = Token.new();
     move_to<Token>(copy(account), move(t));

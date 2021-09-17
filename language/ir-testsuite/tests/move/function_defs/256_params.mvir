@@ -257,6 +257,7 @@ module {{default}}.M {
         p255 : u8,
         p256 : u8,
     ) {
+    label b0:
         return;
     }
 }

@@ -29,6 +29,7 @@ import 0x1.DiemAccount;
 
 main(dr_account: signer, account: signer, auth_key_prefix: vector<u8>) {
   let rotate_cap: DiemAccount.KeyRotationCapability;
+label b0:
   rotate_cap = DiemAccount.extract_key_rotation_capability(&account);
   DiemAccount.rotate_authentication_key(&rotate_cap, move(auth_key_prefix));
   DiemAccount.restore_key_rotation_capability(move(rotate_cap));
@@ -90,6 +91,7 @@ import 0x1.DiemConfig;
 
 main(dr_account: signer, account: signer, auth_key_prefix: vector<u8>) {
   let rotate_cap: DiemAccount.KeyRotationCapability;
+label b0:
   rotate_cap = DiemAccount.extract_key_rotation_capability(&account);
   DiemAccount.rotate_authentication_key(&rotate_cap, move(auth_key_prefix));
   DiemAccount.restore_key_rotation_capability(move(rotate_cap));
@@ -151,6 +153,7 @@ import 0x1.DiemAccount;
 
 main(account: signer, auth_key_prefix: vector<u8>) {
   let rotate_cap: DiemAccount.KeyRotationCapability;
+label b0:
   rotate_cap = DiemAccount.extract_key_rotation_capability(&account);
   DiemAccount.rotate_authentication_key(&rotate_cap, move(auth_key_prefix));
   DiemAccount.restore_key_rotation_capability(move(rotate_cap));

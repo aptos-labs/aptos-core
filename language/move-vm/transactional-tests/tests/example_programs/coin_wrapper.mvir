@@ -3,14 +3,17 @@ module 0x1.Coin {
     struct Coin<phantom CoinType> has store { value: u64 }
 
     public zero<CoinType>(): Self.Coin<CoinType> {
+    label b0:
         return Coin<CoinType> { value: 0 };
     }
 
     public value<CoinType>(c: &Self.Coin<CoinType>): u64 {
+    label b0:
         return *&move(c).Coin<CoinType>::value;
     }
 
     public destroy_zero<CoinType>(c: Self.Coin<CoinType>) {
+    label b0:
         Coin<CoinType> { } = move(c);
         _ = ();
         return;
@@ -38,7 +41,7 @@ module 0x1.M {
     public coin_wrapper(account: &signer, c: Coin.Coin<YYZ.YYZ>) {
         let foo: Self.Foo<Coin.Coin<YYZ.YYZ>>;
         let coin_wrapper: Self.CoinWrapper;
-
+    label b0:
         foo = Foo<Coin.Coin<YYZ.YYZ>> {x: move(c)};
         coin_wrapper = CoinWrapper {f: move(foo)};
         move_to<CoinWrapper>(move(account), move(coin_wrapper));
@@ -49,7 +52,7 @@ module 0x1.M {
         let foo: Self.Foo<Self.Inner>;
         let inner_wrapper: Self.InnerWrapper;
         let inner: Self.Inner;
-
+    label b0:
         inner = Inner { b: move(b) };
         foo = Foo<Self.Inner> {x: move(inner)};
         inner_wrapper = InnerWrapper {f: move(foo)};
@@ -62,7 +65,7 @@ module 0x1.M {
         let coin_wrapper_ref: &Self.CoinWrapper;
         let foo_ref: &Self.Foo<Coin.Coin<YYZ.YYZ>>;
         let coin_ref: &Coin.Coin<YYZ.YYZ>;
-
+    label b0:
         sender = Signer.address_of(copy(account));
         coin_wrapper_ref = borrow_global<CoinWrapper>(move(sender));
         foo_ref = &move(coin_wrapper_ref).CoinWrapper::f;
@@ -76,7 +79,7 @@ module 0x1.M {
         let inner_wrapper_ref: &Self.InnerWrapper;
         let foo_ref: &Self.Foo<Self.Inner>;
         let inner_ref: &Self.Inner;
-
+    label b0:
         sender = Signer.address_of(copy(account));
         inner_wrapper_ref = borrow_global<InnerWrapper>(move(sender));
         foo_ref = &move(inner_wrapper_ref).InnerWrapper::f;
@@ -91,7 +94,7 @@ module 0x1.M {
         let coin_wrapper: Self.CoinWrapper;
         let f: Self.Foo<Coin.Coin<YYZ.YYZ>>;
         let x: Coin.Coin<YYZ.YYZ>;
-
+    label b0:
         sender = Signer.address_of(copy(account));
         coin_wrapper = move_from<CoinWrapper>(move(sender));
         CoinWrapper {f} = move(coin_wrapper);
@@ -106,16 +109,16 @@ import 0x1.YYZ;
 import 0x1.Coin;
 
 main(account: signer) {
-  let coin: Coin.Coin<YYZ.YYZ>;
-  let byte: vector<u8>;
+    let coin: Coin.Coin<YYZ.YYZ>;
+    let byte: vector<u8>;
+label b0:
+    byte = h"bac1ac";
+    coin = Coin.zero<YYZ.YYZ>();
 
-  byte = h"bac1ac";
-  coin = Coin.zero<YYZ.YYZ>();
+    M.coin_wrapper(&account, move(coin));
+    M.inner_wrapper(&account, move(byte));
 
-  M.coin_wrapper(&account, move(coin));
-  M.inner_wrapper(&account, move(byte));
-
-  return;
+    return;
 }
 
 //# run --signers 0x1
@@ -126,7 +129,7 @@ import 0x1.Coin;
 main(account: signer) {
     let coin: Coin.Coin<YYZ.YYZ>;
     let byte: vector<u8>;
-
+label b0:
     byte = h"bac1ac";
     assert(M.get_coin_value(&account) == 0, 4);
     assert(M.get_inner(&account) == move(byte), 4);
@@ -140,6 +143,7 @@ import 0x1.Coin;
 
 main(account: signer) {
     let coin: Coin.Coin<YYZ.YYZ>;
+label b0:
     coin = M.destroy(&account);
     Coin.destroy_zero<YYZ.YYZ>(move(coin));
     return;

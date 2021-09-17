@@ -1,8 +1,7 @@
 //# run
 main() {
-    loop {
-        return;
-        assert(false, 42);
-    }
+label loop:
     return;
+    assert(false, 42);
+    jump loop;
 }

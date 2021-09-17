@@ -1,5 +1,6 @@
 module {{default}}.M {
     public foo(x: u64): u64 {
+    label b0:
         return copy(x)*2;
     }
 }
@@ -8,6 +9,7 @@ module {{default}}.M {
 
 module {{default}}.N {
     public bar(x: u64): u64 {
+    label b0:
         return copy(x)*3;
     }
 }
@@ -20,6 +22,7 @@ import {{default}}.N;
 main() {
     let x: u64;
     let y: u64;
+label b0:
     x = N.bar(7);
     y = M.foo(move(x));
     assert(move(y) == 41, 42);

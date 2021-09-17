@@ -10,6 +10,7 @@ module 0x42.B {
 module 0x42.M {
     friend 0x42.A;
     public(friend) foo() {
+    label b0:
         return;
     }
 }
@@ -19,6 +20,7 @@ module 0x42.M {
     friend 0x42.A;
     friend 0x42.B;
     public(friend) foo() {
+    label b0:
         return;
     }
 }

@@ -1,6 +1,6 @@
 processed 26 tasks
 
-task 2 'run'. lines 257-265:
+task 2 'run'. lines 246-254:
 Error: Script execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(1),
@@ -9,7 +9,7 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(3), 9)],
 }
 
-task 4 'run'. lines 275-282:
+task 4 'run'. lines 265-273:
 Error: Script execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(3),
@@ -18,7 +18,7 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(4), 9)],
 }
 
-task 5 'run'. lines 284-291:
+task 5 'run'. lines 275-283:
 Error: Script execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(7),
@@ -27,7 +27,7 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(4), 61)],
 }
 
-task 7 'run'. lines 301-308:
+task 7 'run'. lines 294-302:
 Error: Script execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(6),
@@ -36,7 +36,7 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(4), 52)],
 }
 
-task 9 'run'. lines 318-325:
+task 9 'run'. lines 313-321:
 Error: Script execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(5),
@@ -45,7 +45,7 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(4), 15)],
 }
 
-task 10 'run'. lines 327-334:
+task 10 'run'. lines 323-331:
 Error: Script execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(6),
@@ -54,7 +54,7 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(4), 52)],
 }
 
-task 11 'run'. lines 336-343:
+task 11 'run'. lines 333-341:
 Error: Script execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(3),
@@ -63,7 +63,7 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(4), 9)],
 }
 
-task 14 'run'. lines 361-368:
+task 14 'run'. lines 361-369:
 Error: Script execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(11),
@@ -72,7 +72,7 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(6), 8)],
 }
 
-task 17 'run'. lines 386-393:
+task 17 'run'. lines 389-397:
 Error: Script execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(11),
@@ -81,7 +81,7 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(6), 8)],
 }
 
-task 18 'run'. lines 395-402:
+task 18 'run'. lines 399-407:
 Error: Script execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(15),
@@ -90,7 +90,7 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(7), 27)],
 }
 
-task 19 'run'. lines 404-411:
+task 19 'run'. lines 409-417:
 Error: Script execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(14),
@@ -99,7 +99,7 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(7), 12)],
 }
 
-task 20 'run'. lines 413-420:
+task 20 'run'. lines 419-427:
 Error: Script execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(12),
@@ -108,7 +108,7 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(6), 15)],
 }
 
-task 21 'run'. lines 422-429:
+task 21 'run'. lines 429-437:
 Error: Script execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(9),
@@ -117,7 +117,7 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(5), 32)],
 }
 
-task 22 'run'. lines 431-441:
+task 22 'run'. lines 439-450:
 Error: Script execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(14),
@@ -126,7 +126,7 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(7), 12)],
 }
 
-task 23 'run'. lines 443-453:
+task 23 'run'. lines 452-463:
 Error: Script execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(12),

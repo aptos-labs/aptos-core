@@ -8,7 +8,7 @@ import 0x1.Diem;
 
 main(account: signer) {
     let with_cap: DiemAccount.WithdrawCapability;
-
+label b0:
     with_cap = DiemAccount.extract_withdraw_capability(&account);
     DiemAccount.pay_from<XUS.XUS>(&with_cap, {{bob}}, 42, h"", h"");
     DiemAccount.restore_withdraw_capability(move(with_cap));

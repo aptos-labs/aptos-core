@@ -5,8 +5,8 @@ module 0x1.M {
     bar() acquires Foo {
         let x: &Self.Foo<u64>;
         let y: Self.Foo<u64>;
-        // type does not have key
-        x = borrow_global<Foo<u64>>(0x100);
+    label b0:
+        x = borrow_global<Foo<u64>>(0x100); // type does not have key
         return;
     }
 }

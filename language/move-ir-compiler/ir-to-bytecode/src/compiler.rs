@@ -19,11 +19,12 @@ use move_ir_types::{
     ast::{self, Bytecode as IRBytecode, Bytecode_ as IRBytecode_, *},
     sp,
 };
+use move_symbol_pool::Symbol;
 use std::{
     clone::Clone,
     collections::{
         hash_map::Entry::{Occupied, Vacant},
-        BTreeSet, HashMap,
+        BTreeSet, HashMap, HashSet,
     },
 };
 
@@ -112,41 +113,6 @@ macro_rules! make_record_nop_label {
     };
 }
 
-#[derive(Debug, Default)]
-struct LoopInfo {
-    start_loc: usize,
-    breaks: Vec<usize>,
-}
-
-// Ideally, we should capture all of this info into a CFG, but as we only have structured control
-// flow currently, it would be a bit overkill. It will be a necessity if we add arbitrary branches
-// in the IR, as is expressible in the bytecode
-struct ControlFlowInfo {
-    // A `break` is reachable iff it was used before a terminal node
-    reachable_break: bool,
-    // A terminal node is an infinite loop or a path that always returns
-    terminal_node: bool,
-}
-
-impl ControlFlowInfo {
-    fn join(f1: ControlFlowInfo, f2: ControlFlowInfo) -> ControlFlowInfo {
-        ControlFlowInfo {
-            reachable_break: f1.reachable_break || f2.reachable_break,
-            terminal_node: f1.terminal_node && f2.terminal_node,
-        }
-    }
-    fn successor(prev: ControlFlowInfo, next: ControlFlowInfo) -> ControlFlowInfo {
-        if prev.terminal_node {
-            prev
-        } else {
-            ControlFlowInfo {
-                reachable_break: prev.reachable_break || next.reachable_break,
-                terminal_node: next.terminal_node,
-            }
-        }
-    }
-}
-
 // Holds information about a function being compiled.
 #[derive(Debug)]
 struct FunctionFrame {
@@ -160,7 +126,6 @@ struct FunctionFrame {
     max_stack_depth: i64,
     cur_stack_depth: i64,
     type_parameters: HashMap<TypeVar_, TypeParameterIndex>,
-    loops: Vec<LoopInfo>,
 }
 
 impl FunctionFrame {
@@ -170,7 +135,6 @@ impl FunctionFrame {
             local_types: Signature(vec![]),
             max_stack_depth: 0,
             cur_stack_depth: 0,
-            loops: vec![],
             type_parameters,
         }
     }
@@ -218,47 +182,134 @@ impl FunctionFrame {
         Ok(cur_loc_idx)
     }
 
-    fn push_loop(&mut self, start_loc: usize) {
-        self.loops.push(LoopInfo {
-            start_loc,
-            breaks: Vec::new(),
-        });
-    }
-
-    fn pop_loop(&mut self) -> Result<()> {
-        match self.loops.pop() {
-            Some(_) => Ok(()),
-            None => bail!("Impossible: failed to pop loop!"),
-        }
-    }
-
-    fn get_loop_start(&self) -> Result<usize> {
-        match self.loops.last() {
-            Some(loop_) => Ok(loop_.start_loc),
-            None => bail!("continue outside loop"),
-        }
-    }
-
-    fn push_loop_break(&mut self, loc: usize) -> Result<()> {
-        match self.loops.last_mut() {
-            Some(loop_) => {
-                loop_.breaks.push(loc);
-                Ok(())
-            }
-            None => bail!("break outside loop"),
-        }
-    }
-
-    fn get_loop_breaks(&self) -> Result<&Vec<usize>> {
-        match self.loops.last() {
-            Some(loop_) => Ok(&loop_.breaks),
-            None => bail!("Impossible: failed to get loop breaks (no loops in stack)"),
-        }
-    }
-
     fn type_parameters(&self) -> &HashMap<TypeVar_, TypeParameterIndex> {
         &self.type_parameters
     }
+}
+
+// Returns an error that lists any labels that have been redeclared, or used without being declared.
+fn label_verification_error(
+    redeclared: &[&BlockLabel_],
+    undeclared: &[&BlockLabel_],
+) -> Result<()> {
+    let mut message = "Invalid block labels".to_string();
+    if !redeclared.is_empty() {
+        message.push_str(&format!(
+            ", labels were declared twice ({})",
+            redeclared
+                .iter()
+                .map(|l| l.to_string())
+                .collect::<Vec<_>>()
+                .join(", "),
+        ));
+    }
+    if !undeclared.is_empty() {
+        message.push_str(&format!(
+            ", labels were used without being declared ({})",
+            undeclared
+                .iter()
+                .map(|l| l.to_string())
+                .collect::<Vec<_>>()
+                .join(", "),
+        ));
+    }
+    bail!(message);
+}
+
+fn verify_move_function_body(code: &[Block]) -> Result<()> {
+    let mut labels = HashSet::new();
+    let mut redeclared = vec![];
+    for block in code {
+        let label = &block.value.label.value;
+        if labels.contains(&label) {
+            redeclared.push(label);
+        } else {
+            labels.insert(label);
+        }
+    }
+
+    let mut undeclared = vec![];
+    for block in code {
+        for statement in &block.value.statements {
+            match &statement.value {
+                Statement_::Jump(label)
+                | Statement_::JumpIf(_, label)
+                | Statement_::JumpIfFalse(_, label) => {
+                    if !labels.contains(&label.value) {
+                        undeclared.push(&label.value);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    if redeclared.is_empty() && undeclared.is_empty() {
+        Ok(())
+    } else {
+        label_verification_error(&redeclared, &undeclared)
+    }
+}
+
+fn verify_bytecode_function_body(code: &[(BlockLabel_, BytecodeBlock)]) -> Result<()> {
+    let mut labels = HashSet::new();
+    let mut redeclared = vec![];
+    for block in code {
+        let label = &block.0;
+        if labels.contains(&label) {
+            redeclared.push(label);
+        } else {
+            labels.insert(label);
+        }
+    }
+
+    let mut undeclared = vec![];
+    for block in code {
+        for statement in &block.1 {
+            match &statement.value {
+                IRBytecode_::Branch(label)
+                | IRBytecode_::BrTrue(label)
+                | IRBytecode_::BrFalse(label) => {
+                    if !labels.contains(&label) {
+                        undeclared.push(label);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    if redeclared.is_empty() && undeclared.is_empty() {
+        Ok(())
+    } else {
+        label_verification_error(&redeclared, &undeclared)
+    }
+}
+
+/// Verify that, within a single function, no two blocks use the same label, and all jump statements
+/// specify a destination label that exists on some block. If any block labels or statements don't
+/// meet these conditions, return an error.
+fn verify_function(function: &Function) -> Result<()> {
+    match &function.value.body {
+        FunctionBody::Move { code, .. } => verify_move_function_body(code),
+        FunctionBody::Bytecode { code, .. } => verify_bytecode_function_body(code),
+        _ => Ok(()),
+    }
+}
+
+/// Verifies that the given module is semantically valid. Invoking this prior to compiling the
+/// module to bytecode may help diagnose malformed programs.
+fn verify_module(module: &ModuleDefinition) -> Result<()> {
+    for function in &module.functions {
+        verify_function(&function.1)?;
+    }
+    Ok(())
+}
+
+/// Verifies that the given script is semantically valid. Invoking this prior to compiling the
+/// script to bytecode may help diagnose malformed programs.
+fn verify_script(script: &Script) -> Result<()> {
+    verify_function(&script.main)
 }
 
 /// Compile a transaction script.
@@ -266,6 +317,8 @@ pub fn compile_script<'a>(
     script: Script,
     dependencies: impl IntoIterator<Item = &'a CompiledModule>,
 ) -> Result<(CompiledScript, SourceMap)> {
+    verify_script(&script)?;
+
     let mut context = Context::new(script.loc, HashMap::new(), None)?;
     for dep in dependencies {
         context.add_compiled_dependency(dep)?;
@@ -341,6 +394,8 @@ pub fn compile_module<'a>(
     module: ModuleDefinition,
     dependencies: impl IntoIterator<Item = &'a CompiledModule>,
 ) -> Result<(CompiledModule, SourceMap)> {
+    verify_module(&module)?;
+
     let current_module = module.identifier;
     let mut context = Context::new(module.loc, HashMap::new(), Some(current_module))?;
     for dep in dependencies {
@@ -810,217 +865,142 @@ fn compile_function_body(
     type_parameters: HashMap<TypeVar_, TypeParameterIndex>,
     formals: Vec<(Var, Type)>,
     locals: Vec<(Var, Type)>,
-    block: Block_,
+    blocks: Vec<Block>,
 ) -> Result<CodeUnit> {
     let mut function_frame = FunctionFrame::new(type_parameters);
-    let mut locals_signature = Signature(vec![]);
     for (var, t) in formals {
         let sig = compile_type(context, function_frame.type_parameters(), &t)?;
         function_frame.define_local(&var.value, sig.clone())?;
         record_src_loc!(parameter: context, var);
     }
 
+    let mut locals_signature = Signature(vec![]);
     for (var_, t) in locals {
         let sig = compile_type(context, function_frame.type_parameters(), &t)?;
         function_frame.define_local(&var_.value, sig.clone())?;
         locals_signature.0.push(sig);
         record_src_loc!(local: context, var_);
     }
-    let sig_idx = context.signature_index(locals_signature)?;
 
-    let mut code = vec![];
-    compile_block(context, &mut function_frame, &mut code, block)?;
     Ok(CodeUnit {
-        locals: sig_idx,
-        code,
+        locals: context.signature_index(locals_signature)?,
+        code: compile_blocks(context, &mut function_frame, blocks)?,
     })
 }
 
+/// Translates each of the blocks that a function body is composed of to bytecode.
+///
+/// Once the initial translation of statements to bytecode instructions is complete, instructions
+/// that jump to an offset in the bytecode are fixed up to refer to the correct offset.
+fn compile_blocks(
+    context: &mut Context,
+    function_frame: &mut FunctionFrame,
+    blocks: Vec<Block>,
+) -> Result<Vec<Bytecode>> {
+    let mut code = vec![];
+    let mut label_to_index: HashMap<BlockLabel_, u16> = HashMap::new();
+    for block in blocks {
+        compile_block(
+            context,
+            function_frame,
+            &mut label_to_index,
+            &mut code,
+            block.value,
+        )?;
+    }
+    let fake_to_actual = context.build_index_remapping(label_to_index);
+    remap_branch_offsets(&mut code, &fake_to_actual);
+    Ok(code)
+}
+
+/// Translates a block's statements to bytecode instructions.
 fn compile_block(
     context: &mut Context,
     function_frame: &mut FunctionFrame,
+    label_to_index: &mut HashMap<BlockLabel_, u16>,
     code: &mut Vec<Bytecode>,
     block: Block_,
-) -> Result<ControlFlowInfo> {
-    let mut cf_info = ControlFlowInfo {
-        reachable_break: false,
-        terminal_node: false,
-    };
-    for stmt in block.stmts {
-        let stmt_info = match stmt {
-            Statement::CommandStatement(command) => {
-                compile_command(context, function_frame, code, command)?
-            }
-            Statement::WhileStatement(while_) => {
-                // always assume the loop might not be taken
-                compile_while(context, function_frame, code, while_)?
-            }
-            Statement::LoopStatement(loop_) => compile_loop(context, function_frame, code, loop_)?,
-            Statement::IfElseStatement(if_else) => {
-                compile_if_else(context, function_frame, code, if_else)?
-            }
-        };
-        cf_info = ControlFlowInfo::successor(cf_info, stmt_info);
+) -> Result<()> {
+    label_to_index.insert(block.label.value.clone(), code.len() as u16);
+    context.label_index(block.label.value)?;
+    for statement in block.statements {
+        compile_statement(context, function_frame, label_to_index, code, statement)?;
     }
-    Ok(cf_info)
+    Ok(())
 }
 
-fn compile_if_else(
+/// Translates a statement to one or more bytecode instructions.
+///
+/// Most statements do not impact the control flow of the program, except for the `assert`
+/// statement. When translating this statement, additional labels are added to our mapping, and
+/// jump instructions referring to those labels' offsets are inserted into the bytecode.
+fn compile_statement(
     context: &mut Context,
     function_frame: &mut FunctionFrame,
+    label_to_index: &mut HashMap<BlockLabel_, u16>,
     code: &mut Vec<Bytecode>,
-    if_else: IfElse,
-) -> Result<ControlFlowInfo> {
+    statement: Statement,
+) -> Result<()> {
     make_push_instr!(context, code);
-    let cond_span = if_else.cond.loc;
-    compile_expression(context, function_frame, code, if_else.cond)?;
-
-    let brfalse_ins_loc = code.len();
-    // placeholder, final branch target replaced later
-    push_instr!(cond_span, Bytecode::BrFalse(0));
-    function_frame.pop()?;
-    let if_cf_info = compile_block(context, function_frame, code, if_else.if_block.value)?;
-
-    let mut else_block_location = code.len();
-
-    let else_cf_info = match if_else.else_block {
-        None => ControlFlowInfo {
-            reachable_break: false,
-            terminal_node: false,
-        },
-        Some(else_block) => {
-            let branch_ins_loc = code.len();
-            if !if_cf_info.terminal_node {
-                // placeholder, final branch target replaced later
-                push_instr!(else_block.loc, Bytecode::Branch(0));
-                else_block_location += 1;
-            }
-            let else_cf_info = compile_block(context, function_frame, code, else_block.value)?;
-            if !if_cf_info.terminal_node {
-                code[branch_ins_loc] = Bytecode::Branch(code.len() as u16);
-            }
-            else_cf_info
-        }
-    };
-
-    code[brfalse_ins_loc] = Bytecode::BrFalse(else_block_location as u16);
-
-    let cf_info = ControlFlowInfo::join(if_cf_info, else_cf_info);
-    Ok(cf_info)
-}
-
-fn compile_while(
-    context: &mut Context,
-    function_frame: &mut FunctionFrame,
-    code: &mut Vec<Bytecode>,
-    while_: While,
-) -> Result<ControlFlowInfo> {
-    make_push_instr!(context, code);
-    let cond_span = while_.cond.loc;
-    let loop_start_loc = code.len();
-    function_frame.push_loop(loop_start_loc);
-    compile_expression(context, function_frame, code, while_.cond)?;
-
-    let brfalse_loc = code.len();
-
-    // placeholder, final branch target replaced later
-    push_instr!(cond_span, Bytecode::BrFalse(0));
-    function_frame.pop()?;
-
-    compile_block(context, function_frame, code, while_.block.value)?;
-    push_instr!(while_.block.loc, Bytecode::Branch(loop_start_loc as u16));
-
-    let loop_end_loc = code.len() as u16;
-    code[brfalse_loc] = Bytecode::BrFalse(loop_end_loc);
-    let breaks = function_frame.get_loop_breaks()?;
-    for i in breaks {
-        code[*i] = Bytecode::Branch(loop_end_loc);
-    }
-
-    function_frame.pop_loop()?;
-    Ok(ControlFlowInfo {
-        // this `reachable_break` break is for any outer loop
-        // not the loop that was just compiled
-        reachable_break: false,
-        // While always has the ability to break.
-        // Conceptually we treat
-        //   `while (cond) { body }`
-        // as `
-        //   `loop { if (cond) { body; continue; } else { break; } }`
-        // So a `break` is always reachable
-        terminal_node: false,
-    })
-}
-
-fn compile_loop(
-    context: &mut Context,
-    function_frame: &mut FunctionFrame,
-    code: &mut Vec<Bytecode>,
-    loop_: Loop,
-) -> Result<ControlFlowInfo> {
-    make_push_instr!(context, code);
-    let loop_start_loc = code.len();
-    function_frame.push_loop(loop_start_loc);
-
-    let body_cf_info = compile_block(context, function_frame, code, loop_.block.value)?;
-    push_instr!(loop_.block.loc, Bytecode::Branch(loop_start_loc as u16));
-
-    let loop_end_loc = code.len() as u16;
-    let breaks = function_frame.get_loop_breaks()?;
-    for i in breaks {
-        code[*i] = Bytecode::Branch(loop_end_loc);
-    }
-
-    function_frame.pop_loop()?;
-    // this `reachable_break` break is for any outer loop
-    // not the loop that was just compiled
-    let reachable_break = false;
-    // If the body of the loop does not have a break, it will loop forever
-    // and thus is a terminal node
-    let terminal_node = !body_cf_info.reachable_break;
-    Ok(ControlFlowInfo {
-        reachable_break,
-        terminal_node,
-    })
-}
-
-fn compile_command(
-    context: &mut Context,
-    function_frame: &mut FunctionFrame,
-    code: &mut Vec<Bytecode>,
-    cmd: Cmd,
-) -> Result<ControlFlowInfo> {
-    make_push_instr!(context, code);
-    let (reachable_break, terminal_node) = match &cmd.value {
-            // If we are in a loop, `continue` makes a terminal node
-            // Conceptually we treat
-            //   `while (cond) { body }`
-            // as `
-            //   `loop { if (cond) { body; continue; } else { break; } }`
-            Cmd_::Continue |
-            // `return` and `abort` alway makes a terminal node
-            Cmd_::Abort(_) |
-            Cmd_::Return(_) => (false, true),
-            Cmd_::Break => (true, false),
-            _ => (false, false),
-        };
-    match cmd.value {
-        Cmd_::Return(exps) => {
-            compile_expression(context, function_frame, code, *exps)?;
-            push_instr!(cmd.loc, Bytecode::Ret);
-        }
-        Cmd_::Abort(exp_opt) => {
+    match statement.value {
+        Statement_::Abort(exp_opt) => {
             if let Some(exp) = exp_opt {
                 compile_expression(context, function_frame, code, *exp)?;
             }
-            push_instr!(cmd.loc, Bytecode::Abort);
+            push_instr!(statement.loc, Bytecode::Abort);
             function_frame.pop()?;
         }
-        Cmd_::Assign(lvalues, rhs_expressions) => {
+        Statement_::Assert(cond, err) => {
+            // First, compile the bytecode for the assert's condition.
+            // The parser implicitly wraps the condition expression in a unary
+            // expression `!(exp)`.
+            let cond_loc = cond.loc;
+            compile_expression(context, function_frame, code, *cond)?;
+
+            // Create a conditional branch that continues execution if the condition holds,
+            // and otherwise falls through to an abort. Because the condition expression is
+            // evaluated as `!(exp)`, branch to the failure label if the condition is *false*.
+            let cont_label = BlockLabel_(Symbol::from(format!("assert_cont_{}", code.len())));
+            push_instr!(
+                cond_loc,
+                Bytecode::BrFalse(context.label_index(cont_label.clone())?)
+            );
+
+            // In case of a fallthrough, the assert has failed.
+            // Compile the bytecode for the error expression, then abort.
+            let err_loc = err.loc;
+            compile_expression(context, function_frame, code, *err)?;
+            push_instr!(err_loc, Bytecode::Abort);
+
+            // Record the continue block index as coming after the abort.
+            label_to_index.insert(cont_label, code.len() as u16);
+        }
+        Statement_::Assign(lvalues, rhs_expressions) => {
             compile_expression(context, function_frame, code, rhs_expressions)?;
             compile_lvalues(context, function_frame, code, lvalues)?;
         }
-        Cmd_::Unpack(name, tys, bindings, e) => {
+        Statement_::Exp(e) => {
+            compile_expression(context, function_frame, code, *e)?;
+        }
+        Statement_::Jump(label) => push_instr!(
+            label.loc,
+            Bytecode::Branch(context.label_index(label.value)?)
+        ),
+        Statement_::JumpIf(cond, label) => {
+            let loc = cond.loc;
+            compile_expression(context, function_frame, code, *cond)?;
+            push_instr!(loc, Bytecode::BrTrue(context.label_index(label.value)?));
+        }
+        Statement_::JumpIfFalse(cond, label) => {
+            let loc = cond.loc;
+            compile_expression(context, function_frame, code, *cond)?;
+            push_instr!(loc, Bytecode::BrFalse(context.label_index(label.value)?));
+        }
+        Statement_::Return(exps) => {
+            compile_expression(context, function_frame, code, *exps)?;
+            push_instr!(statement.loc, Bytecode::Ret);
+        }
+        Statement_::Unpack(name, tys, bindings, e) => {
             let tokens = Signature(compile_types(
                 context,
                 function_frame.type_parameters(),
@@ -1031,11 +1011,11 @@ fn compile_command(
 
             let def_idx = context.struct_definition_index(&name)?;
             if tys.is_empty() {
-                push_instr!(cmd.loc, Bytecode::Unpack(def_idx));
+                push_instr!(statement.loc, Bytecode::Unpack(def_idx));
             } else {
                 let type_parameters_id = context.signature_index(tokens)?;
                 let si_idx = context.struct_instantiation_index(def_idx, type_parameters_id)?;
-                push_instr!(cmd.loc, Bytecode::UnpackGeneric(si_idx));
+                push_instr!(statement.loc, Bytecode::UnpackGeneric(si_idx));
             }
             function_frame.pop()?;
 
@@ -1045,23 +1025,8 @@ fn compile_command(
                 push_instr!(field_.loc, st_loc);
             }
         }
-        Cmd_::Continue => {
-            let loc = function_frame.get_loop_start()?;
-            push_instr!(cmd.loc, Bytecode::Branch(loc as u16));
-        }
-        Cmd_::Break => {
-            function_frame.push_loop_break(code.len())?;
-            // placeholder, to be replaced when the enclosing while is compiled
-            push_instr!(cmd.loc, Bytecode::Branch(0));
-        }
-        Cmd_::Exp(e) => {
-            compile_expression(context, function_frame, code, *e)?;
-        }
     }
-    Ok(ControlFlowInfo {
-        reachable_break,
-        terminal_node,
-    })
+    Ok(())
 }
 
 fn compile_lvalues(
@@ -1596,7 +1561,7 @@ fn compile_function_body_bytecode(
     let sig_idx = context.signature_index(locals_signature)?;
 
     let mut code = vec![];
-    let mut label_to_index: HashMap<BlockLabel, u16> = HashMap::new();
+    let mut label_to_index: HashMap<BlockLabel_, u16> = HashMap::new();
     for (label, block) in blocks {
         label_to_index.insert(label.clone(), code.len() as u16);
         context.label_index(label)?;

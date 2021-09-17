@@ -2,6 +2,7 @@
 //! show-writeset: true
 //! show-events: true
 main() {
+label b0:
     return;
 }
 
@@ -11,6 +12,7 @@ main() {
 //! show-writeset: true
 //! show-events: true
 main() {
+label b0:
     _ = 10 - 20;
     return;
 }

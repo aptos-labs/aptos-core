@@ -2,8 +2,8 @@
 main() {
     let x: u64;
     let y: u64;
+label b0:
     x = 0;
-    // cannot deref a u64
-    y = *move(x);
+    y = *move(x); // cannot deref a u64
     return;
 }

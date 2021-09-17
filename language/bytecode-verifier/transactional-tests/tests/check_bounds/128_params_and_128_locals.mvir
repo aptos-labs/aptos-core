@@ -258,6 +258,7 @@ module 0x1.M {
         let x126 : u8;
         let x127 : u8;
         let x128 : u8;
+    label b0:
         return;
     }
 }

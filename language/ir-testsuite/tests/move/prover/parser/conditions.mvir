@@ -13,37 +13,38 @@ module {{default}}.TestConditions {
   public ensures_alone()
   ensures true
   {
-      return;
+      label b0: return;
   }
 
   public requires_alone()
   requires true
   {
-      return;
+      label b0: return;
   }
 
   public aborts_if_alone()
   aborts_if true   //! postcondition might not hold
   {
-      return;
+      label b0: return;
   }
 
   public succeeds_if_alone()
   succeeds_if true
   {
-      return;
+      label b0: return;
   }
 
   public ensures_with_return(): bool
   ensures true
   {
-      return true;
+      label b0: return true;
   }
 
   public ensures_with_acquires()
   acquires T
   ensures true
   {
+    label b0:
       _ = borrow_global<T>(0x0);
       return;
   }
@@ -52,6 +53,7 @@ module {{default}}.TestConditions {
   acquires T
   ensures true
   {
+    label b0:
       _ = borrow_global<T>(0x0);
       return true;
   }
@@ -61,7 +63,7 @@ module {{default}}.TestConditions {
   ensures false
   ensures true
   {
-      return;
+      label b0: return;
   }
 
   public all_together_now(): bool
@@ -75,8 +77,9 @@ module {{default}}.TestConditions {
   succeeds_if true
   succeeds_if false
   {
+    label b0:
       _ = borrow_global<T>(0x0);
-     return true;
+      return true;
   }
 
 }
@@ -92,69 +95,69 @@ module {{default}}.TestSpecExp {
   public ensures_ret()
   ensures RET
   {
-      return;
+      label b0: return;
   }
 
   public ensures_multiple_ret()
   ensures RET(0)
   ensures RET(1)
   {
-      return;
+      label b0: return;
   }
 
 
   public ensures_txn_sender()
   ensures txn_sender {
-      return;
+      label b0: return;
   }
 
   public ensures_addr()
   ensures 0x0
   {
-      return;
+      label b0: return;
   }
 
   public ensures_formal(b: bool)
   ensures b
   {
-      return;
+      label b0: return;
   }
 
   public ensures_global(a: address)
   ensures global<Self.T>(a)
   {
-      return;
+      label b0: return;
   }
 
 
   public ensures_generic_global(a: address)
   ensures global<Self.T1<bool>>(a)
   {
-      return;
+      label b0: return;
   }
 
   public ensures_exists(a: address)
   ensures global_exists<Self.T>(a)
   {
-      return;
+      label b0: return;
   }
 
   public ensures_exists_generic(a: address)
   ensures global_exists<Self.T1<bool>>(a)
   {
-      return;
+      label b0: return;
   }
 
   public ensures_old(b: bool)
   ensures old(b)
   {
-      return;
+      label b0: return;
   }
 
   public ensures_old_global(a: address)
   ensures old(global<Self.T>(a))
   {
-      return;
+      label b0: return;
   }
 
 }
@@ -172,37 +175,37 @@ module {{default}}.TestEnsuresAccessPath {
   public ensures_access_path(t: Self.T): Self.T
   ensures t.b
   {
-      return move(t);
+      label b0: return move(t);
   }
 
   public ensures_access_path2(t: Self.T1): Self.T1
   ensures t.y.b
   {
-      return move(t);
+      label b0: return move(t);
   }
 
   public ensures_access_path3(t: Self.T2): Self.T2
   ensures t.x.y.b
   {
-      return move(t);
+      label b0: return move(t);
   }
 
   public ensures_old_access_path(t: Self.T): Self.T
   ensures old(t.b)
   {
-      return move(t);
+      label b0: return move(t);
   }
 
   public ensures_exists_access_path(t: Self.T): Self.T
   ensures global_exists<Self.T>(t.a)
   {
-      return move(t);
+      label b0: return move(t);
   }
 
   public ensures_global_access_path(t: Self.T): Self.T
   ensures global<Self.T>(t.a)
   {
-      return move(t);
+      label b0: return move(t);
   }
 
 }
@@ -216,49 +219,49 @@ module {{default}}.TestBinaryOps {
   public ret_eq_seven(): u64
   ensures RET == 7
   {
-      return 7;
+      label b0: return 7;
   }
 
   public ret_neq_seven(): u64
   ensures RET != 7
   {
-      return 5;
+      label b0: return 5;
   }
 
   public ret_add(x: u64): u64
   ensures RET == x + 1
   {
-      return move(x) + 1;
+      label b0: return move(x) + 1;
   }
 
   public ret_sub(x: u64): u64
   ensures RET - 1 == x
   {
-      return move(x) + 1;
+      label b0: return move(x) + 1;
   }
 
   public ret_unop(x: bool): bool
   ensures RET == !x
   {
-      return !move(x);
+      label b0: return !move(x);
   }
 
   public ret_access_path_exp(p: &Self.Pair): u64
   ensures RET == p.x + p.y
   {
-      return *&copy(p).Pair::y;
+      label b0: return *&copy(p).Pair::y;
   }
 
   public ret_implies(x: u64): u64
   ensures x >= 4 ==> RET == x % 4
   ensures x < 4  ==> RET == x
   {
-      return move(x) % 4;
+      label b0: return move(x) % 4;
   }
 
   public ret_spec_function(x: u64): u64
   ensures some_function(x, x) > RET
   {
-      return move(x);
+      label b0: return move(x);
   }
 }

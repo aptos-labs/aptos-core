@@ -4,8 +4,8 @@ module 0x1.Token {
 
     public test() {
         let no: bool;
-        // == requires drop
-        no = T{ b: true } == T{ b: true };
+    label b0:
+        no = T{ b: true } == T{ b: true }; // == requires drop
         return;
     }
 }

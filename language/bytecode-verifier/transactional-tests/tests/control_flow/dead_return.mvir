@@ -5,6 +5,7 @@
 
 module 0x1.Test {
     public t(): u64 {
+    label b0:
         return 100;
         return 0;
     }
@@ -14,6 +15,7 @@ module 0x1.Test {
 import 0x1.Test;
 main() {
     let x: u64;
+label b0:
     x = Test.t();
     assert(copy(x) == 100, 42);
     return;

@@ -8,6 +8,7 @@ import 0x1.XUS;
     public new(account: &signer) {
         let coin_vec: vector<Diem.Diem<XUS.XUS>>;
         let coins: Self.Coins;
+    label b0:
         coin_vec = Vector.empty<Diem.Diem<XUS.XUS>>();
         coins = Coins { f: move(coin_vec)};
 
@@ -18,7 +19,7 @@ import 0x1.XUS;
     public put_coin(account: &signer, coin: Diem.Diem<XUS.XUS>) acquires Coins {
         let coins_ref: &mut Self.Coins;
         let v_ref: &mut vector<Diem.Diem<XUS.XUS>>;
-
+    label b0:
         coins_ref = borrow_global_mut<Coins>(Signer.address_of(move(account)));
         v_ref = &mut move(coins_ref).Coins::f;
         Vector.push_back<Diem.Diem<XUS.XUS>>(move(v_ref), move(coin));
@@ -29,7 +30,7 @@ import 0x1.XUS;
         let coins_ref: &Self.Coins;
         let v_ref: &vector<Diem.Diem<XUS.XUS>>;
         let coin_ref: &Diem.Diem<XUS.XUS>;
-
+    label b0:
         coins_ref = borrow_global<Coins>(Signer.address_of(move(account)));
         v_ref = &move(coins_ref).Coins::f;
         coin_ref = Vector.borrow<Diem.Diem<XUS.XUS>>(move(v_ref), move(i));
@@ -40,7 +41,7 @@ import 0x1.XUS;
     public pop(account: &signer): Diem.Diem<XUS.XUS> acquires Coins {
         let coins_ref: &mut Self.Coins;
         let v_ref: &mut vector<Diem.Diem<XUS.XUS>>;
-
+    label b0:
         coins_ref = borrow_global_mut<Coins>(Signer.address_of(move(account)));
         v_ref = &mut move(coins_ref).Coins::f;
         return Vector.pop_back<Diem.Diem<XUS.XUS>>(move(v_ref));
@@ -53,6 +54,7 @@ import 0x1.XUS;
 import 0x1.Diem;
 
 main(account: signer) {
+label b0:
     M.new(&account);
     M.put_coin(&account, Diem.zero<XUS.XUS>());
 

@@ -2,11 +2,14 @@
 main() {
     let x: u64;
     let y: u64;
-    if (true) {
-        y = 0;
-    } else {
-        x = 42;
-    }
+label b0:
+    jump_if (true) b2;
+label b1:
+    x = 42;
+    jump b3;
+label b2:
+    y = 0;
+label b3:
     // invalid copy
     assert(copy(y) == 0, 42);
     return;

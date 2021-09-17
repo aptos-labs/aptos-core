@@ -4,7 +4,7 @@ module 0x1.Tester {
         let x: u64;
         let r1: &u64;
         let r2: &u64;
-
+    label b0:
         x = 0;
         r1 = &x;
         r2 = &x;

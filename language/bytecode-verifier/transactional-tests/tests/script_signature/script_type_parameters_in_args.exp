@@ -1,6 +1,6 @@
 processed 5 tasks
 
-task 0 'run'. lines 1-5:
+task 0 'run'. lines 1-6:
 Error: Script execution failed with VMError: {
     major_status: INVALID_MAIN_FUNCTION_SIGNATURE,
     sub_status: None,
@@ -9,7 +9,7 @@ Error: Script execution failed with VMError: {
     offsets: [],
 }
 
-task 1 'run'. lines 8-11:
+task 1 'run'. lines 9-13:
 Error: Script execution failed with VMError: {
     major_status: INVALID_MAIN_FUNCTION_SIGNATURE,
     sub_status: None,
@@ -18,7 +18,7 @@ Error: Script execution failed with VMError: {
     offsets: [],
 }
 
-task 2 'run'. lines 14-17:
+task 2 'run'. lines 16-20:
 Error: Script execution failed with VMError: {
     major_status: INVALID_MAIN_FUNCTION_SIGNATURE,
     sub_status: None,
@@ -27,7 +27,7 @@ Error: Script execution failed with VMError: {
     offsets: [],
 }
 
-task 4 'run'. lines 26-31:
+task 4 'run'. lines 29-35:
 Error: Script execution failed with VMError: {
     major_status: INVALID_MAIN_FUNCTION_SIGNATURE,
     sub_status: None,

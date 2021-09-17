@@ -256,6 +256,7 @@ module {{default}}.M {
         let x254 : u8;
         let x255 : u8;
         let x256 : u8;
+    label b0:
         return;
     }
 }

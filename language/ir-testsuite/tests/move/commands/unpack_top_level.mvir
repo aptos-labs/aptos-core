@@ -2,6 +2,7 @@ module {{default}}.Test {
     struct T { b: bool }
 
     public new_t(): Self.T {
+    label b0:
         return T { b: true };
     }
 
@@ -14,7 +15,7 @@ import {{default}}.Test;
 main() {
     let t: Test.T;
     let b: bool;
-
+label b0:
     t = Test.new_t();
     T { b } = move(t);
 

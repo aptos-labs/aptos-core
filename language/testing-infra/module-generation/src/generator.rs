@@ -246,11 +246,12 @@ impl<'a> ModuleGenerator<'a> {
             signature,
             body: FunctionBody::Move {
                 locals,
-                code: Block_ {
-                    stmts: VecDeque::from(vec![Statement::CommandStatement(
-                        Spanned::unsafe_no_loc(Cmd_::return_empty()),
+                code: vec![Spanned::unsafe_no_loc(Block_ {
+                    label: Spanned::unsafe_no_loc(BlockLabel_(Symbol::from("b0"))),
+                    statements: VecDeque::from(vec![Spanned::unsafe_no_loc(
+                        Statement_::return_empty(),
                     )]),
-                },
+                })],
             },
         };
         let fun_name = FunctionName(self.identifier().into());

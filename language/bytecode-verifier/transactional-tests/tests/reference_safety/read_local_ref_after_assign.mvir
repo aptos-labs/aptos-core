@@ -4,13 +4,13 @@ main() {
     let read_ref: &mut u64;
     let assign_ref: &mut u64;
     let no: u64;
+label b0:
     v = 5;
     read_ref = &mut v;
     assign_ref = copy(read_ref);
     *copy(assign_ref) = 0;
     assert(*copy(assign_ref) == 0, 42);
-    // valid to read reference after assiging a copy!
-    no = *move(read_ref);
+    no = *move(read_ref); // valid to read reference after assiging a copy!
     _ = move(assign_ref);
     return;
 }

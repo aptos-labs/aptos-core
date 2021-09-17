@@ -5,5 +5,6 @@ module 0x1.M {
 
 //# run --type-args 0x1::M::Cup<0x1::M::Cup<bool>>
 main<T>() {
+label b0:
     return;
 }

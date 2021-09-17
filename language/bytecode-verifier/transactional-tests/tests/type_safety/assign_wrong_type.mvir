@@ -1,7 +1,7 @@
 //# run
 main() {
     let x: u64;
-    // invalid assignment
-    x = false;
+label b0:
+    x = false; // invalid assignment
     return;
 }

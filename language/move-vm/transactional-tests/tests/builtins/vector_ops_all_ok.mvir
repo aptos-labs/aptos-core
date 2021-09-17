@@ -7,7 +7,7 @@ main() {
     let e_imm: &u64;
     let e_mut: &mut u64;
     let e_val: u64;
-
+label b0:
     v = vec_pack_0<u64>();
     v_imm = &v;
     v_len = vec_len<u64>(copy(v_imm));

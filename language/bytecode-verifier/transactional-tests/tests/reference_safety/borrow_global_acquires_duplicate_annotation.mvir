@@ -5,6 +5,7 @@ module 0x1.A {
 
     // duplicate acquires annotation
     public test(account: &signer) acquires T1, T1 {
+    label b0:
         _ = borrow_global_mut<T1>(Signer.address_of(move(account)));
         return;
     }

@@ -1,6 +1,7 @@
 //# publish
 module 0x42.A {
     public foo() {
+    label b0:
         return;
     }
 }
@@ -9,6 +10,7 @@ module 0x42.A {
 module 0x42.B {
     import 0x42.A;
     public foo() {
+    label b0:
         A.foo();
         return;
     }
@@ -20,6 +22,7 @@ module 0x42.C {
     friend 0x42.A;
     import 0x42.B;
     public foo() {
+    label b0:
         B.foo();
         return;
     }

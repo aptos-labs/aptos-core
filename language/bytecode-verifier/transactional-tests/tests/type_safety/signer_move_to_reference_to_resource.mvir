@@ -2,6 +2,7 @@
 module 0x42.M {
     struct R has key { f: bool }
     t0(s: &signer, r: &Self.R) {
+    label b0:
         (copy(s));
         (move(r));
         // needs owned resource
@@ -14,6 +15,7 @@ module 0x42.M {
 module 0x42.N {
     struct R<T> has key { f: T }
     t0(s: &signer, r: &mut Self.R<bool>) {
+    label b0:
         // needs owned resource
         move_to<R<bool>>(copy(s), move(r));
         return;

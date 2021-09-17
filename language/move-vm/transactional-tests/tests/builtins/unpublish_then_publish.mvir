@@ -5,12 +5,14 @@ module 0x1.M {
     struct R has key { x: bool }
 
     public init(s: &signer) {
+    label b0:
         move_to<R>(move(s), R { x: false });
         return;
     }
 
     public test(s: &signer) acquires R {
         let r: Self.R;
+    label b0:
         r = move_from<R>(Signer.address_of(copy(s)));
         move_to<R>(move(s), move(r));
         return;
@@ -21,6 +23,7 @@ module 0x1.M {
 import 0x1.M;
 
 main(s: signer) {
+label b0:
     M.init(&s);
     return;
 }
@@ -31,6 +34,7 @@ main(s: signer) {
 import 0x1.M;
 
 main(s: signer) {
+label b0:
     M.test(&s);
     return;
 }

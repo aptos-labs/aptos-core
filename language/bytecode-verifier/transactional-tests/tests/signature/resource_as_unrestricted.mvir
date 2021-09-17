@@ -6,6 +6,7 @@ module 0x1.M {
     foo() {
         // R does not have copy or drop
         let x: Self.S<Self.R>;
+    label b0:
         return;
     }
 }

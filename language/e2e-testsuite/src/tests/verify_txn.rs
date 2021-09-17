@@ -786,16 +786,17 @@ pub fn test_publish_from_diem_root() {
         "
         module 0x{}.M {{
             public max(a: u64, b: u64): u64 {{
-                if (copy(a) > copy(b)) {{
-                    return copy(a);
-                }} else {{
-                    return copy(b);
-                }}
-                return 0;
+            label b0:
+                jump_if (copy(a) > copy(b)) b2;
+            label b1:
+                return copy(b);
+            label b2:
+                return copy(a);
             }}
 
             public sum(a: u64, b: u64): u64 {{
                 let c: u64;
+            label b0:
                 c = copy(a) + copy(b);
                 return copy(c);
             }}
@@ -987,16 +988,17 @@ pub fn test_no_publishing_diem_root_sender() {
         "
         module 0x1.M {
             public max(a: u64, b: u64): u64 {
-                if (copy(a) > copy(b)) {
-                    return copy(a);
-                } else {
-                    return copy(b);
-                }
-                return 0;
+            label b0:
+                jump_if (copy(a) > copy(b)) b2;
+            label b1:
+                return copy(b);
+            label b2:
+                return copy(a);
             }
 
             public sum(a: u64, b: u64): u64 {
                 let c: u64;
+            label b0:
                 c = copy(a) + copy(b);
                 return copy(c);
             }
@@ -1034,16 +1036,17 @@ pub fn test_open_publishing_invalid_address() {
         "
         module 0x{}.M {{
             public max(a: u64, b: u64): u64 {{
-                if (copy(a) > copy(b)) {{
-                    return copy(a);
-                }} else {{
-                    return copy(b);
-                }}
-                return 0;
+            label b0:
+                jump_if (copy(a) > copy(b)) b2;
+            label b1:
+                return copy(b);
+            label b2:
+                return copy(a);
             }}
 
             public sum(a: u64, b: u64): u64 {{
                 let c: u64;
+            label b0:
                 c = copy(a) + copy(b);
                 return copy(c);
             }}
@@ -1093,16 +1096,17 @@ pub fn test_open_publishing() {
         "
         module 0x{}.M {{
             public max(a: u64, b: u64): u64 {{
-                if (copy(a) > copy(b)) {{
-                    return copy(a);
-                }} else {{
-                    return copy(b);
-                }}
-                return 0;
+            label b0:
+                jump_if (copy(a) > copy(b)) b2;
+            label b1:
+                return copy(b);
+            label b2:
+                return copy(a);
             }}
 
             public sum(a: u64, b: u64): u64 {{
                 let c: u64;
+            label b0:
                 c = copy(a) + copy(b);
                 return copy(c);
             }}
@@ -1136,6 +1140,7 @@ fn bad_module() -> (CompiledModule, Vec<u8>) {
         public new_S1(): Self.S1 {
             let s: Self.S1;
             let r: Self.R1;
+        label b0:
             r = R1 { b: true };
             s = S1 { r1: move(r) };
             return move(s);
@@ -1162,9 +1167,11 @@ fn good_module_uses_bad(
         struct S {{ b: bool }}
 
         foo(): Test.S1 {{
+        label b0:
             return Test.new_S1();
         }}
         public bar() {{
+        label b0:
             return;
         }}
     }}
@@ -1204,6 +1211,7 @@ fn test_script_dependency_fails_verification() {
 
     main() {
         let x: Test.S1;
+    label b0:
         x = Test.new_S1();
         return;
     }
@@ -1283,6 +1291,7 @@ fn test_type_tag_dependency_fails_verification() {
 
     let code = "
     main<T>() {
+    label b0:
         return;
     }
     ";
@@ -1341,6 +1350,7 @@ fn test_script_transitive_dependency_fails_verification() {
     import 0x1.Test2;
 
     main() {
+    label b0:
         Test2.bar();
         return;
     }
@@ -1392,6 +1402,7 @@ fn test_module_transitive_dependency_fails_verification() {
     module 0x{}.Test3 {{
         import 0x1.Test2;
         public bar() {{
+        label b0:
             Test2.bar();
             return;
         }}
@@ -1449,6 +1460,7 @@ fn test_type_tag_transitive_dependency_fails_verification() {
 
     let code = "
     main<T>() {
+    label b0:
         return;
     }
     ";
@@ -1535,6 +1547,7 @@ pub fn publish_and_register_new_currency() {
             import 0x1.Diem;
             struct COIN has store { x: bool }
             public initialize(dr_account: &signer, tc_account: &signer) {
+            label b0:
                 Diem.register_SCS_currency<Self.COIN>(
                     move(dr_account),
                     move(tc_account),
@@ -1566,6 +1579,7 @@ pub fn publish_and_register_new_currency() {
             let code = r#"
             import 0x1.COIN;
             main(lr_account: signer, tc_account: signer) {
+            label b0:
                 COIN.initialize(&lr_account, &tc_account);
                 return;
             }

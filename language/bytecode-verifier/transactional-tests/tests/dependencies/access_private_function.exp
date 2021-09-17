@@ -1,6 +1,6 @@
 processed 2 tasks
 
-task 1 'run'. lines 8-18:
+task 1 'run'. lines 9-20:
 Error: Script execution failed with VMError: {
     major_status: LOOKUP_FAILED,
     sub_status: None,

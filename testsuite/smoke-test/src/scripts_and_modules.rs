@@ -229,6 +229,7 @@ pub fn enable_open_publishing(
             import 0x1.DiemTransactionPublishingOption;
 
             main(account: signer) {
+            label b0:
                 DiemTransactionPublishingOption.set_open_script(&account);
                 DiemTransactionPublishingOption.set_open_module(&account, true);
 

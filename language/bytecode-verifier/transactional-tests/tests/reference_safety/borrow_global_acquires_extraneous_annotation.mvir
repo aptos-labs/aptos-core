@@ -4,6 +4,7 @@ module 0x1.A {
 
     // unnecessary acquires annotation
     public test() acquires T1 {
+    label b0:
         return;
     }
 

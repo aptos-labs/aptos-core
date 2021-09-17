@@ -18,7 +18,7 @@ Error: Unable to publish module '00000000000000000000000000000001::M3'. Got VMEr
     offsets: [],
 }
 
-task 3 'publish'. lines 36-45:
+task 3 'publish'. lines 36-46:
 Error: Unable to publish module '00000000000000000000000000000001::M4'. Got VMError: {
     major_status: CONSTRAINT_NOT_SATISFIED,
     sub_status: None,
@@ -27,7 +27,7 @@ Error: Unable to publish module '00000000000000000000000000000001::M4'. Got VMEr
     offsets: [],
 }
 
-task 4 'publish'. lines 48-62:
+task 4 'publish'. lines 49-64:
 Error: Unable to publish module '00000000000000000000000000000001::M5'. Got VMError: {
     major_status: CONSTRAINT_NOT_SATISFIED,
     sub_status: None,

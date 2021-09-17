@@ -1,6 +1,6 @@
 processed 1 task
 
-task 0 'publish'. lines 1-7:
+task 0 'publish'. lines 1-8:
 Error: Unable to publish module '00000000000000000000000000000042::M'. Got VMError: {
     major_status: COPYLOC_WITHOUT_COPY_ABILITY,
     sub_status: None,

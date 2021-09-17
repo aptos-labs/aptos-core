@@ -6,6 +6,7 @@ module 0x1.M {
     t1(): &u64 {
         let x: u64;
         let y: &u64;
+    label b0:
         x = 0;
         y = &x;
         // invalid return, borrowing a local
@@ -20,6 +21,7 @@ module 0x1.M2 {
     t2(): &u64 {
         let x: u64;
         let y: &u64;
+    label b0:
         x = 0;
         y = &x;
         // invalid return, borrowing a local
@@ -36,6 +38,7 @@ module 0x1.M3 {
         let x: &Self.X;
         let y: &Self.Y;
         let u: &u64;
+    label b0:
         s = X { y: Y { u: 0 } };
         x = &s;
         y = &move(x).X::y;
@@ -54,6 +57,7 @@ module 0x1.M4 {
         let x: &Self.X;
         let y: &Self.Y;
         let u: &u64;
+    label b0:
         s = X { y: Y { u: 0 } };
         x = &s;
         y = &copy(x).X::y;

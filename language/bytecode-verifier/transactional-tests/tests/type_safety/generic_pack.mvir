@@ -4,8 +4,8 @@ module 0x1.M {
 
     foo() {
         let x: Self.Foo<u64>;
-        // valid
-        x = Foo<u64> { x : 42 };
+    label b0:
+        x = Foo<u64> { x : 42 }; // valid
         abort 0;
     }
 }
@@ -17,8 +17,8 @@ module 0x1.N {
 
     foo() {
         let x: Self.Foo<u64, Self.Bar>;
-        // valid
-        x = Foo<u64, Self.Bar> { x : 42, y: Bar { f: false } };
+    label b0:
+        x = Foo<u64, Self.Bar> { x : 42, y: Bar { f: false } }; // valid
         abort 0;
     }
 }

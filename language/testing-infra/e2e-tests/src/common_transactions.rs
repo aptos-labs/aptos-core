@@ -24,6 +24,7 @@ pub static CREATE_ACCOUNT_SCRIPT: Lazy<Vec<u8>> = Lazy::new(|| {
     main<Token>(account: signer, fresh_address: address, auth_key_prefix: vector<u8>, initial_amount: u64) {
       let with_cap: DiemAccount.WithdrawCapability;
       let name: vector<u8>;
+    label b0:
       name = h\"\";
 
       DiemAccount.create_parent_vasp_account<Token>(
@@ -33,17 +34,18 @@ pub static CREATE_ACCOUNT_SCRIPT: Lazy<Vec<u8>> = Lazy::new(|| {
         move(name),
         false
       );
-      if (copy(initial_amount) > 0) {
-         with_cap = DiemAccount.extract_withdraw_capability(&account);
-         DiemAccount.pay_from<Token>(
-           &with_cap,
-           move(fresh_address),
-           move(initial_amount),
-           h\"\",
-           h\"\"
-         );
-         DiemAccount.restore_withdraw_capability(move(with_cap));
-      }
+      jump_if_false (copy(initial_amount) > 0) b2;
+    label b1:
+      with_cap = DiemAccount.extract_withdraw_capability(&account);
+      DiemAccount.pay_from<Token>(
+        &with_cap,
+        move(fresh_address),
+        move(initial_amount),
+        h\"\",
+        h\"\"
+      );
+      DiemAccount.restore_withdraw_capability(move(with_cap));
+    label b2:
       return;
     }
 ";
@@ -57,6 +59,7 @@ pub static CREATE_ACCOUNT_SCRIPT: Lazy<Vec<u8>> = Lazy::new(|| {
 pub static EMPTY_SCRIPT: Lazy<Vec<u8>> = Lazy::new(|| {
     let code = "
     main(account: signer) {
+    label b0:
       return;
     }
 ";
@@ -81,7 +84,7 @@ pub static MULTI_AGENT_SWAP_SCRIPT: Lazy<Vec<u8>> = Lazy::new(|| {
         let bob_withdrawal_cap: DiemAccount.WithdrawCapability;
         let alice_addr: address;
         let bob_addr: address;
-
+    label b0:
         alice_withdrawal_cap = DiemAccount.extract_withdraw_capability(&alice);
         bob_addr = Signer.address_of(&bob);
         DiemAccount.pay_from<XUS.XUS>(
@@ -124,7 +127,7 @@ pub static MULTI_AGENT_MINT_SCRIPT: Lazy<Vec<u8>> = Lazy::new(|| {
         let dd_address: address;
         let dd_withdrawal_cap: DiemAccount.WithdrawCapability;
         let vasp_address: address;
-
+    label b0:
         dd_address = Signer.address_of(&dd_account);
         // First, TC mints to DD.
         DiemAccount.tiered_mint<CoinType>(

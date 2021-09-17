@@ -5,6 +5,7 @@ module 0x1.M {
     foo() {
         // cannot use refs in generics
         let s: Self.S<&u64>;
+    label b0:
         return;
     }
 }

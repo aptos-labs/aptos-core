@@ -356,7 +356,7 @@ pub enum FunctionBody {
     /// `code` is the code that defines the procedure
     Move {
         locals: Vec<(Var, Type)>,
-        code: Block_,
+        code: Vec<Block>,
     },
     Bytecode {
         locals: Vec<(Var, Type)>,
@@ -462,75 +462,42 @@ pub enum LValue_ {
 }
 pub type LValue = Spanned<LValue_>;
 
-/// Enum for Move commands
-#[allow(clippy::large_enum_variant)]
+/// A [`Block_`] is composed of zero or more "statements," which can be translated into one or more
+/// bytecode instructions.
 #[derive(Debug, Clone, PartialEq)]
-pub enum Cmd_ {
-    /// `l_1, ..., l_n = e`
-    Assign(Vec<LValue>, Exp),
-    /// `n { f_1: x_1, ... , f_j: x_j  } = e`
-    Unpack(StructName, Vec<Type>, Fields<Var>, Box<Exp>),
-    /// `abort e`
+pub enum Statement_ {
+    /// `abort e`.
     Abort(Option<Box<Exp>>),
+    /// `assert(e_1, e_2)`
+    Assert(Box<Exp>, Box<Exp>),
     /// `return e_1, ... , e_j`
     Return(Box<Exp>),
-    /// `break`
-    Break,
-    /// `continue`
-    Continue,
+    /// `l_1, ..., l_n = e`
+    Assign(Vec<LValue>, Exp),
+    /// A statement representing an expression `e`.
     Exp(Box<Exp>),
+    /// `jump lbl`
+    Jump(BlockLabel),
+    /// `jump_if (e) lbl`
+    JumpIf(Box<Exp>, BlockLabel),
+    /// `jump_if_false (e) lbl`
+    JumpIfFalse(Box<Exp>, BlockLabel),
+    /// `n { f_1: x_1, ... , f_j: x_j  } = e`
+    Unpack(StructName, Vec<Type>, Fields<Var>, Box<Exp>),
 }
-/// The type of a command with its location
-pub type Cmd = Spanned<Cmd_>;
+/// A [`Statement_`] with a location.
+pub type Statement = Spanned<Statement_>;
 
-/// Struct defining an if statement
+/// A block is composed of a [`BlockLabel`], followed by 0 or more [`Statement`],
+/// e.g.: `label b: s_1; ... s_n;`.
 #[derive(Debug, PartialEq, Clone)]
-pub struct IfElse {
-    /// the if's condition
-    pub cond: Exp,
-    /// the block taken if the condition is `true`
-    pub if_block: Block,
-    /// the block taken if the condition is `false`
-    pub else_block: Option<Block>,
-}
-
-/// Struct defining a while statement
-#[derive(Debug, PartialEq, Clone)]
-pub struct While {
-    /// The condition for a while statement
-    pub cond: Exp,
-    /// The block taken if the condition is `true`
-    pub block: Block,
-}
-
-/// Struct defining a loop statement
-#[derive(Debug, PartialEq, Clone)]
-pub struct Loop {
-    /// The body of the loop
-    pub block: Block,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-#[allow(clippy::large_enum_variant)]
-pub enum Statement {
-    /// `c;`
-    CommandStatement(Cmd),
-    /// `if (e) { s_1 } else { s_2 }`
-    IfElseStatement(IfElse),
-    /// `while (e) { s }`
-    WhileStatement(While),
-    /// `loop { s }`
-    LoopStatement(Loop),
-}
-
-#[derive(Debug, PartialEq, Clone)]
-/// `{ s }`
 pub struct Block_ {
-    /// The statements that make up the block
-    pub stmts: VecDeque<Statement>,
+    /// The label that can be used to jump to this block.
+    pub label: BlockLabel,
+    /// The statements that make up the block.
+    pub statements: VecDeque<Statement>,
 }
-
-/// The type of a Block coupled with source location information.
+/// A [`Block_`] with a location.
 pub type Block = Spanned<Block_>;
 
 //**************************************************************************************************
@@ -661,11 +628,12 @@ pub type Exp = Spanned<Exp_>;
 // Bytecode
 //**************************************************************************************************
 
-pub type BytecodeBlocks = Vec<(BlockLabel, BytecodeBlock)>;
+pub type BytecodeBlocks = Vec<(BlockLabel_, BytecodeBlock)>;
 pub type BytecodeBlock = Vec<Bytecode>;
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, PartialOrd, Ord, Serialize, Deserialize)]
-pub struct BlockLabel(pub Symbol);
+pub struct BlockLabel_(pub Symbol);
+pub type BlockLabel = Spanned<BlockLabel_>;
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct NopLabel(pub Symbol);
@@ -675,9 +643,9 @@ pub enum Bytecode_ {
     Pop,
     Ret,
     Nop(Option<NopLabel>),
-    BrTrue(BlockLabel),
-    BrFalse(BlockLabel),
-    Branch(BlockLabel),
+    BrTrue(BlockLabel_),
+    BrFalse(BlockLabel_),
+    Branch(BlockLabel_),
     LdU8(u8),
     LdU64(u64),
     LdU128(u128),
@@ -776,7 +744,7 @@ impl Script {
     }
 
     /// Accessor for the body of the 'main' procedure
-    pub fn body(&self) -> &Block_ {
+    pub fn body(&self) -> &[Block] {
         match self.main.value.body {
             FunctionBody::Move { ref code, .. } => code,
             FunctionBody::Bytecode { .. } => panic!("Invalid body access on bytecode main()"),
@@ -1011,67 +979,24 @@ impl FunctionCall_ {
     }
 }
 
-impl Cmd_ {
-    /// Creates a command that returns no values
+impl Statement_ {
+    /// Creates a statement that returns no values.
     pub fn return_empty() -> Self {
-        Cmd_::Return(Box::new(Spanned::unsafe_no_loc(Exp_::ExprList(vec![]))))
+        Statement_::Return(Box::new(Spanned::unsafe_no_loc(Exp_::ExprList(vec![]))))
     }
 
-    /// Creates a command that returns a single value
+    /// Creates a statement that returns a single value.
     pub fn return_(op: Exp) -> Self {
-        Cmd_::Return(Box::new(op))
-    }
-}
-
-impl IfElse {
-    /// Creates an if-statement with no else branch
-    pub fn if_block(cond: Exp, if_block: Block) -> Self {
-        IfElse {
-            cond,
-            if_block,
-            else_block: None,
-        }
-    }
-
-    /// Creates an if-statement with an else branch
-    pub fn if_else(cond: Exp, if_block: Block, else_block: Block) -> Self {
-        IfElse {
-            cond,
-            if_block,
-            else_block: Some(else_block),
-        }
-    }
-}
-
-impl Statement {
-    /// Lifts a command into a statement
-    pub fn cmd(c: Cmd) -> Self {
-        Statement::CommandStatement(c)
-    }
-
-    /// Creates an `Statement::IfElseStatement` variant with no else branch
-    pub fn if_block(cond: Exp, if_block: Block) -> Self {
-        Statement::IfElseStatement(IfElse::if_block(cond, if_block))
-    }
-
-    /// Creates an `Statement::IfElseStatement` variant with an else branch
-    pub fn if_else(cond: Exp, if_block: Block, else_block: Block) -> Self {
-        Statement::IfElseStatement(IfElse::if_else(cond, if_block, else_block))
+        Statement_::Return(Box::new(op))
     }
 }
 
 impl Block_ {
-    /// Creates a new block from the vector of statements
-    pub fn new(stmts: Vec<Statement>) -> Self {
-        Block_ {
-            stmts: VecDeque::from(stmts),
-        }
-    }
-
-    /// Creates an empty block
-    pub fn empty() -> Self {
-        Block_ {
-            stmts: VecDeque::new(),
+    /// Creates a new block from a label and a vector of statements.
+    pub fn new(label: BlockLabel, statements: Vec<Statement>) -> Self {
+        Self {
+            label,
+            statements: VecDeque::from(statements),
         }
     }
 }
@@ -1162,18 +1087,6 @@ impl Exp_ {
 // Trait impls
 //**************************************************************************************************
 
-impl Iterator for Script {
-    type Item = Statement;
-
-    fn next(&mut self) -> Option<Statement> {
-        match self.main.value.body {
-            FunctionBody::Move { ref mut code, .. } => code.stmts.pop_front(),
-            FunctionBody::Bytecode { .. } => panic!("main() cannot currently be bytecode"),
-            FunctionBody::Native => panic!("main() cannot be native code"),
-        }
-    }
-}
-
 impl PartialEq for Script {
     fn eq(&self, other: &Script) -> bool {
         self.imports == other.imports && self.main.value.body == other.main.value.body
@@ -1184,7 +1097,7 @@ impl Iterator for Block_ {
     type Item = Statement;
 
     fn next(&mut self) -> Option<Statement> {
-        self.stmts.pop_front()
+        self.statements.pop_front()
     }
 }
 
@@ -1406,6 +1319,12 @@ impl fmt::Display for FunctionName {
     }
 }
 
+impl fmt::Display for BlockLabel_ {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 impl fmt::Display for ConstantName {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
@@ -1422,7 +1341,10 @@ impl fmt::Display for FunctionBody {
                 for (local, ty) in locals {
                     write!(f, "let {}: {};", local, ty)?;
                 }
-                writeln!(f, "{}", code)
+                for block in code {
+                    writeln!(f, "{}", block.value)?;
+                }
+                Ok(())
             }
             FunctionBody::Bytecode { locals, code } => {
                 write!(f, "locals: [")?;
@@ -1431,7 +1353,7 @@ impl fmt::Display for FunctionBody {
                 }
                 writeln!(f, "]")?;
                 for (label, block) in code {
-                    writeln!(f, "label {}:", &label.0)?;
+                    writeln!(f, "{}:", &label)?;
                     for instr in block {
                         writeln!(f, "  {}", instr)?;
                     }
@@ -1602,17 +1524,25 @@ impl fmt::Display for LValue_ {
     }
 }
 
-impl fmt::Display for Cmd_ {
+impl fmt::Display for Statement_ {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Cmd_::Assign(var_list, e) => {
+            Statement_::Abort(None) => write!(f, "abort;"),
+            Statement_::Abort(Some(err)) => write!(f, "abort {};", err),
+            Statement_::Assert(cond, err) => write!(f, "assert({}, {});", cond, err),
+            Statement_::Assign(var_list, e) => {
                 if var_list.is_empty() {
                     write!(f, "{};", e)
                 } else {
                     write!(f, "{} = ({});", intersperse(var_list, ", "), e)
                 }
             }
-            Cmd_::Unpack(n, tys, bindings, e) => write!(
+            Statement_::Exp(e) => write!(f, "({});", e),
+            Statement_::Jump(label) => write!(f, "jump {}", label),
+            Statement_::JumpIf(e, label) => write!(f, "jump_if ({}) {}", e, label),
+            Statement_::JumpIfFalse(e, label) => write!(f, "jump_if_false ({}) {}", e, label),
+            Statement_::Return(exps) => write!(f, "return {};", exps),
+            Statement_::Unpack(n, tys, bindings, e) => write!(
                 f,
                 "{}{} {{ {} }} = {}",
                 n,
@@ -1625,67 +1555,15 @@ impl fmt::Display for Cmd_ {
                     )),
                 e
             ),
-            Cmd_::Abort(None) => write!(f, "abort;"),
-            Cmd_::Abort(Some(err)) => write!(f, "abort {};", err),
-            Cmd_::Return(exps) => write!(f, "return {};", exps),
-            Cmd_::Break => write!(f, "break;"),
-            Cmd_::Continue => write!(f, "continue;"),
-            Cmd_::Exp(e) => write!(f, "({});", e),
-        }
-    }
-}
-
-impl fmt::Display for IfElse {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "if ({}) {{\n{:indent$}\n}}",
-            self.cond,
-            self.if_block,
-            indent = 4
-        )?;
-        match self.else_block {
-            None => Ok(()),
-            Some(ref block) => write!(f, " else {{\n{:indent$}\n}}", block, indent = 4),
-        }
-    }
-}
-
-impl fmt::Display for While {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "while ({}) {{\n{:indent$}\n}}",
-            self.cond,
-            self.block,
-            indent = 4
-        )?;
-        Ok(())
-    }
-}
-
-impl fmt::Display for Loop {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "loop {{\n{:indent$}\n}}", self.block, indent = 4)?;
-        Ok(())
-    }
-}
-
-impl fmt::Display for Statement {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Statement::CommandStatement(cmd) => write!(f, "{}", cmd),
-            Statement::IfElseStatement(if_else) => write!(f, "{}", if_else),
-            Statement::WhileStatement(while_) => write!(f, "{}", while_),
-            Statement::LoopStatement(loop_) => write!(f, "{}", loop_),
         }
     }
 }
 
 impl fmt::Display for Block_ {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for stmt in self.stmts.iter() {
-            writeln!(f, "{}", stmt)?;
+        writeln!(f, "label {}:", self.label)?;
+        for statement in self.statements.iter() {
+            writeln!(f, "    {}", statement)?;
         }
         Ok(())
     }

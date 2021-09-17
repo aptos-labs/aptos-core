@@ -8,7 +8,7 @@ use std::collections::{BTreeSet, HashMap};
 // Iterates to find a fixpoint as it might create empty blocks which could create more jumps to
 // clean up
 
-pub fn code(loop_heads: &BTreeSet<IR::BlockLabel>, blocks: &mut IR::BytecodeBlocks) {
+pub fn code(loop_heads: &BTreeSet<IR::BlockLabel_>, blocks: &mut IR::BytecodeBlocks) {
     let mut changed = true;
     while changed {
         let fall_through_removed = remove_fall_through(loop_heads, blocks);
@@ -18,7 +18,7 @@ pub fn code(loop_heads: &BTreeSet<IR::BlockLabel>, blocks: &mut IR::BytecodeBloc
 }
 
 fn remove_fall_through(
-    loop_heads: &BTreeSet<IR::BlockLabel>,
+    loop_heads: &BTreeSet<IR::BlockLabel_>,
     blocks: &mut IR::BytecodeBlocks,
 ) -> bool {
     use IR::Bytecode_ as B;

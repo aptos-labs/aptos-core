@@ -4,26 +4,31 @@ module 0x1.M {
     struct R has key { x: bool, y: Self.Y }
 
     public publish(s: &signer) {
+    label b0:
         move_to<R>(move(s), R { x: false, y: Y { x: 0 } });
         return;
     }
 
     public modify_x(addr: address) acquires R {
+    label b0:
         *&mut borrow_global_mut<R>(move(addr)).R::x = true;
         return;
     }
 
     public verify_x(addr: address) acquires R {
+    label b0:
         assert(*&borrow_global<R>(move(addr)).R::x == true, 1000);
         return;
     }
 
     public modify_y_x(addr: address) acquires R {
+    label b0:
         *&mut ((&mut borrow_global_mut<R>(move(addr)).R::y)).Y::x = 42;
         return;
     }
 
     public verify_y_x(addr: address) acquires R {
+    label b0:
         assert(*&(&borrow_global<R>(move(addr)).R::y).Y::x == 42, 1001);
         return;
     }
@@ -33,6 +38,7 @@ module 0x1.M {
 import 0x1.M;
 
 main(s: signer) {
+label b0:
     M.publish(&s);
     return;
 }
@@ -43,6 +49,7 @@ import 0x1.M;
 import 0x1.Signer;
 
 main(s: signer) {
+label b0:
     M.modify_x(Signer.address_of(&s));
     return;
 }
@@ -53,6 +60,7 @@ import 0x1.M;
 import 0x1.Signer;
 
 main(s: signer) {
+label b0:
     M.verify_x(Signer.address_of(&s));
     return;
 }
@@ -63,6 +71,7 @@ import 0x1.M;
 import 0x1.Signer;
 
 main(s: signer) {
+label b0:
     M.modify_y_x(Signer.address_of(&s));
     return;
 }
@@ -72,6 +81,7 @@ import 0x1.M;
 import 0x1.Signer;
 
 main(s: signer) {
+label b0:
     M.verify_y_x(Signer.address_of(&s));
     return;
 }

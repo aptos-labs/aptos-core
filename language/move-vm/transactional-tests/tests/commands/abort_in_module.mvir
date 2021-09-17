@@ -1,6 +1,7 @@
 //# publish
 module 0x1.M {
     public foo() {
+    label b0:
         abort 22;
     }
 
@@ -10,6 +11,7 @@ module 0x1.M {
 import 0x1.M;
 
 main() {
+label b0:
     // should abort and point to the module
     M.foo();
     return;

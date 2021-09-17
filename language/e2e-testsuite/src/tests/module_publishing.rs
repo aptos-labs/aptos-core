@@ -116,13 +116,13 @@ module_republish_test!(
     "
     module 0x##ADDRESS##.M {
         struct T { f: u64 }
-        public f() { return; }
+        public f() { label b0: return; }
     }
     ",
     "
     module 0x##ADDRESS##.M {
         struct T { f: u64 }
-        public f() { return; }
+        public f() { label b0: return; }
     }
     ",
     Executed
@@ -152,7 +152,7 @@ module_republish_test!(
     ",
     "
     module 0x##ADDRESS##.M {
-        public f() { return; }
+        public f() { label b0: return; }
     }
     ",
     Executed
@@ -223,12 +223,12 @@ module_republish_test!(
     linking_incompatible_module_with_added_param,
     "
     module 0x##ADDRESS##.M {
-        public f() { return; }
+        public f() { label b0: return; }
     }
     ",
     "
     module 0x##ADDRESS##.M {
-        public f(_a: u64) { return; }
+        public f(_a: u64) { label b0: return; }
     }
     ",
     MiscellaneousError
@@ -238,12 +238,12 @@ module_republish_test!(
     linking_incompatible_module_with_changed_param,
     "
     module 0x##ADDRESS##.M {
-        public f(_a: u64) { return; }
+        public f(_a: u64) { label b0: return; }
     }
     ",
     "
     module 0x##ADDRESS##.M {
-        public f(_a: bool) { return; }
+        public f(_a: bool) { label b0: return; }
     }
     ",
     MiscellaneousError
@@ -253,7 +253,7 @@ module_republish_test!(
     linking_incompatible_module_with_removed_pub_fn,
     "
     module 0x##ADDRESS##.M {
-        public f() { return; }
+        public f() { label b0: return; }
     }
     ",
     "

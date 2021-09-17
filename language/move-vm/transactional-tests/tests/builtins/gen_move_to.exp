@@ -1,6 +1,6 @@
 processed 9 tasks
 
-task 1 'run'. lines 147-158:
+task 1 'run'. lines 158-170:
 Error: Script execution failed with VMError: {
     major_status: NUMBER_OF_SIGNER_ARGUMENTS_MISMATCH,
     sub_status: None,
@@ -9,7 +9,7 @@ Error: Script execution failed with VMError: {
     offsets: [],
 }
 
-task 2 'run'. lines 160-174:
+task 2 'run'. lines 172-187:
 Error: Script execution failed with VMError: {
     major_status: NUMBER_OF_SIGNER_ARGUMENTS_MISMATCH,
     sub_status: None,
@@ -18,7 +18,7 @@ Error: Script execution failed with VMError: {
     offsets: [],
 }
 
-task 3 'run'. lines 176-206:
+task 3 'run'. lines 189-220:
 Error: Script execution failed with VMError: {
     major_status: NUMBER_OF_SIGNER_ARGUMENTS_MISMATCH,
     sub_status: None,
@@ -27,7 +27,7 @@ Error: Script execution failed with VMError: {
     offsets: [],
 }
 
-task 4 'run'. lines 208-229:
+task 4 'run'. lines 222-244:
 Error: Script execution failed with VMError: {
     major_status: NUMBER_OF_SIGNER_ARGUMENTS_MISMATCH,
     sub_status: None,
@@ -36,7 +36,7 @@ Error: Script execution failed with VMError: {
     offsets: [],
 }
 
-task 5 'run'. lines 231-248:
+task 5 'run'. lines 246-264:
 Error: Script execution failed with VMError: {
     major_status: NUMBER_OF_SIGNER_ARGUMENTS_MISMATCH,
     sub_status: None,
@@ -45,7 +45,7 @@ Error: Script execution failed with VMError: {
     offsets: [],
 }
 
-task 6 'run'. lines 250-261:
+task 6 'run'. lines 266-278:
 Error: Script execution failed with VMError: {
     major_status: NUMBER_OF_SIGNER_ARGUMENTS_MISMATCH,
     sub_status: None,
@@ -54,7 +54,7 @@ Error: Script execution failed with VMError: {
     offsets: [],
 }
 
-task 7 'run'. lines 263-285:
+task 7 'run'. lines 280-303:
 Error: Script execution failed with VMError: {
     major_status: NUMBER_OF_SIGNER_ARGUMENTS_MISMATCH,
     sub_status: None,
@@ -63,7 +63,7 @@ Error: Script execution failed with VMError: {
     offsets: [],
 }
 
-task 8 'run'. lines 288-308:
+task 8 'run'. lines 306-327:
 Error: Script execution failed with VMError: {
     major_status: NUMBER_OF_SIGNER_ARGUMENTS_MISMATCH,
     sub_status: None,

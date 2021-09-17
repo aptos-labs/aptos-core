@@ -4,15 +4,17 @@ module 0x1.M {
     t0() {
         let r: Self.R;
         let f: bool;
+    label b0:
         r = R{ f: false };
-        if (true) {
-            R{ f: f } = move(r);
-        } else {
-            R{ f: f } = move(r);
-            r = R{ f: false };
-        }
-        // invalid move loc
+        jump_if (true) b2;
+    label b1:
         R{ f: f } = move(r);
+        r = R{ f: false };
+        jump b3;
+    label b2:
+        R{ f: f } = move(r);
+    label b3:
+        R{ f: f } = move(r); // invalid move loc
         return;
     }
 }
@@ -23,15 +25,17 @@ module 0x1.M {
     t0() {
         let r: Self.R;
         let f: bool;
+    label b0:
         r = R{ f: false };
-        if (true) {
-            R{ f: f } = move(r);
-        } else {
-            R{ f: f } = move(r);
-            r = R{ f: false };
-        }
-        // resurce unused
-        return;
+        jump_if (true) b2;
+    label b1:
+        R{ f: f } = move(r);
+        r = R{ f: false };
+        jump b3;
+    label b2:
+        R{ f: f } = move(r);
+    label b3:
+        return; // resource unused
     }
 }
 
@@ -41,15 +45,17 @@ module 0x1.M {
     t0() {
         let r: Self.R;
         let f: bool;
+    label b0:
         r = R{ f: false };
-        if (true) {
-            R{ f: f } = move(r);
-        } else {
-            R{ f: f } = move(r);
-            r = R{ f: false };
-        }
-        // invalid, still possibly a resource in r
+        jump_if (true) b2;
+    label b1:
+        R{ f: f } = move(r);
         r = R{ f: false };
+        jump b3;
+    label b2:
+        R{ f: f } = move(r);
+    label b3:
+        r = R{ f: false }; // invalid, still possibly a resource in r
         return;
     }
 }
@@ -60,15 +66,17 @@ module 0x1.M {
     t0() {
         let r: Self.R;
         let f: bool;
+    label b0:
         r = R{ f: false };
-        if (true) {
-            R{ f: f } = move(r);
-        } else {
-            R{ f: f } = move(r);
-            r = R{ f: false };
-        }
-        // invalid copy, r might not have a value
-        R{ f: f } = copy(r);
+        jump_if (true) b2;
+    label b1:
+        R{ f: f } = move(r);
+        r = R{ f: false };
+        jump b3;
+    label b2:
+        R{ f: f } = move(r);
+    label b3:
+        R{ f: f } = copy(r); // invalid copy, r might not have a value
         return;
     }
 }
@@ -80,15 +88,17 @@ module 0x1.M {
         let r: Self.R;
         let ref: &Self.R;
         let f: bool;
+    label b0:
         r = R{ f: false };
-        if (true) {
-            R{ f: f } = move(r);
-        } else {
-            R{ f: f } = move(r);
-            r = R{ f: false };
-        }
-        // cannot borrow, might not have a value
-        ref = &r;
+        jump_if (true) b2;
+    label b1:
+        R{ f: f } = move(r);
+        r = R{ f: false };
+        jump b3;
+    label b2:
+        R{ f: f } = move(r);
+    label b3:
+        ref = &r; // cannot borrow, might not have a value
         return;
     }
 }

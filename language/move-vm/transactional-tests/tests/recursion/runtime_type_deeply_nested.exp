@@ -1,6 +1,6 @@
 processed 3 tasks
 
-task 2 'run'. lines 80-87:
+task 2 'run'. lines 81-89:
 Error: Script execution failed with VMError: {
     major_status: VM_MAX_TYPE_DEPTH_REACHED,
     sub_status: None,

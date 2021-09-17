@@ -1,6 +1,6 @@
 processed 1 task
 
-task 0 'run'. lines 1-14:
+task 0 'run'. lines 1-17:
 Error: Script execution failed with VMError: {
     major_status: COPYLOC_UNAVAILABLE_ERROR,
     sub_status: None,

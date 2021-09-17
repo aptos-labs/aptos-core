@@ -3,7 +3,7 @@ main() {
     let x: u64;
     let x_ref: &mut u64;
     let imm_ref: &bool;
-
+label b0:
     x = 5;
     x_ref = &mut x;
     // freeze, correct ref kind, wrong type

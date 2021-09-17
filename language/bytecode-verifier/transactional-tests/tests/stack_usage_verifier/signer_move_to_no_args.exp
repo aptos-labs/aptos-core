@@ -1,6 +1,6 @@
 processed 2 tasks
 
-task 0 'publish'. lines 1-9:
+task 0 'publish'. lines 1-10:
 Error: Unable to publish module '00000000000000000000000000000042::M'. Got VMError: {
     major_status: NEGATIVE_STACK_SIZE_WITHIN_BLOCK,
     sub_status: None,
@@ -9,7 +9,7 @@ Error: Unable to publish module '00000000000000000000000000000042::M'. Got VMErr
     offsets: [(FunctionDefinitionIndex(0), 0)],
 }
 
-task 1 'publish'. lines 11-19:
+task 1 'publish'. lines 12-21:
 Error: Unable to publish module '00000000000000000000000000000042::N'. Got VMError: {
     major_status: NEGATIVE_STACK_SIZE_WITHIN_BLOCK,
     sub_status: None,

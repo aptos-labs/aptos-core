@@ -7,7 +7,7 @@ main() {
     let a5: address;
     let a6: address;
     let a7: address;
-
+label b0:
     a1 = 0x1;
     a2 = 0x01;
     a3 = 0x0001;

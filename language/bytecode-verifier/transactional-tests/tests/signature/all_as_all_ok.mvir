@@ -4,6 +4,7 @@ module 0x1.M {
 
     foo<T>() {
         let x: Self.S<T>;
+    label b0:
         return;
     }
 }

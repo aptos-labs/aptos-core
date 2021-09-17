@@ -6,10 +6,12 @@ module {{default}}.M {
         a: u64
     }
     public error(code: u64): u64 {
+    label b0:
         abort(move(code));
         return 0;
     }
     public new(): Self.T {
+    label b0:
         return T { b: Self.error(42), a: Self.error(100) };
     }
 }
@@ -18,6 +20,7 @@ module {{default}}.M {
 import {{default}}.M;
 main() {
   let m: M.T;
+label b0:
   m = M.new();
   return;
 }

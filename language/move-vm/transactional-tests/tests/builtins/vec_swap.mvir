@@ -6,6 +6,7 @@ module 0x1.M {
 
     public publish(s: &signer) {
         let v: vector<u64>;
+    label b0:
         v = Vector.empty<u64>();
         Vector.push_back<u64>(&mut v, 100);
         Vector.push_back<u64>(&mut v, 200);
@@ -15,6 +16,7 @@ module 0x1.M {
 
     public borrow_and_swap(addr: address) acquires R {
         let r: &mut Self.R;
+    label b0:
         r = borrow_global_mut<R>(move(addr));
         Vector.swap<u64>(&mut move(r).R::v, 0, 1);
         return;
@@ -22,6 +24,7 @@ module 0x1.M {
 
     public verify_effects(addr: address) acquires R {
         let v: &vector<u64>;
+    label b0:
         v = & borrow_global<R>(move(addr)).R::v;
         assert(*Vector.borrow<u64>(copy(v), 0) == 200, 1000);
         assert(*Vector.borrow<u64>(move(v), 1) == 100, 1001);
@@ -33,6 +36,7 @@ module 0x1.M {
 import 0x1.M;
 
 main(s: signer) {
+label b0:
     M.publish(&s);
     return;
 }
@@ -42,6 +46,7 @@ import 0x1.M;
 import 0x1.Signer;
 
 main(s: signer) {
+label b0:
     M.borrow_and_swap(Signer.address_of(&s));
     return;
 }
@@ -51,6 +56,7 @@ import 0x1.M;
 import 0x1.Signer;
 
 main(s: signer) {
+label b0:
     M.verify_effects(Signer.address_of(&s));
     return;
 }

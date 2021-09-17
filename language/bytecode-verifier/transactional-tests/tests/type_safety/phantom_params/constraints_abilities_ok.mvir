@@ -21,14 +21,16 @@ module 0x1.M {
                   >
     }
 
-    f1<T: drop + copy + store + key>() { return; }
+    f1<T: drop + copy + store + key>() { label b0: return; }
     f2() {
+    label b0:
         Self.f1<Self.HasAbilities<Self.NoAbilities, u64>>();
         return;
     }
 
-    f3<T1: drop, T2: copy, T3: store, T4: key>() { return; }
+    f3<T1: drop, T2: copy, T3: store, T4: key>() { label b0: return; }
     f4() {
+    label b0:
         Self.f3< Self.HasDrop<Self.NoAbilities, u64>,
                  Self.HasCopy<Self.NoAbilities, u64>,
                  Self.HasStore<Self.NoAbilities, u64>,

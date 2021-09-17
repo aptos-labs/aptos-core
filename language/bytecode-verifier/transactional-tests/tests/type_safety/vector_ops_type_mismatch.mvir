@@ -1,6 +1,7 @@
 //# run
 main() {
     let v: vector<u8>;
+label b0:
     v = vec_pack_0<bool>();
     return;
 }
@@ -9,7 +10,7 @@ main() {
 main() {
     let v: vector<u8>;
     let v_mut: &mut vector<bool>;
-
+label b0:
     v = vec_pack_0<u8>();
     v_mut = &mut v;
 
@@ -21,7 +22,7 @@ main() {
     let v: vector<u8>;
     let v_imm: &vector<u8>;
     let v_len: u8;
-
+label b0:
     v = vec_pack_0<u8>();
     v_imm = &v;
     v_len = vec_len<u8>(move(v_imm));
@@ -34,7 +35,7 @@ main() {
     let v: vector<u8>;
     let v_mut: &mut vector<u8>;
     let e: u64;
-
+label b0:
     e = 0;
     v = vec_pack_0<u8>();
     v_mut = &mut v;
@@ -48,7 +49,7 @@ main() {
     let v: vector<u8>;
     let v_mut: &mut vector<u8>;
     let e: u64;
-
+label b0:
     v = vec_pack_0<u8>();
     v_mut = &mut v;
     vec_push_back<u8>(copy(v_mut), 0);
@@ -63,7 +64,7 @@ main() {
     let v_mut: &mut vector<u8>;
     let i1: u8;
     let i2: u128;
-
+label b0:
     i1 = 0;
     i2 = 1;
     v = vec_pack_0<u8>();

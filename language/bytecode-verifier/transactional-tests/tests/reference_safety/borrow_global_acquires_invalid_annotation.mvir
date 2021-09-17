@@ -4,6 +4,7 @@ module 0x1.A {
 
     // unnecessary acquire annotation
     public test() acquires T1 {
+    label b0:
         Self.test();
         return;
     }

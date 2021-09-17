@@ -2,13 +2,14 @@
 
 main(b: bool) {
   let x: u64;
-
-  if (move(b)) {
-    x = 2;
-  } else {
-    x = 3;
-  }
+label b0:
+  jump_if (move(b)) b2;
+label b1:
+  x = 3;
+  jump b3;
+label b2:
+  x = 2;
+label b3:
   x = true; // type error here
-
   return;
 }

@@ -5,47 +5,47 @@ module 0x42.TestMoveFrom {
     struct Counter has key { i: u64 }
 
     public has(account: &signer): bool {
-      let sender_address: address;
-      let yes: bool;
-
-      sender_address = Signer.address_of(move(account));
-      yes = exists<Counter>(move(sender_address));
-      return move(yes);
+        let sender_address: address;
+        let yes: bool;
+    label b0:
+        sender_address = Signer.address_of(move(account));
+        yes = exists<Counter>(move(sender_address));
+        return move(yes);
     }
 
     public increment(account: &signer) acquires Counter {
-      let sender_address: address;
-      let t_ref: &mut Self.Counter;
-      let counter_ref: &mut u64;
+        let sender_address: address;
+        let t_ref: &mut Self.Counter;
+        let counter_ref: &mut u64;
+    label b0:
+        sender_address = Signer.address_of(move(account));
+        t_ref = borrow_global_mut<Counter>(move(sender_address));
+        counter_ref = &mut copy(t_ref).Counter::i;
+        _ = move(t_ref);
+        *move(counter_ref) = *copy(counter_ref) + 1;
 
-      sender_address = Signer.address_of(move(account));
-      t_ref = borrow_global_mut<Counter>(move(sender_address));
-      counter_ref = &mut copy(t_ref).Counter::i;
-      _ = move(t_ref);
-      *move(counter_ref) = *copy(counter_ref) + 1;
-
-      return;
+        return;
     }
 
     public publish(account: &signer) {
-      let t: Self.Counter;
+        let t: Self.Counter;
+    label b0:
+        t = Counter { i: 0 };
+        move_to<Counter>(move(account), move(t));
 
-      t = Counter { i: 0 };
-      move_to<Counter>(move(account), move(t));
-
-      return;
+        return;
     }
 
     public unpublish(account: &signer) acquires Counter {
-      let sender_address: address;
-      let counter: Self.Counter;
-      let i: u64;
+        let sender_address: address;
+        let counter: Self.Counter;
+        let i: u64;
+    label b0:
+        sender_address = Signer.address_of(move(account));
+        counter = move_from<Counter>(move(sender_address));
+        Counter { i } = move(counter);
 
-      sender_address = Signer.address_of(move(account));
-      counter = move_from<Counter>(move(sender_address));
-      Counter { i } = move(counter);
-
-      return;
+        return;
     }
 
 }
@@ -54,19 +54,19 @@ module 0x42.TestMoveFrom {
 import 0x42.TestMoveFrom;
 
 main(account: signer) {
-  let has1: bool;
-  let has2: bool;
+    let has1: bool;
+    let has2: bool;
+label b0:
+    TestMoveFrom.publish(&account);
+    TestMoveFrom.increment(&account);
 
-  TestMoveFrom.publish(&account);
-  TestMoveFrom.increment(&account);
+    has1 = TestMoveFrom.has(&account);
+    assert(move(has1), 77);
 
-  has1 = TestMoveFrom.has(&account);
-  assert(move(has1), 77);
+    TestMoveFrom.unpublish(&account);
 
-  TestMoveFrom.unpublish(&account);
+    has2 = TestMoveFrom.has(&account);
+    assert(!move(has2), 88);
 
-  has2 = TestMoveFrom.has(&account);
-  assert(!move(has2), 88);
-
-  return;
+    return;
 }

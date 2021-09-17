@@ -2,6 +2,7 @@
 module 0x1.Cup {
     struct Cup<T> { f: T }
     public cup<T>(f: T): Self.Cup<T> {
+    label b0:
         return Cup<T> { f: move(f) };
     }
 }
@@ -20,6 +21,7 @@ module 0x1.M1 {
 
     // would blow up the stack
     public foo(): Self.Foo {
+    label b0:
         return Foo { f: Cup.cup<Self.Foo>(Self.foo()) };
     }
 
@@ -34,11 +36,13 @@ module 0x1.M2 {
 
     // would blow up the vm
     public ex(account: &signer): bool {
+    label b0:
         return exists<X>(Signer.address_of(move(account)));
     }
 
     // would blow up the vm
     public borrow(account: &signer) acquires X {
+    label b0:
         _ = borrow_global<X>(Signer.address_of(move(account)));
         return;
     }

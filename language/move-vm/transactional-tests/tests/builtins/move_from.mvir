@@ -3,17 +3,20 @@ module 0x1.M {
     struct R has key { x: bool }
 
     public publish(s: &signer) {
+    label b0:
         move_to<R>(move(s), R { x: false });
         return;
     }
 
     public take_off_and_consume(addr: address) acquires R {
         let x: bool;
+    label b0:
         R { x: x } = move_from<R>(move(addr));
         return;
     }
 
     public verify_effects(addr: address) {
+    label b0:
         assert(!exists<R>(move(addr)), 1000);
         return;
     }
@@ -23,6 +26,7 @@ module 0x1.M {
 import 0x1.M;
 
 main(s: signer) {
+label b0:
     M.publish(&s);
     return;
 }
@@ -32,6 +36,7 @@ import 0x1.M;
 import 0x1.Signer;
 
 main(s: signer) {
+label b0:
     M.take_off_and_consume(Signer.address_of(&s));
     return;
 }
@@ -41,6 +46,7 @@ import 0x1.M;
 import 0x1.Signer;
 
 main(s: signer) {
+label b0:
     M.verify_effects(Signer.address_of(&s));
     return;
 }

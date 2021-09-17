@@ -5,6 +5,7 @@
 // to exist when loading module M.
 module 0x42.N {
     foo() {
+    label b0:
         return;
     }
 }
@@ -13,6 +14,7 @@ module 0x42.N {
 module 0x42.M {
     friend 0x42.N;
     public(friend) foo() {
+    label b0:
         return;
     }
 }
@@ -21,6 +23,7 @@ module 0x42.M {
 module 0x42.N {
     import 0x42.M;
     foo() {
+    label b0:
         // call friend visible function if declared a friend
         M.foo();
         return;

@@ -4,6 +4,7 @@ module {{default}}.M {
     struct T{
         x: u64,
         no() {
+        label b0:
             return;
         }
     }

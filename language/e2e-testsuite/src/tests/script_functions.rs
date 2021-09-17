@@ -17,14 +17,17 @@ fn prepare_module(executor: &mut FakeExecutor, account: &Account, seq_num: u64) 
         "
         module 0x{}.M {{
             f_private(s: &signer) {{
+            label b0:
                 return;
             }}
 
             public f_public(s: &signer) {{
+            label b0:
                 return;
             }}
 
             public(script) f_script(s: signer) {{
+            label b0:
                 return;
             }}
         }}

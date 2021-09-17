@@ -1,5 +1,6 @@
 //# run
 main() {
+label b0:
     assert(0u8 + 0u8 == 0u8, 1000);
     assert(0u8 + 1u8 == 1u8, 1001);
     assert(1u8 + 1u8 == 2u8, 1002);
@@ -15,12 +16,14 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 1u8 + 255u8;
     return;
 }
 
 //# run
 main() {
+label b0:
     _ = 215u8 + 156u8;
     return;
 }
@@ -29,6 +32,7 @@ main() {
 
 //# run
 main() {
+label b0:
     assert(0u8 - 0u8 == 0u8, 2000);
     assert(1u8 - 0u8 == 1u8, 2001);
     assert(1u8 - 1u8 == 0u8, 2002);
@@ -43,12 +47,14 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u8 - 1u8;
     return;
 }
 
 //# run
 main() {
+label b0:
     _ = 54u8 - 100u8;
     return;
 }
@@ -56,6 +62,7 @@ main() {
 
 //# run
 main() {
+label b0:
     assert(0u8 * 0u8 == 0u8, 3000);
     assert(1u8 * 0u8 == 0u8, 3001);
     assert(1u8 * 1u8 == 1u8, 3002);
@@ -69,12 +76,14 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 16u8 * 16u8;
     return;
 }
 
 //# run
 main() {
+label b0:
     _ = 128u8 * 2u8;
     return;
 }
@@ -83,6 +92,7 @@ main() {
 
 //# run
 main() {
+label b0:
     assert(0u8 / 1u8 == 0u8, 4000);
     assert(1u8 / 1u8 == 1u8, 4001);
     assert(1u8 / 2u8 == 0u8, 4002);
@@ -97,18 +107,21 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u8 / 0u8;
     return;
 }
 
 //# run
 main() {
+label b0:
     _ = 1u8 / 0u8;
     return;
 }
 
 //# run
 main() {
+label b0:
     _ = 255u8 / 0u8;
     return;
 }
@@ -117,6 +130,7 @@ main() {
 
 //# run
 main() {
+label b0:
     assert(0u8 % 1u8 == 0u8, 5000);
     assert(1u8 % 1u8 == 0u8, 5001);
     assert(1u8 % 2u8 == 1u8, 5002);
@@ -131,18 +145,21 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u8 % 0u8;
     return;
 }
 
 //# run
 main() {
+label b0:
     _ = 1u8 % 0u8;
     return;
 }
 
 //# run
 main() {
+label b0:
     _ = 255u8 % 0u8;
     return;
 }

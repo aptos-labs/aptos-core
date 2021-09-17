@@ -1,6 +1,7 @@
 //# run
 main() {
     let v: vector<bool>;
+label b0:
     v = vec_pack_0<bool>(true);
     return;
 }
@@ -8,6 +9,7 @@ main() {
 //# run
 main() {
     let v: vector<bool>;
+label b0:
     v = vec_pack_1<bool>();
     return;
 }
@@ -16,6 +18,7 @@ main() {
 main() {
     let v: vector<bool>;
     let x: bool;
+label b0:
     v = vec_pack_1<bool>(true);
     x = vec_unpack_2<bool>(move(v));
     return;
@@ -25,6 +28,7 @@ main() {
 main() {
     let v: vector<bool>;
     let x: bool;
+label b0:
     v = vec_pack_1<bool>(true);
     x = vec_unpack_0<bool>(move(v));
     return;

@@ -1,6 +1,6 @@
 processed 2 tasks
 
-task 1 'run'. lines 20-40:
+task 1 'run'. lines 23-43:
 Error: Script execution failed with VMError: {
     major_status: NEGATIVE_STACK_SIZE_WITHIN_BLOCK,
     sub_status: None,

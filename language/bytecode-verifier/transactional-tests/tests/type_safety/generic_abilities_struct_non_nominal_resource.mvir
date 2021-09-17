@@ -5,8 +5,8 @@ module 0x1.M {
 
     foo(x: Self.Box<Self.R>): Self.Box<Self.R> {
         let y: Self.Box<Self.R>;
-        // type does not have copy
-        y = copy(x);
+    label b0:
+        y = copy(x); // type does not have copy
         return move(y);
     }
 }

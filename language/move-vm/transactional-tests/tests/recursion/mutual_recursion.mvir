@@ -1,25 +1,27 @@
 //# publish
 module 0x42.Math {
 
-  public even(n: u64): bool {
-    let is_pred_odd: bool;
-    if (copy(n) == 0) {
-      return true;
+    public even(n: u64): bool {
+        let is_pred_odd: bool;
+    label b0:
+        jump_if_false (copy(n) == 0) b2;
+    label b1:
+        return true;
+    label b2:
+        is_pred_odd = Self.odd(move(n) - 1);
+        return move(is_pred_odd);
     }
 
-    is_pred_odd = Self.odd(move(n) - 1);
-    return move(is_pred_odd);
-  }
-
-  public odd(n: u64): bool {
-    let is_pred_even: bool;
-    if (copy(n) == 0) {
-      return false;
+    public odd(n: u64): bool {
+        let is_pred_even: bool;
+    label b0:
+        jump_if_false (copy(n) == 0) b2;
+    label b1:
+        return false;
+    label b2:
+        is_pred_even = Self.even(move(n) - 1);
+        return move(is_pred_even);
     }
-
-    is_pred_even = Self.even(move(n) - 1);
-    return move(is_pred_even);
-  }
 }
 
 //# run
@@ -30,7 +32,7 @@ main() {
     let zero_odd: bool;
     let ten_even: bool;
     let ten_odd: bool;
-
+label b0:
     zero_even = Math.even(0);
     assert(move(zero_even), 50);
 

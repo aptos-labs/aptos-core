@@ -14,6 +14,7 @@ fn init(executor: &mut FakeExecutor) {
     let program = r#"
         import 0x1.CRSN;
         main(account: signer) {
+        label b0:
           CRSN.allow_crsns(&account);
           return;
         }

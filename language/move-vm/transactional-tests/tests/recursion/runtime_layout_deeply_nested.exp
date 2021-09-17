@@ -1,6 +1,6 @@
 processed 4 tasks
 
-task 1 'run'. lines 59-65:
+task 1 'run'. lines 69-76:
 Error: Script execution failed with VMError: {
     major_status: NUMBER_OF_SIGNER_ARGUMENTS_MISMATCH,
     sub_status: None,
@@ -9,7 +9,7 @@ Error: Script execution failed with VMError: {
     offsets: [],
 }
 
-task 2 'run'. lines 68-74:
+task 2 'run'. lines 79-86:
 Error: Script execution failed with VMError: {
     major_status: NUMBER_OF_SIGNER_ARGUMENTS_MISMATCH,
     sub_status: None,
@@ -18,7 +18,7 @@ Error: Script execution failed with VMError: {
     offsets: [],
 }
 
-task 3 'run'. lines 77-84:
+task 3 'run'. lines 89-97:
 Error: Script execution failed with VMError: {
     major_status: NUMBER_OF_SIGNER_ARGUMENTS_MISMATCH,
     sub_status: None,

@@ -37,8 +37,9 @@ module 0x1.M3 {
 module 0x1.M4 {
     import 0x1.M1;
 
-    f1<T: drop + copy + store + key>() { return; }
+    f1<T: drop + copy + store + key>() { label b0: return; }
     f2() {
+    label b0:
         Self.f1<M1.HasAbilities<M1.NoAbilities, M1.NoAbilities>>();
         return;
     }
@@ -50,8 +51,9 @@ module 0x1.M5 {
     import 0x1.M1;
     import 0x1.M3;
 
-    f1<T1: drop, T2: copy, T3: store, T4: key>() { return; }
+    f1<T1: drop, T2: copy, T3: store, T4: key>() { label b0: return; }
     f2() {
+    label b0:
         Self.f1< M3.HasDrop<M1.NoAbilities, M1.NoAbilities>,
                  M3.HasCopy<M1.NoAbilities, M1.NoAbilities>,
                  M3.HasStore<M1.NoAbilities, M1.NoAbilities>,

@@ -6,10 +6,10 @@ module 0x1.Token {
         let t: Self.T;
         let t_ref: &Self.T;
         let b: bool;
+    label b0:
         t = T{ b: true };
         t_ref = &t;
-        // == works over refs, even if resources without drop
-        assert(copy(t_ref) == move(t_ref), 42);
+        assert(copy(t_ref) == move(t_ref), 42); // == works over refs, even if resources without drop
         T{ b } = move(t);
         return;
     }
@@ -19,6 +19,7 @@ module 0x1.Token {
 import 0x1.Token;
 
 main() {
+label b0:
     Token.test();
     return;
 }

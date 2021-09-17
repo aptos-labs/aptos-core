@@ -3,6 +3,7 @@ module 0x42.Tester {
     struct T has drop {v: u64}
 
     public new(v: u64): Self.T  {
+    label b0:
         return T{v: move(v)};
     }
 
@@ -10,6 +11,7 @@ module 0x42.Tester {
         let t2: &mut Self.T;
         let t_v: &mut u64;
         let new_t: Self.T;
+    label b0:
         t2 = copy(t);
         t_v = &mut copy(t2).T::v;
         *move(t_v) = 10000;
@@ -22,6 +24,7 @@ module 0x42.Tester {
 
     public value(this: &mut Self.T): u64 {
         let ref_v: &u64;
+    label b0:
         ref_v = &move(this).T::v;
         return *move(ref_v);
     }
@@ -37,6 +40,7 @@ main() {
     let v_from_ref: u64;
     let tt: &mut Tester.T;
     let v_from_t: u64;
+label b0:
     t = Tester.new(0);
     ref_t = &mut t;
     // valid as this is the only reference to t

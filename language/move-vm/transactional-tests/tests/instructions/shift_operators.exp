@@ -1,6 +1,6 @@
 processed 12 tasks
 
-task 0 'run'. lines 1-6:
+task 0 'run'. lines 1-7:
 Error: Script execution failed with VMError: {
     major_status: ARITHMETIC_ERROR,
     sub_status: None,
@@ -9,7 +9,7 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 2)],
 }
 
-task 1 'run'. lines 8-12:
+task 1 'run'. lines 9-14:
 Error: Script execution failed with VMError: {
     major_status: ARITHMETIC_ERROR,
     sub_status: None,
@@ -18,7 +18,7 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 2)],
 }
 
-task 2 'run'. lines 14-18:
+task 2 'run'. lines 16-21:
 Error: Script execution failed with VMError: {
     major_status: ARITHMETIC_ERROR,
     sub_status: None,
@@ -27,7 +27,7 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 2)],
 }
 
-task 3 'run'. lines 20-24:
+task 3 'run'. lines 23-28:
 Error: Script execution failed with VMError: {
     major_status: ARITHMETIC_ERROR,
     sub_status: None,
@@ -36,7 +36,7 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 2)],
 }
 
-task 4 'run'. lines 26-30:
+task 4 'run'. lines 30-35:
 Error: Script execution failed with VMError: {
     major_status: ARITHMETIC_ERROR,
     sub_status: None,
@@ -45,7 +45,7 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 2)],
 }
 
-task 5 'run'. lines 32-39:
+task 5 'run'. lines 37-45:
 Error: Script execution failed with VMError: {
     major_status: ARITHMETIC_ERROR,
     sub_status: None,

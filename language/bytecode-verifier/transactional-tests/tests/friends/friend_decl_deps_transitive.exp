@@ -1,6 +1,6 @@
 processed 3 tasks
 
-task 2 'publish'. lines 17-26:
+task 2 'publish'. lines 19-29:
 Error: Unable to publish module '00000000000000000000000000000042::C'. Got VMError: {
     major_status: INVALID_FRIEND_DECL_WITH_MODULES_IN_DEPENDENCIES,
     sub_status: None,

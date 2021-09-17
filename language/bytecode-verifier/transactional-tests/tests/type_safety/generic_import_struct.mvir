@@ -10,6 +10,7 @@ import 0x1.M;
 
 main() {
     let x: M.Foo<u64>;
+label b0:
     return;
 }
 
@@ -18,5 +19,6 @@ import 0x1.M;
 
 main() {
     let x: M.Bar<u64, M.Foo<u64>, bool>;
+label b0:
     return;
 }

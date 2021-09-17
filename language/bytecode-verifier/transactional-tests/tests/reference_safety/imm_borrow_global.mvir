@@ -3,12 +3,14 @@ module 0x1.A {
     struct Coin has store { u: u64 }
 
     public new(): Self.Coin {
+    label b0:
         return Coin { u: 1 };
     }
 
     public join(c1: Self.Coin, c2: Self.Coin): Self.Coin {
         let u1: u64;
         let u2: u64;
+    label b0:
         Coin { u1 } = move(c1);
         Coin { u2 } = move(c2);
         return Coin { u: move(u1) + move(u2) };
@@ -17,6 +19,7 @@ module 0x1.A {
     public split(c1: Self.Coin, amt: u64): Self.Coin * Self.Coin {
         let u1: u64;
         let u2: u64;
+    label b0:
         Coin { u1 } = move(c1);
         assert(copy(u1) >= copy(amt), 42);
         u1 = move(u1) - copy(amt);
@@ -35,7 +38,7 @@ module 0x1.Tester {
     public test_eq(addr1: address, addr2: address): bool acquires Pair {
         let p1: &Self.Pair;
         let p2: &Self.Pair;
-
+    label b0:
         // can immutably borrow/acquire more than once
         p1 = borrow_global<Pair>(move(addr1));
         p2 = borrow_global<Pair>(move(addr2));
@@ -45,6 +48,7 @@ module 0x1.Tester {
     //  valid acquires usage
     public test(account: &signer) acquires Pair {
         let sender: address;
+    label b0:
         sender = Signer.address_of(copy(account));
         move_to<Pair>(move(account), Pair { x: A.new(), y: A.new() });
         assert(Self.test_eq(copy(sender), copy(sender)), 42);
@@ -57,6 +61,7 @@ module 0x1.Tester {
 import 0x1.Tester;
 
 main(account: signer) {
+label b0:
     Tester.test(&account);
     return;
 }

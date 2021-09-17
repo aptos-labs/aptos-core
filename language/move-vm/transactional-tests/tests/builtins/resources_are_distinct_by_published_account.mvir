@@ -6,17 +6,20 @@ module 0x42.Account {
     struct T has key {sequence_number: u64}
 
     public new(m: u64): Self.T {
+    label b0:
         return T{sequence_number: move(m)};
     }
 
     public sequence_number(this: &Self.T): u64 {
         let ref: &u64;
+    label b0:
         ref = &copy(this).T::sequence_number;
         _ = move(this);
         return *move(ref);
     }
 
     public publish(account: &signer, r: Self.T) {
+    label b0:
         move_to<T>(copy(account), move(r));
         return;
     }
@@ -28,7 +31,7 @@ module 0x42.Account {
         let fake_ref: &mut Self.T;
         let fake_ref_frozen: &Self.T;
         let fake_value: u64;
-
+    label b0:
         c1 = Self.new(112);
         Self.publish(copy(account), move(c1));
 
@@ -50,6 +53,7 @@ module 0x42.Account {
 import 0x42.Account as MyAccount;
 
 main(account: signer) {
+label b0:
   MyAccount.test(&account);
   return;
 }

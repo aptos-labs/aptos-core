@@ -9,18 +9,18 @@ module 0x1.Tester {
     bump_and_pick(account: &signer, b1: &mut Self.Box, b2: &mut Self.Box): &u64 acquires Data {
         let sender: address;
         let data: &mut Self.Data;
-
+    label b0:
         sender = Signer.address_of(move(account));
         data = borrow_global_mut<Data>(move(sender));
         *&mut copy(b1).Box::f = *&copy(data).Data::v1;
         *&mut copy(b2).Box::f = *&move(data).Data::v2;
-        if (*&copy(b1).Box::f >= *&copy(b2).Box::f) {
-            _ = move(b2);
-            return &move(b1).Box::f;
-        } else {
-            _ = move(b1);
-            return &move(b2).Box::f;
-        }
+        jump_if (*&copy(b1).Box::f >= *&copy(b2).Box::f) b2;
+    label b1:
+        _ = move(b1);
+        return &move(b2).Box::f;
+    label b2:
+        _ = move(b2);
+        return &move(b1).Box::f;
     }
 
     larger_field(account: &signer, drop: address, result: &mut u64) acquires Box, Data {
@@ -28,7 +28,7 @@ module 0x1.Tester {
         let b2: Self.Box;
         let returned_ref: &u64;
         let dump: u64;
-
+    label b0:
         b1 = move_from<Box>(Signer.address_of(copy(account)));
         b2 = move_from<Box>(move(drop));
 

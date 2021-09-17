@@ -7,6 +7,7 @@ module 0x1.M {
     struct S<T> { x: T }
 
     f<T1, T2>(a: T1, b: T2) {
+    label b0:
         Self.f<Self.S<T2>, T1>(S<T2> { x: move(b) }, move(a));
         return;
     }

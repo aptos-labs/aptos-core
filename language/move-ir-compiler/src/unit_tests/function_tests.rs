@@ -12,6 +12,7 @@ fn compile_module_with_functions() {
 
             public value(this: &Self.FooCoin): u64 {
                 let value_ref: &u64;
+            label b0:
                 value_ref = &move(this).FooCoin::value;
                 return *move(value_ref);
             }
@@ -23,6 +24,7 @@ fn compile_module_with_functions() {
                 let check_value: u64;
                 let new_value: u64;
                 let i: u64;
+            label b0:
                 value_ref = &mut move(this).FooCoin::value;
                 value = *copy(value_ref);
                 check_ref = &check;
@@ -56,6 +58,7 @@ fn generate_function(name: &str, num_formals: usize, num_locals: usize) -> Strin
     for i in 0..num_locals {
         code.push_str(&format!("let x_{}: u64;\n", i));
     }
+    code.push_str("label b0:\n");
     for i in 0..num_locals {
         code.push_str(&format!("x_{} = {};\n", i, i));
     }
@@ -91,10 +94,12 @@ fn compile_module_with_script_visibility_functions() {
         "
         module 0xa1.Foobar {
             public(script) foo() {
+            label b0:
                 return;
             }
 
             public(script) bar() {
+            label b0:
                 Self.foo();
                 return;
             }

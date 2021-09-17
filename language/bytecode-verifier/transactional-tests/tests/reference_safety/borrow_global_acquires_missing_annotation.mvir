@@ -5,6 +5,7 @@ module 0x1.A {
 
     // missing acquire annotation
     public test(account: &signer) {
+    label b0:
         _ = borrow_global_mut<T1>(Signer.address_of(move(account)));
         return;
     }

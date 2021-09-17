@@ -3,11 +3,13 @@ module 0x42.Tester {
     struct T has drop {v: u64}
 
     public new(v: u64): Self.T  {
+    label b0:
         return T{v: move(v)};
     }
 
     public update(t: &mut Self.T) {
         let vref: &mut u64;
+    label b0:
         vref = &mut move(t).T::v;
         *move(vref) = 1;
         return;
@@ -15,6 +17,7 @@ module 0x42.Tester {
 
     public vref(this: &mut Self.T): &u64 {
         let r: &u64;
+    label b0:
         r = &copy(this).T::v;
         _ = move(this);
         return move(r);
@@ -30,6 +33,7 @@ main() {
     let vref_before: &u64;
     let ref_t: &mut Tester.T;
     let vref_after: &u64;
+label b0:
     t = Tester.new(0);
     tt = &mut t;
     vref_before = Tester.vref(move(tt));

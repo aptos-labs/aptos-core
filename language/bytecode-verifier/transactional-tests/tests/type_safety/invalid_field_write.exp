@@ -1,6 +1,6 @@
 processed 1 task
 
-task 0 'publish'. lines 1-16:
+task 0 'publish'. lines 1-18:
 Error: Unable to publish module '00000000000000000000000000000042::Test'. Got VMError: {
     major_status: WRITEREF_TYPE_MISMATCH_ERROR,
     sub_status: None,

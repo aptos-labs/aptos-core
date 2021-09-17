@@ -9,7 +9,7 @@ module 0x1.M {
         let ref_x_f: &mut Self.Y;
         let ref_x_f_g: &mut u64;
         let ref_x_f_h: &mut u64;
-
+    label b0:
         x = X { f: Y { g: 0, h: 0 } };
 
         ref_x = &mut x;
@@ -22,6 +22,7 @@ module 0x1.M {
     }
 
     foo(a: &mut u64, b: &mut Self.Y) {
+    label b0:
         return;
     }
 }
@@ -36,7 +37,7 @@ module 0x1.M2 {
         let ref_x_f: &mut Self.Y;
         let ref_x_f_g: &mut u64;
         let ref_x_f_h: &mut u64;
-
+    label b0:
         x = X { f: Y { g: 0, h: 0 } };
 
         ref_x = &mut x;
@@ -50,6 +51,7 @@ module 0x1.M2 {
 
 
     bar(a: &mut Self.Y, b: &mut u64) {
+    label b0:
         return;
     }
 }

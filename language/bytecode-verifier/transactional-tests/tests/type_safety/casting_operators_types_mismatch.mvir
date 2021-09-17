@@ -1,18 +1,21 @@
 //# run
 // tests bad casts/integer conversions
 main() {
+label b0:
     _ = to_u8(true);
     return;
 }
 
 //# run
 main() {
+label b0:
     _ = to_u64(true);
     return;
 }
 
 //# run
 main() {
+label b0:
     _ = to_u128(true);
     return;
 }
@@ -21,18 +24,21 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = to_u8(0x0);
     return;
 }
 
 //# run
 main() {
+label b0:
     _ = to_u64(0x0);
     return;
 }
 
 //# run
 main() {
+label b0:
     _ = to_u128(0x0);
     return;
 }
@@ -43,6 +49,7 @@ main() {
 module 0x42.M {
     struct S { x: bool }
     f() {
+    label b0:
         _ = to_u8(S { x: true });
         return;
     }
@@ -52,6 +59,7 @@ module 0x42.M {
 module 0x42.M {
     struct S { x: bool }
     g() {
+    label b0:
         _ = to_u64(S { x: true });
         return;
     }
@@ -61,6 +69,7 @@ module 0x42.M {
 module 0x42.M {
     struct S { x: bool }
     h() {
+    label b0:
         _ = to_u128(S { x: true });
         return;
     }

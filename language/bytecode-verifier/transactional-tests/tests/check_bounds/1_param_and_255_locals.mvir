@@ -256,6 +256,7 @@ module 0x1.M {
         let x253 : u8;
         let x254 : u8;
         let x255 : u8;
+    label b0:
         return;
     }
 }

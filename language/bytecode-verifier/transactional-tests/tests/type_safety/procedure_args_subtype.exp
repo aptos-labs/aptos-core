@@ -1,6 +1,6 @@
 processed 2 tasks
 
-task 1 'run'. lines 10-20:
+task 1 'run'. lines 11-22:
 Error: Script execution failed with VMError: {
     major_status: CALL_TYPE_MISMATCH_ERROR,
     sub_status: None,

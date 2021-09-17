@@ -1,4 +1,5 @@
 main() {
+label b0:
   // /*
   return;
   // */

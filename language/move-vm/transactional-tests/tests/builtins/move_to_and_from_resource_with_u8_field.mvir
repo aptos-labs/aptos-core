@@ -7,12 +7,14 @@ module 0x42.M {
     }
 
     public foo(account: &signer) {
+    label b0:
         move_to<Foo>(move(account), Foo {x: 100u8});
         return;
     }
 
     public bar(account: &signer): u8 acquires Foo {
         let x: u8;
+    label b0:
         Foo { x } = move_from<Foo>(Signer.address_of(move(account)));
         return move(x);
     }
@@ -23,6 +25,7 @@ module 0x42.M {
 import 0x42.M;
 
 main(account: signer) {
+label b0:
     M.foo(&account);
     return;
 }
@@ -31,6 +34,7 @@ main(account: signer) {
 import 0x42.M;
 
 main(account: signer) {
+label b0:
     assert(M.bar(&account) == 100u8, 42);
     return;
 }

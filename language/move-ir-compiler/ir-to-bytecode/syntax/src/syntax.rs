@@ -906,7 +906,7 @@ fn parse_field_bindings(
 //     "(" <Comma<Sp<Exp>>> ")" => Cmd::Exp(Box::new(Spanned::unsafe_no_loc(Exp::ExprList(<>)))),
 // }
 
-fn parse_assign_(tokens: &mut Lexer) -> Result<Cmd_, ParseError<Loc, anyhow::Error>> {
+fn parse_assign_(tokens: &mut Lexer) -> Result<Statement_, ParseError<Loc, anyhow::Error>> {
     let lvalues = parse_comma_list(tokens, &[Tok::Equal], parse_lvalue, false)?;
     if lvalues.is_empty() {
         return Err(ParseError::InvalidToken {
@@ -916,20 +916,20 @@ fn parse_assign_(tokens: &mut Lexer) -> Result<Cmd_, ParseError<Loc, anyhow::Err
     }
     consume_token(tokens, Tok::Equal)?;
     let e = parse_exp(tokens)?;
-    Ok(Cmd_::Assign(lvalues, e))
+    Ok(Statement_::Assign(lvalues, e))
 }
 
 fn parse_unpack_(
     tokens: &mut Lexer,
     name: Symbol,
     type_actuals: Vec<Type>,
-) -> Result<Cmd_, ParseError<Loc, anyhow::Error>> {
+) -> Result<Statement_, ParseError<Loc, anyhow::Error>> {
     consume_token(tokens, Tok::LBrace)?;
     let bindings = parse_comma_list(tokens, &[Tok::RBrace], parse_field_bindings, true)?;
     consume_token(tokens, Tok::RBrace)?;
     consume_token(tokens, Tok::Equal)?;
     let e = parse_exp(tokens)?;
-    Ok(Cmd_::Unpack(
+    Ok(Statement_::Unpack(
         StructName(name),
         type_actuals,
         bindings.into_iter().collect(),
@@ -937,8 +937,51 @@ fn parse_unpack_(
     ))
 }
 
-fn parse_cmd_(tokens: &mut Lexer) -> Result<Cmd_, ParseError<Loc, anyhow::Error>> {
+/// Parses a statement.
+fn parse_statement_(tokens: &mut Lexer) -> Result<Statement_, ParseError<Loc, anyhow::Error>> {
     match tokens.peek() {
+        Tok::Abort => {
+            tokens.advance()?;
+            let val = if tokens.peek() == Tok::Semicolon {
+                None
+            } else {
+                Some(Box::new(parse_exp(tokens)?))
+            };
+            Ok(Statement_::Abort(val))
+        }
+        Tok::Assert => {
+            tokens.advance()?;
+            let e = parse_exp(tokens)?;
+            consume_token(tokens, Tok::Comma)?;
+            let err = parse_exp(tokens)?;
+            consume_token(tokens, Tok::RParen)?;
+            let cond = {
+                let loc = e.loc;
+                sp(loc, Exp_::UnaryExp(UnaryOp::Not, Box::new(e)))
+            };
+            Ok(Statement_::Assert(Box::new(cond), Box::new(err)))
+        }
+        Tok::Jump => {
+            consume_token(tokens, Tok::Jump)?;
+            Ok(Statement_::Jump(parse_label(tokens)?))
+        }
+        Tok::JumpIf => {
+            consume_token(tokens, Tok::JumpIf)?;
+            consume_token(tokens, Tok::LParen)?;
+            let cond = parse_exp(tokens)?;
+            consume_token(tokens, Tok::RParen)?;
+            Ok(Statement_::JumpIf(Box::new(cond), parse_label(tokens)?))
+        }
+        Tok::JumpIfFalse => {
+            consume_token(tokens, Tok::JumpIfFalse)?;
+            consume_token(tokens, Tok::LParen)?;
+            let cond = parse_exp(tokens)?;
+            consume_token(tokens, Tok::RParen)?;
+            Ok(Statement_::JumpIfFalse(
+                Box::new(cond),
+                parse_label(tokens)?,
+            ))
+        }
         Tok::NameValue => {
             // This could be either an LValue for an assignment or
             // NameAndTypeActuals (with no type_actuals) for an unpack.
@@ -949,39 +992,22 @@ fn parse_cmd_(tokens: &mut Lexer) -> Result<Cmd_, ParseError<Loc, anyhow::Error>
                 parse_assign_(tokens)
             }
         }
-        Tok::Star | Tok::Underscore => parse_assign_(tokens),
-        Tok::NameBeginTyValue => {
-            let (name, tys) = parse_name_and_type_actuals(tokens)?;
-            parse_unpack_(tokens, name, tys)
-        }
-        Tok::Abort => {
-            tokens.advance()?;
-            let val = if tokens.peek() == Tok::Semicolon {
-                None
-            } else {
-                Some(Box::new(parse_exp(tokens)?))
-            };
-            Ok(Cmd_::Abort(val))
-        }
         Tok::Return => {
             tokens.advance()?;
             let start = tokens.start_loc();
             let v = parse_comma_list(tokens, &[Tok::Semicolon], parse_exp, true)?;
             let end = tokens.start_loc();
-            Ok(Cmd_::Return(Box::new(spanned(
+            Ok(Statement_::Return(Box::new(spanned(
                 tokens.file_hash(),
                 start,
                 end,
                 Exp_::ExprList(v),
             ))))
         }
-        Tok::Continue => {
-            tokens.advance()?;
-            Ok(Cmd_::Continue)
-        }
-        Tok::Break => {
-            tokens.advance()?;
-            Ok(Cmd_::Break)
+        Tok::Star | Tok::Underscore => parse_assign_(tokens),
+        Tok::NameBeginTyValue => {
+            let (name, tys) = parse_name_and_type_actuals(tokens)?;
+            parse_unpack_(tokens, name, tys)
         }
         Tok::Exists
         | Tok::BorrowGlobal
@@ -1000,14 +1026,14 @@ fn parse_cmd_(tokens: &mut Lexer) -> Result<Cmd_, ParseError<Loc, anyhow::Error>
         | Tok::DotNameValue
         | Tok::ToU8
         | Tok::ToU64
-        | Tok::ToU128 => Ok(Cmd_::Exp(Box::new(parse_call(tokens)?))),
+        | Tok::ToU128 => Ok(Statement_::Exp(Box::new(parse_call(tokens)?))),
         Tok::LParen => {
             tokens.advance()?;
             let start = tokens.start_loc();
             let v = parse_comma_list(tokens, &[Tok::RParen], parse_exp, true)?;
             consume_token(tokens, Tok::RParen)?;
             let end = tokens.start_loc();
-            Ok(Cmd_::Exp(Box::new(spanned(
+            Ok(Statement_::Exp(Box::new(spanned(
                 tokens.file_hash(),
                 start,
                 end,
@@ -1016,128 +1042,60 @@ fn parse_cmd_(tokens: &mut Lexer) -> Result<Cmd_, ParseError<Loc, anyhow::Error>
         }
         t => Err(ParseError::InvalidToken {
             location: current_token_loc(tokens),
-            message: format!("invalid token kind for cmd {:?}", t),
+            message: format!("invalid token kind for statement {:?}", t),
         }),
     }
 }
 
-// Statement : Statement = {
-//     <cmd: Cmd_> ";" => Statement::CommandStatement(cmd),
-//     "assert(" <e: Sp<Exp>> "," <err: Sp<Exp>> ")" => { ... },
-//     <IfStatement>,
-//     <WhileStatement>,
-//     <LoopStatement>,
-// }
-
+/// Parses a statement with its location.
 fn parse_statement(tokens: &mut Lexer) -> Result<Statement, ParseError<Loc, anyhow::Error>> {
-    match tokens.peek() {
-        Tok::Assert => {
-            tokens.advance()?;
-            let e = parse_exp(tokens)?;
-            consume_token(tokens, Tok::Comma)?;
-            let err = parse_exp(tokens)?;
-            consume_token(tokens, Tok::RParen)?;
-            consume_token(tokens, Tok::Semicolon)?;
-            let cond = {
-                let loc = e.loc;
-                sp(loc, Exp_::UnaryExp(UnaryOp::Not, Box::new(e)))
-            };
-            let loc = err.loc;
-            let stmt = { Statement::CommandStatement(sp(loc, Cmd_::Abort(Some(Box::new(err))))) };
-            Ok(Statement::IfElseStatement(IfElse::if_block(
-                cond,
-                sp(loc, Block_::new(vec![stmt])),
-            )))
-        }
-        Tok::If => parse_if_statement(tokens),
-        Tok::While => parse_while_statement(tokens),
-        Tok::Loop => parse_loop_statement(tokens),
-        _ => {
-            // Anything else should be parsed as a Cmd...
-            let start_loc = tokens.start_loc();
-            let c = parse_cmd_(tokens)?;
-            let end_loc = tokens.previous_end_loc();
-            let cmd = spanned(tokens.file_hash(), start_loc, end_loc, c);
-            consume_token(tokens, Tok::Semicolon)?;
-            Ok(Statement::CommandStatement(cmd))
-        }
-    }
+    let start_loc = tokens.start_loc();
+    let c = parse_statement_(tokens)?;
+    let end_loc = tokens.previous_end_loc();
+    let cmd = spanned(tokens.file_hash(), start_loc, end_loc, c);
+    consume_token(tokens, Tok::Semicolon)?;
+    Ok(cmd)
 }
 
-// IfStatement : Statement = {
-//     "if" "(" <cond: Sp<Exp>> ")" <block: Sp<Block>> => { ... }
-//     "if" "(" <cond: Sp<Exp>> ")" <if_block: Sp<Block>> "else" <else_block: Sp<Block>> => { ... }
-// }
-
-fn parse_if_statement(tokens: &mut Lexer) -> Result<Statement, ParseError<Loc, anyhow::Error>> {
-    consume_token(tokens, Tok::If)?;
-    consume_token(tokens, Tok::LParen)?;
-    let cond = parse_exp(tokens)?;
-    consume_token(tokens, Tok::RParen)?;
-    let if_block = parse_block(tokens)?;
-    if tokens.peek() == Tok::Else {
-        tokens.advance()?;
-        let else_block = parse_block(tokens)?;
-        Ok(Statement::IfElseStatement(IfElse::if_else(
-            cond, if_block, else_block,
-        )))
-    } else {
-        Ok(Statement::IfElseStatement(IfElse::if_block(cond, if_block)))
-    }
+/// Parses a label declaration for a block, e.g.: `label b0:`.
+fn parse_block_label(tokens: &mut Lexer) -> Result<BlockLabel, ParseError<Loc, anyhow::Error>> {
+    consume_token(tokens, Tok::Label)?;
+    let label = parse_label(tokens)?;
+    consume_token(tokens, Tok::Colon)?;
+    Ok(label)
 }
 
-// WhileStatement : Statement = {
-//     "while" "(" <cond: Sp<Exp>> ")" <block: Sp<Block>> => { ... }
-// }
-
-fn parse_while_statement(tokens: &mut Lexer) -> Result<Statement, ParseError<Loc, anyhow::Error>> {
-    consume_token(tokens, Tok::While)?;
-    consume_token(tokens, Tok::LParen)?;
-    let cond = parse_exp(tokens)?;
-    consume_token(tokens, Tok::RParen)?;
-    let block = parse_block(tokens)?;
-    Ok(Statement::WhileStatement(While { cond, block }))
+/// Parses a label identifier, e.g.: the `b0` in the statement `jump b0;`.
+fn parse_label(tokens: &mut Lexer) -> Result<BlockLabel, ParseError<Loc, anyhow::Error>> {
+    let start = tokens.start_loc();
+    let name = parse_name(tokens)?;
+    let end = tokens.previous_end_loc();
+    Ok(spanned(tokens.file_hash(), start, end, BlockLabel_(name)))
 }
 
-// LoopStatement : Statement = {
-//     "loop" <block: Sp<Block>> => { ... }
-// }
-
-fn parse_loop_statement(tokens: &mut Lexer) -> Result<Statement, ParseError<Loc, anyhow::Error>> {
-    consume_token(tokens, Tok::Loop)?;
-    let block = parse_block(tokens)?;
-    Ok(Statement::LoopStatement(Loop { block }))
-}
-
-// Statements : Vec<Statement> = {
-//     <Statement*>
-// }
-
-fn parse_statements(tokens: &mut Lexer) -> Result<Vec<Statement>, ParseError<Loc, anyhow::Error>> {
-    let mut stmts: Vec<Statement> = vec![];
-    // The Statements non-terminal in the grammar is always followed by a
-    // closing brace, so continue parsing until we find one of those.
+/// Parses a sequence of blocks, such as would appear within the `{` and `}` delimiters of a
+/// function body.
+fn parse_blocks(tokens: &mut Lexer) -> Result<Vec<Block>, ParseError<Loc, anyhow::Error>> {
+    let mut blocks = vec![];
     while tokens.peek() != Tok::RBrace {
-        stmts.push(parse_statement(tokens)?);
+        blocks.push(parse_block(tokens)?);
     }
-    Ok(stmts)
+    Ok(blocks)
 }
 
-// Block : Block = {
-//     "{" <stmts: Statements> "}" => Block::new(stmts)
-// }
-
+/// Parses a block: its block label `label b:`, and a sequence of 0 or more statements.
 fn parse_block(tokens: &mut Lexer) -> Result<Block, ParseError<Loc, anyhow::Error>> {
     let start_loc = tokens.start_loc();
-    consume_token(tokens, Tok::LBrace)?;
-    let stmts = parse_statements(tokens)?;
-    consume_token(tokens, Tok::RBrace)?;
-    let end_loc = tokens.previous_end_loc();
+    let label = parse_block_label(tokens)?;
+    let mut statements = vec![];
+    while !matches!(tokens.peek(), Tok::Label | Tok::RBrace) {
+        statements.push(parse_statement(tokens)?);
+    }
     Ok(spanned(
         tokens.file_hash(),
         start_loc,
-        end_loc,
-        Block_::new(stmts),
+        tokens.previous_end_loc(),
+        Block_::new(label, statements),
     ))
 }
 
@@ -1176,12 +1134,12 @@ fn parse_declarations(
 
 fn parse_function_block_(
     tokens: &mut Lexer,
-) -> Result<(Vec<(Var, Type)>, Block_), ParseError<Loc, anyhow::Error>> {
+) -> Result<(Vec<(Var, Type)>, Vec<Block>), ParseError<Loc, anyhow::Error>> {
     consume_token(tokens, Tok::LBrace)?;
     let locals = parse_declarations(tokens)?;
-    let stmts = parse_statements(tokens)?;
+    let statements = parse_blocks(tokens)?;
     consume_token(tokens, Tok::RBrace)?;
-    Ok((locals, Block_::new(stmts)))
+    Ok((locals, statements))
 }
 
 fn token_to_ability(token: Tok, contents: &str) -> Option<Ability> {
@@ -1950,7 +1908,7 @@ fn parse_script(tokens: &mut Lexer) -> Result<Script, ParseError<Loc, anyhow::Er
     consume_token(tokens, Tok::LParen)?;
     let args = parse_comma_list(tokens, &[Tok::RParen], parse_arg_decl, true)?;
     consume_token(tokens, Tok::RParen)?;
-    let (locals, body) = parse_function_block_(tokens)?;
+    let (locals, code) = parse_function_block_(tokens)?;
     let end_loc = tokens.previous_end_loc();
     let main = Function_::new(
         FunctionVisibility::Public,
@@ -1959,7 +1917,7 @@ fn parse_script(tokens: &mut Lexer) -> Result<Script, ParseError<Loc, anyhow::Er
         type_formals,
         vec![],
         vec![],
-        FunctionBody::Move { locals, code: body },
+        FunctionBody::Move { locals, code },
     );
     let main = spanned(tokens.file_hash(), fun_start, end_loc, main);
     let loc = make_loc(tokens.file_hash(), script_start, end_loc);

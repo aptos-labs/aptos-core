@@ -212,12 +212,14 @@ fn add_module_txn(sender: &AccountData, seq_num: u64) -> (CompiledModule, Signed
 
             public borrow_t1(account: &signer) acquires T1 {{
                 let t1: &Self.T1;
+            label b0:
                 t1 = borrow_global<T1>(Signer.address_of(move(account)));
                 return;
             }}
 
             public change_t1(account: &signer, v: u64) acquires T1 {{
                 let t1: &mut Self.T1;
+            label b0:
                 t1 = borrow_global_mut<T1>(Signer.address_of(move(account)));
                 *&mut move(t1).T1::v = move(v);
                 return;
@@ -225,11 +227,13 @@ fn add_module_txn(sender: &AccountData, seq_num: u64) -> (CompiledModule, Signed
 
             public remove_t1(account: &signer) acquires T1 {{
                 let v: u64;
+            label b0:
                 T1 {{ v }} = move_from<T1>(Signer.address_of(move(account)));
                 return;
             }}
 
             public publish_t1(account: &signer) {{
+            label b0:
                 move_to<T1>(move(account), T1 {{ v: 3 }});
                 return;
             }}
@@ -270,6 +274,7 @@ fn add_resource_txn(
             import 0x{}.M;
 
             main(account: signer) {{
+            label b0:
                 M.publish_t1(&account);
                 return;
             }}
@@ -296,6 +301,7 @@ fn remove_resource_txn(
             import 0x{}.M;
 
             main(account: signer) {{
+            label b0:
                 M.remove_t1(&account);
                 return;
             }}
@@ -322,6 +328,7 @@ fn borrow_resource_txn(
             import 0x{}.M;
 
             main(account: signer) {{
+            label b0:
                 M.borrow_t1(&account);
                 return;
             }}
@@ -348,6 +355,7 @@ fn change_resource_txn(
             import 0x{}.M;
 
             main(account: signer) {{
+            label b0:
                 M.change_t1(&account, 20);
                 return;
             }}

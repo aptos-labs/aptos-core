@@ -1,5 +1,6 @@
 //# run
 main() {
+label b0:
     assert(0u64 + 0u64 == 0u64, 1000);
     assert(0u64 + 1u64 == 1u64, 1001);
     assert(1u64 + 1u64 == 2u64, 1002);
@@ -15,12 +16,14 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 1u64 + 18446744073709551615u64;
     return;
 }
 
 //# run
 main() {
+label b0:
     _ = 12000000000000000000u64 + 10000000000000000000u64;
     return;
 }
@@ -29,6 +32,7 @@ main() {
 
 //# run
 main() {
+label b0:
     assert(0u64 - 0u64 == 0u64, 2000);
     assert(1u64 - 0u64 == 1u64, 2001);
     assert(1u64 - 1u64 == 0u64, 2002);
@@ -43,12 +47,14 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u64 - 1u64;
     return;
 }
 
 //# run
 main() {
+label b0:
     _ = 54u64 - 100u64;
     return;
 }
@@ -56,6 +62,7 @@ main() {
 
 //# run
 main() {
+label b0:
     assert(0u64 * 0u64 == 0u64, 3000);
     assert(1u64 * 0u64 == 0u64, 3001);
     assert(1u64 * 1u64 == 1u64, 3002);
@@ -69,12 +76,14 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 4294967296u64 * 4294967296u64;
     return;
 }
 
 //# run
 main() {
+label b0:
     _ = 9223372036854775808 * 2u64;
     return;
 }
@@ -83,6 +92,7 @@ main() {
 
 //# run
 main() {
+label b0:
     assert(0u64 / 1u64 == 0u64, 4000);
     assert(1u64 / 1u64 == 1u64, 4001);
     assert(1u64 / 2u64 == 0u64, 4002);
@@ -97,18 +107,21 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u64 / 0u64;
     return;
 }
 
 //# run
 main() {
+label b0:
     _ = 1u64 / 0u64;
     return;
 }
 
 //# run
 main() {
+label b0:
     _ = 18446744073709551615u64 / 0u64;
     return;
 }
@@ -116,6 +129,7 @@ main() {
 
 //# run
 main() {
+label b0:
     assert(0u64 % 1u64 == 0u64, 5000);
     assert(1u64 % 1u64 == 0u64, 5001);
     assert(1u64 % 2u64 == 1u64, 5002);
@@ -130,18 +144,21 @@ main() {
 
 //# run
 main() {
+label b0:
     _ = 0u64 % 0u64;
     return;
 }
 
 //# run
 main() {
+label b0:
     _ = 1u64 % 0u64;
     return;
 }
 
 //# run
 main() {
+label b0:
     _ = 18446744073709551615u64 % 0u64;
     return;
 }
