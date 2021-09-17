@@ -22,6 +22,7 @@ use diem_types::{
     validator_verifier::ValidatorVerifier,
 };
 
+use crate::experimental::linkedlist::find_elem;
 use crate::{
     counters,
     experimental::{
@@ -36,6 +37,7 @@ use crate::{
     round_manager::VerifiedEvent,
     state_replication::StateComputerCommitCallBackType,
 };
+use std::ops::Deref;
 
 pub const BUFFER_MANAGER_RETRY_INTERVAL: u64 = 1000;
 
@@ -172,38 +174,19 @@ impl StateManager {
     /// check if the items at and after the execution root is already executed
     /// if yes, move the execution root to the first *unexecuted* item.
     /// if there is no such item, set it to none.
-    fn try_advance_executed_root(&mut self) {
-        let mut cursor = self.execution_root.clone();
-        while cursor.is_some() {
-            {
-                let buffer_item = get_elem(&cursor);
-                if !matches!(&*buffer_item, BufferItem::Executed(_)) {
-                    break;
-                }
-            }
-            cursor = get_next(&cursor);
-        }
-        self.execution_root = cursor;
+    fn advance_executed_root(&mut self) {
+        let cursor = self.execution_root.clone();
+        self.execution_root = find_elem(cursor, |item| !matches!(*item, BufferItem::Executed(_)));
     }
 
     /// check if the items at and after the signing root is already signed
     /// if yes, move the signing root to the first *unsigned* item.
     /// if there is no such item, set it to none.
-    fn try_advance_signing_root(&mut self) {
-        let mut cursor = self.signing_root.clone();
-        while cursor.is_some() {
-            {
-                let buffer_item = get_elem(&cursor);
-                if !matches!(
-                    &*buffer_item,
-                    BufferItem::Signed(_) | BufferItem::Aggregated(_)
-                ) {
-                    break;
-                }
-            }
-            cursor = get_next(&cursor);
-        }
-        self.signing_root = cursor;
+    fn advance_signing_root(&mut self) {
+        let cursor = self.signing_root.clone();
+        self.signing_root = find_elem(cursor, |item| {
+            !matches!(*item, BufferItem::Signed(_) | BufferItem::Aggregated(_))
+        });
     }
 
     /// Pop the prefix of buffer items until (including) aggregated_item_cursor
@@ -258,9 +241,9 @@ impl StateManager {
     fn reset_all_roots(&mut self) {
         // reset all the roots (in a better way)
         self.signing_root = self.buffer.head.clone();
-        self.try_advance_signing_root();
+        self.advance_signing_root();
         self.execution_root = self.signing_root.clone();
-        self.try_advance_executed_root();
+        self.advance_executed_root();
     }
 
     /// this function processes a sync request
@@ -317,30 +300,13 @@ impl StateManager {
         &mut self,
         executed_blocks: Vec<ExecutedBlock>,
     ) -> anyhow::Result<()> {
-        if self.execution_root.is_none() {
-            // right after a sync
-            return Ok(());
-        }
-
-        let current_cursor = self.execution_root.clone();
+        let current_cursor = find_elem(self.execution_root.clone(), |item| {
+            item.block_id() == executed_blocks.last().unwrap().id()
+        });
 
         if current_cursor.is_some() {
-            // update buffer
             let buffer_item = take_elem(&current_cursor);
             if let BufferItem::Ordered(ordered_box) = &buffer_item {
-                // the block batch in the response might be a single large batch due
-                // to a previous re-try, so we compare the id of the last blocks of the
-                // two batches.
-                if ordered_box.ordered_blocks.last().unwrap().id()
-                    != executed_blocks.last().unwrap().id()
-                {
-                    // an sync req happened before the response
-                    // we do nothing except putting the item back
-                    // the process_execution_resp function will retry the next ordered batch
-                    set_elem(&current_cursor, buffer_item);
-                    return Ok(());
-                }
-
                 // push to the signing phase
                 let commit_ledger_info = LedgerInfo::new(
                     executed_blocks.last().unwrap().block_info(),
@@ -433,43 +399,27 @@ impl StateManager {
         sig: Ed25519Signature,
         commit_ledger_info: LedgerInfo,
     ) -> anyhow::Result<()> {
-        let mut current_cursor = self.signing_root.clone();
+        let current_cursor = find_elem(self.signing_root.clone(), |item| {
+            item.block_id() == commit_ledger_info.commit_info().id()
+        });
         if current_cursor.is_some() {
-            // this is important because the responses might not come in order because
-            // retrying a failed signature and finishing execution will incur requests
-            // to signing phase
-            while current_cursor.is_some() {
-                // update signature
-                let buffer_item = take_elem(&current_cursor);
-                if !buffer_item.has_been_executed() {
-                    // a reset has happened
-                    // we do nothing except put it back
-                    set_elem(&current_cursor, buffer_item);
-                    break;
-                }
+            let buffer_item = take_elem(&current_cursor);
+            // it is possible that we already signed this buffer item (double check after the final integration)
+            if matches!(buffer_item, BufferItem::Executed(_)) {
+                // we have found the buffer item
+                let (signed_buffer_item, commit_vote) =
+                    buffer_item.advance_to_signed(self.author, sig, &self.verifier);
 
-                if buffer_item.get_commit_info() == commit_ledger_info.commit_info() {
-                    // it is possible that we already signed this buffer item (double check after the final integration)
-                    if matches!(buffer_item, BufferItem::Executed(_)) {
-                        // we have found the buffer item
-                        let (signed_buffer_item, commit_vote) =
-                            buffer_item.advance_to_signed(self.author, sig.clone(), &self.verifier);
+                set_elem(&current_cursor, signed_buffer_item);
 
-                        set_elem(&current_cursor, signed_buffer_item);
+                // send out commit vote
+                self.commit_msg_tx
+                    .broadcast(ConsensusMsg::CommitVoteMsg(Box::new(commit_vote)))
+                    .await;
 
-                        // send out commit vote
-                        self.commit_msg_tx
-                            .broadcast(ConsensusMsg::CommitVoteMsg(Box::new(commit_vote)))
-                            .await;
-
-                        self.try_advance_signing_root();
-                    }
-                    break;
-                }
-                current_cursor = get_next(&current_cursor);
+                self.advance_signing_root();
             }
         }
-        // otherwise, a reset happened, we do nothing
         Ok(())
     }
 
@@ -505,7 +455,7 @@ impl StateManager {
             let current_cursor = self.signing_root.clone();
             if current_cursor.is_some() {
                 let buffer_item = get_elem(&current_cursor);
-                if let BufferItem::Executed(executed) = &(*buffer_item) {
+                if let BufferItem::Executed(executed) = buffer_item.deref() {
                     self.signing_phase_tx
                         .send(SigningRequest {
                             ordered_ledger_info: executed.ordered_proof.clone(),
@@ -523,20 +473,19 @@ impl StateManager {
     /// if found, try advancing the item to be aggregated
     async fn process_commit_msg(&mut self, commit_msg: VerifiedEvent) -> anyhow::Result<()> {
         match commit_msg {
-            VerifiedEvent::CommitVote(cv) => {
+            VerifiedEvent::CommitVote(vote) => {
                 // travel the whole buffer (including ordered items)
-                let mut current_cursor = self.buffer.head.clone();
-                while current_cursor.is_some() {
-                    {
-                        let mut buffer_item = get_elem_mut(&current_cursor);
-                        if buffer_item
-                            .add_signature_if_matched(
-                                cv.commit_info(),
-                                cv.author(),
-                                cv.signature().clone(),
-                            )
-                            .is_ok()
-                        {
+                let current_cursor = find_elem(self.buffer.head.clone(), |item| {
+                    item.block_id() == vote.commit_info().id()
+                });
+                if current_cursor.is_some() {
+                    let mut buffer_item = get_elem_mut(&current_cursor);
+                    match buffer_item.add_signature_if_matched(
+                        vote.commit_info(),
+                        vote.author(),
+                        vote.signature().clone(),
+                    ) {
+                        Ok(()) => {
                             // try advance to aggregated
                             let taken_buffer_item = take_elem(&current_cursor);
                             let (new_buffer_item, success) =
@@ -546,10 +495,9 @@ impl StateManager {
                             if success {
                                 self.try_persisting_blocks(current_cursor.clone());
                             }
-                            break;
                         }
+                        Err(e) => error!("Failed to add commit vote {:?}", e),
                     }
-                    current_cursor = get_next(&current_cursor);
                 }
             }
             _ => {
@@ -569,7 +517,7 @@ impl StateManager {
             let next_cursor = get_next(&cursor);
             {
                 let buffer_item = get_elem(&cursor);
-                match &*buffer_item {
+                match buffer_item.deref() {
                     BufferItem::Aggregated(_) => continue, // skip aggregated items
                     BufferItem::Signed(signed) => {
                         self.commit_msg_tx

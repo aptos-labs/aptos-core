@@ -207,6 +207,17 @@ pub fn set_elem<T>(link: &Link<T>, new_val: T) {
     node.elem.replace(new_val);
 }
 
+pub fn find_elem<F: Fn(&T) -> bool, T>(link: Link<T>, compare: F) -> Link<T> {
+    let mut current = link.clone();
+    while current.is_some() {
+        if compare(&get_elem(&current)) {
+            return current;
+        }
+        current = get_next(&current);
+    }
+    None
+}
+
 pub fn link_eq<T>(link_a: &Link<T>, link_b: &Link<T>) -> bool {
     link_a.is_some()
         && link_b.is_some()

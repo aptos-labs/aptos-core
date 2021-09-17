@@ -18,6 +18,7 @@ use diem_types::{
 };
 
 use crate::state_replication::StateComputerCommitCallBackType;
+use diem_crypto::HashValue;
 
 // we differentiate buffer items at different stages
 // for better code readability
@@ -274,6 +275,10 @@ impl BufferItem {
             Self::Signed(signed) => &signed.executed_blocks,
             Self::Aggregated(aggregated) => &aggregated.executed_blocks,
         }
+    }
+
+    pub fn block_id(&self) -> HashValue {
+        self.get_blocks().last().unwrap().id()
     }
 
     pub fn get_commit_info(&self) -> &BlockInfo {
