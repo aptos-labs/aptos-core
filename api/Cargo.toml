@@ -24,6 +24,8 @@ diem-types = { path = "../types" }
 diem-workspace-hack = { path = "../common/workspace-hack" }
 diem-api-types = { path = "./types", package = "diem-api-types" }
 storage-interface = { path = "../storage/storage-interface" }
+move-core-types = { path = "../language/move-core/types" }
+resource-viewer = { path = "../language/tools/resource-viewer" }
 
 [dev-dependencies]
 bytes = "1.0.1"

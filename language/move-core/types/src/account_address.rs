@@ -65,6 +65,10 @@ impl AccountAddress {
         }
     }
 
+    pub fn to_hex_literal(&self) -> String {
+        format!("0x{}", self.short_str_lossless())
+    }
+
     pub fn from_hex<T: AsRef<[u8]>>(hex: T) -> Result<Self, AccountAddressParseError> {
         <[u8; Self::LENGTH]>::from_hex(hex)
             .map_err(|_| AccountAddressParseError)
@@ -324,6 +328,7 @@ mod tests {
         let address = AccountAddress::from_hex(hex).unwrap();
 
         assert_eq!(address_from_literal, address);
+        assert_eq!(hex_literal, address.to_hex_literal());
 
         // Missing '0x'
         AccountAddress::from_hex_literal(hex).unwrap_err();

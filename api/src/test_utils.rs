@@ -1,8 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{context::Context, filters};
-
+use crate::{context::Context, index};
 use diem_genesis_tool::validator_builder::ValidatorBuilder;
 use diem_temppath::TempPath;
 use diem_types::chain_id::ChainId;
@@ -11,33 +10,7 @@ use diemdb::DiemDB;
 use executor::db_bootstrapper;
 use storage_interface::DbReaderWriter;
 
-use serde_json::{json, Value};
-
-#[tokio::test]
-async fn test_get_ledger_info() {
-    let context = new_test_context();
-    let filter = filters::routes(context.clone());
-
-    let resp = warp::test::request()
-        .method("GET")
-        .path("/")
-        .reply(&filter)
-        .await;
-    assert_eq!(resp.status(), 200);
-
-    let ledger_info = context.get_latest_ledger_info().unwrap();
-    let ledger_version = ledger_info.ledger_info().version();
-    let ledger_timestamp = ledger_info.ledger_info().timestamp_usecs();
-
-    assert_eq!(
-        serde_json::from_slice::<Value>(resp.body()).unwrap(),
-        json!({
-            "chain_id": 4,
-            "ledger_version": ledger_version.to_string(),
-            "ledger_timestamp": ledger_timestamp.to_string(),
-        })
-    );
-}
+use serde_json::Value;
 
 pub fn new_test_context() -> Context {
     let tmp_dir = TempPath::new();
@@ -54,4 +27,21 @@ pub fn new_test_context() -> Context {
     db_bootstrapper::maybe_bootstrap::<DiemVM>(&db_rw, &genesis, genesis_waypoint).unwrap();
 
     Context::new(ChainId::test(), db)
+}
+
+pub async fn send_request(context: Context, method: &str, path: &str, status_code: u16) -> Value {
+    let routes = index::routes(context);
+
+    let resp = warp::test::request()
+        .method(method)
+        .path(path)
+        .reply(&routes)
+        .await;
+    let body = serde_json::from_slice(resp.body()).expect("response body is JSON");
+    assert_eq!(status_code, resp.status(), "\nresponse: {}", pretty(&body));
+    body
+}
+
+pub fn pretty(val: &Value) -> String {
+    serde_json::to_string_pretty(val).unwrap()
 }

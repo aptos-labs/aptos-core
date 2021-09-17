@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{context::Context, filters};
+use crate::{context::Context, index};
 
 use diem_config::config::ApiConfig;
 use diem_types::chain_id::ChainId;
@@ -22,7 +22,7 @@ pub fn bootstrap(chain_id: ChainId, db: Arc<dyn MoveDbReader>, config: &ApiConfi
     let address = config.address;
     runtime.spawn(async move {
         let service = Context::new(chain_id, db);
-        let routes = filters::routes(service);
+        let routes = index::routes(service);
         let server = warp::serve(routes).bind(address);
         server.await
     });

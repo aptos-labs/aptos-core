@@ -248,7 +248,7 @@ impl serde::Serialize for AnnotatedMoveValue {
                 }
             }
             Bool(b) => serializer.serialize_bool(*b),
-            Address(a) => a.serialize(serializer),
+            Address(a) => a.short_str_lossless().serialize(serializer),
             Vector(t, vals) => {
                 assert_ne!(t, &TypeTag::U8);
                 let mut vec = serializer.serialize_seq(Some(vals.len()))?;
