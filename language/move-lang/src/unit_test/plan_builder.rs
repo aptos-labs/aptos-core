@@ -5,7 +5,10 @@ use crate::{
     cfgir::ast as G,
     diag,
     expansion::ast::{self as E, Address, ModuleIdent, ModuleIdent_},
-    shared::{known_attributes, AddressBytes, CompilationEnv, Identifier},
+    shared::{
+        known_attributes::{KnownAttribute, TestingAttribute},
+        AddressBytes, CompilationEnv, Identifier,
+    },
     unit_test::{ExpectedFailure, ModuleTestPlan, TestCase},
 };
 use move_core_types::{account_address::AccountAddress as MoveAddress, value::MoveValue};
@@ -76,92 +79,57 @@ fn construct_module_test_plan(
     }
 }
 
-fn build_test_info(
+fn build_test_info<'func>(
     context: &mut Context,
     fn_loc: Loc,
     fn_name: &str,
-    function: &G::Function,
+    function: &'func G::Function,
 ) -> Option<TestCase> {
-    let get_attrs = |attr_name: &'static str| {
+    let get_attrs = |attr: TestingAttribute| -> Option<&'func E::Attribute> {
         function
             .attributes
-            .iter()
-            .filter(|attr| attr.value.attribute_name().value.as_str() == attr_name)
-            .collect::<Vec<_>>()
+            .get_(&E::AttributeName_::Known(KnownAttribute::Testing(attr)))
     };
 
-    let previously_annotated_msg = "Previously annotated here";
-    let in_this_test_msg = "Error found in this test";
-    let make_duplicate_msg = |attr_name: &str| {
-        format!(
-            "Duplicate '#[{0}]' attribute. Only one #[{0}] attribute is allowed",
-            attr_name
-        )
-    };
+    const PREVIOUSLY_ANNOTATED_MSG: &str = "Previously annotated here";
+    const IN_THIS_TEST_MSG: &str = "Error found in this test";
 
-    let test_attributes = get_attrs(known_attributes::TestingAttributes::TEST);
-    let test_only_attributes = get_attrs(known_attributes::TestingAttributes::TEST_ONLY);
-    let abort_attributes = get_attrs(known_attributes::TestingAttributes::EXPECTED_FAILURE);
+    let test_attribute_opt = get_attrs(TestingAttribute::Test);
+    let abort_attribute_opt = get_attrs(TestingAttribute::ExpectedFailure);
+    let test_only_attribute_opt = get_attrs(TestingAttribute::TestOnly);
 
-    // expected failures cannot be annotated on non-#[test] functions
-    if !abort_attributes.is_empty() && test_attributes.is_empty() {
-        let fn_msg = "Only functions defined as a test with #[test] can also have an \
+    let test_attribute = match test_attribute_opt {
+        None => {
+            // expected failures cannot be annotated on non-#[test] functions
+            if let Some(abort_attribute) = abort_attribute_opt {
+                let fn_msg = "Only functions defined as a test with #[test] can also have an \
                       #[expected_failure] attribute";
-        let abort_msg = "Attributed as #[expected_failure] here";
-        context.env.add_diag(diag!(
-            Attributes::InvalidUsage,
-            (fn_loc, fn_msg),
-            (abort_attributes.last().unwrap().loc, abort_msg),
-        ))
-    }
-
-    if test_attributes.is_empty() {
-        return None;
-    }
-
-    // Check for duplicate #[test(...)] attributes
-    if test_attributes.len() > 1 {
-        let msg = make_duplicate_msg(known_attributes::TestingAttributes::TEST);
-        let len = test_attributes.len();
-
-        context.env.add_diag(diag!(
-            Attributes::Duplicate,
-            (test_attributes[len - 1].loc, msg),
-            (test_attributes[len - 2].loc, previously_annotated_msg),
-            (fn_loc, in_this_test_msg),
-        ))
-    }
+                let abort_msg = "Attributed as #[expected_failure] here";
+                context.env.add_diag(diag!(
+                    Attributes::InvalidUsage,
+                    (fn_loc, fn_msg),
+                    (abort_attribute.loc, abort_msg),
+                ))
+            }
+            return None;
+        }
+        Some(test_attribute) => test_attribute,
+    };
 
     // A #[test] function cannot also be annotated #[test_only]
-    if !test_only_attributes.is_empty() {
+    if let Some(test_only_attribute) = test_only_attribute_opt {
         let msg = "Function annotated as both #[test(...)] and #[test_only]. You need to declare \
                    it as either one or the other";
         context.env.add_diag(diag!(
             Attributes::InvalidUsage,
-            (test_only_attributes.last().unwrap().loc, msg),
-            (
-                test_attributes.last().unwrap().loc,
-                previously_annotated_msg,
-            ),
-            (fn_loc, in_this_test_msg),
+            (test_only_attribute.loc, msg),
+            (test_attribute.loc, PREVIOUSLY_ANNOTATED_MSG),
+            (fn_loc, IN_THIS_TEST_MSG),
         ))
     }
 
-    // Only one abort can be specified
-    if abort_attributes.len() > 1 {
-        let msg = make_duplicate_msg(known_attributes::TestingAttributes::EXPECTED_FAILURE);
-        let len = abort_attributes.len();
-        context.env.add_diag(diag!(
-            Attributes::Duplicate,
-            (abort_attributes[len - 1].loc, msg),
-            (abort_attributes[len - 2].loc, previously_annotated_msg),
-        ))
-    }
-
-    let test_attribute = test_attributes.last().unwrap();
-    let test_annotation_params = parse_test_attribute(context, test_attribute);
+    let test_annotation_params = parse_test_attribute(context, test_attribute, 0);
     let mut arguments = Vec::new();
-
     for (var, _) in &function.signature.parameters {
         match test_annotation_params.get(&var.value()) {
             Some(value) => arguments.push(value.clone()),
@@ -172,16 +140,15 @@ fn build_test_info(
                     Attributes::InvalidTest,
                     (test_attribute.loc, missing_param_msg),
                     (var.loc(), "Corresponding to this parameter"),
-                    (fn_loc, in_this_test_msg),
+                    (fn_loc, IN_THIS_TEST_MSG),
                 ))
             }
         }
     }
 
-    let expected_failure = if abort_attributes.is_empty() {
-        None
-    } else {
-        parse_failure_attribute(context, abort_attributes.last().unwrap())
+    let expected_failure = match abort_attribute_opt {
+        None => None,
+        Some(abort_attribute) => parse_failure_attribute(context, abort_attribute),
     };
 
     Some(TestCase {
@@ -198,18 +165,33 @@ fn build_test_info(
 fn parse_test_attribute(
     context: &mut Context,
     sp!(aloc, test_attribute): &E::Attribute,
+    depth: usize,
 ) -> BTreeMap<Symbol, MoveValue> {
     use E::Attribute_ as EA;
 
     match test_attribute {
+        EA::Name(_) | EA::Parameterized(_, _) if depth > 0 => {
+            context.env.add_diag(diag!(
+                Attributes::InvalidTest,
+                (*aloc, "Unexpected nested attribute in test declaration"),
+            ));
+            BTreeMap::new()
+        }
         EA::Name(nm) => {
             assert!(
-                nm.value.as_str() == known_attributes::TestingAttributes::TEST,
+                nm.value.as_str() == TestingAttribute::Test.name() && depth == 0,
                 "ICE: We should only be parsing a raw test attribute"
             );
             BTreeMap::new()
         }
         EA::Assigned(nm, attr_value) => {
+            if depth != 1 {
+                context.env.add_diag(diag!(
+                    Attributes::InvalidTest,
+                    (*aloc, "Unexpected nested attribute in test declaration"),
+                ));
+                return BTreeMap::new();
+            }
             let sp!(assign_loc, attr_value) = &**attr_value;
             let value = match convert_attribute_value_to_move_value(context, attr_value) {
                 Some(move_value) => move_value,
@@ -229,12 +211,12 @@ fn parse_test_attribute(
         }
         EA::Parameterized(nm, attributes) => {
             assert!(
-                nm.value.as_str() == known_attributes::TestingAttributes::TEST,
+                nm.value.as_str() == TestingAttribute::Test.name() && depth == 0,
                 "ICE: We should only be parsing a raw test attribute"
             );
             attributes
                 .iter()
-                .flat_map(|attr| parse_test_attribute(context, attr))
+                .flat_map(|(_, _, attr)| parse_test_attribute(context, attr, depth + 1))
                 .collect()
         }
     }
@@ -248,7 +230,7 @@ fn parse_failure_attribute(
     match expected_attr {
         EA::Name(nm) => {
             assert!(
-                nm.value.as_str() == known_attributes::TestingAttributes::EXPECTED_FAILURE,
+                nm.value.as_str() == TestingAttribute::ExpectedFailure.name(),
                 "ICE: We should only be parsing a raw expected failure attribute"
             );
             Some(ExpectedFailure::Expected)
@@ -258,7 +240,7 @@ fn parse_failure_attribute(
             let invalid_assignment_msg = "Invalid expected failure code assignment";
             let expected_msg = format!(
                 "Expect an #[expected_failure({}=...)] attribute for abort code assignment",
-                known_attributes::TestingAttributes::CODE_ASSIGNMENT_NAME
+                TestingAttribute::CODE_ASSIGNMENT_NAME
             );
             context.env.add_diag(diag!(
                 Attributes::InvalidValue,
@@ -268,10 +250,11 @@ fn parse_failure_attribute(
             None
         }
         EA::Parameterized(sp!(_, nm), attrs) => {
-            if attrs.len() != 1 {
+            let mut attrs_vec = attrs.iter().map(|(_, _, attr)| attr).collect::<Vec<_>>();
+            if attrs_vec.len() != 1 {
                 let invalid_attr_msg = format!(
                     "Invalid #[expected_failure(...)] attribute, expected 1 argument but found {}",
-                    attrs.len()
+                    attrs_vec.len()
                 );
                 context
                     .env
@@ -279,12 +262,13 @@ fn parse_failure_attribute(
                 return None;
             }
             assert!(
-                nm.as_str() == known_attributes::TestingAttributes::EXPECTED_FAILURE,
+                nm.as_str() == TestingAttribute::ExpectedFailure.name(),
                 "ICE: expected failure attribute must have the right name"
             );
-            match attrs.last().unwrap() {
+            let attr = attrs_vec.pop().unwrap();
+            match attr {
                 sp!(assign_loc, EA::Assigned(sp!(_, nm), value))
-                    if nm.as_str() == known_attributes::TestingAttributes::CODE_ASSIGNMENT_NAME =>
+                    if nm.as_str() == TestingAttribute::CODE_ASSIGNMENT_NAME =>
                 {
                     match &**value {
                         sp!(_, EAV::Value(sp!(_, EV::InferredNum(u))))
@@ -319,7 +303,7 @@ fn parse_failure_attribute(
                     let invalid_name_msg = format!(
                         "Invalid name in expected failure code assignment. Did you mean to use \
                          '{}'?",
-                        known_attributes::TestingAttributes::CODE_ASSIGNMENT_NAME
+                        TestingAttribute::CODE_ASSIGNMENT_NAME
                     );
                     context.env.add_diag(diag!(
                         Attributes::InvalidName,

@@ -6,7 +6,10 @@ use crate::{
         Ability, Ability_, BinOp, ConstantName, Field, FunctionName, ModuleName, QuantKind,
         SpecApplyPattern, StructName, UnaryOp, Var, Visibility,
     },
-    shared::{ast_debug::*, unique_map::UniqueMap, unique_set::UniqueSet, *},
+    shared::{
+        ast_debug::*, known_attributes::KnownAttribute, unique_map::UniqueMap,
+        unique_set::UniqueSet, *,
+    },
 };
 use move_ir_types::location::*;
 use move_symbol_pool::Symbol;
@@ -42,7 +45,7 @@ pub type AttributeValue = Spanned<AttributeValue_>;
 pub enum Attribute_ {
     Name(Name),
     Assigned(Name, Box<AttributeValue>),
-    Parameterized(Name, Vec<Attribute>),
+    Parameterized(Name, Attributes),
 }
 pub type Attribute = Spanned<Attribute_>;
 
@@ -56,13 +59,22 @@ impl Attribute_ {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum AttributeName_ {
+    Unknown(Symbol),
+    Known(KnownAttribute),
+}
+pub type AttributeName = Spanned<AttributeName_>;
+
+pub type Attributes = UniqueMap<AttributeName, Attribute>;
+
 //**************************************************************************************************
 // Scripts
 //**************************************************************************************************
 
 #[derive(Debug, Clone)]
 pub struct Script {
-    pub attributes: Vec<Attribute>,
+    pub attributes: Attributes,
     pub loc: Loc,
     pub immediate_neighbors: UniqueMap<ModuleIdent, Neighbor>,
     pub used_addresses: BTreeSet<Address>,
@@ -90,7 +102,7 @@ pub type ModuleIdent = Spanned<ModuleIdent_>;
 
 #[derive(Debug, Clone)]
 pub struct ModuleDefinition {
-    pub attributes: Vec<Attribute>,
+    pub attributes: Attributes,
     pub loc: Loc,
     pub is_source_module: bool,
     /// `dependency_order` is the topological order/rank in the dependency graph.
@@ -111,7 +123,7 @@ pub struct ModuleDefinition {
 
 #[derive(Debug, Clone)]
 pub struct Friend {
-    pub attributes: Vec<Attribute>,
+    pub attributes: Attributes,
     pub loc: Loc,
 }
 
@@ -136,7 +148,7 @@ pub struct StructTypeParameter {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct StructDefinition {
-    pub attributes: Vec<Attribute>,
+    pub attributes: Attributes,
     pub loc: Loc,
     pub abilities: AbilitySet,
     pub type_parameters: Vec<StructTypeParameter>,
@@ -172,7 +184,7 @@ pub struct SpecId(usize);
 
 #[derive(PartialEq, Clone, Debug)]
 pub struct Function {
-    pub attributes: Vec<Attribute>,
+    pub attributes: Attributes,
     pub loc: Loc,
     pub visibility: Visibility,
     pub signature: FunctionSignature,
@@ -187,7 +199,7 @@ pub struct Function {
 
 #[derive(PartialEq, Clone, Debug)]
 pub struct Constant {
-    pub attributes: Vec<Attribute>,
+    pub attributes: Attributes,
     pub loc: Loc,
     pub signature: Type,
     pub value: Exp,
@@ -199,7 +211,7 @@ pub struct Constant {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct SpecBlock_ {
-    pub attributes: Vec<Attribute>,
+    pub attributes: Attributes,
     pub target: SpecBlockTarget,
     pub members: Vec<SpecBlockMember>,
 }
@@ -448,6 +460,25 @@ impl TName for ModuleIdent {
     }
 }
 
+impl TName for AttributeName {
+    type Key = AttributeName_;
+    type Loc = Loc;
+
+    fn drop_loc(self) -> (Self::Loc, Self::Key) {
+        let sp!(loc, n_) = self;
+        (loc, n_)
+    }
+
+    fn add_loc(loc: Self::Loc, name_: Self::Key) -> Self {
+        sp(loc, name_)
+    }
+
+    fn borrow(&self) -> (&Self::Loc, &Self::Key) {
+        let sp!(loc, n_) = self;
+        (loc, n_)
+    }
+}
+
 impl fmt::Debug for Address {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self)
@@ -657,6 +688,15 @@ impl fmt::Display for Neighbor {
     }
 }
 
+impl fmt::Display for AttributeName_ {
+    fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
+        match self {
+            AttributeName_::Unknown(sym) => write!(f, "{}", sym),
+            AttributeName_::Known(known) => write!(f, "{}", known.name()),
+        }
+    }
+}
+
 impl fmt::Display for ModuleIdent_ {
     fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}::{}", self.address, &self.module)
@@ -747,7 +787,7 @@ impl AstDebug for Attribute_ {
             Attribute_::Parameterized(n, inners) => {
                 w.write(&format!("{}", n));
                 w.write("(");
-                w.list(inners, ", ", |w, inner| {
+                w.list(inners, ", ", |w, (_, _, inner)| {
                     inner.ast_debug(w);
                     false
                 });
@@ -757,10 +797,10 @@ impl AstDebug for Attribute_ {
     }
 }
 
-impl AstDebug for Vec<Attribute> {
+impl AstDebug for Attributes {
     fn ast_debug(&self, w: &mut AstWriter) {
         w.write("#[");
-        w.list(self, ", ", |w, attr| {
+        w.list(self, ", ", |w, (_, _, attr)| {
             attr.ast_debug(w);
             false
         });

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    expansion::ast::{Attribute, Friend, ModuleIdent},
+    expansion::ast::{Attributes, Friend, ModuleIdent},
     hlir::ast::{
         BaseType, Command, Command_, FunctionSignature, Label, SingleType, StructDefinition,
     },
@@ -32,7 +32,7 @@ pub struct Program {
 
 #[derive(Debug, Clone)]
 pub struct Script {
-    pub attributes: Vec<Attribute>,
+    pub attributes: Attributes,
     pub loc: Loc,
     pub constants: UniqueMap<ConstantName, Constant>,
     pub function_name: FunctionName,
@@ -45,7 +45,7 @@ pub struct Script {
 
 #[derive(Debug, Clone)]
 pub struct ModuleDefinition {
-    pub attributes: Vec<Attribute>,
+    pub attributes: Attributes,
     pub is_source_module: bool,
     /// `dependency_order` is the topological order/rank in the dependency graph.
     pub dependency_order: usize,
@@ -61,7 +61,7 @@ pub struct ModuleDefinition {
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct Constant {
-    pub attributes: Vec<Attribute>,
+    pub attributes: Attributes,
     pub loc: Loc,
     pub signature: BaseType,
     pub value: Option<MoveValue>,
@@ -85,7 +85,7 @@ pub type FunctionBody = Spanned<FunctionBody_>;
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct Function {
-    pub attributes: Vec<Attribute>,
+    pub attributes: Attributes,
     pub visibility: Visibility,
     pub signature: FunctionSignature,
     pub acquires: BTreeMap<StructName, Loc>,

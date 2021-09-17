@@ -3,7 +3,7 @@
 
 use crate::{
     expansion::ast::{
-        ability_modifiers_ast_debug, AbilitySet, Attribute, Friend, ModuleIdent, SpecId, Value,
+        ability_modifiers_ast_debug, AbilitySet, Attributes, Friend, ModuleIdent, SpecId, Value,
     },
     naming::ast::{BuiltinTypeName, BuiltinTypeName_, StructTypeParameter, TParam},
     parser::ast::{BinOp, ConstantName, Field, FunctionName, StructName, UnaryOp, Var, Visibility},
@@ -31,7 +31,7 @@ pub struct Program {
 
 #[derive(Debug, Clone)]
 pub struct Script {
-    pub attributes: Vec<Attribute>,
+    pub attributes: Attributes,
     pub loc: Loc,
     pub constants: UniqueMap<ConstantName, Constant>,
     pub function_name: FunctionName,
@@ -44,7 +44,7 @@ pub struct Script {
 
 #[derive(Debug, Clone)]
 pub struct ModuleDefinition {
-    pub attributes: Vec<Attribute>,
+    pub attributes: Attributes,
     pub is_source_module: bool,
     /// `dependency_order` is the topological order/rank in the dependency graph.
     pub dependency_order: usize,
@@ -60,7 +60,7 @@ pub struct ModuleDefinition {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct StructDefinition {
-    pub attributes: Vec<Attribute>,
+    pub attributes: Attributes,
     pub abilities: AbilitySet,
     pub type_parameters: Vec<StructTypeParameter>,
     pub fields: StructFields,
@@ -78,7 +78,7 @@ pub enum StructFields {
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct Constant {
-    pub attributes: Vec<Attribute>,
+    pub attributes: Attributes,
     pub loc: Loc,
     pub signature: BaseType,
     pub value: (UniqueMap<Var, SingleType>, Block),
@@ -107,7 +107,7 @@ pub type FunctionBody = Spanned<FunctionBody_>;
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct Function {
-    pub attributes: Vec<Attribute>,
+    pub attributes: Attributes,
     pub visibility: Visibility,
     pub signature: FunctionSignature,
     pub acquires: BTreeMap<StructName, Loc>,

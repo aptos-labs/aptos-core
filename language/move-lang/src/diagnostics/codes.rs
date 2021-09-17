@@ -127,8 +127,11 @@ codes!(
         InvalidFriendDeclaration:
             { msg: "invalid 'friend' declaration", severity: NonblockingError },
         InvalidAcquiresItem: { msg: "invalid 'acquires' item", severity: NonblockingError },
-        InvalidPhantomUse: { msg: "invalid phantom type parameter usage", severity: NonblockingError },
-        InvalidNonPhantomUse: { msg: "invalid non-phantom type parameter usage", severity: Warning },
+        InvalidPhantomUse:
+            { msg: "invalid phantom type parameter usage", severity: NonblockingError },
+        InvalidNonPhantomUse:
+            { msg: "invalid non-phantom type parameter usage", severity: Warning },
+        InvalidAttribute: { msg: "invalid attribute", severity: NonblockingError },
     ],
     // errors name resolution, mostly expansion/translate and naming/translate
     NameResolution: [

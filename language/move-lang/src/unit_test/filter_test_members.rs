@@ -303,16 +303,18 @@ fn should_remove_node(env: &CompilationEnv, attrs: &[P::Attributes], is_source_d
         || (!is_source_def
             && flattened_attrs
                 .iter()
-                .any(|attr| attr.1 == known_attributes::TestingAttributes::Test))
+                .any(|attr| attr.1 == known_attributes::TestingAttribute::Test))
 }
 
-fn test_attributes(attrs: &P::Attributes) -> Vec<(Loc, known_attributes::TestingAttributes)> {
+fn test_attributes(attrs: &P::Attributes) -> Vec<(Loc, known_attributes::TestingAttribute)> {
+    use known_attributes::KnownAttribute;
     attrs
         .value
         .iter()
-        .filter_map(|attr| {
-            known_attributes::TestingAttributes::resolve(&attr.value.attribute_name().value)
-                .map(|test_attr| (attr.loc, test_attr))
-        })
+        .filter_map(
+            |attr| match KnownAttribute::resolve(&attr.value.attribute_name().value)? {
+                KnownAttribute::Testing(test_attr) => Some((attr.loc, test_attr)),
+            },
+        )
         .collect()
 }

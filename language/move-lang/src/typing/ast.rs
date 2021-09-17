@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    expansion::ast::{Attribute, Fields, Friend, ModuleIdent, SpecId, Value},
+    expansion::ast::{Attributes, Fields, Friend, ModuleIdent, SpecId, Value},
     naming::ast::{FunctionSignature, StructDefinition, Type, TypeName_, Type_},
     parser::ast::{BinOp, ConstantName, Field, FunctionName, StructName, UnaryOp, Var, Visibility},
     shared::{ast_debug::*, unique_map::UniqueMap},
@@ -30,7 +30,7 @@ pub struct Program {
 
 #[derive(Debug, Clone)]
 pub struct Script {
-    pub attributes: Vec<Attribute>,
+    pub attributes: Attributes,
     pub loc: Loc,
     pub constants: UniqueMap<ConstantName, Constant>,
     pub function_name: FunctionName,
@@ -43,7 +43,7 @@ pub struct Script {
 
 #[derive(Debug, Clone)]
 pub struct ModuleDefinition {
-    pub attributes: Vec<Attribute>,
+    pub attributes: Attributes,
     pub is_source_module: bool,
     /// `dependency_order` is the topological order/rank in the dependency graph.
     pub dependency_order: usize,
@@ -66,7 +66,7 @@ pub type FunctionBody = Spanned<FunctionBody_>;
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct Function {
-    pub attributes: Vec<Attribute>,
+    pub attributes: Attributes,
     pub visibility: Visibility,
     pub signature: FunctionSignature,
     pub acquires: BTreeMap<StructName, Loc>,
@@ -79,7 +79,7 @@ pub struct Function {
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct Constant {
-    pub attributes: Vec<Attribute>,
+    pub attributes: Attributes,
     pub loc: Loc,
     pub signature: Type,
     pub value: Exp,

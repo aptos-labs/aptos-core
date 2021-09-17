@@ -443,8 +443,29 @@ impl Flags {
 //**************************************************************************************************
 
 pub mod known_attributes {
-    #[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord)]
-    pub enum TestingAttributes {
+    use once_cell::sync::Lazy;
+    use std::{collections::BTreeSet, fmt};
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+    pub enum AttributePosition {
+        AddressBlock,
+        Module,
+        Script,
+        Use,
+        Friend,
+        Constant,
+        Struct,
+        Function,
+        Spec,
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+    pub enum KnownAttribute {
+        Testing(TestingAttribute),
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+    pub enum TestingAttribute {
         // Can be called by other testing code, and included in compilation in test mode
         TestOnly,
         // Is a test that will be run
@@ -453,26 +474,82 @@ pub mod known_attributes {
         ExpectedFailure,
     }
 
-    impl TestingAttributes {
+    impl fmt::Display for AttributePosition {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            match self {
+                Self::AddressBlock => write!(f, "address block"),
+                Self::Module => write!(f, "module"),
+                Self::Script => write!(f, "script"),
+                Self::Use => write!(f, "use"),
+                Self::Friend => write!(f, "friend"),
+                Self::Constant => write!(f, "constant"),
+                Self::Struct => write!(f, "struct"),
+                Self::Function => write!(f, "function"),
+                Self::Spec => write!(f, "spec"),
+            }
+        }
+    }
+
+    impl KnownAttribute {
+        pub fn resolve(attribute_str: impl AsRef<str>) -> Option<Self> {
+            Some(match attribute_str.as_ref() {
+                TestingAttribute::TEST => Self::Testing(TestingAttribute::Test),
+                TestingAttribute::TEST_ONLY => Self::Testing(TestingAttribute::TestOnly),
+                TestingAttribute::EXPECTED_FAILURE => {
+                    Self::Testing(TestingAttribute::ExpectedFailure)
+                }
+                _ => return None,
+            })
+        }
+
+        pub const fn name(&self) -> &str {
+            match self {
+                Self::Testing(a) => a.name(),
+            }
+        }
+
+        pub fn expected_positions(&self) -> &'static BTreeSet<AttributePosition> {
+            match self {
+                Self::Testing(a) => a.expected_positions(),
+            }
+        }
+    }
+
+    impl TestingAttribute {
         pub const TEST: &'static str = "test";
         pub const EXPECTED_FAILURE: &'static str = "expected_failure";
         pub const TEST_ONLY: &'static str = "test_only";
         pub const CODE_ASSIGNMENT_NAME: &'static str = "abort_code";
 
-        pub fn resolve(attribute_str: &str) -> Option<Self> {
-            Some(match attribute_str {
-                Self::TEST => Self::Test,
-                Self::TEST_ONLY => Self::TestOnly,
-                Self::EXPECTED_FAILURE => Self::ExpectedFailure,
-                _ => return None,
-            })
-        }
-
-        pub fn name(&self) -> &str {
+        pub const fn name(&self) -> &str {
             match self {
                 Self::Test => Self::TEST,
                 Self::TestOnly => Self::TEST_ONLY,
                 Self::ExpectedFailure => Self::EXPECTED_FAILURE,
+            }
+        }
+
+        pub fn expected_positions(&self) -> &'static BTreeSet<AttributePosition> {
+            static TEST_ONLY_POSITIONS: Lazy<BTreeSet<AttributePosition>> = Lazy::new(|| {
+                IntoIterator::into_iter([
+                    AttributePosition::AddressBlock,
+                    AttributePosition::Module,
+                    AttributePosition::Use,
+                    AttributePosition::Friend,
+                    AttributePosition::Constant,
+                    AttributePosition::Struct,
+                    AttributePosition::Function,
+                ])
+                .collect()
+            });
+            static TEST_POSITIONS: Lazy<BTreeSet<AttributePosition>> =
+                Lazy::new(|| IntoIterator::into_iter([AttributePosition::Function]).collect());
+            static EXPECTED_FAILURE_POSITIONS: Lazy<BTreeSet<AttributePosition>> =
+                Lazy::new(|| IntoIterator::into_iter([AttributePosition::Function]).collect());
+            match self {
+                TestingAttribute::TestOnly => &*TEST_ONLY_POSITIONS,
+                TestingAttribute::Test => &*TEST_POSITIONS,
+                TestingAttribute::ExpectedFailure => &*EXPECTED_FAILURE_POSITIONS,
             }
         }
     }

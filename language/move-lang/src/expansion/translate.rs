@@ -13,7 +13,7 @@ use crate::{
         self as P, Ability, ConstantName, Field, FunctionName, ModuleName, StructName, Var,
         Visibility,
     },
-    shared::{unique_map::UniqueMap, *},
+    shared::{known_attributes::AttributePosition, unique_map::UniqueMap, *},
     FullyCompiledProgram,
 };
 use move_ir_types::location::*;
@@ -333,7 +333,7 @@ fn module_(
         name,
         members,
     } = mdef;
-    let attributes = flatten_attributes(context, attributes);
+    let attributes = flatten_attributes(context, AttributePosition::Module, attributes);
     assert!(context.address == None);
     assert!(address == None);
     set_sender_address(context, &name, module_address);
@@ -418,7 +418,7 @@ fn script_(context: &mut Context, pscript: P::Script) -> E::Script {
         specs: pspecs,
     } = pscript;
 
-    let attributes = flatten_attributes(context, attributes);
+    let attributes = flatten_attributes(context, AttributePosition::Script, attributes);
     let mut new_scope = AliasMapBuilder::new();
     for u in uses {
         use_(context, &mut new_scope, u.use_);
@@ -479,16 +479,88 @@ fn script_(context: &mut Context, pscript: P::Script) -> E::Script {
     }
 }
 
-fn flatten_attributes(context: &mut Context, attributes: Vec<P::Attributes>) -> Vec<E::Attribute> {
-    attributes
+fn flatten_attributes(
+    context: &mut Context,
+    attr_position: AttributePosition,
+    attributes: Vec<P::Attributes>,
+) -> E::Attributes {
+    let all_attrs = attributes
         .into_iter()
         .map(|attrs| attrs.value)
         .flatten()
-        .flat_map(|attr| attribute(context, attr))
-        .collect()
+        .flat_map(|attr| attribute(context, attr_position, attr))
+        .collect::<Vec<_>>();
+    unique_attributes(context, attr_position, false, all_attrs)
 }
 
-fn attribute(context: &mut Context, sp!(loc, attribute_): P::Attribute) -> Option<E::Attribute> {
+fn unique_attributes(
+    context: &mut Context,
+    attr_position: AttributePosition,
+    is_nested: bool,
+    attributes: impl IntoIterator<Item = E::Attribute>,
+) -> E::Attributes {
+    let mut attr_map = UniqueMap::new();
+    for sp!(loc, attr_) in attributes {
+        let sp!(nloc, sym) = match &attr_ {
+            E::Attribute_::Name(n)
+            | E::Attribute_::Assigned(n, _)
+            | E::Attribute_::Parameterized(n, _) => *n,
+        };
+        let name_ = match known_attributes::KnownAttribute::resolve(sym) {
+            None => E::AttributeName_::Unknown(sym),
+            Some(known) => {
+                debug_assert!(known.name() == sym.as_str());
+                if is_nested {
+                    let msg = "Known attribute '{}' is not expected in a nested attribute position";
+                    context
+                        .env
+                        .add_diag(diag!(Declarations::InvalidAttribute, (nloc, msg)));
+                    continue;
+                }
+
+                let expected_positions = known.expected_positions();
+                if !expected_positions.contains(&attr_position) {
+                    let msg = format!(
+                        "Known attribute '{}' is not expected with a {}",
+                        known.name(),
+                        attr_position
+                    );
+                    let all_expected = expected_positions
+                        .iter()
+                        .map(|p| format!("{}", p))
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    let expected_msg = format!(
+                        "Expected to be used with one of the following: {}",
+                        all_expected
+                    );
+                    context.env.add_diag(diag!(
+                        Declarations::InvalidAttribute,
+                        (nloc, msg),
+                        (nloc, expected_msg)
+                    ));
+                    continue;
+                }
+                E::AttributeName_::Known(known)
+            }
+        };
+        if let Err((_, old_loc)) = attr_map.add(sp(nloc, name_), sp(loc, attr_)) {
+            let msg = format!("Duplicate attribute '{}' attached to the same item", name_);
+            context.env.add_diag(diag!(
+                Declarations::DuplicateItem,
+                (loc, msg),
+                (old_loc, "Attribute previously given here"),
+            ));
+        }
+    }
+    attr_map
+}
+
+fn attribute(
+    context: &mut Context,
+    attr_position: AttributePosition,
+    sp!(loc, attribute_): P::Attribute,
+) -> Option<E::Attribute> {
     use E::Attribute_ as EA;
     use P::Attribute_ as PA;
     Some(sp(
@@ -496,13 +568,13 @@ fn attribute(context: &mut Context, sp!(loc, attribute_): P::Attribute) -> Optio
         match attribute_ {
             PA::Name(n) => EA::Name(n),
             PA::Assigned(n, v) => EA::Assigned(n, Box::new(attribute_value(context, *v)?)),
-            PA::Parameterized(n, sp!(_, attrs_)) => EA::Parameterized(
-                n,
-                attrs_
+            PA::Parameterized(n, sp!(_, pattrs_)) => {
+                let attrs = pattrs_
                     .into_iter()
-                    .map(|a| attribute(context, a))
-                    .collect::<Option<Vec<_>>>()?,
-            ),
+                    .map(|a| attribute(context, attr_position, a))
+                    .collect::<Option<Vec<_>>>()?;
+                EA::Parameterized(n, unique_attributes(context, attr_position, true, attrs))
+            }
         },
     ))
 }
@@ -839,7 +911,7 @@ fn struct_def_(
         type_parameters: pty_params,
         fields: pfields,
     } = pstruct;
-    let attributes = flatten_attributes(context, attributes);
+    let attributes = flatten_attributes(context, AttributePosition::Struct, attributes);
     let type_parameters = struct_type_parameters(context, pty_params);
     let old_aliases = context
         .aliases
@@ -923,7 +995,7 @@ fn friend_(context: &mut Context, pfriend_decl: P::FriendDecl) -> Option<(Module
         friend: pfriend,
     } = pfriend_decl;
     let mident = name_access_chain_to_module_ident(context, pfriend)?;
-    let attributes = flatten_attributes(context, pattributes);
+    let attributes = flatten_attributes(context, AttributePosition::Friend, pattributes);
     Some((mident, E::Friend { attributes, loc }))
 }
 
@@ -951,7 +1023,7 @@ fn constant_(context: &mut Context, pconstant: P::Constant) -> (ConstantName, E:
         signature: psignature,
         value: pvalue,
     } = pconstant;
-    let attributes = flatten_attributes(context, pattributes);
+    let attributes = flatten_attributes(context, AttributePosition::Constant, pattributes);
     let signature = type_(context, psignature);
     let value = exp_(context, pvalue);
     let _specs = context.extract_exp_specs();
@@ -990,7 +1062,7 @@ fn function_(context: &mut Context, pfunction: P::Function) -> (FunctionName, E:
         acquires,
     } = pfunction;
     assert!(context.exp_specs.is_empty());
-    let attributes = flatten_attributes(context, pattributes);
+    let attributes = flatten_attributes(context, AttributePosition::Function, pattributes);
     let (old_aliases, signature) = function_signature(context, psignature);
     let acquires = acquires
         .into_iter()
@@ -1066,7 +1138,7 @@ fn spec(context: &mut Context, sp!(loc, pspec): P::SpecBlock) -> E::SpecBlock {
         members: pmembers,
     } = pspec;
 
-    let attributes = flatten_attributes(context, pattributes);
+    let attributes = flatten_attributes(context, AttributePosition::Spec, pattributes);
     context.in_spec_context = true;
     let mut new_scope = AliasMapBuilder::new();
     for u in uses {
@@ -1794,7 +1866,13 @@ fn value(context: &mut Context, sp!(loc, pvalue_): P::Value) -> Option<E::Value>
     use P::Value_ as PV;
     let value_ = match pvalue_ {
         PV::Address(addr) => {
-            EV::Address(address(context, /* suggest_declaration */ true, addr))
+            let mut addr = address(context, /* suggest_declaration */ true, addr);
+            if let Address::Named(n) = addr {
+                if context.env.named_address_mapping().get(&n.value).is_none() {
+                    addr = Address::Anonymous(sp(n.loc, AddressBytes::DEFAULT_ERROR_BYTES));
+                }
+            }
+            EV::Address(addr)
         }
         PV::Num(s) if s.ends_with("u8") => match parse_u8(&s[..s.len() - 2]) {
             Ok(u) => EV::U8(u),
