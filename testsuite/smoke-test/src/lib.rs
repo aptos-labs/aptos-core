@@ -5,6 +5,7 @@
 pub mod event_fetcher;
 pub mod fullnode;
 pub mod replay_tooling;
+pub mod rest_api;
 pub mod scripts_and_modules;
 pub mod transaction;
 pub mod verifying_client;

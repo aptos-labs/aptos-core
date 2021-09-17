@@ -79,7 +79,7 @@ pub struct NodeConfig {
     pub metrics: DeprecatedConfig,
     #[serde(default)]
     pub json_rpc: JsonRpcConfig,
-    #[serde(default, skip_serializing)]
+    #[serde(default)]
     pub api: ApiConfig,
     #[serde(default)]
     pub state_sync: StateSyncConfig,

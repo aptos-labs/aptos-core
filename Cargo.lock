@@ -7807,6 +7807,7 @@ dependencies = [
  "proptest",
  "rand 0.8.3",
  "regex",
+ "reqwest",
  "serde_yaml",
  "tokio",
  "walkdir",
