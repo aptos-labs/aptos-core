@@ -208,7 +208,7 @@ pub fn set_elem<T>(link: &Link<T>, new_val: T) {
 }
 
 pub fn find_elem<F: Fn(&T) -> bool, T>(link: Link<T>, compare: F) -> Link<T> {
-    let mut current = link.clone();
+    let mut current = link;
     while current.is_some() {
         if compare(&get_elem(&current)) {
             return current;
