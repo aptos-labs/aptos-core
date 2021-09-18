@@ -113,13 +113,10 @@ impl BufferItem {
         signatures: BTreeMap<AccountAddress, Ed25519Signature>,
         validator: &ValidatorVerifier,
     ) -> LedgerInfoWithSignatures {
-        let mut valid_sigs = BTreeMap::new();
-
-        for (author, sig) in signatures.into_iter() {
-            if validator.verify(author, commit_ledger_info, &sig).is_ok() {
-                valid_sigs.insert(author, sig);
-            }
-        }
+        let valid_sigs = signatures
+            .into_iter()
+            .filter(|(author, sig)| validator.verify(*author, commit_ledger_info, sig).is_ok())
+            .collect();
 
         LedgerInfoWithSignatures::new(commit_ledger_info.clone(), valid_sigs)
     }
@@ -280,12 +277,10 @@ impl BufferItem {
         }
     }
 
-    pub fn add_signature_if_matched(
-        &mut self,
-        target_commit_info: &BlockInfo,
-        author: Author,
-        sig: Ed25519Signature,
-    ) -> anyhow::Result<()> {
+    pub fn add_signature_if_matched(&mut self, vote: CommitVote) -> anyhow::Result<()> {
+        let target_commit_info = vote.commit_info();
+        let author = vote.author();
+        let signature = vote.signature().clone();
         match self {
             Self::Ordered(ordered) => {
                 if ordered
@@ -297,19 +292,19 @@ impl BufferItem {
                     // when advancing to signed item, we will check if the sigs are valid.
                     // each author at most stores a single sig for each item,
                     // so an adversary will not be able to flood our memory.
-                    ordered.pending_votes.insert(author, sig);
+                    ordered.pending_votes.insert(author, signature);
                     return Ok(());
                 }
             }
             Self::Executed(executed) => {
                 if &executed.commit_info == target_commit_info {
-                    executed.pending_votes.insert(author, sig);
+                    executed.pending_votes.insert(author, signature);
                     return Ok(());
                 }
             }
             Self::Signed(signed) => {
                 if signed.commit_proof.commit_info() == target_commit_info {
-                    signed.commit_proof.add_signature(author, sig);
+                    signed.commit_proof.add_signature(author, signature);
                     return Ok(());
                 }
             }

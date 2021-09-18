@@ -33,6 +33,7 @@ use crate::{
     round_manager::VerifiedEvent,
     state_replication::StateComputerCommitCallBackType,
 };
+use diem_crypto::HashValue;
 use futures::executor::block_on;
 use std::ops::Deref;
 
@@ -144,15 +145,17 @@ impl StateManager {
             callback,
         } = ordered_blocks;
 
-        let item = BufferItem::new_ordered(ordered_blocks.clone(), ordered_proof, callback);
-        // push blocks to buffer
+        let item = BufferItem::new_ordered(ordered_blocks, ordered_proof, callback);
         self.buffer.push_back(item);
     }
 
     /// Set the execution root to the first not executed item (Ordered) and send execution request
     /// Set to None if not exist
     async fn advance_execution_root(&mut self) {
-        let cursor = self.execution_root.clone().or(self.buffer.head.clone());
+        let cursor = self
+            .execution_root
+            .clone()
+            .or_else(|| self.buffer.head.clone());
         self.execution_root = find_elem(cursor, |item| item.is_ordered());
         if self.execution_root.is_some() {
             let ordered_blocks = get_elem(&self.execution_root).get_blocks().clone();
@@ -166,7 +169,10 @@ impl StateManager {
     /// Set the signing root to the first not signed item (Executed) and send execution request
     /// Set to None if not exist
     async fn advance_signing_root(&mut self) {
-        let cursor = self.signing_root.clone().or(self.buffer.head.clone());
+        let cursor = self
+            .signing_root
+            .clone()
+            .or_else(|| self.buffer.head.clone());
         self.signing_root = find_elem(cursor, |item| item.is_executed());
         if self.signing_root.is_some() {
             let item = get_elem(&self.signing_root);
@@ -192,14 +198,9 @@ impl StateManager {
         }
     }
 
-    /// Pop the prefix of buffer items until (including) aggregated_item_cursor
+    /// Pop the prefix of buffer items until (including) target_block_id
     /// Send persist request.
-    fn advance_head(&mut self, aggregated_cursor: BufferItemRootType) {
-        let target_block_id = {
-            let item = get_elem(&aggregated_cursor);
-            assert!(item.is_aggregated());
-            item.block_id()
-        };
+    fn advance_head(&mut self, target_block_id: HashValue) {
         let mut blocks_to_persist: Vec<Arc<ExecutedBlock>> = vec![];
 
         while let Some(item) = self.buffer.pop_front() {
@@ -221,7 +222,8 @@ impl StateManager {
                         // the block_tree and storage are the same for all the callbacks in the current epoch
                         // the commit root is used in logging only.
                         callback: aggregated.callback,
-                    }));
+                    }))
+                    .expect("Failed to send persist request");
                     return;
                 } else {
                     unreachable!("Expect aggregated item");
@@ -259,17 +261,18 @@ impl StateManager {
             // if not found: it means the block is in BlockStore but not in the buffer
             // either the block is just persisted, or has not been added to the buffer
             // in either cases, we do nothing.
+            let target_block_id = ledger_info.commit_info().id();
             let cursor = find_elem(self.buffer.head.clone(), |item| {
-                item.block_id() == ledger_info.commit_info().id()
+                item.block_id() == target_block_id
             });
             if cursor.is_some() {
                 let buffer_item = take_elem(&cursor);
                 let attempted_item =
-                    buffer_item.try_advance_to_aggregated_with_ledger_info(ledger_info.clone());
+                    buffer_item.try_advance_to_aggregated_with_ledger_info(ledger_info);
                 let aggregated = attempted_item.is_aggregated();
                 set_elem(&cursor, attempted_item);
                 if aggregated {
-                    self.advance_head(cursor);
+                    self.advance_head(target_block_id);
                 }
             }
 
@@ -338,23 +341,17 @@ impl StateManager {
     /// process the commit vote messages
     /// it scans the whole buffer for a matching blockinfo
     /// if found, try advancing the item to be aggregated
-    async fn process_commit_message(
-        &mut self,
-        commit_msg: VerifiedEvent,
-    ) -> Option<BufferItemRootType> {
+    async fn process_commit_message(&mut self, commit_msg: VerifiedEvent) -> Option<HashValue> {
         match commit_msg {
             VerifiedEvent::CommitVote(vote) => {
                 // find the corresponding item
+                let target_block_id = vote.commit_info().id();
                 let current_cursor = find_elem(self.buffer.head.clone(), |item| {
-                    item.block_id() == vote.commit_info().id()
+                    item.block_id() == target_block_id
                 });
                 if current_cursor.is_some() {
                     let mut buffer_item = take_elem(&current_cursor);
-                    let new_item = match buffer_item.add_signature_if_matched(
-                        vote.commit_info(),
-                        vote.author(),
-                        vote.signature().clone(),
-                    ) {
+                    let new_item = match buffer_item.add_signature_if_matched(*vote) {
                         Ok(()) => buffer_item.try_advance_to_aggregated(&self.verifier),
                         Err(e) => {
                             error!("Failed to add commit vote {:?}", e);
@@ -363,7 +360,7 @@ impl StateManager {
                     };
                     set_elem(&current_cursor, new_item);
                     if get_elem(&current_cursor).is_aggregated() {
-                        return Some(current_cursor);
+                        return Some(target_block_id);
                     }
                 }
             }
@@ -436,8 +433,8 @@ impl StateManager {
                     self.advance_signing_root().await;
                 }
                 Some(commit_msg) = self.commit_msg_rx.next() => {
-                    if let Some(aggregated) = self.process_commit_message(commit_msg).await {
-                        self.advance_head(aggregated);
+                    if let Some(aggregated_block_id) = self.process_commit_message(commit_msg).await {
+                        self.advance_head(aggregated_block_id);
                     }
                 }
                 _ = interval.tick() => {
