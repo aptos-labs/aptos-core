@@ -24,9 +24,7 @@ use crate::{
     experimental::{
         buffer_item::BufferItem,
         execution_phase::{ExecutionRequest, ExecutionResponse},
-        linkedlist::{
-            find_elem, get_elem, get_elem_mut, get_next, link_eq, set_elem, take_elem, Link, List,
-        },
+        linkedlist::{find_elem, get_elem, get_next, link_eq, set_elem, take_elem, Link, List},
         persisting_phase::PersistingRequest,
         signing_phase::{SigningRequest, SigningResponse},
     },
@@ -155,7 +153,7 @@ impl StateManager {
     /// Set to None if not exist
     async fn advance_execution_root(&mut self) {
         let cursor = self.execution_root.clone().or(self.buffer.head.clone());
-        self.execution_root = find_elem(cursor, |item| matches!(*item, BufferItem::Ordered(_)));
+        self.execution_root = find_elem(cursor, |item| item.is_ordered());
         if self.execution_root.is_some() {
             let ordered_blocks = get_elem(&self.execution_root).get_blocks().clone();
             self.execution_phase_tx
@@ -169,7 +167,7 @@ impl StateManager {
     /// Set to None if not exist
     async fn advance_signing_root(&mut self) {
         let cursor = self.signing_root.clone().or(self.buffer.head.clone());
-        self.signing_root = find_elem(cursor, |item| matches!(*item, BufferItem::Executed(_)));
+        self.signing_root = find_elem(cursor, |item| item.is_executed());
         if self.signing_root.is_some() {
             let item = get_elem(&self.signing_root);
             match item.deref() {
@@ -199,7 +197,7 @@ impl StateManager {
     fn advance_head(&mut self, aggregated_cursor: BufferItemRootType) {
         let target_block_id = {
             let item = get_elem(&aggregated_cursor);
-            assert!(matches!(item.deref(), BufferItem::Aggregated(_)));
+            assert!(item.is_aggregated());
             item.block_id()
         };
         let mut blocks_to_persist: Vec<Arc<ExecutedBlock>> = vec![];
@@ -268,7 +266,7 @@ impl StateManager {
                 let buffer_item = take_elem(&cursor);
                 let attempted_item =
                     buffer_item.try_advance_to_aggregated_with_ledger_info(ledger_info.clone());
-                let aggregated = matches!(attempted_item, BufferItem::Aggregated(_));
+                let aggregated = attempted_item.is_aggregated();
                 set_elem(&cursor, attempted_item);
                 if aggregated {
                     self.advance_head(cursor);
@@ -295,7 +293,7 @@ impl StateManager {
 
         if current_cursor.is_some() {
             let buffer_item = take_elem(&current_cursor);
-            assert!(matches!(buffer_item, BufferItem::Ordered(_)));
+            assert!(buffer_item.is_ordered());
             set_elem(
                 &current_cursor,
                 buffer_item.advance_to_executed(executed_blocks),
@@ -323,7 +321,7 @@ impl StateManager {
         if current_cursor.is_some() {
             let buffer_item = take_elem(&current_cursor);
             // it is possible that we already signed this buffer item (double check after the final integration)
-            if matches!(buffer_item, BufferItem::Executed(_)) {
+            if buffer_item.is_executed() {
                 // we have found the buffer item
                 let (signed_buffer_item, commit_vote) =
                     buffer_item.advance_to_signed(self.author, signature, &self.verifier);
@@ -364,7 +362,7 @@ impl StateManager {
                         }
                     };
                     set_elem(&current_cursor, new_item);
-                    if matches!(get_elem(&current_cursor).deref(), BufferItem::Aggregated(_)) {
+                    if get_elem(&current_cursor).is_aggregated() {
                         return Some(current_cursor);
                     }
                 }

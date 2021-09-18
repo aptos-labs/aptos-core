@@ -310,6 +310,22 @@ impl BufferItem {
     }
 
     pub fn has_been_executed(&self) -> bool {
-        !matches!(self, Self::Ordered(_))
+        !self.is_ordered()
+    }
+
+    pub fn is_ordered(&self) -> bool {
+        matches!(self, Self::Ordered(_))
+    }
+
+    pub fn is_executed(&self) -> bool {
+        matches!(self, Self::Executed(_))
+    }
+
+    pub fn is_signed(&self) -> bool {
+        matches!(self, Self::Signed(_))
+    }
+
+    pub fn is_aggregated(&self) -> bool {
+        matches!(self, Self::Aggregated(_))
     }
 }
