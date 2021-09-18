@@ -83,18 +83,23 @@ impl BufferItem {
     // pipeline functions
     pub fn advance_to_executed(self, executed_blocks: Vec<ExecutedBlock>) -> Self {
         match self {
-            Self::Ordered(ordered_item_box) => {
-                let ordered_item = *ordered_item_box;
-                for (b1, b2) in zip_eq(ordered_item.ordered_blocks.iter(), executed_blocks.iter()) {
+            Self::Ordered(ordered_item) => {
+                let OrderedBufferItem {
+                    ordered_blocks,
+                    pending_votes,
+                    callback,
+                    ordered_proof,
+                } = *ordered_item;
+                for (b1, b2) in zip_eq(ordered_blocks.iter(), executed_blocks.iter()) {
                     assert_eq!(b1.id(), b2.id());
                 }
                 let commit_info = executed_blocks.last().unwrap().block_info();
                 Self::Executed(Box::new(ExecutedBufferItem {
                     executed_blocks,
-                    pending_votes: ordered_item.pending_votes,
-                    callback: ordered_item.callback,
+                    pending_votes,
+                    callback,
                     commit_info,
-                    ordered_proof: ordered_item.ordered_proof,
+                    ordered_proof,
                 }))
             }
             _ => {
@@ -110,15 +115,19 @@ impl BufferItem {
         verifier: &ValidatorVerifier,
     ) -> (Self, CommitVote) {
         match self {
-            Self::Executed(executed_item_box) => {
-                let executed_item = *executed_item_box;
+            Self::Executed(executed_item) => {
+                let commit_ledger_info = executed_item.generate_commit_ledger_info();
+                let ExecutedBufferItem {
+                    executed_blocks,
+                    callback,
+                    pending_votes,
+                    ..
+                } = *executed_item;
 
                 let mut valid_sigs = BTreeMap::<AccountAddress, Ed25519Signature>::new();
                 valid_sigs.insert(author, signature.clone());
 
-                let commit_ledger_info = executed_item.generate_commit_ledger_info();
-
-                for (author, sig) in executed_item.pending_votes.iter() {
+                for (author, sig) in pending_votes.iter() {
                     if verifier.verify(*author, &commit_ledger_info, sig).is_ok() {
                         valid_sigs.insert(*author, sig.clone());
                     }
@@ -132,8 +141,8 @@ impl BufferItem {
 
                 (
                     Self::Signed(Box::new(SignedBufferItem {
-                        executed_blocks: executed_item.executed_blocks,
-                        callback: executed_item.callback,
+                        executed_blocks,
+                        callback,
                         commit_proof: commit_ledger_info_with_sigs,
                         commit_vote: commit_vote.clone(),
                     })),
@@ -200,8 +209,7 @@ impl BufferItem {
 
     pub fn try_advance_to_aggregated(self, validator: &ValidatorVerifier) -> Self {
         match self {
-            Self::Signed(signed_item_box) => {
-                let signed_item = *signed_item_box;
+            Self::Signed(signed_item) => {
                 if signed_item
                     .commit_proof
                     .check_voting_power(validator)
@@ -213,12 +221,11 @@ impl BufferItem {
                         callback: signed_item.callback,
                     }))
                 } else {
-                    Self::Signed(Box::new(signed_item))
+                    Self::Signed(signed_item)
                 }
             }
-            Self::Executed(executed_item_box) => {
-                let executed_item = *executed_item_box;
-                // TODO this needs to verify the votes
+            Self::Executed(executed_item) => {
+                // TODO this needs to verify the votes match the commit info
                 if validator
                     .check_voting_power(executed_item.pending_votes.keys())
                     .is_ok()
@@ -233,7 +240,7 @@ impl BufferItem {
                         callback: executed_item.callback,
                     }))
                 } else {
-                    Self::Executed(Box::new(executed_item))
+                    Self::Executed(executed_item)
                 }
             }
             _ => self,
