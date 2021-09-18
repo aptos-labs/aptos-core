@@ -7551,6 +7551,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "shuffle"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+ "structopt 0.3.21",
+ "tempfile",
+ "toml",
+]
+
+[[package]]
 name = "shuffle-custom-move-code"
 version = "0.1.0"
 dependencies = [
