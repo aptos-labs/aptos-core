@@ -108,11 +108,27 @@ impl BufferItem {
         }
     }
 
+    fn aggregate_ledger_info(
+        commit_ledger_info: &LedgerInfo,
+        signatures: BTreeMap<AccountAddress, Ed25519Signature>,
+        validator: &ValidatorVerifier,
+    ) -> LedgerInfoWithSignatures {
+        let mut valid_sigs = BTreeMap::new();
+
+        for (author, sig) in signatures.into_iter() {
+            if validator.verify(author, commit_ledger_info, &sig).is_ok() {
+                valid_sigs.insert(author, sig);
+            }
+        }
+
+        LedgerInfoWithSignatures::new(commit_ledger_info.clone(), valid_sigs)
+    }
+
     pub fn advance_to_signed(
         self,
         author: Author,
         signature: Ed25519Signature,
-        verifier: &ValidatorVerifier,
+        validator: &ValidatorVerifier,
     ) -> (Self, CommitVote) {
         match self {
             Self::Executed(executed_item) => {
@@ -120,21 +136,13 @@ impl BufferItem {
                 let ExecutedBufferItem {
                     executed_blocks,
                     callback,
-                    pending_votes,
+                    mut pending_votes,
                     ..
                 } = *executed_item;
 
-                let mut valid_sigs = BTreeMap::<AccountAddress, Ed25519Signature>::new();
-                valid_sigs.insert(author, signature.clone());
-
-                for (author, sig) in pending_votes.iter() {
-                    if verifier.verify(*author, &commit_ledger_info, sig).is_ok() {
-                        valid_sigs.insert(*author, sig.clone());
-                    }
-                }
-
-                let commit_ledger_info_with_sigs =
-                    LedgerInfoWithSignatures::new(commit_ledger_info.clone(), valid_sigs);
+                pending_votes.insert(author, signature.clone());
+                let commit_proof =
+                    Self::aggregate_ledger_info(&commit_ledger_info, pending_votes, validator);
 
                 let commit_vote =
                     CommitVote::new_with_signature(author, commit_ledger_info, signature);
@@ -143,7 +151,7 @@ impl BufferItem {
                     Self::Signed(Box::new(SignedBufferItem {
                         executed_blocks,
                         callback,
-                        commit_proof: commit_ledger_info_with_sigs,
+                        commit_proof,
                         commit_vote: commit_vote.clone(),
                     })),
                     commit_vote,
@@ -225,18 +233,18 @@ impl BufferItem {
                 }
             }
             Self::Executed(executed_item) => {
-                // TODO this needs to verify the votes match the commit info
+                let maybe_aggregated_proof = Self::aggregate_ledger_info(
+                    &executed_item.generate_commit_ledger_info(),
+                    executed_item.pending_votes.clone(),
+                    validator,
+                );
                 if validator
-                    .check_voting_power(executed_item.pending_votes.keys())
+                    .check_voting_power(maybe_aggregated_proof.signatures().keys())
                     .is_ok()
                 {
-                    let aggregated_proof = LedgerInfoWithSignatures::new(
-                        executed_item.generate_commit_ledger_info(),
-                        executed_item.pending_votes,
-                    );
                     Self::Aggregated(Box::new(AggregatedBufferItem {
                         executed_blocks: executed_item.executed_blocks,
-                        aggregated_proof,
+                        aggregated_proof: maybe_aggregated_proof,
                         callback: executed_item.callback,
                     }))
                 } else {
