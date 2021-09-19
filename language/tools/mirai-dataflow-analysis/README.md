@@ -36,8 +36,7 @@ interfaces with to perform its analysis.
 
 `mirai-dataflow` exposes the following CLI (viewable via the `--help` flag):
 ```
-mirai-dataflow 0.1.0
-Rust dataflow analyzer built on MIRAI
+Rust dataflow analyzer built on MIRAI.
 
 USAGE:
     mirai-dataflow-analysis [FLAGS] [OPTIONS] <crate-path> <config-path>
@@ -45,7 +44,7 @@ USAGE:
 FLAGS:
         --call-graph-only    Only produce a call graph (no analysis)
     -h, --help               Prints help information
-    -n, --no-clean           Do not clean the crate before analysis
+    -n, --no-rebuild         Do not rebuild the crate before analysis
     -r, --reanalyze          Rerun the Datalog analysis without running MIRAI
     -V, --version            Prints version information
 
@@ -73,7 +72,13 @@ The configuration file is a JSON file following this schema:
 ```
 {
     "reductions": List[Reduction],
-    "included_crates": List[String]
+    "included_crates": List[String],
+    "node_types": {
+        "entry": List[String],
+        "checker: List[String],
+        "safe": List[String],
+        "exit": List[String]
+    }
 }
 ```
 where a Reduction is one of:
@@ -86,7 +91,40 @@ where a Reduction is one of:
 
 Please see the call graph generator's
 [documentation](https://github.com/facebookexperimental/MIRAI/blob/main/documentation/CallGraph.md)
-for more details.
+for more details on the "reductions" and "included_crates" fields.
+
+#### Node Type Specifications
+
+The `node_type` configuration is of particular importance as it is used to inform the analysis
+of entry points, exit points, checkers, and endpoints that can be safely ignored.
+Please see below for an explanation of each of these types:
+
+1. Entry: This is a list of names of function that are considered entry points of the crate.
+2. Checker: Names of functions that are considered checking functions of the crate.
+3. Safe: Names of functions that are not checking functions, but are "safe" if they are endpoints
+where an unchecked dataflow ends. This field is typically used to exclude function endpoints that
+are false positives for an analysis.
+4. Exit: Names of functions that are considered the exit points of the crate.
+
+These node types are converted into datalog input relations that are provided to the analysis
+as well as the call graph input relations.
+For Soufflé, a file name `NodeType.facts` is generated with relations of the form:
+1. Entry: `{node_id},0`
+2. Checker: `{node_id},1`
+3. Safe: `{node_id},1`
+4. Exit: `{node_id},2`
+
+For Differential Datalog, input relations are added directly to the call graph input relations file:
+1. Entry: `NodeType({node_id},Entry)`
+2. Checker: `NodeType({node_id},Checker)`
+3. Safe: `NodeType({node_id},Checker)`
+4. Exit: `NodeType({node_id},Exit)`
+
+Note that both Checker and Safe are assigned to Checker. This is a valid optimization as semantically
+they are the same in the default analysis, but if an analysis assigns a different meaning to them
+this can be modified.
+
+#### Example Configuration
 
 Below is an example of a valid configuration file:
 ```
@@ -96,7 +134,20 @@ Below is an example of a valid configuration file:
         "Fold",
         "Clean"
     ],
-    "included_crates": ["check_bounds"]
+    "included_crates": ["check_bounds"],
+    "node_types": {
+        "entry": [
+            "verify_impl"
+        ],
+        "checker": [
+            "check_bounds_impl",
+            "check_code_unit_bounds_impl",
+            "check_type_parameter"
+        ],
+        "exit": [
+            "verify_impl_exit"
+        ]
+    }
 }
 ```
 
@@ -104,7 +155,7 @@ Below is an example of a valid configuration file:
 
 Having configured `mirai-dataflow` as explained above, the analysis can then be run:
 ```
-$ cargo run -- ../../move-binary-format ./config/call_graph_config.json --datalog-backend=Souffle
+$ cargo run -- ../../move-binary-format config/call_graph_config.json --type-relations-path=config/type_relations.json
 ```
 
 `mirai-dataflow` will then execute MIRAI on the crate and then execute the Datalog analysis:

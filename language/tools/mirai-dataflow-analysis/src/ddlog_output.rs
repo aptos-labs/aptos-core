@@ -10,7 +10,9 @@ use std::{
 };
 
 use crate::{
-    datalog::{determine_op_type, DatalogRelation, DatalogRelationOperand, DatalogRelations},
+    datalog::{
+        determine_op_type, DatalogRelation, DatalogRelationOperand, DatalogRelations, NodeType,
+    },
     util::get_child_output,
 };
 
@@ -100,4 +102,30 @@ pub fn parse_ddlog_output(analysis_output_path: &Path) -> Result<DatalogRelation
             }
             Ok(relations)
         })
+}
+
+/// Output node type annotations as datalog input relations
+pub fn write_ddlog_node_types(
+    node_types: &[NodeType],
+    ddlog_relations_path: &Path,
+) -> Result<(), String> {
+    let mut out_strs = Vec::<String>::new();
+    for node_type in node_types.iter() {
+        out_strs.push(match node_type {
+            NodeType::Entry(id) => format!("insert NodeType({},Entry)", id),
+            NodeType::Checker(id) => format!("insert NodeType({},Checker)", id),
+            NodeType::Safe(id) => format!("insert NodeType({},Checker)", id),
+            NodeType::Exit(id) => format!("insert NodeType({},Exit)", id),
+        });
+    }
+    let mut out_str = out_strs.join(";\n");
+    out_str.push_str(";\ncommit;\ndump CheckedType;\ndump NotCheckedType;");
+    let ddlog_relations_str = fs::read_to_string(ddlog_relations_path)
+        .map_err(|msg| format!("Failed to read ddlog relations: {}", msg))?;
+    fs::write(
+        ddlog_relations_path,
+        ddlog_relations_str.replace("commit;", &out_str),
+    )
+    .map(|_| ())
+    .map_err(|msg| format!("Failed to write node type relations: {}", msg))
 }

@@ -49,6 +49,15 @@ pub struct DatalogConfig {
     pub analysis_decoded_output_path: PathBuf,
 }
 
+/// Configuration for node type input relations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NodeTypeConfig {
+    pub entry: Vec<Box<str>>,
+    pub checker: Vec<Box<str>>,
+    pub safe: Vec<Box<str>>,
+    pub exit: Vec<Box<str>>,
+}
+
 /// Configuration options for call graph generation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CallGraphConfig {
@@ -63,6 +72,8 @@ pub struct CallGraphConfig {
     pub included_crates: Vec<Box<str>>,
     /// Datalog output configuration
     pub datalog_config: Option<DatalogConfig>,
+    /// Node type annotations
+    pub node_types: NodeTypeConfig,
 }
 
 /// Generate a complete CallGraphConfig from a combination of the partial config
@@ -90,7 +101,7 @@ pub fn generate_config(
     if !call_graph_only {
         let datalog_backend = match datalog_backend {
             Some(backend) => backend,
-            None => DatalogBackend::DifferentialDatalog,
+            None => DatalogBackend::Souffle,
         };
         let ddlog_output_path = make_absolute(&match datalog_backend {
             DatalogBackend::DifferentialDatalog => output_path.join("graph.dat"),

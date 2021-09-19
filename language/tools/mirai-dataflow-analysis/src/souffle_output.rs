@@ -8,7 +8,9 @@ use std::{
 };
 
 use crate::{
-    datalog::{determine_op_type, DatalogRelation, DatalogRelationOperand, DatalogRelations},
+    datalog::{
+        determine_op_type, DatalogRelation, DatalogRelationOperand, DatalogRelations, NodeType,
+    },
     util::make_absolute,
 };
 
@@ -75,4 +77,22 @@ pub fn parse_souffle_output(output_path: &Path) -> Result<DatalogRelations, Stri
         relations.extend(relations_subset);
     }
     Ok(relations)
+}
+
+/// Output node type annotations as datalog input relations
+pub fn write_souffle_node_types(node_types: &[NodeType], output_path: &Path) -> Result<(), String> {
+    let mut out_strs = Vec::<String>::new();
+    for node_type in node_types.iter() {
+        out_strs.push(match node_type {
+            NodeType::Entry(id) => format!("{},0", id),
+            NodeType::Checker(id) => format!("{},1", id),
+            NodeType::Safe(id) => format!("{},1", id),
+            NodeType::Exit(id) => format!("{},2", id),
+        });
+    }
+    out_strs.sort_unstable();
+    let out_str = out_strs.join("\n");
+    fs::write(output_path.join("NodeType.facts"), out_str)
+        .map(|_| ())
+        .map_err(|msg| format!("Failed to write node types: {}", msg))
 }

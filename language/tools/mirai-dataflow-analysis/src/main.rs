@@ -17,10 +17,10 @@ mod ddlog_output;
 mod souffle_output;
 mod util;
 
-use configuration::generate_config;
-use datalog::{decode_analysis_output, DatalogBackend, DatalogRelations};
-use ddlog_output::{parse_ddlog_output, run_ddlog_analysis};
-use souffle_output::{parse_souffle_output, run_souffle_analysis};
+use configuration::{generate_config, NodeTypeConfig};
+use datalog::{decode_analysis_output, DatalogBackend, DatalogRelations, NodeType};
+use ddlog_output::{parse_ddlog_output, run_ddlog_analysis, write_ddlog_node_types};
+use souffle_output::{parse_souffle_output, run_souffle_analysis, write_souffle_node_types};
 use util::{get_child_output, NodeMap, TypeMap};
 
 // Path to the current Rust nightly toolchain version
@@ -29,17 +29,9 @@ const RUST_TOOLCHAIN_PATH: &str = "./rust-toolchain";
 
 // Run the Datalog analysis on the test file and
 // capture output
-fn run_mirai(config_path: &Path, crate_path: &Path, no_clean: bool) -> Result<(), String> {
-    if !no_clean {
-        // cargo clean
-        println!("Executing cargo clean on {}", crate_path.display());
-        let out1 = Command::new("cargo")
-            .current_dir(&crate_path)
-            .arg("clean")
-            .output()
-            .map_err(|msg| format!("Failed to clean crate: {}", msg))?;
-        println!("Result: {}", get_child_output(&out1));
-        // Set nightly
+fn run_mirai(config_path: &Path, crate_path: &Path, no_rebuild: bool) -> Result<(), String> {
+    if !no_rebuild {
+        // rustup override set toolchain
         println!(
             "Setting nightly toolchain version for {}",
             crate_path.display()
@@ -55,24 +47,16 @@ fn run_mirai(config_path: &Path, crate_path: &Path, no_clean: bool) -> Result<()
             .output()
             .map_err(|msg| format!("Failed to set nightly: {}", msg))?;
         println!("Result: {}", get_child_output(&out2));
-        // cargo build
-        println!("Executing cargo build on {}", crate_path.display());
-        let out3 = Command::new("cargo")
+        // 'RUSTFLAGS="-Z always_encode_mir" cargo build'
+        println!("Executing MIR cargo build on {}", crate_path.display());
+        let out4 = Command::new("cargo")
             .current_dir(&crate_path)
+            .env("RUSTFLAGS", "-Z always_encode_mir")
             .arg("build")
             .output()
-            .map_err(|msg| format!("Failed to clean crate: {}", msg))?;
-        println!("Result: {}", get_child_output(&out3));
+            .map_err(|msg| format!("Failed to build crate with MIR: {}", msg))?;
+        println!("Result: {}", get_child_output(&out4));
     }
-    // 'RUSTFLAGS="-Z always_encode_mir" cargo build'
-    println!("Executing MIR cargo build on {}", crate_path.display());
-    let out4 = Command::new("cargo")
-        .current_dir(&crate_path)
-        .env("RUSTFLAGS", "-Z always_encode_mir")
-        .arg("build")
-        .output()
-        .map_err(|msg| format!("Failed to build crate with MIR: {}", msg))?;
-    println!("Result: {}", get_child_output(&out4));
     // touch src/lib.rs
     println!("Executing touch src/lib.rs {}", crate_path.display());
     let out5 = Command::new("touch")
@@ -142,18 +126,65 @@ fn parse_dot_graph(graph_path: &Path) -> Result<NodeMap, String> {
 /// Process raw analysis output and write it to a file
 fn process_datalog_output(
     relations: &mut DatalogRelations,
+    node_map: &NodeMap,
     type_map_path: &Path,
-    dot_path: &Path,
     decoded_path: &Path,
 ) -> Result<(), String> {
     let type_map = parse_type_map(type_map_path)?;
-    let node_map = parse_dot_graph(dot_path)?;
-    decode_analysis_output(relations, type_map, node_map);
+    decode_analysis_output(relations, &type_map, node_map);
     let relations_output = serde_json::to_string(&relations)
         .map_err(|msg| format!("Failed to serialize relations: {}", msg))?;
     fs::write(decoded_path, relations_output)
         .map(|_| ())
         .map_err(|msg| format!("Failed to write relations to file: {}", msg))
+}
+
+/// Parse a node name to retrieve its suffix
+fn parse_node_name(name: &str) -> String {
+    let name1 = name.replace("\"", "");
+    let name_parts = name1.split("::").collect::<Vec<&str>>();
+    let len = name_parts.len();
+    assert!(len >= 2);
+    if name_parts[len - 1].contains("closure") {
+        format!("{}::{}", name_parts[len - 2], name_parts[len - 1])
+    } else {
+        name_parts[len - 1].to_owned()
+    }
+}
+
+/// Find the node id for a given node name
+fn get_id_for_node(node_map: &NodeMap, name: &str) -> Result<u32, String> {
+    for (id, node_name) in node_map.iter() {
+        if parse_node_name(node_name) == name {
+            return Ok(*id);
+        }
+    }
+    Err(format!("Failed to find node {} in node map", &name))
+}
+
+/// Derive node type annotations from the node type configuration
+pub fn parse_node_types(
+    node_map: &NodeMap,
+    raw_node_types: &NodeTypeConfig,
+) -> Result<Vec<NodeType>, String> {
+    let mut node_types = Vec::<NodeType>::new();
+    for node_name in raw_node_types.entry.iter() {
+        let node_id = get_id_for_node(node_map, node_name.as_ref())?;
+        node_types.push(NodeType::Entry(node_id));
+    }
+    for node_name in raw_node_types.checker.iter() {
+        let node_id = get_id_for_node(node_map, node_name.as_ref())?;
+        node_types.push(NodeType::Checker(node_id));
+    }
+    for node_name in raw_node_types.safe.iter() {
+        let node_id = get_id_for_node(node_map, node_name.as_ref())?;
+        node_types.push(NodeType::Safe(node_id));
+    }
+    for node_name in raw_node_types.exit.iter() {
+        let node_id = get_id_for_node(node_map, node_name.as_ref())?;
+        node_types.push(NodeType::Exit(node_id));
+    }
+    Ok(node_types)
 }
 
 #[derive(Debug, StructOpt)]
@@ -182,9 +213,9 @@ struct Opt {
     #[structopt(short, long, parse(from_os_str))]
     type_relations_path: Option<PathBuf>,
 
-    /// Do not clean the crate before analysis
+    /// Do not rebuild the crate before analysis
     #[structopt(short, long)]
-    no_clean: bool,
+    no_rebuild: bool,
 
     /// Rerun the Datalog analysis without running MIRAI
     #[structopt(short, long)]
@@ -216,7 +247,7 @@ fn main() {
     };
     if !opt.reanalyze {
         println!("Running MIRAI...");
-        match run_mirai(&config_path, &crate_path, opt.no_clean) {
+        match run_mirai(&config_path, &crate_path, opt.no_rebuild) {
             Ok(_) => {}
             Err(msg) => unrecoverable!("{}", msg),
         }
@@ -226,6 +257,28 @@ fn main() {
     // Datalog analysis
     if let Some(datalog_config) = config.datalog_config {
         println!("Running Datalog analysis...");
+        // Generate Datalog input relations for node types
+        assert!(config.dot_output_path.is_some());
+        let node_map = match parse_dot_graph(&config.dot_output_path.unwrap()) {
+            Ok(node_map) => node_map,
+            Err(msg) => unrecoverable!("{}", msg),
+        };
+        let node_types = match parse_node_types(&node_map, &config.node_types) {
+            Ok(node_types) => node_types,
+            Err(msg) => unrecoverable!("{}", msg),
+        };
+        let node_type_result = match datalog_config.datalog_backend {
+            DatalogBackend::DifferentialDatalog => {
+                write_ddlog_node_types(&node_types, &datalog_config.ddlog_output_path)
+            }
+            DatalogBackend::Souffle => {
+                write_souffle_node_types(&node_types, &datalog_config.analysis_raw_output_path)
+            }
+        };
+        match node_type_result {
+            Ok(_) => {}
+            Err(msg) => unrecoverable!("{}", msg),
+        }
         let analysis_result = match datalog_config.datalog_backend {
             DatalogBackend::DifferentialDatalog => run_ddlog_analysis(
                 &datalog_config.ddlog_output_path,
@@ -244,7 +297,7 @@ fn main() {
         println!("Processing output...");
         let relations_result = match datalog_config.datalog_backend {
             DatalogBackend::DifferentialDatalog => {
-                parse_ddlog_output(&datalog_config.ddlog_output_path)
+                parse_ddlog_output(&datalog_config.analysis_raw_output_path)
             }
             DatalogBackend::Souffle => {
                 parse_souffle_output(&datalog_config.analysis_raw_output_path)
@@ -254,11 +307,10 @@ fn main() {
             Ok(relations) => relations,
             Err(msg) => unrecoverable!("{}", msg),
         };
-        assert!(config.dot_output_path.is_some());
         let process_result = process_datalog_output(
             &mut relations,
+            &node_map,
             &datalog_config.type_map_output_path,
-            &config.dot_output_path.unwrap(),
             &datalog_config.analysis_decoded_output_path,
         );
         match process_result {

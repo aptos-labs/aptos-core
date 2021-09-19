@@ -7,6 +7,15 @@ use serde::{Deserialize, Serialize};
 
 use crate::util::{NodeMap, TypeMap};
 
+/// Annotations for NodeType input relations
+#[derive(Debug, Clone)]
+pub enum NodeType {
+    Entry(u32),
+    Checker(u32),
+    Safe(u32),
+    Exit(u32),
+}
+
 pub type DatalogRelations = Vec<DatalogRelation>;
 
 /// A Datalog relation operand is an index of a
@@ -94,8 +103,8 @@ pub fn determine_op_type(op_name: &str) -> Result<DatalogRelationOperandType, St
 /// operands to strings
 pub fn decode_analysis_output(
     relations: &mut DatalogRelations,
-    type_map: TypeMap,
-    node_map: NodeMap,
+    type_map: &TypeMap,
+    node_map: &NodeMap,
 ) {
     for relation in relations.iter_mut() {
         for operand in relation.operands.iter_mut() {
