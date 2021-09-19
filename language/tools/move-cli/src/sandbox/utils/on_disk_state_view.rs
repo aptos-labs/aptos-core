@@ -105,7 +105,7 @@ impl OnDiskStateView {
         })
     }
 
-    pub(crate) fn get_named_addresses(
+    pub fn get_named_addresses(
         &self,
         additional_named_address_values: BTreeMap<String, AddressBytes>,
     ) -> Result<BTreeMap<String, AddressBytes>> {

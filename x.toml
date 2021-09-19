@@ -227,6 +227,7 @@ members = [
     "scratchpad-benchmark",
     "sdk-compatibility",
     "serializer-tests",
+    "shuffle",
     "shuffle-custom-move-code",
     "shuffle-custom-node",
     "shuffle-sample-custom-app",

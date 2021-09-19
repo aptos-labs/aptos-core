@@ -7,6 +7,11 @@ use diem_types::on_chain_config::VMPublishingOption;
 use std::path::Path;
 use structopt::StructOpt;
 
+/// Directory where Move source code lives
+const MOVE_CODE_DIR: &str = "../move/";
+/// Directory where Move module bytecodes live
+const MOVE_BYTECODE_DIR: &str = "../move/storage/0x00000000000000000000000000000001/modules";
+
 #[derive(StructOpt)]
 #[structopt(
     name = "custom-node",
@@ -23,7 +28,7 @@ pub struct CustomFramework {
 /// Generate a node config under `args.node_config_dir`
 fn main() -> Result<()> {
     let args = CustomFramework::from_args();
-    shuffle_custom_node::build_move_sources()?;
+    shuffle_custom_node::build_move_sources(Path::new(MOVE_CODE_DIR))?;
     let publishing_option = if args.open_publishing {
         VMPublishingOption::open() // everyone can publish modules and execute custom scripts
     } else {
@@ -31,6 +36,7 @@ fn main() -> Result<()> {
     };
     let validator_config = shuffle_custom_node::generate_validator_config(
         Path::new(&args.node_config_dir),
+        Path::new(MOVE_BYTECODE_DIR),
         publishing_option,
     )?;
     let node_config = NodeConfig::load(validator_config.config_path())?;

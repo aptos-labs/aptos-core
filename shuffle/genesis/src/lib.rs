@@ -27,13 +27,10 @@ const DF_COMPILED_SCRIPTS_ABI_DIR: &str =
     "../../language/diem-framework/DPN/releases/artifacts/current/script_abis";
 /// The output path for generated transaction builders
 const TRANSACTION_BUILDERS_GENERATED_SOURCE_PATH: &str = "../transaction-builder/src/framework.rs";
-/// Directory where Move source code lives
-const MOVE_CODE_DIR: &str = "../move/";
-/// Directory where Move module bytecodes live
-const MOVE_BYTECODE_DIR: &str = "../move/storage/0x00000000000000000000000000000001/modules";
 
 pub fn generate_validator_config(
     node_config_dir: &Path,
+    move_bytecode_dir: &Path,
     publishing_option: VMPublishingOption,
 ) -> Result<ValidatorConfig> {
     assert!(
@@ -42,7 +39,7 @@ pub fn generate_validator_config(
         node_config_dir
     );
     fs::create_dir(node_config_dir)?;
-    let mut genesis_modules: Vec<Vec<u8>> = fs::read_dir(MOVE_BYTECODE_DIR)?
+    let mut genesis_modules: Vec<Vec<u8>> = fs::read_dir(move_bytecode_dir)?
         .map(|f| fs::read(f.unwrap().path()).unwrap())
         .collect();
     genesis_modules.extend(diem_framework_releases::current_module_blobs().to_vec());
@@ -72,13 +69,12 @@ pub fn generate_validator_config(
     Ok(validators.pop().unwrap())
 }
 
-/// TODO: remove this code and use Move package manager to build sources when it is available
-pub fn build_move_sources() -> Result<()> {
+pub fn build_move_sources(move_code_dir: &Path) -> Result<()> {
     // Build the Move code to ensure we get the latest changes in script builders + the genesis WriteSet
     utils::time_it("Building Move code", || {
         let output = Command::new("move")
             .args(&["sandbox", "publish", "--mode=bare"])
-            .current_dir(MOVE_CODE_DIR)
+            .current_dir(move_code_dir)
             .output()
             .expect("Failure building Move code");
         if !output.status.success() || !output.stdout.is_empty() || !output.stderr.is_empty() {

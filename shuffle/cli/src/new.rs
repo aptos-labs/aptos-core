@@ -2,49 +2,176 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
-use serde::Serialize;
+use diem_genesis_tool::validator_builder::ValidatorConfig;
+use diem_types::{account_address::AccountAddress, on_chain_config::VMPublishingOption};
+use move_cli::{
+    sandbox,
+    sandbox::utils::{on_disk_state_view::OnDiskStateView, Mode, ModeType},
+};
+use move_lang::shared::AddressBytes;
+use once_cell::sync::Lazy;
+use serde::{Deserialize, Serialize};
 use std::{
+    collections::{BTreeMap, HashMap},
     fs,
     path::{Path, PathBuf},
 };
-use toml;
 
 /// Default blockchain configuration
-pub const DEFAULT_BLOCKCHAIN: &str = "dpn";
+pub const DEFAULT_BLOCKCHAIN: &str = "goodday";
 
-pub fn handle(blockchain: String, path: PathBuf) -> Result<()> {
-    println!("Creating shuffle project in {}", path.display());
-    fs::create_dir_all(path.as_path())?;
+pub fn handle(blockchain: String, pathbuf: PathBuf) -> Result<()> {
+    let project_path = pathbuf.as_path();
+    println!("Creating shuffle project in {}", project_path.display());
+    fs::create_dir_all(project_path)?;
 
-    let config = Config { blockchain };
-    write_config(path.as_path(), config)
+    let mode = Mode::new(ModeType::Bare);
+    let build_path = project_path.join("move/build");
+    let storage_path = project_path.join("move/storage");
+    let state = mode.prepare_state(build_path.as_path(), storage_path.as_path())?;
+
+    let config = Config {
+        blockchain,
+        named_addresses: fetch_named_addresses(&state)?,
+    };
+    write_project_config(project_path, &config)?;
+    write_move_starter_modules(project_path)?;
+    build_move_starter_modules(project_path, &state)?;
+    generate_validator_config(project_path)?;
+    Ok(())
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "kebab-case")]
-struct Config {
-    blockchain: String,
+pub struct Config {
+    pub(crate) blockchain: String,
+    named_addresses: BTreeMap<String, AccountAddress>,
 }
 
-fn write_config(path: &Path, config: Config) -> Result<()> {
+// Fetches the named addresses for a particular project or genesis.
+// Uses a BTreeMap over HashMap because upstream AddressBytes does as well,
+// probably because order matters.
+fn fetch_named_addresses(state: &OnDiskStateView) -> Result<BTreeMap<String, AccountAddress>> {
+    let address_bytes_map = state.get_named_addresses(BTreeMap::new())?;
+    Ok(map_address_bytes_to_account_address(address_bytes_map))
+}
+
+// map_address_bytes_to_account_address converts BTreeMap<String,AddressBytes>
+// to BTreeMap<String, AccountAddress> because AddressBytes is not serializable.
+fn map_address_bytes_to_account_address(
+    original: BTreeMap<String, AddressBytes>,
+) -> BTreeMap<String, AccountAddress> {
+    original
+        .iter()
+        .map(|(name, addr)| (name.to_string(), AccountAddress::new(addr.into_bytes())))
+        .collect()
+}
+
+fn write_project_config(path: &Path, config: &Config) -> Result<()> {
     let toml_path = PathBuf::from(path).join("Shuffle").with_extension("toml");
-    let toml_string = toml::to_string(&config)?;
+    let toml_string = toml::to_string(config)?;
     fs::write(toml_path, toml_string)?;
     Ok(())
+}
+
+// Embeds bytes into the binary, keyed off of their file path relative to the
+// crate sibling path. ie: shuffle/cli/../../$key
+macro_rules! include_files(
+    ($($key:expr),+) => {{
+        let mut m = HashMap::new();
+        $(
+            m.insert($key, include_bytes!(concat!("../../", $key)).as_ref());
+        )+
+        m
+    }};
+);
+
+/// Embeds .move files used to generate the starter template into the binary
+/// at compilation time, for reference during project generation.
+static EMBEDDED_MOVE_STARTER_FILES: Lazy<HashMap<&str, &[u8]>> = Lazy::new(|| {
+    include_files! {
+        "move/src/modules/SampleModule.move"
+    }
+});
+
+// Writes all the move modules for a new project, including genesis and
+// starter template.
+fn write_move_starter_modules(path: &Path) -> Result<()> {
+    fs::create_dir_all(PathBuf::from(path).join("move/src/modules").as_path())?;
+    for key in EMBEDDED_MOVE_STARTER_FILES.keys() {
+        let dst = PathBuf::from(path).join(key);
+        fs::write(dst.as_path(), EMBEDDED_MOVE_STARTER_FILES[key])?;
+    }
+    Ok(())
+}
+
+// Inspired by https://github.com/diem/diem/blob/e0379458c85d58224798b79194a2871be9a7e655/shuffle/genesis/src/lib.rs#L72
+fn build_move_starter_modules(project_path: &Path, state: &OnDiskStateView) -> Result<()> {
+    // Hook into move cli and reuse publish command
+    let natives =
+        move_stdlib::natives::all_natives(AccountAddress::from_hex_literal("0x1").unwrap());
+    sandbox::commands::publish(
+        natives,
+        state,
+        &[project_path.join("move/src").to_string_lossy().to_string()],
+        true,
+        true,
+        None,
+        state.get_named_addresses(BTreeMap::new())?,
+        true,
+    )
+}
+
+fn generate_validator_config(path: &Path) -> Result<ValidatorConfig> {
+    let publishing_option = VMPublishingOption::open();
+    shuffle_custom_node::generate_validator_config(
+        path.join("nodeconfig").as_path(),
+        path.join("move/storage/0x00000000000000000000000000000001/modules")
+            .as_path(),
+        publishing_option,
+    )
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+    use diem_config::config::NodeConfig;
     use tempfile::tempdir;
+
+    #[test]
+    fn test_write_project_config() {
+        let dir = tempdir().unwrap();
+        let config = Config {
+            blockchain: String::from(DEFAULT_BLOCKCHAIN),
+            named_addresses: map_address_bytes_to_account_address(
+                diem_framework::diem_framework_named_addresses(),
+            ),
+        };
+
+        write_project_config(dir.path(), &config).unwrap();
+
+        let config_string =
+            fs::read_to_string(dir.path().join("Shuffle").with_extension("toml")).unwrap();
+        let read_config: Config = toml::from_str(config_string.as_str()).unwrap();
+        assert_eq!(config, read_config);
+        let actual_std_address = read_config.named_addresses["Std"].short_str_lossless();
+        assert_eq!(actual_std_address, "1");
+    }
 
     #[test]
     fn test_handle() {
         let dir = tempdir().unwrap();
         handle(String::from(DEFAULT_BLOCKCHAIN), PathBuf::from(dir.path())).unwrap();
-        let expectation = r#"blockchain = "dpn"
-"#;
-        let actual = fs::read_to_string(dir.path().join("Shuffle").with_extension("toml")).unwrap();
-        assert_eq!(expectation, actual);
+
+        // spot check move starter files
+        let expected_starter_content =
+            String::from_utf8_lossy(include_bytes!("../../move/src/modules/SampleModule.move"));
+        let actual_starter_content =
+            fs::read_to_string(dir.path().join("move/src/modules/SampleModule.move")).unwrap();
+        assert_eq!(expected_starter_content, actual_starter_content);
+
+        // check if we can load generated node.yaml config file
+        let _node_config =
+            NodeConfig::load(dir.path().join("nodeconfig/0/node.yaml").as_path()).unwrap();
     }
 }

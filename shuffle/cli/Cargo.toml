@@ -11,10 +11,22 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0.38"
+once_cell = "1.7.2"
 serde = { version = "1.0.124", features = ["derive"] }
 serde_json = "1.0.64"
 structopt = "0.3.21"
 toml = "0.5.8"
+
+diem-config = { path = "../../config" }
+diem-framework = { path = "../../language/diem-framework" }
+diem-genesis-tool = { path = "../../config/management/genesis" }
+diem-node = { path = "../../diem-node" }
+diem-types = { path = "../../types" }
+diem-workspace-hack = { path = "../../common/workspace-hack" }
+move-cli = { path = "../../language/tools/move-cli" }
+move-lang = { path = "../../language/move-lang" }
+move-stdlib = { path = "../../language/move-stdlib" }
+shuffle-custom-node = { path = "../genesis" }
 
 [[bin]]
 name = "shuffle"

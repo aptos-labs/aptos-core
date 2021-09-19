@@ -6,11 +6,13 @@ use std::path::PathBuf;
 use structopt::StructOpt;
 
 mod new;
+mod node;
 
 pub fn main() -> Result<()> {
     let subcommand = Subcommand::from_args();
     match subcommand {
         Subcommand::New { blockchain, path } => new::handle(blockchain, path),
+        Subcommand::Node { project_path } => node::handle(project_path.as_path()),
     }
 }
 
@@ -26,4 +28,6 @@ pub enum Subcommand {
         #[structopt(parse(from_os_str))]
         path: PathBuf,
     },
+    #[structopt(about = "Runs a local devnet with prefunded accounts")]
+    Node { project_path: PathBuf },
 }
