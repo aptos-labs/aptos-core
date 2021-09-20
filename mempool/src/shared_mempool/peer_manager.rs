@@ -365,7 +365,7 @@ impl PeerManager {
             peer_states
                 .iter()
                 .filter(|(_, state)| state.is_alive)
-                .map(|(peer, state)| (peer.clone(), state.metadata.role))
+                .map(|(peer, state)| (*peer, state.metadata.role))
                 .collect()
         };
 
@@ -376,7 +376,7 @@ impl PeerManager {
         let peers: Vec<_> = peers
             .iter()
             .sorted_by(|peer_a, peer_b| compare_prioritized_peers(peer_a, peer_b))
-            .map(|(peer, _)| peer.clone())
+            .map(|(peer, _)| *peer)
             .collect();
         let _ = std::mem::replace(&mut *prioritized_peers, peers);
     }

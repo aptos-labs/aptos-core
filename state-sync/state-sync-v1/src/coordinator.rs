@@ -277,7 +277,7 @@ impl<T: ExecutorProxyTrait, M: MempoolNotificationSender> StateSyncCoordinator<T
                     .start_timer();
 
                 // Process chunk request
-                let process_result = self.process_chunk_request(peer.clone(), *request.clone());
+                let process_result = self.process_chunk_request(peer, *request.clone());
                 if let Err(ref error) = process_result {
                     error!(
                         LogSchema::event_log(LogEntry::ProcessChunkRequest, LogEvent::Fail)
@@ -1644,7 +1644,7 @@ impl<T: ExecutorProxyTrait, M: MempoolNotificationSender> StateSyncCoordinator<T
                 return false;
             }
             if request_info.known_version < highest_li_version {
-                ready.push((peer.clone(), request_info.clone()));
+                ready.push((*peer, request_info.clone()));
                 false
             } else {
                 true
@@ -1653,7 +1653,7 @@ impl<T: ExecutorProxyTrait, M: MempoolNotificationSender> StateSyncCoordinator<T
 
         ready.into_iter().for_each(|(peer, request_info)| {
             let result_label = if let Err(err) =
-                self.deliver_subscription(peer.clone(), request_info, highest_li_version)
+                self.deliver_subscription(peer, request_info, highest_li_version)
             {
                 error!(LogSchema::new(LogEntry::SubscriptionDeliveryFail)
                     .peer(&peer)

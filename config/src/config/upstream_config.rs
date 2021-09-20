@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use short_hex_str::AsShortHexStr;
 use std::fmt;
 
-#[derive(Clone, Deserialize, Eq, Hash, PartialEq, Serialize)]
+#[derive(Clone, Copy, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 /// Identifier of a node, represented as (network_id, peer_id)
 pub struct PeerNetworkId {
     network_id: NetworkId,

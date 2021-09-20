@@ -104,7 +104,7 @@ impl Future for ScheduledBroadcast {
 
             Poll::Pending
         } else {
-            Poll::Ready((self.peer.clone(), self.backoff))
+            Poll::Ready((self.peer, self.backoff))
         }
     }
 }

@@ -206,7 +206,7 @@ impl RequestManager {
                 let weights: Vec<_> = peers
                     .iter()
                     .map(|(peer, peer_score)| {
-                        eligible_peers.push((*peer).clone());
+                        eligible_peers.push(**peer);
                         *peer_score
                     })
                     .collect();
@@ -282,7 +282,7 @@ impl RequestManager {
             let send_result = sender.send_to(peer_id, msg.clone());
             let curr_log = log.clone().peer(&peer);
             let result_label = if let Err(e) = send_result {
-                failed_peer_sends.push(peer.clone());
+                failed_peer_sends.push(peer);
                 error!(curr_log.event(LogEvent::NetworkSendError).error(&e));
                 counters::SEND_FAIL_LABEL
             } else {
@@ -542,7 +542,7 @@ fn pick_peer(
     if let Some(weighted_index) = &weighted_index {
         let mut rng = thread_rng();
         if let Some(peer) = peers.get(weighted_index.sample(&mut rng)) {
-            return Some(peer.clone());
+            return Some(*peer);
         }
     }
     None
@@ -576,7 +576,7 @@ mod tests {
     fn test_disable_peer() {
         let (mut request_manager, validators) = generate_request_manager_and_validators(0, 1);
 
-        let validator_0 = validators[0].clone();
+        let validator_0 = validators[0];
 
         // Verify single validator in peers
         assert!(request_manager.is_known_state_sync_peer(&validator_0));
@@ -621,11 +621,11 @@ mod tests {
     fn test_score_chunk_timeout() {
         let (mut request_manager, validators) = generate_request_manager_and_validators(0, 4);
 
-        let validator_0 = vec![validators[0].clone()];
+        let validator_0 = validators[0];
 
         // Process multiple request timeouts from validator 0
         for _ in 0..NUM_CHUNKS_TO_PROCESS {
-            request_manager.add_request(1, validator_0.clone());
+            request_manager.add_request(1, vec![validator_0]);
             assert!(request_manager.has_request_timed_out(1).unwrap());
         }
 
@@ -637,11 +637,11 @@ mod tests {
     fn test_score_chunk_version_mismatch() {
         let (mut request_manager, validators) = generate_request_manager_and_validators(0, 4);
 
-        let validator_0 = validators[0].clone();
+        let validator_0 = validators[0];
 
         // Process multiple chunk version mismatches from validator 0
         for _ in 0..NUM_CHUNKS_TO_PROCESS {
-            request_manager.add_request(100, vec![validator_0.clone()]);
+            request_manager.add_request(100, vec![validator_0]);
             request_manager
                 .process_chunk_version_mismatch(&validator_0, 100, 0)
                 .unwrap_err();
@@ -657,8 +657,8 @@ mod tests {
         let (mut request_manager, validators) =
             generate_request_manager_and_validators(0, num_validators);
 
-        let validator_0 = validators[0].clone();
-        let validator_1 = validators[1].clone();
+        let validator_0 = validators[0];
+        let validator_1 = validators[1];
 
         // Process empty chunk responses from all validators except validator 0
         for _ in 0..NUM_CHUNKS_TO_PROCESS {
@@ -669,7 +669,7 @@ mod tests {
 
         // Process multiple multi-cast chunk version mismatches from validator 0
         for _ in 0..NUM_CHUNKS_TO_PROCESS {
-            request_manager.add_request(100, vec![validator_0.clone(), validator_1.clone()]);
+            request_manager.add_request(100, vec![validator_0, validator_1]);
             request_manager
                 .process_chunk_version_mismatch(&validator_0, 100, 0)
                 .unwrap_err();
@@ -758,8 +758,8 @@ mod tests {
     fn test_remove_requests() {
         let (mut request_manager, validators) = generate_request_manager_and_validators(0, 2);
 
-        let validator_0 = vec![validators[0].clone()];
-        let validator_1 = vec![validators[1].clone()];
+        let validator_0 = vec![validators[0]];
+        let validator_1 = vec![validators[1]];
 
         // Add version requests to request manager
         request_manager.add_request(1, validator_0.clone());
@@ -787,8 +787,8 @@ mod tests {
         assert!(request_manager.get_first_request_time(1).is_none());
 
         // Add version requests to request manager
-        request_manager.add_request(1, vec![validators[0].clone()]);
-        request_manager.add_request(1, vec![validators[1].clone()]);
+        request_manager.add_request(1, vec![validators[0]]);
+        request_manager.add_request(1, vec![validators[1]]);
 
         // Verify first request time is less than last request time
         assert!(
@@ -854,7 +854,7 @@ mod tests {
             let picked_peers = request_manager.pick_peers();
             assert_eq!(1, picked_peers.len()); // Ensure only one validator per multicast level
 
-            let picked_peer = picked_peers[0].clone();
+            let picked_peer = picked_peers[0];
             let counter = pick_counts.entry(picked_peer).or_insert(0);
             *counter += 1;
         }
@@ -900,7 +900,7 @@ mod tests {
             ConnectionOrigin::Inbound,
         );
         request_manager
-            .enable_peer(validator.clone(), connection_metadata)
+            .enable_peer(*validator, connection_metadata)
             .unwrap();
     }
 }
