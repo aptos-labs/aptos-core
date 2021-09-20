@@ -453,6 +453,12 @@ impl DB {
                 )
             })
     }
+
+    /// Creates new physical DB checkpoint in directory specified by `path`.
+    pub fn create_checkpoint<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+        rocksdb::checkpoint::Checkpoint::new(&self.inner)?.create_checkpoint(path)?;
+        Ok(())
+    }
 }
 
 /// For now we always use synchronous writes. This makes sure that once the operation returns

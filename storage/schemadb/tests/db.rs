@@ -384,3 +384,33 @@ fn test_report_size() {
         0
     );
 }
+
+#[test]
+fn test_checkpoint() {
+    let tmpdir = diem_temppath::TempPath::new();
+    let checkpoint = diem_temppath::TempPath::new();
+    {
+        let db = open_db(&tmpdir);
+        db.put::<TestSchema1>(&TestField(0), &TestField(0)).unwrap();
+        db.create_checkpoint(&checkpoint).unwrap();
+    }
+    {
+        let db = open_db(&tmpdir);
+        assert_eq!(
+            db.get::<TestSchema1>(&TestField(0)).unwrap(),
+            Some(TestField(0)),
+        );
+
+        let cp = open_db(&checkpoint);
+        assert_eq!(
+            cp.get::<TestSchema1>(&TestField(0)).unwrap(),
+            Some(TestField(0)),
+        );
+        cp.put::<TestSchema1>(&TestField(1), &TestField(1)).unwrap();
+        assert_eq!(
+            cp.get::<TestSchema1>(&TestField(1)).unwrap(),
+            Some(TestField(1)),
+        );
+        assert_eq!(db.get::<TestSchema1>(&TestField(1)).unwrap(), None);
+    }
+}
