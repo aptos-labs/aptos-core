@@ -34,8 +34,6 @@ use crate::{
     state_replication::StateComputerCommitCallBackType,
 };
 use diem_crypto::HashValue;
-use futures::executor::block_on;
-use std::ops::Deref;
 
 pub const BUFFER_MANAGER_RETRY_INTERVAL: u64 = 1000;
 
@@ -59,10 +57,10 @@ pub type BufferItemRootType = Link<BufferItem>;
 pub type Sender<T> = UnboundedSender<T>;
 pub type Receiver<T> = UnboundedReceiver<T>;
 
-/// StateManager handles the states of ordered blocks and
+/// BufferManager handles the states of ordered blocks and
 /// interacts with the execution phase, the signing phase, and
 /// the persisting phase.
-pub struct StateManager {
+pub struct BufferManager {
     author: Author,
 
     buffer: List<BufferItem>,
@@ -90,7 +88,7 @@ pub struct StateManager {
     verifier: ValidatorVerifier,
 }
 
-impl StateManager {
+impl BufferManager {
     pub fn new(
         author: Author,
         execution_phase_tx: Sender<ExecutionRequest>,
@@ -106,20 +104,16 @@ impl StateManager {
     ) -> Self {
         let buffer = List::<BufferItem>::new();
 
-        // point the roots to the head
-        let execution_root = buffer.head.as_ref().cloned();
-        let signing_root = buffer.head.as_ref().cloned();
-
         Self {
             author,
 
             buffer,
 
-            execution_root,
+            execution_root: None,
             execution_phase_tx,
             execution_phase_rx,
 
-            signing_root,
+            signing_root: None,
             signing_phase_tx,
             signing_phase_rx,
 
@@ -176,31 +170,27 @@ impl StateManager {
         self.signing_root = find_elem(cursor, |item| item.is_executed());
         if self.signing_root.is_some() {
             let item = get_elem(&self.signing_root);
-            match item.deref() {
-                BufferItem::Executed(executed_item) => {
-                    let commit_ledger_info = LedgerInfo::new(
-                        executed_item.executed_blocks.last().unwrap().block_info(),
-                        executed_item
-                            .ordered_proof
-                            .ledger_info()
-                            .consensus_data_hash(),
-                    );
-                    self.signing_phase_tx
-                        .send(SigningRequest {
-                            ordered_ledger_info: executed_item.ordered_proof.clone(),
-                            commit_ledger_info,
-                        })
-                        .await
-                        .expect("Failed to send signing request");
-                }
-                _ => unreachable!(),
-            }
+            let executed_item = item.unwrap_executed_ref();
+            let commit_ledger_info = LedgerInfo::new(
+                executed_item.executed_blocks.last().unwrap().block_info(),
+                executed_item
+                    .ordered_proof
+                    .ledger_info()
+                    .consensus_data_hash(),
+            );
+            self.signing_phase_tx
+                .send(SigningRequest {
+                    ordered_ledger_info: executed_item.ordered_proof.clone(),
+                    commit_ledger_info,
+                })
+                .await
+                .expect("Failed to send signing request");
         }
     }
 
     /// Pop the prefix of buffer items until (including) target_block_id
     /// Send persist request.
-    fn advance_head(&mut self, target_block_id: HashValue) {
+    async fn advance_head(&mut self, target_block_id: HashValue) {
         let mut blocks_to_persist: Vec<Arc<ExecutedBlock>> = vec![];
 
         while let Some(item) = self.buffer.pop_front() {
@@ -211,23 +201,22 @@ impl StateManager {
                     .collect::<Vec<Arc<ExecutedBlock>>>(),
             );
             if item.block_id() == target_block_id {
-                if let BufferItem::Aggregated(aggregated) = item {
-                    block_on(self.persisting_phase_tx.send(PersistingRequest {
+                let aggregated_item = item.unwrap_aggregated();
+                self.persisting_phase_tx
+                    .send(PersistingRequest {
                         blocks: blocks_to_persist,
-                        commit_ledger_info: aggregated.aggregated_proof,
+                        commit_ledger_info: aggregated_item.commit_proof,
                         // we use the last callback
                         // this is okay because the callback function (from BlockStore::commit)
                         // takes in the actual blocks and ledger info from the state computer
                         // the encoded values are references to the block_tree, storage, and a commit root
                         // the block_tree and storage are the same for all the callbacks in the current epoch
                         // the commit root is used in logging only.
-                        callback: aggregated.callback,
-                    }))
+                        callback: aggregated_item.callback,
+                    })
+                    .await
                     .expect("Failed to send persist request");
-                    return;
-                } else {
-                    unreachable!("Expect aggregated item");
-                }
+                return;
             }
         }
         unreachable!("Aggregated item not found in the list");
@@ -266,13 +255,12 @@ impl StateManager {
                 item.block_id() == target_block_id
             });
             if cursor.is_some() {
-                let buffer_item = take_elem(&cursor);
-                let attempted_item =
-                    buffer_item.try_advance_to_aggregated_with_ledger_info(ledger_info);
+                let item = take_elem(&cursor);
+                let attempted_item = item.try_advance_to_aggregated_with_ledger_info(ledger_info);
                 let aggregated = attempted_item.is_aggregated();
                 set_elem(&cursor, attempted_item);
                 if aggregated {
-                    self.advance_head(target_block_id);
+                    self.advance_head(target_block_id).await;
                 }
             }
 
@@ -285,7 +273,7 @@ impl StateManager {
     }
 
     /// If the response is successful, advance the item to Executed, otherwise panic (TODO fix).
-    async fn process_execution_response(&mut self, response: ExecutionResponse) {
+    fn process_execution_response(&mut self, response: ExecutionResponse) {
         let ExecutionResponse { inner } = response;
         let executed_blocks = inner.expect("Execution failure");
 
@@ -295,11 +283,10 @@ impl StateManager {
         });
 
         if current_cursor.is_some() {
-            let buffer_item = take_elem(&current_cursor);
-            assert!(buffer_item.is_ordered());
+            let item = take_elem(&current_cursor);
             set_elem(
                 &current_cursor,
-                buffer_item.advance_to_executed(executed_blocks),
+                item.advance_to_executed(executed_blocks, &self.verifier),
             );
         }
     }
@@ -322,14 +309,14 @@ impl StateManager {
             item.block_id() == commit_ledger_info.commit_info().id()
         });
         if current_cursor.is_some() {
-            let buffer_item = take_elem(&current_cursor);
+            let item = take_elem(&current_cursor);
             // it is possible that we already signed this buffer item (double check after the final integration)
-            if buffer_item.is_executed() {
+            if item.is_executed() {
                 // we have found the buffer item
-                let (signed_buffer_item, commit_vote) =
-                    buffer_item.advance_to_signed(self.author, signature, &self.verifier);
+                let signed_item = item.advance_to_signed(self.author, signature);
+                let commit_vote = signed_item.unwrap_signed_ref().commit_vote.clone();
 
-                set_elem(&current_cursor, signed_buffer_item);
+                set_elem(&current_cursor, signed_item);
 
                 self.commit_msg_tx
                     .broadcast(ConsensusMsg::CommitVoteMsg(Box::new(commit_vote)))
@@ -341,7 +328,7 @@ impl StateManager {
     /// process the commit vote messages
     /// it scans the whole buffer for a matching blockinfo
     /// if found, try advancing the item to be aggregated
-    async fn process_commit_message(&mut self, commit_msg: VerifiedEvent) -> Option<HashValue> {
+    fn process_commit_message(&mut self, commit_msg: VerifiedEvent) -> Option<HashValue> {
         match commit_msg {
             VerifiedEvent::CommitVote(vote) => {
                 // find the corresponding item
@@ -350,12 +337,12 @@ impl StateManager {
                     item.block_id() == target_block_id
                 });
                 if current_cursor.is_some() {
-                    let mut buffer_item = take_elem(&current_cursor);
-                    let new_item = match buffer_item.add_signature_if_matched(*vote) {
-                        Ok(()) => buffer_item.try_advance_to_aggregated(&self.verifier),
+                    let mut item = take_elem(&current_cursor);
+                    let new_item = match item.add_signature_if_matched(*vote) {
+                        Ok(()) => item.try_advance_to_aggregated(&self.verifier),
                         Err(e) => {
                             error!("Failed to add commit vote {:?}", e);
-                            buffer_item
+                            item
                         }
                     };
                     set_elem(&current_cursor, new_item);
@@ -376,26 +363,16 @@ impl StateManager {
     async fn retry_broadcasting_commit_votes(&mut self) {
         let mut cursor = self.buffer.head.clone();
         while cursor.is_some() && !link_eq(&cursor, &self.signing_root) {
-            // we move forward before sending the message
-            // just in case the buffer becomes empty during await.
-            let next_cursor = get_next(&cursor);
             {
-                let buffer_item = get_elem(&cursor);
-                match buffer_item.deref() {
-                    BufferItem::Aggregated(_) => continue, // skip aggregated items
-                    BufferItem::Signed(signed) => {
-                        self.commit_msg_tx
-                            .broadcast(ConsensusMsg::CommitVoteMsg(Box::new(
-                                signed.commit_vote.clone(),
-                            )))
-                            .await;
-                    }
-                    _ => {
-                        unreachable!()
-                    }
-                }
+                let item = get_elem(&cursor);
+                let signed_item = item.unwrap_signed_ref();
+                self.commit_msg_tx
+                    .broadcast(ConsensusMsg::CommitVoteMsg(Box::new(
+                        signed_item.commit_vote.clone(),
+                    )))
+                    .await;
             }
-            cursor = next_cursor;
+            cursor = get_next(&cursor);
         }
     }
 
@@ -422,7 +399,7 @@ impl StateManager {
                     }
                 }
                 Some(response) = self.execution_phase_rx.next() => {
-                    self.process_execution_response(response).await;
+                    self.process_execution_response(response);
                     self.advance_execution_root().await;
                     if self.signing_root.is_none() {
                         self.advance_signing_root().await;
@@ -433,8 +410,8 @@ impl StateManager {
                     self.advance_signing_root().await;
                 }
                 Some(commit_msg) = self.commit_msg_rx.next() => {
-                    if let Some(aggregated_block_id) = self.process_commit_message(commit_msg).await {
-                        self.advance_head(aggregated_block_id);
+                    if let Some(aggregated_block_id) = self.process_commit_message(commit_msg) {
+                        self.advance_head(aggregated_block_id).await;
                     }
                 }
                 _ = interval.tick() => {

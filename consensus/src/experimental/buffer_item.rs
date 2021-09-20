@@ -20,50 +20,64 @@ use diem_types::{
 use crate::state_replication::StateComputerCommitCallBackType;
 use diem_crypto::HashValue;
 
+fn generate_commit_proof(
+    commit_info: &BlockInfo,
+    ordered_proof: &LedgerInfoWithSignatures,
+) -> LedgerInfo {
+    LedgerInfo::new(
+        commit_info.clone(),
+        ordered_proof.ledger_info().consensus_data_hash(),
+    )
+}
+
+fn aggregate_ledger_info(
+    commit_ledger_info: &LedgerInfo,
+    unverified_signatures: BTreeMap<AccountAddress, Ed25519Signature>,
+    validator: &ValidatorVerifier,
+) -> LedgerInfoWithSignatures {
+    let valid_sigs = unverified_signatures
+        .into_iter()
+        .filter(|(author, sig)| validator.verify(*author, commit_ledger_info, sig).is_ok())
+        .collect();
+
+    LedgerInfoWithSignatures::new(commit_ledger_info.clone(), valid_sigs)
+}
+
 // we differentiate buffer items at different stages
 // for better code readability
-pub struct OrderedBufferItem {
-    pub pending_votes: BTreeMap<AccountAddress, Ed25519Signature>,
+pub struct OrderedItem {
+    pub unverified_signatures: BTreeMap<AccountAddress, Ed25519Signature>,
     pub callback: StateComputerCommitCallBackType,
     pub ordered_blocks: Vec<ExecutedBlock>,
     pub ordered_proof: LedgerInfoWithSignatures,
 }
 
-pub struct ExecutedBufferItem {
+pub struct ExecutedItem {
     pub executed_blocks: Vec<ExecutedBlock>,
-    pub pending_votes: BTreeMap<AccountAddress, Ed25519Signature>,
+    pub commit_proof: LedgerInfoWithSignatures,
     pub callback: StateComputerCommitCallBackType,
     pub commit_info: BlockInfo,
     pub ordered_proof: LedgerInfoWithSignatures,
 }
 
-impl ExecutedBufferItem {
-    pub fn generate_commit_ledger_info(&self) -> LedgerInfo {
-        LedgerInfo::new(
-            self.commit_info.clone(),
-            self.ordered_proof.ledger_info().consensus_data_hash(),
-        )
-    }
-}
-
-pub struct SignedBufferItem {
+pub struct SignedItem {
     pub executed_blocks: Vec<ExecutedBlock>,
     pub commit_proof: LedgerInfoWithSignatures,
     pub callback: StateComputerCommitCallBackType,
     pub commit_vote: CommitVote,
 }
 
-pub struct AggregatedBufferItem {
+pub struct AggregatedItem {
     pub executed_blocks: Vec<ExecutedBlock>,
-    pub aggregated_proof: LedgerInfoWithSignatures,
+    pub commit_proof: LedgerInfoWithSignatures,
     pub callback: StateComputerCommitCallBackType,
 }
 
 pub enum BufferItem {
-    Ordered(Box<OrderedBufferItem>),
-    Executed(Box<ExecutedBufferItem>),
-    Signed(Box<SignedBufferItem>),
-    Aggregated(Box<AggregatedBufferItem>),
+    Ordered(Box<OrderedItem>),
+    Executed(Box<ExecutedItem>),
+    Signed(Box<SignedItem>),
+    Aggregated(Box<AggregatedItem>),
 }
 
 impl BufferItem {
@@ -72,8 +86,8 @@ impl BufferItem {
         ordered_proof: LedgerInfoWithSignatures,
         callback: StateComputerCommitCallBackType,
     ) -> Self {
-        Self::Ordered(Box::new(OrderedBufferItem {
-            pending_votes: BTreeMap::<AccountAddress, Ed25519Signature>::new(),
+        Self::Ordered(Box::new(OrderedItem {
+            unverified_signatures: BTreeMap::new(),
             callback,
             ordered_blocks,
             ordered_proof,
@@ -81,12 +95,16 @@ impl BufferItem {
     }
 
     // pipeline functions
-    pub fn advance_to_executed(self, executed_blocks: Vec<ExecutedBlock>) -> Self {
+    pub fn advance_to_executed(
+        self,
+        executed_blocks: Vec<ExecutedBlock>,
+        validator: &ValidatorVerifier,
+    ) -> Self {
         match self {
             Self::Ordered(ordered_item) => {
-                let OrderedBufferItem {
+                let OrderedItem {
                     ordered_blocks,
-                    pending_votes,
+                    unverified_signatures,
                     callback,
                     ordered_proof,
                 } = *ordered_item;
@@ -94,9 +112,14 @@ impl BufferItem {
                     assert_eq!(b1.id(), b2.id());
                 }
                 let commit_info = executed_blocks.last().unwrap().block_info();
-                Self::Executed(Box::new(ExecutedBufferItem {
+                let commit_proof = aggregate_ledger_info(
+                    &generate_commit_proof(&commit_info, &ordered_proof),
+                    unverified_signatures,
+                    validator,
+                );
+                Self::Executed(Box::new(ExecutedItem {
                     executed_blocks,
-                    pending_votes,
+                    commit_proof,
                     callback,
                     commit_info,
                     ordered_proof,
@@ -108,51 +131,30 @@ impl BufferItem {
         }
     }
 
-    fn aggregate_ledger_info(
-        commit_ledger_info: &LedgerInfo,
-        signatures: BTreeMap<AccountAddress, Ed25519Signature>,
-        validator: &ValidatorVerifier,
-    ) -> LedgerInfoWithSignatures {
-        let valid_sigs = signatures
-            .into_iter()
-            .filter(|(author, sig)| validator.verify(*author, commit_ledger_info, sig).is_ok())
-            .collect();
-
-        LedgerInfoWithSignatures::new(commit_ledger_info.clone(), valid_sigs)
-    }
-
-    pub fn advance_to_signed(
-        self,
-        author: Author,
-        signature: Ed25519Signature,
-        validator: &ValidatorVerifier,
-    ) -> (Self, CommitVote) {
+    pub fn advance_to_signed(self, author: Author, signature: Ed25519Signature) -> Self {
         match self {
             Self::Executed(executed_item) => {
-                let commit_ledger_info = executed_item.generate_commit_ledger_info();
-                let ExecutedBufferItem {
+                let ExecutedItem {
                     executed_blocks,
                     callback,
-                    mut pending_votes,
+                    mut commit_proof,
                     ..
                 } = *executed_item;
 
-                pending_votes.insert(author, signature.clone());
-                let commit_proof =
-                    Self::aggregate_ledger_info(&commit_ledger_info, pending_votes, validator);
+                commit_proof.add_signature(author, signature.clone());
 
-                let commit_vote =
-                    CommitVote::new_with_signature(author, commit_ledger_info, signature);
+                let commit_vote = CommitVote::new_with_signature(
+                    author,
+                    commit_proof.ledger_info().clone(),
+                    signature,
+                );
 
-                (
-                    Self::Signed(Box::new(SignedBufferItem {
-                        executed_blocks,
-                        callback,
-                        commit_proof,
-                        commit_vote: commit_vote.clone(),
-                    })),
-                    commit_vote,
-                )
+                Self::Signed(Box::new(SignedItem {
+                    executed_blocks,
+                    callback,
+                    commit_proof,
+                    commit_vote: commit_vote.clone(),
+                }))
             }
             _ => {
                 panic!("Only executed buffer items can advance to signed blocks.")
@@ -164,35 +166,35 @@ impl BufferItem {
     /// it returns an updated item
     pub fn try_advance_to_aggregated_with_ledger_info(
         self,
-        commit_ledger_info: LedgerInfoWithSignatures,
+        commit_proof: LedgerInfoWithSignatures,
     ) -> Self {
         match self {
             Self::Signed(signed_item) => {
-                let SignedBufferItem {
+                let SignedItem {
                     executed_blocks,
                     callback,
                     commit_proof,
                     ..
                 } = *signed_item;
-                assert_eq!(commit_proof.commit_info(), commit_ledger_info.commit_info(),);
-                Self::Aggregated(Box::new(AggregatedBufferItem {
+                assert_eq!(commit_proof.commit_info(), commit_proof.commit_info(),);
+                Self::Aggregated(Box::new(AggregatedItem {
                     executed_blocks,
                     callback,
-                    aggregated_proof: commit_ledger_info,
+                    commit_proof,
                 }))
             }
             Self::Executed(executed_item) => {
-                let ExecutedBufferItem {
+                let ExecutedItem {
                     executed_blocks,
                     callback,
                     commit_info,
                     ..
                 } = *executed_item;
-                assert_eq!(commit_info, *commit_ledger_info.commit_info());
-                Self::Aggregated(Box::new(AggregatedBufferItem {
+                assert_eq!(commit_info, *commit_proof.commit_info());
+                Self::Aggregated(Box::new(AggregatedItem {
                     executed_blocks,
                     callback,
-                    aggregated_proof: commit_ledger_info,
+                    commit_proof,
                 }))
             }
             Self::Ordered(ordered_item) => {
@@ -200,9 +202,10 @@ impl BufferItem {
                 assert!(ordered
                     .ordered_proof
                     .commit_info()
-                    .match_ordered_only(commit_ledger_info.commit_info()));
-                Self::Ordered(Box::new(OrderedBufferItem {
-                    pending_votes: commit_ledger_info.signatures().clone(),
+                    .match_ordered_only(commit_proof.commit_info()));
+                // can't aggregate it without execution, only store the signatures
+                Self::Ordered(Box::new(OrderedItem {
+                    unverified_signatures: commit_proof.signatures().clone(),
                     ..ordered
                 }))
             }
@@ -220,9 +223,9 @@ impl BufferItem {
                     .check_voting_power(validator)
                     .is_ok()
                 {
-                    Self::Aggregated(Box::new(AggregatedBufferItem {
+                    Self::Aggregated(Box::new(AggregatedItem {
                         executed_blocks: signed_item.executed_blocks,
-                        aggregated_proof: signed_item.commit_proof,
+                        commit_proof: signed_item.commit_proof,
                         callback: signed_item.callback,
                     }))
                 } else {
@@ -230,18 +233,14 @@ impl BufferItem {
                 }
             }
             Self::Executed(executed_item) => {
-                let maybe_aggregated_proof = Self::aggregate_ledger_info(
-                    &executed_item.generate_commit_ledger_info(),
-                    executed_item.pending_votes.clone(),
-                    validator,
-                );
-                if validator
-                    .check_voting_power(maybe_aggregated_proof.signatures().keys())
+                if executed_item
+                    .commit_proof
+                    .check_voting_power(validator)
                     .is_ok()
                 {
-                    Self::Aggregated(Box::new(AggregatedBufferItem {
+                    Self::Aggregated(Box::new(AggregatedItem {
                         executed_blocks: executed_item.executed_blocks,
-                        aggregated_proof: maybe_aggregated_proof,
+                        commit_proof: executed_item.commit_proof,
                         callback: executed_item.callback,
                     }))
                 } else {
@@ -273,7 +272,7 @@ impl BufferItem {
             }
             Self::Executed(executed) => &executed.commit_info,
             Self::Signed(signed) => signed.commit_proof.ledger_info().commit_info(),
-            Self::Aggregated(aggregated) => aggregated.aggregated_proof.ledger_info().commit_info(),
+            Self::Aggregated(aggregated) => aggregated.commit_proof.ledger_info().commit_info(),
         }
     }
 
@@ -289,16 +288,16 @@ impl BufferItem {
                     .match_ordered_only(target_commit_info)
                 {
                     // we optimistically assume the vote will be valid in the future.
-                    // when advancing to signed item, we will check if the sigs are valid.
+                    // when advancing to executed item, we will check if the sigs are valid.
                     // each author at most stores a single sig for each item,
                     // so an adversary will not be able to flood our memory.
-                    ordered.pending_votes.insert(author, signature);
+                    ordered.unverified_signatures.insert(author, signature);
                     return Ok(());
                 }
             }
             Self::Executed(executed) => {
-                if &executed.commit_info == target_commit_info {
-                    executed.pending_votes.insert(author, signature);
+                if executed.commit_info == *target_commit_info {
+                    executed.commit_proof.add_signature(author, signature);
                     return Ok(());
                 }
             }
@@ -311,7 +310,7 @@ impl BufferItem {
             Self::Aggregated(aggregated) => {
                 // we do not need to do anything for aggregated
                 // but return true is helpful to stop the outer loop early
-                if aggregated.aggregated_proof.commit_info() == target_commit_info {
+                if aggregated.commit_proof.commit_info() == target_commit_info {
                     return Ok(());
                 }
             }
@@ -337,5 +336,26 @@ impl BufferItem {
 
     pub fn is_aggregated(&self) -> bool {
         matches!(self, Self::Aggregated(_))
+    }
+
+    pub fn unwrap_signed_ref(&self) -> &SignedItem {
+        match self {
+            BufferItem::Signed(item) => item.as_ref(),
+            _ => panic!("Not signed item"),
+        }
+    }
+
+    pub fn unwrap_executed_ref(&self) -> &ExecutedItem {
+        match self {
+            BufferItem::Executed(item) => item.as_ref(),
+            _ => panic!("Not executed item"),
+        }
+    }
+
+    pub fn unwrap_aggregated(self) -> AggregatedItem {
+        match self {
+            BufferItem::Aggregated(item) => *item,
+            _ => panic!("Not aggregated item"),
+        }
     }
 }
