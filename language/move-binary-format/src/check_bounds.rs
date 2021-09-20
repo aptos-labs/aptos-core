@@ -68,46 +68,106 @@ impl<'a> BoundsChecker<'a> {
     }
 
     fn verify_impl(&mut self) -> PartialVMResult<()> {
+        self.check_signatures()?;
+        self.check_constants()?;
+        self.check_module_handles()?;
+        self.check_self_module_handle()?;
+        self.check_struct_handles()?;
+        self.check_function_handles()?;
+        self.check_field_handles()?;
+        self.check_friend_decls()?;
+        self.check_struct_instantiations()?;
+        self.check_function_instantiations()?;
+        self.check_field_instantiations()?;
+        self.check_struct_defs()?;
+        self.check_function_defs()
+    }
+
+    fn check_signatures(&self) -> PartialVMResult<()> {
         for signature in self.view.signatures() {
             self.check_signature(signature)?
         }
+        Ok(())
+    }
+
+    fn check_constants(&self) -> PartialVMResult<()> {
         for constant in self.view.constant_pool() {
             self.check_constant(constant)?
         }
+        Ok(())
+    }
+
+    fn check_module_handles(&self) -> PartialVMResult<()> {
         for script_handle in self.view.module_handles() {
             self.check_module_handle(script_handle)?
         }
+        Ok(())
+    }
+
+    fn check_struct_handles(&self) -> PartialVMResult<()> {
         for struct_handle in self.view.struct_handles() {
             self.check_struct_handle(struct_handle)?
         }
+        Ok(())
+    }
+
+    fn check_function_handles(&self) -> PartialVMResult<()> {
         for function_handle in self.view.function_handles() {
             self.check_function_handle(function_handle)?
         }
+        Ok(())
+    }
+
+    fn check_field_handles(&self) -> PartialVMResult<()> {
         for field_handle in self.view.field_handles().into_iter().flatten() {
             self.check_field_handle(field_handle)?
         }
+        Ok(())
+    }
+
+    fn check_friend_decls(&self) -> PartialVMResult<()> {
         for friend_decl in self.view.friend_decls().into_iter().flatten() {
             self.check_module_handle(friend_decl)?
         }
+        Ok(())
+    }
+
+    fn check_struct_instantiations(&self) -> PartialVMResult<()> {
         for struct_instantiation in self.view.struct_instantiations().into_iter().flatten() {
             self.check_struct_instantiation(struct_instantiation)?
         }
+        Ok(())
+    }
+
+    fn check_function_instantiations(&self) -> PartialVMResult<()> {
         for function_instantiation in self.view.function_instantiations() {
             self.check_function_instantiation(function_instantiation)?
         }
+        Ok(())
+    }
+
+    fn check_field_instantiations(&self) -> PartialVMResult<()> {
         for field_instantiation in self.view.field_instantiations().into_iter().flatten() {
             self.check_field_instantiation(field_instantiation)?
         }
+        Ok(())
+    }
+
+    fn check_struct_defs(&self) -> PartialVMResult<()> {
         for struct_def in self.view.struct_defs().into_iter().flatten() {
             self.check_struct_def(struct_def)?
         }
+        Ok(())
+    }
+
+    fn check_function_defs(&mut self) -> PartialVMResult<()> {
         let view = self.view;
         for (function_def_idx, function_def) in
             view.function_defs().into_iter().flatten().enumerate()
         {
             self.check_function_def(function_def_idx, function_def)?
         }
-        self.check_self_module_handle()
+        Ok(())
     }
 
     fn check_module_handle(&self, module_handle: &ModuleHandle) -> PartialVMResult<()> {
