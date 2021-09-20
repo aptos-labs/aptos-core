@@ -9,7 +9,7 @@
 # Assumptions for nix systems:
 # 1 The running user is the user who will execute the builds.
 # 2 .profile will be used to configure the shell
-# 3 ${HOME}/bin/ is expected to be on the path - hashicorp tools/hadolint/etc.  will be installed there on linux systems.
+# 3 ${HOME}/bin/, or ${INSTALL_DIR} is expected to be on the path - hashicorp tools/hadolint/etc.  will be installed there on linux systems.
 
 # fast fail.
 set -eo pipefail
@@ -46,6 +46,7 @@ function usage {
   echo "-s installs or updates requirements to test code-generation for Move SDKs"
   echo "-v verbose mode"
   echo "-i installs an individual tool by name"
+  echo "-n will target the /opt/ dir rather than the $HOME dir.  /opt/bin/, /opt/rustup/, and /opt/dotnet/ rather than $HOME/bin/, $HOME/.rustup/, and $HOME/.dotnet/"
   echo "If no toolchain component is selected with -t, -o, -y, or -p, the behavior is as if -t had been provided."
   echo "This command must be called from the root folder of the Diem project."
 }
@@ -58,24 +59,43 @@ function add_to_profile {
   fi
 }
 
+
+# It is important to keep all path updates together to allow this script to work well when run in github actions
+# on inside of a docker image created using this script.   GHA wipes the home directory via docker mount options, so
+# this profile needs built and sourced on every execution of a job using the docker image.   See the .github/actions/build-setup
+# action in this repo, as well as docker/ci/github/Dockerfile.
 function update_path_and_profile {
   touch "${HOME}"/.profile
-  mkdir -p "${HOME}"/bin
+
+  DOTNET_ROOT="$HOME/.dotnet"
+  BIN_DIR="$HOME/bin"
+  C_HOME="${HOME}/.cargo"
+  if [[ -n "$OPT_DIR" ]]; then
+    DOTNET_ROOT="/opt/dotnet"
+    BIN_DIR="/opt/bin"
+    C_HOME="/opt/cargo"
+  fi
+
+  mkdir -p "${BIN_DIR}"
   if [ -n "$CARGO_HOME" ]; then
     add_to_profile "export CARGO_HOME=\"${CARGO_HOME}\""
-    add_to_profile "export PATH=\"${HOME}/bin:${CARGO_HOME}/bin:\$PATH\""
+    add_to_profile "export PATH=\"${BIN_DIR}:${CARGO_HOME}/bin:\$PATH\""
   else
-    add_to_profile "export PATH=\"${HOME}/bin:${HOME}/.dotnet:${HOME}/.cargo/bin:\$PATH\""
+    add_to_profile "export PATH=\"${BIN_DIR}:${C_HOME}/bin:\$PATH\""
   fi
   if [[ "$INSTALL_PROVER" == "true" ]]; then
-    add_to_profile "export DOTNET_ROOT=\$HOME/.dotnet"
-    add_to_profile "export PATH=\"${HOME}/.dotnet/tools:\$PATH\""
-    add_to_profile "export Z3_EXE=$HOME/bin/z3"
-    add_to_profile "export CVC4_EXE=$HOME/bin/cvc4"
-    add_to_profile "export BOOGIE_EXE=$HOME/.dotnet/tools/boogie"
+    add_to_profile "export DOTNET_ROOT=\"${DOTNET_ROOT}\""
+    add_to_profile "export PATH=\"${DOTNET_ROOT}/tools:\$PATH\""
+    add_to_profile "export Z3_EXE=\"${BIN_DIR}/z3\""
+    add_to_profile "export CVC4_EXE=\"${BIN_DIR}/cvc4\""
+    add_to_profile "export BOOGIE_EXE=\"${DOTNET_ROOT}/tools/boogie\""
   fi
   if [[ "$INSTALL_CODEGEN" == "true" ]] && [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
-    add_to_profile "export PATH=\$PATH:/usr/lib/golang/bin:\$GOBIN"
+    if [[ -n "${GOBIN}" ]]; then
+      add_to_profile "export PATH=\$PATH:/usr/lib/golang/bin"
+    else
+      add_to_profile "export PATH=\$PATH:$GOBIN"
+    fi
   fi
 }
 
@@ -105,6 +125,13 @@ function install_build_essentials {
 function install_rustup {
   echo installing rust.
   BATCH_MODE=$1
+  if [[ "$OPT_DIR" == "true" ]]; then
+     export RUSTUP_HOME=/opt/rustup/
+     mkdir -p "$RUSTUP_HOME" || true
+     export CARGO_HOME=/opt/cargo/
+     mkdir -p "$CARGO_HOME" || true
+  fi
+
   # Install Rust
   if [[ "${BATCH_MODE}" == "false" ]]; then
     echo "Installing Rust......"
@@ -116,13 +143,17 @@ function install_rustup {
     fi
   else
 	  curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
-    PATH="${HOME}/.cargo/bin:${PATH}"
+    if [[ -n "${CARGO_HOME}" ]]; then
+      PATH="${CARGO_HOME}/bin:${PATH}"
+    else
+      PATH="${HOME}/.cargo/bin:${PATH}"
+    fi
   fi
 }
 
 function install_hadolint {
   if ! command -v hadolint &> /dev/null; then
-    export HADOLINT=${HOME}/bin/hadolint
+    export HADOLINT=${INSTALL_DIR}/hadolint
     curl -sL -o "$HADOLINT" "https://github.com/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}/hadolint-$(uname -s)-$(uname -m)" && chmod 700 "$HADOLINT"
   fi
   hadolint -v
@@ -137,9 +168,9 @@ function install_vault {
     fi
     TMPFILE=$(mktemp)
     curl -sL -o "$TMPFILE" "https://releases.hashicorp.com/vault/${VAULT_VERSION}/vault_${VAULT_VERSION}_$(uname -s | tr '[:upper:]' '[:lower:]')_${MACHINE}.zip"
-    unzip -qq -d "${HOME}"/bin/ "$TMPFILE"
+    unzip -qq -d "$INSTALL_DIR" "$TMPFILE"
     rm "$TMPFILE"
-    chmod +x "${HOME}"/bin/vault
+    chmod +x "${INSTALL_DIR}"/vault
   fi
   vault --version
 }
@@ -158,9 +189,9 @@ function install_helm {
       mkdir -p "$TMPFILE"/
       curl -sL -o "$TMPFILE"/out.tar.gz "https://get.helm.sh/helm-v${HELM_VERSION}-$(uname -s | tr '[:upper:]' '[:lower:]')-${MACHINE}.tar.gz"
       tar -zxvf "$TMPFILE"/out.tar.gz -C "$TMPFILE"/
-      cp "${TMPFILE}/$(uname -s | tr '[:upper:]' '[:lower:]')-${MACHINE}/helm" "${HOME}/bin/helm"
+      cp "${TMPFILE}/$(uname -s | tr '[:upper:]' '[:lower:]')-${MACHINE}/helm" "${INSTALL_DIR}/helm"
       rm -rf "$TMPFILE"
-      chmod +x "${HOME}"/bin/helm
+      chmod +x "${INSTALL_DIR}"/helm
     fi
   fi
 }
@@ -179,9 +210,9 @@ function install_terraform {
       fi
       TMPFILE=$(mktemp)
       curl -sL -o "$TMPFILE" "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_$(uname -s | tr '[:upper:]' '[:lower:]')_${MACHINE}.zip"
-      unzip -qq -d "${HOME}"/bin/ "$TMPFILE"
+      unzip -qq -d "${INSTALL_DIR}" "$TMPFILE"
       rm "$TMPFILE"
-      chmod +x "${HOME}"/bin/terraform
+      chmod +x "${INSTALL_DIR}"/terraform
       terraform --version
     fi
   fi
@@ -197,8 +228,8 @@ function install_kubectl {
       if [[ $MACHINE == "x86_64" ]]; then
         MACHINE="amd64"
       fi
-      curl -sL -o "${HOME}"/bin/kubectl "https://storage.googleapis.com/kubernetes-release/release/v${KUBECTL_VERSION}/bin/$(uname -s | tr '[:upper:]' '[:lower:]')/${MACHINE}/kubectl"
-      chmod +x "${HOME}"/bin/kubectl
+      curl -sL -o "${INSTALL_DIR}"/kubectl "https://storage.googleapis.com/kubernetes-release/release/v${KUBECTL_VERSION}/bin/$(uname -s | tr '[:upper:]' '[:lower:]')/${MACHINE}/kubectl"
+      chmod +x "${INSTALL_DIR}"/kubectl
     fi
   fi
   kubectl version client --short=true | head -1 || true
@@ -220,8 +251,12 @@ function install_awscli {
       mkdir -p "$TMPFILE"/work/
       curl -sL -o "$TMPFILE"/aws.zip  "https://awscli.amazonaws.com/awscli-exe-$(uname -s | tr '[:upper:]' '[:lower:]')-${MACHINE}.zip"
       unzip -qq -d "$TMPFILE"/work/ "$TMPFILE"/aws.zip
-      mkdir -p "${HOME}"/.local/
-      "$TMPFILE"/work/aws/install -i "${HOME}"/.local/aws-cli -b "${HOME}"/bin
+      TARGET_DIR="${HOME}"/.local/
+      if [[ "$OPT_DIR" == "true" ]]; then
+         TARGET_DIR="/opt/aws"
+      fi
+      mkdir -p "${TARGET_DIR}" || true
+      "$TMPFILE"/work/aws/install -i "${TARGET_DIR}"/aws-cli -b "${INSTALL_DIR}"
       rm -rf "$TMPFILE"
     fi
   fi
@@ -282,9 +317,9 @@ function install_shellcheck {
       mkdir -p "$TMPFILE"/
       curl -sL -o "$TMPFILE"/out.xz "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.$(uname -s | tr '[:upper:]' '[:lower:]').${MACHINE}.tar.xz"
       tar -xf "$TMPFILE"/out.xz -C "$TMPFILE"/
-      cp "${TMPFILE}/shellcheck-v${SHELLCHECK_VERSION}/shellcheck" "${HOME}/bin/shellcheck"
+      cp "${TMPFILE}/shellcheck-v${SHELLCHECK_VERSION}/shellcheck" "${INSTALL_DIR}/shellcheck"
       rm -rf "$TMPFILE"
-      chmod +x "${HOME}"/bin/shellcheck
+      chmod +x "${INSTALL_DIR}"/shellcheck
     fi
   fi
 }
@@ -389,7 +424,8 @@ function install_grcov {
 
 function install_dotnet {
   echo "Installing .Net"
-  if [[ $("${HOME}/.dotnet/dotnet" --list-sdks | grep -c "^${DOTNET_VERSION}" || true) == "0" ]]; then
+  mkdir -p "${DOTNET_INSTALL_DIR}" || true
+  if [[ $("${DOTNET_INSTALL_DIR}/dotnet" --list-sdks | grep -c "^${DOTNET_VERSION}" || true) == "0" ]]; then
     if [[ "$(uname)" == "Linux" ]]; then
         # Install various prerequisites for .dotnet. There are known bugs
         # in the dotnet installer to warn even if they are present. We try
@@ -413,7 +449,7 @@ function install_dotnet {
     # Below we need to (a) set TERM variable because the .net installer expects it and it is not set
     # in some environments (b) use bash not sh because the installer uses bash features.
     curl -sSL https://dot.net/v1/dotnet-install.sh \
-        | TERM=linux /bin/bash -s -- --channel $DOTNET_VERSION --version latest
+        | TERM=linux /bin/bash -s -- --channel $DOTNET_VERSION --install-dir "${DOTNET_INSTALL_DIR}" --version latest
   else
     echo Dotnet already installed.
   fi
@@ -421,11 +457,11 @@ function install_dotnet {
 
 function install_boogie {
   echo "Installing boogie"
-  export DOTNET_ROOT=$HOME/.dotnet
-  if [[ "$("$HOME"/.dotnet/dotnet tool list -g)" =~ .*boogie.*${BOOGIE_VERSION}.* ]]; then
+  mkdir -p "${DOTNET_INSTALL_DIR}tools/" || true
+  if [[ "$("${DOTNET_INSTALL_DIR}dotnet" tool list -g)" =~ .*boogie.*${BOOGIE_VERSION}.* ]]; then
     echo "Boogie $BOOGIE_VERSION already installed"
   else
-    "$HOME/.dotnet/dotnet" tool update --global Boogie --version $BOOGIE_VERSION
+    "${DOTNET_INSTALL_DIR}dotnet" tool update --tool-path "${DOTNET_INSTALL_DIR}tools/" Boogie --version $BOOGIE_VERSION
   fi
 }
 
@@ -433,10 +469,10 @@ function install_z3 {
   echo "Installing Z3"
   if which /usr/local/bin/z3 &>/dev/null; then
     echo "z3 already exists at /usr/local/bin/z3"
-    echo "but this install will go to $HOME/bin/z3."
+    echo "but this install will go to ${INSTALL_DIR}/z3."
     echo "you may want to remove the shared instance to avoid version confusion"
   fi
-  if which "$HOME/bin/z3" &>/dev/null && [[ "$("$HOME/bin/z3" --version || true)" =~ .*${Z3_VERSION}.* ]]; then
+  if which "${INSTALL_DIR}z3" &>/dev/null && [[ "$("${INSTALL_DIR}z3" --version || true)" =~ .*${Z3_VERSION}.* ]]; then
      echo "Z3 ${Z3_VERSION} already installed"
      return
   fi
@@ -455,9 +491,8 @@ function install_z3 {
     cd "$TMPFILE" || exit
     curl -LOs "https://github.com/Z3Prover/z3/releases/download/z3-$Z3_VERSION/$Z3_PKG.zip"
     unzip -q "$Z3_PKG.zip"
-    mkdir -p "$HOME/bin"
-    cp "$Z3_PKG/bin/z3" "$HOME/bin"
-    chmod +x "$HOME/bin/z3"
+    cp "$Z3_PKG/bin/z3" "${INSTALL_DIR}"
+    chmod +x "${INSTALL_DIR}z3"
   )
   rm -rf "$TMPFILE"
 }
@@ -466,10 +501,10 @@ function install_cvc4 {
   echo "Installing CVC4"
   if which /usr/local/bin/cvc4 &>/dev/null; then
     echo "cvc4 already exists at /usr/local/bin/cvc4"
-    echo "but this install will go to $HOME/bin/cvc4."
+    echo "but this install will go to $${INSTALL_DIR}cvc4."
     echo "you may want to remove the shared instance to avoid version confusion"
   fi
-  if which "$HOME/bin/cvc4" &>/dev/null && [[ "$("$HOME/bin/cvc4" --version || true)" =~ .*${CVC4_VERSION}.* ]]; then
+  if which "${INSTALL_DIR}cvc4" &>/dev/null && [[ "$("${INSTALL_DIR}cvc4" --version || true)" =~ .*${CVC4_VERSION}.* ]]; then
      echo "CVC4 ${CVC4_VERSION} already installed"
      return
   fi
@@ -488,8 +523,8 @@ function install_cvc4 {
     cd "$TMPFILE" || exit
     curl -LOs "https://cvc4.cs.stanford.edu/downloads/builds/minireleases/$CVC4_PKG.zip"
     unzip -q "$CVC4_PKG.zip"
-    cp "$CVC4_PKG/cvc4" "$HOME/bin"
-    chmod +x "$HOME/bin/cvc4"
+    cp "$CVC4_PKG/cvc4" "${INSTALL_DIR}"
+    chmod +x "${INSTALL_DIR}cvc4"
   )
   rm -rf "$TMPFILE"
 }
@@ -636,9 +671,11 @@ INSTALL_PROVER=false;
 INSTALL_CODEGEN=false;
 INSTALL_INDIVIDUAL=false;
 INSTALL_PACKAGES=();
+INSTALL_DIR="$HOME/bin/"
+OPT_DIR="false"
 
 #parse args
-while getopts "btopvysh:i:" arg; do
+while getopts "btopvysh:i:n" arg; do
   case "$arg" in
     b)
       BATCH_MODE="true"
@@ -666,6 +703,9 @@ while getopts "btopvysh:i:" arg; do
       echo "$OPTARG"
       INSTALL_PACKAGES+=("$OPTARG")
       ;;
+    n)
+      OPT_DIR="true"
+      ;;
     *)
       usage;
       exit 0;
@@ -690,6 +730,11 @@ if [ ! -f rust-toolchain ]; then
 	echo "Unknown location. Please run this from the diem repository. Abort."
 	exit 1
 fi
+
+if [[ "${OPT_DIR}" == "true" ]]; then
+  INSTALL_DIR="/opt/bin/"
+fi
+mkdir -p "$INSTALL_DIR" || true
 
 PRE_COMMAND=()
 if [ "$(whoami)" != 'root' ]; then
@@ -811,6 +856,11 @@ if [[ "$INSTALL_INDIVIDUAL" == "true" ]]; then
 fi
 
 if [[ "$INSTALL_PROVER" == "true" ]]; then
+  export DOTNET_INSTALL_DIR="${HOME}/.dotnet/"
+  if [[ "$OPT_DIR" == "true" ]]; then
+    export DOTNET_INSTALL_DIR="/opt/dotnet/"
+    mkdir -p "$DOTNET_INSTALL_DIR" || true
+  fi
   install_z3
   install_cvc4
   install_dotnet

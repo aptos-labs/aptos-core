@@ -29,7 +29,8 @@ runs:
     - name: reconfigure container for gha runner
       shell: bash
       run: |
-        echo 'CARGO_HOME=/opt/cargo/' | tee -a $GITHUB_ENV
+        echo 'CARGO_HOME=/opt/cargo' | tee -a $GITHUB_ENV
+        echo 'RUSTUP_HOME=/opt/rustup' | tee -a $GITHUB_ENV
         if [[ "$(uname -s)" == "Darwin" ]]; then
           sudo dscl . append /Groups/wheel GroupMembership $USER
           sudo mkdir -p /opt/cargo || true
@@ -43,18 +44,19 @@ runs:
 
         # prepare move lang prover tooling.
         # By setting these values the dev-setup.sh script can detect already installed executables (and check versions).
-        echo 'Z3_EXE='${HOME}/bin/z3 | tee -a $GITHUB_ENV
-        echo 'CVC4_EXE='${HOME}/bin/cvc4 | tee -a $GITHUB_ENV
-        echo 'DOTNET_ROOT='${HOME}/.dotnet/ | tee -a $GITHUB_ENV
-        echo 'BOOGIE_EXE='${HOME}/.dotnet/tools/boogie | tee -a $GITHUB_ENV
+        echo 'Z3_EXE='/opt/bin/z3 | tee -a $GITHUB_ENV
+        echo 'CVC4_EXE='/opt/bin/cvc4 | tee -a $GITHUB_ENV
+        echo 'DOTNET_ROOT='/opt/dotnet/ | tee -a $GITHUB_ENV
+        echo 'BOOGIE_EXE='/opt/dotnet/tools/boogie | tee -a $GITHUB_ENV
         echo 'MVP_TEST_ON_CI'='1' | tee -a $GITHUB_ENV
-        echo "$HOME/bin" | tee -a $GITHUB_PATH
-        echo "$HOME/.dotnet" | tee -a $GITHUB_PATH
+        echo "/opt/bin" | tee -a $GITHUB_PATH
+        echo "/opt/dotnet" | tee -a $GITHUB_PATH
+        echo "/opt/dotnet/tools" | tee -a $GITHUB_PATH
         echo "/opt/cargo/bin" | tee -a $GITHUB_PATH
         echo '/usr/lib/golang/bin' | tee -a $GITHUB_PATH
     - name: install common dependencies (should be ~ 10 seconds in a linux build, on mac it's a beast.)
       shell: bash
-      run: scripts/dev_setup.sh -t -o -b -p -y -s
+      run: scripts/dev_setup.sh -t -o -b -p -y -s -n
     - id: rust-environment
       shell: bash
       run: |
