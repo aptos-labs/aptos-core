@@ -4,7 +4,7 @@
 use crate::{
     experimental::{
         execution_phase::{ExecutionPhase, ExecutionRequest, ExecutionResponse},
-        pipeline_phase::{PipelinePhase, ResponseWithInstruction, StatelessPipeline},
+        pipeline_phase::{PipelinePhase, StatelessPipeline},
     },
     test_utils::{consensus_runtime, timed_block_on, RandomComputeResultStateComputer},
 };
@@ -39,8 +39,11 @@ pub fn prepare_execution_pipeline() -> (
 
     let (hash_val, execution_phase) = prepare_execution_phase();
 
-    let execution_phase_pipeline =
-        PipelinePhase::new(in_channel_rx, out_channel_tx, Box::new(execution_phase));
+    let execution_phase_pipeline = PipelinePhase::new(
+        in_channel_rx,
+        Some(out_channel_tx),
+        Box::new(execution_phase),
+    );
 
     (
         in_channel_tx,
@@ -62,10 +65,7 @@ fn test_execution_phase_process() {
     let block = Block::new_proposal(vec![], 1, 1, genesis_qc, &signers[0]);
 
     timed_block_on(&mut runtime, async move {
-        let ResponseWithInstruction {
-            response: resp,
-            instruction: _,
-        } = execution_phase
+        let resp = execution_phase
             .process(ExecutionRequest {
                 ordered_blocks: vec![ExecutedBlock::new(block, StateComputeResult::new_dummy())],
             })

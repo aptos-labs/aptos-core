@@ -1,10 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    experimental::pipeline_phase::{Instruction, ResponseWithInstruction, StatelessPipeline},
-    state_replication::StateComputer,
-};
+use crate::{experimental::pipeline_phase::StatelessPipeline, state_replication::StateComputer};
 use anyhow::Result;
 use async_trait::async_trait;
 use consensus_types::executed_block::ExecutedBlock;
@@ -54,11 +51,11 @@ impl ExecutionPhase {
 impl StatelessPipeline for ExecutionPhase {
     type Request = ExecutionRequest;
     type Response = ExecutionResponse;
-    async fn process(&self, req: ExecutionRequest) -> ResponseWithInstruction<ExecutionResponse> {
+    async fn process(&self, req: ExecutionRequest) -> ExecutionResponse {
         let ExecutionRequest { ordered_blocks } = req;
 
         // execute the blocks with execution_correctness_client
-        let resp_inner = ordered_blocks
+        let inner = ordered_blocks
             .iter()
             .map(|b| {
                 let state_compute_result =
@@ -67,15 +64,6 @@ impl StatelessPipeline for ExecutionPhase {
             })
             .collect::<Result<Vec<ExecutedBlock>, ExecutionError>>();
 
-        let instruction = if resp_inner.is_ok() {
-            Instruction::Ok
-        } else {
-            Instruction::Clear
-        };
-
-        ResponseWithInstruction {
-            response: ExecutionResponse { inner: resp_inner },
-            instruction,
-        }
+        ExecutionResponse { inner }
     }
 }
