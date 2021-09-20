@@ -1,5 +1,5 @@
 #[test_only]
-module DiemFramework::DiemDesignatedDealerTests {
+module DiemFramework::CurrenciesTests {
     use DiemFramework::DualAttestation;
     use DiemFramework::DiemAccount;
     use DiemFramework::XUS::XUS;

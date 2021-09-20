@@ -1,5 +1,5 @@
 #[test_only]
-module Std::BasicTests {
+module Std::ErrorsTests {
     use Std::Errors;
 
     #[test]

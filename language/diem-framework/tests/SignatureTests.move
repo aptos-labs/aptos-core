@@ -1,5 +1,5 @@
 #[test_only]
-module DiemFramework::DiemSignatureTests{
+module DiemFramework::SignatureTests{
     use DiemFramework::Signature;
 
     // Test fot public key validation
