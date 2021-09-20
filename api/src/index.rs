@@ -24,8 +24,8 @@ pub fn index(context: Context) -> impl Filter<Extract = impl Reply, Error = Reje
 pub async fn handle_index(context: Context) -> Result<impl Reply, Rejection> {
     let ledger_info = context.get_latest_ledger_info().map_err(Error::internal)?;
     let chain_id = context.chain_id().id();
-    let ledger_version = ledger_info.ledger_info().version();
-    let ledger_timestamp = ledger_info.ledger_info().timestamp_usecs();
+    let ledger_version = ledger_info.ledger_info().version().into();
+    let ledger_timestamp = ledger_info.ledger_info().timestamp_usecs().into();
 
     let info = LedgerInfo {
         chain_id,

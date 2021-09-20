@@ -8,7 +8,7 @@ use move_core_types::{
 };
 use resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue};
 
-use serde::{Serialize, Serializer};
+use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
 use std::{collections::BTreeMap, convert::From, result::Result};
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -38,18 +38,66 @@ impl From<AnnotatedMoveStruct> for MoveResource {
 #[derive(Clone, Debug, PartialEq)]
 pub struct U64(u64);
 
+impl U64 {
+    pub fn into_inner(&self) -> u64 {
+        self.0
+    }
+}
+
+impl From<u64> for U64 {
+    fn from(d: u64) -> Self {
+        Self(d)
+    }
+}
+
 impl Serialize for U64 {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         self.0.to_string().serialize(serializer)
     }
 }
 
+impl<'de> Deserialize<'de> for U64 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = <String>::deserialize(deserializer)?;
+        let data = s.parse::<u64>().map_err(D::Error::custom)?;
+
+        Ok(U64(data))
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct U128(u128);
+
+impl U128 {
+    pub fn into_inner(&self) -> u128 {
+        self.0
+    }
+}
+
+impl From<u128> for U128 {
+    fn from(d: u128) -> Self {
+        Self(d)
+    }
+}
 
 impl Serialize for U128 {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         self.0.to_string().serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for U128 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = <String>::deserialize(deserializer)?;
+        let data = s.parse::<u128>().map_err(D::Error::custom)?;
+
+        Ok(U128(data))
     }
 }
 
@@ -176,7 +224,7 @@ impl From<TypeTag> for MoveTypeTag {
 
 #[cfg(test)]
 mod tests {
-    use crate::{MoveResource, MoveTypeTag};
+    use crate::{MoveResource, MoveTypeTag, U128, U64};
 
     use diem_types::account_address::AccountAddress;
     use move_binary_format::file_format::AbilitySet;
@@ -352,6 +400,24 @@ mod tests {
             "{}",
             pretty(&value)
         );
+    }
+
+    #[test]
+    fn test_serialize_deserialize_u64() {
+        let val = to_value(&U64::from(u64::MAX)).unwrap();
+        assert_eq!(val, json!(u64::MAX.to_string()));
+
+        let data: U64 = serde_json::from_value(json!(u64::MAX.to_string())).unwrap();
+        assert_eq!(data.into_inner(), u64::MAX);
+    }
+
+    #[test]
+    fn test_serialize_deserialize_u128() {
+        let val = to_value(&U128::from(u128::MAX)).unwrap();
+        assert_eq!(val, json!(u128::MAX.to_string()));
+
+        let data: U128 = serde_json::from_value(json!(u128::MAX.to_string())).unwrap();
+        assert_eq!(data.into_inner(), u128::MAX);
     }
 
     fn create_nested_struct() -> StructTag {
