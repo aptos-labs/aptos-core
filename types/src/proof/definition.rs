@@ -10,7 +10,6 @@ use super::{
 use crate::{
     account_state_blob::AccountStateBlob,
     ledger_info::LedgerInfo,
-    protocol_spec::ProtocolSpec,
     transaction::{TransactionInfoTrait, Version},
 };
 use anyhow::{bail, ensure, format_err, Context, Result};
@@ -612,21 +611,21 @@ impl SparseMerkleRangeProof {
 /// `TransactionInfo` and a `TransactionAccumulatorProof` connecting it to the ledger root.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
-pub struct TransactionInfoWithProof<PS: ProtocolSpec> {
+pub struct TransactionInfoWithProof<T> {
     /// The accumulator proof from ledger info root to leaf that authenticates the hash of the
     /// `TransactionInfo` object.
     pub ledger_info_to_transaction_info_proof: TransactionAccumulatorProof,
 
     /// The `TransactionInfo` object at the leaf of the accumulator.
-    pub transaction_info: PS::TransactionInfo,
+    pub transaction_info: T,
 }
 
-impl<PS: ProtocolSpec> TransactionInfoWithProof<PS> {
+impl<T: TransactionInfoTrait> TransactionInfoWithProof<T> {
     /// Constructs a new `TransactionWithProof` object using given
     /// `ledger_info_to_transaction_info_proof`.
     pub fn new(
         ledger_info_to_transaction_info_proof: TransactionAccumulatorProof,
-        transaction_info: PS::TransactionInfo,
+        transaction_info: T,
     ) -> Self {
         Self {
             ledger_info_to_transaction_info_proof,
@@ -640,14 +639,14 @@ impl<PS: ProtocolSpec> TransactionInfoWithProof<PS> {
     }
 
     /// Returns the `transaction_info` object in this proof.
-    pub fn transaction_info(&self) -> &PS::TransactionInfo {
+    pub fn transaction_info(&self) -> &T {
         &self.transaction_info
     }
 
     /// Verifies that the `TransactionInfo` exists in the ledger represented by the `LedgerInfo`
     /// at specified version.
     pub fn verify(&self, ledger_info: &LedgerInfo, transaction_version: Version) -> Result<()> {
-        verify_transaction_info::<PS>(
+        verify_transaction_info(
             ledger_info,
             transaction_version,
             &self.transaction_info,
@@ -662,19 +661,18 @@ impl<PS: ProtocolSpec> TransactionInfoWithProof<PS> {
 /// `SparseMerkleProof` from state root to the account.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
-#[serde(bound = "for<'a> PS: Deserialize<'a>")]
-pub struct AccountStateProof<PS: ProtocolSpec> {
-    transaction_info_with_proof: TransactionInfoWithProof<PS>,
+pub struct AccountStateProof<T> {
+    transaction_info_with_proof: TransactionInfoWithProof<T>,
 
     /// The sparse merkle proof from state root to the account state.
     transaction_info_to_account_proof: SparseMerkleProof<AccountStateBlob>,
 }
 
-impl<PS: ProtocolSpec> AccountStateProof<PS> {
+impl<T: TransactionInfoTrait> AccountStateProof<T> {
     /// Constructs a new `AccountStateProof` using given `ledger_info_to_transaction_info_proof`,
     /// `transaction_info` and `transaction_info_to_account_proof`.
     pub fn new(
-        transaction_info_with_proof: TransactionInfoWithProof<PS>,
+        transaction_info_with_proof: TransactionInfoWithProof<T>,
         transaction_info_to_account_proof: SparseMerkleProof<AccountStateBlob>,
     ) -> Self {
         AccountStateProof {
@@ -684,7 +682,7 @@ impl<PS: ProtocolSpec> AccountStateProof<PS> {
     }
 
     /// Returns the `transaction_info_with_proof` object in this proof.
-    pub fn transaction_info_with_proof(&self) -> &TransactionInfoWithProof<PS> {
+    pub fn transaction_info_with_proof(&self) -> &TransactionInfoWithProof<T> {
         &self.transaction_info_with_proof
     }
 
@@ -723,19 +721,18 @@ impl<PS: ProtocolSpec> AccountStateProof<PS> {
 /// `AccumulatorProof` from event accumulator root to the event.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
-#[serde(bound = "for<'a> PS: Deserialize<'a>")]
-pub struct EventProof<PS: ProtocolSpec> {
-    transaction_info_with_proof: TransactionInfoWithProof<PS>,
+pub struct EventProof<T> {
+    transaction_info_with_proof: TransactionInfoWithProof<T>,
 
     /// The accumulator proof from event root to the actual event.
     transaction_info_to_event_proof: EventAccumulatorProof,
 }
 
-impl<PS: ProtocolSpec> EventProof<PS> {
+impl<T: TransactionInfoTrait> EventProof<T> {
     /// Constructs a new `EventProof` using given `ledger_info_to_transaction_info_proof`,
     /// `transaction_info` and `transaction_info_to_event_proof`.
     pub fn new(
-        transaction_info_with_proof: TransactionInfoWithProof<PS>,
+        transaction_info_with_proof: TransactionInfoWithProof<T>,
         transaction_info_to_event_proof: EventAccumulatorProof,
     ) -> Self {
         EventProof {
@@ -745,7 +742,7 @@ impl<PS: ProtocolSpec> EventProof<PS> {
     }
 
     /// Returns the `transaction_info_with_proof` object in this proof.
-    pub fn transaction_info_with_proof(&self) -> &TransactionInfoWithProof<PS> {
+    pub fn transaction_info_with_proof(&self) -> &TransactionInfoWithProof<T> {
         &self.transaction_info_with_proof
     }
 
@@ -775,15 +772,15 @@ impl<PS: ProtocolSpec> EventProof<PS> {
 /// The proof used to authenticate a list of consecutive transaction infos.
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
-pub struct TransactionInfoListWithProof<PS: ProtocolSpec> {
+pub struct TransactionInfoListWithProof<T> {
     pub ledger_info_to_transaction_infos_proof: TransactionAccumulatorRangeProof,
-    pub transaction_infos: Vec<PS::TransactionInfo>,
+    pub transaction_infos: Vec<T>,
 }
 
-impl<PS: ProtocolSpec> TransactionInfoListWithProof<PS> {
+impl<T: TransactionInfoTrait> TransactionInfoListWithProof<T> {
     pub fn new(
         ledger_info_to_transaction_infos_proof: TransactionAccumulatorRangeProof,
-        transaction_infos: Vec<PS::TransactionInfo>,
+        transaction_infos: Vec<T>,
     ) -> Self {
         Self {
             ledger_info_to_transaction_infos_proof,
@@ -859,7 +856,7 @@ impl<H: CryptoHasher> AccumulatorExtensionProof<H> {
 }
 
 pub mod default_protocol {
-    use crate::protocol_spec::DpnProto;
+    use crate::transaction::TransactionInfo;
 
     pub use super::{
         AccumulatorConsistencyProof, AccumulatorExtensionProof, AccumulatorProof,
@@ -868,8 +865,8 @@ pub mod default_protocol {
         TransactionAccumulatorSummary,
     };
 
-    pub type AccountStateProof = super::AccountStateProof<DpnProto>;
-    pub type EventProof = super::EventProof<DpnProto>;
-    pub type TransactionInfoListWithProof = super::TransactionInfoListWithProof<DpnProto>;
-    pub type TransactionInfoWithProof = super::TransactionInfoWithProof<DpnProto>;
+    pub type AccountStateProof = super::AccountStateProof<TransactionInfo>;
+    pub type EventProof = super::EventProof<TransactionInfo>;
+    pub type TransactionInfoListWithProof = super::TransactionInfoListWithProof<TransactionInfo>;
+    pub type TransactionInfoWithProof = super::TransactionInfoWithProof<TransactionInfo>;
 }

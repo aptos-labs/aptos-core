@@ -171,7 +171,7 @@ where
     ///  3. Return Transactions to be applied.
     fn verify_chunk(
         &self,
-        txn_list_with_proof: TransactionListWithProof<PS>,
+        txn_list_with_proof: TransactionListWithProof<PS::TransactionInfo>,
         verified_target_li: &LedgerInfoWithSignatures,
     ) -> Result<(Vec<Transaction>, Vec<PS::TransactionInfo>)> {
         // 1. Verify that input transactions belongs to the ledger represented by the ledger info.

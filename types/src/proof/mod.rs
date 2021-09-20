@@ -10,7 +10,10 @@ pub mod proptest_proof;
 #[cfg(test)]
 mod unit_tests;
 
-use crate::{ledger_info::LedgerInfo, transaction::Version};
+use crate::{
+    ledger_info::LedgerInfo,
+    transaction::{TransactionInfoTrait, Version},
+};
 use anyhow::{ensure, Result};
 use diem_crypto::{
     hash::{
@@ -34,13 +37,12 @@ pub use self::definition::{
 
 #[cfg(any(test, feature = "fuzzing"))]
 pub use self::definition::{TestAccumulatorProof, TestAccumulatorRangeProof};
-use crate::protocol_spec::ProtocolSpec;
 
 /// Verifies that a given `transaction_info` exists in the ledger using provided proof.
-fn verify_transaction_info<PS: ProtocolSpec>(
+fn verify_transaction_info<T: TransactionInfoTrait>(
     ledger_info: &LedgerInfo,
     transaction_version: Version,
-    transaction_info: &PS::TransactionInfo,
+    transaction_info: &T,
     ledger_info_to_transaction_info_proof: &TransactionAccumulatorProof,
 ) -> Result<()> {
     ensure!(

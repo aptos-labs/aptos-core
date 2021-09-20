@@ -29,7 +29,7 @@ use diem_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use move_core_types::transaction_argument::convert_txn_args;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
     collections::HashMap,
     convert::TryFrom,
@@ -52,7 +52,6 @@ pub use script::{
     TypeArgumentABI,
 };
 
-use crate::protocol_spec::ProtocolSpec;
 use std::{collections::BTreeSet, hash::Hash, ops::Deref};
 pub use transaction_argument::{parse_transaction_argument, TransactionArgument, VecBytes};
 
@@ -634,20 +633,19 @@ impl SignedTransaction {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
-#[serde(bound = "for<'a> PS: Deserialize<'a>")]
-pub struct TransactionWithProof<PS: ProtocolSpec> {
+pub struct TransactionWithProof<T> {
     pub version: Version,
     pub transaction: Transaction,
     pub events: Option<Vec<ContractEvent>>,
-    pub proof: TransactionInfoWithProof<PS>,
+    pub proof: TransactionInfoWithProof<T>,
 }
 
-impl<PS: ProtocolSpec> TransactionWithProof<PS> {
+impl<T: TransactionInfoTrait> TransactionWithProof<T> {
     pub fn new(
         version: Version,
         transaction: Transaction,
         events: Option<Vec<ContractEvent>>,
-        proof: TransactionInfoWithProof<PS>,
+        proof: TransactionInfoWithProof<T>,
     ) -> Self {
         Self {
             version,
@@ -913,7 +911,7 @@ impl TransactionOutput {
 }
 
 pub trait TransactionInfoTrait:
-    Clone + CryptoHash + Debug + Display + Eq + Serialize + for<'de> Deserialize<'de>
+    Clone + CryptoHash + Debug + Display + Eq + Serialize + DeserializeOwned
 {
     /// Constructs a new `TransactionInfo` object using transaction hash, state root hash and event
     /// root hash.
@@ -1070,21 +1068,20 @@ impl TransactionToCommit {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
-#[serde(bound = "for<'a> PS: Deserialize<'a>")]
-pub struct TransactionListWithProof<PS: ProtocolSpec> {
+pub struct TransactionListWithProof<T> {
     pub transactions: Vec<Transaction>,
     pub events: Option<Vec<Vec<ContractEvent>>>,
     pub first_transaction_version: Option<Version>,
-    pub proof: TransactionInfoListWithProof<PS>,
+    pub proof: TransactionInfoListWithProof<T>,
 }
 
-impl<PS: ProtocolSpec> TransactionListWithProof<PS> {
+impl<T: TransactionInfoTrait> TransactionListWithProof<T> {
     /// Constructor.
     pub fn new(
         transactions: Vec<Transaction>,
         events: Option<Vec<Vec<ContractEvent>>>,
         first_transaction_version: Option<Version>,
-        proof: TransactionInfoListWithProof<PS>,
+        proof: TransactionInfoListWithProof<T>,
     ) -> Self {
         Self {
             transactions,
@@ -1161,7 +1158,7 @@ impl<PS: ProtocolSpec> TransactionListWithProof<PS> {
                 self.transactions.len(),
             );
             itertools::zip_eq(event_lists, &self.proof.transaction_infos)
-                .map(|(events, txn_info)| verify_events_against_root_hash::<PS>(events, txn_info))
+                .map(|(events, txn_info)| verify_events_against_root_hash(events, txn_info))
                 .collect::<Result<Vec<_>>>()?;
         }
 
@@ -1176,18 +1173,17 @@ impl<PS: ProtocolSpec> TransactionListWithProof<PS> {
 /// requires speculative execution of each TransactionOutput to verify that the
 /// resulting state matches the expected state in the proof (for each version).
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
-#[serde(bound = "for<'a> PS: Deserialize<'a>")]
-pub struct TransactionOutputListWithProof<PS: ProtocolSpec> {
+pub struct TransactionOutputListWithProof<T> {
     pub transaction_outputs: Vec<TransactionOutput>,
     pub first_transaction_output_version: Option<Version>,
-    pub proof: TransactionInfoListWithProof<PS>,
+    pub proof: TransactionInfoListWithProof<T>,
 }
 
-impl<PS: ProtocolSpec> TransactionOutputListWithProof<PS> {
+impl<T: TransactionInfoTrait> TransactionOutputListWithProof<T> {
     pub fn new(
         transaction_outputs: Vec<TransactionOutput>,
         first_transaction_output_version: Option<Version>,
-        proof: TransactionInfoListWithProof<PS>,
+        proof: TransactionInfoListWithProof<T>,
     ) -> Self {
         Self {
             transaction_outputs,
@@ -1231,7 +1227,7 @@ impl<PS: ProtocolSpec> TransactionOutputListWithProof<PS> {
         // Verify the events
         itertools::zip_eq(&self.transaction_outputs, &self.proof.transaction_infos)
             .map(|(txn_output, txn_info)| {
-                verify_events_against_root_hash::<PS>(&txn_output.events, txn_info)
+                verify_events_against_root_hash(&txn_output.events, txn_info)
             })
             .collect::<Result<Vec<_>>>()?;
 
@@ -1241,9 +1237,9 @@ impl<PS: ProtocolSpec> TransactionOutputListWithProof<PS> {
 
 /// Verifies a list of events against an expected event root hash. This is done
 /// by calculating the hash of the events using an event accumulator hasher.
-fn verify_events_against_root_hash<PS: ProtocolSpec>(
+fn verify_events_against_root_hash<T: TransactionInfoTrait>(
     events: &[ContractEvent],
-    transaction_info: &PS::TransactionInfo,
+    transaction_info: &T,
 ) -> Result<()> {
     let event_hashes: Vec<_> = events.iter().map(CryptoHash::hash).collect();
     let event_root_hash =
@@ -1262,11 +1258,10 @@ fn verify_events_against_root_hash<PS: ProtocolSpec>(
 /// and include proofs.
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
-#[serde(bound = "for<'a> PS: Deserialize<'a>")]
-pub struct AccountTransactionsWithProof<PS: ProtocolSpec>(pub Vec<TransactionWithProof<PS>>);
+pub struct AccountTransactionsWithProof<T>(pub Vec<TransactionWithProof<T>>);
 
-impl<PS: ProtocolSpec> AccountTransactionsWithProof<PS> {
-    pub fn new(txns_with_proofs: Vec<TransactionWithProof<PS>>) -> Self {
+impl<T: TransactionInfoTrait> AccountTransactionsWithProof<T> {
+    pub fn new(txns_with_proofs: Vec<TransactionWithProof<T>>) -> Self {
         Self(txns_with_proofs)
     }
 
@@ -1282,11 +1277,11 @@ impl<PS: ProtocolSpec> AccountTransactionsWithProof<PS> {
         self.0.len()
     }
 
-    pub fn inner(&self) -> &[TransactionWithProof<PS>] {
+    pub fn inner(&self) -> &[TransactionWithProof<T>] {
         &self.0
     }
 
-    pub fn into_inner(self) -> Vec<TransactionWithProof<PS>> {
+    pub fn into_inner(self) -> Vec<TransactionWithProof<T>> {
         self.0
     }
 
@@ -1397,10 +1392,10 @@ impl TryFrom<Transaction> for SignedTransaction {
 }
 
 pub mod default_protocol {
-    use crate::protocol_spec::DpnProto;
+    use super::TransactionInfo;
 
-    pub type AccountTransactionsWithProof = super::AccountTransactionsWithProof<DpnProto>;
-    pub type TransactionInfoWithProof = super::TransactionInfoWithProof<DpnProto>;
-    pub type TransactionListWithProof = super::TransactionListWithProof<DpnProto>;
-    pub type TransactionWithProof = super::TransactionWithProof<DpnProto>;
+    pub type AccountTransactionsWithProof = super::AccountTransactionsWithProof<TransactionInfo>;
+    pub type TransactionInfoWithProof = super::TransactionInfoWithProof<TransactionInfo>;
+    pub type TransactionListWithProof = super::TransactionListWithProof<TransactionInfo>;
+    pub type TransactionWithProof = super::TransactionWithProof<TransactionInfo>;
 }

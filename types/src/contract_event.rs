@@ -11,8 +11,7 @@ use crate::{
     event::EventKey,
     ledger_info::LedgerInfo,
     proof::EventProof,
-    protocol_spec::ProtocolSpec,
-    transaction::Version,
+    transaction::{TransactionInfoTrait, Version},
 };
 use anyhow::{ensure, Context, Error, Result};
 use diem_crypto::hash::CryptoHash;
@@ -300,15 +299,14 @@ impl std::fmt::Display for ContractEvent {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
-#[serde(bound = "for<'a> PS: Deserialize<'a>")]
-pub struct EventWithProof<PS: ProtocolSpec> {
+pub struct EventWithProof<T> {
     pub transaction_version: u64, // Should be `Version`
     pub event_index: u64,
     pub event: ContractEvent,
-    pub proof: EventProof<PS>,
+    pub proof: EventProof<T>,
 }
 
-impl<PS: ProtocolSpec> std::fmt::Display for EventWithProof<PS> {
+impl<T: TransactionInfoTrait> std::fmt::Display for EventWithProof<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -319,13 +317,13 @@ impl<PS: ProtocolSpec> std::fmt::Display for EventWithProof<PS> {
     }
 }
 
-impl<PS: ProtocolSpec> EventWithProof<PS> {
+impl<T: TransactionInfoTrait> EventWithProof<T> {
     /// Constructor.
     pub fn new(
         transaction_version: Version,
         event_index: u64,
         event: ContractEvent,
-        proof: EventProof<PS>,
+        proof: EventProof<T>,
     ) -> Self {
         Self {
             transaction_version,
@@ -426,16 +424,15 @@ impl<PS: ProtocolSpec> EventWithProof<PS> {
 /// version.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
-#[serde(bound = "for<'a> PS: Deserialize<'a>")]
-pub struct EventByVersionWithProof<PS: ProtocolSpec> {
-    pub lower_bound_incl: Option<EventWithProof<PS>>,
-    pub upper_bound_excl: Option<EventWithProof<PS>>,
+pub struct EventByVersionWithProof<T> {
+    pub lower_bound_incl: Option<EventWithProof<T>>,
+    pub upper_bound_excl: Option<EventWithProof<T>>,
 }
 
-impl<PS: ProtocolSpec> EventByVersionWithProof<PS> {
+impl<T: TransactionInfoTrait> EventByVersionWithProof<T> {
     pub fn new(
-        lower_bound_incl: Option<EventWithProof<PS>>,
-        upper_bound_excl: Option<EventWithProof<PS>>,
+        lower_bound_incl: Option<EventWithProof<T>>,
+        upper_bound_excl: Option<EventWithProof<T>>,
     ) -> Self {
         Self {
             lower_bound_incl,
@@ -571,8 +568,8 @@ impl<PS: ProtocolSpec> EventByVersionWithProof<PS> {
 }
 
 pub mod default_protocol {
-    use crate::protocol_spec::DpnProto;
+    use crate::transaction::TransactionInfo;
 
-    pub type EventWithProof = super::EventWithProof<DpnProto>;
-    pub type EventByVersionWithProof = super::EventByVersionWithProof<DpnProto>;
+    pub type EventWithProof = super::EventWithProof<TransactionInfo>;
+    pub type EventByVersionWithProof = super::EventByVersionWithProof<TransactionInfo>;
 }

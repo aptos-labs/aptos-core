@@ -7,8 +7,7 @@ use crate::{
     account_state::AccountState,
     ledger_info::LedgerInfo,
     proof::AccountStateProof,
-    protocol_spec::ProtocolSpec,
-    transaction::Version,
+    transaction::{TransactionInfoTrait, Version},
 };
 use anyhow::{anyhow, ensure, Error, Result};
 use diem_crypto::{
@@ -140,23 +139,22 @@ impl Arbitrary for AccountStateBlob {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
-#[serde(bound = "for<'a> PS: Deserialize<'a>")]
-pub struct AccountStateWithProof<PS: ProtocolSpec> {
+pub struct AccountStateWithProof<T> {
     /// The transaction version at which this account state is seen.
     pub version: Version,
     /// Blob value representing the account state. If this field is not set, it
     /// means the account does not exist.
     pub blob: Option<AccountStateBlob>,
     /// The proof the client can use to authenticate the value.
-    pub proof: AccountStateProof<PS>,
+    pub proof: AccountStateProof<T>,
 }
 
-impl<PS: ProtocolSpec> AccountStateWithProof<PS> {
+impl<T: TransactionInfoTrait> AccountStateWithProof<T> {
     /// Constructor.
     pub fn new(
         version: Version,
         blob: Option<AccountStateBlob>,
-        proof: AccountStateProof<PS>,
+        proof: AccountStateProof<T>,
     ) -> Self {
         Self {
             version,
@@ -191,9 +189,9 @@ impl<PS: ProtocolSpec> AccountStateWithProof<PS> {
 }
 
 pub mod default_protocol {
-    use crate::protocol_spec::DpnProto;
+    use crate::transaction::TransactionInfo;
 
-    pub type AccountStateWithProof = super::AccountStateWithProof<DpnProto>;
+    pub type AccountStateWithProof = super::AccountStateWithProof<TransactionInfo>;
 }
 
 #[cfg(test)]

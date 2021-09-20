@@ -22,7 +22,6 @@ use crate::{
         TestAccumulatorInternalNode, TestAccumulatorProof, TransactionAccumulatorInternalNode,
         TransactionAccumulatorProof, TransactionInfoWithProof,
     },
-    protocol_spec::DpnProto,
     transaction::{
         RawTransaction, Script, Transaction, TransactionInfo, TransactionInfoTrait,
         TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
@@ -300,10 +299,8 @@ fn test_verify_transaction() {
 
     let ledger_info_to_transaction_info_proof =
         TransactionAccumulatorProof::new(vec![txn_info0_hash, internal_b_hash]);
-    let proof = TransactionInfoWithProof::<DpnProto>::new(
-        ledger_info_to_transaction_info_proof.clone(),
-        txn_info1,
-    );
+    let proof =
+        TransactionInfoWithProof::new(ledger_info_to_transaction_info_proof.clone(), txn_info1);
 
     // The proof can be used to verify txn1.
     assert!(proof.verify(&ledger_info, 1).is_ok());
@@ -317,10 +314,7 @@ fn test_verify_transaction() {
         /* gas_used = */ 0,
         /* major_status = */ KeptVMStatus::Executed,
     );
-    let proof = TransactionInfoWithProof::<DpnProto>::new(
-        ledger_info_to_transaction_info_proof,
-        fake_txn_info,
-    );
+    let proof = TransactionInfoWithProof::new(ledger_info_to_transaction_info_proof, fake_txn_info);
     assert!(proof.verify(&ledger_info, 1).is_err());
 }
 

@@ -189,7 +189,7 @@ pub trait DbReader<PS: ProtocolSpec>: Send + Sync {
         batch_size: u64,
         ledger_version: Version,
         fetch_events: bool,
-    ) -> Result<TransactionListWithProof<PS>>;
+    ) -> Result<TransactionListWithProof<PS::TransactionInfo>>;
 
     /// Returns events by given event key
     fn get_events(
@@ -208,7 +208,7 @@ pub trait DbReader<PS: ProtocolSpec>: Send + Sync {
         order: Order,
         limit: u64,
         known_version: Option<u64>,
-    ) -> Result<Vec<EventWithProof<PS>>>;
+    ) -> Result<Vec<EventWithProof<PS::TransactionInfo>>>;
 
     /// See [`DiemDB::get_block_timestamp`].
     ///
@@ -223,7 +223,7 @@ pub trait DbReader<PS: ProtocolSpec>: Send + Sync {
         event_key: &EventKey,
         event_version: u64,
         proof_version: u64,
-    ) -> Result<EventByVersionWithProof<PS>>;
+    ) -> Result<EventByVersionWithProof<PS::TransactionInfo>>;
 
     /// Gets the version of the last transaction committed before timestamp,
     /// a commited block at or after the required timestamp must exist (otherwise it's possible
@@ -273,7 +273,7 @@ pub trait DbReader<PS: ProtocolSpec>: Send + Sync {
         seq_num: u64,
         include_events: bool,
         ledger_version: Version,
-    ) -> Result<Option<TransactionWithProof<PS>>>;
+    ) -> Result<Option<TransactionWithProof<PS::TransactionInfo>>>;
 
     /// Returns the list of transactions sent by an account with `address` starting
     /// at sequence number `seq_num`. Will return no more than `limit` transactions.
@@ -286,7 +286,7 @@ pub trait DbReader<PS: ProtocolSpec>: Send + Sync {
         limit: u64,
         include_events: bool,
         ledger_version: Version,
-    ) -> Result<AccountTransactionsWithProof<PS>>;
+    ) -> Result<AccountTransactionsWithProof<PS::TransactionInfo>>;
 
     /// Returns proof of new state for a given ledger info with signatures relative to version known
     /// to client
@@ -306,7 +306,7 @@ pub trait DbReader<PS: ProtocolSpec>: Send + Sync {
         address: AccountAddress,
         version: Version,
         ledger_version: Version,
-    ) -> Result<AccountStateWithProof<PS>>;
+    ) -> Result<AccountStateWithProof<PS::TransactionInfo>>;
 
     // Gets an account state by account address, out of the ledger state indicated by the state
     // Merkle tree root with a sparse merkle proof proving state tree root.

@@ -22,7 +22,7 @@ use diem_types::{
         default_protocol::{
             AccountTransactionsWithProof, TransactionListWithProof, TransactionWithProof,
         },
-        TransactionToCommit, Version,
+        TransactionInfo, TransactionToCommit, Version,
     },
 };
 use move_core_types::move_resource::MoveResource;
@@ -69,7 +69,7 @@ impl DbReader<DpnProto> for MockDbReaderWriter {
         _order: Order,
         _limit: u64,
         _known_version: Option<u64>,
-    ) -> Result<Vec<EventWithProof<DpnProto>>> {
+    ) -> Result<Vec<EventWithProof<TransactionInfo>>> {
         unimplemented!()
     }
 
@@ -78,7 +78,7 @@ impl DbReader<DpnProto> for MockDbReaderWriter {
         _event_key: &EventKey,
         _version: u64,
         _proof_version: u64,
-    ) -> Result<EventByVersionWithProof<DpnProto>> {
+    ) -> Result<EventByVersionWithProof<TransactionInfo>> {
         unimplemented!()
     }
 
@@ -140,7 +140,7 @@ impl DbReader<DpnProto> for MockDbReaderWriter {
         _address: AccountAddress,
         _version: Version,
         _ledger_version: Version,
-    ) -> Result<AccountStateWithProof<DpnProto>> {
+    ) -> Result<AccountStateWithProof<TransactionInfo>> {
         unimplemented!()
     }
 
