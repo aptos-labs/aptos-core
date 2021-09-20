@@ -38,7 +38,10 @@ pub async fn handle_index(context: Context) -> Result<impl Reply, Rejection> {
 async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> {
     let code;
     let body;
-    if let Some(error) = err.find::<Error>() {
+    if err.is_not_found() {
+        code = StatusCode::NOT_FOUND;
+        body = reply::json(&Error::new(code, "Not Found".to_owned()));
+    } else if let Some(error) = err.find::<Error>() {
         code = error.status_code();
         body = reply::json(error);
     } else {
@@ -66,5 +69,12 @@ mod test {
         });
 
         assert_eq!(expected, resp);
+    }
+
+    #[tokio::test]
+    async fn test_returns_not_found_for_the_invalid_path() {
+        let context = new_test_context();
+        let resp = send_request(context.clone(), "GET", "/invalid_path", 404).await;
+        assert_eq!(json!({"code": 404, "message": "Not Found"}), resp)
     }
 }
