@@ -9,7 +9,7 @@ use move_core_types::{
 use resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue};
 
 use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
-use std::{collections::BTreeMap, convert::From, result::Result};
+use std::{collections::BTreeMap, convert::From, fmt, result::Result};
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct MoveResource {
@@ -47,6 +47,12 @@ impl U64 {
 impl From<u64> for U64 {
     fn from(d: u64) -> Self {
         Self(d)
+    }
+}
+
+impl fmt::Display for U64 {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", &self.0)
     }
 }
 

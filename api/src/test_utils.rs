@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{context::Context, index};
+use diem_api_types::{X_DIEM_CHAIN_ID, X_DIEM_LEDGER_TIMESTAMP, X_DIEM_LEDGER_VERSION};
 use diem_genesis_tool::validator_builder::ValidatorBuilder;
 use diem_temppath::TempPath;
 use diem_types::chain_id::ChainId;
@@ -11,6 +12,7 @@ use executor::db_bootstrapper;
 use storage_interface::DbReaderWriter;
 
 use serde_json::Value;
+use warp::http::header::CONTENT_TYPE;
 
 pub fn new_test_context() -> Context {
     let tmp_dir = TempPath::new();
@@ -30,13 +32,30 @@ pub fn new_test_context() -> Context {
 }
 
 pub async fn send_request(context: Context, method: &str, path: &str, status_code: u16) -> Value {
-    let routes = index::routes(context);
+    let routes = index::routes(context.clone());
 
     let resp = warp::test::request()
         .method(method)
         .path(path)
         .reply(&routes)
         .await;
+
+    let headers = resp.headers();
+    assert_eq!(headers[CONTENT_TYPE], "application/json");
+
+    if status_code < 300 {
+        let ledger_info = context.get_latest_ledger_info().unwrap();
+        assert_eq!(headers[X_DIEM_CHAIN_ID], "4");
+        assert_eq!(
+            headers[X_DIEM_LEDGER_VERSION],
+            ledger_info.version().to_string()
+        );
+        assert_eq!(
+            headers[X_DIEM_LEDGER_TIMESTAMP],
+            ledger_info.timestamp().to_string()
+        );
+    }
+
     let body = serde_json::from_slice(resp.body()).expect("response body is JSON");
     assert_eq!(status_code, resp.status(), "\nresponse: {}", pretty(&body));
     body

@@ -1,9 +1,9 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use diem_api_types::LedgerInfo;
 use diem_types::{
     account_address::AccountAddress, account_state_blob::AccountStateBlob, chain_id::ChainId,
-    ledger_info::LedgerInfoWithSignatures,
 };
 use storage_interface::MoveDbReader;
 
@@ -35,8 +35,11 @@ impl Context {
         warp::any().map(move || self.clone())
     }
 
-    pub fn get_latest_ledger_info(&self) -> Result<LedgerInfoWithSignatures> {
-        self.db.get_latest_ledger_info()
+    pub fn get_latest_ledger_info(&self) -> Result<LedgerInfo> {
+        Ok(LedgerInfo::new(
+            self.chain_id(),
+            &self.db.get_latest_ledger_info()?,
+        ))
     }
 
     pub fn get_account_state(

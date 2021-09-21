@@ -3,7 +3,7 @@
 
 use crate::context::Context;
 
-use diem_api_types::{Address, Error, MoveResource};
+use diem_api_types::{Address, Error, MoveResource, Response};
 use diem_types::account_state::AccountState;
 use resource_viewer::MoveValueAnnotator;
 
@@ -34,7 +34,7 @@ async fn handle_get_account_resources(
     let ledger_info = context.get_latest_ledger_info().map_err(Error::internal)?;
 
     let state = context
-        .get_account_state(address.into_inner(), ledger_info.ledger_info().version())
+        .get_account_state(address.into_inner(), ledger_info.version())
         .map_err(Error::internal)?
         .ok_or_else(|| account_not_found(&address_str))?;
 
@@ -48,7 +48,7 @@ async fn handle_get_account_resources(
             .map_err(Error::internal)?;
         resources.push(MoveResource::from(resource));
     }
-    Ok(warp::reply::json(&resources))
+    Ok(Response::new(ledger_info, &resources).map_err(Error::internal)?)
 }
 
 fn account_not_found(address: &str) -> Error {
