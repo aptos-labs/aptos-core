@@ -3,8 +3,10 @@
 
 #![forbid(unsafe_code)]
 
+use diem_crypto::HashValue;
 use diem_infallible::RwLock;
 use diem_types::{
+    account_state_blob::AccountStatesChunkWithProof,
     epoch_change::EpochChangeProof,
     transaction::default_protocol::{TransactionListWithProof, TransactionOutputListWithProof},
 };
@@ -12,9 +14,10 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use storage_interface::default_protocol::DbReaderWriter;
 use storage_service_types::{
-    DataSummary, EpochEndingLedgerInfoRequest, ProtocolMetadata, ServerProtocolVersion,
-    StorageServerSummary, StorageServiceError, StorageServiceRequest, StorageServiceResponse,
-    TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
+    AccountStatesChunkWithProofRequest, DataSummary, EpochEndingLedgerInfoRequest,
+    ProtocolMetadata, ServerProtocolVersion, StorageServerSummary, StorageServiceError,
+    StorageServiceRequest, StorageServiceResponse, TransactionOutputsWithProofRequest,
+    TransactionsWithProofRequest,
 };
 use thiserror::Error;
 
@@ -50,6 +53,9 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
         request: StorageServiceRequest,
     ) -> Result<StorageServiceResponse, Error> {
         let response = match request {
+            StorageServiceRequest::GetAccountStatesChunkWithProof(request) => {
+                self.get_account_states_chunk_with_proof(request)
+            }
             StorageServiceRequest::GetEpochEndingLedgerInfos(request) => {
                 self.get_epoch_ending_ledger_infos(request)
             }
@@ -73,6 +79,21 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
         } else {
             response
         }
+    }
+
+    fn get_account_states_chunk_with_proof(
+        &self,
+        request: AccountStatesChunkWithProofRequest,
+    ) -> Result<StorageServiceResponse, Error> {
+        let account_states_chunk_with_proof = self.storage.get_account_states_chunk_with_proof(
+            request.version,
+            request.start_account_key,
+            request.expected_num_account_states,
+        )?;
+
+        Ok(StorageServiceResponse::AccountStatesChunkWithProof(
+            account_states_chunk_with_proof,
+        ))
     }
 
     fn get_epoch_ending_ledger_infos(
@@ -178,16 +199,14 @@ pub trait StorageReaderInterface {
         expected_num_transaction_outputs: u64,
     ) -> Result<TransactionOutputListWithProof, Error>;
 
-    // TODO(joshlind): support me!
-    //
-    // Returns an AccountStateChunk holding a list of account states
-    // starting at the specified account key with *at most*
-    // `expected_num_account_states`.
-    //fn get_account_states_chunk(
-    //    version,
-    //    start_account_key,
-    //    expected_num_account_states: u64,
-    //) -> Result<AccountStateChunk, Error>
+    /// Returns a chunk holding a list of account states starting at the
+    /// specified account key with *at most* `expected_num_account_states`.
+    fn get_account_states_chunk_with_proof(
+        &self,
+        version: u64,
+        start_account_key: HashValue,
+        expected_num_account_states: u64,
+    ) -> Result<AccountStatesChunkWithProof, Error>;
 }
 
 /// The underlying implementation of the StorageReaderInterface, used by the
@@ -266,6 +285,18 @@ impl StorageReaderInterface for StorageReader {
         _expected_num_transaction_outputs: u64,
     ) -> Result<TransactionOutputListWithProof, Error> {
         // TODO(joshlind): implement this once the transaction outputs are persisted in the DB.
+        Err(Error::UnexpectedErrorEncountered(
+            "Unimplemented! This API call needs to be implemented!".into(),
+        ))
+    }
+
+    fn get_account_states_chunk_with_proof(
+        &self,
+        _version: u64,
+        _start_account_key: HashValue,
+        _expected_num_account_states: u64,
+    ) -> Result<AccountStatesChunkWithProof, Error> {
+        // TODO(joshlind): implement this once DbReaderWriter supports these calls.
         Err(Error::UnexpectedErrorEncountered(
             "Unimplemented! This API call needs to be implemented!".into(),
         ))

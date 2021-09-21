@@ -8044,6 +8044,7 @@ dependencies = [
 name = "storage-service-types"
 version = "0.1.0"
 dependencies = [
+ "diem-crypto",
  "diem-types",
  "diem-workspace-hack",
 ]

@@ -6,7 +6,7 @@ use crate::{
     account_config::{AccountResource, BalanceResource},
     account_state::AccountState,
     ledger_info::LedgerInfo,
-    proof::AccountStateProof,
+    proof::{AccountStateProof, SparseMerkleRangeProof},
     transaction::{TransactionInfoTrait, Version},
 };
 use anyhow::{anyhow, ensure, Error, Result};
@@ -194,6 +194,26 @@ pub mod default_protocol {
     pub type AccountStateWithProof = super::AccountStateWithProof<TransactionInfo>;
 }
 
+/// TODO(joshlind): add a proof implementation (e.g., verify()) and unit tests
+/// for these once we start supporting them.
+///
+/// A single chunk of all account states at a specific version.
+/// Note: this is similar to `StateSnapshotChunk` but all data is included
+/// in the struct itself and not behind pointers/handles to file locations.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AccountStatesChunkWithProof {
+    pub first_index: u64,
+    // The first account index in chunk
+    pub last_index: u64,
+    // The last account index in chunk
+    pub first_key: HashValue,
+    // The first account key in chunk
+    pub last_key: HashValue,
+    // The last account key in chunk
+    pub account_blobs: Vec<(HashValue, AccountStateBlob)>,
+    // The account blobs in the chunk
+    pub proof: SparseMerkleRangeProof, // The proof to ensure the chunk is in the account states
+}
 #[cfg(test)]
 mod tests {
     use super::{default_protocol::AccountStateWithProof, *};

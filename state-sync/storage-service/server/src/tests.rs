@@ -35,13 +35,39 @@ use move_core_types::language_storage::TypeTag;
 use std::{collections::BTreeMap, sync::Arc};
 use storage_interface::{DbReader, DbReaderWriter, DbWriter, Order, StartupInfo, TreeState};
 use storage_service_types::{
-    DataSummary, EpochEndingLedgerInfoRequest, ProtocolMetadata, ServerProtocolVersion,
-    StorageServerSummary, StorageServiceError, StorageServiceRequest, StorageServiceResponse,
-    TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
+    AccountStatesChunkWithProofRequest, DataSummary, EpochEndingLedgerInfoRequest,
+    ProtocolMetadata, ServerProtocolVersion, StorageServerSummary, StorageServiceError,
+    StorageServiceRequest, StorageServiceResponse, TransactionOutputsWithProofRequest,
+    TransactionsWithProofRequest,
 };
 
 // TODO(joshlind): Expand these test cases to better test storage interaction
 // and functionality. This will likely require a better mock db abstraction.
+
+#[test]
+fn test_get_account_states_chunk_with_proof() {
+    // Create a storage service server
+    let storage_server = create_storage_server();
+
+    // Create a request to fetch an account states chunk with a proof
+    let account_states_chunk_request =
+        StorageServiceRequest::GetAccountStatesChunkWithProof(AccountStatesChunkWithProofRequest {
+            version: 0,
+            start_account_key: HashValue::random(),
+            expected_num_account_states: 0,
+        });
+
+    // Process the request
+    let account_states_chunk_response = storage_server
+        .handle_request(account_states_chunk_request)
+        .unwrap();
+
+    // Verify the response is correct (the API call is currently unsupported)
+    assert_matches!(
+        account_states_chunk_response,
+        StorageServiceResponse::StorageServiceError(StorageServiceError::InternalError)
+    );
+}
 
 #[test]
 fn test_get_server_protocol_version() {

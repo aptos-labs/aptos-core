@@ -3,7 +3,9 @@
 
 #![forbid(unsafe_code)]
 
+use diem_crypto::HashValue;
 use diem_types::{
+    account_state_blob::AccountStatesChunkWithProof,
     epoch_change::EpochChangeProof,
     transaction::default_protocol::{TransactionListWithProof, TransactionOutputListWithProof},
 };
@@ -11,6 +13,7 @@ use diem_types::{
 /// A storage service request.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum StorageServiceRequest {
+    GetAccountStatesChunkWithProof(AccountStatesChunkWithProofRequest), // Fetches a list of account states with a proof
     GetEpochEndingLedgerInfos(EpochEndingLedgerInfoRequest), // Fetches a list of epoch ending ledger infos
     GetServerProtocolVersion, // Fetches the protocol version run by the server
     GetStorageServerSummary,  // Fetches a summary of the storage server state
@@ -21,12 +24,22 @@ pub enum StorageServiceRequest {
 /// A storage service response.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum StorageServiceResponse {
+    AccountStatesChunkWithProof(AccountStatesChunkWithProof),
     EpochEndingLedgerInfos(EpochChangeProof),
     ServerProtocolVersion(ServerProtocolVersion),
     StorageServiceError(StorageServiceError),
     StorageServerSummary(StorageServerSummary),
     TransactionOutputsWithProof(TransactionOutputListWithProof),
     TransactionsWithProof(TransactionListWithProof),
+}
+
+/// A storage service request for fetching a list of account states at a
+/// specified version.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AccountStatesChunkWithProofRequest {
+    pub version: u64,                     // The version to fetch the account states at
+    pub start_account_key: HashValue,     // The account key to start fetching account states
+    pub expected_num_account_states: u64, // Expected number of account states to fetch
 }
 
 /// A storage service request for fetching a transaction output list with a
