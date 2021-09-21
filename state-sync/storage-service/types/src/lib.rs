@@ -7,7 +7,10 @@ use diem_crypto::HashValue;
 use diem_types::{
     account_state_blob::AccountStatesChunkWithProof,
     epoch_change::EpochChangeProof,
-    transaction::default_protocol::{TransactionListWithProof, TransactionOutputListWithProof},
+    transaction::{
+        default_protocol::{TransactionListWithProof, TransactionOutputListWithProof},
+        Version,
+    },
 };
 
 /// A storage service request.
@@ -95,15 +98,47 @@ pub struct StorageServerSummary {
 /// the maximum chunk sizes supported for different requests.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ProtocolMetadata {
-    pub max_transaction_chunk_size: u64, // The max number of transaction the server can return in a single chunk
+    pub max_epoch_chunk_size: u64, // The max number of epochs the server can return in a single chunk
+    pub max_transaction_chunk_size: u64, // The max number of transactions the server can return in a single chunk
+    pub max_transaction_output_chunk_size: u64, // The max number of transaction outputs the server can return in a single chunk
+    pub max_account_states_chunk_size: u64, // The max number of account states the server can return in a single chunk
 }
+
+/// A type alias for different epochs.
+pub type Epoch = u64;
 
 /// A summary of the data actually held by the storage service instance.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DataSummary {
-    pub highest_transaction_version: u64, // The highest transaction version currently synced
-    pub lowest_transaction_version: u64,  // The lowest transaction version currently stored
+    /// The range of epoch ending ledger infos in storage, e.g., if the range
+    /// is [(X,Y)], it means all epoch ending ledger infos for epochs X->Y
+    /// (inclusive) are held.
+    pub epoch_ending_ledger_infos: CompleteDataRange<Epoch>,
+    /// The range of transactions held in storage, e.g., if the range is
+    /// [(X,Y)], it means all transactions for versions X->Y (inclusive) are held.
+    pub transactions: CompleteDataRange<Version>,
+    /// The range of transaction outputs held in storage, e.g., if the range
+    /// is [(X,Y)], it means all transaction outputs for versions X->Y
+    /// (inclusive) are held.
+    pub transaction_outputs: CompleteDataRange<Version>,
+    /// The range of account states held in storage, e.g., if the range is
+    /// [(X,Y)], it means all account states are held for every version X->Y
+    /// (inclusive).
+    pub account_states: CompleteDataRange<Version>,
+}
 
-    pub highest_epoch: u64, // The highest epoch currently synced
-    pub lowest_epoch: u64,  // The lowest epoch currently stored
+/// A struct representing a data range (lowest to highest, inclusive) where data
+/// is complete (i.e. there are no missing pieces of data).
+/// This is used to provide a summary of the data currently held in storage, e.g.
+/// a CompleteDataRange<Version> of (A,B) means all versions A->B (inclusive).
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CompleteDataRange<T> {
+    pub lowest: T,
+    pub highest: T,
+}
+
+impl<T> CompleteDataRange<T> {
+    pub fn new(lowest: T, highest: T) -> Self {
+        Self { lowest, highest }
+    }
 }

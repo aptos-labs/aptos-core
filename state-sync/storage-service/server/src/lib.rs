@@ -14,10 +14,10 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use storage_interface::default_protocol::DbReaderWriter;
 use storage_service_types::{
-    AccountStatesChunkWithProofRequest, DataSummary, EpochEndingLedgerInfoRequest,
-    ProtocolMetadata, ServerProtocolVersion, StorageServerSummary, StorageServiceError,
-    StorageServiceRequest, StorageServiceResponse, TransactionOutputsWithProofRequest,
-    TransactionsWithProofRequest,
+    AccountStatesChunkWithProofRequest, CompleteDataRange, DataSummary,
+    EpochEndingLedgerInfoRequest, ProtocolMetadata, ServerProtocolVersion, StorageServerSummary,
+    StorageServiceError, StorageServiceRequest, StorageServiceResponse,
+    TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
 };
 use thiserror::Error;
 
@@ -26,7 +26,10 @@ mod tests;
 
 // TODO(joshlind): make these configurable.
 /// Storage server constants.
+pub const MAX_EPOCH_CHUNK_SIZE: u64 = 1000;
 pub const MAX_TRANSACTION_CHUNK_SIZE: u64 = 1000;
+pub const MAX_TRANSACTION_OUTPUT_CHUNK_SIZE: u64 = 1000;
+pub const MAX_ACCOUNT_STATES_CHUNK_SIZE: u64 = 1000;
 pub const STORAGE_SERVER_VERSION: u64 = 1;
 
 #[derive(Clone, Debug, Deserialize, Error, PartialEq, Serialize)]
@@ -121,7 +124,10 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
     fn get_storage_server_summary(&self) -> Result<StorageServiceResponse, Error> {
         let storage_server_summary = StorageServerSummary {
             protocol_metadata: ProtocolMetadata {
+                max_epoch_chunk_size: MAX_EPOCH_CHUNK_SIZE,
                 max_transaction_chunk_size: MAX_TRANSACTION_CHUNK_SIZE,
+                max_transaction_output_chunk_size: MAX_TRANSACTION_OUTPUT_CHUNK_SIZE,
+                max_account_states_chunk_size: MAX_ACCOUNT_STATES_CHUNK_SIZE,
             },
             data_summary: self.storage.get_data_summary()?,
         };
@@ -231,15 +237,18 @@ impl StorageReaderInterface for StorageReader {
             .get_latest_ledger_info()
             .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
         let latest_ledger_info = latest_ledger_info_with_sigs.ledger_info();
+        let latest_version = latest_ledger_info.version();
 
+        // TODO(joshlind): Update the DiemDB to support fetching all of this data!
+        // For now we assume everything (since genesis) is held.
         // Return the relevant data summary
-        // TODO(joshlind): Update the DiemDB to support fetching the lowest txn version and epoch!
         let data_summary = DataSummary {
-            highest_transaction_version: latest_ledger_info.version(),
-            lowest_transaction_version: 0,
-            highest_epoch: latest_ledger_info.epoch(),
-            lowest_epoch: 0,
+            epoch_ending_ledger_infos: CompleteDataRange::new(0, latest_ledger_info.epoch() - 1),
+            transactions: CompleteDataRange::new(0, latest_version),
+            transaction_outputs: CompleteDataRange::new(0, latest_version),
+            account_states: CompleteDataRange::new(0, latest_version),
         };
+
         Ok(data_summary)
     }
 

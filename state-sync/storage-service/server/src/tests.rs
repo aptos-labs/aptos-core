@@ -35,10 +35,10 @@ use move_core_types::language_storage::TypeTag;
 use std::{collections::BTreeMap, sync::Arc};
 use storage_interface::{DbReader, DbReaderWriter, DbWriter, Order, StartupInfo, TreeState};
 use storage_service_types::{
-    AccountStatesChunkWithProofRequest, DataSummary, EpochEndingLedgerInfoRequest,
-    ProtocolMetadata, ServerProtocolVersion, StorageServerSummary, StorageServiceError,
-    StorageServiceRequest, StorageServiceResponse, TransactionOutputsWithProofRequest,
-    TransactionsWithProofRequest,
+    AccountStatesChunkWithProofRequest, CompleteDataRange, DataSummary,
+    EpochEndingLedgerInfoRequest, ProtocolMetadata, ServerProtocolVersion, StorageServerSummary,
+    StorageServiceError, StorageServiceRequest, StorageServiceResponse,
+    TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
 };
 
 // TODO(joshlind): Expand these test cases to better test storage interaction
@@ -98,15 +98,20 @@ fn test_get_storage_server_summary() {
     let summary_response = storage_server.handle_request(summary_request).unwrap();
 
     // Verify the response is correct
+    let highest_version = 100;
+    let highest_epoch = 10;
     let expected_server_summary = StorageServerSummary {
         protocol_metadata: ProtocolMetadata {
+            max_epoch_chunk_size: 1000,
             max_transaction_chunk_size: 1000,
+            max_transaction_output_chunk_size: 1000,
+            max_account_states_chunk_size: 1000,
         },
         data_summary: DataSummary {
-            highest_transaction_version: 100,
-            lowest_transaction_version: 0,
-            highest_epoch: 10,
-            lowest_epoch: 0,
+            epoch_ending_ledger_infos: CompleteDataRange::new(0, highest_epoch - 1),
+            transactions: CompleteDataRange::new(0, highest_version),
+            transaction_outputs: CompleteDataRange::new(0, highest_version),
+            account_states: CompleteDataRange::new(0, highest_version),
         },
     };
     assert_eq!(
