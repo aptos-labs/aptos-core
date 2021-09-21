@@ -3,7 +3,7 @@
 
 use diem_types::account_address::AccountAddress;
 use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
-use std::{fmt, str::FromStr};
+use std::{convert::TryFrom, fmt, str::FromStr};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Address(AccountAddress);
@@ -38,6 +38,14 @@ impl FromStr for Address {
     }
 }
 
+impl TryFrom<String> for Address {
+    type Error = anyhow::Error;
+
+    fn try_from(s: String) -> anyhow::Result<Self, anyhow::Error> {
+        Address::from_str(&s)
+    }
+}
+
 impl Serialize for Address {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         self.to_string().serialize(serializer)
@@ -58,13 +66,17 @@ impl<'de> Deserialize<'de> for Address {
 mod tests {
     use crate::address::Address;
     use serde_json::{json, Value};
-    use std::str::FromStr;
+    use std::{convert::TryFrom, str::FromStr};
 
     #[test]
     fn test_from_and_to_string() {
         let valid_addresses = vec!["0x1", "0x001", "00000000000000000000000000000001"];
         for address in valid_addresses {
             assert_eq!(Address::from_str(address).unwrap().to_string(), "0x1");
+            assert_eq!(
+                Address::try_from(address.to_owned()).unwrap().to_string(),
+                "0x1"
+            );
         }
 
         let invalid_addresses = vec!["invalid", "00x1", "x1", "01", "1"];

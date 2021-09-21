@@ -3,13 +3,11 @@
 
 use crate::context::Context;
 
-use diem_api_types::{Address, Error, MoveResource, Response};
-use diem_types::account_state::AccountState;
+use diem_api_types::{Address, Error, LedgerInfo, MoveResource, Response};
 use resource_viewer::MoveValueAnnotator;
 
 use anyhow::Result;
-use serde_json::json;
-use std::{convert::TryFrom, str::FromStr};
+use std::convert::TryInto;
 use warp::{Filter, Rejection, Reply};
 
 pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
@@ -27,36 +25,40 @@ pub fn get_account_resources(
 }
 
 async fn handle_get_account_resources(
-    address_str: String,
+    address: String,
     context: Context,
 ) -> Result<impl Reply, Rejection> {
-    let address = Address::from_str(&address_str).map_err(Error::bad_request)?;
-
-    let ledger_info = context.get_latest_ledger_info().map_err(Error::internal)?;
-
-    let state = context
-        .get_account_state(address.into_inner(), ledger_info.version())
-        .map_err(Error::internal)?
-        .ok_or_else(|| account_not_found(&address_str, ledger_info.version()))?;
-
-    let db = context.db();
-    let annotator = MoveValueAnnotator::new(&db);
-    let account_state = AccountState::try_from(&state).map_err(Error::internal)?;
-    let mut resources = vec![];
-    for (typ, bytes) in account_state.get_resources() {
-        let resource = annotator
-            .view_resource(&typ, bytes)
-            .map_err(Error::internal)?;
-        resources.push(MoveResource::from(resource));
-    }
-    Ok(Response::new(ledger_info, &resources)?)
+    Ok(GetAccountResources::new(address, context)?.process()?)
 }
 
-fn account_not_found(address: &str, ledger_version: u64) -> Error {
-    Error::not_found(
-        format!("could not find account by address: {}", address),
-        json!({ "ledger_version": ledger_version.to_string() }),
-    )
+struct GetAccountResources {
+    address: Address,
+    ledger_info: LedgerInfo,
+    context: Context,
+}
+
+impl GetAccountResources {
+    pub fn new(address: String, context: Context) -> Result<Self, Error> {
+        Ok(Self {
+            address: address.try_into().map_err(Error::bad_request)?,
+            ledger_info: context.get_latest_ledger_info()?,
+            context,
+        })
+    }
+
+    pub fn process(self) -> Result<impl Reply, Error> {
+        let account_state = self
+            .context
+            .get_account_state(&self.address, self.ledger_info.version())?;
+        let db = self.context.db();
+        let annotator = MoveValueAnnotator::new(&db);
+        let mut resources = vec![];
+        for (typ, bytes) in account_state.get_resources() {
+            let resource = annotator.view_resource(&typ, bytes)?;
+            resources.push(MoveResource::from(resource));
+        }
+        Response::new(self.ledger_info, &resources)
+    }
 }
 
 #[cfg(any(test))]
