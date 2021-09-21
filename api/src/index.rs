@@ -22,8 +22,8 @@ pub fn index(context: Context) -> impl Filter<Extract = impl Reply, Error = Reje
 }
 
 pub async fn handle_index(context: Context) -> Result<impl Reply, Rejection> {
-    let info = context.get_latest_ledger_info().map_err(Error::internal)?;
-    Ok(Response::new(info.clone(), &info).map_err(Error::internal)?)
+    let info = context.get_latest_ledger_info()?;
+    Ok(Response::new(info.clone(), &info)?)
 }
 
 async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> {

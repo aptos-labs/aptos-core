@@ -8,6 +8,7 @@ use diem_types::account_state::AccountState;
 use resource_viewer::MoveValueAnnotator;
 
 use anyhow::Result;
+use serde_json::json;
 use std::{convert::TryFrom, str::FromStr};
 use warp::{Filter, Rejection, Reply};
 
@@ -36,7 +37,7 @@ async fn handle_get_account_resources(
     let state = context
         .get_account_state(address.into_inner(), ledger_info.version())
         .map_err(Error::internal)?
-        .ok_or_else(|| account_not_found(&address_str))?;
+        .ok_or_else(|| account_not_found(&address_str, ledger_info.version()))?;
 
     let db = context.db();
     let annotator = MoveValueAnnotator::new(&db);
@@ -48,11 +49,14 @@ async fn handle_get_account_resources(
             .map_err(Error::internal)?;
         resources.push(MoveResource::from(resource));
     }
-    Ok(Response::new(ledger_info, &resources).map_err(Error::internal)?)
+    Ok(Response::new(ledger_info, &resources)?)
 }
 
-fn account_not_found(address: &str) -> Error {
-    Error::not_found(format!("could not find account by address: {}", address))
+fn account_not_found(address: &str, ledger_version: u64) -> Error {
+    Error::not_found(
+        format!("could not find account by address: {}", address),
+        json!({ "ledger_version": ledger_version.to_string() }),
+    )
 }
 
 #[cfg(any(test))]
@@ -74,11 +78,16 @@ mod tests {
         let context = new_test_context();
         let address = "0x0";
 
-        let resp = send_request(context, "GET", &account_resources(address), 404).await;
+        let resp = send_request(context.clone(), "GET", &account_resources(address), 404).await;
+
+        let info = context.get_latest_ledger_info().unwrap();
         assert_eq!(
             json!({
                 "code": 404,
-                "message": "could not find account by address: 0x0"
+                "message": "could not find account by address: 0x0",
+                "data": {
+                    "ledger_version": info.ledger_version,
+                },
             }),
             resp
         );

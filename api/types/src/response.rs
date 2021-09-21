@@ -1,11 +1,10 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::LedgerInfo;
+use crate::{Error, LedgerInfo};
 
 use anyhow::Result;
 use serde::Serialize;
-use std::convert::From;
 use warp::http::header::{HeaderValue, CONTENT_TYPE};
 
 pub const X_DIEM_CHAIN_ID: &str = "X-Diem-Chain-Id";
@@ -18,10 +17,10 @@ pub struct Response {
 }
 
 impl Response {
-    pub fn new<T: Serialize>(ledger_info: LedgerInfo, body: &T) -> Result<Self> {
+    pub fn new<T: Serialize>(ledger_info: LedgerInfo, body: &T) -> Result<Self, Error> {
         Ok(Self {
             ledger_info,
-            body: serde_json::to_vec(body).map_err(anyhow::Error::from)?,
+            body: serde_json::to_vec(body)?,
         })
     }
 }

@@ -35,7 +35,7 @@ impl Context {
         warp::any().map(move || self.clone())
     }
 
-    pub fn get_latest_ledger_info(&self) -> Result<LedgerInfo> {
+    pub fn get_latest_ledger_info(&self) -> Result<LedgerInfo, Error> {
         Ok(LedgerInfo::new(
             self.chain_id(),
             &self.db.get_latest_ledger_info()?,
