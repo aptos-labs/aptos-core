@@ -23,6 +23,7 @@ from kube import (
 TAG = ""
 BASE_TAG = ""
 WORKSPACE = ""
+REPORT = ""
 DEFL_TIMEOUT_SECS = 2700  # Default timeout is 45 mins
 USER = getpass.getuser()  # Use the current user for naming
 OUTPUT_TEE = os.getenv("FGI_OUTPUT_LOG", tempfile.mkstemp()[1])
@@ -70,6 +71,11 @@ def build_argparser():
         "-B",
         help="Base image tag to use in kubernetes Forge test"
     )
+    parser.add_argument(
+        "--report",
+        "-R",
+        help="Dump report to file"
+    )
     return parser.parse_known_args()
 
 
@@ -92,6 +98,7 @@ args, forge_args = build_argparser()
 # was not specified explicitly
 TAG = args.tag
 BASE_TAG = args.base_image_tag
+REPORT = args.report
 if not args.tag:
     if args.pr:  # codebuild using a PR
         ret = subprocess.call(
@@ -221,6 +228,23 @@ print(
     f"{OKBLUE}Dashboard snapshot:{RESTORE} {grafana_url}/d/overview/overview?from={start_ts_ms}&to={end_ts_ms}&orgId=1"
 )
 print("**********\n")
+
+if args.report:
+    # perf report
+    test_report = []
+    read_lines = False
+    with open(f"{OUTPUT_TEE}", 'r') as file:
+        for line in file.readlines():
+            if 'json-report-end' in line: read_lines = False
+            if read_lines:
+                test_report.append(line)
+            if 'json-report-begin' in line: read_lines = True
+    with open(f"{REPORT}", 'w') as file_object:
+        if len(test_report) == 0:
+            file_object.write("{\"text\": \"Forge test runner is terminated\"}")
+        else:
+            for line in test_report:
+                file_object.write(f"{line}\n")
 
 if "failed" in job_status and job_status["failed"] == 1:
     print()

@@ -2,15 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::TxnStats;
+use serde::Serialize;
 use std::{fmt, time::Duration};
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Serialize)]
 pub struct TestReport {
     metrics: Vec<ReportedMetric>,
     text: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct ReportedMetric {
     pub test_name: String,
     pub metric: String,
@@ -64,7 +65,13 @@ impl TestReport {
     }
 
     pub fn print_report(&self) {
-        println!("Test Statistics: {}", self,);
+        println!("Test Statistics: {}", self);
+        let json_report =
+            serde_json::to_string_pretty(&self).expect("Failed to serialize report to json");
+        println!(
+            "\n====json-report-begin===\n{}\n====json-report-end===",
+            json_report
+        );
     }
 }
 
