@@ -5,7 +5,8 @@
 
 use diem_infallible::RwLock;
 use diem_types::{
-    epoch_change::EpochChangeProof, transaction::default_protocol::TransactionListWithProof,
+    epoch_change::EpochChangeProof,
+    transaction::default_protocol::{TransactionListWithProof, TransactionOutputListWithProof},
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -13,7 +14,7 @@ use storage_interface::default_protocol::DbReaderWriter;
 use storage_service_types::{
     DataSummary, EpochEndingLedgerInfoRequest, ProtocolMetadata, ServerProtocolVersion,
     StorageServerSummary, StorageServiceError, StorageServiceRequest, StorageServiceResponse,
-    TransactionsWithProofRequest,
+    TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
 };
 use thiserror::Error;
 
@@ -54,6 +55,9 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
             }
             StorageServiceRequest::GetServerProtocolVersion => self.get_server_protocol_version(),
             StorageServiceRequest::GetStorageServerSummary => self.get_storage_server_summary(),
+            StorageServiceRequest::GetTransactionOutputsWithProof(request) => {
+                self.get_transaction_outputs_with_proof(request)
+            }
             StorageServiceRequest::GetTransactionsWithProof(request) => {
                 self.get_transactions_with_proof(request)
             }
@@ -106,6 +110,21 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
         ))
     }
 
+    fn get_transaction_outputs_with_proof(
+        &self,
+        request: TransactionOutputsWithProofRequest,
+    ) -> Result<StorageServiceResponse, Error> {
+        let transaction_output_list_with_proof = self.storage.get_transaction_outputs_with_proof(
+            request.proof_version,
+            request.start_version,
+            request.expected_num_outputs,
+        )?;
+
+        Ok(StorageServiceResponse::TransactionOutputsWithProof(
+            transaction_output_list_with_proof,
+        ))
+    }
+
     fn get_transactions_with_proof(
         &self,
         request: TransactionsWithProofRequest,
@@ -149,17 +168,15 @@ pub trait StorageReaderInterface {
         expected_end_epoch: u64,
     ) -> Result<EpochChangeProof, Error>;
 
-    // TODO(joshlind): support me!
-    //
-    // Returns a list of transaction outputs with a proof relative to the
-    // `proof_version`. The transaction output list is expected to contain
-    // *at most* `expected_num_transaction_outputs` and start at `start_version`.
-    //fn get_transaction_outputs_with_proof(
-    //    &self,
-    //    proof_version: u64,
-    //    start_version: u64,
-    //    expected_num_transaction_outputs: u64,
-    //) -> Result<TransactionOutputListWithProof, Error>;
+    /// Returns a list of transaction outputs with a proof relative to the
+    /// `proof_version`. The transaction output list is expected to contain
+    /// *at most* `expected_num_transaction_outputs` and start at `start_version`.
+    fn get_transaction_outputs_with_proof(
+        &self,
+        proof_version: u64,
+        start_version: u64,
+        expected_num_transaction_outputs: u64,
+    ) -> Result<TransactionOutputListWithProof, Error>;
 
     // TODO(joshlind): support me!
     //
@@ -240,5 +257,17 @@ impl StorageReaderInterface for StorageReader {
             .get_epoch_ending_ledger_infos(start_epoch, expected_end_epoch)
             .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
         Ok(epoch_change_proof)
+    }
+
+    fn get_transaction_outputs_with_proof(
+        &self,
+        _proof_version: u64,
+        _start_version: u64,
+        _expected_num_transaction_outputs: u64,
+    ) -> Result<TransactionOutputListWithProof, Error> {
+        // TODO(joshlind): implement this once the transaction outputs are persisted in the DB.
+        Err(Error::UnexpectedErrorEncountered(
+            "Unimplemented! This API call needs to be implemented!".into(),
+        ))
     }
 }

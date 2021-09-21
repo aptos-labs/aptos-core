@@ -4,7 +4,8 @@
 #![forbid(unsafe_code)]
 
 use diem_types::{
-    epoch_change::EpochChangeProof, transaction::default_protocol::TransactionListWithProof,
+    epoch_change::EpochChangeProof,
+    transaction::default_protocol::{TransactionListWithProof, TransactionOutputListWithProof},
 };
 
 /// A storage service request.
@@ -13,6 +14,7 @@ pub enum StorageServiceRequest {
     GetEpochEndingLedgerInfos(EpochEndingLedgerInfoRequest), // Fetches a list of epoch ending ledger infos
     GetServerProtocolVersion, // Fetches the protocol version run by the server
     GetStorageServerSummary,  // Fetches a summary of the storage server state
+    GetTransactionOutputsWithProof(TransactionOutputsWithProofRequest), // Fetches a list of transaction outputs with a proof
     GetTransactionsWithProof(TransactionsWithProofRequest), // Fetches a list of transactions with a proof
 }
 
@@ -23,7 +25,17 @@ pub enum StorageServiceResponse {
     ServerProtocolVersion(ServerProtocolVersion),
     StorageServiceError(StorageServiceError),
     StorageServerSummary(StorageServerSummary),
+    TransactionOutputsWithProof(TransactionOutputListWithProof),
     TransactionsWithProof(TransactionListWithProof),
+}
+
+/// A storage service request for fetching a transaction output list with a
+/// corresponding proof.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TransactionOutputsWithProofRequest {
+    pub proof_version: u64,        // The version the proof should be relative to
+    pub start_version: u64,        // The starting version of the transaction output list
+    pub expected_num_outputs: u64, // Expected number of transaction outputs in the list
 }
 
 /// A storage service request for fetching a transaction list with a

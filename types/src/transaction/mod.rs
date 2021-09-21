@@ -1397,5 +1397,7 @@ pub mod default_protocol {
     pub type AccountTransactionsWithProof = super::AccountTransactionsWithProof<TransactionInfo>;
     pub type TransactionInfoWithProof = super::TransactionInfoWithProof<TransactionInfo>;
     pub type TransactionListWithProof = super::TransactionListWithProof<TransactionInfo>;
+    pub type TransactionOutputListWithProof =
+        super::TransactionOutputListWithProof<TransactionInfo>;
     pub type TransactionWithProof = super::TransactionWithProof<TransactionInfo>;
 }

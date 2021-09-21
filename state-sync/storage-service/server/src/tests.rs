@@ -5,7 +5,7 @@
 
 use crate::{StorageReader, StorageServiceServer};
 use anyhow::Result;
-use claim::{assert_none, assert_some};
+use claim::{assert_matches, assert_none, assert_some};
 use diem_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use diem_infallible::RwLock;
 use diem_types::{
@@ -36,8 +36,8 @@ use std::{collections::BTreeMap, sync::Arc};
 use storage_interface::{DbReader, DbReaderWriter, DbWriter, Order, StartupInfo, TreeState};
 use storage_service_types::{
     DataSummary, EpochEndingLedgerInfoRequest, ProtocolMetadata, ServerProtocolVersion,
-    StorageServerSummary, StorageServiceRequest, StorageServiceResponse,
-    TransactionsWithProofRequest,
+    StorageServerSummary, StorageServiceError, StorageServiceRequest, StorageServiceResponse,
+    TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
 };
 
 // TODO(joshlind): Expand these test cases to better test storage interaction
@@ -127,6 +127,31 @@ fn test_get_transactions_with_proof_events() {
             panic!("Expected transactions with proof but got: {:?}", result);
         }
     };
+}
+
+#[test]
+fn test_get_transaction_outputs_with_proof() {
+    // Create a storage service server
+    let storage_server = create_storage_server();
+
+    // Create a request to fetch transaction outputs with a proof
+    let transaction_outputs_proof_request =
+        StorageServiceRequest::GetTransactionOutputsWithProof(TransactionOutputsWithProofRequest {
+            proof_version: 1000,
+            start_version: 0,
+            expected_num_outputs: 10,
+        });
+
+    // Process the request
+    let transactions_proof_response = storage_server
+        .handle_request(transaction_outputs_proof_request)
+        .unwrap();
+
+    // Verify the response is correct (the API call is currently unsupported)
+    assert_matches!(
+        transactions_proof_response,
+        StorageServiceResponse::StorageServiceError(StorageServiceError::InternalError)
+    );
 }
 
 #[test]
