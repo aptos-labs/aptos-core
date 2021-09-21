@@ -192,6 +192,14 @@ impl BufferManager {
     /// Send persist request.
     async fn advance_head(&mut self, target_block_id: HashValue) {
         let mut blocks_to_persist: Vec<Arc<ExecutedBlock>> = vec![];
+        // reset if signing root is part of the aggregated prefix, this is not efficient we probably should revisit it later
+        let reset_signing = find_elem(self.signing_root.clone(), |item| {
+            item.block_id() == target_block_id
+        })
+        .is_some();
+        if reset_signing {
+            self.signing_root = None;
+        }
 
         while let Some(item) = self.buffer.pop_front() {
             blocks_to_persist.extend(
@@ -216,16 +224,13 @@ impl BufferManager {
                     })
                     .await
                     .expect("Failed to send persist request");
+                if reset_signing {
+                    self.advance_signing_root().await;
+                }
                 return;
             }
         }
         unreachable!("Aggregated item not found in the list");
-    }
-
-    /// update the root to None;
-    fn reset_all_roots(&mut self) {
-        self.signing_root = None;
-        self.execution_root = None;
     }
 
     /// this function processes a sync request
@@ -263,9 +268,6 @@ impl BufferManager {
                     self.advance_head(target_block_id).await;
                 }
             }
-
-            // reset roots because the item pointed by them might no longer exist
-            self.reset_all_roots();
         }
 
         // ack reset
@@ -273,21 +275,24 @@ impl BufferManager {
     }
 
     /// If the response is successful, advance the item to Executed, otherwise panic (TODO fix).
-    fn process_execution_response(&mut self, response: ExecutionResponse) {
+    async fn process_execution_response(&mut self, response: ExecutionResponse) {
         let ExecutionResponse { inner } = response;
         let executed_blocks = inner.expect("Execution failure");
+        let block_id = executed_blocks.last().unwrap().id();
 
         // find the corresponding item, may not exist if a reset or aggregated happened
         let current_cursor = find_elem(self.execution_root.clone(), |item| {
-            item.block_id() == executed_blocks.last().unwrap().id()
+            item.block_id() == block_id
         });
 
         if current_cursor.is_some() {
             let item = take_elem(&current_cursor);
-            set_elem(
-                &current_cursor,
-                item.advance_to_executed(executed_blocks, &self.verifier),
-            );
+            let new_item = item.advance_to_executed_or_aggregated(executed_blocks, &self.verifier);
+            let aggregated = new_item.is_aggregated();
+            set_elem(&current_cursor, new_item);
+            if aggregated {
+                self.advance_head(block_id).await;
+            }
         }
     }
 
@@ -391,15 +396,9 @@ impl BufferManager {
                 }
                 Some(reset_event) = self.sync_rx.next() => {
                     self.process_sync_request(reset_event).await;
-                    if self.execution_root.is_none() {
-                        self.advance_execution_root().await;
-                    }
-                    if self.signing_root.is_none() {
-                        self.advance_signing_root().await;
-                    }
                 }
                 Some(response) = self.execution_phase_rx.next() => {
-                    self.process_execution_response(response);
+                    self.process_execution_response(response).await;
                     self.advance_execution_root().await;
                     if self.signing_root.is_none() {
                         self.advance_signing_root().await;

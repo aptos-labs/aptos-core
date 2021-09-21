@@ -95,7 +95,7 @@ impl BufferItem {
     }
 
     // pipeline functions
-    pub fn advance_to_executed(
+    pub fn advance_to_executed_or_aggregated(
         self,
         executed_blocks: Vec<ExecutedBlock>,
         validator: &ValidatorVerifier,
@@ -117,13 +117,21 @@ impl BufferItem {
                     unverified_signatures,
                     validator,
                 );
-                Self::Executed(Box::new(ExecutedItem {
-                    executed_blocks,
-                    commit_proof,
-                    callback,
-                    commit_info,
-                    ordered_proof,
-                }))
+                if commit_proof.check_voting_power(validator).is_ok() {
+                    Self::Aggregated(Box::new(AggregatedItem {
+                        executed_blocks,
+                        commit_proof,
+                        callback,
+                    }))
+                } else {
+                    Self::Executed(Box::new(ExecutedItem {
+                        executed_blocks,
+                        commit_proof,
+                        callback,
+                        commit_info,
+                        ordered_proof,
+                    }))
+                }
             }
             _ => {
                 panic!("Only ordered blocks can advance to executed blocks.")
@@ -137,12 +145,11 @@ impl BufferItem {
                 let ExecutedItem {
                     executed_blocks,
                     callback,
-                    mut commit_proof,
+                    commit_proof,
                     ..
                 } = *executed_item;
 
-                commit_proof.add_signature(author, signature.clone());
-
+                // we don't add the signature here, it'll be added when receiving the commit vote from self
                 let commit_vote = CommitVote::new_with_signature(
                     author,
                     commit_proof.ledger_info().clone(),
@@ -153,7 +160,7 @@ impl BufferItem {
                     executed_blocks,
                     callback,
                     commit_proof,
-                    commit_vote: commit_vote.clone(),
+                    commit_vote,
                 }))
             }
             _ => {
