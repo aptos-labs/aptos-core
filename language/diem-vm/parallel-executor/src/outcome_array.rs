@@ -37,7 +37,6 @@ impl<T: TransactionOutput, E: Send> OutcomeArray<T, E> {
                 Some(ExecutionStatus::SkipRest(t)) if idx == stop_at - 1 => t,
                 Some(ExecutionStatus::SkipRest(_)) => return Err(Error::InvariantViolation),
                 Some(ExecutionStatus::Abort(err)) => return Err(err),
-                Some(ExecutionStatus::Retry(_)) => return Err(Error::InvariantViolation),
                 None => return Err(Error::InvariantViolation),
             };
             final_results.push(t)

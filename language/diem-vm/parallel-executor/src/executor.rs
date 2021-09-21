@@ -7,15 +7,52 @@ use crate::{
     scheduler::Scheduler,
     task::{ExecutionStatus, ExecutorTask, ReadWriteSetInferencer, Transaction, TransactionOutput},
 };
-use anyhow::Result as AResult;
-use mvhashmap::MVHashMap;
+use anyhow::{bail, Result as AResult};
+use mvhashmap::{MVHashMap, Version};
 use num_cpus;
 use rayon::{prelude::*, scope};
 use std::{
     cmp::{max, min},
+    hash::Hash,
     marker::PhantomData,
-    sync::Arc,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
 };
+
+pub struct MVHashMapView<'a, K, V> {
+    map: &'a MVHashMap<K, V>,
+    version: Version,
+    scheduler: &'a Scheduler,
+    has_unexpected_read: AtomicBool,
+}
+
+impl<'a, K: Hash + Clone + Eq, V> MVHashMapView<'a, K, V> {
+    pub fn read(&self, key: &K) -> AResult<Option<&V>> {
+        match self.map.read(key, self.version) {
+            Ok(v) => Ok(Some(v)),
+            Err(None) => Ok(None),
+            Err(Some(dep_idx)) => {
+                // Don't start execution transaction `self.version` until `dep_idx` is computed.
+                if !self.scheduler.add_dependency(self.version, dep_idx) {
+                    // dep_idx is already executed, push `self.version` to ready queue.
+                    self.scheduler.add_transaction(self.version);
+                }
+                self.has_unexpected_read.fetch_or(true, Ordering::Relaxed);
+                bail!("Read dependency is not computed, retry later")
+            }
+        }
+    }
+
+    pub fn version(&self) -> Version {
+        self.version
+    }
+
+    pub fn has_unexpected_read(&self) -> bool {
+        self.has_unexpected_read.load(Ordering::Relaxed)
+    }
+}
 
 pub struct ParallelTransactionExecutor<T: Transaction, E: ExecutorTask, I: ReadWriteSetInferencer> {
     num_cpus: usize,
@@ -113,8 +150,21 @@ where
                         }
 
                         // Process the output of a transaction
+                        let view = MVHashMapView {
+                            map: &versioned_data_cache,
+                            version: idx,
+                            scheduler: &scheduler,
+                            has_unexpected_read: AtomicBool::new(false),
+                        };
+                        let execute_result = task.execute_transaction(&view, txn);
+                        if view.has_unexpected_read() {
+                            // We've already added this transaction back to the scheduler in the
+                            // MVHashmapView where this bit is set, thus it is safe to continue
+                            // here.
+                            continue;
+                        }
                         let commit_result =
-                            match task.execute_transaction(versioned_data_cache.view(idx), txn) {
+                            match execute_result {
                                 ExecutionStatus::Success(output) => {
                                     // Commit the side effects to the versioned_data_cache.
                                     if output.get_writes().into_iter().all(|(k, v)| {
@@ -146,14 +196,6 @@ where
                                     // Abort the execution with user defined error.
                                     scheduler.set_stop_version(idx + 1);
                                     ExecutionStatus::Abort(Error::UserError(err.clone()))
-                                }
-                                ExecutionStatus::Retry(dep_idx) => {
-                                    // Mark transaction `idx` to be dependent on `dep_idx`.
-                                    if !scheduler.add_dependency(idx, dep_idx) {
-                                        // dep_idx is already executed, push idx to ready queue.
-                                        scheduler.add_transaction(idx);
-                                    }
-                                    continue;
                                 }
                             };
 

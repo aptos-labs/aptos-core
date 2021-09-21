@@ -176,10 +176,6 @@ impl<K: Hash + Clone + Eq, V> MVHashMap<K, V> {
 
         Err(None)
     }
-
-    pub fn view(&self, version: Version) -> MVHashMapView<K, V> {
-        MVHashMapView { map: self, version }
-    }
 }
 
 const PARALLEL_THRESHOLD: usize = 1000;
@@ -223,20 +219,5 @@ where
 
         let (max_dependency_len, data) = Self::split_merge(num_cpus, 0, possible_writes);
         (MVHashMap { data }, max_dependency_len)
-    }
-}
-
-pub struct MVHashMapView<'a, K, V> {
-    map: &'a MVHashMap<K, V>,
-    version: Version,
-}
-
-impl<'a, K: Hash + Clone + Eq, V> MVHashMapView<'a, K, V> {
-    pub fn read(&self, key: &K) -> Result<&V, Option<Version>> {
-        self.map.read(key, self.version)
-    }
-
-    pub fn version(&self) -> Version {
-        self.version
     }
 }

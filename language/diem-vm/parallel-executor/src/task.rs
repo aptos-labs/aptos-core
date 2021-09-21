@@ -1,8 +1,8 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::executor::MVHashMapView;
 use anyhow::Result;
-use mvhashmap::{MVHashMapView, Version};
 use std::{fmt::Debug, hash::Hash};
 
 /// The execution result of a transaction
@@ -16,14 +16,11 @@ pub enum ExecutionStatus<T, E> {
     /// Transaction was executed successfully, but will skip the execution of the trailing
     /// transactions in the list
     SkipRest(T),
-    /// Transaction has an unexpected read dependency that is blocked by `Version` transaction.
-    /// Put the transaction back to the scheduler.
-    Retry(/*blocked_by*/ Version),
 }
 
 /// Trait that defines a transaction that could be parallel executed by the scheduler. Each
 /// transaction will write to a key value storage as their side effect.
-pub trait Transaction: Clone + Sync + Send + 'static {
+pub trait Transaction: Sync + Send + 'static {
     type Key: PartialOrd + Send + Sync + Clone + Hash + Eq;
     type Value: Send + Sync;
 }
@@ -66,7 +63,7 @@ pub trait ExecutorTask: Sync {
     /// Execute one single transaction given the view of the current state.
     fn execute_transaction(
         &self,
-        view: MVHashMapView<<Self::T as Transaction>::Key, <Self::T as Transaction>::Value>,
+        view: &MVHashMapView<<Self::T as Transaction>::Key, <Self::T as Transaction>::Value>,
         txn: &Self::T,
     ) -> ExecutionStatus<Self::Output, Self::Error>;
 }

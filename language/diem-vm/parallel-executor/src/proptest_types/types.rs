@@ -3,13 +3,13 @@
 
 use crate::{
     errors::{Error, Result},
+    executor::MVHashMapView,
     task::{
         ExecutionStatus, ExecutorTask, ReadWriteSetInferencer, Transaction as TransactionType,
         TransactionOutput,
     },
 };
 use anyhow::Result as AResult;
-use mvhashmap::MVHashMapView;
 use proptest::{
     arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index, strategy::Strategy,
 };
@@ -240,7 +240,7 @@ where
 
     fn execute_transaction(
         &self,
-        view: MVHashMapView<K, V>,
+        view: &MVHashMapView<K, V>,
         txn: &Self::T,
     ) -> ExecutionStatus<Self::Output, Self::Error> {
         match txn {
@@ -253,9 +253,9 @@ where
                 let mut reads_result = vec![];
                 for k in reads.iter() {
                     reads_result.push(match view.read(k) {
-                        Ok(v) => Some(v.clone()),
-                        Err(None) => None,
-                        Err(Some(v)) => return ExecutionStatus::Retry(v),
+                        Ok(Some(v)) => Some(v.clone()),
+                        Ok(None) => None,
+                        Err(_) => return ExecutionStatus::Abort(0),
                     })
                 }
                 ExecutionStatus::Success(Output(actual_writes.clone(), reads_result))
