@@ -263,7 +263,7 @@ fn zero_amount_peer_to_peer() {
 }
 
 // Holder for transaction data; arguments to transactions.
-struct TxnInfo {
+pub(crate) struct TxnInfo {
     pub sender: Account,
     pub receiver: Account,
     pub transfer_amount: u64,
@@ -281,7 +281,7 @@ impl TxnInfo {
 
 // Create a cyclic transfer around a slice of Accounts.
 // Each Account makes a transfer for the same amount to the next DiemAccount.
-fn create_cyclic_transfers(
+pub(crate) fn create_cyclic_transfers(
     executor: &FakeExecutor,
     accounts: &[Account],
     transfer_amount: u64,
@@ -364,7 +364,7 @@ fn create_many_to_one_transfers(
 // state after a successful transfer.
 // The transaction arguments are provided in txn_args.
 // Apply the WriteSet to the data store.
-fn check_and_apply_transfer_output(
+pub(crate) fn check_and_apply_transfer_output(
     executor: &mut FakeExecutor,
     txn_args: &[TxnInfo],
     output: &[TransactionOutput],

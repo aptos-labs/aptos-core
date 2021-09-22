@@ -190,7 +190,6 @@ members = [
     "diem-fuzzer",
     "diem-json-rpc-client",
     "diem-keygen",
-    "diem-parallel-executor", # Will be removed once parallel execution is used in production.
     "diem-proptest-helpers",
     "diem-retrier",
     "data-streaming-service", # Will be removed once state sync v2 is plugged into diem-node.
@@ -222,7 +221,6 @@ members = [
     "move-transactional-test-runner",
     "move-vm-integration-tests",
     "move-vm-transactional-tests",
-    "mvhashmap", # Will be removed once mvhashmap is used in production.
     "offchain",
     "public-script-helper",
     "scratchpad-benchmark",

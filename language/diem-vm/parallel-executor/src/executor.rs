@@ -79,6 +79,9 @@ where
         task_initial_arguments: E::Argument,
         signature_verified_block: Vec<T>,
     ) -> Result<Vec<E::Output>, E::Error> {
+        if signature_verified_block.is_empty() {
+            return Ok(vec![]);
+        }
         let num_txns = signature_verified_block.len();
         let chunks_size = max(1, num_txns / self.num_cpus);
 
@@ -117,6 +120,11 @@ where
 
         let (versioned_data_cache, max_dependency_level) =
             MVHashMap::new_from_parallel(path_version_tuples);
+
+        if max_dependency_level == 0 {
+            return Err(Error::InferencerError);
+        }
+
         let outcomes = OutcomeArray::new(num_txns);
 
         let scheduler = Arc::new(Scheduler::new(num_txns));

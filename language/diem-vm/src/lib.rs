@@ -111,18 +111,16 @@ pub mod data_cache;
 pub mod foreign_contracts;
 
 mod adapter_common;
+pub mod diem_vm;
 mod diem_vm_impl;
 mod errors;
-pub mod natives;
-pub mod transaction_metadata;
-
-// pub mod diem_transaction_executor;
-// pub mod diem_transaction_validator;
-pub mod diem_vm;
 pub mod logging;
+pub mod natives;
+pub mod parallel_executor;
 pub mod read_write_set_analysis;
 pub mod script_to_script_function;
 pub mod system_module_names;
+pub mod transaction_metadata;
 
 #[cfg(test)]
 mod unit_tests;

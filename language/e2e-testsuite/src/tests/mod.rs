@@ -24,6 +24,7 @@ mod mint;
 mod module_publishing;
 mod multi_agent;
 mod on_chain_configs;
+mod parallel_execution;
 mod peer_to_peer;
 mod preburn_queue;
 mod rotate_key;

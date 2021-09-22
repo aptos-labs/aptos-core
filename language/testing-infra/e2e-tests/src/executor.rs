@@ -37,7 +37,8 @@ use diem_types::{
     write_set::WriteSet,
 };
 use diem_vm::{
-    convert_changeset_and_events, data_cache::RemoteStorage, DiemVM, VMExecutor, VMValidator,
+    convert_changeset_and_events, data_cache::RemoteStorage, parallel_executor::ParallelDiemVM,
+    read_write_set_analysis::add_on_functions_list, DiemVM, VMExecutor, VMValidator,
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -47,6 +48,7 @@ use move_core_types::{
 };
 use move_vm_runtime::move_vm::MoveVM;
 use move_vm_types::gas_schedule::GasStatus;
+use read_write_set::analyze;
 
 static RNG_SEED: [u8; 32] = [9u8; 32];
 
@@ -349,6 +351,20 @@ impl FakeExecutor {
             TransactionStatus::Discard(status) => panic!("transaction discarded with {:?}", status),
             TransactionStatus::Retry => panic!("transaction status is retry"),
         }
+    }
+
+    pub fn execute_transaction_block_parallel(
+        &self,
+        txn_block: Vec<Transaction>,
+    ) -> Result<Vec<TransactionOutput>, VMStatus> {
+        let analyze_result = analyze(current_modules().iter())
+            .unwrap()
+            .normalize_all_scripts(add_on_functions_list());
+
+        let (result, _) =
+            ParallelDiemVM::execute_block(&analyze_result, txn_block, &self.data_store)?;
+
+        Ok(result)
     }
 
     pub fn execute_transaction_block(

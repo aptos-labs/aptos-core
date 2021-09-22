@@ -2751,6 +2751,7 @@ dependencies = [
  "diem-framework-releases",
  "diem-logger",
  "diem-metrics",
+ "diem-parallel-executor",
  "diem-state-view",
  "diem-types",
  "diem-workspace-hack",
@@ -2761,6 +2762,7 @@ dependencies = [
  "move-stdlib",
  "move-vm-runtime",
  "move-vm-types",
+ "mvhashmap",
  "once_cell",
  "proptest",
  "rayon",
@@ -4596,6 +4598,7 @@ dependencies = [
  "proptest",
  "proptest-derive",
  "rand 0.8.4",
+ "read-write-set",
  "serde",
  "vm-genesis",
 ]
@@ -4624,6 +4627,7 @@ dependencies = [
  "move-vm-runtime",
  "move-vm-types",
  "proptest",
+ "read-write-set",
  "serde_json",
 ]
 

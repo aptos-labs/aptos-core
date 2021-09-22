@@ -31,6 +31,7 @@ diem-framework-releases = { path = "../diem-framework/DPN/releases" }
 diem-workspace-hack = { path = "../../common/workspace-hack" }
 diem-writeset-generator = { path = "../../diem-move/writeset-transaction-generator"}
 diem-state-view = { path = "../../storage/state-view" }
+read-write-set = { path = "../tools/read-write-set" }
 
 [features]
 default = ["diem-transaction-builder/fuzzing"]
