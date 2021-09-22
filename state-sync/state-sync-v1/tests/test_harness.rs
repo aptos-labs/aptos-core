@@ -46,6 +46,7 @@ use futures::{executor::block_on, future::FutureExt, StreamExt};
 use memsocket::MemoryListener;
 use netcore::transport::ConnectionOrigin;
 use network::{
+    application::storage::PeerMetadataStorage,
     peer_manager::{
         builder::AuthenticationMode, conn_notifs_channel, ConnectionNotification,
         ConnectionRequestSender, PeerManagerNotification, PeerManagerRequest,
@@ -396,6 +397,7 @@ impl StateSyncEnvironment {
                 TimeService::real(),
                 base_addr,
                 auth_mode,
+                Arc::new(PeerMetadataStorage::new()),
             );
 
             let (sender, events) = network_builder

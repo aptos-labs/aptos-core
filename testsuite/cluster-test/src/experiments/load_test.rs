@@ -18,7 +18,8 @@ use diem_time_service::TimeService;
 use diem_types::{account_config::diem_root_address, chain_id::ChainId};
 use futures::{sink::SinkExt, StreamExt};
 use network::{
-    connectivity_manager::DiscoverySource, protocols::network::Event, ConnectivityRequest,
+    application::storage::PeerMetadataStorage, connectivity_manager::DiscoverySource,
+    protocols::network::Event, ConnectivityRequest,
 };
 use network_builder::builder::NetworkBuilder;
 use state_sync_v1::network::{StateSyncEvents, StateSyncSender};
@@ -26,6 +27,7 @@ use std::{
     collections::HashSet,
     fmt,
     ops::Add,
+    sync::Arc,
     time::{Duration, Instant},
 };
 use structopt::StructOpt;
@@ -275,6 +277,7 @@ impl StubbedNode {
             network_config,
             TimeService::real(),
             None,
+            Arc::new(PeerMetadataStorage::new()),
         );
 
         let state_sync_handle = Some(

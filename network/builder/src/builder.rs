@@ -77,9 +77,11 @@ pub struct NetworkBuilder {
 impl NetworkBuilder {
     /// Return a new NetworkBuilder initialized with default configuration values.
     // TODO:  Remove `pub`.  NetworkBuilder should only be created thorugh `::create()`
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         chain_id: ChainId,
         trusted_peers: Arc<RwLock<PeerSet>>,
+        peer_metadata_storage: Arc<PeerMetadataStorage>,
         network_context: NetworkContext,
         time_service: TimeService,
         listen_address: NetworkAddress,
@@ -92,7 +94,6 @@ impl NetworkBuilder {
         inbound_rate_limit_config: Option<RateLimitConfig>,
         outbound_rate_limit_config: Option<RateLimitConfig>,
     ) -> Self {
-        let peer_metadata_storage = Arc::new(PeerMetadataStorage::new());
         // A network cannot exist without a PeerManager
         // TODO:  construct this in create and pass it to new() as a parameter. The complication is manual construction of NetworkBuilder in various tests.
         let peer_manager_builder = PeerManagerBuilder::create(
@@ -133,12 +134,14 @@ impl NetworkBuilder {
         time_service: TimeService,
         listen_address: NetworkAddress,
         authentication_mode: AuthenticationMode,
+        peer_metadata_storage: Arc<PeerMetadataStorage>,
     ) -> NetworkBuilder {
         let mutual_authentication = matches!(authentication_mode, AuthenticationMode::Mutual(_));
 
         let mut builder = NetworkBuilder::new(
             chain_id,
             trusted_peers.clone(),
+            peer_metadata_storage,
             network_context,
             time_service,
             listen_address,
@@ -173,6 +176,7 @@ impl NetworkBuilder {
         config: &NetworkConfig,
         time_service: TimeService,
         mut reconfig_subscription_service: Option<&mut EventSubscriptionService>,
+        peer_metadata_storage: Arc<PeerMetadataStorage>,
     ) -> NetworkBuilder {
         let peer_id = config.peer_id();
         let identity_key = config.identity_key();
@@ -191,6 +195,7 @@ impl NetworkBuilder {
         let mut network_builder = NetworkBuilder::new(
             chain_id,
             trusted_peers.clone(),
+            peer_metadata_storage,
             network_context,
             time_service,
             config.listen_address.clone(),

@@ -46,6 +46,7 @@ diem-vm = { path = "../language/diem-vm" }
 diem-workspace-hack = { path = "../common/workspace-hack" }
 diemdb = { path = "../storage/diemdb" }
 mempool-notifications = { path = "../state-sync/inter-component/mempool-notifications" }
+network = { path = "../network" }
 network-builder = { path = "../network/builder" }
 state-sync-v1 = { path = "../state-sync/state-sync-v1" }
 storage-client = { path = "../storage/storage-client" }

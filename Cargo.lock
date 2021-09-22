@@ -2316,6 +2316,7 @@ dependencies = [
  "hex",
  "jemallocator",
  "mempool-notifications",
+ "network",
  "network-builder",
  "rand 0.8.3",
  "state-sync-v1",

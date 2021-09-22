@@ -17,6 +17,7 @@ use diem_types::{chain_id::ChainId, network_address::NetworkAddress, PeerId};
 use futures::{executor::block_on, StreamExt};
 use netcore::transport::ConnectionOrigin;
 use network::{
+    application::storage::PeerMetadataStorage,
     error::NetworkError,
     peer_manager::{
         builder::AuthenticationMode, ConnectionRequestSender, PeerManagerRequestSender,
@@ -138,7 +139,7 @@ pub fn setup_network() -> DummyNetwork {
 
     let trusted_peers = Arc::new(RwLock::new(HashMap::new()));
     let authentication_mode = AuthenticationMode::Mutual(listener_identity_private_key);
-
+    let peer_metadata_storage = Arc::new(PeerMetadataStorage::new());
     // Set up the listener network
     let network_context = NetworkContext::new(role, network_id, listener_peer_id);
     let mut network_builder = NetworkBuilder::new_for_test(
@@ -149,6 +150,7 @@ pub fn setup_network() -> DummyNetwork {
         TimeService::real(),
         listener_addr,
         authentication_mode,
+        peer_metadata_storage.clone(),
     );
 
     let (listener_sender, mut listener_events) = network_builder
@@ -177,6 +179,7 @@ pub fn setup_network() -> DummyNetwork {
         TimeService::real(),
         dialer_addr,
         authentication_mode,
+        peer_metadata_storage,
     );
 
     let (dialer_sender, mut dialer_events) = network_builder

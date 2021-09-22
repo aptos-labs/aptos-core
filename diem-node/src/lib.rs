@@ -28,6 +28,7 @@ use event_notifications::EventSubscriptionService;
 use executor::{db_bootstrapper::maybe_bootstrap, Executor};
 use executor_types::ChunkExecutor;
 use futures::{channel::mpsc::channel, executor::block_on};
+use network::application::storage::PeerMetadataStorage;
 use network_builder::builder::NetworkBuilder;
 use state_sync_v1::bootstrapper::StateSyncBootstrapper;
 use std::{
@@ -343,6 +344,7 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
 
     // Instantiate every network and collect the requisite endpoints for state_sync, mempool, and consensus.
     let mut network_ids = HashSet::new();
+    let peer_metadata_storage = Arc::new(PeerMetadataStorage::new());
     for network_config in network_configs.into_iter() {
         debug!("Creating runtime for {}", network_config.network_id);
         let runtime = Builder::new_multi_thread()
@@ -361,6 +363,7 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
             network_config,
             TimeService::real(),
             Some(&mut event_subscription_service),
+            peer_metadata_storage.clone(),
         );
         let network_id = network_config.network_id;
         // Guarantee there is only one of this network
