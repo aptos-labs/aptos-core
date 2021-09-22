@@ -695,7 +695,7 @@ impl<'env> Docgen<'env> {
     }
 
     /// Generate a static call diagram (.svg) starting from the given function.
-    fn gen_call_diagram(&self, fun_id: QualifiedId<FunId>) {
+    fn gen_call_diagram(&self, fun_id: QualifiedId<FunId>, is_forward: bool) {
         let fun_env = self.env.get_function(fun_id);
         let name_of = |env: &FunctionEnv| {
             if fun_env.module_env.get_id() == env.module_env.get_id() {
@@ -713,34 +713,42 @@ impl<'env> Docgen<'env> {
         queue.push_back(fun_id);
 
         while let Some(id) = queue.pop_front() {
-            let caller_env = self.env.get_function(id);
-            let caller_name = name_of(&caller_env);
-            let callee_list = caller_env.get_called_functions();
-
-            if fun_env.module_env.get_id() == caller_env.module_env.get_id() {
-                dot_src_lines.push(format!("\t{}", caller_name));
+            let curr_env = self.env.get_function(id);
+            let curr_name = name_of(&curr_env);
+            let next_list = if is_forward {
+                curr_env.get_called_functions()
             } else {
-                let module_name = caller_env
+                curr_env.get_calling_functions()
+            };
+
+            if fun_env.module_env.get_id() == curr_env.module_env.get_id() {
+                dot_src_lines.push(format!("\t{}", curr_name));
+            } else {
+                let module_name = curr_env
                     .module_env
                     .get_name()
-                    .display(caller_env.module_env.symbol_pool());
+                    .display(curr_env.module_env.symbol_pool());
                 dot_src_lines.push(format!("\tsubgraph cluster_{} {{", module_name));
                 dot_src_lines.push(format!("\t\tlabel = \"{}\";", module_name));
                 dot_src_lines.push(format!(
                     "\t\t{}[label=\"{}\"]",
-                    caller_name,
-                    caller_env.get_simple_name_string()
+                    curr_name,
+                    curr_env.get_simple_name_string()
                 ));
                 dot_src_lines.push("\t}".to_string());
             }
 
-            for callee_id in callee_list.iter() {
-                let callee_env = self.env.get_function(*callee_id);
-                let callee_name = name_of(&callee_env);
-                dot_src_lines.push(format!("\t{} -> {}", caller_name, callee_name));
-                if !visited.contains(callee_id) {
-                    visited.insert(*callee_id);
-                    queue.push_back(*callee_id);
+            for next_id in next_list.iter() {
+                let next_env = self.env.get_function(*next_id);
+                let next_name = name_of(&next_env);
+                if is_forward {
+                    dot_src_lines.push(format!("\t{} -> {}", curr_name, next_name));
+                } else {
+                    dot_src_lines.push(format!("\t{} -> {}", next_name, curr_name));
+                }
+                if !visited.contains(next_id) {
+                    visited.insert(*next_id);
+                    queue.push_back(*next_id);
                 }
             }
         }
@@ -749,8 +757,9 @@ impl<'env> Docgen<'env> {
         let out_file_path = PathBuf::from(&self.options.output_directory)
             .join("img")
             .join(format!(
-                "{}_call_graph.svg",
-                fun_env.get_name_string().to_string().replace("::", "_")
+                "{}_{}_call_graph.svg",
+                fun_env.get_name_string().to_string().replace("::", "_"),
+                (if is_forward { "forward" } else { "backward" }).to_string()
             ));
 
         self.gen_svg_file(&out_file_path, &dot_src_lines.join("\n"));
@@ -1069,13 +1078,24 @@ impl<'env> Docgen<'env> {
         }
         if self.options.include_call_diagrams {
             let func_name = func_env.get_simple_name_string();
-            self.gen_call_diagram(func_env.get_qualified_id());
+            self.gen_call_diagram(func_env.get_qualified_id(), true);
             self.begin_collapsed(&format!(
                 "Show all the functions that \"{}\" calls",
                 &func_name
             ));
             self.image(&format!(
-                "img/{}_call_graph.svg",
+                "img/{}_forward_call_graph.svg",
+                func_env.get_name_string().to_string().replace("::", "_")
+            ));
+            self.end_collapsed();
+
+            self.gen_call_diagram(func_env.get_qualified_id(), false);
+            self.begin_collapsed(&format!(
+                "Show all the functions that call \"{}\"",
+                &func_name
+            ));
+            self.image(&format!(
+                "img/{}_backward_call_graph.svg",
                 func_env.get_name_string().to_string().replace("::", "_")
             ));
             self.end_collapsed();
