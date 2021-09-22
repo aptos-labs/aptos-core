@@ -49,8 +49,8 @@ impl NetworkContext {
         self.role
     }
 
-    pub fn network_id(&self) -> &NetworkId {
-        &self.network_id
+    pub fn network_id(&self) -> NetworkId {
+        self.network_id
     }
 
     pub fn peer_id(&self) -> PeerId {

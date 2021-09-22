@@ -443,14 +443,13 @@ where
         supported_protocols.insert(SUPPORTED_MESSAGING_PROTOCOL, application_protocols);
 
         let identity_pubkey = identity_key.public_key();
-        let network_id = *network_context.network_id();
 
         let upgrade_context = UpgradeContext::new(
             NoiseUpgrader::new(network_context, identity_key, auth_mode),
             handshake_version,
             supported_protocols,
             chain_id,
-            network_id,
+            network_context.network_id(),
         );
 
         Self {
