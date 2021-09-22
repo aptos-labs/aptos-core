@@ -35,18 +35,24 @@ impl From<AnnotatedMoveStruct> for MoveResource {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Copy)]
 pub struct U64(u64);
-
-impl U64 {
-    pub fn into_inner(&self) -> u64 {
-        self.0
-    }
-}
 
 impl From<u64> for U64 {
     fn from(d: u64) -> Self {
         Self(d)
+    }
+}
+
+impl From<U64> for warp::http::header::HeaderValue {
+    fn from(d: U64) -> Self {
+        d.0.into()
+    }
+}
+
+impl From<U64> for u64 {
+    fn from(d: U64) -> Self {
+        d.0
     }
 }
 
@@ -74,18 +80,18 @@ impl<'de> Deserialize<'de> for U64 {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Copy)]
 pub struct U128(u128);
-
-impl U128 {
-    pub fn into_inner(&self) -> u128 {
-        self.0
-    }
-}
 
 impl From<u128> for U128 {
     fn from(d: u128) -> Self {
         Self(d)
+    }
+}
+
+impl From<U128> for u128 {
+    fn from(d: U128) -> Self {
+        d.0
     }
 }
 
@@ -154,7 +160,7 @@ impl From<AnnotatedMoveValue> for MoveValue {
             AnnotatedMoveValue::U64(v) => MoveValue::U64(U64(v)),
             AnnotatedMoveValue::U128(v) => MoveValue::U128(U128(v)),
             AnnotatedMoveValue::Bool(v) => MoveValue::Bool(v),
-            AnnotatedMoveValue::Address(v) => MoveValue::Address(Address::new(v)),
+            AnnotatedMoveValue::Address(v) => MoveValue::Address(v.into()),
             AnnotatedMoveValue::Vector(_, vals) => {
                 MoveValue::Vector(vals.into_iter().map(MoveValue::from).collect())
             }
@@ -190,7 +196,7 @@ pub struct MoveStructTag {
 impl From<StructTag> for MoveStructTag {
     fn from(tag: StructTag) -> Self {
         Self {
-            address: Address::new(tag.address),
+            address: tag.address.into(),
             module: tag.module,
             name: tag.name,
             type_params: tag.type_params.into_iter().map(MoveTypeTag::from).collect(),
@@ -414,7 +420,7 @@ mod tests {
         assert_eq!(val, json!(u64::MAX.to_string()));
 
         let data: U64 = serde_json::from_value(json!(u64::MAX.to_string())).unwrap();
-        assert_eq!(data.into_inner(), u64::MAX);
+        assert_eq!(u64::from(data), u64::MAX);
     }
 
     #[test]
@@ -423,7 +429,7 @@ mod tests {
         assert_eq!(val, json!(u128::MAX.to_string()));
 
         let data: U128 = serde_json::from_value(json!(u128::MAX.to_string())).unwrap();
-        assert_eq!(data.into_inner(), u128::MAX);
+        assert_eq!(u128::from(data), u128::MAX);
     }
 
     fn create_nested_struct() -> StructTag {

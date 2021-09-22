@@ -4,6 +4,7 @@
 use crate::U64;
 
 use diem_types::{chain_id::ChainId, ledger_info::LedgerInfoWithSignatures};
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -24,10 +25,10 @@ impl LedgerInfo {
     }
 
     pub fn version(&self) -> u64 {
-        self.ledger_version.into_inner()
+        self.ledger_version.into()
     }
 
     pub fn timestamp(&self) -> u64 {
-        self.ledger_timestamp.into_inner()
+        self.ledger_timestamp.into()
     }
 }

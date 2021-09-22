@@ -54,7 +54,7 @@ impl Context {
         ledger_version: u64,
     ) -> Result<AccountState, Error> {
         let state = self
-            .get_account_state_blob(address.into_inner(), ledger_version)?
+            .get_account_state_blob(address.into(), ledger_version)?
             .ok_or_else(|| account_not_found(&address.to_string(), ledger_version))?;
         Ok(AccountState::try_from(&state)?)
     }

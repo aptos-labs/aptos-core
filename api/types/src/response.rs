@@ -34,11 +34,11 @@ impl warp::Reply for Response {
         headers.insert(X_DIEM_CHAIN_ID, (self.ledger_info.chain_id as u16).into());
         headers.insert(
             X_DIEM_LEDGER_VERSION,
-            self.ledger_info.ledger_version.into_inner().into(),
+            self.ledger_info.ledger_version.into(),
         );
         headers.insert(
             X_DIEM_LEDGER_TIMESTAMP,
-            self.ledger_info.ledger_timestamp.into_inner().into(),
+            self.ledger_info.ledger_timestamp.into(),
         );
 
         res

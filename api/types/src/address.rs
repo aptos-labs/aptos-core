@@ -5,18 +5,8 @@ use diem_types::account_address::AccountAddress;
 use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
 use std::{convert::TryFrom, fmt, str::FromStr};
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Copy)]
 pub struct Address(AccountAddress);
-
-impl Address {
-    pub fn new(address: AccountAddress) -> Self {
-        Self(address)
-    }
-
-    pub fn into_inner(&self) -> AccountAddress {
-        self.0
-    }
-}
 
 impl fmt::Display for Address {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -46,6 +36,24 @@ impl TryFrom<String> for Address {
     }
 }
 
+impl From<AccountAddress> for Address {
+    fn from(address: AccountAddress) -> Self {
+        Self(address)
+    }
+}
+
+impl From<Address> for AccountAddress {
+    fn from(address: Address) -> Self {
+        address.0
+    }
+}
+
+impl From<&Address> for AccountAddress {
+    fn from(address: &Address) -> Self {
+        address.0
+    }
+}
+
 impl Serialize for Address {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         self.to_string().serialize(serializer)
@@ -65,6 +73,9 @@ impl<'de> Deserialize<'de> for Address {
 #[cfg(test)]
 mod tests {
     use crate::address::Address;
+
+    use diem_types::account_address::AccountAddress;
+
     use serde_json::{json, Value};
     use std::{convert::TryFrom, str::FromStr};
 
@@ -95,5 +106,19 @@ mod tests {
 
         let val: Value = serde_json::to_value(address).unwrap();
         assert_eq!(val, json!("0x1"));
+    }
+
+    #[test]
+    fn test_from_and_to_account_address() {
+        let address: Address = serde_json::from_value(json!("0x1")).unwrap();
+        let account_address: AccountAddress = address.into();
+
+        assert_eq!(
+            account_address.to_string(),
+            "00000000000000000000000000000001"
+        );
+
+        let new_address: Address = account_address.into();
+        assert_eq!(new_address, address);
     }
 }
