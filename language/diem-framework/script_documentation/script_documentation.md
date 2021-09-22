@@ -133,8 +133,8 @@ e.g.,
 
 | Error Category           | Error Reason                                | Description                                               |
 | ----------------         | --------------                              | -------------                                             |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_EPAYER_DOESNT_HOLD_CURRENCY">DiemAccount::EPAYER_DOESNT_HOLD_CURRENCY</a></code> | <code>payer</code> doesn't hold a balance in <code>Currency</code>.             |
-| <code><a href="_LIMIT_EXCEEDED">Errors::LIMIT_EXCEEDED</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_EINSUFFICIENT_BALANCE">DiemAccount::EINSUFFICIENT_BALANCE</a></code>       | <code>amount</code> is greater than <code>payer</code>'s balance in <code>Currency</code>. |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_EPAYER_DOESNT_HOLD_CURRENCY">DiemAccount::EPAYER_DOESNT_HOLD_CURRENCY</a></code> | <code>payer</code> doesn't hold a balance in <code>Currency</code>.             |
+| <code><a href="_LIMIT_EXCEEDED">Errors::LIMIT_EXCEEDED</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_EINSUFFICIENT_BALANCE">DiemAccount::EINSUFFICIENT_BALANCE</a></code>       | <code>amount</code> is greater than <code>payer</code>'s balance in <code>Currency</code>. |
 
 For each of these tables, the **error categories should be considered stable**;
 any changes to these categories will be be well-publicized in advance. On the
@@ -269,7 +269,7 @@ Script documentation: <code><a href="script_documentation.md#0x1_AccountCreation
 
 
 Adds a zero <code>Currency</code> balance to the sending <code>account</code>. This will enable <code>account</code> to
-send, receive, and hold <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_Diem">Diem::Diem</a>&lt;Currency&gt;</code> coins. This transaction can be
+send, receive, and hold <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_Diem">Diem::Diem</a>&lt;Currency&gt;</code> coins. This transaction can be
 successfully sent by any account that is allowed to hold balances
 (e.g., VASP, Designated Dealer).
 
@@ -382,7 +382,7 @@ Script documentation: <code><a href="script_documentation.md#0x1_AccountAdminist
 #### Script rotate_shared_ed25519_public_key
 
 
-Rotates the authentication key in a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SharedEd25519PublicKey.md#0x1_SharedEd25519PublicKey">SharedEd25519PublicKey</a></code>. This transaction can be sent by
+Rotates the authentication key in a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SharedEd25519PublicKey.md#0x1_SharedEd25519PublicKey">SharedEd25519PublicKey</a></code>. This transaction can be sent by
 any account that has previously published a shared ed25519 public key using
 <code><a href="script_documentation.md#0x1_AccountAdministrationScripts_publish_shared_ed25519_public_key">AccountAdministrationScripts::publish_shared_ed25519_public_key</a></code>.
 
@@ -700,8 +700,8 @@ Script documentation: <code><a href="script_documentation.md#0x1_SystemAdministr
 
 
 
-<pre><code><b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount">0x1::DiemAccount</a>;
-<b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce">0x1::SlidingNonce</a>;
+<pre><code><b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount">0x1::DiemAccount</a>;
+<b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce">0x1::SlidingNonce</a>;
 </code></pre>
 
 
@@ -741,15 +741,15 @@ child accounts of the creating Parent VASP account.
 ###### Events
 
 Successful execution will emit:
-* A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_CreateAccountEvent">DiemAccount::CreateAccountEvent</a></code> with the <code>created</code> field being <code>child_address</code>,
-and the <code>rold_id</code> field being <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_CHILD_VASP_ROLE_ID">Roles::CHILD_VASP_ROLE_ID</a></code>. This is emitted on the
-<code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_AccountOperationsCapability">DiemAccount::AccountOperationsCapability</a></code> <code>creation_events</code> handle.
+* A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_CreateAccountEvent">DiemAccount::CreateAccountEvent</a></code> with the <code>created</code> field being <code>child_address</code>,
+and the <code>rold_id</code> field being <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles_CHILD_VASP_ROLE_ID">Roles::CHILD_VASP_ROLE_ID</a></code>. This is emitted on the
+<code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_AccountOperationsCapability">DiemAccount::AccountOperationsCapability</a></code> <code>creation_events</code> handle.
 
 Successful execution with a <code>child_initial_balance</code> greater than zero will additionaly emit:
-* A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_SentPaymentEvent">DiemAccount::SentPaymentEvent</a></code> with the <code>payee</code> field being <code>child_address</code>.
-This is emitted on the Parent VASP's <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_DiemAccount">DiemAccount::DiemAccount</a></code> <code>sent_events</code> handle.
-* A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_ReceivedPaymentEvent">DiemAccount::ReceivedPaymentEvent</a></code> with the  <code>payer</code> field being the Parent VASP's address.
-This is emitted on the new Child VASPS's <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_DiemAccount">DiemAccount::DiemAccount</a></code> <code>received_events</code> handle.
+* A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_SentPaymentEvent">DiemAccount::SentPaymentEvent</a></code> with the <code>payee</code> field being <code>child_address</code>.
+This is emitted on the Parent VASP's <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_DiemAccount">DiemAccount::DiemAccount</a></code> <code>sent_events</code> handle.
+* A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_ReceivedPaymentEvent">DiemAccount::ReceivedPaymentEvent</a></code> with the  <code>payer</code> field being the Parent VASP's address.
+This is emitted on the new Child VASPS's <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_DiemAccount">DiemAccount::DiemAccount</a></code> <code>received_events</code> handle.
 
 
 <a name="@Parameters_50"></a>
@@ -772,15 +772,15 @@ This is emitted on the new Child VASPS's <code><a href="../../../../../../DPN/re
 
 | Error Category              | Error Reason                                             | Description                                                                              |
 | ----------------            | --------------                                           | -------------                                                                            |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_EMALFORMED_AUTHENTICATION_KEY">DiemAccount::EMALFORMED_AUTHENTICATION_KEY</a></code>            | The <code>auth_key_prefix</code> was not of length 32.                                              |
-| <code><a href="_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a></code>     | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_EPARENT_VASP">Roles::EPARENT_VASP</a></code>                                    | The sending account wasn't a Parent VASP account.                                        |
-| <code><a href="_ALREADY_PUBLISHED">Errors::ALREADY_PUBLISHED</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_EROLE_ID">Roles::EROLE_ID</a></code>                                        | The <code>child_address</code> address is already taken.                                            |
-| <code><a href="_LIMIT_EXCEEDED">Errors::LIMIT_EXCEEDED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/VASP.md#0x1_VASP_ETOO_MANY_CHILDREN">VASP::ETOO_MANY_CHILDREN</a></code>                               | The sending account has reached the maximum number of allowed child accounts.            |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>     | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_ECURRENCY_INFO">Diem::ECURRENCY_INFO</a></code>                                  | The <code>CoinType</code> is not a registered currency on-chain.                                    |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_EMALFORMED_AUTHENTICATION_KEY">DiemAccount::EMALFORMED_AUTHENTICATION_KEY</a></code>            | The <code>auth_key_prefix</code> was not of length 32.                                              |
+| <code><a href="_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a></code>     | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles_EPARENT_VASP">Roles::EPARENT_VASP</a></code>                                    | The sending account wasn't a Parent VASP account.                                        |
+| <code><a href="_ALREADY_PUBLISHED">Errors::ALREADY_PUBLISHED</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles_EROLE_ID">Roles::EROLE_ID</a></code>                                        | The <code>child_address</code> address is already taken.                                            |
+| <code><a href="_LIMIT_EXCEEDED">Errors::LIMIT_EXCEEDED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/VASP.md#0x1_VASP_ETOO_MANY_CHILDREN">VASP::ETOO_MANY_CHILDREN</a></code>                               | The sending account has reached the maximum number of allowed child accounts.            |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>     | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_ECURRENCY_INFO">Diem::ECURRENCY_INFO</a></code>                                  | The <code>CoinType</code> is not a registered currency on-chain.                                    |
 | <code><a href="_INVALID_STATE">Errors::INVALID_STATE</a></code>     | <code>DiemAccount::EWITHDRAWAL_CAPABILITY_ALREADY_EXTRACTED</code> | The withdrawal capability for the sending account has already been extracted.            |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>     | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_EPAYER_DOESNT_HOLD_CURRENCY">DiemAccount::EPAYER_DOESNT_HOLD_CURRENCY</a></code>              | The sending account doesn't have a balance in <code>CoinType</code>.                                |
-| <code><a href="_LIMIT_EXCEEDED">Errors::LIMIT_EXCEEDED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_EINSUFFICIENT_BALANCE">DiemAccount::EINSUFFICIENT_BALANCE</a></code>                    | The sending account doesn't have at least <code>child_initial_balance</code> of <code>CoinType</code> balance. |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_ECANNOT_CREATE_AT_VM_RESERVED">DiemAccount::ECANNOT_CREATE_AT_VM_RESERVED</a></code>            | The <code>child_address</code> is the reserved address 0x0.                                         |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>     | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_EPAYER_DOESNT_HOLD_CURRENCY">DiemAccount::EPAYER_DOESNT_HOLD_CURRENCY</a></code>              | The sending account doesn't have a balance in <code>CoinType</code>.                                |
+| <code><a href="_LIMIT_EXCEEDED">Errors::LIMIT_EXCEEDED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_EINSUFFICIENT_BALANCE">DiemAccount::EINSUFFICIENT_BALANCE</a></code>                    | The sending account doesn't have at least <code>child_initial_balance</code> of <code>CoinType</code> balance. |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_ECANNOT_CREATE_AT_VM_RESERVED">DiemAccount::ECANNOT_CREATE_AT_VM_RESERVED</a></code>            | The <code>child_address</code> is the reserved address 0x0.                                         |
 
 
 <a name="@Related_Scripts_52"></a>
@@ -810,7 +810,7 @@ This is emitted on the new Child VASPS's <code><a href="../../../../../../DPN/re
     add_all_currencies: bool,
     child_initial_balance: u64
 ) {
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_create_child_vasp_account">DiemAccount::create_child_vasp_account</a>&lt;CoinType&gt;(
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_create_child_vasp_account">DiemAccount::create_child_vasp_account</a>&lt;CoinType&gt;(
         &parent_vasp,
         child_address,
         auth_key_prefix,
@@ -818,11 +818,11 @@ This is emitted on the new Child VASPS's <code><a href="../../../../../../DPN/re
     );
     // Give the newly created child `child_initial_balance` coins
     <b>if</b> (child_initial_balance &gt; 0) {
-        <b>let</b> vasp_withdrawal_cap = <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_extract_withdraw_capability">DiemAccount::extract_withdraw_capability</a>(&parent_vasp);
-        <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_pay_from">DiemAccount::pay_from</a>&lt;CoinType&gt;(
+        <b>let</b> vasp_withdrawal_cap = <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_extract_withdraw_capability">DiemAccount::extract_withdraw_capability</a>(&parent_vasp);
+        <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_pay_from">DiemAccount::pay_from</a>&lt;CoinType&gt;(
             &vasp_withdrawal_cap, child_address, child_initial_balance, x"", x""
         );
-        <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_restore_withdraw_capability">DiemAccount::restore_withdraw_capability</a>(vasp_withdrawal_cap);
+        <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_restore_withdraw_capability">DiemAccount::restore_withdraw_capability</a>(vasp_withdrawal_cap);
     };
 }
 </code></pre>
@@ -836,15 +836,15 @@ This is emitted on the new Child VASPS's <code><a href="../../../../../../DPN/re
 
 
 
-<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: parent_vasp};
+<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: parent_vasp};
 <b>let</b> parent_addr = <a href="_spec_address_of">Signer::spec_address_of</a>(parent_vasp);
-<b>let</b> parent_cap = <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_spec_get_withdraw_cap">DiemAccount::spec_get_withdraw_cap</a>(parent_addr);
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_CreateChildVASPAccountAbortsIf">DiemAccount::CreateChildVASPAccountAbortsIf</a>&lt;CoinType&gt;{
+<b>let</b> parent_cap = <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_spec_get_withdraw_cap">DiemAccount::spec_get_withdraw_cap</a>(parent_addr);
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_CreateChildVASPAccountAbortsIf">DiemAccount::CreateChildVASPAccountAbortsIf</a>&lt;CoinType&gt;{
     parent: parent_vasp, new_account_address: child_address};
 <b>aborts_if</b> child_initial_balance &gt; max_u64() <b>with</b> <a href="_LIMIT_EXCEEDED">Errors::LIMIT_EXCEEDED</a>;
 <b>include</b> (child_initial_balance &gt; 0) ==&gt;
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_ExtractWithdrawCapAbortsIf">DiemAccount::ExtractWithdrawCapAbortsIf</a>{sender_addr: parent_addr};
-<b>include</b> (child_initial_balance &gt; 0) ==&gt; <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DualAttestation.md#0x1_DualAttestation_AssertPaymentOkAbortsIf">DualAttestation::AssertPaymentOkAbortsIf</a>&lt;CoinType&gt;{
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_ExtractWithdrawCapAbortsIf">DiemAccount::ExtractWithdrawCapAbortsIf</a>{sender_addr: parent_addr};
+<b>include</b> (child_initial_balance &gt; 0) ==&gt; <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DualAttestation.md#0x1_DualAttestation_AssertPaymentOkAbortsIf">DualAttestation::AssertPaymentOkAbortsIf</a>&lt;CoinType&gt;{
     payer: parent_addr,
     payee: child_address,
     metadata: x"",
@@ -852,19 +852,19 @@ This is emitted on the new Child VASPS's <code><a href="../../../../../../DPN/re
     value: child_initial_balance
 };
 <b>include</b> (child_initial_balance) &gt; 0 ==&gt;
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_PayFromAbortsIfRestricted">DiemAccount::PayFromAbortsIfRestricted</a>&lt;CoinType&gt;{
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_PayFromAbortsIfRestricted">DiemAccount::PayFromAbortsIfRestricted</a>&lt;CoinType&gt;{
         cap: parent_cap,
         payee: child_address,
         amount: child_initial_balance,
         metadata: x"",
     };
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_CreateChildVASPAccountEnsures">DiemAccount::CreateChildVASPAccountEnsures</a>&lt;CoinType&gt;{
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_CreateChildVASPAccountEnsures">DiemAccount::CreateChildVASPAccountEnsures</a>&lt;CoinType&gt;{
     parent_addr: parent_addr,
     child_addr: child_address,
 };
-<b>ensures</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_balance">DiemAccount::balance</a>&lt;CoinType&gt;(child_address) == child_initial_balance;
-<b>ensures</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_balance">DiemAccount::balance</a>&lt;CoinType&gt;(parent_addr)
-    == <b>old</b>(<a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_balance">DiemAccount::balance</a>&lt;CoinType&gt;(parent_addr)) - child_initial_balance;
+<b>ensures</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_balance">DiemAccount::balance</a>&lt;CoinType&gt;(child_address) == child_initial_balance;
+<b>ensures</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_balance">DiemAccount::balance</a>&lt;CoinType&gt;(parent_addr)
+    == <b>old</b>(<a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_balance">DiemAccount::balance</a>&lt;CoinType&gt;(parent_addr)) - child_initial_balance;
 <b>aborts_with</b> [check]
     <a href="_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a>,
     <a href="_ALREADY_PUBLISHED">Errors::ALREADY_PUBLISHED</a>,
@@ -879,7 +879,7 @@ This is emitted on the new Child VASPS's <code><a href="../../../../../../DPN/re
 Only Parent VASP accounts can create Child VASP accounts [[A7]][ROLE].
 
 
-<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_AbortsIfNotParentVasp">Roles::AbortsIfNotParentVasp</a>{account: parent_vasp};
+<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles_AbortsIfNotParentVasp">Roles::AbortsIfNotParentVasp</a>{account: parent_vasp};
 </code></pre>
 
 
@@ -905,7 +905,7 @@ Root account.
 
 Creates an account with a Validator Operator role at <code>new_account_address</code>, with authentication key
 <code>auth_key_prefix</code> | <code>new_account_address</code>. It publishes a
-<code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_ValidatorOperatorConfig">ValidatorOperatorConfig::ValidatorOperatorConfig</a></code> resource with the specified <code>human_name</code>.
+<code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_ValidatorOperatorConfig">ValidatorOperatorConfig::ValidatorOperatorConfig</a></code> resource with the specified <code>human_name</code>.
 This script does not assign the validator operator to any validator accounts but only creates the account.
 Authentication key prefixes, and how to construct them from an ed25519 public key are described
 [here](https://developers.diem.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
@@ -916,9 +916,9 @@ Authentication key prefixes, and how to construct them from an ed25519 public ke
 ###### Events
 
 Successful execution will emit:
-* A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_CreateAccountEvent">DiemAccount::CreateAccountEvent</a></code> with the <code>created</code> field being <code>new_account_address</code>,
-and the <code>rold_id</code> field being <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_VALIDATOR_OPERATOR_ROLE_ID">Roles::VALIDATOR_OPERATOR_ROLE_ID</a></code>. This is emitted on the
-<code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_AccountOperationsCapability">DiemAccount::AccountOperationsCapability</a></code> <code>creation_events</code> handle.
+* A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_CreateAccountEvent">DiemAccount::CreateAccountEvent</a></code> with the <code>created</code> field being <code>new_account_address</code>,
+and the <code>rold_id</code> field being <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles_VALIDATOR_OPERATOR_ROLE_ID">Roles::VALIDATOR_OPERATOR_ROLE_ID</a></code>. This is emitted on the
+<code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_AccountOperationsCapability">DiemAccount::AccountOperationsCapability</a></code> <code>creation_events</code> handle.
 
 
 <a name="@Parameters_56"></a>
@@ -928,7 +928,7 @@ and the <code>rold_id</code> field being <code><a href="../../../../../../DPN/re
 | Name                  | Type         | Description                                                                              |
 | ------                | ------       | -------------                                                                            |
 | <code>dr_account</code>          | <code>signer</code>     | The signer of the sending account of this transaction. Must be the Diem Root signer.     |
-| <code>sliding_nonce</code>       | <code>u64</code>        | The <code>sliding_nonce</code> (see: <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction.               |
+| <code>sliding_nonce</code>       | <code>u64</code>        | The <code>sliding_nonce</code> (see: <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction.               |
 | <code>new_account_address</code> | <code>address</code>    | Address of the to-be-created Validator account.                                          |
 | <code>auth_key_prefix</code>     | <code>vector&lt;u8&gt;</code> | The authentication key prefix that will be used initially for the newly created account. |
 | <code>human_name</code>          | <code>vector&lt;u8&gt;</code> | ASCII-encoded human name for the validator.                                              |
@@ -940,13 +940,13 @@ and the <code>rold_id</code> field being <code><a href="../../../../../../DPN/re
 
 | Error Category              | Error Reason                            | Description                                                                                |
 | ----------------            | --------------                          | -------------                                                                              |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>     | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>          | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code> resource is not published under <code>dr_account</code>.                             |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_OLD">SlidingNonce::ENONCE_TOO_OLD</a></code>          | The <code>sliding_nonce</code> is too old and it's impossible to determine if it's duplicated or not. |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_NEW">SlidingNonce::ENONCE_TOO_NEW</a></code>          | The <code>sliding_nonce</code> is too far in the future.                                              |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_ALREADY_RECORDED">SlidingNonce::ENONCE_ALREADY_RECORDED</a></code> | The <code>sliding_nonce</code> has been previously recorded.                                          |
-| <code><a href="_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/CoreAddresses.md#0x1_CoreAddresses_EDIEM_ROOT">CoreAddresses::EDIEM_ROOT</a></code>            | The sending account is not the Diem Root account.                                         |
-| <code><a href="_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a></code>     | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_EDIEM_ROOT">Roles::EDIEM_ROOT</a></code>                    | The sending account is not the Diem Root account.                                         |
-| <code><a href="_ALREADY_PUBLISHED">Errors::ALREADY_PUBLISHED</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_EROLE_ID">Roles::EROLE_ID</a></code>                       | The <code>new_account_address</code> address is already taken.                                        |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>     | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>          | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code> resource is not published under <code>dr_account</code>.                             |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_OLD">SlidingNonce::ENONCE_TOO_OLD</a></code>          | The <code>sliding_nonce</code> is too old and it's impossible to determine if it's duplicated or not. |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_NEW">SlidingNonce::ENONCE_TOO_NEW</a></code>          | The <code>sliding_nonce</code> is too far in the future.                                              |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_ALREADY_RECORDED">SlidingNonce::ENONCE_ALREADY_RECORDED</a></code> | The <code>sliding_nonce</code> has been previously recorded.                                          |
+| <code><a href="_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/CoreAddresses.md#0x1_CoreAddresses_EDIEM_ROOT">CoreAddresses::EDIEM_ROOT</a></code>            | The sending account is not the Diem Root account.                                         |
+| <code><a href="_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a></code>     | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles_EDIEM_ROOT">Roles::EDIEM_ROOT</a></code>                    | The sending account is not the Diem Root account.                                         |
+| <code><a href="_ALREADY_PUBLISHED">Errors::ALREADY_PUBLISHED</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles_EROLE_ID">Roles::EROLE_ID</a></code>                       | The <code>new_account_address</code> address is already taken.                                        |
 
 
 <a name="@Related_Scripts_58"></a>
@@ -978,8 +978,8 @@ and the <code>rold_id</code> field being <code><a href="../../../../../../DPN/re
     auth_key_prefix: vector&lt;u8&gt;,
     human_name: vector&lt;u8&gt;
 ) {
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&dr_account, sliding_nonce);
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_create_validator_operator_account">DiemAccount::create_validator_operator_account</a>(
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&dr_account, sliding_nonce);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_create_validator_operator_account">DiemAccount::create_validator_operator_account</a>(
         &dr_account,
         new_account_address,
         auth_key_prefix,
@@ -999,22 +999,22 @@ Only Diem root may create Validator Operator accounts
 Authentication: ValidatorAccountAbortsIf includes AbortsIfNotDiemRoot.
 Checks that above table includes all error categories.
 The verifier finds an abort that is not documented, and cannot occur in practice:
-* REQUIRES_ROLE comes from <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_assert_diem_root">Roles::assert_diem_root</a></code>. However, assert_diem_root checks the literal
+* REQUIRES_ROLE comes from <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles_assert_diem_root">Roles::assert_diem_root</a></code>. However, assert_diem_root checks the literal
 Diem root address before checking the role, and the role abort is unreachable in practice, since
 only Diem root has the Diem root role.
 
 
-<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: dr_account};
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_RecordNonceAbortsIf">SlidingNonce::RecordNonceAbortsIf</a>{seq_nonce: sliding_nonce, account: dr_account};
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_CreateValidatorOperatorAccountAbortsIf">DiemAccount::CreateValidatorOperatorAccountAbortsIf</a>;
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_CreateValidatorOperatorAccountEnsures">DiemAccount::CreateValidatorOperatorAccountEnsures</a>;
+<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: dr_account};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_RecordNonceAbortsIf">SlidingNonce::RecordNonceAbortsIf</a>{seq_nonce: sliding_nonce, account: dr_account};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_CreateValidatorOperatorAccountAbortsIf">DiemAccount::CreateValidatorOperatorAccountAbortsIf</a>;
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_CreateValidatorOperatorAccountEnsures">DiemAccount::CreateValidatorOperatorAccountEnsures</a>;
 <b>aborts_with</b> [check]
     <a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>,
     <a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a>,
     <a href="_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a>,
     <a href="_ALREADY_PUBLISHED">Errors::ALREADY_PUBLISHED</a>,
     <a href="_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a>;
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_MakeAccountEmits">DiemAccount::MakeAccountEmits</a>;
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_MakeAccountEmits">DiemAccount::MakeAccountEmits</a>;
 </code></pre>
 
 
@@ -1022,7 +1022,7 @@ only Diem root has the Diem root role.
 Only the Diem Root account can create Validator Operator accounts [[A4]][ROLE].
 
 
-<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_AbortsIfNotDiemRoot">Roles::AbortsIfNotDiemRoot</a>{account: dr_account};
+<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles_AbortsIfNotDiemRoot">Roles::AbortsIfNotDiemRoot</a>{account: dr_account};
 </code></pre>
 
 
@@ -1048,9 +1048,9 @@ Root account.
 
 Creates an account with a Validator role at <code>new_account_address</code>, with authentication key
 <code>auth_key_prefix</code> | <code>new_account_address</code>. It publishes a
-<code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> resource with empty <code>config</code>, and
+<code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> resource with empty <code>config</code>, and
 <code>operator_account</code> fields. The <code>human_name</code> field of the
-<code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> is set to the passed in <code>human_name</code>.
+<code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> is set to the passed in <code>human_name</code>.
 This script does not add the validator to the validator set or the system,
 but only creates the account.
 Authentication keys, prefixes, and how to construct them from an ed25519 public key are described
@@ -1062,9 +1062,9 @@ Authentication keys, prefixes, and how to construct them from an ed25519 public 
 ###### Events
 
 Successful execution will emit:
-* A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_CreateAccountEvent">DiemAccount::CreateAccountEvent</a></code> with the <code>created</code> field being <code>new_account_address</code>,
-and the <code>rold_id</code> field being <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_VALIDATOR_ROLE_ID">Roles::VALIDATOR_ROLE_ID</a></code>. This is emitted on the
-<code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_AccountOperationsCapability">DiemAccount::AccountOperationsCapability</a></code> <code>creation_events</code> handle.
+* A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_CreateAccountEvent">DiemAccount::CreateAccountEvent</a></code> with the <code>created</code> field being <code>new_account_address</code>,
+and the <code>rold_id</code> field being <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles_VALIDATOR_ROLE_ID">Roles::VALIDATOR_ROLE_ID</a></code>. This is emitted on the
+<code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_AccountOperationsCapability">DiemAccount::AccountOperationsCapability</a></code> <code>creation_events</code> handle.
 
 
 <a name="@Parameters_62"></a>
@@ -1074,7 +1074,7 @@ and the <code>rold_id</code> field being <code><a href="../../../../../../DPN/re
 | Name                  | Type         | Description                                                                              |
 | ------                | ------       | -------------                                                                            |
 | <code>dr_account</code>          | <code>signer</code>     | The signer of the sending account of this transaction. Must be the Diem Root signer.     |
-| <code>sliding_nonce</code>       | <code>u64</code>        | The <code>sliding_nonce</code> (see: <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction.               |
+| <code>sliding_nonce</code>       | <code>u64</code>        | The <code>sliding_nonce</code> (see: <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction.               |
 | <code>new_account_address</code> | <code>address</code>    | Address of the to-be-created Validator account.                                          |
 | <code>auth_key_prefix</code>     | <code>vector&lt;u8&gt;</code> | The authentication key prefix that will be used initially for the newly created account. |
 | <code>human_name</code>          | <code>vector&lt;u8&gt;</code> | ASCII-encoded human name for the validator.                                              |
@@ -1086,13 +1086,13 @@ and the <code>rold_id</code> field being <code><a href="../../../../../../DPN/re
 
 | Error Category              | Error Reason                            | Description                                                                                |
 | ----------------            | --------------                          | -------------                                                                              |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>     | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>          | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code> resource is not published under <code>dr_account</code>.                             |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_OLD">SlidingNonce::ENONCE_TOO_OLD</a></code>          | The <code>sliding_nonce</code> is too old and it's impossible to determine if it's duplicated or not. |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_NEW">SlidingNonce::ENONCE_TOO_NEW</a></code>          | The <code>sliding_nonce</code> is too far in the future.                                              |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_ALREADY_RECORDED">SlidingNonce::ENONCE_ALREADY_RECORDED</a></code> | The <code>sliding_nonce</code> has been previously recorded.                                          |
-| <code><a href="_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/CoreAddresses.md#0x1_CoreAddresses_EDIEM_ROOT">CoreAddresses::EDIEM_ROOT</a></code>            | The sending account is not the Diem Root account.                                         |
-| <code><a href="_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a></code>     | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_EDIEM_ROOT">Roles::EDIEM_ROOT</a></code>                    | The sending account is not the Diem Root account.                                         |
-| <code><a href="_ALREADY_PUBLISHED">Errors::ALREADY_PUBLISHED</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_EROLE_ID">Roles::EROLE_ID</a></code>                       | The <code>new_account_address</code> address is already taken.                                        |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>     | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>          | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code> resource is not published under <code>dr_account</code>.                             |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_OLD">SlidingNonce::ENONCE_TOO_OLD</a></code>          | The <code>sliding_nonce</code> is too old and it's impossible to determine if it's duplicated or not. |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_NEW">SlidingNonce::ENONCE_TOO_NEW</a></code>          | The <code>sliding_nonce</code> is too far in the future.                                              |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_ALREADY_RECORDED">SlidingNonce::ENONCE_ALREADY_RECORDED</a></code> | The <code>sliding_nonce</code> has been previously recorded.                                          |
+| <code><a href="_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/CoreAddresses.md#0x1_CoreAddresses_EDIEM_ROOT">CoreAddresses::EDIEM_ROOT</a></code>            | The sending account is not the Diem Root account.                                         |
+| <code><a href="_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a></code>     | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles_EDIEM_ROOT">Roles::EDIEM_ROOT</a></code>                    | The sending account is not the Diem Root account.                                         |
+| <code><a href="_ALREADY_PUBLISHED">Errors::ALREADY_PUBLISHED</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles_EROLE_ID">Roles::EROLE_ID</a></code>                       | The <code>new_account_address</code> address is already taken.                                        |
 
 
 <a name="@Related_Scripts_64"></a>
@@ -1124,8 +1124,8 @@ and the <code>rold_id</code> field being <code><a href="../../../../../../DPN/re
     auth_key_prefix: vector&lt;u8&gt;,
     human_name: vector&lt;u8&gt;,
 ) {
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&dr_account, sliding_nonce);
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_create_validator_account">DiemAccount::create_validator_account</a>(
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&dr_account, sliding_nonce);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_create_validator_account">DiemAccount::create_validator_account</a>(
         &dr_account,
         new_account_address,
         auth_key_prefix,
@@ -1145,22 +1145,22 @@ Only Diem root may create Validator accounts
 Authentication: ValidatorAccountAbortsIf includes AbortsIfNotDiemRoot.
 Checks that above table includes all error categories.
 The verifier finds an abort that is not documented, and cannot occur in practice:
-* REQUIRES_ROLE comes from <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_assert_diem_root">Roles::assert_diem_root</a></code>. However, assert_diem_root checks the literal
+* REQUIRES_ROLE comes from <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles_assert_diem_root">Roles::assert_diem_root</a></code>. However, assert_diem_root checks the literal
 Diem root address before checking the role, and the role abort is unreachable in practice, since
 only Diem root has the Diem root role.
 
 
-<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: dr_account};
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_RecordNonceAbortsIf">SlidingNonce::RecordNonceAbortsIf</a>{seq_nonce: sliding_nonce, account: dr_account};
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_CreateValidatorAccountAbortsIf">DiemAccount::CreateValidatorAccountAbortsIf</a>;
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_CreateValidatorAccountEnsures">DiemAccount::CreateValidatorAccountEnsures</a>;
+<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: dr_account};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_RecordNonceAbortsIf">SlidingNonce::RecordNonceAbortsIf</a>{seq_nonce: sliding_nonce, account: dr_account};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_CreateValidatorAccountAbortsIf">DiemAccount::CreateValidatorAccountAbortsIf</a>;
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_CreateValidatorAccountEnsures">DiemAccount::CreateValidatorAccountEnsures</a>;
 <b>aborts_with</b> [check]
     <a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>,
     <a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a>,
     <a href="_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a>,
     <a href="_ALREADY_PUBLISHED">Errors::ALREADY_PUBLISHED</a>,
     <a href="_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a>;
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_MakeAccountEmits">DiemAccount::MakeAccountEmits</a>;
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_MakeAccountEmits">DiemAccount::MakeAccountEmits</a>;
 </code></pre>
 
 
@@ -1168,7 +1168,7 @@ only Diem root has the Diem root role.
 Only the Diem Root account can create Validator accounts [[A3]][ROLE].
 
 
-<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_AbortsIfNotDiemRoot">Roles::AbortsIfNotDiemRoot</a>{account: dr_account};
+<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles_AbortsIfNotDiemRoot">Roles::AbortsIfNotDiemRoot</a>{account: dr_account};
 </code></pre>
 
 
@@ -1195,7 +1195,7 @@ Creates an account with the Parent VASP role at <code>address</code> with authen
 <code>auth_key_prefix</code> | <code>new_account_address</code> and a 0 balance of type <code>CoinType</code>. If
 <code>add_all_currencies</code> is true, 0 balances for all available currencies in the system will
 also be added. This can only be invoked by an TreasuryCompliance account.
-<code>sliding_nonce</code> is a unique nonce for operation, see <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code> for details.
+<code>sliding_nonce</code> is a unique nonce for operation, see <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code> for details.
 Authentication keys, prefixes, and how to construct them from an ed25519 public key are described
 [here](https://developers.diem.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
 
@@ -1205,9 +1205,9 @@ Authentication keys, prefixes, and how to construct them from an ed25519 public 
 ###### Events
 
 Successful execution will emit:
-* A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_CreateAccountEvent">DiemAccount::CreateAccountEvent</a></code> with the <code>created</code> field being <code>new_account_address</code>,
-and the <code>rold_id</code> field being <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_PARENT_VASP_ROLE_ID">Roles::PARENT_VASP_ROLE_ID</a></code>. This is emitted on the
-<code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_AccountOperationsCapability">DiemAccount::AccountOperationsCapability</a></code> <code>creation_events</code> handle.
+* A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_CreateAccountEvent">DiemAccount::CreateAccountEvent</a></code> with the <code>created</code> field being <code>new_account_address</code>,
+and the <code>rold_id</code> field being <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles_PARENT_VASP_ROLE_ID">Roles::PARENT_VASP_ROLE_ID</a></code>. This is emitted on the
+<code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_AccountOperationsCapability">DiemAccount::AccountOperationsCapability</a></code> <code>creation_events</code> handle.
 
 
 <a name="@Parameters_68"></a>
@@ -1218,7 +1218,7 @@ and the <code>rold_id</code> field being <code><a href="../../../../../../DPN/re
 | ------                | ------       | -------------                                                                                                                                                  |
 | <code>CoinType</code>            | Type         | The Move type for the <code>CoinType</code> currency that the Parent VASP account should be initialized with. <code>CoinType</code> must be an already-registered currency on-chain. |
 | <code>tc_account</code>          | <code>signer</code>     | The signer of the sending account of this transaction. Must be the Treasury Compliance account.                                                                |
-| <code>sliding_nonce</code>       | <code>u64</code>        | The <code>sliding_nonce</code> (see: <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction.                                                                                     |
+| <code>sliding_nonce</code>       | <code>u64</code>        | The <code>sliding_nonce</code> (see: <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction.                                                                                     |
 | <code>new_account_address</code> | <code>address</code>    | Address of the to-be-created Parent VASP account.                                                                                                              |
 | <code>auth_key_prefix</code>     | <code>vector&lt;u8&gt;</code> | The authentication key prefix that will be used initially for the newly created account.                                                                       |
 | <code>human_name</code>          | <code>vector&lt;u8&gt;</code> | ASCII-encoded human name for the Parent VASP.                                                                                                                  |
@@ -1231,14 +1231,14 @@ and the <code>rold_id</code> field being <code><a href="../../../../../../DPN/re
 
 | Error Category              | Error Reason                            | Description                                                                                |
 | ----------------            | --------------                          | -------------                                                                              |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>     | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>          | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code> resource is not published under <code>tc_account</code>.                             |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_OLD">SlidingNonce::ENONCE_TOO_OLD</a></code>          | The <code>sliding_nonce</code> is too old and it's impossible to determine if it's duplicated or not. |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_NEW">SlidingNonce::ENONCE_TOO_NEW</a></code>          | The <code>sliding_nonce</code> is too far in the future.                                              |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_ALREADY_RECORDED">SlidingNonce::ENONCE_ALREADY_RECORDED</a></code> | The <code>sliding_nonce</code> has been previously recorded.                                          |
-| <code><a href="_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/CoreAddresses.md#0x1_CoreAddresses_ETREASURY_COMPLIANCE">CoreAddresses::ETREASURY_COMPLIANCE</a></code>   | The sending account is not the Treasury Compliance account.                                |
-| <code><a href="_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a></code>     | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_ETREASURY_COMPLIANCE">Roles::ETREASURY_COMPLIANCE</a></code>           | The sending account is not the Treasury Compliance account.                                |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>     | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_ECURRENCY_INFO">Diem::ECURRENCY_INFO</a></code>                 | The <code>CoinType</code> is not a registered currency on-chain.                                      |
-| <code><a href="_ALREADY_PUBLISHED">Errors::ALREADY_PUBLISHED</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_EROLE_ID">Roles::EROLE_ID</a></code>                       | The <code>new_account_address</code> address is already taken.                                        |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>     | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>          | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code> resource is not published under <code>tc_account</code>.                             |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_OLD">SlidingNonce::ENONCE_TOO_OLD</a></code>          | The <code>sliding_nonce</code> is too old and it's impossible to determine if it's duplicated or not. |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_NEW">SlidingNonce::ENONCE_TOO_NEW</a></code>          | The <code>sliding_nonce</code> is too far in the future.                                              |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_ALREADY_RECORDED">SlidingNonce::ENONCE_ALREADY_RECORDED</a></code> | The <code>sliding_nonce</code> has been previously recorded.                                          |
+| <code><a href="_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/CoreAddresses.md#0x1_CoreAddresses_ETREASURY_COMPLIANCE">CoreAddresses::ETREASURY_COMPLIANCE</a></code>   | The sending account is not the Treasury Compliance account.                                |
+| <code><a href="_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a></code>     | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles_ETREASURY_COMPLIANCE">Roles::ETREASURY_COMPLIANCE</a></code>           | The sending account is not the Treasury Compliance account.                                |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>     | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_ECURRENCY_INFO">Diem::ECURRENCY_INFO</a></code>                 | The <code>CoinType</code> is not a registered currency on-chain.                                      |
+| <code><a href="_ALREADY_PUBLISHED">Errors::ALREADY_PUBLISHED</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles_EROLE_ID">Roles::EROLE_ID</a></code>                       | The <code>new_account_address</code> address is already taken.                                        |
 
 
 <a name="@Related_Scripts_70"></a>
@@ -1270,8 +1270,8 @@ and the <code>rold_id</code> field being <code><a href="../../../../../../DPN/re
     human_name: vector&lt;u8&gt;,
     add_all_currencies: bool
 ) {
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&tc_account, sliding_nonce);
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_create_parent_vasp_account">DiemAccount::create_parent_vasp_account</a>&lt;CoinType&gt;(
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&tc_account, sliding_nonce);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_create_parent_vasp_account">DiemAccount::create_parent_vasp_account</a>&lt;CoinType&gt;(
         &tc_account,
         new_account_address,
         auth_key_prefix,
@@ -1290,17 +1290,17 @@ and the <code>rold_id</code> field being <code><a href="../../../../../../DPN/re
 
 
 
-<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: tc_account};
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_RecordNonceAbortsIf">SlidingNonce::RecordNonceAbortsIf</a>{account: tc_account, seq_nonce: sliding_nonce};
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_CreateParentVASPAccountAbortsIf">DiemAccount::CreateParentVASPAccountAbortsIf</a>&lt;CoinType&gt;{creator_account: tc_account};
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_CreateParentVASPAccountEnsures">DiemAccount::CreateParentVASPAccountEnsures</a>&lt;CoinType&gt;;
+<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: tc_account};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_RecordNonceAbortsIf">SlidingNonce::RecordNonceAbortsIf</a>{account: tc_account, seq_nonce: sliding_nonce};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_CreateParentVASPAccountAbortsIf">DiemAccount::CreateParentVASPAccountAbortsIf</a>&lt;CoinType&gt;{creator_account: tc_account};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_CreateParentVASPAccountEnsures">DiemAccount::CreateParentVASPAccountEnsures</a>&lt;CoinType&gt;;
 <b>aborts_with</b> [check]
     <a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>,
     <a href="_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a>,
     <a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a>,
     <a href="_ALREADY_PUBLISHED">Errors::ALREADY_PUBLISHED</a>,
     <a href="_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a>;
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_MakeAccountEmits">DiemAccount::MakeAccountEmits</a>;
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_MakeAccountEmits">DiemAccount::MakeAccountEmits</a>;
 </code></pre>
 
 
@@ -1308,7 +1308,7 @@ and the <code>rold_id</code> field being <code><a href="../../../../../../DPN/re
 Only the Treasury Compliance account can create Parent VASP accounts [[A6]][ROLE].
 
 
-<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_AbortsIfNotTreasuryCompliance">Roles::AbortsIfNotTreasuryCompliance</a>{account: tc_account};
+<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles_AbortsIfNotTreasuryCompliance">Roles::AbortsIfNotTreasuryCompliance</a>{account: tc_account};
 </code></pre>
 
 
@@ -1349,9 +1349,9 @@ account.
 ###### Events
 
 Successful execution will emit:
-* A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_CreateAccountEvent">DiemAccount::CreateAccountEvent</a></code> with the <code>created</code> field being <code>addr</code>,
-and the <code>rold_id</code> field being <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_DESIGNATED_DEALER_ROLE_ID">Roles::DESIGNATED_DEALER_ROLE_ID</a></code>. This is emitted on the
-<code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_AccountOperationsCapability">DiemAccount::AccountOperationsCapability</a></code> <code>creation_events</code> handle.
+* A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_CreateAccountEvent">DiemAccount::CreateAccountEvent</a></code> with the <code>created</code> field being <code>addr</code>,
+and the <code>rold_id</code> field being <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles_DESIGNATED_DEALER_ROLE_ID">Roles::DESIGNATED_DEALER_ROLE_ID</a></code>. This is emitted on the
+<code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_AccountOperationsCapability">DiemAccount::AccountOperationsCapability</a></code> <code>creation_events</code> handle.
 
 
 <a name="@Parameters_74"></a>
@@ -1362,7 +1362,7 @@ and the <code>rold_id</code> field being <code><a href="../../../../../../DPN/re
 | ------               | ------       | -------------                                                                                                                                       |
 | <code>Currency</code>           | Type         | The Move type for the <code>Currency</code> that the Designated Dealer should be initialized with. <code>Currency</code> must be an already-registered currency on-chain. |
 | <code>tc_account</code>         | <code>signer</code>     | The signer of the sending account of this transaction. Must be the Treasury Compliance account.                                                     |
-| <code>sliding_nonce</code>      | <code>u64</code>        | The <code>sliding_nonce</code> (see: <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction.                                                                          |
+| <code>sliding_nonce</code>      | <code>u64</code>        | The <code>sliding_nonce</code> (see: <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction.                                                                          |
 | <code>addr</code>               | <code>address</code>    | Address of the to-be-created Designated Dealer account.                                                                                             |
 | <code>auth_key_prefix</code>    | <code>vector&lt;u8&gt;</code> | The authentication key prefix that will be used initially for the newly created account.                                                            |
 | <code>human_name</code>         | <code>vector&lt;u8&gt;</code> | ASCII-encoded human name for the Designated Dealer.                                                                                                 |
@@ -1376,14 +1376,14 @@ and the <code>rold_id</code> field being <code><a href="../../../../../../DPN/re
 
 | Error Category              | Error Reason                            | Description                                                                                |
 | ----------------            | --------------                          | -------------                                                                              |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>     | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>          | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code> resource is not published under <code>tc_account</code>.                             |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_OLD">SlidingNonce::ENONCE_TOO_OLD</a></code>          | The <code>sliding_nonce</code> is too old and it's impossible to determine if it's duplicated or not. |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_NEW">SlidingNonce::ENONCE_TOO_NEW</a></code>          | The <code>sliding_nonce</code> is too far in the future.                                              |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_ALREADY_RECORDED">SlidingNonce::ENONCE_ALREADY_RECORDED</a></code> | The <code>sliding_nonce</code> has been previously recorded.                                          |
-| <code><a href="_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/CoreAddresses.md#0x1_CoreAddresses_ETREASURY_COMPLIANCE">CoreAddresses::ETREASURY_COMPLIANCE</a></code>   | The sending account is not the Treasury Compliance account.                                |
-| <code><a href="_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a></code>     | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_ETREASURY_COMPLIANCE">Roles::ETREASURY_COMPLIANCE</a></code>           | The sending account is not the Treasury Compliance account.                                |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>     | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_ECURRENCY_INFO">Diem::ECURRENCY_INFO</a></code>                 | The <code>Currency</code> is not a registered currency on-chain.                                      |
-| <code><a href="_ALREADY_PUBLISHED">Errors::ALREADY_PUBLISHED</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_EROLE_ID">Roles::EROLE_ID</a></code>                       | The <code>addr</code> address is already taken.                                                       |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>     | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>          | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code> resource is not published under <code>tc_account</code>.                             |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_OLD">SlidingNonce::ENONCE_TOO_OLD</a></code>          | The <code>sliding_nonce</code> is too old and it's impossible to determine if it's duplicated or not. |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_NEW">SlidingNonce::ENONCE_TOO_NEW</a></code>          | The <code>sliding_nonce</code> is too far in the future.                                              |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_ALREADY_RECORDED">SlidingNonce::ENONCE_ALREADY_RECORDED</a></code> | The <code>sliding_nonce</code> has been previously recorded.                                          |
+| <code><a href="_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/CoreAddresses.md#0x1_CoreAddresses_ETREASURY_COMPLIANCE">CoreAddresses::ETREASURY_COMPLIANCE</a></code>   | The sending account is not the Treasury Compliance account.                                |
+| <code><a href="_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a></code>     | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles_ETREASURY_COMPLIANCE">Roles::ETREASURY_COMPLIANCE</a></code>           | The sending account is not the Treasury Compliance account.                                |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>     | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_ECURRENCY_INFO">Diem::ECURRENCY_INFO</a></code>                 | The <code>Currency</code> is not a registered currency on-chain.                                      |
+| <code><a href="_ALREADY_PUBLISHED">Errors::ALREADY_PUBLISHED</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles_EROLE_ID">Roles::EROLE_ID</a></code>                       | The <code>addr</code> address is already taken.                                                       |
 
 
 <a name="@Related_Scripts_76"></a>
@@ -1412,8 +1412,8 @@ and the <code>rold_id</code> field being <code><a href="../../../../../../DPN/re
     human_name: vector&lt;u8&gt;,
     add_all_currencies: bool,
 ) {
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&tc_account, sliding_nonce);
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_create_designated_dealer">DiemAccount::create_designated_dealer</a>&lt;Currency&gt;(
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&tc_account, sliding_nonce);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_create_designated_dealer">DiemAccount::create_designated_dealer</a>&lt;Currency&gt;(
         &tc_account,
         addr,
         auth_key_prefix,
@@ -1432,18 +1432,18 @@ and the <code>rold_id</code> field being <code><a href="../../../../../../DPN/re
 
 
 
-<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: tc_account};
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_RecordNonceAbortsIf">SlidingNonce::RecordNonceAbortsIf</a>{account: tc_account, seq_nonce: sliding_nonce};
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_CreateDesignatedDealerAbortsIf">DiemAccount::CreateDesignatedDealerAbortsIf</a>&lt;Currency&gt;{
+<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: tc_account};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_RecordNonceAbortsIf">SlidingNonce::RecordNonceAbortsIf</a>{account: tc_account, seq_nonce: sliding_nonce};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_CreateDesignatedDealerAbortsIf">DiemAccount::CreateDesignatedDealerAbortsIf</a>&lt;Currency&gt;{
     creator_account: tc_account, new_account_address: addr};
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_CreateDesignatedDealerEnsures">DiemAccount::CreateDesignatedDealerEnsures</a>&lt;Currency&gt;{new_account_address: addr};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_CreateDesignatedDealerEnsures">DiemAccount::CreateDesignatedDealerEnsures</a>&lt;Currency&gt;{new_account_address: addr};
 <b>aborts_with</b> [check]
     <a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>,
     <a href="_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a>,
     <a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a>,
     <a href="_ALREADY_PUBLISHED">Errors::ALREADY_PUBLISHED</a>,
     <a href="_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a>;
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_MakeAccountEmits">DiemAccount::MakeAccountEmits</a>{new_account_address: addr};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_MakeAccountEmits">DiemAccount::MakeAccountEmits</a>{new_account_address: addr};
 </code></pre>
 
 
@@ -1451,7 +1451,7 @@ and the <code>rold_id</code> field being <code><a href="../../../../../../DPN/re
 Only the Treasury Compliance account can create Designated Dealer accounts [[A5]][ROLE].
 
 
-<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_AbortsIfNotTreasuryCompliance">Roles::AbortsIfNotTreasuryCompliance</a>{account: tc_account};
+<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles_AbortsIfNotTreasuryCompliance">Roles::AbortsIfNotTreasuryCompliance</a>{account: tc_account};
 </code></pre>
 
 
@@ -1474,13 +1474,13 @@ Only the Treasury Compliance account can create Designated Dealer accounts [[A5]
 This module holds transactions that can be used to administer accounts in the Diem Framework.
 
 
-<pre><code><b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/CRSN.md#0x1_CRSN">0x1::CRSN</a>;
-<b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount">0x1::DiemAccount</a>;
-<b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DualAttestation.md#0x1_DualAttestation">0x1::DualAttestation</a>;
-<b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/RecoveryAddress.md#0x1_RecoveryAddress">0x1::RecoveryAddress</a>;
-<b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SharedEd25519PublicKey.md#0x1_SharedEd25519PublicKey">0x1::SharedEd25519PublicKey</a>;
-<b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce">0x1::SlidingNonce</a>;
-<b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/VASPDomain.md#0x1_VASPDomain">0x1::VASPDomain</a>;
+<pre><code><b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/CRSN.md#0x1_CRSN">0x1::CRSN</a>;
+<b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount">0x1::DiemAccount</a>;
+<b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DualAttestation.md#0x1_DualAttestation">0x1::DualAttestation</a>;
+<b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/RecoveryAddress.md#0x1_RecoveryAddress">0x1::RecoveryAddress</a>;
+<b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SharedEd25519PublicKey.md#0x1_SharedEd25519PublicKey">0x1::SharedEd25519PublicKey</a>;
+<b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce">0x1::SlidingNonce</a>;
+<b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/VASPDomain.md#0x1_VASPDomain">0x1::VASPDomain</a>;
 </code></pre>
 
 
@@ -1495,7 +1495,7 @@ This module holds transactions that can be used to administer accounts in the Di
 ###### Summary
 
 Adds a zero <code>Currency</code> balance to the sending <code>account</code>. This will enable <code>account</code> to
-send, receive, and hold <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_Diem">Diem::Diem</a>&lt;Currency&gt;</code> coins. This transaction can be
+send, receive, and hold <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_Diem">Diem::Diem</a>&lt;Currency&gt;</code> coins. This transaction can be
 successfully sent by any account that is allowed to hold balances
 (e.g., VASP, Designated Dealer).
 
@@ -1505,9 +1505,9 @@ successfully sent by any account that is allowed to hold balances
 ###### Technical Description
 
 After the successful execution of this transaction the sending account will have a
-<code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_Balance">DiemAccount::Balance</a>&lt;Currency&gt;</code> resource with zero balance published under it. Only
+<code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_Balance">DiemAccount::Balance</a>&lt;Currency&gt;</code> resource with zero balance published under it. Only
 accounts that can hold balances can send this transaction, the sending account cannot
-already have a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_Balance">DiemAccount::Balance</a>&lt;Currency&gt;</code> published under it.
+already have a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_Balance">DiemAccount::Balance</a>&lt;Currency&gt;</code> published under it.
 
 
 <a name="@Parameters_80"></a>
@@ -1526,9 +1526,9 @@ already have a <code><a href="../../../../../../DPN/releases/artifacts/current/d
 
 | Error Category              | Error Reason                             | Description                                                                |
 | ----------------            | --------------                           | -------------                                                              |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>     | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_ECURRENCY_INFO">Diem::ECURRENCY_INFO</a></code>                  | The <code>Currency</code> is not a registered currency on-chain.                      |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_EROLE_CANT_STORE_BALANCE">DiemAccount::EROLE_CANT_STORE_BALANCE</a></code> | The sending <code>account</code>'s role does not permit balances.                     |
-| <code><a href="_ALREADY_PUBLISHED">Errors::ALREADY_PUBLISHED</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_EADD_EXISTING_CURRENCY">DiemAccount::EADD_EXISTING_CURRENCY</a></code>   | A balance for <code>Currency</code> is already published under the sending <code>account</code>. |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>     | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_ECURRENCY_INFO">Diem::ECURRENCY_INFO</a></code>                  | The <code>Currency</code> is not a registered currency on-chain.                      |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_EROLE_CANT_STORE_BALANCE">DiemAccount::EROLE_CANT_STORE_BALANCE</a></code> | The sending <code>account</code>'s role does not permit balances.                     |
+| <code><a href="_ALREADY_PUBLISHED">Errors::ALREADY_PUBLISHED</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_EADD_EXISTING_CURRENCY">DiemAccount::EADD_EXISTING_CURRENCY</a></code>   | A balance for <code>Currency</code> is already published under the sending <code>account</code>. |
 
 
 <a name="@Related_Scripts_82"></a>
@@ -1550,7 +1550,7 @@ already have a <code><a href="../../../../../../DPN/releases/artifacts/current/d
 
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_AccountAdministrationScripts_add_currency_to_account">add_currency_to_account</a>&lt;Currency&gt;(account: signer) {
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_add_currency">DiemAccount::add_currency</a>&lt;Currency&gt;(&account);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_add_currency">DiemAccount::add_currency</a>&lt;Currency&gt;(&account);
 }
 </code></pre>
 
@@ -1563,9 +1563,9 @@ already have a <code><a href="../../../../../../DPN/releases/artifacts/current/d
 
 
 
-<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: account};
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_AddCurrencyAbortsIf">DiemAccount::AddCurrencyAbortsIf</a>&lt;Currency&gt;;
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_AddCurrencyEnsures">DiemAccount::AddCurrencyEnsures</a>&lt;Currency&gt;{addr: <a href="_spec_address_of">Signer::spec_address_of</a>(account)};
+<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: account};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_AddCurrencyAbortsIf">DiemAccount::AddCurrencyAbortsIf</a>&lt;Currency&gt;;
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_AddCurrencyEnsures">DiemAccount::AddCurrencyEnsures</a>&lt;Currency&gt;{addr: <a href="_spec_address_of">Signer::spec_address_of</a>(account)};
 <b>aborts_with</b> [check]
     <a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a>,
     <a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>,
@@ -1578,7 +1578,7 @@ The account must be allowed to hold balances. Only Designated Dealers, Parent VA
 and Child VASPs can hold balances [[D1]][ROLE][[D2]][ROLE][[D3]][ROLE][[D4]][ROLE][[D5]][ROLE][[D6]][ROLE][[D7]][ROLE].
 
 
-<pre><code><b>aborts_if</b> !<a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_can_hold_balance">Roles::can_hold_balance</a>(account) <b>with</b> <a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>;
+<pre><code><b>aborts_if</b> !<a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles_can_hold_balance">Roles::can_hold_balance</a>(account) <b>with</b> <a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>;
 </code></pre>
 
 
@@ -1604,8 +1604,8 @@ specified recovery account can rotate the sender account's authentication key.
 
 ###### Technical Description
 
-Adds the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code> for the sending account
-(<code>to_recover_account</code>) to the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/RecoveryAddress.md#0x1_RecoveryAddress_RecoveryAddress">RecoveryAddress::RecoveryAddress</a></code> resource under
+Adds the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code> for the sending account
+(<code>to_recover_account</code>) to the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/RecoveryAddress.md#0x1_RecoveryAddress_RecoveryAddress">RecoveryAddress::RecoveryAddress</a></code> resource under
 <code>recovery_address</code>. After this transaction has been executed successfully the account at
 <code>recovery_address</code> and the <code>to_recover_account</code> may rotate the authentication key of
 <code>to_recover_account</code> (the sender of this transaction).
@@ -1617,7 +1617,7 @@ Additionally the account at <code>recovery_address</code> must have already init
 a recovery account address using the <code><a href="script_documentation.md#0x1_AccountAdministrationScripts_create_recovery_address">AccountAdministrationScripts::create_recovery_address</a></code> transaction script.
 
 The sending account's (<code>to_recover_account</code>) key rotation capability is
-removed in this transaction and stored in the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/RecoveryAddress.md#0x1_RecoveryAddress_RecoveryAddress">RecoveryAddress::RecoveryAddress</a></code>
+removed in this transaction and stored in the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/RecoveryAddress.md#0x1_RecoveryAddress_RecoveryAddress">RecoveryAddress::RecoveryAddress</a></code>
 resource stored under the account at <code>recovery_address</code>.
 
 
@@ -1628,7 +1628,7 @@ resource stored under the account at <code>recovery_address</code>.
 | Name                 | Type      | Description                                                                                               |
 | ------               | ------    | -------------                                                                                             |
 | <code>to_recover_account</code> | <code>signer</code>  | The signer of the sending account of this transaction.                                                    |
-| <code>recovery_address</code>   | <code>address</code> | The account address where the <code>to_recover_account</code>'s <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code> will be stored. |
+| <code>recovery_address</code>   | <code>address</code> | The account address where the <code>to_recover_account</code>'s <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code> will be stored. |
 
 
 <a name="@Common_Abort_Conditions_86"></a>
@@ -1637,10 +1637,10 @@ resource stored under the account at <code>recovery_address</code>.
 
 | Error Category             | Error Reason                                              | Description                                                                                       |
 | ----------------           | --------------                                            | -------------                                                                                     |
-| <code><a href="_INVALID_STATE">Errors::INVALID_STATE</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_EKEY_ROTATION_CAPABILITY_ALREADY_EXTRACTED">DiemAccount::EKEY_ROTATION_CAPABILITY_ALREADY_EXTRACTED</a></code> | <code>to_recover_account</code> has already delegated/extracted its <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code>.    |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/RecoveryAddress.md#0x1_RecoveryAddress_ERECOVERY_ADDRESS">RecoveryAddress::ERECOVERY_ADDRESS</a></code>                      | <code>recovery_address</code> does not have a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/RecoveryAddress.md#0x1_RecoveryAddress">RecoveryAddress</a></code> resource published under it.                 |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/RecoveryAddress.md#0x1_RecoveryAddress_EINVALID_KEY_ROTATION_DELEGATION">RecoveryAddress::EINVALID_KEY_ROTATION_DELEGATION</a></code>       | <code>to_recover_account</code> and <code>recovery_address</code> do not belong to the same VASP.                       |
-| <code><a href="_LIMIT_EXCEEDED">Errors::LIMIT_EXCEEDED</a></code>   | <code> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/RecoveryAddress.md#0x1_RecoveryAddress_EMAX_KEYS_REGISTERED">RecoveryAddress::EMAX_KEYS_REGISTERED</a></code>                  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/RecoveryAddress.md#0x1_RecoveryAddress_MAX_REGISTERED_KEYS">RecoveryAddress::MAX_REGISTERED_KEYS</a></code> have already been registered with this <code>recovery_address</code>. |
+| <code><a href="_INVALID_STATE">Errors::INVALID_STATE</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_EKEY_ROTATION_CAPABILITY_ALREADY_EXTRACTED">DiemAccount::EKEY_ROTATION_CAPABILITY_ALREADY_EXTRACTED</a></code> | <code>to_recover_account</code> has already delegated/extracted its <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code>.    |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/RecoveryAddress.md#0x1_RecoveryAddress_ERECOVERY_ADDRESS">RecoveryAddress::ERECOVERY_ADDRESS</a></code>                      | <code>recovery_address</code> does not have a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/RecoveryAddress.md#0x1_RecoveryAddress">RecoveryAddress</a></code> resource published under it.                 |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/RecoveryAddress.md#0x1_RecoveryAddress_EINVALID_KEY_ROTATION_DELEGATION">RecoveryAddress::EINVALID_KEY_ROTATION_DELEGATION</a></code>       | <code>to_recover_account</code> and <code>recovery_address</code> do not belong to the same VASP.                       |
+| <code><a href="_LIMIT_EXCEEDED">Errors::LIMIT_EXCEEDED</a></code>   | <code> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/RecoveryAddress.md#0x1_RecoveryAddress_EMAX_KEYS_REGISTERED">RecoveryAddress::EMAX_KEYS_REGISTERED</a></code>                  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/RecoveryAddress.md#0x1_RecoveryAddress_MAX_REGISTERED_KEYS">RecoveryAddress::MAX_REGISTERED_KEYS</a></code> have already been registered with this <code>recovery_address</code>. |
 
 
 <a name="@Related_Scripts_87"></a>
@@ -1661,8 +1661,8 @@ resource stored under the account at <code>recovery_address</code>.
 
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_AccountAdministrationScripts_add_recovery_rotation_capability">add_recovery_rotation_capability</a>(to_recover_account: signer, recovery_address: address) {
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/RecoveryAddress.md#0x1_RecoveryAddress_add_rotation_capability">RecoveryAddress::add_rotation_capability</a>(
-        <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_extract_key_rotation_capability">DiemAccount::extract_key_rotation_capability</a>(&to_recover_account), recovery_address
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/RecoveryAddress.md#0x1_RecoveryAddress_add_rotation_capability">RecoveryAddress::add_rotation_capability</a>(
+        <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_extract_key_rotation_capability">DiemAccount::extract_key_rotation_capability</a>(&to_recover_account), recovery_address
     )
 }
 </code></pre>
@@ -1676,16 +1676,16 @@ resource stored under the account at <code>recovery_address</code>.
 
 
 
-<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: to_recover_account};
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_ExtractKeyRotationCapabilityAbortsIf">DiemAccount::ExtractKeyRotationCapabilityAbortsIf</a>{account: to_recover_account};
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_ExtractKeyRotationCapabilityEnsures">DiemAccount::ExtractKeyRotationCapabilityEnsures</a>{account: to_recover_account};
+<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: to_recover_account};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_ExtractKeyRotationCapabilityAbortsIf">DiemAccount::ExtractKeyRotationCapabilityAbortsIf</a>{account: to_recover_account};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_ExtractKeyRotationCapabilityEnsures">DiemAccount::ExtractKeyRotationCapabilityEnsures</a>{account: to_recover_account};
 <b>let</b> addr = <a href="_spec_address_of">Signer::spec_address_of</a>(to_recover_account);
-<b>let</b> rotation_cap = <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_spec_get_key_rotation_cap">DiemAccount::spec_get_key_rotation_cap</a>(addr);
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/RecoveryAddress.md#0x1_RecoveryAddress_AddRotationCapabilityAbortsIf">RecoveryAddress::AddRotationCapabilityAbortsIf</a>{
+<b>let</b> rotation_cap = <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_spec_get_key_rotation_cap">DiemAccount::spec_get_key_rotation_cap</a>(addr);
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/RecoveryAddress.md#0x1_RecoveryAddress_AddRotationCapabilityAbortsIf">RecoveryAddress::AddRotationCapabilityAbortsIf</a>{
     to_recover: rotation_cap
 };
-<b>ensures</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/RecoveryAddress.md#0x1_RecoveryAddress_spec_get_rotation_caps">RecoveryAddress::spec_get_rotation_caps</a>(recovery_address)[
-    len(<a href="../../../../../../DPN/releases/artifacts/current/docs/modules/RecoveryAddress.md#0x1_RecoveryAddress_spec_get_rotation_caps">RecoveryAddress::spec_get_rotation_caps</a>(recovery_address)) - 1] == rotation_cap;
+<b>ensures</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/RecoveryAddress.md#0x1_RecoveryAddress_spec_get_rotation_caps">RecoveryAddress::spec_get_rotation_caps</a>(recovery_address)[
+    len(<a href="../../../../../../DPN/releases/artifacts/current/docs/sources/RecoveryAddress.md#0x1_RecoveryAddress_spec_get_rotation_caps">RecoveryAddress::spec_get_rotation_caps</a>(recovery_address)) - 1] == rotation_cap;
 <b>aborts_with</b> [check]
     <a href="_INVALID_STATE">Errors::INVALID_STATE</a>,
     <a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a>,
@@ -1717,8 +1717,8 @@ Any account can send this transaction.
 
 Rotates the authentication key of the sending account to the
 [authentication key derived from <code>public_key</code>](https://developers.diem.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys)
-and publishes a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SharedEd25519PublicKey.md#0x1_SharedEd25519PublicKey_SharedEd25519PublicKey">SharedEd25519PublicKey::SharedEd25519PublicKey</a></code> resource
-containing the 32-byte ed25519 <code>public_key</code> and the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code> for
+and publishes a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SharedEd25519PublicKey.md#0x1_SharedEd25519PublicKey_SharedEd25519PublicKey">SharedEd25519PublicKey::SharedEd25519PublicKey</a></code> resource
+containing the 32-byte ed25519 <code>public_key</code> and the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code> for
 <code>account</code> under <code>account</code>.
 
 
@@ -1738,9 +1738,9 @@ containing the 32-byte ed25519 <code>public_key</code> and the <code><a href="..
 
 | Error Category              | Error Reason                                               | Description                                                                                         |
 | ----------------            | --------------                                             | -------------                                                                                       |
-| <code><a href="_INVALID_STATE">Errors::INVALID_STATE</a></code>     | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_EKEY_ROTATION_CAPABILITY_ALREADY_EXTRACTED">DiemAccount::EKEY_ROTATION_CAPABILITY_ALREADY_EXTRACTED</a></code> | <code>account</code> has already delegated/extracted its <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code> resource.       |
-| <code><a href="_ALREADY_PUBLISHED">Errors::ALREADY_PUBLISHED</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SharedEd25519PublicKey.md#0x1_SharedEd25519PublicKey_ESHARED_KEY">SharedEd25519PublicKey::ESHARED_KEY</a></code>                      | The <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SharedEd25519PublicKey.md#0x1_SharedEd25519PublicKey_SharedEd25519PublicKey">SharedEd25519PublicKey::SharedEd25519PublicKey</a></code> resource is already published under <code>account</code>. |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SharedEd25519PublicKey.md#0x1_SharedEd25519PublicKey_EMALFORMED_PUBLIC_KEY">SharedEd25519PublicKey::EMALFORMED_PUBLIC_KEY</a></code>            | <code>public_key</code> is an invalid ed25519 public key.                                                      |
+| <code><a href="_INVALID_STATE">Errors::INVALID_STATE</a></code>     | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_EKEY_ROTATION_CAPABILITY_ALREADY_EXTRACTED">DiemAccount::EKEY_ROTATION_CAPABILITY_ALREADY_EXTRACTED</a></code> | <code>account</code> has already delegated/extracted its <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code> resource.       |
+| <code><a href="_ALREADY_PUBLISHED">Errors::ALREADY_PUBLISHED</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SharedEd25519PublicKey.md#0x1_SharedEd25519PublicKey_ESHARED_KEY">SharedEd25519PublicKey::ESHARED_KEY</a></code>                      | The <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SharedEd25519PublicKey.md#0x1_SharedEd25519PublicKey_SharedEd25519PublicKey">SharedEd25519PublicKey::SharedEd25519PublicKey</a></code> resource is already published under <code>account</code>. |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SharedEd25519PublicKey.md#0x1_SharedEd25519PublicKey_EMALFORMED_PUBLIC_KEY">SharedEd25519PublicKey::EMALFORMED_PUBLIC_KEY</a></code>            | <code>public_key</code> is an invalid ed25519 public key.                                                      |
 
 
 <a name="@Related_Scripts_92"></a>
@@ -1760,7 +1760,7 @@ containing the 32-byte ed25519 <code>public_key</code> and the <code><a href="..
 
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_AccountAdministrationScripts_publish_shared_ed25519_public_key">publish_shared_ed25519_public_key</a>(account: signer, public_key: vector&lt;u8&gt;) {
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SharedEd25519PublicKey.md#0x1_SharedEd25519PublicKey_publish">SharedEd25519PublicKey::publish</a>(&account, public_key)
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SharedEd25519PublicKey.md#0x1_SharedEd25519PublicKey_publish">SharedEd25519PublicKey::publish</a>(&account, public_key)
 }
 </code></pre>
 
@@ -1773,9 +1773,9 @@ containing the 32-byte ed25519 <code>public_key</code> and the <code><a href="..
 
 
 
-<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: account};
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SharedEd25519PublicKey.md#0x1_SharedEd25519PublicKey_PublishAbortsIf">SharedEd25519PublicKey::PublishAbortsIf</a>{key: public_key};
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SharedEd25519PublicKey.md#0x1_SharedEd25519PublicKey_PublishEnsures">SharedEd25519PublicKey::PublishEnsures</a>{key: public_key};
+<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: account};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SharedEd25519PublicKey.md#0x1_SharedEd25519PublicKey_PublishAbortsIf">SharedEd25519PublicKey::PublishAbortsIf</a>{key: public_key};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SharedEd25519PublicKey.md#0x1_SharedEd25519PublicKey_PublishEnsures">SharedEd25519PublicKey::PublishEnsures</a>{key: public_key};
 <b>aborts_with</b> [check]
     <a href="_INVALID_STATE">Errors::INVALID_STATE</a>,
     <a href="_ALREADY_PUBLISHED">Errors::ALREADY_PUBLISHED</a>,
@@ -1802,10 +1802,10 @@ Rotates the <code>account</code>'s authentication key to the supplied new authen
 
 ###### Technical Description
 
-Rotate the <code>account</code>'s <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_DiemAccount">DiemAccount::DiemAccount</a></code> <code>authentication_key</code>
+Rotate the <code>account</code>'s <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_DiemAccount">DiemAccount::DiemAccount</a></code> <code>authentication_key</code>
 field to <code>new_key</code>. <code>new_key</code> must be a valid authentication key that
 corresponds to an ed25519 public key as described [here](https://developers.diem.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys),
-and <code>account</code> must not have previously delegated its <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code>.
+and <code>account</code> must not have previously delegated its <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code>.
 
 
 <a name="@Parameters_95"></a>
@@ -1824,8 +1824,8 @@ and <code>account</code> must not have previously delegated its <code><a href=".
 
 | Error Category             | Error Reason                                              | Description                                                                         |
 | ----------------           | --------------                                            | -------------                                                                       |
-| <code><a href="_INVALID_STATE">Errors::INVALID_STATE</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_EKEY_ROTATION_CAPABILITY_ALREADY_EXTRACTED">DiemAccount::EKEY_ROTATION_CAPABILITY_ALREADY_EXTRACTED</a></code> | <code>account</code> has already delegated/extracted its <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code>. |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_EMALFORMED_AUTHENTICATION_KEY">DiemAccount::EMALFORMED_AUTHENTICATION_KEY</a></code>              | <code>new_key</code> was an invalid length.                                                    |
+| <code><a href="_INVALID_STATE">Errors::INVALID_STATE</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_EKEY_ROTATION_CAPABILITY_ALREADY_EXTRACTED">DiemAccount::EKEY_ROTATION_CAPABILITY_ALREADY_EXTRACTED</a></code> | <code>account</code> has already delegated/extracted its <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code>. |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_EMALFORMED_AUTHENTICATION_KEY">DiemAccount::EMALFORMED_AUTHENTICATION_KEY</a></code>              | <code>new_key</code> was an invalid length.                                                    |
 
 
 <a name="@Related_Scripts_97"></a>
@@ -1847,9 +1847,9 @@ and <code>account</code> must not have previously delegated its <code><a href=".
 
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_AccountAdministrationScripts_rotate_authentication_key">rotate_authentication_key</a>(account: signer, new_key: vector&lt;u8&gt;) {
-    <b>let</b> key_rotation_capability = <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_extract_key_rotation_capability">DiemAccount::extract_key_rotation_capability</a>(&account);
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_rotate_authentication_key">DiemAccount::rotate_authentication_key</a>(&key_rotation_capability, new_key);
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_restore_key_rotation_capability">DiemAccount::restore_key_rotation_capability</a>(key_rotation_capability);
+    <b>let</b> key_rotation_capability = <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_extract_key_rotation_capability">DiemAccount::extract_key_rotation_capability</a>(&account);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_rotate_authentication_key">DiemAccount::rotate_authentication_key</a>(&key_rotation_capability, new_key);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_restore_key_rotation_capability">DiemAccount::restore_key_rotation_capability</a>(key_rotation_capability);
 }
 </code></pre>
 
@@ -1862,18 +1862,18 @@ and <code>account</code> must not have previously delegated its <code><a href=".
 
 
 
-<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: account};
+<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: account};
 <b>let</b> account_addr = <a href="_spec_address_of">Signer::spec_address_of</a>(account);
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_ExtractKeyRotationCapabilityAbortsIf">DiemAccount::ExtractKeyRotationCapabilityAbortsIf</a>;
-<b>let</b> key_rotation_capability = <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_spec_get_key_rotation_cap">DiemAccount::spec_get_key_rotation_cap</a>(account_addr);
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_RotateAuthenticationKeyAbortsIf">DiemAccount::RotateAuthenticationKeyAbortsIf</a>{cap: key_rotation_capability, new_authentication_key: new_key};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_ExtractKeyRotationCapabilityAbortsIf">DiemAccount::ExtractKeyRotationCapabilityAbortsIf</a>;
+<b>let</b> key_rotation_capability = <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_spec_get_key_rotation_cap">DiemAccount::spec_get_key_rotation_cap</a>(account_addr);
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_RotateAuthenticationKeyAbortsIf">DiemAccount::RotateAuthenticationKeyAbortsIf</a>{cap: key_rotation_capability, new_authentication_key: new_key};
 </code></pre>
 
 
 This rotates the authentication key of <code>account</code> to <code>new_key</code>
 
 
-<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_RotateAuthenticationKeyEnsures">DiemAccount::RotateAuthenticationKeyEnsures</a>{addr: account_addr, new_authentication_key: new_key};
+<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_RotateAuthenticationKeyEnsures">DiemAccount::RotateAuthenticationKeyEnsures</a>{addr: account_addr, new_authentication_key: new_key};
 <b>aborts_with</b> [check]
     <a href="_INVALID_STATE">Errors::INVALID_STATE</a>,
     <a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>;
@@ -1885,7 +1885,7 @@ The account can rotate its own authentication key unless
 it has delegrated the capability [[H18]][PERMISSION][[J18]][PERMISSION].
 
 
-<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_AbortsIfDelegatedKeyRotationCapability">DiemAccount::AbortsIfDelegatedKeyRotationCapability</a>;
+<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_AbortsIfDelegatedKeyRotationCapability">DiemAccount::AbortsIfDelegatedKeyRotationCapability</a>;
 </code></pre>
 
 
@@ -1910,10 +1910,10 @@ Compliance or Diem Root accounts).
 
 ###### Technical Description
 
-Rotates the <code>account</code>'s <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_DiemAccount">DiemAccount::DiemAccount</a></code> <code>authentication_key</code>
+Rotates the <code>account</code>'s <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_DiemAccount">DiemAccount::DiemAccount</a></code> <code>authentication_key</code>
 field to <code>new_key</code>. <code>new_key</code> must be a valid authentication key that
 corresponds to an ed25519 public key as described [here](https://developers.diem.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys),
-and <code>account</code> must not have previously delegated its <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code>.
+and <code>account</code> must not have previously delegated its <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code>.
 
 
 <a name="@Parameters_100"></a>
@@ -1923,7 +1923,7 @@ and <code>account</code> must not have previously delegated its <code><a href=".
 | Name            | Type         | Description                                                                |
 | ------          | ------       | -------------                                                              |
 | <code>account</code>       | <code>signer</code>     | Signer of the sending account of the transaction.                          |
-| <code>sliding_nonce</code> | <code>u64</code>        | The <code>sliding_nonce</code> (see: <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction. |
+| <code>sliding_nonce</code> | <code>u64</code>        | The <code>sliding_nonce</code> (see: <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction. |
 | <code>new_key</code>       | <code>vector&lt;u8&gt;</code> | New authentication key to be used for <code>account</code>.                           |
 
 
@@ -1933,12 +1933,12 @@ and <code>account</code> must not have previously delegated its <code><a href=".
 
 | Error Category             | Error Reason                                               | Description                                                                                |
 | ----------------           | --------------                                             | -------------                                                                              |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>                             | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code> resource is not published under <code>account</code>.                                |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_OLD">SlidingNonce::ENONCE_TOO_OLD</a></code>                             | The <code>sliding_nonce</code> is too old and it's impossible to determine if it's duplicated or not. |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_NEW">SlidingNonce::ENONCE_TOO_NEW</a></code>                             | The <code>sliding_nonce</code> is too far in the future.                                              |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_ALREADY_RECORDED">SlidingNonce::ENONCE_ALREADY_RECORDED</a></code>                    | The <code>sliding_nonce</code> has been previously recorded.                                          |
-| <code><a href="_INVALID_STATE">Errors::INVALID_STATE</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_EKEY_ROTATION_CAPABILITY_ALREADY_EXTRACTED">DiemAccount::EKEY_ROTATION_CAPABILITY_ALREADY_EXTRACTED</a></code> | <code>account</code> has already delegated/extracted its <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code>.       |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_EMALFORMED_AUTHENTICATION_KEY">DiemAccount::EMALFORMED_AUTHENTICATION_KEY</a></code>              | <code>new_key</code> was an invalid length.                                                           |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>                             | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code> resource is not published under <code>account</code>.                                |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_OLD">SlidingNonce::ENONCE_TOO_OLD</a></code>                             | The <code>sliding_nonce</code> is too old and it's impossible to determine if it's duplicated or not. |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_NEW">SlidingNonce::ENONCE_TOO_NEW</a></code>                             | The <code>sliding_nonce</code> is too far in the future.                                              |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_ALREADY_RECORDED">SlidingNonce::ENONCE_ALREADY_RECORDED</a></code>                    | The <code>sliding_nonce</code> has been previously recorded.                                          |
+| <code><a href="_INVALID_STATE">Errors::INVALID_STATE</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_EKEY_ROTATION_CAPABILITY_ALREADY_EXTRACTED">DiemAccount::EKEY_ROTATION_CAPABILITY_ALREADY_EXTRACTED</a></code> | <code>account</code> has already delegated/extracted its <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code>.       |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_EMALFORMED_AUTHENTICATION_KEY">DiemAccount::EMALFORMED_AUTHENTICATION_KEY</a></code>              | <code>new_key</code> was an invalid length.                                                           |
 
 
 <a name="@Related_Scripts_102"></a>
@@ -1960,10 +1960,10 @@ and <code>account</code> must not have previously delegated its <code><a href=".
 
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_AccountAdministrationScripts_rotate_authentication_key_with_nonce">rotate_authentication_key_with_nonce</a>(account: signer, sliding_nonce: u64, new_key: vector&lt;u8&gt;) {
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&account, sliding_nonce);
-    <b>let</b> key_rotation_capability = <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_extract_key_rotation_capability">DiemAccount::extract_key_rotation_capability</a>(&account);
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_rotate_authentication_key">DiemAccount::rotate_authentication_key</a>(&key_rotation_capability, new_key);
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_restore_key_rotation_capability">DiemAccount::restore_key_rotation_capability</a>(key_rotation_capability);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&account, sliding_nonce);
+    <b>let</b> key_rotation_capability = <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_extract_key_rotation_capability">DiemAccount::extract_key_rotation_capability</a>(&account);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_rotate_authentication_key">DiemAccount::rotate_authentication_key</a>(&key_rotation_capability, new_key);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_restore_key_rotation_capability">DiemAccount::restore_key_rotation_capability</a>(key_rotation_capability);
 }
 </code></pre>
 
@@ -1976,19 +1976,19 @@ and <code>account</code> must not have previously delegated its <code><a href=".
 
 
 
-<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: account};
+<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: account};
 <b>let</b> account_addr = <a href="_spec_address_of">Signer::spec_address_of</a>(account);
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_RecordNonceAbortsIf">SlidingNonce::RecordNonceAbortsIf</a>{ seq_nonce: sliding_nonce };
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_ExtractKeyRotationCapabilityAbortsIf">DiemAccount::ExtractKeyRotationCapabilityAbortsIf</a>;
-<b>let</b> key_rotation_capability = <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_spec_get_key_rotation_cap">DiemAccount::spec_get_key_rotation_cap</a>(account_addr);
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_RotateAuthenticationKeyAbortsIf">DiemAccount::RotateAuthenticationKeyAbortsIf</a>{cap: key_rotation_capability, new_authentication_key: new_key};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_RecordNonceAbortsIf">SlidingNonce::RecordNonceAbortsIf</a>{ seq_nonce: sliding_nonce };
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_ExtractKeyRotationCapabilityAbortsIf">DiemAccount::ExtractKeyRotationCapabilityAbortsIf</a>;
+<b>let</b> key_rotation_capability = <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_spec_get_key_rotation_cap">DiemAccount::spec_get_key_rotation_cap</a>(account_addr);
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_RotateAuthenticationKeyAbortsIf">DiemAccount::RotateAuthenticationKeyAbortsIf</a>{cap: key_rotation_capability, new_authentication_key: new_key};
 </code></pre>
 
 
 This rotates the authentication key of <code>account</code> to <code>new_key</code>
 
 
-<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_RotateAuthenticationKeyEnsures">DiemAccount::RotateAuthenticationKeyEnsures</a>{addr: account_addr, new_authentication_key: new_key};
+<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_RotateAuthenticationKeyEnsures">DiemAccount::RotateAuthenticationKeyEnsures</a>{addr: account_addr, new_authentication_key: new_key};
 <b>aborts_with</b> [check]
     <a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>,
     <a href="_INVALID_STATE">Errors::INVALID_STATE</a>,
@@ -2001,7 +2001,7 @@ The account can rotate its own authentication key unless
 it has delegrated the capability [[H18]][PERMISSION][[J18]][PERMISSION].
 
 
-<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_AbortsIfDelegatedKeyRotationCapability">DiemAccount::AbortsIfDelegatedKeyRotationCapability</a>;
+<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_AbortsIfDelegatedKeyRotationCapability">DiemAccount::AbortsIfDelegatedKeyRotationCapability</a>;
 </code></pre>
 
 
@@ -2025,10 +2025,10 @@ only be sent by the Diem Root account as a write set transaction.
 
 ###### Technical Description
 
-Rotate the <code>account</code>'s <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_DiemAccount">DiemAccount::DiemAccount</a></code> <code>authentication_key</code> field to <code>new_key</code>.
+Rotate the <code>account</code>'s <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_DiemAccount">DiemAccount::DiemAccount</a></code> <code>authentication_key</code> field to <code>new_key</code>.
 <code>new_key</code> must be a valid authentication key that corresponds to an ed25519
 public key as described [here](https://developers.diem.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys),
-and <code>account</code> must not have previously delegated its <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code>.
+and <code>account</code> must not have previously delegated its <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code>.
 
 
 <a name="@Parameters_105"></a>
@@ -2039,7 +2039,7 @@ and <code>account</code> must not have previously delegated its <code><a href=".
 | ------          | ------       | -------------                                                                                     |
 | <code>dr_account</code>    | <code>signer</code>     | The signer of the sending account of the write set transaction. May only be the Diem Root signer. |
 | <code>account</code>       | <code>signer</code>     | Signer of account specified in the <code>execute_as</code> field of the write set transaction.               |
-| <code>sliding_nonce</code> | <code>u64</code>        | The <code>sliding_nonce</code> (see: <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction for Diem Root.          |
+| <code>sliding_nonce</code> | <code>u64</code>        | The <code>sliding_nonce</code> (see: <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction for Diem Root.          |
 | <code>new_key</code>       | <code>vector&lt;u8&gt;</code> | New authentication key to be used for <code>account</code>.                                                  |
 
 
@@ -2049,12 +2049,12 @@ and <code>account</code> must not have previously delegated its <code><a href=".
 
 | Error Category             | Error Reason                                              | Description                                                                                                |
 | ----------------           | --------------                                            | -------------                                                                                              |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>                            | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code> resource is not published under <code>dr_account</code>.                                             |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_OLD">SlidingNonce::ENONCE_TOO_OLD</a></code>                            | The <code>sliding_nonce</code> in <code>dr_account</code> is too old and it's impossible to determine if it's duplicated or not. |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_NEW">SlidingNonce::ENONCE_TOO_NEW</a></code>                            | The <code>sliding_nonce</code> in <code>dr_account</code> is too far in the future.                                              |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_ALREADY_RECORDED">SlidingNonce::ENONCE_ALREADY_RECORDED</a></code>                   | The <code>sliding_nonce</code> in<code> dr_account</code> has been previously recorded.                                          |
-| <code><a href="_INVALID_STATE">Errors::INVALID_STATE</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_EKEY_ROTATION_CAPABILITY_ALREADY_EXTRACTED">DiemAccount::EKEY_ROTATION_CAPABILITY_ALREADY_EXTRACTED</a></code> | <code>account</code> has already delegated/extracted its <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code>.                        |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_EMALFORMED_AUTHENTICATION_KEY">DiemAccount::EMALFORMED_AUTHENTICATION_KEY</a></code>              | <code>new_key</code> was an invalid length.                                                                           |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>                            | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code> resource is not published under <code>dr_account</code>.                                             |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_OLD">SlidingNonce::ENONCE_TOO_OLD</a></code>                            | The <code>sliding_nonce</code> in <code>dr_account</code> is too old and it's impossible to determine if it's duplicated or not. |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_NEW">SlidingNonce::ENONCE_TOO_NEW</a></code>                            | The <code>sliding_nonce</code> in <code>dr_account</code> is too far in the future.                                              |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_ALREADY_RECORDED">SlidingNonce::ENONCE_ALREADY_RECORDED</a></code>                   | The <code>sliding_nonce</code> in<code> dr_account</code> has been previously recorded.                                          |
+| <code><a href="_INVALID_STATE">Errors::INVALID_STATE</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_EKEY_ROTATION_CAPABILITY_ALREADY_EXTRACTED">DiemAccount::EKEY_ROTATION_CAPABILITY_ALREADY_EXTRACTED</a></code> | <code>account</code> has already delegated/extracted its <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code>.                        |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_EMALFORMED_AUTHENTICATION_KEY">DiemAccount::EMALFORMED_AUTHENTICATION_KEY</a></code>              | <code>new_key</code> was an invalid length.                                                                           |
 
 
 <a name="@Related_Scripts_107"></a>
@@ -2076,10 +2076,10 @@ and <code>account</code> must not have previously delegated its <code><a href=".
 
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_AccountAdministrationScripts_rotate_authentication_key_with_nonce_admin">rotate_authentication_key_with_nonce_admin</a>(dr_account: signer, account: signer, sliding_nonce: u64, new_key: vector&lt;u8&gt;) {
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&dr_account, sliding_nonce);
-    <b>let</b> key_rotation_capability = <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_extract_key_rotation_capability">DiemAccount::extract_key_rotation_capability</a>(&account);
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_rotate_authentication_key">DiemAccount::rotate_authentication_key</a>(&key_rotation_capability, new_key);
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_restore_key_rotation_capability">DiemAccount::restore_key_rotation_capability</a>(key_rotation_capability);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&dr_account, sliding_nonce);
+    <b>let</b> key_rotation_capability = <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_extract_key_rotation_capability">DiemAccount::extract_key_rotation_capability</a>(&account);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_rotate_authentication_key">DiemAccount::rotate_authentication_key</a>(&key_rotation_capability, new_key);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_restore_key_rotation_capability">DiemAccount::restore_key_rotation_capability</a>(key_rotation_capability);
 }
 </code></pre>
 
@@ -2092,19 +2092,19 @@ and <code>account</code> must not have previously delegated its <code><a href=".
 
 
 
-<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: account};
+<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: account};
 <b>let</b> account_addr = <a href="_spec_address_of">Signer::spec_address_of</a>(account);
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_RecordNonceAbortsIf">SlidingNonce::RecordNonceAbortsIf</a>{ account: dr_account, seq_nonce: sliding_nonce };
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_ExtractKeyRotationCapabilityAbortsIf">DiemAccount::ExtractKeyRotationCapabilityAbortsIf</a>;
-<b>let</b> key_rotation_capability = <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_spec_get_key_rotation_cap">DiemAccount::spec_get_key_rotation_cap</a>(account_addr);
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_RotateAuthenticationKeyAbortsIf">DiemAccount::RotateAuthenticationKeyAbortsIf</a>{cap: key_rotation_capability, new_authentication_key: new_key};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_RecordNonceAbortsIf">SlidingNonce::RecordNonceAbortsIf</a>{ account: dr_account, seq_nonce: sliding_nonce };
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_ExtractKeyRotationCapabilityAbortsIf">DiemAccount::ExtractKeyRotationCapabilityAbortsIf</a>;
+<b>let</b> key_rotation_capability = <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_spec_get_key_rotation_cap">DiemAccount::spec_get_key_rotation_cap</a>(account_addr);
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_RotateAuthenticationKeyAbortsIf">DiemAccount::RotateAuthenticationKeyAbortsIf</a>{cap: key_rotation_capability, new_authentication_key: new_key};
 </code></pre>
 
 
 This rotates the authentication key of <code>account</code> to <code>new_key</code>
 
 
-<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_RotateAuthenticationKeyEnsures">DiemAccount::RotateAuthenticationKeyEnsures</a>{addr: account_addr, new_authentication_key: new_key};
+<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_RotateAuthenticationKeyEnsures">DiemAccount::RotateAuthenticationKeyEnsures</a>{addr: account_addr, new_authentication_key: new_key};
 <b>aborts_with</b> [check]
     <a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>,
     <a href="_INVALID_STATE">Errors::INVALID_STATE</a>,
@@ -2116,7 +2116,7 @@ This rotates the authentication key of <code>account</code> to <code>new_key</co
 Only the Diem Root account can process the admin scripts [[H9]][PERMISSION].
 
 
-<pre><code><b>requires</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_has_diem_root_role">Roles::has_diem_root_role</a>(dr_account);
+<pre><code><b>requires</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles_has_diem_root_role">Roles::has_diem_root_role</a>(dr_account);
 </code></pre>
 
 
@@ -2125,7 +2125,7 @@ The account can rotate its own authentication key unless
 it has delegrated the capability [[H18]][PERMISSION][[J18]][PERMISSION].
 
 
-<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_AbortsIfDelegatedKeyRotationCapability">DiemAccount::AbortsIfDelegatedKeyRotationCapability</a>{account: account};
+<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_AbortsIfDelegatedKeyRotationCapability">DiemAccount::AbortsIfDelegatedKeyRotationCapability</a>{account: account};
 </code></pre>
 
 
@@ -2151,11 +2151,11 @@ new authentication key. Only used for accounts that are part of a recovery addre
 ###### Technical Description
 
 Rotates the authentication key of the <code>to_recover</code> account to <code>new_key</code> using the
-<code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code> stored in the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/RecoveryAddress.md#0x1_RecoveryAddress_RecoveryAddress">RecoveryAddress::RecoveryAddress</a></code> resource
+<code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code> stored in the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/RecoveryAddress.md#0x1_RecoveryAddress_RecoveryAddress">RecoveryAddress::RecoveryAddress</a></code> resource
 published under <code>recovery_address</code>. <code>new_key</code> must be a valide authentication key as described
 [here](https://developers.diem.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
 This transaction can be sent either by the <code>to_recover</code> account, or by the account where the
-<code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/RecoveryAddress.md#0x1_RecoveryAddress_RecoveryAddress">RecoveryAddress::RecoveryAddress</a></code> resource is published that contains <code>to_recover</code>'s <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code>.
+<code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/RecoveryAddress.md#0x1_RecoveryAddress_RecoveryAddress">RecoveryAddress::RecoveryAddress</a></code> resource is published that contains <code>to_recover</code>'s <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code>.
 
 
 <a name="@Parameters_110"></a>
@@ -2165,7 +2165,7 @@ This transaction can be sent either by the <code>to_recover</code> account, or b
 | Name               | Type         | Description                                                                                                                   |
 | ------             | ------       | -------------                                                                                                                 |
 | <code>account</code>          | <code>signer</code>     | Signer of the sending account of the transaction.                                                                             |
-| <code>recovery_address</code> | <code>address</code>    | Address where <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/RecoveryAddress.md#0x1_RecoveryAddress_RecoveryAddress">RecoveryAddress::RecoveryAddress</a></code> that holds <code>to_recover</code>'s <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code> is published. |
+| <code>recovery_address</code> | <code>address</code>    | Address where <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/RecoveryAddress.md#0x1_RecoveryAddress_RecoveryAddress">RecoveryAddress::RecoveryAddress</a></code> that holds <code>to_recover</code>'s <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code> is published. |
 | <code>to_recover</code>       | <code>address</code>    | The address of the account whose authentication key will be updated.                                                          |
 | <code>new_key</code>          | <code>vector&lt;u8&gt;</code> | New authentication key to be used for the account at the <code>to_recover</code> address.                                                |
 
@@ -2176,10 +2176,10 @@ This transaction can be sent either by the <code>to_recover</code> account, or b
 
 | Error Category             | Error Reason                                 | Description                                                                                                                                         |
 | ----------------           | --------------                               | -------------                                                                                                                                       |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/RecoveryAddress.md#0x1_RecoveryAddress_ERECOVERY_ADDRESS">RecoveryAddress::ERECOVERY_ADDRESS</a></code>         | <code>recovery_address</code> does not have a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/RecoveryAddress.md#0x1_RecoveryAddress_RecoveryAddress">RecoveryAddress::RecoveryAddress</a></code> resource published under it.                                                  |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/RecoveryAddress.md#0x1_RecoveryAddress_ECANNOT_ROTATE_KEY">RecoveryAddress::ECANNOT_ROTATE_KEY</a></code>        | The address of <code>account</code> is not <code>recovery_address</code> or <code>to_recover</code>.                                                                                 |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/RecoveryAddress.md#0x1_RecoveryAddress_EACCOUNT_NOT_RECOVERABLE">RecoveryAddress::EACCOUNT_NOT_RECOVERABLE</a></code>  | <code>to_recover</code>'s <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code>  is not in the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/RecoveryAddress.md#0x1_RecoveryAddress_RecoveryAddress">RecoveryAddress::RecoveryAddress</a></code>  resource published under <code>recovery_address</code>. |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_EMALFORMED_AUTHENTICATION_KEY">DiemAccount::EMALFORMED_AUTHENTICATION_KEY</a></code> | <code>new_key</code> was an invalid length.                                                                                                                    |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/RecoveryAddress.md#0x1_RecoveryAddress_ERECOVERY_ADDRESS">RecoveryAddress::ERECOVERY_ADDRESS</a></code>         | <code>recovery_address</code> does not have a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/RecoveryAddress.md#0x1_RecoveryAddress_RecoveryAddress">RecoveryAddress::RecoveryAddress</a></code> resource published under it.                                                  |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/RecoveryAddress.md#0x1_RecoveryAddress_ECANNOT_ROTATE_KEY">RecoveryAddress::ECANNOT_ROTATE_KEY</a></code>        | The address of <code>account</code> is not <code>recovery_address</code> or <code>to_recover</code>.                                                                                 |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/RecoveryAddress.md#0x1_RecoveryAddress_EACCOUNT_NOT_RECOVERABLE">RecoveryAddress::EACCOUNT_NOT_RECOVERABLE</a></code>  | <code>to_recover</code>'s <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code>  is not in the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/RecoveryAddress.md#0x1_RecoveryAddress_RecoveryAddress">RecoveryAddress::RecoveryAddress</a></code>  resource published under <code>recovery_address</code>. |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_EMALFORMED_AUTHENTICATION_KEY">DiemAccount::EMALFORMED_AUTHENTICATION_KEY</a></code> | <code>new_key</code> was an invalid length.                                                                                                                    |
 
 
 <a name="@Related_Scripts_112"></a>
@@ -2206,7 +2206,7 @@ This transaction can be sent either by the <code>to_recover</code> account, or b
         to_recover: address,
         new_key: vector&lt;u8&gt;
         ) {
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/RecoveryAddress.md#0x1_RecoveryAddress_rotate_authentication_key">RecoveryAddress::rotate_authentication_key</a>(&account, recovery_address, to_recover, new_key)
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/RecoveryAddress.md#0x1_RecoveryAddress_rotate_authentication_key">RecoveryAddress::rotate_authentication_key</a>(&account, recovery_address, to_recover, new_key)
 }
 </code></pre>
 
@@ -2219,9 +2219,9 @@ This transaction can be sent either by the <code>to_recover</code> account, or b
 
 
 
-<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: account};
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/RecoveryAddress.md#0x1_RecoveryAddress_RotateAuthenticationKeyAbortsIf">RecoveryAddress::RotateAuthenticationKeyAbortsIf</a>;
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/RecoveryAddress.md#0x1_RecoveryAddress_RotateAuthenticationKeyEnsures">RecoveryAddress::RotateAuthenticationKeyEnsures</a>;
+<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: account};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/RecoveryAddress.md#0x1_RecoveryAddress_RotateAuthenticationKeyAbortsIf">RecoveryAddress::RotateAuthenticationKeyAbortsIf</a>;
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/RecoveryAddress.md#0x1_RecoveryAddress_RotateAuthenticationKeyEnsures">RecoveryAddress::RotateAuthenticationKeyEnsures</a>;
 <b>aborts_with</b> [check]
     <a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a>,
     <a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>;
@@ -2235,7 +2235,7 @@ the delegatee's address or the address to recover [[H18]][PERMISSION][[J18]][PER
 
 
 <pre><code><b>let</b> account_addr = <a href="_spec_address_of">Signer::spec_address_of</a>(account);
-<b>aborts_if</b> !<a href="../../../../../../DPN/releases/artifacts/current/docs/modules/RecoveryAddress.md#0x1_RecoveryAddress_spec_holds_key_rotation_cap_for">RecoveryAddress::spec_holds_key_rotation_cap_for</a>(recovery_address, to_recover) <b>with</b> <a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>;
+<b>aborts_if</b> !<a href="../../../../../../DPN/releases/artifacts/current/docs/sources/RecoveryAddress.md#0x1_RecoveryAddress_spec_holds_key_rotation_cap_for">RecoveryAddress::spec_holds_key_rotation_cap_for</a>(recovery_address, to_recover) <b>with</b> <a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>;
 <b>aborts_if</b> !(account_addr == recovery_address || account_addr == to_recover) <b>with</b> <a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>;
 </code></pre>
 
@@ -2262,7 +2262,7 @@ Parent VASPs.
 
 ###### Technical Description
 
-Updates the <code>base_url</code> and <code>compliance_public_key</code> fields of the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DualAttestation.md#0x1_DualAttestation_Credential">DualAttestation::Credential</a></code>
+Updates the <code>base_url</code> and <code>compliance_public_key</code> fields of the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DualAttestation.md#0x1_DualAttestation_Credential">DualAttestation::Credential</a></code>
 resource published under <code>account</code>. The <code>new_key</code> must be a valid ed25519 public key.
 
 
@@ -2271,12 +2271,12 @@ resource published under <code>account</code>. The <code>new_key</code> must be 
 ###### Events
 
 Successful execution of this transaction emits two events:
-* A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DualAttestation.md#0x1_DualAttestation_ComplianceKeyRotationEvent">DualAttestation::ComplianceKeyRotationEvent</a></code> containing the new compliance public key, and
-the blockchain time at which the key was updated emitted on the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DualAttestation.md#0x1_DualAttestation_Credential">DualAttestation::Credential</a></code>
+* A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DualAttestation.md#0x1_DualAttestation_ComplianceKeyRotationEvent">DualAttestation::ComplianceKeyRotationEvent</a></code> containing the new compliance public key, and
+the blockchain time at which the key was updated emitted on the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DualAttestation.md#0x1_DualAttestation_Credential">DualAttestation::Credential</a></code>
 <code>compliance_key_rotation_events</code> handle published under <code>account</code>; and
-* A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DualAttestation.md#0x1_DualAttestation_BaseUrlRotationEvent">DualAttestation::BaseUrlRotationEvent</a></code> containing the new base url to be used for
+* A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DualAttestation.md#0x1_DualAttestation_BaseUrlRotationEvent">DualAttestation::BaseUrlRotationEvent</a></code> containing the new base url to be used for
 off-chain communication, and the blockchain time at which the url was updated emitted on the
-<code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DualAttestation.md#0x1_DualAttestation_Credential">DualAttestation::Credential</a></code> <code>base_url_rotation_events</code> handle published under <code>account</code>.
+<code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DualAttestation.md#0x1_DualAttestation_Credential">DualAttestation::Credential</a></code> <code>base_url_rotation_events</code> handle published under <code>account</code>.
 
 
 <a name="@Parameters_116"></a>
@@ -2296,8 +2296,8 @@ off-chain communication, and the blockchain time at which the url was updated em
 
 | Error Category             | Error Reason                           | Description                                                                |
 | ----------------           | --------------                         | -------------                                                              |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DualAttestation.md#0x1_DualAttestation_ECREDENTIAL">DualAttestation::ECREDENTIAL</a></code>         | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DualAttestation.md#0x1_DualAttestation_Credential">DualAttestation::Credential</a></code> resource is not published under <code>account</code>. |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DualAttestation.md#0x1_DualAttestation_EINVALID_PUBLIC_KEY">DualAttestation::EINVALID_PUBLIC_KEY</a></code> | <code>new_key</code> is not a valid ed25519 public key.                               |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DualAttestation.md#0x1_DualAttestation_ECREDENTIAL">DualAttestation::ECREDENTIAL</a></code>         | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DualAttestation.md#0x1_DualAttestation_Credential">DualAttestation::Credential</a></code> resource is not published under <code>account</code>. |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DualAttestation.md#0x1_DualAttestation_EINVALID_PUBLIC_KEY">DualAttestation::EINVALID_PUBLIC_KEY</a></code> | <code>new_key</code> is not a valid ed25519 public key.                               |
 
 
 <a name="@Related_Scripts_118"></a>
@@ -2319,8 +2319,8 @@ off-chain communication, and the blockchain time at which the url was updated em
 
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_AccountAdministrationScripts_rotate_dual_attestation_info">rotate_dual_attestation_info</a>(account: signer, new_url: vector&lt;u8&gt;, new_key: vector&lt;u8&gt;) {
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DualAttestation.md#0x1_DualAttestation_rotate_base_url">DualAttestation::rotate_base_url</a>(&account, new_url);
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DualAttestation.md#0x1_DualAttestation_rotate_compliance_public_key">DualAttestation::rotate_compliance_public_key</a>(&account, new_key)
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DualAttestation.md#0x1_DualAttestation_rotate_base_url">DualAttestation::rotate_base_url</a>(&account, new_url);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DualAttestation.md#0x1_DualAttestation_rotate_compliance_public_key">DualAttestation::rotate_compliance_public_key</a>(&account, new_key)
 }
 </code></pre>
 
@@ -2333,16 +2333,16 @@ off-chain communication, and the blockchain time at which the url was updated em
 
 
 
-<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: account};
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DualAttestation.md#0x1_DualAttestation_RotateBaseUrlAbortsIf">DualAttestation::RotateBaseUrlAbortsIf</a>;
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DualAttestation.md#0x1_DualAttestation_RotateBaseUrlEnsures">DualAttestation::RotateBaseUrlEnsures</a>;
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DualAttestation.md#0x1_DualAttestation_RotateCompliancePublicKeyAbortsIf">DualAttestation::RotateCompliancePublicKeyAbortsIf</a>;
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DualAttestation.md#0x1_DualAttestation_RotateCompliancePublicKeyEnsures">DualAttestation::RotateCompliancePublicKeyEnsures</a>;
+<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: account};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DualAttestation.md#0x1_DualAttestation_RotateBaseUrlAbortsIf">DualAttestation::RotateBaseUrlAbortsIf</a>;
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DualAttestation.md#0x1_DualAttestation_RotateBaseUrlEnsures">DualAttestation::RotateBaseUrlEnsures</a>;
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DualAttestation.md#0x1_DualAttestation_RotateCompliancePublicKeyAbortsIf">DualAttestation::RotateCompliancePublicKeyAbortsIf</a>;
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DualAttestation.md#0x1_DualAttestation_RotateCompliancePublicKeyEnsures">DualAttestation::RotateCompliancePublicKeyEnsures</a>;
 <b>aborts_with</b> [check]
     <a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a>,
     <a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>;
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DualAttestation.md#0x1_DualAttestation_RotateBaseUrlEmits">DualAttestation::RotateBaseUrlEmits</a>;
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DualAttestation.md#0x1_DualAttestation_RotateCompliancePublicKeyEmits">DualAttestation::RotateCompliancePublicKeyEmits</a>;
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DualAttestation.md#0x1_DualAttestation_RotateBaseUrlEmits">DualAttestation::RotateBaseUrlEmits</a>;
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DualAttestation.md#0x1_DualAttestation_RotateCompliancePublicKeyEmits">DualAttestation::RotateCompliancePublicKeyEmits</a>;
 </code></pre>
 
 
@@ -2351,7 +2351,7 @@ Only the account having Credential can rotate the info.
 Credential is granted to either a Parent VASP or a designated dealer [[H17]][PERMISSION].
 
 
-<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DualAttestation.md#0x1_DualAttestation_AbortsIfNoCredential">DualAttestation::AbortsIfNoCredential</a>{addr: <a href="_spec_address_of">Signer::spec_address_of</a>(account)};
+<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DualAttestation.md#0x1_DualAttestation_AbortsIfNoCredential">DualAttestation::AbortsIfNoCredential</a>{addr: <a href="_spec_address_of">Signer::spec_address_of</a>(account)};
 </code></pre>
 
 
@@ -2367,7 +2367,7 @@ Credential is granted to either a Parent VASP or a designated dealer [[H17]][PER
 
 ###### Summary
 
-Rotates the authentication key in a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SharedEd25519PublicKey.md#0x1_SharedEd25519PublicKey">SharedEd25519PublicKey</a></code>. This transaction can be sent by
+Rotates the authentication key in a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SharedEd25519PublicKey.md#0x1_SharedEd25519PublicKey">SharedEd25519PublicKey</a></code>. This transaction can be sent by
 any account that has previously published a shared ed25519 public key using
 <code><a href="script_documentation.md#0x1_AccountAdministrationScripts_publish_shared_ed25519_public_key">AccountAdministrationScripts::publish_shared_ed25519_public_key</a></code>.
 
@@ -2377,10 +2377,10 @@ any account that has previously published a shared ed25519 public key using
 ###### Technical Description
 
 <code>public_key</code> must be a valid ed25519 public key.  This transaction first rotates the public key stored in <code>account</code>'s
-<code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SharedEd25519PublicKey.md#0x1_SharedEd25519PublicKey_SharedEd25519PublicKey">SharedEd25519PublicKey::SharedEd25519PublicKey</a></code> resource to <code>public_key</code>, after which it
+<code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SharedEd25519PublicKey.md#0x1_SharedEd25519PublicKey_SharedEd25519PublicKey">SharedEd25519PublicKey::SharedEd25519PublicKey</a></code> resource to <code>public_key</code>, after which it
 rotates the <code>account</code>'s authentication key to the new authentication key derived from <code>public_key</code> as defined
 [here](https://developers.diem.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys)
-using the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code> stored in <code>account</code>'s <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SharedEd25519PublicKey.md#0x1_SharedEd25519PublicKey_SharedEd25519PublicKey">SharedEd25519PublicKey::SharedEd25519PublicKey</a></code>.
+using the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code> stored in <code>account</code>'s <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SharedEd25519PublicKey.md#0x1_SharedEd25519PublicKey_SharedEd25519PublicKey">SharedEd25519PublicKey::SharedEd25519PublicKey</a></code>.
 
 
 <a name="@Parameters_121"></a>
@@ -2399,8 +2399,8 @@ using the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/m
 
 | Error Category             | Error Reason                                    | Description                                                                                   |
 | ----------------           | --------------                                  | -------------                                                                                 |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SharedEd25519PublicKey.md#0x1_SharedEd25519PublicKey_ESHARED_KEY">SharedEd25519PublicKey::ESHARED_KEY</a></code>           | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SharedEd25519PublicKey.md#0x1_SharedEd25519PublicKey_SharedEd25519PublicKey">SharedEd25519PublicKey::SharedEd25519PublicKey</a></code> resource is not published under <code>account</code>. |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SharedEd25519PublicKey.md#0x1_SharedEd25519PublicKey_EMALFORMED_PUBLIC_KEY">SharedEd25519PublicKey::EMALFORMED_PUBLIC_KEY</a></code> | <code>public_key</code> is an invalid ed25519 public key.                                                |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SharedEd25519PublicKey.md#0x1_SharedEd25519PublicKey_ESHARED_KEY">SharedEd25519PublicKey::ESHARED_KEY</a></code>           | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SharedEd25519PublicKey.md#0x1_SharedEd25519PublicKey_SharedEd25519PublicKey">SharedEd25519PublicKey::SharedEd25519PublicKey</a></code> resource is not published under <code>account</code>. |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SharedEd25519PublicKey.md#0x1_SharedEd25519PublicKey_EMALFORMED_PUBLIC_KEY">SharedEd25519PublicKey::EMALFORMED_PUBLIC_KEY</a></code> | <code>public_key</code> is an invalid ed25519 public key.                                                |
 
 
 <a name="@Related_Scripts_123"></a>
@@ -2420,7 +2420,7 @@ using the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/m
 
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_AccountAdministrationScripts_rotate_shared_ed25519_public_key">rotate_shared_ed25519_public_key</a>(account: signer, public_key: vector&lt;u8&gt;) {
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SharedEd25519PublicKey.md#0x1_SharedEd25519PublicKey_rotate_key">SharedEd25519PublicKey::rotate_key</a>(&account, public_key)
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SharedEd25519PublicKey.md#0x1_SharedEd25519PublicKey_rotate_key">SharedEd25519PublicKey::rotate_key</a>(&account, public_key)
 }
 </code></pre>
 
@@ -2433,9 +2433,9 @@ using the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/m
 
 
 
-<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: account};
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SharedEd25519PublicKey.md#0x1_SharedEd25519PublicKey_RotateKeyAbortsIf">SharedEd25519PublicKey::RotateKeyAbortsIf</a>{new_public_key: public_key};
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SharedEd25519PublicKey.md#0x1_SharedEd25519PublicKey_RotateKeyEnsures">SharedEd25519PublicKey::RotateKeyEnsures</a>{new_public_key: public_key};
+<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: account};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SharedEd25519PublicKey.md#0x1_SharedEd25519PublicKey_RotateKeyAbortsIf">SharedEd25519PublicKey::RotateKeyAbortsIf</a>{new_public_key: public_key};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SharedEd25519PublicKey.md#0x1_SharedEd25519PublicKey_RotateKeyEnsures">SharedEd25519PublicKey::RotateKeyEnsures</a>{new_public_key: public_key};
 <b>aborts_with</b> [check]
     <a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a>,
     <a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>;
@@ -2465,8 +2465,8 @@ each must be disjoint.
 
 ###### Technical Description
 
-Publishes a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/RecoveryAddress.md#0x1_RecoveryAddress_RecoveryAddress">RecoveryAddress::RecoveryAddress</a></code> resource under <code>account</code>. It then
-extracts the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code> for <code>account</code> and adds
+Publishes a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/RecoveryAddress.md#0x1_RecoveryAddress_RecoveryAddress">RecoveryAddress::RecoveryAddress</a></code> resource under <code>account</code>. It then
+extracts the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code> for <code>account</code> and adds
 it to the resource. After the successful execution of this transaction
 other accounts may add their key rotation to this resource so that <code>account</code>
 may be used as a recovery account for those accounts.
@@ -2487,10 +2487,10 @@ may be used as a recovery account for those accounts.
 
 | Error Category              | Error Reason                                               | Description                                                                                   |
 | ----------------            | --------------                                             | -------------                                                                                 |
-| <code><a href="_INVALID_STATE">Errors::INVALID_STATE</a></code>     | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_EKEY_ROTATION_CAPABILITY_ALREADY_EXTRACTED">DiemAccount::EKEY_ROTATION_CAPABILITY_ALREADY_EXTRACTED</a></code> | <code>account</code> has already delegated/extracted its <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code>.          |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/RecoveryAddress.md#0x1_RecoveryAddress_ENOT_A_VASP">RecoveryAddress::ENOT_A_VASP</a></code>                             | <code>account</code> is not a VASP account.                                                              |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/RecoveryAddress.md#0x1_RecoveryAddress_EKEY_ROTATION_DEPENDENCY_CYCLE">RecoveryAddress::EKEY_ROTATION_DEPENDENCY_CYCLE</a></code>          | A key rotation recovery cycle would be created by adding <code>account</code>'s key rotation capability. |
-| <code><a href="_ALREADY_PUBLISHED">Errors::ALREADY_PUBLISHED</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/RecoveryAddress.md#0x1_RecoveryAddress_ERECOVERY_ADDRESS">RecoveryAddress::ERECOVERY_ADDRESS</a></code>                       | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/RecoveryAddress.md#0x1_RecoveryAddress_RecoveryAddress">RecoveryAddress::RecoveryAddress</a></code> resource has already been published under <code>account</code>.     |
+| <code><a href="_INVALID_STATE">Errors::INVALID_STATE</a></code>     | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_EKEY_ROTATION_CAPABILITY_ALREADY_EXTRACTED">DiemAccount::EKEY_ROTATION_CAPABILITY_ALREADY_EXTRACTED</a></code> | <code>account</code> has already delegated/extracted its <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code>.          |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/RecoveryAddress.md#0x1_RecoveryAddress_ENOT_A_VASP">RecoveryAddress::ENOT_A_VASP</a></code>                             | <code>account</code> is not a VASP account.                                                              |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/RecoveryAddress.md#0x1_RecoveryAddress_EKEY_ROTATION_DEPENDENCY_CYCLE">RecoveryAddress::EKEY_ROTATION_DEPENDENCY_CYCLE</a></code>          | A key rotation recovery cycle would be created by adding <code>account</code>'s key rotation capability. |
+| <code><a href="_ALREADY_PUBLISHED">Errors::ALREADY_PUBLISHED</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/RecoveryAddress.md#0x1_RecoveryAddress_ERECOVERY_ADDRESS">RecoveryAddress::ERECOVERY_ADDRESS</a></code>                       | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/RecoveryAddress.md#0x1_RecoveryAddress_RecoveryAddress">RecoveryAddress::RecoveryAddress</a></code> resource has already been published under <code>account</code>.     |
 
 
 <a name="@Related_Scripts_128"></a>
@@ -2511,7 +2511,7 @@ may be used as a recovery account for those accounts.
 
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_AccountAdministrationScripts_create_recovery_address">create_recovery_address</a>(account: signer) {
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/RecoveryAddress.md#0x1_RecoveryAddress_publish">RecoveryAddress::publish</a>(&account, <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_extract_key_rotation_capability">DiemAccount::extract_key_rotation_capability</a>(&account))
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/RecoveryAddress.md#0x1_RecoveryAddress_publish">RecoveryAddress::publish</a>(&account, <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_extract_key_rotation_capability">DiemAccount::extract_key_rotation_capability</a>(&account))
 }
 </code></pre>
 
@@ -2524,18 +2524,18 @@ may be used as a recovery account for those accounts.
 
 
 
-<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: account};
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_ExtractKeyRotationCapabilityAbortsIf">DiemAccount::ExtractKeyRotationCapabilityAbortsIf</a>;
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_ExtractKeyRotationCapabilityEnsures">DiemAccount::ExtractKeyRotationCapabilityEnsures</a>;
+<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: account};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_ExtractKeyRotationCapabilityAbortsIf">DiemAccount::ExtractKeyRotationCapabilityAbortsIf</a>;
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_ExtractKeyRotationCapabilityEnsures">DiemAccount::ExtractKeyRotationCapabilityEnsures</a>;
 <b>let</b> account_addr = <a href="_spec_address_of">Signer::spec_address_of</a>(account);
-<b>let</b> rotation_cap = <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_spec_get_key_rotation_cap">DiemAccount::spec_get_key_rotation_cap</a>(account_addr);
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/RecoveryAddress.md#0x1_RecoveryAddress_PublishAbortsIf">RecoveryAddress::PublishAbortsIf</a>{
+<b>let</b> rotation_cap = <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_spec_get_key_rotation_cap">DiemAccount::spec_get_key_rotation_cap</a>(account_addr);
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/RecoveryAddress.md#0x1_RecoveryAddress_PublishAbortsIf">RecoveryAddress::PublishAbortsIf</a>{
     recovery_account: account,
     rotation_cap: rotation_cap
 };
-<b>ensures</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/RecoveryAddress.md#0x1_RecoveryAddress_spec_is_recovery_address">RecoveryAddress::spec_is_recovery_address</a>(account_addr);
-<b>ensures</b> len(<a href="../../../../../../DPN/releases/artifacts/current/docs/modules/RecoveryAddress.md#0x1_RecoveryAddress_spec_get_rotation_caps">RecoveryAddress::spec_get_rotation_caps</a>(account_addr)) == 1;
-<b>ensures</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/RecoveryAddress.md#0x1_RecoveryAddress_spec_get_rotation_caps">RecoveryAddress::spec_get_rotation_caps</a>(account_addr)[0] == rotation_cap;
+<b>ensures</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/RecoveryAddress.md#0x1_RecoveryAddress_spec_is_recovery_address">RecoveryAddress::spec_is_recovery_address</a>(account_addr);
+<b>ensures</b> len(<a href="../../../../../../DPN/releases/artifacts/current/docs/sources/RecoveryAddress.md#0x1_RecoveryAddress_spec_get_rotation_caps">RecoveryAddress::spec_get_rotation_caps</a>(account_addr)) == 1;
+<b>ensures</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/RecoveryAddress.md#0x1_RecoveryAddress_spec_get_rotation_caps">RecoveryAddress::spec_get_rotation_caps</a>(account_addr)[0] == rotation_cap;
 <b>aborts_with</b> [check]
     <a href="_INVALID_STATE">Errors::INVALID_STATE</a>,
     <a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>,
@@ -2555,7 +2555,7 @@ may be used as a recovery account for those accounts.
 
 ###### Summary
 
-Publishes a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomain::VASPDomains</a></code> resource under a parent VASP account.
+Publishes a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomain::VASPDomains</a></code> resource under a parent VASP account.
 The sending account must be a parent VASP account.
 
 
@@ -2563,8 +2563,8 @@ The sending account must be a parent VASP account.
 
 ###### Technical Description
 
-Publishes a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomain::VASPDomains</a></code> resource under <code>account</code>.
-The The <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomain::VASPDomains</a></code> resource's <code>domains</code> field is a vector
+Publishes a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomain::VASPDomains</a></code> resource under <code>account</code>.
+The The <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomain::VASPDomains</a></code> resource's <code>domains</code> field is a vector
 of VASPDomain, and will be empty on at the end of processing this transaction.
 
 
@@ -2583,8 +2583,8 @@ of VASPDomain, and will be empty on at the end of processing this transaction.
 
 | Error Category              | Error Reason              | Description                                                                    |
 | ----------------            | --------------            | -------------                                                                  |
-| <code><a href="_ALREADY_PUBLISHED">Errors::ALREADY_PUBLISHED</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/VASPDomain.md#0x1_VASPDomain_EVASP_DOMAINS">VASPDomain::EVASP_DOMAINS</a></code> | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomain::VASPDomains</a></code> resource has already been published under <code>account</code>. |
-| <code><a href="_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a></code>     | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_EPARENT_VASP">Roles::EPARENT_VASP</a></code>     | The sending <code>account</code> was not a parent VASP account.                           |
+| <code><a href="_ALREADY_PUBLISHED">Errors::ALREADY_PUBLISHED</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/VASPDomain.md#0x1_VASPDomain_EVASP_DOMAINS">VASPDomain::EVASP_DOMAINS</a></code> | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomain::VASPDomains</a></code> resource has already been published under <code>account</code>. |
+| <code><a href="_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a></code>     | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles_EPARENT_VASP">Roles::EPARENT_VASP</a></code>     | The sending <code>account</code> was not a parent VASP account.                           |
 
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_AccountAdministrationScripts_create_vasp_domains">create_vasp_domains</a>(account: signer)
@@ -2597,7 +2597,7 @@ of VASPDomain, and will be empty on at the end of processing this transaction.
 
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_AccountAdministrationScripts_create_vasp_domains">create_vasp_domains</a>(account: signer) {
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/VASPDomain.md#0x1_VASPDomain_publish_vasp_domains">VASPDomain::publish_vasp_domains</a>(&account)
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/VASPDomain.md#0x1_VASPDomain_publish_vasp_domains">VASPDomain::publish_vasp_domains</a>(&account)
 }
 </code></pre>
 
@@ -2611,10 +2611,10 @@ of VASPDomain, and will be empty on at the end of processing this transaction.
 
 
 <pre><code><b>let</b> vasp_addr = <a href="_spec_address_of">Signer::spec_address_of</a>(account);
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: account};
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_AbortsIfNotParentVasp">Roles::AbortsIfNotParentVasp</a>;
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/VASPDomain.md#0x1_VASPDomain_PublishVASPDomainsAbortsIf">VASPDomain::PublishVASPDomainsAbortsIf</a> { vasp_addr };
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/VASPDomain.md#0x1_VASPDomain_PublishVASPDomainsEnsures">VASPDomain::PublishVASPDomainsEnsures</a> { vasp_addr };
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: account};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles_AbortsIfNotParentVasp">Roles::AbortsIfNotParentVasp</a>;
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/VASPDomain.md#0x1_VASPDomain_PublishVASPDomainsAbortsIf">VASPDomain::PublishVASPDomainsAbortsIf</a> { vasp_addr };
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/VASPDomain.md#0x1_VASPDomain_PublishVASPDomainsEnsures">VASPDomain::PublishVASPDomainsEnsures</a> { vasp_addr };
 <b>aborts_with</b> [check]
     <a href="_ALREADY_PUBLISHED">Errors::ALREADY_PUBLISHED</a>,
     <a href="_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a>;
@@ -2643,7 +2643,7 @@ and processed according to DIP-168.
 
 ###### Technical Description
 
-This publishes a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/CRSN.md#0x1_CRSN_CRSN">CRSN::CRSN</a></code> resource under <code>account</code> with <code>crsn_size</code>
+This publishes a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/CRSN.md#0x1_CRSN_CRSN">CRSN::CRSN</a></code> resource under <code>account</code> with <code>crsn_size</code>
 number of slots. All slots will be initialized to the empty (unused)
 state, and the CRSN resource's <code>min_nonce</code> field will be set to the transaction's
 sequence number + 1.
@@ -2665,8 +2665,8 @@ sequence number + 1.
 
 | Error Category             | Error Reason            | Description                                                    |
 | ----------------           | --------------          | -------------                                                  |
-| <code><a href="_INVALID_STATE">Errors::INVALID_STATE</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/CRSN.md#0x1_CRSN_EHAS_CRSN">CRSN::EHAS_CRSN</a></code>       | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/CRSN.md#0x1_CRSN_CRSN">CRSN::CRSN</a></code> resource was already published under <code>account</code>. |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/CRSN.md#0x1_CRSN_EZERO_SIZE_CRSN">CRSN::EZERO_SIZE_CRSN</a></code> | The <code>crsn_size</code> was zero.                                      |
+| <code><a href="_INVALID_STATE">Errors::INVALID_STATE</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/CRSN.md#0x1_CRSN_EHAS_CRSN">CRSN::EHAS_CRSN</a></code>       | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/CRSN.md#0x1_CRSN_CRSN">CRSN::CRSN</a></code> resource was already published under <code>account</code>. |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/CRSN.md#0x1_CRSN_EZERO_SIZE_CRSN">CRSN::EZERO_SIZE_CRSN</a></code> | The <code>crsn_size</code> was zero.                                      |
 
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_AccountAdministrationScripts_opt_in_to_crsn">opt_in_to_crsn</a>(account: signer, crsn_size: u64)
@@ -2679,7 +2679,7 @@ sequence number + 1.
 
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_AccountAdministrationScripts_opt_in_to_crsn">opt_in_to_crsn</a>(account: signer, crsn_size: u64) {
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_publish_crsn">DiemAccount::publish_crsn</a>(&account, crsn_size)
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_publish_crsn">DiemAccount::publish_crsn</a>(&account, crsn_size)
 }
 </code></pre>
 
@@ -2706,7 +2706,7 @@ semantics are defined in DIP-168.
 
 ###### Technical Description
 
-This shifts the slots in the published <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/CRSN.md#0x1_CRSN_CRSN">CRSN::CRSN</a></code> resource under
+This shifts the slots in the published <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/CRSN.md#0x1_CRSN_CRSN">CRSN::CRSN</a></code> resource under
 <code>account</code> by <code>shift_amount</code>, and increments the CRSN's <code>min_nonce</code> field
 by <code>shift_amount</code> as well. After this, it will shift the window over
 any set bits. It is important to note that the sequence nonce of the
@@ -2730,7 +2730,7 @@ order for this transaction to be processed successfully.
 
 | Error Category          | Error Reason     | Description                                               |
 | ----------------        | --------------   | -------------                                             |
-| <code><a href="_INVALID_STATE">Errors::INVALID_STATE</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/CRSN.md#0x1_CRSN_ENO_CRSN">CRSN::ENO_CRSN</a></code> | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/CRSN.md#0x1_CRSN_CRSN">CRSN::CRSN</a></code> resource is not published under <code>account</code>. |
+| <code><a href="_INVALID_STATE">Errors::INVALID_STATE</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/CRSN.md#0x1_CRSN_ENO_CRSN">CRSN::ENO_CRSN</a></code> | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/CRSN.md#0x1_CRSN_CRSN">CRSN::CRSN</a></code> resource is not published under <code>account</code>. |
 
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_AccountAdministrationScripts_force_expire">force_expire</a>(account: signer, shift_amount: u64)
@@ -2743,7 +2743,7 @@ order for this transaction to be processed successfully.
 
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_AccountAdministrationScripts_force_expire">force_expire</a>(account: signer, shift_amount: u64) {
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/CRSN.md#0x1_CRSN_force_expire">CRSN::force_expire</a>(&account, shift_amount)
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/CRSN.md#0x1_CRSN_force_expire">CRSN::force_expire</a>(&account, shift_amount)
 }
 </code></pre>
 
@@ -2768,7 +2768,7 @@ This module holds all payment related script entrypoints in the Diem Framework.
 Any account that can hold a balance can use the transaction scripts within this module.
 
 
-<pre><code><b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount">0x1::DiemAccount</a>;
+<pre><code><b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount">0x1::DiemAccount</a>;
 </code></pre>
 
 
@@ -2797,12 +2797,12 @@ currency being transacted.
 
 Transfers <code>amount</code> coins of type <code>Currency</code> from <code>payer</code> to <code>payee</code> with (optional) associated
 <code>metadata</code> and an (optional) <code>metadata_signature</code> on the message of the form
-<code>metadata</code> | <code><a href="_address_of">Signer::address_of</a>(payer)</code> | <code>amount</code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DualAttestation.md#0x1_DualAttestation_DOMAIN_SEPARATOR">DualAttestation::DOMAIN_SEPARATOR</a></code>, that
+<code>metadata</code> | <code><a href="_address_of">Signer::address_of</a>(payer)</code> | <code>amount</code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DualAttestation.md#0x1_DualAttestation_DOMAIN_SEPARATOR">DualAttestation::DOMAIN_SEPARATOR</a></code>, that
 has been signed by the <code>payee</code>'s private key associated with the <code>compliance_public_key</code> held in
-the <code>payee</code>'s <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DualAttestation.md#0x1_DualAttestation_Credential">DualAttestation::Credential</a></code>. Both the <code><a href="_address_of">Signer::address_of</a>(payer)</code> and <code>amount</code> fields
+the <code>payee</code>'s <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DualAttestation.md#0x1_DualAttestation_Credential">DualAttestation::Credential</a></code>. Both the <code><a href="_address_of">Signer::address_of</a>(payer)</code> and <code>amount</code> fields
 in the <code>metadata_signature</code> must be BCS-encoded bytes, and <code>|</code> denotes concatenation.
 The <code>metadata</code> and <code>metadata_signature</code> parameters are only required if <code>amount</code> >=
-<code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DualAttestation.md#0x1_DualAttestation_get_cur_microdiem_limit">DualAttestation::get_cur_microdiem_limit</a></code> XDX and <code>payer</code> and <code>payee</code> are distinct VASPs.
+<code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DualAttestation.md#0x1_DualAttestation_get_cur_microdiem_limit">DualAttestation::get_cur_microdiem_limit</a></code> XDX and <code>payer</code> and <code>payee</code> are distinct VASPs.
 However, a transaction sender can opt in to dual attestation even when it is not required
 (e.g., a DesignatedDealer -> VASP payment) by providing a non-empty <code>metadata_signature</code>.
 Standardized <code>metadata</code> BCS format can be found in <code>diem_types::transaction::metadata::Metadata</code>.
@@ -2813,8 +2813,8 @@ Standardized <code>metadata</code> BCS format can be found in <code>diem_types::
 ###### Events
 
 Successful execution of this script emits two events:
-* A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_SentPaymentEvent">DiemAccount::SentPaymentEvent</a></code> on <code>payer</code>'s <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_DiemAccount">DiemAccount::DiemAccount</a></code> <code>sent_events</code> handle; and
-* A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_ReceivedPaymentEvent">DiemAccount::ReceivedPaymentEvent</a></code> on <code>payee</code>'s <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_DiemAccount">DiemAccount::DiemAccount</a></code> <code>received_events</code> handle.
+* A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_SentPaymentEvent">DiemAccount::SentPaymentEvent</a></code> on <code>payer</code>'s <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_DiemAccount">DiemAccount::DiemAccount</a></code> <code>sent_events</code> handle; and
+* A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_ReceivedPaymentEvent">DiemAccount::ReceivedPaymentEvent</a></code> on <code>payee</code>'s <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_DiemAccount">DiemAccount::DiemAccount</a></code> <code>received_events</code> handle.
 
 
 <a name="@Parameters_145"></a>
@@ -2836,16 +2836,16 @@ Successful execution of this script emits two events:
 
 | Error Category             | Error Reason                                     | Description                                                                                                                         |
 | ----------------           | --------------                                   | -------------                                                                                                                       |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_EPAYER_DOESNT_HOLD_CURRENCY">DiemAccount::EPAYER_DOESNT_HOLD_CURRENCY</a></code>       | <code>payer</code> doesn't hold a balance in <code>Currency</code>.                                                                                       |
-| <code><a href="_LIMIT_EXCEEDED">Errors::LIMIT_EXCEEDED</a></code>   | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_EINSUFFICIENT_BALANCE">DiemAccount::EINSUFFICIENT_BALANCE</a></code>             | <code>amount</code> is greater than <code>payer</code>'s balance in <code>Currency</code>.                                                                           |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_ECOIN_DEPOSIT_IS_ZERO">DiemAccount::ECOIN_DEPOSIT_IS_ZERO</a></code>             | <code>amount</code> is zero.                                                                                                                   |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_EPAYEE_DOES_NOT_EXIST">DiemAccount::EPAYEE_DOES_NOT_EXIST</a></code>             | No account exists at the <code>payee</code> address.                                                                                           |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_EPAYEE_CANT_ACCEPT_CURRENCY_TYPE">DiemAccount::EPAYEE_CANT_ACCEPT_CURRENCY_TYPE</a></code>  | An account exists at <code>payee</code>, but it does not accept payments in <code>Currency</code>.                                                        |
-| <code><a href="_INVALID_STATE">Errors::INVALID_STATE</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/AccountFreezing.md#0x1_AccountFreezing_EACCOUNT_FROZEN">AccountFreezing::EACCOUNT_FROZEN</a></code>               | The <code>payee</code> account is frozen.                                                                                                      |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DualAttestation.md#0x1_DualAttestation_EMALFORMED_METADATA_SIGNATURE">DualAttestation::EMALFORMED_METADATA_SIGNATURE</a></code> | <code>metadata_signature</code> is not 64 bytes.                                                                                               |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DualAttestation.md#0x1_DualAttestation_EINVALID_METADATA_SIGNATURE">DualAttestation::EINVALID_METADATA_SIGNATURE</a></code>   | <code>metadata_signature</code> does not verify on the against the <code>payee'</code>s <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DualAttestation.md#0x1_DualAttestation_Credential">DualAttestation::Credential</a></code> <code>compliance_public_key</code> public key. |
-| <code><a href="_LIMIT_EXCEEDED">Errors::LIMIT_EXCEEDED</a></code>   | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_EWITHDRAWAL_EXCEEDS_LIMITS">DiemAccount::EWITHDRAWAL_EXCEEDS_LIMITS</a></code>        | <code>payer</code> has exceeded its daily withdrawal limits for the backing coins of XDX.                                                      |
-| <code><a href="_LIMIT_EXCEEDED">Errors::LIMIT_EXCEEDED</a></code>   | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_EDEPOSIT_EXCEEDS_LIMITS">DiemAccount::EDEPOSIT_EXCEEDS_LIMITS</a></code>           | <code>payee</code> has exceeded its daily deposit limits for XDX.                                                                              |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_EPAYER_DOESNT_HOLD_CURRENCY">DiemAccount::EPAYER_DOESNT_HOLD_CURRENCY</a></code>       | <code>payer</code> doesn't hold a balance in <code>Currency</code>.                                                                                       |
+| <code><a href="_LIMIT_EXCEEDED">Errors::LIMIT_EXCEEDED</a></code>   | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_EINSUFFICIENT_BALANCE">DiemAccount::EINSUFFICIENT_BALANCE</a></code>             | <code>amount</code> is greater than <code>payer</code>'s balance in <code>Currency</code>.                                                                           |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_ECOIN_DEPOSIT_IS_ZERO">DiemAccount::ECOIN_DEPOSIT_IS_ZERO</a></code>             | <code>amount</code> is zero.                                                                                                                   |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_EPAYEE_DOES_NOT_EXIST">DiemAccount::EPAYEE_DOES_NOT_EXIST</a></code>             | No account exists at the <code>payee</code> address.                                                                                           |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_EPAYEE_CANT_ACCEPT_CURRENCY_TYPE">DiemAccount::EPAYEE_CANT_ACCEPT_CURRENCY_TYPE</a></code>  | An account exists at <code>payee</code>, but it does not accept payments in <code>Currency</code>.                                                        |
+| <code><a href="_INVALID_STATE">Errors::INVALID_STATE</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/AccountFreezing.md#0x1_AccountFreezing_EACCOUNT_FROZEN">AccountFreezing::EACCOUNT_FROZEN</a></code>               | The <code>payee</code> account is frozen.                                                                                                      |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DualAttestation.md#0x1_DualAttestation_EMALFORMED_METADATA_SIGNATURE">DualAttestation::EMALFORMED_METADATA_SIGNATURE</a></code> | <code>metadata_signature</code> is not 64 bytes.                                                                                               |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DualAttestation.md#0x1_DualAttestation_EINVALID_METADATA_SIGNATURE">DualAttestation::EINVALID_METADATA_SIGNATURE</a></code>   | <code>metadata_signature</code> does not verify on the against the <code>payee'</code>s <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DualAttestation.md#0x1_DualAttestation_Credential">DualAttestation::Credential</a></code> <code>compliance_public_key</code> public key. |
+| <code><a href="_LIMIT_EXCEEDED">Errors::LIMIT_EXCEEDED</a></code>   | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_EWITHDRAWAL_EXCEEDS_LIMITS">DiemAccount::EWITHDRAWAL_EXCEEDS_LIMITS</a></code>        | <code>payer</code> has exceeded its daily withdrawal limits for the backing coins of XDX.                                                      |
+| <code><a href="_LIMIT_EXCEEDED">Errors::LIMIT_EXCEEDED</a></code>   | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_EDEPOSIT_EXCEEDS_LIMITS">DiemAccount::EDEPOSIT_EXCEEDS_LIMITS</a></code>           | <code>payee</code> has exceeded its daily deposit limits for XDX.                                                                              |
 
 
 <a name="@Related_Scripts_147"></a>
@@ -2874,11 +2874,11 @@ Successful execution of this script emits two events:
     metadata: vector&lt;u8&gt;,
     metadata_signature: vector&lt;u8&gt;
 ) {
-    <b>let</b> payer_withdrawal_cap = <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_extract_withdraw_capability">DiemAccount::extract_withdraw_capability</a>(&payer);
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_pay_from">DiemAccount::pay_from</a>&lt;Currency&gt;(
+    <b>let</b> payer_withdrawal_cap = <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_extract_withdraw_capability">DiemAccount::extract_withdraw_capability</a>(&payer);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_pay_from">DiemAccount::pay_from</a>&lt;Currency&gt;(
         &payer_withdrawal_cap, payee, amount, metadata, metadata_signature
     );
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_restore_withdraw_capability">DiemAccount::restore_withdraw_capability</a>(payer_withdrawal_cap);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_restore_withdraw_capability">DiemAccount::restore_withdraw_capability</a>(payer_withdrawal_cap);
 }
 </code></pre>
 
@@ -2892,7 +2892,7 @@ Successful execution of this script emits two events:
 
 
 <pre><code><b>include</b> <a href="script_documentation.md#0x1_PaymentScripts_PeerToPeer">PeerToPeer</a>&lt;Currency&gt;{payer_signer: payer};
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DualAttestation.md#0x1_DualAttestation_AssertPaymentOkAbortsIf">DualAttestation::AssertPaymentOkAbortsIf</a>&lt;Currency&gt;{
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DualAttestation.md#0x1_DualAttestation_AssertPaymentOkAbortsIf">DualAttestation::AssertPaymentOkAbortsIf</a>&lt;Currency&gt;{
     payer: <a href="_spec_address_of">Signer::spec_address_of</a>(payer),
     value: amount
 };
@@ -2935,8 +2935,8 @@ Standardized <code>metadata</code> BCS format can be found in <code>diem_types::
 ###### Events
 
 Successful execution of this script emits two events:
-* A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_SentPaymentEvent">DiemAccount::SentPaymentEvent</a></code> on <code>payer</code>'s <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_DiemAccount">DiemAccount::DiemAccount</a></code> <code>sent_events</code> handle; and
-* A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_ReceivedPaymentEvent">DiemAccount::ReceivedPaymentEvent</a></code> on <code>payee</code>'s <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_DiemAccount">DiemAccount::DiemAccount</a></code> <code>received_events</code> handle.
+* A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_SentPaymentEvent">DiemAccount::SentPaymentEvent</a></code> on <code>payer</code>'s <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_DiemAccount">DiemAccount::DiemAccount</a></code> <code>sent_events</code> handle; and
+* A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_ReceivedPaymentEvent">DiemAccount::ReceivedPaymentEvent</a></code> on <code>payee</code>'s <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_DiemAccount">DiemAccount::DiemAccount</a></code> <code>received_events</code> handle.
 
 
 <a name="@Parameters_151"></a>
@@ -2957,14 +2957,14 @@ Successful execution of this script emits two events:
 
 | Error Category             | Error Reason                                     | Description                                                                                                                         |
 | ----------------           | --------------                                   | -------------                                                                                                                       |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_EPAYER_DOESNT_HOLD_CURRENCY">DiemAccount::EPAYER_DOESNT_HOLD_CURRENCY</a></code>       | <code>payer</code> doesn't hold a balance in <code>Currency</code>.                                                                                       |
-| <code><a href="_LIMIT_EXCEEDED">Errors::LIMIT_EXCEEDED</a></code>   | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_EINSUFFICIENT_BALANCE">DiemAccount::EINSUFFICIENT_BALANCE</a></code>             | <code>amount</code> is greater than <code>payer</code>'s balance in <code>Currency</code>.                                                                           |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_ECOIN_DEPOSIT_IS_ZERO">DiemAccount::ECOIN_DEPOSIT_IS_ZERO</a></code>             | <code>amount</code> is zero.                                                                                                                   |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_EPAYEE_DOES_NOT_EXIST">DiemAccount::EPAYEE_DOES_NOT_EXIST</a></code>             | No account exists at the <code>payee</code> address.                                                                                           |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_EPAYEE_CANT_ACCEPT_CURRENCY_TYPE">DiemAccount::EPAYEE_CANT_ACCEPT_CURRENCY_TYPE</a></code>  | An account exists at <code>payee</code>, but it does not accept payments in <code>Currency</code>.                                                        |
-| <code><a href="_INVALID_STATE">Errors::INVALID_STATE</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/AccountFreezing.md#0x1_AccountFreezing_EACCOUNT_FROZEN">AccountFreezing::EACCOUNT_FROZEN</a></code>               | The <code>payee</code> account is frozen.                                                                                                      |
-| <code><a href="_LIMIT_EXCEEDED">Errors::LIMIT_EXCEEDED</a></code>   | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_EWITHDRAWAL_EXCEEDS_LIMITS">DiemAccount::EWITHDRAWAL_EXCEEDS_LIMITS</a></code>        | <code>payer</code> has exceeded its daily withdrawal limits for the backing coins of XDX.                                                      |
-| <code><a href="_LIMIT_EXCEEDED">Errors::LIMIT_EXCEEDED</a></code>   | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_EDEPOSIT_EXCEEDS_LIMITS">DiemAccount::EDEPOSIT_EXCEEDS_LIMITS</a></code>           | <code>payee</code> has exceeded its daily deposit limits for XDX.                                                                              |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_EPAYER_DOESNT_HOLD_CURRENCY">DiemAccount::EPAYER_DOESNT_HOLD_CURRENCY</a></code>       | <code>payer</code> doesn't hold a balance in <code>Currency</code>.                                                                                       |
+| <code><a href="_LIMIT_EXCEEDED">Errors::LIMIT_EXCEEDED</a></code>   | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_EINSUFFICIENT_BALANCE">DiemAccount::EINSUFFICIENT_BALANCE</a></code>             | <code>amount</code> is greater than <code>payer</code>'s balance in <code>Currency</code>.                                                                           |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_ECOIN_DEPOSIT_IS_ZERO">DiemAccount::ECOIN_DEPOSIT_IS_ZERO</a></code>             | <code>amount</code> is zero.                                                                                                                   |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_EPAYEE_DOES_NOT_EXIST">DiemAccount::EPAYEE_DOES_NOT_EXIST</a></code>             | No account exists at the <code>payee</code> address.                                                                                           |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_EPAYEE_CANT_ACCEPT_CURRENCY_TYPE">DiemAccount::EPAYEE_CANT_ACCEPT_CURRENCY_TYPE</a></code>  | An account exists at <code>payee</code>, but it does not accept payments in <code>Currency</code>.                                                        |
+| <code><a href="_INVALID_STATE">Errors::INVALID_STATE</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/AccountFreezing.md#0x1_AccountFreezing_EACCOUNT_FROZEN">AccountFreezing::EACCOUNT_FROZEN</a></code>               | The <code>payee</code> account is frozen.                                                                                                      |
+| <code><a href="_LIMIT_EXCEEDED">Errors::LIMIT_EXCEEDED</a></code>   | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_EWITHDRAWAL_EXCEEDS_LIMITS">DiemAccount::EWITHDRAWAL_EXCEEDS_LIMITS</a></code>        | <code>payer</code> has exceeded its daily withdrawal limits for the backing coins of XDX.                                                      |
+| <code><a href="_LIMIT_EXCEEDED">Errors::LIMIT_EXCEEDED</a></code>   | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_EDEPOSIT_EXCEEDS_LIMITS">DiemAccount::EDEPOSIT_EXCEEDS_LIMITS</a></code>           | <code>payee</code> has exceeded its daily deposit limits for XDX.                                                                              |
 
 
 <a name="@Related_Scripts_153"></a>
@@ -2992,11 +2992,11 @@ Successful execution of this script emits two events:
     amount: u64,
     metadata: vector&lt;u8&gt;,
 ) {
-    <b>let</b> payer_withdrawal_cap = <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_extract_withdraw_capability">DiemAccount::extract_withdraw_capability</a>(&payer);
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_pay_by_signers">DiemAccount::pay_by_signers</a>&lt;Currency&gt;(
+    <b>let</b> payer_withdrawal_cap = <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_extract_withdraw_capability">DiemAccount::extract_withdraw_capability</a>(&payer);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_pay_by_signers">DiemAccount::pay_by_signers</a>&lt;Currency&gt;(
         &payer_withdrawal_cap, &payee, amount, metadata
     );
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_restore_withdraw_capability">DiemAccount::restore_withdraw_capability</a>(payer_withdrawal_cap);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_restore_withdraw_capability">DiemAccount::restore_withdraw_capability</a>(payer_withdrawal_cap);
 }
 </code></pre>
 
@@ -3023,11 +3023,11 @@ Successful execution of this script emits two events:
     payee: address;
     amount: u64;
     metadata: vector&lt;u8&gt;;
-    <b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: payer_signer};
+    <b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: payer_signer};
     <b>let</b> payer_addr = <a href="_spec_address_of">Signer::spec_address_of</a>(payer_signer);
-    <b>let</b> cap = <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_spec_get_withdraw_cap">DiemAccount::spec_get_withdraw_cap</a>(payer_addr);
-    <b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_ExtractWithdrawCapAbortsIf">DiemAccount::ExtractWithdrawCapAbortsIf</a>{sender_addr: payer_addr};
-    <b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_PayFromAbortsIf">DiemAccount::PayFromAbortsIf</a>&lt;Currency&gt;{cap: cap};
+    <b>let</b> cap = <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_spec_get_withdraw_cap">DiemAccount::spec_get_withdraw_cap</a>(payer_addr);
+    <b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_ExtractWithdrawCapAbortsIf">DiemAccount::ExtractWithdrawCapAbortsIf</a>{sender_addr: payer_addr};
+    <b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_PayFromAbortsIf">DiemAccount::PayFromAbortsIf</a>&lt;Currency&gt;{cap: cap};
 }
 </code></pre>
 
@@ -3037,20 +3037,20 @@ The balances of payer and payee change by the correct amount.
 
 <pre><code><b>schema</b> <a href="script_documentation.md#0x1_PaymentScripts_PeerToPeer">PeerToPeer</a>&lt;Currency&gt; {
     <b>ensures</b> payer_addr != payee
-        ==&gt; <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_balance">DiemAccount::balance</a>&lt;Currency&gt;(payer_addr)
-        == <b>old</b>(<a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_balance">DiemAccount::balance</a>&lt;Currency&gt;(payer_addr)) - amount;
+        ==&gt; <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_balance">DiemAccount::balance</a>&lt;Currency&gt;(payer_addr)
+        == <b>old</b>(<a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_balance">DiemAccount::balance</a>&lt;Currency&gt;(payer_addr)) - amount;
     <b>ensures</b> payer_addr != payee
-        ==&gt; <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_balance">DiemAccount::balance</a>&lt;Currency&gt;(payee)
-        == <b>old</b>(<a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_balance">DiemAccount::balance</a>&lt;Currency&gt;(payee)) + amount;
+        ==&gt; <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_balance">DiemAccount::balance</a>&lt;Currency&gt;(payee)
+        == <b>old</b>(<a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_balance">DiemAccount::balance</a>&lt;Currency&gt;(payee)) + amount;
     <b>ensures</b> payer_addr == payee
-        ==&gt; <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_balance">DiemAccount::balance</a>&lt;Currency&gt;(payee)
-        == <b>old</b>(<a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_balance">DiemAccount::balance</a>&lt;Currency&gt;(payee));
+        ==&gt; <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_balance">DiemAccount::balance</a>&lt;Currency&gt;(payee)
+        == <b>old</b>(<a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_balance">DiemAccount::balance</a>&lt;Currency&gt;(payee));
     <b>aborts_with</b> [check]
         <a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a>,
         <a href="_INVALID_STATE">Errors::INVALID_STATE</a>,
         <a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>,
         <a href="_LIMIT_EXCEEDED">Errors::LIMIT_EXCEEDED</a>;
-    <b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_PayFromEmits">DiemAccount::PayFromEmits</a>&lt;Currency&gt;{cap: cap};
+    <b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_PayFromEmits">DiemAccount::PayFromEmits</a>&lt;Currency&gt;{cap: cap};
 }
 </code></pre>
 
@@ -3061,8 +3061,8 @@ Parent VASPs, and Child VASPs can hold balances [[D1]][ROLE][[D2]][ROLE][[D3]][R
 
 
 <pre><code><b>schema</b> <a href="script_documentation.md#0x1_PaymentScripts_PeerToPeer">PeerToPeer</a>&lt;Currency&gt; {
-    <b>aborts_if</b> !<b>exists</b>&lt;<a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_Balance">DiemAccount::Balance</a>&lt;Currency&gt;&gt;(payer_addr) <b>with</b> <a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a>;
-    <b>aborts_if</b> !<b>exists</b>&lt;<a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_Balance">DiemAccount::Balance</a>&lt;Currency&gt;&gt;(payee) <b>with</b> <a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>;
+    <b>aborts_if</b> !<b>exists</b>&lt;<a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_Balance">DiemAccount::Balance</a>&lt;Currency&gt;&gt;(payer_addr) <b>with</b> <a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a>;
+    <b>aborts_if</b> !<b>exists</b>&lt;<a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_Balance">DiemAccount::Balance</a>&lt;Currency&gt;&gt;(payee) <b>with</b> <a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>;
 }
 </code></pre>
 
@@ -3085,10 +3085,10 @@ Parent VASPs, and Child VASPs can hold balances [[D1]][ROLE][[D2]][ROLE][[D3]][R
 
 
 
-<pre><code><b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemSystem.md#0x1_DiemSystem">0x1::DiemSystem</a>;
-<b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce">0x1::SlidingNonce</a>;
-<b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig">0x1::ValidatorConfig</a>;
-<b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig">0x1::ValidatorOperatorConfig</a>;
+<pre><code><b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemSystem.md#0x1_DiemSystem">0x1::DiemSystem</a>;
+<b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce">0x1::SlidingNonce</a>;
+<b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig">0x1::ValidatorConfig</a>;
+<b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig">0x1::ValidatorOperatorConfig</a>;
 </code></pre>
 
 
@@ -3112,13 +3112,13 @@ transaction can only be successfully called by the Diem Root account.
 ###### Technical Description
 
 This script adds the account at <code>validator_address</code> to the validator set.
-This transaction emits a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemConfig.md#0x1_DiemConfig_NewEpochEvent">DiemConfig::NewEpochEvent</a></code> event and triggers a
+This transaction emits a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemConfig.md#0x1_DiemConfig_NewEpochEvent">DiemConfig::NewEpochEvent</a></code> event and triggers a
 reconfiguration. Once the reconfiguration triggered by this script's
 execution has been performed, the account at the <code>validator_address</code> is
 considered to be a validator in the network.
 
 This transaction script will fail if the <code>validator_address</code> address is already in the validator set
-or does not have a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> resource already published under it.
+or does not have a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> resource already published under it.
 
 
 <a name="@Parameters_157"></a>
@@ -3128,8 +3128,8 @@ or does not have a <code><a href="../../../../../../DPN/releases/artifacts/curre
 | Name                | Type         | Description                                                                                                                        |
 | ------              | ------       | -------------                                                                                                                      |
 | <code>dr_account</code>        | <code>signer</code>     | The signer of the sending account of this transaction. Must be the Diem Root signer.                                               |
-| <code>sliding_nonce</code>     | <code>u64</code>        | The <code>sliding_nonce</code> (see: <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction.                                                         |
-| <code>validator_name</code>    | <code>vector&lt;u8&gt;</code> | ASCII-encoded human name for the validator. Must match the human name in the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> for the validator. |
+| <code>sliding_nonce</code>     | <code>u64</code>        | The <code>sliding_nonce</code> (see: <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction.                                                         |
+| <code>validator_name</code>    | <code>vector&lt;u8&gt;</code> | ASCII-encoded human name for the validator. Must match the human name in the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> for the validator. |
 | <code>validator_address</code> | <code>address</code>    | The validator account address to be added to the validator set.                                                                    |
 
 
@@ -3139,17 +3139,17 @@ or does not have a <code><a href="../../../../../../DPN/releases/artifacts/curre
 
 | Error Category             | Error Reason                                 | Description                                                                                                                               |
 | ----------------           | --------------                               | -------------                                                                                                                             |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>               | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code> resource is not published under <code>dr_account</code>.                                                                            |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_OLD">SlidingNonce::ENONCE_TOO_OLD</a></code>               | The <code>sliding_nonce</code> is too old and it's impossible to determine if it's duplicated or not.                                                |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_NEW">SlidingNonce::ENONCE_TOO_NEW</a></code>               | The <code>sliding_nonce</code> is too far in the future.                                                                                             |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_ALREADY_RECORDED">SlidingNonce::ENONCE_ALREADY_RECORDED</a></code>      | The <code>sliding_nonce</code> has been previously recorded.                                                                                         |
-| <code><a href="_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/CoreAddresses.md#0x1_CoreAddresses_EDIEM_ROOT">CoreAddresses::EDIEM_ROOT</a></code>                  | The sending account is not the Diem Root account.                                                                                         |
-| <code><a href="_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_EDIEM_ROOT">Roles::EDIEM_ROOT</a></code>                          | The sending account is not the Diem Root account.                                                                                         |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>               | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code> resource is not published under <code>dr_account</code>.                                                                            |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_OLD">SlidingNonce::ENONCE_TOO_OLD</a></code>               | The <code>sliding_nonce</code> is too old and it's impossible to determine if it's duplicated or not.                                                |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_NEW">SlidingNonce::ENONCE_TOO_NEW</a></code>               | The <code>sliding_nonce</code> is too far in the future.                                                                                             |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_ALREADY_RECORDED">SlidingNonce::ENONCE_ALREADY_RECORDED</a></code>      | The <code>sliding_nonce</code> has been previously recorded.                                                                                         |
+| <code><a href="_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/CoreAddresses.md#0x1_CoreAddresses_EDIEM_ROOT">CoreAddresses::EDIEM_ROOT</a></code>                  | The sending account is not the Diem Root account.                                                                                         |
+| <code><a href="_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles_EDIEM_ROOT">Roles::EDIEM_ROOT</a></code>                          | The sending account is not the Diem Root account.                                                                                         |
 | 0                          | 0                                            | The provided <code>validator_name</code> does not match the already-recorded human name for the validator.                                           |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemSystem.md#0x1_DiemSystem_EINVALID_PROSPECTIVE_VALIDATOR">DiemSystem::EINVALID_PROSPECTIVE_VALIDATOR</a></code> | The validator to be added does not have a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> resource published under it, or its <code>config</code> field is empty. |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemSystem.md#0x1_DiemSystem_EALREADY_A_VALIDATOR">DiemSystem::EALREADY_A_VALIDATOR</a></code>           | The <code>validator_address</code> account is already a registered validator.                                                                        |
-| <code><a href="_INVALID_STATE">Errors::INVALID_STATE</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemConfig.md#0x1_DiemConfig_EINVALID_BLOCK_TIME">DiemConfig::EINVALID_BLOCK_TIME</a></code>            | An invalid time value was encountered in reconfiguration. Unlikely to occur.                                                              |
-| <code><a href="_LIMIT_EXCEEDED">Errors::LIMIT_EXCEEDED</a></code>   | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemSystem.md#0x1_DiemSystem_EMAX_VALIDATORS">DiemSystem::EMAX_VALIDATORS</a></code>                | The validator set is already at its maximum size. The validator could not be added.                                                       |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemSystem.md#0x1_DiemSystem_EINVALID_PROSPECTIVE_VALIDATOR">DiemSystem::EINVALID_PROSPECTIVE_VALIDATOR</a></code> | The validator to be added does not have a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> resource published under it, or its <code>config</code> field is empty. |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemSystem.md#0x1_DiemSystem_EALREADY_A_VALIDATOR">DiemSystem::EALREADY_A_VALIDATOR</a></code>           | The <code>validator_address</code> account is already a registered validator.                                                                        |
+| <code><a href="_INVALID_STATE">Errors::INVALID_STATE</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemConfig.md#0x1_DiemConfig_EINVALID_BLOCK_TIME">DiemConfig::EINVALID_BLOCK_TIME</a></code>            | An invalid time value was encountered in reconfiguration. Unlikely to occur.                                                              |
+| <code><a href="_LIMIT_EXCEEDED">Errors::LIMIT_EXCEEDED</a></code>   | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemSystem.md#0x1_DiemSystem_EMAX_VALIDATORS">DiemSystem::EMAX_VALIDATORS</a></code>                | The validator set is already at its maximum size. The validator could not be added.                                                       |
 
 
 <a name="@Related_Scripts_159"></a>
@@ -3180,9 +3180,9 @@ or does not have a <code><a href="../../../../../../DPN/releases/artifacts/curre
     validator_name: vector&lt;u8&gt;,
     validator_address: address
 ) {
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&dr_account, sliding_nonce);
-    <b>assert</b>(<a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_get_human_name">ValidatorConfig::get_human_name</a>(validator_address) == validator_name, 0);
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemSystem.md#0x1_DiemSystem_add_validator">DiemSystem::add_validator</a>(&dr_account, validator_address);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&dr_account, sliding_nonce);
+    <b>assert</b>(<a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_get_human_name">ValidatorConfig::get_human_name</a>(validator_address) == validator_name, 0);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemSystem.md#0x1_DiemSystem_add_validator">DiemSystem::add_validator</a>(&dr_account, validator_address);
 }
 </code></pre>
 
@@ -3195,12 +3195,12 @@ or does not have a <code><a href="../../../../../../DPN/releases/artifacts/curre
 
 
 
-<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: dr_account};
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_RecordNonceAbortsIf">SlidingNonce::RecordNonceAbortsIf</a>{seq_nonce: sliding_nonce, account: dr_account};
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_AbortsIfNoValidatorConfig">ValidatorConfig::AbortsIfNoValidatorConfig</a>{addr: validator_address};
-<b>aborts_if</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_get_human_name">ValidatorConfig::get_human_name</a>(validator_address) != validator_name <b>with</b> 0;
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemSystem.md#0x1_DiemSystem_AddValidatorAbortsIf">DiemSystem::AddValidatorAbortsIf</a>{validator_addr: validator_address};
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemSystem.md#0x1_DiemSystem_AddValidatorEnsures">DiemSystem::AddValidatorEnsures</a>{validator_addr: validator_address};
+<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: dr_account};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_RecordNonceAbortsIf">SlidingNonce::RecordNonceAbortsIf</a>{seq_nonce: sliding_nonce, account: dr_account};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_AbortsIfNoValidatorConfig">ValidatorConfig::AbortsIfNoValidatorConfig</a>{addr: validator_address};
+<b>aborts_if</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_get_human_name">ValidatorConfig::get_human_name</a>(validator_address) != validator_name <b>with</b> 0;
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemSystem.md#0x1_DiemSystem_AddValidatorAbortsIf">DiemSystem::AddValidatorAbortsIf</a>{validator_addr: validator_address};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemSystem.md#0x1_DiemSystem_AddValidatorEnsures">DiemSystem::AddValidatorEnsures</a>{validator_addr: validator_address};
 </code></pre>
 
 
@@ -3219,7 +3219,7 @@ in practice because it aborts with NOT_PUBLISHED or REQUIRES_ADDRESS, first.
     <a href="_INVALID_STATE">Errors::INVALID_STATE</a>,
     <a href="_LIMIT_EXCEEDED">Errors::LIMIT_EXCEEDED</a>,
     <a href="_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a>;
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemConfig.md#0x1_DiemConfig_ReconfigureEmits">DiemConfig::ReconfigureEmits</a>;
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemConfig.md#0x1_DiemConfig_ReconfigureEmits">DiemConfig::ReconfigureEmits</a>;
 </code></pre>
 
 
@@ -3227,7 +3227,7 @@ in practice because it aborts with NOT_PUBLISHED or REQUIRES_ADDRESS, first.
 Only the Diem Root account can add Validators [[H14]][PERMISSION].
 
 
-<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_AbortsIfNotDiemRoot">Roles::AbortsIfNotDiemRoot</a>{account: dr_account};
+<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles_AbortsIfNotDiemRoot">Roles::AbortsIfNotDiemRoot</a>{account: dr_account};
 </code></pre>
 
 
@@ -3253,8 +3253,8 @@ validator.
 
 ###### Technical Description
 
-This updates the fields with corresponding names held in the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code>
-config resource held under <code>validator_account</code>. It does not emit a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemConfig.md#0x1_DiemConfig_NewEpochEvent">DiemConfig::NewEpochEvent</a></code>
+This updates the fields with corresponding names held in the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code>
+config resource held under <code>validator_account</code>. It does not emit a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemConfig.md#0x1_DiemConfig_NewEpochEvent">DiemConfig::NewEpochEvent</a></code>
 so the copy of this config held in the validator set will not be updated, and the changes are
 only "locally" under the <code>validator_account</code> account address.
 
@@ -3266,10 +3266,10 @@ only "locally" under the <code>validator_account</code> account address.
 | Name                          | Type         | Description                                                                                                        |
 | ------                        | ------       | -------------                                                                                                      |
 | <code>validator_operator_account</code>  | <code>signer</code>     | Signer of the sending account. Must be the registered validator operator for the validator at <code>validator_address</code>. |
-| <code>validator_account</code>           | <code>address</code>    | The address of the validator's <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> resource being updated.                          |
-| <code>consensus_pubkey</code>            | <code>vector&lt;u8&gt;</code> | New Ed25519 public key to be used in the updated <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code>.                               |
-| <code>validator_network_addresses</code> | <code>vector&lt;u8&gt;</code> | New set of <code>validator_network_addresses</code> to be used in the updated <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code>.             |
-| <code>fullnode_network_addresses</code>  | <code>vector&lt;u8&gt;</code> | New set of <code>fullnode_network_addresses</code> to be used in the updated <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code>.              |
+| <code>validator_account</code>           | <code>address</code>    | The address of the validator's <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> resource being updated.                          |
+| <code>consensus_pubkey</code>            | <code>vector&lt;u8&gt;</code> | New Ed25519 public key to be used in the updated <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code>.                               |
+| <code>validator_network_addresses</code> | <code>vector&lt;u8&gt;</code> | New set of <code>validator_network_addresses</code> to be used in the updated <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code>.             |
+| <code>fullnode_network_addresses</code>  | <code>vector&lt;u8&gt;</code> | New set of <code>fullnode_network_addresses</code> to be used in the updated <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code>.              |
 
 
 <a name="@Common_Abort_Conditions_163"></a>
@@ -3278,9 +3278,9 @@ only "locally" under the <code>validator_account</code> account address.
 
 | Error Category             | Error Reason                                   | Description                                                                                           |
 | ----------------           | --------------                                 | -------------                                                                                         |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_EVALIDATOR_CONFIG">ValidatorConfig::EVALIDATOR_CONFIG</a></code>           | <code>validator_address</code> does not have a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> resource published under it.   |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_EINVALID_TRANSACTION_SENDER">ValidatorConfig::EINVALID_TRANSACTION_SENDER</a></code> | <code>validator_operator_account</code> is not the registered operator for the validator at <code>validator_address</code>. |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_EINVALID_CONSENSUS_KEY">ValidatorConfig::EINVALID_CONSENSUS_KEY</a></code>      | <code>consensus_pubkey</code> is not a valid ed25519 public key.                                                 |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_EVALIDATOR_CONFIG">ValidatorConfig::EVALIDATOR_CONFIG</a></code>           | <code>validator_address</code> does not have a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> resource published under it.   |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_EINVALID_TRANSACTION_SENDER">ValidatorConfig::EINVALID_TRANSACTION_SENDER</a></code> | <code>validator_operator_account</code> is not the registered operator for the validator at <code>validator_address</code>. |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_EINVALID_CONSENSUS_KEY">ValidatorConfig::EINVALID_CONSENSUS_KEY</a></code>      | <code>consensus_pubkey</code> is not a valid ed25519 public key.                                                 |
 
 
 <a name="@Related_Scripts_164"></a>
@@ -3313,7 +3313,7 @@ only "locally" under the <code>validator_account</code> account address.
     validator_network_addresses: vector&lt;u8&gt;,
     fullnode_network_addresses: vector&lt;u8&gt;,
 ) {
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_set_config">ValidatorConfig::set_config</a>(
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_set_config">ValidatorConfig::set_config</a>(
         &validator_operator_account,
         validator_account,
         consensus_pubkey,
@@ -3334,9 +3334,9 @@ Access control rule is that only the validator operator for a validator may set
 call this, but there is an aborts_if in SetConfigAbortsIf that tests that directly.
 
 
-<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: validator_operator_account};
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_SetConfigAbortsIf">ValidatorConfig::SetConfigAbortsIf</a> {validator_addr: validator_account};
-<b>ensures</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_is_valid">ValidatorConfig::is_valid</a>(validator_account);
+<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: validator_operator_account};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_SetConfigAbortsIf">ValidatorConfig::SetConfigAbortsIf</a> {validator_addr: validator_account};
+<b>ensures</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_is_valid">ValidatorConfig::is_valid</a>(validator_account);
 <b>aborts_with</b> [check]
     <a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>,
     <a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a>;
@@ -3349,7 +3349,7 @@ update the validator's configuration [[H15]][PERMISSION].
 
 
 <pre><code><b>aborts_if</b> <a href="_address_of">Signer::address_of</a>(validator_operator_account) !=
-            <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_get_operator">ValidatorConfig::get_operator</a>(validator_account)
+            <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_get_operator">ValidatorConfig::get_operator</a>(validator_account)
                 <b>with</b> <a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>;
 </code></pre>
 
@@ -3376,7 +3376,7 @@ successfully called by the Diem Root account.
 ###### Technical Description
 
 This script removes the account at <code>validator_address</code> from the validator set. This transaction
-emits a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemConfig.md#0x1_DiemConfig_NewEpochEvent">DiemConfig::NewEpochEvent</a></code> event. Once the reconfiguration triggered by this event
+emits a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemConfig.md#0x1_DiemConfig_NewEpochEvent">DiemConfig::NewEpochEvent</a></code> event. Once the reconfiguration triggered by this event
 has been performed, the account at <code>validator_address</code> is no longer considered to be a
 validator in the network. This transaction will fail if the validator at <code>validator_address</code>
 is not in the validator set.
@@ -3389,8 +3389,8 @@ is not in the validator set.
 | Name                | Type         | Description                                                                                                                        |
 | ------              | ------       | -------------                                                                                                                      |
 | <code>dr_account</code>        | <code>signer</code>     | The signer of the sending account of this transaction. Must be the Diem Root signer.                                               |
-| <code>sliding_nonce</code>     | <code>u64</code>        | The <code>sliding_nonce</code> (see: <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction.                                                         |
-| <code>validator_name</code>    | <code>vector&lt;u8&gt;</code> | ASCII-encoded human name for the validator. Must match the human name in the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> for the validator. |
+| <code>sliding_nonce</code>     | <code>u64</code>        | The <code>sliding_nonce</code> (see: <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction.                                                         |
+| <code>validator_name</code>    | <code>vector&lt;u8&gt;</code> | ASCII-encoded human name for the validator. Must match the human name in the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> for the validator. |
 | <code>validator_address</code> | <code>address</code>    | The validator account address to be removed from the validator set.                                                                |
 
 
@@ -3400,16 +3400,16 @@ is not in the validator set.
 
 | Error Category             | Error Reason                            | Description                                                                                     |
 | ----------------           | --------------                          | -------------                                                                                   |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>          | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code> resource is not published under <code>dr_account</code>.                                  |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_OLD">SlidingNonce::ENONCE_TOO_OLD</a></code>          | The <code>sliding_nonce</code> is too old and it's impossible to determine if it's duplicated or not.      |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_NEW">SlidingNonce::ENONCE_TOO_NEW</a></code>          | The <code>sliding_nonce</code> is too far in the future.                                                   |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_ALREADY_RECORDED">SlidingNonce::ENONCE_ALREADY_RECORDED</a></code> | The <code>sliding_nonce</code> has been previously recorded.                                               |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>          | The sending account is not the Diem Root account or Treasury Compliance account                |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>          | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code> resource is not published under <code>dr_account</code>.                                  |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_OLD">SlidingNonce::ENONCE_TOO_OLD</a></code>          | The <code>sliding_nonce</code> is too old and it's impossible to determine if it's duplicated or not.      |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_NEW">SlidingNonce::ENONCE_TOO_NEW</a></code>          | The <code>sliding_nonce</code> is too far in the future.                                                   |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_ALREADY_RECORDED">SlidingNonce::ENONCE_ALREADY_RECORDED</a></code> | The <code>sliding_nonce</code> has been previously recorded.                                               |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>          | The sending account is not the Diem Root account or Treasury Compliance account                |
 | 0                          | 0                                       | The provided <code>validator_name</code> does not match the already-recorded human name for the validator. |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemSystem.md#0x1_DiemSystem_ENOT_AN_ACTIVE_VALIDATOR">DiemSystem::ENOT_AN_ACTIVE_VALIDATOR</a></code> | The validator to be removed is not in the validator set.                                        |
-| <code><a href="_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/CoreAddresses.md#0x1_CoreAddresses_EDIEM_ROOT">CoreAddresses::EDIEM_ROOT</a></code>            | The sending account is not the Diem Root account.                                              |
-| <code><a href="_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_EDIEM_ROOT">Roles::EDIEM_ROOT</a></code>                    | The sending account is not the Diem Root account.                                              |
-| <code><a href="_INVALID_STATE">Errors::INVALID_STATE</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemConfig.md#0x1_DiemConfig_EINVALID_BLOCK_TIME">DiemConfig::EINVALID_BLOCK_TIME</a></code>      | An invalid time value was encountered in reconfiguration. Unlikely to occur.                    |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemSystem.md#0x1_DiemSystem_ENOT_AN_ACTIVE_VALIDATOR">DiemSystem::ENOT_AN_ACTIVE_VALIDATOR</a></code> | The validator to be removed is not in the validator set.                                        |
+| <code><a href="_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/CoreAddresses.md#0x1_CoreAddresses_EDIEM_ROOT">CoreAddresses::EDIEM_ROOT</a></code>            | The sending account is not the Diem Root account.                                              |
+| <code><a href="_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles_EDIEM_ROOT">Roles::EDIEM_ROOT</a></code>                    | The sending account is not the Diem Root account.                                              |
+| <code><a href="_INVALID_STATE">Errors::INVALID_STATE</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemConfig.md#0x1_DiemConfig_EINVALID_BLOCK_TIME">DiemConfig::EINVALID_BLOCK_TIME</a></code>      | An invalid time value was encountered in reconfiguration. Unlikely to occur.                    |
 
 
 <a name="@Related_Scripts_169"></a>
@@ -3440,10 +3440,10 @@ is not in the validator set.
     validator_name: vector&lt;u8&gt;,
     validator_address: address
 ) {
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&dr_account, sliding_nonce);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&dr_account, sliding_nonce);
     // TODO: Use an error code from <a href="">Errors</a>.<b>move</b>
-    <b>assert</b>(<a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_get_human_name">ValidatorConfig::get_human_name</a>(validator_address) == validator_name, 0);
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemSystem.md#0x1_DiemSystem_remove_validator">DiemSystem::remove_validator</a>(&dr_account, validator_address);
+    <b>assert</b>(<a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_get_human_name">ValidatorConfig::get_human_name</a>(validator_address) == validator_name, 0);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemSystem.md#0x1_DiemSystem_remove_validator">DiemSystem::remove_validator</a>(&dr_account, validator_address);
 }
 </code></pre>
 
@@ -3456,12 +3456,12 @@ is not in the validator set.
 
 
 
-<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: dr_account};
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_RecordNonceAbortsIf">SlidingNonce::RecordNonceAbortsIf</a>{seq_nonce: sliding_nonce, account: dr_account};
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_AbortsIfNoValidatorConfig">ValidatorConfig::AbortsIfNoValidatorConfig</a>{addr: validator_address};
-<b>aborts_if</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_get_human_name">ValidatorConfig::get_human_name</a>(validator_address) != validator_name <b>with</b> 0;
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemSystem.md#0x1_DiemSystem_RemoveValidatorAbortsIf">DiemSystem::RemoveValidatorAbortsIf</a>{validator_addr: validator_address};
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemSystem.md#0x1_DiemSystem_RemoveValidatorEnsures">DiemSystem::RemoveValidatorEnsures</a>{validator_addr: validator_address};
+<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: dr_account};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_RecordNonceAbortsIf">SlidingNonce::RecordNonceAbortsIf</a>{seq_nonce: sliding_nonce, account: dr_account};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_AbortsIfNoValidatorConfig">ValidatorConfig::AbortsIfNoValidatorConfig</a>{addr: validator_address};
+<b>aborts_if</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_get_human_name">ValidatorConfig::get_human_name</a>(validator_address) != validator_name <b>with</b> 0;
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemSystem.md#0x1_DiemSystem_RemoveValidatorAbortsIf">DiemSystem::RemoveValidatorAbortsIf</a>{validator_addr: validator_address};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemSystem.md#0x1_DiemSystem_RemoveValidatorEnsures">DiemSystem::RemoveValidatorEnsures</a>{validator_addr: validator_address};
 </code></pre>
 
 
@@ -3479,7 +3479,7 @@ in practice because it aborts with NOT_PUBLISHED or REQUIRES_ADDRESS, first.
     <a href="_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a>,
     <a href="_INVALID_STATE">Errors::INVALID_STATE</a>,
     <a href="_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a>;
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemConfig.md#0x1_DiemConfig_ReconfigureEmits">DiemConfig::ReconfigureEmits</a>;
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemConfig.md#0x1_DiemConfig_ReconfigureEmits">DiemConfig::ReconfigureEmits</a>;
 </code></pre>
 
 
@@ -3487,7 +3487,7 @@ in practice because it aborts with NOT_PUBLISHED or REQUIRES_ADDRESS, first.
 Only the Diem Root account can remove Validators [[H14]][PERMISSION].
 
 
-<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_AbortsIfNotDiemRoot">Roles::AbortsIfNotDiemRoot</a>{account: dr_account};
+<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles_AbortsIfNotDiemRoot">Roles::AbortsIfNotDiemRoot</a>{account: dr_account};
 </code></pre>
 
 
@@ -3512,10 +3512,10 @@ Validator Operator account that is already registered with a validator.
 
 ###### Technical Description
 
-This updates the fields with corresponding names held in the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code>
-config resource held under <code>validator_account</code>. It then emits a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemConfig.md#0x1_DiemConfig_NewEpochEvent">DiemConfig::NewEpochEvent</a></code> to
+This updates the fields with corresponding names held in the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code>
+config resource held under <code>validator_account</code>. It then emits a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemConfig.md#0x1_DiemConfig_NewEpochEvent">DiemConfig::NewEpochEvent</a></code> to
 trigger a reconfiguration of the system.  This reconfiguration will update the validator set
-on-chain with the updated <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code>.
+on-chain with the updated <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code>.
 
 
 <a name="@Parameters_172"></a>
@@ -3525,10 +3525,10 @@ on-chain with the updated <code><a href="../../../../../../DPN/releases/artifact
 | Name                          | Type         | Description                                                                                                        |
 | ------                        | ------       | -------------                                                                                                      |
 | <code>validator_operator_account</code>  | <code>signer</code>     | Signer of the sending account. Must be the registered validator operator for the validator at <code>validator_address</code>. |
-| <code>validator_account</code>           | <code>address</code>    | The address of the validator's <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> resource being updated.                          |
-| <code>consensus_pubkey</code>            | <code>vector&lt;u8&gt;</code> | New Ed25519 public key to be used in the updated <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code>.                               |
-| <code>validator_network_addresses</code> | <code>vector&lt;u8&gt;</code> | New set of <code>validator_network_addresses</code> to be used in the updated <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code>.             |
-| <code>fullnode_network_addresses</code>  | <code>vector&lt;u8&gt;</code> | New set of <code>fullnode_network_addresses</code> to be used in the updated <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code>.              |
+| <code>validator_account</code>           | <code>address</code>    | The address of the validator's <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> resource being updated.                          |
+| <code>consensus_pubkey</code>            | <code>vector&lt;u8&gt;</code> | New Ed25519 public key to be used in the updated <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code>.                               |
+| <code>validator_network_addresses</code> | <code>vector&lt;u8&gt;</code> | New set of <code>validator_network_addresses</code> to be used in the updated <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code>.             |
+| <code>fullnode_network_addresses</code>  | <code>vector&lt;u8&gt;</code> | New set of <code>fullnode_network_addresses</code> to be used in the updated <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code>.              |
 
 
 <a name="@Common_Abort_Conditions_173"></a>
@@ -3537,11 +3537,11 @@ on-chain with the updated <code><a href="../../../../../../DPN/releases/artifact
 
 | Error Category             | Error Reason                                   | Description                                                                                           |
 | ----------------           | --------------                                 | -------------                                                                                         |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_EVALIDATOR_CONFIG">ValidatorConfig::EVALIDATOR_CONFIG</a></code>           | <code>validator_address</code> does not have a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> resource published under it.   |
-| <code><a href="_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_EVALIDATOR_OPERATOR">Roles::EVALIDATOR_OPERATOR</a></code>                   | <code>validator_operator_account</code> does not have a Validator Operator role.                                 |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_EINVALID_TRANSACTION_SENDER">ValidatorConfig::EINVALID_TRANSACTION_SENDER</a></code> | <code>validator_operator_account</code> is not the registered operator for the validator at <code>validator_address</code>. |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_EINVALID_CONSENSUS_KEY">ValidatorConfig::EINVALID_CONSENSUS_KEY</a></code>      | <code>consensus_pubkey</code> is not a valid ed25519 public key.                                                 |
-| <code><a href="_INVALID_STATE">Errors::INVALID_STATE</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemConfig.md#0x1_DiemConfig_EINVALID_BLOCK_TIME">DiemConfig::EINVALID_BLOCK_TIME</a></code>             | An invalid time value was encountered in reconfiguration. Unlikely to occur.                          |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_EVALIDATOR_CONFIG">ValidatorConfig::EVALIDATOR_CONFIG</a></code>           | <code>validator_address</code> does not have a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> resource published under it.   |
+| <code><a href="_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles_EVALIDATOR_OPERATOR">Roles::EVALIDATOR_OPERATOR</a></code>                   | <code>validator_operator_account</code> does not have a Validator Operator role.                                 |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_EINVALID_TRANSACTION_SENDER">ValidatorConfig::EINVALID_TRANSACTION_SENDER</a></code> | <code>validator_operator_account</code> is not the registered operator for the validator at <code>validator_address</code>. |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_EINVALID_CONSENSUS_KEY">ValidatorConfig::EINVALID_CONSENSUS_KEY</a></code>      | <code>consensus_pubkey</code> is not a valid ed25519 public key.                                                 |
+| <code><a href="_INVALID_STATE">Errors::INVALID_STATE</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemConfig.md#0x1_DiemConfig_EINVALID_BLOCK_TIME">DiemConfig::EINVALID_BLOCK_TIME</a></code>             | An invalid time value was encountered in reconfiguration. Unlikely to occur.                          |
 
 
 <a name="@Related_Scripts_174"></a>
@@ -3573,14 +3573,14 @@ on-chain with the updated <code><a href="../../../../../../DPN/releases/artifact
     validator_network_addresses: vector&lt;u8&gt;,
     fullnode_network_addresses: vector&lt;u8&gt;,
 ) {
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_set_config">ValidatorConfig::set_config</a>(
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_set_config">ValidatorConfig::set_config</a>(
         &validator_operator_account,
         validator_account,
         consensus_pubkey,
         validator_network_addresses,
         fullnode_network_addresses
     );
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemSystem.md#0x1_DiemSystem_update_config_and_reconfigure">DiemSystem::update_config_and_reconfigure</a>(&validator_operator_account, validator_account);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemSystem.md#0x1_DiemSystem_update_config_and_reconfigure">DiemSystem::update_config_and_reconfigure</a>(&validator_operator_account, validator_account);
  }
 </code></pre>
 
@@ -3593,31 +3593,31 @@ on-chain with the updated <code><a href="../../../../../../DPN/releases/artifact
 
 
 
-<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: validator_operator_account};
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemSystem.md#0x1_DiemSystem_UpdateConfigAndReconfigureEnsures">DiemSystem::UpdateConfigAndReconfigureEnsures</a>{validator_addr: validator_account};
-<b>ensures</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_is_valid">ValidatorConfig::is_valid</a>(validator_account);
-<b>ensures</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_spec_get_config">ValidatorConfig::spec_get_config</a>(validator_account)
-    == <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_Config">ValidatorConfig::Config</a> {
+<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: validator_operator_account};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemSystem.md#0x1_DiemSystem_UpdateConfigAndReconfigureEnsures">DiemSystem::UpdateConfigAndReconfigureEnsures</a>{validator_addr: validator_account};
+<b>ensures</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_is_valid">ValidatorConfig::is_valid</a>(validator_account);
+<b>ensures</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_spec_get_config">ValidatorConfig::spec_get_config</a>(validator_account)
+    == <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_Config">ValidatorConfig::Config</a> {
                 consensus_pubkey,
                 validator_network_addresses,
                 fullnode_network_addresses,
 };
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_SetConfigAbortsIf">ValidatorConfig::SetConfigAbortsIf</a>{validator_addr: validator_account};
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemSystem.md#0x1_DiemSystem_UpdateConfigAndReconfigureAbortsIf">DiemSystem::UpdateConfigAndReconfigureAbortsIf</a>{validator_addr: validator_account};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_SetConfigAbortsIf">ValidatorConfig::SetConfigAbortsIf</a>{validator_addr: validator_account};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemSystem.md#0x1_DiemSystem_UpdateConfigAndReconfigureAbortsIf">DiemSystem::UpdateConfigAndReconfigureAbortsIf</a>{validator_addr: validator_account};
 <b>let</b> is_validator_info_updated =
-    (<b>exists</b> v_info in <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemSystem.md#0x1_DiemSystem_spec_get_validators">DiemSystem::spec_get_validators</a>():
+    (<b>exists</b> v_info in <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemSystem.md#0x1_DiemSystem_spec_get_validators">DiemSystem::spec_get_validators</a>():
         v_info.addr == validator_account
-        && v_info.config != <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_Config">ValidatorConfig::Config</a> {
+        && v_info.config != <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_Config">ValidatorConfig::Config</a> {
                 consensus_pubkey,
                 validator_network_addresses,
                 fullnode_network_addresses,
            });
-<b>include</b> is_validator_info_updated ==&gt; <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemConfig.md#0x1_DiemConfig_ReconfigureAbortsIf">DiemConfig::ReconfigureAbortsIf</a>;
-<b>let</b> validator_index = <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemSystem.md#0x1_DiemSystem_spec_index_of_validator">DiemSystem::spec_index_of_validator</a>(<a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemSystem.md#0x1_DiemSystem_spec_get_validators">DiemSystem::spec_get_validators</a>(), validator_account);
-<b>let</b> last_config_time = <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemSystem.md#0x1_DiemSystem_spec_get_validators">DiemSystem::spec_get_validators</a>()[validator_index].last_config_update_time;
-<b>aborts_if</b> is_validator_info_updated && last_config_time &gt; <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemSystem.md#0x1_DiemSystem_MAX_U64">DiemSystem::MAX_U64</a> - <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemSystem.md#0x1_DiemSystem_FIVE_MINUTES">DiemSystem::FIVE_MINUTES</a>
+<b>include</b> is_validator_info_updated ==&gt; <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemConfig.md#0x1_DiemConfig_ReconfigureAbortsIf">DiemConfig::ReconfigureAbortsIf</a>;
+<b>let</b> validator_index = <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemSystem.md#0x1_DiemSystem_spec_index_of_validator">DiemSystem::spec_index_of_validator</a>(<a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemSystem.md#0x1_DiemSystem_spec_get_validators">DiemSystem::spec_get_validators</a>(), validator_account);
+<b>let</b> last_config_time = <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemSystem.md#0x1_DiemSystem_spec_get_validators">DiemSystem::spec_get_validators</a>()[validator_index].last_config_update_time;
+<b>aborts_if</b> is_validator_info_updated && last_config_time &gt; <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemSystem.md#0x1_DiemSystem_MAX_U64">DiemSystem::MAX_U64</a> - <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemSystem.md#0x1_DiemSystem_FIVE_MINUTES">DiemSystem::FIVE_MINUTES</a>
     <b>with</b> <a href="_LIMIT_EXCEEDED">Errors::LIMIT_EXCEEDED</a>;
-<b>aborts_if</b> is_validator_info_updated && <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemTimestamp.md#0x1_DiemTimestamp_spec_now_microseconds">DiemTimestamp::spec_now_microseconds</a>() &lt;= last_config_time + <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemSystem.md#0x1_DiemSystem_FIVE_MINUTES">DiemSystem::FIVE_MINUTES</a>
+<b>aborts_if</b> is_validator_info_updated && <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemTimestamp.md#0x1_DiemTimestamp_spec_now_microseconds">DiemTimestamp::spec_now_microseconds</a>() &lt;= last_config_time + <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemSystem.md#0x1_DiemSystem_FIVE_MINUTES">DiemSystem::FIVE_MINUTES</a>
     <b>with</b> <a href="_LIMIT_EXCEEDED">Errors::LIMIT_EXCEEDED</a>;
 </code></pre>
 
@@ -3632,7 +3632,7 @@ for which there is no useful recovery except to resubmit the transaction.
     <a href="_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a>,
     <a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>,
     <a href="_INVALID_STATE">Errors::INVALID_STATE</a>;
-<b>include</b> is_validator_info_updated ==&gt; <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemConfig.md#0x1_DiemConfig_ReconfigureEmits">DiemConfig::ReconfigureEmits</a>;
+<b>include</b> is_validator_info_updated ==&gt; <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemConfig.md#0x1_DiemConfig_ReconfigureEmits">DiemConfig::ReconfigureEmits</a>;
 </code></pre>
 
 
@@ -3642,7 +3642,7 @@ update the validator's configuration [[H15]][PERMISSION].
 
 
 <pre><code><b>aborts_if</b> <a href="_address_of">Signer::address_of</a>(validator_operator_account) !=
-            <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_get_operator">ValidatorConfig::get_operator</a>(validator_account)
+            <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_get_operator">ValidatorConfig::get_operator</a>(validator_account)
                 <b>with</b> <a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>;
 </code></pre>
 
@@ -3671,10 +3671,10 @@ Validator role.
 
 Sets the account at <code>operator_account</code> address and with the specified <code>human_name</code> as an
 operator for the sending validator account. The account at <code>operator_account</code> address must have
-a Validator Operator role and have a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_ValidatorOperatorConfig">ValidatorOperatorConfig::ValidatorOperatorConfig</a></code>
+a Validator Operator role and have a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_ValidatorOperatorConfig">ValidatorOperatorConfig::ValidatorOperatorConfig</a></code>
 resource published under it. The sending <code>account</code> must be a Validator and have a
-<code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> resource published under it. This script does not emit a
-<code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemConfig.md#0x1_DiemConfig_NewEpochEvent">DiemConfig::NewEpochEvent</a></code> and no reconfiguration of the system is initiated by this script.
+<code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> resource published under it. This script does not emit a
+<code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemConfig.md#0x1_DiemConfig_NewEpochEvent">DiemConfig::NewEpochEvent</a></code> and no reconfiguration of the system is initiated by this script.
 
 
 <a name="@Parameters_177"></a>
@@ -3694,11 +3694,11 @@ resource published under it. The sending <code>account</code> must be a Validato
 
 | Error Category             | Error Reason                                          | Description                                                                                                                                                  |
 | ----------------           | --------------                                        | -------------                                                                                                                                                |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_EVALIDATOR_OPERATOR_CONFIG">ValidatorOperatorConfig::EVALIDATOR_OPERATOR_CONFIG</a></code> | The <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_ValidatorOperatorConfig">ValidatorOperatorConfig::ValidatorOperatorConfig</a></code> resource is not published under <code>operator_account</code>.                                                   |
-| 0                          | 0                                                     | The <code>human_name</code> field of the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_ValidatorOperatorConfig">ValidatorOperatorConfig::ValidatorOperatorConfig</a></code> resource under <code>operator_account</code> does not match the provided <code>human_name</code>. |
-| <code><a href="_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_EVALIDATOR">Roles::EVALIDATOR</a></code>                                   | <code>account</code> does not have a Validator account role.                                                                                                            |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_ENOT_A_VALIDATOR_OPERATOR">ValidatorConfig::ENOT_A_VALIDATOR_OPERATOR</a></code>          | The account at <code>operator_account</code> does not have a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_ValidatorOperatorConfig">ValidatorOperatorConfig::ValidatorOperatorConfig</a></code> resource.                                               |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_EVALIDATOR_CONFIG">ValidatorConfig::EVALIDATOR_CONFIG</a></code>                  | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> is not published under <code>account</code>.                                                                                       |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_EVALIDATOR_OPERATOR_CONFIG">ValidatorOperatorConfig::EVALIDATOR_OPERATOR_CONFIG</a></code> | The <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_ValidatorOperatorConfig">ValidatorOperatorConfig::ValidatorOperatorConfig</a></code> resource is not published under <code>operator_account</code>.                                                   |
+| 0                          | 0                                                     | The <code>human_name</code> field of the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_ValidatorOperatorConfig">ValidatorOperatorConfig::ValidatorOperatorConfig</a></code> resource under <code>operator_account</code> does not match the provided <code>human_name</code>. |
+| <code><a href="_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles_EVALIDATOR">Roles::EVALIDATOR</a></code>                                   | <code>account</code> does not have a Validator account role.                                                                                                            |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_ENOT_A_VALIDATOR_OPERATOR">ValidatorConfig::ENOT_A_VALIDATOR_OPERATOR</a></code>          | The account at <code>operator_account</code> does not have a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_ValidatorOperatorConfig">ValidatorOperatorConfig::ValidatorOperatorConfig</a></code> resource.                                               |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_EVALIDATOR_CONFIG">ValidatorConfig::EVALIDATOR_CONFIG</a></code>                  | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> is not published under <code>account</code>.                                                                                       |
 
 
 <a name="@Related_Scripts_179"></a>
@@ -3728,8 +3728,8 @@ resource published under it. The sending <code>account</code> must be a Validato
     operator_name: vector&lt;u8&gt;,
     operator_account: address
 ) {
-    <b>assert</b>(<a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_get_human_name">ValidatorOperatorConfig::get_human_name</a>(operator_account) == operator_name, 0);
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_set_operator">ValidatorConfig::set_operator</a>(&account, operator_account);
+    <b>assert</b>(<a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_get_human_name">ValidatorOperatorConfig::get_human_name</a>(operator_account) == operator_name, 0);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_set_operator">ValidatorConfig::set_operator</a>(&account, operator_account);
 }
 </code></pre>
 
@@ -3743,11 +3743,11 @@ resource published under it. The sending <code>account</code> must be a Validato
 
 
 <pre><code><b>let</b> account_addr = <a href="_address_of">Signer::address_of</a>(account);
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: account};
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_AbortsIfNoValidatorConfig">ValidatorConfig::AbortsIfNoValidatorConfig</a>{addr: account_addr};
-<b>aborts_if</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_get_human_name">ValidatorOperatorConfig::get_human_name</a>(operator_account) != operator_name <b>with</b> 0;
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_SetOperatorAbortsIf">ValidatorConfig::SetOperatorAbortsIf</a>{validator_account: account, operator_addr: operator_account};
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_SetOperatorEnsures">ValidatorConfig::SetOperatorEnsures</a>{validator_account: account, operator_addr: operator_account};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: account};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_AbortsIfNoValidatorConfig">ValidatorConfig::AbortsIfNoValidatorConfig</a>{addr: account_addr};
+<b>aborts_if</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_get_human_name">ValidatorOperatorConfig::get_human_name</a>(operator_account) != operator_name <b>with</b> 0;
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_SetOperatorAbortsIf">ValidatorConfig::SetOperatorAbortsIf</a>{validator_account: account, operator_addr: operator_account};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_SetOperatorEnsures">ValidatorConfig::SetOperatorEnsures</a>{validator_account: account, operator_addr: operator_account};
 </code></pre>
 
 
@@ -3767,7 +3767,7 @@ because CapabilityHolder is published during initialization (Genesis).
 Only a Validator account can set its Validator Operator [[H16]][PERMISSION].
 
 
-<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_AbortsIfNotValidator">Roles::AbortsIfNotValidator</a>;
+<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles_AbortsIfNotValidator">Roles::AbortsIfNotValidator</a>;
 </code></pre>
 
 
@@ -3795,9 +3795,9 @@ account as a write set transaction.
 
 Sets the account at <code>operator_account</code> address and with the specified <code>human_name</code> as an
 operator for the validator <code>account</code>. The account at <code>operator_account</code> address must have a
-Validator Operator role and have a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_ValidatorOperatorConfig">ValidatorOperatorConfig::ValidatorOperatorConfig</a></code> resource
+Validator Operator role and have a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_ValidatorOperatorConfig">ValidatorOperatorConfig::ValidatorOperatorConfig</a></code> resource
 published under it. The account represented by the <code>account</code> signer must be a Validator and
-have a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> resource published under it. No reconfiguration of
+have a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> resource published under it. No reconfiguration of
 the system is initiated by this script.
 
 
@@ -3809,7 +3809,7 @@ the system is initiated by this script.
 | ------             | ------       | -------------                                                                                 |
 | <code>dr_account</code>       | <code>signer</code>     | Signer of the sending account of the write set transaction. May only be the Diem Root signer. |
 | <code>account</code>          | <code>signer</code>     | Signer of account specified in the <code>execute_as</code> field of the write set transaction.           |
-| <code>sliding_nonce</code>    | <code>u64</code>        | The <code>sliding_nonce</code> (see: <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction for Diem Root.      |
+| <code>sliding_nonce</code>    | <code>u64</code>        | The <code>sliding_nonce</code> (see: <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction for Diem Root.      |
 | <code>operator_name</code>    | <code>vector&lt;u8&gt;</code> | Validator operator's human name.                                                              |
 | <code>operator_account</code> | <code>address</code>    | Address of the validator operator account to be added as the <code>account</code> validator's operator.  |
 
@@ -3820,16 +3820,16 @@ the system is initiated by this script.
 
 | Error Category             | Error Reason                                          | Description                                                                                                                                                  |
 | ----------------           | --------------                                        | -------------                                                                                                                                                |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>                        | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code> resource is not published under <code>dr_account</code>.                                                                                               |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_OLD">SlidingNonce::ENONCE_TOO_OLD</a></code>                        | The <code>sliding_nonce</code> in <code>dr_account</code> is too old and it's impossible to determine if it's duplicated or not.                                                   |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_NEW">SlidingNonce::ENONCE_TOO_NEW</a></code>                        | The <code>sliding_nonce</code> in <code>dr_account</code> is too far in the future.                                                                                                |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_ALREADY_RECORDED">SlidingNonce::ENONCE_ALREADY_RECORDED</a></code>               | The <code>sliding_nonce</code> in<code> dr_account</code> has been previously recorded.                                                                                            |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>                        | The sending account is not the Diem Root account or Treasury Compliance account                                                                             |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_EVALIDATOR_OPERATOR_CONFIG">ValidatorOperatorConfig::EVALIDATOR_OPERATOR_CONFIG</a></code> | The <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_ValidatorOperatorConfig">ValidatorOperatorConfig::ValidatorOperatorConfig</a></code> resource is not published under <code>operator_account</code>.                                                   |
-| 0                          | 0                                                     | The <code>human_name</code> field of the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_ValidatorOperatorConfig">ValidatorOperatorConfig::ValidatorOperatorConfig</a></code> resource under <code>operator_account</code> does not match the provided <code>human_name</code>. |
-| <code><a href="_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_EVALIDATOR">Roles::EVALIDATOR</a></code>                                   | <code>account</code> does not have a Validator account role.                                                                                                            |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_ENOT_A_VALIDATOR_OPERATOR">ValidatorConfig::ENOT_A_VALIDATOR_OPERATOR</a></code>          | The account at <code>operator_account</code> does not have a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_ValidatorOperatorConfig">ValidatorOperatorConfig::ValidatorOperatorConfig</a></code> resource.                                               |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_EVALIDATOR_CONFIG">ValidatorConfig::EVALIDATOR_CONFIG</a></code>                  | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> is not published under <code>account</code>.                                                                                       |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>                        | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code> resource is not published under <code>dr_account</code>.                                                                                               |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_OLD">SlidingNonce::ENONCE_TOO_OLD</a></code>                        | The <code>sliding_nonce</code> in <code>dr_account</code> is too old and it's impossible to determine if it's duplicated or not.                                                   |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_NEW">SlidingNonce::ENONCE_TOO_NEW</a></code>                        | The <code>sliding_nonce</code> in <code>dr_account</code> is too far in the future.                                                                                                |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_ALREADY_RECORDED">SlidingNonce::ENONCE_ALREADY_RECORDED</a></code>               | The <code>sliding_nonce</code> in<code> dr_account</code> has been previously recorded.                                                                                            |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>                        | The sending account is not the Diem Root account or Treasury Compliance account                                                                             |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_EVALIDATOR_OPERATOR_CONFIG">ValidatorOperatorConfig::EVALIDATOR_OPERATOR_CONFIG</a></code> | The <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_ValidatorOperatorConfig">ValidatorOperatorConfig::ValidatorOperatorConfig</a></code> resource is not published under <code>operator_account</code>.                                                   |
+| 0                          | 0                                                     | The <code>human_name</code> field of the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_ValidatorOperatorConfig">ValidatorOperatorConfig::ValidatorOperatorConfig</a></code> resource under <code>operator_account</code> does not match the provided <code>human_name</code>. |
+| <code><a href="_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles_EVALIDATOR">Roles::EVALIDATOR</a></code>                                   | <code>account</code> does not have a Validator account role.                                                                                                            |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_ENOT_A_VALIDATOR_OPERATOR">ValidatorConfig::ENOT_A_VALIDATOR_OPERATOR</a></code>          | The account at <code>operator_account</code> does not have a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_ValidatorOperatorConfig">ValidatorOperatorConfig::ValidatorOperatorConfig</a></code> resource.                                               |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_EVALIDATOR_CONFIG">ValidatorConfig::EVALIDATOR_CONFIG</a></code>                  | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> is not published under <code>account</code>.                                                                                       |
 
 
 <a name="@Related_Scripts_184"></a>
@@ -3861,9 +3861,9 @@ the system is initiated by this script.
     operator_name: vector&lt;u8&gt;,
     operator_account: address
 ) {
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&dr_account, sliding_nonce);
-    <b>assert</b>(<a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_get_human_name">ValidatorOperatorConfig::get_human_name</a>(operator_account) == operator_name, 0);
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_set_operator">ValidatorConfig::set_operator</a>(&account, operator_account);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&dr_account, sliding_nonce);
+    <b>assert</b>(<a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_get_human_name">ValidatorOperatorConfig::get_human_name</a>(operator_account) == operator_name, 0);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_set_operator">ValidatorConfig::set_operator</a>(&account, operator_account);
 }
 </code></pre>
 
@@ -3877,12 +3877,12 @@ the system is initiated by this script.
 
 
 <pre><code><b>let</b> account_addr = <a href="_address_of">Signer::address_of</a>(account);
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: account};
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_RecordNonceAbortsIf">SlidingNonce::RecordNonceAbortsIf</a>{seq_nonce: sliding_nonce, account: dr_account};
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_AbortsIfNoValidatorConfig">ValidatorConfig::AbortsIfNoValidatorConfig</a>{addr: account_addr};
-<b>aborts_if</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_get_human_name">ValidatorOperatorConfig::get_human_name</a>(operator_account) != operator_name <b>with</b> 0;
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_SetOperatorAbortsIf">ValidatorConfig::SetOperatorAbortsIf</a>{validator_account: account, operator_addr: operator_account};
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig_SetOperatorEnsures">ValidatorConfig::SetOperatorEnsures</a>{validator_account: account, operator_addr: operator_account};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: account};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_RecordNonceAbortsIf">SlidingNonce::RecordNonceAbortsIf</a>{seq_nonce: sliding_nonce, account: dr_account};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_AbortsIfNoValidatorConfig">ValidatorConfig::AbortsIfNoValidatorConfig</a>{addr: account_addr};
+<b>aborts_if</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_get_human_name">ValidatorOperatorConfig::get_human_name</a>(operator_account) != operator_name <b>with</b> 0;
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_SetOperatorAbortsIf">ValidatorConfig::SetOperatorAbortsIf</a>{validator_account: account, operator_addr: operator_account};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig_SetOperatorEnsures">ValidatorConfig::SetOperatorEnsures</a>{validator_account: account, operator_addr: operator_account};
 <b>aborts_with</b> [check]
     0, // Odd error code in <b>assert</b> on second statement in add_validator_and_reconfigure
     <a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>,
@@ -3895,7 +3895,7 @@ the system is initiated by this script.
 Only the Diem Root account can process the admin scripts [[H9]][PERMISSION].
 
 
-<pre><code><b>requires</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_has_diem_root_role">Roles::has_diem_root_role</a>(dr_account);
+<pre><code><b>requires</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles_has_diem_root_role">Roles::has_diem_root_role</a>(dr_account);
 </code></pre>
 
 
@@ -3903,7 +3903,7 @@ This is ensured by DiemAccount::writeset_prologue.
 Only a Validator account can set its Validator Operator [[H16]][PERMISSION].
 
 
-<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_AbortsIfNotValidator">Roles::AbortsIfNotValidator</a>;
+<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles_AbortsIfNotValidator">Roles::AbortsIfNotValidator</a>;
 </code></pre>
 
 
@@ -3932,14 +3932,14 @@ module. The exact role required for a transaction is determined on a
 per-transaction basis.
 
 
-<pre><code><b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/AccountFreezing.md#0x1_AccountFreezing">0x1::AccountFreezing</a>;
-<b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem">0x1::Diem</a>;
-<b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount">0x1::DiemAccount</a>;
-<b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DualAttestation.md#0x1_DualAttestation">0x1::DualAttestation</a>;
+<pre><code><b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/AccountFreezing.md#0x1_AccountFreezing">0x1::AccountFreezing</a>;
+<b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem">0x1::Diem</a>;
+<b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount">0x1::DiemAccount</a>;
+<b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DualAttestation.md#0x1_DualAttestation">0x1::DualAttestation</a>;
 <b>use</b> <a href="">0x1::FixedPoint32</a>;
-<b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce">0x1::SlidingNonce</a>;
-<b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/TransactionFee.md#0x1_TransactionFee">0x1::TransactionFee</a>;
-<b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/VASPDomain.md#0x1_VASPDomain">0x1::VASPDomain</a>;
+<b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce">0x1::SlidingNonce</a>;
+<b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/TransactionFee.md#0x1_TransactionFee">0x1::TransactionFee</a>;
+<b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/VASPDomain.md#0x1_VASPDomain">0x1::VASPDomain</a>;
 </code></pre>
 
 
@@ -3963,13 +3963,13 @@ Can only be successfully sent by an account with Treasury Compliance role.
 
 ###### Technical Description
 
-Cancels and returns all coins held in the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_Preburn">Diem::Preburn</a>&lt;Token&gt;</code> resource under the <code>preburn_address</code> and
-return the funds to the <code>preburn_address</code> account's <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_Balance">DiemAccount::Balance</a>&lt;Token&gt;</code>.
-The transaction must be sent by an <code>account</code> with a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_BurnCapability">Diem::BurnCapability</a>&lt;Token&gt;</code>
+Cancels and returns all coins held in the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_Preburn">Diem::Preburn</a>&lt;Token&gt;</code> resource under the <code>preburn_address</code> and
+return the funds to the <code>preburn_address</code> account's <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_Balance">DiemAccount::Balance</a>&lt;Token&gt;</code>.
+The transaction must be sent by an <code>account</code> with a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_BurnCapability">Diem::BurnCapability</a>&lt;Token&gt;</code>
 resource published under it. The account at <code>preburn_address</code> must have a
-<code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_Preburn">Diem::Preburn</a>&lt;Token&gt;</code> resource published under it, and its value must be nonzero. The transaction removes
-the entire balance held in the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_Preburn">Diem::Preburn</a>&lt;Token&gt;</code> resource, and returns it back to the account's
-<code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_Balance">DiemAccount::Balance</a>&lt;Token&gt;</code> under <code>preburn_address</code>. Due to this, the account at
+<code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_Preburn">Diem::Preburn</a>&lt;Token&gt;</code> resource published under it, and its value must be nonzero. The transaction removes
+the entire balance held in the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_Preburn">Diem::Preburn</a>&lt;Token&gt;</code> resource, and returns it back to the account's
+<code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_Balance">DiemAccount::Balance</a>&lt;Token&gt;</code> under <code>preburn_address</code>. Due to this, the account at
 <code>preburn_address</code> must already have a balance in the <code>Token</code> currency published
 before this script is called otherwise the transaction will fail.
 
@@ -3979,10 +3979,10 @@ before this script is called otherwise the transaction will fail.
 ###### Events
 
 The successful execution of this transaction will emit:
-* A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_CancelBurnEvent">Diem::CancelBurnEvent</a></code> on the event handle held in the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_CurrencyInfo">Diem::CurrencyInfo</a>&lt;Token&gt;</code>
+* A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_CancelBurnEvent">Diem::CancelBurnEvent</a></code> on the event handle held in the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_CurrencyInfo">Diem::CurrencyInfo</a>&lt;Token&gt;</code>
 resource's <code>burn_events</code> published under <code>0xA550C18</code>.
-* A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_ReceivedPaymentEvent">DiemAccount::ReceivedPaymentEvent</a></code> on the <code>preburn_address</code>'s
-<code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_DiemAccount">DiemAccount::DiemAccount</a></code> <code>received_events</code> event handle with both the <code>payer</code> and <code>payee</code>
+* A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_ReceivedPaymentEvent">DiemAccount::ReceivedPaymentEvent</a></code> on the <code>preburn_address</code>'s
+<code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_DiemAccount">DiemAccount::DiemAccount</a></code> <code>received_events</code> event handle with both the <code>payer</code> and <code>payee</code>
 being <code>preburn_address</code>.
 
 
@@ -4004,13 +4004,13 @@ being <code>preburn_address</code>.
 
 | Error Category                | Error Reason                                     | Description                                                                                                                         |
 | ----------------              | --------------                                   | -------------                                                                                                                       |
-| <code><a href="_REQUIRES_CAPABILITY">Errors::REQUIRES_CAPABILITY</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_EBURN_CAPABILITY">Diem::EBURN_CAPABILITY</a></code>                         | The sending <code>account</code> does not have a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_BurnCapability">Diem::BurnCapability</a>&lt;Token&gt;</code> published under it.                                             |
-| <code><a href="_INVALID_STATE">Errors::INVALID_STATE</a></code>       | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_EPREBURN_NOT_FOUND">Diem::EPREBURN_NOT_FOUND</a></code>                       | The <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_PreburnQueue">Diem::PreburnQueue</a>&lt;Token&gt;</code> resource under <code>preburn_address</code> does not contain a preburn request with a value matching <code>amount</code>. |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>       | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_EPREBURN_QUEUE">Diem::EPREBURN_QUEUE</a></code>                           | The account at <code>preburn_address</code> does not have a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_PreburnQueue">Diem::PreburnQueue</a>&lt;Token&gt;</code> resource published under it.                           |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>       | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_ECURRENCY_INFO">Diem::ECURRENCY_INFO</a></code>                           | The specified <code>Token</code> is not a registered currency on-chain.                                                                        |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_EPAYEE_CANT_ACCEPT_CURRENCY_TYPE">DiemAccount::EPAYEE_CANT_ACCEPT_CURRENCY_TYPE</a></code>  | The account at <code>preburn_address</code> doesn't have a balance resource for <code>Token</code>.                                                       |
-| <code><a href="_LIMIT_EXCEEDED">Errors::LIMIT_EXCEEDED</a></code>      | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_EDEPOSIT_EXCEEDS_LIMITS">DiemAccount::EDEPOSIT_EXCEEDS_LIMITS</a></code>           | The depositing of the funds held in the prebun area would exceed the <code>account</code>'s account limits.                                    |
-| <code><a href="_INVALID_STATE">Errors::INVALID_STATE</a></code>       | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DualAttestation.md#0x1_DualAttestation_EPAYEE_COMPLIANCE_KEY_NOT_SET">DualAttestation::EPAYEE_COMPLIANCE_KEY_NOT_SET</a></code> | The <code>account</code> does not have a compliance key set on it but dual attestion checking was performed.                                   |
+| <code><a href="_REQUIRES_CAPABILITY">Errors::REQUIRES_CAPABILITY</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_EBURN_CAPABILITY">Diem::EBURN_CAPABILITY</a></code>                         | The sending <code>account</code> does not have a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_BurnCapability">Diem::BurnCapability</a>&lt;Token&gt;</code> published under it.                                             |
+| <code><a href="_INVALID_STATE">Errors::INVALID_STATE</a></code>       | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_EPREBURN_NOT_FOUND">Diem::EPREBURN_NOT_FOUND</a></code>                       | The <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_PreburnQueue">Diem::PreburnQueue</a>&lt;Token&gt;</code> resource under <code>preburn_address</code> does not contain a preburn request with a value matching <code>amount</code>. |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>       | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_EPREBURN_QUEUE">Diem::EPREBURN_QUEUE</a></code>                           | The account at <code>preburn_address</code> does not have a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_PreburnQueue">Diem::PreburnQueue</a>&lt;Token&gt;</code> resource published under it.                           |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>       | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_ECURRENCY_INFO">Diem::ECURRENCY_INFO</a></code>                           | The specified <code>Token</code> is not a registered currency on-chain.                                                                        |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_EPAYEE_CANT_ACCEPT_CURRENCY_TYPE">DiemAccount::EPAYEE_CANT_ACCEPT_CURRENCY_TYPE</a></code>  | The account at <code>preburn_address</code> doesn't have a balance resource for <code>Token</code>.                                                       |
+| <code><a href="_LIMIT_EXCEEDED">Errors::LIMIT_EXCEEDED</a></code>      | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_EDEPOSIT_EXCEEDS_LIMITS">DiemAccount::EDEPOSIT_EXCEEDS_LIMITS</a></code>           | The depositing of the funds held in the prebun area would exceed the <code>account</code>'s account limits.                                    |
+| <code><a href="_INVALID_STATE">Errors::INVALID_STATE</a></code>       | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DualAttestation.md#0x1_DualAttestation_EPAYEE_COMPLIANCE_KEY_NOT_SET">DualAttestation::EPAYEE_COMPLIANCE_KEY_NOT_SET</a></code> | The <code>account</code> does not have a compliance key set on it but dual attestion checking was performed.                                   |
 
 
 <a name="@Related_Scripts_191"></a>
@@ -4032,7 +4032,7 @@ being <code>preburn_address</code>.
 
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_TreasuryComplianceScripts_cancel_burn_with_amount">cancel_burn_with_amount</a>&lt;Token&gt;(account: signer, preburn_address: address, amount: u64) {
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_cancel_burn">DiemAccount::cancel_burn</a>&lt;Token&gt;(&account, preburn_address, amount)
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_cancel_burn">DiemAccount::cancel_burn</a>&lt;Token&gt;(&account, preburn_address, amount)
 }
 </code></pre>
 
@@ -4045,18 +4045,18 @@ being <code>preburn_address</code>.
 
 
 
-<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: account};
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_CancelBurnAbortsIf">DiemAccount::CancelBurnAbortsIf</a>&lt;Token&gt;;
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_CancelBurnWithCapEnsures">Diem::CancelBurnWithCapEnsures</a>&lt;Token&gt;;
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_DepositEnsures">DiemAccount::DepositEnsures</a>&lt;Token&gt;{payee: preburn_address};
-<b>let</b> total_preburn_value = <b>global</b>&lt;<a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_CurrencyInfo">Diem::CurrencyInfo</a>&lt;Token&gt;&gt;(
+<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: account};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_CancelBurnAbortsIf">DiemAccount::CancelBurnAbortsIf</a>&lt;Token&gt;;
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_CancelBurnWithCapEnsures">Diem::CancelBurnWithCapEnsures</a>&lt;Token&gt;;
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_DepositEnsures">DiemAccount::DepositEnsures</a>&lt;Token&gt;{payee: preburn_address};
+<b>let</b> total_preburn_value = <b>global</b>&lt;<a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_CurrencyInfo">Diem::CurrencyInfo</a>&lt;Token&gt;&gt;(
     @CurrencyInfo
 ).preburn_value;
-<b>let</b> post post_total_preburn_value = <b>global</b>&lt;<a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_CurrencyInfo">Diem::CurrencyInfo</a>&lt;Token&gt;&gt;(
+<b>let</b> post post_total_preburn_value = <b>global</b>&lt;<a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_CurrencyInfo">Diem::CurrencyInfo</a>&lt;Token&gt;&gt;(
     @CurrencyInfo
 ).preburn_value;
-<b>let</b> balance_at_addr = <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_balance">DiemAccount::balance</a>&lt;Token&gt;(preburn_address);
-<b>let</b> post post_balance_at_addr = <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_balance">DiemAccount::balance</a>&lt;Token&gt;(preburn_address);
+<b>let</b> balance_at_addr = <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_balance">DiemAccount::balance</a>&lt;Token&gt;(preburn_address);
+<b>let</b> post post_balance_at_addr = <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_balance">DiemAccount::balance</a>&lt;Token&gt;(preburn_address);
 </code></pre>
 
 
@@ -4071,8 +4071,8 @@ The balance of <code>Token</code> at <code>preburn_address</code> should increas
 
 
 <pre><code><b>ensures</b> post_balance_at_addr == balance_at_addr + amount;
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_CancelBurnWithCapEmits">Diem::CancelBurnWithCapEmits</a>&lt;Token&gt;;
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_DepositEmits">DiemAccount::DepositEmits</a>&lt;Token&gt;{
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_CancelBurnWithCapEmits">Diem::CancelBurnWithCapEmits</a>&lt;Token&gt;;
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_DepositEmits">DiemAccount::DepositEmits</a>&lt;Token&gt;{
     payer: preburn_address,
     payee: preburn_address,
     amount: amount,
@@ -4091,7 +4091,7 @@ The balance of <code>Token</code> at <code>preburn_address</code> should increas
 Only the account with the burn capability can cancel burning [[H3]][PERMISSION].
 
 
-<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_AbortsIfNoBurnCapability">Diem::AbortsIfNoBurnCapability</a>&lt;Token&gt;{account: account};
+<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_AbortsIfNoBurnCapability">Diem::AbortsIfNoBurnCapability</a>&lt;Token&gt;{account: account};
 </code></pre>
 
 
@@ -4121,14 +4121,14 @@ Dealer, but there are no enforced requirements that it be one.
 ###### Technical Description
 
 This transaction permanently destroys all the coins of <code>Token</code> type
-stored in the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_Preburn">Diem::Preburn</a>&lt;Token&gt;</code> resource published under the
+stored in the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_Preburn">Diem::Preburn</a>&lt;Token&gt;</code> resource published under the
 <code>preburn_address</code> account address.
 
 This transaction will only succeed if the sending <code>account</code> has a
-<code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_BurnCapability">Diem::BurnCapability</a>&lt;Token&gt;</code>, and a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_Preburn">Diem::Preburn</a>&lt;Token&gt;</code> resource
+<code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_BurnCapability">Diem::BurnCapability</a>&lt;Token&gt;</code>, and a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_Preburn">Diem::Preburn</a>&lt;Token&gt;</code> resource
 exists under <code>preburn_address</code>, with a non-zero <code>to_burn</code> field. After the successful execution
 of this transaction the <code>total_value</code> field in the
-<code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_CurrencyInfo">Diem::CurrencyInfo</a>&lt;Token&gt;</code> resource published under <code>0xA550C18</code> will be
+<code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_CurrencyInfo">Diem::CurrencyInfo</a>&lt;Token&gt;</code> resource published under <code>0xA550C18</code> will be
 decremented by the value of the <code>to_burn</code> field of the preburn resource
 under <code>preburn_address</code> immediately before this transaction, and the
 <code>to_burn</code> field of the preburn resource will have a zero value.
@@ -4138,8 +4138,8 @@ under <code>preburn_address</code> immediately before this transaction, and the
 
 ###### Events
 
-The successful execution of this transaction will emit a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_BurnEvent">Diem::BurnEvent</a></code> on the event handle
-held in the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_CurrencyInfo">Diem::CurrencyInfo</a>&lt;Token&gt;</code> resource's <code>burn_events</code> published under
+The successful execution of this transaction will emit a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_BurnEvent">Diem::BurnEvent</a></code> on the event handle
+held in the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_CurrencyInfo">Diem::CurrencyInfo</a>&lt;Token&gt;</code> resource's <code>burn_events</code> published under
 <code>0xA550C18</code>.
 
 
@@ -4151,7 +4151,7 @@ held in the <code><a href="../../../../../../DPN/releases/artifacts/current/docs
 | ------            | ------    | -------------                                                                                                      |
 | <code>Token</code>           | Type      | The Move type for the <code>Token</code> currency being burned. <code>Token</code> must be an already-registered currency on-chain.      |
 | <code>tc_account</code>      | <code>signer</code>  | The signer of the sending account of this transaction, must have a burn capability for <code>Token</code> published under it. |
-| <code>sliding_nonce</code>   | <code>u64</code>     | The <code>sliding_nonce</code> (see: <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction.                                         |
+| <code>sliding_nonce</code>   | <code>u64</code>     | The <code>sliding_nonce</code> (see: <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction.                                         |
 | <code>preburn_address</code> | <code>address</code> | The address where the coins to-be-burned are currently held.                                                       |
 | <code>amount</code>          | <code>u64</code>     | The amount to be burned.                                                                                           |
 
@@ -4162,14 +4162,14 @@ held in the <code><a href="../../../../../../DPN/releases/artifacts/current/docs
 
 | Error Category                | Error Reason                            | Description                                                                                                                         |
 | ----------------              | --------------                          | -------------                                                                                                                       |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>       | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>          | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code> resource is not published under <code>account</code>.                                                                         |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_OLD">SlidingNonce::ENONCE_TOO_OLD</a></code>          | The <code>sliding_nonce</code> is too old and it's impossible to determine if it's duplicated or not.                                          |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_NEW">SlidingNonce::ENONCE_TOO_NEW</a></code>          | The <code>sliding_nonce</code> is too far in the future.                                                                                       |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_ALREADY_RECORDED">SlidingNonce::ENONCE_ALREADY_RECORDED</a></code> | The <code>sliding_nonce</code> has been previously recorded.                                                                                   |
-| <code><a href="_REQUIRES_CAPABILITY">Errors::REQUIRES_CAPABILITY</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_EBURN_CAPABILITY">Diem::EBURN_CAPABILITY</a></code>                | The sending <code>account</code> does not have a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_BurnCapability">Diem::BurnCapability</a>&lt;Token&gt;</code> published under it.                                             |
-| <code><a href="_INVALID_STATE">Errors::INVALID_STATE</a></code>       | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_EPREBURN_NOT_FOUND">Diem::EPREBURN_NOT_FOUND</a></code>              | The <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_PreburnQueue">Diem::PreburnQueue</a>&lt;Token&gt;</code> resource under <code>preburn_address</code> does not contain a preburn request with a value matching <code>amount</code>. |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>       | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_EPREBURN_QUEUE">Diem::EPREBURN_QUEUE</a></code>                  | The account at <code>preburn_address</code> does not have a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_PreburnQueue">Diem::PreburnQueue</a>&lt;Token&gt;</code> resource published under it.                           |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>       | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_ECURRENCY_INFO">Diem::ECURRENCY_INFO</a></code>                  | The specified <code>Token</code> is not a registered currency on-chain.                                                                        |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>       | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>          | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code> resource is not published under <code>account</code>.                                                                         |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_OLD">SlidingNonce::ENONCE_TOO_OLD</a></code>          | The <code>sliding_nonce</code> is too old and it's impossible to determine if it's duplicated or not.                                          |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_NEW">SlidingNonce::ENONCE_TOO_NEW</a></code>          | The <code>sliding_nonce</code> is too far in the future.                                                                                       |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_ALREADY_RECORDED">SlidingNonce::ENONCE_ALREADY_RECORDED</a></code> | The <code>sliding_nonce</code> has been previously recorded.                                                                                   |
+| <code><a href="_REQUIRES_CAPABILITY">Errors::REQUIRES_CAPABILITY</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_EBURN_CAPABILITY">Diem::EBURN_CAPABILITY</a></code>                | The sending <code>account</code> does not have a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_BurnCapability">Diem::BurnCapability</a>&lt;Token&gt;</code> published under it.                                             |
+| <code><a href="_INVALID_STATE">Errors::INVALID_STATE</a></code>       | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_EPREBURN_NOT_FOUND">Diem::EPREBURN_NOT_FOUND</a></code>              | The <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_PreburnQueue">Diem::PreburnQueue</a>&lt;Token&gt;</code> resource under <code>preburn_address</code> does not contain a preburn request with a value matching <code>amount</code>. |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>       | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_EPREBURN_QUEUE">Diem::EPREBURN_QUEUE</a></code>                  | The account at <code>preburn_address</code> does not have a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_PreburnQueue">Diem::PreburnQueue</a>&lt;Token&gt;</code> resource published under it.                           |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>       | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_ECURRENCY_INFO">Diem::ECURRENCY_INFO</a></code>                  | The specified <code>Token</code> is not a registered currency on-chain.                                                                        |
 
 
 <a name="@Related_Scripts_197"></a>
@@ -4191,8 +4191,8 @@ held in the <code><a href="../../../../../../DPN/releases/artifacts/current/docs
 
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_TreasuryComplianceScripts_burn_with_amount">burn_with_amount</a>&lt;Token&gt;(account: signer, sliding_nonce: u64, preburn_address: address, amount: u64) {
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&account, sliding_nonce);
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_burn">Diem::burn</a>&lt;Token&gt;(&account, preburn_address, amount)
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&account, sliding_nonce);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_burn">Diem::burn</a>&lt;Token&gt;(&account, preburn_address, amount)
 }
 </code></pre>
 
@@ -4205,17 +4205,17 @@ held in the <code><a href="../../../../../../DPN/releases/artifacts/current/docs
 
 
 
-<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: account};
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_RecordNonceAbortsIf">SlidingNonce::RecordNonceAbortsIf</a>{ seq_nonce: sliding_nonce };
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_BurnAbortsIf">Diem::BurnAbortsIf</a>&lt;Token&gt;;
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_BurnEnsures">Diem::BurnEnsures</a>&lt;Token&gt;;
+<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: account};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_RecordNonceAbortsIf">SlidingNonce::RecordNonceAbortsIf</a>{ seq_nonce: sliding_nonce };
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_BurnAbortsIf">Diem::BurnAbortsIf</a>&lt;Token&gt;;
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_BurnEnsures">Diem::BurnEnsures</a>&lt;Token&gt;;
 <b>aborts_with</b> [check]
     <a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>,
     <a href="_REQUIRES_CAPABILITY">Errors::REQUIRES_CAPABILITY</a>,
     <a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a>,
     <a href="_INVALID_STATE">Errors::INVALID_STATE</a>,
     <a href="_LIMIT_EXCEEDED">Errors::LIMIT_EXCEEDED</a>;
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_BurnWithResourceCapEmits">Diem::BurnWithResourceCapEmits</a>&lt;Token&gt;{preburn: <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_spec_make_preburn">Diem::spec_make_preburn</a>(amount)};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_BurnWithResourceCapEmits">Diem::BurnWithResourceCapEmits</a>&lt;Token&gt;{preburn: <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_spec_make_preburn">Diem::spec_make_preburn</a>(amount)};
 </code></pre>
 
 
@@ -4223,7 +4223,7 @@ held in the <code><a href="../../../../../../DPN/releases/artifacts/current/docs
 Only the account with the burn capability can burn coins [[H3]][PERMISSION].
 
 
-<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_AbortsIfNoBurnCapability">Diem::AbortsIfNoBurnCapability</a>&lt;Token&gt;{account: account};
+<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_AbortsIfNoBurnCapability">Diem::AbortsIfNoBurnCapability</a>&lt;Token&gt;{account: account};
 </code></pre>
 
 
@@ -4250,7 +4250,7 @@ in the specified currency.
 ###### Technical Description
 
 Moves the specified <code>amount</code> of coins in <code>Token</code> currency from the sending <code>account</code>'s
-<code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_Balance">DiemAccount::Balance</a>&lt;Token&gt;</code> to the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_Preburn">Diem::Preburn</a>&lt;Token&gt;</code> published under the same
+<code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_Balance">DiemAccount::Balance</a>&lt;Token&gt;</code> to the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_Preburn">Diem::Preburn</a>&lt;Token&gt;</code> published under the same
 <code>account</code>. <code>account</code> must have both of these resources published under it at the start of this
 transaction in order for it to execute successfully.
 
@@ -4260,10 +4260,10 @@ transaction in order for it to execute successfully.
 ###### Events
 
 Successful execution of this script emits two events:
-* <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_SentPaymentEvent">DiemAccount::SentPaymentEvent</a> </code> on <code>account</code>'s <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_DiemAccount">DiemAccount::DiemAccount</a></code> <code>sent_events</code>
+* <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_SentPaymentEvent">DiemAccount::SentPaymentEvent</a> </code> on <code>account</code>'s <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_DiemAccount">DiemAccount::DiemAccount</a></code> <code>sent_events</code>
 handle with the <code>payee</code> and <code>payer</code> fields being <code>account</code>'s address; and
-* A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_PreburnEvent">Diem::PreburnEvent</a></code> with <code>Token</code>'s currency code on the
-<code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_CurrencyInfo">Diem::CurrencyInfo</a>&lt;Token</code>'s <code>preburn_events</code> handle for <code>Token</code> and with
+* A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_PreburnEvent">Diem::PreburnEvent</a></code> with <code>Token</code>'s currency code on the
+<code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_CurrencyInfo">Diem::CurrencyInfo</a>&lt;Token</code>'s <code>preburn_events</code> handle for <code>Token</code> and with
 <code>preburn_address</code> set to <code>account</code>'s address.
 
 
@@ -4284,14 +4284,14 @@ handle with the <code>payee</code> and <code>payer</code> fields being <code>acc
 
 | Error Category           | Error Reason                                             | Description                                                                             |
 | ----------------         | --------------                                           | -------------                                                                           |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_ECURRENCY_INFO">Diem::ECURRENCY_INFO</a></code>                                  | The <code>Token</code> is not a registered currency on-chain.                                      |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_ECURRENCY_INFO">Diem::ECURRENCY_INFO</a></code>                                  | The <code>Token</code> is not a registered currency on-chain.                                      |
 | <code><a href="_INVALID_STATE">Errors::INVALID_STATE</a></code>  | <code>DiemAccount::EWITHDRAWAL_CAPABILITY_ALREADY_EXTRACTED</code> | The withdrawal capability for <code>account</code> has already been extracted.                     |
-| <code><a href="_LIMIT_EXCEEDED">Errors::LIMIT_EXCEEDED</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_EINSUFFICIENT_BALANCE">DiemAccount::EINSUFFICIENT_BALANCE</a></code>                    | <code>amount</code> is greater than <code>payer</code>'s balance in <code>Token</code>.                                  |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_EPAYER_DOESNT_HOLD_CURRENCY">DiemAccount::EPAYER_DOESNT_HOLD_CURRENCY</a></code>              | <code>account</code> doesn't hold a balance in <code>Token</code>.                                            |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_EPREBURN">Diem::EPREBURN</a></code>                                        | <code>account</code> doesn't have a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_Preburn">Diem::Preburn</a>&lt;Token&gt;</code> resource published under it.           |
-| <code><a href="_INVALID_STATE">Errors::INVALID_STATE</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_EPREBURN_OCCUPIED">Diem::EPREBURN_OCCUPIED</a></code>                               | The <code>value</code> field in the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_Preburn">Diem::Preburn</a>&lt;Token&gt;</code> resource under the sender is non-zero. |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_EROLE_ID">Roles::EROLE_ID</a></code>                                        | The <code>account</code> did not have a role assigned to it.                                       |
-| <code><a href="_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_EDESIGNATED_DEALER">Roles::EDESIGNATED_DEALER</a></code>                              | The <code>account</code> did not have the role of DesignatedDealer.                                |
+| <code><a href="_LIMIT_EXCEEDED">Errors::LIMIT_EXCEEDED</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_EINSUFFICIENT_BALANCE">DiemAccount::EINSUFFICIENT_BALANCE</a></code>                    | <code>amount</code> is greater than <code>payer</code>'s balance in <code>Token</code>.                                  |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_EPAYER_DOESNT_HOLD_CURRENCY">DiemAccount::EPAYER_DOESNT_HOLD_CURRENCY</a></code>              | <code>account</code> doesn't hold a balance in <code>Token</code>.                                            |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_EPREBURN">Diem::EPREBURN</a></code>                                        | <code>account</code> doesn't have a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_Preburn">Diem::Preburn</a>&lt;Token&gt;</code> resource published under it.           |
+| <code><a href="_INVALID_STATE">Errors::INVALID_STATE</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_EPREBURN_OCCUPIED">Diem::EPREBURN_OCCUPIED</a></code>                               | The <code>value</code> field in the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_Preburn">Diem::Preburn</a>&lt;Token&gt;</code> resource under the sender is non-zero. |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles_EROLE_ID">Roles::EROLE_ID</a></code>                                        | The <code>account</code> did not have a role assigned to it.                                       |
+| <code><a href="_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a></code>  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles_EDESIGNATED_DEALER">Roles::EDESIGNATED_DEALER</a></code>                              | The <code>account</code> did not have the role of DesignatedDealer.                                |
 
 
 <a name="@Related_Scripts_203"></a>
@@ -4313,9 +4313,9 @@ handle with the <code>payee</code> and <code>payer</code> fields being <code>acc
 
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_TreasuryComplianceScripts_preburn">preburn</a>&lt;Token&gt;(account: signer, amount: u64) {
-    <b>let</b> withdraw_cap = <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_extract_withdraw_capability">DiemAccount::extract_withdraw_capability</a>(&account);
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_preburn">DiemAccount::preburn</a>&lt;Token&gt;(&account, &withdraw_cap, amount);
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_restore_withdraw_capability">DiemAccount::restore_withdraw_capability</a>(withdraw_cap);
+    <b>let</b> withdraw_cap = <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_extract_withdraw_capability">DiemAccount::extract_withdraw_capability</a>(&account);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_preburn">DiemAccount::preburn</a>&lt;Token&gt;(&account, &withdraw_cap, amount);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_restore_withdraw_capability">DiemAccount::restore_withdraw_capability</a>(withdraw_cap);
 }
 </code></pre>
 
@@ -4328,13 +4328,13 @@ handle with the <code>payee</code> and <code>payer</code> fields being <code>acc
 
 
 
-<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: account};
+<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: account};
 <b>let</b> account_addr = <a href="_spec_address_of">Signer::spec_address_of</a>(account);
-<b>let</b> cap = <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_spec_get_withdraw_cap">DiemAccount::spec_get_withdraw_cap</a>(account_addr);
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_ExtractWithdrawCapAbortsIf">DiemAccount::ExtractWithdrawCapAbortsIf</a>{sender_addr: account_addr};
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_PreburnAbortsIf">DiemAccount::PreburnAbortsIf</a>&lt;Token&gt;{dd: account, cap: cap};
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_PreburnEnsures">DiemAccount::PreburnEnsures</a>&lt;Token&gt;{dd: account, payer: account_addr};
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_PreburnEmits">DiemAccount::PreburnEmits</a>&lt;Token&gt;{dd: account, cap: cap};
+<b>let</b> cap = <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_spec_get_withdraw_cap">DiemAccount::spec_get_withdraw_cap</a>(account_addr);
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_ExtractWithdrawCapAbortsIf">DiemAccount::ExtractWithdrawCapAbortsIf</a>{sender_addr: account_addr};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_PreburnAbortsIf">DiemAccount::PreburnAbortsIf</a>&lt;Token&gt;{dd: account, cap: cap};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_PreburnEnsures">DiemAccount::PreburnEnsures</a>&lt;Token&gt;{dd: account, payer: account_addr};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_PreburnEmits">DiemAccount::PreburnEmits</a>&lt;Token&gt;{dd: account, cap: cap};
 <b>aborts_with</b> [check]
     <a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a>,
     <a href="_INVALID_STATE">Errors::INVALID_STATE</a>,
@@ -4347,7 +4347,7 @@ handle with the <code>payee</code> and <code>payer</code> fields being <code>acc
 Only the account with a Preburn resource or PreburnQueue resource can preburn [[H4]][PERMISSION].
 
 
-<pre><code><b>aborts_if</b> !(<b>exists</b>&lt;<a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_Preburn">Diem::Preburn</a>&lt;Token&gt;&gt;(account_addr) || <b>exists</b>&lt;<a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_PreburnQueue">Diem::PreburnQueue</a>&lt;Token&gt;&gt;(account_addr));
+<pre><code><b>aborts_if</b> !(<b>exists</b>&lt;<a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_Preburn">Diem::Preburn</a>&lt;Token&gt;&gt;(account_addr) || <b>exists</b>&lt;<a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_PreburnQueue">Diem::PreburnQueue</a>&lt;Token&gt;&gt;(account_addr));
 </code></pre>
 
 
@@ -4377,7 +4377,7 @@ association may reclaim the backing coins. Once this transaction has executed
 successfully all transaction fees that will have been collected in
 <code>CoinType</code> since the last time this script was called with that specific
 currency. Both <code>balance</code> and <code>preburn</code> fields in the
-<code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/TransactionFee.md#0x1_TransactionFee_TransactionFee">TransactionFee::TransactionFee</a>&lt;CoinType&gt;</code> resource published under the <code>0xB1E55ED</code>
+<code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/TransactionFee.md#0x1_TransactionFee_TransactionFee">TransactionFee::TransactionFee</a>&lt;CoinType&gt;</code> resource published under the <code>0xB1E55ED</code>
 account address will have a value of 0 after the successful execution of this script.
 
 
@@ -4385,8 +4385,8 @@ account address will have a value of 0 after the successful execution of this sc
 
 ###### Events
 
-The successful execution of this transaction will emit a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_BurnEvent">Diem::BurnEvent</a></code> on the event handle
-held in the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_CurrencyInfo">Diem::CurrencyInfo</a>&lt;CoinType&gt;</code> resource's <code>burn_events</code> published under
+The successful execution of this transaction will emit a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_BurnEvent">Diem::BurnEvent</a></code> on the event handle
+held in the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_CurrencyInfo">Diem::CurrencyInfo</a>&lt;CoinType&gt;</code> resource's <code>burn_events</code> published under
 <code>0xA550C18</code>.
 
 
@@ -4406,9 +4406,9 @@ held in the <code><a href="../../../../../../DPN/releases/artifacts/current/docs
 
 | Error Category             | Error Reason                          | Description                                                 |
 | ----------------           | --------------                        | -------------                                               |
-| <code><a href="_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/CoreAddresses.md#0x1_CoreAddresses_ETREASURY_COMPLIANCE">CoreAddresses::ETREASURY_COMPLIANCE</a></code> | The sending account is not the Treasury Compliance account. |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/TransactionFee.md#0x1_TransactionFee_ETRANSACTION_FEE">TransactionFee::ETRANSACTION_FEE</a></code>    | <code>CoinType</code> is not an accepted transaction fee currency.     |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_ECOIN">Diem::ECOIN</a></code>                        | The collected fees in <code>CoinType</code> are zero.                  |
+| <code><a href="_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/CoreAddresses.md#0x1_CoreAddresses_ETREASURY_COMPLIANCE">CoreAddresses::ETREASURY_COMPLIANCE</a></code> | The sending account is not the Treasury Compliance account. |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/TransactionFee.md#0x1_TransactionFee_ETRANSACTION_FEE">TransactionFee::ETRANSACTION_FEE</a></code>    | <code>CoinType</code> is not an accepted transaction fee currency.     |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_ECOIN">Diem::ECOIN</a></code>                        | The collected fees in <code>CoinType</code> are zero.                  |
 
 
 <a name="@Related_Scripts_209"></a>
@@ -4429,7 +4429,7 @@ held in the <code><a href="../../../../../../DPN/releases/artifacts/current/docs
 
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_TreasuryComplianceScripts_burn_txn_fees">burn_txn_fees</a>&lt;CoinType&gt;(tc_account: signer) {
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/TransactionFee.md#0x1_TransactionFee_burn_fees">TransactionFee::burn_fees</a>&lt;CoinType&gt;(&tc_account);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/TransactionFee.md#0x1_TransactionFee_burn_fees">TransactionFee::burn_fees</a>&lt;CoinType&gt;(&tc_account);
 }
 </code></pre>
 
@@ -4469,11 +4469,11 @@ receiver an authorized Designated Dealer account.
 ###### Events
 
 Successful execution of the transaction will emit two events:
-* A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_MintEvent">Diem::MintEvent</a></code> with the amount and currency code minted is emitted on the
-<code>mint_event_handle</code> in the stored <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_CurrencyInfo">Diem::CurrencyInfo</a>&lt;CoinType&gt;</code> resource stored under
+* A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_MintEvent">Diem::MintEvent</a></code> with the amount and currency code minted is emitted on the
+<code>mint_event_handle</code> in the stored <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_CurrencyInfo">Diem::CurrencyInfo</a>&lt;CoinType&gt;</code> resource stored under
 <code>0xA550C18</code>; and
-* A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DesignatedDealer.md#0x1_DesignatedDealer_ReceivedMintEvent">DesignatedDealer::ReceivedMintEvent</a></code> with the amount, currency code, and Designated
-Dealer's address is emitted on the <code>mint_event_handle</code> in the stored <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DesignatedDealer.md#0x1_DesignatedDealer_Dealer">DesignatedDealer::Dealer</a></code>
+* A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DesignatedDealer.md#0x1_DesignatedDealer_ReceivedMintEvent">DesignatedDealer::ReceivedMintEvent</a></code> with the amount, currency code, and Designated
+Dealer's address is emitted on the <code>mint_event_handle</code> in the stored <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DesignatedDealer.md#0x1_DesignatedDealer_Dealer">DesignatedDealer::Dealer</a></code>
 resource published under the <code>designated_dealer_address</code>.
 
 
@@ -4485,7 +4485,7 @@ resource published under the <code>designated_dealer_address</code>.
 | ------                      | ------    | -------------                                                                                              |
 | <code>CoinType</code>                  | Type      | The Move type for the <code>CoinType</code> being minted. <code>CoinType</code> must be an already-registered currency on-chain. |
 | <code>tc_account</code>                | <code>signer</code>  | The signer of the sending account of this transaction. Must be the Treasury Compliance account.            |
-| <code>sliding_nonce</code>             | <code>u64</code>     | The <code>sliding_nonce</code> (see: <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction.                                 |
+| <code>sliding_nonce</code>             | <code>u64</code>     | The <code>sliding_nonce</code> (see: <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction.                                 |
 | <code>designated_dealer_address</code> | <code>address</code> | The address of the Designated Dealer account being minted to.                                              |
 | <code>mint_amount</code>               | <code>u64</code>     | The number of coins to be minted.                                                                          |
 | <code>tier_index</code>                | <code>u64</code>     | [Deprecated] The mint tier index to use for the Designated Dealer account. Will be ignored                 |
@@ -4497,17 +4497,17 @@ resource published under the <code>designated_dealer_address</code>.
 
 | Error Category                | Error Reason                                 | Description                                                                                                                  |
 | ----------------              | --------------                               | -------------                                                                                                                |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>       | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>               | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code> resource is not published under <code>tc_account</code>.                                                               |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_OLD">SlidingNonce::ENONCE_TOO_OLD</a></code>               | The <code>sliding_nonce</code> is too old and it's impossible to determine if it's duplicated or not.                                   |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_NEW">SlidingNonce::ENONCE_TOO_NEW</a></code>               | The <code>sliding_nonce</code> is too far in the future.                                                                                |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_ALREADY_RECORDED">SlidingNonce::ENONCE_ALREADY_RECORDED</a></code>      | The <code>sliding_nonce</code> has been previously recorded.                                                                            |
-| <code><a href="_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/CoreAddresses.md#0x1_CoreAddresses_ETREASURY_COMPLIANCE">CoreAddresses::ETREASURY_COMPLIANCE</a></code>        | <code>tc_account</code> is not the Treasury Compliance account.                                                                         |
-| <code><a href="_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a></code>       | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_ETREASURY_COMPLIANCE">Roles::ETREASURY_COMPLIANCE</a></code>                | <code>tc_account</code> is not the Treasury Compliance account.                                                                         |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DesignatedDealer.md#0x1_DesignatedDealer_EINVALID_MINT_AMOUNT">DesignatedDealer::EINVALID_MINT_AMOUNT</a></code>     | <code>mint_amount</code> is zero.                                                                                                       |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>       | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DesignatedDealer.md#0x1_DesignatedDealer_EDEALER">DesignatedDealer::EDEALER</a></code>                  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DesignatedDealer.md#0x1_DesignatedDealer_Dealer">DesignatedDealer::Dealer</a></code> or <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DesignatedDealer.md#0x1_DesignatedDealer_TierInfo">DesignatedDealer::TierInfo</a>&lt;CoinType&gt;</code> resource does not exist at <code>designated_dealer_address</code>. |
-| <code><a href="_REQUIRES_CAPABILITY">Errors::REQUIRES_CAPABILITY</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_EMINT_CAPABILITY">Diem::EMINT_CAPABILITY</a></code>                    | <code>tc_account</code> does not have a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_MintCapability">Diem::MintCapability</a>&lt;CoinType&gt;</code> resource published under it.                                  |
-| <code><a href="_INVALID_STATE">Errors::INVALID_STATE</a></code>       | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_EMINTING_NOT_ALLOWED">Diem::EMINTING_NOT_ALLOWED</a></code>                | Minting is not currently allowed for <code>CoinType</code> coins.                                                                       |
-| <code><a href="_LIMIT_EXCEEDED">Errors::LIMIT_EXCEEDED</a></code>      | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_EDEPOSIT_EXCEEDS_LIMITS">DiemAccount::EDEPOSIT_EXCEEDS_LIMITS</a></code>      | The depositing of the funds would exceed the <code>account</code>'s account limits.                                                     |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>       | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>               | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code> resource is not published under <code>tc_account</code>.                                                               |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_OLD">SlidingNonce::ENONCE_TOO_OLD</a></code>               | The <code>sliding_nonce</code> is too old and it's impossible to determine if it's duplicated or not.                                   |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_NEW">SlidingNonce::ENONCE_TOO_NEW</a></code>               | The <code>sliding_nonce</code> is too far in the future.                                                                                |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_ALREADY_RECORDED">SlidingNonce::ENONCE_ALREADY_RECORDED</a></code>      | The <code>sliding_nonce</code> has been previously recorded.                                                                            |
+| <code><a href="_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/CoreAddresses.md#0x1_CoreAddresses_ETREASURY_COMPLIANCE">CoreAddresses::ETREASURY_COMPLIANCE</a></code>        | <code>tc_account</code> is not the Treasury Compliance account.                                                                         |
+| <code><a href="_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a></code>       | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles_ETREASURY_COMPLIANCE">Roles::ETREASURY_COMPLIANCE</a></code>                | <code>tc_account</code> is not the Treasury Compliance account.                                                                         |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DesignatedDealer.md#0x1_DesignatedDealer_EINVALID_MINT_AMOUNT">DesignatedDealer::EINVALID_MINT_AMOUNT</a></code>     | <code>mint_amount</code> is zero.                                                                                                       |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>       | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DesignatedDealer.md#0x1_DesignatedDealer_EDEALER">DesignatedDealer::EDEALER</a></code>                  | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DesignatedDealer.md#0x1_DesignatedDealer_Dealer">DesignatedDealer::Dealer</a></code> or <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DesignatedDealer.md#0x1_DesignatedDealer_TierInfo">DesignatedDealer::TierInfo</a>&lt;CoinType&gt;</code> resource does not exist at <code>designated_dealer_address</code>. |
+| <code><a href="_REQUIRES_CAPABILITY">Errors::REQUIRES_CAPABILITY</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_EMINT_CAPABILITY">Diem::EMINT_CAPABILITY</a></code>                    | <code>tc_account</code> does not have a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_MintCapability">Diem::MintCapability</a>&lt;CoinType&gt;</code> resource published under it.                                  |
+| <code><a href="_INVALID_STATE">Errors::INVALID_STATE</a></code>       | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_EMINTING_NOT_ALLOWED">Diem::EMINTING_NOT_ALLOWED</a></code>                | Minting is not currently allowed for <code>CoinType</code> coins.                                                                       |
+| <code><a href="_LIMIT_EXCEEDED">Errors::LIMIT_EXCEEDED</a></code>      | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_EDEPOSIT_EXCEEDS_LIMITS">DiemAccount::EDEPOSIT_EXCEEDS_LIMITS</a></code>      | The depositing of the funds would exceed the <code>account</code>'s account limits.                                                     |
 
 
 <a name="@Related_Scripts_215"></a>
@@ -4535,8 +4535,8 @@ resource published under the <code>designated_dealer_address</code>.
     mint_amount: u64,
     tier_index: u64
 ) {
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&tc_account, sliding_nonce);
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_tiered_mint">DiemAccount::tiered_mint</a>&lt;CoinType&gt;(
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&tc_account, sliding_nonce);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_tiered_mint">DiemAccount::tiered_mint</a>&lt;CoinType&gt;(
         &tc_account, designated_dealer_address, mint_amount, tier_index
     );
 }
@@ -4551,10 +4551,10 @@ resource published under the <code>designated_dealer_address</code>.
 
 
 
-<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: tc_account};
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_RecordNonceAbortsIf">SlidingNonce::RecordNonceAbortsIf</a>{account: tc_account, seq_nonce: sliding_nonce};
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_TieredMintAbortsIf">DiemAccount::TieredMintAbortsIf</a>&lt;CoinType&gt;;
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_TieredMintEnsures">DiemAccount::TieredMintEnsures</a>&lt;CoinType&gt;;
+<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: tc_account};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_RecordNonceAbortsIf">SlidingNonce::RecordNonceAbortsIf</a>{account: tc_account, seq_nonce: sliding_nonce};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_TieredMintAbortsIf">DiemAccount::TieredMintAbortsIf</a>&lt;CoinType&gt;;
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_TieredMintEnsures">DiemAccount::TieredMintEnsures</a>&lt;CoinType&gt;;
 <b>aborts_with</b> [check]
     <a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>,
     <a href="_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a>,
@@ -4563,7 +4563,7 @@ resource published under the <code>designated_dealer_address</code>.
     <a href="_INVALID_STATE">Errors::INVALID_STATE</a>,
     <a href="_LIMIT_EXCEEDED">Errors::LIMIT_EXCEEDED</a>,
     <a href="_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a>;
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_TieredMintEmits">DiemAccount::TieredMintEmits</a>&lt;CoinType&gt;;
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_TieredMintEmits">DiemAccount::TieredMintEmits</a>&lt;CoinType&gt;;
 </code></pre>
 
 
@@ -4571,7 +4571,7 @@ resource published under the <code>designated_dealer_address</code>.
 Only the Treasury Compliance account can mint [[H1]][PERMISSION].
 
 
-<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_AbortsIfNotTreasuryCompliance">Roles::AbortsIfNotTreasuryCompliance</a>{account: tc_account};
+<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles_AbortsIfNotTreasuryCompliance">Roles::AbortsIfNotTreasuryCompliance</a>{account: tc_account};
 </code></pre>
 
 
@@ -4598,8 +4598,8 @@ account, and the frozen account may not send or receive coins.
 
 ###### Technical Description
 
-Sets the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/AccountFreezing.md#0x1_AccountFreezing_FreezingBit">AccountFreezing::FreezingBit</a></code> to <code><b>true</b></code> and emits a
-<code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/AccountFreezing.md#0x1_AccountFreezing_FreezeAccountEvent">AccountFreezing::FreezeAccountEvent</a></code>. The transaction sender must be the
+Sets the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/AccountFreezing.md#0x1_AccountFreezing_FreezingBit">AccountFreezing::FreezingBit</a></code> to <code><b>true</b></code> and emits a
+<code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/AccountFreezing.md#0x1_AccountFreezing_FreezeAccountEvent">AccountFreezing::FreezeAccountEvent</a></code>. The transaction sender must be the
 Treasury Compliance account, but the account at <code>to_freeze_account</code> must
 not be either <code>0xA550C18</code> (the Diem Root address), or <code>0xB1E55ED</code> (the
 Treasury Compliance address). Note that this is a per-account property
@@ -4612,8 +4612,8 @@ accounts and vice versa.
 
 ###### Events
 
-Successful execution of this transaction will emit a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/AccountFreezing.md#0x1_AccountFreezing_FreezeAccountEvent">AccountFreezing::FreezeAccountEvent</a></code> on
-the <code>freeze_event_handle</code> held in the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/AccountFreezing.md#0x1_AccountFreezing_FreezeEventsHolder">AccountFreezing::FreezeEventsHolder</a></code> resource published
+Successful execution of this transaction will emit a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/AccountFreezing.md#0x1_AccountFreezing_FreezeAccountEvent">AccountFreezing::FreezeAccountEvent</a></code> on
+the <code>freeze_event_handle</code> held in the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/AccountFreezing.md#0x1_AccountFreezing_FreezeEventsHolder">AccountFreezing::FreezeEventsHolder</a></code> resource published
 under <code>0xA550C18</code> with the <code>frozen_address</code> being the <code>to_freeze_account</code>.
 
 
@@ -4624,7 +4624,7 @@ under <code>0xA550C18</code> with the <code>frozen_address</code> being the <cod
 | Name                | Type      | Description                                                                                     |
 | ------              | ------    | -------------                                                                                   |
 | <code>tc_account</code>        | <code>signer</code>  | The signer of the sending account of this transaction. Must be the Treasury Compliance account. |
-| <code>sliding_nonce</code>     | <code>u64</code>     | The <code>sliding_nonce</code> (see: <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction.                      |
+| <code>sliding_nonce</code>     | <code>u64</code>     | The <code>sliding_nonce</code> (see: <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction.                      |
 | <code>to_freeze_account</code> | <code>address</code> | The account address to be frozen.                                                               |
 
 
@@ -4634,14 +4634,14 @@ under <code>0xA550C18</code> with the <code>frozen_address</code> being the <cod
 
 | Error Category             | Error Reason                                 | Description                                                                                |
 | ----------------           | --------------                               | -------------                                                                              |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>               | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code> resource is not published under <code>tc_account</code>.                             |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_OLD">SlidingNonce::ENONCE_TOO_OLD</a></code>               | The <code>sliding_nonce</code> is too old and it's impossible to determine if it's duplicated or not. |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_NEW">SlidingNonce::ENONCE_TOO_NEW</a></code>               | The <code>sliding_nonce</code> is too far in the future.                                              |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_ALREADY_RECORDED">SlidingNonce::ENONCE_ALREADY_RECORDED</a></code>      | The <code>sliding_nonce</code> has been previously recorded.                                          |
-| <code><a href="_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/CoreAddresses.md#0x1_CoreAddresses_ETREASURY_COMPLIANCE">CoreAddresses::ETREASURY_COMPLIANCE</a></code>        | The sending account is not the Treasury Compliance account.                                |
-| <code><a href="_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_ETREASURY_COMPLIANCE">Roles::ETREASURY_COMPLIANCE</a></code>                | The sending account is not the Treasury Compliance account.                                |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/AccountFreezing.md#0x1_AccountFreezing_ECANNOT_FREEZE_TC">AccountFreezing::ECANNOT_FREEZE_TC</a></code>         | <code>to_freeze_account</code> was the Treasury Compliance account (<code>0xB1E55ED</code>).                     |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/AccountFreezing.md#0x1_AccountFreezing_ECANNOT_FREEZE_DIEM_ROOT">AccountFreezing::ECANNOT_FREEZE_DIEM_ROOT</a></code> | <code>to_freeze_account</code> was the Diem Root account (<code>0xA550C18</code>).                              |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>               | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code> resource is not published under <code>tc_account</code>.                             |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_OLD">SlidingNonce::ENONCE_TOO_OLD</a></code>               | The <code>sliding_nonce</code> is too old and it's impossible to determine if it's duplicated or not. |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_NEW">SlidingNonce::ENONCE_TOO_NEW</a></code>               | The <code>sliding_nonce</code> is too far in the future.                                              |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_ALREADY_RECORDED">SlidingNonce::ENONCE_ALREADY_RECORDED</a></code>      | The <code>sliding_nonce</code> has been previously recorded.                                          |
+| <code><a href="_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/CoreAddresses.md#0x1_CoreAddresses_ETREASURY_COMPLIANCE">CoreAddresses::ETREASURY_COMPLIANCE</a></code>        | The sending account is not the Treasury Compliance account.                                |
+| <code><a href="_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles_ETREASURY_COMPLIANCE">Roles::ETREASURY_COMPLIANCE</a></code>                | The sending account is not the Treasury Compliance account.                                |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/AccountFreezing.md#0x1_AccountFreezing_ECANNOT_FREEZE_TC">AccountFreezing::ECANNOT_FREEZE_TC</a></code>         | <code>to_freeze_account</code> was the Treasury Compliance account (<code>0xB1E55ED</code>).                     |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/AccountFreezing.md#0x1_AccountFreezing_ECANNOT_FREEZE_DIEM_ROOT">AccountFreezing::ECANNOT_FREEZE_DIEM_ROOT</a></code> | <code>to_freeze_account</code> was the Diem Root account (<code>0xA550C18</code>).                              |
 
 
 <a name="@Related_Scripts_221"></a>
@@ -4661,8 +4661,8 @@ under <code>0xA550C18</code> with the <code>frozen_address</code> being the <cod
 
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_TreasuryComplianceScripts_freeze_account">freeze_account</a>(tc_account: signer, sliding_nonce: u64, to_freeze_account: address) {
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&tc_account, sliding_nonce);
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/AccountFreezing.md#0x1_AccountFreezing_freeze_account">AccountFreezing::freeze_account</a>(&tc_account, to_freeze_account);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&tc_account, sliding_nonce);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/AccountFreezing.md#0x1_AccountFreezing_freeze_account">AccountFreezing::freeze_account</a>(&tc_account, to_freeze_account);
 }
 </code></pre>
 
@@ -4688,7 +4688,7 @@ may be sent from the previously frozen account, and coins may be sent and receiv
 
 ###### Technical Description
 
-Sets the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/AccountFreezing.md#0x1_AccountFreezing_FreezingBit">AccountFreezing::FreezingBit</a></code> to <code><b>false</b></code> and emits a
+Sets the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/AccountFreezing.md#0x1_AccountFreezing_FreezingBit">AccountFreezing::FreezingBit</a></code> to <code><b>false</b></code> and emits a
 <code>AccountFreezing::UnFreezeAccountEvent</code>. The transaction sender must be the Treasury Compliance
 account. Note that this is a per-account property so unfreezing a Parent VASP will not effect
 the status any of its child accounts and vice versa.
@@ -4709,7 +4709,7 @@ the <code>unfrozen_address</code> set the <code>to_unfreeze_account</code>'s add
 | Name                  | Type      | Description                                                                                     |
 | ------                | ------    | -------------                                                                                   |
 | <code>tc_account</code>          | <code>signer</code>  | The signer of the sending account of this transaction. Must be the Treasury Compliance account. |
-| <code>sliding_nonce</code>       | <code>u64</code>     | The <code>sliding_nonce</code> (see: <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction.                      |
+| <code>sliding_nonce</code>       | <code>u64</code>     | The <code>sliding_nonce</code> (see: <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction.                      |
 | <code>to_unfreeze_account</code> | <code>address</code> | The account address to be frozen.                                                               |
 
 
@@ -4719,11 +4719,11 @@ the <code>unfrozen_address</code> set the <code>to_unfreeze_account</code>'s add
 
 | Error Category             | Error Reason                            | Description                                                                                |
 | ----------------           | --------------                          | -------------                                                                              |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>          | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code> resource is not published under <code>account</code>.                                |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_OLD">SlidingNonce::ENONCE_TOO_OLD</a></code>          | The <code>sliding_nonce</code> is too old and it's impossible to determine if it's duplicated or not. |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_NEW">SlidingNonce::ENONCE_TOO_NEW</a></code>          | The <code>sliding_nonce</code> is too far in the future.                                              |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_ALREADY_RECORDED">SlidingNonce::ENONCE_ALREADY_RECORDED</a></code> | The <code>sliding_nonce</code> has been previously recorded.                                          |
-| <code><a href="_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/CoreAddresses.md#0x1_CoreAddresses_ETREASURY_COMPLIANCE">CoreAddresses::ETREASURY_COMPLIANCE</a></code>   | The sending account is not the Treasury Compliance account.                                |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>          | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code> resource is not published under <code>account</code>.                                |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_OLD">SlidingNonce::ENONCE_TOO_OLD</a></code>          | The <code>sliding_nonce</code> is too old and it's impossible to determine if it's duplicated or not. |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_NEW">SlidingNonce::ENONCE_TOO_NEW</a></code>          | The <code>sliding_nonce</code> is too far in the future.                                              |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_ALREADY_RECORDED">SlidingNonce::ENONCE_ALREADY_RECORDED</a></code> | The <code>sliding_nonce</code> has been previously recorded.                                          |
+| <code><a href="_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/CoreAddresses.md#0x1_CoreAddresses_ETREASURY_COMPLIANCE">CoreAddresses::ETREASURY_COMPLIANCE</a></code>   | The sending account is not the Treasury Compliance account.                                |
 
 
 <a name="@Related_Scripts_227"></a>
@@ -4743,8 +4743,8 @@ the <code>unfrozen_address</code> set the <code>to_unfreeze_account</code>'s add
 
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_TreasuryComplianceScripts_unfreeze_account">unfreeze_account</a>(account: signer, sliding_nonce: u64, to_unfreeze_account: address) {
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&account, sliding_nonce);
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/AccountFreezing.md#0x1_AccountFreezing_unfreeze_account">AccountFreezing::unfreeze_account</a>(&account, to_unfreeze_account);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&account, sliding_nonce);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/AccountFreezing.md#0x1_AccountFreezing_unfreeze_account">AccountFreezing::unfreeze_account</a>(&account, to_unfreeze_account);
 }
 </code></pre>
 
@@ -4770,7 +4770,7 @@ payments over this limit must be checked for dual attestation.
 
 ###### Technical Description
 
-Updates the <code>micro_xdx_limit</code> field of the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DualAttestation.md#0x1_DualAttestation_Limit">DualAttestation::Limit</a></code> resource published under
+Updates the <code>micro_xdx_limit</code> field of the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DualAttestation.md#0x1_DualAttestation_Limit">DualAttestation::Limit</a></code> resource published under
 <code>0xA550C18</code>. The amount is set in micro-XDX.
 
 
@@ -4781,7 +4781,7 @@ Updates the <code>micro_xdx_limit</code> field of the <code><a href="../../../..
 | Name                  | Type     | Description                                                                                     |
 | ------                | ------   | -------------                                                                                   |
 | <code>tc_account</code>          | <code>signer</code> | The signer of the sending account of this transaction. Must be the Treasury Compliance account. |
-| <code>sliding_nonce</code>       | <code>u64</code>    | The <code>sliding_nonce</code> (see: <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction.                      |
+| <code>sliding_nonce</code>       | <code>u64</code>    | The <code>sliding_nonce</code> (see: <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction.                      |
 | <code>new_micro_xdx_limit</code> | <code>u64</code>    | The new dual attestation limit to be used on-chain.                                             |
 
 
@@ -4791,11 +4791,11 @@ Updates the <code>micro_xdx_limit</code> field of the <code><a href="../../../..
 
 | Error Category             | Error Reason                            | Description                                                                                |
 | ----------------           | --------------                          | -------------                                                                              |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>          | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code> resource is not published under <code>tc_account</code>.                             |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_OLD">SlidingNonce::ENONCE_TOO_OLD</a></code>          | The <code>sliding_nonce</code> is too old and it's impossible to determine if it's duplicated or not. |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_NEW">SlidingNonce::ENONCE_TOO_NEW</a></code>          | The <code>sliding_nonce</code> is too far in the future.                                              |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_ALREADY_RECORDED">SlidingNonce::ENONCE_ALREADY_RECORDED</a></code> | The <code>sliding_nonce</code> has been previously recorded.                                          |
-| <code><a href="_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/CoreAddresses.md#0x1_CoreAddresses_ETREASURY_COMPLIANCE">CoreAddresses::ETREASURY_COMPLIANCE</a></code>   | <code>tc_account</code> is not the Treasury Compliance account.                                       |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>          | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code> resource is not published under <code>tc_account</code>.                             |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_OLD">SlidingNonce::ENONCE_TOO_OLD</a></code>          | The <code>sliding_nonce</code> is too old and it's impossible to determine if it's duplicated or not. |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_NEW">SlidingNonce::ENONCE_TOO_NEW</a></code>          | The <code>sliding_nonce</code> is too far in the future.                                              |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_ALREADY_RECORDED">SlidingNonce::ENONCE_ALREADY_RECORDED</a></code> | The <code>sliding_nonce</code> has been previously recorded.                                          |
+| <code><a href="_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/CoreAddresses.md#0x1_CoreAddresses_ETREASURY_COMPLIANCE">CoreAddresses::ETREASURY_COMPLIANCE</a></code>   | <code>tc_account</code> is not the Treasury Compliance account.                                       |
 
 
 <a name="@Related_Scripts_232"></a>
@@ -4820,8 +4820,8 @@ Updates the <code>micro_xdx_limit</code> field of the <code><a href="../../../..
         sliding_nonce: u64,
         new_micro_xdx_limit: u64
     ) {
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&tc_account, sliding_nonce);
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DualAttestation.md#0x1_DualAttestation_set_microdiem_limit">DualAttestation::set_microdiem_limit</a>(&tc_account, new_micro_xdx_limit);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&tc_account, sliding_nonce);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DualAttestation.md#0x1_DualAttestation_set_microdiem_limit">DualAttestation::set_microdiem_limit</a>(&tc_account, new_micro_xdx_limit);
 }
 </code></pre>
 
@@ -4860,7 +4860,7 @@ is given by <code>new_exchange_rate_numerator/new_exchange_rate_denominator</cod
 | ------                          | ------   | -------------                                                                                                                      |
 | <code>Currency</code>                      | Type     | The Move type for the <code>Currency</code> whose exchange rate is being updated. <code>Currency</code> must be an already-registered currency on-chain. |
 | <code>tc_account</code>                    | <code>signer</code> | The signer of the sending account of this transaction. Must be the Treasury Compliance account.                                    |
-| <code>sliding_nonce</code>                 | <code>u64</code>    | The <code>sliding_nonce</code> (see: <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for the transaction.                                                          |
+| <code>sliding_nonce</code>                 | <code>u64</code>    | The <code>sliding_nonce</code> (see: <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for the transaction.                                                          |
 | <code>new_exchange_rate_numerator</code>   | <code>u64</code>    | The numerator for the new to micro-XDX exchange rate for <code>Currency</code>.                                                               |
 | <code>new_exchange_rate_denominator</code> | <code>u64</code>    | The denominator for the new to micro-XDX exchange rate for <code>Currency</code>.                                                             |
 
@@ -4871,12 +4871,12 @@ is given by <code>new_exchange_rate_numerator/new_exchange_rate_denominator</cod
 
 | Error Category             | Error Reason                            | Description                                                                                |
 | ----------------           | --------------                          | -------------                                                                              |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>          | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code> resource is not published under <code>tc_account</code>.                             |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_OLD">SlidingNonce::ENONCE_TOO_OLD</a></code>          | The <code>sliding_nonce</code> is too old and it's impossible to determine if it's duplicated or not. |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_NEW">SlidingNonce::ENONCE_TOO_NEW</a></code>          | The <code>sliding_nonce</code> is too far in the future.                                              |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_ALREADY_RECORDED">SlidingNonce::ENONCE_ALREADY_RECORDED</a></code> | The <code>sliding_nonce</code> has been previously recorded.                                          |
-| <code><a href="_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/CoreAddresses.md#0x1_CoreAddresses_ETREASURY_COMPLIANCE">CoreAddresses::ETREASURY_COMPLIANCE</a></code>   | <code>tc_account</code> is not the Treasury Compliance account.                                       |
-| <code><a href="_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_ETREASURY_COMPLIANCE">Roles::ETREASURY_COMPLIANCE</a></code>           | <code>tc_account</code> is not the Treasury Compliance account.                                       |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>          | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code> resource is not published under <code>tc_account</code>.                             |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_OLD">SlidingNonce::ENONCE_TOO_OLD</a></code>          | The <code>sliding_nonce</code> is too old and it's impossible to determine if it's duplicated or not. |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_NEW">SlidingNonce::ENONCE_TOO_NEW</a></code>          | The <code>sliding_nonce</code> is too far in the future.                                              |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_ALREADY_RECORDED">SlidingNonce::ENONCE_ALREADY_RECORDED</a></code> | The <code>sliding_nonce</code> has been previously recorded.                                          |
+| <code><a href="_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/CoreAddresses.md#0x1_CoreAddresses_ETREASURY_COMPLIANCE">CoreAddresses::ETREASURY_COMPLIANCE</a></code>   | <code>tc_account</code> is not the Treasury Compliance account.                                       |
+| <code><a href="_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles_ETREASURY_COMPLIANCE">Roles::ETREASURY_COMPLIANCE</a></code>           | <code>tc_account</code> is not the Treasury Compliance account.                                       |
 | <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="_EDENOMINATOR">FixedPoint32::EDENOMINATOR</a></code>            | <code>new_exchange_rate_denominator</code> is zero.                                                   |
 | <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="_ERATIO_OUT_OF_RANGE">FixedPoint32::ERATIO_OUT_OF_RANGE</a></code>     | The quotient is unrepresentable as a <code><a href="">FixedPoint32</a></code>.                                       |
 | <code><a href="_LIMIT_EXCEEDED">Errors::LIMIT_EXCEEDED</a></code>   | <code><a href="_ERATIO_OUT_OF_RANGE">FixedPoint32::ERATIO_OUT_OF_RANGE</a></code>     | The quotient is unrepresentable as a <code><a href="">FixedPoint32</a></code>.                                       |
@@ -4905,12 +4905,12 @@ is given by <code>new_exchange_rate_numerator/new_exchange_rate_denominator</cod
         new_exchange_rate_numerator: u64,
         new_exchange_rate_denominator: u64,
 ) {
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&tc_account, sliding_nonce);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&tc_account, sliding_nonce);
     <b>let</b> rate = <a href="_create_from_rational">FixedPoint32::create_from_rational</a>(
             new_exchange_rate_numerator,
             new_exchange_rate_denominator,
     );
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_update_xdx_exchange_rate">Diem::update_xdx_exchange_rate</a>&lt;Currency&gt;(&tc_account, rate);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_update_xdx_exchange_rate">Diem::update_xdx_exchange_rate</a>&lt;Currency&gt;(&tc_account, rate);
 }
 </code></pre>
 
@@ -4923,8 +4923,8 @@ is given by <code>new_exchange_rate_numerator/new_exchange_rate_denominator</cod
 
 
 
-<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: tc_account};
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_RecordNonceAbortsIf">SlidingNonce::RecordNonceAbortsIf</a>{ account: tc_account, seq_nonce: sliding_nonce };
+<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: tc_account};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_RecordNonceAbortsIf">SlidingNonce::RecordNonceAbortsIf</a>{ account: tc_account, seq_nonce: sliding_nonce };
 <b>include</b> <a href="_CreateFromRationalAbortsIf">FixedPoint32::CreateFromRationalAbortsIf</a>{
        numerator: new_exchange_rate_numerator,
        denominator: new_exchange_rate_denominator
@@ -4933,9 +4933,9 @@ is given by <code>new_exchange_rate_numerator/new_exchange_rate_denominator</cod
         new_exchange_rate_numerator,
         new_exchange_rate_denominator
 );
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_UpdateXDXExchangeRateAbortsIf">Diem::UpdateXDXExchangeRateAbortsIf</a>&lt;Currency&gt;;
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_UpdateXDXExchangeRateEnsures">Diem::UpdateXDXExchangeRateEnsures</a>&lt;Currency&gt;{xdx_exchange_rate: rate};
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_UpdateXDXExchangeRateEmits">Diem::UpdateXDXExchangeRateEmits</a>&lt;Currency&gt;{xdx_exchange_rate: rate};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_UpdateXDXExchangeRateAbortsIf">Diem::UpdateXDXExchangeRateAbortsIf</a>&lt;Currency&gt;;
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_UpdateXDXExchangeRateEnsures">Diem::UpdateXDXExchangeRateEnsures</a>&lt;Currency&gt;{xdx_exchange_rate: rate};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_UpdateXDXExchangeRateEmits">Diem::UpdateXDXExchangeRateEmits</a>&lt;Currency&gt;{xdx_exchange_rate: rate};
 <b>aborts_with</b> [check]
     <a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>,
     <a href="_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a>,
@@ -4949,7 +4949,7 @@ is given by <code>new_exchange_rate_numerator/new_exchange_rate_denominator</cod
 Only the Treasury Compliance account can update the exchange rate [[H5]][PERMISSION].
 
 
-<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_AbortsIfNotTreasuryCompliance">Roles::AbortsIfNotTreasuryCompliance</a>{account: tc_account};
+<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles_AbortsIfNotTreasuryCompliance">Roles::AbortsIfNotTreasuryCompliance</a>{account: tc_account};
 </code></pre>
 
 
@@ -4974,7 +4974,7 @@ no effect on coins already in circulation, and coins may still be removed from t
 
 ###### Technical Description
 
-This transaction sets the <code>can_mint</code> field of the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_CurrencyInfo">Diem::CurrencyInfo</a>&lt;Currency&gt;</code> resource
+This transaction sets the <code>can_mint</code> field of the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_CurrencyInfo">Diem::CurrencyInfo</a>&lt;Currency&gt;</code> resource
 published under <code>0xA550C18</code> to the value of <code>allow_minting</code>. Minting of coins if allowed if
 this field is set to <code><b>true</b></code> and minting of new coins in <code>Currency</code> is disallowed otherwise.
 This transaction needs to be sent by the Treasury Compliance account.
@@ -4997,8 +4997,8 @@ This transaction needs to be sent by the Treasury Compliance account.
 
 | Error Category             | Error Reason                          | Description                                          |
 | ----------------           | --------------                        | -------------                                        |
-| <code><a href="_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/CoreAddresses.md#0x1_CoreAddresses_ETREASURY_COMPLIANCE">CoreAddresses::ETREASURY_COMPLIANCE</a></code> | <code>tc_account</code> is not the Treasury Compliance account. |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_ECURRENCY_INFO">Diem::ECURRENCY_INFO</a></code>               | <code>Currency</code> is not a registered currency on-chain.    |
+| <code><a href="_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/CoreAddresses.md#0x1_CoreAddresses_ETREASURY_COMPLIANCE">CoreAddresses::ETREASURY_COMPLIANCE</a></code> | <code>tc_account</code> is not the Treasury Compliance account. |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_ECURRENCY_INFO">Diem::ECURRENCY_INFO</a></code>               | <code>Currency</code> is not a registered currency on-chain.    |
 
 
 <a name="@Related_Scripts_242"></a>
@@ -5022,7 +5022,7 @@ This transaction needs to be sent by the Treasury Compliance account.
     tc_account: signer,
     allow_minting: bool
 ) {
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem_update_minting_ability">Diem::update_minting_ability</a>&lt;Currency&gt;(&tc_account, allow_minting);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem_update_minting_ability">Diem::update_minting_ability</a>&lt;Currency&gt;(&tc_account, allow_minting);
 }
 </code></pre>
 
@@ -5047,7 +5047,7 @@ the Treasury Compliance account.
 
 ###### Technical Description
 
-Adds a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/VASPDomain.md#0x1_VASPDomain_VASPDomain">VASPDomain::VASPDomain</a></code> to the <code>domains</code> field of the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomain::VASPDomains</a></code> resource published under
+Adds a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/VASPDomain.md#0x1_VASPDomain_VASPDomain">VASPDomain::VASPDomain</a></code> to the <code>domains</code> field of the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomain::VASPDomains</a></code> resource published under
 the account at <code>address</code>.
 
 
@@ -5068,12 +5068,12 @@ the account at <code>address</code>.
 
 | Error Category             | Error Reason                             | Description                                                                                                                            |
 | ----------------           | --------------                           | -------------                                                                                                                          |
-| <code><a href="_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_ETREASURY_COMPLIANCE">Roles::ETREASURY_COMPLIANCE</a></code>            | The sending account is not the Treasury Compliance account.                                                                            |
-| <code><a href="_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/CoreAddresses.md#0x1_CoreAddresses_ETREASURY_COMPLIANCE">CoreAddresses::ETREASURY_COMPLIANCE</a></code>    | <code>tc_account</code> is not the Treasury Compliance account.                                                                                   |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/VASPDomain.md#0x1_VASPDomain_EVASP_DOMAIN_MANAGER">VASPDomain::EVASP_DOMAIN_MANAGER</a></code>        | The <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/VASPDomain.md#0x1_VASPDomain_VASPDomainManager">VASPDomain::VASPDomainManager</a></code> resource is not yet published under the Treasury Compliance account.                                 |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/VASPDomain.md#0x1_VASPDomain_EVASP_DOMAINS_NOT_PUBLISHED">VASPDomain::EVASP_DOMAINS_NOT_PUBLISHED</a></code> | <code>address</code> does not have a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomain::VASPDomains</a></code> resource published under it.                                                         |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code>VASPDomain::EDOMAIN_ALREADY_EXISTS</code>         | The <code>domain</code> already exists in the list of <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/VASPDomain.md#0x1_VASPDomain_VASPDomain">VASPDomain::VASPDomain</a></code>s  in the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomain::VASPDomains</a></code> resource published under <code>address</code>. |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/VASPDomain.md#0x1_VASPDomain_EINVALID_VASP_DOMAIN">VASPDomain::EINVALID_VASP_DOMAIN</a></code>        | The <code>domain</code> is greater in length than <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/VASPDomain.md#0x1_VASPDomain_DOMAIN_LENGTH">VASPDomain::DOMAIN_LENGTH</a></code>.                                                                        |
+| <code><a href="_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles_ETREASURY_COMPLIANCE">Roles::ETREASURY_COMPLIANCE</a></code>            | The sending account is not the Treasury Compliance account.                                                                            |
+| <code><a href="_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/CoreAddresses.md#0x1_CoreAddresses_ETREASURY_COMPLIANCE">CoreAddresses::ETREASURY_COMPLIANCE</a></code>    | <code>tc_account</code> is not the Treasury Compliance account.                                                                                   |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/VASPDomain.md#0x1_VASPDomain_EVASP_DOMAIN_MANAGER">VASPDomain::EVASP_DOMAIN_MANAGER</a></code>        | The <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/VASPDomain.md#0x1_VASPDomain_VASPDomainManager">VASPDomain::VASPDomainManager</a></code> resource is not yet published under the Treasury Compliance account.                                 |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/VASPDomain.md#0x1_VASPDomain_EVASP_DOMAINS_NOT_PUBLISHED">VASPDomain::EVASP_DOMAINS_NOT_PUBLISHED</a></code> | <code>address</code> does not have a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomain::VASPDomains</a></code> resource published under it.                                                         |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code>VASPDomain::EDOMAIN_ALREADY_EXISTS</code>         | The <code>domain</code> already exists in the list of <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/VASPDomain.md#0x1_VASPDomain_VASPDomain">VASPDomain::VASPDomain</a></code>s  in the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomain::VASPDomains</a></code> resource published under <code>address</code>. |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/VASPDomain.md#0x1_VASPDomain_EINVALID_VASP_DOMAIN">VASPDomain::EINVALID_VASP_DOMAIN</a></code>        | The <code>domain</code> is greater in length than <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/VASPDomain.md#0x1_VASPDomain_DOMAIN_LENGTH">VASPDomain::DOMAIN_LENGTH</a></code>.                                                                        |
 
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_TreasuryComplianceScripts_add_vasp_domain">add_vasp_domain</a>(tc_account: signer, address: address, domain: vector&lt;u8&gt;)
@@ -5090,7 +5090,7 @@ the account at <code>address</code>.
     address: address,
     domain: vector&lt;u8&gt;,
 ) {
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/VASPDomain.md#0x1_VASPDomain_add_vasp_domain">VASPDomain::add_vasp_domain</a>(&tc_account, address, domain);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/VASPDomain.md#0x1_VASPDomain_add_vasp_domain">VASPDomain::add_vasp_domain</a>(&tc_account, address, domain);
 }
 </code></pre>
 
@@ -5103,10 +5103,10 @@ the account at <code>address</code>.
 
 
 
-<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: tc_account};
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/VASPDomain.md#0x1_VASPDomain_AddVASPDomainAbortsIf">VASPDomain::AddVASPDomainAbortsIf</a>;
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/VASPDomain.md#0x1_VASPDomain_AddVASPDomainEnsures">VASPDomain::AddVASPDomainEnsures</a>;
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/VASPDomain.md#0x1_VASPDomain_AddVASPDomainEmits">VASPDomain::AddVASPDomainEmits</a>;
+<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: tc_account};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/VASPDomain.md#0x1_VASPDomain_AddVASPDomainAbortsIf">VASPDomain::AddVASPDomainAbortsIf</a>;
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/VASPDomain.md#0x1_VASPDomain_AddVASPDomainEnsures">VASPDomain::AddVASPDomainEnsures</a>;
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/VASPDomain.md#0x1_VASPDomain_AddVASPDomainEmits">VASPDomain::AddVASPDomainEmits</a>;
 <b>aborts_with</b> [check]
     <a href="_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a>,
     <a href="_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a>,
@@ -5135,7 +5135,7 @@ the Treasury Compliance account.
 
 ###### Technical Description
 
-Removes a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/VASPDomain.md#0x1_VASPDomain_VASPDomain">VASPDomain::VASPDomain</a></code> from the <code>domains</code> field of the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomain::VASPDomains</a></code> resource published under
+Removes a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/VASPDomain.md#0x1_VASPDomain_VASPDomain">VASPDomain::VASPDomain</a></code> from the <code>domains</code> field of the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomain::VASPDomains</a></code> resource published under
 account with <code>address</code>.
 
 
@@ -5156,12 +5156,12 @@ account with <code>address</code>.
 
 | Error Category             | Error Reason                             | Description                                                                                                                            |
 | ----------------           | --------------                           | -------------                                                                                                                          |
-| <code><a href="_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/Roles.md#0x1_Roles_ETREASURY_COMPLIANCE">Roles::ETREASURY_COMPLIANCE</a></code>            | The sending account is not the Treasury Compliance account.                                                                            |
-| <code><a href="_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/CoreAddresses.md#0x1_CoreAddresses_ETREASURY_COMPLIANCE">CoreAddresses::ETREASURY_COMPLIANCE</a></code>    | <code>tc_account</code> is not the Treasury Compliance account.                                                                                   |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/VASPDomain.md#0x1_VASPDomain_EVASP_DOMAIN_MANAGER">VASPDomain::EVASP_DOMAIN_MANAGER</a></code>        | The <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/VASPDomain.md#0x1_VASPDomain_VASPDomainManager">VASPDomain::VASPDomainManager</a></code> resource is not yet published under the Treasury Compliance account.                                 |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/VASPDomain.md#0x1_VASPDomain_EVASP_DOMAINS_NOT_PUBLISHED">VASPDomain::EVASP_DOMAINS_NOT_PUBLISHED</a></code> | <code>address</code> does not have a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomain::VASPDomains</a></code> resource published under it.                                                         |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/VASPDomain.md#0x1_VASPDomain_EINVALID_VASP_DOMAIN">VASPDomain::EINVALID_VASP_DOMAIN</a></code>        | The <code>domain</code> is greater in length than <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/VASPDomain.md#0x1_VASPDomain_DOMAIN_LENGTH">VASPDomain::DOMAIN_LENGTH</a></code>.                                                                        |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/VASPDomain.md#0x1_VASPDomain_EVASP_DOMAIN_NOT_FOUND">VASPDomain::EVASP_DOMAIN_NOT_FOUND</a></code>              | The <code>domain</code> does not exist in the list of <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/VASPDomain.md#0x1_VASPDomain_VASPDomain">VASPDomain::VASPDomain</a></code>s  in the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomain::VASPDomains</a></code> resource published under <code>address</code>. |
+| <code><a href="_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles_ETREASURY_COMPLIANCE">Roles::ETREASURY_COMPLIANCE</a></code>            | The sending account is not the Treasury Compliance account.                                                                            |
+| <code><a href="_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/CoreAddresses.md#0x1_CoreAddresses_ETREASURY_COMPLIANCE">CoreAddresses::ETREASURY_COMPLIANCE</a></code>    | <code>tc_account</code> is not the Treasury Compliance account.                                                                                   |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/VASPDomain.md#0x1_VASPDomain_EVASP_DOMAIN_MANAGER">VASPDomain::EVASP_DOMAIN_MANAGER</a></code>        | The <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/VASPDomain.md#0x1_VASPDomain_VASPDomainManager">VASPDomain::VASPDomainManager</a></code> resource is not yet published under the Treasury Compliance account.                                 |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/VASPDomain.md#0x1_VASPDomain_EVASP_DOMAINS_NOT_PUBLISHED">VASPDomain::EVASP_DOMAINS_NOT_PUBLISHED</a></code> | <code>address</code> does not have a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomain::VASPDomains</a></code> resource published under it.                                                         |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/VASPDomain.md#0x1_VASPDomain_EINVALID_VASP_DOMAIN">VASPDomain::EINVALID_VASP_DOMAIN</a></code>        | The <code>domain</code> is greater in length than <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/VASPDomain.md#0x1_VASPDomain_DOMAIN_LENGTH">VASPDomain::DOMAIN_LENGTH</a></code>.                                                                        |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/VASPDomain.md#0x1_VASPDomain_EVASP_DOMAIN_NOT_FOUND">VASPDomain::EVASP_DOMAIN_NOT_FOUND</a></code>              | The <code>domain</code> does not exist in the list of <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/VASPDomain.md#0x1_VASPDomain_VASPDomain">VASPDomain::VASPDomain</a></code>s  in the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomain::VASPDomains</a></code> resource published under <code>address</code>. |
 
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_TreasuryComplianceScripts_remove_vasp_domain">remove_vasp_domain</a>(tc_account: signer, address: address, domain: vector&lt;u8&gt;)
@@ -5178,7 +5178,7 @@ account with <code>address</code>.
     address: address,
     domain: vector&lt;u8&gt;,
 ) {
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/VASPDomain.md#0x1_VASPDomain_remove_vasp_domain">VASPDomain::remove_vasp_domain</a>(&tc_account, address, domain);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/VASPDomain.md#0x1_VASPDomain_remove_vasp_domain">VASPDomain::remove_vasp_domain</a>(&tc_account, address, domain);
 }
 </code></pre>
 
@@ -5219,10 +5219,10 @@ This module contains Diem Framework script functions to administer the
 network outside of validators and validator operators.
 
 
-<pre><code><b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemConsensusConfig.md#0x1_DiemConsensusConfig">0x1::DiemConsensusConfig</a>;
-<b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemVMConfig.md#0x1_DiemVMConfig">0x1::DiemVMConfig</a>;
-<b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemVersion.md#0x1_DiemVersion">0x1::DiemVersion</a>;
-<b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce">0x1::SlidingNonce</a>;
+<pre><code><b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemConsensusConfig.md#0x1_DiemConsensusConfig">0x1::DiemConsensusConfig</a>;
+<b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemVMConfig.md#0x1_DiemVMConfig">0x1::DiemVMConfig</a>;
+<b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemVersion.md#0x1_DiemVersion">0x1::DiemVersion</a>;
+<b>use</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce">0x1::SlidingNonce</a>;
 </code></pre>
 
 
@@ -5244,7 +5244,7 @@ transaction can only be sent from the Diem Root account.
 
 ###### Technical Description
 
-Updates the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemVersion.md#0x1_DiemVersion">DiemVersion</a></code> on-chain config and emits a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemConfig.md#0x1_DiemConfig_NewEpochEvent">DiemConfig::NewEpochEvent</a></code> to trigger
+Updates the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemVersion.md#0x1_DiemVersion">DiemVersion</a></code> on-chain config and emits a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemConfig.md#0x1_DiemConfig_NewEpochEvent">DiemConfig::NewEpochEvent</a></code> to trigger
 a reconfiguration of the system. The <code>major</code> version that is passed in must be strictly greater
 than the current major version held on-chain. The VM reads this information and can use it to
 preserve backwards compatibility with previous major versions of the VM.
@@ -5257,7 +5257,7 @@ preserve backwards compatibility with previous major versions of the VM.
 | Name            | Type     | Description                                                                |
 | ------          | ------   | -------------                                                              |
 | <code>account</code>       | <code>signer</code> | Signer of the sending account. Must be the Diem Root account.              |
-| <code>sliding_nonce</code> | <code>u64</code>    | The <code>sliding_nonce</code> (see: <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction. |
+| <code>sliding_nonce</code> | <code>u64</code>    | The <code>sliding_nonce</code> (see: <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction. |
 | <code>major</code>         | <code>u64</code>    | The <code>major</code> version of the VM to be used from this transaction on.         |
 
 
@@ -5267,12 +5267,12 @@ preserve backwards compatibility with previous major versions of the VM.
 
 | Error Category             | Error Reason                                  | Description                                                                                |
 | ----------------           | --------------                                | -------------                                                                              |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>                | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code> resource is not published under <code>account</code>.                                |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_OLD">SlidingNonce::ENONCE_TOO_OLD</a></code>                | The <code>sliding_nonce</code> is too old and it's impossible to determine if it's duplicated or not. |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_NEW">SlidingNonce::ENONCE_TOO_NEW</a></code>                | The <code>sliding_nonce</code> is too far in the future.                                              |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_ALREADY_RECORDED">SlidingNonce::ENONCE_ALREADY_RECORDED</a></code>       | The <code>sliding_nonce</code> has been previously recorded.                                          |
-| <code><a href="_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/CoreAddresses.md#0x1_CoreAddresses_EDIEM_ROOT">CoreAddresses::EDIEM_ROOT</a></code>                   | <code>account</code> is not the Diem Root account.                                                    |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemVersion.md#0x1_DiemVersion_EINVALID_MAJOR_VERSION_NUMBER">DiemVersion::EINVALID_MAJOR_VERSION_NUMBER</a></code>  | <code>major</code> is less-than or equal to the current major version stored on-chain.                |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>                | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code> resource is not published under <code>account</code>.                                |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_OLD">SlidingNonce::ENONCE_TOO_OLD</a></code>                | The <code>sliding_nonce</code> is too old and it's impossible to determine if it's duplicated or not. |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_NEW">SlidingNonce::ENONCE_TOO_NEW</a></code>                | The <code>sliding_nonce</code> is too far in the future.                                              |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_ALREADY_RECORDED">SlidingNonce::ENONCE_ALREADY_RECORDED</a></code>       | The <code>sliding_nonce</code> has been previously recorded.                                          |
+| <code><a href="_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/CoreAddresses.md#0x1_CoreAddresses_EDIEM_ROOT">CoreAddresses::EDIEM_ROOT</a></code>                   | <code>account</code> is not the Diem Root account.                                                    |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemVersion.md#0x1_DiemVersion_EINVALID_MAJOR_VERSION_NUMBER">DiemVersion::EINVALID_MAJOR_VERSION_NUMBER</a></code>  | <code>major</code> is less-than or equal to the current major version stored on-chain.                |
 
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_SystemAdministrationScripts_update_diem_version">update_diem_version</a>(account: signer, sliding_nonce: u64, major: u64)
@@ -5285,8 +5285,8 @@ preserve backwards compatibility with previous major versions of the VM.
 
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_SystemAdministrationScripts_update_diem_version">update_diem_version</a>(account: signer, sliding_nonce: u64, major: u64) {
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&account, sliding_nonce);
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemVersion.md#0x1_DiemVersion_set">DiemVersion::set</a>(&account, major)
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&account, sliding_nonce);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemVersion.md#0x1_DiemVersion_set">DiemVersion::set</a>(&account, major)
 }
 </code></pre>
 
@@ -5311,8 +5311,8 @@ metering. This transaction can only be sent from the Diem Root account.
 
 ###### Technical Description
 
-Updates the on-chain config holding the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemVMConfig.md#0x1_DiemVMConfig">DiemVMConfig</a></code> and emits a
-<code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemConfig.md#0x1_DiemConfig_NewEpochEvent">DiemConfig::NewEpochEvent</a></code> to trigger a reconfiguration of the system.
+Updates the on-chain config holding the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemVMConfig.md#0x1_DiemVMConfig">DiemVMConfig</a></code> and emits a
+<code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemConfig.md#0x1_DiemConfig_NewEpochEvent">DiemConfig::NewEpochEvent</a></code> to trigger a reconfiguration of the system.
 
 
 <a name="@Parameters_258"></a>
@@ -5322,7 +5322,7 @@ Updates the on-chain config holding the <code><a href="../../../../../../DPN/rel
 | Name                                | Type     | Description                                                                                            |
 | ------                              | ------   | -------------                                                                                          |
 | <code>account</code>                           | <code>signer</code> | Signer of the sending account. Must be the Diem Root account.                                          |
-| <code>sliding_nonce</code>                     | <code>u64</code>    | The <code>sliding_nonce</code> (see: <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction.                             |
+| <code>sliding_nonce</code>                     | <code>u64</code>    | The <code>sliding_nonce</code> (see: <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction.                             |
 | <code>global_memory_per_byte_cost</code>       | <code>u64</code>    | The new cost to read global memory per-byte to be used for gas metering.                               |
 | <code>global_memory_per_byte_write_cost</code> | <code>u64</code>    | The new cost to write global memory per-byte to be used for gas metering.                              |
 | <code>min_transaction_gas_units</code>         | <code>u64</code>    | The new flat minimum amount of gas required for any transaction.                                       |
@@ -5342,12 +5342,12 @@ Updates the on-chain config holding the <code><a href="../../../../../../DPN/rel
 
 | Error Category             | Error Reason                                | Description                                                                                |
 | ----------------           | --------------                              | -------------                                                                              |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemVMConfig.md#0x1_DiemVMConfig_EGAS_CONSTANT_INCONSISTENCY">DiemVMConfig::EGAS_CONSTANT_INCONSISTENCY</a></code> | The provided gas constants are inconsistent.                                               |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>              | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code> resource is not published under <code>account</code>.                                |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_OLD">SlidingNonce::ENONCE_TOO_OLD</a></code>              | The <code>sliding_nonce</code> is too old and it's impossible to determine if it's duplicated or not. |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_NEW">SlidingNonce::ENONCE_TOO_NEW</a></code>              | The <code>sliding_nonce</code> is too far in the future.                                              |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_ALREADY_RECORDED">SlidingNonce::ENONCE_ALREADY_RECORDED</a></code>     | The <code>sliding_nonce</code> has been previously recorded.                                          |
-| <code><a href="_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/CoreAddresses.md#0x1_CoreAddresses_EDIEM_ROOT">CoreAddresses::EDIEM_ROOT</a></code>                 | <code>account</code> is not the Diem Root account.                                                    |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemVMConfig.md#0x1_DiemVMConfig_EGAS_CONSTANT_INCONSISTENCY">DiemVMConfig::EGAS_CONSTANT_INCONSISTENCY</a></code> | The provided gas constants are inconsistent.                                               |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>              | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code> resource is not published under <code>account</code>.                                |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_OLD">SlidingNonce::ENONCE_TOO_OLD</a></code>              | The <code>sliding_nonce</code> is too old and it's impossible to determine if it's duplicated or not. |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_NEW">SlidingNonce::ENONCE_TOO_NEW</a></code>              | The <code>sliding_nonce</code> is too far in the future.                                              |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_ALREADY_RECORDED">SlidingNonce::ENONCE_ALREADY_RECORDED</a></code>     | The <code>sliding_nonce</code> has been previously recorded.                                          |
+| <code><a href="_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/CoreAddresses.md#0x1_CoreAddresses_EDIEM_ROOT">CoreAddresses::EDIEM_ROOT</a></code>                 | <code>account</code> is not the Diem Root account.                                                    |
 
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_SystemAdministrationScripts_set_gas_constants">set_gas_constants</a>(dr_account: signer, sliding_nonce: u64, global_memory_per_byte_cost: u64, global_memory_per_byte_write_cost: u64, min_transaction_gas_units: u64, large_transaction_cutoff: u64, intrinsic_gas_per_byte: u64, maximum_number_of_gas_units: u64, min_price_per_gas_unit: u64, max_price_per_gas_unit: u64, max_transaction_size_in_bytes: u64, gas_unit_scaling_factor: u64, default_account_size: u64)
@@ -5374,8 +5374,8 @@ Updates the on-chain config holding the <code><a href="../../../../../../DPN/rel
     gas_unit_scaling_factor: u64,
     default_account_size: u64,
 ) {
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&dr_account, sliding_nonce);
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemVMConfig.md#0x1_DiemVMConfig_set_gas_constants">DiemVMConfig::set_gas_constants</a>(
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&dr_account, sliding_nonce);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemVMConfig.md#0x1_DiemVMConfig_set_gas_constants">DiemVMConfig::set_gas_constants</a>(
             &dr_account,
             global_memory_per_byte_cost,
             global_memory_per_byte_write_cost,
@@ -5413,8 +5413,8 @@ transaction can only be sent from the Diem Root account.
 
 ###### Technical Description
 
-Initializes the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemConsensusConfig.md#0x1_DiemConsensusConfig">DiemConsensusConfig</a></code> on-chain config to empty and allows future updates from DiemRoot via
-<code>update_diem_consensus_config</code>. This doesn't emit a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemConfig.md#0x1_DiemConfig_NewEpochEvent">DiemConfig::NewEpochEvent</a></code>.
+Initializes the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemConsensusConfig.md#0x1_DiemConsensusConfig">DiemConsensusConfig</a></code> on-chain config to empty and allows future updates from DiemRoot via
+<code>update_diem_consensus_config</code>. This doesn't emit a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemConfig.md#0x1_DiemConfig_NewEpochEvent">DiemConfig::NewEpochEvent</a></code>.
 
 
 <a name="@Parameters_262"></a>
@@ -5424,7 +5424,7 @@ Initializes the <code><a href="../../../../../../DPN/releases/artifacts/current/
 | Name            | Type      | Description                                                                |
 | ------          | ------    | -------------                                                              |
 | <code>account</code>       | <code>signer</code> | Signer of the sending account. Must be the Diem Root account.               |
-| <code>sliding_nonce</code> | <code>u64</code>     | The <code>sliding_nonce</code> (see: <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction. |
+| <code>sliding_nonce</code> | <code>u64</code>     | The <code>sliding_nonce</code> (see: <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction. |
 
 
 <a name="@Common_Abort_Conditions_263"></a>
@@ -5433,11 +5433,11 @@ Initializes the <code><a href="../../../../../../DPN/releases/artifacts/current/
 
 | Error Category             | Error Reason                                  | Description                                                                                |
 | ----------------           | --------------                                | -------------                                                                              |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>                | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code> resource is not published under <code>account</code>.                                |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_OLD">SlidingNonce::ENONCE_TOO_OLD</a></code>                | The <code>sliding_nonce</code> is too old and it's impossible to determine if it's duplicated or not. |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_NEW">SlidingNonce::ENONCE_TOO_NEW</a></code>                | The <code>sliding_nonce</code> is too far in the future.                                              |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_ALREADY_RECORDED">SlidingNonce::ENONCE_ALREADY_RECORDED</a></code>       | The <code>sliding_nonce</code> has been previously recorded.                                          |
-| <code><a href="_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/CoreAddresses.md#0x1_CoreAddresses_EDIEM_ROOT">CoreAddresses::EDIEM_ROOT</a></code>                   | <code>account</code> is not the Diem Root account.                                                    |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>                | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code> resource is not published under <code>account</code>.                                |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_OLD">SlidingNonce::ENONCE_TOO_OLD</a></code>                | The <code>sliding_nonce</code> is too old and it's impossible to determine if it's duplicated or not. |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_NEW">SlidingNonce::ENONCE_TOO_NEW</a></code>                | The <code>sliding_nonce</code> is too far in the future.                                              |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_ALREADY_RECORDED">SlidingNonce::ENONCE_ALREADY_RECORDED</a></code>       | The <code>sliding_nonce</code> has been previously recorded.                                          |
+| <code><a href="_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/CoreAddresses.md#0x1_CoreAddresses_EDIEM_ROOT">CoreAddresses::EDIEM_ROOT</a></code>                   | <code>account</code> is not the Diem Root account.                                                    |
 
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_SystemAdministrationScripts_initialize_diem_consensus_config">initialize_diem_consensus_config</a>(account: signer, sliding_nonce: u64)
@@ -5450,8 +5450,8 @@ Initializes the <code><a href="../../../../../../DPN/releases/artifacts/current/
 
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_SystemAdministrationScripts_initialize_diem_consensus_config">initialize_diem_consensus_config</a>(account: signer, sliding_nonce: u64) {
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&account, sliding_nonce);
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemConsensusConfig.md#0x1_DiemConsensusConfig_initialize">DiemConsensusConfig::initialize</a>(&account);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&account, sliding_nonce);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemConsensusConfig.md#0x1_DiemConsensusConfig_initialize">DiemConsensusConfig::initialize</a>(&account);
 }
 </code></pre>
 
@@ -5476,7 +5476,7 @@ transaction can only be sent from the Diem Root account.
 
 ###### Technical Description
 
-Updates the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemConsensusConfig.md#0x1_DiemConsensusConfig">DiemConsensusConfig</a></code> on-chain config and emits a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemConfig.md#0x1_DiemConfig_NewEpochEvent">DiemConfig::NewEpochEvent</a></code> to trigger
+Updates the <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemConsensusConfig.md#0x1_DiemConsensusConfig">DiemConsensusConfig</a></code> on-chain config and emits a <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemConfig.md#0x1_DiemConfig_NewEpochEvent">DiemConfig::NewEpochEvent</a></code> to trigger
 a reconfiguration of the system.
 
 
@@ -5487,7 +5487,7 @@ a reconfiguration of the system.
 | Name            | Type          | Description                                                                |
 | ------          | ------        | -------------                                                              |
 | <code>account</code>       | <code>signer</code>      | Signer of the sending account. Must be the Diem Root account.              |
-| <code>sliding_nonce</code> | <code>u64</code>         | The <code>sliding_nonce</code> (see: <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction. |
+| <code>sliding_nonce</code> | <code>u64</code>         | The <code>sliding_nonce</code> (see: <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction. |
 | <code>config</code>        | <code>vector&lt;u8&gt;</code>  | The serialized bytes of consensus config.                                  |
 
 
@@ -5497,11 +5497,11 @@ a reconfiguration of the system.
 
 | Error Category             | Error Reason                                  | Description                                                                                |
 | ----------------           | --------------                                | -------------                                                                              |
-| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>                | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code> resource is not published under <code>account</code>.                                |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_OLD">SlidingNonce::ENONCE_TOO_OLD</a></code>                | The <code>sliding_nonce</code> is too old and it's impossible to determine if it's duplicated or not. |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_NEW">SlidingNonce::ENONCE_TOO_NEW</a></code>                | The <code>sliding_nonce</code> is too far in the future.                                              |
-| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_ENONCE_ALREADY_RECORDED">SlidingNonce::ENONCE_ALREADY_RECORDED</a></code>       | The <code>sliding_nonce</code> has been previously recorded.                                          |
-| <code><a href="_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/modules/CoreAddresses.md#0x1_CoreAddresses_EDIEM_ROOT">CoreAddresses::EDIEM_ROOT</a></code>                   | <code>account</code> is not the Diem Root account.                                                    |
+| <code><a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>    | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>                | A <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code> resource is not published under <code>account</code>.                                |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_OLD">SlidingNonce::ENONCE_TOO_OLD</a></code>                | The <code>sliding_nonce</code> is too old and it's impossible to determine if it's duplicated or not. |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_NEW">SlidingNonce::ENONCE_TOO_NEW</a></code>                | The <code>sliding_nonce</code> is too far in the future.                                              |
+| <code><a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_ENONCE_ALREADY_RECORDED">SlidingNonce::ENONCE_ALREADY_RECORDED</a></code>       | The <code>sliding_nonce</code> has been previously recorded.                                          |
+| <code><a href="_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a></code> | <code><a href="../../../../../../DPN/releases/artifacts/current/docs/sources/CoreAddresses.md#0x1_CoreAddresses_EDIEM_ROOT">CoreAddresses::EDIEM_ROOT</a></code>                   | <code>account</code> is not the Diem Root account.                                                    |
 
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_SystemAdministrationScripts_update_diem_consensus_config">update_diem_consensus_config</a>(account: signer, sliding_nonce: u64, config: vector&lt;u8&gt;)
@@ -5514,8 +5514,8 @@ a reconfiguration of the system.
 
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_SystemAdministrationScripts_update_diem_consensus_config">update_diem_consensus_config</a>(account: signer, sliding_nonce: u64, config: vector&lt;u8&gt;) {
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&account, sliding_nonce);
-    <a href="../../../../../../DPN/releases/artifacts/current/docs/modules/DiemConsensusConfig.md#0x1_DiemConsensusConfig_set">DiemConsensusConfig::set</a>(&account, config)
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&account, sliding_nonce);
+    <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemConsensusConfig.md#0x1_DiemConsensusConfig_set">DiemConsensusConfig::set</a>(&account, config)
 }
 </code></pre>
 
@@ -5532,42 +5532,42 @@ a reconfiguration of the system.
 
 -  [`0x1::AccountAdministrationScripts`](script_documentation.md#0x1_AccountAdministrationScripts)
 -  [`0x1::AccountCreationScripts`](script_documentation.md#0x1_AccountCreationScripts)
--  [`0x1::AccountFreezing`](../../../../../../DPN/releases/artifacts/current/docs/modules/AccountFreezing.md#0x1_AccountFreezing)
--  [`0x1::AccountLimits`](../../../../../../DPN/releases/artifacts/current/docs/modules/AccountLimits.md#0x1_AccountLimits)
--  [`0x1::Authenticator`](../../../../../../DPN/releases/artifacts/current/docs/modules/Authenticator.md#0x1_Authenticator)
--  [`0x1::CRSN`](../../../../../../DPN/releases/artifacts/current/docs/modules/CRSN.md#0x1_CRSN)
--  [`0x1::ChainId`](../../../../../../DPN/releases/artifacts/current/docs/modules/ChainId.md#0x1_ChainId)
--  [`0x1::CoreAddresses`](../../../../../../DPN/releases/artifacts/current/docs/modules/CoreAddresses.md#0x1_CoreAddresses)
--  [`0x1::DesignatedDealer`](../../../../../../DPN/releases/artifacts/current/docs/modules/DesignatedDealer.md#0x1_DesignatedDealer)
--  [`0x1::Diem`](../../../../../../DPN/releases/artifacts/current/docs/modules/Diem.md#0x1_Diem)
--  [`0x1::DiemAccount`](../../../../../../DPN/releases/artifacts/current/docs/modules/DiemAccount.md#0x1_DiemAccount)
--  [`0x1::DiemBlock`](../../../../../../DPN/releases/artifacts/current/docs/modules/DiemBlock.md#0x1_DiemBlock)
--  [`0x1::DiemConfig`](../../../../../../DPN/releases/artifacts/current/docs/modules/DiemConfig.md#0x1_DiemConfig)
--  [`0x1::DiemConsensusConfig`](../../../../../../DPN/releases/artifacts/current/docs/modules/DiemConsensusConfig.md#0x1_DiemConsensusConfig)
--  [`0x1::DiemSystem`](../../../../../../DPN/releases/artifacts/current/docs/modules/DiemSystem.md#0x1_DiemSystem)
--  [`0x1::DiemTimestamp`](../../../../../../DPN/releases/artifacts/current/docs/modules/DiemTimestamp.md#0x1_DiemTimestamp)
--  [`0x1::DiemTransactionPublishingOption`](../../../../../../DPN/releases/artifacts/current/docs/modules/DiemTransactionPublishingOption.md#0x1_DiemTransactionPublishingOption)
--  [`0x1::DiemVMConfig`](../../../../../../DPN/releases/artifacts/current/docs/modules/DiemVMConfig.md#0x1_DiemVMConfig)
--  [`0x1::DiemVersion`](../../../../../../DPN/releases/artifacts/current/docs/modules/DiemVersion.md#0x1_DiemVersion)
--  [`0x1::DualAttestation`](../../../../../../DPN/releases/artifacts/current/docs/modules/DualAttestation.md#0x1_DualAttestation)
--  [`0x1::Genesis`](../../../../../../DPN/releases/artifacts/current/docs/modules/Genesis.md#0x1_Genesis)
+-  [`0x1::AccountFreezing`](../../../../../../DPN/releases/artifacts/current/docs/sources/AccountFreezing.md#0x1_AccountFreezing)
+-  [`0x1::AccountLimits`](../../../../../../DPN/releases/artifacts/current/docs/sources/AccountLimits.md#0x1_AccountLimits)
+-  [`0x1::Authenticator`](../../../../../../DPN/releases/artifacts/current/docs/sources/Authenticator.md#0x1_Authenticator)
+-  [`0x1::CRSN`](../../../../../../DPN/releases/artifacts/current/docs/sources/CRSN.md#0x1_CRSN)
+-  [`0x1::ChainId`](../../../../../../DPN/releases/artifacts/current/docs/sources/ChainId.md#0x1_ChainId)
+-  [`0x1::CoreAddresses`](../../../../../../DPN/releases/artifacts/current/docs/sources/CoreAddresses.md#0x1_CoreAddresses)
+-  [`0x1::DesignatedDealer`](../../../../../../DPN/releases/artifacts/current/docs/sources/DesignatedDealer.md#0x1_DesignatedDealer)
+-  [`0x1::Diem`](../../../../../../DPN/releases/artifacts/current/docs/sources/Diem.md#0x1_Diem)
+-  [`0x1::DiemAccount`](../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount)
+-  [`0x1::DiemBlock`](../../../../../../DPN/releases/artifacts/current/docs/sources/DiemBlock.md#0x1_DiemBlock)
+-  [`0x1::DiemConfig`](../../../../../../DPN/releases/artifacts/current/docs/sources/DiemConfig.md#0x1_DiemConfig)
+-  [`0x1::DiemConsensusConfig`](../../../../../../DPN/releases/artifacts/current/docs/sources/DiemConsensusConfig.md#0x1_DiemConsensusConfig)
+-  [`0x1::DiemSystem`](../../../../../../DPN/releases/artifacts/current/docs/sources/DiemSystem.md#0x1_DiemSystem)
+-  [`0x1::DiemTimestamp`](../../../../../../DPN/releases/artifacts/current/docs/sources/DiemTimestamp.md#0x1_DiemTimestamp)
+-  [`0x1::DiemTransactionPublishingOption`](../../../../../../DPN/releases/artifacts/current/docs/sources/DiemTransactionPublishingOption.md#0x1_DiemTransactionPublishingOption)
+-  [`0x1::DiemVMConfig`](../../../../../../DPN/releases/artifacts/current/docs/sources/DiemVMConfig.md#0x1_DiemVMConfig)
+-  [`0x1::DiemVersion`](../../../../../../DPN/releases/artifacts/current/docs/sources/DiemVersion.md#0x1_DiemVersion)
+-  [`0x1::DualAttestation`](../../../../../../DPN/releases/artifacts/current/docs/sources/DualAttestation.md#0x1_DualAttestation)
+-  [`0x1::Genesis`](../../../../../../DPN/releases/artifacts/current/docs/sources/Genesis.md#0x1_Genesis)
 -  [`0x1::PaymentScripts`](script_documentation.md#0x1_PaymentScripts)
--  [`0x1::RecoveryAddress`](../../../../../../DPN/releases/artifacts/current/docs/modules/RecoveryAddress.md#0x1_RecoveryAddress)
--  [`0x1::RegisteredCurrencies`](../../../../../../DPN/releases/artifacts/current/docs/modules/RegisteredCurrencies.md#0x1_RegisteredCurrencies)
--  [`0x1::Roles`](../../../../../../DPN/releases/artifacts/current/docs/modules/Roles.md#0x1_Roles)
--  [`0x1::SharedEd25519PublicKey`](../../../../../../DPN/releases/artifacts/current/docs/modules/SharedEd25519PublicKey.md#0x1_SharedEd25519PublicKey)
--  [`0x1::Signature`](../../../../../../DPN/releases/artifacts/current/docs/modules/Signature.md#0x1_Signature)
--  [`0x1::SlidingNonce`](../../../../../../DPN/releases/artifacts/current/docs/modules/SlidingNonce.md#0x1_SlidingNonce)
+-  [`0x1::RecoveryAddress`](../../../../../../DPN/releases/artifacts/current/docs/sources/RecoveryAddress.md#0x1_RecoveryAddress)
+-  [`0x1::RegisteredCurrencies`](../../../../../../DPN/releases/artifacts/current/docs/sources/RegisteredCurrencies.md#0x1_RegisteredCurrencies)
+-  [`0x1::Roles`](../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles)
+-  [`0x1::SharedEd25519PublicKey`](../../../../../../DPN/releases/artifacts/current/docs/sources/SharedEd25519PublicKey.md#0x1_SharedEd25519PublicKey)
+-  [`0x1::Signature`](../../../../../../DPN/releases/artifacts/current/docs/sources/Signature.md#0x1_Signature)
+-  [`0x1::SlidingNonce`](../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce)
 -  [`0x1::SystemAdministrationScripts`](script_documentation.md#0x1_SystemAdministrationScripts)
--  [`0x1::TransactionFee`](../../../../../../DPN/releases/artifacts/current/docs/modules/TransactionFee.md#0x1_TransactionFee)
+-  [`0x1::TransactionFee`](../../../../../../DPN/releases/artifacts/current/docs/sources/TransactionFee.md#0x1_TransactionFee)
 -  [`0x1::TreasuryComplianceScripts`](script_documentation.md#0x1_TreasuryComplianceScripts)
--  [`0x1::VASP`](../../../../../../DPN/releases/artifacts/current/docs/modules/VASP.md#0x1_VASP)
--  [`0x1::VASPDomain`](../../../../../../DPN/releases/artifacts/current/docs/modules/VASPDomain.md#0x1_VASPDomain)
+-  [`0x1::VASP`](../../../../../../DPN/releases/artifacts/current/docs/sources/VASP.md#0x1_VASP)
+-  [`0x1::VASPDomain`](../../../../../../DPN/releases/artifacts/current/docs/sources/VASPDomain.md#0x1_VASPDomain)
 -  [`0x1::ValidatorAdministrationScripts`](script_documentation.md#0x1_ValidatorAdministrationScripts)
--  [`0x1::ValidatorConfig`](../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorConfig.md#0x1_ValidatorConfig)
--  [`0x1::ValidatorOperatorConfig`](../../../../../../DPN/releases/artifacts/current/docs/modules/ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig)
--  [`0x1::XDX`](../../../../../../DPN/releases/artifacts/current/docs/modules/XDX.md#0x1_XDX)
--  [`0x1::XUS`](../../../../../../DPN/releases/artifacts/current/docs/modules/XUS.md#0x1_XUS)
+-  [`0x1::ValidatorConfig`](../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorConfig.md#0x1_ValidatorConfig)
+-  [`0x1::ValidatorOperatorConfig`](../../../../../../DPN/releases/artifacts/current/docs/sources/ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig)
+-  [`0x1::XDX`](../../../../../../DPN/releases/artifacts/current/docs/sources/XDX.md#0x1_XDX)
+-  [`0x1::XUS`](../../../../../../DPN/releases/artifacts/current/docs/sources/XUS.md#0x1_XUS)
 
 
 [//]: # ("File containing references which can be used from documentation")

@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 DIEM="$(git rev-parse --show-toplevel)"
-FRAMEWORK="$DIEM/language/diem-framework/core/modules"
+FRAMEWORK="$DIEM/language/diem-framework/core/sources"
 STDLIB="$DIEM/language/move-stdlib/sources"
 
 for config in *.toml ; do

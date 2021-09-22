@@ -93,10 +93,10 @@ where
 }
 
 /// The documentation root template for the Diem Framework modules.
-const MODULE_DOC_TEMPLATE: &str = "core/overview_template.md";
+const MODULE_DOC_TEMPLATE: &str = "core/doc_templates/overview_template.md";
 
 /// Path to the references template.
-const REFERENCES_DOC_TEMPLATE: &str = "core/references_template.md";
+const REFERENCES_DOC_TEMPLATE: &str = "core/doc_templates/references_template.md";
 
 fn generate_module_docs(output_path: impl AsRef<Path>, with_diagram: bool) {
     let output_path = output_path.as_ref();
@@ -158,27 +158,27 @@ fn generate_script_docs(
                 .to_string(),
         ),
         &[
-            path_in_crate("core/modules/AccountAdministrationScripts.move")
+            path_in_crate("core/sources/AccountAdministrationScripts.move")
                 .to_str()
                 .unwrap()
                 .to_string(),
-            path_in_crate("core/modules/AccountCreationScripts.move")
+            path_in_crate("core/sources/AccountCreationScripts.move")
                 .to_str()
                 .unwrap()
                 .to_string(),
-            path_in_crate("core/modules/PaymentScripts.move")
+            path_in_crate("core/sources/PaymentScripts.move")
                 .to_str()
                 .unwrap()
                 .to_string(),
-            path_in_crate("core/modules/SystemAdministrationScripts.move")
+            path_in_crate("core/sources/SystemAdministrationScripts.move")
                 .to_str()
                 .unwrap()
                 .to_string(),
-            path_in_crate("core/modules/TreasuryComplianceScripts.move")
+            path_in_crate("core/sources/TreasuryComplianceScripts.move")
                 .to_str()
                 .unwrap()
                 .to_string(),
-            path_in_crate("core/modules/ValidatorAdministrationScripts.move")
+            path_in_crate("core/sources/ValidatorAdministrationScripts.move")
                 .to_str()
                 .unwrap()
                 .to_string(),
@@ -330,7 +330,7 @@ pub fn create_release(output_path: impl AsRef<Path>, options: &ReleaseOptions) {
     let msg = |s: &'static str| if options.time_it { Some(s) } else { None };
 
     if options.build_modules {
-        let modules_path = output_path.join("modules");
+        let modules_path = output_path.join("sources");
         let mut old_module_apis = None;
         if options.check_layout_compatibility {
             old_module_apis = run_step(
@@ -349,7 +349,7 @@ pub fn create_release(output_path: impl AsRef<Path>, options: &ReleaseOptions) {
     }
 
     let docs_path = output_path.join("docs");
-    let module_docs_path = docs_path.join("modules");
+    let module_docs_path = docs_path.join("sources");
     if options.module_docs {
         run_step(msg("Generating module docs"), || {
             generate_module_docs(&module_docs_path, options.with_diagram)
@@ -405,7 +405,7 @@ pub fn sync_doc_files(output_path: &str) {
     };
 
     sync(
-        &Path::new(output_path).join("docs").join("modules"),
+        &Path::new(output_path).join("docs").join("sources"),
         &Path::new("core").join("doc"),
     );
 

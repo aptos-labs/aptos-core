@@ -37,7 +37,7 @@ pub fn list_all_releases() -> Result<Vec<String>> {
 /// Load the serialized modules from the specified release.
 pub fn load_modules_from_release(release_name: &str) -> Result<Vec<Vec<u8>>> {
     let mut modules_path = PathBuf::from(release_name);
-    modules_path.push("modules");
+    modules_path.push("sources");
 
     match RELEASES_DIR.get_dir(&modules_path) {
         Some(modules_dir) => {

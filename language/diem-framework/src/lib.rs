@@ -22,8 +22,8 @@ use std::{
 pub mod natives;
 pub mod release;
 
-const CORE_MODULES_DIR: &str = "core/modules";
-const DPN_MODULES_DIR: &str = "DPN/modules";
+const CORE_MODULES_DIR: &str = "core/sources";
+const DPN_MODULES_DIR: &str = "DPN/sources";
 
 /// The output path under which compiled files will be put
 pub const COMPILED_OUTPUT_PATH: &str = "compiled";

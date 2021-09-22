@@ -27,14 +27,14 @@ const ENV_TEST_FEATURE: &str = "MVP_TEST_FEATURE";
 const ENV_TEST_ON_CI: &str = "MVP_TEST_ON_CI";
 const INCONSISTENCY_TEST_FLAGS: &[&str] = &[
     "--dependency=../move-stdlib/sources",
-    "--dependency=../diem-framework/core/modules",
-    "--dependency=../diem-framework/experimental/modules",
+    "--dependency=../diem-framework/core/sources",
+    "--dependency=../diem-framework/experimental/sources",
     "--check-inconsistency",
 ];
 const REGULAR_TEST_FLAGS: &[&str] = &[
     "--dependency=../move-stdlib/sources",
-    "--dependency=../diem-framework/core/modules",
-    "--dependency=../diem-framework/experimental/modules",
+    "--dependency=../diem-framework/core/sources",
+    "--dependency=../diem-framework/experimental/sources",
 ];
 
 static NOT_CONFIGURED_WARNED: AtomicBool = AtomicBool::new(false);

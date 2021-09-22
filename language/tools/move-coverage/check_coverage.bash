@@ -42,7 +42,7 @@ echo "Building Move modules and source maps.."
 echo "---------------------------------------------------------------------------"
 pushd ../../move-lang || exit 1
 rm -rf build
-cargo run --bin move-build -- ../diem-framework/core/modules -m
+cargo run --bin move-build -- ../diem-framework/core/sources -m
 popd || exit 1
 
 echo "---------------------------------------------------------------------------"
@@ -53,7 +53,7 @@ cargo run --bin move-trace-conversion -- -f "$TRACE_PATH" -o trace.mvcov
 echo "---------------------------------------------------------------------------"
 echo "Producing coverage summaries..."
 echo "---------------------------------------------------------------------------"
-cargo run --bin coverage-summaries -- -t trace.mvcov -s ../../diem-framework/DPN/releases/artifacts/current/modules
+cargo run --bin coverage-summaries -- -t trace.mvcov -s ../../diem-framework/DPN/releases/artifacts/current/sources
 
 echo "==========================================================================="
 echo "You can check source coverage for a module by running:"
