@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_config::{config::PeerNetworkId, network_id::NetworkId};
+use diem_config::network_id::{NetworkId, PeerNetworkId};
 use diem_metrics::{
     register_histogram, register_histogram_vec, register_int_counter, register_int_counter_vec,
     register_int_gauge, register_int_gauge_vec, DurationHistogram, HistogramTimer, HistogramVec,

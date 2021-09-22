@@ -1,7 +1,9 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_types::PeerId;
+use crate::network_id::NetworkId;
+use diem_secure_storage::{KVStorage, Storage};
+use diem_types::{waypoint::Waypoint, PeerId};
 use rand::{rngs::StdRng, SeedableRng};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
@@ -40,12 +42,7 @@ mod storage_config;
 pub use storage_config::*;
 mod safety_rules_config;
 pub use safety_rules_config::*;
-mod upstream_config;
-pub use upstream_config::*;
 mod test_config;
-use crate::network_id::NetworkId;
-use diem_secure_storage::{KVStorage, Storage};
-use diem_types::waypoint::Waypoint;
 pub use test_config::*;
 mod api_config;
 pub use api_config::*;

@@ -2,6 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! Processes that are directly spawned by shared mempool runtime initialization
+use anyhow::Result;
+use futures::{
+    channel::{mpsc, oneshot},
+    stream::{select_all, FuturesUnordered},
+    StreamExt,
+};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant, SystemTime},
+};
+use tokio::{runtime::Handle, time::interval};
+use tokio_stream::wrappers::IntervalStream;
 
 use crate::{
     core_mempool::{CoreMempool, TimelineState},
@@ -16,9 +28,8 @@ use crate::{
     ConsensusRequest, SubmissionStatus, TransactionSummary,
 };
 use ::network::protocols::network::Event;
-use anyhow::Result;
 use bounded_executor::BoundedExecutor;
-use diem_config::{config::PeerNetworkId, network_id::NetworkId};
+use diem_config::network_id::{NetworkId, PeerNetworkId};
 use diem_infallible::Mutex;
 use diem_logger::prelude::*;
 use diem_types::{
@@ -26,18 +37,7 @@ use diem_types::{
     transaction::SignedTransaction, vm_status::DiscardedVMStatus,
 };
 use event_notifications::ReconfigNotificationListener;
-use futures::{
-    channel::{mpsc, oneshot},
-    stream::{select_all, FuturesUnordered},
-    StreamExt,
-};
 use mempool_notifications::{MempoolCommitNotification, MempoolNotificationListener};
-use std::{
-    sync::Arc,
-    time::{Duration, Instant, SystemTime},
-};
-use tokio::{runtime::Handle, time::interval};
-use tokio_stream::wrappers::IntervalStream;
 use vm_validator::vm_validator::TransactionValidation;
 
 /// Coordinator that handles inbound network events and outbound txn broadcasts.

@@ -16,7 +16,7 @@ use crate::{
     },
 };
 use async_trait::async_trait;
-use diem_config::config::PeerNetworkId;
+use diem_config::network_id::PeerNetworkId;
 use diem_types::PeerId;
 use futures::{stream::FusedStream, Stream};
 use std::{

@@ -18,8 +18,8 @@ use consensus_notifications::{
     ConsensusSyncNotification,
 };
 use diem_config::{
-    config::{NodeConfig, PeerNetworkId, RoleType, StateSyncConfig},
-    network_id::NetworkId,
+    config::{NodeConfig, RoleType, StateSyncConfig},
+    network_id::{NetworkId, PeerNetworkId},
 };
 use diem_logger::prelude::*;
 use diem_types::{
@@ -1728,8 +1728,8 @@ mod tests {
         ConsensusCommitNotification, ConsensusNotificationResponse, ConsensusSyncNotification,
     };
     use diem_config::{
-        config::{NodeConfig, PeerNetworkId, PeerRole, RoleType},
-        network_id::NetworkId,
+        config::{NodeConfig, PeerRole, RoleType},
+        network_id::{NetworkId, PeerNetworkId},
     };
     use diem_crypto::{
         ed25519::{Ed25519PrivateKey, Ed25519Signature},

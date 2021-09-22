@@ -33,7 +33,7 @@ use crate::{
 };
 use bytes::Bytes;
 use channel::message_queues::QueueStyle;
-use diem_config::{config::PeerNetworkId, network_id::NetworkContext};
+use diem_config::network_id::{NetworkContext, PeerNetworkId};
 use diem_logger::prelude::*;
 use diem_metrics::IntCounterVec;
 use diem_time_service::{TimeService, TimeServiceTrait};

@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! Tasks that are executed by coordinators (short-lived compared to coordinators)
-
 use crate::{
     core_mempool::{CoreMempool, TimelineState, TxnPointer},
     counters,
@@ -15,7 +14,7 @@ use crate::{
     ConsensusRequest, ConsensusResponse, SubmissionStatus,
 };
 use anyhow::Result;
-use diem_config::config::PeerNetworkId;
+use diem_config::network_id::PeerNetworkId;
 use diem_infallible::{Mutex, RwLock};
 use diem_logger::prelude::*;
 use diem_metrics::HistogramTimer;

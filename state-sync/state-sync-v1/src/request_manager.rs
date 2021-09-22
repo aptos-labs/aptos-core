@@ -9,8 +9,8 @@ use crate::{
     network::{StateSyncMessage, StateSyncSender},
 };
 use diem_config::{
-    config::{PeerNetworkId, PeerRole},
-    network_id::NetworkId,
+    config::PeerRole,
+    network_id::{NetworkId, PeerNetworkId},
 };
 use diem_logger::prelude::*;
 use itertools::Itertools;

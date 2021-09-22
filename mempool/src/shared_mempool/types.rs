@@ -2,15 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! Objects used by/related to shared mempool
-
 use crate::{
     core_mempool::CoreMempool,
     shared_mempool::{network::MempoolNetworkSender, peer_manager::PeerManager},
 };
 use anyhow::Result;
 use diem_config::{
-    config::{MempoolConfig, PeerNetworkId},
-    network_id::NetworkId,
+    config::MempoolConfig,
+    network_id::{NetworkId, PeerNetworkId},
 };
 use diem_infallible::{Mutex, RwLock};
 use diem_types::{

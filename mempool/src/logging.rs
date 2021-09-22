@@ -3,7 +3,7 @@
 
 use crate::shared_mempool::{peer_manager::BatchId, types::ConsensusRequest};
 use anyhow::Error;
-use diem_config::{config::PeerNetworkId, network_id::NetworkId};
+use diem_config::network_id::{NetworkId, PeerNetworkId};
 use diem_logger::Schema;
 use diem_types::{account_address::AccountAddress, on_chain_config::OnChainConfigPayload};
 use mempool_notifications::MempoolCommitNotification;

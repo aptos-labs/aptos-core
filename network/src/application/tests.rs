@@ -9,7 +9,7 @@ use crate::{
     },
     transport::ConnectionMetadata,
 };
-use diem_config::{config::PeerNetworkId, network_id::NetworkId};
+use diem_config::network_id::{NetworkId, PeerNetworkId};
 use diem_types::PeerId;
 use std::{collections::hash_map::Entry, sync::Arc};
 

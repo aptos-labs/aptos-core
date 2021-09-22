@@ -1,10 +1,11 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
+
 use crate::{
     application::types::{PeerError, PeerInfo},
     transport::ConnectionMetadata,
 };
-use diem_config::{config::PeerNetworkId, network_id::NetworkId};
+use diem_config::network_id::{NetworkId, PeerNetworkId};
 use diem_infallible::{RwLock, RwLockWriteGuard};
 use std::{
     collections::{hash_map::Entry, HashMap},

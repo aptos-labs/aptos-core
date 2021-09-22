@@ -6,7 +6,7 @@ use crate::application::{
     types::{PeerError, PeerInfo, PeerState},
 };
 use async_trait::async_trait;
-use diem_config::config::PeerNetworkId;
+use diem_config::network_id::PeerNetworkId;
 use std::collections::{hash_map::Entry, HashMap};
 
 /// A generic `NetworkInterface` for applications to connect to networking
