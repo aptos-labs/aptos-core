@@ -34,7 +34,6 @@ dump NotCheckedAtTypeBy;
 # expect NotCheckedAtTypeBy{.node = 3, .checker = 3, .t = 2}
 
 # expect NotCheckedAtTypeBy{.node = 4, .checker = 3, .t = 1}
-# expect NotCheckedAtTypeBy{.node = 4, .checker = 3, .t = 2}
 
 # expect NotCheckedAtTypeBy{.node = 5, .checker = 3, .t = 1}
 # expect NotCheckedAtTypeBy{.node = 5, .checker = 3, .t = 2}

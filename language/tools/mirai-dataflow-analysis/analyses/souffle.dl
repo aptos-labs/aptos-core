@@ -60,9 +60,14 @@ NotEqual(node2, node1) :- NotEqual(node1, node2).
 
 
 // Valid type
-// A valid type is associated with some edge in the graph.
-.decl ValidType(rtype: TypeID)
-ValidType(rtype) :- EdgeType(_, rtype).
+// A valid type is associated with some edge in the graph
+// or is associated with some input type relation.
+.decl ValidType(t: TypeID)
+ValidType(t) :- EdgeType(_, t).
+ValidType(t) :- Member(t, _).
+ValidType(t) :- Member(_, t).
+ValidType(t) :- EqType(t, _).
+ValidType(t) :- EqType(_, t).
 
 
 // Type equality
@@ -76,12 +81,18 @@ TypeEquality(rtype1, rtype2) :- EqType(rtype2, rtype1).
 
 
 // Transitive type member (includes type equality)
-// Encodes that rtype2 is a (transitive) member of rtype1
+// Encodes that rtype2 is a (transitive) member of rtype1 if
+//   a. rtype1 == rtype2
+//   b. rtype2 is (transitively) a member of rtype1
+//   c. rtype1 and rtype2 are equal to some other rtypes that
+//      are in a membership relationship
 .decl MemberTrans(rtype1: TypeID, rtype2: TypeID)
 MemberTrans(rtype1, rtype2) :- TypeEquality(rtype1, rtype2).
 MemberTrans(rtype1, rtype2) :- Member(rtype1, rtype2).
 MemberTrans(rtype1, rtype3) :- Member(rtype1, rtype2), MemberTrans(rtype2, rtype3).
-
+MemberTrans(rtype1a, rtype2a) :- TypeEquality(rtype1a, rtype1b),
+                                TypeEquality(rtype2a, rtype2b),
+                                MemberTrans(rtype1b, rtype2b).
 
 // Typed caller (non-transitive)
 // node1 is a caller of node2 at type t if there is an edge from node1
@@ -95,9 +106,11 @@ TypedCallerNT(node1, node2, t2) :- Edge(id, node1, node2), EdgeType(id, t), Memb
 //   a. node1 calls node2 with an argument of type t
 //   b. node1 calls a sequence of nodes with arguments whose types are members
 //      of t up to the call to node2
+//   c. t is a subtype of t2 and node1 calls node2 with t2
 .decl TypedCaller(node1: NodeID, node2: NodeID, t: NodeID)
 TypedCaller(node1, node2, t) :- TypedCallerNT(node1, node2, t).
 TypedCaller(node1, node3, t) :- TypedCallerNT(node1, node2, t), TypedCaller(node2, node3, t).
+TypedCaller(node1, node2, t) :- MemberTrans(t2, t), TypedCaller(node1, node2, t2).
 
 
 // Dominates with typing (non-transitive)
@@ -118,10 +131,12 @@ TypedDominatesNT(node1, node2, t) :- Dom(node1, node2), Edge(id1, parent, node1)
 //  a. node1 non-transitively dominates node2 at type t
 //  b. node2 is a callee of some node that is dominated by node1 at type t.
 //     (This case is a heuristic that should be obviated with precise dominance information.)
+//  c. t is a subtype of t2 and node1 dominates node2 for t2
 .decl TypedDominates(node1: NodeID, node2: NodeID, t: TypeID)
 TypedDominates(node1, node2, t) :- TypedDominatesNT(node1, node2, t).
 TypedDominates(node1, node3, t) :- TypedDominatesNT(node1, node2, t), TypedDominates(node2, node3, t).
 TypedDominates(node1, node2, t) :- TypedCaller(parent, node1, t), TypedDominates(parent, node2, t).
+TypedDominates(node1, node2, t) :- Member(t2, t), TypedDominates(node1, node2, t2).
 
 
 // Typed dataflow model (non-transitive)
@@ -138,12 +153,13 @@ TypedDataflowNT(node1, node2, t) :- TypedDominatesNT(node1, node2, t).
 //      a. if node1 transitively calls node2 at type t
 //      b. if node1 transitively dominates node2 at type t
 //      c. if there transitively is a dataflow at type t
-//      d. if there is a dataflow of type t1 and t is a member of t1
+//      d. if there is a dataflow of type t2 and t is a member of t2
 .decl TypedDataflow(node1: NodeID, node2: NodeID, t: TypeID)
 TypedDataflow(node1, node2, t) :- TypedCaller(node1, node2, t).
 TypedDataflow(node1, node2, t) :- TypedDominates(node1, node2, t).
 TypedDataflow(node1, node3, t) :- TypedDataflow(node1, node2, t), TypedDataflow(node2, node3, t).
-TypedDataflow(node1, node2, t2) :- MemberTrans(t1, t2), TypedDataflow(node1, node2, t1).
+TypedDataflow(node1, node2, t) :- MemberTrans(t2, t), TypedDataflow(node1, node2, t2).
+
 
 // Typed dataflow via
 // There exists a dataflow from node1 to node3 that passes through node2
@@ -153,25 +169,42 @@ TypedDataflowVia(node1, node2, node3, t) :- TypedDataflow(node1, node2, t), NotE
                                             TypedDataflow(node2, node3, t), NotEqual(node2, node3).
 
 
+// Safe dataflow
+// A dataflow from node1 to node2 (a checker) is considered safe if
+//   a. node1 is a checker
+//   b. node1 has a dataflow to node2
+//   c. node2 dominates node1 for t
+.decl SafeDataflow(node1: NodeID, node2: NodeID, t: TypeID)
+SafeDataflow(node1, node2, t) :- ValidNode(node2), ValidType(t), NodeType(node1, 1).
+SafeDataflow(node1, node2, t) :- TypedDataflow(node1, node2, t).
+SafeDataflow(node1, node2, t) :- TypedDominates(node2, node1, t).
+
+
+// Terminal node
+// A node is a terminal node if it does not have any outgoing edges.
+.decl TerminalNode(node: NodeID)
+TerminalNode(node) :- ValidNode(node), !Edge(_, node, _).
+
+
 // Typed dataflow not via
 // There exists a dataflow of type t from node1 to node3 that does not pass through node2.
 //
-// a. There is a non-transitive dataflow of type t from node1 to node3.
+// a. There is a terminal non-transitive dataflow of type t from node1 to node3.
 // b. There is a dataflow of type t from node1 to node3 that passes through some node4 != node2.
 //    Since there is no dataflow of type t from node2 to node4, node2 cannot be in that same flow.
 //
 // This is not guaranteed if an over-approximation of the call graph is used.
 .decl TypedDataflowNotVia(node1: NodeID, node2: NodeID, node3: NodeID, t: TypeID)
-// TypedDataflowNotVia(node1, node2, node3, t) :- NotEqual(node1, node2), NotEqual(node2, node3),
-//                                                 TypedDataflowNT(node1, node3, t).
+TypedDataflowNotVia(node1, node2, node3, t) :- NotEqual(node1, node2), NotEqual(node2, node3), TerminalNode(node3),
+                                                TypedDataflowNT(node1, node3, t).
 TypedDataflowNotVia(node1, node2, node3, t) :- NotEqual(node1, node2), NotEqual(node2, node3),
                                                 TypedDataflowVia(node1, node4, node3, t), NotEqual(node2, node4),
-                                                !TypedDataflow(node4, node2, t).
+                                                !SafeDataflow(node4, node2, t).
 
 
 // Checked type
-// All dataflow of type t are pass through the checker
-// There does not exist a dataflow of type t that does not pass through the checker
+// All dataflow of type t pass through a checker
+// There does not exist a dataflow of type t that does not pass through a checker
 .decl CheckedType(t: TypeID)
 CheckedType(t) :- ValidType(t), NodeType(entry, 0), NodeType(checker, 1), NodeType(exit, 2),
     TypedDataflowVia(entry, checker, exit, t),
@@ -179,10 +212,19 @@ CheckedType(t) :- ValidType(t), NodeType(entry, 0), NodeType(checker, 1), NodeTy
 
 
 // Not checked type
-// There exists a dataflow of type t that does not pass through the checker
+// There exists a dataflow of type t that does not pass through a checker
 .decl NotCheckedType(t: TypeID)
 NotCheckedType(t) :- ValidType(t), !CheckedType(t).
 
 
+// Not checked type at
+// There exists a dataflow of type t that does not pass through a checker,
+// instead reaching some terminal node
+.decl NotCheckedTypeAt(t: TypeID, node: NodeID)
+NotCheckedTypeAt(t, node) :- ValidType(t), NodeType(entry, 0), NodeType(exit, 2),
+    !NodeType(node, 1), !Edge(_, node, _),
+    TypedDataflowVia(entry, node, exit, t).
+
+
 .output CheckedType(io=file, headers=true, delimiter=",")
-.output NotCheckedType(io=file, headers=true, delimiter=",")
+.output NotCheckedTypeAt(io=file, headers=true, delimiter=",")

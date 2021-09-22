@@ -18,17 +18,10 @@ dump TypedDataflowNotVia;
 
 # expect TypedDataflowNotVia{.node1 = 1, .node2 = 2, .node3 = 4, .t = 3}
 # expect TypedDataflowNotVia{.node1 = 1, .node2 = 2, .node3 = 5, .t = 1}
-
-# expect TypedDataflowNotVia{.node1 = 1, .node2 = 3, .node3 = 2, .t = 1}
 # expect TypedDataflowNotVia{.node1 = 1, .node2 = 3, .node3 = 4, .t = 3}
 # expect TypedDataflowNotVia{.node1 = 1, .node2 = 3, .node3 = 5, .t = 1}
-
-# expect TypedDataflowNotVia{.node1 = 1, .node2 = 4, .node3 = 2, .t = 1}
 # expect TypedDataflowNotVia{.node1 = 1, .node2 = 4, .node3 = 5, .t = 1}
-
-# expect TypedDataflowNotVia{.node1 = 1, .node2 = 5, .node3 = 2, .t = 1}
 # expect TypedDataflowNotVia{.node1 = 1, .node2 = 5, .node3 = 4, .t = 3}
-
 # expect TypedDataflowNotVia{.node1 = 2, .node2 = 1, .node3 = 3, .t = 2}
 # expect TypedDataflowNotVia{.node1 = 2, .node2 = 4, .node3 = 3, .t = 2}
 # expect TypedDataflowNotVia{.node1 = 2, .node2 = 5, .node3 = 3, .t = 2}
