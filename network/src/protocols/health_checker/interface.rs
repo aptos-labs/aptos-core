@@ -16,6 +16,7 @@ use crate::{
     },
 };
 use async_trait::async_trait;
+use diem_config::config::PeerNetworkId;
 use diem_types::PeerId;
 use futures::{stream::FusedStream, Stream};
 use std::{
@@ -61,9 +62,13 @@ impl HealthCheckNetworkInterface {
 
     /// Disconnect a peer, and keep track of the associated state
     /// Note: This removes the peer outright for now until we add GCing, and historical state management
-    pub async fn disconnect_peer(&mut self, peer_id: PeerId) -> Result<(), NetworkError> {
+    pub async fn disconnect_peer(
+        &mut self,
+        peer_network_id: PeerNetworkId,
+    ) -> Result<(), NetworkError> {
         // Possibly already disconnected, but try anyways
-        let _ = self.update_state(peer_id, PeerState::Disconnecting);
+        let _ = self.update_state(peer_network_id, PeerState::Disconnecting);
+        let peer_id = peer_network_id.peer_id();
         let result = self.sender.disconnect_peer(peer_id).await;
         if result.is_ok() {
             self.remove_app_data(&peer_id);
@@ -76,9 +81,13 @@ impl HealthCheckNetworkInterface {
     }
 
     /// Update state of peer globally
-    fn update_state(&self, peer_id: PeerId, state: PeerState) -> Result<(), PeerError> {
+    fn update_state(
+        &self,
+        peer_network_id: PeerNetworkId,
+        state: PeerState,
+    ) -> Result<(), PeerError> {
         self.peer_metadata_storage()
-            .write(peer_id, |entry| match entry {
+            .write(peer_network_id, |entry| match entry {
                 Entry::Vacant(..) => Err(PeerError::NotFound),
                 Entry::Occupied(inner) => {
                     inner.get_mut().status = state;
@@ -91,6 +100,7 @@ impl HealthCheckNetworkInterface {
 #[async_trait]
 impl NetworkInterface for HealthCheckNetworkInterface {
     type Sender = HealthCheckerNetworkSender;
+    type AppDataKey = PeerId;
     type AppData = HealthCheckData;
 
     fn peer_metadata_storage(&self) -> &PeerMetadataStorage {

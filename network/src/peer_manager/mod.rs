@@ -378,8 +378,10 @@ where
                     if conn_metadata.connection_id == lost_conn_metadata.connection_id {
                         // We lost an active connection.
                         entry.remove();
-                        self.peer_metadata_storage
-                            .remove_connection(&lost_conn_metadata)
+                        self.peer_metadata_storage.remove_connection(
+                            self.network_context.network_id(),
+                            &lost_conn_metadata,
+                        )
                     }
                 }
                 self.update_connected_peers_metrics();
@@ -469,7 +471,8 @@ where
                 // PeerRequest channel.
                 if let Some((conn_metadata, sender)) = self.active_peers.remove(&peer_id) {
                     let connection_id = conn_metadata.connection_id;
-                    self.peer_metadata_storage.remove_connection(&conn_metadata);
+                    self.peer_metadata_storage
+                        .remove_connection(self.network_context.network_id(), &conn_metadata);
 
                     // This triggers a disconnect.
                     drop(sender);
@@ -712,7 +715,7 @@ where
         self.active_peers
             .insert(peer_id, (conn_meta.clone(), peer_reqs_tx));
         self.peer_metadata_storage
-            .insert_connection(conn_meta.clone());
+            .insert_connection(self.network_context.network_id(), conn_meta.clone());
         // Send NewPeer notification to connection event handlers.
         if send_new_peer_notification {
             let notif = ConnectionNotification::NewPeer(conn_meta, self.network_context);

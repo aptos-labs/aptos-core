@@ -4,15 +4,15 @@ use crate::{
     application::types::{PeerError, PeerInfo},
     transport::ConnectionMetadata,
 };
-use diem_infallible::RwLock;
-use diem_types::PeerId;
+use diem_config::{config::PeerNetworkId, network_id::NetworkId};
+use diem_infallible::{RwLock, RwLockWriteGuard};
 use std::{
     collections::{hash_map::Entry, HashMap},
     fmt::Debug,
     hash::Hash,
 };
 
-pub type PeerMetadataStorage = LockingHashMap<PeerId, PeerInfo>;
+pub type PeerMetadataStorage = LockingHashMap<PeerNetworkId, PeerInfo>;
 
 /// A generic locking hash map with ability to read before write consistency
 pub struct LockingHashMap<Key: Clone + Debug + Eq + Hash, Value: Clone + Debug> {
@@ -81,24 +81,39 @@ where
         let mut map = self.map.write();
         modifier(&mut map.entry(key))
     }
+
+    /// Get the underlying `RwLock` of the map.  Usage is discouraged as it leads to the possiblity of
+    /// leaving the lock held for a long period of time.  However, not everything fits into the `write`
+    /// model.
+    pub fn write_lock(&self) -> RwLockWriteGuard<'_, HashMap<Key, Value>> {
+        self.map.write()
+    }
 }
 
 impl PeerMetadataStorage {
-    pub fn insert_connection(&self, connection_metadata: ConnectionMetadata) {
-        let peer_id = connection_metadata.remote_peer_id;
+    pub fn insert_connection(
+        &self,
+        network_id: NetworkId,
+        connection_metadata: ConnectionMetadata,
+    ) {
+        let peer_network_id = PeerNetworkId::new(network_id, connection_metadata.remote_peer_id);
         self.map
             .write()
-            .entry(peer_id)
+            .entry(peer_network_id)
             .and_modify(|entry| entry.active_connection = connection_metadata.clone())
             .or_insert_with(|| PeerInfo::new(connection_metadata));
     }
 
-    pub fn remove_connection(&self, connection_metadata: &ConnectionMetadata) {
-        let peer_id = connection_metadata.remote_peer_id;
+    pub fn remove_connection(
+        &self,
+        network_id: NetworkId,
+        connection_metadata: &ConnectionMetadata,
+    ) {
+        let peer_network_id = PeerNetworkId::new(network_id, connection_metadata.remote_peer_id);
         let mut map = self.map.write();
 
         // Don't remove the peer if the connection doesn't match!
-        if let Entry::Occupied(entry) = map.entry(peer_id) {
+        if let Entry::Occupied(entry) = map.entry(peer_network_id) {
             // For now, remove the peer entirely, we could in the future have multiple connections for a peer
             if entry.get().active_connection.connection_id == connection_metadata.connection_id {
                 entry.remove();

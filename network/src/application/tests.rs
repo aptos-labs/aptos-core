@@ -9,6 +9,7 @@ use crate::{
     },
     transport::ConnectionMetadata,
 };
+use diem_config::{config::PeerNetworkId, network_id::NetworkId};
 use diem_types::PeerId;
 use std::{collections::hash_map::Entry, sync::Arc};
 
@@ -20,6 +21,7 @@ struct DummyNetworkInterface {
 
 impl NetworkInterface for DummyNetworkInterface {
     type Sender = ();
+    type AppDataKey = PeerId;
     type AppData = usize;
 
     fn peer_metadata_storage(&self) -> &PeerMetadataStorage {
@@ -64,15 +66,15 @@ fn test_interface() {
     // Insert 2 connections, and we should have two active peers
     let connection_1 = ConnectionMetadata::mock(peer_1);
     let connection_2 = ConnectionMetadata::mock(peer_2);
-    peer_metadata_storage.insert_connection(connection_1);
-    peer_metadata_storage.insert_connection(connection_2.clone());
+    peer_metadata_storage.insert_connection(NetworkId::Public, connection_1);
+    peer_metadata_storage.insert_connection(NetworkId::Public, connection_2.clone());
     assert_eq!(2, interface.peers().len());
     assert_eq!(2, interface.connected_peers().len());
 
     // Disconnecting / disconnected are not counted in active
     update_state(
         peer_metadata_storage.clone(),
-        peer_1,
+        PeerNetworkId::new(NetworkId::Public, peer_1),
         PeerState::Disconnecting,
     );
     assert_eq!(2, interface.peers().len());
@@ -80,23 +82,23 @@ fn test_interface() {
 
     // Removing a connection with a different connection id doesn't remove it from storage
     let different_connection_2 = ConnectionMetadata::mock(peer_2);
-    peer_metadata_storage.remove_connection(&different_connection_2);
+    peer_metadata_storage.remove_connection(NetworkId::Public, &different_connection_2);
     assert_eq!(2, interface.peers().len());
     assert_eq!(1, interface.connected_peers().len());
 
     // Removing the same connection id removes it
-    peer_metadata_storage.remove_connection(&connection_2);
+    peer_metadata_storage.remove_connection(NetworkId::Public, &connection_2);
     assert_eq!(1, interface.peers().len());
     assert_eq!(0, interface.connected_peers().len());
 }
 
 fn update_state(
     peer_metadata_storage: Arc<PeerMetadataStorage>,
-    peer_id: PeerId,
+    peer_network_id: PeerNetworkId,
     state: PeerState,
 ) {
     peer_metadata_storage
-        .write(peer_id, |entry| match entry {
+        .write(peer_network_id, |entry| match entry {
             Entry::Vacant(..) => Err(PeerError::NotFound),
             Entry::Occupied(inner) => {
                 inner.get_mut().status = state;

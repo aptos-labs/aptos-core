@@ -33,7 +33,7 @@ use crate::{
 };
 use bytes::Bytes;
 use channel::message_queues::QueueStyle;
-use diem_config::network_id::NetworkContext;
+use diem_config::{config::PeerNetworkId, network_id::NetworkContext};
 use diem_logger::prelude::*;
 use diem_metrics::IntCounterVec;
 use diem_time_service::{TimeService, TimeServiceTrait};
@@ -410,7 +410,13 @@ impl HealthChecker {
                         self.network_context,
                         peer_id.short_str()
                     );
-                    if let Err(err) = self.network_interface.disconnect_peer(peer_id).await {
+                    let peer_network_id =
+                        PeerNetworkId::new(self.network_context.network_id(), peer_id);
+                    if let Err(err) = self
+                        .network_interface
+                        .disconnect_peer(peer_network_id)
+                        .await
+                    {
                         warn!(
                             NetworkSchema::new(&self.network_context)
                                 .remote_peer(&peer_id),
