@@ -1,0 +1,46 @@
+\UseRawInputEncoding
+\documentclass[runningheads]{llncs}
+\sloppy
+
+\input{prelude.tex}
+
+
+\begin{document}
+
+\title{Verifying Smart Contracts\\ with the Move Prover}
+
+
+\author{
+  David Dill\inst{1} \and Wolfgang Grieskamp\inst{1} \and \\ Junkil
+  Park\inst{1} \and Shaz Qadeer\inst{1} \and Meng Xu\inst{1}
+  \and Emma Zhong\inst{1}
+}
+
+\institute{Facebook}
+\authorrunning{D. Dill, W. Grieskamp et. al.}
+
+\maketitle
+
+\input{intro.tex}
+\input{move.tex}
+\input{design.tex}
+\input{analysis.tex}
+\input{conclusion.tex}
+
+\bibliographystyle{splncs04}
+\bibliography{biblio}
+
+\appendix
+
+\newpage
+\input{references-apx.tex}
+\newpage
+\input{function-injection-apx.tex}
+
+\end{document}
+
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: t
+%%% End:
