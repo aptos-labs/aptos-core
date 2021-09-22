@@ -61,7 +61,7 @@ function add_to_profile {
 
 
 # It is important to keep all path updates together to allow this script to work well when run in github actions
-# on inside of a docker image created using this script.   GHA wipes the home directory via docker mount options, so
+# inside of a docker image created using this script.   GHA wipes the home directory via docker mount options, so
 # this profile needs built and sourced on every execution of a job using the docker image.   See the .github/actions/build-setup
 # action in this repo, as well as docker/ci/github/Dockerfile.
 function update_path_and_profile {
@@ -160,7 +160,7 @@ function install_hadolint {
 }
 
 function install_vault {
-  VERSION=$(vault --version || true)
+  VERSION=$("${INSTALL_DIR}"/vault --version || true)
   if [[ "$VERSION" != "Vault v${VAULT_VERSION}" ]]; then
     MACHINE=$(uname -m);
     if [[ $MACHINE == "x86_64" ]]; then
@@ -172,7 +172,7 @@ function install_vault {
     rm "$TMPFILE"
     chmod +x "${INSTALL_DIR}"/vault
   fi
-  vault --version
+  "${INSTALL_DIR}"/vault --version
 }
 
 function install_helm {
@@ -253,14 +253,13 @@ function install_awscli {
       unzip -qq -d "$TMPFILE"/work/ "$TMPFILE"/aws.zip
       TARGET_DIR="${HOME}"/.local/
       if [[ "$OPT_DIR" == "true" ]]; then
-         TARGET_DIR="/opt/aws"
+         TARGET_DIR="/opt/aws/"
       fi
-      mkdir -p "${TARGET_DIR}" || true
-      "$TMPFILE"/work/aws/install -i "${TARGET_DIR}"/aws-cli -b "${INSTALL_DIR}"
-      rm -rf "$TMPFILE"
+      mkdir -p "${TARGET_DIR}"
+      "$TMPFILE"/work/aws/install -i "${TARGET_DIR}" -b "${INSTALL_DIR}"
+      "${INSTALL_DIR}"aws --version
     fi
   fi
-  aws --version
 }
 
 function install_pkg {
@@ -671,7 +670,7 @@ INSTALL_PROVER=false;
 INSTALL_CODEGEN=false;
 INSTALL_INDIVIDUAL=false;
 INSTALL_PACKAGES=();
-INSTALL_DIR="$HOME/bin/"
+INSTALL_DIR="${HOME}/bin/"
 OPT_DIR="false"
 
 #parse args
