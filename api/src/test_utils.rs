@@ -43,6 +43,9 @@ pub async fn send_request(context: Context, method: &str, path: &str, status_cod
     let headers = resp.headers();
     assert_eq!(headers[CONTENT_TYPE], "application/json");
 
+    let body = serde_json::from_slice(resp.body()).expect("response body is JSON");
+    assert_eq!(status_code, resp.status(), "\nresponse: {}", pretty(&body));
+
     if status_code < 300 {
         let ledger_info = context.get_latest_ledger_info().unwrap();
         assert_eq!(headers[X_DIEM_CHAIN_ID], "4");
@@ -56,9 +59,34 @@ pub async fn send_request(context: Context, method: &str, path: &str, status_cod
         );
     }
 
-    let body = serde_json::from_slice(resp.body()).expect("response body is JSON");
-    assert_eq!(status_code, resp.status(), "\nresponse: {}", pretty(&body));
     body
+}
+
+pub fn find_value(val: &Value, filter: for<'r> fn(&'r &Value) -> bool) -> Value {
+    let resources = val.as_array().expect("array");
+    let mut balances = resources.iter().filter(filter);
+    match balances.next() {
+        Some(resource) => {
+            let more = balances.next();
+            if let Some(val) = more {
+                panic!("found multiple items by the filter: {}", pretty(val));
+            }
+            resource.clone()
+        }
+        None => {
+            panic!("\ncould not find item in {}", pretty(val))
+        }
+    }
+}
+
+pub fn assert_json(ret: Value, expected: Value) {
+    assert_eq!(
+        &ret,
+        &expected,
+        "\nexpected: {}, \nbut got: {}",
+        pretty(&expected),
+        pretty(&ret)
+    )
 }
 
 pub fn pretty(val: &Value) -> String {

@@ -11,7 +11,7 @@ pub use address::Address;
 pub use error::Error;
 pub use ledger_info::LedgerInfo;
 pub use move_types::{
-    HexEncodedBytes, MoveResource, MoveResourceType, MoveStructTag, MoveStructValue, MoveTypeTag,
-    MoveValue, U128, U64,
+    HexEncodedBytes, MoveModule, MoveModuleId, MoveResource, MoveStructTag, MoveStructValue,
+    MoveType, MoveValue, U128, U64,
 };
 pub use response::{Response, X_DIEM_CHAIN_ID, X_DIEM_LEDGER_TIMESTAMP, X_DIEM_LEDGER_VERSION};

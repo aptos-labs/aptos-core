@@ -111,8 +111,22 @@ mod tests {
     #[test]
     fn test_from_and_to_account_address() {
         let address: Address = serde_json::from_value(json!("0x1")).unwrap();
-        let account_address: AccountAddress = address.into();
 
+        let account_address: AccountAddress = address.into();
+        assert_eq!(
+            account_address.to_string(),
+            "00000000000000000000000000000001"
+        );
+
+        let new_address: Address = account_address.into();
+        assert_eq!(new_address, address);
+    }
+
+    #[test]
+    fn test_from_and_to_account_address_reference() {
+        let address: Address = serde_json::from_value(json!("0x1")).unwrap();
+
+        let account_address: AccountAddress = (&address).into();
         assert_eq!(
             account_address.to_string(),
             "00000000000000000000000000000001"

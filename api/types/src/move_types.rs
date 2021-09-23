@@ -1,21 +1,35 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::Address;
+use crate::{Address, Error};
+use move_binary_format::{
+    access::ModuleAccess,
+    file_format::{
+        Ability, AbilitySet, CompiledModule, FieldDefinition, FunctionDefinition, SignatureToken,
+        StructDefinition, StructFieldInformation, StructHandleIndex, StructTypeParameter,
+        Visibility,
+    },
+};
 use move_core_types::{
+    account_address::AccountAddress,
     identifier::Identifier,
-    language_storage::{StructTag, TypeTag},
+    language_storage::{ModuleId, StructTag, TypeTag},
 };
 use resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue};
 
 use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
-use std::{collections::BTreeMap, convert::From, fmt, result::Result};
+use std::{
+    borrow::Borrow,
+    collections::BTreeMap,
+    convert::{From, Into, TryFrom},
+    fmt,
+    result::Result,
+};
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct MoveResource {
     #[serde(rename = "type")]
-    pub typ: String,
-    pub type_tag: MoveResourceType,
+    pub typ: MoveResourceType,
     pub value: MoveStructValue,
 }
 
@@ -28,9 +42,8 @@ pub enum MoveResourceType {
 impl From<AnnotatedMoveStruct> for MoveResource {
     fn from(s: AnnotatedMoveStruct) -> Self {
         Self {
-            typ: s.type_.to_string(),
-            type_tag: MoveResourceType::Struct(MoveStructTag::from(s.type_.clone())),
-            value: MoveStructValue::from(s),
+            typ: MoveResourceType::Struct(s.type_.clone().into()),
+            value: s.into(),
         }
     }
 }
@@ -165,7 +178,7 @@ impl From<AnnotatedMoveValue> for MoveValue {
                 MoveValue::Vector(vals.into_iter().map(MoveValue::from).collect())
             }
             AnnotatedMoveValue::Bytes(v) => MoveValue::Bytes(HexEncodedBytes(v)),
-            AnnotatedMoveValue::Struct(v) => MoveValue::Struct(MoveStructValue::from(v)),
+            AnnotatedMoveValue::Struct(v) => MoveValue::Struct(v.into()),
         }
     }
 }
@@ -190,7 +203,7 @@ pub struct MoveStructTag {
     pub address: Address,
     pub module: Identifier,
     pub name: Identifier,
-    pub type_params: Vec<MoveTypeTag>,
+    pub generic_type_params: Vec<MoveType>,
 }
 
 impl From<StructTag> for MoveStructTag {
@@ -199,44 +212,336 @@ impl From<StructTag> for MoveStructTag {
             address: tag.address.into(),
             module: tag.module,
             name: tag.name,
-            type_params: tag.type_params.into_iter().map(MoveTypeTag::from).collect(),
+            generic_type_params: tag.type_params.into_iter().map(MoveType::from).collect(),
+        }
+    }
+}
+
+impl From<(&CompiledModule, &StructHandleIndex, &Vec<SignatureToken>)> for MoveStructTag {
+    fn from(
+        (m, shi, type_params): (&CompiledModule, &StructHandleIndex, &Vec<SignatureToken>),
+    ) -> Self {
+        let s_handle = m.struct_handle_at(*shi);
+        let m_handle = m.module_handle_at(s_handle.module);
+        Self {
+            address: (*m.address_identifier_at(m_handle.address)).into(),
+            module: m.identifier_at(m_handle.name).to_owned(),
+            name: m.identifier_at(s_handle.name).to_owned(),
+            generic_type_params: type_params.iter().map(|t| (m, t).into()).collect(),
         }
     }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
-pub enum MoveTypeTag {
+pub enum MoveType {
     Bool,
     U8,
     U64,
     U128,
     Address,
     Signer,
-    Vector { items: Box<MoveTypeTag> },
+    Vector { items: Box<MoveType> },
     Struct(MoveStructTag),
+    GenericTypeParam { index: u16 },
+    Reference { mutable: bool, to: Box<MoveType> },
 }
 
-impl From<TypeTag> for MoveTypeTag {
+impl From<TypeTag> for MoveType {
     fn from(tag: TypeTag) -> Self {
         match tag {
-            TypeTag::Bool => MoveTypeTag::Bool,
-            TypeTag::U8 => MoveTypeTag::U8,
-            TypeTag::U64 => MoveTypeTag::U64,
-            TypeTag::U128 => MoveTypeTag::U128,
-            TypeTag::Address => MoveTypeTag::Address,
-            TypeTag::Signer => MoveTypeTag::Signer,
-            TypeTag::Vector(v) => MoveTypeTag::Vector {
-                items: Box::new(MoveTypeTag::from(*v)),
+            TypeTag::Bool => MoveType::Bool,
+            TypeTag::U8 => MoveType::U8,
+            TypeTag::U64 => MoveType::U64,
+            TypeTag::U128 => MoveType::U128,
+            TypeTag::Address => MoveType::Address,
+            TypeTag::Signer => MoveType::Signer,
+            TypeTag::Vector(v) => MoveType::Vector {
+                items: Box::new(MoveType::from(*v)),
             },
-            TypeTag::Struct(v) => MoveTypeTag::Struct(MoveStructTag::from(v)),
+            TypeTag::Struct(v) => MoveType::Struct(v.into()),
+        }
+    }
+}
+
+impl From<(&CompiledModule, &SignatureToken)> for MoveType {
+    fn from((m, token): (&CompiledModule, &SignatureToken)) -> Self {
+        match token {
+            SignatureToken::Bool => MoveType::Bool,
+            SignatureToken::U8 => MoveType::U8,
+            SignatureToken::U64 => MoveType::U64,
+            SignatureToken::U128 => MoveType::U128,
+            SignatureToken::Address => MoveType::Address,
+            SignatureToken::Signer => MoveType::Signer,
+            SignatureToken::Vector(t) => MoveType::Vector {
+                items: Box::new((m, t.borrow()).into()),
+            },
+            SignatureToken::Struct(v) => MoveType::Struct((m, v, &vec![]).into()),
+            SignatureToken::StructInstantiation(shi, type_params) => {
+                MoveType::Struct((m, shi, type_params).into())
+            }
+            SignatureToken::TypeParameter(i) => MoveType::GenericTypeParam { index: *i },
+            SignatureToken::Reference(t) => MoveType::Reference {
+                mutable: false,
+                to: Box::new((m, t.borrow()).into()),
+            },
+            SignatureToken::MutableReference(t) => MoveType::Reference {
+                mutable: true,
+                to: Box::new((m, t.borrow()).into()),
+            },
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct MoveModule {
+    pub address: Address,
+    pub name: Identifier,
+    pub friends: Vec<MoveModuleId>,
+    pub exposed_functions: Vec<MoveFunction>,
+    pub structs: Vec<MoveStruct>,
+}
+
+impl TryFrom<&Vec<u8>> for MoveModule {
+    type Error = Error;
+    fn try_from(bytes: &Vec<u8>) -> anyhow::Result<Self, Error> {
+        let m = CompiledModule::deserialize(bytes)?;
+        let (address, name) = <(AccountAddress, Identifier)>::from(m.self_id());
+        Ok(Self {
+            address: address.into(),
+            name,
+            friends: m
+                .immediate_friends()
+                .iter()
+                .map(|f| f.clone().into())
+                .collect(),
+            exposed_functions: m
+                .function_defs
+                .iter()
+                .filter(|def| match def.visibility {
+                    Visibility::Public | Visibility::Friend | Visibility::Script => true,
+                    Visibility::Private => false,
+                })
+                .map(|def| (&m, def).into())
+                .collect(),
+            structs: m.struct_defs.iter().map(|def| (&m, def).into()).collect(),
+        })
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct MoveModuleId {
+    pub address: Address,
+    pub name: Identifier,
+}
+
+impl From<ModuleId> for MoveModuleId {
+    fn from(id: ModuleId) -> Self {
+        let (address, name) = <(AccountAddress, Identifier)>::from(id);
+        Self {
+            address: address.into(),
+            name,
+        }
+    }
+}
+
+impl fmt::Display for MoveModuleId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}::{}", self.address, self.name)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct MoveStruct {
+    pub name: Identifier,
+    pub is_native: bool,
+    pub abilities: Vec<MoveAbility>,
+    pub generic_type_params: Vec<MoveStructGenericTypeParam>,
+    pub fields: Vec<MoveStructField>,
+}
+
+impl From<(&CompiledModule, &StructDefinition)> for MoveStruct {
+    fn from((m, def): (&CompiledModule, &StructDefinition)) -> Self {
+        let handle = m.struct_handle_at(def.struct_handle);
+        let (is_native, fields) = match &def.field_information {
+            StructFieldInformation::Native => (true, vec![]),
+            StructFieldInformation::Declared(fields) => {
+                (false, fields.iter().map(|f| (m, f).into()).collect())
+            }
+        };
+        let name = m.identifier_at(handle.name).to_owned();
+        let abilities = handle
+            .abilities
+            .into_iter()
+            .map(MoveAbility::from)
+            .collect();
+        let generic_type_params = (&handle.type_parameters)
+            .iter()
+            .map(MoveStructGenericTypeParam::from)
+            .collect();
+        Self {
+            name,
+            is_native,
+            abilities,
+            generic_type_params,
+            fields,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct MoveAbility(Ability);
+
+impl From<Ability> for MoveAbility {
+    fn from(a: Ability) -> Self {
+        Self(a)
+    }
+}
+
+impl From<MoveAbility> for Ability {
+    fn from(a: MoveAbility) -> Self {
+        a.0
+    }
+}
+
+impl fmt::Display for MoveAbility {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let st = match self.0 {
+            Ability::Copy => "copy",
+            Ability::Drop => "drop",
+            Ability::Store => "store",
+            Ability::Key => "key",
+        };
+        write!(f, "{}", st)
+    }
+}
+
+impl Serialize for MoveAbility {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.to_string().serialize(serializer)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct MoveStructGenericTypeParam {
+    pub constraints: Vec<MoveAbility>,
+    pub is_phantom: bool,
+}
+
+impl From<&StructTypeParameter> for MoveStructGenericTypeParam {
+    fn from(param: &StructTypeParameter) -> Self {
+        Self {
+            constraints: param
+                .constraints
+                .into_iter()
+                .map(MoveAbility::from)
+                .collect(),
+            is_phantom: param.is_phantom,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct MoveStructField {
+    name: Identifier,
+    #[serde(rename = "type")]
+    typ: MoveType,
+}
+
+impl From<(&CompiledModule, &FieldDefinition)> for MoveStructField {
+    fn from((m, def): (&CompiledModule, &FieldDefinition)) -> Self {
+        Self {
+            name: m.identifier_at(def.name).to_owned(),
+            typ: (m, &def.signature.0).into(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct MoveFunction {
+    pub name: Identifier,
+    pub visibility: MoveFunctionVisibility,
+    pub generic_type_params: Vec<MoveFunctionGenericTypeParam>,
+    pub params: Vec<MoveType>,
+    #[serde(rename = "return")]
+    pub return_: Vec<MoveType>,
+}
+
+impl From<(&CompiledModule, &FunctionDefinition)> for MoveFunction {
+    fn from((m, def): (&CompiledModule, &FunctionDefinition)) -> Self {
+        let fhandle = m.function_handle_at(def.function);
+        let name = m.identifier_at(fhandle.name).to_owned();
+        Self {
+            name,
+            visibility: def.visibility.into(),
+            generic_type_params: fhandle
+                .type_parameters
+                .iter()
+                .map(MoveFunctionGenericTypeParam::from)
+                .collect(),
+            params: m
+                .signature_at(fhandle.parameters)
+                .0
+                .iter()
+                .map(|s| (m, s).into())
+                .collect(),
+            return_: m
+                .signature_at(fhandle.return_)
+                .0
+                .iter()
+                .map(|s| (m, s).into())
+                .collect(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MoveFunctionVisibility {
+    Private,
+    Public,
+    Script,
+    Friend,
+}
+
+impl From<Visibility> for MoveFunctionVisibility {
+    fn from(v: Visibility) -> Self {
+        match &v {
+            Visibility::Private => Self::Private,
+            Visibility::Public => Self::Public,
+            Visibility::Script => Self::Script,
+            Visibility::Friend => Self::Friend,
+        }
+    }
+}
+
+impl From<MoveFunctionVisibility> for Visibility {
+    fn from(v: MoveFunctionVisibility) -> Self {
+        match &v {
+            MoveFunctionVisibility::Private => Self::Private,
+            MoveFunctionVisibility::Public => Self::Public,
+            MoveFunctionVisibility::Script => Self::Script,
+            MoveFunctionVisibility::Friend => Self::Friend,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct MoveFunctionGenericTypeParam {
+    pub constraints: Vec<MoveAbility>,
+}
+
+impl From<&AbilitySet> for MoveFunctionGenericTypeParam {
+    fn from(constraints: &AbilitySet) -> Self {
+        Self {
+            constraints: constraints.into_iter().map(MoveAbility::from).collect(),
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{MoveResource, MoveTypeTag, U128, U64};
+    use crate::{MoveResource, MoveType, U128, U64};
 
     use diem_types::account_address::AccountAddress;
     use move_binary_format::file_format::AbilitySet;
@@ -253,8 +558,8 @@ mod tests {
     fn test_serialize_move_type_tag() {
         use TypeTag::*;
         fn assert_serialize(t: TypeTag, expected: Value) {
-            let value = to_value(MoveTypeTag::from(t)).unwrap();
-            assert_eq!(value, expected, "{}", pretty(&value))
+            let value = to_value(MoveType::from(t)).unwrap();
+            assert_json(value, expected)
         }
         assert_serialize(Bool, json!({"type": "bool"}));
         assert_serialize(U8, json!({"type": "u8"}));
@@ -275,7 +580,7 @@ mod tests {
                 "address": "0x1",
                 "module": "Home",
                 "name": "ABC",
-                "type_params": [
+                "generic_type_params": [
                     {
                         "type": "address"
                     },
@@ -284,7 +589,7 @@ mod tests {
                         "address": "0x1",
                         "module": "Account",
                         "name": "Base",
-                        "type_params": [
+                        "generic_type_params": [
                             {
                                 "type": "u128"
                             },
@@ -301,7 +606,7 @@ mod tests {
                                     "address": "0x1",
                                     "module": "Type",
                                     "name": "String",
-                                    "type_params": []
+                                    "generic_type_params": []
                                 }
                             },
                             {
@@ -309,7 +614,7 @@ mod tests {
                                 "address": "0x1",
                                 "module": "Type",
                                 "name": "String",
-                                "type_params": []
+                                "generic_type_params": []
                             }
                         ]
                     }
@@ -357,16 +662,15 @@ mod tests {
             ],
         ));
         let value = to_value(&res).unwrap();
-        assert_eq!(
+        assert_json(
             value,
             json!({
-                "type": "0x1::Type::Values",
-                "type_tag": {
+                "type": {
                     "type": "struct",
                     "address": "0x1",
                     "module": "Type",
                     "name": "Values",
-                    "type_params": []
+                    "generic_type_params": []
                 },
                 "value": {
                     "field_u8": 7,
@@ -376,11 +680,11 @@ mod tests {
                     "field_address": "0xdd",
                     "field_vector": ["128"],
                     "field_bytes": "0x0909",
-                    "field_struct": {"nested_vector": [{"address1": "0x0", "address2": "0x123"}]},
+                    "field_struct": {
+                        "nested_vector": [{"address1": "0x0", "address2": "0x123"}]
+                    },
                 }
             }),
-            "{}",
-            pretty(&value)
         );
     }
 
@@ -394,23 +698,20 @@ mod tests {
             )],
         ));
         let value = to_value(&res).unwrap();
-        assert_eq!(
+        assert_json(
             value,
             json!({
-                "type": "0x1::Type::Values",
-                "type_tag": {
+                "type": {
                     "type": "struct",
                     "address": "0x1",
                     "module": "Type",
                     "name": "Values",
-                    "type_params": []
+                    "generic_type_params": []
                 },
                 "value": {
                     "address_0x0": "0x0",
                 }
             }),
-            "{}",
-            pretty(&value)
         );
     }
 
@@ -482,6 +783,16 @@ mod tests {
 
     fn identifier(id: &str) -> Identifier {
         Identifier::new(id).unwrap()
+    }
+
+    fn assert_json(ret: Value, expected: Value) {
+        assert_eq!(
+            &ret,
+            &expected,
+            "\nexpected: {}, \nbut got: {}",
+            pretty(&expected),
+            pretty(&ret)
+        )
     }
 
     fn pretty(val: &Value) -> String {

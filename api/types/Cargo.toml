@@ -18,6 +18,7 @@ warp = { version = "0.3.0", features = ["default"] }
 
 diem-types = { path = "../../types" }
 diem-workspace-hack = { path = "../../common/workspace-hack" }
+move-binary-format = { path = "../../language/move-binary-format" }
 move-core-types = { path = "../../language/move-core/types" }
 resource-viewer = { path = "../../language/tools/resource-viewer" }
 
