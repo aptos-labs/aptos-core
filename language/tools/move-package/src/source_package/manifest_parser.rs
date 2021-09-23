@@ -270,15 +270,27 @@ pub fn parse_dev_addresses(tval: TV) -> Result<PM::DevAddressDeclarations> {
 fn parse_dependency(tval: TV) -> Result<PM::Dependency> {
     match tval {
         TV::Table(mut table) => {
-            warn_if_unknown_field_names(&table, &["addr_subst", "version", "local", "digest"]);
+            warn_if_unknown_field_names(
+                &table,
+                &[
+                    "addr_subst",
+                    "version",
+                    "local",
+                    "digest",
+                    "git",
+                    "rev",
+                    "subdir",
+                ],
+            );
             let subst = table
                 .remove("addr_subst")
                 .map(parse_substitution)
                 .transpose()?;
             let version = table.remove("version").map(parse_version).transpose()?;
             let digest = table.remove("digest").map(parse_digest).transpose()?;
-            match table.remove("local") {
-                Some(local) => {
+            let mut git_info = None;
+            match (table.remove("local"), table.remove("git")) {
+                (Some(local), None) => {
                     let local_str = local
                         .as_str()
                         .ok_or_else(|| format_err!("Local source path not a string"))?;
@@ -288,10 +300,64 @@ fn parse_dependency(tval: TV) -> Result<PM::Dependency> {
                         version,
                         digest,
                         local: local_path,
+                        git_info,
                     })
                 }
-                None => {
-                    bail!("'local' path not specified for dependency.")
+                (None, Some(git)) => {
+                    // Look to see if a MOVE_HOME has been set. Otherwise default to $HOME
+                    let move_home = std::env::var("MOVE_HOME").unwrap_or_else(|_| {
+                        format!(
+                            "{}/.move",
+                            std::env::var("HOME").expect("env var 'HOME' must be set")
+                        )
+                    });
+                    let rev_name = match table.remove("rev") {
+                        None => bail!("Git revision not supplied for dependency"),
+                        Some(r) => Symbol::from(
+                            r.as_str()
+                                .ok_or_else(|| format_err!("Git revision not a string"))?,
+                        ),
+                    };
+                    // Downloaded packages are of the form <sanitized_git_url>_<rev_name>
+                    let local_path = PathBuf::from(move_home).join(format!(
+                        "{}_{}",
+                        regex::Regex::new(r"/|:|\.|@").unwrap().replace_all(
+                            git.as_str()
+                                .ok_or_else(|| anyhow::anyhow!("Git URL not a string"))?,
+                            "_"
+                        ),
+                        rev_name.replace('/', "__")
+                    ));
+                    let subdir = PathBuf::from(match table.remove("subdir") {
+                        None => "".to_string(),
+                        Some(path) => path
+                            .as_str()
+                            .ok_or_else(|| format_err!("'subdir' not a string"))?
+                            .to_string(),
+                    });
+                    git_info = Some(PM::GitInfo {
+                        git_url: Symbol::from(
+                            git.as_str()
+                                .ok_or_else(|| format_err!("Git url not a string"))?,
+                        ),
+                        git_rev: rev_name,
+                        subdir: subdir.clone(),
+                        download_to: local_path.clone(),
+                    });
+
+                    Ok(PM::Dependency {
+                        subst,
+                        version,
+                        digest,
+                        local: local_path.join(subdir),
+                        git_info,
+                    })
+                }
+                (Some(_), Some(_)) => {
+                    bail!("both 'local' and 'git' paths specified for dependency.")
+                }
+                (None, None) => {
+                    bail!("both 'local' and 'git' paths not specified for dependency.")
                 }
             }
         }

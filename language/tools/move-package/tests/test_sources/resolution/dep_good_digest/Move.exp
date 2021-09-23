@@ -39,6 +39,7 @@ ResolutionGraph {
                 digest: Some(
                     "98051FC9E21CC5A667DB6B47072E2095E97F9D47C0A32BF3A9FBE2BA67F910B4",
                 ),
+                git_info: None,
             },
         },
         dev_dependencies: {},
@@ -124,6 +125,7 @@ ResolutionGraph {
                         digest: Some(
                             "98051FC9E21CC5A667DB6B47072E2095E97F9D47C0A32BF3A9FBE2BA67F910B4",
                         ),
+                        git_info: None,
                     },
                 },
                 dev_dependencies: {},

@@ -22,6 +22,7 @@ use std::{
     cell::RefCell,
     collections::{BTreeMap, BTreeSet},
     path::{Path, PathBuf},
+    process::Command,
     rc::Rc,
 };
 
@@ -79,7 +80,7 @@ pub struct ResolutionPackage<T> {
     pub renaming: Renaming,
     /// The mapping of addresses for this package (and that are in scope for it)
     pub resolution_table: ResolutionTable<T>,
-    /// The digest of the contents of all files under the package root
+    /// The digest of the contents of all source files and manifest under the package root
     pub source_digest: PackageDigest,
 }
 
@@ -336,6 +337,7 @@ impl ResolvingGraph {
         dep: Dependency,
         root_path: PathBuf,
     ) -> Result<(Renaming, ResolvingTable)> {
+        Self::download_and_update_if_repo(dep_name_in_pkg, &dep)?;
         let (dep_package, dep_package_dir) =
             Self::parse_package_manifest(&dep, &dep_name_in_pkg, root_path)
                 .with_context(|| format!("While processing dependency '{}'", dep_name_in_pkg))?;
@@ -350,6 +352,7 @@ impl ResolvingGraph {
                 dep_package.package.name
             );
         }
+
         match dep.digest {
             None => (),
             Some(fixed_digest) => {
@@ -455,6 +458,39 @@ impl ResolvingGraph {
                 SourcePackageLayout::Manifest.path().join(root_path),
             )),
         }
+    }
+
+    fn download_and_update_if_repo(dep_name: PackageName, dep: &Dependency) -> Result<()> {
+        if let Some(git_info) = &dep.git_info {
+            if !git_info.download_to.exists() {
+                Command::new("git")
+                    .args([
+                        "clone",
+                        &git_info.git_url,
+                        &git_info.download_to.to_string_lossy(),
+                    ])
+                    .output()
+                    .map_err(|_| {
+                        anyhow::anyhow!("Failed to clone Git repository for package '{}'", dep_name)
+                    })?;
+                Command::new("git")
+                    .args([
+                        "-C",
+                        &git_info.download_to.to_string_lossy(),
+                        "checkout",
+                        &git_info.git_rev,
+                    ])
+                    .output()
+                    .map_err(|_| {
+                        anyhow::anyhow!(
+                            "Failed to checkout Git reference '{}' for package '{}'",
+                            &git_info.git_rev,
+                            dep_name
+                        )
+                    })?;
+            }
+        }
+        Ok(())
     }
 }
 

@@ -40,6 +40,20 @@ pub struct Dependency {
     pub subst: Option<Substitution>,
     pub version: Option<Version>,
     pub digest: Option<PackageDigest>,
+    pub git_info: Option<GitInfo>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct GitInfo {
+    /// The git clone url to download from
+    pub git_url: Symbol,
+    /// The git revision, AKA, a commit SHA
+    pub git_rev: Symbol,
+    /// The path under this repo where the move package can be found -- e.g.,
+    /// 'language/move-stdlib`
+    pub subdir: PathBuf,
+    /// Where the git repo is downloaded to.
+    pub download_to: PathBuf,
 }
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]

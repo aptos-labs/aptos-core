@@ -307,13 +307,6 @@ impl CompiledPackage {
         )
             -> Result<(FilesSourceText, Vec<AnnotatedCompiledUnit>)>,
     ) -> Result<CompiledPackage> {
-        writeln!(
-            w,
-            "{} {}",
-            "BUILDING".bold().green(),
-            resolved_package.source_package.package.name,
-        )?;
-
         let mut module_resolution_metadata = BTreeMap::new();
 
         // NB: This renaming needs to be applied in the topological order of dependencies
@@ -337,10 +330,22 @@ impl CompiledPackage {
                 if package.compiled_package_info.address_alias_instantiation
                     == resolved_package.resolution_table
                 {
+                    writeln!(
+                        w,
+                        "{} {}",
+                        "CACHED".bold().green(),
+                        resolved_package.source_package.package.name,
+                    )?;
                     return package.into_compiled_package();
                 }
             }
         }
+        writeln!(
+            w,
+            "{} {}",
+            "BUILDING".bold().green(),
+            resolved_package.source_package.package.name,
+        )?;
 
         let dep_paths = dependencies
             .iter()

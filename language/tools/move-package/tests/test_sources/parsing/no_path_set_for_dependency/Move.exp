@@ -1,1 +1,1 @@
-Error parsing '[dependencies]' section of manifest: 'local' path not specified for dependency.
+Error parsing '[dependencies]' section of manifest: both 'local' and 'git' paths not specified for dependency.

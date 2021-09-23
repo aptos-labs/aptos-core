@@ -31,6 +31,7 @@ ResolutionGraph {
                 ),
                 version: None,
                 digest: None,
+                git_info: None,
             },
             "D": Dependency {
                 local: "./deps_only/D",
@@ -43,6 +44,7 @@ ResolutionGraph {
                 ),
                 version: None,
                 digest: None,
+                git_info: None,
             },
         },
         dev_dependencies: {},
@@ -164,6 +166,7 @@ ResolutionGraph {
                         ),
                         version: None,
                         digest: None,
+                        git_info: None,
                     },
                     "D": Dependency {
                         local: "./deps_only/D",
@@ -176,6 +179,7 @@ ResolutionGraph {
                         ),
                         version: None,
                         digest: None,
+                        git_info: None,
                     },
                 },
                 dev_dependencies: {},
