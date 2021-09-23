@@ -1,7 +1,12 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::counters;
+use crate::{
+    block_storage::block_store::update_counters_for_committed_blocks,
+    counters,
+    logging::{LogEvent, LogSchema},
+    persistent_liveness_storage::PersistentLivenessStorage,
+};
 use anyhow::bail;
 use consensus_types::{
     executed_block::ExecutedBlock, quorum_cert::QuorumCert,
@@ -11,6 +16,7 @@ use diem_crypto::HashValue;
 use diem_logger::prelude::*;
 use diem_types::{block_info::BlockInfo, ledger_info::LedgerInfoWithSignatures};
 use mirai_annotations::{checked_verify_eq, precondition};
+use short_hex_str::AsShortHexStr;
 use std::{
     collections::{vec_deque::VecDeque, HashMap, HashSet},
     sync::Arc,
@@ -253,14 +259,12 @@ impl BlockTree {
         }
     }
 
-    pub(super) fn update_highest_ledger_info(
-        &mut self,
-        new_ledger_info_with_sig: LedgerInfoWithSignatures,
-    ) {
+    fn update_highest_ledger_info(&mut self, new_ledger_info_with_sig: LedgerInfoWithSignatures) {
         if new_ledger_info_with_sig.commit_info().round()
             > self.highest_ledger_info.commit_info().round()
         {
-            self.highest_ledger_info = new_ledger_info_with_sig
+            self.highest_ledger_info = new_ledger_info_with_sig;
+            self.update_commit_root(self.highest_ledger_info.commit_info().id());
         }
     }
 
@@ -339,11 +343,14 @@ impl BlockTree {
         blocks_pruned
     }
 
-    pub(super) fn update_ordered_root_id(&mut self, root_id: HashValue) -> &mut Self {
+    pub(super) fn update_ordered_root(&mut self, root_id: HashValue) {
         assert!(self.block_exists(&root_id));
-        // Update the next root
         self.ordered_root_id = root_id;
-        self
+    }
+
+    pub(super) fn update_commit_root(&mut self, root_id: HashValue) {
+        assert!(self.block_exists(&root_id));
+        self.commit_root_id = root_id;
     }
 
     /// Process the data returned by the prune_tree, they're separated because caller might
@@ -351,12 +358,7 @@ impl BlockTree {
     /// Note that we do not necessarily remove the pruned blocks: they're kept in a separate buffer
     /// for some time in order to enable other peers to retrieve the blocks even after they've
     /// been committed.
-    pub(super) fn update_commit_id_and_process_pruned_blocks(
-        &mut self,
-        next_root_id: HashValue,
-        mut newly_pruned_blocks: VecDeque<HashValue>,
-    ) {
-        self.commit_root_id = next_root_id;
+    pub(super) fn process_pruned_blocks(&mut self, mut newly_pruned_blocks: VecDeque<HashValue>) {
         counters::NUM_BLOCKS_IN_TREE.sub(newly_pruned_blocks.len() as i64);
         // The newly pruned blocks are pushed back to the deque pruned_block_ids.
         // In case the overall number of the elements is greater than the predefined threshold,
@@ -428,6 +430,40 @@ impl BlockTree {
 
     pub(super) fn get_all_block_id(&self) -> Vec<HashValue> {
         self.id_to_block.keys().cloned().collect()
+    }
+
+    /// Update the counters for committed blocks and prune them from the in-memory and persisted store.
+    pub fn commit_callback(
+        &mut self,
+        storage: Arc<dyn PersistentLivenessStorage>,
+        blocks_to_commit: &[Arc<ExecutedBlock>],
+        commit_proof: LedgerInfoWithSignatures,
+    ) {
+        let block_to_commit = blocks_to_commit.last().unwrap().clone();
+        update_counters_for_committed_blocks(blocks_to_commit);
+        let current_round = self.commit_root().round();
+        let committed_round = block_to_commit.round();
+        debug!(
+            LogSchema::new(LogEvent::CommitViaBlock).round(current_round),
+            committed_round = committed_round,
+            block_id = block_to_commit.id(),
+        );
+        event!("committed",
+            "block_id": block_to_commit.id().short_str(),
+            "epoch": block_to_commit.epoch(),
+            "round": committed_round,
+            "parent_id": block_to_commit.parent_id().short_str(),
+        );
+
+        let id_to_remove = self.find_blocks_to_prune(block_to_commit.id());
+        if let Err(e) = storage.prune_tree(id_to_remove.clone().into_iter().collect()) {
+            // it's fine to fail here, as long as the commit succeeds, the next restart will clean
+            // up dangling blocks, and we need to prune the tree to keep the root consistent with
+            // executor.
+            error!(error = ?e, "fail to delete block");
+        }
+        self.process_pruned_blocks(id_to_remove);
+        self.update_highest_ledger_info(commit_proof);
     }
 }
 

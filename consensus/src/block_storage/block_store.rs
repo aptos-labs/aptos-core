@@ -8,7 +8,6 @@ use crate::{
         BlockReader,
     },
     counters,
-    logging::{LogEvent, LogSchema},
     persistent_liveness_storage::{
         PersistentLivenessStorage, RecoveryData, RootInfo, RootMetadata,
     },
@@ -27,7 +26,6 @@ use diem_logger::prelude::*;
 use diem_types::{ledger_info::LedgerInfoWithSignatures, transaction::TransactionStatus};
 use executor_types::{Error, StateComputeResult};
 use futures::executor::block_on;
-use short_hex_str::AsShortHexStr;
 #[cfg(test)]
 use std::collections::VecDeque;
 use std::{sync::Arc, time::Duration};
@@ -49,7 +47,7 @@ fn update_counters_for_ordered_blocks(ordered_blocks: &[Arc<ExecutedBlock>]) {
     }
 }
 
-fn update_counters_for_committed_blocks(blocks_to_commit: &[Arc<ExecutedBlock>]) {
+pub fn update_counters_for_committed_blocks(blocks_to_commit: &[Arc<ExecutedBlock>]) {
     for block in blocks_to_commit {
         observe_block(block.block().timestamp_usecs(), BlockStage::COMMITTED);
         let txn_status = block.compute_result().compute_status();
@@ -104,40 +102,6 @@ pub struct BlockStore {
     storage: Arc<dyn PersistentLivenessStorage>,
     /// Used to ensure that any block stored will have a timestamp < the local time
     time_service: Arc<dyn TimeService>,
-}
-
-pub fn update_counters_and_prune_blocks(
-    block_tree: Arc<RwLock<BlockTree>>,
-    storage: Arc<dyn PersistentLivenessStorage>,
-    commit_root: Arc<ExecutedBlock>,
-    blocks_to_commit: &[Arc<ExecutedBlock>],
-) {
-    let block_to_commit = blocks_to_commit.last().unwrap().clone();
-    update_counters_for_committed_blocks(blocks_to_commit);
-    let current_round = commit_root.round();
-    let committed_round = block_to_commit.round();
-    debug!(
-        LogSchema::new(LogEvent::CommitViaBlock).round(current_round),
-        committed_round = committed_round,
-        block_id = block_to_commit.id(),
-    );
-    event!("committed",
-        "block_id": block_to_commit.id().short_str(),
-        "epoch": block_to_commit.epoch(),
-        "round": committed_round,
-        "parent_id": block_to_commit.parent_id().short_str(),
-    );
-
-    let id_to_remove = block_tree.read().find_blocks_to_prune(block_to_commit.id());
-    if let Err(e) = storage.prune_tree(id_to_remove.clone().into_iter().collect()) {
-        // it's fine to fail here, as long as the commit succeeds, the next restart will clean
-        // up dangling blocks, and we need to prune the tree to keep the root consistent with
-        // executor.
-        error!(error = ?e, "fail to delete block");
-    }
-    block_tree
-        .write()
-        .update_commit_id_and_process_pruned_blocks(block_to_commit.id(), id_to_remove);
 }
 
 impl BlockStore {
@@ -294,36 +258,29 @@ impl BlockStore {
 
         let block_tree = self.inner.clone();
         let storage = self.storage.clone();
-        let commit_root = self.commit_root();
 
-        self.inner
-            .write()
-            .update_ordered_root_id(block_to_commit.id());
-        update_counters_for_ordered_blocks(&blocks_to_commit);
-
-        // asynchronously execute and commit
+        // This callback is invoked synchronously withe coupled-execution and asynchronously in decoupled setup.
+        // the callback could be used for multiple batches of blocks.
         self.state_computer
             .commit(
                 &blocks_to_commit,
                 finality_proof,
                 Box::new(
-                    move |executed_blocks: &[Arc<ExecutedBlock>],
+                    move |committed_blocks: &[Arc<ExecutedBlock>],
                           commit_decision: LedgerInfoWithSignatures| {
-                        // TODO: shall we merge these into a single write lock event?
-                        block_tree
-                            .write()
-                            .update_highest_ledger_info(commit_decision);
-                        update_counters_and_prune_blocks(
-                            block_tree,
+                        block_tree.write().commit_callback(
                             storage,
-                            commit_root,
-                            executed_blocks,
+                            committed_blocks,
+                            commit_decision,
                         );
                     },
                 ),
             )
             .await
             .expect("Failed to persist commit");
+
+        self.inner.write().update_ordered_root(block_to_commit.id());
+        update_counters_for_ordered_blocks(&blocks_to_commit);
 
         Ok(())
     }
@@ -510,10 +467,10 @@ impl BlockStore {
         }
 
         // synchronously update both root_id and commit_root_id
-        self.inner
-            .write()
-            .update_ordered_root_id(next_root_id)
-            .update_commit_id_and_process_pruned_blocks(next_root_id, id_to_remove.clone());
+        let mut wlock = self.inner.write();
+        wlock.update_ordered_root(next_root_id);
+        wlock.update_commit_root(next_root_id);
+        wlock.process_pruned_blocks(id_to_remove.clone());
         id_to_remove
     }
 }

@@ -92,10 +92,11 @@ impl SyncInfo {
         highest_timeout_cert: Option<TimeoutCertificate>,
         highest_2chain_timeout_cert: Option<TwoChainTimeoutCertificate>,
     ) -> Self {
+        let highest_ledger_info = Some(highest_ordered_cert.ledger_info().clone());
         Self::new_decoupled(
             highest_quorum_cert,
-            highest_ordered_cert.clone(),
-            Some(highest_ordered_cert.ledger_info().clone()),
+            highest_ordered_cert,
+            highest_ledger_info,
             highest_timeout_cert,
             highest_2chain_timeout_cert,
         )
