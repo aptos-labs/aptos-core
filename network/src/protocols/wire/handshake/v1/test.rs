@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::*;
+use std::iter::FromIterator;
 
 // Ensure serialization of MessagingProtocolVersion enum takes 1 byte.
 #[test]
@@ -94,7 +95,10 @@ fn common_protocols() {
         network_id,
         supported_protocols: BTreeMap::new(),
     };
-    h1.perform_handshake(&h2).unwrap_err();
+    assert_eq!(
+        h1.perform_handshake(&h2).unwrap_err(),
+        HandshakeError::NoCommonProtocols,
+    );
 
     // Case 3: Intersecting messaging protocol version is present, but no intersecting protocols.
     let mut supported_protocols = BTreeMap::new();
@@ -104,9 +108,61 @@ fn common_protocols() {
         chain_id,
         network_id,
     };
+    assert_eq!(
+        h1.perform_handshake(&h2).unwrap_err(),
+        HandshakeError::NoCommonProtocols,
+    );
+}
+
+#[test]
+fn is_empty() {
+    assert!(SupportedProtocols::default().is_empty());
+    assert!(SupportedProtocols::from(ProtocolId::all().iter())
+        .intersect(&SupportedProtocols::default())
+        .is_empty());
+    assert!(!SupportedProtocols::from(ProtocolId::all().iter()).is_empty());
+}
+
+// Ensure we can handshake with a peer advertising some totally unknown ProtocoId's.
+
+#[test]
+fn ignore_unknown_protocols() {
+    let all_known_protos = HandshakeMsg::from_supported(SupportedProtocols::from(
+        [
+            ProtocolId::MempoolDirectSend,
+            ProtocolId::StateSyncDirectSend,
+        ]
+        .iter(),
+    ));
+
+    let some_unknown_protos =
+        HandshakeMsg::from_supported(SupportedProtocols(bitvec::BitVec::from_iter([
+            ProtocolId::MempoolDirectSend as u8,
+            66,
+            234,
+        ])));
+
+    let all_unknown_protos =
+        HandshakeMsg::from_supported(SupportedProtocols(bitvec::BitVec::from_iter([42, 99, 123])));
+
+    // Case 1: the other set contains some unknown protocols, but we can still
+    // find a common protocol.
+
+    let (_, common_protos) = all_known_protos
+        .perform_handshake(&some_unknown_protos)
+        .unwrap();
+    assert_eq!(
+        common_protos,
+        SupportedProtocols::from([ProtocolId::MempoolDirectSend].iter())
+    );
+
+    // Case 2: the other set contains exclusively unknown protocols and so we
+    // can't communicate.
 
     assert_eq!(
-        (MessagingProtocolVersion::V1, [].iter().into()),
-        h1.perform_handshake(&h2).unwrap()
+        all_known_protos
+            .perform_handshake(&all_unknown_protos)
+            .unwrap_err(),
+        HandshakeError::NoCommonProtocols,
     );
 }

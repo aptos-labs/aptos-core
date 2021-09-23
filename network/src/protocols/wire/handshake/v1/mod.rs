@@ -16,7 +16,7 @@ use anyhow::anyhow;
 use diem_config::network_id::NetworkId;
 use diem_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, convert::TryInto, fmt, iter::Iterator};
+use std::{collections::BTreeMap, convert::TryInto, fmt, iter::Iterator, ops::BitAnd};
 use thiserror::Error;
 
 #[cfg(any(test, feature = "fuzzing"))]
@@ -110,6 +110,12 @@ impl fmt::Display for ProtocolId {
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct SupportedProtocols(bitvec::BitVec);
 
+impl SupportedProtocols {
+    pub fn is_empty(&self) -> bool {
+        self.0.all_zeros()
+    }
+}
+
 impl TryInto<Vec<ProtocolId>> for SupportedProtocols {
     type Error = bcs::Error;
 
@@ -136,9 +142,9 @@ impl<'a, T: Iterator<Item = &'a ProtocolId>> From<T> for SupportedProtocols {
 }
 
 impl SupportedProtocols {
-    /// Returns a new SupportedProtocols struct that is an intersection.
-    fn intersection(self, other: SupportedProtocols) -> SupportedProtocols {
-        SupportedProtocols(self.0 & other.0)
+    /// Find the intersection between two sets of protocols.
+    fn intersect(&self, other: &SupportedProtocols) -> SupportedProtocols {
+        SupportedProtocols(self.0.bitand(&other.0))
     }
 
     /// Returns if the protocol is set.
@@ -176,7 +182,7 @@ impl fmt::Debug for MessagingProtocolVersion {
 
 impl fmt::Display for MessagingProtocolVersion {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.as_str(),)
+        write!(f, "{}", self.as_str())
     }
 }
 
@@ -185,7 +191,7 @@ impl fmt::Display for MessagingProtocolVersion {
 //
 
 /// An enum to list the possible errors during the diem handshake negotiation
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Eq, PartialEq)]
 pub enum HandshakeError {
     #[error("diem-handshake: the received message has a different chain id: {0}, expected: {1}")]
     InvalidChainId(ChainId, ChainId),
@@ -211,11 +217,13 @@ impl HandshakeMsg {
     /// Useful function for tests
     #[cfg(test)]
     pub fn new_for_testing() -> Self {
+        Self::from_supported([ProtocolId::HealthCheckerRpc].iter().into())
+    }
+
+    #[cfg(test)]
+    pub fn from_supported(protos: SupportedProtocols) -> Self {
         let mut supported_protocols = BTreeMap::new();
-        supported_protocols.insert(
-            MessagingProtocolVersion::V1,
-            [ProtocolId::StateSyncDirectSend].iter().into(),
-        );
+        supported_protocols.insert(MessagingProtocolVersion::V1, protos);
         Self {
             chain_id: ChainId::test(),
             network_id: NetworkId::Validator,
@@ -238,7 +246,7 @@ impl HandshakeMsg {
             ));
         }
 
-        // verify that both peers are on the same type of network
+        // verify that both peers are on the same network
         if self.network_id != other.network_id {
             return Err(HandshakeError::InvalidNetworkId(
                 other.network_id,
@@ -246,28 +254,15 @@ impl HandshakeMsg {
             ));
         }
 
-        // first, find the highest MessagingProtocolVersion supported by both nodes.
-        let mut inner = other.supported_protocols.iter().rev().peekable();
+        // find the greatest common MessagingProtocolVersion where we both support
+        // at least one common ProtocolId.
+        for (our_handshake_version, our_protocols) in self.supported_protocols.iter().rev() {
+            if let Some(their_protocols) = other.supported_protocols.get(our_handshake_version) {
+                let common_protocols = our_protocols.intersect(their_protocols);
 
-        // iterate over all supported protocol versions in decreasing order.
-        for (k_outer, _) in self.supported_protocols.iter().rev() {
-            // Remove all elements from inner iterator that are larger than the current head of the
-            // outer iterator.
-            match inner.by_ref().find(|(k_inner, _)| *k_inner <= k_outer) {
-                None => {
-                    break;
+                if !common_protocols.is_empty() {
+                    return Ok((*our_handshake_version, common_protocols));
                 }
-                Some((k_inner, _)) if k_inner == k_outer => {
-                    // Find all protocols supported by both nodes for the above protocol version.
-                    // Both `self` and `other` shold have entry in map for `key`.
-                    let protocols_self = self.supported_protocols.get(k_inner).unwrap();
-                    let protocols_other = other.supported_protocols.get(k_inner).unwrap();
-                    return Ok((
-                        *k_inner,
-                        protocols_self.clone().intersection(protocols_other.clone()),
-                    ));
-                }
-                _ => {}
             }
         }
 

@@ -4,7 +4,7 @@
 //! This library defines a BitVec struct that represents a bit vector.
 
 use serde::{de::Error, Deserialize, Deserializer, Serialize};
-use std::ops::BitAnd;
+use std::{iter::FromIterator, ops::BitAnd};
 
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
@@ -14,11 +14,14 @@ const BUCKET_SIZE: usize = 8;
 const MAX_BUCKETS: usize = 32;
 
 /// BitVec represents a bit vector that supports 4 operations:
+///
 /// 1. Marking a position as set.
 /// 2. Checking if a position is set.
 /// 3. Count set bits.
 /// 4. Get the index of the last set bit.
+///
 /// Internally, it stores a vector of u8's (as Vec<u8>).
+///
 /// * The first 8 positions of the bit vector are encoded in the first element of the vector, the
 ///   next 8 are encoded in the second element, and so on.
 /// * Bits are read from left to right. For instance, in the following bitvec
@@ -33,6 +36,8 @@ const MAX_BUCKETS: usize = 32;
 /// # Examples:
 /// ```
 /// use diem_bitvec::BitVec;
+/// use std::ops::BitAnd;
+///
 /// let mut bv = BitVec::default();
 /// bv.set(2);
 /// bv.set(5);
@@ -48,7 +53,7 @@ const MAX_BUCKETS: usize = 32;
 /// bv1.set(3);
 /// let mut bv2 = BitVec::default();
 /// bv2.set(2);
-/// let intersection = bv1 & bv2;
+/// let intersection = bv1.bitand(&bv2);
 /// assert!(intersection.is_set(2));
 /// assert_eq!(false, intersection.is_set(3));
 /// ```
@@ -84,6 +89,11 @@ impl BitVec {
         (self.inner[bucket] & (0b1000_0000 >> bucket_pos as u8)) != 0
     }
 
+    /// Return true if the BitVec is all zeros.
+    pub fn all_zeros(&self) -> bool {
+        self.inner.iter().all(|byte| *byte == 0)
+    }
+
     /// Returns the number of set bits.
     pub fn count_ones(&self) -> u32 {
         self.inner.iter().map(|a| a.count_ones()).sum()
@@ -102,11 +112,11 @@ impl BitVec {
     }
 }
 
-impl BitAnd for BitVec {
+impl BitAnd for &BitVec {
     type Output = BitVec;
 
     /// Returns a new BitVec that is a bitwise AND of two BitVecs.
-    fn bitand(self, other: Self) -> Self {
+    fn bitand(self, other: Self) -> Self::Output {
         let len = std::cmp::min(self.inner.len(), other.inner.len());
         let mut ret = BitVec {
             inner: Vec::with_capacity(len),
@@ -115,6 +125,16 @@ impl BitAnd for BitVec {
             ret.inner.push(self.inner[i] & other.inner[i]);
         }
         ret
+    }
+}
+
+impl FromIterator<u8> for BitVec {
+    fn from_iter<T: IntoIterator<Item = u8>>(iter: T) -> Self {
+        let mut bitvec = Self::default();
+        for bit in iter {
+            bitvec.set(bit);
+        }
+        bitvec
     }
 }
 
@@ -288,7 +308,7 @@ mod test {
         fn test_and(v1 in vec(any::<u8>(), 0..256), v2 in vec(any::<u8>(), 0..256)) {
             let bv1 = construct_bitvec(&v1);
             let bv2 = construct_bitvec(&v2);
-            let intersection = bv1.clone() & bv2.clone();
+            let intersection = bv1.bitand(&bv2);
             for i in 0..std::u8::MAX {
                 if bv1.is_set(i) && bv2.is_set(i) {
                     prop_assert!(intersection.is_set(i));
