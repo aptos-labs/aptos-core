@@ -315,7 +315,7 @@ fn set_sender_address(
             context
                 .env
                 .add_diag(diag!(Declarations::InvalidModule, (loc, msg)));
-            Address::Anonymous(sp(loc, AddressBytes::DEFAULT_ERROR_BYTES))
+            Address::Anonymous(sp(loc, NumericalAddress::DEFAULT_ERROR_ADDRESS))
         }
     })
 }
@@ -612,7 +612,7 @@ fn all_module_members<'a>(
                         address_impl(compilation_env, /* suggest_declaration */ true, *a)
                     }
                     // Error will be handled when the module is compiled
-                    None => Address::Anonymous(sp(m.loc, AddressBytes::DEFAULT_ERROR_BYTES)),
+                    None => Address::Anonymous(sp(m.loc, NumericalAddress::DEFAULT_ERROR_ADDRESS)),
                 };
                 module_members(members, always_add, addr, m)
             }
@@ -1869,34 +1869,34 @@ fn value(context: &mut Context, sp!(loc, pvalue_): P::Value) -> Option<E::Value>
             let mut addr = address(context, /* suggest_declaration */ true, addr);
             if let Address::Named(n) = addr {
                 if context.env.named_address_mapping().get(&n.value).is_none() {
-                    addr = Address::Anonymous(sp(n.loc, AddressBytes::DEFAULT_ERROR_BYTES));
+                    addr = Address::Anonymous(sp(n.loc, NumericalAddress::DEFAULT_ERROR_ADDRESS));
                 }
             }
             EV::Address(addr)
         }
         PV::Num(s) if s.ends_with("u8") => match parse_u8(&s[..s.len() - 2]) {
-            Ok(u) => EV::U8(u),
+            Ok((u, _format)) => EV::U8(u),
             Err(_) => {
                 context.env.add_diag(num_too_big_error(loc, "'u8'"));
                 return None;
             }
         },
         PV::Num(s) if s.ends_with("u64") => match parse_u64(&s[..s.len() - 3]) {
-            Ok(u) => EV::U64(u),
+            Ok((u, _format)) => EV::U64(u),
             Err(_) => {
                 context.env.add_diag(num_too_big_error(loc, "'u64'"));
                 return None;
             }
         },
         PV::Num(s) if s.ends_with("u128") => match parse_u128(&s[..s.len() - 4]) {
-            Ok(u) => EV::U128(u),
+            Ok((u, _format)) => EV::U128(u),
             Err(_) => {
                 context.env.add_diag(num_too_big_error(loc, "'u128'"));
                 return None;
             }
         },
         PV::Num(s) => match parse_u128(&s) {
-            Ok(u) => EV::InferredNum(u),
+            Ok((u, _format)) => EV::InferredNum(u),
             Err(_) => {
                 context.env.add_diag(num_too_big_error(
                     loc,

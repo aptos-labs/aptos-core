@@ -23,7 +23,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_lang::{
-    shared::{AddressBytes, Flags},
+    shared::{Flags, NumericalAddress},
     unit_test::{ExpectedFailure, ModuleTestPlan, TestCase, TestPlan},
 };
 use move_model::{
@@ -45,7 +45,7 @@ pub struct SharedTestingConfig {
     native_function_table: NativeFunctionTable,
     starting_storage_state: InMemoryStorage,
     source_files: Vec<String>,
-    named_address_values: BTreeMap<String, AddressBytes>,
+    named_address_values: BTreeMap<String, NumericalAddress>,
     check_stackless_vm: bool,
     verbose: bool,
 }
@@ -120,7 +120,7 @@ impl TestRunner {
         save_storage_state_on_failure: bool,
         tests: TestPlan,
         native_function_table: Option<NativeFunctionTable>,
-        named_address_values: BTreeMap<String, AddressBytes>,
+        named_address_values: BTreeMap<String, NumericalAddress>,
     ) -> Result<Self> {
         let source_files = tests
             .files

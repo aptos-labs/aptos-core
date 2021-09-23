@@ -5,7 +5,7 @@
 
 use move_lang::{
     command_line::{self as cli},
-    shared::{self, verify_and_create_named_address_mapping, AddressBytes, Flags},
+    shared::{self, verify_and_create_named_address_mapping, Flags, NumericalAddress},
 };
 use structopt::*;
 
@@ -43,7 +43,7 @@ pub struct Options {
         long = "addresses",
         parse(try_from_str = shared::parse_named_address)
     )]
-    pub named_addresses: Vec<(String, AddressBytes)>,
+    pub named_addresses: Vec<(String, NumericalAddress)>,
 
     #[structopt(flatten)]
     pub flags: Flags,

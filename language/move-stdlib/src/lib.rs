@@ -3,7 +3,7 @@
 
 use log::LevelFilter;
 use move_command_line_common::files::{extension_equals, find_filenames, MOVE_EXTENSION};
-use move_lang::shared::AddressBytes;
+use move_lang::shared::NumericalAddress;
 use std::{collections::BTreeMap, path::PathBuf};
 
 #[cfg(test)]
@@ -63,11 +63,11 @@ pub fn move_nursery_files() -> Vec<String> {
     find_filenames(&[path], |p| extension_equals(p, MOVE_EXTENSION)).unwrap()
 }
 
-pub fn move_stdlib_named_addresses() -> BTreeMap<String, AddressBytes> {
+pub fn move_stdlib_named_addresses() -> BTreeMap<String, NumericalAddress> {
     let mapping = [("Std", "0x1")];
     mapping
         .iter()
-        .map(|(name, addr)| (name.to_string(), AddressBytes::parse_str(addr).unwrap()))
+        .map(|(name, addr)| (name.to_string(), NumericalAddress::parse_str(addr).unwrap()))
         .collect()
 }
 
@@ -79,7 +79,7 @@ pub fn build_doc(
     sources: &[String],
     dep_paths: Vec<String>,
     with_diagram: bool,
-    named_addresses: BTreeMap<String, AddressBytes>,
+    named_addresses: BTreeMap<String, NumericalAddress>,
 ) {
     let options = move_prover::cli::Options {
         move_sources: sources.to_vec(),

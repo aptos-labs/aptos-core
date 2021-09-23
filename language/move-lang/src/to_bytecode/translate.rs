@@ -235,7 +235,7 @@ fn module(
     };
     let function_infos = module_function_infos(&module, &source_map, &collected_function_infos);
     let module = NamedCompiledModule {
-        address_bytes: addr_bytes,
+        address: addr_bytes,
         name: module_name.value(),
         module,
         source_map,

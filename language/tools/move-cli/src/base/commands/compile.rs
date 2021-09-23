@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use anyhow::Result;
 use move_lang::{
     self,
-    shared::{AddressBytes, Flags},
+    shared::{Flags, NumericalAddress},
     Compiler,
 };
 
@@ -17,7 +17,7 @@ pub fn compile(
     output_dir: &str,
     sources_shadow_deps: bool,
     sources: &[String],
-    named_address_mapping: BTreeMap<String, AddressBytes>,
+    named_address_mapping: BTreeMap<String, NumericalAddress>,
     emit_source_map: bool,
     verbose: bool,
 ) -> Result<()> {

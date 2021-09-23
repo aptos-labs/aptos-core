@@ -9,7 +9,7 @@ use move_core_types::language_storage::ModuleId;
 use move_lang::{
     self,
     diagnostics::{self, codes::Severity},
-    shared::{self, AddressBytes},
+    shared::{self, NumericalAddress},
     unit_test::{self, TestPlan},
     Compiler, Flags, PASS_CFGIR,
 };
@@ -70,7 +70,7 @@ pub struct UnitTestingConfig {
         long = "addresses",
         parse(try_from_str = shared::parse_named_address)
     )]
-    pub named_address_values: Vec<(String, AddressBytes)>,
+    pub named_address_values: Vec<(String, NumericalAddress)>,
 
     /// Source files
     #[structopt(name = "sources")]
@@ -114,7 +114,7 @@ impl UnitTestingConfig {
 
     pub fn with_named_addresses(
         mut self,
-        named_address_values: BTreeMap<String, AddressBytes>,
+        named_address_values: BTreeMap<String, NumericalAddress>,
     ) -> Self {
         assert!(self.named_address_values.is_empty());
         self.named_address_values = named_address_values.into_iter().collect();

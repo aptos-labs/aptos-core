@@ -280,10 +280,10 @@ fn parse_identifier(context: &mut Context) -> Result<Name, Diagnostic> {
 }
 
 // Parse a numerical address value
-//     AddressBytes = <Number>
-fn parse_address_bytes(context: &mut Context) -> Result<Spanned<AddressBytes>, Diagnostic> {
+//     NumericalAddress = <Number>
+fn parse_address_bytes(context: &mut Context) -> Result<Spanned<NumericalAddress>, Diagnostic> {
     let loc = current_token_loc(context.tokens);
-    let addr_res = AddressBytes::parse_str(context.tokens.content());
+    let addr_res = NumericalAddress::parse_str(context.tokens.content());
     consume_token(context.tokens, Tok::NumValue)?;
     let addr_ = match addr_res {
         Ok(addr_) => addr_,
@@ -291,14 +291,14 @@ fn parse_address_bytes(context: &mut Context) -> Result<Spanned<AddressBytes>, D
             context
                 .env
                 .add_diag(diag!(Syntax::InvalidAddress, (loc, msg)));
-            AddressBytes::DEFAULT_ERROR_BYTES
+            NumericalAddress::DEFAULT_ERROR_ADDRESS
         }
     };
     Ok(sp(loc, addr_))
 }
 
 // Parse the beginning of an access, either an address or an identifier:
-//      LeadingNameAccess = <AddressBytes> | <Identifier>
+//      LeadingNameAccess = <NumericalAddress> | <Identifier>
 fn parse_leading_name_access(context: &mut Context) -> Result<LeadingNameAccess, Diagnostic> {
     parse_leading_name_access_(context, || "an address or an identifier")
 }

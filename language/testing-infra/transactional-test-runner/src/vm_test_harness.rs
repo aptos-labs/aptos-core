@@ -23,7 +23,7 @@ use move_core_types::{
 };
 use move_lang::{
     compiled_unit::AnnotatedCompiledUnit,
-    shared::{verify_and_create_named_address_mapping, AddressBytes},
+    shared::{verify_and_create_named_address_mapping, NumericalAddress},
     FullyCompiledProgram,
 };
 use move_stdlib::move_stdlib_named_addresses;
@@ -128,7 +128,10 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             assert!(prev.is_none());
         }
         for module in &*MOVE_STDLIB_COMPILED {
-            let bytes = AddressBytes::new(module.address().to_u8());
+            let bytes = NumericalAddress::new(
+                module.address().into_bytes(),
+                move_lang::shared::NumberFormat::Hex,
+            );
             let named_addr = *addr_to_name_mapping.get(&bytes).unwrap();
             adapter.compiled_state.add(Some(named_addr), module.clone());
         }

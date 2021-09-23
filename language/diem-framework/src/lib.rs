@@ -8,7 +8,7 @@ use move_binary_format::{access::ModuleAccess, file_format::CompiledModule};
 use move_command_line_common::files::{
     extension_equals, find_filenames, MOVE_COMPILED_EXTENSION, MOVE_EXTENSION,
 };
-use move_lang::{compiled_unit::AnnotatedCompiledUnit, shared::AddressBytes, Compiler};
+use move_lang::{compiled_unit::AnnotatedCompiledUnit, shared::NumericalAddress, Compiler};
 use move_symbol_pool::Symbol;
 use once_cell::sync::Lazy;
 use sha2::{Digest, Sha256};
@@ -61,7 +61,7 @@ pub fn diem_stdlib_files() -> Vec<String> {
 }
 
 // TODO: This will be declared in the package once those are in
-pub fn diem_framework_named_addresses() -> BTreeMap<String, AddressBytes> {
+pub fn diem_framework_named_addresses() -> BTreeMap<String, NumericalAddress> {
     let mapping = [
         ("Std", "0x1"),
         ("DiemFramework", "0x1"),
@@ -72,7 +72,7 @@ pub fn diem_framework_named_addresses() -> BTreeMap<String, AddressBytes> {
     ];
     mapping
         .iter()
-        .map(|(name, addr)| (name.to_string(), AddressBytes::parse_str(addr).unwrap()))
+        .map(|(name, addr)| (name.to_string(), NumericalAddress::parse_str(addr).unwrap()))
         .collect()
 }
 

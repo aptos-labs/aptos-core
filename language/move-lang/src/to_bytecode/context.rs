@@ -5,7 +5,7 @@ use crate::{
     expansion::ast::{Address, ModuleIdent, ModuleIdent_, SpecId},
     hlir::ast as H,
     parser::ast::{ConstantName, FunctionName, StructName, Var},
-    shared::{AddressBytes, CompilationEnv},
+    shared::{CompilationEnv, NumericalAddress},
 };
 use move_core_types::account_address::AccountAddress as MoveAddress;
 use move_ir_types::ast as IR;
@@ -207,10 +207,14 @@ impl<'a> Context<'a> {
     //**********************************************************************************************
 
     fn ir_module_alias(sp!(_, ModuleIdent_ { address, module }): &ModuleIdent) -> IR::ModuleName {
-        IR::ModuleName(format!("{}::{}", address, module).into())
+        let s = match address {
+            Address::Anonymous(sp!(_, a_)) => format!("{:X}::{}", a_, module),
+            Address::Named(n) => format!("{}::{}", n, module),
+        };
+        IR::ModuleName(s.into())
     }
 
-    pub fn resolve_address(&self, addr: Address) -> AddressBytes {
+    pub fn resolve_address(&self, addr: Address) -> NumericalAddress {
         addr.into_addr_bytes(self.env.named_address_mapping())
     }
 
@@ -219,7 +223,7 @@ impl<'a> Context<'a> {
     }
 
     fn translate_module_ident_impl(
-        addresses: &BTreeMap<Symbol, AddressBytes>,
+        addresses: &BTreeMap<Symbol, NumericalAddress>,
         sp!(_, ModuleIdent_ { address, module }): ModuleIdent,
     ) -> IR::ModuleIdent {
         let address_bytes = address.into_addr_bytes(addresses);

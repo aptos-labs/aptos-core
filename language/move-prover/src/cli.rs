@@ -13,7 +13,7 @@ use std::{
 use anyhow::anyhow;
 use clap::{App, Arg};
 use log::LevelFilter;
-use move_lang::shared::AddressBytes;
+use move_lang::shared::NumericalAddress;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use simplelog::{
@@ -794,10 +794,10 @@ impl Options {
 }
 
 pub fn named_addresses_for_options(
-    named_address_values: &BTreeMap<String, AddressBytes>,
+    named_address_values: &BTreeMap<String, NumericalAddress>,
 ) -> Vec<String> {
     named_address_values
         .iter()
-        .map(|(name, addr)| format!("{}=0x{:#X}", name, addr))
+        .map(|(name, addr)| format!("{}={}", name, addr))
         .collect()
 }

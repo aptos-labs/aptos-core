@@ -9,7 +9,7 @@ use move_cli::{
     sandbox,
     sandbox::utils::{on_disk_state_view::OnDiskStateView, Mode, ModeType},
 };
-use move_lang::shared::AddressBytes;
+use move_lang::shared::NumericalAddress;
 use move_package::source_package::layout::SourcePackageLayout;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
@@ -57,21 +57,21 @@ pub struct Config {
 }
 
 // Fetches the named addresses for a particular project or genesis.
-// Uses a BTreeMap over HashMap because upstream AddressBytes does as well,
+// Uses a BTreeMap over HashMap because upstream NumericalAddress does as well,
 // probably because order matters.
 fn fetch_named_addresses(state: &OnDiskStateView) -> Result<BTreeMap<String, AccountAddress>> {
     let address_bytes_map = state.get_named_addresses(BTreeMap::new())?;
     Ok(map_address_bytes_to_account_address(address_bytes_map))
 }
 
-// map_address_bytes_to_account_address converts BTreeMap<String,AddressBytes>
-// to BTreeMap<String, AccountAddress> because AddressBytes is not serializable.
+// map_address_bytes_to_account_address converts BTreeMap<String,NumericalAddress>
+// to BTreeMap<String, AccountAddress> because NumericalAddress is not serializable.
 fn map_address_bytes_to_account_address(
-    original: BTreeMap<String, AddressBytes>,
+    original: BTreeMap<String, NumericalAddress>,
 ) -> BTreeMap<String, AccountAddress> {
     original
-        .iter()
-        .map(|(name, addr)| (name.to_string(), AccountAddress::new(addr.into_bytes())))
+        .into_iter()
+        .map(|(name, addr)| (name, addr.into_inner()))
         .collect()
 }
 

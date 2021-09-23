@@ -270,7 +270,7 @@ pub fn compile_program(file_path: &str, dependency_paths: &[&str]) -> Result<Vec
         command.args(&["-d", dep]);
     }
     for (name, addr) in diem_framework::diem_framework_named_addresses() {
-        command.args(&["-a", &format!("{}=0x{:#X}", name, addr)]);
+        command.args(&["-a", &format!("{}={:#X}", name, addr)]);
     }
 
     let output = command.output()?;

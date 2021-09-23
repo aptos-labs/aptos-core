@@ -11,7 +11,7 @@ use crate::{
     expansion::ast::{AbilitySet, ModuleIdent, Value, Value_},
     hlir::ast::{self as H, Label},
     parser::ast::{ConstantName, FunctionName, StructName, Var},
-    shared::{unique_map::UniqueMap, AddressBytes, CompilationEnv},
+    shared::{unique_map::UniqueMap, CompilationEnv, NumericalAddress},
     FullyCompiledProgram,
 };
 use cfgir::ast::LoopInfo;
@@ -360,14 +360,14 @@ fn move_value_from_exp(context: &mut Context, e: H::Exp) -> Option<MoveValue> {
 }
 
 pub(crate) fn move_value_from_value(
-    address_mapping: &BTreeMap<Symbol, AddressBytes>,
+    address_mapping: &BTreeMap<Symbol, NumericalAddress>,
     sp!(_, v_): Value,
 ) -> MoveValue {
     move_value_from_value_(address_mapping, v_)
 }
 
 pub(crate) fn move_value_from_value_(
-    address_mapping: &BTreeMap<Symbol, AddressBytes>,
+    address_mapping: &BTreeMap<Symbol, NumericalAddress>,
     v_: Value_,
 ) -> MoveValue {
     use MoveValue as MV;

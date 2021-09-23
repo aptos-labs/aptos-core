@@ -7,7 +7,7 @@ use crate::{
     expansion::ast::{ModuleIdent, ModuleIdent_, SpecId},
     hlir::ast as H,
     parser::ast::{FunctionName, ModuleName, Var},
-    shared::{unique_map::UniqueMap, AddressBytes, Name},
+    shared::{unique_map::UniqueMap, Name, NumericalAddress},
 };
 use bytecode_source_map::source_map::SourceMap;
 use move_binary_format::file_format as F;
@@ -44,7 +44,7 @@ pub struct FunctionInfo {
 
 #[derive(Debug, Clone)]
 pub struct NamedCompiledModule {
-    pub address_bytes: AddressBytes,
+    pub address: NumericalAddress,
     pub name: Symbol,
     pub module: F::CompiledModule,
     pub source_map: SourceMap,
@@ -93,7 +93,7 @@ impl AnnotatedCompiledModule {
     pub fn module_ident(&self) -> ModuleIdent {
         use crate::expansion::ast::Address;
         let address = match self.address_name {
-            None => Address::Anonymous(sp(self.loc, self.named_module.address_bytes)),
+            None => Address::Anonymous(sp(self.loc, self.named_module.address)),
             Some(n) => Address::Named(n),
         };
         sp(
@@ -107,7 +107,7 @@ impl AnnotatedCompiledModule {
 
     pub fn module_id(&self) -> (Option<Name>, ModuleId) {
         let id = ModuleId::new(
-            AccountAddress::new(self.named_module.address_bytes.into_bytes()),
+            AccountAddress::new(self.named_module.address.into_bytes()),
             MoveCoreIdentifier::new(self.named_module.name.to_string()).unwrap(),
         );
         (self.address_name, id)
@@ -125,7 +125,7 @@ impl AnnotatedCompiledUnit {
                 function_infos,
             }) => {
                 let NamedCompiledModule {
-                    address_bytes,
+                    address: address_bytes,
                     name,
                     module,
                     source_map,
@@ -136,7 +136,7 @@ impl AnnotatedCompiledUnit {
                     module_name_loc,
                     address_name,
                     named_module: NamedCompiledModule {
-                        address_bytes,
+                        address: address_bytes,
                         name,
                         module,
                         source_map,

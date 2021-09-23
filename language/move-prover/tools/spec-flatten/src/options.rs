@@ -3,7 +3,7 @@
 
 use structopt::StructOpt;
 
-use move_lang::shared::{parse_named_address, AddressBytes};
+use move_lang::shared::{parse_named_address, NumericalAddress};
 
 /// Options passed into the specification flattening tool.
 #[derive(StructOpt, Clone)]
@@ -25,7 +25,7 @@ pub struct FlattenOptions {
 
     /// Extra mappings for named address
     #[structopt(short = "a", long = "address", parse(try_from_str = parse_named_address))]
-    pub named_addresses_extra: Option<Vec<(String, AddressBytes)>>,
+    pub named_addresses_extra: Option<Vec<(String, NumericalAddress)>>,
 
     /// Verbose mode
     #[structopt(short, long)]

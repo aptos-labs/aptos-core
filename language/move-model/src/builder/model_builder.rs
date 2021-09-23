@@ -12,7 +12,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use log::{debug, info, warn};
 use num::BigUint;
 
-use move_lang::{expansion::ast as EA, parser::ast as PA, shared::AddressBytes};
+use move_lang::{expansion::ast as EA, parser::ast as PA, shared::NumericalAddress};
 use move_symbol_pool::Symbol as MoveStringSymbol;
 
 use crate::{
@@ -37,7 +37,7 @@ pub(crate) struct ModelBuilder<'env> {
     /// The global environment we are building.
     pub env: &'env mut GlobalEnv,
     /// Set of known named addresses provided by the compiler
-    pub named_address_mapping: BTreeMap<MoveStringSymbol, AddressBytes>,
+    pub named_address_mapping: BTreeMap<MoveStringSymbol, NumericalAddress>,
     /// A symbol table for specification functions. Because of overloading, and entry can
     /// contain multiple functions.
     pub spec_fun_table: BTreeMap<QualifiedSymbol, Vec<SpecFunEntry>>,
@@ -133,7 +133,7 @@ impl<'env> ModelBuilder<'env> {
     /// Creates a builders.
     pub fn new(
         env: &'env mut GlobalEnv,
-        named_address_mapping: BTreeMap<MoveStringSymbol, AddressBytes>,
+        named_address_mapping: BTreeMap<MoveStringSymbol, NumericalAddress>,
     ) -> Self {
         let mut translator = ModelBuilder {
             env,
@@ -290,7 +290,7 @@ impl<'env> ModelBuilder<'env> {
         assert!(self.const_table.insert(name, entry).is_none());
     }
 
-    pub fn resolve_address(&self, loc: &Loc, addr: &EA::Address) -> AddressBytes {
+    pub fn resolve_address(&self, loc: &Loc, addr: &EA::Address) -> NumericalAddress {
         match addr {
             EA::Address::Anonymous(bytes) => bytes.value,
             EA::Address::Named(n) => self
@@ -299,7 +299,7 @@ impl<'env> ModelBuilder<'env> {
                 .cloned()
                 .unwrap_or_else(|| {
                     self.error(loc, &format!("Undeclared address `{}`", n));
-                    AddressBytes::DEFAULT_ERROR_BYTES
+                    NumericalAddress::DEFAULT_ERROR_ADDRESS
                 }),
         }
     }

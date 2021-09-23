@@ -9,7 +9,7 @@ use crate::{
     diagnostics::{codes::Severity, *},
     expansion, hlir, interface_generator, naming, parser,
     parser::{comments::*, *},
-    shared::{AddressBytes, CompilationEnv, Flags},
+    shared::{CompilationEnv, Flags, NumericalAddress},
     to_bytecode, typing, unit_test,
 };
 use move_command_line_common::files::{
@@ -36,7 +36,7 @@ pub struct Compiler<'a, 'b> {
     interface_files_dir_opt: Option<String>,
     pre_compiled_lib: Option<&'b FullyCompiledProgram>,
     compiled_module_named_address_mapping: BTreeMap<CompiledModuleId, String>,
-    named_address_mapping: BTreeMap<Symbol, AddressBytes>,
+    named_address_mapping: BTreeMap<Symbol, NumericalAddress>,
     flags: Flags,
 }
 
@@ -141,7 +141,7 @@ impl<'a, 'b> Compiler<'a, 'b> {
 
     pub fn set_named_address_values(
         mut self,
-        named_address_mapping: BTreeMap<impl Into<Symbol>, AddressBytes>,
+        named_address_mapping: BTreeMap<impl Into<Symbol>, NumericalAddress>,
     ) -> Self {
         assert!(self.named_address_mapping.is_empty());
         self.named_address_mapping = named_address_mapping
@@ -375,7 +375,7 @@ pub fn construct_pre_compiled_lib(
     deps: &[String],
     interface_files_dir_opt: Option<String>,
     flags: Flags,
-    named_address_values: BTreeMap<String, AddressBytes>,
+    named_address_values: BTreeMap<String, NumericalAddress>,
 ) -> anyhow::Result<Result<FullyCompiledProgram, (FilesSourceText, Diagnostics)>> {
     let (files, pprog_and_comments_res) = Compiler::new(&[], deps)
         .set_interface_files_dir_opt(interface_files_dir_opt)

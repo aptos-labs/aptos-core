@@ -4,7 +4,7 @@
 use crate::{
     compiled_unit::{AnnotatedCompiledUnit, NamedCompiledModule},
     diagnostics::FilesSourceText,
-    shared::AddressBytes,
+    shared::NumericalAddress,
 };
 use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
@@ -47,7 +47,7 @@ pub enum ExpectedFailure {
 
 impl ModuleTestPlan {
     pub fn new(
-        addr: &AddressBytes,
+        addr: &NumericalAddress,
         module_name: &str,
         tests: BTreeMap<TestName, TestCase>,
     ) -> Self {

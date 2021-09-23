@@ -29,7 +29,7 @@ use move_lang::{
     diagnostics::Diagnostics,
     expansion::ast::{self as E, Address, ModuleDefinition, ModuleIdent, ModuleIdent_},
     parser::ast::{self as P, ModuleName as ParserModuleName},
-    shared::{parse_named_address, unique_map::UniqueMap, AddressBytes},
+    shared::{parse_named_address, unique_map::UniqueMap, NumericalAddress},
     Compiler, Flags, PASS_COMPILATION, PASS_EXPANSION, PASS_PARSER,
 };
 use move_symbol_pool::Symbol as MoveStringSymbol;
@@ -79,7 +79,7 @@ pub fn run_model_builder_with_options(
     move_sources: &[String],
     deps_dir: &[String],
     options: ModelBuilderOptions,
-    named_address_mapping: BTreeMap<String, AddressBytes>,
+    named_address_mapping: BTreeMap<String, NumericalAddress>,
 ) -> anyhow::Result<GlobalEnv> {
     run_model_builder_with_options_and_compilation_flags(
         move_sources,
@@ -97,7 +97,7 @@ pub fn run_model_builder_with_options_and_compilation_flags(
     deps_dir: &[String],
     options: ModelBuilderOptions,
     flags: Flags,
-    named_address_mapping: BTreeMap<String, AddressBytes>,
+    named_address_mapping: BTreeMap<String, NumericalAddress>,
 ) -> anyhow::Result<GlobalEnv> {
     let mut env = GlobalEnv::new();
     env.set_extension(options);
@@ -458,7 +458,7 @@ fn script_into_module(compiled_script: CompiledScript) -> CompiledModule {
 #[allow(deprecated)]
 fn run_spec_checker(
     env: &mut GlobalEnv,
-    named_address_mapping: BTreeMap<MoveStringSymbol, AddressBytes>,
+    named_address_mapping: BTreeMap<MoveStringSymbol, NumericalAddress>,
     units: Vec<AnnotatedCompiledUnit>,
     mut eprog: E::Program,
 ) {
@@ -514,7 +514,8 @@ fn run_spec_checker(
                         }
                     };
                     // Convert the script into a module.
-                    let address = Address::Anonymous(sp(loc, AddressBytes::DEFAULT_ERROR_BYTES));
+                    let address =
+                        Address::Anonymous(sp(loc, NumericalAddress::DEFAULT_ERROR_ADDRESS));
                     let ident = sp(
                         loc,
                         ModuleIdent_::new(address, ParserModuleName(function_name.0)),
@@ -592,7 +593,7 @@ pub fn big_uint_to_addr(i: &BigUint) -> AccountAddress {
 
 pub fn parse_addresses_from_options(
     named_addr_strings: Vec<String>,
-) -> anyhow::Result<BTreeMap<String, AddressBytes>> {
+) -> anyhow::Result<BTreeMap<String, NumericalAddress>> {
     named_addr_strings
         .iter()
         .map(|x| parse_named_address(x))

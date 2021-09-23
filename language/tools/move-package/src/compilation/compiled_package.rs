@@ -26,7 +26,7 @@ use move_lang::{
         AnnotatedCompiledUnit, CompiledUnit, NamedCompiledModule, NamedCompiledScript,
     },
     diagnostics::FilesSourceText,
-    shared::{AddressBytes, Flags},
+    shared::{Flags, NumericalAddress},
     Compiler,
 };
 use move_model::{model::GlobalEnv, options::ModelBuilderOptions, run_model_builder_with_options};
@@ -131,12 +131,15 @@ impl OnDiskCompiledPackage {
                     Ok(module) => {
                         let (address_bytes, module_name) = {
                             let id = module.self_id();
-                            let addr_bytes = AddressBytes::new(id.address().to_u8());
+                            let parsed_addr = NumericalAddress::new(
+                                id.address().into_bytes(),
+                                move_lang::shared::NumberFormat::Hex,
+                            );
                             let module_name = FileName::from(id.name().as_str());
-                            (addr_bytes, module_name)
+                            (parsed_addr, module_name)
                         };
                         Ok(CompiledUnit::Module(NamedCompiledModule {
-                            address_bytes,
+                            address: address_bytes,
                             name: module_name,
                             module,
                             source_map,
@@ -359,7 +362,11 @@ impl CompiledPackage {
         let in_scope_named_addrs = resolved_package
             .resolution_table
             .iter()
-            .map(|(ident, addr)| (ident.to_string(), AddressBytes::new(addr.to_u8())))
+            .map(|(ident, addr)| {
+                let parsed_addr =
+                    NumericalAddress::new(addr.into_bytes(), move_lang::shared::NumberFormat::Hex);
+                (ident.to_string(), parsed_addr)
+            })
             .collect::<BTreeMap<_, _>>();
         let sources: Vec<_> = resolved_package
             .get_sources(&resolution_graph.build_options)?

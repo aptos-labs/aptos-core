@@ -1009,7 +1009,7 @@ impl ModuleName {
     }
 
     pub fn from_address_bytes_and_name(
-        addr: move_lang::shared::AddressBytes,
+        addr: move_lang::shared::NumericalAddress,
         name: Symbol,
     ) -> ModuleName {
         ModuleName(BigUint::from_bytes_be(&addr.into_bytes()), name)

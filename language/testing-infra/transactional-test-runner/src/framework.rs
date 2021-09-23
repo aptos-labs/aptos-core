@@ -23,7 +23,7 @@ use move_core_types::{
 use move_lang::{
     compiled_unit::AnnotatedCompiledUnit,
     diagnostics::{Diagnostics, FilesSourceText},
-    shared::AddressBytes,
+    shared::NumericalAddress,
     FullyCompiledProgram,
 };
 use move_symbol_pool::Symbol;
@@ -44,7 +44,7 @@ pub struct ProcessedModule {
 pub struct CompiledState<'a> {
     pre_compiled_deps: Option<&'a FullyCompiledProgram>,
     compiled_module_named_address_mapping: BTreeMap<ModuleId, Symbol>,
-    named_address_mapping: BTreeMap<Symbol, AddressBytes>,
+    named_address_mapping: BTreeMap<Symbol, NumericalAddress>,
     modules: BTreeMap<ModuleId, ProcessedModule>,
 }
 
@@ -254,7 +254,7 @@ pub trait MoveTestAdapter<'a> {
 
 impl<'a> CompiledState<'a> {
     pub fn new(
-        named_address_mapping: BTreeMap<impl Into<Symbol>, AddressBytes>,
+        named_address_mapping: BTreeMap<impl Into<Symbol>, NumericalAddress>,
         pre_compiled_deps: Option<&'a FullyCompiledProgram>,
     ) -> Self {
         let named_address_mapping = named_address_mapping
@@ -327,7 +327,7 @@ impl<'a> CompiledState<'a> {
 
 fn compile_source_unit(
     pre_compiled_deps: Option<&FullyCompiledProgram>,
-    named_address_mapping: BTreeMap<Symbol, AddressBytes>,
+    named_address_mapping: BTreeMap<Symbol, NumericalAddress>,
     deps: &[String],
     path: String,
 ) -> Result<(AnnotatedCompiledUnit, Option<String>)> {

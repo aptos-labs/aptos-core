@@ -17,7 +17,7 @@ use move_core_types::{
     transaction_argument::{convert_txn_args, TransactionArgument},
 };
 use move_lang::{
-    self, compiled_unit::AnnotatedCompiledUnit, shared::AddressBytes, Compiler, Flags,
+    self, compiled_unit::AnnotatedCompiledUnit, shared::NumericalAddress, Compiler, Flags,
 };
 use move_vm_runtime::move_vm::MoveVM;
 
@@ -33,7 +33,7 @@ pub fn run(
     signers: &[String],
     txn_args: &[TransactionArgument],
     vm_type_args: Vec<TypeTag>,
-    named_address_mapping: BTreeMap<String, AddressBytes>,
+    named_address_mapping: BTreeMap<String, NumericalAddress>,
     gas_budget: Option<u64>,
     dry_run: bool,
     verbose: bool,
@@ -41,7 +41,7 @@ pub fn run(
     fn compile_script(
         state: &OnDiskStateView,
         script_path: &Path,
-        named_address_mapping: BTreeMap<String, AddressBytes>,
+        named_address_mapping: BTreeMap<String, NumericalAddress>,
         verbose: bool,
     ) -> Result<Option<CompiledScript>> {
         if verbose {

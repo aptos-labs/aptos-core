@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use anyhow::Result;
 use move_lang::{
     self,
-    shared::{AddressBytes, Flags},
+    shared::{Flags, NumericalAddress},
     Compiler,
 };
 
@@ -15,7 +15,7 @@ pub fn check(
     interface_files: &[String],
     sources_shadow_deps: bool,
     files: &[String],
-    named_addresses: BTreeMap<String, AddressBytes>,
+    named_addresses: BTreeMap<String, NumericalAddress>,
     verbose: bool,
 ) -> Result<()> {
     if verbose {

@@ -11,7 +11,7 @@ use crate::{
 use anyhow::{bail, Result};
 use include_dir::{include_dir, Dir};
 use move_binary_format::file_format::CompiledModule;
-use move_lang::shared::AddressBytes;
+use move_lang::shared::NumericalAddress;
 use move_stdlib::move_stdlib_named_addresses;
 use once_cell::sync::Lazy;
 use std::{
@@ -62,7 +62,7 @@ static PACKAGE_DIEM_FRAMEWORK: Lazy<MovePackage> = Lazy::new(|| {
         ("VMReserved", "0x0"),
     ]
     .iter()
-    .map(|(name, addr)| (name.to_string(), AddressBytes::parse_str(addr).unwrap()))
+    .map(|(name, addr)| (name.to_string(), NumericalAddress::parse_str(addr).unwrap()))
     .collect();
     MovePackage::new(
         "diem".to_string(),
@@ -133,7 +133,7 @@ impl Mode {
         &self,
         out_path: &Path,
         source_only: bool,
-    ) -> Result<BTreeMap<String, AddressBytes>> {
+    ) -> Result<BTreeMap<String, NumericalAddress>> {
         let mut named_address_values = BTreeMap::new();
         for pkg in &self.0 {
             pkg.prepare(out_path, source_only)?;

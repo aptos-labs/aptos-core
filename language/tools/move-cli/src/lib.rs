@@ -28,7 +28,7 @@ use anyhow::Result;
 use move_core_types::{
     account_address::AccountAddress, errmap::ErrorMapping, identifier::Identifier,
 };
-use move_lang::shared::{self, AddressBytes};
+use move_lang::shared::{self, NumericalAddress};
 use move_vm_runtime::native_functions::NativeFunction;
 use sandbox::utils::mode::{Mode, ModeType};
 use std::path::PathBuf;
@@ -51,7 +51,7 @@ pub struct Move {
         global = true,
         parse(try_from_str = shared::parse_named_address)
     )]
-    named_addresses: Vec<(String, AddressBytes)>,
+    named_addresses: Vec<(String, NumericalAddress)>,
 
     /// Directory storing Move resources, events, and module bytecodes produced by module publishing
     /// and script execution.

@@ -3,7 +3,7 @@
 
 use crate::resolution::resolution_graph::ResolvedGraph;
 use anyhow::Result;
-use move_lang::shared::AddressBytes;
+use move_lang::shared::NumericalAddress;
 use move_model::{model::GlobalEnv, options::ModelBuilderOptions, run_model_builder_with_options};
 
 #[derive(Debug, Clone)]
@@ -64,7 +64,13 @@ impl ModelBuilder {
             root_package
                 .resolution_table
                 .into_iter()
-                .map(|(ident, addr)| (ident.to_string(), AddressBytes::new(addr.to_u8())))
+                .map(|(ident, addr)| {
+                    let addr = NumericalAddress::new(
+                        addr.into_bytes(),
+                        move_lang::shared::NumberFormat::Hex,
+                    );
+                    (ident.to_string(), addr)
+                })
                 .collect(),
         )
     }

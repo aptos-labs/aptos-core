@@ -293,7 +293,7 @@ enum FoldableValue {
     U64(u64),
     U128(u128),
     Bool(bool),
-    Address(AddressBytes),
+    Address(NumericalAddress),
     Bytearray(Vec<u8>),
 }
 

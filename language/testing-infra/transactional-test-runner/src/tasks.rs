@@ -12,7 +12,7 @@ use move_core_types::{
     parser,
     transaction_argument::TransactionArgument,
 };
-use move_lang::shared::AddressBytes;
+use move_lang::shared::NumericalAddress;
 use std::{fmt::Debug, path::Path, str::FromStr};
 use structopt::*;
 use tempfile::NamedTempFile;
@@ -200,7 +200,7 @@ pub struct InitCommand {
         long = "addresses",
         parse(try_from_str = move_lang::shared::parse_named_address)
     )]
-    pub named_addresses: Vec<(String, AddressBytes)>,
+    pub named_addresses: Vec<(String, NumericalAddress)>,
 }
 
 #[derive(Debug, StructOpt)]
@@ -316,9 +316,9 @@ where
 pub struct EmptyCommand {}
 
 fn parse_account_address(s: &str) -> Result<AccountAddress> {
-    let n = move_lang::shared::parse_u128(s)
+    let a = move_lang::shared::NumericalAddress::parse_str(s)
         .map_err(|e| anyhow!("Failed to parse address. Got error: {}", e))?;
-    Ok(AccountAddress::new(n.to_be_bytes()))
+    Ok(a.into_inner())
 }
 
 fn parse_qualified_module_access(s: &str) -> Result<(ModuleId, Identifier)> {

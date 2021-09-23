@@ -41,7 +41,7 @@ impl AccountAddress {
         self.0.to_vec()
     }
 
-    pub fn to_u8(self) -> [u8; Self::LENGTH] {
+    pub fn into_bytes(self) -> [u8; Self::LENGTH] {
         self.0
     }
 

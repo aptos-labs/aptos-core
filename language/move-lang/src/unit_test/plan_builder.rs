@@ -7,7 +7,7 @@ use crate::{
     expansion::ast::{self as E, Address, ModuleIdent, ModuleIdent_},
     shared::{
         known_attributes::{KnownAttribute, TestingAttribute},
-        AddressBytes, CompilationEnv, Identifier,
+        CompilationEnv, Identifier, NumericalAddress,
     },
     unit_test::{ExpectedFailure, ModuleTestPlan, TestCase},
 };
@@ -27,7 +27,7 @@ impl<'env> Context<'env> {
         }
     }
 
-    fn resolve_address(&mut self, addr: &Address) -> AddressBytes {
+    fn resolve_address(&mut self, addr: &Address) -> NumericalAddress {
         (*addr).into_addr_bytes(self.env.named_address_mapping())
     }
 }

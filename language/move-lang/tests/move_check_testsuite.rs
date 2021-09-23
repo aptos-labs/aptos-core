@@ -8,7 +8,7 @@ use move_command_line_common::{
 use move_lang::{
     compiled_unit::AnnotatedCompiledUnit,
     diagnostics::*,
-    shared::{AddressBytes, Flags},
+    shared::{Flags, NumericalAddress},
     unit_test, CommentMap, Compiler, SteppedCompiler, PASS_CFGIR, PASS_PARSER,
 };
 use std::{collections::BTreeMap, fs, path::Path};
@@ -18,7 +18,7 @@ const KEEP_TMP: &str = "KEEP";
 
 const TEST_EXT: &str = "unit_test";
 
-fn default_testing_addresses() -> BTreeMap<String, AddressBytes> {
+fn default_testing_addresses() -> BTreeMap<String, NumericalAddress> {
     let mapping = [
         ("Std", "0x1"),
         ("M", "0x1"),
@@ -28,7 +28,7 @@ fn default_testing_addresses() -> BTreeMap<String, AddressBytes> {
     ];
     mapping
         .iter()
-        .map(|(name, addr)| (name.to_string(), AddressBytes::parse_str(addr).unwrap()))
+        .map(|(name, addr)| (name.to_string(), NumericalAddress::parse_str(addr).unwrap()))
         .collect()
 }
 

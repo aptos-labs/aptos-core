@@ -90,7 +90,7 @@ pub struct Script {
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Address {
-    Anonymous(Spanned<AddressBytes>),
+    Anonymous(Spanned<NumericalAddress>),
     Named(Name),
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -490,11 +490,14 @@ impl fmt::Debug for Address {
 //**************************************************************************************************
 
 impl Address {
-    pub const fn anonymous(loc: Loc, address: [u8; ADDRESS_LENGTH]) -> Self {
-        Self::Anonymous(sp(loc, AddressBytes::new(address)))
+    pub const fn anonymous(loc: Loc, address: NumericalAddress) -> Self {
+        Self::Anonymous(sp(loc, address))
     }
 
-    pub fn into_addr_bytes(self, addresses: &BTreeMap<Symbol, AddressBytes>) -> AddressBytes {
+    pub fn into_addr_bytes(
+        self,
+        addresses: &BTreeMap<Symbol, NumericalAddress>,
+    ) -> NumericalAddress {
         match self {
             Self::Anonymous(sp!(_, bytes)) => bytes,
             Self::Named(n) => *addresses.get(&n.value).unwrap_or_else(|| {

@@ -15,14 +15,14 @@ use std::collections::BTreeMap;
 // Entry
 //**************************************************************************************************
 
-type RefinedModuleIdent = (Loc, Option<Name>, AddressBytes, ModuleName);
+type RefinedModuleIdent = (Loc, Option<Name>, NumericalAddress, ModuleName);
 
 /// Verifies that modules remain unique, even after substituting named addresses for their values
 pub fn verify(
     compilation_env: &mut CompilationEnv,
     modules: &UniqueMap<ModuleIdent, E::ModuleDefinition>,
 ) {
-    let mut decl_locs: BTreeMap<(AddressBytes, Symbol), RefinedModuleIdent> = BTreeMap::new();
+    let mut decl_locs: BTreeMap<(NumericalAddress, Symbol), RefinedModuleIdent> = BTreeMap::new();
     for (sp!(loc, ModuleIdent_ { address, module }), _mdef) in modules.key_cloned_iter() {
         let sp!(nloc, n_) = module.0;
         let addr_name = match &address {

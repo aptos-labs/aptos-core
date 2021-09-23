@@ -32,7 +32,9 @@ pub fn program(compilation_env: &CompilationEnv, prog: Program) -> Program {
             Definition::Module(module) => {
                 modules_defined_in_src.insert((
                     module.address.map(|a| a.value).unwrap_or_else(|| {
-                        LeadingNameAccess_::AnonymousAddress(AddressBytes::DEFAULT_ERROR_BYTES)
+                        LeadingNameAccess_::AnonymousAddress(
+                            NumericalAddress::DEFAULT_ERROR_ADDRESS,
+                        )
                     }),
                     module.name,
                 ));
@@ -63,7 +65,7 @@ pub fn program(compilation_env: &CompilationEnv, prog: Program) -> Program {
             Definition::Address(_) => true,
             Definition::Module(module) => !modules_defined_in_src.contains(&(
                 module.address.map(|a| a.value).unwrap_or_else(|| {
-                    LeadingNameAccess_::AnonymousAddress(AddressBytes::DEFAULT_ERROR_BYTES)
+                    LeadingNameAccess_::AnonymousAddress(NumericalAddress::DEFAULT_ERROR_ADDRESS)
                 }),
                 module.name,
             )),

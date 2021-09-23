@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::shared::{ast_debug::*, AddressBytes, Identifier, Name, TName, ADDRESS_LENGTH};
+use crate::shared::{ast_debug::*, Identifier, Name, NumericalAddress, TName};
 use move_ir_types::location::*;
 use move_symbol_pool::Symbol;
 use std::{fmt, hash::Hash};
@@ -136,7 +136,7 @@ new_name!(ModuleName);
 /// - A named address
 /// - An address numerical value
 pub enum LeadingNameAccess_ {
-    AnonymousAddress(AddressBytes),
+    AnonymousAddress(NumericalAddress),
     Name(Name),
 }
 pub type LeadingNameAccess = Spanned<LeadingNameAccess_>;
@@ -696,8 +696,8 @@ impl fmt::Debug for LeadingNameAccess_ {
 //**************************************************************************************************
 
 impl LeadingNameAccess_ {
-    pub const fn anonymous(address: [u8; ADDRESS_LENGTH]) -> Self {
-        Self::AnonymousAddress(AddressBytes::new(address))
+    pub const fn anonymous(address: NumericalAddress) -> Self {
+        Self::AnonymousAddress(address)
     }
 }
 

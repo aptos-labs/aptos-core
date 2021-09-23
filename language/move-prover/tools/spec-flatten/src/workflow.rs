@@ -8,7 +8,7 @@ use bytecode::{
     function_target_pipeline::FunctionTargetsHolder, options::ProverOptions,
     pipeline_factory::default_pipeline_with_options,
 };
-use move_lang::shared::AddressBytes;
+use move_lang::shared::NumericalAddress;
 use move_model::{
     ast::Spec,
     model::{FunId, GlobalEnv, QualifiedId, VerificationScope},
@@ -41,7 +41,7 @@ pub(crate) fn prepare_with_override(
         named_addresses.extend(
             default_mapping
                 .iter()
-                .map(|(name, addr)| (name.to_string(), AddressBytes::parse_str(addr).unwrap())),
+                .map(|(name, addr)| (name.to_string(), NumericalAddress::parse_str(addr).unwrap())),
         );
     }
 

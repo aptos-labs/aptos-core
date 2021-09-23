@@ -9,7 +9,7 @@ use crate::{
     NativeFunctionRecord,
 };
 use move_lang::{
-    self, compiled_unit::AnnotatedCompiledUnit, shared::AddressBytes, Compiler, Flags,
+    self, compiled_unit::AnnotatedCompiledUnit, shared::NumericalAddress, Compiler, Flags,
 };
 use move_vm_runtime::move_vm::MoveVM;
 
@@ -23,7 +23,7 @@ pub fn publish(
     republish: bool,
     ignore_breaking_changes: bool,
     override_ordering: Option<&[String]>,
-    named_address_mapping: BTreeMap<String, AddressBytes>,
+    named_address_mapping: BTreeMap<String, NumericalAddress>,
     verbose: bool,
 ) -> Result<()> {
     if verbose {

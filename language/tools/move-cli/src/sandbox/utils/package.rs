@@ -10,7 +10,7 @@ use move_command_line_common::files::{
 };
 use move_lang::{
     compiled_unit::{AnnotatedCompiledModule, AnnotatedCompiledUnit},
-    shared::{AddressBytes, Flags},
+    shared::{Flags, NumericalAddress},
     Compiler,
 };
 use move_symbol_pool::Symbol;
@@ -81,7 +81,7 @@ pub struct MovePackage {
     /// Dependencies
     deps: Vec<&'static Lazy<MovePackage>>,
     /// Named address values to be be used in this package.
-    named_addresses: BTreeMap<String, AddressBytes>,
+    named_addresses: BTreeMap<String, NumericalAddress>,
     /// Hack to support named addresses. Works now since our current packages only have one address
     // TODO properly support named addresses, will require migrating to new/planned build system
     named_address_hack: Option<String>,
@@ -92,7 +92,7 @@ impl MovePackage {
         name: String,
         sources: Vec<SourceFilter<'static>>,
         deps: Vec<&'static Lazy<MovePackage>>,
-        named_addresses: BTreeMap<String, AddressBytes>,
+        named_addresses: BTreeMap<String, NumericalAddress>,
         named_address: Option<String>,
     ) -> Self {
         MovePackage {
@@ -186,7 +186,7 @@ impl MovePackage {
         Ok(src_dirs)
     }
 
-    pub(crate) fn named_addresses(&self) -> &BTreeMap<String, AddressBytes> {
+    pub(crate) fn named_addresses(&self) -> &BTreeMap<String, NumericalAddress> {
         &self.named_addresses
     }
 
