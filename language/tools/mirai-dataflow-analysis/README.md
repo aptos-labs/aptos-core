@@ -5,6 +5,9 @@ Internally, this tool uses [MIRAI](https://github.com/facebookexperimental/MIRAI
 representation of that call graph. Then, a dataflow analysis is run over the call graph using either
 [Differential Datalog](https://github.com/vmware/differential-datalog) or [Soufflé](https://souffle-lang.github.io/) and decoded results are presented.
 
+## Examples
+Please see the included [examples](examples/examples.md) for notes on analysis construction, execution, and results.
+
 ## Installation
 
 This tool depends on the presence of MIRAI, correctly installed on your system, as well as
@@ -16,6 +19,8 @@ setup, please follow the steps below:
 3. Set the nightly version of Rust for this crate using `rustup override set nightly-YYYY-MM-DD`.
     - See [rust-toolchain](./rust_toolchain)) to determine the current compatible version, which in turn
     must match the version [currently in use by MIRAI](https://github.com/facebookexperimental/MIRAI/blob/main/rust-toolchain).
+
+Please note that the MIRAI's [is_excluded](https://github.com/facebookexperimental/MIRAI/blob/49c8add3706d49f82d96f3ace2c01c738ea04dc2/checker/src/callbacks.rs#L145) function may have to be modified _before_ installing MIRAI to not exclude certain crates.
 
 ### Differential-Datalog-specific step
 

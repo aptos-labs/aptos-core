@@ -309,14 +309,15 @@ TerminalNode(node) :- ValidNode(node), not Edge(_, node, _).
 // Typed dataflow not via
 // There exists a dataflow of type t from node1 to node3 that does not pass through node2.
 //
-// a. There is a terminal non-transitive dataflow of type t from node1 to node3.
+// a. There is a terminal non-transitive dataflow of type t from node1 to node3, and node3 is not
+//    dominated by node2 for t.
 // b. There is a dataflow of type t from node1 to node3 that passes through some node4 != node2.
 //    Since there is no dataflow of type t from node2 to node4, node2 cannot be in that same flow.
 //
 // This is not guaranteed if an over-approximation of the call graph is used.
 output relation TypedDataflowNotVia(node1: NodeID, node2: NodeID, node3: NodeID, t: TypeID)
 TypedDataflowNotVia(node1, node2, node3, t) :- NotEqual(node1, node2), NotEqual(node2, node3), TerminalNode(node3),
-                                                TypedDataflowNT(node1, node3, t).
+                                                TypedDataflowNT(node1, node3, t), not TypedDominates(node2, node3, t).
 TypedDataflowNotVia(node1, node2, node3, t) :- NotEqual(node1, node2), NotEqual(node2, node3),
                                                 TypedDataflowVia(node1, node4, node3, t), NotEqual(node2, node4),
                                                 not SafeDataflow(node4, node2, t).
