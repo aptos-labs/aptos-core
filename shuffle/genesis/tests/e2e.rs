@@ -24,6 +24,7 @@ fn node_e2e() -> Result<()> {
         node_config_dir.path(),
         Path::new("../move/storage/0x00000000000000000000000000000001/modules"),
         VMPublishingOption::open(),
+        diem_framework_releases::current_module_blobs().to_vec(),
     )?;
     let node_config = NodeConfig::load(validator_config.config_path())?;
     let root_key = generate_key::load_key(node_config_dir.path().join("mint.key"));

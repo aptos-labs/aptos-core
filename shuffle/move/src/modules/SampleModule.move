@@ -1,4 +1,6 @@
 module 0x1::SampleModule {
+    use Std::Signer;
+
     struct Coin has key, store {
         value: u64,
     }
@@ -8,6 +10,7 @@ module 0x1::SampleModule {
     const COIN_HAS_WRONG_VALUE: u64 = 2;
 
     public(script) fun mint_coin(owner: signer, amount: u64) {
+        let _x = Signer::address_of(&owner); // Prove Stdlib is available
         move_to(&owner, Coin { value: amount } );
     }
 

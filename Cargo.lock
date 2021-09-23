@@ -7563,6 +7563,7 @@ dependencies = [
  "diem-workspace-hack",
  "move-cli",
  "move-lang",
+ "move-package",
  "move-stdlib",
  "once_cell",
  "serde",

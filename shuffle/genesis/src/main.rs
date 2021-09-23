@@ -38,6 +38,7 @@ fn main() -> Result<()> {
         Path::new(&args.node_config_dir),
         Path::new(MOVE_BYTECODE_DIR),
         publishing_option,
+        diem_framework_releases::current_module_blobs().to_vec(),
     )?;
     let node_config = NodeConfig::load(validator_config.config_path())?;
     println!("Running a Diem node with custom modules ...");

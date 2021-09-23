@@ -32,6 +32,7 @@ pub fn generate_validator_config(
     node_config_dir: &Path,
     move_bytecode_dir: &Path,
     publishing_option: VMPublishingOption,
+    additional_modules: Vec<Vec<u8>>,
 ) -> Result<ValidatorConfig> {
     assert!(
         !node_config_dir.exists(),
@@ -42,7 +43,7 @@ pub fn generate_validator_config(
     let mut genesis_modules: Vec<Vec<u8>> = fs::read_dir(move_bytecode_dir)?
         .map(|f| fs::read(f.unwrap().path()).unwrap())
         .collect();
-    genesis_modules.extend(diem_framework_releases::current_module_blobs().to_vec());
+    genesis_modules.extend(additional_modules);
     println!("Creating genesis with {} modules", genesis_modules.len());
     let template = NodeConfig::default_for_validator();
     std::fs::DirBuilder::new()

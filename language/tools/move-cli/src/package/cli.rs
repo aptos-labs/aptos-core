@@ -3,6 +3,7 @@
 
 use std::{
     collections::HashMap,
+    fmt::Display,
     fs::{create_dir_all, read_to_string},
     io::Write,
     path::{Path, PathBuf},
@@ -122,15 +123,7 @@ pub fn handle_package_commands(
         }
         PackageCommand::New { name } => {
             let creation_path = Path::new(&path).join(name);
-            create_dir_all(&creation_path)?;
-            create_dir_all(creation_path.join(SourcePackageLayout::Sources.path()))?;
-            let mut w =
-                std::fs::File::create(creation_path.join(SourcePackageLayout::Manifest.path()))?;
-            writeln!(
-                &mut w,
-                "[package]\nname = \"{}\"\nversion = \"0.0.0\"",
-                name
-            )?;
+            create_move_package(name, &creation_path)?;
         }
         PackageCommand::Prove { cmd } => {
             let options = match cmd {
@@ -260,5 +253,16 @@ pub fn handle_package_commands(
             }
         }
     };
+    Ok(())
+}
+
+pub fn create_move_package<S: AsRef<str> + Display>(name: S, creation_path: &Path) -> Result<()> {
+    create_dir_all(creation_path.join(SourcePackageLayout::Sources.path()))?;
+    let mut w = std::fs::File::create(creation_path.join(SourcePackageLayout::Manifest.path()))?;
+    writeln!(
+        &mut w,
+        "[package]\nname = \"{}\"\nversion = \"0.0.0\"",
+        name
+    )?;
     Ok(())
 }
