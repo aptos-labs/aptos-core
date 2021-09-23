@@ -459,7 +459,7 @@ impl DiemVM {
 
     fn read_writeset(
         &self,
-        state_view: &dyn StateView,
+        state_view: &impl StateView,
         write_set: &WriteSet,
     ) -> Result<(), VMStatus> {
         // All Move executions satisfy the read-before-write property. Thus we need to read each
@@ -688,7 +688,7 @@ impl DiemVM {
     /// `TransactionOutput`
     pub fn execute_block_and_keep_vm_status(
         transactions: Vec<Transaction>,
-        state_view: &dyn StateView,
+        state_view: &impl StateView,
     ) -> Result<Vec<(VMStatus, TransactionOutput)>, VMStatus> {
         let mut state_view_cache = StateViewCache::new(state_view);
         let count = transactions.len();
@@ -709,7 +709,7 @@ impl VMExecutor for DiemVM {
     /// transaction output.
     fn execute_block(
         transactions: Vec<Transaction>,
-        state_view: &dyn StateView,
+        state_view: &impl StateView,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         fail_point!("move_adapter::execute_block", |_| {
             Err(VMStatus::Error(
@@ -741,9 +741,9 @@ impl VMValidator for DiemVM {
     fn validate_transaction(
         &self,
         transaction: SignedTransaction,
-        state_view: &dyn StateView,
+        state_view: &impl StateView,
     ) -> VMValidatorResult {
-        validate_signed_transaction::<Self>(self, transaction, state_view)
+        validate_signed_transaction(self, transaction, state_view)
     }
 }
 

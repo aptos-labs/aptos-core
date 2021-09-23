@@ -70,7 +70,7 @@ pub struct FakeVM;
 impl VMExecutor for FakeVM {
     fn execute_block(
         _transactions: Vec<Transaction>,
-        _state_view: &dyn StateView,
+        _state_view: &impl StateView,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         Ok(Vec::new())
     }

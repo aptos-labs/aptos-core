@@ -35,15 +35,15 @@ use std::collections::btree_map::BTreeMap;
 ///
 /// If a system wishes to execute a block of transaction on a given view, a cache that keeps
 /// track of incremental changes is vital to the consistency of the data store and the system.
-pub struct StateViewCache<'a> {
-    data_view: &'a dyn StateView,
+pub struct StateViewCache<'a, S> {
+    data_view: &'a S,
     data_map: BTreeMap<AccessPath, Option<Vec<u8>>>,
 }
 
-impl<'a> StateViewCache<'a> {
+impl<'a, S: StateView> StateViewCache<'a, S> {
     /// Create a `StateViewCache` give a `StateView`. Hold updates to the data store and
     /// forward data request to the `StateView` if not in the local cache.
-    pub fn new(data_view: &'a dyn StateView) -> Self {
+    pub fn new(data_view: &'a S) -> Self {
         StateViewCache {
             data_view,
             data_map: BTreeMap::new(),
@@ -68,7 +68,7 @@ impl<'a> StateViewCache<'a> {
     }
 }
 
-impl<'block> StateView for StateViewCache<'block> {
+impl<'block, S: StateView> StateView for StateViewCache<'block, S> {
     // Get some data either through the cache or the `StateView` on a cache miss.
     fn get(&self, access_path: &AccessPath) -> anyhow::Result<Option<Vec<u8>>> {
         fail_point!("move_adapter::data_cache::get", |_| Err(format_err!(
@@ -107,7 +107,7 @@ impl<'block> StateView for StateViewCache<'block> {
     }
 }
 
-impl<'block> ModuleResolver for StateViewCache<'block> {
+impl<'block, S: StateView> ModuleResolver for StateViewCache<'block, S> {
     type Error = VMError;
 
     fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
@@ -115,7 +115,7 @@ impl<'block> ModuleResolver for StateViewCache<'block> {
     }
 }
 
-impl<'block> ResourceResolver for StateViewCache<'block> {
+impl<'block, S: StateView> ResourceResolver for StateViewCache<'block, S> {
     type Error = VMError;
 
     fn get_resource(
@@ -127,7 +127,7 @@ impl<'block> ResourceResolver for StateViewCache<'block> {
     }
 }
 
-impl<'block> ConfigStorage for StateViewCache<'block> {
+impl<'block, S: StateView> ConfigStorage for StateViewCache<'block, S> {
     fn fetch_config(&self, access_path: AccessPath) -> Option<Vec<u8>> {
         self.get(&access_path).ok()?
     }

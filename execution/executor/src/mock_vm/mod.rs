@@ -54,7 +54,7 @@ pub struct MockVM;
 impl VMExecutor for MockVM {
     fn execute_block(
         transactions: Vec<Transaction>,
-        state_view: &dyn StateView,
+        state_view: &impl StateView,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         if state_view.is_genesis() {
             assert_eq!(
@@ -169,7 +169,7 @@ impl VMExecutor for MockVM {
 
 fn read_balance(
     output_cache: &HashMap<AccessPath, u64>,
-    state_view: &dyn StateView,
+    state_view: &impl StateView,
     account: AccountAddress,
 ) -> u64 {
     let balance_access_path = balance_ap(account);
@@ -181,7 +181,7 @@ fn read_balance(
 
 fn read_seqnum(
     output_cache: &HashMap<AccessPath, u64>,
-    state_view: &dyn StateView,
+    state_view: &impl StateView,
     account: AccountAddress,
 ) -> u64 {
     let seqnum_access_path = seqnum_ap(account);
@@ -191,15 +191,15 @@ fn read_seqnum(
     }
 }
 
-fn read_balance_from_storage(state_view: &dyn StateView, balance_access_path: &AccessPath) -> u64 {
+fn read_balance_from_storage(state_view: &impl StateView, balance_access_path: &AccessPath) -> u64 {
     read_u64_from_storage(state_view, balance_access_path)
 }
 
-fn read_seqnum_from_storage(state_view: &dyn StateView, seqnum_access_path: &AccessPath) -> u64 {
+fn read_seqnum_from_storage(state_view: &impl StateView, seqnum_access_path: &AccessPath) -> u64 {
     read_u64_from_storage(state_view, seqnum_access_path)
 }
 
-fn read_u64_from_storage(state_view: &dyn StateView, access_path: &AccessPath) -> u64 {
+fn read_u64_from_storage(state_view: &impl StateView, access_path: &AccessPath) -> u64 {
     state_view
         .get(access_path)
         .expect("Failed to query storage.")

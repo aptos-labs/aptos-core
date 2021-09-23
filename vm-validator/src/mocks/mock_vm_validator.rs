@@ -19,7 +19,7 @@ impl VMValidator for MockVMValidator {
     fn validate_transaction(
         &self,
         _transaction: SignedTransaction,
-        _state_view: &dyn StateView,
+        _state_view: &impl StateView,
     ) -> VMValidatorResult {
         VMValidatorResult::new(None, 0, GovernanceRole::NonGovernanceRole)
     }

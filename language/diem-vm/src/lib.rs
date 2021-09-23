@@ -145,7 +145,7 @@ pub trait VMValidator {
     fn validate_transaction(
         &self,
         transaction: SignedTransaction,
-        state_view: &dyn StateView,
+        state_view: &impl StateView,
     ) -> VMValidatorResult;
 }
 
@@ -159,7 +159,7 @@ pub trait VMExecutor: Send + Sync {
     /// Executes a block of transactions and returns output for each one of them.
     fn execute_block(
         transactions: Vec<Transaction>,
-        state_view: &dyn StateView,
+        state_view: &impl StateView,
     ) -> Result<Vec<TransactionOutput>, VMStatus>;
 }
 

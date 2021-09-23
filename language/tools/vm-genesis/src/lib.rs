@@ -144,7 +144,7 @@ pub fn encode_genesis_change_set(
 }
 
 fn exec_function(
-    session: &mut Session<StateViewCache>,
+    session: &mut Session<StateViewCache<GenesisStateView>>,
 
     module_name: &str,
     function_name: &str,
@@ -173,7 +173,7 @@ fn exec_function(
 }
 
 fn exec_script_function(
-    session: &mut Session<StateViewCache>,
+    session: &mut Session<StateViewCache<GenesisStateView>>,
 
     sender: AccountAddress,
     script_function: &ScriptFunction,
@@ -192,7 +192,7 @@ fn exec_script_function(
 
 /// Create and initialize Association and Core Code accounts.
 fn create_and_initialize_main_accounts(
-    session: &mut Session<StateViewCache>,
+    session: &mut Session<StateViewCache<GenesisStateView>>,
     diem_root_key: &Ed25519PublicKey,
     treasury_compliance_key: &Ed25519PublicKey,
     publishing_option: VMPublishingOption,
@@ -263,7 +263,7 @@ fn create_and_initialize_main_accounts(
 }
 
 fn create_and_initialize_testnet_minting(
-    session: &mut Session<StateViewCache>,
+    session: &mut Session<StateViewCache<GenesisStateView>>,
 
     public_key: &Ed25519PublicKey,
 ) {
@@ -313,7 +313,7 @@ fn create_and_initialize_testnet_minting(
 /// the required accounts, sets the validator operators for each validator owner, and sets the
 /// validator config on-chain.
 fn create_and_initialize_owners_operators(
-    session: &mut Session<StateViewCache>,
+    session: &mut Session<StateViewCache<GenesisStateView>>,
     validators: &[Validator],
 ) {
     let diem_root_address = account_config::diem_root_address();
@@ -359,7 +359,7 @@ fn create_and_initialize_owners_operators(
 }
 
 /// Publish the standard library.
-fn publish_stdlib(session: &mut Session<StateViewCache>, stdlib: Modules) {
+fn publish_stdlib(session: &mut Session<StateViewCache<GenesisStateView>>, stdlib: Modules) {
     let dep_graph = stdlib.compute_dependency_graph();
     let mut addr_opt: Option<AccountAddress> = None;
     let modules = dep_graph
@@ -390,7 +390,7 @@ fn publish_stdlib(session: &mut Session<StateViewCache>, stdlib: Modules) {
 }
 
 /// Trigger a reconfiguration. This emits an event that will be passed along to the storage layer.
-fn reconfigure(session: &mut Session<StateViewCache>) {
+fn reconfigure(session: &mut Session<StateViewCache<GenesisStateView>>) {
     exec_function(
         session,
         "DiemConfig",

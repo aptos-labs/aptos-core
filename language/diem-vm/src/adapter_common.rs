@@ -83,7 +83,7 @@ pub trait VMAdapter {
 pub fn validate_signed_transaction<A: VMAdapter>(
     adapter: &A,
     transaction: SignedTransaction,
-    state_view: &dyn StateView,
+    state_view: &impl StateView,
 ) -> VMValidatorResult {
     let _timer = TXN_VALIDATION_SECONDS.start_timer();
     let txn_sender = transaction.sender();
@@ -126,7 +126,10 @@ pub fn validate_signed_transaction<A: VMAdapter>(
     VMValidatorResult::new(status, gas_price, account_role)
 }
 
-fn get_account_role(sender: AccountAddress, remote_cache: &StateViewCache) -> GovernanceRole {
+fn get_account_role<S: StateView>(
+    sender: AccountAddress,
+    remote_cache: &StateViewCache<S>,
+) -> GovernanceRole {
     let role_access_path = create_access_path(sender, RoleId::struct_tag());
     match remote_cache.get(&role_access_path) {
         Ok(Some(blob)) => bcs::from_bytes::<account_config::RoleId>(&blob)
@@ -179,10 +182,10 @@ fn preload_cache(signature_verified_block: &[PreprocessedTransaction], data_view
         .collect::<Vec<Option<Vec<u8>>>>();
 }
 
-pub(crate) fn execute_block_impl<A: VMAdapter>(
+pub(crate) fn execute_block_impl<A: VMAdapter, S: StateView>(
     adapter: &A,
     transactions: Vec<Transaction>,
-    data_cache: &mut StateViewCache,
+    data_cache: &mut StateViewCache<S>,
 ) -> Result<Vec<(VMStatus, TransactionOutput)>, VMStatus> {
     let mut result = vec![];
     let mut should_restart = false;
