@@ -570,8 +570,12 @@ pub type TransactionAccumulatorRangeProof = AccumulatorRangeProof<TransactionAcc
 #[cfg(any(test, feature = "fuzzing"))]
 pub type TestAccumulatorRangeProof = AccumulatorRangeProof<TestOnlyHasher>;
 
-/// A proof that can be used authenticate a range of consecutive leaves, from the leftmost leaf to
-/// a certain one, in a sparse Merkle tree. For example, given the following sparse Merkle tree:
+/// Note: this is not a range proof in the sense that a range of nodes is verified!
+/// Instead, it verifies the entire left part of the tree up to a known rightmost node.
+/// See the description below.
+///
+/// A proof that can be used to authenticate a range of consecutive leaves, from the leftmost leaf to
+/// the rightmost known one, in a sparse Merkle tree. For example, given the following sparse Merkle tree:
 ///
 /// ```text
 ///                   root
@@ -602,9 +606,56 @@ impl SparseMerkleRangeProof {
         Self { right_siblings }
     }
 
-    /// Returns the siblings.
+    /// Returns the right siblings.
     pub fn right_siblings(&self) -> &[HashValue] {
         &self.right_siblings
+    }
+
+    /// Verifies that the rightmost known leaf exists in the tree and that the resulting
+    /// root hash matches the expected root hash.
+    pub fn verify(
+        &self,
+        expected_root_hash: HashValue,
+        rightmost_known_leaf: SparseMerkleLeafNode,
+        left_siblings: Vec<HashValue>,
+    ) -> Result<()> {
+        let num_siblings = left_siblings.len() + self.right_siblings.len();
+        let mut left_sibling_iter = left_siblings.iter();
+        let mut right_sibling_iter = self.right_siblings().iter();
+
+        let mut current_hash = rightmost_known_leaf.hash();
+        for bit in rightmost_known_leaf
+            .key()
+            .iter_bits()
+            .rev()
+            .skip(HashValue::LENGTH_IN_BITS - num_siblings)
+        {
+            let (left_hash, right_hash) = if bit {
+                (
+                    *left_sibling_iter
+                        .next()
+                        .ok_or_else(|| format_err!("Missing left sibling."))?,
+                    current_hash,
+                )
+            } else {
+                (
+                    current_hash,
+                    *right_sibling_iter
+                        .next()
+                        .ok_or_else(|| format_err!("Missing right sibling."))?,
+                )
+            };
+            current_hash = SparseMerkleInternalNode::new(left_hash, right_hash).hash();
+        }
+
+        ensure!(
+            current_hash == expected_root_hash,
+            "Root hashes do not match. Actual root hash: {:x}. Expected root hash: {:x}.",
+            current_hash,
+            expected_root_hash,
+        );
+
+        Ok(())
     }
 }
 

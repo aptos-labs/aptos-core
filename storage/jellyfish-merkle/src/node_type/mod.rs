@@ -530,6 +530,11 @@ where
         &self.value
     }
 
+    /// Gets the associated value hash.
+    pub fn value_hash(&self) -> HashValue {
+        self.value_hash
+    }
+
     pub fn hash(&self) -> HashValue {
         SparseMerkleLeafNode::new(self.account_key, self.value_hash).hash()
     }

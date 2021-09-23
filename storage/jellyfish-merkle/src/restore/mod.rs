@@ -13,7 +13,7 @@ use crate::{
     },
     NibbleExt, NodeBatch, TreeReader, TreeWriter, ROOT_NIBBLE_HEIGHT,
 };
-use anyhow::{bail, ensure, format_err, Result};
+use anyhow::{bail, ensure, Result};
 use diem_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
@@ -23,7 +23,7 @@ use diem_types::{
         nibble_path::{NibbleIterator, NibblePath},
         Nibble,
     },
-    proof::{SparseMerkleInternalNode, SparseMerkleRangeProof},
+    proof::{SparseMerkleInternalNode, SparseMerkleLeafNode, SparseMerkleRangeProof},
     transaction::Version,
 };
 use mirai_annotations::*;
@@ -567,42 +567,15 @@ where
             }
         }
 
-        // Compute the root hash now that we have all the siblings.
-        let num_siblings = left_siblings.len() + proof.right_siblings().len();
-        let mut left_sibling_iter = left_siblings.iter().rev();
-        let mut right_sibling_iter = proof.right_siblings().iter();
-        let mut current_hash = previous_leaf.hash();
-        for bit in previous_key
-            .iter_bits()
-            .rev()
-            .skip(HashValue::LENGTH_IN_BITS - num_siblings)
-        {
-            let (left_hash, right_hash) = if bit {
-                (
-                    *left_sibling_iter
-                        .next()
-                        .ok_or_else(|| format_err!("Missing left sibling."))?,
-                    current_hash,
-                )
-            } else {
-                (
-                    current_hash,
-                    *right_sibling_iter
-                        .next()
-                        .ok_or_else(|| format_err!("Missing right sibling."))?,
-                )
-            };
-            current_hash = SparseMerkleInternalNode::new(left_hash, right_hash).hash();
-        }
+        // Left siblings must use the same ordering as the right siblings in the proof
+        left_siblings.reverse();
 
-        ensure!(
-            current_hash == self.expected_root_hash,
-            "Root hashes do not match. Actual root hash: {:x}. Expected root hash: {:x}.",
-            current_hash,
+        // Verify the proof now that we have all the siblings
+        proof.verify(
             self.expected_root_hash,
-        );
-
-        Ok(())
+            SparseMerkleLeafNode::new(previous_key, previous_leaf.value_hash()),
+            left_siblings,
+        )
     }
 
     /// Computes the sibling on the left for the `n`-th child.
