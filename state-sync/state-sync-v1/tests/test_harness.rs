@@ -397,7 +397,7 @@ impl StateSyncEnvironment {
                 TimeService::real(),
                 base_addr,
                 auth_mode,
-                Arc::new(PeerMetadataStorage::new()),
+                PeerMetadataStorage::new(&[network_id]),
             );
 
             let (sender, events) = network_builder

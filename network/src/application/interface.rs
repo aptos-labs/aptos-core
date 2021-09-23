@@ -6,7 +6,8 @@ use crate::application::{
     types::{PeerError, PeerInfo, PeerState},
 };
 use async_trait::async_trait;
-use diem_config::network_id::PeerNetworkId;
+use diem_config::network_id::{NetworkId, PeerNetworkId};
+use diem_types::PeerId;
 use std::collections::{hash_map::Entry, HashMap};
 
 /// A generic `NetworkInterface` for applications to connect to networking
@@ -29,21 +30,25 @@ pub trait NetworkInterface {
     fn sender(&self) -> Self::Sender;
 
     /// Retrieve only connected peers
-    fn connected_peers(&self) -> HashMap<PeerNetworkId, PeerInfo> {
-        self.filtered_peers(|(_, peer_info)| peer_info.status == PeerState::Connected)
+    fn connected_peers(&self, network_id: NetworkId) -> HashMap<PeerNetworkId, PeerInfo> {
+        self.filtered_peers(network_id, |(_, peer_info)| {
+            peer_info.status == PeerState::Connected
+        })
     }
 
     /// Filter peers with according `filter`
-    fn filtered_peers<F: FnMut(&(&PeerNetworkId, &PeerInfo)) -> bool>(
+    fn filtered_peers<F: FnMut(&(&PeerId, &PeerInfo)) -> bool>(
         &self,
+        network_id: NetworkId,
         filter: F,
     ) -> HashMap<PeerNetworkId, PeerInfo> {
-        self.peer_metadata_storage().read_filtered(filter)
+        self.peer_metadata_storage()
+            .read_filtered(network_id, filter)
     }
 
     /// Retrieve PeerInfo for the node
-    fn peers(&self) -> HashMap<PeerNetworkId, PeerInfo> {
-        self.peer_metadata_storage().read_all()
+    fn peers(&self, network_id: NetworkId) -> HashMap<PeerNetworkId, PeerInfo> {
+        self.peer_metadata_storage().read_all(network_id)
     }
 
     /// Insert application specific data

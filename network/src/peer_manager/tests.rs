@@ -104,7 +104,7 @@ fn build_test_peer_manager(
         build_test_transport(),
         NetworkContext::mock_with_peer_id(peer_id),
         "/memory/0".parse().unwrap(),
-        Arc::new(PeerMetadataStorage::new()),
+        PeerMetadataStorage::test(),
         Arc::new(RwLock::new(HashMap::new())),
         peer_manager_request_rx,
         connection_reqs_rx,

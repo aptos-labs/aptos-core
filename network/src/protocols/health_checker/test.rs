@@ -17,7 +17,6 @@ use crate::{
 use channel::{diem_channel, message_queues::QueueStyle};
 use diem_time_service::{MockTimeService, TimeService};
 use futures::{executor::block_on, future};
-use std::sync::Arc;
 
 const PING_INTERVAL: Duration = Duration::from_secs(1);
 const PING_TIMEOUT: Duration = Duration::from_millis(500);
@@ -50,7 +49,7 @@ impl TestHarness {
             NetworkContext::mock(),
             mock_time.clone(),
             HealthCheckNetworkInterface::new(
-                Arc::new(PeerMetadataStorage::new()),
+                PeerMetadataStorage::test(),
                 hc_network_tx,
                 hc_network_rx,
             ),

@@ -53,43 +53,44 @@ impl NetworkInterface for DummyNetworkInterface {
 
 #[test]
 fn test_interface() {
-    let peer_metadata_storage = Arc::new(PeerMetadataStorage::new());
+    let network_id = NetworkId::Validator;
+    let peer_metadata_storage = PeerMetadataStorage::test();
     let interface = DummyNetworkInterface {
         peer_metadata_storage: peer_metadata_storage.clone(),
         app_data: LockingHashMap::new(),
     };
     let peer_1 = PeerId::random();
     let peer_2 = PeerId::random();
-    assert_eq!(0, interface.peers().len());
-    assert_eq!(0, interface.connected_peers().len());
+    assert_eq!(0, interface.peers(network_id).len());
+    assert_eq!(0, interface.connected_peers(network_id).len());
 
     // Insert 2 connections, and we should have two active peers
     let connection_1 = ConnectionMetadata::mock(peer_1);
     let connection_2 = ConnectionMetadata::mock(peer_2);
-    peer_metadata_storage.insert_connection(NetworkId::Public, connection_1);
-    peer_metadata_storage.insert_connection(NetworkId::Public, connection_2.clone());
-    assert_eq!(2, interface.peers().len());
-    assert_eq!(2, interface.connected_peers().len());
+    peer_metadata_storage.insert_connection(network_id, connection_1);
+    peer_metadata_storage.insert_connection(network_id, connection_2.clone());
+    assert_eq!(2, interface.peers(network_id).len());
+    assert_eq!(2, interface.connected_peers(network_id).len());
 
     // Disconnecting / disconnected are not counted in active
     update_state(
         peer_metadata_storage.clone(),
-        PeerNetworkId::new(NetworkId::Public, peer_1),
+        PeerNetworkId::new(network_id, peer_1),
         PeerState::Disconnecting,
     );
-    assert_eq!(2, interface.peers().len());
-    assert_eq!(1, interface.connected_peers().len());
+    assert_eq!(2, interface.peers(network_id).len());
+    assert_eq!(1, interface.connected_peers(network_id).len());
 
     // Removing a connection with a different connection id doesn't remove it from storage
     let different_connection_2 = ConnectionMetadata::mock(peer_2);
-    peer_metadata_storage.remove_connection(NetworkId::Public, &different_connection_2);
-    assert_eq!(2, interface.peers().len());
-    assert_eq!(1, interface.connected_peers().len());
+    peer_metadata_storage.remove_connection(network_id, &different_connection_2);
+    assert_eq!(2, interface.peers(network_id).len());
+    assert_eq!(1, interface.connected_peers(network_id).len());
 
     // Removing the same connection id removes it
-    peer_metadata_storage.remove_connection(NetworkId::Public, &connection_2);
-    assert_eq!(1, interface.peers().len());
-    assert_eq!(0, interface.connected_peers().len());
+    peer_metadata_storage.remove_connection(network_id, &connection_2);
+    assert_eq!(1, interface.peers(network_id).len());
+    assert_eq!(0, interface.connected_peers(network_id).len());
 }
 
 fn update_state(

@@ -27,7 +27,6 @@ use std::{
     collections::HashSet,
     fmt,
     ops::Add,
-    sync::Arc,
     time::{Duration, Instant},
 };
 use structopt::StructOpt;
@@ -277,7 +276,7 @@ impl StubbedNode {
             network_config,
             TimeService::real(),
             None,
-            Arc::new(PeerMetadataStorage::new()),
+            PeerMetadataStorage::new(&[network_config.network_id]),
         );
 
         let state_sync_handle = Some(

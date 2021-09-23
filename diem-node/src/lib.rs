@@ -344,7 +344,20 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
 
     // Instantiate every network and collect the requisite endpoints for state_sync, mempool, and consensus.
     let mut network_ids = HashSet::new();
-    let peer_metadata_storage = Arc::new(PeerMetadataStorage::new());
+    network_configs.iter().for_each(|config| {
+        let network_id = config.network_id;
+        // Guarantee there is only one of this network
+        if network_ids.contains(&network_id) {
+            panic!(
+                "Duplicate NetworkId: '{}'.  Can't start node with duplicate networks",
+                network_id
+            );
+        }
+        network_ids.insert(network_id);
+    });
+    let network_ids: Vec<_> = network_ids.into_iter().collect();
+
+    let peer_metadata_storage = PeerMetadataStorage::new(&network_ids);
     for network_config in network_configs.into_iter() {
         debug!("Creating runtime for {}", network_config.network_id);
         let runtime = Builder::new_multi_thread()
@@ -366,14 +379,6 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
             peer_metadata_storage.clone(),
         );
         let network_id = network_config.network_id;
-        // Guarantee there is only one of this network
-        if network_ids.contains(&network_id) {
-            panic!(
-                "Duplicate NetworkId: '{}'.  Can't start node with duplicate networks",
-                network_id
-            );
-        }
-        network_ids.insert(network_id);
 
         // Create the endpoints to connect the Network to State Sync.
         let (state_sync_sender, state_sync_events) =

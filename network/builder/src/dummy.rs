@@ -139,7 +139,7 @@ pub fn setup_network() -> DummyNetwork {
 
     let trusted_peers = Arc::new(RwLock::new(HashMap::new()));
     let authentication_mode = AuthenticationMode::Mutual(listener_identity_private_key);
-    let peer_metadata_storage = Arc::new(PeerMetadataStorage::new());
+    let peer_metadata_storage = PeerMetadataStorage::new(&[NetworkId::Validator]);
     // Set up the listener network
     let network_context = NetworkContext::new(role, network_id, listener_peer_id);
     let mut network_builder = NetworkBuilder::new_for_test(
@@ -150,7 +150,7 @@ pub fn setup_network() -> DummyNetwork {
         TimeService::real(),
         listener_addr,
         authentication_mode,
-        peer_metadata_storage.clone(),
+        peer_metadata_storage,
     );
 
     let (listener_sender, mut listener_events) = network_builder
@@ -170,6 +170,7 @@ pub fn setup_network() -> DummyNetwork {
     let network_context = NetworkContext::new(role, network_id, dialer_peer_id);
 
     let trusted_peers = Arc::new(RwLock::new(HashMap::new()));
+    let peer_metadata_storage = PeerMetadataStorage::new(&[NetworkId::Validator]);
 
     let mut network_builder = NetworkBuilder::new_for_test(
         chain_id,
