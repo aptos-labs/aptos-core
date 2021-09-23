@@ -18,10 +18,10 @@ use std::fmt::{Debug, Display, Formatter};
 pub struct SyncInfo {
     /// Highest quorum certificate known to the peer.
     highest_quorum_cert: QuorumCert,
-    /// Highest ledger info known to the peer.
+    /// Highest ordered cert known to the peer.
     #[serde(alias = "highest_commit_cert")]
     highest_ordered_cert: Option<QuorumCert>,
-    /// Highest commit decision ledger info
+    /// Highest commit cert (ordered cert with execution result) known to the peer.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     highest_ledger_info: Option<LedgerInfoWithSignatures>,
     /// Optional highest timeout certificate if available.
@@ -94,8 +94,8 @@ impl SyncInfo {
     ) -> Self {
         Self::new_decoupled(
             highest_quorum_cert,
-            highest_ordered_cert,
-            None,
+            highest_ordered_cert.clone(),
+            Some(highest_ordered_cert.ledger_info().clone()),
             highest_timeout_cert,
             highest_2chain_timeout_cert,
         )
@@ -115,6 +115,7 @@ impl SyncInfo {
 
     /// Highest ledger info
     pub fn highest_ledger_info(&self) -> &LedgerInfoWithSignatures {
+        // TODO this should not use ordered cert in decoupled-execution
         self.highest_ledger_info
             .as_ref()
             .unwrap_or_else(|| self.highest_ordered_cert().ledger_info())
