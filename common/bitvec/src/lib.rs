@@ -60,8 +60,6 @@ pub struct BitVec {
 }
 
 impl BitVec {
-    // TODO(abhayb): Remove after migration to new wire format.
-    #[allow(dead_code)]
     /// Sets the bit at position @pos.
     pub fn set(&mut self, pos: u8) {
         // This is optimised to: let bucket = pos >> 3;
@@ -74,8 +72,6 @@ impl BitVec {
         self.inner[bucket] |= 0b1000_0000 >> bucket_pos as u8;
     }
 
-    // TODO(abhayb): Remove after migration to new wire format.
-    #[allow(dead_code)]
     /// Checks if the bit at position @pos is set.
     pub fn is_set(&self, pos: u8) -> bool {
         // This is optimised to: let bucket = pos >> 3;
@@ -88,15 +84,11 @@ impl BitVec {
         (self.inner[bucket] & (0b1000_0000 >> bucket_pos as u8)) != 0
     }
 
-    // TODO(kostas): Remove after applying it to multi-sig.
-    #[allow(dead_code)]
     /// Returns the number of set bits.
     pub fn count_ones(&self) -> u32 {
         self.inner.iter().map(|a| a.count_ones()).sum()
     }
 
-    // TODO(kostas): Remove after applying it to multi-sig.
-    #[allow(dead_code)]
     /// Returns the index of the last set bit.
     pub fn last_set_bit(&self) -> Option<u8> {
         self.inner
