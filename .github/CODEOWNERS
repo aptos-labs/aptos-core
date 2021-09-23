@@ -13,6 +13,12 @@
 /storage @diem/diem-core
 /types @diem/diem-core
 
+# Subscribe to diem-ecosystem changes
+/api @diem/diem-ecosystem
+/json-rpc @diem/diem-ecosystem
+/sdk @diem/diem-ecosystem
+/shuffle @diem/diem-ecosystem
+
 # Subscribe to crypto crate changing PRs
 /crypto @kchalkias @valerini
 
