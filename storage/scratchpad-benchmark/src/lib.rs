@@ -2,16 +2,34 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
+use byteorder::{BigEndian, WriteBytesExt};
 use diem_config::config::RocksdbConfig;
-use diem_types::{account_address::HashAccountAddress, account_state_blob::AccountStateBlob};
+use diem_types::{
+    account_address::{AccountAddress, HashAccountAddress},
+    account_state_blob::AccountStateBlob,
+};
 use diemdb::DiemDB;
-use diemdb_benchmark::{gen_account_from_index, gen_random_blob};
 use executor_types::ProofReader;
 use rand::Rng;
 use std::{collections::HashMap, path::PathBuf};
 use storage_interface::DbReader;
 
 type SparseMerkleTree = scratchpad::SparseMerkleTree<AccountStateBlob>;
+
+fn gen_account_from_index(account_index: u64) -> AccountAddress {
+    let mut array = [0u8; AccountAddress::LENGTH];
+    array
+        .as_mut()
+        .write_u64::<BigEndian>(account_index)
+        .expect("Unable to write u64 to array");
+    AccountAddress::new(array)
+}
+
+fn gen_random_blob<R: Rng>(size: usize, rng: &mut R) -> AccountStateBlob {
+    let mut v = vec![0u8; size];
+    rng.fill(v.as_mut_slice());
+    AccountStateBlob::from(v)
+}
 
 pub fn run_benchmark(num_updates: usize, max_accounts: u64, blob_size: usize, db_dir: PathBuf) {
     let db = DiemDB::open(

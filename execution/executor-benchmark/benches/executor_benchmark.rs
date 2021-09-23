@@ -3,7 +3,8 @@
 
 use criterion::{criterion_group, criterion_main, measurement::Measurement, BatchSize, Criterion};
 use executor_benchmark::{
-    create_storage_service_and_executor, TransactionExecutor, TransactionGenerator,
+    create_storage_service_and_executor, transaction_executor::TransactionExecutor,
+    transaction_generator::TransactionGenerator,
 };
 use std::sync::Arc;
 
@@ -27,7 +28,7 @@ fn executor_benchmark<M: Measurement + 'static>(c: &mut Criterion<M>) {
     let mut generator = TransactionGenerator::new(genesis_key, NUM_ACCOUNTS);
     let (commit_tx, _commit_rx) = std::sync::mpsc::channel();
 
-    let mut executor = TransactionExecutor::new(executor, parent_block_id, commit_tx);
+    let mut executor = TransactionExecutor::new(executor, parent_block_id, Some(commit_tx));
     let txns = generator.gen_account_creations(SMALL_BLOCK_SIZE);
     for txn_block in txns {
         executor.execute_block(txn_block);

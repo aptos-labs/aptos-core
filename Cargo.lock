@@ -2899,16 +2899,18 @@ name = "diemdb-benchmark"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "byteorder",
  "diem-config",
  "diem-crypto",
+ "diem-genesis-tool",
  "diem-jellyfish-merkle",
  "diem-types",
+ "diem-vm",
  "diem-workspace-hack",
  "diemdb",
+ "executor",
+ "executor-benchmark",
  "indicatif",
  "itertools 0.10.1",
- "rand 0.8.3",
  "storage-interface",
  "structopt 0.3.21",
 ]
@@ -7140,6 +7142,7 @@ name = "scratchpad-benchmark"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "byteorder",
  "diem-config",
  "diem-crypto",
  "diem-genesis-tool",

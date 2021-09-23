@@ -6,14 +6,14 @@ use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
 struct Opt {
-    #[structopt(short, default_value = "1000000")]
+    #[structopt(long, default_value = "1000000")]
     num_accounts: usize,
 
-    #[structopt(short, default_value = "1000000")]
-    version: u64,
+    #[structopt(long, default_value = "1000000")]
+    init_account_balance: u64,
 
-    #[structopt(short, default_value = "40")]
-    blob_size: usize,
+    #[structopt(long, default_value = "500")]
+    block_size: usize,
 
     #[structopt(long, parse(from_os_str))]
     db_dir: PathBuf,
@@ -27,8 +27,8 @@ fn main() {
 
     diemdb_benchmark::run_benchmark(
         opt.num_accounts,
-        opt.version,
-        opt.blob_size,
+        opt.init_account_balance,
+        opt.block_size,
         opt.db_dir,
         opt.prune_window,
     );

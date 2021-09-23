@@ -11,17 +11,19 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0.38"
-byteorder = "1.4.3"
 indicatif = "0.15.0"
 itertools = { version = "0.10.0", default-features = false }
-rand = "0.8.3"
 structopt = "0.3.21"
 
+executor = { path = "../../execution/executor" }
+executor-benchmark = { path = "../../execution/executor-benchmark" }
 diemdb = { path = "../diemdb" }
 diem-crypto = { path = "../../crypto/crypto" }
+diem-genesis-tool = {path = "../../config/management/genesis", features = ["testing"] }
 diem-jellyfish-merkle = { path = "../jellyfish-merkle" }
 diem-config = { path = "../../config" }
 diem-types = { path = "../../types" }
+diem-vm= { path = "../../language/diem-vm" }
 diem-workspace-hack = { path = "../../common/workspace-hack" }
 storage-interface = { path = "../storage-interface" }
 

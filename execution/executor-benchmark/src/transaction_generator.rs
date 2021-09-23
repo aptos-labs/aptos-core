@@ -1,0 +1,279 @@
+// Copyright (c) The Diem Core Contributors
+// SPDX-License-Identifier: Apache-2.0
+
+use diem_crypto::{
+    ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
+    PrivateKey, SigningKey, Uniform,
+};
+use diem_transaction_builder::stdlib::{
+    encode_create_parent_vasp_account_script, encode_peer_to_peer_with_metadata_script,
+};
+use diem_types::{
+    account_address::AccountAddress,
+    account_config::{
+        testnet_dd_account_address, treasury_compliance_account_address, xus_tag, AccountResource,
+        XUS_NAME,
+    },
+    chain_id::ChainId,
+    protocol_spec::DpnProto,
+    transaction::{
+        authenticator::AuthenticationKey, RawTransaction, Script, SignedTransaction, Transaction,
+        Version,
+    },
+};
+use rand::{rngs::StdRng, SeedableRng};
+use std::{convert::TryFrom, sync::mpsc};
+use storage_interface::DbReader;
+
+struct AccountData {
+    private_key: Ed25519PrivateKey,
+    public_key: Ed25519PublicKey,
+    address: AccountAddress,
+    sequence_number: u64,
+}
+
+impl AccountData {
+    pub fn auth_key_prefix(&self) -> Vec<u8> {
+        AuthenticationKey::ed25519(&self.public_key)
+            .prefix()
+            .to_vec()
+    }
+}
+
+pub struct TransactionGenerator {
+    /// The current state of the accounts. The main purpose is to keep track of the sequence number
+    /// so generated transactions are guaranteed to be successfully executed.
+    accounts: Vec<AccountData>,
+
+    /// Used to mint accounts.
+    genesis_key: Ed25519PrivateKey,
+
+    /// Record the number of txns generated.
+    version: Version,
+
+    /// For deterministic transaction generation.
+    rng: StdRng,
+
+    /// Each generated block of transactions are sent to this channel. Using `SyncSender` to make
+    /// sure if execution is slow to consume the transactions, we do not run out of memory.
+    block_sender: Option<mpsc::SyncSender<Vec<Transaction>>>,
+}
+
+impl TransactionGenerator {
+    pub fn new(genesis_key: Ed25519PrivateKey, num_accounts: usize) -> Self {
+        Self::new_impl(genesis_key, num_accounts, None)
+    }
+
+    pub fn new_with_sender(
+        genesis_key: Ed25519PrivateKey,
+        num_accounts: usize,
+        block_sender: mpsc::SyncSender<Vec<Transaction>>,
+    ) -> Self {
+        Self::new_impl(genesis_key, num_accounts, Some(block_sender))
+    }
+
+    fn new_impl(
+        genesis_key: Ed25519PrivateKey,
+        num_accounts: usize,
+        block_sender: Option<mpsc::SyncSender<Vec<Transaction>>>,
+    ) -> Self {
+        let seed = [1u8; 32];
+        let mut rng = StdRng::from_seed(seed);
+
+        let mut accounts = Vec::with_capacity(num_accounts);
+        for _i in 0..num_accounts {
+            let private_key = Ed25519PrivateKey::generate(&mut rng);
+            let public_key = private_key.public_key();
+            let address = diem_types::account_address::from_public_key(&public_key);
+            let account = AccountData {
+                private_key,
+                public_key,
+                address,
+                sequence_number: 0,
+            };
+            accounts.push(account);
+        }
+
+        Self {
+            accounts,
+            genesis_key,
+            version: 0,
+            rng,
+            block_sender,
+        }
+    }
+
+    pub fn version(&self) -> Version {
+        self.version
+    }
+
+    pub fn run_mint(&mut self, init_account_balance: u64, block_size: usize) {
+        assert!(self.block_sender.is_some());
+        self.gen_account_creations(block_size);
+        self.gen_mint_transactions(init_account_balance, block_size);
+    }
+
+    pub fn run_transfer(&mut self, block_size: usize, num_transfer_blocks: usize) {
+        assert!(self.block_sender.is_some());
+        self.gen_transfer_transactions(block_size, num_transfer_blocks);
+    }
+
+    pub fn gen_account_creations(&mut self, block_size: usize) -> Vec<Vec<Transaction>> {
+        let tc_account = treasury_compliance_account_address();
+        let mut txn_block = vec![];
+
+        for (i, block) in self.accounts.chunks(block_size).enumerate() {
+            let mut transactions = Vec::with_capacity(block_size);
+            for (j, account) in block.iter().enumerate() {
+                let txn = create_transaction(
+                    tc_account,
+                    (i * block_size + j) as u64,
+                    &self.genesis_key,
+                    self.genesis_key.public_key(),
+                    encode_create_parent_vasp_account_script(
+                        xus_tag(),
+                        0,
+                        account.address,
+                        account.auth_key_prefix(),
+                        vec![],
+                        false, /* add all currencies */
+                    ),
+                );
+                transactions.push(txn);
+            }
+            self.version += transactions.len() as Version;
+            if let Some(sender) = &self.block_sender {
+                sender.send(transactions).unwrap();
+            } else {
+                txn_block.push(transactions);
+            }
+        }
+        txn_block
+    }
+
+    /// Generates transactions that allocate `init_account_balance` to every account.
+    pub fn gen_mint_transactions(
+        &mut self,
+        init_account_balance: u64,
+        block_size: usize,
+    ) -> Vec<Vec<Transaction>> {
+        let testnet_dd_account = testnet_dd_account_address();
+        let mut txn_block = vec![];
+
+        for (i, block) in self.accounts.chunks(block_size).enumerate() {
+            let mut transactions = Vec::with_capacity(block_size);
+            for (j, account) in block.iter().enumerate() {
+                let txn = create_transaction(
+                    testnet_dd_account,
+                    (i * block_size + j) as u64,
+                    &self.genesis_key,
+                    self.genesis_key.public_key(),
+                    encode_peer_to_peer_with_metadata_script(
+                        xus_tag(),
+                        account.address,
+                        init_account_balance,
+                        vec![],
+                        vec![],
+                    ),
+                );
+                transactions.push(txn);
+            }
+            self.version += transactions.len() as Version;
+
+            if let Some(sender) = &self.block_sender {
+                sender.send(transactions).unwrap();
+            } else {
+                txn_block.push(transactions);
+            }
+        }
+        txn_block
+    }
+
+    /// Generates transactions for random pairs of accounts.
+    pub fn gen_transfer_transactions(
+        &mut self,
+        block_size: usize,
+        num_blocks: usize,
+    ) -> Vec<Vec<Transaction>> {
+        let mut txn_block = vec![];
+        for _i in 0..num_blocks {
+            let mut transactions = Vec::with_capacity(block_size);
+            for _j in 0..block_size {
+                let indices = rand::seq::index::sample(&mut self.rng, self.accounts.len(), 2);
+                let sender_idx = indices.index(0);
+                let receiver_idx = indices.index(1);
+
+                let sender = &self.accounts[sender_idx];
+                let receiver = &self.accounts[receiver_idx];
+                let txn = create_transaction(
+                    sender.address,
+                    sender.sequence_number,
+                    &sender.private_key,
+                    sender.public_key.clone(),
+                    encode_peer_to_peer_with_metadata_script(
+                        xus_tag(),
+                        receiver.address,
+                        1, /* amount */
+                        vec![],
+                        vec![],
+                    ),
+                );
+                transactions.push(txn);
+
+                self.accounts[sender_idx].sequence_number += 1;
+            }
+            self.version += transactions.len() as Version;
+
+            if let Some(sender) = &self.block_sender {
+                sender.send(transactions).unwrap();
+            } else {
+                txn_block.push(transactions);
+            }
+        }
+        txn_block
+    }
+
+    /// Verifies the sequence numbers in storage match what we have locally.
+    pub fn verify_sequence_number(&self, db: &dyn DbReader<DpnProto>) {
+        for account in &self.accounts {
+            let address = account.address;
+            let blob = db
+                .get_latest_account_state(address)
+                .expect("Failed to query storage.")
+                .expect("Account must exist.");
+            let account_resource = AccountResource::try_from(&blob).unwrap();
+            assert_eq!(account_resource.sequence_number(), account.sequence_number);
+        }
+    }
+
+    /// Drops the sender to notify the receiving end of the channel.
+    pub fn drop_sender(&mut self) {
+        self.block_sender.take().unwrap();
+    }
+}
+
+fn create_transaction(
+    sender: AccountAddress,
+    sequence_number: u64,
+    private_key: &Ed25519PrivateKey,
+    public_key: Ed25519PublicKey,
+    program: Script,
+) -> Transaction {
+    let now = diem_infallible::duration_since_epoch();
+    let expiration_time = now.as_secs() + 3600;
+
+    let raw_txn = RawTransaction::new_script(
+        sender,
+        sequence_number,
+        program,
+        1_000_000,           /* max_gas_amount */
+        0,                   /* gas_unit_price */
+        XUS_NAME.to_owned(), /* gas_currency_code */
+        expiration_time,
+        ChainId::test(),
+    );
+
+    let signature = private_key.sign(&raw_txn);
+    let signed_txn = SignedTransaction::new(raw_txn, public_key, signature);
+    Transaction::UserTransaction(signed_txn)
+}
