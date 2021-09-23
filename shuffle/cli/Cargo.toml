@@ -19,6 +19,7 @@ toml = "0.5.8"
 
 diem-config = { path = "../../config" }
 diem-framework = { path = "../../language/diem-framework" }
+diem-framework-releases = { path = "../../language/diem-framework/DPN/releases" }
 diem-genesis-tool = { path = "../../config/management/genesis" }
 diem-node = { path = "../../diem-node" }
 diem-types = { path = "../../types" }

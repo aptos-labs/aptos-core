@@ -15,16 +15,14 @@ use diem_types::{
     account_config, chain_id::ChainId, on_chain_config::VMPublishingOption,
     transaction::authenticator::AuthenticationKey,
 };
-use std::path::Path;
 
 #[test]
 fn node_e2e() -> Result<()> {
     let node_config_dir = diem_temppath::TempPath::new();
     let validator_config = shuffle_custom_node::generate_validator_config(
         node_config_dir.path(),
-        Path::new("../move/storage/0x00000000000000000000000000000001/modules"),
-        VMPublishingOption::open(),
         diem_framework_releases::current_module_blobs().to_vec(),
+        VMPublishingOption::open(),
     )?;
     let node_config = NodeConfig::load(validator_config.config_path())?;
     let root_key = generate_key::load_key(node_config_dir.path().join("mint.key"));

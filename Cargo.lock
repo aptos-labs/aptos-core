@@ -7557,6 +7557,7 @@ dependencies = [
  "anyhow",
  "diem-config",
  "diem-framework",
+ "diem-framework-releases",
  "diem-genesis-tool",
  "diem-node",
  "diem-types",

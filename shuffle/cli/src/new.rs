@@ -137,14 +137,12 @@ fn build_move_starter_modules(project_path: &Path, state: &OnDiskStateView) -> R
 
 fn generate_validator_config(project_path: &Path) -> Result<ValidatorConfig> {
     let publishing_option = VMPublishingOption::open();
+    // TODO (dimroc): place genesis module deployment/generate validator config
+    // in shuffle node command
     shuffle_custom_node::generate_validator_config(
         project_path.join("nodeconfig").as_path(),
-        project_path
-            .join(HELLOBLOCKCHAIN)
-            .join("storage/0x00000000000000000000000000000001/modules")
-            .as_path(),
+        diem_framework_releases::current_module_blobs().to_vec(),
         publishing_option,
-        Vec::new(),
     )
 }
 

@@ -9,8 +9,6 @@ use structopt::StructOpt;
 
 /// Directory where Move source code lives
 const MOVE_CODE_DIR: &str = "../move/";
-/// Directory where Move module bytecodes live
-const MOVE_BYTECODE_DIR: &str = "../move/storage/0x00000000000000000000000000000001/modules";
 
 #[derive(StructOpt)]
 #[structopt(
@@ -36,9 +34,8 @@ fn main() -> Result<()> {
     };
     let validator_config = shuffle_custom_node::generate_validator_config(
         Path::new(&args.node_config_dir),
-        Path::new(MOVE_BYTECODE_DIR),
-        publishing_option,
         diem_framework_releases::current_module_blobs().to_vec(),
+        publishing_option,
     )?;
     let node_config = NodeConfig::load(validator_config.config_path())?;
     println!("Running a Diem node with custom modules ...");

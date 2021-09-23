@@ -30,9 +30,8 @@ const TRANSACTION_BUILDERS_GENERATED_SOURCE_PATH: &str = "../transaction-builder
 
 pub fn generate_validator_config(
     node_config_dir: &Path,
-    move_bytecode_dir: &Path,
+    genesis_modules: Vec<Vec<u8>>,
     publishing_option: VMPublishingOption,
-    additional_modules: Vec<Vec<u8>>,
 ) -> Result<ValidatorConfig> {
     assert!(
         !node_config_dir.exists(),
@@ -40,10 +39,6 @@ pub fn generate_validator_config(
         node_config_dir
     );
     fs::create_dir(node_config_dir)?;
-    let mut genesis_modules: Vec<Vec<u8>> = fs::read_dir(move_bytecode_dir)?
-        .map(|f| fs::read(f.unwrap().path()).unwrap())
-        .collect();
-    genesis_modules.extend(additional_modules);
     println!("Creating genesis with {} modules", genesis_modules.len());
     let template = NodeConfig::default_for_validator();
     std::fs::DirBuilder::new()
