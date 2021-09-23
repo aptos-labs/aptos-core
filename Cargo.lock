@@ -2648,6 +2648,7 @@ dependencies = [
  "move-transactional-test-runner",
  "once_cell",
  "structopt 0.3.21",
+ "vm-genesis",
 ]
 
 [[package]]

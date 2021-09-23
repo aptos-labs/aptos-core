@@ -10,7 +10,8 @@ use diem_state_view::StateView;
 use diem_types::{
     access_path::AccessPath,
     account_config::{
-        self, type_tag_for_currency_code, AccountResource, BalanceResource, XUS_NAME,
+        self, diem_root_address, type_tag_for_currency_code, AccountResource, BalanceResource,
+        XUS_NAME,
     },
     chain_id::ChainId,
     transaction::{
@@ -43,6 +44,7 @@ use std::{
     path::Path,
 };
 use structopt::StructOpt;
+use vm_genesis::GENESIS_KEYPAIR;
 
 /// The Diem transaction test adapter.
 ///
@@ -80,7 +82,10 @@ struct DiemPublishArgs {
 #[derive(StructOpt, Debug)]
 struct DiemRunArgs {
     #[structopt(short = "k", long = "private-key", parse(try_from_str = parse_ed25519_private_key))]
-    privkey: Ed25519PrivateKey,
+    privkey: Option<Ed25519PrivateKey>,
+
+    #[structopt(long = "--admin-script")]
+    admin_script: bool,
 }
 
 impl<'a> DiemTestAdapter<'a> {
@@ -291,22 +296,37 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
     ) -> Result<()> {
         assert!(!signers.is_empty());
 
+        if !extra_args.admin_script {
+            panic!(
+                "Transactions scripts are not currently allowed on Diem. \
+                If you intend to run an admin script, add the `--admin-script` option to the run command."
+            )
+        }
+
+        if gas_budget.is_some() {
+            panic!("Cannot set gas budget for admin script.")
+        }
+
         let mut script_blob = vec![];
         script.serialize(&mut script_blob)?;
 
-        let params = self.fetch_default_transaction_parameters(&signers[0])?;
+        let diem_root = diem_root_address();
 
-        let txn = RawTransaction::new_script(
-            signers[0],
+        let params = self.fetch_default_transaction_parameters(&diem_root)?;
+
+        let privkey = match &extra_args.privkey {
+            Some(privkey) => privkey,
+            None => &GENESIS_KEYPAIR.0,
+        };
+
+        let txn = RawTransaction::new_writeset_script(
+            diem_root,
             params.sequence_number,
             TransactionScript::new(script_blob, type_args, txn_args),
-            gas_budget.unwrap_or(params.max_gas_amount),
-            params.gas_unit_price,
-            params.gas_currency_code,
-            params.expiration_timestamp_secs,
+            signers[0],
             ChainId::test(),
         )
-        .sign_multi_agent(&extra_args.privkey, vec![], vec![])
+        .sign(privkey, Ed25519PublicKey::from(privkey))
         .unwrap()
         .into_inner();
 
@@ -327,6 +347,15 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
     ) -> Result<()> {
         assert!(!signers.is_empty());
 
+        if extra_args.admin_script {
+            panic!("Admin script functions are not supported.")
+        }
+
+        let privkey = match extra_args.privkey {
+            Some(privkey) => privkey,
+            None => panic!("Missing private key."),
+        };
+
         let params = self.fetch_default_transaction_parameters(&signers[0])?;
         let txn = RawTransaction::new_script_function(
             signers[0],
@@ -343,10 +372,7 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
             params.expiration_timestamp_secs,
             ChainId::test(),
         )
-        .sign(
-            &extra_args.privkey,
-            Ed25519PublicKey::from(&extra_args.privkey),
-        )?
+        .sign(&privkey, Ed25519PublicKey::from(&privkey))?
         .into_inner();
 
         self.run_transaction(txn)?;

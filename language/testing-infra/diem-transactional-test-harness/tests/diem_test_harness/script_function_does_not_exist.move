@@ -11,13 +11,18 @@ script {
     }
 }
 
+
 //# publish --private-key 42e777fa2a36434a318ec39b2d6833228078dd73a377442c46a90c0318090b3c
 module A::M {
-    fun foo() {}
+    public(script) fun foo() {}
 }
 
 
 //# run --signers 0x4d6ecd8b6ac8416825234605ba5d48ea
-//#     --private-key 42e777fa2a36434a318ec39b2d6833228078dd73a377442c46a90c0318090b3d
-//#     -- 0x4d6ecd8b6ac8416825234605ba5d48ea::M::foo
-// correct private key: 42e777fa2a36434a318ec39b2d6833228078dd73a377442c46a90c0318090b3c
+//#     --private-key 42e777fa2a36434a318ec39b2d6833228078dd73a377442c46a90c0318090b3c
+//#     -- 0x4d6ecd8b6ac8416825234605ba5d48ea::M::bar
+
+
+//# run --signers 0x4d6ecd8b6ac8416825234605ba5d48ea
+//#     --private-key 42e777fa2a36434a318ec39b2d6833228078dd73a377442c46a90c0318090b3c
+//#     -- 0x4d6ecd8b6ac8416825234605ba5d48ea::N::bar
