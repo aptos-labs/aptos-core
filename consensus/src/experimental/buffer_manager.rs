@@ -356,6 +356,23 @@ impl BufferManager {
                     }
                 }
             }
+            VerifiedEvent::CommitDecision(commit_proof) => {
+                let target_block_id = commit_proof.ledger_info().commit_info().id();
+                let cursor = find_elem(self.buffer.head.clone(), |item| {
+                    item.block_id() == target_block_id
+                });
+                if cursor.is_some() {
+                    let item = take_elem(&cursor);
+                    let new_item = item.try_advance_to_aggregated_with_ledger_info(
+                        commit_proof.ledger_info().clone(),
+                    );
+                    let aggregated = new_item.is_aggregated();
+                    set_elem(&cursor, new_item);
+                    if aggregated {
+                        return Some(target_block_id);
+                    }
+                }
+            }
             _ => {
                 unreachable!();
             }

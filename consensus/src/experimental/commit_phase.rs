@@ -205,10 +205,7 @@ impl CommitPhase {
         network_sender: NetworkSender,
         reset_event_rx: Receiver<oneshot::Sender<SyncAck>>,
     ) -> Self {
-        let (timeout_event_tx, timeout_event_rx) = channel::new::<CommitVote>(
-            2,
-            &counters::DECOUPLED_EXECUTION__COMMIT_MESSAGE_TIMEOUT_CHANNEL,
-        );
+        let (timeout_event_tx, timeout_event_rx) = channel::new_test::<CommitVote>(2);
         Self {
             commit_channel_recv,
             execution_proxy,

@@ -553,8 +553,8 @@ impl EpochManager {
                 ),
                 verified_event @ VerifiedEvent::CommitVote(_)
                 | verified_event @ VerifiedEvent::CommitDecision(_) => {
-                    if let Some(sender) = &self.commit_msg_tx {
-                        sender.clone().send(verified_event).await.map_err(|err| {
+                    if let Some(sender) = &mut self.commit_msg_tx {
+                        sender.send(verified_event).await.map_err(|err| {
                             anyhow!(
                                 "Error in Passing Commit Message (CommitVote/CommitDecision): {}",
                                 err
