@@ -91,8 +91,8 @@ instead of an n-dimensional Boogie array.
 
 \Paragraph{Discussion and Related Work}
 
-A recent survey of formal verification applied to smart contracts is found
-in~\cite{CONTRACT_VERIFICATION}. The authors distinguish between \emph{contract}
+Many approaches have applied to the verification of smart contracts \cite{liu2019survey,miller2018smart,CONTRACT_VERIFICATION}.
+A recent survey~\cite{CONTRACT_VERIFICATION} distinguishes between \emph{contract}
 and \emph{program} level approaches. Our approach has aspects of both: we
 address program level properties via pre/post conditions, and contract
 (``blockchain state'') level properties via global invariants. In both cases, we
@@ -113,14 +113,17 @@ dynamic dispatching and the notorious re-entrance problem~\cite{REENTRANCE}, as
 well as the borrow semantics which enables optimizations like reference
 elimination (Sec.~\ref{sec:RefElim}).
 
+In contrast to the other approaches that only focus on specific vulnerability patterns~\cite{mythril,oyente,maian,securify}, \MVP offers the rich specification language based on program logic, thus allowing users to define the specifications of their contracts.
 As regards expressiveness of specification, to the best of our knowledge, no
 existing specification approach for smart contracts based on inductive Hoare
 logic has similar expressiveness. We support universal quantification over
 arbitrary memory content, a suspension mechanism of invariants to allow
-non-atomic construction of memory content, and generic invariants. The standard
-verification mechanism in Solidity does not support quantifiers, because it
+non-atomic construction of memory content, and generic invariants.
+%
+The program verification
+approaches in Solidity~\cite{solcverify,DBLP:conf/esop/HajduJ20,verisol} does not support quantifiers, because it
 interprets programming language constructs a specifications and has no
-dedidacted specification language. While in Solidity one can simulate aspects of
+dedicated specification language. While in Solidity one can simulate aspects of
 global invariants using modifiers by attaching pre/post conditions, this is not
 the same as our invariants, which are guaranteed to hold independent of whether
 a user may or (accidentally) may not attach a modifier.  Moreover, from
@@ -133,10 +136,10 @@ undecidability and the dependency from heuristics in SMT solvers, \MVP is
 capable to deal with this by its elaborated translation to SMT logic, as
 partially described in this paper. The result is a practical verification system
 that is fully integrated into the Diem blockchain production process, which (to
-the best of our knowledge) is novel by itself.
+the best of our knowledge) is novel by itself. Other related works on the \solidity smart contract verification employ the theoretical foundations including the \kay framework \cite{kay} (e.g., \cite{kevm}), \fstar \cite{dm4all} (e.g., \cite{DBLP:conf/ccs/BhargavanDFGGKK16,post2018}), and proof assistants such as Coq \cite{coqref} (e.g., \cite{fspvme,fether}).
 
-Borrow semantics is considered a good way to perform high-performance \emph{and}
-safe programming in the Rust community. Even though the kind of reference
+Move has similar characteristics to Rust~\cite{rust} such as borrow semantics. Borrow semantics is considered a good way to perform high-performance \emph{and} safe programming in the Rust community. There also have been works on the formal verification of Rust programs~\cite{prusti,smack,nopanic,crust}.
+Even though the kind of reference
 elimination we perform could also be done for the safe Rust language subset, to
 the best of our knowledge, this has not been attempted before. The same
 technique could likely not only be used for verification, but also for runtime

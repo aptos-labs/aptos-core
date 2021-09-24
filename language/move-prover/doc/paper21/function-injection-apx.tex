@@ -1,6 +1,6 @@
 \Section{Injection of Function Specifications}
 
-During function specification injection, move specifications are reduced to basic
+During function specification injection, Move specifications are reduced to basic
 assume/assert statements added to the Move code.  Those statements represent
 instructions to the solver backend about what propositions can be assumed and
 which need to be asserted (verified) at a given program point.  In this appendix,
@@ -36,7 +36,7 @@ block on bytecode level which is target of branching.
   fun f(x: u64, y: u64): u64 {
     spec assume x < y;
     let result = x + y;
-    spec assert result == x + y;     // ensures of of
+    spec assert result == x + y;     // ensures of f
     spec assert                      // negated abort_if of f
       !(x + y > MAX_U64); @\label{line:aborts_holds_not}@
     result
@@ -147,6 +147,50 @@ For opaque calls, we also need to \emph{havoc} the memory they modify
 value to it. If present, |ensures| from the called function, injected as
 subsequent assumptions, are further constraining the modified memory.
 
+
+\Paragraph{Emits}
+
+\begin{Figure}
+  \caption{Emits Injection}
+  \label{fig:Emits}
+  \centering
+\begin{MoveBoxNumbered}
+  use Std::Event;
+  struct E has drop, store { m: u64 }
+  fun f(h: &mut Event::EventHandle<E>, x: u64) {
+    Event::emit_event(h, E{m:0}); @\label{line:emit_event}@
+    if (x > 0) {
+      Event::emit_event(h, E{m:x});
+    }
+  }
+  spec f {
+    emits E{m:0} to h; @\label{line:emits}@
+    emits E{m:x} to h if x > 0; @\label{line:emits_if}@
+  }
+  @\transform@
+  fun f(h: &mut Event::EventHandle<E>, x: u64) {
+    es = Mvp::ExtendEventStore(es, h, E{m:0}); // emitting event @\label{line:extend_es}@
+    if (x > 0) {
+      es = Mvp::ExtendEventStore(es, h, E{m:x}); // emitting event
+    }
+    let actual_es = Mvp::subtract(es, old(es)); // events emitted by f @\label{line:actual_es}@
+    let expected_es = Mvp::CondExtendEventStore( // specified events @\label{line:expected_es}@
+      Mvp::ExtendEventStore(Mvp::EmptyEventStore, E{m:x}, h),
+      E{m:x}, h, x>0);
+    spec assert Mvp::includes(expected_es, actual_es); // spec completeness @\label{line:emits_completeness}@
+    spec assert Mvp::includes(actual_es, expected_es); // spec relevance @\label{line:emits_relevance}@
+  }
+\end{MoveBoxNumbered}
+\end{Figure}
+
+The injection for the |emits| clause is illustrated in Fig.~\ref{fig:Emits}. The |emits| clause specifies the events that a function is expected to emit. It comes in the form |emits message to handle if condition| (e.g., line~\ref{line:emits_if}). The condition part (i.e., |if condition|) can be omitted if the event is expected to be emitted unconditionally (e.g., line~\ref{line:emits}).
+
+The function call to |Event::emit_event| (e.g., line~\ref{line:emit_event}) is transformed into the statement to extend |es| with the event to emit (e.g., line~\ref{line:extend_es}). |es| is a global variable of type |EventStore| which is a map where the key is an event handle and the value is the event stream of the handle (modeled as a bag of messages).
+
+In line~\ref{line:actual_es}, |actual_es| represents the portion of the EventStore that only comprises the events that the program (i.e., |f|) actually emits. In line~\ref{line:expected_es}, |expected_es| is constructed from the |emits| specification which contains all of the expected events specified by the |emits| clauses. Having these, two assertions using |Mvp::includes| (multiset inclusion relation per event handle) are injected. One asserts that |expected_es| includes |actual_es|, meaning that the function only emits the events that are expected (e.g., line~\ref{line:emits_completeness}). This would be violated if there is any event emitted by |f| that is not covered by some |emits| clause. Another asserts that |actual_es| includes |expected_es|, meaning that the function emits all of the events that are expected (e.g., line~\ref{line:emits_relevance}). This would be violated if |f| does not emit the expected event which a |emits| clause specifies.
+
+We also handle opaque calls properly although it is not illustrated in Fig.~\ref{fig:Emits}. Suppose |f| is an opaque function, and another function |g| calls |f|. In the transformation of |g|, the event store |es| extends with the expected events of |f| (i.e., the events specified by the |emits| clauses of |f|) in a similar way to how |expected_es| is constructed in line~\ref{line:expected_es}.
+
 \vspace{-2ex}
 \SubSection{Data Invariants}
 
@@ -154,7 +198,7 @@ subsequent assumptions, are further constraining the modified memory.
   \caption{Data Invariant Injection}
   \label{fig:DataInvariants}
   \centering
-\begin{MoveBox}
+\begin{MoveBoxNumbered}
   struct S { a: u64, b: u64 }
   spec S { invariant a < b }
   fun f(s: S): S {
@@ -174,7 +218,7 @@ subsequent assumptions, are further constraining the modified memory.
     s = Mvp::get(r);            // write back to s
     s
   }
-\end{MoveBox}
+\end{MoveBoxNumbered}
 \end{Figure}
 
 A data invariant specifies a constraint over a struct value. The value is
@@ -198,8 +242,6 @@ The implementation of data invariants hooks into the reference elimination
 computed. Whenever a reference is released and the mutated value is written
 back, we also enforce the data invariant. In addition, the data invariant is
 enforced when a struct value is directly constructed.
-
-
 
 
 %%% Local Variables:
