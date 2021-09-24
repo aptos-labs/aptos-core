@@ -98,8 +98,9 @@ impl HealthCheckNetworkInterface {
 }
 
 #[async_trait]
-impl NetworkInterface for HealthCheckNetworkInterface {
-    type Sender = HealthCheckerNetworkSender;
+impl NetworkInterface<HealthCheckerMsg, HealthCheckerNetworkSender>
+    for HealthCheckNetworkInterface
+{
     type AppDataKey = PeerId;
     type AppData = HealthCheckData;
 
@@ -107,7 +108,7 @@ impl NetworkInterface for HealthCheckNetworkInterface {
         &self.peer_metadata_storage
     }
 
-    fn sender(&self) -> Self::Sender {
+    fn sender(&self) -> HealthCheckerNetworkSender {
         self.sender.clone()
     }
 

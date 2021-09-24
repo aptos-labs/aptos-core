@@ -24,9 +24,11 @@ use std::{
 /// Each application would implement their own `NetworkInterface`.  This would hold `AppData` specific
 /// to the application as well as a specific `Sender` for cloning across threads and sending requests.
 #[async_trait]
-pub trait NetworkInterface {
-    /// A cloneable sender for sending outbound messages
-    type Sender;
+pub trait NetworkInterface<
+    TMessage: Message + Send,
+    PeerNetworkIdSender: ApplicationPeerNetworkIdSender<TMessage>,
+>
+{
     /// The application specific key for `AppData`
     type AppDataKey;
     /// The application specific data to be stored
@@ -36,7 +38,7 @@ pub trait NetworkInterface {
     fn peer_metadata_storage(&self) -> &PeerMetadataStorage;
 
     /// Give a copy of the sender for the network
-    fn sender(&self) -> Self::Sender;
+    fn sender(&self) -> PeerNetworkIdSender;
 
     /// Retrieve only connected peers
     fn connected_peers(&self, network_id: NetworkId) -> HashMap<PeerNetworkId, PeerInfo> {
@@ -80,7 +82,62 @@ pub trait NetworkInterface {
 }
 
 #[derive(Clone)]
-struct MultiNetworkSender<
+pub struct SingleNetworkSender<
+    TMessage: Message + Send,
+    Sender: ApplicationNetworkSender<TMessage> + Send,
+> {
+    sender: Sender,
+    network_id: NetworkId,
+    _phantom: PhantomData<TMessage>,
+}
+
+impl<TMessage: Clone + Message + Send, Sender: ApplicationNetworkSender<TMessage> + Send>
+    SingleNetworkSender<TMessage, Sender>
+{
+    fn sender(&mut self, network_id: &NetworkId) -> &mut Sender {
+        assert_eq!(network_id, &self.network_id);
+        &mut self.sender
+    }
+}
+
+#[async_trait]
+impl<TMessage: Clone + Message + Send, Sender: ApplicationNetworkSender<TMessage> + Send>
+    ApplicationPeerNetworkIdSender<TMessage> for SingleNetworkSender<TMessage, Sender>
+{
+    fn send_to(&mut self, recipient: PeerNetworkId, message: TMessage) -> Result<(), NetworkError> {
+        self.sender(&recipient.network_id())
+            .send_to(recipient.peer_id(), message)
+    }
+
+    fn send_to_many(
+        &mut self,
+        recipients: impl Iterator<Item = PeerNetworkId>,
+        message: TMessage,
+    ) -> Result<(), NetworkError> {
+        for (network_id, recipients) in
+            &recipients.group_by(|peer_network_id| peer_network_id.network_id())
+        {
+            let sender = self.sender(&network_id);
+            let peer_ids = recipients.map(|peer_network_id| peer_network_id.peer_id());
+            sender.send_to_many(peer_ids, message.clone())?;
+        }
+        Ok(())
+    }
+
+    async fn send_rpc(
+        &mut self,
+        recipient: PeerNetworkId,
+        req_msg: TMessage,
+        timeout: Duration,
+    ) -> Result<TMessage, RpcError> {
+        self.sender(&recipient.network_id())
+            .send_rpc(recipient.peer_id(), req_msg, timeout)
+            .await
+    }
+}
+
+#[derive(Clone)]
+pub struct MultiNetworkSender<
     TMessage: Message + Send,
     Sender: ApplicationNetworkSender<TMessage> + Send,
 > {
@@ -88,7 +145,7 @@ struct MultiNetworkSender<
     _phantom: PhantomData<TMessage>,
 }
 
-impl<TMessage: Message + Send, Sender: ApplicationNetworkSender<TMessage> + Send>
+impl<TMessage: Clone + Message + Send, Sender: ApplicationNetworkSender<TMessage> + Send>
     MultiNetworkSender<TMessage, Sender>
 {
     fn sender(&mut self, network_id: &NetworkId) -> &mut Sender {
@@ -133,7 +190,7 @@ impl<TMessage: Clone + Message + Send, Sender: ApplicationNetworkSender<TMessage
 }
 
 #[async_trait]
-trait ApplicationPeerNetworkIdSender<TMessage: Send>: Clone {
+pub trait ApplicationPeerNetworkIdSender<TMessage: Message + Send>: Clone {
     fn send_to(&mut self, recipient: PeerNetworkId, message: TMessage) -> Result<(), NetworkError>;
 
     fn send_to_many(

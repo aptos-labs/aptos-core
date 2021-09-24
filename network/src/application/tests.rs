@@ -3,15 +3,49 @@
 
 use crate::{
     application::{
-        interface::NetworkInterface,
+        interface::{ApplicationPeerNetworkIdSender, NetworkInterface},
         storage::{LockingHashMap, PeerMetadataStorage},
         types::{PeerError, PeerState},
     },
+    error::NetworkError,
+    protocols::{health_checker::HealthCheckerMsg, network::RpcError},
     transport::ConnectionMetadata,
 };
+use async_trait::async_trait;
 use diem_config::network_id::{NetworkId, PeerNetworkId};
 use diem_types::PeerId;
-use std::{collections::hash_map::Entry, sync::Arc};
+use std::{collections::hash_map::Entry, sync::Arc, time::Duration};
+
+#[derive(Clone)]
+struct DummySender {}
+
+#[async_trait]
+impl ApplicationPeerNetworkIdSender<HealthCheckerMsg> for DummySender {
+    fn send_to(
+        &mut self,
+        _recipient: PeerNetworkId,
+        _message: HealthCheckerMsg,
+    ) -> Result<(), NetworkError> {
+        unimplemented!()
+    }
+
+    fn send_to_many(
+        &mut self,
+        _recipients: impl Iterator<Item = PeerNetworkId>,
+        _message: HealthCheckerMsg,
+    ) -> Result<(), NetworkError> {
+        unimplemented!()
+    }
+
+    async fn send_rpc(
+        &mut self,
+        _recipient: PeerNetworkId,
+        _req_msg: HealthCheckerMsg,
+        _timeout: Duration,
+    ) -> Result<HealthCheckerMsg, RpcError> {
+        unimplemented!()
+    }
+}
 
 /// Dummy network so we can test the interfaces
 struct DummyNetworkInterface {
@@ -19,8 +53,7 @@ struct DummyNetworkInterface {
     app_data: LockingHashMap<PeerId, usize>,
 }
 
-impl NetworkInterface for DummyNetworkInterface {
-    type Sender = ();
+impl NetworkInterface<HealthCheckerMsg, DummySender> for DummyNetworkInterface {
     type AppDataKey = PeerId;
     type AppData = usize;
 
@@ -28,7 +61,9 @@ impl NetworkInterface for DummyNetworkInterface {
         &self.peer_metadata_storage
     }
 
-    fn sender(&self) -> Self::Sender {}
+    fn sender(&self) -> DummySender {
+        DummySender {}
+    }
 
     fn insert_app_data(&self, peer_id: PeerId, data: Self::AppData) {
         self.app_data.insert(peer_id, data)
