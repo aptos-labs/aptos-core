@@ -44,7 +44,7 @@ mod tests {
     use crate::{
         protocols::{
             identity::exchange_handshake,
-            wire::handshake::v1::{HandshakeMsg, MessagingProtocolVersion},
+            wire::handshake::v1::{HandshakeMsg, MessagingProtocolVersion, SupportedProtocols},
         },
         ProtocolId,
     };
@@ -52,7 +52,7 @@ mod tests {
     use diem_types::chain_id::ChainId;
     use futures::{executor::block_on, future::join};
     use memsocket::MemorySocket;
-    use std::collections::BTreeMap;
+    use std::{collections::BTreeMap, iter::FromIterator};
 
     fn build_test_connection() -> (MemorySocket, MemorySocket) {
         MemorySocket::new_pair()
@@ -68,12 +68,10 @@ mod tests {
         let mut supported_protocols = BTreeMap::new();
         supported_protocols.insert(
             MessagingProtocolVersion::V1,
-            [
+            SupportedProtocols::from_iter([
                 ProtocolId::ConsensusDirectSend,
                 ProtocolId::MempoolDirectSend,
-            ]
-            .iter()
-            .into(),
+            ]),
         );
         let server_handshake = HandshakeMsg {
             chain_id,
@@ -83,9 +81,10 @@ mod tests {
         let mut supported_protocols = BTreeMap::new();
         supported_protocols.insert(
             MessagingProtocolVersion::V1,
-            [ProtocolId::ConsensusRpc, ProtocolId::ConsensusDirectSend]
-                .iter()
-                .into(),
+            SupportedProtocols::from_iter([
+                ProtocolId::ConsensusRpc,
+                ProtocolId::ConsensusDirectSend,
+            ]),
         );
         let client_handshake = HandshakeMsg {
             supported_protocols,

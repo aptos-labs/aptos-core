@@ -81,7 +81,7 @@ impl TransportContext {
         self.direct_send_protocols
             .iter()
             .chain(&self.rpc_protocols)
-            .into()
+            .collect()
     }
 
     fn augment_direct_send_protocols(

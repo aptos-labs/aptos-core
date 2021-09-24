@@ -24,7 +24,7 @@ use netcore::{
     transport::{memory, ConnectionOrigin, Transport},
 };
 use rand::{rngs::StdRng, SeedableRng};
-use std::{collections::HashMap, io, sync::Arc};
+use std::{collections::HashMap, io, iter::FromIterator, sync::Arc};
 use tokio::runtime::Runtime;
 
 /// helper to build trusted peer map
@@ -143,9 +143,8 @@ where
             }
         };
 
-    let supported_protocols = SupportedProtocols::from(
-        [ProtocolId::ConsensusRpc, ProtocolId::DiscoveryDirectSend].iter(),
-    );
+    let supported_protocols =
+        SupportedProtocols::from_iter([ProtocolId::ConsensusRpc, ProtocolId::DiscoveryDirectSend]);
     let chain_id = ChainId::default();
     let listener_transport = DiemNetTransport::new(
         base_transport.clone(),

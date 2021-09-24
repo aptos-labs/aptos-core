@@ -29,7 +29,6 @@ use network::{
     noise::{HandshakeAuthMode, NoiseUpgrader},
     protocols::wire::handshake::v1::SupportedProtocols,
     transport::{upgrade_outbound, UpgradeContext, SUPPORTED_MESSAGING_PROTOCOL},
-    ProtocolId,
 };
 use std::{collections::BTreeMap, sync::Arc};
 use structopt::StructOpt;
@@ -219,7 +218,7 @@ fn build_upgrade_context(
     let mut supported_protocols = BTreeMap::new();
     supported_protocols.insert(
         SUPPORTED_MESSAGING_PROTOCOL,
-        SupportedProtocols::from(ProtocolId::all().iter()),
+        SupportedProtocols::all_known(),
     );
 
     // Build the noise and network handshake, without running a full Noise server with listener

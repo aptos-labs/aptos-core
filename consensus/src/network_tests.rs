@@ -33,6 +33,7 @@ use network::{
 };
 use std::{
     collections::{HashMap, HashSet},
+    iter::FromIterator,
     sync::Arc,
     time::Duration,
 };
@@ -550,13 +551,11 @@ mod tests {
             let (_, conn_status_rx) = conn_notifs_channel::new();
             shared_connections.write().insert(
                 *peer,
-                vec![
+                SupportedProtocols::from_iter([
                     ProtocolId::ConsensusDirectSendJSON,
                     ProtocolId::ConsensusDirectSend,
                     ProtocolId::ConsensusRpc,
-                ]
-                .iter()
-                .into(),
+                ]),
             );
             let mut network_sender = ConsensusNetworkSender::new(
                 PeerManagerRequestSender::new(network_reqs_tx),
@@ -653,13 +652,11 @@ mod tests {
             );
             shared_connections.write().insert(
                 *peer,
-                vec![
+                SupportedProtocols::from_iter([
                     ProtocolId::ConsensusDirectSendJSON,
                     ProtocolId::ConsensusDirectSend,
                     ProtocolId::ConsensusRpc,
-                ]
-                .iter()
-                .into(),
+                ]),
             );
             network_sender.initialize(shared_connections.clone());
             let network_events = ConsensusNetworkEvents::new(consensus_rx, conn_status_rx);

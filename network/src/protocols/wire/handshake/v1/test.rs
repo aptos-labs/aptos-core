@@ -13,18 +13,15 @@ fn net_protocol() -> bcs::Result<()> {
 }
 
 #[test]
-fn protocols_to_from_vec() {
+fn protocols_to_from_iter() {
     let supported_protocols: SupportedProtocols =
         [ProtocolId::ConsensusRpc, ProtocolId::MempoolDirectSend]
             .iter()
-            .into();
+            .collect();
+    let protocols_vec: Vec<ProtocolId> = supported_protocols.clone().try_into().unwrap();
     assert_eq!(
-        SupportedProtocols::from(
-            (supported_protocols.clone().try_into() as Result<Vec<ProtocolId>, _>)
-                .unwrap()
-                .iter()
-        ),
-        supported_protocols
+        SupportedProtocols::from_iter(protocols_vec),
+        supported_protocols,
     );
 }
 
@@ -56,9 +53,7 @@ fn common_protocols() {
     let mut supported_protocols = BTreeMap::new();
     supported_protocols.insert(
         MessagingProtocolVersion::V1,
-        [ProtocolId::ConsensusRpc, ProtocolId::DiscoveryDirectSend]
-            .iter()
-            .into(),
+        SupportedProtocols::from_iter([ProtocolId::ConsensusRpc, ProtocolId::DiscoveryDirectSend]),
     );
 
     let h1 = HandshakeMsg {
@@ -71,9 +66,7 @@ fn common_protocols() {
     let mut supported_protocols = BTreeMap::new();
     supported_protocols.insert(
         MessagingProtocolVersion::V1,
-        [ProtocolId::ConsensusRpc, ProtocolId::MempoolDirectSend]
-            .iter()
-            .into(),
+        SupportedProtocols::from_iter([ProtocolId::ConsensusRpc, ProtocolId::MempoolDirectSend]),
     );
     let h2 = HandshakeMsg {
         chain_id,
@@ -84,7 +77,7 @@ fn common_protocols() {
     assert_eq!(
         (
             MessagingProtocolVersion::V1,
-            [ProtocolId::ConsensusRpc].iter().into()
+            SupportedProtocols::from_iter([ProtocolId::ConsensusRpc]),
         ),
         h1.perform_handshake(&h2).unwrap()
     );
@@ -102,7 +95,7 @@ fn common_protocols() {
 
     // Case 3: Intersecting messaging protocol version is present, but no intersecting protocols.
     let mut supported_protocols = BTreeMap::new();
-    supported_protocols.insert(MessagingProtocolVersion::V1, SupportedProtocols::default());
+    supported_protocols.insert(MessagingProtocolVersion::V1, SupportedProtocols::empty());
     let h2 = HandshakeMsg {
         supported_protocols,
         chain_id,
@@ -116,24 +109,21 @@ fn common_protocols() {
 
 #[test]
 fn is_empty() {
-    assert!(SupportedProtocols::default().is_empty());
-    assert!(SupportedProtocols::from(ProtocolId::all().iter())
-        .intersect(&SupportedProtocols::default())
+    assert!(SupportedProtocols::empty().is_empty());
+    assert!(SupportedProtocols::all_known()
+        .intersect(&SupportedProtocols::empty())
         .is_empty());
-    assert!(!SupportedProtocols::from(ProtocolId::all().iter()).is_empty());
+    assert!(!SupportedProtocols::all_known().is_empty());
 }
 
 // Ensure we can handshake with a peer advertising some totally unknown ProtocoId's.
 
 #[test]
 fn ignore_unknown_protocols() {
-    let all_known_protos = HandshakeMsg::from_supported(SupportedProtocols::from(
-        [
-            ProtocolId::MempoolDirectSend,
-            ProtocolId::StateSyncDirectSend,
-        ]
-        .iter(),
-    ));
+    let all_known_protos = HandshakeMsg::from_supported(SupportedProtocols::from_iter([
+        ProtocolId::MempoolDirectSend,
+        ProtocolId::StateSyncDirectSend,
+    ]));
 
     let some_unknown_protos =
         HandshakeMsg::from_supported(SupportedProtocols(bitvec::BitVec::from_iter([
@@ -153,7 +143,7 @@ fn ignore_unknown_protocols() {
         .unwrap();
     assert_eq!(
         common_protos,
-        SupportedProtocols::from([ProtocolId::MempoolDirectSend].iter())
+        SupportedProtocols::from_iter([ProtocolId::MempoolDirectSend])
     );
 
     // Case 2: the other set contains exclusively unknown protocols and so we

@@ -54,11 +54,14 @@ use futures::{
 };
 use network::{
     peer_manager::{conn_notifs_channel, ConnectionRequestSender, PeerManagerRequestSender},
-    protocols::network::{Event, NewNetworkEvents, NewNetworkSender},
+    protocols::{
+        network::{Event, NewNetworkEvents, NewNetworkSender},
+        wire::handshake::v1::SupportedProtocols,
+    },
     ProtocolId,
 };
 use safety_rules::{PersistentSafetyStorage, SafetyRulesManager};
-use std::{sync::Arc, time::Duration};
+use std::{iter::FromIterator, sync::Arc, time::Duration};
 use tokio::runtime::Handle;
 
 /// Auxiliary struct that is setting up node environment for the test.
@@ -104,13 +107,11 @@ impl NodeSetup {
         for signer in signers.iter().take(num_nodes) {
             shared_connections.write().insert(
                 signer.author(),
-                vec![
+                SupportedProtocols::from_iter([
                     ProtocolId::ConsensusDirectSendJSON,
                     ProtocolId::ConsensusDirectSend,
                     ProtocolId::ConsensusRpc,
-                ]
-                .iter()
-                .into(),
+                ]),
             );
         }
         for (id, signer) in signers.iter().take(num_nodes).enumerate() {

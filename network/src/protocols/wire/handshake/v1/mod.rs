@@ -16,7 +16,13 @@ use anyhow::anyhow;
 use diem_config::network_id::NetworkId;
 use diem_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, convert::TryInto, fmt, iter::Iterator, ops::BitAnd};
+use std::{
+    collections::BTreeMap,
+    convert::TryInto,
+    fmt,
+    iter::{FromIterator, Iterator},
+    ops::BitAnd,
+};
 use thiserror::Error;
 
 #[cfg(any(test, feature = "fuzzing"))]
@@ -38,6 +44,7 @@ pub enum ProtocolId {
     ConsensusDirectSend = 1,
     MempoolDirectSend = 2,
     StateSyncDirectSend = 3,
+    // UNUSED
     DiscoveryDirectSend = 4,
     HealthCheckerRpc = 5,
     // json provides flexibility for backwards compatible upgrade
@@ -68,6 +75,11 @@ impl ProtocolId {
             ProtocolId::HealthCheckerRpc,
             ProtocolId::ConsensusDirectSendJSON,
         ]
+    }
+
+    #[cfg(test)]
+    pub fn mock() -> Self {
+        ProtocolId::DiscoveryDirectSend
     }
 
     pub fn to_bytes<T: Serialize>(&self, value: &T) -> anyhow::Result<Vec<u8>> {
@@ -111,6 +123,19 @@ impl fmt::Display for ProtocolId {
 pub struct SupportedProtocols(bitvec::BitVec);
 
 impl SupportedProtocols {
+    pub fn empty() -> Self {
+        Self::default()
+    }
+
+    pub fn all_known() -> Self {
+        Self::from_iter(ProtocolId::all())
+    }
+
+    #[cfg(test)]
+    pub fn mock() -> Self {
+        Self::from_iter([ProtocolId::mock()])
+    }
+
     pub fn is_empty(&self) -> bool {
         self.0.all_zeros()
     }
@@ -133,11 +158,15 @@ impl TryInto<Vec<ProtocolId>> for SupportedProtocols {
     }
 }
 
-impl<'a, T: Iterator<Item = &'a ProtocolId>> From<T> for SupportedProtocols {
-    fn from(protocols: T) -> Self {
-        let mut bv = bitvec::BitVec::default();
-        protocols.for_each(|p| bv.set(*p as u8));
-        Self(bv)
+impl FromIterator<ProtocolId> for SupportedProtocols {
+    fn from_iter<T: IntoIterator<Item = ProtocolId>>(iter: T) -> Self {
+        Self(iter.into_iter().map(|protocol| protocol as u8).collect())
+    }
+}
+
+impl<'a> FromIterator<&'a ProtocolId> for SupportedProtocols {
+    fn from_iter<T: IntoIterator<Item = &'a ProtocolId>>(iter: T) -> Self {
+        iter.into_iter().copied().collect()
     }
 }
 
@@ -217,7 +246,7 @@ impl HandshakeMsg {
     /// Useful function for tests
     #[cfg(test)]
     pub fn new_for_testing() -> Self {
-        Self::from_supported([ProtocolId::HealthCheckerRpc].iter().into())
+        Self::from_supported([ProtocolId::HealthCheckerRpc].iter().collect())
     }
 
     #[cfg(test)]

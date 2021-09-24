@@ -30,10 +30,13 @@ use event_notifications::{ReconfigNotification, ReconfigNotificationListener};
 use futures::channel::mpsc;
 use network::{
     peer_manager::{conn_notifs_channel, ConnectionRequestSender, PeerManagerRequestSender},
-    protocols::network::{NewNetworkEvents, NewNetworkSender},
+    protocols::{
+        network::{NewNetworkEvents, NewNetworkSender},
+        wire::handshake::v1::SupportedProtocols,
+    },
     ProtocolId,
 };
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, iter::FromIterator, sync::Arc};
 use tokio::runtime::{Builder, Runtime};
 
 /// Auxiliary struct that is preparing SMR for the test
@@ -161,13 +164,11 @@ impl SMRNode {
         node_configs.iter().for_each(|config| {
             shared_connections.write().insert(
                 author_from_config(config),
-                vec![
+                SupportedProtocols::from_iter([
                     ProtocolId::ConsensusDirectSendJSON,
                     ProtocolId::ConsensusDirectSend,
                     ProtocolId::ConsensusRpc,
-                ]
-                .iter()
-                .into(),
+                ]),
             );
         });
 
