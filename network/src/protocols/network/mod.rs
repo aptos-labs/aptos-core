@@ -13,6 +13,7 @@ use crate::{
     transport::ConnectionMetadata,
     ProtocolId,
 };
+use async_trait::async_trait;
 use bytes::Bytes;
 use channel::diem_channel;
 use diem_logger::prelude::*;
@@ -348,4 +349,24 @@ impl<TMessage: Message> NetworkSender<TMessage> {
         let res_msg: TMessage = protocol.from_bytes(&res_data)?;
         Ok(res_msg)
     }
+}
+
+/// A simplified version of `NetworkSender` that doesn't use `ProtocolId` in the input
+/// It was already being implemented for every application, but is now standardized
+#[async_trait]
+pub trait ApplicationNetworkSender<TMessage: Send>: Clone {
+    fn send_to(&mut self, recipient: PeerId, message: TMessage) -> Result<(), NetworkError>;
+
+    fn send_to_many(
+        &mut self,
+        recipients: impl Iterator<Item = PeerId>,
+        message: TMessage,
+    ) -> Result<(), NetworkError>;
+
+    async fn send_rpc(
+        &mut self,
+        recipient: PeerId,
+        req_msg: TMessage,
+        timeout: Duration,
+    ) -> Result<TMessage, RpcError>;
 }
