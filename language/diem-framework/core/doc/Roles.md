@@ -593,7 +593,7 @@ Helper function to grant a role.
 
 <pre><code><b>pragma</b> opaque;
 <b>include</b> <a href="Roles.md#0x1_Roles_GrantRole">GrantRole</a>{addr: <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account)};
-<b>let</b> addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account);
+<b>let</b> addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
 <b>requires</b> role_id == <a href="Roles.md#0x1_Roles_DIEM_ROOT_ROLE_ID">DIEM_ROOT_ROLE_ID</a> ==&gt; addr == @DiemRoot;
 <b>requires</b> role_id == <a href="Roles.md#0x1_Roles_TREASURY_COMPLIANCE_ROLE_ID">TREASURY_COMPLIANCE_ROLE_ID</a> ==&gt; addr == @TreasuryCompliance;
 </code></pre>
@@ -1511,7 +1511,7 @@ ChildVASP have balances [[D7]][ROLE].
 <pre><code><b>schema</b> <a href="Roles.md#0x1_Roles_AbortsIfNotDiemRoot">AbortsIfNotDiemRoot</a> {
     account: signer;
     <b>include</b> <a href="CoreAddresses.md#0x1_CoreAddresses_AbortsIfNotDiemRoot">CoreAddresses::AbortsIfNotDiemRoot</a>;
-    <b>let</b> addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account);
+    <b>let</b> addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="Roles.md#0x1_Roles_RoleId">RoleId</a>&gt;(addr) <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a>;
     <b>aborts_if</b> <b>global</b>&lt;<a href="Roles.md#0x1_Roles_RoleId">RoleId</a>&gt;(addr).role_id != <a href="Roles.md#0x1_Roles_DIEM_ROOT_ROLE_ID">DIEM_ROOT_ROLE_ID</a> <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a>;
 }
@@ -1526,7 +1526,7 @@ ChildVASP have balances [[D7]][ROLE].
 <pre><code><b>schema</b> <a href="Roles.md#0x1_Roles_AbortsIfNotTreasuryCompliance">AbortsIfNotTreasuryCompliance</a> {
     account: signer;
     <b>include</b> <a href="CoreAddresses.md#0x1_CoreAddresses_AbortsIfNotTreasuryCompliance">CoreAddresses::AbortsIfNotTreasuryCompliance</a>;
-    <b>let</b> addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account);
+    <b>let</b> addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="Roles.md#0x1_Roles_RoleId">RoleId</a>&gt;(addr) <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a>;
     <b>aborts_if</b> <b>global</b>&lt;<a href="Roles.md#0x1_Roles_RoleId">RoleId</a>&gt;(addr).role_id != <a href="Roles.md#0x1_Roles_TREASURY_COMPLIANCE_ROLE_ID">TREASURY_COMPLIANCE_ROLE_ID</a> <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a>;
 }
@@ -1540,7 +1540,7 @@ ChildVASP have balances [[D7]][ROLE].
 
 <pre><code><b>schema</b> <a href="Roles.md#0x1_Roles_AbortsIfNotParentVasp">AbortsIfNotParentVasp</a> {
     account: signer;
-    <b>let</b> addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account);
+    <b>let</b> addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="Roles.md#0x1_Roles_RoleId">RoleId</a>&gt;(addr) <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a>;
     <b>aborts_if</b> <b>global</b>&lt;<a href="Roles.md#0x1_Roles_RoleId">RoleId</a>&gt;(addr).role_id != <a href="Roles.md#0x1_Roles_PARENT_VASP_ROLE_ID">PARENT_VASP_ROLE_ID</a> <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a>;
 }
@@ -1567,7 +1567,7 @@ ChildVASP have balances [[D7]][ROLE].
 
 <pre><code><b>schema</b> <a href="Roles.md#0x1_Roles_AbortsIfNotDesignatedDealer">AbortsIfNotDesignatedDealer</a> {
     account: signer;
-    <b>let</b> addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account);
+    <b>let</b> addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="Roles.md#0x1_Roles_RoleId">RoleId</a>&gt;(addr) <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a>;
     <b>aborts_if</b> <b>global</b>&lt;<a href="Roles.md#0x1_Roles_RoleId">RoleId</a>&gt;(addr).role_id != <a href="Roles.md#0x1_Roles_DESIGNATED_DEALER_ROLE_ID">DESIGNATED_DEALER_ROLE_ID</a> <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a>;
 }
@@ -1581,7 +1581,7 @@ ChildVASP have balances [[D7]][ROLE].
 
 <pre><code><b>schema</b> <a href="Roles.md#0x1_Roles_AbortsIfNotParentVaspOrDesignatedDealer">AbortsIfNotParentVaspOrDesignatedDealer</a> {
     account: signer;
-    <b>let</b> addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account);
+    <b>let</b> addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="Roles.md#0x1_Roles_RoleId">RoleId</a>&gt;(addr) <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a>;
     <b>let</b> role_id = <b>global</b>&lt;<a href="Roles.md#0x1_Roles_RoleId">RoleId</a>&gt;(addr).role_id;
     <b>aborts_if</b> role_id != <a href="Roles.md#0x1_Roles_PARENT_VASP_ROLE_ID">PARENT_VASP_ROLE_ID</a> && role_id != <a href="Roles.md#0x1_Roles_DESIGNATED_DEALER_ROLE_ID">DESIGNATED_DEALER_ROLE_ID</a>
@@ -1597,7 +1597,7 @@ ChildVASP have balances [[D7]][ROLE].
 
 <pre><code><b>schema</b> <a href="Roles.md#0x1_Roles_AbortsIfNotParentVaspOrChildVasp">AbortsIfNotParentVaspOrChildVasp</a> {
     account: signer;
-    <b>let</b> addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account);
+    <b>let</b> addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="Roles.md#0x1_Roles_RoleId">RoleId</a>&gt;(addr) <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a>;
     <b>let</b> role_id = <b>global</b>&lt;<a href="Roles.md#0x1_Roles_RoleId">RoleId</a>&gt;(addr).role_id;
     <b>aborts_if</b> role_id != <a href="Roles.md#0x1_Roles_PARENT_VASP_ROLE_ID">PARENT_VASP_ROLE_ID</a> && role_id != <a href="Roles.md#0x1_Roles_CHILD_VASP_ROLE_ID">CHILD_VASP_ROLE_ID</a>
@@ -1613,7 +1613,7 @@ ChildVASP have balances [[D7]][ROLE].
 
 <pre><code><b>schema</b> <a href="Roles.md#0x1_Roles_AbortsIfNotValidator">AbortsIfNotValidator</a> {
     account: signer;
-    <b>let</b> addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account);
+    <b>let</b> addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="Roles.md#0x1_Roles_RoleId">RoleId</a>&gt;(addr) <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a>;
     <b>aborts_if</b> <b>global</b>&lt;<a href="Roles.md#0x1_Roles_RoleId">RoleId</a>&gt;(addr).role_id != <a href="Roles.md#0x1_Roles_VALIDATOR_ROLE_ID">VALIDATOR_ROLE_ID</a> <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a>;
 }
@@ -1627,7 +1627,7 @@ ChildVASP have balances [[D7]][ROLE].
 
 <pre><code><b>schema</b> <a href="Roles.md#0x1_Roles_AbortsIfNotValidatorOperator">AbortsIfNotValidatorOperator</a> {
     account: signer;
-    <b>let</b> addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account);
+    <b>let</b> addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="Roles.md#0x1_Roles_RoleId">RoleId</a>&gt;(addr) <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a>;
     <b>aborts_if</b> <b>global</b>&lt;<a href="Roles.md#0x1_Roles_RoleId">RoleId</a>&gt;(addr).role_id != <a href="Roles.md#0x1_Roles_VALIDATOR_OPERATOR_ROLE_ID">VALIDATOR_OPERATOR_ROLE_ID</a>
         <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_REQUIRES_ROLE">Errors::REQUIRES_ROLE</a>;

@@ -933,7 +933,7 @@ impl<'env> SpecTranslator<'env> {
 
         let is_signer = self.env.get_node_type(args[0].node_id()).is_signer();
         if is_signer {
-            emit!(self.writer, "$1_Signer_spec_address_of(");
+            emit!(self.writer, "$addr#$signer(");
         }
         self.translate_exp(&args[0]);
         if is_signer {
@@ -1329,7 +1329,7 @@ impl<'env> SpecTranslator<'env> {
                     emit!(
                         self.writer,
                         &format!(
-                            " && $1_Signer_is_txn_signer_addr($1_Signer_spec_address_of({}))",
+                            " && $1_Signer_is_txn_signer_addr($addr#$signer({}))",
                             target
                         )
                     );

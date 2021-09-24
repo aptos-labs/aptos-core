@@ -90,7 +90,7 @@ module 0x42::TestGlobalVars {
         assert(Signer::address_of(s) == @0, 1);
     }
     spec assert_access {
-        aborts_if Signer::spec_address_of(s) != @0;
+        aborts_if Signer::address_of(s) != @0;
         update access_verified = true;
     }
 

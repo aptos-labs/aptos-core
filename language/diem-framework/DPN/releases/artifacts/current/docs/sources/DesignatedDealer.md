@@ -210,7 +210,7 @@ for each known currency at launch.
 
 
 <pre><code><b>pragma</b> opaque;
-<b>let</b> dd_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(dd);
+<b>let</b> dd_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(dd);
 <b>include</b> <a href="Roles.md#0x1_Roles_AbortsIfNotTreasuryCompliance">Roles::AbortsIfNotTreasuryCompliance</a>{account: tc_account};
 <b>include</b> <a href="Roles.md#0x1_Roles_AbortsIfNotDesignatedDealer">Roles::AbortsIfNotDesignatedDealer</a>{account: dd};
 <b>aborts_if</b> <b>exists</b>&lt;<a href="DesignatedDealer.md#0x1_DesignatedDealer_Dealer">Dealer</a>&gt;(dd_addr) <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_ALREADY_PUBLISHED">Errors::ALREADY_PUBLISHED</a>;
@@ -263,7 +263,7 @@ multi-signer transactions in order to add a new currency to an existing DD.
 
 
 <pre><code><b>pragma</b> opaque;
-<b>let</b> dd_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(dd);
+<b>let</b> dd_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(dd);
 <b>include</b> <a href="Roles.md#0x1_Roles_AbortsIfNotTreasuryCompliance">Roles::AbortsIfNotTreasuryCompliance</a>{account: tc_account};
 <b>include</b> <a href="Roles.md#0x1_Roles_AbortsIfNotDesignatedDealer">Roles::AbortsIfNotDesignatedDealer</a>{account: dd};
 <b>include</b> <a href="DesignatedDealer.md#0x1_DesignatedDealer_AbortsIfNoDealer">AbortsIfNoDealer</a>{dd_addr: dd_addr};
@@ -397,7 +397,7 @@ multi-signer transactions in order to add a new currency to an existing DD.
     <b>include</b> <a href="Roles.md#0x1_Roles_AbortsIfNotTreasuryCompliance">Roles::AbortsIfNotTreasuryCompliance</a>{account: tc_account};
     <b>aborts_if</b> amount == 0 <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>;
     <b>include</b> <a href="DesignatedDealer.md#0x1_DesignatedDealer_AbortsIfNoDealer">AbortsIfNoDealer</a>;
-    <b>aborts_if</b> !<b>exists</b>&lt;<a href="Diem.md#0x1_Diem_MintCapability">Diem::MintCapability</a>&lt;CoinType&gt;&gt;(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(tc_account)) <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_REQUIRES_CAPABILITY">Errors::REQUIRES_CAPABILITY</a>;
+    <b>aborts_if</b> !<b>exists</b>&lt;<a href="Diem.md#0x1_Diem_MintCapability">Diem::MintCapability</a>&lt;CoinType&gt;&gt;(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(tc_account)) <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_REQUIRES_CAPABILITY">Errors::REQUIRES_CAPABILITY</a>;
     <b>include</b> <a href="Diem.md#0x1_Diem_MintAbortsIf">Diem::MintAbortsIf</a>&lt;CoinType&gt;{value: amount};
 }
 </code></pre>

@@ -12,14 +12,6 @@ module Std::Signer {
     public fun address_of(s: &signer): address {
         *borrow_address(s)
     }
-    spec address_of {
-        pragma opaque;
-        aborts_if false;
-        ensures result == spec_address_of(s);
-    }
-
-    /// Specification version of `Self::address_of`.
-    spec native fun spec_address_of(account: signer): address;
 
     /// Return true only if `s` is a transaction signer. This is a spec function only available in spec.
     spec native fun is_txn_signer(s: signer): bool;

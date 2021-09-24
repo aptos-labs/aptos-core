@@ -390,7 +390,7 @@ The permission "RotateDualAttestationInfo" is granted to ParentVASP and Designat
 
 <pre><code><b>include</b> <a href="Roles.md#0x1_Roles_AbortsIfNotParentVaspOrDesignatedDealer">Roles::AbortsIfNotParentVaspOrDesignatedDealer</a>{account: created};
 <b>include</b> <a href="Roles.md#0x1_Roles_AbortsIfNotTreasuryCompliance">Roles::AbortsIfNotTreasuryCompliance</a>{account: creator};
-<b>aborts_if</b> <a href="DualAttestation.md#0x1_DualAttestation_spec_has_credential">spec_has_credential</a>(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(created)) <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_ALREADY_PUBLISHED">Errors::ALREADY_PUBLISHED</a>;
+<b>aborts_if</b> <a href="DualAttestation.md#0x1_DualAttestation_spec_has_credential">spec_has_credential</a>(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(created)) <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_ALREADY_PUBLISHED">Errors::ALREADY_PUBLISHED</a>;
 </code></pre>
 
 
@@ -458,7 +458,7 @@ Rotate the base URL for <code>account</code> to <code>new_url</code>
 
 <pre><code><b>schema</b> <a href="DualAttestation.md#0x1_DualAttestation_RotateBaseUrlAbortsIf">RotateBaseUrlAbortsIf</a> {
     account: signer;
-    <b>let</b> sender = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account);
+    <b>let</b> sender = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
 }
 </code></pre>
 
@@ -493,7 +493,7 @@ Must abort if the account does not have the resource Credential [[H17]][PERMISSI
 <pre><code><b>schema</b> <a href="DualAttestation.md#0x1_DualAttestation_RotateBaseUrlEnsures">RotateBaseUrlEnsures</a> {
     account: signer;
     new_url: vector&lt;u8&gt;;
-    <b>let</b> sender = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account);
+    <b>let</b> sender = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
     <b>ensures</b> <b>global</b>&lt;<a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a>&gt;(sender).base_url == new_url;
 }
 </code></pre>
@@ -517,7 +517,7 @@ The sender can only rotate its own base url [[H17]][PERMISSION].
 <pre><code><b>schema</b> <a href="DualAttestation.md#0x1_DualAttestation_RotateBaseUrlEmits">RotateBaseUrlEmits</a> {
     account: signer;
     new_url: vector&lt;u8&gt;;
-    <b>let</b> sender = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account);
+    <b>let</b> sender = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
     <b>let</b> handle = <b>global</b>&lt;<a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a>&gt;(sender).base_url_rotation_events;
     <b>let</b> msg = <a href="DualAttestation.md#0x1_DualAttestation_BaseUrlRotationEvent">BaseUrlRotationEvent</a> {
         new_base_url: new_url,
@@ -587,7 +587,7 @@ Rotate the compliance public key for <code>account</code> to <code>new_key</code
 <pre><code><b>schema</b> <a href="DualAttestation.md#0x1_DualAttestation_RotateCompliancePublicKeyAbortsIf">RotateCompliancePublicKeyAbortsIf</a> {
     account: signer;
     new_key: vector&lt;u8&gt;;
-    <b>let</b> sender = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account);
+    <b>let</b> sender = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
 }
 </code></pre>
 
@@ -611,7 +611,7 @@ Must abort if the account does not have the resource Credential [[H17]][PERMISSI
 <pre><code><b>schema</b> <a href="DualAttestation.md#0x1_DualAttestation_RotateCompliancePublicKeyEnsures">RotateCompliancePublicKeyEnsures</a> {
     account: signer;
     new_key: vector&lt;u8&gt;;
-    <b>let</b> sender = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account);
+    <b>let</b> sender = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
     <b>ensures</b> <b>global</b>&lt;<a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a>&gt;(sender).compliance_public_key == new_key;
 }
 </code></pre>
@@ -635,7 +635,7 @@ The sender only rotates its own compliance_public_key [[H17]][PERMISSION].
 <pre><code><b>schema</b> <a href="DualAttestation.md#0x1_DualAttestation_RotateCompliancePublicKeyEmits">RotateCompliancePublicKeyEmits</a> {
     account: signer;
     new_key: vector&lt;u8&gt;;
-    <b>let</b> sender = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account);
+    <b>let</b> sender = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
     <b>let</b> handle = <b>global</b>&lt;<a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a>&gt;(sender).compliance_key_rotation_events;
     <b>let</b> msg = <a href="DualAttestation.md#0x1_DualAttestation_ComplianceKeyRotationEvent">ComplianceKeyRotationEvent</a> {
         new_compliance_public_key: new_key,

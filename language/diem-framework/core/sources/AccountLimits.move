@@ -177,7 +177,7 @@ module DiemFramework::AccountLimits {
 
         include Roles::AbortsIfNotDiemRoot{account: dr_account};
         aborts_if !exists<LimitsDefinition<CoinType>>(limit_address) with Errors::NOT_PUBLISHED;
-        aborts_if exists<Window<CoinType>>(Signer::spec_address_of(to_limit)) with Errors::ALREADY_PUBLISHED;
+        aborts_if exists<Window<CoinType>>(Signer::address_of(to_limit)) with Errors::ALREADY_PUBLISHED;
     }
 
     /// Unrestricted limits are represented by setting all fields in the
@@ -207,12 +207,12 @@ module DiemFramework::AccountLimits {
     }
     spec schema PublishUnrestrictedLimitsAbortsIf<CoinType> {
         publish_account: signer;
-        aborts_if exists<LimitsDefinition<CoinType>>(Signer::spec_address_of(publish_account))
+        aborts_if exists<LimitsDefinition<CoinType>>(Signer::address_of(publish_account))
             with Errors::ALREADY_PUBLISHED;
     }
     spec schema PublishUnrestrictedLimitsEnsures<CoinType> {
         publish_account: signer;
-        ensures exists<LimitsDefinition<CoinType>>(Signer::spec_address_of(publish_account));
+        ensures exists<LimitsDefinition<CoinType>>(Signer::address_of(publish_account));
     }
 
     // #[test_only]

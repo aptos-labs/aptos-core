@@ -60,7 +60,7 @@ module DiemFramework::AccountFreezing {
     spec initialize {
         include DiemTimestamp::AbortsIfNotGenesis;
         include CoreAddresses::AbortsIfNotDiemRoot{account: dr_account};
-        let addr = Signer::spec_address_of(dr_account);
+        let addr = Signer::address_of(dr_account);
         aborts_if exists<FreezeEventsHolder>(addr) with Errors::ALREADY_PUBLISHED;
         ensures exists<FreezeEventsHolder>(addr);
     }
@@ -71,7 +71,7 @@ module DiemFramework::AccountFreezing {
         move_to(account, FreezingBit { is_frozen: false })
     }
     spec create {
-        let addr = Signer::spec_address_of(account);
+        let addr = Signer::address_of(account);
         modifies global<FreezingBit>(addr);
         aborts_if exists<FreezingBit>(addr) with Errors::ALREADY_PUBLISHED;
         ensures spec_account_is_not_frozen(addr);
@@ -113,7 +113,7 @@ module DiemFramework::AccountFreezing {
         frozen_address: address;
         let handle = global<FreezeEventsHolder>(@DiemRoot).freeze_event_handle;
         let msg = FreezeAccountEvent {
-            initiator_address: Signer::spec_address_of(account),
+            initiator_address: Signer::address_of(account),
             frozen_address
         };
         emits msg to handle;
@@ -150,7 +150,7 @@ module DiemFramework::AccountFreezing {
         unfrozen_address: address;
         let handle = global<FreezeEventsHolder>(@DiemRoot).unfreeze_event_handle;
         let msg = UnfreezeAccountEvent {
-            initiator_address: Signer::spec_address_of(account),
+            initiator_address: Signer::address_of(account),
             unfrozen_address
         };
         emits msg to handle;

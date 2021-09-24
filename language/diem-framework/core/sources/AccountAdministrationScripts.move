@@ -48,7 +48,7 @@ module DiemFramework::AccountAdministrationScripts {
 
         include DiemAccount::TransactionChecks{sender: account}; // properties checked by the prologue.
         include DiemAccount::AddCurrencyAbortsIf<Currency>;
-        include DiemAccount::AddCurrencyEnsures<Currency>{addr: Signer::spec_address_of(account)};
+        include DiemAccount::AddCurrencyEnsures<Currency>{addr: Signer::address_of(account)};
 
         aborts_with [check]
             Errors::NOT_PUBLISHED,
@@ -115,7 +115,7 @@ module DiemFramework::AccountAdministrationScripts {
         include DiemAccount::ExtractKeyRotationCapabilityAbortsIf{account: to_recover_account};
         include DiemAccount::ExtractKeyRotationCapabilityEnsures{account: to_recover_account};
 
-        let addr = Signer::spec_address_of(to_recover_account);
+        let addr = Signer::address_of(to_recover_account);
         let rotation_cap = DiemAccount::spec_get_key_rotation_cap(addr);
 
         include RecoveryAddress::AddRotationCapabilityAbortsIf{
@@ -213,7 +213,7 @@ module DiemFramework::AccountAdministrationScripts {
         use Std::Errors;
 
         include DiemAccount::TransactionChecks{sender: account}; // properties checked by the prologue.
-        let account_addr = Signer::spec_address_of(account);
+        let account_addr = Signer::address_of(account);
         include DiemAccount::ExtractKeyRotationCapabilityAbortsIf;
         let key_rotation_capability = DiemAccount::spec_get_key_rotation_cap(account_addr);
         include DiemAccount::RotateAuthenticationKeyAbortsIf{cap: key_rotation_capability, new_authentication_key: new_key};
@@ -275,7 +275,7 @@ module DiemFramework::AccountAdministrationScripts {
         use Std::Errors;
 
         include DiemAccount::TransactionChecks{sender: account}; // properties checked by the prologue.
-        let account_addr = Signer::spec_address_of(account);
+        let account_addr = Signer::address_of(account);
         include SlidingNonce::RecordNonceAbortsIf{ seq_nonce: sliding_nonce };
         include DiemAccount::ExtractKeyRotationCapabilityAbortsIf;
         let key_rotation_capability = DiemAccount::spec_get_key_rotation_cap(account_addr);
@@ -340,7 +340,7 @@ module DiemFramework::AccountAdministrationScripts {
         use DiemFramework::Roles;
 
         include DiemAccount::TransactionChecks{sender: account}; // properties checked by the prologue.
-        let account_addr = Signer::spec_address_of(account);
+        let account_addr = Signer::address_of(account);
         include SlidingNonce::RecordNonceAbortsIf{ account: dr_account, seq_nonce: sliding_nonce };
         include DiemAccount::ExtractKeyRotationCapabilityAbortsIf;
         let key_rotation_capability = DiemAccount::spec_get_key_rotation_cap(account_addr);
@@ -421,7 +421,7 @@ module DiemFramework::AccountAdministrationScripts {
         /// The delegatee at the recovery address has to hold the key rotation capability for
         /// the address to recover. The address of the transaction signer has to be either
         /// the delegatee's address or the address to recover [[H18]][PERMISSION][[J18]][PERMISSION].
-        let account_addr = Signer::spec_address_of(account);
+        let account_addr = Signer::address_of(account);
         aborts_if !RecoveryAddress::spec_holds_key_rotation_cap_for(recovery_address, to_recover) with Errors::INVALID_ARGUMENT;
         aborts_if !(account_addr == recovery_address || account_addr == to_recover) with Errors::INVALID_ARGUMENT;
     }
@@ -488,7 +488,7 @@ module DiemFramework::AccountAdministrationScripts {
         /// **Access Control:**
         /// Only the account having Credential can rotate the info.
         /// Credential is granted to either a Parent VASP or a designated dealer [[H17]][PERMISSION].
-        include DualAttestation::AbortsIfNoCredential{addr: Signer::spec_address_of(account)};
+        include DualAttestation::AbortsIfNoCredential{addr: Signer::address_of(account)};
     }
 
     /// # Summary
@@ -577,7 +577,7 @@ module DiemFramework::AccountAdministrationScripts {
         include DiemAccount::ExtractKeyRotationCapabilityAbortsIf;
         include DiemAccount::ExtractKeyRotationCapabilityEnsures;
 
-        let account_addr = Signer::spec_address_of(account);
+        let account_addr = Signer::address_of(account);
         let rotation_cap = DiemAccount::spec_get_key_rotation_cap(account_addr);
 
         include RecoveryAddress::PublishAbortsIf{
@@ -622,7 +622,7 @@ module DiemFramework::AccountAdministrationScripts {
         use Std::Errors;
         use Std::Signer;
 
-        let vasp_addr = Signer::spec_address_of(account);
+        let vasp_addr = Signer::address_of(account);
         include DiemAccount::TransactionChecks{sender: account}; // properties checked by the prologue.
         include Roles::AbortsIfNotParentVasp;
         include VASPDomain::PublishVASPDomainsAbortsIf { vasp_addr };

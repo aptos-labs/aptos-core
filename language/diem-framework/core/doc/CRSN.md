@@ -311,10 +311,10 @@ Publish a DSN under <code>account</code>. Cannot already have a DSN published.
 
 <pre><code><b>include</b> <a href="../../../../../../../move-stdlib/docs/BitVector.md#0x1_BitVector_NewAbortsIf">BitVector::NewAbortsIf</a>{length: size};
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="CRSN.md#0x1_CRSN_CRSNsAllowed">CRSNsAllowed</a>&gt;(@DiemRoot) <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_INVALID_STATE">Errors::INVALID_STATE</a>;
-<b>aborts_if</b> <a href="CRSN.md#0x1_CRSN_has_crsn">has_crsn</a>(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account)) <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_INVALID_STATE">Errors::INVALID_STATE</a>;
+<b>aborts_if</b> <a href="CRSN.md#0x1_CRSN_has_crsn">has_crsn</a>(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account)) <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_INVALID_STATE">Errors::INVALID_STATE</a>;
 <b>aborts_if</b> size == 0 <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>;
 <b>aborts_if</b> size &gt; <a href="CRSN.md#0x1_CRSN_MAX_CRSN_SIZE">MAX_CRSN_SIZE</a> <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>;
-<b>ensures</b> <b>exists</b>&lt;<a href="CRSN.md#0x1_CRSN">CRSN</a>&gt;(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account));
+<b>ensures</b> <b>exists</b>&lt;<a href="CRSN.md#0x1_CRSN">CRSN</a>&gt;(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account));
 </code></pre>
 
 
@@ -408,7 +408,7 @@ will be accepted, and <code><b>false</b></code> otherwise.
 
 
 
-<pre><code><b>include</b> <a href="CRSN.md#0x1_CRSN_CheckAbortsIf">CheckAbortsIf</a>{addr: <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account)};
+<pre><code><b>include</b> <a href="CRSN.md#0x1_CRSN_CheckAbortsIf">CheckAbortsIf</a>{addr: <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account)};
 </code></pre>
 
 

@@ -1103,7 +1103,7 @@ impl<'env> FunctionTranslator<'env> {
                         let signer_str = str_local(srcs[1]);
                         emitln!(
                             writer,
-                            "if ($ResourceExists({}, $1_Signer_spec_address_of({}))) {{",
+                            "if ($ResourceExists({}, $addr#$signer({}))) {{",
                             memory,
                             signer_str
                         );
@@ -1112,7 +1112,7 @@ impl<'env> FunctionTranslator<'env> {
                         writer.with_indent(|| {
                             emitln!(
                                 writer,
-                                "{} := $ResourceUpdate({}, $1_Signer_spec_address_of({}), {});",
+                                "{} := $ResourceUpdate({}, $addr#$signer({}), {});",
                                 memory,
                                 memory,
                                 signer_str,

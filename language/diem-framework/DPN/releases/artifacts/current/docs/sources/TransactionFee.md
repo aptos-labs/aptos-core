@@ -407,7 +407,7 @@ BurnCapability is not transferrable [[J3]][PERMISSION].
 
 
 <pre><code><b>schema</b> <a href="TransactionFee.md#0x1_TransactionFee_BurnFeesNotXDX">BurnFeesNotXDX</a>&lt;CoinType&gt; {
-    <b>ensures</b> <b>exists</b>&lt;<a href="Diem.md#0x1_Diem_BurnCapability">Diem::BurnCapability</a>&lt;CoinType&gt;&gt;(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(tc_account));
+    <b>ensures</b> <b>exists</b>&lt;<a href="Diem.md#0x1_Diem_BurnCapability">Diem::BurnCapability</a>&lt;CoinType&gt;&gt;(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(tc_account));
 }
 </code></pre>
 

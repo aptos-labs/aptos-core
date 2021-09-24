@@ -944,7 +944,7 @@ Only a TreasuryCompliance account can have the BurnCapability [[H3]][PERMISSION]
 
 <pre><code><b>schema</b> <a href="Diem.md#0x1_Diem_PublishBurnCapAbortsIfs">PublishBurnCapAbortsIfs</a>&lt;CoinType&gt; {
     <b>include</b> <a href="Roles.md#0x1_Roles_AbortsIfNotTreasuryCompliance">Roles::AbortsIfNotTreasuryCompliance</a>{account: tc_account};
-    <b>aborts_if</b> <b>exists</b>&lt;<a href="Diem.md#0x1_Diem_BurnCapability">BurnCapability</a>&lt;CoinType&gt;&gt;(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(tc_account)) <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_ALREADY_PUBLISHED">Errors::ALREADY_PUBLISHED</a>;
+    <b>aborts_if</b> <b>exists</b>&lt;<a href="Diem.md#0x1_Diem_BurnCapability">BurnCapability</a>&lt;CoinType&gt;&gt;(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(tc_account)) <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_ALREADY_PUBLISHED">Errors::ALREADY_PUBLISHED</a>;
 }
 </code></pre>
 
@@ -956,7 +956,7 @@ Only a TreasuryCompliance account can have the BurnCapability [[H3]][PERMISSION]
 
 <pre><code><b>schema</b> <a href="Diem.md#0x1_Diem_PublishBurnCapEnsures">PublishBurnCapEnsures</a>&lt;CoinType&gt; {
     tc_account: &signer;
-    <b>ensures</b> <b>exists</b>&lt;<a href="Diem.md#0x1_Diem_BurnCapability">BurnCapability</a>&lt;CoinType&gt;&gt;(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(tc_account));
+    <b>ensures</b> <b>exists</b>&lt;<a href="Diem.md#0x1_Diem_BurnCapability">BurnCapability</a>&lt;CoinType&gt;&gt;(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(tc_account));
 }
 </code></pre>
 
@@ -1010,7 +1010,7 @@ to be successful.
 Must abort if the account does not have the MintCapability [[H1]][PERMISSION].
 
 
-<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="Diem.md#0x1_Diem_MintCapability">MintCapability</a>&lt;CoinType&gt;&gt;(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account)) <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_REQUIRES_CAPABILITY">Errors::REQUIRES_CAPABILITY</a>;
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="Diem.md#0x1_Diem_MintCapability">MintCapability</a>&lt;CoinType&gt;&gt;(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account)) <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_REQUIRES_CAPABILITY">Errors::REQUIRES_CAPABILITY</a>;
 <b>include</b> <a href="Diem.md#0x1_Diem_MintAbortsIf">MintAbortsIf</a>&lt;CoinType&gt;;
 <b>include</b> <a href="Diem.md#0x1_Diem_MintEnsures">MintEnsures</a>&lt;CoinType&gt;;
 </code></pre>
@@ -1086,7 +1086,7 @@ Must abort if the account does not have the BurnCapability [[H3]][PERMISSION].
 
 
 <pre><code><b>schema</b> <a href="Diem.md#0x1_Diem_BurnAbortsIf">BurnAbortsIf</a>&lt;CoinType&gt; {
-    <b>aborts_if</b> !<b>exists</b>&lt;<a href="Diem.md#0x1_Diem_BurnCapability">BurnCapability</a>&lt;CoinType&gt;&gt;(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account)) <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_REQUIRES_CAPABILITY">Errors::REQUIRES_CAPABILITY</a>;
+    <b>aborts_if</b> !<b>exists</b>&lt;<a href="Diem.md#0x1_Diem_BurnCapability">BurnCapability</a>&lt;CoinType&gt;&gt;(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account)) <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_REQUIRES_CAPABILITY">Errors::REQUIRES_CAPABILITY</a>;
     <b>include</b> <a href="Diem.md#0x1_Diem_BurnWithCapabilityAbortsIf">BurnWithCapabilityAbortsIf</a>&lt;CoinType&gt;;
 }
 </code></pre>
@@ -1202,7 +1202,7 @@ Must abort if the account does not have the BurnCapability [[H3]][PERMISSION].
 
 
 <pre><code><b>schema</b> <a href="Diem.md#0x1_Diem_CancelBurnAbortsIf">CancelBurnAbortsIf</a>&lt;CoinType&gt; {
-    <b>aborts_if</b> !<b>exists</b>&lt;<a href="Diem.md#0x1_Diem_BurnCapability">BurnCapability</a>&lt;CoinType&gt;&gt;(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account)) <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_REQUIRES_CAPABILITY">Errors::REQUIRES_CAPABILITY</a>;
+    <b>aborts_if</b> !<b>exists</b>&lt;<a href="Diem.md#0x1_Diem_BurnCapability">BurnCapability</a>&lt;CoinType&gt;&gt;(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account)) <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_REQUIRES_CAPABILITY">Errors::REQUIRES_CAPABILITY</a>;
     <b>include</b> <a href="Diem.md#0x1_Diem_CancelBurnWithCapAbortsIf">CancelBurnWithCapAbortsIf</a>&lt;CoinType&gt;;
 }
 </code></pre>
@@ -1567,7 +1567,7 @@ dealer account <code>account</code>.
 
 
 <pre><code><b>pragma</b> opaque;
-<b>let</b> account_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account);
+<b>let</b> account_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
 <b>modifies</b> <b>global</b>&lt;<a href="Diem.md#0x1_Diem_PreburnQueue">PreburnQueue</a>&lt;CoinType&gt;&gt;(account_addr);
 <b>aborts_if</b> <b>exists</b>&lt;<a href="Diem.md#0x1_Diem_PreburnQueue">PreburnQueue</a>&lt;CoinType&gt;&gt;(account_addr) <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_ALREADY_PUBLISHED">Errors::ALREADY_PUBLISHED</a>;
 <b>aborts_if</b> <b>exists</b>&lt;<a href="Diem.md#0x1_Diem_Preburn">Preburn</a>&lt;CoinType&gt;&gt;(account_addr) <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_INVALID_STATE">Errors::INVALID_STATE</a>;
@@ -1596,7 +1596,7 @@ dealer account <code>account</code>.
 
 <pre><code><b>schema</b> <a href="Diem.md#0x1_Diem_PublishPreburnQueueEnsures">PublishPreburnQueueEnsures</a>&lt;CoinType&gt; {
     account: signer;
-    <b>let</b> account_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account);
+    <b>let</b> account_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
     <b>ensures</b> <b>exists</b>&lt;<a href="Diem.md#0x1_Diem_PreburnQueue">PreburnQueue</a>&lt;CoinType&gt;&gt;(account_addr);
     <b>ensures</b> !<b>exists</b>&lt;<a href="Diem.md#0x1_Diem_Preburn">Preburn</a>&lt;CoinType&gt;&gt;(account_addr);
     <b>ensures</b> <a href="../../../../../../../move-stdlib/docs/Vector.md#0x1_Vector_length">Vector::length</a>(<b>global</b>&lt;<a href="Diem.md#0x1_Diem_PreburnQueue">PreburnQueue</a>&lt;CoinType&gt;&gt;(account_addr).preburns) == 0;
@@ -1647,7 +1647,7 @@ this resource for the designated dealer <code>account</code>.
 
 
 <pre><code><b>pragma</b> opaque;
-<b>let</b> account_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account);
+<b>let</b> account_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
 <b>modifies</b> <b>global</b>&lt;<a href="Diem.md#0x1_Diem_PreburnQueue">PreburnQueue</a>&lt;CoinType&gt;&gt;(account_addr);
 </code></pre>
 
@@ -1768,7 +1768,7 @@ requests can be outstanding in the same currency for a designated dealer.
 
 
 
-<pre><code><b>let</b> account_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account);
+<pre><code><b>let</b> account_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
 <b>modifies</b> <b>global</b>&lt;<a href="Diem.md#0x1_Diem_Preburn">Preburn</a>&lt;CoinType&gt;&gt;(account_addr);
 <b>modifies</b> <b>global</b>&lt;<a href="Diem.md#0x1_Diem_PreburnQueue">PreburnQueue</a>&lt;CoinType&gt;&gt;(account_addr);
 <b>include</b> <a href="Diem.md#0x1_Diem_UpgradePreburnAbortsIf">UpgradePreburnAbortsIf</a>&lt;CoinType&gt;;
@@ -1783,7 +1783,7 @@ requests can be outstanding in the same currency for a designated dealer.
 
 <pre><code><b>schema</b> <a href="Diem.md#0x1_Diem_UpgradePreburnAbortsIf">UpgradePreburnAbortsIf</a>&lt;CoinType&gt; {
     account: signer;
-    <b>let</b> account_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account);
+    <b>let</b> account_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
     <b>let</b> upgrade = <b>exists</b>&lt;<a href="Diem.md#0x1_Diem_Preburn">Preburn</a>&lt;CoinType&gt;&gt;(account_addr) && !<b>exists</b>&lt;<a href="Diem.md#0x1_Diem_PreburnQueue">PreburnQueue</a>&lt;CoinType&gt;&gt;(account_addr);
 }
 </code></pre>
@@ -1807,7 +1807,7 @@ Must abort if the account doesn't have the <code><a href="Diem.md#0x1_Diem_Prebu
 
 <pre><code><b>schema</b> <a href="Diem.md#0x1_Diem_UpgradePreburnEnsures">UpgradePreburnEnsures</a>&lt;CoinType&gt; {
     account: signer;
-    <b>let</b> account_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account);
+    <b>let</b> account_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
     <b>let</b> upgrade = <b>exists</b>&lt;<a href="Diem.md#0x1_Diem_Preburn">Preburn</a>&lt;CoinType&gt;&gt;(account_addr) && !<b>exists</b>&lt;<a href="Diem.md#0x1_Diem_PreburnQueue">PreburnQueue</a>&lt;CoinType&gt;&gt;(account_addr);
     <b>let</b> preburn = <b>global</b>&lt;<a href="Diem.md#0x1_Diem_Preburn">Preburn</a>&lt;CoinType&gt;&gt;(account_addr);
     <b>ensures</b> upgrade ==&gt;
@@ -1865,7 +1865,7 @@ number of preburn requests does not exceed <code><a href="Diem.md#0x1_Diem_MAX_O
 
 
 <pre><code><b>pragma</b> opaque;
-<b>let</b> account_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account);
+<b>let</b> account_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
 <b>let</b> preburns = <b>global</b>&lt;<a href="Diem.md#0x1_Diem_PreburnQueue">PreburnQueue</a>&lt;CoinType&gt;&gt;(account_addr).preburns;
 <b>let</b> post post_preburns = <b>global</b>&lt;<a href="Diem.md#0x1_Diem_PreburnQueue">PreburnQueue</a>&lt;CoinType&gt;&gt;(account_addr).preburns;
 <b>modifies</b> <b>global</b>&lt;<a href="Diem.md#0x1_Diem_PreburnQueue">PreburnQueue</a>&lt;CoinType&gt;&gt;(account_addr);
@@ -1884,7 +1884,7 @@ number of preburn requests does not exceed <code><a href="Diem.md#0x1_Diem_MAX_O
 <pre><code><b>schema</b> <a href="Diem.md#0x1_Diem_AddPreburnToQueueAbortsIf">AddPreburnToQueueAbortsIf</a>&lt;CoinType&gt; {
     account: signer;
     preburn: <a href="Diem.md#0x1_Diem_PreburnWithMetadata">PreburnWithMetadata</a>&lt;CoinType&gt;;
-    <b>let</b> account_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account);
+    <b>let</b> account_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
     <b>aborts_if</b> preburn.preburn.to_burn.value == 0 <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>;
     <b>aborts_if</b> <b>exists</b>&lt;<a href="Diem.md#0x1_Diem_PreburnQueue">PreburnQueue</a>&lt;CoinType&gt;&gt;(account_addr) &&
         <a href="../../../../../../../move-stdlib/docs/Vector.md#0x1_Vector_length">Vector::length</a>(<b>global</b>&lt;<a href="Diem.md#0x1_Diem_PreburnQueue">PreburnQueue</a>&lt;CoinType&gt;&gt;(account_addr).preburns) &gt;= <a href="Diem.md#0x1_Diem_MAX_OUTSTANDING_PREBURNS">MAX_OUTSTANDING_PREBURNS</a>
@@ -1952,7 +1952,7 @@ Calls to this function will fail if:
 <b>pragma</b> disable_invariants_in_body;
 <b>include</b> <a href="Diem.md#0x1_Diem_PreburnToAbortsIf">PreburnToAbortsIf</a>&lt;CoinType&gt;{amount: coin.value};
 <b>include</b> <a href="Diem.md#0x1_Diem_PreburnToEnsures">PreburnToEnsures</a>&lt;CoinType&gt;{amount: coin.value};
-<b>let</b> account_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account);
+<b>let</b> account_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
 <b>include</b> <a href="Diem.md#0x1_Diem_PreburnWithResourceEmits">PreburnWithResourceEmits</a>&lt;CoinType&gt;{amount: coin.value, preburn_address: account_addr};
 </code></pre>
 
@@ -1965,7 +1965,7 @@ Calls to this function will fail if:
 <pre><code><b>schema</b> <a href="Diem.md#0x1_Diem_PreburnToAbortsIf">PreburnToAbortsIf</a>&lt;CoinType&gt; {
     account: signer;
     amount: u64;
-    <b>let</b> account_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account);
+    <b>let</b> account_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
 }
 </code></pre>
 
@@ -1992,7 +1992,7 @@ the correct role [[H4]][PERMISSION].
 <pre><code><b>schema</b> <a href="Diem.md#0x1_Diem_PreburnToEnsures">PreburnToEnsures</a>&lt;CoinType&gt; {
     account: signer;
     amount: u64;
-    <b>let</b> account_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account);
+    <b>let</b> account_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
 }
 </code></pre>
 
@@ -2581,7 +2581,7 @@ published <code><a href="Diem.md#0x1_Diem_BurnCapability">BurnCapability</a>&lt;
 
 <pre><code><b>schema</b> <a href="Diem.md#0x1_Diem_AbortsIfNoBurnCapability">AbortsIfNoBurnCapability</a>&lt;CoinType&gt; {
     account: signer;
-    <b>aborts_if</b> !<b>exists</b>&lt;<a href="Diem.md#0x1_Diem_BurnCapability">BurnCapability</a>&lt;CoinType&gt;&gt;(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account)) <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_REQUIRES_CAPABILITY">Errors::REQUIRES_CAPABILITY</a>;
+    <b>aborts_if</b> !<b>exists</b>&lt;<a href="Diem.md#0x1_Diem_BurnCapability">BurnCapability</a>&lt;CoinType&gt;&gt;(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account)) <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_REQUIRES_CAPABILITY">Errors::REQUIRES_CAPABILITY</a>;
 }
 </code></pre>
 
@@ -3054,7 +3054,7 @@ Must abort if the signer does not have the DiemRoot role [[H8]][PERMISSION].
     <b>include</b> <a href="Roles.md#0x1_Roles_AbortsIfNotDiemRoot">Roles::AbortsIfNotDiemRoot</a>{account: dr_account};
     <b>aborts_if</b> scaling_factor == 0 || scaling_factor &gt; <a href="Diem.md#0x1_Diem_MAX_SCALING_FACTOR">MAX_SCALING_FACTOR</a> <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>;
     <b>include</b> <a href="CoreAddresses.md#0x1_CoreAddresses_AbortsIfNotCurrencyInfo">CoreAddresses::AbortsIfNotCurrencyInfo</a>{account: dr_account};
-    <b>aborts_if</b> <b>exists</b>&lt;<a href="Diem.md#0x1_Diem_CurrencyInfo">CurrencyInfo</a>&lt;CoinType&gt;&gt;(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(dr_account))
+    <b>aborts_if</b> <b>exists</b>&lt;<a href="Diem.md#0x1_Diem_CurrencyInfo">CurrencyInfo</a>&lt;CoinType&gt;&gt;(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(dr_account))
         <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_ALREADY_PUBLISHED">Errors::ALREADY_PUBLISHED</a>;
     <b>include</b> <a href="RegisteredCurrencies.md#0x1_RegisteredCurrencies_AddCurrencyCodeAbortsIf">RegisteredCurrencies::AddCurrencyCodeAbortsIf</a>;
 }
@@ -3160,7 +3160,7 @@ Only a TreasuryCompliance account can have the BurnCapability [[H3]][PERMISSION]
 
 <pre><code><b>schema</b> <a href="Diem.md#0x1_Diem_RegisterSCSCurrencyAbortsIf">RegisterSCSCurrencyAbortsIf</a>&lt;CoinType&gt; {
     <b>include</b> <a href="Roles.md#0x1_Roles_AbortsIfNotTreasuryCompliance">Roles::AbortsIfNotTreasuryCompliance</a>{account: tc_account};
-    <b>aborts_if</b> <b>exists</b>&lt;<a href="Diem.md#0x1_Diem_MintCapability">MintCapability</a>&lt;CoinType&gt;&gt;(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(tc_account)) <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_ALREADY_PUBLISHED">Errors::ALREADY_PUBLISHED</a>;
+    <b>aborts_if</b> <b>exists</b>&lt;<a href="Diem.md#0x1_Diem_MintCapability">MintCapability</a>&lt;CoinType&gt;&gt;(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(tc_account)) <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_ALREADY_PUBLISHED">Errors::ALREADY_PUBLISHED</a>;
     <b>include</b> <a href="Diem.md#0x1_Diem_RegisterCurrencyAbortsIf">RegisterCurrencyAbortsIf</a>&lt;CoinType&gt;;
     <b>include</b> <a href="Diem.md#0x1_Diem_PublishBurnCapAbortsIfs">PublishBurnCapAbortsIfs</a>&lt;CoinType&gt;;
 }
@@ -3174,7 +3174,7 @@ Only a TreasuryCompliance account can have the BurnCapability [[H3]][PERMISSION]
 
 <pre><code><b>schema</b> <a href="Diem.md#0x1_Diem_RegisterSCSCurrencyEnsures">RegisterSCSCurrencyEnsures</a>&lt;CoinType&gt; {
     tc_account: signer;
-    <b>ensures</b> <a href="Diem.md#0x1_Diem_spec_has_mint_capability">spec_has_mint_capability</a>&lt;CoinType&gt;(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(tc_account));
+    <b>ensures</b> <a href="Diem.md#0x1_Diem_spec_has_mint_capability">spec_has_mint_capability</a>&lt;CoinType&gt;(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(tc_account));
 }
 </code></pre>
 

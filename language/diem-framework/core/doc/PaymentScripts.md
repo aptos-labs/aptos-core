@@ -148,7 +148,7 @@ Successful execution of this script emits two events:
 
 <pre><code><b>include</b> <a href="PaymentScripts.md#0x1_PaymentScripts_PeerToPeer">PeerToPeer</a>&lt;Currency&gt;{payer_signer: payer};
 <b>include</b> <a href="DualAttestation.md#0x1_DualAttestation_AssertPaymentOkAbortsIf">DualAttestation::AssertPaymentOkAbortsIf</a>&lt;Currency&gt;{
-    payer: <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(payer),
+    payer: <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(payer),
     value: amount
 };
 </code></pre>
@@ -264,7 +264,7 @@ Successful execution of this script emits two events:
 
 
 
-<pre><code><b>include</b> <a href="PaymentScripts.md#0x1_PaymentScripts_PeerToPeer">PeerToPeer</a>&lt;Currency&gt;{payer_signer: payer, payee: <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(payee)};
+<pre><code><b>include</b> <a href="PaymentScripts.md#0x1_PaymentScripts_PeerToPeer">PeerToPeer</a>&lt;Currency&gt;{payer_signer: payer, payee: <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(payee)};
 </code></pre>
 
 
@@ -279,7 +279,7 @@ Successful execution of this script emits two events:
     amount: u64;
     metadata: vector&lt;u8&gt;;
     <b>include</b> <a href="DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: payer_signer};
-    <b>let</b> payer_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(payer_signer);
+    <b>let</b> payer_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(payer_signer);
     <b>let</b> cap = <a href="DiemAccount.md#0x1_DiemAccount_spec_get_withdraw_cap">DiemAccount::spec_get_withdraw_cap</a>(payer_addr);
     <b>include</b> <a href="DiemAccount.md#0x1_DiemAccount_ExtractWithdrawCapAbortsIf">DiemAccount::ExtractWithdrawCapAbortsIf</a>{sender_addr: payer_addr};
     <b>include</b> <a href="DiemAccount.md#0x1_DiemAccount_PayFromAbortsIf">DiemAccount::PayFromAbortsIf</a>&lt;Currency&gt;{cap: cap};

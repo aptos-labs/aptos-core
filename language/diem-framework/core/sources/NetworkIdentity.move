@@ -68,7 +68,7 @@ module DiemFramework::NetworkIdentity {
         move_to(account, NetworkIdentity { identities });
     }
     spec initialize_network_identity {
-        let account_addr = Signer::spec_address_of(account);
+        let account_addr = Signer::address_of(account);
         modifies global<NetworkIdentity>(account_addr);
     }
 
@@ -117,7 +117,7 @@ module DiemFramework::NetworkIdentity {
     }
     spec add_identities {
         pragma verify=false; // TODO: due to timeout
-        let account_addr = Signer::spec_address_of(account);
+        let account_addr = Signer::address_of(account);
         let prior_identities = if (exists<NetworkIdentity>(account_addr)) {
             global<NetworkIdentity>(account_addr).identities
         } else {
@@ -177,7 +177,7 @@ module DiemFramework::NetworkIdentity {
         };
     }
     spec remove_identities {
-        let account_addr = Signer::spec_address_of(account);
+        let account_addr = Signer::address_of(account);
         let prior_identities = global<NetworkIdentity>(account_addr).identities;
         let has_change = (exists e in to_remove: contains(prior_identities, e));
 

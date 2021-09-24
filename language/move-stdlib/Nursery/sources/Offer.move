@@ -38,10 +38,10 @@ module Std::Offer {
   spec create {
     /// Offer a struct to the account under address `for` by
     /// placing the offer under the signer's address
-    aborts_if exists<Offer<Offered>>(Signer::spec_address_of(account))
+    aborts_if exists<Offer<Offered>>(Signer::address_of(account))
         with Errors::ALREADY_PUBLISHED;
-    ensures exists<Offer<Offered>>(Signer::spec_address_of(account));
-    ensures global<Offer<Offered>>(Signer::spec_address_of(account)) == Offer<Offered> { offered: offered, for: for };
+    ensures exists<Offer<Offered>>(Signer::address_of(account));
+    ensures global<Offer<Offered>>(Signer::address_of(account)) == Offer<Offered> { offered: offered, for: for };
   }
 
   /// Claim the value of type `Offered` published at `offer_address`.
@@ -61,7 +61,7 @@ module Std::Offer {
     /// Ensures that the offered struct under `offer_address` is removed.
     aborts_if !exists<Offer<Offered>>(offer_address)
         with Errors::NOT_PUBLISHED;
-    aborts_if !is_allowed_recipient<Offered>(offer_address, Signer::spec_address_of(account))
+    aborts_if !is_allowed_recipient<Offered>(offer_address, Signer::address_of(account))
         with Errors::INVALID_ARGUMENT;
     ensures !exists<Offer<Offered>>(offer_address);
     ensures result == old(global<Offer<Offered>>(offer_address).offered);

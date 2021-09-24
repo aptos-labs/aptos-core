@@ -116,7 +116,7 @@ module DiemFramework::DualAttestation {
         /// The permission "RotateDualAttestationInfo" is granted to ParentVASP and DesignatedDealer [[H17]][PERMISSION].
         include Roles::AbortsIfNotParentVaspOrDesignatedDealer{account: created};
         include Roles::AbortsIfNotTreasuryCompliance{account: creator};
-        aborts_if spec_has_credential(Signer::spec_address_of(created)) with Errors::ALREADY_PUBLISHED;
+        aborts_if spec_has_credential(Signer::address_of(created)) with Errors::ALREADY_PUBLISHED;
     }
     spec fun spec_has_credential(addr: address): bool {
         exists<Credential>(addr)
@@ -140,7 +140,7 @@ module DiemFramework::DualAttestation {
     }
     spec schema RotateBaseUrlAbortsIf {
         account: signer;
-        let sender = Signer::spec_address_of(account);
+        let sender = Signer::address_of(account);
 
         /// Must abort if the account does not have the resource Credential [[H17]][PERMISSION].
         include AbortsIfNoCredential{addr: sender};
@@ -154,7 +154,7 @@ module DiemFramework::DualAttestation {
     spec schema RotateBaseUrlEnsures {
         account: signer;
         new_url: vector<u8>;
-        let sender = Signer::spec_address_of(account);
+        let sender = Signer::address_of(account);
 
         ensures global<Credential>(sender).base_url == new_url;
         /// The sender can only rotate its own base url [[H17]][PERMISSION].
@@ -164,7 +164,7 @@ module DiemFramework::DualAttestation {
     spec schema RotateBaseUrlEmits {
         account: signer;
         new_url: vector<u8>;
-        let sender = Signer::spec_address_of(account);
+        let sender = Signer::address_of(account);
         let handle = global<Credential>(sender).base_url_rotation_events;
         let msg = BaseUrlRotationEvent {
             new_base_url: new_url,
@@ -198,7 +198,7 @@ module DiemFramework::DualAttestation {
         account: signer;
         new_key: vector<u8>;
 
-        let sender = Signer::spec_address_of(account);
+        let sender = Signer::address_of(account);
         /// Must abort if the account does not have the resource Credential [[H17]][PERMISSION].
         include AbortsIfNoCredential{addr: sender};
 
@@ -209,7 +209,7 @@ module DiemFramework::DualAttestation {
         account: signer;
         new_key: vector<u8>;
 
-        let sender = Signer::spec_address_of(account);
+        let sender = Signer::address_of(account);
         ensures global<Credential>(sender).compliance_public_key == new_key;
         /// The sender only rotates its own compliance_public_key [[H17]][PERMISSION].
         ensures forall addr1: address where addr1 != sender:
@@ -218,7 +218,7 @@ module DiemFramework::DualAttestation {
     spec schema RotateCompliancePublicKeyEmits {
         account: signer;
         new_key: vector<u8>;
-        let sender = Signer::spec_address_of(account);
+        let sender = Signer::address_of(account);
         let handle = global<Credential>(sender).compliance_key_rotation_events;
         let msg = ComplianceKeyRotationEvent {
             new_compliance_public_key: new_key,

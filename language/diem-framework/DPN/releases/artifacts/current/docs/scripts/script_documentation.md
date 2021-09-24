@@ -837,7 +837,7 @@ This is emitted on the new Child VASPS's <code><a href="../../../../../../DPN/re
 
 
 <pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: parent_vasp};
-<b>let</b> parent_addr = <a href="_spec_address_of">Signer::spec_address_of</a>(parent_vasp);
+<b>let</b> parent_addr = <a href="_address_of">Signer::address_of</a>(parent_vasp);
 <b>let</b> parent_cap = <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_spec_get_withdraw_cap">DiemAccount::spec_get_withdraw_cap</a>(parent_addr);
 <b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_CreateChildVASPAccountAbortsIf">DiemAccount::CreateChildVASPAccountAbortsIf</a>&lt;CoinType&gt;{
     parent: parent_vasp, new_account_address: child_address};
@@ -1565,7 +1565,7 @@ already have a <code><a href="../../../../../../DPN/releases/artifacts/current/d
 
 <pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: account};
 <b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_AddCurrencyAbortsIf">DiemAccount::AddCurrencyAbortsIf</a>&lt;Currency&gt;;
-<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_AddCurrencyEnsures">DiemAccount::AddCurrencyEnsures</a>&lt;Currency&gt;{addr: <a href="_spec_address_of">Signer::spec_address_of</a>(account)};
+<b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_AddCurrencyEnsures">DiemAccount::AddCurrencyEnsures</a>&lt;Currency&gt;{addr: <a href="_address_of">Signer::address_of</a>(account)};
 <b>aborts_with</b> [check]
     <a href="_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a>,
     <a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>,
@@ -1679,7 +1679,7 @@ resource stored under the account at <code>recovery_address</code>.
 <pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: to_recover_account};
 <b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_ExtractKeyRotationCapabilityAbortsIf">DiemAccount::ExtractKeyRotationCapabilityAbortsIf</a>{account: to_recover_account};
 <b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_ExtractKeyRotationCapabilityEnsures">DiemAccount::ExtractKeyRotationCapabilityEnsures</a>{account: to_recover_account};
-<b>let</b> addr = <a href="_spec_address_of">Signer::spec_address_of</a>(to_recover_account);
+<b>let</b> addr = <a href="_address_of">Signer::address_of</a>(to_recover_account);
 <b>let</b> rotation_cap = <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_spec_get_key_rotation_cap">DiemAccount::spec_get_key_rotation_cap</a>(addr);
 <b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/RecoveryAddress.md#0x1_RecoveryAddress_AddRotationCapabilityAbortsIf">RecoveryAddress::AddRotationCapabilityAbortsIf</a>{
     to_recover: rotation_cap
@@ -1863,7 +1863,7 @@ and <code>account</code> must not have previously delegated its <code><a href=".
 
 
 <pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: account};
-<b>let</b> account_addr = <a href="_spec_address_of">Signer::spec_address_of</a>(account);
+<b>let</b> account_addr = <a href="_address_of">Signer::address_of</a>(account);
 <b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_ExtractKeyRotationCapabilityAbortsIf">DiemAccount::ExtractKeyRotationCapabilityAbortsIf</a>;
 <b>let</b> key_rotation_capability = <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_spec_get_key_rotation_cap">DiemAccount::spec_get_key_rotation_cap</a>(account_addr);
 <b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_RotateAuthenticationKeyAbortsIf">DiemAccount::RotateAuthenticationKeyAbortsIf</a>{cap: key_rotation_capability, new_authentication_key: new_key};
@@ -1977,7 +1977,7 @@ and <code>account</code> must not have previously delegated its <code><a href=".
 
 
 <pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: account};
-<b>let</b> account_addr = <a href="_spec_address_of">Signer::spec_address_of</a>(account);
+<b>let</b> account_addr = <a href="_address_of">Signer::address_of</a>(account);
 <b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_RecordNonceAbortsIf">SlidingNonce::RecordNonceAbortsIf</a>{ seq_nonce: sliding_nonce };
 <b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_ExtractKeyRotationCapabilityAbortsIf">DiemAccount::ExtractKeyRotationCapabilityAbortsIf</a>;
 <b>let</b> key_rotation_capability = <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_spec_get_key_rotation_cap">DiemAccount::spec_get_key_rotation_cap</a>(account_addr);
@@ -2093,7 +2093,7 @@ and <code>account</code> must not have previously delegated its <code><a href=".
 
 
 <pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: account};
-<b>let</b> account_addr = <a href="_spec_address_of">Signer::spec_address_of</a>(account);
+<b>let</b> account_addr = <a href="_address_of">Signer::address_of</a>(account);
 <b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/SlidingNonce.md#0x1_SlidingNonce_RecordNonceAbortsIf">SlidingNonce::RecordNonceAbortsIf</a>{ account: dr_account, seq_nonce: sliding_nonce };
 <b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_ExtractKeyRotationCapabilityAbortsIf">DiemAccount::ExtractKeyRotationCapabilityAbortsIf</a>;
 <b>let</b> key_rotation_capability = <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_spec_get_key_rotation_cap">DiemAccount::spec_get_key_rotation_cap</a>(account_addr);
@@ -2234,7 +2234,7 @@ the address to recover. The address of the transaction signer has to be either
 the delegatee's address or the address to recover [[H18]][PERMISSION][[J18]][PERMISSION].
 
 
-<pre><code><b>let</b> account_addr = <a href="_spec_address_of">Signer::spec_address_of</a>(account);
+<pre><code><b>let</b> account_addr = <a href="_address_of">Signer::address_of</a>(account);
 <b>aborts_if</b> !<a href="../../../../../../DPN/releases/artifacts/current/docs/sources/RecoveryAddress.md#0x1_RecoveryAddress_spec_holds_key_rotation_cap_for">RecoveryAddress::spec_holds_key_rotation_cap_for</a>(recovery_address, to_recover) <b>with</b> <a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>;
 <b>aborts_if</b> !(account_addr == recovery_address || account_addr == to_recover) <b>with</b> <a href="_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>;
 </code></pre>
@@ -2351,7 +2351,7 @@ Only the account having Credential can rotate the info.
 Credential is granted to either a Parent VASP or a designated dealer [[H17]][PERMISSION].
 
 
-<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DualAttestation.md#0x1_DualAttestation_AbortsIfNoCredential">DualAttestation::AbortsIfNoCredential</a>{addr: <a href="_spec_address_of">Signer::spec_address_of</a>(account)};
+<pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DualAttestation.md#0x1_DualAttestation_AbortsIfNoCredential">DualAttestation::AbortsIfNoCredential</a>{addr: <a href="_address_of">Signer::address_of</a>(account)};
 </code></pre>
 
 
@@ -2527,7 +2527,7 @@ may be used as a recovery account for those accounts.
 <pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: account};
 <b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_ExtractKeyRotationCapabilityAbortsIf">DiemAccount::ExtractKeyRotationCapabilityAbortsIf</a>;
 <b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_ExtractKeyRotationCapabilityEnsures">DiemAccount::ExtractKeyRotationCapabilityEnsures</a>;
-<b>let</b> account_addr = <a href="_spec_address_of">Signer::spec_address_of</a>(account);
+<b>let</b> account_addr = <a href="_address_of">Signer::address_of</a>(account);
 <b>let</b> rotation_cap = <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_spec_get_key_rotation_cap">DiemAccount::spec_get_key_rotation_cap</a>(account_addr);
 <b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/RecoveryAddress.md#0x1_RecoveryAddress_PublishAbortsIf">RecoveryAddress::PublishAbortsIf</a>{
     recovery_account: account,
@@ -2610,7 +2610,7 @@ of VASPDomain, and will be empty on at the end of processing this transaction.
 
 
 
-<pre><code><b>let</b> vasp_addr = <a href="_spec_address_of">Signer::spec_address_of</a>(account);
+<pre><code><b>let</b> vasp_addr = <a href="_address_of">Signer::address_of</a>(account);
 <b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: account};
 <b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/Roles.md#0x1_Roles_AbortsIfNotParentVasp">Roles::AbortsIfNotParentVasp</a>;
 <b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/VASPDomain.md#0x1_VASPDomain_PublishVASPDomainsAbortsIf">VASPDomain::PublishVASPDomainsAbortsIf</a> { vasp_addr };
@@ -2893,7 +2893,7 @@ Successful execution of this script emits two events:
 
 <pre><code><b>include</b> <a href="script_documentation.md#0x1_PaymentScripts_PeerToPeer">PeerToPeer</a>&lt;Currency&gt;{payer_signer: payer};
 <b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DualAttestation.md#0x1_DualAttestation_AssertPaymentOkAbortsIf">DualAttestation::AssertPaymentOkAbortsIf</a>&lt;Currency&gt;{
-    payer: <a href="_spec_address_of">Signer::spec_address_of</a>(payer),
+    payer: <a href="_address_of">Signer::address_of</a>(payer),
     value: amount
 };
 </code></pre>
@@ -3009,7 +3009,7 @@ Successful execution of this script emits two events:
 
 
 
-<pre><code><b>include</b> <a href="script_documentation.md#0x1_PaymentScripts_PeerToPeer">PeerToPeer</a>&lt;Currency&gt;{payer_signer: payer, payee: <a href="_spec_address_of">Signer::spec_address_of</a>(payee)};
+<pre><code><b>include</b> <a href="script_documentation.md#0x1_PaymentScripts_PeerToPeer">PeerToPeer</a>&lt;Currency&gt;{payer_signer: payer, payee: <a href="_address_of">Signer::address_of</a>(payee)};
 </code></pre>
 
 
@@ -3024,7 +3024,7 @@ Successful execution of this script emits two events:
     amount: u64;
     metadata: vector&lt;u8&gt;;
     <b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: payer_signer};
-    <b>let</b> payer_addr = <a href="_spec_address_of">Signer::spec_address_of</a>(payer_signer);
+    <b>let</b> payer_addr = <a href="_address_of">Signer::address_of</a>(payer_signer);
     <b>let</b> cap = <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_spec_get_withdraw_cap">DiemAccount::spec_get_withdraw_cap</a>(payer_addr);
     <b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_ExtractWithdrawCapAbortsIf">DiemAccount::ExtractWithdrawCapAbortsIf</a>{sender_addr: payer_addr};
     <b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_PayFromAbortsIf">DiemAccount::PayFromAbortsIf</a>&lt;Currency&gt;{cap: cap};
@@ -4329,7 +4329,7 @@ handle with the <code>payee</code> and <code>payer</code> fields being <code>acc
 
 
 <pre><code><b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: account};
-<b>let</b> account_addr = <a href="_spec_address_of">Signer::spec_address_of</a>(account);
+<b>let</b> account_addr = <a href="_address_of">Signer::address_of</a>(account);
 <b>let</b> cap = <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_spec_get_withdraw_cap">DiemAccount::spec_get_withdraw_cap</a>(account_addr);
 <b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_ExtractWithdrawCapAbortsIf">DiemAccount::ExtractWithdrawCapAbortsIf</a>{sender_addr: account_addr};
 <b>include</b> <a href="../../../../../../DPN/releases/artifacts/current/docs/sources/DiemAccount.md#0x1_DiemAccount_PreburnAbortsIf">DiemAccount::PreburnAbortsIf</a>&lt;Token&gt;{dd: account, cap: cap};

@@ -87,10 +87,10 @@ module DiemFramework::CRSN {
     spec publish {
         include BitVector::NewAbortsIf{length: size};
         aborts_if !exists<CRSNsAllowed>(@DiemRoot) with Errors::INVALID_STATE;
-        aborts_if has_crsn(Signer::spec_address_of(account)) with Errors::INVALID_STATE;
+        aborts_if has_crsn(Signer::address_of(account)) with Errors::INVALID_STATE;
         aborts_if size == 0 with Errors::INVALID_ARGUMENT;
         aborts_if size > MAX_CRSN_SIZE with Errors::INVALID_ARGUMENT;
-        ensures exists<CRSN>(Signer::spec_address_of(account));
+        ensures exists<CRSN>(Signer::address_of(account));
     }
 
     /// Record `sequence_nonce` under the `account`. Returns true if
@@ -135,7 +135,7 @@ module DiemFramework::CRSN {
         }
     }
     spec check {
-        include CheckAbortsIf{addr: Signer::spec_address_of(account)};
+        include CheckAbortsIf{addr: Signer::address_of(account)};
     }
     spec schema CheckAbortsIf {
         addr: address;

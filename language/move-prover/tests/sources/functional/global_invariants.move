@@ -31,8 +31,8 @@ module 0x42::TestGlobalInvariants {
         move_to<R>(account, R{x: 0});
     }
     spec create_R {
-        requires !exists<R>(Signer::spec_address_of(account));
-        requires !exists<S>(Signer::spec_address_of(account));
+        requires !exists<R>(Signer::address_of(account));
+        requires !exists<S>(Signer::address_of(account));
     }
 
     public fun create_R_invalid(account: &signer) {
@@ -46,8 +46,8 @@ module 0x42::TestGlobalInvariants {
     }
     spec get_S_x {
         // We do not need the aborts for exists<S> because exists<R> implies this.
-        aborts_if !exists<R>(Signer::spec_address_of(account));
-        ensures result == global<S>(Signer::spec_address_of(account)).x;
+        aborts_if !exists<R>(Signer::address_of(account));
+        ensures result == global<S>(Signer::address_of(account)).x;
     }
 
     public fun remove_S_invalid(account: &signer) acquires S {
@@ -56,7 +56,7 @@ module 0x42::TestGlobalInvariants {
         let S{x:_} = move_from<S>(Signer::address_of(account));
     }
     spec remove_S_invalid {
-        aborts_if !exists<R>(Signer::spec_address_of(account));
+        aborts_if !exists<R>(Signer::address_of(account));
     }
 
     public fun remove_R_invalid(account: &signer) acquires R {

@@ -88,7 +88,7 @@ module DiemFramework::DiemId {
         })
     }
     spec publish_diem_id_domains {
-        let vasp_addr = Signer::spec_address_of(vasp_account);
+        let vasp_addr = Signer::address_of(vasp_account);
         include Roles::AbortsIfNotParentVasp{account: vasp_account};
         include PublishDiemIdDomainsAbortsIf;
         include PublishDiemIdDomainsEnsures;
@@ -132,8 +132,8 @@ module DiemFramework::DiemId {
     spec publish_diem_id_domain_manager {
         include Roles::AbortsIfNotTreasuryCompliance{account: tc_account};
         aborts_if tc_domain_manager_exists() with Errors::ALREADY_PUBLISHED;
-        ensures exists<DiemIdDomainManager>(Signer::spec_address_of(tc_account));
-        modifies global<DiemIdDomainManager>(Signer::spec_address_of(tc_account));
+        ensures exists<DiemIdDomainManager>(Signer::address_of(tc_account));
+        modifies global<DiemIdDomainManager>(Signer::address_of(tc_account));
     }
 
     /// Add a DiemIdDomain to a parent VASP's DiemIdDomains resource.

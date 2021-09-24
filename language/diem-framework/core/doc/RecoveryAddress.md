@@ -210,7 +210,7 @@ Aborts if <code>recovery_account</code> has delegated its <code>KeyRotationCapab
 <pre><code><b>schema</b> <a href="RecoveryAddress.md#0x1_RecoveryAddress_PublishAbortsIf">PublishAbortsIf</a> {
     recovery_account: signer;
     rotation_cap: KeyRotationCapability;
-    <b>let</b> addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(recovery_account);
+    <b>let</b> addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(recovery_account);
     <b>aborts_if</b> !<a href="VASP.md#0x1_VASP_is_vasp">VASP::is_vasp</a>(addr) <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>;
     <b>aborts_if</b> <a href="RecoveryAddress.md#0x1_RecoveryAddress_spec_is_recovery_address">spec_is_recovery_address</a>(addr) <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_ALREADY_PUBLISHED">Errors::ALREADY_PUBLISHED</a>;
     <b>aborts_if</b> <a href="DiemAccount.md#0x1_DiemAccount_key_rotation_capability_address">DiemAccount::key_rotation_capability_address</a>(rotation_cap) != addr
@@ -227,7 +227,7 @@ Aborts if <code>recovery_account</code> has delegated its <code>KeyRotationCapab
 <pre><code><b>schema</b> <a href="RecoveryAddress.md#0x1_RecoveryAddress_PublishEnsures">PublishEnsures</a> {
     recovery_account: signer;
     rotation_cap: KeyRotationCapability;
-    <b>let</b> addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(recovery_account);
+    <b>let</b> addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(recovery_account);
     <b>ensures</b> <a href="RecoveryAddress.md#0x1_RecoveryAddress_spec_is_recovery_address">spec_is_recovery_address</a>(addr);
     <b>ensures</b> len(<a href="RecoveryAddress.md#0x1_RecoveryAddress_spec_get_rotation_caps">spec_get_rotation_caps</a>(addr)) == 1;
     <b>ensures</b> <a href="RecoveryAddress.md#0x1_RecoveryAddress_spec_get_rotation_caps">spec_get_rotation_caps</a>(addr)[0] == rotation_cap;
@@ -328,8 +328,8 @@ Aborts if <code>recovery_address</code> does not have the <code>KeyRotationCapab
     <b>aborts_if</b> !<a href="DiemAccount.md#0x1_DiemAccount_exists_at">DiemAccount::exists_at</a>(to_recover) <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a>;
     <b>aborts_if</b> len(new_key) != 32 <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>;
     <b>aborts_if</b> !<a href="RecoveryAddress.md#0x1_RecoveryAddress_spec_holds_key_rotation_cap_for">spec_holds_key_rotation_cap_for</a>(recovery_address, to_recover) <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>;
-    <b>aborts_if</b> !(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account) == recovery_address
-                || <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account) == to_recover) <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>;
+    <b>aborts_if</b> !(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account) == recovery_address
+                || <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account) == to_recover) <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>;
 }
 </code></pre>
 

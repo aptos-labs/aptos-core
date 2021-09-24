@@ -69,13 +69,13 @@ module DiemFramework::ValidatorConfig {
 
     spec publish {
         include PublishAbortsIf;
-        ensures exists_config(Signer::spec_address_of(validator_account));
+        ensures exists_config(Signer::address_of(validator_account));
     }
 
     spec schema PublishAbortsIf {
         validator_account: signer;
         dr_account: signer;
-        let validator_addr = Signer::spec_address_of(validator_account);
+        let validator_addr = Signer::address_of(validator_account);
         include DiemTimestamp::AbortsIfNotOperating;
         include Roles::AbortsIfNotDiemRoot{account: dr_account};
         include Roles::AbortsIfNotValidator{account: validator_account};
@@ -123,7 +123,7 @@ module DiemFramework::ValidatorConfig {
         /// Must abort if the signer does not have the Validator role [B24].
         validator_account: signer;
         operator_addr: address;
-        let validator_addr = Signer::spec_address_of(validator_account);
+        let validator_addr = Signer::address_of(validator_account);
         include Roles::AbortsIfNotValidator{account: validator_account};
         aborts_if !ValidatorOperatorConfig::has_validator_operator_config(operator_addr)
             with Errors::INVALID_ARGUMENT;
@@ -134,7 +134,7 @@ module DiemFramework::ValidatorConfig {
     spec schema SetOperatorEnsures {
         validator_account: signer;
         operator_addr: address;
-        let validator_addr = Signer::spec_address_of(validator_account);
+        let validator_addr = Signer::address_of(validator_account);
         ensures spec_has_operator(validator_addr);
         ensures get_operator(validator_addr) == operator_addr;
         /// The signer can only change its own operator account [[H16]][PERMISSION].
@@ -154,10 +154,10 @@ module DiemFramework::ValidatorConfig {
 
     spec remove_operator {
         /// Must abort if the signer does not have the Validator role [[H16]][PERMISSION].
-        let sender = Signer::spec_address_of(validator_account);
+        let sender = Signer::address_of(validator_account);
         include Roles::AbortsIfNotValidator{account: validator_account};
         include AbortsIfNoValidatorConfig{addr: sender};
-        ensures !spec_has_operator(Signer::spec_address_of(validator_account));
+        ensures !spec_has_operator(Signer::address_of(validator_account));
 
         /// The signer can only change its own operator account [[H16]][PERMISSION].
         ensures forall addr: address where addr != sender:

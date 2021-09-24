@@ -44,7 +44,7 @@ module DiemFramework::SlidingNonce {
     spec schema RecordNonceAbortsIf {
         account: signer;
         seq_nonce: u64;
-        aborts_if !exists<SlidingNonce>(Signer::spec_address_of(account)) with Errors::NOT_PUBLISHED;
+        aborts_if !exists<SlidingNonce>(Signer::address_of(account)) with Errors::NOT_PUBLISHED;
         aborts_if spec_try_record_nonce(account, seq_nonce) != 0 with Errors::INVALID_ARGUMENT;
     }
 
@@ -248,10 +248,10 @@ module DiemFramework::SlidingNonce {
         /// >Note: Verification is turned off. For verifying callers, this is effectively abstracted into a function
         /// that returns arbitrary results because `spec_try_record_nonce` is uninterpreted.
         pragma opaque, verify = false;
-        aborts_if !exists<SlidingNonce>(Signer::spec_address_of(account)) with Errors::NOT_PUBLISHED;
-        modifies global<SlidingNonce>(Signer::spec_address_of(account));
+        aborts_if !exists<SlidingNonce>(Signer::address_of(account)) with Errors::NOT_PUBLISHED;
+        modifies global<SlidingNonce>(Signer::address_of(account));
         ensures result == spec_try_record_nonce(account, seq_nonce);
-        ensures exists<SlidingNonce>(Signer::spec_address_of(account));
+        ensures exists<SlidingNonce>(Signer::address_of(account));
     }
 
     /// Specification version of `Self::try_record_nonce`.
@@ -265,9 +265,9 @@ module DiemFramework::SlidingNonce {
     }
     spec publish {
         pragma opaque;
-        modifies global<SlidingNonce>(Signer::spec_address_of(account));
-        aborts_if exists<SlidingNonce>(Signer::spec_address_of(account)) with Errors::ALREADY_PUBLISHED;
-        ensures exists<SlidingNonce>(Signer::spec_address_of(account));
+        modifies global<SlidingNonce>(Signer::address_of(account));
+        aborts_if exists<SlidingNonce>(Signer::address_of(account)) with Errors::ALREADY_PUBLISHED;
+        ensures exists<SlidingNonce>(Signer::address_of(account));
     }
 
     // =================================================================

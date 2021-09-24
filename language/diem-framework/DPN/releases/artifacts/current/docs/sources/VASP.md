@@ -189,7 +189,7 @@ or if there is already a VASP (child or parent) at this account.
 <pre><code><b>include</b> <a href="DiemTimestamp.md#0x1_DiemTimestamp_AbortsIfNotOperating">DiemTimestamp::AbortsIfNotOperating</a>;
 <b>include</b> <a href="Roles.md#0x1_Roles_AbortsIfNotTreasuryCompliance">Roles::AbortsIfNotTreasuryCompliance</a>{account: tc_account};
 <b>include</b> <a href="Roles.md#0x1_Roles_AbortsIfNotParentVasp">Roles::AbortsIfNotParentVasp</a>{account: vasp};
-<b>let</b> vasp_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(vasp);
+<b>let</b> vasp_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(vasp);
 <b>aborts_if</b> <a href="VASP.md#0x1_VASP_is_vasp">is_vasp</a>(vasp_addr) <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_ALREADY_PUBLISHED">Errors::ALREADY_PUBLISHED</a>;
 <b>include</b> <a href="VASP.md#0x1_VASP_PublishParentVASPEnsures">PublishParentVASPEnsures</a>{vasp_addr: vasp_addr};
 </code></pre>
@@ -255,10 +255,10 @@ Aborts if <code>parent</code> is not a ParentVASP
 
 
 
-<pre><code><b>let</b> child_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(child);
+<pre><code><b>let</b> child_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(child);
 <b>include</b> <a href="VASP.md#0x1_VASP_PublishChildVASPAbortsIf">PublishChildVASPAbortsIf</a>{child_addr};
 <b>include</b> <a href="Roles.md#0x1_Roles_AbortsIfNotChildVasp">Roles::AbortsIfNotChildVasp</a>{account: child_addr};
-<b>include</b> <a href="VASP.md#0x1_VASP_PublishChildVASPEnsures">PublishChildVASPEnsures</a>{parent_addr: <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(parent), child_addr: child_addr};
+<b>include</b> <a href="VASP.md#0x1_VASP_PublishChildVASPEnsures">PublishChildVASPEnsures</a>{parent_addr: <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(parent), child_addr: child_addr};
 </code></pre>
 
 
@@ -270,7 +270,7 @@ Aborts if <code>parent</code> is not a ParentVASP
 <pre><code><b>schema</b> <a href="VASP.md#0x1_VASP_PublishChildVASPAbortsIf">PublishChildVASPAbortsIf</a> {
     parent: signer;
     child_addr: address;
-    <b>let</b> parent_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(parent);
+    <b>let</b> parent_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(parent);
     <b>include</b> <a href="Roles.md#0x1_Roles_AbortsIfNotParentVasp">Roles::AbortsIfNotParentVasp</a>{account: parent};
     <b>aborts_if</b> <a href="VASP.md#0x1_VASP_is_vasp">is_vasp</a>(child_addr) <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_ALREADY_PUBLISHED">Errors::ALREADY_PUBLISHED</a>;
     <b>aborts_if</b> !<a href="VASP.md#0x1_VASP_is_parent">is_parent</a>(parent_addr) <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>;

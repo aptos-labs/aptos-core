@@ -677,7 +677,7 @@ module DiemFramework::DiemAccount {
     }
     spec preburn {
         pragma opaque;
-        let dd_addr = Signer::spec_address_of(dd);
+        let dd_addr = Signer::address_of(dd);
         let payer = cap.account_address;
         modifies global<AccountLimits::Window<Token>>(VASP::spec_parent_address(payer));
         modifies global<DiemAccount>(payer);
@@ -701,7 +701,7 @@ module DiemFramework::DiemAccount {
         cap: WithdrawCapability;
         amount: u64;
         include DiemTimestamp::AbortsIfNotOperating{};
-        include WithdrawFromAbortsIf<Token>{payee: Signer::spec_address_of(dd)};
+        include WithdrawFromAbortsIf<Token>{payee: Signer::address_of(dd)};
         include Diem::PreburnToAbortsIf<Token>{account: dd};
     }
     spec schema PreburnEnsures<Token> {
@@ -720,7 +720,7 @@ module DiemFramework::DiemAccount {
         dd: signer;
         cap: WithdrawCapability;
         amount: u64;
-        let dd_addr = Signer::spec_address_of(dd);
+        let dd_addr = Signer::address_of(dd);
         include Diem::PreburnWithResourceEmits<Token>{preburn_address: dd_addr};
         include WithdrawFromEmits<Token>{payee: dd_addr, metadata: x""};
     }
@@ -742,7 +742,7 @@ module DiemFramework::DiemAccount {
 
     spec extract_withdraw_capability {
         pragma opaque;
-        let sender_addr = Signer::spec_address_of(sender);
+        let sender_addr = Signer::address_of(sender);
         modifies global<DiemAccount>(sender_addr);
         include ExtractWithdrawCapAbortsIf{sender_addr};
         ensures exists<DiemAccount>(sender_addr);
@@ -839,7 +839,7 @@ module DiemFramework::DiemAccount {
 
         include PayFromWithoutDualAttestation<Token>{
             payer: cap.account_address,
-            payee: Signer::spec_address_of(payee)
+            payee: Signer::address_of(payee)
         };
     }
 
@@ -969,17 +969,17 @@ module DiemFramework::DiemAccount {
     }
     spec schema ExtractKeyRotationCapabilityAbortsIf {
         account: signer;
-        let account_addr = Signer::spec_address_of(account);
+        let account_addr = Signer::address_of(account);
         aborts_if !exists_at(account_addr) with Errors::NOT_PUBLISHED;
         include AbortsIfDelegatedKeyRotationCapability;
     }
     spec schema AbortsIfDelegatedKeyRotationCapability {
         account: signer;
-        aborts_if delegated_key_rotation_capability(Signer::spec_address_of(account)) with Errors::INVALID_STATE;
+        aborts_if delegated_key_rotation_capability(Signer::address_of(account)) with Errors::INVALID_STATE;
     }
     spec schema ExtractKeyRotationCapabilityEnsures {
         account: signer;
-        ensures delegated_key_rotation_capability(Signer::spec_address_of(account));
+        ensures delegated_key_rotation_capability(Signer::address_of(account));
     }
 
     /// Return the key rotation capability to the account it originally came from
@@ -1022,7 +1022,7 @@ module DiemFramework::DiemAccount {
     }
 
     spec add_currencies_for_account {
-        let new_account_addr = Signer::spec_address_of(new_account);
+        let new_account_addr = Signer::address_of(new_account);
         aborts_if !Roles::spec_can_hold_balance_addr(new_account_addr) with Errors::INVALID_ARGUMENT;
         aborts_if exists<Balance<Token>>(new_account_addr) with Errors::ALREADY_PUBLISHED;
         aborts_if !exists_at(new_account_addr) with Errors::NOT_PUBLISHED;
@@ -1127,7 +1127,7 @@ module DiemFramework::DiemAccount {
         ensures post_account_ops_cap == update_field(account_ops_cap, creation_events, account_ops_cap.creation_events);
         ensures spec_holds_own_key_rotation_cap(new_account_addr);
         ensures spec_holds_own_withdraw_cap(new_account_addr);
-        include MakeAccountEmits{new_account_address: Signer::spec_address_of(new_account)};
+        include MakeAccountEmits{new_account_address: Signer::address_of(new_account)};
     }
     spec schema MakeAccountAbortsIf {
         addr: address;
@@ -1472,7 +1472,7 @@ module DiemFramework::DiemAccount {
         pragma disable_invariants_in_body;
         include CreateChildVASPAccountAbortsIf<Token>;
         include CreateChildVASPAccountEnsures<Token>{
-            parent_addr: Signer::spec_address_of(parent),
+            parent_addr: Signer::address_of(parent),
             child_addr: new_account_address,
         };
         include AddCurrencyForAccountEnsures<Token>{addr: new_account_address};
@@ -1552,7 +1552,7 @@ module DiemFramework::DiemAccount {
     }
     spec add_currency {
         /// An account must exist at the address
-        let addr = Signer::spec_address_of(account);
+        let addr = Signer::address_of(account);
         aborts_if !exists_at(addr) with Errors::NOT_PUBLISHED;
         include AddCurrencyAbortsIf<Token>;
         include AddCurrencyEnsures<Token>;
@@ -1672,7 +1672,7 @@ module DiemFramework::DiemAccount {
         )
     }
     spec module_prologue {
-        let transaction_sender = Signer::spec_address_of(sender);
+        let transaction_sender = Signer::address_of(sender);
         let max_transaction_fee = txn_gas_price * txn_max_gas_units;
         include ModulePrologueAbortsIf<Token> {
             max_transaction_fee,
@@ -1687,7 +1687,7 @@ module DiemFramework::DiemAccount {
         chain_id: u8;
         max_transaction_fee: u128;
         txn_expiration_time_seconds: u64;
-        let transaction_sender = Signer::spec_address_of(sender);
+        let transaction_sender = Signer::address_of(sender);
         include PrologueCommonAbortsIf<Token> {
             transaction_sender,
             txn_sequence_number,
@@ -1729,7 +1729,7 @@ module DiemFramework::DiemAccount {
         )
     }
     spec script_prologue {
-        let transaction_sender = Signer::spec_address_of(sender);
+        let transaction_sender = Signer::address_of(sender);
         let max_transaction_fee = txn_gas_price * txn_max_gas_units;
         include ScriptPrologueAbortsIf<Token>{
             max_transaction_fee,
@@ -1745,7 +1745,7 @@ module DiemFramework::DiemAccount {
         max_transaction_fee: u128;
         txn_expiration_time_seconds: u64;
         script_hash: vector<u8>;
-        let transaction_sender = Signer::spec_address_of(sender);
+        let transaction_sender = Signer::address_of(sender);
         include PrologueCommonAbortsIf<Token> {transaction_sender};
         /// Aborts only in Genesis. Does not need to be handled.
         include DiemTransactionPublishingOption::AbortsIfNoTransactionPublishingOption;
@@ -1791,7 +1791,7 @@ module DiemFramework::DiemAccount {
         txn_public_key: vector<u8>;
         txn_expiration_time_seconds: u64;
         chain_id: u8;
-        let transaction_sender = Signer::spec_address_of(sender);
+        let transaction_sender = Signer::address_of(sender);
         /// Covered: L146 (Match 0)
         aborts_if transaction_sender != @DiemRoot with Errors::INVALID_ARGUMENT;
         /// Must abort if the signer does not have the DiemRoot role [[H9]][PERMISSION].
@@ -1892,7 +1892,7 @@ module DiemFramework::DiemAccount {
         )
     }
     spec multi_agent_script_prologue {
-        let transaction_sender = Signer::spec_address_of(sender);
+        let transaction_sender = Signer::address_of(sender);
         let max_transaction_fee = txn_gas_price * txn_max_gas_units;
         include MultiAgentScriptPrologueAbortsIf<Token>{
             max_transaction_fee,
@@ -1911,7 +1911,7 @@ module DiemFramework::DiemAccount {
         max_transaction_fee: u128;
         txn_expiration_time_seconds: u64;
         include CheckSecondarySignersAbortsIf;
-        let transaction_sender = Signer::spec_address_of(sender);
+        let transaction_sender = Signer::address_of(sender);
         include PrologueCommonAbortsIf<Token> {transaction_sender, txn_public_key: txn_sender_public_key};
     }
 
@@ -2017,7 +2017,7 @@ module DiemFramework::DiemAccount {
         }
     }
     spec prologue_common {
-        let transaction_sender = Signer::spec_address_of(sender);
+        let transaction_sender = Signer::address_of(sender);
         let max_transaction_fee = txn_gas_price * txn_max_gas_units;
         include PrologueCommonAbortsIf<Token> {
             transaction_sender,
@@ -2298,7 +2298,7 @@ module DiemFramework::DiemAccount {
 
     spec schema EnsuresHasKeyRotationCap {
         account: signer;
-        let addr = Signer::spec_address_of(account);
+        let addr = Signer::address_of(account);
         ensures spec_holds_own_key_rotation_cap(addr);
     }
     spec schema PreserveKeyRotationCapAbsence {
@@ -2328,7 +2328,7 @@ module DiemFramework::DiemAccount {
 
     spec schema EnsuresWithdrawCap {
         account: signer;
-        let addr = Signer::spec_address_of(account);
+        let addr = Signer::address_of(account);
         ensures spec_holds_own_withdraw_cap(addr);
     }
     spec schema PreserveWithdrawCapAbsence {
@@ -2542,7 +2542,7 @@ module DiemFramework::DiemAccount {
     /// ## Prologue
 
     spec fun prologue_guarantees(sender: signer) : bool {
-        let addr = Signer::spec_address_of(sender);
+        let addr = Signer::address_of(sender);
         DiemTimestamp::is_operating() && exists_at(addr) && !AccountFreezing::account_is_frozen(addr)
     }
 

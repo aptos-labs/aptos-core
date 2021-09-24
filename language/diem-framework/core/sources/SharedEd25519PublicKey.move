@@ -43,7 +43,7 @@ module DiemFramework::SharedEd25519PublicKey {
     spec schema PublishAbortsIf {
         account: signer;
         key: vector<u8>;
-        let addr = Signer::spec_address_of(account);
+        let addr = Signer::address_of(account);
         include DiemAccount::ExtractKeyRotationCapabilityAbortsIf;
         include RotateKey_AbortsIf {
                 shared_key: SharedEd25519PublicKey {
@@ -57,7 +57,7 @@ module DiemFramework::SharedEd25519PublicKey {
     spec schema PublishEnsures {
         account: signer;
         key: vector<u8>;
-        let addr = Signer::spec_address_of(account);
+        let addr = Signer::address_of(account);
 
         ensures exists_at(addr);
         include RotateKey_Ensures { shared_key: global<SharedEd25519PublicKey>(addr), new_public_key: key};
@@ -112,14 +112,14 @@ module DiemFramework::SharedEd25519PublicKey {
     spec schema RotateKeyAbortsIf {
         account: signer;
         new_public_key: vector<u8>;
-        let addr = Signer::spec_address_of(account);
+        let addr = Signer::address_of(account);
         aborts_if !exists_at(addr) with Errors::NOT_PUBLISHED;
         include RotateKey_AbortsIf {shared_key: global<SharedEd25519PublicKey>(addr)};
     }
     spec schema RotateKeyEnsures {
         account: signer;
         new_public_key: vector<u8>;
-        let addr = Signer::spec_address_of(account);
+        let addr = Signer::address_of(account);
         include RotateKey_Ensures {shared_key: global<SharedEd25519PublicKey>(addr)};
     }
 

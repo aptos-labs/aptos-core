@@ -49,8 +49,8 @@ module B {
     }
     spec move_to_test {
         pragma opaque = true;
-        ensures global<T>(Signer::spec_address_of(account)).x == 2;
-        modifies global<T>(Signer::spec_address_of(account));
+        ensures global<T>(Signer::address_of(account)).x == 2;
+        modifies global<T>(Signer::address_of(account));
     }
 
     public fun move_from_test(addr: address): T acquires T {

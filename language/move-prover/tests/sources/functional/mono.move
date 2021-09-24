@@ -21,8 +21,8 @@ module 0x42::TestMonomorphization {
         move_to<R<u64>>(account, R{x:1, y:2} );
     }
     spec create_R {
-        aborts_if exists<R<u64>>(Signer::spec_address_of(account));
-        ensures exists<R<u64>>(Signer::spec_address_of(account));
+        aborts_if exists<R<u64>>(Signer::address_of(account));
+        ensures exists<R<u64>>(Signer::address_of(account));
     }
 
     public fun mutate_R(addr: address) acquires R {
@@ -36,8 +36,8 @@ module 0x42::TestMonomorphization {
         move_to<R<T>>(account, R{x, y});
     }
     spec create_R_generic {
-        aborts_if exists<R<T>>(Signer::spec_address_of(account));
-        ensures exists<R<T>>(Signer::spec_address_of(account));
+        aborts_if exists<R<T>>(Signer::address_of(account));
+        ensures exists<R<T>>(Signer::address_of(account));
     }
 
     public fun use_vec(_x: vector<u64>) {

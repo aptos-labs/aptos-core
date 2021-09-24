@@ -77,16 +77,16 @@ module 0x42::Test {
         // The next two aborts_if and ensures are correct. However, if they are removed, verification terminates
         // with the expected result.
         aborts_if len(BCS::serialize(fresh_address)) + len(auth_key_prefix) != 32;
-        aborts_if exists<T>(Signer::spec_address_of(sender));
+        aborts_if exists<T>(Signer::address_of(sender));
         ensures eq_append(result, auth_key_prefix, BCS::serialize(fresh_address));
 
         // These two ensures are wrong and should produce an error. Instead, the solver hangs without bounding
         // serialization result size. To reproduce, set --serialize-bound=0 to remove any bound.
-        ensures eq_append(global<T>(Signer::spec_address_of(sender)).received_events.guid, BCS::serialize(2), BCS::serialize(fresh_address));
-        ensures eq_append(global<T>(Signer::spec_address_of(sender)).sent_events.guid, BCS::serialize(3), BCS::serialize(fresh_address));
+        ensures eq_append(global<T>(Signer::address_of(sender)).received_events.guid, BCS::serialize(2), BCS::serialize(fresh_address));
+        ensures eq_append(global<T>(Signer::address_of(sender)).sent_events.guid, BCS::serialize(3), BCS::serialize(fresh_address));
 
         // Correct version of the above ensures:
-        //ensures eq_append(global<T>(Signer::spec_address_of(sender)).received_events.guid, BCS::serialize(0), BCS::serialize(fresh_address));
-        //ensures eq_append(global<T>(Signer::spec_address_of(sender)).sent_events.guid, BCS::serialize(1), BCS::serialize(fresh_address));
+        //ensures eq_append(global<T>(Signer::address_of(sender)).received_events.guid, BCS::serialize(0), BCS::serialize(fresh_address));
+        //ensures eq_append(global<T>(Signer::address_of(sender)).sent_events.guid, BCS::serialize(1), BCS::serialize(fresh_address));
     }
 }

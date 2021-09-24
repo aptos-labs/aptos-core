@@ -2,8 +2,8 @@ Move prover returns: exiting with boogie verification errors
 error: post-condition does not hold
    ┌─ tests/sources/functional/choice.move:54:9
    │
-54 │         ensures choice == Signer::spec_address_of(s2);
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+54 │         ensures choice == Signer::address_of(s2);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
    =     at tests/sources/functional/choice.move:44: populate_R
    =     at tests/sources/functional/choice.move:49

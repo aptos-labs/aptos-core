@@ -15,7 +15,7 @@ module 0x42::TestPureFun {
     }
 
     spec init {
-        ensures get_x(Signer::spec_address_of(account)) == 0;
+        ensures get_x(Signer::address_of(account)) == 0;
     }
 
     public fun get_x(addr: address): u64 acquires T {

@@ -213,7 +213,7 @@ and the address of the validator operator.
 
 
 <pre><code><b>include</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_PublishAbortsIf">PublishAbortsIf</a>;
-<b>ensures</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_exists_config">exists_config</a>(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(validator_account));
+<b>ensures</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_exists_config">exists_config</a>(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(validator_account));
 </code></pre>
 
 
@@ -225,7 +225,7 @@ and the address of the validator operator.
 <pre><code><b>schema</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_PublishAbortsIf">PublishAbortsIf</a> {
     validator_account: signer;
     dr_account: signer;
-    <b>let</b> validator_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(validator_account);
+    <b>let</b> validator_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(validator_account);
     <b>include</b> <a href="DiemTimestamp.md#0x1_DiemTimestamp_AbortsIfNotOperating">DiemTimestamp::AbortsIfNotOperating</a>;
     <b>include</b> <a href="Roles.md#0x1_Roles_AbortsIfNotDiemRoot">Roles::AbortsIfNotDiemRoot</a>{account: dr_account};
     <b>include</b> <a href="Roles.md#0x1_Roles_AbortsIfNotValidator">Roles::AbortsIfNotValidator</a>{account: validator_account};
@@ -321,7 +321,7 @@ Must abort if the signer does not have the Validator role [B24].
 <pre><code><b>schema</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_SetOperatorAbortsIf">SetOperatorAbortsIf</a> {
     validator_account: signer;
     operator_addr: address;
-    <b>let</b> validator_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(validator_account);
+    <b>let</b> validator_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(validator_account);
     <b>include</b> <a href="Roles.md#0x1_Roles_AbortsIfNotValidator">Roles::AbortsIfNotValidator</a>{account: validator_account};
     <b>aborts_if</b> !<a href="ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_has_validator_operator_config">ValidatorOperatorConfig::has_validator_operator_config</a>(operator_addr)
         <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>;
@@ -339,7 +339,7 @@ Must abort if the signer does not have the Validator role [B24].
 <pre><code><b>schema</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_SetOperatorEnsures">SetOperatorEnsures</a> {
     validator_account: signer;
     operator_addr: address;
-    <b>let</b> validator_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(validator_account);
+    <b>let</b> validator_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(validator_account);
     <b>ensures</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_spec_has_operator">spec_has_operator</a>(validator_addr);
     <b>ensures</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_get_operator">get_operator</a>(validator_addr) == operator_addr;
 }
@@ -396,10 +396,10 @@ The old config is preserved.
 Must abort if the signer does not have the Validator role [[H16]][PERMISSION].
 
 
-<pre><code><b>let</b> sender = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(validator_account);
+<pre><code><b>let</b> sender = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(validator_account);
 <b>include</b> <a href="Roles.md#0x1_Roles_AbortsIfNotValidator">Roles::AbortsIfNotValidator</a>{account: validator_account};
 <b>include</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_AbortsIfNoValidatorConfig">AbortsIfNoValidatorConfig</a>{addr: sender};
-<b>ensures</b> !<a href="ValidatorConfig.md#0x1_ValidatorConfig_spec_has_operator">spec_has_operator</a>(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(validator_account));
+<b>ensures</b> !<a href="ValidatorConfig.md#0x1_ValidatorConfig_spec_has_operator">spec_has_operator</a>(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(validator_account));
 </code></pre>
 
 

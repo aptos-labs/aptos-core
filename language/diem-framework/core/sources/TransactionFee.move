@@ -146,7 +146,7 @@ module DiemFramework::TransactionFee {
 
         /// tc_account retrieves BurnCapability [[H3]][PERMISSION].
         /// BurnCapability is not transferrable [[J3]][PERMISSION].
-        ensures exists<Diem::BurnCapability<CoinType>>(Signer::spec_address_of(tc_account));
+        ensures exists<Diem::BurnCapability<CoinType>>(Signer::address_of(tc_account));
     }
 
     spec module {} // Switch documentation context to module level.

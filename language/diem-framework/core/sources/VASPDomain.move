@@ -90,7 +90,7 @@ module DiemFramework::VASPDomain {
         })
     }
     spec publish_vasp_domains {
-        let vasp_addr = Signer::spec_address_of(vasp_account);
+        let vasp_addr = Signer::address_of(vasp_account);
         include Roles::AbortsIfNotParentVasp{account: vasp_account};
         include PublishVASPDomainsAbortsIf;
         include PublishVASPDomainsEnsures;
@@ -134,8 +134,8 @@ module DiemFramework::VASPDomain {
     spec publish_vasp_domain_manager {
         include Roles::AbortsIfNotTreasuryCompliance{account: tc_account};
         aborts_if tc_domain_manager_exists() with Errors::ALREADY_PUBLISHED;
-        ensures exists<VASPDomainManager>(Signer::spec_address_of(tc_account));
-        modifies global<VASPDomainManager>(Signer::spec_address_of(tc_account));
+        ensures exists<VASPDomainManager>(Signer::address_of(tc_account));
+        modifies global<VASPDomainManager>(Signer::address_of(tc_account));
     }
 
     /// Add a VASPDomain to a parent VASP's VASPDomains resource.

@@ -174,7 +174,7 @@ module DiemFramework::Roles {
     spec grant_role {
         pragma opaque;
         include GrantRole{addr: Signer::address_of(account)};
-        let addr = Signer::spec_address_of(account);
+        let addr = Signer::address_of(account);
         // Requires to satisfy global invariants.
         requires role_id == DIEM_ROOT_ROLE_ID ==> addr == @DiemRoot;
         requires role_id == TREASURY_COMPLIANCE_ROLE_ID ==> addr == @TreasuryCompliance;
@@ -538,7 +538,7 @@ module DiemFramework::Roles {
     spec schema AbortsIfNotDiemRoot {
         account: signer;
         include CoreAddresses::AbortsIfNotDiemRoot;
-        let addr = Signer::spec_address_of(account);
+        let addr = Signer::address_of(account);
         aborts_if !exists<RoleId>(addr) with Errors::NOT_PUBLISHED;
         aborts_if global<RoleId>(addr).role_id != DIEM_ROOT_ROLE_ID with Errors::REQUIRES_ROLE;
     }
@@ -546,14 +546,14 @@ module DiemFramework::Roles {
     spec schema AbortsIfNotTreasuryCompliance {
         account: signer;
         include CoreAddresses::AbortsIfNotTreasuryCompliance;
-        let addr = Signer::spec_address_of(account);
+        let addr = Signer::address_of(account);
         aborts_if !exists<RoleId>(addr) with Errors::NOT_PUBLISHED;
         aborts_if global<RoleId>(addr).role_id != TREASURY_COMPLIANCE_ROLE_ID with Errors::REQUIRES_ROLE;
     }
 
     spec schema AbortsIfNotParentVasp {
         account: signer;
-        let addr = Signer::spec_address_of(account);
+        let addr = Signer::address_of(account);
         aborts_if !exists<RoleId>(addr) with Errors::NOT_PUBLISHED;
         aborts_if global<RoleId>(addr).role_id != PARENT_VASP_ROLE_ID with Errors::REQUIRES_ROLE;
     }
@@ -566,14 +566,14 @@ module DiemFramework::Roles {
 
     spec schema AbortsIfNotDesignatedDealer {
         account: signer;
-        let addr = Signer::spec_address_of(account);
+        let addr = Signer::address_of(account);
         aborts_if !exists<RoleId>(addr) with Errors::NOT_PUBLISHED;
         aborts_if global<RoleId>(addr).role_id != DESIGNATED_DEALER_ROLE_ID with Errors::REQUIRES_ROLE;
     }
 
     spec schema AbortsIfNotParentVaspOrDesignatedDealer {
         account: signer;
-        let addr = Signer::spec_address_of(account);
+        let addr = Signer::address_of(account);
         aborts_if !exists<RoleId>(addr) with Errors::NOT_PUBLISHED;
         let role_id = global<RoleId>(addr).role_id;
         aborts_if role_id != PARENT_VASP_ROLE_ID && role_id != DESIGNATED_DEALER_ROLE_ID
@@ -582,7 +582,7 @@ module DiemFramework::Roles {
 
     spec schema AbortsIfNotParentVaspOrChildVasp {
         account: signer;
-        let addr = Signer::spec_address_of(account);
+        let addr = Signer::address_of(account);
         aborts_if !exists<RoleId>(addr) with Errors::NOT_PUBLISHED;
         let role_id = global<RoleId>(addr).role_id;
         aborts_if role_id != PARENT_VASP_ROLE_ID && role_id != CHILD_VASP_ROLE_ID
@@ -591,7 +591,7 @@ module DiemFramework::Roles {
 
     spec schema AbortsIfNotValidator {
         account: signer;
-        let addr = Signer::spec_address_of(account);
+        let addr = Signer::address_of(account);
         //validator_addr: address;
         aborts_if !exists<RoleId>(addr) with Errors::NOT_PUBLISHED;
         aborts_if global<RoleId>(addr).role_id != VALIDATOR_ROLE_ID with Errors::REQUIRES_ROLE;
@@ -599,7 +599,7 @@ module DiemFramework::Roles {
 
     spec schema AbortsIfNotValidatorOperator {
         account: signer;
-        let addr = Signer::spec_address_of(account);
+        let addr = Signer::address_of(account);
         //validator_operator_addr: address;
         aborts_if !exists<RoleId>(addr) with Errors::NOT_PUBLISHED;
         aborts_if global<RoleId>(addr).role_id != VALIDATOR_OPERATOR_ROLE_ID

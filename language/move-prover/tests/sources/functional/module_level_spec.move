@@ -28,7 +28,7 @@ spec 0x42::TestModule {
     spec schema Store {
         s: signer;
         value: u64;
-        let addr = Signer::spec_address_of(s);
+        let addr = Signer::address_of(s);
         ensures exists<R>(addr);
         ensures global<R>(addr).value == value;
     }

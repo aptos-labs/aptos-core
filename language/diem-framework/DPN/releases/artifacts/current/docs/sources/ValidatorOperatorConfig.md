@@ -112,7 +112,7 @@ The <code><a href="ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig">Valid
 <pre><code><b>include</b> <a href="Roles.md#0x1_Roles_AbortsIfNotDiemRoot">Roles::AbortsIfNotDiemRoot</a>{account: dr_account};
 <b>include</b> <a href="Roles.md#0x1_Roles_AbortsIfNotValidatorOperator">Roles::AbortsIfNotValidatorOperator</a>{account: validator_operator_account};
 <b>include</b> <a href="ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_PublishAbortsIf">PublishAbortsIf</a>;
-<b>ensures</b> <a href="ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_has_validator_operator_config">has_validator_operator_config</a>(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(validator_operator_account));
+<b>ensures</b> <a href="ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_has_validator_operator_config">has_validator_operator_config</a>(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(validator_operator_account));
 </code></pre>
 
 
@@ -124,7 +124,7 @@ The <code><a href="ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig">Valid
 <pre><code><b>schema</b> <a href="ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_PublishAbortsIf">PublishAbortsIf</a> {
     validator_operator_account: signer;
     dr_account: signer;
-    <b>let</b> validator_operator_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(validator_operator_account);
+    <b>let</b> validator_operator_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(validator_operator_account);
     <b>include</b> <a href="DiemTimestamp.md#0x1_DiemTimestamp_AbortsIfNotOperating">DiemTimestamp::AbortsIfNotOperating</a>;
     <b>include</b> <a href="Roles.md#0x1_Roles_AbortsIfNotDiemRoot">Roles::AbortsIfNotDiemRoot</a>{account: dr_account};
     <b>include</b> <a href="Roles.md#0x1_Roles_AbortsIfNotValidatorOperator">Roles::AbortsIfNotValidatorOperator</a>{account: validator_operator_account};

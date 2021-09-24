@@ -111,7 +111,7 @@ Specifies that a function aborts if the account does not have the Diem root addr
 
 <pre><code><b>schema</b> <a href="CoreAddresses.md#0x1_CoreAddresses_AbortsIfNotDiemRoot">AbortsIfNotDiemRoot</a> {
     account: signer;
-    <b>aborts_if</b> <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account) != @DiemRoot <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a>;
+    <b>aborts_if</b> <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account) != @DiemRoot <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a>;
 }
 </code></pre>
 
@@ -165,7 +165,7 @@ Specifies that a function aborts if the account does not have the treasury compl
 
 <pre><code><b>schema</b> <a href="CoreAddresses.md#0x1_CoreAddresses_AbortsIfNotTreasuryCompliance">AbortsIfNotTreasuryCompliance</a> {
     account: signer;
-    <b>aborts_if</b> <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account) != @TreasuryCompliance
+    <b>aborts_if</b> <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account) != @TreasuryCompliance
         <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a>;
 }
 </code></pre>
@@ -217,7 +217,7 @@ Specifies that a function aborts if the account does not have the VM reserved ad
 
 <pre><code><b>schema</b> <a href="CoreAddresses.md#0x1_CoreAddresses_AbortsIfNotVM">AbortsIfNotVM</a> {
     account: signer;
-    <b>aborts_if</b> <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account) != @VMReserved <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a>;
+    <b>aborts_if</b> <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account) != @VMReserved <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a>;
 }
 </code></pre>
 
@@ -268,7 +268,7 @@ Specifies that a function aborts if the account has not the currency info addres
 
 <pre><code><b>schema</b> <a href="CoreAddresses.md#0x1_CoreAddresses_AbortsIfNotCurrencyInfo">AbortsIfNotCurrencyInfo</a> {
     account: signer;
-    <b>aborts_if</b> <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account) != @CurrencyInfo <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a>;
+    <b>aborts_if</b> <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account) != @CurrencyInfo <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a>;
 }
 </code></pre>
 

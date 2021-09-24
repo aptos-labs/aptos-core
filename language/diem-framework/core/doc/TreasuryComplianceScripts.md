@@ -488,7 +488,7 @@ handle with the <code>payee</code> and <code>payer</code> fields being <code>acc
 
 
 <pre><code><b>include</b> <a href="DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: account};
-<b>let</b> account_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account);
+<b>let</b> account_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
 <b>let</b> cap = <a href="DiemAccount.md#0x1_DiemAccount_spec_get_withdraw_cap">DiemAccount::spec_get_withdraw_cap</a>(account_addr);
 <b>include</b> <a href="DiemAccount.md#0x1_DiemAccount_ExtractWithdrawCapAbortsIf">DiemAccount::ExtractWithdrawCapAbortsIf</a>{sender_addr: account_addr};
 <b>include</b> <a href="DiemAccount.md#0x1_DiemAccount_PreburnAbortsIf">DiemAccount::PreburnAbortsIf</a>&lt;Token&gt;{dd: account, cap: cap};

@@ -41,13 +41,13 @@ module DiemFramework::ValidatorOperatorConfig {
         include Roles::AbortsIfNotDiemRoot{account: dr_account};
         include Roles::AbortsIfNotValidatorOperator{account: validator_operator_account};
         include PublishAbortsIf;
-        ensures has_validator_operator_config(Signer::spec_address_of(validator_operator_account));
+        ensures has_validator_operator_config(Signer::address_of(validator_operator_account));
     }
 
     spec schema PublishAbortsIf {
         validator_operator_account: signer;
         dr_account: signer;
-        let validator_operator_addr = Signer::spec_address_of(validator_operator_account);
+        let validator_operator_addr = Signer::address_of(validator_operator_account);
         include DiemTimestamp::AbortsIfNotOperating;
         include Roles::AbortsIfNotDiemRoot{account: dr_account};
         include Roles::AbortsIfNotValidatorOperator{account: validator_operator_account};

@@ -28,7 +28,7 @@ module DiemFramework::CoreAddresses {
     /// Specifies that a function aborts if the account does not have the Diem root address.
     spec schema AbortsIfNotDiemRoot {
         account: signer;
-        aborts_if Signer::spec_address_of(account) != @DiemRoot with Errors::REQUIRES_ADDRESS;
+        aborts_if Signer::address_of(account) != @DiemRoot with Errors::REQUIRES_ADDRESS;
     }
 
     /// Assert that the signer has the treasury compliance address.
@@ -46,7 +46,7 @@ module DiemFramework::CoreAddresses {
     /// Specifies that a function aborts if the account does not have the treasury compliance address.
     spec schema AbortsIfNotTreasuryCompliance {
         account: signer;
-        aborts_if Signer::spec_address_of(account) != @TreasuryCompliance
+        aborts_if Signer::address_of(account) != @TreasuryCompliance
             with Errors::REQUIRES_ADDRESS;
     }
 
@@ -62,7 +62,7 @@ module DiemFramework::CoreAddresses {
     /// Specifies that a function aborts if the account does not have the VM reserved address.
     spec schema AbortsIfNotVM {
         account: signer;
-        aborts_if Signer::spec_address_of(account) != @VMReserved with Errors::REQUIRES_ADDRESS;
+        aborts_if Signer::address_of(account) != @VMReserved with Errors::REQUIRES_ADDRESS;
     }
 
     /// Assert that the signer has the currency info address.
@@ -77,7 +77,7 @@ module DiemFramework::CoreAddresses {
     /// Specifies that a function aborts if the account has not the currency info address.
     spec schema AbortsIfNotCurrencyInfo {
         account: signer;
-        aborts_if Signer::spec_address_of(account) != @CurrencyInfo with Errors::REQUIRES_ADDRESS;
+        aborts_if Signer::address_of(account) != @CurrencyInfo with Errors::REQUIRES_ADDRESS;
     }
 
 }

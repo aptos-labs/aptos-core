@@ -66,7 +66,7 @@ module DiemFramework::RecoveryAddress {
     spec schema PublishAbortsIf {
         recovery_account: signer;
         rotation_cap: KeyRotationCapability;
-        let addr = Signer::spec_address_of(recovery_account);
+        let addr = Signer::address_of(recovery_account);
         aborts_if !VASP::is_vasp(addr) with Errors::INVALID_ARGUMENT;
         aborts_if spec_is_recovery_address(addr) with Errors::ALREADY_PUBLISHED;
         aborts_if DiemAccount::key_rotation_capability_address(rotation_cap) != addr
@@ -75,7 +75,7 @@ module DiemFramework::RecoveryAddress {
     spec schema PublishEnsures {
         recovery_account: signer;
         rotation_cap: KeyRotationCapability;
-        let addr = Signer::spec_address_of(recovery_account);
+        let addr = Signer::address_of(recovery_account);
         ensures spec_is_recovery_address(addr);
         ensures len(spec_get_rotation_caps(addr)) == 1;
         ensures spec_get_rotation_caps(addr)[0] == rotation_cap;
@@ -139,8 +139,8 @@ module DiemFramework::RecoveryAddress {
         aborts_if !DiemAccount::exists_at(to_recover) with Errors::NOT_PUBLISHED;
         aborts_if len(new_key) != 32 with Errors::INVALID_ARGUMENT;
         aborts_if !spec_holds_key_rotation_cap_for(recovery_address, to_recover) with Errors::INVALID_ARGUMENT;
-        aborts_if !(Signer::spec_address_of(account) == recovery_address
-                    || Signer::spec_address_of(account) == to_recover) with Errors::INVALID_ARGUMENT;
+        aborts_if !(Signer::address_of(account) == recovery_address
+                    || Signer::address_of(account) == to_recover) with Errors::INVALID_ARGUMENT;
     }
     spec schema RotateAuthenticationKeyEnsures {
         to_recover: address;

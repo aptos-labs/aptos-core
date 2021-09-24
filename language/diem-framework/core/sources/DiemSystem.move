@@ -119,7 +119,7 @@ module DiemFramework::DiemSystem {
         modifies global<DiemConfig::DiemConfig<DiemSystem>>(@DiemRoot);
         include DiemTimestamp::AbortsIfNotGenesis;
         include Roles::AbortsIfNotDiemRoot{account: dr_account};
-        let dr_addr = Signer::spec_address_of(dr_account);
+        let dr_addr = Signer::address_of(dr_account);
         // TODO: The next two aborts_if's are not independent. Perhaps they can be
         // simplified.
         aborts_if DiemConfig::spec_is_published<DiemSystem>() with Errors::ALREADY_PUBLISHED;

@@ -281,7 +281,7 @@ Initialize <code><a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentit
 
 
 
-<pre><code><b>let</b> account_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account);
+<pre><code><b>let</b> account_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
 <b>modifies</b> <b>global</b>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a>&gt;(account_addr);
 </code></pre>
 
@@ -388,7 +388,7 @@ Update and create if not exist <code><a href="NetworkIdentity.md#0x1_NetworkIden
 
 
 <pre><code><b>pragma</b> verify=<b>false</b>;
-<b>let</b> account_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account);
+<b>let</b> account_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
 <b>let</b> prior_identities = <b>if</b> (<b>exists</b>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a>&gt;(account_addr)) {
     <b>global</b>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a>&gt;(account_addr).identities
 } <b>else</b> {
@@ -475,7 +475,7 @@ Remove <code><a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a
 
 
 
-<pre><code><b>let</b> account_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account);
+<pre><code><b>let</b> account_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
 <b>let</b> prior_identities = <b>global</b>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a>&gt;(account_addr).identities;
 <b>let</b> has_change = (<b>exists</b> e in to_remove: contains(prior_identities, e));
 <b>let</b> post handle = <b>global</b>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityEventHandle">NetworkIdentityEventHandle</a>&gt;(@TreasuryCompliance).identity_change_events;

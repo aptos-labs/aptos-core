@@ -8,8 +8,8 @@ module 0x42::M {
         move_to<S<u8>>(&account, S { x: 0 });
     }
     spec extract {
-        aborts_if exists<S<X>>(Signer::spec_address_of(account));
-        aborts_if exists<S<u8>>(Signer::spec_address_of(account));
+        aborts_if exists<S<X>>(Signer::address_of(account));
+        aborts_if exists<S<u8>>(Signer::address_of(account));
 
         // NOTE: besides the above aborts_if conditions, this function
         // also aborts if the type parameter `X` is instantiated with `u8`.
@@ -31,9 +31,9 @@ module 0x42::N {
         *&mut r.x = x;
     }
     spec extract {
-        aborts_if exists<S<u8>>(Signer::spec_address_of(account));
-        aborts_if !exists<S<X>>(Signer::spec_address_of(account));
-        ensures global<S<u8>>(Signer::spec_address_of(account)).x == 0;
+        aborts_if exists<S<u8>>(Signer::address_of(account));
+        aborts_if !exists<S<X>>(Signer::address_of(account));
+        ensures global<S<u8>>(Signer::address_of(account)).x == 0;
 
         // NOTE: there are two issues with the spec
         // 1) the second `aborts_if` condition is necessary only when X != u8

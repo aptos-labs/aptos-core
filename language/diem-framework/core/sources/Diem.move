@@ -286,11 +286,11 @@ module DiemFramework::Diem {
         /// Must abort if tc_account does not have the TreasuryCompliance role.
         /// Only a TreasuryCompliance account can have the BurnCapability [[H3]][PERMISSION].
         include Roles::AbortsIfNotTreasuryCompliance{account: tc_account};
-        aborts_if exists<BurnCapability<CoinType>>(Signer::spec_address_of(tc_account)) with Errors::ALREADY_PUBLISHED;
+        aborts_if exists<BurnCapability<CoinType>>(Signer::address_of(tc_account)) with Errors::ALREADY_PUBLISHED;
     }
     spec schema PublishBurnCapEnsures<CoinType> {
         tc_account: &signer;
-        ensures exists<BurnCapability<CoinType>>(Signer::spec_address_of(tc_account));
+        ensures exists<BurnCapability<CoinType>>(Signer::address_of(tc_account));
     }
 
     /// Mints `amount` of currency. The `account` must hold a
@@ -309,7 +309,7 @@ module DiemFramework::Diem {
         modifies global<CurrencyInfo<CoinType>>(@CurrencyInfo);
         ensures exists<CurrencyInfo<CoinType>>(@CurrencyInfo);
         /// Must abort if the account does not have the MintCapability [[H1]][PERMISSION].
-        aborts_if !exists<MintCapability<CoinType>>(Signer::spec_address_of(account)) with Errors::REQUIRES_CAPABILITY;
+        aborts_if !exists<MintCapability<CoinType>>(Signer::address_of(account)) with Errors::REQUIRES_CAPABILITY;
 
         include MintAbortsIf<CoinType>;
         include MintEnsures<CoinType>;
@@ -344,7 +344,7 @@ module DiemFramework::Diem {
         preburn_address: address;
 
         /// Must abort if the account does not have the BurnCapability [[H3]][PERMISSION].
-        aborts_if !exists<BurnCapability<CoinType>>(Signer::spec_address_of(account)) with Errors::REQUIRES_CAPABILITY;
+        aborts_if !exists<BurnCapability<CoinType>>(Signer::address_of(account)) with Errors::REQUIRES_CAPABILITY;
         include BurnWithCapabilityAbortsIf<CoinType>;
     }
     spec schema BurnEnsures<CoinType> {
@@ -401,7 +401,7 @@ module DiemFramework::Diem {
         preburn_address: address;
         amount: u64;
         /// Must abort if the account does not have the BurnCapability [[H3]][PERMISSION].
-        aborts_if !exists<BurnCapability<CoinType>>(Signer::spec_address_of(account)) with Errors::REQUIRES_CAPABILITY;
+        aborts_if !exists<BurnCapability<CoinType>>(Signer::address_of(account)) with Errors::REQUIRES_CAPABILITY;
         include CancelBurnWithCapAbortsIf<CoinType>;
     }
 
@@ -590,7 +590,7 @@ module DiemFramework::Diem {
     }
     spec publish_preburn_queue {
         pragma opaque;
-        let account_addr = Signer::spec_address_of(account);
+        let account_addr = Signer::address_of(account);
         modifies global<PreburnQueue<CoinType>>(account_addr);
         // the preburn queue cannot already exist
         aborts_if exists<PreburnQueue<CoinType>>(account_addr) with Errors::ALREADY_PUBLISHED;
@@ -607,7 +607,7 @@ module DiemFramework::Diem {
     }
     spec schema PublishPreburnQueueEnsures<CoinType> {
         account: signer;
-        let account_addr = Signer::spec_address_of(account);
+        let account_addr = Signer::address_of(account);
         // The preburn queue is published at the end of this function,
         ensures exists<PreburnQueue<CoinType>>(account_addr);
         // there cannot be a preburn resource for the same currency as the account,
@@ -631,7 +631,7 @@ module DiemFramework::Diem {
     }
     spec publish_preburn_queue_to_account {
         pragma opaque;
-        let account_addr = Signer::spec_address_of(account);
+        let account_addr = Signer::address_of(account);
         modifies global<PreburnQueue<CoinType>>(account_addr);
         /// The premission "PreburnCurrency" is granted to DesignatedDealer [[H4]][PERMISSION].
         /// Must abort if the account does not have the DesignatedDealer role.
@@ -691,7 +691,7 @@ module DiemFramework::Diem {
         }
     }
     spec upgrade_preburn {
-        let account_addr = Signer::spec_address_of(account);
+        let account_addr = Signer::address_of(account);
         modifies global<Preburn<CoinType>>(account_addr);
         modifies global<PreburnQueue<CoinType>>(account_addr);
         include UpgradePreburnAbortsIf<CoinType>;
@@ -699,7 +699,7 @@ module DiemFramework::Diem {
     }
     spec schema UpgradePreburnAbortsIf<CoinType> {
         account: signer;
-        let account_addr = Signer::spec_address_of(account);
+        let account_addr = Signer::address_of(account);
         let upgrade = exists<Preburn<CoinType>>(account_addr) && !exists<PreburnQueue<CoinType>>(account_addr);
         /// Must abort if the account doesn't have the `PreburnQueue` or
         /// `Preburn` resource to satisfy [[H4]][PERMISSION] of `preburn_to`.
@@ -708,7 +708,7 @@ module DiemFramework::Diem {
     }
     spec schema UpgradePreburnEnsures<CoinType> {
         account: signer;
-        let account_addr = Signer::spec_address_of(account);
+        let account_addr = Signer::address_of(account);
         let upgrade = exists<Preburn<CoinType>>(account_addr) && !exists<PreburnQueue<CoinType>>(account_addr);
         let preburn = global<Preburn<CoinType>>(account_addr);
         ensures upgrade ==>
@@ -736,7 +736,7 @@ module DiemFramework::Diem {
     }
     spec add_preburn_to_queue {
         pragma opaque;
-        let account_addr = Signer::spec_address_of(account);
+        let account_addr = Signer::address_of(account);
         let preburns = global<PreburnQueue<CoinType>>(account_addr).preburns;
         let post post_preburns = global<PreburnQueue<CoinType>>(account_addr).preburns;
         modifies global<PreburnQueue<CoinType>>(account_addr);
@@ -748,7 +748,7 @@ module DiemFramework::Diem {
     spec schema AddPreburnToQueueAbortsIf<CoinType> {
         account: signer;
         preburn: PreburnWithMetadata<CoinType>;
-        let account_addr = Signer::spec_address_of(account);
+        let account_addr = Signer::address_of(account);
         aborts_if preburn.preburn.to_burn.value == 0 with Errors::INVALID_ARGUMENT;
         aborts_if exists<PreburnQueue<CoinType>>(account_addr) &&
             Vector::length(global<PreburnQueue<CoinType>>(account_addr).preburns) >= MAX_OUTSTANDING_PREBURNS
@@ -786,13 +786,13 @@ module DiemFramework::Diem {
         pragma disable_invariants_in_body;
         include PreburnToAbortsIf<CoinType>{amount: coin.value};
         include PreburnToEnsures<CoinType>{amount: coin.value};
-        let account_addr = Signer::spec_address_of(account);
+        let account_addr = Signer::address_of(account);
         include PreburnWithResourceEmits<CoinType>{amount: coin.value, preburn_address: account_addr};
     }
     spec schema PreburnToAbortsIf<CoinType> {
         account: signer;
         amount: u64;
-        let account_addr = Signer::spec_address_of(account);
+        let account_addr = Signer::address_of(account);
         /// Must abort if the account doesn't have the PreburnQueue or Preburn resource, or has not
         /// the correct role [[H4]][PERMISSION].
         aborts_if !(exists<Preburn<CoinType>>(account_addr) || exists<PreburnQueue<CoinType>>(account_addr));
@@ -804,7 +804,7 @@ module DiemFramework::Diem {
     spec schema PreburnToEnsures<CoinType> {
         account: signer;
         amount: u64;
-        let account_addr = Signer::spec_address_of(account);
+        let account_addr = Signer::address_of(account);
         /// Removes the preburn resource if it exists
         modifies global<Preburn<CoinType>>(account_addr);
         /// Publishes if it doesn't exists. Updates its state either way.
@@ -1115,7 +1115,7 @@ module DiemFramework::Diem {
     }
     spec schema AbortsIfNoBurnCapability<CoinType> {
         account: signer;
-        aborts_if !exists<BurnCapability<CoinType>>(Signer::spec_address_of(account)) with Errors::REQUIRES_CAPABILITY;
+        aborts_if !exists<BurnCapability<CoinType>>(Signer::address_of(account)) with Errors::REQUIRES_CAPABILITY;
     }
 
     /// Returns the total value of `Diem<CoinType>` that is waiting to be
@@ -1303,7 +1303,7 @@ module DiemFramework::Diem {
 
         aborts_if scaling_factor == 0 || scaling_factor > MAX_SCALING_FACTOR with Errors::INVALID_ARGUMENT;
         include CoreAddresses::AbortsIfNotCurrencyInfo{account: dr_account};
-        aborts_if exists<CurrencyInfo<CoinType>>(Signer::spec_address_of(dr_account))
+        aborts_if exists<CurrencyInfo<CoinType>>(Signer::address_of(dr_account))
             with Errors::ALREADY_PUBLISHED;
         include RegisteredCurrencies::AddCurrencyCodeAbortsIf;
     }
@@ -1361,13 +1361,13 @@ module DiemFramework::Diem {
         /// Only a TreasuryCompliance account can have the BurnCapability [[H3]][PERMISSION].
         include Roles::AbortsIfNotTreasuryCompliance{account: tc_account};
 
-        aborts_if exists<MintCapability<CoinType>>(Signer::spec_address_of(tc_account)) with Errors::ALREADY_PUBLISHED;
+        aborts_if exists<MintCapability<CoinType>>(Signer::address_of(tc_account)) with Errors::ALREADY_PUBLISHED;
         include RegisterCurrencyAbortsIf<CoinType>;
         include PublishBurnCapAbortsIfs<CoinType>;
     }
     spec schema RegisterSCSCurrencyEnsures<CoinType> {
         tc_account: signer;
-        ensures spec_has_mint_capability<CoinType>(Signer::spec_address_of(tc_account));
+        ensures spec_has_mint_capability<CoinType>(Signer::address_of(tc_account));
     }
 
     /// Returns the total amount of currency minted of type `CoinType`.

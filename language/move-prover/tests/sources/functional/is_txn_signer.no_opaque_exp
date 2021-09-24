@@ -26,6 +26,11 @@ error: unknown assertion failed
    =     at tests/sources/functional/is_txn_signer.move:30: f4_incorrect
    =         account = <redacted>
    =     at tests/sources/functional/is_txn_signer.move:31: f4_incorrect
+   =     at ../move-stdlib/sources/Signer.move:12: address_of
+   =         s = <redacted>
+   =     at ../move-stdlib/sources/Signer.move:13: address_of
+   =         result = <redacted>
+   =     at ../move-stdlib/sources/Signer.move:14: address_of
    =         <redacted> = <redacted>
 
 error: precondition does not hold at this call

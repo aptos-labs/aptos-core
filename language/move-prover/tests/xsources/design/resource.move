@@ -10,7 +10,7 @@ module Trafo {
       move_to<R>(account, R{x: x})
   }
   spec fun publish {
-      let addr = Signer::spec_address_of(account);
+      let addr = Signer::address_of(account);
       aborts_if exists<R>(addr);
       ensures exists<R>(addr);
       ensures global<R>(addr).x == x;

@@ -53,7 +53,7 @@ module DiemFramework::VASP {
         include DiemTimestamp::AbortsIfNotOperating;
         include Roles::AbortsIfNotTreasuryCompliance{account: tc_account};
         include Roles::AbortsIfNotParentVasp{account: vasp};
-        let vasp_addr = Signer::spec_address_of(vasp);
+        let vasp_addr = Signer::address_of(vasp);
         aborts_if is_vasp(vasp_addr) with Errors::ALREADY_PUBLISHED;
         include PublishParentVASPEnsures{vasp_addr: vasp_addr};
     }
@@ -83,18 +83,18 @@ module DiemFramework::VASP {
         move_to(child, ChildVASP { parent_vasp_addr });
     }
     spec publish_child_vasp_credential {
-        let child_addr = Signer::spec_address_of(child);
+        let child_addr = Signer::address_of(child);
         include PublishChildVASPAbortsIf{child_addr};
         // NB: This aborts condition is separated out so that `PublishChildVASPAbortsIf` can be used in
         //     `DiemAccount::create_child_vasp_account` since this doesn't hold of the new account in the pre-state.
         include Roles::AbortsIfNotChildVasp{account: child_addr};
-        include PublishChildVASPEnsures{parent_addr: Signer::spec_address_of(parent), child_addr: child_addr};
+        include PublishChildVASPEnsures{parent_addr: Signer::address_of(parent), child_addr: child_addr};
     }
 
     spec schema PublishChildVASPAbortsIf {
         parent: signer;
         child_addr: address;
-        let parent_addr = Signer::spec_address_of(parent);
+        let parent_addr = Signer::address_of(parent);
         include Roles::AbortsIfNotParentVasp{account: parent};
         aborts_if is_vasp(child_addr) with Errors::ALREADY_PUBLISHED;
         aborts_if !is_parent(parent_addr) with Errors::INVALID_ARGUMENT;

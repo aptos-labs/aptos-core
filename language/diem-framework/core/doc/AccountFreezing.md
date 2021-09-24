@@ -256,7 +256,7 @@ The <code><a href="AccountFreezing.md#0x1_AccountFreezing_FreezingBit">FreezingB
 
 <pre><code><b>include</b> <a href="DiemTimestamp.md#0x1_DiemTimestamp_AbortsIfNotGenesis">DiemTimestamp::AbortsIfNotGenesis</a>;
 <b>include</b> <a href="CoreAddresses.md#0x1_CoreAddresses_AbortsIfNotDiemRoot">CoreAddresses::AbortsIfNotDiemRoot</a>{account: dr_account};
-<b>let</b> addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(dr_account);
+<b>let</b> addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(dr_account);
 <b>aborts_if</b> <b>exists</b>&lt;<a href="AccountFreezing.md#0x1_AccountFreezing_FreezeEventsHolder">FreezeEventsHolder</a>&gt;(addr) <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_ALREADY_PUBLISHED">Errors::ALREADY_PUBLISHED</a>;
 <b>ensures</b> <b>exists</b>&lt;<a href="AccountFreezing.md#0x1_AccountFreezing_FreezeEventsHolder">FreezeEventsHolder</a>&gt;(addr);
 </code></pre>
@@ -296,7 +296,7 @@ The <code><a href="AccountFreezing.md#0x1_AccountFreezing_FreezingBit">FreezingB
 
 
 
-<pre><code><b>let</b> addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account);
+<pre><code><b>let</b> addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
 <b>modifies</b> <b>global</b>&lt;<a href="AccountFreezing.md#0x1_AccountFreezing_FreezingBit">FreezingBit</a>&gt;(addr);
 <b>aborts_if</b> <b>exists</b>&lt;<a href="AccountFreezing.md#0x1_AccountFreezing_FreezingBit">FreezingBit</a>&gt;(addr) <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_ALREADY_PUBLISHED">Errors::ALREADY_PUBLISHED</a>;
 <b>ensures</b> <a href="AccountFreezing.md#0x1_AccountFreezing_spec_account_is_not_frozen">spec_account_is_not_frozen</a>(addr);
@@ -374,7 +374,7 @@ Freeze the account at <code>addr</code>.
     frozen_address: address;
     <b>let</b> handle = <b>global</b>&lt;<a href="AccountFreezing.md#0x1_AccountFreezing_FreezeEventsHolder">FreezeEventsHolder</a>&gt;(@DiemRoot).freeze_event_handle;
     <b>let</b> msg = <a href="AccountFreezing.md#0x1_AccountFreezing_FreezeAccountEvent">FreezeAccountEvent</a> {
-        initiator_address: <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account),
+        initiator_address: <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account),
         frozen_address
     };
     emits msg <b>to</b> handle;
@@ -448,7 +448,7 @@ Unfreeze the account at <code>addr</code>.
     unfrozen_address: address;
     <b>let</b> handle = <b>global</b>&lt;<a href="AccountFreezing.md#0x1_AccountFreezing_FreezeEventsHolder">FreezeEventsHolder</a>&gt;(@DiemRoot).unfreeze_event_handle;
     <b>let</b> msg = <a href="AccountFreezing.md#0x1_AccountFreezing_UnfreezeAccountEvent">UnfreezeAccountEvent</a> {
-        initiator_address: <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account),
+        initiator_address: <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account),
         unfrozen_address
     };
     emits msg <b>to</b> handle;

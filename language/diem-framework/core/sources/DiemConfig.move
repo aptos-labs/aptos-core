@@ -75,7 +75,7 @@ module DiemFramework::DiemConfig {
         include InitializeAbortsIf;
         include InitializeEnsures;
         modifies global<Configuration>(@DiemRoot);
-        modifies global<Event::EventHandleGenerator>(Signer::spec_address_of(dr_account));
+        modifies global<Event::EventHandleGenerator>(Signer::address_of(dr_account));
     }
     spec schema InitializeAbortsIf {
         dr_account: signer;
@@ -140,7 +140,7 @@ module DiemFramework::DiemConfig {
     }
     spec schema AbortsIfNotModifiable<Config> {
         account: signer;
-        aborts_if !exists<ModifyConfigCapability<Config>>(Signer::spec_address_of(account))
+        aborts_if !exists<ModifyConfigCapability<Config>>(Signer::address_of(account))
             with Errors::REQUIRES_CAPABILITY;
     }
     spec schema SetEnsures<Config> {
@@ -261,13 +261,13 @@ module DiemFramework::DiemConfig {
         dr_account: signer;
         include Roles::AbortsIfNotDiemRoot{account: dr_account};
         aborts_if spec_is_published<Config>();
-        aborts_if exists<ModifyConfigCapability<Config>>(Signer::spec_address_of(dr_account));
+        aborts_if exists<ModifyConfigCapability<Config>>(Signer::address_of(dr_account));
     }
     spec schema PublishNewConfigEnsures<Config> {
         dr_account: signer;
         payload: Config;
         include SetEnsures<Config>;
-        ensures exists<ModifyConfigCapability<Config>>(Signer::spec_address_of(dr_account));
+        ensures exists<ModifyConfigCapability<Config>>(Signer::address_of(dr_account));
     }
 
     /// Signal validators to start using new configuration. Must be called by Diem root.

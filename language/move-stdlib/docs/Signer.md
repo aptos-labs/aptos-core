@@ -7,6 +7,7 @@
 
 -  [Function `borrow_address`](#0x1_Signer_borrow_address)
 -  [Function `address_of`](#0x1_Signer_address_of)
+-  [Module Specification](#@Module_Specification_0)
 
 
 <pre><code></code></pre>
@@ -59,26 +60,9 @@
 
 </details>
 
-<details>
-<summary>Specification</summary>
+<a name="@Module_Specification_0"></a>
 
-
-
-<pre><code><b>pragma</b> opaque;
-<b>aborts_if</b> <b>false</b>;
-<b>ensures</b> result == <a href="Signer.md#0x1_Signer_spec_address_of">spec_address_of</a>(s);
-</code></pre>
-
-
-Specification version of <code><a href="Signer.md#0x1_Signer_address_of">Self::address_of</a></code>.
-
-
-<a name="0x1_Signer_spec_address_of"></a>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="Signer.md#0x1_Signer_spec_address_of">spec_address_of</a>(account: signer): address;
-</code></pre>
-
+## Module Specification
 
 Return true only if <code>s</code> is a transaction signer. This is a spec function only available in spec.
 
@@ -98,10 +82,6 @@ Return true only if <code>a</code> is a transaction signer address. This is a sp
 
 <pre><code><b>native</b> <b>fun</b> <a href="Signer.md#0x1_Signer_is_txn_signer_addr">is_txn_signer_addr</a>(a: address): bool;
 </code></pre>
-
-
-
-</details>
 
 
 [//]: # ("File containing references which can be used from documentation")

@@ -354,7 +354,7 @@ a transaction that invokes <code>add_domain_id</code> to set the <code>domains</
 
 
 
-<pre><code><b>let</b> vasp_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(vasp_account);
+<pre><code><b>let</b> vasp_addr = <a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(vasp_account);
 <b>include</b> <a href="Roles.md#0x1_Roles_AbortsIfNotParentVasp">Roles::AbortsIfNotParentVasp</a>{account: vasp_account};
 <b>include</b> <a href="DiemId.md#0x1_DiemId_PublishDiemIdDomainsAbortsIf">PublishDiemIdDomainsAbortsIf</a>;
 <b>include</b> <a href="DiemId.md#0x1_DiemId_PublishDiemIdDomainsEnsures">PublishDiemIdDomainsEnsures</a>;
@@ -472,8 +472,8 @@ When Treasury Compliance account sends a transaction that invokes either <code>a
 
 <pre><code><b>include</b> <a href="Roles.md#0x1_Roles_AbortsIfNotTreasuryCompliance">Roles::AbortsIfNotTreasuryCompliance</a>{account: tc_account};
 <b>aborts_if</b> <a href="DiemId.md#0x1_DiemId_tc_domain_manager_exists">tc_domain_manager_exists</a>() <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_ALREADY_PUBLISHED">Errors::ALREADY_PUBLISHED</a>;
-<b>ensures</b> <b>exists</b>&lt;<a href="DiemId.md#0x1_DiemId_DiemIdDomainManager">DiemIdDomainManager</a>&gt;(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(tc_account));
-<b>modifies</b> <b>global</b>&lt;<a href="DiemId.md#0x1_DiemId_DiemIdDomainManager">DiemIdDomainManager</a>&gt;(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(tc_account));
+<b>ensures</b> <b>exists</b>&lt;<a href="DiemId.md#0x1_DiemId_DiemIdDomainManager">DiemIdDomainManager</a>&gt;(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(tc_account));
+<b>modifies</b> <b>global</b>&lt;<a href="DiemId.md#0x1_DiemId_DiemIdDomainManager">DiemIdDomainManager</a>&gt;(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(tc_account));
 </code></pre>
 
 

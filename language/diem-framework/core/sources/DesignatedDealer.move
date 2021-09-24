@@ -78,7 +78,7 @@ module DiemFramework::DesignatedDealer {
     spec publish_designated_dealer_credential {
         pragma opaque;
 
-        let dd_addr = Signer::spec_address_of(dd);
+        let dd_addr = Signer::address_of(dd);
 
         include Roles::AbortsIfNotTreasuryCompliance{account: tc_account};
         include Roles::AbortsIfNotDesignatedDealer{account: dd};
@@ -113,7 +113,7 @@ module DiemFramework::DesignatedDealer {
     spec add_currency {
         pragma opaque;
 
-        let dd_addr = Signer::spec_address_of(dd);
+        let dd_addr = Signer::address_of(dd);
 
         include Roles::AbortsIfNotTreasuryCompliance{account: tc_account};
         include Roles::AbortsIfNotDesignatedDealer{account: dd};
@@ -183,7 +183,7 @@ module DiemFramework::DesignatedDealer {
         include Roles::AbortsIfNotTreasuryCompliance{account: tc_account};
         aborts_if amount == 0 with Errors::INVALID_ARGUMENT;
         include AbortsIfNoDealer;
-        aborts_if !exists<Diem::MintCapability<CoinType>>(Signer::spec_address_of(tc_account)) with Errors::REQUIRES_CAPABILITY;
+        aborts_if !exists<Diem::MintCapability<CoinType>>(Signer::address_of(tc_account)) with Errors::REQUIRES_CAPABILITY;
         include Diem::MintAbortsIf<CoinType>{value: amount};
     }
     spec schema TieredMintEmits<CoinType> {

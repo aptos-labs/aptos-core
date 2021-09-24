@@ -135,13 +135,13 @@ module DiemFramework::PaymentScripts {
     spec peer_to_peer_with_metadata {
         include PeerToPeer<Currency>{payer_signer: payer};
         include DualAttestation::AssertPaymentOkAbortsIf<Currency>{
-            payer: Signer::spec_address_of(payer),
+            payer: Signer::address_of(payer),
             value: amount
         };
     }
 
     spec peer_to_peer_by_signers {
-        include PeerToPeer<Currency>{payer_signer: payer, payee: Signer::spec_address_of(payee)};
+        include PeerToPeer<Currency>{payer_signer: payer, payee: Signer::address_of(payee)};
     }
 
     spec schema PeerToPeer<Currency> {
@@ -153,7 +153,7 @@ module DiemFramework::PaymentScripts {
         metadata: vector<u8>;
 
         include DiemAccount::TransactionChecks{sender: payer_signer}; // properties checked by the prologue.
-        let payer_addr = Signer::spec_address_of(payer_signer);
+        let payer_addr = Signer::address_of(payer_signer);
         let cap = DiemAccount::spec_get_withdraw_cap(payer_addr);
         include DiemAccount::ExtractWithdrawCapAbortsIf{sender_addr: payer_addr};
         include DiemAccount::PayFromAbortsIf<Currency>{cap: cap};

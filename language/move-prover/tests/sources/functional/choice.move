@@ -46,12 +46,12 @@ module 0x42::TestSome {
         move_to<R>(s2, R{x: 2});
     }
     spec populate_R {
-        let a1 = Signer::spec_address_of(s1);
-        let a2 = Signer::spec_address_of(s2);
+        let a1 = Signer::address_of(s1);
+        let a2 = Signer::address_of(s2);
         /// The requires guarantees that there is no other address which can satisfy the choice below.
         requires forall a: address: !exists<R>(a);
         let choice = choose a: address where exists<R>(a) && global<R>(a).x == 2;
-        ensures choice == Signer::spec_address_of(s2);
+        ensures choice == Signer::address_of(s2);
     }
 
     // Testing min choice

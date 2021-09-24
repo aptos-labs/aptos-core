@@ -91,7 +91,7 @@ module DiemFramework::AccountCreationScripts {
         use DiemFramework::Roles;
 
         include DiemAccount::TransactionChecks{sender: parent_vasp}; // properties checked by the prologue.
-        let parent_addr = Signer::spec_address_of(parent_vasp);
+        let parent_addr = Signer::address_of(parent_vasp);
         let parent_cap = DiemAccount::spec_get_withdraw_cap(parent_addr);
         include DiemAccount::CreateChildVASPAccountAbortsIf<CoinType>{
             parent: parent_vasp, new_account_address: child_address};

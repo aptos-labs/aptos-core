@@ -250,7 +250,7 @@ module DiemFramework::TreasuryComplianceScripts {
         use DiemFramework::Diem;
 
         include DiemAccount::TransactionChecks{sender: account}; // properties checked by the prologue.
-        let account_addr = Signer::spec_address_of(account);
+        let account_addr = Signer::address_of(account);
         let cap = DiemAccount::spec_get_withdraw_cap(account_addr);
         include DiemAccount::ExtractWithdrawCapAbortsIf{sender_addr: account_addr};
         include DiemAccount::PreburnAbortsIf<Token>{dd: account, cap: cap};

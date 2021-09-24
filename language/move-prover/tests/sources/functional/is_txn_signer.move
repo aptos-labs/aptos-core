@@ -115,7 +115,7 @@ module 0x42::SimpleIsTxnSigner {
     const AUTH_FAILED: u64 = 1;
 
     public fun publish(account: &signer) {
-        spec { assume Signer::is_txn_signer_addr(Signer::spec_address_of(account)); };
+        spec { assume Signer::is_txn_signer_addr(Signer::address_of(account)); };
 
         assert(Signer::address_of(account) == ADMIN_ADDRESS(), AUTH_FAILED);
         move_to(account, Counter { i: 0 });

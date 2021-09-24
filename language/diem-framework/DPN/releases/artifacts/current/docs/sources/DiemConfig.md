@@ -296,7 +296,7 @@ Publishes <code><a href="DiemConfig.md#0x1_DiemConfig_Configuration">Configurati
 <b>include</b> <a href="DiemConfig.md#0x1_DiemConfig_InitializeAbortsIf">InitializeAbortsIf</a>;
 <b>include</b> <a href="DiemConfig.md#0x1_DiemConfig_InitializeEnsures">InitializeEnsures</a>;
 <b>modifies</b> <b>global</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig_Configuration">Configuration</a>&gt;(@DiemRoot);
-<b>modifies</b> <b>global</b>&lt;<a href="../../../../../../../move-stdlib/docs/Event.md#0x1_Event_EventHandleGenerator">Event::EventHandleGenerator</a>&gt;(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(dr_account));
+<b>modifies</b> <b>global</b>&lt;<a href="../../../../../../../move-stdlib/docs/Event.md#0x1_Event_EventHandleGenerator">Event::EventHandleGenerator</a>&gt;(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(dr_account));
 </code></pre>
 
 
@@ -457,7 +457,7 @@ resource published under it.
 
 <pre><code><b>schema</b> <a href="DiemConfig.md#0x1_DiemConfig_AbortsIfNotModifiable">AbortsIfNotModifiable</a>&lt;Config&gt; {
     account: signer;
-    <b>aborts_if</b> !<b>exists</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig_ModifyConfigCapability">ModifyConfigCapability</a>&lt;Config&gt;&gt;(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(account))
+    <b>aborts_if</b> !<b>exists</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig_ModifyConfigCapability">ModifyConfigCapability</a>&lt;Config&gt;&gt;(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account))
         <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_REQUIRES_CAPABILITY">Errors::REQUIRES_CAPABILITY</a>;
 }
 </code></pre>
@@ -749,7 +749,7 @@ Does not trigger a reconfiguration.
     dr_account: signer;
     <b>include</b> <a href="Roles.md#0x1_Roles_AbortsIfNotDiemRoot">Roles::AbortsIfNotDiemRoot</a>{account: dr_account};
     <b>aborts_if</b> <a href="DiemConfig.md#0x1_DiemConfig_spec_is_published">spec_is_published</a>&lt;Config&gt;();
-    <b>aborts_if</b> <b>exists</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig_ModifyConfigCapability">ModifyConfigCapability</a>&lt;Config&gt;&gt;(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(dr_account));
+    <b>aborts_if</b> <b>exists</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig_ModifyConfigCapability">ModifyConfigCapability</a>&lt;Config&gt;&gt;(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(dr_account));
 }
 </code></pre>
 
@@ -763,7 +763,7 @@ Does not trigger a reconfiguration.
     dr_account: signer;
     payload: Config;
     <b>include</b> <a href="DiemConfig.md#0x1_DiemConfig_SetEnsures">SetEnsures</a>&lt;Config&gt;;
-    <b>ensures</b> <b>exists</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig_ModifyConfigCapability">ModifyConfigCapability</a>&lt;Config&gt;&gt;(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_spec_address_of">Signer::spec_address_of</a>(dr_account));
+    <b>ensures</b> <b>exists</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig_ModifyConfigCapability">ModifyConfigCapability</a>&lt;Config&gt;&gt;(<a href="../../../../../../../move-stdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(dr_account));
 }
 </code></pre>
 
