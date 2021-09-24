@@ -7,8 +7,7 @@ use crate::{
         types::{PeerError, PeerInfo, PeerState},
     },
     error::NetworkError,
-    protocols::network::{Message, NetworkSender, RpcError},
-    ProtocolId,
+    protocols::network::{ApplicationNetworkSender, Message, RpcError},
 };
 use async_trait::async_trait;
 use diem_config::network_id::{NetworkId, PeerNetworkId};
@@ -16,6 +15,7 @@ use diem_types::PeerId;
 use itertools::Itertools;
 use std::{
     collections::{hash_map::Entry, HashMap},
+    marker::PhantomData,
     time::Duration,
 };
 
@@ -79,59 +79,35 @@ pub trait NetworkInterface {
     ) -> Result<(), PeerError>;
 }
 
-#[async_trait]
-trait PeerNetworkIdSender<TMessage: Message> {
-    fn send_to(
-        &mut self,
-        recipient: PeerNetworkId,
-        protocol: ProtocolId,
-        message: TMessage,
-    ) -> Result<(), NetworkError>;
-
-    fn send_to_many(
-        &mut self,
-        recipients: impl Iterator<Item = PeerNetworkId>,
-        protocol: ProtocolId,
-        message: TMessage,
-    ) -> Result<(), NetworkError>;
-
-    async fn send_rpc(
-        &mut self,
-        recipient: PeerNetworkId,
-        protocol: ProtocolId,
-        req_msg: TMessage,
-        timeout: Duration,
-    ) -> Result<TMessage, RpcError>;
+#[derive(Clone)]
+struct MultiNetworkSender<
+    TMessage: Message + Send,
+    Sender: ApplicationNetworkSender<TMessage> + Send,
+> {
+    senders: HashMap<NetworkId, Sender>,
+    _phantom: PhantomData<TMessage>,
 }
 
-struct MultiNetworkSender<TMessage: Message> {
-    senders: HashMap<NetworkId, NetworkSender<TMessage>>,
-}
-
-impl<TMessage: Message> MultiNetworkSender<TMessage> {
-    fn sender(&mut self, network_id: &NetworkId) -> &mut NetworkSender<TMessage> {
+impl<TMessage: Message + Send, Sender: ApplicationNetworkSender<TMessage> + Send>
+    MultiNetworkSender<TMessage, Sender>
+{
+    fn sender(&mut self, network_id: &NetworkId) -> &mut Sender {
         self.senders.get_mut(network_id).expect("Unknown NetworkId")
     }
 }
 
 #[async_trait]
-impl<TMessage: Clone + Message + Send> PeerNetworkIdSender<TMessage>
-    for MultiNetworkSender<TMessage>
+impl<TMessage: Clone + Message + Send, Sender: ApplicationNetworkSender<TMessage> + Send>
+    ApplicationPeerNetworkIdSender<TMessage> for MultiNetworkSender<TMessage, Sender>
 {
-    fn send_to(
-        &mut self,
-        recipient: PeerNetworkId,
-        protocol: ProtocolId,
-        message: TMessage,
-    ) -> Result<(), NetworkError> {
+    fn send_to(&mut self, recipient: PeerNetworkId, message: TMessage) -> Result<(), NetworkError> {
         self.sender(&recipient.network_id())
-            .send_to(recipient.peer_id(), protocol, message)
+            .send_to(recipient.peer_id(), message)
     }
 
     fn send_to_many(
         &mut self,
         recipients: impl Iterator<Item = PeerNetworkId>,
-        protocol: ProtocolId,
         message: TMessage,
     ) -> Result<(), NetworkError> {
         for (network_id, recipients) in
@@ -139,7 +115,7 @@ impl<TMessage: Clone + Message + Send> PeerNetworkIdSender<TMessage>
         {
             let sender = self.sender(&network_id);
             let peer_ids = recipients.map(|peer_network_id| peer_network_id.peer_id());
-            sender.send_to_many(peer_ids, protocol, message.clone())?;
+            sender.send_to_many(peer_ids, message.clone())?;
         }
         Ok(())
     }
@@ -147,12 +123,29 @@ impl<TMessage: Clone + Message + Send> PeerNetworkIdSender<TMessage>
     async fn send_rpc(
         &mut self,
         recipient: PeerNetworkId,
-        protocol: ProtocolId,
         req_msg: TMessage,
         timeout: Duration,
     ) -> Result<TMessage, RpcError> {
         self.sender(&recipient.network_id())
-            .send_rpc(recipient.peer_id(), protocol, req_msg, timeout)
+            .send_rpc(recipient.peer_id(), req_msg, timeout)
             .await
     }
+}
+
+#[async_trait]
+trait ApplicationPeerNetworkIdSender<TMessage: Send>: Clone {
+    fn send_to(&mut self, recipient: PeerNetworkId, message: TMessage) -> Result<(), NetworkError>;
+
+    fn send_to_many(
+        &mut self,
+        recipients: impl Iterator<Item = PeerNetworkId>,
+        message: TMessage,
+    ) -> Result<(), NetworkError>;
+
+    async fn send_rpc(
+        &mut self,
+        recipient: PeerNetworkId,
+        req_msg: TMessage,
+        timeout: Duration,
+    ) -> Result<TMessage, RpcError>;
 }
