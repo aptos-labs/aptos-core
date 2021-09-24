@@ -53,15 +53,15 @@ pub(crate) fn start_shared_mempool<V>(
         network_senders.insert(network_id, network_sender);
     }
 
-    let smp = SharedMempool {
-        mempool: mempool.clone(),
-        config: config.mempool.clone(),
+    let smp = SharedMempool::new(
+        mempool.clone(),
+        config.mempool.clone(),
         network_senders,
         db,
         validator,
         peer_manager,
         subscribers,
-    };
+    );
 
     executor.spawn(coordinator(
         smp,

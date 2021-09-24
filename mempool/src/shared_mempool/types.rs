@@ -41,6 +41,28 @@ where
     pub subscribers: Vec<UnboundedSender<SharedMempoolNotification>>,
 }
 
+impl<V: TransactionValidation + 'static> SharedMempool<V> {
+    pub fn new(
+        mempool: Arc<Mutex<CoreMempool>>,
+        config: MempoolConfig,
+        network_senders: HashMap<NetworkId, MempoolNetworkSender>,
+        db: Arc<dyn DbReader<DpnProto>>,
+        validator: Arc<RwLock<V>>,
+        peer_manager: Arc<PeerManager>,
+        subscribers: Vec<UnboundedSender<SharedMempoolNotification>>,
+    ) -> Self {
+        SharedMempool {
+            mempool,
+            config,
+            network_senders,
+            db,
+            validator,
+            peer_manager,
+            subscribers,
+        }
+    }
+}
+
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum SharedMempoolNotification {
     PeerStateChange,

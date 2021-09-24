@@ -35,15 +35,15 @@ pub fn test_mempool_process_incoming_transactions_impl(
     let config = NodeConfig::default();
     let mock_db = MockDbReaderWriter;
     let vm_validator = Arc::new(RwLock::new(MockVMValidator));
-    let smp = SharedMempool {
-        mempool: Arc::new(Mutex::new(CoreMempool::new(&config))),
-        config: config.mempool.clone(),
-        network_senders: HashMap::new(),
-        db: Arc::new(mock_db),
-        validator: vm_validator,
-        peer_manager: Arc::new(PeerManager::new(config.base.role, config.mempool)),
-        subscribers: vec![],
-    };
+    let smp = SharedMempool::new(
+        Arc::new(Mutex::new(CoreMempool::new(&config))),
+        config.mempool.clone(),
+        HashMap::new(),
+        Arc::new(mock_db),
+        vm_validator,
+        Arc::new(PeerManager::new(config.base.role, config.mempool)),
+        vec![],
+    );
 
     let _ = tasks::process_incoming_transactions(&smp, txns, timeline_state);
 }
