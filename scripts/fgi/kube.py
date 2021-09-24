@@ -3,7 +3,7 @@
 
 import json, os, random, subprocess, time
 
-FORGE_K8S_CLUSTERS = ["forge-1"]
+FORGE_K8S_CLUSTERS = ["forge-0", "forge-1"]
 
 AWS_ACCOUNT = (
     subprocess.check_output(
