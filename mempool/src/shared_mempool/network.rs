@@ -4,16 +4,21 @@
 //! Interface between Mempool and Network layers.
 
 use crate::counters;
+use async_trait::async_trait;
 use channel::{diem_channel, message_queues::QueueStyle};
 use diem_types::{transaction::SignedTransaction, PeerId};
 use fail::fail_point;
 use network::{
     error::NetworkError,
     peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
-    protocols::network::{AppConfig, NetworkEvents, NetworkSender, NewNetworkSender},
+    protocols::network::{
+        AppConfig, ApplicationNetworkSender, NetworkEvents, NetworkSender, NewNetworkSender,
+        RpcError,
+    },
     ProtocolId,
 };
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 /// Container for exchanging transactions with other Mempools.
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -81,16 +86,30 @@ impl NewNetworkSender for MempoolNetworkSender {
     }
 }
 
-impl MempoolNetworkSender {
-    pub fn send_to(
-        &mut self,
-        recipient: PeerId,
-        message: MempoolSyncMsg,
-    ) -> Result<(), NetworkError> {
+#[async_trait]
+impl ApplicationNetworkSender<MempoolSyncMsg> for MempoolNetworkSender {
+    fn send_to(&mut self, recipient: PeerId, message: MempoolSyncMsg) -> Result<(), NetworkError> {
         fail_point!("mempool::send_to", |_| {
             Err(anyhow::anyhow!("Injected error in mempool::send_to").into())
         });
         let protocol = ProtocolId::MempoolDirectSend;
         self.inner.send_to(recipient, protocol, message)
+    }
+
+    fn send_to_many(
+        &mut self,
+        _recipients: impl Iterator<Item = PeerId>,
+        _message: MempoolSyncMsg,
+    ) -> Result<(), NetworkError> {
+        unimplemented!()
+    }
+
+    async fn send_rpc(
+        &mut self,
+        _recipient: PeerId,
+        _req_msg: MempoolSyncMsg,
+        _timeout: Duration,
+    ) -> Result<MempoolSyncMsg, RpcError> {
+        unimplemented!()
     }
 }

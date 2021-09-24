@@ -22,7 +22,10 @@ use futures::{
     sink::SinkExt,
     stream::{FuturesUnordered, StreamExt},
 };
-use network::protocols::{network::Event, rpc::error::RpcError};
+use network::protocols::{
+    network::{ApplicationNetworkSender, Event},
+    rpc::error::RpcError,
+};
 use network_builder::dummy::{setup_network, DummyMsg, DummyNetworkSender};
 use std::time::Duration;
 

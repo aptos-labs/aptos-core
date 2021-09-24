@@ -15,7 +15,7 @@ use diem_config::{
 use diem_logger::prelude::*;
 use itertools::Itertools;
 use netcore::transport::ConnectionOrigin;
-use network::transport::ConnectionMetadata;
+use network::{protocols::network::ApplicationNetworkSender, transport::ConnectionMetadata};
 use rand::{
     distributions::{Distribution, WeightedIndex},
     thread_rng,
@@ -283,7 +283,7 @@ impl RequestManager {
             let curr_log = log.clone().peer(&peer);
             let result_label = if let Err(e) = send_result {
                 failed_peer_sends.push(peer);
-                error!(curr_log.event(LogEvent::NetworkSendError).error(&e));
+                error!(curr_log.event(LogEvent::NetworkSendError).error(&e.into()));
                 counters::SEND_FAIL_LABEL
             } else {
                 debug!(curr_log.event(LogEvent::Success));
@@ -327,6 +327,7 @@ impl RequestManager {
     ) -> Result<(), Error> {
         self.get_network_sender(peer)
             .send_to(peer.peer_id(), message)
+            .map_err(|err| err.into())
     }
 
     pub fn add_request(&mut self, version: u64, peers: Vec<PeerNetworkId>) -> ChunkRequestInfo {

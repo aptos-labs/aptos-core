@@ -46,7 +46,7 @@ use diem_types::{
 };
 use event_notifications::ReconfigNotificationListener;
 use futures::{channel::mpsc::unbounded, select, StreamExt};
-use network::protocols::network::Event;
+use network::protocols::network::{ApplicationNetworkSender, Event};
 use safety_rules::SafetyRulesManager;
 use std::{cmp::Ordering, sync::Arc, time::Duration};
 

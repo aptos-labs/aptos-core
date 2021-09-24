@@ -25,6 +25,7 @@ use diem_types::{
     vm_status::DiscardedVMStatus,
 };
 use futures::{channel::oneshot, stream::FuturesUnordered};
+use network::protocols::network::ApplicationNetworkSender;
 use rayon::prelude::*;
 use short_hex_str::AsShortHexStr;
 use std::{

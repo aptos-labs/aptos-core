@@ -19,7 +19,7 @@ use diem_logger::prelude::*;
 use diem_types::transaction::SignedTransaction;
 use itertools::Itertools;
 use netcore::transport::ConnectionOrigin;
-use network::transport::ConnectionMetadata;
+use network::{protocols::network::ApplicationNetworkSender, transport::ConnectionMetadata};
 use serde::{Deserialize, Serialize};
 use short_hex_str::AsShortHexStr;
 use std::{

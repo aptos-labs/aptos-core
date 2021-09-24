@@ -2227,6 +2227,7 @@ name = "diem-mempool"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "bcs",
  "bounded-executor",
  "channel",
@@ -5483,6 +5484,7 @@ dependencies = [
 name = "network-builder"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "bcs",
  "channel",
  "diem-config",
@@ -7866,6 +7868,7 @@ dependencies = [
 name = "state-sync-v1"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "bcs",
  "bytes",
  "channel",

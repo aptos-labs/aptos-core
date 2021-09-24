@@ -26,11 +26,15 @@ use crate::{
     peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
     protocols::{
         health_checker::interface::{HealthCheckData, HealthCheckNetworkInterface},
-        network::{AppConfig, Event, NetworkEvents, NetworkSender, NewNetworkSender},
+        network::{
+            AppConfig, ApplicationNetworkSender, Event, NetworkEvents, NetworkSender,
+            NewNetworkSender,
+        },
         rpc::error::RpcError,
     },
     ProtocolId,
 };
+use async_trait::async_trait;
 use bytes::Bytes;
 use channel::{diem_channel, message_queues::QueueStyle};
 use diem_config::network_id::{NetworkContext, PeerNetworkId};
@@ -94,12 +98,35 @@ impl NewNetworkSender for HealthCheckerNetworkSender {
 }
 
 impl HealthCheckerNetworkSender {
+    pub async fn disconnect_peer(&mut self, peer_id: PeerId) -> Result<(), NetworkError> {
+        self.inner.disconnect_peer(peer_id).await
+    }
+}
+
+#[async_trait]
+impl ApplicationNetworkSender<HealthCheckerMsg> for HealthCheckerNetworkSender {
+    fn send_to(
+        &mut self,
+        _recipient: PeerId,
+        _message: HealthCheckerMsg,
+    ) -> Result<(), NetworkError> {
+        unimplemented!()
+    }
+
+    fn send_to_many(
+        &mut self,
+        _recipients: impl Iterator<Item = PeerId>,
+        _message: HealthCheckerMsg,
+    ) -> Result<(), NetworkError> {
+        unimplemented!()
+    }
+
     /// Send a HealthChecker Ping RPC request to remote peer `recipient`. Returns
     /// the remote peer's future `Pong` reply.
     ///
     /// The rpc request can be canceled at any point by dropping the returned
     /// future.
-    pub async fn send_rpc(
+    async fn send_rpc(
         &mut self,
         recipient: PeerId,
         req_msg: HealthCheckerMsg,
@@ -109,10 +136,6 @@ impl HealthCheckerNetworkSender {
         self.inner
             .send_rpc(recipient, protocol, req_msg, timeout)
             .await
-    }
-
-    pub async fn disconnect_peer(&mut self, peer_id: PeerId) -> Result<(), NetworkError> {
-        self.inner.disconnect_peer(peer_id).await
     }
 }
 

@@ -4,6 +4,7 @@
 //! Integration tests for validator_network.
 
 use crate::builder::NetworkBuilder;
+use async_trait::async_trait;
 use channel::diem_channel;
 use diem_config::{
     config::{Peer, PeerRole, PeerSet, RoleType, NETWORK_CHANNEL_SIZE},
@@ -22,7 +23,10 @@ use network::{
         builder::AuthenticationMode, ConnectionRequestSender, PeerManagerRequestSender,
     },
     protocols::{
-        network::{AppConfig, Event, NetworkEvents, NetworkSender, NewNetworkSender},
+        network::{
+            AppConfig, ApplicationNetworkSender, Event, NetworkEvents, NetworkSender,
+            NewNetworkSender,
+        },
         rpc::error::RpcError,
     },
     ProtocolId,
@@ -69,13 +73,22 @@ impl NewNetworkSender for DummyNetworkSender {
     }
 }
 
-impl DummyNetworkSender {
-    pub fn send_to(&mut self, recipient: PeerId, message: DummyMsg) -> Result<(), NetworkError> {
+#[async_trait]
+impl ApplicationNetworkSender<DummyMsg> for DummyNetworkSender {
+    fn send_to(&mut self, recipient: PeerId, message: DummyMsg) -> Result<(), NetworkError> {
         let protocol = TEST_DIRECT_SEND_PROTOCOL;
         self.inner.send_to(recipient, protocol, message)
     }
 
-    pub async fn send_rpc(
+    fn send_to_many(
+        &mut self,
+        _recipients: impl Iterator<Item = PeerId>,
+        _message: DummyMsg,
+    ) -> Result<(), NetworkError> {
+        unimplemented!()
+    }
+
+    async fn send_rpc(
         &mut self,
         recipient: PeerId,
         message: DummyMsg,

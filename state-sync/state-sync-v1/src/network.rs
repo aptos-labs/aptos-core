@@ -3,17 +3,21 @@
 
 //! Interface between State Sync and Network layers.
 
-use crate::{
-    chunk_request::GetChunkRequest, chunk_response::GetChunkResponse, counters, error::Error,
-};
+use crate::{chunk_request::GetChunkRequest, chunk_response::GetChunkResponse, counters};
+use async_trait::async_trait;
 use channel::{diem_channel, message_queues::QueueStyle};
 use diem_types::PeerId;
 use network::{
+    error::NetworkError,
     peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
-    protocols::network::{AppConfig, NetworkEvents, NetworkSender, NewNetworkSender},
+    protocols::network::{
+        AppConfig, ApplicationNetworkSender, NetworkEvents, NetworkSender, NewNetworkSender,
+        RpcError,
+    },
     ProtocolId,
 };
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 const STATE_SYNC_MAX_BUFFER_SIZE: usize = 1;
 
@@ -56,10 +60,32 @@ impl NewNetworkSender for StateSyncSender {
     }
 }
 
-impl StateSyncSender {
-    pub fn send_to(&mut self, recipient: PeerId, message: StateSyncMessage) -> Result<(), Error> {
+#[async_trait]
+impl ApplicationNetworkSender<StateSyncMessage> for StateSyncSender {
+    fn send_to(
+        &mut self,
+        recipient: PeerId,
+        message: StateSyncMessage,
+    ) -> Result<(), NetworkError> {
         let protocol = ProtocolId::StateSyncDirectSend;
-        Ok(self.inner.send_to(recipient, protocol, message)?)
+        self.inner.send_to(recipient, protocol, message)
+    }
+
+    fn send_to_many(
+        &mut self,
+        _recipients: impl Iterator<Item = PeerId>,
+        _message: StateSyncMessage,
+    ) -> Result<(), NetworkError> {
+        unimplemented!()
+    }
+
+    async fn send_rpc(
+        &mut self,
+        _recipient: PeerId,
+        _req_msg: StateSyncMessage,
+        _timeout: Duration,
+    ) -> Result<StateSyncMessage, RpcError> {
+        unimplemented!()
     }
 }
 

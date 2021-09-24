@@ -25,7 +25,9 @@ use diem_types::{
 };
 use futures::{channel::oneshot, stream::select, SinkExt, Stream, StreamExt};
 use network::protocols::{
-    network::Event, rpc::error::RpcError, wire::handshake::v1::ProtocolIdSet,
+    network::{ApplicationNetworkSender, Event},
+    rpc::error::RpcError,
+    wire::handshake::v1::ProtocolIdSet,
 };
 use std::{
     collections::HashMap,

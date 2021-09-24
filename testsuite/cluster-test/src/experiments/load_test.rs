@@ -18,8 +18,10 @@ use diem_time_service::TimeService;
 use diem_types::{account_config::diem_root_address, chain_id::ChainId};
 use futures::{sink::SinkExt, StreamExt};
 use network::{
-    application::storage::PeerMetadataStorage, connectivity_manager::DiscoverySource,
-    protocols::network::Event, ConnectivityRequest,
+    application::storage::PeerMetadataStorage,
+    connectivity_manager::DiscoverySource,
+    protocols::network::{ApplicationNetworkSender, Event},
+    ConnectivityRequest,
 };
 use network_builder::builder::NetworkBuilder;
 use state_sync_v1::network::{StateSyncEvents, StateSyncSender};

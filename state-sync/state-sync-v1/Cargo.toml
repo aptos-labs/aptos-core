@@ -10,6 +10,7 @@ publish = false
 edition = "2018"
 
 [dependencies]
+async-trait = "0.1.42"
 bcs = "0.1.2"
 fail = "0.4.0"
 futures = "0.3.12"

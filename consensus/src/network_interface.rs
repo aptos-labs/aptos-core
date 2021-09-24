@@ -5,6 +5,7 @@
 
 use crate::counters;
 use anyhow::anyhow;
+use async_trait::async_trait;
 use channel::{diem_channel, message_queues::QueueStyle};
 use consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse},
@@ -22,7 +23,9 @@ use network::{
     error::NetworkError,
     peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
     protocols::{
-        network::{AppConfig, NetworkEvents, NetworkSender, NewNetworkSender},
+        network::{
+            AppConfig, ApplicationNetworkSender, NetworkEvents, NetworkSender, NewNetworkSender,
+        },
         rpc::error::RpcError,
         wire::handshake::v1::ProtocolIdSet,
     },
@@ -117,52 +120,6 @@ impl NewNetworkSender for ConsensusNetworkSender {
 }
 
 impl ConsensusNetworkSender {
-    /// Send a single message to the destination peer using available ProtocolId.
-    pub fn send_to(
-        &mut self,
-        recipient: PeerId,
-        message: ConsensusMsg,
-    ) -> Result<(), NetworkError> {
-        let protocol = self.preferred_protocol_for_peer(recipient, DIRECT_SEND)?;
-        self.network_sender.send_to(recipient, protocol, message)
-    }
-
-    /// Send a single message to the destination peers using available ProtocolId.
-    pub fn send_to_many(
-        &mut self,
-        recipients: impl Iterator<Item = PeerId>,
-        message: ConsensusMsg,
-    ) -> Result<(), NetworkError> {
-        let mut peers_per_protocol = HashMap::new();
-        for peer in recipients {
-            match self.preferred_protocol_for_peer(peer, DIRECT_SEND) {
-                Ok(protocol) => peers_per_protocol
-                    .entry(protocol)
-                    .or_insert_with(Vec::new)
-                    .push(peer),
-                Err(e) => error!("{}", e),
-            }
-        }
-        for (protocol, peers) in peers_per_protocol {
-            self.network_sender
-                .send_to_many(peers.into_iter(), protocol, message.clone())?;
-        }
-        Ok(())
-    }
-
-    /// Send a RPC to the destination peer using the `CONSENSUS_RPC_PROTOCOL` ProtocolId.
-    pub async fn send_rpc(
-        &mut self,
-        recipient: PeerId,
-        message: ConsensusMsg,
-        timeout: Duration,
-    ) -> Result<ConsensusMsg, RpcError> {
-        let protocol = self.preferred_protocol_for_peer(recipient, RPC)?;
-        self.network_sender
-            .send_rpc(recipient, protocol, message, timeout)
-            .await
-    }
-
     /// Initialize a shared hashmap about connections metadata that is updated by the receiver.
     pub fn initialize(&mut self, connections: Arc<RwLock<HashMap<PeerId, ProtocolIdSet>>>) {
         self.peers_protocols = Some(connections);
@@ -193,5 +150,50 @@ impl ConsensusNetworkSender {
             }
         }
         Err(anyhow!("No available protocols for peer {}", peer))
+    }
+}
+
+#[async_trait]
+impl ApplicationNetworkSender<ConsensusMsg> for ConsensusNetworkSender {
+    /// Send a single message to the destination peer using available ProtocolId.
+    fn send_to(&mut self, recipient: PeerId, message: ConsensusMsg) -> Result<(), NetworkError> {
+        let protocol = self.preferred_protocol_for_peer(recipient, DIRECT_SEND)?;
+        self.network_sender.send_to(recipient, protocol, message)
+    }
+
+    /// Send a single message to the destination peers using available ProtocolId.
+    fn send_to_many(
+        &mut self,
+        recipients: impl Iterator<Item = PeerId>,
+        message: ConsensusMsg,
+    ) -> Result<(), NetworkError> {
+        let mut peers_per_protocol = HashMap::new();
+        for peer in recipients {
+            match self.preferred_protocol_for_peer(peer, DIRECT_SEND) {
+                Ok(protocol) => peers_per_protocol
+                    .entry(protocol)
+                    .or_insert_with(Vec::new)
+                    .push(peer),
+                Err(e) => error!("{}", e),
+            }
+        }
+        for (protocol, peers) in peers_per_protocol {
+            self.network_sender
+                .send_to_many(peers.into_iter(), protocol, message.clone())?;
+        }
+        Ok(())
+    }
+
+    /// Send a RPC to the destination peer using the `CONSENSUS_RPC_PROTOCOL` ProtocolId.
+    async fn send_rpc(
+        &mut self,
+        recipient: PeerId,
+        message: ConsensusMsg,
+        timeout: Duration,
+    ) -> Result<ConsensusMsg, RpcError> {
+        let protocol = self.preferred_protocol_for_peer(recipient, RPC)?;
+        self.network_sender
+            .send_rpc(recipient, protocol, message, timeout)
+            .await
     }
 }
