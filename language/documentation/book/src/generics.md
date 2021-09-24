@@ -135,6 +135,10 @@ module M {
 
 ## Unused Type Parameters
 
+For a struct definition,
+an unused type parameter is one that
+does not appear in any field defined in the struct,
+but is checked statically at compile time.
 Move allows unused type parameters so the following struct definition is valid:
 
 ```move=
@@ -149,8 +153,8 @@ This can be convenient when modeling certain concepts. Here is an example:
 address 0x2 {
 module M {
     // Currency Specifiers
-    struct Currency1 has store {}
-    struct Currency2 has store {}
+    struct Currency1 {}
+    struct Currency2 {}
 
     // A generic coin type that can be instantiated using a currency
     // specifier type.
@@ -158,9 +162,141 @@ module M {
     struct Coin<Currency> has store {
         value: u64
     }
+
+    // Write code generically about all currencies
+    public fun mint_generic<Currency>(value: u64): Coin<Currency> {
+        Coin { value }
+    }
+
+    // Write code concretely about one currency
+    public fun mint_concrete(value: u64): Coin<Currency1> {
+        Coin { value }
+    }
 }
 }
 ```
+
+In this example,
+`struct Coin<Currency>` is generic on the `Currency` type parameter,
+which specifies the currency of the coin and
+allows code to be written either
+generically on any currency or
+concretely on a specific currency.
+This genericity applies even when the `Currency` type parameter
+does not appear in any of the fields defined in `Coin`.
+
+### Phantom Type Parameters
+
+Discerning readers might have noticed that
+in the example above,
+although `struct Coin` asks for the `store` ability,
+based on the rules for
+[Conditional Abilities and Generic Types](./abilities.md#conditional-abilities-and-generic-types),
+neither `Coin<Currency1>` nor `Coin<Currency2>` will have the `store` ability.
+This is bacause `Currency1` and `Currency2` don't have the `store` ability
+despite the fact that they are not even used in the body of `struct Coin`.
+This might cause some unpleasant consequences.
+For example, we are unable to put `Coin<Currency1>` into a wallet that is stored in the global storage.
+
+To solve this issue,
+one possibility is to
+add spurious ability annotations to `Currency1` and `Currency2`
+(i.e., `struct Currency1 has store {}`).
+But this might lead to unexpected programs
+(which could result in bugs or security vulnerabilities)
+because types had to be weakened with unnecessary ability declarations.
+For example, we would never expect a resource in the global storage to have a field in type `Currency1`,
+but this is now possible with the spurious `store` ability.
+Moreover, the spurious annotations were infectious,
+requiring many functions generic on the unused type parameter to also include the necessary constraints.
+
+The solution is to explicitly mark unused type parameters as *phantom* type parameters,
+which do not participate in the ability derivation for structs.
+In this way,
+arguments to phantom type parameters are not considered when deriving the abilities for generic types,
+thus avoiding the need for spurious ability annotations.
+For this relaxed rule to be sound,
+Move's type system guarantees that a parameter declared as phantom is either
+not used at all in the struct definition, or
+it is only used as an argument to type parameters also declared as phantom.
+
+#### Declaration
+
+In a struct definition
+a type parameter can be declared as phantom by adding the `phantom` keyword before its declaration.
+If a type parameter is declared as phantom we say it is a phantom type parameter.
+When defining a struct, Move's type checker ensures that every phantom type parameter is either
+not used inside the struct definition or
+it is only used as an argument to a phantom type parameter.
+
+More formally,
+if a type is used as an argument to a phantom type parameter
+we say the type appears in _phantom position_.
+With this definition in place,
+the rule for the correct use of phantom parameters can be specified as follows:
+**A phantom type parameter can only appear in phantom position**.
+
+The following two examples show valid uses of phantom parameters.
+In the first one,
+the parameter `T1` is not used at all inside the struct definition.
+In the second one, the parameter `T1` is only used as an argument to a phantom type parameter.
+
+```move=
+struct S1<phantom T1, T2> { f: u64 }
+                  ^^
+                  Ok: T1 does not appear inside the struct definition
+
+
+struct S2<phantom T1, T2> { f: S1<T1, T2> }
+                                  ^^
+                                  Ok: T1 appears in phantom position
+```
+
+The following code shows examples of violations of the rule:
+
+```move=
+struct S1<phantom T> { f: T }
+                          ^
+                          Error: Not a phantom position
+
+struct S2<T> { f: T }
+
+struct S3<phantom T> { f: S2<T> }
+                             ^
+                             Error: Not a phantom position
+```
+
+
+#### Instantiation
+
+When instantiating a struct,
+the arguments to phantom parameters are excluded when deriving the struct abilities.
+For example, consider the following code:
+
+```move=
+struct S<T1, phantom T2> has copy { f: T1 }
+struct NoCopy {}
+struct HasCopy has copy {}
+```
+
+Consider now the type `S<HasCopy, NoCopy>`.
+Since `S` is defined with `copy` and all non-phantom arguments have copy
+then `S<HasCopy, NoCopy>` also has copy.
+
+#### Phantom Type Parameters with Ability Constraints
+
+Ability constraints and phantom type parameters are orthogonal features in the sense that
+phantom parameters can be declared with ability constraints.
+When instantiating a phantom type parameter with an ability constraint,
+the type argument has to satisfy that constraint,
+even though the parameter is phantom.
+For example, the following definition is perfectly valid:
+
+```move=
+struct S<phantom T: copy> {}
+```
+
+The usual restrictions apply and `T` can only be instantiated with arguments having `copy`.
 
 ## Constraints
 
