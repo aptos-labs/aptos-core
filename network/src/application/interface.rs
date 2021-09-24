@@ -82,61 +82,6 @@ pub trait NetworkInterface<
 }
 
 #[derive(Clone)]
-pub struct SingleNetworkSender<
-    TMessage: Message + Send,
-    Sender: ApplicationNetworkSender<TMessage> + Send,
-> {
-    sender: Sender,
-    network_id: NetworkId,
-    _phantom: PhantomData<TMessage>,
-}
-
-impl<TMessage: Clone + Message + Send, Sender: ApplicationNetworkSender<TMessage> + Send>
-    SingleNetworkSender<TMessage, Sender>
-{
-    fn sender(&mut self, network_id: &NetworkId) -> &mut Sender {
-        assert_eq!(network_id, &self.network_id);
-        &mut self.sender
-    }
-}
-
-#[async_trait]
-impl<TMessage: Clone + Message + Send, Sender: ApplicationNetworkSender<TMessage> + Send>
-    ApplicationPeerNetworkIdSender<TMessage> for SingleNetworkSender<TMessage, Sender>
-{
-    fn send_to(&mut self, recipient: PeerNetworkId, message: TMessage) -> Result<(), NetworkError> {
-        self.sender(&recipient.network_id())
-            .send_to(recipient.peer_id(), message)
-    }
-
-    fn send_to_many(
-        &mut self,
-        recipients: impl Iterator<Item = PeerNetworkId>,
-        message: TMessage,
-    ) -> Result<(), NetworkError> {
-        for (network_id, recipients) in
-            &recipients.group_by(|peer_network_id| peer_network_id.network_id())
-        {
-            let sender = self.sender(&network_id);
-            let peer_ids = recipients.map(|peer_network_id| peer_network_id.peer_id());
-            sender.send_to_many(peer_ids, message.clone())?;
-        }
-        Ok(())
-    }
-
-    async fn send_rpc(
-        &mut self,
-        recipient: PeerNetworkId,
-        req_msg: TMessage,
-        timeout: Duration,
-    ) -> Result<TMessage, RpcError> {
-        self.sender(&recipient.network_id())
-            .send_rpc(recipient.peer_id(), req_msg, timeout)
-            .await
-    }
-}
-
-#[derive(Clone)]
 pub struct MultiNetworkSender<
     TMessage: Message + Send,
     Sender: ApplicationNetworkSender<TMessage> + Send,
