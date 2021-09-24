@@ -1645,7 +1645,6 @@ name = "diem-bitvec"
 version = "0.1.0"
 dependencies = [
  "bcs",
- "diem-proptest-helpers",
  "diem-workspace-hack",
  "proptest",
  "proptest-derive",

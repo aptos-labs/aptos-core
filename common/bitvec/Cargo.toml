@@ -18,7 +18,6 @@ serde_bytes = "0.11.5"
 
 [dev-dependencies]
 bcs = "0.1.2"
-diem-proptest-helpers = { path = "../proptest-helpers"}
 proptest = { version = "1.0.0", default-features = true }
 proptest-derive = { version = "0.3.0" }
 

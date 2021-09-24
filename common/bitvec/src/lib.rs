@@ -3,11 +3,14 @@
 
 //! This library defines a BitVec struct that represents a bit vector.
 
+#[cfg(any(test, feature = "fuzzing"))]
+use proptest::{
+    arbitrary::{any, Arbitrary, StrategyFor},
+    collection::{vec, VecStrategy},
+    strategy::{Map, Strategy},
+};
 use serde::{de::Error, Deserialize, Deserializer, Serialize};
 use std::{iter::FromIterator, ops::BitAnd};
-
-#[cfg(any(test, feature = "fuzzing"))]
-use proptest_derive::Arbitrary;
 
 // Every u8 is used as a bucket of 8 bits. Total max buckets = 256 / 8 = 32.
 const BUCKET_SIZE: usize = 8;
@@ -58,7 +61,6 @@ const MAX_BUCKETS: usize = 32;
 /// assert_eq!(false, intersection.is_set(3));
 /// ```
 #[derive(Clone, Default, Debug, PartialEq, Serialize)]
-#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct BitVec {
     #[serde(with = "serde_bytes")]
     inner: Vec<u8>,
@@ -78,6 +80,7 @@ impl BitVec {
     }
 
     /// Checks if the bit at position @pos is set.
+    #[inline]
     pub fn is_set(&self, pos: u8) -> bool {
         // This is optimised to: let bucket = pos >> 3;
         let bucket: usize = pos as usize / BUCKET_SIZE;
@@ -109,6 +112,11 @@ impl BitVec {
             .map(|(i, byte)| {
                 (8 * (self.inner.len() - i) - byte.trailing_zeros() as usize - 1) as u8
             })
+    }
+
+    /// Return an `Iterator` over all '1' bit indexes.
+    pub fn iter_ones(&self) -> impl Iterator<Item = u8> + '_ {
+        (0..=u8::MAX).filter(move |idx| self.is_set(*idx))
     }
 }
 
@@ -153,11 +161,20 @@ impl<'de> Deserialize<'de> for BitVec {
     }
 }
 
+#[cfg(any(test, feature = "fuzzing"))]
+impl Arbitrary for BitVec {
+    type Parameters = ();
+    type Strategy = Map<VecStrategy<StrategyFor<u8>>, fn(Vec<u8>) -> BitVec>;
+
+    fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+        vec(any::<u8>(), 0..=MAX_BUCKETS).prop_map(|inner| BitVec { inner })
+    }
+}
+
 #[cfg(test)]
 mod test {
-
     use super::*;
-    use proptest::{arbitrary::any, collection::vec, prelude::*};
+    use proptest::proptest;
 
     #[test]
     fn test_count_ones() {
@@ -239,7 +256,7 @@ mod test {
     fn test_empty() {
         let p = BitVec::default();
         for i in 0..=std::u8::MAX {
-            assert_eq!(false, p.is_set(i));
+            assert!(!p.is_set(i));
         }
     }
 
@@ -251,8 +268,9 @@ mod test {
         assert!(p.is_set(std::u8::MAX));
         assert!(p.is_set(0));
         for i in 1..std::u8::MAX {
-            assert_eq!(false, p.is_set(i));
+            assert!(!p.is_set(i));
         }
+        assert_eq!(vec![0, u8::MAX], p.iter_ones().collect::<Vec<_>>());
     }
 
     #[test]
@@ -272,51 +290,27 @@ mod test {
         assert_eq!(Ok(bv), bcs::from_bytes::<BitVec>(&bytes));
     }
 
-    // Constructs a bit vector by setting the positions specified in the argument vector. The
-    // vector can have duplicates and need not be sorted.
-    fn construct_bitvec(posns: &[u8]) -> BitVec {
-        let mut bv = BitVec::default();
-        posns.iter().for_each(|x| bv.set(*x));
-        bv
-    }
-
-    // Proptest for ensuring is_set returns true iff corresponding position was set.
-    proptest! {
-        #[test]
-        fn test_arbitrary(mut v in vec(any::<u8>(), 0..256)) {
-            let bv = construct_bitvec(&v);
-            // Sort and dedup the vector so we can iterate over its elements from smallest to largest.
-            v.sort_unstable();
-            v.dedup();
-            let mut viter = v.into_iter().peekable();
-            // Positions in bv should be set iff they are in v.
-            for i in 0..std::u8::MAX {
-                if viter.peek() == Some(&i) {
-                    prop_assert!(bv.is_set(i));
-                    viter.next();
-                } else {
-                    prop_assert_eq!(false, bv.is_set(i));
-                }
-            }
-
-        }
-    }
-
     // Test for bitwise AND operation on 2 bitvecs.
     proptest! {
         #[test]
-        fn test_and(v1 in vec(any::<u8>(), 0..256), v2 in vec(any::<u8>(), 0..256)) {
-            let bv1 = construct_bitvec(&v1);
-            let bv2 = construct_bitvec(&v2);
+        fn test_and(bv1 in any::<BitVec>(), bv2 in any::<BitVec>()) {
             let intersection = bv1.bitand(&bv2);
-            for i in 0..std::u8::MAX {
+
+            assert!(intersection.count_ones() <= bv1.count_ones());
+            assert!(intersection.count_ones() <= bv2.count_ones());
+
+            for i in 0..=std::u8::MAX {
                 if bv1.is_set(i) && bv2.is_set(i) {
-                    prop_assert!(intersection.is_set(i));
+                    assert!(intersection.is_set(i));
                 } else {
-                    prop_assert_eq!(false, intersection.is_set(i));
+                    assert!(!intersection.is_set(i));
                 }
             }
+        }
 
+        #[test]
+        fn test_iter_ones(bv1 in any::<BitVec>()) {
+            assert_eq!(bv1.iter_ones().count(), bv1.count_ones() as usize);
         }
     }
 }
