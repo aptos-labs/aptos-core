@@ -9,7 +9,6 @@ use crate::{
 use anyhow::{anyhow, ensure};
 use bytes::Bytes;
 use channel::{self, diem_channel, message_queues::QueueStyle};
-use consensus_types::experimental::commit_decision::CommitDecision;
 use consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse, MAX_BLOCKS_PER_REQUEST},
     common::Author,
@@ -20,7 +19,6 @@ use consensus_types::{
 use diem_infallible::RwLock;
 use diem_logger::prelude::*;
 use diem_metrics::monitor;
-use diem_types::ledger_info::LedgerInfoWithSignatures;
 use diem_types::{
     account_address::AccountAddress, epoch_change::EpochChangeProof,
     ledger_info::LedgerInfoWithSignatures, validator_verifier::ValidatorVerifier, PeerId,

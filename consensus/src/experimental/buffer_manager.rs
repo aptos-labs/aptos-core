@@ -37,13 +37,12 @@ use diem_crypto::HashValue;
 
 pub const BUFFER_MANAGER_RETRY_INTERVAL: u64 = 1000;
 
-pub type SyncAck = ();
+pub type ResetAck = ();
 
-pub fn sync_ack_new() -> SyncAck {}
+pub fn sync_ack_new() -> ResetAck {}
 
-pub struct SyncRequest {
-    tx: oneshot::Sender<SyncAck>,
-    ledger_info: LedgerInfoWithSignatures,
+pub struct ResetRequest {
+    tx: oneshot::Sender<ResetAck>,
     reconfig: bool,
 }
 
@@ -82,8 +81,8 @@ pub struct BufferManager {
     persisting_phase_tx: Sender<PersistingRequest>,
 
     block_rx: UnboundedReceiver<OrderedBlocks>,
-    sync_rx: UnboundedReceiver<SyncRequest>,
-    end_epoch: bool,
+    reset_rx: UnboundedReceiver<ResetRequest>,
+    epoch_ends: bool,
 
     verifier: ValidatorVerifier,
 }
@@ -99,7 +98,7 @@ impl BufferManager {
         commit_msg_rx: channel::diem_channel::Receiver<AccountAddress, VerifiedEvent>,
         persisting_phase_tx: Sender<PersistingRequest>,
         block_rx: UnboundedReceiver<OrderedBlocks>,
-        sync_rx: UnboundedReceiver<SyncRequest>,
+        sync_rx: UnboundedReceiver<ResetRequest>,
         verifier: ValidatorVerifier,
     ) -> Self {
         let buffer = List::<BufferItem>::new();
@@ -123,8 +122,8 @@ impl BufferManager {
             persisting_phase_tx,
 
             block_rx,
-            sync_rx,
-            end_epoch: false,
+            reset_rx: sync_rx,
+            epoch_ends: false,
 
             verifier,
         }
@@ -233,44 +232,15 @@ impl BufferManager {
         unreachable!("Aggregated item not found in the list");
     }
 
-    /// this function processes a sync request
-    /// if reconfig flag is set, it stops the main loop
-    /// otherwise, it looks for a matching buffer item.
-    /// If found and the item is executed/signed, advance it to aggregated and try_persisting
-    /// Otherwise, it adds the signature to cache, later it will get advanced to aggregated
-    /// finally, it sends back an ack.
-    async fn process_sync_request(&mut self, sync_event: SyncRequest) {
-        let SyncRequest {
-            tx,
-            ledger_info,
-            reconfig,
-        } = sync_event;
+    /// It pops everything in the buffer and if reconfig flag is set, it stops the main loop
+    fn process_reset_request(&mut self, request: ResetRequest) {
+        let ResetRequest { tx, reconfig } = request;
 
-        if reconfig {
-            // buffer manager will stop
-            self.end_epoch = true;
-        } else {
-            // look for the target ledger info:
-            // if found: we try to advance it to aggregated, if succeeded, we try persisting the items.
-            // if not found: it means the block is in BlockStore but not in the buffer
-            // either the block is just persisted, or has not been added to the buffer
-            // in either cases, we do nothing.
-            let target_block_id = ledger_info.commit_info().id();
-            let cursor = find_elem(self.buffer.head.clone(), |item| {
-                item.block_id() == target_block_id
-            });
-            if cursor.is_some() {
-                let item = take_elem(&cursor);
-                let attempted_item = item.try_advance_to_aggregated_with_ledger_info(ledger_info);
-                let aggregated = attempted_item.is_aggregated();
-                set_elem(&cursor, attempted_item);
-                if aggregated {
-                    self.advance_head(target_block_id).await;
-                }
-            }
-        }
+        self.epoch_ends = reconfig;
+        self.buffer = List::new();
+        self.execution_root = None;
+        self.signing_root = None;
 
-        // ack reset
         tx.send(sync_ack_new()).unwrap();
     }
 
@@ -402,7 +372,7 @@ impl BufferManager {
         info!("Buffer manager starts.");
         let mut interval =
             tokio::time::interval(Duration::from_millis(BUFFER_MANAGER_RETRY_INTERVAL));
-        while !self.end_epoch {
+        while !self.epoch_ends {
             // advancing the root will trigger sending requests to the pipeline
             tokio::select! {
                 Some(blocks) = self.block_rx.next() => {
@@ -411,8 +381,8 @@ impl BufferManager {
                         self.advance_execution_root().await;
                     }
                 }
-                Some(reset_event) = self.sync_rx.next() => {
-                    self.process_sync_request(reset_event).await;
+                Some(reset_event) = self.reset_rx.next() => {
+                    self.process_reset_request(reset_event);
                 }
                 Some(response) = self.execution_phase_rx.next() => {
                     self.process_execution_response(response).await;
