@@ -1,14 +1,23 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::application::{
-    storage::PeerMetadataStorage,
-    types::{PeerError, PeerInfo, PeerState},
+use crate::{
+    application::{
+        storage::PeerMetadataStorage,
+        types::{PeerError, PeerInfo, PeerState},
+    },
+    error::NetworkError,
+    protocols::network::{Message, NetworkSender, RpcError},
+    ProtocolId,
 };
 use async_trait::async_trait;
 use diem_config::network_id::{NetworkId, PeerNetworkId};
 use diem_types::PeerId;
-use std::collections::{hash_map::Entry, HashMap};
+use itertools::Itertools;
+use std::{
+    collections::{hash_map::Entry, HashMap},
+    time::Duration,
+};
 
 /// A generic `NetworkInterface` for applications to connect to networking
 ///
@@ -68,4 +77,82 @@ pub trait NetworkInterface {
         app_data_key: Self::AppDataKey,
         modifier: F,
     ) -> Result<(), PeerError>;
+}
+
+#[async_trait]
+trait PeerNetworkIdSender<TMessage: Message> {
+    fn send_to(
+        &mut self,
+        recipient: PeerNetworkId,
+        protocol: ProtocolId,
+        message: TMessage,
+    ) -> Result<(), NetworkError>;
+
+    fn send_to_many(
+        &mut self,
+        recipients: impl Iterator<Item = PeerNetworkId>,
+        protocol: ProtocolId,
+        message: TMessage,
+    ) -> Result<(), NetworkError>;
+
+    async fn send_rpc(
+        &mut self,
+        recipient: PeerNetworkId,
+        protocol: ProtocolId,
+        req_msg: TMessage,
+        timeout: Duration,
+    ) -> Result<TMessage, RpcError>;
+}
+
+struct MultiNetworkSender<TMessage: Message> {
+    senders: HashMap<NetworkId, NetworkSender<TMessage>>,
+}
+
+impl<TMessage: Message> MultiNetworkSender<TMessage> {
+    fn sender(&mut self, network_id: &NetworkId) -> &mut NetworkSender<TMessage> {
+        self.senders.get_mut(network_id).expect("Unknown NetworkId")
+    }
+}
+
+#[async_trait]
+impl<TMessage: Clone + Message + Send> PeerNetworkIdSender<TMessage>
+    for MultiNetworkSender<TMessage>
+{
+    fn send_to(
+        &mut self,
+        recipient: PeerNetworkId,
+        protocol: ProtocolId,
+        message: TMessage,
+    ) -> Result<(), NetworkError> {
+        self.sender(&recipient.network_id())
+            .send_to(recipient.peer_id(), protocol, message)
+    }
+
+    fn send_to_many(
+        &mut self,
+        recipients: impl Iterator<Item = PeerNetworkId>,
+        protocol: ProtocolId,
+        message: TMessage,
+    ) -> Result<(), NetworkError> {
+        for (network_id, recipients) in
+            &recipients.group_by(|peer_network_id| peer_network_id.network_id())
+        {
+            let sender = self.sender(&network_id);
+            let peer_ids = recipients.map(|peer_network_id| peer_network_id.peer_id());
+            sender.send_to_many(peer_ids, protocol, message.clone())?;
+        }
+        Ok(())
+    }
+
+    async fn send_rpc(
+        &mut self,
+        recipient: PeerNetworkId,
+        protocol: ProtocolId,
+        req_msg: TMessage,
+        timeout: Duration,
+    ) -> Result<TMessage, RpcError> {
+        self.sender(&recipient.network_id())
+            .send_rpc(recipient.peer_id(), protocol, req_msg, timeout)
+            .await
+    }
 }

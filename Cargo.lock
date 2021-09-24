@@ -5445,6 +5445,7 @@ dependencies = [
  "futures",
  "futures-util",
  "hex",
+ "itertools 0.10.1",
  "maplit",
  "memsocket",
  "netcore",

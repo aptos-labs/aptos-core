@@ -1,15 +1,6 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use enum_dispatch::enum_dispatch;
-use futures::{
-    channel::mpsc::{self, unbounded, UnboundedReceiver},
-    FutureExt, StreamExt,
-};
-use rand::rngs::StdRng;
-use std::{collections::HashMap, sync::Arc};
-use tokio::runtime::{Builder, Runtime};
-
 use crate::{
     core_mempool::{CoreMempool, TimelineState},
     network::{MempoolNetworkEvents, MempoolSyncMsg},
@@ -28,7 +19,12 @@ use diem_types::{
     account_address::AccountAddress, account_config::AccountSequenceInfo,
     on_chain_config::ON_CHAIN_CONFIG_REGISTRY, transaction::GovernanceRole, PeerId,
 };
+use enum_dispatch::enum_dispatch;
 use event_notifications::EventSubscriptionService;
+use futures::{
+    channel::mpsc::{self, unbounded, UnboundedReceiver},
+    FutureExt, StreamExt,
+};
 use netcore::transport::ConnectionOrigin;
 use network::{
     peer_manager::{
@@ -39,7 +35,10 @@ use network::{
     transport::ConnectionMetadata,
     DisconnectReason, ProtocolId,
 };
+use rand::rngs::StdRng;
+use std::{collections::HashMap, sync::Arc};
 use storage_interface::{mock::MockDbReaderWriter, DbReaderWriter};
+use tokio::runtime::{Builder, Runtime};
 use vm_validator::mocks::mock_vm_validator::MockVMValidator;
 
 type MempoolNetworkHandle = (
