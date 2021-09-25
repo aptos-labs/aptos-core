@@ -15,14 +15,24 @@ fn net_protocol() -> bcs::Result<()> {
 #[test]
 fn protocols_to_from_iter() {
     let supported_protocols: SupportedProtocols =
-        [ProtocolId::ConsensusRpc, ProtocolId::MempoolDirectSend]
-            .iter()
-            .collect();
-    let protocols_vec: Vec<ProtocolId> = supported_protocols.clone().try_into().unwrap();
+        SupportedProtocols::from_iter([ProtocolId::ConsensusRpc, ProtocolId::MempoolDirectSend]);
     assert_eq!(
-        SupportedProtocols::from_iter(protocols_vec),
+        SupportedProtocols::from_iter(supported_protocols.iter()),
         supported_protocols,
     );
+}
+
+#[test]
+fn test_as_u8_serde_equiv() {
+    for protocol in ProtocolId::all() {
+        let protocol_as_u8_repr = *protocol as u8;
+        let protocol_bcs_repr = bcs::to_bytes(protocol).unwrap();
+        assert_eq!(protocol_bcs_repr, vec![protocol_as_u8_repr]);
+        assert_eq!(
+            bcs::from_bytes::<ProtocolId>(&[protocol_as_u8_repr]).unwrap(),
+            *protocol,
+        );
+    }
 }
 
 #[test]
@@ -120,39 +130,44 @@ fn is_empty() {
 
 #[test]
 fn ignore_unknown_protocols() {
-    let all_known_protos = HandshakeMsg::from_supported(SupportedProtocols::from_iter([
+    let all_known_protos = SupportedProtocols::from_iter([
         ProtocolId::MempoolDirectSend,
         ProtocolId::StateSyncDirectSend,
+    ]);
+    let all_known_hs = HandshakeMsg::from_supported(all_known_protos);
+
+    let some_unknown_protos = SupportedProtocols(bitvec::BitVec::from_iter([
+        ProtocolId::MempoolDirectSend as u8,
+        66,
+        234,
     ]));
+    let some_unknown_hs = HandshakeMsg::from_supported(some_unknown_protos.clone());
 
-    let some_unknown_protos =
-        HandshakeMsg::from_supported(SupportedProtocols(bitvec::BitVec::from_iter([
-            ProtocolId::MempoolDirectSend as u8,
-            66,
-            234,
-        ])));
-
-    let all_unknown_protos =
-        HandshakeMsg::from_supported(SupportedProtocols(bitvec::BitVec::from_iter([42, 99, 123])));
+    let all_unknown_protos = SupportedProtocols(bitvec::BitVec::from_iter([42, 99, 123]));
+    let all_unknown_hs = HandshakeMsg::from_supported(all_unknown_protos.clone());
 
     // Case 1: the other set contains some unknown protocols, but we can still
     // find a common protocol.
 
-    let (_, common_protos) = all_known_protos
-        .perform_handshake(&some_unknown_protos)
-        .unwrap();
+    let (_, common_protos) = all_known_hs.perform_handshake(&some_unknown_hs).unwrap();
     assert_eq!(
         common_protos,
         SupportedProtocols::from_iter([ProtocolId::MempoolDirectSend])
+    );
+    assert_eq!(
+        SupportedProtocols::from_iter(some_unknown_protos.iter()),
+        SupportedProtocols::from_iter([ProtocolId::MempoolDirectSend]),
     );
 
     // Case 2: the other set contains exclusively unknown protocols and so we
     // can't communicate.
 
     assert_eq!(
-        all_known_protos
-            .perform_handshake(&all_unknown_protos)
-            .unwrap_err(),
+        all_known_hs.perform_handshake(&all_unknown_hs).unwrap_err(),
         HandshakeError::NoCommonProtocols,
+    );
+    assert_eq!(
+        SupportedProtocols::from_iter(all_unknown_protos.iter()),
+        SupportedProtocols::empty(),
     );
 }

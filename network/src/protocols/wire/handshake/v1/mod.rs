@@ -18,7 +18,6 @@ use diem_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
-    convert::TryInto,
     fmt,
     iter::{FromIterator, Iterator},
     ops::BitAnd,
@@ -139,22 +138,13 @@ impl SupportedProtocols {
     pub fn is_empty(&self) -> bool {
         self.0.all_zeros()
     }
-}
 
-impl TryInto<Vec<ProtocolId>> for SupportedProtocols {
-    type Error = bcs::Error;
-
-    fn try_into(self) -> bcs::Result<Vec<ProtocolId>> {
-        let mut protocols = Vec::with_capacity(self.0.count_ones() as usize);
-        if let Some(last_bit) = self.0.last_set_bit() {
-            for i in 0..=last_bit {
-                if self.0.is_set(i) {
-                    let protocol: ProtocolId = bcs::from_bytes(&[i])?;
-                    protocols.push(protocol);
-                }
-            }
-        }
-        Ok(protocols)
+    /// Iterate over all `ProtocolId`s, ignoring any that our node version
+    /// doesn't understand or doesn't yet support.
+    pub fn iter(&self) -> impl Iterator<Item = ProtocolId> + '_ {
+        self.0
+            .iter_ones()
+            .filter_map(|idx| bcs::from_bytes(&[idx]).ok())
     }
 }
 
