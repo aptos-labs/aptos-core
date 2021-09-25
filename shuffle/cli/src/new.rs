@@ -5,25 +5,26 @@ use crate::shared;
 use anyhow::Result;
 use diem_genesis_tool::validator_builder::ValidatorConfig;
 use diem_types::{account_address::AccountAddress, on_chain_config::VMPublishingOption};
+use include_dir::{include_dir, Dir};
 use move_cli::{
     package::cli as pkgcli,
-    sandbox,
     sandbox::utils::{on_disk_state_view::OnDiskStateView, Mode, ModeType},
 };
 use move_lang::shared::NumericalAddress;
 use move_package::source_package::layout::SourcePackageLayout;
 use once_cell::sync::Lazy;
 use std::{
-    collections::{BTreeMap, HashMap},
-    fs,
+    collections::{BTreeMap, HashSet},
+    fs::{self},
     path::{Path, PathBuf},
 };
 
 /// Default blockchain configuration
 pub const DEFAULT_BLOCKCHAIN: &str = "goodday";
 
-/// Name and directory of starter package for all new shuffle projects.
-const HELLOBLOCKCHAIN: &str = "helloblockchain";
+/// Directory of generated transaction builders for helloblockchain.
+const EXAMPLES_DIR: Dir = include_dir!("../move/examples/Message");
+const MESSAGE_EXAMPLE_PATH: &str = "Message";
 
 pub fn handle(blockchain: String, pathbuf: PathBuf) -> Result<()> {
     let project_path = pathbuf.as_path();
@@ -34,8 +35,8 @@ pub fn handle(blockchain: String, pathbuf: PathBuf) -> Result<()> {
     // does not include the DPN. ModeType::Diem is not quite there but is a step
     // towards that goal. Bare and Stdlib do not work as expected but this is a WIP
     let mode = Mode::new(ModeType::Diem);
-    let build_path = project_path.join(HELLOBLOCKCHAIN).join("build");
-    let storage_path = project_path.join(HELLOBLOCKCHAIN).join("storage");
+    let build_path = project_path.join(MESSAGE_EXAMPLE_PATH).join("build");
+    let storage_path = project_path.join(MESSAGE_EXAMPLE_PATH).join("storage");
     let state = mode.prepare_state(build_path.as_path(), storage_path.as_path())?;
 
     let config = shared::Config {
@@ -44,7 +45,7 @@ pub fn handle(blockchain: String, pathbuf: PathBuf) -> Result<()> {
     };
     write_project_config(project_path, &config)?;
     write_move_starter_modules(project_path)?;
-    build_move_starter_modules(project_path, &state)?;
+    build_move_starter_modules(project_path)?;
     generate_validator_config(project_path)?;
     Ok(())
 }
@@ -75,63 +76,59 @@ fn write_project_config(path: &Path, config: &shared::Config) -> Result<()> {
     Ok(())
 }
 
-// Embeds bytes into the binary, keyed off of their file path relative to the
-// crate sibling path. ie: shuffle/cli/../../$key
-macro_rules! include_files(
-    ($($key:expr),+) => {{
-        let mut m = HashMap::new();
-        $(
-            m.insert($key, include_bytes!(concat!("../../", $key)).as_ref());
-        )+
-        m
-    }};
-);
-
-/// Embeds .move files used to generate the starter template into the binary
-/// at compilation time, for reference during project generation.
-static EMBEDDED_MOVE_STARTER_FILES: Lazy<HashMap<&str, &[u8]>> = Lazy::new(|| {
-    include_files! {
-        "move/src/SampleModule.move"
-    }
-});
+static EXAMPLE_BLOCKLIST: Lazy<HashSet<&'static str>> = Lazy::new(|| [].iter().cloned().collect());
 
 // Writes all the move modules for a new project, including genesis and
 // starter template.
 fn write_move_starter_modules(root_path: &Path) -> Result<()> {
-    let pkg_dir = root_path.join(HELLOBLOCKCHAIN);
-    pkgcli::create_move_package(HELLOBLOCKCHAIN, pkg_dir.as_path())?;
-    let sources_path = pkg_dir.join(SourcePackageLayout::Sources.path());
-    for key in EMBEDDED_MOVE_STARTER_FILES.keys() {
-        let dst = sources_path.join(Path::new(key).file_name().unwrap());
-        fs::write(dst.as_path(), EMBEDDED_MOVE_STARTER_FILES[key])?;
+    let creation_path = Path::new(&root_path).join(MESSAGE_EXAMPLE_PATH);
+    pkgcli::create_move_package("helloblockchain", &creation_path)?;
+
+    println!("Copying Examples...");
+    let pkgdir = root_path.join(MESSAGE_EXAMPLE_PATH);
+    for entry in EXAMPLES_DIR.find("**/*").unwrap() {
+        match entry {
+            include_dir::DirEntry::Dir(d) => {
+                fs::create_dir_all(pkgdir.join(d.path()))?;
+            }
+            include_dir::DirEntry::File(f) => {
+                let filename = file_entry_to_string(&f)?;
+                if EXAMPLE_BLOCKLIST.contains(filename.as_str()) {
+                    continue;
+                }
+                let dst = pkgdir.join(f.path());
+                fs::write(dst.as_path(), f.contents())?;
+            }
+        }
     }
     Ok(())
 }
 
-// Inspired by https://github.com/diem/diem/blob/e0379458c85d58224798b79194a2871be9a7e655/shuffle/genesis/src/lib.rs#L72
-// Reuse publish command from move cli
-fn build_move_starter_modules(project_path: &Path, state: &OnDiskStateView) -> Result<()> {
-    let src_dir = project_path
-        .join(HELLOBLOCKCHAIN)
-        .join(SourcePackageLayout::Sources.path());
-    let natives =
-        move_stdlib::natives::all_natives(AccountAddress::from_hex_literal("0x1").unwrap());
-    sandbox::commands::publish(
-        natives,
-        state,
-        &[src_dir.to_string_lossy().to_string()],
-        true,
-        true,
-        None,
-        state.get_named_addresses(BTreeMap::new())?,
-        true,
-    )
+fn file_entry_to_string(f: &include_dir::File) -> Result<String> {
+    Ok(f.path()
+        .file_name()
+        .ok_or_else(|| anyhow::format_err!("embedded example filename unavailable"))?
+        .to_string_lossy()
+        .to_string())
+}
+
+/// Builds the examples using the move package system.
+fn build_move_starter_modules(project_path: &Path) -> Result<()> {
+    println!("Building Examples...");
+    let pkgdir = project_path.join(MESSAGE_EXAMPLE_PATH);
+    let config = move_package::BuildConfig {
+        dev_mode: true,
+        test_mode: false,
+        generate_docs: false,
+        generate_abis: true,
+    };
+
+    config.compile_package(pkgdir.as_path(), &mut std::io::stdout())?;
+    Ok(())
 }
 
 fn generate_validator_config(project_path: &Path) -> Result<ValidatorConfig> {
     let publishing_option = VMPublishingOption::open();
-    // TODO (dimroc): place genesis module deployment/generate validator config
-    // in shuffle node command
     shuffle_custom_node::generate_validator_config(
         project_path.join("nodeconfig").as_path(),
         diem_framework_releases::current_module_blobs().to_vec(),
@@ -172,12 +169,12 @@ mod test {
         handle(String::from(DEFAULT_BLOCKCHAIN), PathBuf::from(dir.path())).unwrap();
 
         // spot check move starter files
-        let expected_starter_content =
-            String::from_utf8_lossy(include_bytes!("../../move/src/SampleModule.move"));
-        let actual_starter_content =
-            fs::read_to_string(dir.path().join("helloblockchain/sources/SampleModule.move"))
-                .unwrap();
-        assert_eq!(expected_starter_content, actual_starter_content);
+        let expected_example_content = String::from_utf8_lossy(include_bytes!(
+            "../../move/examples/Message/sources/Message.move"
+        ));
+        let actual_example_content =
+            fs::read_to_string(dir.path().join("Message/sources/Message.move")).unwrap();
+        assert_eq!(expected_example_content, actual_example_content);
 
         // check if we can load generated node.yaml config file
         let _node_config =
