@@ -5,6 +5,7 @@ mod accounts;
 mod context;
 mod index;
 pub mod runtime;
+mod transactions;
 
 #[cfg(any(test))]
 pub(crate) mod test_utils;

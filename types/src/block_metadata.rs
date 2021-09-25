@@ -73,6 +73,14 @@ impl BlockMetadata {
     pub fn proposer(&self) -> AccountAddress {
         self.proposer
     }
+
+    pub fn previous_block_votes(&self) -> &Vec<AccountAddress> {
+        &self.previous_block_votes
+    }
+
+    pub fn round(&self) -> u64 {
+        self.round
+    }
 }
 
 pub fn new_block_event_key() -> EventKey {

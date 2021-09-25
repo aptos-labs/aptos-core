@@ -135,6 +135,12 @@ impl Serialize for HexEncodedBytes {
     }
 }
 
+impl From<Vec<u8>> for HexEncodedBytes {
+    fn from(bytes: Vec<u8>) -> Self {
+        Self(bytes)
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct MoveStructValue(BTreeMap<Identifier, MoveValue>);
 

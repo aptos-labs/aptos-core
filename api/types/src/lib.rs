@@ -6,6 +6,7 @@ mod error;
 mod ledger_info;
 mod move_types;
 mod response;
+mod transaction;
 
 pub use address::Address;
 pub use error::Error;
@@ -15,3 +16,4 @@ pub use move_types::{
     MoveType, MoveValue, U128, U64,
 };
 pub use response::{Response, X_DIEM_CHAIN_ID, X_DIEM_LEDGER_TIMESTAMP, X_DIEM_LEDGER_VERSION};
+pub use transaction::{Event, Transaction};

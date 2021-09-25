@@ -5,6 +5,7 @@ use diem_api_types::{Address, Error, LedgerInfo};
 use diem_types::{
     account_address::AccountAddress, account_state::AccountState,
     account_state_blob::AccountStateBlob, chain_id::ChainId, protocol_spec::DpnProto,
+    transaction::default_protocol::TransactionListWithProof,
 };
 use storage_interface::MoveDbReader;
 
@@ -68,6 +69,16 @@ impl Context {
             .db
             .get_account_state_with_proof_by_version(account, version)?;
         Ok(account_state_blob)
+    }
+
+    pub fn get_transactions(
+        &self,
+        start_version: u64,
+        limit: u16,
+        ledger_version: u64,
+    ) -> Result<TransactionListWithProof> {
+        self.db
+            .get_transactions(start_version, limit as u64, ledger_version, true)
     }
 }
 

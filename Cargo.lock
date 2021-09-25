@@ -1613,6 +1613,8 @@ name = "diem-api-types"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "bcs",
+ "diem-crypto",
  "diem-types",
  "diem-workspace-hack",
  "hex",
