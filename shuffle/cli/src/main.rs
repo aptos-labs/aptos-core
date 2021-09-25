@@ -5,9 +5,11 @@ use anyhow::Result;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
+mod account;
 mod deploy;
 mod new;
 mod node;
+mod utils;
 
 pub fn main() -> Result<()> {
     let subcommand = Subcommand::from_args();
@@ -18,6 +20,10 @@ pub fn main() -> Result<()> {
             project_path,
             account_key_path,
         } => deploy::handle(project_path, account_key_path),
+        Subcommand::Account {
+            project_path,
+            account_key_path,
+        } => account::handle(project_path, account_key_path),
     }
 }
 
@@ -37,6 +43,11 @@ pub enum Subcommand {
     Node { project_path: PathBuf },
     #[structopt(about = "Publishes a move module under an account")]
     Deploy {
+        project_path: PathBuf,
+        account_key_path: PathBuf,
+    },
+    #[structopt(about = "Create a new account")]
+    Account {
         project_path: PathBuf,
         account_key_path: PathBuf,
     },
