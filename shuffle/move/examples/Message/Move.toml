@@ -1,0 +1,9 @@
+[package]
+name = "Message"
+version = "0.0.0"
+
+[addresses]
+MessageAddress = "0x2"
+
+[dependencies]
+MoveStdlib = { local = "../../../../language/move-stdlib", addr_subst = { "Std" = "0x1" }}
