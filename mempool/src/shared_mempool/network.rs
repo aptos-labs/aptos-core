@@ -6,7 +6,7 @@
 use crate::{counters, shared_mempool::peer_manager::PeerSyncState};
 use async_trait::async_trait;
 use channel::{diem_channel, message_queues::QueueStyle};
-use diem_config::network_id::PeerNetworkId;
+use diem_config::network_id::{NetworkId, PeerNetworkId};
 use diem_types::{transaction::SignedTransaction, PeerId};
 use fail::fail_point;
 use network::{
@@ -24,7 +24,11 @@ use network::{
     ProtocolId,
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::hash_map::Entry, sync::Arc, time::Duration};
+use std::{
+    collections::{hash_map::Entry, HashMap},
+    sync::Arc,
+    time::Duration,
+};
 
 /// Container for exchanging transactions with other Mempools.
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -65,7 +69,7 @@ pub type MempoolNetworkEvents = NetworkEvents<MempoolSyncMsg>;
 /// remote, to finally receiving the response and deserializing. It therefore
 /// makes the most sense to make the rpc call on a separate async task, which
 /// requires the `MempoolNetworkSender` to be `Clone` and `Send`.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MempoolNetworkSender {
     inner: NetworkSender<MempoolSyncMsg>,
 }
@@ -122,10 +126,24 @@ impl ApplicationNetworkSender<MempoolSyncMsg> for MempoolNetworkSender {
 
 type MempoolMultiNetworkSender = MultiNetworkSender<MempoolSyncMsg, MempoolNetworkSender>;
 
+#[derive(Clone, Debug)]
 pub(crate) struct MempoolNetworkInterface {
     peer_metadata_storage: Arc<PeerMetadataStorage>,
     sender: MempoolMultiNetworkSender,
-    sync_states: LockingHashMap<PeerNetworkId, PeerSyncState>,
+    sync_states: Arc<LockingHashMap<PeerNetworkId, PeerSyncState>>,
+}
+
+impl MempoolNetworkInterface {
+    pub(crate) fn new(
+        peer_metadata_storage: Arc<PeerMetadataStorage>,
+        network_senders: HashMap<NetworkId, MempoolNetworkSender>,
+    ) -> MempoolNetworkInterface {
+        MempoolNetworkInterface {
+            peer_metadata_storage,
+            sender: MultiNetworkSender::new(network_senders),
+            sync_states: Arc::new(LockingHashMap::new()),
+        }
+    }
 }
 
 impl NetworkInterface<MempoolSyncMsg, MempoolMultiNetworkSender> for MempoolNetworkInterface {

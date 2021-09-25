@@ -18,14 +18,14 @@ use crate::peer_manager::{types::PeerManagerRequest, ConnectionRequest, PeerMana
 
 /// Convenience wrapper which makes it easy to issue communication requests and await the responses
 /// from PeerManager.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct PeerManagerRequestSender {
     inner: diem_channel::Sender<(PeerId, ProtocolId), PeerManagerRequest>,
 }
 
 /// Convenience wrapper which makes it easy to issue connection requests and await the responses
 /// from PeerManager.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ConnectionRequestSender {
     inner: diem_channel::Sender<PeerId, ConnectionRequest>,
 }

@@ -81,13 +81,24 @@ pub trait NetworkInterface<
     ) -> Result<(), PeerError>;
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MultiNetworkSender<
     TMessage: Message + Send,
     Sender: ApplicationNetworkSender<TMessage> + Send,
 > {
     senders: HashMap<NetworkId, Sender>,
     _phantom: PhantomData<TMessage>,
+}
+
+impl<TMessage: Message + Send, Sender: ApplicationNetworkSender<TMessage> + Send>
+    MultiNetworkSender<TMessage, Sender>
+{
+    pub fn new(senders: HashMap<NetworkId, Sender>) -> Self {
+        MultiNetworkSender {
+            senders,
+            _phantom: Default::default(),
+        }
+    }
 }
 
 impl<TMessage: Clone + Message + Send, Sender: ApplicationNetworkSender<TMessage> + Send>

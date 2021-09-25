@@ -25,7 +25,7 @@ use diem_types::{
     vm_status::DiscardedVMStatus,
 };
 use futures::{channel::oneshot, stream::FuturesUnordered};
-use network::protocols::network::ApplicationNetworkSender;
+use network::application::interface::{ApplicationPeerNetworkIdSender, NetworkInterface};
 use rayon::prelude::*;
 use short_hex_str::AsShortHexStr;
 use std::{
@@ -102,7 +102,7 @@ pub(crate) async fn process_client_transaction_submission<V>(
 
 /// Processes transactions from other nodes.
 pub(crate) async fn process_transaction_broadcast<V>(
-    mut smp: SharedMempool<V>,
+    smp: SharedMempool<V>,
     transactions: Vec<SignedTransaction>,
     request_id: Vec<u8>,
     timeline_state: TimelineState,
@@ -120,11 +120,8 @@ pub(crate) async fn process_transaction_broadcast<V>(
     log_txn_process_results(&results, Some(peer));
 
     let ack_response = gen_ack_response(request_id, results, &peer);
-    let network_sender = smp
-        .network_senders
-        .get_mut(&peer.network_id())
-        .expect("[shared mempool] missing network sender");
-    if let Err(e) = network_sender.send_to(peer.peer_id(), ack_response) {
+    let mut network_sender = smp.network_interface().sender();
+    if let Err(e) = network_sender.send_to(peer, ack_response) {
         counters::network_send_fail_inc(counters::ACK_TXNS);
         error!(
             LogSchema::event_log(LogEntry::BroadcastACK, LogEvent::NetworkSendFail)

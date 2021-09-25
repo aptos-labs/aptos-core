@@ -4,6 +4,7 @@
 //! Objects used by/related to shared mempool
 use crate::{
     core_mempool::CoreMempool,
+    network::MempoolNetworkInterface,
     shared_mempool::{network::MempoolNetworkSender, peer_manager::PeerManager},
 };
 use anyhow::Result;
@@ -21,6 +22,7 @@ use futures::{
     future::Future,
     task::{Context, Poll},
 };
+use network::application::storage::PeerMetadataStorage;
 use std::{collections::HashMap, fmt, pin::Pin, sync::Arc, task::Waker, time::Instant};
 use storage_interface::DbReader;
 use tokio::runtime::Handle;
@@ -34,7 +36,7 @@ where
 {
     pub mempool: Arc<Mutex<CoreMempool>>,
     pub config: MempoolConfig,
-    pub network_senders: HashMap<NetworkId, MempoolNetworkSender>,
+    pub(crate) network_interface: MempoolNetworkInterface,
     pub db: Arc<dyn DbReader<DpnProto>>,
     pub validator: Arc<RwLock<V>>,
     pub peer_manager: Arc<PeerManager>,
@@ -51,15 +53,23 @@ impl<V: TransactionValidation + 'static> SharedMempool<V> {
         peer_manager: Arc<PeerManager>,
         subscribers: Vec<UnboundedSender<SharedMempoolNotification>>,
     ) -> Self {
+        let network_interface = MempoolNetworkInterface::new(
+            PeerMetadataStorage::new(&[NetworkId::Public, NetworkId::Validator, NetworkId::Vfn]),
+            network_senders,
+        );
         SharedMempool {
             mempool,
             config,
-            network_senders,
+            network_interface,
             db,
             validator,
             peer_manager,
             subscribers,
         }
+    }
+
+    pub fn network_interface(&self) -> &MempoolNetworkInterface {
+        &self.network_interface
     }
 }
 

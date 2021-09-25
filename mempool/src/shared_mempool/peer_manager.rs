@@ -19,7 +19,10 @@ use diem_logger::prelude::*;
 use diem_types::transaction::SignedTransaction;
 use itertools::Itertools;
 use netcore::transport::ConnectionOrigin;
-use network::{protocols::network::ApplicationNetworkSender, transport::ConnectionMetadata};
+use network::{
+    application::interface::{ApplicationPeerNetworkIdSender, NetworkInterface},
+    transport::ConnectionMetadata,
+};
 use serde::{Deserialize, Serialize};
 use short_hex_str::AsShortHexStr;
 use std::{
@@ -290,15 +293,11 @@ impl PeerManager {
             return;
         }
 
-        let mut network_sender = smp
-            .network_senders
-            .get_mut(&peer.network_id())
-            .expect("[shared mempool] missing network sender")
-            .clone();
+        let mut network_sender = smp.network_interface.sender();
 
         let num_txns = transactions.len();
         if let Err(e) = network_sender.send_to(
-            peer.peer_id(),
+            peer,
             MempoolSyncMsg::BroadcastTransactionsRequest {
                 request_id: bcs::to_bytes(&batch_id).expect("failed BCS serialization of batch ID"),
                 transactions,

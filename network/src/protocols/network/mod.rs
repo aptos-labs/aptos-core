@@ -253,7 +253,7 @@ impl<TMessage> FusedStream for NetworkEvents<TMessage> {
 /// `MempoolNetworkSender` only exposes a `send_to` function.
 ///
 /// Provide Protobuf wrapper over `[peer_manager::PeerManagerRequestSender]`
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct NetworkSender<TMessage> {
     peer_mgr_reqs_tx: PeerManagerRequestSender,
     connection_reqs_tx: ConnectionRequestSender,

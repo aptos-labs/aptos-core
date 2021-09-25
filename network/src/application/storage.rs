@@ -17,6 +17,7 @@ use std::{
 
 /// Metadata storage for peers across all of networking.  Splits storage of information across
 /// networks to prevent different networks from affecting each other
+#[derive(Debug)]
 pub struct PeerMetadataStorage {
     storage: HashMap<NetworkId, LockingHashMap<PeerId, PeerInfo>>,
 }
@@ -146,6 +147,7 @@ fn to_peer_network_ids(
 }
 
 /// A generic locking hash map with ability to read before write consistency
+#[derive(Debug)]
 pub struct LockingHashMap<Key: Clone + Debug + Eq + Hash, Value: Clone + Debug> {
     map: RwLock<HashMap<Key, Value>>,
 }
