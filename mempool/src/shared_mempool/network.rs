@@ -3,12 +3,18 @@
 
 //! Interface between Mempool and Network layers.
 
-use crate::counters;
+use crate::{counters, shared_mempool::peer_manager::PeerSyncState};
 use async_trait::async_trait;
 use channel::{diem_channel, message_queues::QueueStyle};
+use diem_config::network_id::PeerNetworkId;
 use diem_types::{transaction::SignedTransaction, PeerId};
 use fail::fail_point;
 use network::{
+    application::{
+        interface::{MultiNetworkSender, NetworkInterface},
+        storage::{LockingHashMap, PeerMetadataStorage},
+        types::PeerError,
+    },
     error::NetworkError,
     peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
     protocols::network::{
@@ -18,7 +24,7 @@ use network::{
     ProtocolId,
 };
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
+use std::{collections::hash_map::Entry, sync::Arc, time::Duration};
 
 /// Container for exchanging transactions with other Mempools.
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -111,5 +117,48 @@ impl ApplicationNetworkSender<MempoolSyncMsg> for MempoolNetworkSender {
         _timeout: Duration,
     ) -> Result<MempoolSyncMsg, RpcError> {
         unimplemented!()
+    }
+}
+
+type MempoolMultiNetworkSender = MultiNetworkSender<MempoolSyncMsg, MempoolNetworkSender>;
+
+pub(crate) struct MempoolNetworkInterface {
+    peer_metadata_storage: Arc<PeerMetadataStorage>,
+    sender: MempoolMultiNetworkSender,
+    sync_states: LockingHashMap<PeerNetworkId, PeerSyncState>,
+}
+
+impl NetworkInterface<MempoolSyncMsg, MempoolMultiNetworkSender> for MempoolNetworkInterface {
+    type AppDataKey = PeerNetworkId;
+    type AppData = PeerSyncState;
+
+    fn peer_metadata_storage(&self) -> &PeerMetadataStorage {
+        &self.peer_metadata_storage
+    }
+
+    fn sender(&self) -> MempoolMultiNetworkSender {
+        self.sender.clone()
+    }
+
+    fn insert_app_data(&self, app_data_key: Self::AppDataKey, data: Self::AppData) {
+        self.sync_states.insert(app_data_key, data)
+    }
+
+    fn remove_app_data(&self, app_data_key: &Self::AppDataKey) {
+        self.sync_states.remove(app_data_key)
+    }
+
+    fn read_app_data(&self, app_data_key: &Self::AppDataKey) -> Option<Self::AppData> {
+        self.sync_states.read(app_data_key)
+    }
+
+    fn write_app_data<
+        F: FnOnce(&mut Entry<Self::AppDataKey, Self::AppData>) -> Result<(), PeerError>,
+    >(
+        &self,
+        app_data_key: Self::AppDataKey,
+        modifier: F,
+    ) -> Result<(), PeerError> {
+        self.sync_states.write(app_data_key, modifier)
     }
 }

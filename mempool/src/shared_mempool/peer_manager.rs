@@ -38,7 +38,7 @@ pub(crate) type PeerSyncStates = HashMap<PeerNetworkId, PeerSyncState>;
 /// State of last sync with peer:
 /// `timeline_id` is position in log of ready transactions
 /// `is_alive` - is connection healthy
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(crate) struct PeerSyncState {
     pub timeline_id: u64,
     pub is_alive: bool,
@@ -83,7 +83,7 @@ impl Ord for BatchId {
 }
 
 /// Txn broadcast-related info for a given remote peer.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct BroadcastInfo {
     // Sent broadcasts that have not yet received an ack.
     pub sent_batches: BTreeMap<BatchId, SystemTime>,
