@@ -1,6 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::shared;
 use anyhow::Result;
 use diem_genesis_tool::validator_builder::ValidatorConfig;
 use diem_types::{account_address::AccountAddress, on_chain_config::VMPublishingOption};
@@ -12,7 +13,6 @@ use move_cli::{
 use move_lang::shared::NumericalAddress;
 use move_package::source_package::layout::SourcePackageLayout;
 use once_cell::sync::Lazy;
-use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, HashMap},
     fs,
@@ -38,7 +38,7 @@ pub fn handle(blockchain: String, pathbuf: PathBuf) -> Result<()> {
     let storage_path = project_path.join(HELLOBLOCKCHAIN).join("storage");
     let state = mode.prepare_state(build_path.as_path(), storage_path.as_path())?;
 
-    let config = Config {
+    let config = shared::Config {
         blockchain,
         named_addresses: fetch_named_addresses(&state)?,
     };
@@ -47,13 +47,6 @@ pub fn handle(blockchain: String, pathbuf: PathBuf) -> Result<()> {
     build_move_starter_modules(project_path, &state)?;
     generate_validator_config(project_path)?;
     Ok(())
-}
-
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "kebab-case")]
-pub struct Config {
-    pub(crate) blockchain: String,
-    named_addresses: BTreeMap<String, AccountAddress>,
 }
 
 // Fetches the named addresses for a particular project or genesis.
@@ -75,7 +68,7 @@ fn map_address_bytes_to_account_address(
         .collect()
 }
 
-fn write_project_config(path: &Path, config: &Config) -> Result<()> {
+fn write_project_config(path: &Path, config: &shared::Config) -> Result<()> {
     let toml_path = PathBuf::from(path).join("Shuffle").with_extension("toml");
     let toml_string = toml::to_string(config)?;
     fs::write(toml_path, toml_string)?;
@@ -150,6 +143,7 @@ fn generate_validator_config(project_path: &Path) -> Result<ValidatorConfig> {
 mod test {
     use super::*;
     use diem_config::config::NodeConfig;
+    use shared::Config;
     use tempfile::tempdir;
 
     #[test]

@@ -9,6 +9,7 @@ mod account;
 mod deploy;
 mod new;
 mod node;
+mod shared;
 mod utils;
 
 pub fn main() -> Result<()> {
