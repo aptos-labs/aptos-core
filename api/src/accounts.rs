@@ -40,23 +40,23 @@ async fn handle_get_account_resources(
     address: String,
     context: Context,
 ) -> Result<impl Reply, Rejection> {
-    Ok(AccountResource::new(address, context)?.resources()?)
+    Ok(Account::new(address, context)?.resources()?)
 }
 
 async fn handle_get_account_modules(
     address: String,
     context: Context,
 ) -> Result<impl Reply, Rejection> {
-    Ok(AccountResource::new(address, context)?.modules()?)
+    Ok(Account::new(address, context)?.modules()?)
 }
 
-struct AccountResource {
+struct Account {
     address: Address,
     ledger_info: LedgerInfo,
     context: Context,
 }
 
-impl AccountResource {
+impl Account {
     pub fn new(address: String, context: Context) -> Result<Self, Error> {
         Ok(Self {
             address: address.try_into().map_err(Error::bad_request)?,
