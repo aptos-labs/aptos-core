@@ -8,6 +8,7 @@ use diem_types::account_state::AccountState;
 use resource_viewer::MoveValueAnnotator;
 
 use anyhow::Result;
+use serde_json::json;
 use std::convert::{TryFrom, TryInto};
 use warp::{Filter, Rejection, Reply};
 
@@ -85,8 +86,18 @@ impl AccountResource {
     }
 
     fn account_state(&self) -> Result<AccountState, Error> {
-        self.context
-            .get_account_state(&self.address, self.ledger_info.version())
+        let state = self
+            .context
+            .get_account_state_blob(self.address.into(), self.ledger_info.version())?
+            .ok_or_else(|| self.account_not_found())?;
+        Ok(AccountState::try_from(&state)?)
+    }
+
+    fn account_not_found(&self) -> Error {
+        Error::not_found(
+            format!("could not find account by address: {}", self.address),
+            json!({"ledger_version": self.ledger_info.ledger_version}),
+        )
     }
 }
 

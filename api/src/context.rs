@@ -1,21 +1,15 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_api_types::{Address, Error, LedgerInfo};
+use diem_api_types::{Error, LedgerInfo};
 use diem_types::{
-    account_address::AccountAddress, account_state::AccountState,
-    account_state_blob::AccountStateBlob, chain_id::ChainId, protocol_spec::DpnProto,
-    transaction::default_protocol::TransactionListWithProof,
+    account_address::AccountAddress, account_state_blob::AccountStateBlob, chain_id::ChainId,
+    protocol_spec::DpnProto, transaction::default_protocol::TransactionListWithProof,
 };
 use storage_interface::MoveDbReader;
 
 use anyhow::Result;
-use serde_json::json;
-use std::{
-    borrow::Borrow,
-    convert::{Infallible, TryFrom},
-    sync::Arc,
-};
+use std::{borrow::Borrow, convert::Infallible, sync::Arc};
 use warp::Filter;
 
 // Context holds application scope context
@@ -49,17 +43,6 @@ impl Context {
         ))
     }
 
-    pub fn get_account_state(
-        &self,
-        address: &Address,
-        ledger_version: u64,
-    ) -> Result<AccountState, Error> {
-        let state = self
-            .get_account_state_blob(address.into(), ledger_version)?
-            .ok_or_else(|| account_not_found(&address.to_string(), ledger_version))?;
-        Ok(AccountState::try_from(&state)?)
-    }
-
     pub fn get_account_state_blob(
         &self,
         account: AccountAddress,
@@ -80,11 +63,4 @@ impl Context {
         self.db
             .get_transactions(start_version, limit as u64, ledger_version, true)
     }
-}
-
-fn account_not_found(address: &str, ledger_version: u64) -> Error {
-    Error::not_found(
-        format!("could not find account by address: {}", address),
-        json!({ "ledger_version": ledger_version.to_string() }),
-    )
 }
