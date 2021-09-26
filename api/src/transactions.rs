@@ -1,20 +1,15 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::context::Context;
+use crate::{context::Context, page::Page};
 
 use diem_api_types::{Error, Event, LedgerInfo, Response, Transaction};
 use diem_types::contract_event::ContractEvent;
 use resource_viewer::MoveValueAnnotator;
 
 use anyhow::{format_err, Result};
-use serde::Deserialize;
 use serde_json::json;
-use std::str::FromStr;
 use warp::{Filter, Rejection, Reply};
-
-const DEFAULT_PAGE_SIZE: u32 = 25;
-const MAX_PAGE_SIZE: u32 = 1000;
 
 pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
     get_transactions(context)
@@ -26,70 +21,39 @@ pub fn get_transactions(
 ) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
     warp::path!("transactions")
         .and(warp::get())
-        .and(warp::query::<PageQueryParam>())
+        .and(warp::query::<Page>())
         .and(context.filter())
         .and_then(handle_get_transactions)
 }
 
-async fn handle_get_transactions(
-    page: PageQueryParam,
-    context: Context,
-) -> Result<impl Reply, Rejection> {
-    Ok(Transactions::new(page, context)?.page()?)
-}
-
-#[derive(Clone, Debug, Deserialize)]
-struct PageQueryParam {
-    start: Option<String>,
-    limit: Option<String>,
-}
-
-impl PageQueryParam {
-    pub fn start(&self, latest_ledger_version: u64) -> Result<u64, Error> {
-        let v = parse_param("start", &self.start, latest_ledger_version)?;
-        if v > latest_ledger_version {
-            return Err(transaction_not_found(v, latest_ledger_version));
-        }
-        Ok(v)
-    }
-
-    pub fn limit(&self) -> Result<u16, Error> {
-        let v = parse_param("limit", &self.limit, DEFAULT_PAGE_SIZE)?;
-        if v > MAX_PAGE_SIZE {
-            return Err(Error::bad_request(format_err!(
-                "invalid parameter: limit={}, exceed limit {}",
-                v,
-                MAX_PAGE_SIZE
-            )));
-        }
-        Ok(v as u16)
-    }
+async fn handle_get_transactions(page: Page, context: Context) -> Result<impl Reply, Rejection> {
+    Ok(Transactions::new(context)?.list(page)?)
 }
 
 struct Transactions {
-    start_version: u64,
-    limit: u16,
     ledger_info: LedgerInfo,
     context: Context,
 }
 
 impl Transactions {
-    fn new(page: PageQueryParam, context: Context) -> Result<Self, Error> {
+    fn new(context: Context) -> Result<Self, Error> {
         let ledger_info = context.get_latest_ledger_info()?;
-        let ledger_version = ledger_info.version();
         Ok(Self {
-            start_version: page.start(ledger_version)?,
-            limit: page.limit()?,
             ledger_info,
             context,
         })
     }
 
-    pub fn page(self) -> Result<impl Reply, Error> {
+    pub fn list(self, page: Page) -> Result<impl Reply, Error> {
         let ledger_version = self.ledger_info.version();
+        let start_version = page.start(ledger_version)?;
+        if start_version > ledger_version {
+            return Err(transaction_not_found(start_version, ledger_version));
+        }
+        let limit = page.limit()?;
         let data = self
             .context
-            .get_transactions(self.start_version, self.limit, ledger_version)?;
+            .get_transactions(start_version, limit, ledger_version)?;
 
         let txn_start_version = data.first_transaction_version.unwrap_or(0);
         let submitted = data.transactions;
@@ -126,19 +90,6 @@ impl Transactions {
             ret.push((txn_version, event, data).into());
         }
         Ok(ret)
-    }
-}
-
-fn parse_param<T: FromStr>(
-    param_name: &str,
-    data: &Option<String>,
-    default: T,
-) -> Result<T, Error> {
-    match data {
-        Some(n) => n.parse::<T>().map_err(|_| {
-            Error::bad_request(format_err!("invalid parameter: {}={}", param_name, n))
-        }),
-        None => Ok(default),
     }
 }
 

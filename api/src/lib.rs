@@ -4,6 +4,7 @@
 mod accounts;
 mod context;
 mod index;
+mod page;
 pub mod runtime;
 mod transactions;
 
