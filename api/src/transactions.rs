@@ -151,7 +151,7 @@ fn transaction_not_found(version: u64, ledger_version: u64) -> Error {
 
 #[cfg(any(test))]
 mod tests {
-    use crate::test_utils::{assert_json, new_test_context, send_request};
+    use crate::test_utils::{assert_json, new_test_context};
 
     use diem_types::transaction::TransactionInfoTrait;
 
@@ -160,13 +160,16 @@ mod tests {
     #[tokio::test]
     async fn test_get_transactions() {
         let context = new_test_context();
-        let resp = send_request(context.clone(), "GET", "/transactions", 200).await;
+        let ledger_info = context.get_latest_ledger_info();
+        let txns = context
+            .context
+            .get_transactions(0, 1, ledger_info.version())
+            .unwrap();
+
+        let resp = context.get("/transactions").await;
         assert_eq!(resp[0]["type"], "genesis_transaction");
         assert_eq!(resp[0]["version"], "0");
 
-        let txns = context
-            .get_transactions(0, 1, context.get_latest_ledger_info().unwrap().version())
-            .unwrap();
         let info = txns.proof.transaction_infos[0].clone();
         assert_eq!(resp[0]["hash"], info.transaction_hash().to_hex());
         assert_eq!(resp[0]["state_root_hash"], info.state_root_hash().to_hex());
@@ -198,8 +201,11 @@ mod tests {
     #[tokio::test]
     async fn test_get_transactions_with_start_version_is_too_large() {
         let context = new_test_context();
-        let ledger_version = context.get_latest_ledger_info().unwrap().version();
-        let resp = send_request(context, "GET", "/transactions?start=1000000&limit=10", 404).await;
+        let ledger_version = context.get_latest_ledger_info().version();
+        let resp = context
+            .expect_status_code(404)
+            .get("/transactions?start=1000000&limit=10")
+            .await;
         assert_json(
             resp,
             json!({
@@ -215,7 +221,10 @@ mod tests {
     #[tokio::test]
     async fn test_get_transactions_with_invalid_start_version_param() {
         let context = new_test_context();
-        let resp = send_request(context, "GET", "/transactions?start=hello", 400).await;
+        let resp = context
+            .expect_status_code(400)
+            .get("/transactions?start=hello")
+            .await;
         assert_json(
             resp,
             json!({
@@ -228,7 +237,10 @@ mod tests {
     #[tokio::test]
     async fn test_get_transactions_with_invalid_limit_param() {
         let context = new_test_context();
-        let resp = send_request(context, "GET", "/transactions?limit=hello", 400).await;
+        let resp = context
+            .expect_status_code(400)
+            .get("/transactions?limit=hello")
+            .await;
         assert_json(
             resp,
             json!({
@@ -241,7 +253,10 @@ mod tests {
     #[tokio::test]
     async fn test_get_transactions_param_limit_exceeds_limit() {
         let context = new_test_context();
-        let resp = send_request(context, "GET", "/transactions?limit=2000", 400).await;
+        let resp = context
+            .expect_status_code(400)
+            .get("/transactions?limit=2000")
+            .await;
         assert_json(
             resp,
             json!({

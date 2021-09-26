@@ -103,7 +103,7 @@ impl Account {
 
 #[cfg(any(test))]
 mod tests {
-    use crate::test_utils::{assert_json, find_value, new_test_context, send_request};
+    use crate::test_utils::{assert_json, find_value, new_test_context};
     use serde_json::json;
 
     #[tokio::test]
@@ -111,7 +111,7 @@ mod tests {
         let context = new_test_context();
         let address = "0x1";
 
-        let resp = send_request(context, "GET", &account_resources(address), 200).await;
+        let resp = context.get(&account_resources(address)).await;
         assert_eq!(json!([]), resp);
     }
 
@@ -120,9 +120,11 @@ mod tests {
         let context = new_test_context();
         let address = "0x0";
 
-        let resp = send_request(context.clone(), "GET", &account_resources(address), 404).await;
-
-        let info = context.get_latest_ledger_info().unwrap();
+        let info = context.get_latest_ledger_info();
+        let resp = context
+            .expect_status_code(404)
+            .get(&account_resources(address))
+            .await;
         assert_eq!(
             json!({
                 "code": 404,
@@ -140,8 +142,10 @@ mod tests {
         let context = new_test_context();
         let invalid_addresses = vec!["1", "0xzz", "01"];
         for invalid_address in &invalid_addresses {
-            let path = account_resources(invalid_address);
-            let resp = send_request(context.clone(), "GET", &path, 400).await;
+            let resp = context
+                .expect_status_code(400)
+                .get(&account_resources(invalid_address))
+                .await;
             assert_eq!(
                 json!({
                     "code": 400,
@@ -161,7 +165,7 @@ mod tests {
             "0x000000000000000000000000000000dd",
         ];
         for address in &addresses {
-            send_request(context.clone(), "GET", &account_resources(address), 200).await;
+            context.get(&account_resources(address)).await;
         }
     }
 
@@ -170,7 +174,7 @@ mod tests {
         let context = new_test_context();
         let address = "0xdd";
 
-        let resp = send_request(context, "GET", &account_resources(address), 200).await;
+        let resp = context.get(&account_resources(address)).await;
 
         let res = find_value(&resp, |v| {
             v["type"]["name"] == "Balance" && v["type"]["generic_type_params"][0]["name"] == "XDX"
@@ -225,7 +229,7 @@ mod tests {
         let context = new_test_context();
         let address = "0x1";
 
-        let resp = send_request(context, "GET", &account_modules(address), 200).await;
+        let resp = context.get(&account_modules(address)).await;
         let res = find_value(&resp, |v| v["name"] == "BCS");
         assert_json(
             res,
@@ -272,7 +276,7 @@ mod tests {
         let context = new_test_context();
         let address = "0x1";
 
-        let resp = send_request(context, "GET", &account_modules(address), 200).await;
+        let resp = context.get(&account_modules(address)).await;
         let res = find_value(&resp, |v| v["name"] == "PaymentScripts");
         assert_json(
             res,
@@ -334,7 +338,7 @@ mod tests {
         let context = new_test_context();
         let address = "0x1";
 
-        let resp = send_request(context, "GET", &account_modules(address), 200).await;
+        let resp = context.get(&account_modules(address)).await;
         let res = find_value(&resp, |v| v["name"] == "DiemConfig");
         assert_json(
             res,
@@ -682,7 +686,7 @@ mod tests {
         let context = new_test_context();
         let address = "0x1";
 
-        let resp = send_request(context, "GET", &account_modules(address), 200).await;
+        let resp = context.get(&account_modules(address)).await;
 
         let diem_account_module = find_value(&resp, |v| v["name"] == "DiemAccount");
         let balance_struct =
