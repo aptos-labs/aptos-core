@@ -15,7 +15,7 @@ use move_package::source_package::layout::SourcePackageLayout;
 use once_cell::sync::Lazy;
 use std::{
     collections::{BTreeMap, HashSet},
-    fs::{self},
+    fs,
     path::{Path, PathBuf},
 };
 
@@ -24,7 +24,7 @@ pub const DEFAULT_BLOCKCHAIN: &str = "goodday";
 
 /// Directory of generated transaction builders for helloblockchain.
 const EXAMPLES_DIR: Dir = include_dir!("../move/examples/Message");
-const MESSAGE_EXAMPLE_PATH: &str = "Message";
+pub const MESSAGE_EXAMPLE_PATH: &str = "Message";
 
 pub fn handle(blockchain: String, pathbuf: PathBuf) -> Result<()> {
     let project_path = pathbuf.as_path();
@@ -44,8 +44,7 @@ pub fn handle(blockchain: String, pathbuf: PathBuf) -> Result<()> {
         named_addresses: fetch_named_addresses(&state)?,
     };
     write_project_config(project_path, &config)?;
-    write_move_starter_modules(project_path)?;
-    build_move_starter_modules(project_path)?;
+    write_example_move_packages(project_path)?;
     generate_validator_config(project_path)?;
     Ok(())
 }
@@ -78,9 +77,8 @@ fn write_project_config(path: &Path, config: &shared::Config) -> Result<()> {
 
 static EXAMPLE_BLOCKLIST: Lazy<HashSet<&'static str>> = Lazy::new(|| [].iter().cloned().collect());
 
-// Writes all the move modules for a new project, including genesis and
-// starter template.
-fn write_move_starter_modules(root_path: &Path) -> Result<()> {
+// Writes the move packages for a new project
+fn write_example_move_packages(root_path: &Path) -> Result<()> {
     let creation_path = Path::new(&root_path).join(MESSAGE_EXAMPLE_PATH);
     pkgcli::create_move_package("helloblockchain", &creation_path)?;
 
@@ -110,21 +108,6 @@ fn file_entry_to_string(f: &include_dir::File) -> Result<String> {
         .ok_or_else(|| anyhow::format_err!("embedded example filename unavailable"))?
         .to_string_lossy()
         .to_string())
-}
-
-/// Builds the examples using the move package system.
-fn build_move_starter_modules(project_path: &Path) -> Result<()> {
-    println!("Building Examples...");
-    let pkgdir = project_path.join(MESSAGE_EXAMPLE_PATH);
-    let config = move_package::BuildConfig {
-        dev_mode: true,
-        test_mode: false,
-        generate_docs: false,
-        generate_abis: true,
-    };
-
-    config.compile_package(pkgdir.as_path(), &mut std::io::stdout())?;
-    Ok(())
 }
 
 fn generate_validator_config(project_path: &Path) -> Result<ValidatorConfig> {

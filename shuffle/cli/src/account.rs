@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::utils::send;
+use crate::shared::send;
 use anyhow::{Context, Result};
 use diem_config::config::NodeConfig;
 use diem_crypto::PrivateKey;

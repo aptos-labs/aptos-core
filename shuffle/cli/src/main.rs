@@ -10,7 +10,6 @@ mod deploy;
 mod new;
 mod node;
 mod shared;
-mod utils;
 
 pub fn main() -> Result<()> {
     let subcommand = Subcommand::from_args();
@@ -20,7 +19,7 @@ pub fn main() -> Result<()> {
         Subcommand::Deploy {
             project_path,
             account_key_path,
-        } => deploy::handle(project_path, account_key_path),
+        } => deploy::handle(project_path.as_path(), account_key_path.as_path()),
         Subcommand::Account {
             project_path,
             account_key_path,
