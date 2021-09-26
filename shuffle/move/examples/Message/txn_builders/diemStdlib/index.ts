@@ -1,9 +1,9 @@
 
-import { Serializer } from '../serde/serializer';
-import { Deserializer } from '../serde/deserializer';
-import { Optional, Seq, Tuple, ListTuple, unit, bool, int8, int16, int32, int64, int128, uint8, uint16, uint32, uint64, uint128, float32, float64, char, str, bytes} from '../serde/types';
+import { Serializer } from '../serde/serializer.ts';
+import { Deserializer } from '../serde/deserializer.ts';
+import { Optional, Seq, Tuple, ListTuple, unit, bool, int8, int16, int32, int64, int128, uint8, uint16, uint32, uint64, uint128, float32, float64, char, str, bytes} from '../serde/types.ts';
 
-import * as DiemTypes from '../diemTypes';
+import * as DiemTypes from '../diemTypes/index.ts';
 
 /**
  * Structured representation of a call into a known Move script.
@@ -20,7 +20,7 @@ constructor (public message: bytes) {
 
 }
 
-import { BcsSerializer } from '../bcs/bcsSerializer';
+import { BcsSerializer } from '../bcs/bcsSerializer.ts';
 
 
 

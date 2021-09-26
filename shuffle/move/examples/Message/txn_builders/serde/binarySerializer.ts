@@ -1,5 +1,5 @@
-import { Serializer } from './serializer';
-import util from 'util';
+import { Serializer } from './serializer.ts';
+import * as util from "https://deno.land/std@0.85.0/node/util.ts"
 
 export abstract class BinarySerializer implements Serializer {
     private static readonly BIG_32 = BigInt(32);
@@ -85,8 +85,8 @@ export abstract class BinarySerializer implements Serializer {
     }
 
     public serializeU64(value: BigInt | number): void {
-        const low = BigInt(value) & BinarySerializer.BIG_32Fs;
-        const high = BigInt(value) >> BinarySerializer.BIG_32;
+        const low = BigInt(value.toString()) & BinarySerializer.BIG_32Fs;
+        const high = BigInt(value.toString()) >> BinarySerializer.BIG_32;
 
         // write little endian number
         this.serializeU32(Number(low));
@@ -94,8 +94,8 @@ export abstract class BinarySerializer implements Serializer {
     }
 
     public serializeU128(value: BigInt | number): void {
-        const low = BigInt(value) & BinarySerializer.BIG_64Fs;
-        const high = BigInt(value) >> BinarySerializer.BIG_64;
+        const low = BigInt(value.toString()) & BinarySerializer.BIG_64Fs;
+        const high = BigInt(value.toString()) >> BinarySerializer.BIG_64;
 
         // write little endian number
         this.serializeU64(low);

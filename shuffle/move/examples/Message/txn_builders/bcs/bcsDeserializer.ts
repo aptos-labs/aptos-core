@@ -1,4 +1,4 @@
-import { BinaryDeserializer } from '../serde/binaryDeserializer';
+import { BinaryDeserializer } from '../serde/binaryDeserializer.ts';
 
 export class BcsDeserializer extends BinaryDeserializer {
   private static readonly MAX_UINT_32 = 2 ** 32 - 1;

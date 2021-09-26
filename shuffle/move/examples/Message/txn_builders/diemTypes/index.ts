@@ -1,7 +1,7 @@
 
-import { Serializer } from '../serde/serializer';
-import { Deserializer } from '../serde/deserializer';
-import { Optional, Seq, Tuple, ListTuple, unit, bool, int8, int16, int32, int64, int128, uint8, uint16, uint32, uint64, uint128, float32, float64, char, str, bytes} from '../serde/types';
+import { Serializer } from '../serde/serializer.ts';
+import { Deserializer } from '../serde/deserializer.ts';
+import { Optional, Seq, Tuple, ListTuple, unit, bool, int8, int16, int32, int64, int128, uint8, uint16, uint32, uint64, uint128, float32, float64, char, str, bytes} from '../serde/types.ts';
 
 export class AccessPath {
 
@@ -799,22 +799,22 @@ static deserialize(deserializer: Deserializer): Script {
 }
 export class ScriptFunction {
 
-constructor (public module: ModuleId, public function: Identifier, public ty_args: Seq<TypeTag>, public args: Seq<bytes>) {
+constructor (public module_arg: ModuleId, public function_arg: Identifier, public ty_args: Seq<TypeTag>, public args: Seq<bytes>) {
 }
 
 public serialize(serializer: Serializer): void {
-  this.module.serialize(serializer);
-  this.function.serialize(serializer);
+  this.module_arg.serialize(serializer);
+  this.function_arg.serialize(serializer);
   Helpers.serializeVectorTypeTag(this.ty_args, serializer);
   Helpers.serializeVectorBytes(this.args, serializer);
 }
 
 static deserialize(deserializer: Deserializer): ScriptFunction {
-  const module = ModuleId.deserialize(deserializer);
-  const function = Identifier.deserialize(deserializer);
+  const module_arg = ModuleId.deserialize(deserializer);
+  const function_arg = Identifier.deserialize(deserializer);
   const ty_args = Helpers.deserializeVectorTypeTag(deserializer);
   const args = Helpers.deserializeVectorBytes(deserializer);
-  return new ScriptFunction(module,function,ty_args,args);
+  return new ScriptFunction(module_arg,function_arg,ty_args,args);
 }
 
 }

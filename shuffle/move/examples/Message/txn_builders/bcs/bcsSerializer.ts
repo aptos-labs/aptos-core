@@ -1,4 +1,4 @@
-import { BinarySerializer } from '../serde/binarySerializer';
+import { BinarySerializer } from '../serde/binarySerializer.ts';
 
 export class BcsSerializer extends BinarySerializer {
     constructor() {

@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use structopt::StructOpt;
 
 mod account;
+mod console;
 mod deploy;
 mod new;
 mod node;
@@ -24,6 +25,7 @@ pub fn main() -> Result<()> {
             project_path,
             account_key_path,
         } => account::handle(project_path, account_key_path),
+        Subcommand::Console { project_path } => console::handle(project_path.as_path()),
     }
 }
 
@@ -51,4 +53,6 @@ pub enum Subcommand {
         project_path: PathBuf,
         account_key_path: PathBuf,
     },
+    #[structopt(about = "Starts a REPL for onchain inspection")]
+    Console { project_path: PathBuf },
 }
