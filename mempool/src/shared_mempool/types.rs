@@ -179,3 +179,5 @@ pub type SubmissionStatusBundle = (SignedTransaction, SubmissionStatus);
 
 pub type MempoolClientSender =
     mpsc::Sender<(SignedTransaction, oneshot::Sender<Result<SubmissionStatus>>)>;
+pub type MempoolEventsReceiver =
+    mpsc::Receiver<(SignedTransaction, oneshot::Sender<Result<SubmissionStatus>>)>;

@@ -301,9 +301,9 @@ impl StateSyncEnvironment {
             peer.signer.clone(),
         )));
 
-        let (mempool_notifier, mempool_listener) =
-            mempool_notifications::new_mempool_notifier_listener_pair();
-        peer.mempool = Some(MockSharedMempool::new(Some(mempool_listener)));
+        let mempool = MockSharedMempool::new();
+        let mempool_notifier = mempool.mempool_notifier.clone();
+        peer.mempool = Some(mempool);
 
         let (consensus_notifier, consensus_listener) =
             consensus_notifications::new_consensus_notifier_listener_pair(

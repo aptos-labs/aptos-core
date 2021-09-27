@@ -14,7 +14,7 @@ use tokio::runtime::Builder;
 
 #[test]
 fn test_consensus_events_rejected_txns() {
-    let smp = MockSharedMempool::new(None);
+    let smp = MockSharedMempool::new();
 
     // Add txns 1, 2, 3, 4
     // Txn 1: committed successfully
@@ -59,9 +59,7 @@ fn test_mempool_notify_committed_txns() {
     let _enter = runtime.enter();
 
     // Create a new mempool notifier, listener and shared mempool
-    let (mempool_notifier, mempool_listener) =
-        mempool_notifications::new_mempool_notifier_listener_pair();
-    let smp = MockSharedMempool::new(Some(mempool_listener));
+    let smp = MockSharedMempool::new();
 
     // Add txns 1, 2, 3, 4
     // Txn 1: committed successfully
@@ -83,7 +81,8 @@ fn test_mempool_notify_committed_txns() {
 
     let committed_txns = vec![Transaction::UserTransaction(committed_txn)];
     block_on(async {
-        assert!(mempool_notifier
+        assert!(smp
+            .mempool_notifier
             .notify_new_commit(committed_txns, 1, 1000)
             .await
             .is_ok());

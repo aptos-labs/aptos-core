@@ -73,7 +73,7 @@ impl SMRNode {
 
         let (state_sync_client, state_sync) = mpsc::unbounded();
         let (commit_cb_sender, commit_cb_receiver) = mpsc::unbounded::<LedgerInfoWithSignatures>();
-        let shared_mempool = MockSharedMempool::new(None);
+        let shared_mempool = MockSharedMempool::new();
         let consensus_to_mempool_sender = shared_mempool.consensus_sender.clone();
         let state_computer = Arc::new(MockStateComputer::new(
             state_sync_client,

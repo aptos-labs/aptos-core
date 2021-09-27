@@ -59,7 +59,7 @@ pub fn new_mempool_notifier_listener_pair() -> (MempoolNotifier, MempoolNotifica
 }
 
 /// The state sync component responsible for notifying mempool.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct MempoolNotifier {
     notification_sender: mpsc::Sender<MempoolCommitNotification>,
 }

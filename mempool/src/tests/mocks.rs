@@ -22,36 +22,71 @@ use diem_types::{
 };
 use event_notifications::EventSubscriptionService;
 use futures::channel::{mpsc, oneshot};
-use mempool_notifications::{self, MempoolNotificationListener, MempoolNotifier};
+use mempool_notifications::{self, MempoolNotifier};
 use network::{
     peer_manager::{conn_notifs_channel, ConnectionRequestSender, PeerManagerRequestSender},
     protocols::network::{NewNetworkEvents, NewNetworkSender},
 };
 use std::sync::Arc;
 use storage_interface::{mock::MockDbReaderWriter, DbReaderWriter};
-use tokio::runtime::{Builder, Runtime};
+use tokio::runtime::{Builder, Handle, Runtime};
 use vm_validator::mocks::mock_vm_validator::MockVMValidator;
 
 /// Mock of a running instance of shared mempool.
 pub struct MockSharedMempool {
-    _runtime: Runtime,
+    _runtime: Option<Runtime>,
+    _handle: Option<Handle>,
     pub ac_client: mpsc::Sender<(SignedTransaction, oneshot::Sender<Result<SubmissionStatus>>)>,
     pub mempool: Arc<Mutex<CoreMempool>>,
     pub consensus_sender: mpsc::Sender<ConsensusRequest>,
-    pub mempool_notifier: Option<MempoolNotifier>,
+    pub mempool_notifier: MempoolNotifier,
 }
 
 impl MockSharedMempool {
     /// Creates a mock of a running instance of shared mempool.
     /// Returns the runtime on which the shared mempool is running
     /// and the channel through which shared mempool receives client events.
-    pub fn new(mempool_listener: Option<MempoolNotificationListener>) -> Self {
+    pub fn new() -> Self {
         let runtime = Builder::new_multi_thread()
             .thread_name("mock-shared-mem")
             .enable_all()
             .build()
             .expect("[mock shared mempool] failed to create runtime");
+        let (ac_client, mempool, consensus_sender, mempool_notifier) =
+            Self::start(runtime.handle());
+        Self {
+            _runtime: Some(runtime),
+            _handle: None,
+            ac_client,
+            mempool,
+            consensus_sender,
+            mempool_notifier,
+        }
+    }
 
+    /// Creates a mock of a running instance of shared mempool inside a tokio runtime;
+    /// Holds a runtime handle instead.
+    pub fn new_in_runtime() -> Self {
+        let handle = Handle::current();
+        let (ac_client, mempool, consensus_sender, mempool_notifier) = Self::start(&handle);
+        Self {
+            _runtime: None,
+            _handle: Some(handle),
+            ac_client,
+            mempool,
+            consensus_sender,
+            mempool_notifier,
+        }
+    }
+
+    pub fn start(
+        handle: &Handle,
+    ) -> (
+        mpsc::Sender<(SignedTransaction, oneshot::Sender<Result<SubmissionStatus>>)>,
+        Arc<Mutex<CoreMempool>>,
+        mpsc::Sender<ConsensusRequest>,
+        MempoolNotifier,
+    ) {
         let mut config = NodeConfig::random();
         config.validator_network = Some(NetworkConfig::network_with_id(NetworkId::Validator));
 
@@ -67,14 +102,8 @@ impl MockSharedMempool {
         let network_events = MempoolNetworkEvents::new(network_notifs_rx, conn_notifs_rx);
         let (ac_client, client_events) = mpsc::channel(1_024);
         let (consensus_sender, consensus_events) = mpsc::channel(1_024);
-        let (mempool_notifier, mempool_listener) = match mempool_listener {
-            None => {
-                let (mempool_notifier, mempool_listener) =
-                    mempool_notifications::new_mempool_notifier_listener_pair();
-                (Some(mempool_notifier), mempool_listener)
-            }
-            Some(mempool_listener) => (None, mempool_listener),
-        };
+        let (mempool_notifier, mempool_listener) =
+            mempool_notifications::new_mempool_notifier_listener_pair();
         let mut event_subscriber = EventSubscriptionService::new(
             ON_CHAIN_CONFIG_REGISTRY,
             Arc::new(RwLock::new(DbReaderWriter::new(MockDbReaderWriter))),
@@ -83,7 +112,7 @@ impl MockSharedMempool {
         let network_handles = vec![(NetworkId::Validator, network_sender, network_events)];
 
         start_shared_mempool(
-            runtime.handle(),
+            handle,
             &config,
             mempool.clone(),
             network_handles,
@@ -96,13 +125,7 @@ impl MockSharedMempool {
             vec![],
         );
 
-        Self {
-            _runtime: runtime,
-            ac_client,
-            mempool,
-            consensus_sender,
-            mempool_notifier,
-        }
+        (ac_client, mempool, consensus_sender, mempool_notifier)
     }
 
     pub fn add_txns(&self, txns: Vec<SignedTransaction>) -> Result<()> {

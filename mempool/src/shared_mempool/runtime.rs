@@ -7,19 +7,15 @@ use crate::{
     shared_mempool::{
         coordinator::{coordinator, gc_coordinator, snapshot_job},
         peer_manager::PeerManager,
-        types::{SharedMempool, SharedMempoolNotification},
+        types::{MempoolEventsReceiver, SharedMempool, SharedMempoolNotification},
     },
-    ConsensusRequest, SubmissionStatus,
+    ConsensusRequest,
 };
-use anyhow::Result;
 use diem_config::{config::NodeConfig, network_id::NetworkId};
 use diem_infallible::{Mutex, RwLock};
-use diem_types::{protocol_spec::DpnProto, transaction::SignedTransaction};
+use diem_types::protocol_spec::DpnProto;
 use event_notifications::ReconfigNotificationListener;
-use futures::channel::{
-    mpsc::{self, Receiver, UnboundedSender},
-    oneshot,
-};
+use futures::channel::mpsc::{self, Receiver, UnboundedSender};
 use mempool_notifications::MempoolNotificationListener;
 use std::{collections::HashMap, sync::Arc};
 use storage_interface::DbReader;
@@ -38,7 +34,7 @@ pub(crate) fn start_shared_mempool<V>(
     // First element in tuple is the network ID.
     // See `NodeConfig::is_upstream_peer` for the definition of network ID.
     mempool_network_handles: Vec<(NetworkId, MempoolNetworkSender, MempoolNetworkEvents)>,
-    client_events: mpsc::Receiver<(SignedTransaction, oneshot::Sender<Result<SubmissionStatus>>)>,
+    client_events: MempoolEventsReceiver,
     consensus_requests: mpsc::Receiver<ConsensusRequest>,
     mempool_listener: MempoolNotificationListener,
     mempool_reconfig_events: ReconfigNotificationListener,
@@ -94,7 +90,7 @@ pub fn bootstrap(
     // The first element in the tuple is the ID of the network that this network is a handle to.
     // See `NodeConfig::is_upstream_peer` for the definition of network ID.
     mempool_network_handles: Vec<(NetworkId, MempoolNetworkSender, MempoolNetworkEvents)>,
-    client_events: Receiver<(SignedTransaction, oneshot::Sender<Result<SubmissionStatus>>)>,
+    client_events: MempoolEventsReceiver,
     consensus_requests: Receiver<ConsensusRequest>,
     mempool_listener: MempoolNotificationListener,
     mempool_reconfig_events: ReconfigNotificationListener,
