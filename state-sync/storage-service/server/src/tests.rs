@@ -89,6 +89,26 @@ fn test_get_server_protocol_version() {
 }
 
 #[test]
+fn test_get_number_of_accounts_at_version() {
+    // Create a storage service server
+    let storage_server = create_storage_server();
+
+    // Create a request to fetch the number of accounts at the specified version
+    let number_of_accounts_request = StorageServiceRequest::GetNumberOfAccountsAtVersion(10);
+
+    // Process the request
+    let number_of_accounts_response = storage_server
+        .handle_request(number_of_accounts_request)
+        .unwrap();
+
+    // Verify the response is correct (the API call is currently unsupported)
+    assert_matches!(
+        number_of_accounts_response,
+        StorageServiceResponse::StorageServiceError(StorageServiceError::InternalError)
+    );
+}
+
+#[test]
 fn test_get_storage_server_summary() {
     // Create a storage service server
     let storage_server = create_storage_server();

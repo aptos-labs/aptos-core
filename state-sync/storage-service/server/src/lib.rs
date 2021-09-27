@@ -8,7 +8,10 @@ use diem_infallible::RwLock;
 use diem_types::{
     account_state_blob::AccountStatesChunkWithProof,
     epoch_change::EpochChangeProof,
-    transaction::default_protocol::{TransactionListWithProof, TransactionOutputListWithProof},
+    transaction::{
+        default_protocol::{TransactionListWithProof, TransactionOutputListWithProof},
+        Version,
+    },
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -62,6 +65,9 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
             StorageServiceRequest::GetEpochEndingLedgerInfos(request) => {
                 self.get_epoch_ending_ledger_infos(request)
             }
+            StorageServiceRequest::GetNumberOfAccountsAtVersion(version) => {
+                self.get_number_of_accounts_at_version(version)
+            }
             StorageServiceRequest::GetServerProtocolVersion => self.get_server_protocol_version(),
             StorageServiceRequest::GetStorageServerSummary => self.get_storage_server_summary(),
             StorageServiceRequest::GetTransactionOutputsWithProof(request) => {
@@ -109,6 +115,17 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
 
         Ok(StorageServiceResponse::EpochEndingLedgerInfos(
             epoch_change_proof,
+        ))
+    }
+
+    fn get_number_of_accounts_at_version(
+        &self,
+        version: Version,
+    ) -> Result<StorageServiceResponse, Error> {
+        let number_of_accounts = self.storage.get_number_of_accounts(version)?;
+
+        Ok(StorageServiceResponse::NumberOfAccountsAtVersion(
+            number_of_accounts,
         ))
     }
 
@@ -204,6 +221,10 @@ pub trait StorageReaderInterface {
         start_version: u64,
         expected_num_transaction_outputs: u64,
     ) -> Result<TransactionOutputListWithProof, Error>;
+
+    /// Returns the number of accounts in the account state tree at the
+    /// specified version.
+    fn get_number_of_accounts(&self, version: u64) -> Result<u64, Error>;
 
     /// Returns a chunk holding a list of account states starting at the
     /// specified account key with *at most* `expected_num_account_states`.
@@ -307,6 +328,13 @@ impl StorageReaderInterface for StorageReader {
         _start_account_key: HashValue,
         _expected_num_account_states: u64,
     ) -> Result<AccountStatesChunkWithProof, Error> {
+        // TODO(joshlind): implement this once DbReaderWriter supports these calls.
+        Err(Error::UnexpectedErrorEncountered(
+            "Unimplemented! This API call needs to be implemented!".into(),
+        ))
+    }
+
+    fn get_number_of_accounts(&self, _version: u64) -> Result<u64, Error> {
         // TODO(joshlind): implement this once DbReaderWriter supports these calls.
         Err(Error::UnexpectedErrorEncountered(
             "Unimplemented! This API call needs to be implemented!".into(),

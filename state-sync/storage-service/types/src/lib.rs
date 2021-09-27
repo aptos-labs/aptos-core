@@ -19,8 +19,9 @@ use diem_types::{
 pub enum StorageServiceRequest {
     GetAccountStatesChunkWithProof(AccountStatesChunkWithProofRequest), // Fetches a list of account states with a proof
     GetEpochEndingLedgerInfos(EpochEndingLedgerInfoRequest), // Fetches a list of epoch ending ledger infos
-    GetServerProtocolVersion, // Fetches the protocol version run by the server
-    GetStorageServerSummary,  // Fetches a summary of the storage server state
+    GetNumberOfAccountsAtVersion(Version), // Fetches the number of accounts at the specified version
+    GetServerProtocolVersion,              // Fetches the protocol version run by the server
+    GetStorageServerSummary,               // Fetches a summary of the storage server state
     GetTransactionOutputsWithProof(TransactionOutputsWithProofRequest), // Fetches a list of transaction outputs with a proof
     GetTransactionsWithProof(TransactionsWithProofRequest), // Fetches a list of transactions with a proof
 }
@@ -30,6 +31,7 @@ pub enum StorageServiceRequest {
 pub enum StorageServiceResponse {
     AccountStatesChunkWithProof(AccountStatesChunkWithProof),
     EpochEndingLedgerInfos(EpochChangeProof),
+    NumberOfAccountsAtVersion(u64),
     ServerProtocolVersion(ServerProtocolVersion),
     StorageServiceError(StorageServiceError),
     StorageServerSummary(StorageServerSummary),
