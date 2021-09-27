@@ -5,7 +5,7 @@
 
 // deno-lint-ignore-file no-explicit-any
 import { assert, assertExists } from "https://deno.land/std/testing/asserts.ts";
-import * as Shuffle from "../../repl.ts";
+import * as Shuffle from "../repl.ts";
 import * as utils from "./utils.ts";
 
 Shuffle.test("Test Assert", () => {

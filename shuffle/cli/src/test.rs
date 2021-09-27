@@ -8,11 +8,8 @@ use std::{path::Path, process::Command};
 
 pub fn handle(project_path: &Path) -> Result<()> {
     let _config = shared::read_config(project_path)?;
-    // TODO: Not hardcode Message package, figure out how to run all pacakge
-    // e2e tests.
     let tests_path_string = project_path
-        .join("Message")
-        .join("tests")
+        .join("e2e")
         .as_path()
         .to_string_lossy()
         .to_string();

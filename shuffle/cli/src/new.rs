@@ -23,7 +23,7 @@ use std::{
 pub const DEFAULT_BLOCKCHAIN: &str = "goodday";
 
 /// Directory of generated transaction builders for helloblockchain.
-const EXAMPLES_DIR: Dir = include_dir!("../move/examples/Message");
+const EXAMPLES_DIR: Dir = include_dir!("../move/examples");
 pub const MESSAGE_EXAMPLE_PATH: &str = "Message";
 
 const REPL_FILE_CONTENT: &[u8] = include_bytes!("../repl.ts");
@@ -88,18 +88,17 @@ fn write_example_move_packages(root_path: &Path) -> Result<()> {
     pkgcli::create_move_package("helloblockchain", &creation_path)?; // Move.toml gets overwritten
 
     println!("Copying Examples...");
-    let pkgdir = root_path.join(MESSAGE_EXAMPLE_PATH);
     for entry in EXAMPLES_DIR.find("**/*").unwrap() {
         match entry {
             include_dir::DirEntry::Dir(d) => {
-                fs::create_dir_all(pkgdir.join(d.path()))?;
+                fs::create_dir_all(root_path.join(d.path()))?;
             }
             include_dir::DirEntry::File(f) => {
                 let filename = file_entry_to_string(&f)?;
                 if EXAMPLE_BLOCKLIST.contains(filename.as_str()) {
                     continue;
                 }
-                let dst = pkgdir.join(f.path());
+                let dst = root_path.join(f.path());
                 fs::write(dst.as_path(), f.contents())?;
             }
         }
