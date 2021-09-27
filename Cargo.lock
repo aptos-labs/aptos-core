@@ -7576,6 +7576,7 @@ dependencies = [
  "diem-workspace-hack",
  "diemdb",
  "generate-key",
+ "hex",
  "move-binary-format",
  "move-cli",
  "move-command-line-common",

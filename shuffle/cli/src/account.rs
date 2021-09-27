@@ -43,10 +43,24 @@ pub fn handle(project_dir: PathBuf, account_key_path: PathBuf) -> Result<()> {
         new_account_key,
         0,
     );
-    println!("======new account {}", new_account.address());
+
+    if client
+        .get_account(new_account.address())
+        .unwrap()
+        .into_inner()
+        .is_some()
+    {
+        println!("Account already exists: {}", new_account.address());
+        println!(
+            "Private key: {}",
+            ::hex::encode(new_account.private_key().to_bytes())
+        );
+        println!("Public key: {}", new_account.public_key());
+        return Ok(());
+    }
 
     // Create a new account.
-    print!("Create a new ParentVASP account (we cannot create a regular account right now)...");
+    println!("Create a new account...",);
     let create_new_account_txn = root_account.sign_with_transaction_builder(
         TransactionFactory::new(ChainId::test()).payload(
             encode_create_parent_vasp_account_script_function(
@@ -60,7 +74,12 @@ pub fn handle(project_dir: PathBuf, account_key_path: PathBuf) -> Result<()> {
         ),
     );
     send(&client, create_new_account_txn)?;
-    println!("Success!");
+    println!("Successfully created account {}", new_account.address());
+    println!(
+        "Private key: {}",
+        ::hex::encode(new_account.private_key().to_bytes())
+    );
+    println!("Public key: {}", new_account.public_key());
 
     Ok(())
 }
