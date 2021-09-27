@@ -1,16 +1,19 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::Round;
+use crate::common::{Author, Round};
 use anyhow::Context;
-use diem_types::{ledger_info::LedgerInfoWithSignatures, validator_verifier::ValidatorVerifier};
+use diem_types::{
+    account_address::AccountAddress, ledger_info::LedgerInfoWithSignatures,
+    validator_verifier::ValidatorVerifier,
+};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
 
 #[derive(Deserialize, Serialize, Clone, PartialEq, Eq)]
 pub struct CommitDecision {
+    author: AccountAddress,
     ledger_info: LedgerInfoWithSignatures,
-    // TOOD: we can include a full state here.
 }
 
 // this is required by structured log
@@ -28,8 +31,15 @@ impl Display for CommitDecision {
 
 impl CommitDecision {
     /// Generates a new CommitDecision
-    pub fn new(ledger_info: LedgerInfoWithSignatures) -> Self {
-        Self { ledger_info }
+    pub fn new(author: AccountAddress, ledger_info: LedgerInfoWithSignatures) -> Self {
+        Self {
+            author,
+            ledger_info,
+        }
+    }
+
+    pub fn author(&self) -> Author {
+        self.author
     }
 
     pub fn round(&self) -> Round {

@@ -30,7 +30,7 @@ use network::protocols::network::Event;
 use std::collections::BTreeMap;
 
 use crate::test_utils::{timed_block_on, EmptyStateComputer};
-use consensus_types::experimental::{commit_decision::CommitDecision, commit_vote::CommitVote};
+use consensus_types::experimental::commit_vote::CommitVote;
 use diem_types::block_info::BlockInfo;
 
 use crate::{

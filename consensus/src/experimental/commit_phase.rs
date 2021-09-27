@@ -10,7 +10,7 @@ use channel::{Receiver, Sender};
 use consensus_types::{
     common::Author,
     executed_block::ExecutedBlock,
-    experimental::{commit_decision::CommitDecision, commit_vote::CommitVote},
+    experimental::commit_vote::CommitVote,
 };
 use core::sync::atomic::Ordering;
 use diem_crypto::ed25519::Ed25519Signature;

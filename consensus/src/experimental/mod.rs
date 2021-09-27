@@ -24,7 +24,7 @@
 #![allow(dead_code)]
 pub mod buffer_item;
 pub mod buffer_manager;
-pub mod commit_phase;
+pub mod decoupled_execution_utils;
 pub mod errors;
 pub mod execution_phase;
 pub mod linkedlist;

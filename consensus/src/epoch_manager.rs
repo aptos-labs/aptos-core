@@ -5,6 +5,11 @@ use crate::{
     block_storage::BlockStore,
     counters,
     error::{error_kind, DbError},
+    experimental::{
+        buffer_manager::{OrderedBlocks, ResetRequest},
+        decoupled_execution_utils::prepare_phases_and_buffer_manager,
+        ordering_state_computer::OrderingStateComputer,
+    },
     liveness::{
         leader_reputation::{ActiveInactiveHeuristic, DiemDBBackend, LeaderReputation},
         proposal_generator::ProposalGenerator,
@@ -23,7 +28,7 @@ use crate::{
     util::time_service::TimeService,
 };
 use anyhow::{anyhow, bail, ensure, Context};
-use channel::Sender;
+use channel::{diem_channel, message_queues::QueueStyle};
 use consensus_types::{
     common::{Author, Round},
     epoch_retrieval::EpochRetrievalRequest,
@@ -37,9 +42,10 @@ use diem_types::{
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     on_chain_config::{OnChainConfigPayload, OnChainConsensusConfig, ValidatorSet},
+    validator_verifier::ValidatorVerifier,
 };
 use event_notifications::ReconfigNotificationListener;
-use futures::{select, SinkExt, StreamExt};
+use futures::{channel::mpsc::unbounded, select, StreamExt};
 use network::protocols::network::Event;
 use safety_rules::SafetyRulesManager;
 use std::{
@@ -87,7 +93,7 @@ pub struct EpochManager {
     safety_rules_manager: SafetyRulesManager,
     processor: Option<RoundProcessor>,
     reconfig_events: ReconfigNotificationListener,
-    commit_msg_tx: Option<Sender<VerifiedEvent>>,
+    commit_msg_tx: Option<diem_channel::Sender<AccountAddress, VerifiedEvent>>,
     back_pressure: Arc<AtomicU64>,
 }
 
@@ -288,7 +294,54 @@ impl EpochManager {
         Ok(())
     }
 
-    // TODO: prepare_decoupled_execution
+    /// this function spawns the phases and a buffer manager
+    /// it sets `self.commit_msg_tx` to a new diem_channel::Sender and returns an OrderingStateComputer
+    fn spawn_decoupled_execution(
+        &mut self,
+        safety_rules_container: Arc<Mutex<MetricsSafetyRules>>,
+        verifier: ValidatorVerifier,
+    ) -> OrderingStateComputer {
+        let network_sender = NetworkSender::new(
+            self.author,
+            self.network_sender.clone(),
+            self.self_sender.clone(),
+            verifier.clone(),
+        );
+
+        let (block_tx, block_rx) = unbounded::<OrderedBlocks>();
+        let (reset_tx, reset_rx) = unbounded::<ResetRequest>();
+
+        let (commit_msg_tx, commit_msg_rx) = diem_channel::new::<AccountAddress, VerifiedEvent>(
+            QueueStyle::FIFO,
+            self.config.channel_size,
+            Some(&counters::PENDING_COMMIT_VOTES),
+        );
+
+        self.commit_msg_tx = Some(commit_msg_tx);
+
+        let (execution_phase, signing_phase, persisting_phase, _buffer_manager) =
+            prepare_phases_and_buffer_manager(
+                self.author,
+                self.commit_state_computer.clone(),
+                safety_rules_container,
+                network_sender,
+                commit_msg_rx,
+                self.commit_state_computer.clone(),
+                block_rx,
+                reset_rx,
+                verifier,
+            );
+
+        tokio::spawn(execution_phase.start());
+        tokio::spawn(signing_phase.start());
+        tokio::spawn(persisting_phase.start());
+
+        // TODO: make buffer manager channels sync
+        // tokio::spawn(buffer_manager.start());
+
+        OrderingStateComputer::new(block_tx, self.commit_state_computer.clone(), reset_tx)
+    }
+
     async fn start_round_manager(
         &mut self,
         recovery_data: RecoveryData,
@@ -297,6 +350,7 @@ impl EpochManager {
     ) {
         // Release the previous RoundManager, especially the SafetyRule client
         self.processor = None;
+        self.commit_msg_tx = None;
         let epoch = epoch_state.epoch;
         counters::EPOCH.set(epoch_state.epoch as i64);
         counters::CURRENT_EPOCH_VALIDATORS.set(epoch_state.verifier.len() as i64);
@@ -335,8 +389,46 @@ impl EpochManager {
 
         let safety_rules_container = Arc::new(Mutex::new(safety_rules));
 
-        // TODO: prepare decoupled execution
-        let mut processor = {
+        let mut processor = if self.config.decoupled_execution {
+            let ordering_state_computer = Arc::new(self.spawn_decoupled_execution(
+                safety_rules_container.clone(),
+                epoch_state.verifier.clone(),
+            ));
+
+            info!(epoch = epoch, "Create BlockStore");
+            let block_store = Arc::new(BlockStore::new(
+                Arc::clone(&self.storage),
+                recovery_data,
+                ordering_state_computer,
+                self.config.max_pruned_blocks_in_mem,
+                Arc::clone(&self.time_service),
+            ));
+
+            info!(epoch = epoch, "Create ProposalGenerator");
+            // txn manager is required both by proposal generator (to pull the proposers)
+            // and by event processor (to update their status).
+            let proposal_generator = ProposalGenerator::new(
+                self.author,
+                block_store.clone(),
+                self.txn_manager.clone(),
+                self.time_service.clone(),
+                self.config.max_block_size,
+            );
+
+            RoundManager::new(
+                epoch_state,
+                block_store,
+                round_state,
+                proposer_election,
+                proposal_generator,
+                safety_rules_container,
+                network_sender,
+                self.txn_manager.clone(),
+                self.storage.clone(),
+                self.config.sync_only,
+                onchain_config,
+            )
+        } else {
             info!(epoch = epoch, "Create BlockStore");
             let block_store = Arc::new(BlockStore::new(
                 Arc::clone(&self.storage),
@@ -551,15 +643,25 @@ impl EpochManager {
                     "process_sync_info",
                     p.process_sync_info_msg(*sync_info, peer_id).await
                 ),
-                verified_event @ VerifiedEvent::CommitVote(_)
-                | verified_event @ VerifiedEvent::CommitDecision(_) => {
+                VerifiedEvent::CommitVote(commit_vote) => {
                     if let Some(sender) = &mut self.commit_msg_tx {
-                        sender.send(verified_event).await.map_err(|err| {
-                            anyhow!(
-                                "Error in Passing Commit Message (CommitVote/CommitDecision): {}",
-                                err
+                        sender
+                            .push(commit_vote.author(), VerifiedEvent::CommitVote(commit_vote))
+                            .map_err(|err| anyhow!("Error in Passing Commit Vote Message: {}", err))
+                    } else {
+                        bail!("Commit Phase not started but received Commit Message (CommitVote/CommitDecision)");
+                    }
+                }
+                VerifiedEvent::CommitDecision(commit_decision) => {
+                    if let Some(sender) = &mut self.commit_msg_tx {
+                        sender
+                            .push(
+                                commit_decision.author(),
+                                VerifiedEvent::CommitDecision(commit_decision),
                             )
-                        })
+                            .map_err(|err| {
+                                anyhow!("Error in Passing Commit Decision Message: {}", err)
+                            })
                     } else {
                         bail!("Commit Phase not started but received Commit Message (CommitVote/CommitDecision)");
                     }

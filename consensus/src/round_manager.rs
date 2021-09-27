@@ -35,7 +35,6 @@ use consensus_types::{
     vote::Vote,
     vote_msg::VoteMsg,
 };
-use core::sync::atomic::Ordering;
 use diem_infallible::{checked, Mutex};
 use diem_logger::prelude::*;
 use diem_types::{
@@ -514,10 +513,10 @@ impl RoundManager {
 
     fn sync_only(&self) -> bool {
         if self.decoupled_execution {
-            let back_pressure = self.back_pressure.load(Ordering::SeqCst);
-            let root_round = self.block_store.ordered_root().round();
+            let commit_round = self.block_store.commit_root().round();
+            let ordered_round = self.block_store.ordered_root().round();
             let sync_or_not =
-                self.sync_only || root_round > self.back_pressure_limit + back_pressure;
+                self.sync_only || ordered_round > self.back_pressure_limit + commit_round;
 
             counters::OP_COUNTERS
                 .gauge("sync_only")
@@ -525,7 +524,7 @@ impl RoundManager {
 
             counters::OP_COUNTERS
                 .gauge("back_pressure")
-                .set((root_round - back_pressure) as i64);
+                .set((ordered_round - commit_round) as i64);
 
             sync_or_not
         } else {

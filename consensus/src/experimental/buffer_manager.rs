@@ -34,6 +34,7 @@ use crate::{
     state_replication::StateComputerCommitCallBackType,
 };
 use diem_crypto::HashValue;
+use futures::channel::mpsc::unbounded;
 
 pub const BUFFER_MANAGER_RETRY_INTERVAL: u64 = 1000;
 
@@ -42,8 +43,8 @@ pub type ResetAck = ();
 pub fn sync_ack_new() -> ResetAck {}
 
 pub struct ResetRequest {
-    tx: oneshot::Sender<ResetAck>,
-    reconfig: bool,
+    pub tx: oneshot::Sender<ResetAck>,
+    pub reconfig: bool,
 }
 
 pub struct OrderedBlocks {
@@ -55,6 +56,10 @@ pub struct OrderedBlocks {
 pub type BufferItemRootType = Link<BufferItem>;
 pub type Sender<T> = UnboundedSender<T>;
 pub type Receiver<T> = UnboundedReceiver<T>;
+
+pub fn create_channel<T>() -> (Sender<T>, Receiver<T>) {
+    unbounded::<T>()
+}
 
 /// BufferManager handles the states of ordered blocks and
 /// interacts with the execution phase, the signing phase, and
@@ -368,7 +373,7 @@ impl BufferManager {
         }
     }
 
-    async fn start(mut self) {
+    pub async fn start(mut self) {
         info!("Buffer manager starts.");
         let mut interval =
             tokio::time::interval(Duration::from_millis(BUFFER_MANAGER_RETRY_INTERVAL));

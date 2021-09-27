@@ -1,12 +1,8 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    error::StateSyncError, experimental::execution_phase::ExecutionRequest,
-    state_replication::StateComputer,
-};
+use crate::{error::StateSyncError, state_replication::StateComputer};
 use anyhow::Result;
-use channel::Sender;
 use consensus_types::{block::Block, executed_block::ExecutedBlock};
 use diem_crypto::HashValue;
 use diem_types::ledger_info::LedgerInfoWithSignatures;
@@ -16,10 +12,13 @@ use futures::SinkExt;
 use std::{boxed::Box, sync::Arc};
 
 use crate::{
-    experimental::{buffer_manager::ResetAck, errors::Error},
+    experimental::{
+        buffer_manager::{OrderedBlocks, ResetAck, ResetRequest},
+        errors::Error,
+    },
     state_replication::StateComputerCommitCallBackType,
 };
-use futures::channel::oneshot;
+use futures::channel::{mpsc::UnboundedSender, oneshot};
 
 /// Ordering-only execution proxy
 /// implements StateComputer traits.
@@ -27,16 +26,16 @@ use futures::channel::oneshot;
 pub struct OrderingStateComputer {
     // the channel to pour vectors of blocks into
     // the real execution phase (will be handled in ExecutionPhase).
-    executor_channel: Sender<ExecutionRequest>,
+    executor_channel: UnboundedSender<OrderedBlocks>,
     state_computer_for_sync: Arc<dyn StateComputer>,
-    reset_event_channel_tx: Sender<oneshot::Sender<ResetAck>>,
+    reset_event_channel_tx: UnboundedSender<ResetRequest>,
 }
 
 impl OrderingStateComputer {
     pub fn new(
-        executor_channel: Sender<ExecutionRequest>,
+        executor_channel: UnboundedSender<OrderedBlocks>,
         state_computer_for_sync: Arc<dyn StateComputer>,
-        reset_event_channel_tx: Sender<oneshot::Sender<ResetAck>>,
+        reset_event_channel_tx: UnboundedSender<ResetRequest>,
     ) -> Self {
         Self {
             executor_channel,
@@ -67,12 +66,23 @@ impl StateComputer for OrderingStateComputer {
     async fn commit(
         &self,
         blocks: &[Arc<ExecutedBlock>],
-        _finality_proof: LedgerInfoWithSignatures,
-        _callback: StateComputerCommitCallBackType,
+        finality_proof: LedgerInfoWithSignatures,
+        callback: StateComputerCommitCallBackType,
     ) -> Result<(), ExecutionError> {
         assert!(!blocks.is_empty());
 
-        // TODO: send blocks to buffer manager
+        self.executor_channel
+            .clone()
+            .send(OrderedBlocks {
+                ordered_blocks: blocks
+                    .iter()
+                    .map(|b| (**b).clone())
+                    .collect::<Vec<ExecutedBlock>>(),
+                ordered_proof: finality_proof,
+                callback,
+            })
+            .await
+            .expect("Sending failure in OrderingStateComputer::commit");
 
         Ok(())
     }
@@ -82,13 +92,16 @@ impl StateComputer for OrderingStateComputer {
         fail_point!("consensus::sync_to", |_| {
             Err(anyhow::anyhow!("Injected error in sync_to").into())
         });
+
+        let reconfig = target.ledger_info().ends_epoch();
+
         self.state_computer_for_sync.sync_to(target).await?;
 
         // reset execution phase and commit phase
         let (tx, rx) = oneshot::channel::<ResetAck>();
         self.reset_event_channel_tx
             .clone()
-            .send(tx)
+            .send(ResetRequest { tx, reconfig })
             .await
             .map_err(|_| Error::ResetDropped)?;
         rx.await.map_err(|_| Error::ResetDropped)?;
