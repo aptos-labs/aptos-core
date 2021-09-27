@@ -26,6 +26,8 @@ pub const DEFAULT_BLOCKCHAIN: &str = "goodday";
 const EXAMPLES_DIR: Dir = include_dir!("../move/examples/Message");
 pub const MESSAGE_EXAMPLE_PATH: &str = "Message";
 
+const REPL_FILE_CONTENT: &[u8] = include_bytes!("../repl.ts");
+
 pub fn handle(blockchain: String, pathbuf: PathBuf) -> Result<()> {
     let project_path = pathbuf.as_path();
     println!("Creating shuffle project in {}", project_path.display());
@@ -43,7 +45,7 @@ pub fn handle(blockchain: String, pathbuf: PathBuf) -> Result<()> {
         blockchain,
         named_addresses: fetch_named_addresses(&state)?,
     };
-    write_project_config(project_path, &config)?;
+    write_project_files(project_path, &config)?;
     write_example_move_packages(project_path)?;
     generate_validator_config(project_path)?;
     Ok(())
@@ -68,10 +70,13 @@ fn map_address_bytes_to_account_address(
         .collect()
 }
 
-fn write_project_config(path: &Path, config: &shared::Config) -> Result<()> {
-    let toml_path = PathBuf::from(path).join("Shuffle").with_extension("toml");
+fn write_project_files(path: &Path, config: &shared::Config) -> Result<()> {
+    let toml_path = path.join("Shuffle.toml");
     let toml_string = toml::to_string(config)?;
     fs::write(toml_path, toml_string)?;
+
+    let repl_ts_path = path.join("repl.ts");
+    fs::write(repl_ts_path, REPL_FILE_CONTENT)?;
     Ok(())
 }
 
@@ -80,7 +85,7 @@ static EXAMPLE_BLOCKLIST: Lazy<HashSet<&'static str>> = Lazy::new(|| [].iter().c
 // Writes the move packages for a new project
 fn write_example_move_packages(root_path: &Path) -> Result<()> {
     let creation_path = Path::new(&root_path).join(MESSAGE_EXAMPLE_PATH);
-    pkgcli::create_move_package("helloblockchain", &creation_path)?;
+    pkgcli::create_move_package("helloblockchain", &creation_path)?; // Move.toml gets overwritten
 
     println!("Copying Examples...");
     let pkgdir = root_path.join(MESSAGE_EXAMPLE_PATH);
@@ -136,7 +141,7 @@ mod test {
             ),
         };
 
-        write_project_config(dir.path(), &config).unwrap();
+        write_project_files(dir.path(), &config).unwrap();
 
         let config_string =
             fs::read_to_string(dir.path().join("Shuffle").with_extension("toml")).unwrap();

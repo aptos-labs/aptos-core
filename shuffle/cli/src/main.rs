@@ -11,6 +11,7 @@ mod deploy;
 mod new;
 mod node;
 mod shared;
+mod test;
 
 pub fn main() -> Result<()> {
     let subcommand = Subcommand::from_args();
@@ -26,6 +27,7 @@ pub fn main() -> Result<()> {
             account_key_path,
         } => account::handle(project_path, account_key_path),
         Subcommand::Console { project_path } => console::handle(project_path.as_path()),
+        Subcommand::Test { project_path } => test::handle(project_path.as_path()),
     }
 }
 
@@ -55,4 +57,6 @@ pub enum Subcommand {
     },
     #[structopt(about = "Starts a REPL for onchain inspection")]
     Console { project_path: PathBuf },
+    #[structopt(about = "Runs end to end .ts tests")]
+    Test { project_path: PathBuf },
 }

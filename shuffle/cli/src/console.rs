@@ -11,10 +11,10 @@ pub fn handle(project_path: &Path) -> Result<()> {
     // TODO: Fix hardcoding of mod.ts by copying it into project path and referencing
     // it via project_path.join(...). Remove Message pkg hardcode and iterate over pkgs.
     let deno_bootstrap = format!(
-        r#"import * as Shuffle from "/Users/droc/workspace/diem/shuffle/cli/repl.ts";
-        import * as TxnBuilder from "{}/Message/txn_builders/mod.ts";
-    "#,
-        project_path.display()
+        r#"import * as Shuffle from "{}/repl.ts";
+        import * as TxnBuilder from "{}/Message/txn_builders/mod.ts";"#,
+        project_path.display(),
+        project_path.display(),
     );
 
     Command::new("deno")

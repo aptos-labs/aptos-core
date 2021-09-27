@@ -1,6 +1,8 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+// Generated on new project creation. Invoked by shuffle CLI.
+
 // Creates typescript wrappers around the Developer API for easier consumption,
 // including endpoints: ledgerInfo, resources, modules, and some of transactions.
 // Developer API: https://docs.google.com/document/d/1KEPnGGU3zg_RmN8V4r2ms_MFPwsTMNyK7jCUFygviDg/edit#heading=h.hesw425dw9gz
@@ -16,7 +18,7 @@ export const projectPath = Deno.env.get("PROJECT_PATH") || "unknown";
 export const nodeUrl = 'http://127.0.0.1:8081'
 export const senderAddress = "0x24163afcc6e33b0a9473852e18327fa9";
 
-console.log(`Loading REPL for project ${highlight(projectPath)}`);
+console.log(`Loading Project ${highlight(projectPath)}`);
 console.log(`Connected to Node ${highlight(nodeUrl)}`);
 console.log(`Sender Account Address ${highlight(senderAddress)}`);
 console.log(`"Shuffle", "TxnBuilder" top level objects available`);
@@ -52,6 +54,8 @@ export async function modules(addr: string | undefined) {
 export async function accounts() {
   return [{ "address": senderAddress }];
 }
+
+export const test = Deno.test;
 
 function relativeUrl(tail: string) {
   return new URL(tail, nodeUrl).href;
