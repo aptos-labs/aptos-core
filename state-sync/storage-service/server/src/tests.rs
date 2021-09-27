@@ -108,6 +108,7 @@ fn test_get_storage_server_summary() {
             max_account_states_chunk_size: 1000,
         },
         data_summary: DataSummary {
+            synced_ledger_info: create_test_ledger_info_with_sigs(highest_epoch, highest_version),
             epoch_ending_ledger_infos: CompleteDataRange::new(0, highest_epoch - 1),
             transactions: CompleteDataRange::new(0, highest_version),
             transaction_outputs: CompleteDataRange::new(0, highest_version),

@@ -7,6 +7,7 @@ use diem_crypto::HashValue;
 use diem_types::{
     account_state_blob::AccountStatesChunkWithProof,
     epoch_change::EpochChangeProof,
+    ledger_info::LedgerInfoWithSignatures,
     transaction::{
         default_protocol::{TransactionListWithProof, TransactionOutputListWithProof},
         Version,
@@ -110,6 +111,9 @@ pub type Epoch = u64;
 /// A summary of the data actually held by the storage service instance.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DataSummary {
+    /// The ledger info corresponding to the highest synced version in storage.
+    /// This indicates the highest version and epoch that storage can prove.
+    pub synced_ledger_info: LedgerInfoWithSignatures,
     /// The range of epoch ending ledger infos in storage, e.g., if the range
     /// is [(X,Y)], it means all epoch ending ledger infos for epochs X->Y
     /// (inclusive) are held.
