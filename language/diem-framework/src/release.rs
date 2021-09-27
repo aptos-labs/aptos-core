@@ -330,7 +330,7 @@ pub fn create_release(output_path: impl AsRef<Path>, options: &ReleaseOptions) {
     let msg = |s: &'static str| if options.time_it { Some(s) } else { None };
 
     if options.build_modules {
-        let modules_path = output_path.join("sources");
+        let modules_path = output_path.join("modules");
         let mut old_module_apis = None;
         if options.check_layout_compatibility {
             old_module_apis = run_step(

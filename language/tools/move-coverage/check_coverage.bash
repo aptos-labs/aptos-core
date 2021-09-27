@@ -53,7 +53,7 @@ cargo run --bin move-trace-conversion -- -f "$TRACE_PATH" -o trace.mvcov
 echo "---------------------------------------------------------------------------"
 echo "Producing coverage summaries..."
 echo "---------------------------------------------------------------------------"
-cargo run --bin coverage-summaries -- -t trace.mvcov -s ../../diem-framework/DPN/releases/artifacts/current/sources
+cargo run --bin coverage-summaries -- -t trace.mvcov -s ../../diem-framework/DPN/releases/artifacts/current/modules
 
 echo "==========================================================================="
 echo "You can check source coverage for a module by running:"
