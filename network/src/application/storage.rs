@@ -44,7 +44,7 @@ impl PeerMetadataStorage {
     fn get_network(&self, network_id: NetworkId) -> &LockingHashMap<AccountAddress, PeerInfo> {
         self.storage
             .get(&network_id)
-            .expect("Unexpected network requested")
+            .unwrap_or_else(|| panic!("Unexpected network requested: {}", network_id))
     }
 
     pub fn read(&self, peer_network_id: PeerNetworkId) -> Option<PeerInfo> {

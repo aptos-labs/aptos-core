@@ -369,6 +369,7 @@ impl StateSyncEnvironment {
         } else {
             let peer = self.peers[index].borrow();
             let auth_mode = AuthenticationMode::Mutual(peer.network_key.clone());
+            // TODO: This network is setup incorrectly, all nodes are on the Validator network ignoring the input
             let network_context = NetworkContext::new(*role, NetworkId::Validator, peer.peer_id);
 
             let seeds: HashMap<_, _> = self
@@ -397,7 +398,7 @@ impl StateSyncEnvironment {
                 TimeService::real(),
                 base_addr,
                 auth_mode,
-                PeerMetadataStorage::new(&[network_id]),
+                PeerMetadataStorage::new(&[NetworkId::Validator]),
             );
 
             let (sender, events) = network_builder
