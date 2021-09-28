@@ -156,6 +156,7 @@ members = [
     "shuffle/genesis",
     "shuffle/move",
     "shuffle/transaction-builder",
+    "state-sync/diem-data-client",
     "state-sync/inter-component/consensus-notifications",
     "state-sync/inter-component/event-notifications",
     "state-sync/inter-component/mempool-notifications",

@@ -183,6 +183,7 @@ members = [
     "cli",
     "cluster-test",
     "testcases",
+    "diem-data-client", # Will be removed once the Diem data client is plugged into diem-node.
     "diem-documentation-tool",
     "diem-e2e-tests-replay",
     "diem-fuzz",
