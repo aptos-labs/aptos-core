@@ -18,8 +18,8 @@ function highlight(content: string) {
 // TODO: Replace all hardcoding with calculated or env retrieved values.
 export const projectPath = Deno.env.get("PROJECT_PATH") || "unknown";
 export const nodeUrl = 'http://127.0.0.1:8081'
-export const senderAddress = "0x24163afcc6e33b0a9473852e18327fa9";
-export const privateKeyPath = "/Users/droc/workspace/diem/shuffle/cli/new_account.key";
+export const senderAddress = "0x24163afcc6e33b0a9473852e18327fa9"; //fix this
+export const privateKeyPath = "/Users/droc/workspace/diem/shuffle/cli/new_account.key"; //fix this
 
 console.log(`Loading Project ${highlight(projectPath)}`);
 console.log(`Connected to Node ${highlight(nodeUrl)}`);
@@ -42,7 +42,7 @@ export async function accountTransactions() {
   const remote = createRemote("http://127.0.0.1:8080/v1");
   return await remote.call(
     "get_account_transactions",
-    ["24163afcc6e33b0a9473852e18327fa9", 0, 10, true]
+    ["24163afcc6e33b0a9473852e18327fa9", 0, 10, true] // fix this
   );
 }
 

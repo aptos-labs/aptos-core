@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::shared::send;
+use crate::shared::{get_shuffle_dir, send};
 use anyhow::{Context, Result};
 use diem_config::config::NodeConfig;
 use diem_crypto::PrivateKey;
@@ -15,15 +15,42 @@ use diem_types::{
 };
 use generate_key::load_key;
 use shuffle_transaction_builder::framework::encode_create_parent_vasp_account_script_function;
-use std::path::PathBuf;
+use std::fs;
+use std::io::Write;
+use std::os::unix::fs::PermissionsExt;
+use std::path::Path;
+use std::time::SystemTime;
+use structopt::StructOpt;
 
-pub fn handle(project_dir: PathBuf, account_key_path: PathBuf) -> Result<()> {
-    let config_path = project_dir.join("nodeconfig/0").join("node.yaml");
+// Creates new account from randomly generated private/public key pair.
+pub fn handle() -> Result<()> {
+    let node_config_path = &get_shuffle_dir();
+    if !Path::new(node_config_path.as_path()).is_dir() {
+        println!("A node hasn't been created yet! Run shuffle node first");
+        return Ok(());
+    }
+    let dev_keys_dir = &node_config_path.join("keys");
+    let address_dir = &node_config_path.join("addresses");
+
+    if !Path::new(dev_keys_dir.as_path()).is_dir() && !Path::new(address_dir.as_path()).is_dir() {
+        fs::create_dir(dev_keys_dir)?;
+        fs::create_dir(address_dir)?;
+        fs::set_permissions(dev_keys_dir, fs::Permissions::from_mode(0o700))?;
+        fs::set_permissions(address_dir, fs::Permissions::from_mode(0o700))?;
+    }
+
+    let time = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap();
+    let dev_key_filepath = &dev_keys_dir.join(time.as_secs().to_string() + " dev.key");
+    let new_account_key = generate_key::generate_and_save_key(dev_key_filepath);
+    fs::set_permissions(dev_key_filepath, fs::Permissions::from_mode(0o600))?;
+
+    let config_path = node_config_path.join("nodeconfig/0").join("node.yaml");
     let config = NodeConfig::load(&config_path)
         .with_context(|| format!("Failed to load NodeConfig from file: {:?}", config_path))?;
-    let root_key_path = project_dir.join("nodeconfig").join("mint.key");
+    let root_key_path = node_config_path.join("nodeconfig").join("mint.key");
     let root_account_key = load_key(root_key_path);
-    let new_account_key = load_key(account_key_path.as_path());
     let json_rpc_url = format!("http://0.0.0.0:{}", config.json_rpc.address.port());
     println!("Connecting to {}...", json_rpc_url);
 
@@ -38,7 +65,6 @@ pub fn handle(project_dir: PathBuf, account_key_path: PathBuf) -> Result<()> {
         root_account_key,
         root_seq_num,
     );
-    println!("Using Public Key: {}", &new_account_key.public_key());
     let new_account = LocalAccount::new(
         AuthenticationKey::ed25519(&new_account_key.public_key()).derived_address(),
         new_account_key,
@@ -82,5 +108,30 @@ pub fn handle(project_dir: PathBuf, account_key_path: PathBuf) -> Result<()> {
     );
     println!("Public key: {}", new_account.public_key());
 
+    let account_filepath = &address_dir.join(time.as_secs().to_string() + ".address");
+
+    let mut file = fs::File::create(account_filepath)?;
+    file.write_all(new_account
+        .address()
+        .to_string()
+        .as_ref()
+    )?;
+
+    Ok(())
+}
+
+#[derive(Debug, StructOpt)]
+pub enum AccountCommand {
+    // Rotates dev.key with new private key and saves old key in /keys
+    #[structopt(about = "Creates new account with randomly generated private/public key")]
+    New,
+}
+
+pub fn handle_package_commands(cmd: AccountCommand) -> Result<()> {
+    match cmd {
+        AccountCommand::New => {
+            handle()?;
+        }
+    }
     Ok(())
 }

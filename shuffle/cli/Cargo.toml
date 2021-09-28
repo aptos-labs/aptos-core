@@ -12,6 +12,8 @@ edition = "2018"
 [dependencies]
 anyhow = "1.0.38"
 bcs = "0.1.2"
+chrono = "0.4"
+directories = "4.0.1"
 hex = "0.4.3"
 include_dir = { version = "0.6.0", features = ["glob"] }
 once_cell = "1.7.2"

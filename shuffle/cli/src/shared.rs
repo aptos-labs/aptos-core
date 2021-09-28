@@ -3,8 +3,12 @@
 
 use anyhow::Result;
 use diem_sdk::client::BlockingClient;
+use directories::BaseDirs;
 use serde::{Deserialize, Serialize};
-use std::{fs, path::Path};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 pub const MAIN_PKG_PATH: &str = "main";
 
@@ -34,4 +38,10 @@ pub fn send(client: &BlockingClient, tx: diem_types::transaction::SignedTransact
         VMStatusView::Executed,
     );
     Ok(())
+}
+
+// returns ~/.shuffle
+pub fn get_shuffle_dir() -> PathBuf {
+    let dir = BaseDirs::new().unwrap().home_dir().join(".shuffle");
+    dir
 }

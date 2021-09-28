@@ -22,10 +22,7 @@ pub fn main() -> Result<()> {
             project_path,
             account_key_path,
         } => deploy::handle(project_path.as_path(), account_key_path.as_path()),
-        Subcommand::Account {
-            project_path,
-            account_key_path,
-        } => account::handle(project_path, account_key_path),
+        Subcommand::Account { cmd } => account::handle_package_commands(cmd),
         Subcommand::Console { project_path } => console::handle(project_path.as_path()),
         Subcommand::Test { project_path } => test::handle(project_path.as_path()),
     }
@@ -50,10 +47,10 @@ pub enum Subcommand {
         project_path: PathBuf,
         account_key_path: PathBuf,
     },
-    #[structopt(about = "Create a new account")]
+    #[structopt(about = "Creates new account")]
     Account {
-        project_path: PathBuf,
-        account_key_path: PathBuf,
+        #[structopt(subcommand)]
+        cmd: account::AccountCommand,
     },
     #[structopt(about = "Starts a REPL for onchain inspection")]
     Console { project_path: PathBuf },
