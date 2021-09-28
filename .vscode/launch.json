@@ -1,0 +1,39 @@
+// This file defines launch configurations for Visual Studio Code.
+//
+// When VS Code is used to open the directory containing this repository (which contains this launch
+// configuration at its root), it reads the values in this file and presents the user with launch
+// options in its "Run and Debug" view.
+//
+// The launch configurations below allow the VS Code user to, for example:
+// * Launch a new VS Code window that has the extension in this repository installed and enabled.
+// * Launch a new VS Code window to run the extension's tests.
+//
+// When viewing this file in VS Code, you may use IntelliSense to learn about possible attributes,
+// or hover to view descriptions of existing attributes. For more information, visit:
+// https://go.microsoft.com/fwlink/?linkid=830387
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Launch with Extension",
+            "type": "extensionHost",
+            "request": "launch",
+            "args": [
+                "--extensionDevelopmentPath=${workspaceFolder}/language/move-analyzer/editors/code"
+            ]
+        },
+        {
+            "name": "VS Code Tokenizer Tests",
+            "type": "extensionHost",
+            "request": "launch",
+            "runtimeExecutable": "${execPath}",
+            "args": [
+                "${workspaceFolder}/language/move-analyzer/editors/code/tests",
+                "--extensionDevelopmentPath=${workspaceFolder}/language/move-analyzer/editors/code",
+                "--extensionTestsPath=${workspaceFolder}/language/move-analyzer/editors/code/out/tests/index.js"
+            ],
+            "outFiles": ["${workspaceFolder}/language/move-analyzer/editors/code/out/tests/**/*.js"],
+            "preLaunchTask": "Pretest"
+        }
+    ]
+}

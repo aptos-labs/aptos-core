@@ -1,0 +1,2037 @@
+[
+	{
+		"c": "//",
+		"t": "source.move comment.line.move meta.punctuation.slash-slash.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " Line comment.",
+		"t": "source.move comment.line.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": "///",
+		"t": "source.move meta.comment.line.documentation.move comment.block.documentation.move meta.punctuation.slash-slash-slash.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " Documentation line comment.",
+		"t": "source.move meta.comment.line.documentation.move comment.block.documentation.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": "///",
+		"t": "source.move meta.comment.line.documentation.move comment.block.documentation.move meta.punctuation.slash-slash-slash.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " Nested block commment: /*",
+		"t": "source.move meta.comment.line.documentation.move comment.block.documentation.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": "/*",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " Block comment.",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " // Nested line comment. */",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": "/**",
+		"t": "source.move comment.block.documentation.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " * Documentation block comment.",
+		"t": "source.move comment.block.documentation.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " * ...",
+		"t": "source.move comment.block.documentation.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " /// Nested line comment. */",
+		"t": "source.move comment.block.documentation.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": "/*",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " * Nested",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " * ",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": "/* block",
+		"t": "source.move comment.block.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " *  * comments",
+		"t": "source.move comment.block.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " *  * ",
+		"t": "source.move comment.block.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": "/* create",
+		"t": "source.move comment.block.move comment.block.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " *  *  * a",
+		"t": "source.move comment.block.move comment.block.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " *  *  */",
+		"t": "source.move comment.block.move comment.block.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " comment",
+		"t": "source.move comment.block.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " *  */",
+		"t": "source.move comment.block.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " stack.",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " */",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": "/* Asterisks: *, ",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": "٭",
+		"t": "source.move comment.block.move meta.comment.ambiguous-character.asterisk-lookalike.move invalid.illegal.move",
+		"r": {
+			"dark_plus": "invalid: #F44747",
+			"light_plus": "invalid: #CD3131",
+			"dark_vs": "invalid: #F44747",
+			"light_vs": "invalid: #CD3131",
+			"hc_black": "invalid: #F44747"
+		}
+	},
+	{
+		"c": ", ",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": "⁎",
+		"t": "source.move comment.block.move meta.comment.ambiguous-character.asterisk-lookalike.move invalid.illegal.move",
+		"r": {
+			"dark_plus": "invalid: #F44747",
+			"light_plus": "invalid: #CD3131",
+			"dark_vs": "invalid: #F44747",
+			"light_vs": "invalid: #CD3131",
+			"hc_black": "invalid: #F44747"
+		}
+	},
+	{
+		"c": ", ",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": "∗",
+		"t": "source.move comment.block.move meta.comment.ambiguous-character.asterisk-lookalike.move invalid.illegal.move",
+		"r": {
+			"dark_plus": "invalid: #F44747",
+			"light_plus": "invalid: #CD3131",
+			"dark_vs": "invalid: #F44747",
+			"light_vs": "invalid: #CD3131",
+			"hc_black": "invalid: #F44747"
+		}
+	},
+	{
+		"c": ", ",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": "⚹",
+		"t": "source.move comment.block.move meta.comment.ambiguous-character.asterisk-lookalike.move invalid.illegal.move",
+		"r": {
+			"dark_plus": "invalid: #F44747",
+			"light_plus": "invalid: #CD3131",
+			"dark_vs": "invalid: #F44747",
+			"light_vs": "invalid: #CD3131",
+			"hc_black": "invalid: #F44747"
+		}
+	},
+	{
+		"c": ", ",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": "✱",
+		"t": "source.move comment.block.move meta.comment.ambiguous-character.asterisk-lookalike.move invalid.illegal.move",
+		"r": {
+			"dark_plus": "invalid: #F44747",
+			"light_plus": "invalid: #CD3131",
+			"dark_vs": "invalid: #F44747",
+			"light_vs": "invalid: #CD3131",
+			"hc_black": "invalid: #F44747"
+		}
+	},
+	{
+		"c": " */",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": "//",
+		"t": "source.move comment.line.move meta.punctuation.slash-slash.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " Slashes: /, ",
+		"t": "source.move comment.line.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": "ǀ",
+		"t": "source.move comment.line.move meta.comment.ambiguous-character.slash-lookalike.move invalid.illegal.move",
+		"r": {
+			"dark_plus": "invalid: #F44747",
+			"light_plus": "invalid: #CD3131",
+			"dark_vs": "invalid: #F44747",
+			"light_vs": "invalid: #CD3131",
+			"hc_black": "invalid: #F44747"
+		}
+	},
+	{
+		"c": ",  ",
+		"t": "source.move comment.line.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": "̸",
+		"t": "source.move comment.line.move meta.comment.ambiguous-character.slash-lookalike.move invalid.illegal.move",
+		"r": {
+			"dark_plus": "invalid: #F44747",
+			"light_plus": "invalid: #CD3131",
+			"dark_vs": "invalid: #F44747",
+			"light_vs": "invalid: #CD3131",
+			"hc_black": "invalid: #F44747"
+		}
+	},
+	{
+		"c": ", ",
+		"t": "source.move comment.line.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": "⁄",
+		"t": "source.move comment.line.move meta.comment.ambiguous-character.slash-lookalike.move invalid.illegal.move",
+		"r": {
+			"dark_plus": "invalid: #F44747",
+			"light_plus": "invalid: #CD3131",
+			"dark_vs": "invalid: #F44747",
+			"light_vs": "invalid: #CD3131",
+			"hc_black": "invalid: #F44747"
+		}
+	},
+	{
+		"c": ", ",
+		"t": "source.move comment.line.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": "∕",
+		"t": "source.move comment.line.move meta.comment.ambiguous-character.slash-lookalike.move invalid.illegal.move",
+		"r": {
+			"dark_plus": "invalid: #F44747",
+			"light_plus": "invalid: #CD3131",
+			"dark_vs": "invalid: #F44747",
+			"light_vs": "invalid: #CD3131",
+			"hc_black": "invalid: #F44747"
+		}
+	},
+	{
+		"c": ", ",
+		"t": "source.move comment.line.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": "⹊",
+		"t": "source.move comment.line.move meta.comment.ambiguous-character.slash-lookalike.move invalid.illegal.move",
+		"r": {
+			"dark_plus": "invalid: #F44747",
+			"light_plus": "invalid: #CD3131",
+			"dark_vs": "invalid: #F44747",
+			"light_vs": "invalid: #CD3131",
+			"hc_black": "invalid: #F44747"
+		}
+	},
+	{
+		"c": "/*",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " * Whitespace:",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " * >",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": "\u000b",
+		"t": "source.move comment.block.move meta.comment.ambiguous-character.whitespace.move invalid.illegal.move",
+		"r": {
+			"dark_plus": "invalid: #F44747",
+			"light_plus": "invalid: #CD3131",
+			"dark_vs": "invalid: #F44747",
+			"light_vs": "invalid: #CD3131",
+			"hc_black": "invalid: #F44747"
+		}
+	},
+	{
+		"c": "< \\u000b line tabulation",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " * >",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": "\f",
+		"t": "source.move comment.block.move meta.comment.ambiguous-character.whitespace.move invalid.illegal.move",
+		"r": {
+			"dark_plus": "invalid: #F44747",
+			"light_plus": "invalid: #CD3131",
+			"dark_vs": "invalid: #F44747",
+			"light_vs": "invalid: #CD3131",
+			"hc_black": "invalid: #F44747"
+		}
+	},
+	{
+		"c": "< \\u000c form feed",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " * >",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": "< \\u000d carriage return",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " * >",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": "",
+		"t": "source.move comment.block.move meta.comment.ambiguous-character.whitespace.move invalid.illegal.move",
+		"r": {
+			"dark_plus": "invalid: #F44747",
+			"light_plus": "invalid: #CD3131",
+			"dark_vs": "invalid: #F44747",
+			"light_vs": "invalid: #CD3131",
+			"hc_black": "invalid: #F44747"
+		}
+	},
+	{
+		"c": "< \\u0085 next line",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " * >",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move comment.block.move meta.comment.ambiguous-character.whitespace.move invalid.illegal.move",
+		"r": {
+			"dark_plus": "invalid: #F44747",
+			"light_plus": "invalid: #CD3131",
+			"dark_vs": "invalid: #F44747",
+			"light_vs": "invalid: #CD3131",
+			"hc_black": "invalid: #F44747"
+		}
+	},
+	{
+		"c": "< \\u00a0 no-break space",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " * >",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move comment.block.move meta.comment.ambiguous-character.whitespace.move invalid.illegal.move",
+		"r": {
+			"dark_plus": "invalid: #F44747",
+			"light_plus": "invalid: #CD3131",
+			"dark_vs": "invalid: #F44747",
+			"light_vs": "invalid: #CD3131",
+			"hc_black": "invalid: #F44747"
+		}
+	},
+	{
+		"c": "< \\u1680 ogham space mark",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " * >",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": "᠎",
+		"t": "source.move comment.block.move meta.comment.ambiguous-character.whitespace.move invalid.illegal.move",
+		"r": {
+			"dark_plus": "invalid: #F44747",
+			"light_plus": "invalid: #CD3131",
+			"dark_vs": "invalid: #F44747",
+			"light_vs": "invalid: #CD3131",
+			"hc_black": "invalid: #F44747"
+		}
+	},
+	{
+		"c": "< \\u180e mongolian vowel separator",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " * >",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move comment.block.move meta.comment.ambiguous-character.whitespace.move invalid.illegal.move",
+		"r": {
+			"dark_plus": "invalid: #F44747",
+			"light_plus": "invalid: #CD3131",
+			"dark_vs": "invalid: #F44747",
+			"light_vs": "invalid: #CD3131",
+			"hc_black": "invalid: #F44747"
+		}
+	},
+	{
+		"c": "< \\u2000 en quad",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " * >",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move comment.block.move meta.comment.ambiguous-character.whitespace.move invalid.illegal.move",
+		"r": {
+			"dark_plus": "invalid: #F44747",
+			"light_plus": "invalid: #CD3131",
+			"dark_vs": "invalid: #F44747",
+			"light_vs": "invalid: #CD3131",
+			"hc_black": "invalid: #F44747"
+		}
+	},
+	{
+		"c": "< \\u2001 em quad",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " * >",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move comment.block.move meta.comment.ambiguous-character.whitespace.move invalid.illegal.move",
+		"r": {
+			"dark_plus": "invalid: #F44747",
+			"light_plus": "invalid: #CD3131",
+			"dark_vs": "invalid: #F44747",
+			"light_vs": "invalid: #CD3131",
+			"hc_black": "invalid: #F44747"
+		}
+	},
+	{
+		"c": "< \\u2002 en space",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " * >",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move comment.block.move meta.comment.ambiguous-character.whitespace.move invalid.illegal.move",
+		"r": {
+			"dark_plus": "invalid: #F44747",
+			"light_plus": "invalid: #CD3131",
+			"dark_vs": "invalid: #F44747",
+			"light_vs": "invalid: #CD3131",
+			"hc_black": "invalid: #F44747"
+		}
+	},
+	{
+		"c": "< \\u2003 em space",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " * >",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move comment.block.move meta.comment.ambiguous-character.whitespace.move invalid.illegal.move",
+		"r": {
+			"dark_plus": "invalid: #F44747",
+			"light_plus": "invalid: #CD3131",
+			"dark_vs": "invalid: #F44747",
+			"light_vs": "invalid: #CD3131",
+			"hc_black": "invalid: #F44747"
+		}
+	},
+	{
+		"c": "< \\u2004 three-per-em space",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " * >",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move comment.block.move meta.comment.ambiguous-character.whitespace.move invalid.illegal.move",
+		"r": {
+			"dark_plus": "invalid: #F44747",
+			"light_plus": "invalid: #CD3131",
+			"dark_vs": "invalid: #F44747",
+			"light_vs": "invalid: #CD3131",
+			"hc_black": "invalid: #F44747"
+		}
+	},
+	{
+		"c": "< \\u2005 four-per-em space",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " * >",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move comment.block.move meta.comment.ambiguous-character.whitespace.move invalid.illegal.move",
+		"r": {
+			"dark_plus": "invalid: #F44747",
+			"light_plus": "invalid: #CD3131",
+			"dark_vs": "invalid: #F44747",
+			"light_vs": "invalid: #CD3131",
+			"hc_black": "invalid: #F44747"
+		}
+	},
+	{
+		"c": "< \\u2006 six-per-em space",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " * >",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move comment.block.move meta.comment.ambiguous-character.whitespace.move invalid.illegal.move",
+		"r": {
+			"dark_plus": "invalid: #F44747",
+			"light_plus": "invalid: #CD3131",
+			"dark_vs": "invalid: #F44747",
+			"light_vs": "invalid: #CD3131",
+			"hc_black": "invalid: #F44747"
+		}
+	},
+	{
+		"c": "< \\u2007 figure space",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " * >",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move comment.block.move meta.comment.ambiguous-character.whitespace.move invalid.illegal.move",
+		"r": {
+			"dark_plus": "invalid: #F44747",
+			"light_plus": "invalid: #CD3131",
+			"dark_vs": "invalid: #F44747",
+			"light_vs": "invalid: #CD3131",
+			"hc_black": "invalid: #F44747"
+		}
+	},
+	{
+		"c": "< \\u2008 punctuation space",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " * >",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move comment.block.move meta.comment.ambiguous-character.whitespace.move invalid.illegal.move",
+		"r": {
+			"dark_plus": "invalid: #F44747",
+			"light_plus": "invalid: #CD3131",
+			"dark_vs": "invalid: #F44747",
+			"light_vs": "invalid: #CD3131",
+			"hc_black": "invalid: #F44747"
+		}
+	},
+	{
+		"c": "< \\u2009 thin space",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " * >",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move comment.block.move meta.comment.ambiguous-character.whitespace.move invalid.illegal.move",
+		"r": {
+			"dark_plus": "invalid: #F44747",
+			"light_plus": "invalid: #CD3131",
+			"dark_vs": "invalid: #F44747",
+			"light_vs": "invalid: #CD3131",
+			"hc_black": "invalid: #F44747"
+		}
+	},
+	{
+		"c": "< \\u200a hair space",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " * >",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": "​",
+		"t": "source.move comment.block.move meta.comment.ambiguous-character.whitespace.move invalid.illegal.move",
+		"r": {
+			"dark_plus": "invalid: #F44747",
+			"light_plus": "invalid: #CD3131",
+			"dark_vs": "invalid: #F44747",
+			"light_vs": "invalid: #CD3131",
+			"hc_black": "invalid: #F44747"
+		}
+	},
+	{
+		"c": "< \\u200b zero width space",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " * >",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": "‌",
+		"t": "source.move comment.block.move meta.comment.ambiguous-character.whitespace.move invalid.illegal.move",
+		"r": {
+			"dark_plus": "invalid: #F44747",
+			"light_plus": "invalid: #CD3131",
+			"dark_vs": "invalid: #F44747",
+			"light_vs": "invalid: #CD3131",
+			"hc_black": "invalid: #F44747"
+		}
+	},
+	{
+		"c": "< \\u200c zero width non-joiner",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " * >",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": "‍",
+		"t": "source.move comment.block.move meta.comment.ambiguous-character.whitespace.move invalid.illegal.move",
+		"r": {
+			"dark_plus": "invalid: #F44747",
+			"light_plus": "invalid: #CD3131",
+			"dark_vs": "invalid: #F44747",
+			"light_vs": "invalid: #CD3131",
+			"hc_black": "invalid: #F44747"
+		}
+	},
+	{
+		"c": "< \\u200d zero width joiner",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " * >",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move comment.block.move meta.comment.ambiguous-character.whitespace.move invalid.illegal.move",
+		"r": {
+			"dark_plus": "invalid: #F44747",
+			"light_plus": "invalid: #CD3131",
+			"dark_vs": "invalid: #F44747",
+			"light_vs": "invalid: #CD3131",
+			"hc_black": "invalid: #F44747"
+		}
+	},
+	{
+		"c": "< \\u2028 line separator",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " * >",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move comment.block.move meta.comment.ambiguous-character.whitespace.move invalid.illegal.move",
+		"r": {
+			"dark_plus": "invalid: #F44747",
+			"light_plus": "invalid: #CD3131",
+			"dark_vs": "invalid: #F44747",
+			"light_vs": "invalid: #CD3131",
+			"hc_black": "invalid: #F44747"
+		}
+	},
+	{
+		"c": "< \\u2029 paragraph separator",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " * >",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move comment.block.move meta.comment.ambiguous-character.whitespace.move invalid.illegal.move",
+		"r": {
+			"dark_plus": "invalid: #F44747",
+			"light_plus": "invalid: #CD3131",
+			"dark_vs": "invalid: #F44747",
+			"light_vs": "invalid: #CD3131",
+			"hc_black": "invalid: #F44747"
+		}
+	},
+	{
+		"c": "< \\u202f narrow no-break space",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " * >",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move comment.block.move meta.comment.ambiguous-character.whitespace.move invalid.illegal.move",
+		"r": {
+			"dark_plus": "invalid: #F44747",
+			"light_plus": "invalid: #CD3131",
+			"dark_vs": "invalid: #F44747",
+			"light_vs": "invalid: #CD3131",
+			"hc_black": "invalid: #F44747"
+		}
+	},
+	{
+		"c": "< \\u205f medium mathematical space",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " * >",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": "⁠",
+		"t": "source.move comment.block.move meta.comment.ambiguous-character.whitespace.move invalid.illegal.move",
+		"r": {
+			"dark_plus": "invalid: #F44747",
+			"light_plus": "invalid: #CD3131",
+			"dark_vs": "invalid: #F44747",
+			"light_vs": "invalid: #CD3131",
+			"hc_black": "invalid: #F44747"
+		}
+	},
+	{
+		"c": "< \\u2060 word joiner",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " * >",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": "　",
+		"t": "source.move comment.block.move meta.comment.ambiguous-character.whitespace.move invalid.illegal.move",
+		"r": {
+			"dark_plus": "invalid: #F44747",
+			"light_plus": "invalid: #CD3131",
+			"dark_vs": "invalid: #F44747",
+			"light_vs": "invalid: #CD3131",
+			"hc_black": "invalid: #F44747"
+		}
+	},
+	{
+		"c": "< \\u3000 ideographic space",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " * >",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": "﻿",
+		"t": "source.move comment.block.move meta.comment.ambiguous-character.whitespace.move invalid.illegal.move",
+		"r": {
+			"dark_plus": "invalid: #F44747",
+			"light_plus": "invalid: #CD3131",
+			"dark_vs": "invalid: #F44747",
+			"light_vs": "invalid: #CD3131",
+			"hc_black": "invalid: #F44747"
+		}
+	},
+	{
+		"c": "< \\ufeff zero width non-breaking space",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " */",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": "//",
+		"t": "source.move comment.line.move meta.punctuation.slash-slash.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " All block comments above are closed, so this ought to be treated as",
+		"t": "source.move comment.line.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": "//",
+		"t": "source.move comment.line.move meta.punctuation.slash-slash.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " uncommented source code:",
+		"t": "source.move comment.line.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": "address",
+		"t": "source.move storage.type.move",
+		"r": {
+			"dark_plus": "storage.type: #569CD6",
+			"light_plus": "storage.type: #0000FF",
+			"dark_vs": "storage.type: #569CD6",
+			"light_vs": "storage.type: #0000FF",
+			"hc_black": "storage.type: #569CD6"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "0x1",
+		"t": "source.move meta.value.number.move constant.numeric.move",
+		"r": {
+			"dark_plus": "constant.numeric: #B5CEA8",
+			"light_plus": "constant.numeric: #098658",
+			"dark_vs": "constant.numeric: #B5CEA8",
+			"light_vs": "constant.numeric: #098658",
+			"hc_black": "constant.numeric: #B5CEA8"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "{",
+		"t": "source.move meta.punctuation.left-brace.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "}",
+		"t": "source.move meta.punctuation.right-brace.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "//",
+		"t": "source.move comment.line.move meta.punctuation.slash-slash.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " `/**/` can be tricky: it's a block comment that is opened `/*` and",
+		"t": "source.move comment.line.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": "//",
+		"t": "source.move comment.line.move meta.punctuation.slash-slash.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " immediately closed `*/`, but a bad regular expression could treat it as a",
+		"t": "source.move comment.line.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": "//",
+		"t": "source.move comment.line.move meta.punctuation.slash-slash.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " documentation block comment marker `/**` followed by a lone `/`:",
+		"t": "source.move comment.line.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": "/**/",
+		"t": "source.move comment.block.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "address",
+		"t": "source.move storage.type.move",
+		"r": {
+			"dark_plus": "storage.type: #569CD6",
+			"light_plus": "storage.type: #0000FF",
+			"dark_vs": "storage.type: #569CD6",
+			"light_vs": "storage.type: #0000FF",
+			"hc_black": "storage.type: #569CD6"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "0x2",
+		"t": "source.move meta.value.number.move constant.numeric.move",
+		"r": {
+			"dark_plus": "constant.numeric: #B5CEA8",
+			"light_plus": "constant.numeric: #098658",
+			"dark_vs": "constant.numeric: #B5CEA8",
+			"light_vs": "constant.numeric: #098658",
+			"hc_black": "constant.numeric: #B5CEA8"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "{",
+		"t": "source.move meta.punctuation.left-brace.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "}",
+		"t": "source.move meta.punctuation.right-brace.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "/***/",
+		"t": "source.move comment.block.documentation.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "address",
+		"t": "source.move storage.type.move",
+		"r": {
+			"dark_plus": "storage.type: #569CD6",
+			"light_plus": "storage.type: #0000FF",
+			"dark_vs": "storage.type: #569CD6",
+			"light_vs": "storage.type: #0000FF",
+			"hc_black": "storage.type: #569CD6"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "0x3",
+		"t": "source.move meta.value.number.move constant.numeric.move",
+		"r": {
+			"dark_plus": "constant.numeric: #B5CEA8",
+			"light_plus": "constant.numeric: #098658",
+			"dark_vs": "constant.numeric: #B5CEA8",
+			"light_vs": "constant.numeric: #098658",
+			"hc_black": "constant.numeric: #B5CEA8"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "{",
+		"t": "source.move meta.punctuation.left-brace.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "}",
+		"t": "source.move meta.punctuation.right-brace.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "//",
+		"t": "source.move comment.line.move meta.punctuation.slash-slash.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " FIXME: In VS Code, the comment extends until the carriage return `\\r`, then",
+		"t": "source.move comment.line.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": "//",
+		"t": "source.move comment.line.move meta.punctuation.slash-slash.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " ends. Instead, line comments in Move extend until a line feed `\\n`, and so",
+		"t": "source.move comment.line.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": "//",
+		"t": "source.move comment.line.move meta.punctuation.slash-slash.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " everything up to and including \"return\" should be part of the line comment.",
+		"t": "source.move comment.line.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": "//",
+		"t": "source.move comment.line.move meta.punctuation.slash-slash.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " This is important because VS Code renders the text past the \"<\" below as if",
+		"t": "source.move comment.line.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": "//",
+		"t": "source.move comment.line.move meta.punctuation.slash-slash.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " if were NOT commented out, when in fact it is:",
+		"t": "source.move comment.line.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": "//",
+		"t": "source.move comment.line.move meta.punctuation.slash-slash.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": " >",
+		"t": "source.move comment.line.move",
+		"r": {
+			"dark_plus": "comment: #6A9955",
+			"light_plus": "comment: #008000",
+			"dark_vs": "comment: #6A9955",
+			"light_vs": "comment: #008000",
+			"hc_black": "comment: #7CA668"
+		}
+	},
+	{
+		"c": "<",
+		"t": "source.move meta.punctuation.less.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": " \\",
+		"t": "source.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "u000d",
+		"t": "source.move meta.identifier.move support.variable.move",
+		"r": {
+			"dark_plus": "support.variable: #9CDCFE",
+			"light_plus": "support.variable: #001080",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "support.variable: #9CDCFE"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "carriage",
+		"t": "source.move meta.identifier.move support.variable.move",
+		"r": {
+			"dark_plus": "support.variable: #9CDCFE",
+			"light_plus": "support.variable: #001080",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "support.variable: #9CDCFE"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "return",
+		"t": "source.move keyword.control.move",
+		"r": {
+			"dark_plus": "keyword.control: #C586C0",
+			"light_plus": "keyword.control: #AF00DB",
+			"dark_vs": "keyword.control: #569CD6",
+			"light_vs": "keyword.control: #0000FF",
+			"hc_black": "keyword.control: #C586C0"
+		}
+	}
+]

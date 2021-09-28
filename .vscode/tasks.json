@@ -1,0 +1,23 @@
+// This file define "tasks" that automate parts of a programmer's workflow when
+// developing the Visual Studio Code extension in this repository. See
+// https://go.microsoft.com/fwlink/?LinkId=733558 for documentation.
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Pretest",
+            "group": "build",
+            "isBackground": false,
+            "type": "npm",
+            "script": "pretest",
+            "path": "language/move-analyzer/editors/code/",
+            "problemMatcher": {
+                "base": "$tsc",
+                "fileLocation": [
+                    "relative",
+                    "${workspaceFolder}/language/move-analyzer/editors/code/"
+                ]
+            }
+        }
+    ]
+}

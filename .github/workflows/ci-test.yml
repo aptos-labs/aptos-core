@@ -945,6 +945,44 @@ jobs:
           path: |
             /tmp/benches
 
+  build-move-analyzer-vscode-extension:
+    name: Build VS Code extension for move-analyzer
+    runs-on: ubuntu-latest
+    needs:
+      - prepare
+    steps:
+      - uses: actions/checkout@v2.3.4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Use Node.js 14
+        uses: actions/setup-node@v2.4.0
+        with:
+          node-version: '14'
+      - name: Install NPM dependencies
+        working-directory: language/move-analyzer/editors/code
+        run: npm install
+      - name: Build the extension
+        working-directory: language/move-analyzer/editors/code
+        run: npm run pretest
+      - name: Test the extension
+        # VS Code tests require display output. This action simulates such a
+        # display, using Xvfb. (It's roughly equivalent to prefixing the 'run'
+        # commands below with `xvfb-run <command>`.) Without a simulated display
+        # such as this one, the tests would fail with the error message:
+        # "Unable to open X display."
+        uses: GabrielBB/xvfb-action@v1.5
+        with:
+          working-directory: language/move-analyzer/editors/code
+          run: npm run test
+      - name: Package the extension
+        working-directory: language/move-analyzer/editors/code
+        run: npm run package
+      - name: Upload VS Code extension
+        uses: actions/upload-artifact@v2
+        with:
+          name: move-analyzer-vscode-extension
+          path: language/move-analyzer/editors/code/move-analyzer.vsix
+
   developers-site:
     name: run-developer-site-build
     runs-on: ubuntu-latest
@@ -956,7 +994,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
       - uses: actions/cache@v2.1.6
       # Installs node and yarn
-      - name: Use Node.js 12
+      - name: Use Node.js 14
         uses: actions/setup-node@v2.4.1
         with:
           node-version: '14'

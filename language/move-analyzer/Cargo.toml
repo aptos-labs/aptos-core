@@ -1,0 +1,10 @@
+[package]
+name = "move-analyzer"
+version = "0.0.0"
+authors = ["Diem Association <opensource@diem.com>"]
+description = "A language server for Move"
+repository = "https://github.com/diem/diem"
+homepage = "https://diem.com"
+license = "Apache-2.0"
+publish = false
+edition = "2018"
