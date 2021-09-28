@@ -4,14 +4,13 @@
 //! Interface between Mempool and Network layers.
 
 use crate::counters;
-use channel::message_queues::QueueStyle;
-use diem_metrics::IntCounterVec;
+use channel::{diem_channel, message_queues::QueueStyle};
 use diem_types::{transaction::SignedTransaction, PeerId};
 use fail::fail_point;
 use network::{
     error::NetworkError,
     peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
-    protocols::network::{NetworkEvents, NetworkSender, NewNetworkSender},
+    protocols::network::{AppConfig, NetworkEvents, NetworkSender, NewNetworkSender},
     ProtocolId,
 };
 use serde::{Deserialize, Serialize};
@@ -62,21 +61,12 @@ pub struct MempoolNetworkSender {
 
 /// Create a new Sender that only sends for the `MEMPOOL_DIRECT_SEND_PROTOCOL` ProtocolId and a
 /// Receiver (Events) that explicitly returns only said ProtocolId..
-pub fn network_endpoint_config(
-    max_broadcasts_per_peer: usize,
-) -> (
-    Vec<ProtocolId>,
-    Vec<ProtocolId>,
-    QueueStyle,
-    usize,
-    Option<&'static IntCounterVec>,
-) {
-    (
-        vec![],
-        vec![ProtocolId::MempoolDirectSend],
-        QueueStyle::KLAST,
-        max_broadcasts_per_peer,
-        Some(&counters::PENDING_MEMPOOL_NETWORK_EVENTS),
+pub fn network_endpoint_config(max_broadcasts_per_peer: usize) -> AppConfig {
+    AppConfig::p2p(
+        [ProtocolId::MempoolDirectSend],
+        diem_channel::Config::new(max_broadcasts_per_peer)
+            .queue_style(QueueStyle::KLAST)
+            .counters(&counters::PENDING_MEMPOOL_NETWORK_EVENTS),
     )
 }
 

@@ -26,16 +26,15 @@ use crate::{
     peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
     protocols::{
         health_checker::interface::{HealthCheckData, HealthCheckNetworkInterface},
-        network::{Event, NetworkEvents, NetworkSender, NewNetworkSender},
+        network::{AppConfig, Event, NetworkEvents, NetworkSender, NewNetworkSender},
         rpc::error::RpcError,
     },
     ProtocolId,
 };
 use bytes::Bytes;
-use channel::message_queues::QueueStyle;
+use channel::{diem_channel, message_queues::QueueStyle};
 use diem_config::network_id::{NetworkContext, PeerNetworkId};
 use diem_logger::prelude::*;
-use diem_metrics::IntCounterVec;
 use diem_time_service::{TimeService, TimeServiceTrait};
 use diem_types::PeerId;
 use futures::{
@@ -74,19 +73,12 @@ pub struct HealthCheckerNetworkSender {
 }
 
 /// Configuration for the network endpoints to support HealthChecker.
-pub fn network_endpoint_config() -> (
-    Vec<ProtocolId>,
-    Vec<ProtocolId>,
-    QueueStyle,
-    usize,
-    Option<&'static IntCounterVec>,
-) {
-    (
-        vec![ProtocolId::HealthCheckerRpc],
-        vec![],
-        QueueStyle::LIFO,
-        NETWORK_CHANNEL_SIZE,
-        Some(&counters::PENDING_HEALTH_CHECKER_NETWORK_EVENTS),
+pub fn network_endpoint_config() -> AppConfig {
+    AppConfig::p2p(
+        [ProtocolId::HealthCheckerRpc],
+        diem_channel::Config::new(NETWORK_CHANNEL_SIZE)
+            .queue_style(QueueStyle::LIFO)
+            .counters(&counters::PENDING_HEALTH_CHECKER_NETWORK_EVENTS),
     )
 }
 

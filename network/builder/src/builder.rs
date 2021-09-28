@@ -9,7 +9,6 @@
 //! authentication -- a network end-point running with remote authentication enabled will
 //! connect to or accept connections from an end-point running in authenticated mode as
 //! long as the latter is in its trusted peers set.
-use channel::{self, diem_channel, message_queues::QueueStyle};
 use diem_config::{
     config::{
         DiscoveryMethod, NetworkConfig, Peer, PeerRole, PeerSet, RateLimitConfig, RoleType,
@@ -22,7 +21,6 @@ use diem_config::{
 use diem_crypto::x25519::PublicKey;
 use diem_infallible::RwLock;
 use diem_logger::prelude::*;
-use diem_metrics::IntCounterVec;
 use diem_network_address_encryption::Encryptor;
 use diem_secure_storage::Storage;
 use diem_time_service::TimeService;
@@ -40,7 +38,6 @@ use network::{
         health_checker::{self, builder::HealthCheckerBuilder},
         network::{AppConfig, NewNetworkEvents, NewNetworkSender},
     },
-    ProtocolId,
 };
 use network_discovery::DiscoveryChangeListener;
 use std::{
@@ -420,7 +417,7 @@ impl NetworkBuilder {
     ) -> &mut Self {
         // Initialize and start HealthChecker.
         let (hc_network_tx, hc_network_rx) =
-            self.add_protocol_handler(health_checker::network_endpoint_config());
+            self.add_p2p_service(&health_checker::network_endpoint_config());
         self.health_checker_builder = Some(HealthCheckerBuilder::new(
             self.network_context(),
             self.time_service.clone(),
@@ -438,41 +435,30 @@ impl NetworkBuilder {
         self
     }
 
-    /// Adds a endpoints for the provided configuration.  Returns NetworkSender and NetworkEvent which
-    /// can be attached to other components.
-    pub fn add_protocol_handler<SenderT, EventT>(
+    /// Register a new Peer-to-Peer (both client and service) application with
+    /// network and return the specialized client and service interfaces.
+    pub fn add_p2p_service<SenderT: NewNetworkSender, EventsT: NewNetworkEvents>(
         &mut self,
-        (rpc_protocols, direct_send_protocols, queue_style, max_capacity, counters): (
-            Vec<ProtocolId>,
-            Vec<ProtocolId>,
-            QueueStyle,
-            usize,
-            Option<&'static IntCounterVec>,
-        ),
-    ) -> (SenderT, EventT)
-    where
-        EventT: NewNetworkEvents,
-        SenderT: NewNetworkSender,
-    {
-        // TODO(philiphayes): remove
-        let protocols = rpc_protocols
-            .into_iter()
-            .chain(direct_send_protocols.into_iter());
-        let config = AppConfig::p2p(
-            protocols,
-            diem_channel::Config {
-                queue_style,
-                max_capacity,
-                counters,
-            },
-        );
+        config: &AppConfig,
+    ) -> (SenderT, EventsT) {
+        (self.add_client(config), self.add_service(config))
+    }
 
-        let ((peer_mgr_reqs_tx, connection_reqs_tx), (peer_mgr_reqs_rx, connection_notifs_rx)) =
-            self.peer_manager_builder.add_p2p_service(&config);
-        (
-            SenderT::new(peer_mgr_reqs_tx, connection_reqs_tx),
-            EventT::new(peer_mgr_reqs_rx, connection_notifs_rx),
-        )
+    /// Register a new client application with network. Return the client
+    /// interface for sending messages via network.
+    // TODO(philiphayes): return new NetworkClient (name TBD) interface?
+    pub fn add_client<SenderT: NewNetworkSender>(&mut self, config: &AppConfig) -> SenderT {
+        let (peer_mgr_reqs_tx, connection_reqs_tx) = self.peer_manager_builder.add_client(config);
+        SenderT::new(peer_mgr_reqs_tx, connection_reqs_tx)
+    }
+
+    /// Register a new service application with network. Return the service
+    /// interface for handling new requests from network.
+    // TODO(philiphayes): return new NetworkService (name TBD) interface?
+    pub fn add_service<EventsT: NewNetworkEvents>(&mut self, config: &AppConfig) -> EventsT {
+        let (peer_mgr_reqs_rx, connection_notifs_rx) =
+            self.peer_manager_builder.add_service(config);
+        EventsT::new(peer_mgr_reqs_rx, connection_notifs_rx)
     }
 }
 

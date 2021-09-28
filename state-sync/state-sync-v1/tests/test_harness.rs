@@ -401,8 +401,8 @@ impl StateSyncEnvironment {
                 PeerMetadataStorage::new(&[NetworkId::Validator]),
             );
 
-            let (sender, events) = network_builder
-                .add_protocol_handler(state_sync_v1::network::network_endpoint_config());
+            let (sender, events) =
+                network_builder.add_p2p_service(&state_sync_v1::network::network_endpoint_config());
             network_builder.build(self.runtime.handle().clone()).start();
             network_handles.push((network_id, sender, events));
         };

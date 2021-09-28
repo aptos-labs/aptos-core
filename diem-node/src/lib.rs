@@ -382,12 +382,12 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
 
         // Create the endpoints to connect the Network to State Sync.
         let (state_sync_sender, state_sync_events) =
-            network_builder.add_protocol_handler(state_sync_v1::network::network_endpoint_config());
+            network_builder.add_p2p_service(&state_sync_v1::network::network_endpoint_config());
         state_sync_network_handles.push((network_id, state_sync_sender, state_sync_events));
 
         // Create the endpoints to connect the Network to mempool.
-        let (mempool_sender, mempool_events) = network_builder.add_protocol_handler(
-            diem_mempool::network::network_endpoint_config(MEMPOOL_NETWORK_CHANNEL_BUFFER_SIZE),
+        let (mempool_sender, mempool_events) = network_builder.add_p2p_service(
+            &diem_mempool::network::network_endpoint_config(MEMPOOL_NETWORK_CHANNEL_BUFFER_SIZE),
         );
         mempool_network_handles.push((network_id, mempool_sender, mempool_events));
 
@@ -401,7 +401,7 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
 
             consensus_network_handles = Some(
                 network_builder
-                    .add_protocol_handler(consensus::network_interface::network_endpoint_config()),
+                    .add_p2p_service(&consensus::network_interface::network_endpoint_config()),
             );
         }
 

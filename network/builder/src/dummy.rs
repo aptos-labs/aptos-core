@@ -4,14 +4,13 @@
 //! Integration tests for validator_network.
 
 use crate::builder::NetworkBuilder;
-use channel::message_queues::QueueStyle;
+use channel::diem_channel;
 use diem_config::{
     config::{Peer, PeerRole, PeerSet, RoleType, NETWORK_CHANNEL_SIZE},
     network_id::{NetworkContext, NetworkId},
 };
 use diem_crypto::{test_utils::TEST_SEED, x25519, Uniform};
 use diem_infallible::RwLock;
-use diem_metrics::IntCounterVec;
 use diem_time_service::TimeService;
 use diem_types::{chain_id::ChainId, network_address::NetworkAddress, PeerId};
 use futures::{executor::block_on, StreamExt};
@@ -23,7 +22,7 @@ use network::{
         builder::AuthenticationMode, ConnectionRequestSender, PeerManagerRequestSender,
     },
     protocols::{
-        network::{Event, NetworkEvents, NetworkSender, NewNetworkSender},
+        network::{AppConfig, Event, NetworkEvents, NetworkSender, NewNetworkSender},
         rpc::error::RpcError,
     },
     ProtocolId,
@@ -43,19 +42,10 @@ const TEST_DIRECT_SEND_PROTOCOL: ProtocolId = ProtocolId::ConsensusDirectSend;
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct DummyMsg(pub Vec<u8>);
 
-pub fn network_endpoint_config() -> (
-    Vec<ProtocolId>,
-    Vec<ProtocolId>,
-    QueueStyle,
-    usize,
-    Option<&'static IntCounterVec>,
-) {
-    (
-        vec![TEST_RPC_PROTOCOL],
-        vec![TEST_DIRECT_SEND_PROTOCOL],
-        QueueStyle::LIFO,
-        NETWORK_CHANNEL_SIZE,
-        None,
+pub fn network_endpoint_config() -> AppConfig {
+    AppConfig::p2p(
+        [TEST_RPC_PROTOCOL, TEST_DIRECT_SEND_PROTOCOL],
+        diem_channel::Config::new(NETWORK_CHANNEL_SIZE),
     )
 }
 
@@ -154,7 +144,7 @@ pub fn setup_network() -> DummyNetwork {
     );
 
     let (listener_sender, mut listener_events) = network_builder
-        .add_protocol_handler::<DummyNetworkSender, DummyNetworkEvents>(network_endpoint_config());
+        .add_p2p_service::<DummyNetworkSender, DummyNetworkEvents>(&network_endpoint_config());
     network_builder.build(runtime.handle().clone()).start();
 
     // Add the listener address with port
@@ -184,7 +174,7 @@ pub fn setup_network() -> DummyNetwork {
     );
 
     let (dialer_sender, mut dialer_events) = network_builder
-        .add_protocol_handler::<DummyNetworkSender, DummyNetworkEvents>(network_endpoint_config());
+        .add_p2p_service::<DummyNetworkSender, DummyNetworkEvents>(&network_endpoint_config());
     network_builder.build(runtime.handle().clone()).start();
 
     // Wait for establishing connection

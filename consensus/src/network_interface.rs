@@ -5,7 +5,7 @@
 
 use crate::counters;
 use anyhow::anyhow;
-use channel::message_queues::QueueStyle;
+use channel::{diem_channel, message_queues::QueueStyle};
 use consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse},
     epoch_retrieval::EpochRetrievalRequest,
@@ -16,14 +16,13 @@ use consensus_types::{
 };
 use diem_infallible::RwLock;
 use diem_logger::prelude::*;
-use diem_metrics::IntCounterVec;
 use diem_types::{epoch_change::EpochChangeProof, PeerId};
 use network::{
     constants::NETWORK_CHANNEL_SIZE,
     error::NetworkError,
     peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
     protocols::{
-        network::{NetworkEvents, NetworkSender, NewNetworkSender},
+        network::{AppConfig, NetworkEvents, NetworkSender, NewNetworkSender},
         rpc::error::RpcError,
         wire::handshake::v1::ProtocolIdSet,
     },
@@ -93,19 +92,13 @@ pub const DIRECT_SEND: &[ProtocolId] = &[
 
 /// Configuration for the network endpoints to support consensus.
 /// TODO: make this configurable
-pub fn network_endpoint_config() -> (
-    Vec<ProtocolId>,
-    Vec<ProtocolId>,
-    QueueStyle,
-    usize,
-    Option<&'static IntCounterVec>,
-) {
-    (
-        RPC.to_vec(),
-        DIRECT_SEND.to_vec(),
-        QueueStyle::LIFO,
-        NETWORK_CHANNEL_SIZE,
-        Some(&counters::PENDING_CONSENSUS_NETWORK_EVENTS),
+pub fn network_endpoint_config() -> AppConfig {
+    let protos = RPC.iter().chain(DIRECT_SEND.iter()).copied();
+    AppConfig::p2p(
+        protos,
+        diem_channel::Config::new(NETWORK_CHANNEL_SIZE)
+            .queue_style(QueueStyle::LIFO)
+            .counters(&counters::PENDING_CONSENSUS_NETWORK_EVENTS),
     )
 }
 

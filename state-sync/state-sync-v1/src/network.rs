@@ -6,12 +6,11 @@
 use crate::{
     chunk_request::GetChunkRequest, chunk_response::GetChunkResponse, counters, error::Error,
 };
-use channel::message_queues::QueueStyle;
-use diem_metrics::IntCounterVec;
+use channel::{diem_channel, message_queues::QueueStyle};
 use diem_types::PeerId;
 use network::{
     peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
-    protocols::network::{NetworkEvents, NetworkSender, NewNetworkSender},
+    protocols::network::{AppConfig, NetworkEvents, NetworkSender, NewNetworkSender},
     ProtocolId,
 };
 use serde::{Deserialize, Serialize};
@@ -65,18 +64,11 @@ impl StateSyncSender {
 }
 
 /// Configuration for the network endpoints to support state sync.
-pub fn network_endpoint_config() -> (
-    Vec<ProtocolId>,
-    Vec<ProtocolId>,
-    QueueStyle,
-    usize,
-    Option<&'static IntCounterVec>,
-) {
-    (
-        vec![],
-        vec![ProtocolId::StateSyncDirectSend],
-        QueueStyle::LIFO,
-        STATE_SYNC_MAX_BUFFER_SIZE,
-        Some(&counters::PENDING_STATE_SYNC_NETWORK_EVENTS),
+pub fn network_endpoint_config() -> AppConfig {
+    AppConfig::p2p(
+        [ProtocolId::StateSyncDirectSend],
+        diem_channel::Config::new(STATE_SYNC_MAX_BUFFER_SIZE)
+            .queue_style(QueueStyle::LIFO)
+            .counters(&counters::PENDING_STATE_SYNC_NETWORK_EVENTS),
     )
 }

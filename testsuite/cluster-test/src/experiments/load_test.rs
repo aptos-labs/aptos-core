@@ -280,11 +280,11 @@ impl StubbedNode {
         );
 
         let state_sync_handle = Some(
-            network_builder.add_protocol_handler(state_sync_v1::network::network_endpoint_config()),
+            network_builder.add_p2p_service(&state_sync_v1::network::network_endpoint_config()),
         );
 
-        let mempool_handle = Some(network_builder.add_protocol_handler(
-            diem_mempool::network::network_endpoint_config(
+        let mempool_handle = Some(network_builder.add_p2p_service(
+            &diem_mempool::network::network_endpoint_config(
                 pfn_config.mempool.max_broadcasts_per_peer,
             ),
         ));
