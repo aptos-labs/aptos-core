@@ -17,7 +17,7 @@ pub fn main() -> Result<()> {
     let subcommand = Subcommand::from_args();
     match subcommand {
         Subcommand::New { blockchain, path } => new::handle(blockchain, path),
-        Subcommand::Node { project_path } => node::handle(project_path.as_path()),
+        Subcommand::Node {} => node::handle(),
         Subcommand::Deploy {
             project_path,
             account_key_path,
@@ -41,7 +41,7 @@ pub enum Subcommand {
         path: PathBuf,
     },
     #[structopt(about = "Runs a local devnet with prefunded accounts")]
-    Node { project_path: PathBuf },
+    Node {},
     #[structopt(about = "Publishes a move module under an account")]
     Deploy {
         project_path: PathBuf,

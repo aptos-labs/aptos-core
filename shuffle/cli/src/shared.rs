@@ -44,3 +44,23 @@ pub fn send(client: &BlockingClient, tx: diem_types::transaction::SignedTransact
 pub fn get_shuffle_dir() -> PathBuf {
     BaseDirs::new().unwrap().home_dir().join(".shuffle")
 }
+
+#[cfg(test)]
+mod test {
+    use crate::shared::get_shuffle_dir;
+    use directories::BaseDirs;
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_get_shuffle_dir() {
+        let path = BaseDirs::new()
+            .unwrap()
+            .home_dir()
+            .to_str()
+            .unwrap()
+            .to_string()
+            + "/.shuffle";
+        let correct_dir = PathBuf::from(path);
+        assert_eq!(get_shuffle_dir(), correct_dir);
+    }
+}
