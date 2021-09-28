@@ -10,6 +10,8 @@
 [![License](https://img.shields.io/badge/license-Apache-green.svg)](LICENSE)
 [![grcov](https://img.shields.io/badge/Coverage-grcov-green)](https://ci-artifacts.diem.com/coverage/unit-coverage/latest/index.html)
 [![test history](https://img.shields.io/badge/Test-History-green)](https://ci-artifacts.diem.com/testhistory/diem/diem/auto/ci-test.yml/index.html)
+[![Automated Issues](https://img.shields.io/github/issues-search?color=orange&label=Automated%20Issues&query=repo%3Adiem%2Fdiem%20is%3Aopen%20author%3Aapp%2Fgithub-actions)](https://github.com/diem/diem/issues/created_by/app/github-actions)
+
 
 Diem Core implements a decentralized, programmable database which provides a financial infrastructure that can empower billions of people.
 
