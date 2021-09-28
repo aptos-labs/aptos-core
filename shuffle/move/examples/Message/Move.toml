@@ -3,8 +3,7 @@ name = "Message"
 version = "0.0.0"
 
 [addresses]
-# Std = "0x1"
-MessageAddress = "0x24163afcc6e33b0a9473852e18327fa9"
+MessageAddress = "0x24163afcc6e33b0a9473852e18327fa9" # TODO: Hardcoded to sender addr
 
 [dependencies]
-MoveStdlib = { local = "/Users/droc/workspace/diem/language/move-stdlib", addr_subst = { "Std" = "0x1" }}
+MoveStdlib = { local = "../stdlib", addr_subst = { "Std" = "0x1" }}

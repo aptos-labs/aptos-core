@@ -3,15 +3,13 @@
 
 use anyhow::Result;
 use diem_sdk::client::BlockingClient;
-use diem_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, fs, path::Path};
+use std::{fs, path::Path};
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "kebab-case")]
 pub struct Config {
     pub(crate) blockchain: String,
-    pub(crate) named_addresses: BTreeMap<String, AccountAddress>,
 }
 
 pub fn read_config(project_path: &Path) -> Result<Config> {

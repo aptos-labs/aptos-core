@@ -12,7 +12,9 @@ pub fn handle(project_path: &Path) -> Result<()> {
     // it via project_path.join(...). Remove Message pkg hardcode and iterate over pkgs.
     let deno_bootstrap = format!(
         r#"import * as Shuffle from "{}/repl.ts";
-        import * as TxnBuilder from "{}/Message/txn_builders/mod.ts";"#,
+        import * as TxnBuilder from "{}/Message/txn_builders/mod.ts";
+        import * as Helper from "{}/Message/txn_builders/helper.ts";"#,
+        project_path.display(),
         project_path.display(),
         project_path.display(),
     );

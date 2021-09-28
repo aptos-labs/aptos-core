@@ -6,3 +6,7 @@ export * as TxnBuilder from "../Message/txn_builders/mod.ts";
 export function deployMessageModule() {
   return true;
 }
+
+export function setMessage(_address: any, _message: any) {
+  return true;
+}

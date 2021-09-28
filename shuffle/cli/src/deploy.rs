@@ -60,16 +60,17 @@ fn publish_packages_as_transaction(project_path: &Path, account_key_path: &Path)
 
     let client = BlockingClient::new(json_rpc_url);
 
+    println!("Using Public Key {}", &new_account_key.public_key());
     let derived_address =
         AuthenticationKey::ed25519(&new_account_key.public_key()).derived_address();
     println!(
         "Sending txn from address {}",
         derived_address.to_hex_literal()
     );
-    let mut new_account = LocalAccount::new(derived_address, new_account_key, 0);
 
     // ================= Send a module transaction ========================
 
+    let mut new_account = LocalAccount::new(derived_address, new_account_key, 0);
     let pkg_path = project_path
         .join(MESSAGE_EXAMPLE_PATH)
         .join(CompiledPackageLayout::Root.path())

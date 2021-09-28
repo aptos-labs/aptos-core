@@ -7585,6 +7585,7 @@ dependencies = [
  "diemdb",
  "generate-key",
  "hex",
+ "include_dir",
  "move-binary-format",
  "move-cli",
  "move-command-line-common",

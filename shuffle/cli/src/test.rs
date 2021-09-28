@@ -20,6 +20,7 @@ pub fn handle(project_path: &Path) -> Result<()> {
             "--unstable",
             tests_path_string.as_str(),
             "--allow-env=PROJECT_PATH",
+            "--allow-read",
             format!("--allow-net=:{}", DEFAULT_PORT).as_str(),
         ])
         .env("PROJECT_PATH", project_path.to_string_lossy().to_string())

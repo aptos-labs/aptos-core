@@ -7,7 +7,9 @@
 // including endpoints: ledgerInfo, resources, modules, and some of transactions.
 // Developer API: https://docs.google.com/document/d/1KEPnGGU3zg_RmN8V4r2ms_MFPwsTMNyK7jCUFygviDg/edit#heading=h.hesw425dw9gz
 
+// deno-lint-ignore-file no-explicit-any
 import { green } from 'https://deno.land/x/nanocolors/mod.ts';
+import { createRemote } from "https://deno.land/x/gentle_rpc/mod.ts";
 
 function highlight(content: string) {
   return green(content);
@@ -17,11 +19,12 @@ function highlight(content: string) {
 export const projectPath = Deno.env.get("PROJECT_PATH") || "unknown";
 export const nodeUrl = 'http://127.0.0.1:8081'
 export const senderAddress = "0x24163afcc6e33b0a9473852e18327fa9";
+export const privateKeyPath = "/Users/droc/workspace/diem/shuffle/cli/new_account.key";
 
 console.log(`Loading Project ${highlight(projectPath)}`);
 console.log(`Connected to Node ${highlight(nodeUrl)}`);
 console.log(`Sender Account Address ${highlight(senderAddress)}`);
-console.log(`"Shuffle", "TxnBuilder" top level objects available`);
+console.log(`"Shuffle", "TxnBuilder", "Helper" top level objects available`);
 console.log(await ledgerInfo());
 console.log();
 
@@ -33,6 +36,14 @@ export async function ledgerInfo() {
 export async function transactions() {
   const res = await fetch(relativeUrl("/transactions"));
   return await res.json();
+}
+
+export async function accountTransactions() {
+  const remote = createRemote("http://127.0.0.1:8080/v1");
+  return await remote.call(
+    "get_account_transactions",
+    ["24163afcc6e33b0a9473852e18327fa9", 0, 10, true]
+  );
 }
 
 export async function resources(addr: string | undefined) {
@@ -51,8 +62,36 @@ export async function modules(addr: string | undefined) {
   return await res.json();
 }
 
+// Gets the sender address's account resource from the developer API.
+// Example payload below:
+// {
+//   "type": {
+//     "type": "struct",
+//     "address": "0x1",
+//     "module": "DiemAccount",
+//     "name": "DiemAccount",
+//     "generic_type_params": []
+//   },
+//   "value": {
+//     "sequence_number": "2",
+export async function account() {
+  const res = await resources(senderAddress);
+  return res.
+    find(
+      (entry: any) => entry["type"]["name"] == "DiemAccount"
+    );
+}
+
+export async function sequenceNumber() {
+  const acc = await account();
+  if (acc) {
+    return parseInt(acc["value"]["sequence_number"]);
+  }
+  return null;
+}
+
 export async function accounts() {
-  return [{ "address": senderAddress }];
+  return [await account()];
 }
 
 export const test = Deno.test;

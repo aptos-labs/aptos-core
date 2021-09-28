@@ -23,7 +23,7 @@ pub fn handle(project_dir: PathBuf, account_key_path: PathBuf) -> Result<()> {
         .with_context(|| format!("Failed to load NodeConfig from file: {:?}", config_path))?;
     let root_key_path = project_dir.join("nodeconfig").join("mint.key");
     let root_account_key = load_key(root_key_path);
-    let new_account_key = load_key(account_key_path);
+    let new_account_key = load_key(account_key_path.as_path());
     let json_rpc_url = format!("http://0.0.0.0:{}", config.json_rpc.address.port());
     println!("Connecting to {}...", json_rpc_url);
 
@@ -38,6 +38,7 @@ pub fn handle(project_dir: PathBuf, account_key_path: PathBuf) -> Result<()> {
         root_account_key,
         root_seq_num,
     );
+    println!("Using Public Key: {}", &new_account_key.public_key());
     let new_account = LocalAccount::new(
         AuthenticationKey::ed25519(&new_account_key.public_key()).derived_address(),
         new_account_key,
