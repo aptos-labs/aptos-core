@@ -93,7 +93,7 @@ impl Factory for K8sFactory {
         &self,
         _rng: &mut StdRng,
         node_num: NonZeroUsize,
-        version: &Version,
+        init_version: &Version,
     ) -> Result<Box<dyn Swarm>> {
         uninstall_from_k8s_cluster()?;
         set_eks_nodegroup_size(self.cluster_name.clone(), 0, true)?;
@@ -101,8 +101,8 @@ impl Factory for K8sFactory {
         clean_k8s_cluster(
             self.helm_repo.clone(),
             node_num.get(),
-            format!("{}", version),
-            format!("{}", version),
+            format!("{}", init_version),
+            format!("{}", init_version),
             true,
         )?;
         let rt = Runtime::new().unwrap();
@@ -114,6 +114,7 @@ impl Factory for K8sFactory {
                 &self.helm_repo,
                 &self.image_tag,
                 &self.base_image_tag,
+                format!("{}", init_version).as_str(),
             ))
             .unwrap();
         Ok(Box::new(swarm))

@@ -262,6 +262,7 @@ fn land_blocking_test_compat_suite() -> ForgeConfig<'static> {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(30).unwrap())
         .with_network_tests(&[&SimpleValidatorUpgrade, &PerformanceBenchmark])
+        .with_initial_version(InitialVersion::Oldest)
 }
 
 //TODO Make public test later

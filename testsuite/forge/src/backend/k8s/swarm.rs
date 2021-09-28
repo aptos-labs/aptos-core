@@ -49,10 +49,11 @@ impl K8sSwarm {
         helm_repo: &str,
         image_tag: &str,
         base_image_tag: &str,
+        init_image_tag: &str,
     ) -> Result<Self> {
         let kube_client = create_k8s_client().await;
         let fullnodes = HashMap::new();
-        let validators = get_validators(kube_client.clone(), image_tag).await?;
+        let validators = get_validators(kube_client.clone(), init_image_tag).await?;
 
         let client = validators.values().next().unwrap().json_rpc_client();
         let key = load_root_key(root_key);
