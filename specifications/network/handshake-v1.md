@@ -18,11 +18,11 @@ where supported `<version>` is currently only `0`.
 /// The HandshakeMsg contains a mapping from MessagingProtocolVersion suppported by the node
 /// to a bit-vector specifying application-level protocols supported over that version.
 pub struct HandshakeMsg {
-    pub supported_protocols: BTreeMap<MessagingProtocolVersion, SupportedProtocols>,
+    pub supported_protocols: BTreeMap<MessagingProtocolVersion, ProtocolIdSet>,
 }
 
 /// Supported application protocols represented as a bit-vector.
-pub struct SupportedProtocols(BitVec);
+pub struct ProtocolIdSet(BitVec);
 
 /// Position _i_ in the bit-vector is set if and only if the _i_th ProtocolId variant
 /// is supported by the node.
@@ -46,7 +46,7 @@ The `Handshake` protocol is currently symmetric, i.e., we follow the same upgrad
 
   * Construct a `HandshakeMsg` according to the set of supported DiemNet messaging protocol versions and corresponding application protocols for each version.
 
-    * Note: the `HandshakeMsg` is a _sorted_ map from `MessageProtocolVersion` to `SupportedProtocols` , where `SupportedProtocols` is a bit-vector with a position set if the corresponding `ProtocolId` (represented as a `u8`) is supported over the given DiemNet version.
+    * Note: the `HandshakeMsg` is a _sorted_ map from `MessageProtocolVersion` to `ProtocolIdSet` , where `ProtocolIdSet` is a bit-vector with a position set if the corresponding `ProtocolId` (represented as a `u8`) is supported over the given DiemNet version.
 
   * Serialize the `HandshakeMsg` into bytes and prepend the `u16` length-prefix.
   * Send the `u16` length-prefixed, serialized `HandshakeMsg` over the Noise-wrapped socket.

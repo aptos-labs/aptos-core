@@ -56,7 +56,7 @@ use network::{
     peer_manager::{conn_notifs_channel, ConnectionRequestSender, PeerManagerRequestSender},
     protocols::{
         network::{Event, NewNetworkEvents, NewNetworkSender},
-        wire::handshake::v1::SupportedProtocols,
+        wire::handshake::v1::ProtocolIdSet,
     },
     ProtocolId,
 };
@@ -107,7 +107,7 @@ impl NodeSetup {
         for signer in signers.iter().take(num_nodes) {
             shared_connections.write().insert(
                 signer.author(),
-                SupportedProtocols::from_iter([
+                ProtocolIdSet::from_iter([
                     ProtocolId::ConsensusDirectSendJSON,
                     ProtocolId::ConsensusDirectSend,
                     ProtocolId::ConsensusRpc,

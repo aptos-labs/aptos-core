@@ -32,7 +32,7 @@ use network::{
     peer_manager::{conn_notifs_channel, ConnectionRequestSender, PeerManagerRequestSender},
     protocols::{
         network::{NewNetworkEvents, NewNetworkSender},
-        wire::handshake::v1::SupportedProtocols,
+        wire::handshake::v1::ProtocolIdSet,
     },
     ProtocolId,
 };
@@ -164,7 +164,7 @@ impl SMRNode {
         node_configs.iter().for_each(|config| {
             shared_connections.write().insert(
                 author_from_config(config),
-                SupportedProtocols::from_iter([
+                ProtocolIdSet::from_iter([
                     ProtocolId::ConsensusDirectSendJSON,
                     ProtocolId::ConsensusDirectSend,
                     ProtocolId::ConsensusRpc,

@@ -27,7 +27,7 @@ use futures::{AsyncReadExt, AsyncWriteExt};
 use netcore::transport::tcp::{resolve_and_connect, TcpSocket};
 use network::{
     noise::{HandshakeAuthMode, NoiseUpgrader},
-    protocols::wire::handshake::v1::SupportedProtocols,
+    protocols::wire::handshake::v1::ProtocolIdSet,
     transport::{upgrade_outbound, UpgradeContext, SUPPORTED_MESSAGING_PROTOCOL},
 };
 use std::{collections::BTreeMap, sync::Arc};
@@ -216,10 +216,7 @@ fn build_upgrade_context(
 
     // Let's make sure some protocol can be connected.  In the future we may want to allow for specifics
     let mut supported_protocols = BTreeMap::new();
-    supported_protocols.insert(
-        SUPPORTED_MESSAGING_PROTOCOL,
-        SupportedProtocols::all_known(),
-    );
+    supported_protocols.insert(SUPPORTED_MESSAGING_PROTOCOL, ProtocolIdSet::all_known());
 
     // Build the noise and network handshake, without running a full Noise server with listener
     Arc::new(UpgradeContext::new(

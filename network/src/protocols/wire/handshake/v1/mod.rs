@@ -113,15 +113,20 @@ impl fmt::Display for ProtocolId {
 }
 
 //
-// SupportedProtocols
+// ProtocolIdSet
 //
 
-/// A bit vector of supported [`ProtocolId`]s.
+/// A compact representation for a set of [`ProtocolId`]s. Internally, this is a
+/// bitvec which supports at most 256 bits.
+///
+/// These sets are sent over-the-wire in the initial [`HandshakeMsg`] to other
+/// DiemNet peers in order to negotiate the set of common supported protocols for
+/// use on a new DiemNet connection.
 #[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
-pub struct SupportedProtocols(bitvec::BitVec);
+pub struct ProtocolIdSet(bitvec::BitVec);
 
-impl SupportedProtocols {
+impl ProtocolIdSet {
     pub fn empty() -> Self {
         Self::default()
     }
@@ -148,13 +153,13 @@ impl SupportedProtocols {
     }
 
     /// Find the intersection between two sets of protocols.
-    pub fn intersect(&self, other: &SupportedProtocols) -> SupportedProtocols {
-        SupportedProtocols(self.0.bitand(&other.0))
+    pub fn intersect(&self, other: &ProtocolIdSet) -> ProtocolIdSet {
+        ProtocolIdSet(self.0.bitand(&other.0))
     }
 
     /// Return the union of two sets of protocols.
-    pub fn union(&self, other: &SupportedProtocols) -> SupportedProtocols {
-        SupportedProtocols(self.0.bitor(&other.0))
+    pub fn union(&self, other: &ProtocolIdSet) -> ProtocolIdSet {
+        ProtocolIdSet(self.0.bitor(&other.0))
     }
 
     /// Returns if the protocol is set.
@@ -163,13 +168,13 @@ impl SupportedProtocols {
     }
 }
 
-impl FromIterator<ProtocolId> for SupportedProtocols {
+impl FromIterator<ProtocolId> for ProtocolIdSet {
     fn from_iter<T: IntoIterator<Item = ProtocolId>>(iter: T) -> Self {
         Self(iter.into_iter().map(|protocol| protocol as u8).collect())
     }
 }
 
-impl<'a> FromIterator<&'a ProtocolId> for SupportedProtocols {
+impl<'a> FromIterator<&'a ProtocolId> for ProtocolIdSet {
     fn from_iter<T: IntoIterator<Item = &'a ProtocolId>>(iter: T) -> Self {
         iter.into_iter().copied().collect()
     }
@@ -230,7 +235,7 @@ pub enum HandshakeError {
 /// supported over that version.
 #[derive(Clone, Deserialize, Serialize, Default)]
 pub struct HandshakeMsg {
-    pub supported_protocols: BTreeMap<MessagingProtocolVersion, SupportedProtocols>,
+    pub supported_protocols: BTreeMap<MessagingProtocolVersion, ProtocolIdSet>,
     pub chain_id: ChainId,
     pub network_id: NetworkId,
 }
@@ -243,7 +248,7 @@ impl HandshakeMsg {
     }
 
     #[cfg(test)]
-    pub fn from_supported(protos: SupportedProtocols) -> Self {
+    pub fn from_supported(protos: ProtocolIdSet) -> Self {
         let mut supported_protocols = BTreeMap::new();
         supported_protocols.insert(MessagingProtocolVersion::V1, protos);
         Self {
@@ -259,7 +264,7 @@ impl HandshakeMsg {
     pub fn perform_handshake(
         &self,
         other: &HandshakeMsg,
-    ) -> Result<(MessagingProtocolVersion, SupportedProtocols), HandshakeError> {
+    ) -> Result<(MessagingProtocolVersion, ProtocolIdSet), HandshakeError> {
         // verify that both peers are on the same chain
         if self.chain_id != other.chain_id {
             return Err(HandshakeError::InvalidChainId(

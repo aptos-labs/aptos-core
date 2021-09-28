@@ -25,7 +25,7 @@ use diem_types::{
 };
 use futures::{channel::oneshot, stream::select, SinkExt, Stream, StreamExt};
 use network::protocols::{
-    network::Event, rpc::error::RpcError, wire::handshake::v1::SupportedProtocols,
+    network::Event, rpc::error::RpcError, wire::handshake::v1::ProtocolIdSet,
 };
 use std::{
     collections::HashMap,
@@ -205,7 +205,7 @@ pub struct NetworkTask {
     >,
     block_retrieval_tx: diem_channel::Sender<AccountAddress, IncomingBlockRetrievalRequest>,
     all_events: Box<dyn Stream<Item = Event<ConsensusMsg>> + Send + Unpin>,
-    connections: Arc<RwLock<HashMap<PeerId, SupportedProtocols>>>,
+    connections: Arc<RwLock<HashMap<PeerId, ProtocolIdSet>>>,
 }
 
 impl NetworkTask {
@@ -213,7 +213,7 @@ impl NetworkTask {
     pub fn new(
         network_events: ConsensusNetworkEvents,
         self_receiver: channel::Receiver<Event<ConsensusMsg>>,
-        connections: Arc<RwLock<HashMap<PeerId, SupportedProtocols>>>,
+        connections: Arc<RwLock<HashMap<PeerId, ProtocolIdSet>>>,
     ) -> (NetworkTask, NetworkReceivers) {
         let (consensus_messages_tx, consensus_messages) =
             diem_channel::new(QueueStyle::LIFO, 1, Some(&counters::CONSENSUS_CHANNEL_MSGS));

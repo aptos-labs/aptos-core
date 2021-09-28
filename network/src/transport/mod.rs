@@ -6,7 +6,7 @@ use crate::{
     noise::{stream::NoiseStream, AntiReplayTimestamps, HandshakeAuthMode, NoiseUpgrader},
     protocols::{
         identity::exchange_handshake,
-        wire::handshake::v1::{HandshakeMsg, MessagingProtocolVersion, SupportedProtocols},
+        wire::handshake::v1::{HandshakeMsg, MessagingProtocolVersion, ProtocolIdSet},
     },
 };
 use diem_config::{
@@ -103,7 +103,7 @@ pub struct ConnectionMetadata {
     pub addr: NetworkAddress,
     pub origin: ConnectionOrigin,
     pub messaging_protocol: MessagingProtocolVersion,
-    pub application_protocols: SupportedProtocols,
+    pub application_protocols: ProtocolIdSet,
     pub role: PeerRole,
 }
 
@@ -114,7 +114,7 @@ impl ConnectionMetadata {
         addr: NetworkAddress,
         origin: ConnectionOrigin,
         messaging_protocol: MessagingProtocolVersion,
-        application_protocols: SupportedProtocols,
+        application_protocols: ProtocolIdSet,
         role: PeerRole,
     ) -> ConnectionMetadata {
         ConnectionMetadata {
@@ -150,7 +150,7 @@ impl ConnectionMetadata {
             connection_id: CONNECTION_ID_GENERATOR.next(),
             addr: NetworkAddress::mock(),
             messaging_protocol: MessagingProtocolVersion::V1,
-            application_protocols: SupportedProtocols::empty(),
+            application_protocols: ProtocolIdSet::empty(),
         }
     }
 }
@@ -200,7 +200,7 @@ where
 pub struct UpgradeContext {
     noise: NoiseUpgrader,
     handshake_version: u8,
-    supported_protocols: BTreeMap<MessagingProtocolVersion, SupportedProtocols>,
+    supported_protocols: BTreeMap<MessagingProtocolVersion, ProtocolIdSet>,
     chain_id: ChainId,
     network_id: NetworkId,
 }
@@ -209,7 +209,7 @@ impl UpgradeContext {
     pub fn new(
         noise: NoiseUpgrader,
         handshake_version: u8,
-        supported_protocols: BTreeMap<MessagingProtocolVersion, SupportedProtocols>,
+        supported_protocols: BTreeMap<MessagingProtocolVersion, ProtocolIdSet>,
         chain_id: ChainId,
         network_id: NetworkId,
     ) -> Self {
@@ -435,7 +435,7 @@ where
         auth_mode: HandshakeAuthMode,
         handshake_version: u8,
         chain_id: ChainId,
-        application_protocols: SupportedProtocols,
+        application_protocols: ProtocolIdSet,
         enable_proxy_protocol: bool,
     ) -> Self {
         // build supported protocols

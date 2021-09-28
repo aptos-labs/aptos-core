@@ -44,7 +44,7 @@ mod tests {
     use crate::{
         protocols::{
             identity::exchange_handshake,
-            wire::handshake::v1::{HandshakeMsg, MessagingProtocolVersion, SupportedProtocols},
+            wire::handshake::v1::{HandshakeMsg, MessagingProtocolVersion, ProtocolIdSet},
         },
         ProtocolId,
     };
@@ -68,7 +68,7 @@ mod tests {
         let mut supported_protocols = BTreeMap::new();
         supported_protocols.insert(
             MessagingProtocolVersion::V1,
-            SupportedProtocols::from_iter([
+            ProtocolIdSet::from_iter([
                 ProtocolId::ConsensusDirectSend,
                 ProtocolId::MempoolDirectSend,
             ]),
@@ -81,10 +81,7 @@ mod tests {
         let mut supported_protocols = BTreeMap::new();
         supported_protocols.insert(
             MessagingProtocolVersion::V1,
-            SupportedProtocols::from_iter([
-                ProtocolId::ConsensusRpc,
-                ProtocolId::ConsensusDirectSend,
-            ]),
+            ProtocolIdSet::from_iter([ProtocolId::ConsensusRpc, ProtocolId::ConsensusDirectSend]),
         );
         let client_handshake = HandshakeMsg {
             supported_protocols,

@@ -10,7 +10,7 @@ use crate::{
         conn_notifs_channel, ConnectionRequest, ConnectionRequestSender, PeerManager,
         PeerManagerNotification, PeerManagerRequest, PeerManagerRequestSender,
     },
-    protocols::wire::handshake::v1::SupportedProtocols,
+    protocols::wire::handshake::v1::ProtocolIdSet,
     transport::{self, Connection, DiemNetTransport, DIEM_TCP_TRANSPORT},
     ProtocolId,
 };
@@ -77,7 +77,7 @@ impl TransportContext {
         }
     }
 
-    fn supported_protocols(&self) -> SupportedProtocols {
+    fn supported_protocols(&self) -> ProtocolIdSet {
         self.direct_send_protocols
             .iter()
             .chain(&self.rpc_protocols)

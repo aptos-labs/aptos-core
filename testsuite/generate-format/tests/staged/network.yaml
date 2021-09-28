@@ -31,7 +31,7 @@ HandshakeMsg:
           KEY:
             TYPENAME: MessagingProtocolVersion
           VALUE:
-            TYPENAME: SupportedProtocols
+            TYPENAME: ProtocolIdSet
     - chain_id:
         TYPENAME: ChainId
     - network_id:
@@ -142,6 +142,8 @@ ProtocolId:
       HealthCheckerRpc: UNIT
     6:
       ConsensusDirectSendJSON: UNIT
+ProtocolIdSet:
+  NEWTYPESTRUCT: BYTES
 PublicKey:
   NEWTYPESTRUCT: BYTES
 RpcRequest:
@@ -156,5 +158,3 @@ RpcResponse:
     - request_id: U32
     - priority: U8
     - raw_response: BYTES
-SupportedProtocols:
-  NEWTYPESTRUCT: BYTES

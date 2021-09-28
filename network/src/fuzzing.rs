@@ -4,7 +4,7 @@
 use crate::{
     protocols::{
         identity::exchange_handshake,
-        wire::handshake::v1::{HandshakeMsg, MessagingProtocolVersion, SupportedProtocols},
+        wire::handshake::v1::{HandshakeMsg, MessagingProtocolVersion, ProtocolIdSet},
     },
     testutils::fake_socket::ReadOnlyTestSocketVec,
 };
@@ -60,7 +60,7 @@ prop_compose! {
   fn build_handshake_msg()(
     supported_protocols in btree_map(
       any::<MessagingProtocolVersion>(),
-      any::<SupportedProtocols>(),
+      any::<ProtocolIdSet>(),
       0..5
     ),
   ) -> HandshakeMsg {

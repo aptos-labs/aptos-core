@@ -5,7 +5,7 @@ use crate::{
     constants,
     peer::Peer,
     protocols::wire::{
-        handshake::v1::{MessagingProtocolVersion, SupportedProtocols},
+        handshake::v1::{MessagingProtocolVersion, ProtocolIdSet},
         messaging::v1::{NetworkMessage, NetworkMessageSink},
     },
     testutils::fake_socket::ReadOnlyTestSocketVec,
@@ -82,7 +82,7 @@ pub fn fuzz(data: &[u8]) {
         NetworkAddress::mock(),
         ConnectionOrigin::Inbound,
         MessagingProtocolVersion::V1,
-        SupportedProtocols::all_known(),
+        ProtocolIdSet::all_known(),
         PeerRole::Unknown,
     );
     let connection = Connection { socket, metadata };

@@ -27,7 +27,7 @@ use network::{
     protocols::{
         network::{NewNetworkEvents, NewNetworkSender},
         rpc::InboundRpcRequest,
-        wire::handshake::v1::SupportedProtocols,
+        wire::handshake::v1::ProtocolIdSet,
     },
     ProtocolId,
 };
@@ -80,7 +80,7 @@ pub struct NetworkPlayground {
     /// An author may have multiple twin IDs for Twins
     author_to_twin_ids: Arc<RwLock<AuthorToTwinIds>>,
     /// Supported protocols for peers.
-    shared_connections: Arc<RwLock<HashMap<PeerId, SupportedProtocols>>>,
+    shared_connections: Arc<RwLock<HashMap<PeerId, ProtocolIdSet>>>,
 }
 
 impl NetworkPlayground {
@@ -100,7 +100,7 @@ impl NetworkPlayground {
     }
 
     /// HashMap of supported protocols to initialize ConsensusNetworkSender.
-    pub fn peer_protocols(&self) -> Arc<RwLock<HashMap<PeerId, SupportedProtocols>>> {
+    pub fn peer_protocols(&self) -> Arc<RwLock<HashMap<PeerId, ProtocolIdSet>>> {
         self.shared_connections.clone()
     }
 
@@ -551,7 +551,7 @@ mod tests {
             let (_, conn_status_rx) = conn_notifs_channel::new();
             shared_connections.write().insert(
                 *peer,
-                SupportedProtocols::from_iter([
+                ProtocolIdSet::from_iter([
                     ProtocolId::ConsensusDirectSendJSON,
                     ProtocolId::ConsensusDirectSend,
                     ProtocolId::ConsensusRpc,
@@ -652,7 +652,7 @@ mod tests {
             );
             shared_connections.write().insert(
                 *peer,
-                SupportedProtocols::from_iter([
+                ProtocolIdSet::from_iter([
                     ProtocolId::ConsensusDirectSendJSON,
                     ProtocolId::ConsensusDirectSend,
                     ProtocolId::ConsensusRpc,

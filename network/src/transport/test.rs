@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    protocols::wire::handshake::v1::{MessagingProtocolVersion, ProtocolId, SupportedProtocols},
+    protocols::wire::handshake::v1::{MessagingProtocolVersion, ProtocolId, ProtocolIdSet},
     transport::*,
 };
 use bytes::{Bytes, BytesMut};
@@ -63,7 +63,7 @@ fn setup<TTransport>(
     (PeerId, DiemNetTransport<TTransport>),
     (PeerId, DiemNetTransport<TTransport>),
     Arc<RwLock<PeerSet>>,
-    SupportedProtocols,
+    ProtocolIdSet,
 )
 where
     TTransport: Transport<Error = io::Error> + Clone,
@@ -144,7 +144,7 @@ where
         };
 
     let supported_protocols =
-        SupportedProtocols::from_iter([ProtocolId::ConsensusRpc, ProtocolId::DiscoveryDirectSend]);
+        ProtocolIdSet::from_iter([ProtocolId::ConsensusRpc, ProtocolId::DiscoveryDirectSend]);
     let chain_id = ChainId::default();
     let listener_transport = DiemNetTransport::new(
         base_transport.clone(),

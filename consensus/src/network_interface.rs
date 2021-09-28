@@ -25,7 +25,7 @@ use network::{
     protocols::{
         network::{NetworkEvents, NetworkSender, NewNetworkSender},
         rpc::error::RpcError,
-        wire::handshake::v1::SupportedProtocols,
+        wire::handshake::v1::ProtocolIdSet,
     },
     ProtocolId,
 };
@@ -80,7 +80,7 @@ pub type ConsensusNetworkEvents = NetworkEvents<ConsensusMsg>;
 #[derive(Clone)]
 pub struct ConsensusNetworkSender {
     network_sender: NetworkSender<ConsensusMsg>,
-    peers_protocols: Option<Arc<RwLock<HashMap<PeerId, SupportedProtocols>>>>,
+    peers_protocols: Option<Arc<RwLock<HashMap<PeerId, ProtocolIdSet>>>>,
 }
 
 /// Supported protocols in preferred order (from highest priority to lowest).
@@ -171,12 +171,12 @@ impl ConsensusNetworkSender {
     }
 
     /// Initialize a shared hashmap about connections metadata that is updated by the receiver.
-    pub fn initialize(&mut self, connections: Arc<RwLock<HashMap<PeerId, SupportedProtocols>>>) {
+    pub fn initialize(&mut self, connections: Arc<RwLock<HashMap<PeerId, ProtocolIdSet>>>) {
         self.peers_protocols = Some(connections);
     }
 
     /// Query the supported protocols from this peer's connection.
-    fn supported_protocols(&self, peer: PeerId) -> anyhow::Result<SupportedProtocols> {
+    fn supported_protocols(&self, peer: PeerId) -> anyhow::Result<ProtocolIdSet> {
         if let Some(map) = &self.peers_protocols {
             map.read()
                 .get(&peer)
