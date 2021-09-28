@@ -123,6 +123,17 @@ fn is_empty() {
     assert!(SupportedProtocols::all_known()
         .intersect(&SupportedProtocols::empty())
         .is_empty());
+    assert!(SupportedProtocols::empty()
+        .intersect(&SupportedProtocols::all_known())
+        .is_empty());
+    assert_eq!(
+        SupportedProtocols::all_known().union(&SupportedProtocols::empty()),
+        SupportedProtocols::all_known()
+    );
+    assert_eq!(
+        SupportedProtocols::empty().union(&SupportedProtocols::all_known()),
+        SupportedProtocols::all_known()
+    );
     assert!(!SupportedProtocols::all_known().is_empty());
 }
 

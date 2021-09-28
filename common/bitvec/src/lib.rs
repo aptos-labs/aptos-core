@@ -10,7 +10,10 @@ use proptest::{
     strategy::{Map, Strategy},
 };
 use serde::{de::Error, Deserialize, Deserializer, Serialize};
-use std::{iter::FromIterator, ops::BitAnd};
+use std::{
+    iter::FromIterator,
+    ops::{BitAnd, BitOr},
+};
 
 // Every u8 is used as a bucket of 8 bits. Total max buckets = 256 / 8 = 32.
 const BUCKET_SIZE: usize = 8;
@@ -67,6 +70,12 @@ pub struct BitVec {
 }
 
 impl BitVec {
+    fn with_capacity(num_buckets: usize) -> Self {
+        Self {
+            inner: Vec::with_capacity(num_buckets),
+        }
+    }
+
     /// Sets the bit at position @pos.
     pub fn set(&mut self, pos: u8) {
         // This is optimised to: let bucket = pos >> 3;
@@ -126,11 +135,25 @@ impl BitAnd for &BitVec {
     /// Returns a new BitVec that is a bitwise AND of two BitVecs.
     fn bitand(self, other: Self) -> Self::Output {
         let len = std::cmp::min(self.inner.len(), other.inner.len());
-        let mut ret = BitVec {
-            inner: Vec::with_capacity(len),
-        };
+        let mut ret = BitVec::with_capacity(len);
         for i in 0..len {
             ret.inner.push(self.inner[i] & other.inner[i]);
+        }
+        ret
+    }
+}
+
+impl BitOr for &BitVec {
+    type Output = BitVec;
+
+    /// Returns a new BitVec that is a bitwise OR of two BitVecs.
+    fn bitor(self, other: Self) -> Self::Output {
+        let len = std::cmp::max(self.inner.len(), other.inner.len());
+        let mut ret = BitVec::with_capacity(len);
+        for i in 0..len {
+            let a = self.inner.get(i).copied().unwrap_or(0);
+            let b = other.inner.get(i).copied().unwrap_or(0);
+            ret.inner.push(a | b);
         }
         ret
     }
@@ -304,6 +327,22 @@ mod test {
                     assert!(intersection.is_set(i));
                 } else {
                     assert!(!intersection.is_set(i));
+                }
+            }
+        }
+
+        #[test]
+        fn test_or(bv1 in any::<BitVec>(), bv2 in any::<BitVec>()) {
+            let union = bv1.bitor(&bv2);
+
+            assert!(union.count_ones() >= bv1.count_ones());
+            assert!(union.count_ones() >= bv2.count_ones());
+
+            for i in 0..=std::u8::MAX {
+                if bv1.is_set(i) || bv2.is_set(i) {
+                    assert!(union.is_set(i));
+                } else {
+                    assert!(!union.is_set(i));
                 }
             }
         }

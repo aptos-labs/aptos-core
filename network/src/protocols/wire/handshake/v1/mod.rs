@@ -20,7 +20,7 @@ use std::{
     collections::BTreeMap,
     fmt,
     iter::{FromIterator, Iterator},
-    ops::BitAnd,
+    ops::{BitAnd, BitOr},
 };
 use thiserror::Error;
 
@@ -146,6 +146,21 @@ impl SupportedProtocols {
             .iter_ones()
             .filter_map(|idx| bcs::from_bytes(&[idx]).ok())
     }
+
+    /// Find the intersection between two sets of protocols.
+    pub fn intersect(&self, other: &SupportedProtocols) -> SupportedProtocols {
+        SupportedProtocols(self.0.bitand(&other.0))
+    }
+
+    /// Return the union of two sets of protocols.
+    pub fn union(&self, other: &SupportedProtocols) -> SupportedProtocols {
+        SupportedProtocols(self.0.bitor(&other.0))
+    }
+
+    /// Returns if the protocol is set.
+    pub fn contains(&self, protocol: ProtocolId) -> bool {
+        self.0.is_set(protocol as u8)
+    }
 }
 
 impl FromIterator<ProtocolId> for SupportedProtocols {
@@ -157,18 +172,6 @@ impl FromIterator<ProtocolId> for SupportedProtocols {
 impl<'a> FromIterator<&'a ProtocolId> for SupportedProtocols {
     fn from_iter<T: IntoIterator<Item = &'a ProtocolId>>(iter: T) -> Self {
         iter.into_iter().copied().collect()
-    }
-}
-
-impl SupportedProtocols {
-    /// Find the intersection between two sets of protocols.
-    fn intersect(&self, other: &SupportedProtocols) -> SupportedProtocols {
-        SupportedProtocols(self.0.bitand(&other.0))
-    }
-
-    /// Returns if the protocol is set.
-    pub fn contains(&self, protocol: ProtocolId) -> bool {
-        self.0.is_set(protocol as u8)
     }
 }
 
