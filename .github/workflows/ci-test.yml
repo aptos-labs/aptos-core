@@ -957,7 +957,7 @@ jobs:
       - uses: actions/cache@v2.1.6
       # Installs node and yarn
       - name: Use Node.js 12
-        uses: actions/setup-node@v2.4.0
+        uses: actions/setup-node@v2.4.1
         with:
           node-version: '14'
       # Install git
