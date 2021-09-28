@@ -45,6 +45,11 @@ diem-move/vm-genesis/genesis/vm_config.toml
 # Move Build Output
 build/
 
+# Do not ignore the Move build output under the releases for DPN, core, and
+# experimental -- these are the release code.
+!language/diem-framework/DPN/releases/artifacts/**
+!language/diem-framework/experimental/releases/artifacts/**
+
 # Docker incremental build temporary files and directories
 target-out-docker
 **/Dockerfile.tmp

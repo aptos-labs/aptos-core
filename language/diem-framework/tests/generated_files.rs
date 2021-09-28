@@ -25,7 +25,7 @@ fn test_that_generated_file_are_up_to_date_in_git() {
     // Don't check if git isn't in a clean state
     if check_that_version_control_has_no_unstaged_changes().is_ok() {
         assert!(Command::new("cargo")
-            .current_dir("../..")
+            .current_dir(std::env!("CARGO_MANIFEST_DIR"))
             .arg("run")
             .arg("--release")
             .arg("-p")

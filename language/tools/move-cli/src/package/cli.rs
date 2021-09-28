@@ -21,7 +21,7 @@ use move_lang::{
     PASS_CFGIR,
 };
 use move_package::{
-    compilation::build_plan::BuildPlan, source_package::layout::SourcePackageLayout,
+    compilation::build_plan::BuildPlan, source_package::layout::SourcePackageLayout, ModelConfig,
 };
 use move_prover::run_move_prover_with_model;
 use move_unit_test::UnitTestingConfig;
@@ -135,7 +135,12 @@ pub fn handle_package_commands(
             };
             let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
             let now = Instant::now();
-            let model = config.move_model_for_package(&path)?;
+            let model = config.move_model_for_package(
+                &path,
+                ModelConfig {
+                    all_files_as_targets: false,
+                },
+            )?;
             run_move_prover_with_model(&model, &mut error_writer, options, Some(now))?;
         }
         PackageCommand::ErrMapGen {
@@ -150,7 +155,12 @@ pub fn handle_package_commands(
                 .with_extension(move_command_line_common::files::MOVE_ERROR_DESC_EXTENSION)
                 .to_string_lossy()
                 .to_string();
-            let model = config.move_model_for_package(&path)?;
+            let model = config.move_model_for_package(
+                &path,
+                ModelConfig {
+                    all_files_as_targets: true,
+                },
+            )?;
             let mut errmap_gen = errmapgen::ErrmapGen::new(&model, &errmap_options);
             errmap_gen.gen();
             errmap_gen.save_result();

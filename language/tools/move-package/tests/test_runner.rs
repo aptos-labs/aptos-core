@@ -6,13 +6,14 @@ use move_package::{
     compilation::{build_plan::BuildPlan, model_builder::ModelBuilder},
     resolution::resolution_graph as RG,
     source_package::{manifest_parser as MP, parsed_manifest::PackageDigest},
-    BuildConfig,
+    BuildConfig, ModelConfig,
 };
 use std::{
     ffi::OsStr,
     fs,
     path::{Component, Path, PathBuf},
 };
+use tempfile::tempdir;
 
 const COMPILE_EXT: &str = "compile";
 const MODEL_EXT: &str = "model";
@@ -43,6 +44,7 @@ pub fn run_test(path: &Path) -> datatest_stable::Result<()> {
                     test_mode: false,
                     generate_docs: false,
                     generate_abis: false,
+                    install_dir: Some(tempdir().unwrap().path().to_path_buf()),
                 },
             )
         })
@@ -61,11 +63,20 @@ pub fn run_test(path: &Path) -> datatest_stable::Result<()> {
                 Ok(mut pkg) => {
                     pkg.compiled_package_info.source_digest =
                         Some(PackageDigest::from("ELIDED_FOR_TEST"));
+                    pkg.compiled_package_info.build_flags.install_dir =
+                        Some(PathBuf::from("ELIDED_FOR_TEST"));
                     format!("{:#?}\n", pkg.compiled_package_info)
                 }
                 Err(error) => format!("{:#}\n", error),
             },
-            (_, true) => match ModelBuilder::create(resolved_package).build_model() {
+            (_, true) => match ModelBuilder::create(
+                resolved_package,
+                ModelConfig {
+                    all_files_as_targets: false,
+                },
+            )
+            .build_model()
+            {
                 Ok(_) => "Built model".to_string(),
                 Err(error) => format!("{:#}\n", error),
             },
@@ -74,6 +85,7 @@ pub fn run_test(path: &Path) -> datatest_stable::Result<()> {
                     package.package_path = PathBuf::from("ELIDED_FOR_TEST");
                     package.source_digest = PackageDigest::from("ELIDED_FOR_TEST");
                 }
+                resolved_package.build_options.install_dir = Some(PathBuf::from("ELIDED_FOR_TEST"));
                 format!("{:#?}\n", resolved_package)
             }
         },

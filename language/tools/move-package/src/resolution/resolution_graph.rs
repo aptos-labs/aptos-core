@@ -58,6 +58,7 @@ pub struct ResolvingNamedAddress {
 /// Named addresses can also be renamed in a package and will be re-exported under thes new names in this case.
 #[derive(Debug, Clone)]
 pub struct ResolutionGraph<T> {
+    pub root_package_path: PathBuf,
     /// Build options
     pub build_options: BuildConfig,
     /// Root package
@@ -91,6 +92,7 @@ impl ResolvingGraph {
         build_options: BuildConfig,
     ) -> Result<ResolvingGraph> {
         let mut resolution_graph = Self {
+            root_package_path: root_package_path.clone(),
             build_options,
             root_package: root_package.clone(),
             graph: DiGraphMap::new(),
@@ -110,6 +112,7 @@ impl ResolvingGraph {
 
     pub fn resolve(self) -> Result<ResolvedGraph> {
         let ResolvingGraph {
+            root_package_path,
             build_options,
             root_package,
             graph,
@@ -165,6 +168,7 @@ impl ResolvingGraph {
         }
 
         Ok(ResolvedGraph {
+            root_package_path,
             build_options,
             root_package,
             graph,
@@ -250,7 +254,6 @@ impl ResolvingGraph {
 
         self.unify_addresses_in_package(&package, &mut resolution_table, is_root_package)?;
 
-        let package_path = package_path.canonicalize()?;
         let source_digest =
             ResolvingPackage::get_package_digest_for_config(&package_path, &self.build_options)?;
 
@@ -631,7 +634,6 @@ impl ResolvedPackage {
             .map(Symbol::from)
             .collect())
     }
-
     /// Returns the transitive dependencies of this package in dependency order
     pub fn transitive_dependencies(&self, resolved_graph: &ResolvedGraph) -> Vec<PackageName> {
         let mut seen = BTreeSet::new();

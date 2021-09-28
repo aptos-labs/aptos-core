@@ -1,9 +1,13 @@
 ResolutionGraph {
+    root_package_path: "tests/test_sources/resolution/multiple_deps_rename",
     build_options: BuildConfig {
         dev_mode: true,
         test_mode: false,
         generate_docs: false,
         generate_abis: false,
+        install_dir: Some(
+            "ELIDED_FOR_TEST",
+        ),
     },
     root_package: SourceManifest {
         package: PackageInfo {

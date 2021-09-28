@@ -288,6 +288,7 @@ pub fn build_move_packages(project_path: &Path) -> Result<CompiledPackage> {
         test_mode: false,
         generate_docs: false,
         generate_abis: true,
+        install_dir: None,
     };
 
     config.compile_package(pkgdir.as_path(), &mut std::io::stdout())

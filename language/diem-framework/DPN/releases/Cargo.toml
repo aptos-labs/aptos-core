@@ -16,6 +16,7 @@ diem-crypto = { path = "../../../../crypto/crypto" }
 diem-types = { path = "../../../../types" }
 diem-workspace-hack = { path = "../../../../common/workspace-hack" }
 move-binary-format = { path = "../../../move-binary-format" }
+framework-releases = { path = "../../releases" }
 
 anyhow = "1.0.38"
 include_dir = "0.6.0"

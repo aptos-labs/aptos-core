@@ -843,14 +843,14 @@ pub fn eval<TComp: Compiler>(
         }
     } else {
         let module_blobs = if compiler.use_compiled_genesis() {
-            diem_framework_releases::current_module_blobs()
+            diem_framework_releases::current_module_blobs().to_vec()
         } else {
             diem_framework::module_blobs()
         };
         // use custom validator set. this requires dynamically generating a new genesis tx and
         // is thus more expensive.
         FakeExecutor::custom_genesis(
-            module_blobs,
+            &module_blobs,
             Some(config.validator_accounts),
             VMPublishingOption::open(),
         )

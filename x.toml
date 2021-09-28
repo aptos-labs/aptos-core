@@ -258,6 +258,7 @@ members = [
 diem_crates_in_language = [
     "diem-framework",
     "diem-framework-releases",
+    "framework-releases",
     "diem-transactional-test-harness",
     "diem-transaction-benchmarks",
     "diem-vm",
@@ -346,7 +347,7 @@ mark-changed = []
 
 [[determinator.path-rule]]
 # Required by get_stdlib_script_abis in transaction-builder-generator.
-globs = ["language/diem-framework/DPN/releases/artifacts/current/script_abis/**/*"]
+globs = ["language/diem-framework/DPN/releases/artifacts/current/**/*"]
 mark-changed = ["transaction-builder-generator"]
 post-rule = "skip-rules"
 

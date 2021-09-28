@@ -23,7 +23,7 @@ fn get_tx_script_abis() -> Vec<ScriptABI> {
 }
 
 fn get_script_fun_abis() -> Vec<ScriptABI> {
-    let new_abis = Path::new("../../diem-framework/DPN/releases/artifacts/current/script_abis");
+    let new_abis = Path::new("../../diem-framework/DPN/releases/artifacts/current");
     buildgen::read_abis(&[new_abis]).expect("reading new ABI files should not fail")
 }
 

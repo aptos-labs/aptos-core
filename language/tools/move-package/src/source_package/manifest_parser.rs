@@ -7,9 +7,11 @@ use move_core_types::account_address::AccountAddress;
 use move_symbol_pool::symbol::Symbol;
 use std::{
     collections::{BTreeMap, BTreeSet},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 use toml::Value as TV;
+
+use super::layout::SourcePackageLayout;
 
 const EMPTY_ADDR_STR: &str = "_";
 
@@ -30,6 +32,15 @@ const KNOWN_NAMES: &[&str] = &[
 ];
 
 const REQUIRED_FIELDS: &[&str] = &[PACKAGE_NAME];
+
+pub fn parse_move_manifest_from_file(path: &Path) -> Result<PM::SourceManifest> {
+    let file_contents = if path.is_file() {
+        std::fs::read_to_string(path)?
+    } else {
+        std::fs::read_to_string(path.join(SourcePackageLayout::Manifest.path()))?
+    };
+    parse_source_manifest(parse_move_manifest_string(file_contents)?)
+}
 
 pub fn parse_move_manifest_string(manifest_string: String) -> Result<TV> {
     toml::from_str::<TV>(&manifest_string).context("Unable to parse Move package manifest")

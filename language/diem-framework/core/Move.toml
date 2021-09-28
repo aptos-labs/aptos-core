@@ -7,7 +7,7 @@ Std = "0x1"
 DiemFramework = "0x1"
 DiemRoot = "0xA550C18"
 TreasuryCompliance = "0xB1E55ED"
-CurrencyInfo = "0xB1E55ED"
+CurrencyInfo = "0xA550C18"
 VMReserved = "0x0"
 
 [dependencies]

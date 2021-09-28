@@ -1873,11 +1873,14 @@ dependencies = [
  "dir-diff",
  "docgen",
  "errmapgen",
+ "include_dir",
  "log",
  "move-binary-format",
+ "move-bytecode-utils",
  "move-command-line-common",
  "move-core-types",
  "move-lang",
+ "move-package",
  "move-prover",
  "move-stdlib",
  "move-symbol-pool",
@@ -1888,9 +1891,9 @@ dependencies = [
  "rayon",
  "sha2",
  "smallvec",
+ "structopt 0.3.21",
  "tempfile",
  "transaction-builder-generator",
- "walkdir",
 ]
 
 [[package]]
@@ -1903,6 +1906,7 @@ dependencies = [
  "diem-crypto",
  "diem-types",
  "diem-workspace-hack",
+ "framework-releases",
  "include_dir",
  "move-binary-format",
  "move-command-line-common",
@@ -3542,6 +3546,34 @@ checksum = "5fc25a87fa4fd2094bffb06925852034d90a17f0d1e05197d4956d3555752191"
 dependencies = [
  "matches",
  "percent-encoding",
+]
+
+[[package]]
+name = "framework-releases"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bcs",
+ "bytecode-verifier",
+ "clap",
+ "diem-types",
+ "diem-workspace-hack",
+ "include_dir",
+ "log",
+ "move-binary-format",
+ "move-bytecode-utils",
+ "move-command-line-common",
+ "move-core-types",
+ "move-lang",
+ "move-package",
+ "move-vm-runtime",
+ "move-vm-types",
+ "once_cell",
+ "rayon",
+ "sha2",
+ "smallvec",
+ "structopt 0.3.21",
+ "walkdir",
 ]
 
 [[package]]
@@ -8977,7 +9009,7 @@ version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f559b464de2e2bdabcac6a210d12e9b5a5973c251e102c44c585c71d51bd78e"
 dependencies = [
- "cfg-if 1.0.0",
+ "cfg-if 0.1.10",
  "static_assertions",
 ]
 

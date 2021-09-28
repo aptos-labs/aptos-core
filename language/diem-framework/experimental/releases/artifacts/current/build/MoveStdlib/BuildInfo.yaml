@@ -1,0 +1,47 @@
+---
+compiled_package_info:
+  package_name: MoveStdlib
+  address_alias_instantiation:
+    Std: "00000000000000000000000000000001"
+  module_resolution_metadata:
+    ? address: "00000000000000000000000000000001"
+      name: BCS
+    : Std
+    ? address: "00000000000000000000000000000001"
+      name: BitVector
+    : Std
+    ? address: "00000000000000000000000000000001"
+      name: Capability
+    : Std
+    ? address: "00000000000000000000000000000001"
+      name: Errors
+    : Std
+    ? address: "00000000000000000000000000000001"
+      name: Event
+    : Std
+    ? address: "00000000000000000000000000000001"
+      name: FixedPoint32
+    : Std
+    ? address: "00000000000000000000000000000001"
+      name: GUID
+    : Std
+    ? address: "00000000000000000000000000000001"
+      name: Hash
+    : Std
+    ? address: "00000000000000000000000000000001"
+      name: Option
+    : Std
+    ? address: "00000000000000000000000000000001"
+      name: Signer
+    : Std
+    ? address: "00000000000000000000000000000001"
+      name: Vector
+    : Std
+  source_digest: 132D7BC13710F6DD72AB6AE04D28F91AE2917BB937D471305CDD1A1FC1BC13FE
+  build_flags:
+    dev_mode: false
+    test_mode: false
+    generate_docs: true
+    generate_abis: true
+    install_dir: experimental/releases/artifacts/current
+dependencies: []

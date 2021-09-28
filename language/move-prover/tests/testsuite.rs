@@ -314,8 +314,15 @@ fn main() {
             collect_enabled_tests(&mut reqs, "extended", feature, "tests/xsources");
         } else {
             collect_enabled_tests(&mut reqs, "unit", feature, "tests/sources");
-            collect_enabled_tests(&mut reqs, "stdlib", feature, "../move-stdlib");
-            collect_enabled_tests(&mut reqs, "diem", feature, "../diem-framework");
+            collect_enabled_tests(&mut reqs, "stdlib", feature, "../move-stdlib/sources");
+            collect_enabled_tests(&mut reqs, "diem", feature, "../diem-framework/core/sources");
+            collect_enabled_tests(&mut reqs, "diem", feature, "../diem-framework/DPN/sources");
+            collect_enabled_tests(
+                &mut reqs,
+                "diem",
+                feature,
+                "../diem-framework/experimental/sources",
+            );
         }
     }
     datatest_stable::runner(&reqs);

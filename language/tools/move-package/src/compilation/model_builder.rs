@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::resolution::resolution_graph::ResolvedGraph;
+use crate::{resolution::resolution_graph::ResolvedGraph, ModelConfig};
 use anyhow::Result;
 use move_lang::shared::NumericalAddress;
 use move_model::{model::GlobalEnv, options::ModelBuilderOptions, run_model_builder_with_options};
@@ -9,11 +9,15 @@ use move_model::{model::GlobalEnv, options::ModelBuilderOptions, run_model_build
 #[derive(Debug, Clone)]
 pub struct ModelBuilder {
     resolution_graph: ResolvedGraph,
+    model_config: ModelConfig,
 }
 
 impl ModelBuilder {
-    pub fn create(resolution_graph: ResolvedGraph) -> Self {
-        Self { resolution_graph }
+    pub fn create(resolution_graph: ResolvedGraph, model_config: ModelConfig) -> Self {
+        Self {
+            resolution_graph,
+            model_config,
+        }
     }
 
     // NOTE: If there are now renamings, then the root package has the global resolution of all named
@@ -36,7 +40,7 @@ impl ModelBuilder {
         // Targets are all files in the root package
         let root_name = &self.resolution_graph.root_package.package.name;
         let root_package = self.resolution_graph.get_package(root_name).clone();
-        let targets: Vec<_> = root_package
+        let mut targets: Vec<_> = root_package
             .get_sources(&self.resolution_graph.build_options)?
             .into_iter()
             .map(|symbol| symbol.to_string())
@@ -56,6 +60,13 @@ impl ModelBuilder {
             })
             .map(|symbol| symbol.to_string())
             .collect::<Vec<String>>();
+
+        let (targets, deps) = if self.model_config.all_files_as_targets {
+            targets.extend(deps.into_iter());
+            (targets, vec![])
+        } else {
+            (targets, deps)
+        };
 
         run_model_builder_with_options(
             &targets,

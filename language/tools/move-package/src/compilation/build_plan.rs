@@ -50,7 +50,10 @@ impl BuildPlan {
             -> anyhow::Result<(FilesSourceText, Vec<AnnotatedCompiledUnit>)>,
     ) -> Result<CompiledPackage> {
         let package_root = &self.resolution_graph.package_table[&self.root];
-        let project_root = &package_root.package_path;
+        let project_root = match &self.resolution_graph.build_options.install_dir {
+            Some(under_path) => under_path.clone(),
+            None => self.resolution_graph.root_package_path.clone(),
+        };
         let mut compiled: BTreeMap<PackageName, CompiledPackage> = BTreeMap::new();
         for package_ident in &self.sorted_deps {
             let resolved_package = self.resolution_graph.get_package(package_ident);
@@ -61,7 +64,7 @@ impl BuildPlan {
                 .collect();
             let compiled_package = CompiledPackage::build(
                 writer,
-                project_root,
+                &project_root,
                 resolved_package.clone(),
                 dependencies,
                 &self.resolution_graph,

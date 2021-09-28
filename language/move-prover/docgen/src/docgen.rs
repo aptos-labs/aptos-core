@@ -147,6 +147,8 @@ pub struct DocgenOptions {
     pub include_dep_diagrams: bool,
     /// Whether to include call diagrams in the generated docs.
     pub include_call_diagrams: bool,
+    /// If this is being compiled relative to a different place where it will be stored (output directory).
+    pub compile_relative_to_output_dir: bool,
 }
 
 impl Default for DocgenOptions {
@@ -161,6 +163,7 @@ impl Default for DocgenOptions {
             collapsed_sections: true,
             output_directory: "doc".to_string(),
             doc_path: vec!["doc".to_string()],
+            compile_relative_to_output_dir: false,
             root_doc_templates: vec![],
             references_file: None,
             include_dep_diagrams: false,
@@ -289,12 +292,8 @@ impl<'env> Docgen<'env> {
             let m = self.env.get_module(id);
             if !info.is_included && m.is_target() {
                 self.gen_module(&m, &info);
-                let mut path = PathBuf::from(&self.options.output_directory);
-                path.push(info.target_file);
-                self.output.push((
-                    path.to_string_lossy().to_string(),
-                    self.writer.extract_result(),
-                ));
+                let path = self.make_file_in_out_dir(&info.target_file);
+                self.output.push((path, self.writer.extract_result()));
             }
         }
 
@@ -384,6 +383,7 @@ impl<'env> Docgen<'env> {
         self.writer = CodeWriter::new(self.env.unknown_loc());
         *self.label_counter.borrow_mut() = 0;
         let mut toc_label = None;
+        self.toc = RefCell::new(Default::default());
         for elem in elements {
             match elem {
                 TemplateElement::Text(str) => self.doc_text_for_root(&str),
@@ -535,9 +535,13 @@ impl<'env> Docgen<'env> {
 
     /// Make a file name in the output directory.
     fn make_file_in_out_dir(&self, name: &str) -> String {
-        let mut path = PathBuf::from(&self.options.output_directory);
-        path.push(name);
-        path.to_string_lossy().to_string()
+        if self.options.compile_relative_to_output_dir {
+            name.to_string()
+        } else {
+            let mut path = PathBuf::from(&self.options.output_directory);
+            path.push(name);
+            path.to_string_lossy().to_string()
+        }
     }
 
     /// Make path relative to other path.

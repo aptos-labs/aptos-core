@@ -27,6 +27,8 @@ move-symbol-pool = { path = "../move-symbol-pool" }
 move-core-types = { path = "../move-core/types" }
 move-vm-types = { path = "../move-vm/types" }
 move-vm-runtime = { path = "../move-vm/runtime" }
+move-package = { path = "../tools/move-package" }
+move-bytecode-utils = { path = "../tools/move-bytecode-utils" }
 
 bcs = "0.1.2"
 anyhow = "1.0.38"
@@ -34,9 +36,10 @@ clap = "2.33.3"
 log = "0.4.14"
 rayon = "1.5.0"
 sha2 = "0.9.3"
-walkdir = "2.3.1"
 once_cell = "1.7.2"
 smallvec = "1.6.1"
+structopt = "0.3.21"
+include_dir = "0.6.0"
 
 [dev-dependencies]
 datatest-stable = "0.1.1"

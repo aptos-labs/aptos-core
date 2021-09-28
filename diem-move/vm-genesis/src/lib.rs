@@ -145,7 +145,6 @@ pub fn encode_genesis_change_set(
 
 fn exec_function(
     session: &mut Session<StateViewCache<GenesisStateView>>,
-
     module_name: &str,
     function_name: &str,
     ty_args: Vec<TypeTag>,
@@ -440,11 +439,11 @@ pub enum GenesisOptions {
 /// Generate an artificial genesis `ChangeSet` for testing
 pub fn generate_genesis_change_set_for_testing(genesis_options: GenesisOptions) -> ChangeSet {
     let modules = match genesis_options {
-        GenesisOptions::Compiled => diem_framework_releases::current_module_blobs(),
+        GenesisOptions::Compiled => diem_framework_releases::current_module_blobs().to_vec(),
         GenesisOptions::Fresh => diem_framework::module_blobs(),
     };
 
-    generate_test_genesis(modules, VMPublishingOption::open(), None).0
+    generate_test_genesis(&modules, VMPublishingOption::open(), None).0
 }
 
 pub fn test_genesis_transaction() -> Transaction {
