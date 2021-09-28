@@ -18,8 +18,6 @@ pub use swarm::*;
 use diem_sdk::crypto::ed25519::ED25519_PRIVATE_KEY_LENGTH;
 use diem_secure_storage::{CryptoStorage, KVStorage, VaultStorage};
 
-const DEFAULT_TESTNET_IMAGE_TAG: &str = "devnet";
-
 pub struct K8sFactory {
     root_key: [u8; ED25519_PRIVATE_KEY_LENGTH],
     treasury_compliance_key: [u8; ED25519_PRIVATE_KEY_LENGTH],
@@ -104,7 +102,7 @@ impl Factory for K8sFactory {
             self.helm_repo.clone(),
             node_num.get(),
             format!("{}", version),
-            DEFAULT_TESTNET_IMAGE_TAG.to_string(),
+            format!("{}", version),
             true,
         )?;
         let rt = Runtime::new().unwrap();
