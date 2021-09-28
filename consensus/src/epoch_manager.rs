@@ -643,25 +643,12 @@ impl EpochManager {
                     "process_sync_info",
                     p.process_sync_info_msg(*sync_info, peer_id).await
                 ),
-                VerifiedEvent::CommitVote(commit_vote) => {
+                verified_event @ VerifiedEvent::CommitVote(_)
+                | verified_event @ VerifiedEvent::CommitDecision(_) => {
                     if let Some(sender) = &mut self.commit_msg_tx {
-                        sender
-                            .push(commit_vote.author(), VerifiedEvent::CommitVote(commit_vote))
-                            .map_err(|err| anyhow!("Error in Passing Commit Vote Message: {}", err))
-                    } else {
-                        bail!("Commit Phase not started but received Commit Message (CommitVote/CommitDecision)");
-                    }
-                }
-                VerifiedEvent::CommitDecision(commit_decision) => {
-                    if let Some(sender) = &mut self.commit_msg_tx {
-                        sender
-                            .push(
-                                commit_decision.author(),
-                                VerifiedEvent::CommitDecision(commit_decision),
-                            )
-                            .map_err(|err| {
-                                anyhow!("Error in Passing Commit Decision Message: {}", err)
-                            })
+                        sender.push(peer_id, verified_event).map_err(|err| {
+                            anyhow!("Error in Passing Commit Vote/Decision Message: {}", err)
+                        })
                     } else {
                         bail!("Commit Phase not started but received Commit Message (CommitVote/CommitDecision)");
                     }

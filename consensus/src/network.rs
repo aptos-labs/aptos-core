@@ -193,10 +193,7 @@ impl NetworkSender {
     /// Sends the ledger info to self buffer manager
     pub async fn notify_commit_proof(&self, ledger_info: LedgerInfoWithSignatures) {
         // this requires re-verification of the ledger info we can probably optimize it later
-        let msg = ConsensusMsg::CommitDecisionMsg(Box::new(CommitDecision::new(
-            self.author,
-            ledger_info,
-        )));
+        let msg = ConsensusMsg::CommitDecisionMsg(Box::new(CommitDecision::new(ledger_info)));
         self.send(msg, vec![self.author]).await
     }
 }

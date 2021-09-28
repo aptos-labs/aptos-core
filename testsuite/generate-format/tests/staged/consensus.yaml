@@ -110,8 +110,6 @@ ChangeSet:
           TYPENAME: ContractEvent
 CommitDecision:
   STRUCT:
-    - author:
-        TYPENAME: AccountAddress
     - ledger_info:
         TYPENAME: LedgerInfoWithSignatures
 CommitVote:
