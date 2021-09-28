@@ -21,9 +21,15 @@ const POPS_PER_GC: u32 = 50;
 /// With KLAST, oldest messages are dropped, but remaining are retrieved in FIFO order
 #[derive(Clone, Copy, Debug)]
 pub enum QueueStyle {
-    LIFO,
     FIFO,
+    LIFO,
     KLAST,
+}
+
+impl Default for QueueStyle {
+    fn default() -> Self {
+        Self::FIFO
+    }
 }
 
 /// PerKeyQueue maintains a queue of messages per key. It

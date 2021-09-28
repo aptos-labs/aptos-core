@@ -26,7 +26,9 @@ use futures::{
 use pin_project::pin_project;
 use serde::{de::DeserializeOwned, Serialize};
 use short_hex_str::AsShortHexStr;
-use std::{cmp::min, marker::PhantomData, pin::Pin, time::Duration};
+use std::{cmp::min, iter::FromIterator, marker::PhantomData, pin::Pin, time::Duration};
+
+use super::wire::handshake::v1::ProtocolIdSet;
 
 pub trait Message: DeserializeOwned + Serialize {}
 impl<T: DeserializeOwned + Serialize> Message for T {}
@@ -65,6 +67,56 @@ impl<TMessage: PartialEq> PartialEq for Event<TMessage> {
             (NewPeer(metadata1), NewPeer(metadata2)) => metadata1 == metadata2,
             (LostPeer(metadata1), LostPeer(metadata2)) => metadata1 == metadata2,
             _ => false,
+        }
+    }
+}
+
+/// Configuration needed for DiemNet applications to register with the network
+/// builder. Supports client-only, service-only, and p2p (both) applications.
+// TODO(philiphayes): separate configs for client & server?
+#[derive(Clone, Default)]
+pub struct AppConfig {
+    /// The set of protocols needed for this application.
+    pub protocols: ProtocolIdSet,
+    /// The config for the inbound message queue from network to the application.
+    /// Used for specifying the queue style (e.g. FIFO vs LIFO) and sub-queue max
+    /// capacity.
+    // TODO(philiphayes): only relevant for services
+    // TODO(philiphayes): in the future, use a Service trait here instead?
+    pub inbound_queue: Option<diem_channel::Config>,
+}
+
+impl AppConfig {
+    /// DiemNet client configuration. Requires the set of protocols used by the
+    /// client in its requests.
+    pub fn client(protocols: impl IntoIterator<Item = ProtocolId>) -> Self {
+        Self {
+            protocols: ProtocolIdSet::from_iter(protocols),
+            inbound_queue: None,
+        }
+    }
+
+    /// DiemNet service configuration. Requires both the set of protocols this
+    /// service can handle and the queue configuration.
+    pub fn service(
+        protocols: impl IntoIterator<Item = ProtocolId>,
+        inbound_queue: diem_channel::Config,
+    ) -> Self {
+        Self {
+            protocols: ProtocolIdSet::from_iter(protocols),
+            inbound_queue: Some(inbound_queue),
+        }
+    }
+
+    /// DiemNet peer-to-peer service configuration. A peer-to-peer service is both
+    /// a client and a service.
+    pub fn p2p(
+        protocols: impl IntoIterator<Item = ProtocolId>,
+        inbound_queue: diem_channel::Config,
+    ) -> Self {
+        Self {
+            protocols: ProtocolIdSet::from_iter(protocols),
+            inbound_queue: Some(inbound_queue),
         }
     }
 }

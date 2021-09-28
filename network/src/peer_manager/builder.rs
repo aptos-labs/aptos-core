@@ -10,7 +10,7 @@ use crate::{
         conn_notifs_channel, ConnectionRequest, ConnectionRequestSender, PeerManager,
         PeerManagerNotification, PeerManagerRequest, PeerManagerRequestSender,
     },
-    protocols::wire::handshake::v1::ProtocolIdSet,
+    protocols::{network::AppConfig, wire::handshake::v1::ProtocolIdSet},
     transport::{self, Connection, DiemNetTransport, DIEM_TCP_TRANSPORT},
     ProtocolId,
 };
@@ -22,7 +22,6 @@ use diem_config::{
 use diem_crypto::x25519;
 use diem_infallible::RwLock;
 use diem_logger::prelude::*;
-use diem_metrics::IntCounterVec;
 use diem_rate_limiter::rate_limit::TokenBucketRateLimiter;
 use diem_time_service::TimeService;
 use diem_types::{chain_id::ChainId, network_address::NetworkAddress, PeerId};
@@ -51,50 +50,15 @@ pub enum AuthenticationMode {
 
 struct TransportContext {
     chain_id: ChainId,
-    direct_send_protocols: Vec<ProtocolId>,
-    rpc_protocols: Vec<ProtocolId>,
+    supported_protocols: ProtocolIdSet,
     authentication_mode: AuthenticationMode,
     trusted_peers: Arc<RwLock<PeerSet>>,
     enable_proxy_protocol: bool,
 }
 
 impl TransportContext {
-    pub fn new(
-        chain_id: ChainId,
-        direct_send_protocols: Vec<ProtocolId>,
-        rpc_protocols: Vec<ProtocolId>,
-        authentication_mode: AuthenticationMode,
-        trusted_peers: Arc<RwLock<PeerSet>>,
-        enable_proxy_protocol: bool,
-    ) -> Self {
-        Self {
-            chain_id,
-            direct_send_protocols,
-            rpc_protocols,
-            authentication_mode,
-            trusted_peers,
-            enable_proxy_protocol,
-        }
-    }
-
-    fn supported_protocols(&self) -> ProtocolIdSet {
-        self.direct_send_protocols
-            .iter()
-            .chain(&self.rpc_protocols)
-            .collect()
-    }
-
-    fn augment_direct_send_protocols(
-        &mut self,
-        direct_send_protocols: Vec<ProtocolId>,
-    ) -> &mut Self {
-        self.direct_send_protocols.extend(direct_send_protocols);
-        self
-    }
-
-    fn augment_rpc_protocols(&mut self, rpc_protocols: Vec<ProtocolId>) -> &mut Self {
-        self.rpc_protocols.extend(rpc_protocols);
-        self
+    fn add_protocols(&mut self, protocols: &ProtocolIdSet) {
+        self.supported_protocols = self.supported_protocols.union(protocols);
     }
 }
 
@@ -232,14 +196,13 @@ impl PeerManagerBuilder {
         Self {
             network_context,
             time_service,
-            transport_context: Some(TransportContext::new(
+            transport_context: Some(TransportContext {
                 chain_id,
-                Vec::new(),
-                Vec::new(),
+                supported_protocols: ProtocolIdSet::empty(),
                 authentication_mode,
-                trusted_peers.clone(),
+                trusted_peers: trusted_peers.clone(),
                 enable_proxy_protocol,
-            )),
+            }),
             peer_manager_context: Some(PeerManagerContext::new(
                 pm_reqs_tx,
                 pm_reqs_rx,
@@ -273,6 +236,18 @@ impl PeerManagerBuilder {
             .clone()
     }
 
+    fn transport_context(&mut self) -> &mut TransportContext {
+        self.transport_context
+            .as_mut()
+            .expect("Cannot get TransportContext once PeerManager has been built")
+    }
+
+    fn peer_manager_context(&mut self) -> &mut PeerManagerContext {
+        self.peer_manager_context
+            .as_mut()
+            .expect("Cannot get PeerManagerContext once PeerManager has been built")
+    }
+
     /// Create the configured transport and start PeerManager.
     /// Return the actual NetworkAddress over which this peer is listening.
     pub fn build(&mut self, executor: &Handle) -> &mut Self {
@@ -283,7 +258,7 @@ impl PeerManagerBuilder {
             .take()
             .expect("PeerManager can only be built once");
 
-        let protos = transport_context.supported_protocols();
+        let protos = transport_context.supported_protocols;
         let chain_id = transport_context.chain_id;
         let enable_proxy_protocol = transport_context.enable_proxy_protocol;
 
@@ -425,49 +400,56 @@ impl PeerManagerBuilder {
             .add_connection_event_listener()
     }
 
-    /// Add a handler for given protocols using raw bytes.
-    pub fn add_protocol_handler(
+    /// Register a peer-to-peer service (i.e., both client and service) for given
+    /// protocols.
+    pub fn add_p2p_service(
         &mut self,
-        rpc_protocols: Vec<ProtocolId>,
-        direct_send_protocols: Vec<ProtocolId>,
-        queue_preference: QueueStyle,
-        max_queue_size_per_peer: usize,
-        counter: Option<&'static IntCounterVec>,
+        config: &AppConfig,
     ) -> (
-        PeerManagerRequestSender,
+        (PeerManagerRequestSender, ConnectionRequestSender),
+        (
+            diem_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
+            conn_notifs_channel::Receiver,
+        ),
+    ) {
+        (self.add_client(config), self.add_service(config))
+    }
+
+    /// Register a client that's interested in some set of protocols and return
+    /// the outbound channels into network.
+    pub fn add_client(
+        &mut self,
+        config: &AppConfig,
+    ) -> (PeerManagerRequestSender, ConnectionRequestSender) {
+        self.transport_context().add_protocols(&config.protocols);
+        let pm_context = self.peer_manager_context();
+        (
+            PeerManagerRequestSender::new(pm_context.pm_reqs_tx.clone()),
+            ConnectionRequestSender::new(pm_context.connection_reqs_tx.clone()),
+        )
+    }
+
+    /// Register a service for handling some protocols.
+    pub fn add_service(
+        &mut self,
+        config: &AppConfig,
+    ) -> (
         diem_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
-        ConnectionRequestSender,
         conn_notifs_channel::Receiver,
     ) {
-        self.transport_context
-            .as_mut()
-            .expect("Cannot add a protocol handler once PeerManager has been built")
-            .augment_direct_send_protocols(direct_send_protocols.clone())
-            .augment_rpc_protocols(rpc_protocols.clone());
+        self.transport_context().add_protocols(&config.protocols);
 
-        let (network_notifs_tx, network_notifs_rx) =
-            diem_channel::new(queue_preference, max_queue_size_per_peer, counter);
-
-        let pm_context = self
-            .peer_manager_context
-            .as_mut()
-            .expect("Cannot add a protocol handler once PeerManager has been built");
-
-        for protocol in rpc_protocols
-            .iter()
-            .chain(direct_send_protocols.iter())
-            .cloned()
-        {
+        let (network_notifs_tx, network_notifs_rx) = config
+            .inbound_queue
+            .expect("Requires a service config")
+            .build();
+        let pm_context = self.peer_manager_context();
+        for protocol in config.protocols.iter() {
             pm_context.add_upstream_handler(protocol, network_notifs_tx.clone());
         }
         let connection_notifs_rx = pm_context.add_connection_event_listener();
 
-        (
-            PeerManagerRequestSender::new(pm_context.pm_reqs_tx.clone()),
-            network_notifs_rx,
-            ConnectionRequestSender::new(pm_context.connection_reqs_tx.clone()),
-            connection_notifs_rx,
-        )
+        (network_notifs_rx, connection_notifs_rx)
     }
 }
 

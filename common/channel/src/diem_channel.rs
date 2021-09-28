@@ -191,6 +191,45 @@ impl<K: Eq + Hash + Clone, M> FusedStream for Receiver<K, M> {
     }
 }
 
+/// Configuration for a new diem_channel queue.
+#[derive(Clone, Copy)]
+pub struct Config {
+    pub queue_style: QueueStyle,
+    pub max_capacity: usize,
+    pub counters: Option<&'static IntCounterVec>,
+}
+
+impl Config {
+    /// The diem_channel has a "sub-queue" per key. The `max_capacity` controls
+    /// the capacity of each "sub-queue"; when the queues exceed the max
+    /// capacity the messages will be dropped according to the queue style/eviction
+    /// policy.
+    pub fn new(max_capacity: usize) -> Self {
+        Self {
+            queue_style: QueueStyle::FIFO,
+            max_capacity,
+            counters: None,
+        }
+    }
+
+    /// The queue's push/pop and eviction behavior. Defaults to FIFO.
+    pub fn queue_style(mut self, queue_style: QueueStyle) -> Self {
+        self.queue_style = queue_style;
+        self
+    }
+
+    /// Optional prometheus counters for this queue, which keep track of items
+    /// in the queue and # dropped items. Defaults to no counters.
+    pub fn counters(mut self, counters: &'static IntCounterVec) -> Self {
+        self.counters = Some(counters);
+        self
+    }
+
+    pub fn build<K: Eq + Hash + Clone, M>(self) -> (Sender<K, M>, Receiver<K, M>) {
+        new(self.queue_style, self.max_capacity, self.counters)
+    }
+}
+
 /// Create a new Diem Channel and returns the two ends of the channel.
 pub fn new<K: Eq + Hash + Clone, M>(
     queue_style: QueueStyle,

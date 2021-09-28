@@ -9,7 +9,7 @@
 //! authentication -- a network end-point running with remote authentication enabled will
 //! connect to or accept connections from an end-point running in authenticated mode as
 //! long as the latter is in its trusted peers set.
-use channel::{self, message_queues::QueueStyle};
+use channel::{self, diem_channel, message_queues::QueueStyle};
 use diem_config::{
     config::{
         DiscoveryMethod, NetworkConfig, Peer, PeerRole, PeerSet, RateLimitConfig, RoleType,
@@ -38,7 +38,7 @@ use network::{
     },
     protocols::{
         health_checker::{self, builder::HealthCheckerBuilder},
-        network::{NewNetworkEvents, NewNetworkSender},
+        network::{AppConfig, NewNetworkEvents, NewNetworkSender},
     },
     ProtocolId,
 };
@@ -442,7 +442,7 @@ impl NetworkBuilder {
     /// can be attached to other components.
     pub fn add_protocol_handler<SenderT, EventT>(
         &mut self,
-        (rpc_protocols, direct_send_protocols, queue_preference, max_queue_size_per_peer, counter): (
+        (rpc_protocols, direct_send_protocols, queue_style, max_capacity, counters): (
             Vec<ProtocolId>,
             Vec<ProtocolId>,
             QueueStyle,
@@ -454,14 +454,21 @@ impl NetworkBuilder {
         EventT: NewNetworkEvents,
         SenderT: NewNetworkSender,
     {
-        let (peer_mgr_reqs_tx, peer_mgr_reqs_rx, connection_reqs_tx, connection_notifs_rx) =
-            self.peer_manager_builder.add_protocol_handler(
-                rpc_protocols,
-                direct_send_protocols,
-                queue_preference,
-                max_queue_size_per_peer,
-                counter,
-            );
+        // TODO(philiphayes): remove
+        let protocols = rpc_protocols
+            .into_iter()
+            .chain(direct_send_protocols.into_iter());
+        let config = AppConfig::p2p(
+            protocols,
+            diem_channel::Config {
+                queue_style,
+                max_capacity,
+                counters,
+            },
+        );
+
+        let ((peer_mgr_reqs_tx, connection_reqs_tx), (peer_mgr_reqs_rx, connection_notifs_rx)) =
+            self.peer_manager_builder.add_p2p_service(&config);
         (
             SenderT::new(peer_mgr_reqs_tx, connection_reqs_tx),
             EventT::new(peer_mgr_reqs_rx, connection_notifs_rx),
