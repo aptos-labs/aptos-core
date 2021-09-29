@@ -6,11 +6,12 @@ use diem_api_types::{mime_types, X_DIEM_CHAIN_ID, X_DIEM_LEDGER_TIMESTAMP, X_DIE
 use diem_crypto::hash::HashValue;
 use diem_genesis_tool::validator_builder::{RootKeys, ValidatorBuilder};
 use diem_global_constants::OWNER_ACCOUNT;
+use diem_mempool::mocks::MockSharedMempool;
 use diem_sdk::{
     transaction_builder::{Currency, TransactionFactory},
     types::{
         account_config::treasury_compliance_account_address, transaction::SignedTransaction,
-        LocalAccount,
+        AccountKey, LocalAccount,
     },
 };
 use diem_secure_storage::KVStorage;
@@ -29,6 +30,7 @@ use diemdb::DiemDB;
 use executor::{db_bootstrapper, Executor};
 use executor_types::BlockExecutor;
 use storage_interface::DbReaderWriter;
+use vm_validator::vm_validator::VMValidator;
 
 use rand::{Rng, SeedableRng};
 use serde_json::Value;
@@ -53,12 +55,15 @@ pub fn new_test_context() -> TestContext {
         db_bootstrapper::maybe_bootstrap::<DiemVM>(&db_rw, &genesis, genesis_waypoint).unwrap();
     assert!(ret);
 
+    let mempool = MockSharedMempool::new_in_runtime(&db_rw, VMValidator::new(db.clone()));
+
     TestContext::new(
-        Context::new(ChainId::test(), db),
+        Context::new(ChainId::test(), db, mempool.ac_client.clone()),
         rng,
         root_keys,
         validator_owner,
         Box::new(Executor::<DpnProto, DiemVM>::new(db_rw)),
+        mempool,
     )
 }
 
@@ -69,6 +74,7 @@ pub struct TestContext {
     rng: rand::rngs::StdRng,
     root_keys: Arc<RootKeys>,
     executor: Arc<Box<dyn BlockExecutor>>,
+    mempool: Arc<MockSharedMempool>,
     expect_status_code: u16,
 }
 
@@ -79,6 +85,7 @@ impl TestContext {
         root_keys: RootKeys,
         validator_owner: AccountAddress,
         executor: Box<dyn BlockExecutor>,
+        mempool: MockSharedMempool,
     ) -> Self {
         Self {
             context,
@@ -86,6 +93,7 @@ impl TestContext {
             root_keys: Arc::new(root_keys),
             validator_owner,
             executor: Arc::new(executor),
+            mempool: Arc::new(mempool),
             expect_status_code: 200,
         }
     }
@@ -120,6 +128,20 @@ impl TestContext {
                 "vasp",
                 true,
             ))
+    }
+
+    pub fn create_invalid_signature_transaction(&mut self) -> SignedTransaction {
+        let factory = self.transaction_factory();
+        let tc_account = self.tc_account();
+        let txn = factory
+            .create_recovery_address()
+            .sender(tc_account.address())
+            .sequence_number(tc_account.sequence_number())
+            .build();
+        let invalid_key = AccountKey::generate(self.rng());
+        txn.sign(invalid_key.private_key(), tc_account.public_key().clone())
+            .unwrap()
+            .into_inner()
     }
 
     pub fn get_latest_ledger_info(&self) -> diem_api_types::LedgerInfo {
@@ -174,6 +196,17 @@ impl TestContext {
     pub async fn get(&self, path: &str) -> Value {
         self.execute(warp::test::request().method("GET").path(path))
             .await
+    }
+
+    pub async fn post_bcs_txn(&self, path: &str, body: impl AsRef<[u8]>) -> Value {
+        self.execute(
+            warp::test::request()
+                .method("POST")
+                .path(path)
+                .header(CONTENT_TYPE, mime_types::BCS_SIGNED_TRANSACTION)
+                .body(body),
+        )
+        .await
     }
 
     pub async fn execute(&self, req: warp::test::RequestBuilder) -> Value {

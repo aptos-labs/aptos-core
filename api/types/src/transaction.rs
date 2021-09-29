@@ -3,9 +3,10 @@
 
 use crate::{Address, EventKey, HashValue, HexEncodedBytes, MoveType, MoveValue, U64};
 
+use diem_crypto::hash::CryptoHash;
 use diem_types::{
     contract_event::ContractEvent,
-    transaction::{Transaction as DiemTransaction, TransactionInfoTrait},
+    transaction::{SignedTransaction, Transaction as DiemTransaction, TransactionInfoTrait},
     vm_status::KeptVMStatus,
 };
 use resource_viewer::AnnotatedMoveValue;
@@ -16,6 +17,15 @@ use std::convert::From;
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Transaction {
+    PendingTransaction {
+        hash: HashValue,
+        sender: Address,
+        sequence_number: U64,
+        max_gas_amount: U64,
+        gas_unit_price: U64,
+        gas_currency_code: String,
+        expiration_timestamp_secs: U64,
+    },
     UserTransaction {
         version: U64,
         hash: HashValue,
@@ -59,6 +69,26 @@ pub enum Transaction {
         previous_block_votes: Vec<Address>,
         proposer: Address,
     },
+}
+
+impl Transaction {
+    pub fn hash(txn: SignedTransaction) -> HashValue {
+        DiemTransaction::UserTransaction(txn).hash().into()
+    }
+}
+
+impl From<SignedTransaction> for Transaction {
+    fn from(txn: SignedTransaction) -> Self {
+        Transaction::PendingTransaction {
+            sender: txn.sender().into(),
+            sequence_number: txn.sequence_number().into(),
+            max_gas_amount: txn.max_gas_amount().into(),
+            gas_unit_price: txn.gas_unit_price().into(),
+            gas_currency_code: txn.gas_currency_code().to_owned(),
+            expiration_timestamp_secs: txn.expiration_timestamp_secs().into(),
+            hash: Transaction::hash(txn),
+        }
+    }
 }
 
 impl<T: TransactionInfoTrait> From<(u64, &DiemTransaction, &T, Vec<Event>)> for Transaction {

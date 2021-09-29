@@ -18,6 +18,7 @@ use diem_types::{
     account_config::AccountSequenceInfo,
     mempool_status::MempoolStatusCode,
     on_chain_config::ON_CHAIN_CONFIG_REGISTRY,
+    protocol_spec::DpnProto,
     transaction::{GovernanceRole, SignedTransaction},
 };
 use event_notifications::EventSubscriptionService;
@@ -27,10 +28,12 @@ use network::{
     peer_manager::{conn_notifs_channel, ConnectionRequestSender, PeerManagerRequestSender},
     protocols::network::{NewNetworkEvents, NewNetworkSender},
 };
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 use storage_interface::{mock::MockDbReaderWriter, DbReaderWriter};
 use tokio::runtime::{Builder, Handle, Runtime};
-use vm_validator::mocks::mock_vm_validator::MockVMValidator;
+use vm_validator::{
+    mocks::mock_vm_validator::MockVMValidator, vm_validator::TransactionValidation,
+};
 
 /// Mock of a running instance of shared mempool.
 pub struct MockSharedMempool {
@@ -52,8 +55,11 @@ impl MockSharedMempool {
             .enable_all()
             .build()
             .expect("[mock shared mempool] failed to create runtime");
-        let (ac_client, mempool, consensus_sender, mempool_notifier) =
-            Self::start(runtime.handle());
+        let (ac_client, mempool, consensus_sender, mempool_notifier) = Self::start(
+            runtime.handle(),
+            &DbReaderWriter::new(MockDbReaderWriter),
+            MockVMValidator,
+        );
         Self {
             _runtime: Some(runtime),
             _handle: None,
@@ -66,9 +72,13 @@ impl MockSharedMempool {
 
     /// Creates a mock of a running instance of shared mempool inside a tokio runtime;
     /// Holds a runtime handle instead.
-    pub fn new_in_runtime() -> Self {
+    pub fn new_in_runtime<V: TransactionValidation + 'static>(
+        db: &DbReaderWriter<DpnProto>,
+        validator: V,
+    ) -> Self {
         let handle = Handle::current();
-        let (ac_client, mempool, consensus_sender, mempool_notifier) = Self::start(&handle);
+        let (ac_client, mempool, consensus_sender, mempool_notifier) =
+            Self::start(&handle, db, validator);
         Self {
             _runtime: None,
             _handle: Some(handle),
@@ -79,8 +89,10 @@ impl MockSharedMempool {
         }
     }
 
-    pub fn start(
+    pub fn start<V: TransactionValidation + 'static>(
         handle: &Handle,
+        db: &DbReaderWriter<DpnProto>,
+        validator: V,
     ) -> (
         mpsc::Sender<(SignedTransaction, oneshot::Sender<Result<SubmissionStatus>>)>,
         Arc<Mutex<CoreMempool>>,
@@ -106,7 +118,7 @@ impl MockSharedMempool {
             mempool_notifications::new_mempool_notifier_listener_pair();
         let mut event_subscriber = EventSubscriptionService::new(
             ON_CHAIN_CONFIG_REGISTRY,
-            Arc::new(RwLock::new(DbReaderWriter::new(MockDbReaderWriter))),
+            Arc::new(RwLock::new(db.clone())),
         );
         let reconfig_event_subscriber = event_subscriber.subscribe_to_reconfigurations().unwrap();
         let network_handles = vec![(NetworkId::Validator, network_sender, network_events)];
@@ -120,8 +132,8 @@ impl MockSharedMempool {
             consensus_events,
             mempool_listener,
             reconfig_event_subscriber,
-            Arc::new(MockDbReaderWriter),
-            Arc::new(RwLock::new(MockVMValidator)),
+            db.reader.clone(),
+            Arc::new(RwLock::new(validator)),
             vec![],
         );
 
@@ -149,6 +161,16 @@ impl MockSharedMempool {
             }
         }
         Ok(())
+    }
+
+    pub fn get_txns(&self, size: u64) -> Vec<SignedTransaction> {
+        let mut pool = self.mempool.lock();
+        pool.get_block(size, HashSet::new())
+    }
+
+    pub fn remove_txn(&self, txn: &SignedTransaction) {
+        let mut pool = self.mempool.lock();
+        pool.remove_transaction(&txn.sender(), txn.sequence_number(), false)
     }
 
     /// True if all the given txns are in mempool, else false.

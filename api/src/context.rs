@@ -2,14 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use diem_api_types::{Error, LedgerInfo};
+use diem_mempool::{MempoolClientSender, SubmissionStatus};
 use diem_types::{
-    account_address::AccountAddress, account_state_blob::AccountStateBlob, chain_id::ChainId,
-    ledger_info::LedgerInfoWithSignatures, protocol_spec::DpnProto,
-    transaction::default_protocol::TransactionListWithProof,
+    account_address::AccountAddress,
+    account_state_blob::AccountStateBlob,
+    chain_id::ChainId,
+    ledger_info::LedgerInfoWithSignatures,
+    protocol_spec::DpnProto,
+    transaction::{default_protocol::TransactionListWithProof, SignedTransaction},
 };
 use storage_interface::MoveDbReader;
 
 use anyhow::Result;
+use futures::{channel::oneshot, SinkExt};
 use std::{borrow::Borrow, convert::Infallible, sync::Arc};
 use warp::Filter;
 
@@ -18,11 +23,20 @@ use warp::Filter;
 pub struct Context {
     chain_id: ChainId,
     db: Arc<dyn MoveDbReader<DpnProto>>,
+    mp_sender: MempoolClientSender,
 }
 
 impl Context {
-    pub fn new(chain_id: ChainId, db: Arc<dyn MoveDbReader<DpnProto>>) -> Self {
-        Self { chain_id, db }
+    pub fn new(
+        chain_id: ChainId,
+        db: Arc<dyn MoveDbReader<DpnProto>>,
+        mp_sender: MempoolClientSender,
+    ) -> Self {
+        Self {
+            chain_id,
+            db,
+            mp_sender,
+        }
     }
 
     pub fn db(&self) -> &dyn MoveDbReader<DpnProto> {
@@ -35,6 +49,13 @@ impl Context {
 
     pub fn filter(self) -> impl Filter<Extract = (Context,), Error = Infallible> + Clone {
         warp::any().map(move || self.clone())
+    }
+
+    pub async fn submit_transaction(&self, txn: SignedTransaction) -> Result<SubmissionStatus> {
+        let (req_sender, callback) = oneshot::channel();
+        self.mp_sender.clone().send((txn, req_sender)).await?;
+
+        callback.await?
     }
 
     pub fn get_latest_ledger_info(&self) -> Result<LedgerInfo, Error> {

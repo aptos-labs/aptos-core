@@ -3,16 +3,22 @@
 
 use crate::{context::Context, page::Page};
 
-use diem_api_types::{Error, Event, LedgerInfo, Response, Transaction};
-use diem_types::contract_event::ContractEvent;
+use diem_api_types::{mime_types, Error, Event, LedgerInfo, Response, Transaction};
+use diem_types::{
+    contract_event::ContractEvent, mempool_status::MempoolStatusCode,
+    transaction::SignedTransaction,
+};
 use resource_viewer::MoveValueAnnotator;
 
 use anyhow::{format_err, Result};
 use serde_json::json;
-use warp::{Filter, Rejection, Reply};
+use warp::{
+    http::{header::CONTENT_TYPE, StatusCode},
+    reply, Filter, Rejection, Reply,
+};
 
 pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
-    get_transactions(context)
+    get_transactions(context.clone()).or(post_bcs_transactions(context))
 }
 
 // GET /transactions?start={u64}&limit={u16}
@@ -30,6 +36,33 @@ async fn handle_get_transactions(page: Page, context: Context) -> Result<impl Re
     Ok(Transactions::new(context)?.list(page)?)
 }
 
+// POST /transactions
+pub fn post_bcs_transactions(
+    context: Context,
+) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+    warp::path!("transactions")
+        .and(warp::post())
+        .and(warp::header::exact(
+            CONTENT_TYPE.as_str(),
+            mime_types::BCS_SIGNED_TRANSACTION,
+        ))
+        .and(warp::body::bytes())
+        .and(context.filter())
+        .and_then(handle_post_bcs_transactions)
+}
+
+async fn handle_post_bcs_transactions(
+    body: bytes::Bytes,
+    context: Context,
+) -> Result<impl Reply, Rejection> {
+    let txn = bcs::from_bytes(&body)
+        .map_err(|_| {
+            format_err!("invalid request body: deserialize SignedTransaction BCS bytes failed")
+        })
+        .map_err(Error::bad_request)?;
+    Ok(Transactions::new(context)?.create(txn).await?)
+}
+
 struct Transactions {
     ledger_info: LedgerInfo,
     context: Context,
@@ -42,6 +75,29 @@ impl Transactions {
             ledger_info,
             context,
         })
+    }
+
+    pub async fn create(self, txn: SignedTransaction) -> Result<impl Reply, Error> {
+        let (mempool_status, vm_status_opt) = self.context.submit_transaction(txn.clone()).await?;
+        match mempool_status.code {
+            MempoolStatusCode::Accepted => {
+                let resp = Response::new(
+                    self.context.get_latest_ledger_info()?,
+                    &Transaction::from(txn),
+                )?;
+                Ok(reply::with_status(resp, StatusCode::ACCEPTED))
+            }
+            MempoolStatusCode::VmError => Err(Error::bad_request(format_err!(
+                "invalid transaction: {}",
+                vm_status_opt
+                    .map(|s| format!("{:?}", s))
+                    .unwrap_or_else(|| "UNKNOWN".to_owned())
+            ))),
+            _ => Err(Error::bad_request(format_err!(
+                "transaction is rejected: {}",
+                mempool_status,
+            ))),
+        }
     }
 
     pub fn list(self, page: Page) -> Result<impl Reply, Error> {
@@ -104,6 +160,7 @@ fn transaction_not_found(version: u64, ledger_version: u64) -> Error {
 mod tests {
     use crate::test_utils::{assert_json, new_test_context};
 
+    use diem_crypto::hash::CryptoHash;
     use diem_types::transaction::{Transaction, TransactionInfoTrait};
 
     use serde_json::json;
@@ -300,5 +357,93 @@ mod tests {
                 ]
             }),
         )
+    }
+
+    #[tokio::test]
+    async fn test_post_bcs_format_transaction() {
+        let mut context = new_test_context();
+        let account = context.gen_account();
+        let txn = context.create_parent_vasp(&account);
+        let body = bcs::to_bytes(&txn).unwrap();
+        let resp = context
+            .expect_status_code(202)
+            .post_bcs_txn("/transactions", body)
+            .await;
+        let expiration_timestamp = txn.expiration_timestamp_secs();
+        let hash = Transaction::UserTransaction(txn).hash();
+        assert_json(
+            resp,
+            json!({
+                "type": "pending_transaction",
+                "hash": hash.to_hex_literal(),
+                "sender": "0xb1e55ed",
+                "sequence_number": "0",
+                "max_gas_amount": "1000000",
+                "gas_unit_price": "0",
+                "gas_currency_code": "XUS",
+                "expiration_timestamp_secs": expiration_timestamp.to_string(),
+            }),
+        );
+    }
+
+    #[tokio::test]
+    async fn test_post_invalid_bcs_format_transaction() {
+        let context = new_test_context();
+
+        let resp = context
+            .expect_status_code(400)
+            .post_bcs_txn("/transactions", bcs::to_bytes("invalid data").unwrap())
+            .await;
+        assert_json(
+            resp,
+            json!({
+              "code": 400,
+              "message": "invalid request body: deserialize SignedTransaction BCS bytes failed"
+            }),
+        );
+    }
+
+    #[tokio::test]
+    async fn test_post_invalid_signature_transaction() {
+        let mut context = new_test_context();
+        let txn = context.create_invalid_signature_transaction();
+        let body = bcs::to_bytes(&txn).unwrap();
+        let resp = context
+            .expect_status_code(400)
+            .post_bcs_txn("/transactions", &body)
+            .await;
+        assert_json(
+            resp,
+            json!({
+              "code": 400,
+              "message": "invalid transaction: INVALID_SIGNATURE"
+            }),
+        );
+    }
+
+    #[tokio::test]
+    async fn test_post_transaction_rejected_by_mempool() {
+        let mut context = new_test_context();
+        let account1 = context.gen_account();
+        let account2 = context.gen_account();
+        let txn1 = context.create_parent_vasp(&account1);
+        let txn2 = context.create_parent_vasp(&account2);
+
+        context
+            .expect_status_code(202)
+            .post_bcs_txn("/transactions", &bcs::to_bytes(&txn1).unwrap())
+            .await;
+
+        let resp = context
+            .expect_status_code(400)
+            .post_bcs_txn("/transactions", &bcs::to_bytes(&txn2).unwrap())
+            .await;
+        assert_json(
+            resp,
+            json!({
+              "code": 400,
+              "message": "transaction is rejected: InvalidUpdate - Failed to update gas price to 0"
+            }),
+        );
     }
 }

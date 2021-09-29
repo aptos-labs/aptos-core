@@ -12,6 +12,7 @@ edition = "2018"
 [dependencies]
 anyhow = "1.0.38"
 bcs = "0.1.2"
+bytes = "1.0.1"
 futures = "0.3.12"
 hex = "0.4.3"
 hyper = "0.14.4"
@@ -21,6 +22,7 @@ tokio = { version = "1.8.1", features = ["full"] }
 warp = { version = "0.3.0", features = ["default"] }
 
 diem-config = { path = "../config" }
+diem-mempool = { path = "../mempool"}
 diem-types = { path = "../types" }
 diem-workspace-hack = { path = "../common/workspace-hack" }
 diem-api-types = { path = "./types", package = "diem-api-types" }
@@ -34,11 +36,13 @@ rand = "0.8.3"
 diemdb = { path = "../storage/diemdb", features = ["fuzzing"] }
 diem-crypto = { path = "../crypto/crypto" }
 diem-global-constants = { path = "../config/global-constants" }
+diem-mempool = { path = "../mempool", features = ["fuzzing"] }
 diem-secure-storage = { path = "../secure/storage" }
 diem-temppath = { path = "../common/temppath" }
 diem-genesis-tool = {path = "../config/management/genesis", features = ["testing"] }
 diem-framework-releases = { path = "../language/diem-framework/DPN/releases" }
 diem-sdk = { path = "../sdk" }
+vm-validator = { path = "../vm-validator" }
 diem-vm = { path = "../language/diem-vm" }
 executor = { path = "../execution/executor" }
 executor-types = { path = "../execution/executor-types" }

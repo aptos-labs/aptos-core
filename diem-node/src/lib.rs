@@ -436,9 +436,19 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
     );
     let (mp_client_sender, mp_client_events) = channel(AC_SMP_CHANNEL_BUFFER_SIZE);
 
-    let rpc_runtime = bootstrap_rpc(node_config, chain_id, diem_db.clone(), mp_client_sender);
+    let rpc_runtime = bootstrap_rpc(
+        node_config,
+        chain_id,
+        diem_db.clone(),
+        mp_client_sender.clone(),
+    );
     let api_runtime = match node_config.api.enabled {
-        true => Some(bootstrap_api(chain_id, diem_db.clone(), &node_config.api)),
+        true => Some(bootstrap_api(
+            chain_id,
+            diem_db.clone(),
+            &node_config.api,
+            mp_client_sender,
+        )),
         false => None,
     };
 

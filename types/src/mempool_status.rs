@@ -36,6 +36,16 @@ impl MempoolStatus {
     }
 }
 
+impl fmt::Display for MempoolStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", &self.code)?;
+        if !self.message.is_empty() {
+            write!(f, " - {}", &self.message)?;
+        }
+        Ok(())
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 #[repr(u64)]

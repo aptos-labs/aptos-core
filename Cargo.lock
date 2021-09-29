@@ -1585,12 +1585,14 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bcs",
+ "bytes",
  "diem-api-types",
  "diem-config",
  "diem-crypto",
  "diem-framework-releases",
  "diem-genesis-tool",
  "diem-global-constants",
+ "diem-mempool",
  "diem-sdk",
  "diem-secure-storage",
  "diem-temppath",
@@ -1610,6 +1612,7 @@ dependencies = [
  "serde_json",
  "storage-interface",
  "tokio",
+ "vm-validator",
  "warp",
 ]
 
