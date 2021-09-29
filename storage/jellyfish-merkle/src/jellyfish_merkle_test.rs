@@ -2,15 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::*;
-use crate::test_helper::{
-    arb_existent_kvs_and_nonexistent_keys, arb_kv_pair_with_distinct_last_nibble,
-    arb_tree_with_index, test_get_range_proof, test_get_with_proof,
-    test_get_with_proof_with_distinct_last_nibble, ValueBlob,
+use crate::{
+    node_type::node_type_test::to_legacy,
+    test_helper::{
+        arb_existent_kvs_and_nonexistent_keys, arb_kv_pair_with_distinct_last_nibble,
+        arb_tree_with_index, test_get_leaf_count, test_get_range_proof, test_get_with_proof,
+        test_get_with_proof_with_distinct_last_nibble, ValueBlob,
+    },
 };
 use diem_crypto::HashValue;
 use diem_types::{nibble::Nibble, transaction::PRE_GENESIS_VERSION};
 use mock_tree_store::MockTreeStore;
-use proptest::prelude::*;
+use proptest::{collection::hash_set, prelude::*};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::collections::HashMap;
 
@@ -232,7 +235,7 @@ fn test_insert_at_leaf_with_multiple_internals_created() {
     );
     assert_eq!(db.get_node(&internal_node_key).unwrap(), internal);
     assert_eq!(
-        db.get_node(&NodeKey::new_empty_path(1)).unwrap(),
+        to_legacy(db.get_node(&NodeKey::new_empty_path(1)).unwrap()),
         root_internal,
     );
 
@@ -678,5 +681,10 @@ proptest! {
     #[test]
     fn proptest_get_range_proof((btree, n) in arb_tree_with_index::<ValueBlob>(1000)) {
         test_get_range_proof((btree, n))
+    }
+
+    #[test]
+    fn proptest_get_leaf_count(keys in hash_set(any::<HashValue>(), 1..1000)) {
+        test_get_leaf_count(keys)
     }
 }

@@ -953,17 +953,26 @@ where
         Ok(self.get_with_proof(key, version)?.0)
     }
 
-    pub fn get_root_hash(&self, version: Version) -> Result<HashValue> {
-        self.get_root_hash_option(version)?
+    fn get_root_node(&self, version: Version) -> Result<Node<V>> {
+        self.get_root_node_option(version)?
             .ok_or_else(|| format_err!("Root node not found for version {}.", version))
     }
 
-    pub fn get_root_hash_option(&self, version: Version) -> Result<Option<HashValue>> {
+    fn get_root_node_option(&self, version: Version) -> Result<Option<Node<V>>> {
         let root_node_key = NodeKey::new_empty_path(version);
-        Ok(self
-            .reader
-            .get_node_option(&root_node_key)?
-            .map(|root_node| root_node.hash()))
+        self.reader.get_node_option(&root_node_key)
+    }
+
+    pub fn get_root_hash(&self, version: Version) -> Result<HashValue> {
+        self.get_root_node(version).map(|n| n.hash())
+    }
+
+    pub fn get_root_hash_option(&self, version: Version) -> Result<Option<HashValue>> {
+        Ok(self.get_root_node_option(version)?.map(|n| n.hash()))
+    }
+
+    pub fn get_leaf_count(&self, version: Version) -> Result<Option<usize>> {
+        self.get_root_node(version).map(|n| n.leaf_count())
     }
 }
 

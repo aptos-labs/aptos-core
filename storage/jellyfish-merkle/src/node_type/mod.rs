@@ -10,7 +10,7 @@
 //! chidren at the lowest level. [`LeafNode`] stores the full key and the value associated.
 
 #[cfg(test)]
-mod node_type_test;
+pub(crate) mod node_type_test;
 
 use crate::metrics::{DIEM_JELLYFISH_INTERNAL_ENCODED_BYTES, DIEM_JELLYFISH_LEAF_ENCODED_BYTES};
 use anyhow::{ensure, Context, Result};
@@ -137,10 +137,25 @@ impl NodeKey {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub enum NodeType {
     Leaf,
     InternalLegacy,
+    Internal { leaf_count: usize },
+}
+
+#[cfg(any(test, feature = "fuzzing"))]
+impl Arbitrary for NodeType {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+
+    fn arbitrary_with(_args: ()) -> Self::Strategy {
+        prop_oneof![
+            Just(NodeType::Leaf),
+            Just(NodeType::InternalLegacy),
+            (2..100usize).prop_map(|leaf_count| NodeType::Internal { leaf_count })
+        ]
+        .boxed()
+    }
 }
 
 /// Each child of [`InternalNode`] encapsulates a nibble forking at this node.
@@ -170,6 +185,14 @@ impl Child {
     pub fn is_leaf(&self) -> bool {
         matches!(self.node_type, NodeType::Leaf)
     }
+
+    pub fn leaf_count(&self) -> Option<usize> {
+        match self.node_type {
+            NodeType::Leaf => Some(1),
+            NodeType::InternalLegacy => None,
+            NodeType::Internal { leaf_count } => Some(leaf_count),
+        }
+    }
 }
 
 /// [`Children`] is just a collection of children belonging to a [`InternalNode`], indexed from 0 to
@@ -183,8 +206,10 @@ pub(crate) type Children = HashMap<Nibble, Child>;
 /// the `CryptoHash` trait implementation below for details.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct InternalNode {
-    // Up to 16 children.
+    /// Up to 16 children.
     children: Children,
+    /// Total number of leaves under this internal node
+    leaf_count: Option<usize>,
 }
 
 /// Computes the hash of internal node according to [`JellyfishTree`](crate::JellyfishTree)
@@ -265,7 +290,35 @@ impl InternalNode {
                 .expect("Must have 1 element")
                 .is_leaf())
         }
-        Self { children }
+
+        let leaf_count = Self::sum_leaf_count(&children);
+        Self {
+            children,
+            leaf_count,
+        }
+    }
+
+    fn sum_leaf_count(children: &Children) -> Option<usize> {
+        let mut leaf_count = 0;
+        for child in children.values() {
+            if let Some(n) = child.leaf_count() {
+                leaf_count += n;
+            } else {
+                return None;
+            }
+        }
+        Some(leaf_count)
+    }
+
+    pub fn is_legacy(&self) -> bool {
+        self.leaf_count.is_none()
+    }
+
+    pub fn node_type(&self) -> NodeType {
+        match self.leaf_count {
+            Some(leaf_count) => NodeType::Internal { leaf_count },
+            None => NodeType::InternalLegacy,
+        }
     }
 
     pub fn hash(&self) -> HashValue {
@@ -340,7 +393,10 @@ impl InternalNode {
             existence_bitmap &= !child_bit;
         }
         assert_eq!(existence_bitmap, 0);
-        Ok(Self { children })
+        Ok(Self {
+            children,
+            leaf_count: None,
+        })
     }
 
     /// Gets the `n`-th child.
@@ -625,11 +681,21 @@ where
 
     /// Returns `NodeType`
     pub fn node_type(&self) -> NodeType {
-        // TODO(aldenhu): make it real
-        if self.is_leaf() {
-            NodeType::Leaf
-        } else {
-            NodeType::InternalLegacy
+        match self {
+            // The returning value will be used to construct a `Child` of a internal node, while an
+            // internal node will never have a child of Node::Null.
+            Self::Null => unreachable!(),
+            Self::Leaf(_) => NodeType::Leaf,
+            Self::Internal(n) => n.node_type(),
+        }
+    }
+
+    /// Returns leaf count if known
+    pub fn leaf_count(&self) -> Option<usize> {
+        match self {
+            Node::Null => Some(0),
+            Node::Leaf(_) => Some(1),
+            Node::Internal(internal_node) => internal_node.leaf_count,
         }
     }
 

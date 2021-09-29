@@ -18,7 +18,7 @@ use proptest::{
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, HashMap, HashSet},
     ops::Bound,
 };
 
@@ -347,4 +347,11 @@ fn compute_root_hash_impl(kvs: Vec<(&[bool], HashValue)>) -> HashValue {
     }
 
     SparseMerkleInternalNode::new(left_hash, right_hash).hash()
+}
+
+pub fn test_get_leaf_count(keys: HashSet<HashValue>) {
+    let kvs = keys.into_iter().map(|k| (k, ValueBlob(vec![]))).collect();
+    let (db, version) = init_mock_db(&kvs);
+    let tree = JellyfishMerkleTree::new(&db);
+    assert_eq!(tree.get_leaf_count(version).unwrap().unwrap(), kvs.len())
 }

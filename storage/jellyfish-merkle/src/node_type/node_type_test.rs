@@ -49,6 +49,25 @@ fn gen_leaf_keys(
     (NodeKey::new(version, np), account_key)
 }
 
+pub(crate) fn to_legacy_internal(mut node: InternalNode) -> InternalNode {
+    node.children.iter_mut().for_each(|(_, mut child)| {
+        if matches!(child.node_type, NodeType::Internal { .. }) {
+            child.node_type = NodeType::InternalLegacy
+        }
+    });
+    node.leaf_count = None;
+
+    node
+}
+
+pub(crate) fn to_legacy(node: Node) -> Node {
+    if let Node::Internal(internal_node) = node {
+        Node::Internal(to_legacy_internal(internal_node))
+    } else {
+        node
+    }
+}
+
 #[test]
 fn test_encode_decode() {
     let internal_node_key = random_63nibbles_node_key();
@@ -75,7 +94,7 @@ fn test_encode_decode() {
     ];
     for n in &nodes {
         let v = n.encode().unwrap();
-        assert_eq!(*n, Node::decode(&v).unwrap());
+        assert_eq!(to_legacy(n.clone()), Node::decode(&v).unwrap());
     }
     // Error cases
     if let Err(e) = Node::decode(&[]) {

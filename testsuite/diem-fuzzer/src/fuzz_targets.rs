@@ -89,6 +89,7 @@ static ALL_TARGETS: Lazy<BTreeMap<&'static str, Box<dyn FuzzTargetImpl>>> = Lazy
         //Box::new(storage::JellyfishGetWithProof::default()),
         Box::new(storage::JellyfishGetWithProofWithDistinctLastNibble::default()),
         Box::new(storage::JellyfishGetRangeProof::default()),
+        Box::new(storage::JellyfishGetLeafCount::default()),
         Box::new(storage::AccumulatorFrozenSubtreeHashes::default()),
         Box::new(storage::AccumulatorProof::default()),
         Box::new(storage::AccumulatorConsistencyProof::default()),
