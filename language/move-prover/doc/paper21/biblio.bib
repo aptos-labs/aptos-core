@@ -173,3 +173,76 @@ month = {January},
 abstract = {SMT-based program verifiers often suffer from the so-called butterfly effect, in which minor modifications to the program source cause significant instabilities in verification times, which in turn may lead to spurious verification failures and a degraded user experience. This paper identifies matching loops (ill-behaved quantifiers causing an SMT solver to repeatedly instantiate a small set of quantified formulas) as a significant contributor to these instabilities, and describes some techniques to detect and prevent them. At their core, the contributed techniques move the trigger selection logic away from the SMT solver and into the high-level verifier: this move allows authors of verifiers to annotate, rewrite, and analyze user-written quantifiers to improve the solver’s performance, using information that is easily available at the source level but would be hard to extract from the heavily encoded terms that the solver works with. The paper demonstrates three core techniques (quantifier splitting, trigger sharing, and matching loop detection) by extending the Dafny verifier with its own trigger selection routine, and demonstrates significant predictability and performance gains on both Dafny’s test suite and large verification efforts using Dafny.},
 url = {https://www.microsoft.com/en-us/research/publication/trigger-selection-strategies-stabilize-program-verifiers/},
 }
+
+@article{CONTRACT_VERIFICATION,
+  author    = {Palina Tolmach and
+               Yi Li and
+               Shang{-}Wei Lin and
+               Yang Liu and
+               Zengxiang Li},
+  title     = {A Survey of Smart Contract Formal Specification and Verification},
+  journal   = {CoRR},
+  volume    = {abs/2008.02712},
+  year      = {2020},
+  url       = {https://arxiv.org/abs/2008.02712},
+  eprinttype = {arXiv},
+  eprint    = {2008.02712},
+  timestamp = {Wed, 07 Jul 2021 10:04:24 +0200},
+  biburl    = {https://dblp.org/rec/journals/corr/abs-2008-02712.bib},
+  bibsource = {dblp computer science bibliography, https://dblp.org}
+}
+
+@ARTICLE {DAFNY,
+author = {K. M. Leino},
+journal = {IEEE Software},
+title = {Accessible Software Verification with Dafny},
+year = {2017},
+volume = {34},
+number = {06},
+issn = {1937-4194},
+pages = {94-97},
+keywords = {formal verification;software reliability;software development;encoding;cognition},
+doi = {10.1109/MS.2017.4121212},
+publisher = {IEEE Computer Society},
+address = {Los Alamitos, CA, USA},
+month = {nov}
+}
+
+@Inbook{SPECSHARP,
+author="Barnett, Mike
+and DeLine, Robert
+and F{\"a}hndrich, Manuel
+and Jacobs, Bart
+and Leino, K. Rustan M.
+and Schulte, Wolfram
+and Venter, Herman",
+title="The Spec{\#} Programming System: Challenges and Directions",
+bookTitle="Verified Software: Theories, Tools, Experiments: First IFIP TC 2/WG 2.3 Conference, VSTTE 2005, Zurich, Switzerland, October 10-13, 2005, Revised Selected Papers and Discussions",
+year="2008",
+publisher="Springer Berlin Heidelberg",
+address="Berlin, Heidelberg",
+pages="144--152",
+abstract="The Spec{\#} programming system [4] is a new attempt to increase the quality of general purpose, industrial software. Using old wisdom, we propose the use of specifications to make programmer assumptions explicit. Using modern technology, we propose the use of tools to enforce the specifications. To increase its chances of having impact, we want to design the system so that it can be widely adopted.",
+isbn="978-3-540-69149-5",
+url="https://doi.org/10.1007/978-3-540-69149-5_16"
+}
+
+
+@INPROCEEDINGS{REENTRANCE,
+author={Fatima Samreen, Noama and Alalfi, Manar H.},
+booktitle={2020 IEEE International Workshop on Blockchain Oriented Software Engineering (IWBOSE)},
+title={Reentrancy Vulnerability Identification in Ethereum Smart Contracts},
+year={2020},
+volume={},
+number={},
+pages={22-29},
+}
+
+@misc{SOLIDITY_EVENTS,
+      title={Formal Specification and Verification of Solidity Contracts with Events},
+      author={Ákos Hajdu and Dejan Jovanović and Gabriela Ciocarlie},
+      year={2020},
+      eprint={2005.10382},
+      archivePrefix={arXiv},
+      primaryClass={cs.PL}
+}

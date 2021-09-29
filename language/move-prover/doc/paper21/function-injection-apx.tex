@@ -147,7 +147,7 @@ For opaque calls, we also need to \emph{havoc} the memory they modify
 value to it. If present, |ensures| from the called function, injected as
 subsequent assumptions, are further constraining the modified memory.
 
-
+\vspace{-2ex}
 \SubSection{Data Invariants}
 
 \begin{Figure}
@@ -193,9 +193,7 @@ specification formalisms, we would need a special language construct for
 invariant suspension. Fig.~\ref{fig:DataInvariants} gives an example, and shows
 how data invariants are reduced to assert/assume statements.
 
-\Paragraph{Implementation}
-
-The implementation hooks into the reference elimination
+The implementation of data invariants hooks into the reference elimination
 (Sec.~\ref{sec:RefElim}). As part of this the lifetime of references is
 computed. Whenever a reference is released and the mutated value is written
 back, we also enforce the data invariant. In addition, the data invariant is

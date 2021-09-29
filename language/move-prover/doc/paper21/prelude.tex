@@ -3,16 +3,16 @@
 \usepackage{listings}
 \usepackage{inconsolata}
 \usepackage{relsize}
-\usepackage{amsmath,amssymb,array}
+%\usepackage{amsmath,amssymb,array}
 \usepackage{mathpartir}
 \usepackage{graphicx}
 \usepackage{xspace}
-\usepackage{hyperref}
+\usepackage[colorlinks=true]{hyperref}
 \usepackage{caption}
 
 \newcommand{\Section}[1]{\section{#1}}
 \newcommand{\SubSection}[1]{\subsection{#1}}
-\newcommand{\Paragraph}[1]{\subsubsection{#1}} % lncs
+\newcommand{\Paragraph}[1]{\vspace{-1ex}\subsubsection{#1}} % lncs
 
 \newcommand{\TODO}[2]{%
   \noindent\textcolor{gray}{%
@@ -20,6 +20,8 @@
   }
 }
 
+\setlength{\belowcaptionskip}{-1ex}
+\setlength{\textfloatsep}{0.1ex}
 \newenvironment{Figure}{
   \begin{figure}[tb]
 } {
@@ -46,6 +48,7 @@
   basicstyle=\ttfamily,
   keywordstyle=\color{black}, % don't bold keywords which is the default
   escapechar=@, % use to embed LaTeX into code
+  breaklines=true,
 }
 
 

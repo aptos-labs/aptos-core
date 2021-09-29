@@ -18,10 +18,10 @@ control via the builtin type of \emph{signers}, as will be discussed later.
 
 A Move application consists of a set of \emph{transaction scripts}. Each of
 those script defines a Move function with input parameters but no output
-parameters.  This function updates the global memory. The execution of this
-function can fail via a well-defined abort mechanism, in which case the memory
-stays unmodified. An environment emits a sequence of calls to such scripts,
-thereby evolving the memory.
+parameters.  This function updates the global memory, including emitting
+events. The execution of this function can fail via a well-defined abort
+mechanism, in which case the memory stays unmodified. An environment emits a
+sequence of calls to such scripts, thereby evolving the memory.
 
 % A transaction script is written in Move as an imperative function which can read
 % and write the global memory. Move uses a specific style of
@@ -63,7 +63,9 @@ module Account {
     *balance = *balance + amount;
   }
 
-  public(script) fun transfer(from: &signer, to: address, amount: u64) {
+  public(script) fun transfer(from: &signer, to: address, amount: u64)
+  acquires Account {
+    assert(Signer::address_of(from) != to, Errors::invalid_argument());
     withdraw(Signer::address_of(from), amount);
     deposit(to, amount);
   }
@@ -95,10 +97,9 @@ example, the expression |borrow_global_mut<T>(addr)| will abort if no resource
 module Account {
   spec transfer {
     let from_addr = Signer::address_of(from);
+    aborts_if from_addr == to;
     aborts_if bal(from_addr) < amount;
     aborts_if bal(to) + amount > Limits::max_u64();
-    modifies global<Account>(from_addr);
-    modifies global<Account>(to);
     ensures bal(from_addr) == old(bal(from_addr)) - amount;
     ensures bal(to) == old(bal(to)) + amount;
   }
@@ -129,20 +130,18 @@ dependent on heuristic decision procedures).
 
 Fig.~\ref{fig:AccountSpec} illustrates the specification language by extending
 the account example in Fig.~\ref{fig:AccountDef} (for the definition of the
-specification language see \cite{MOVE_SPEC_LANG_DEF}). This adds specifications
-for the |transfer| function, a helper function |bal| used in specs, and two
-global memory invariants. The first invariant states that a balance can never
-drop underneath a certain minimum. The second invariant refers to an update of
-global memory with pre and post state: the balance on an account can never
-decrease in one step more than a certain amount.
+specification language see \cite{MOVE_SPEC_LANG_DEF}). This adds the
+specification of the |transfer| function, a helper function |bal| for use in
+specs, and two global memory invariants. The first invariant states that a
+balance can never drop underneath a certain minimum. The second invariant refers
+to an update of global memory with pre and post state: the balance on an account
+can never decrease in one step more than a certain amount.  Note that while the
+Move programming language has only unsigned integers, the specification language
+uses arbitrary precision signed integers, making it convenient to specify
+something like |x + y <= limit|, without need to worry about overflow.
 
-Note that while the Move programming language has only unsigned integers, the
-specification language uses arbitrary precision signed integers, making it
-convenient to specify something like |x - y <= limit|, without need to worry
-about underflow or overflow.
-
-We have omitted specifications for the |withdraw| and |deposit| functions
-intentionally. \MVP supports keeping specs for non-recursive functions open, in
+Specifications for the |withdraw| and |deposit| functions have been omitted in
+this examples. \MVP supports omitting specs for non-recursive functions, in
 which case they are treated as being inlined at caller site.
 
 A discerning reader may have noted that the program in Fig.~\ref{fig:AccountDef}
@@ -164,69 +163,65 @@ will be discussed in the next section.
 \Paragraph{Running the Prover}
 \label{sec:RunningProver}
 
-\MVP operates fully automated, quite similar as a type checker or linter, and is
+\MVP operates fully automated, quite similar to a type checker or linter, and is
 expected to conclude in reasonable execution time, so it can be integrated in
-the regular development workflow. Running the prover on the program and
-specification of |module Account| produces multiple errors. The
-first is this one:
-
-\TODO{wrwg}{update example}
+the regular development workflow. Running \MVP on the |module Account| produces
+multiple errors. The first is this one:
 
 \begin{MoveDiag}
 error: abort not covered by any of the `aborts_if` clauses
-
-    --- account.move:15:3 ---
-    |
- 15 |  public fun withdraw(account: address, amount: u64): Coin
-    .
- 18 |         &mut borrow_global_mut<Account>(account).balance;
-    .              ----------------- abort happened here
-    |
-    =     at account.move:15:3: withdraw
-    =         account = 0x19, amount = 15724
-    =     at account.move:18:14: withdraw (ABORTED)
+   -- account.move:24:3
+   |
+13 |       let balance = &mut borrow_global_mut<Account>(account).balance;
+   |                          ----------------- abort happened here
+   |
+   =     at account.move:18: transfer
+   =         from = signer{0x18be}
+   =         to = 0x18bf
+   =         amount = 147u8
+   =     at ...
 \end{MoveDiag}
 
-\noindent The prover has detected that an implicit aborts condition is missing
-in the specification of the |withdraw| function. It prints the context of the
-error, as well as an \emph{execution trace} which lead to the error. Values of
-variable assignments from the counterexample found by the SMT solver are printed
-together with the execution trace. Logically, the counter example presents an
-instance of assignments to variables such that program and specification
-disagree. In general, the Move prover attempts to produce diagnostics readable
-for Move developers without the need of understanding any internals of the
-prover.
+\noindent \MVP detected that an implicit aborts condition is missing in the
+specification of the |withdraw| function. It prints the context of the error, as
+well as an \emph{execution trace} which lead to the error. Values of variable
+assignments from the counterexample found by the SMT solver are printed together
+with the execution trace. Logically, the counter example presents an instance of
+assignments to variables such that program and specification disagree. In
+general, \MVP attempts to produce diagnostics readable for Move developers
+without the need of understanding any internals of the prover.
 
 The next errors produced are about the memory invariants in
-Fig.~\ref{fig:AccountSpec}. Both of them do not hold:
+Fig.~\ref{fig:AccountSpec}. Both of them do not hold; we show only the first failure:
 
 \begin{MoveDiag}
 error: global memory invariant does not hold
-
-    --- account.move:43:5 ---
-    |
- 43 | invariant forall acc: address where exists<Account>(acc):
- 44 |     bal(acc) >= AccountLimits::MIN_BALANCE;
-    |
-    .
-    =     at account.move:21:35: withdraw
-
-error: global memory invariant does not hold
-
-    --- account.move:45:5 ---
-    |
- 45 | invariant update
- 46 |   forall acc: address where exists<Account>(acc):
- 47 |     old(bal(acc)) - bal(acc) <= AccountLimits::MAX_DECREASE;
-    .
-    =     at account.move:21:35: withdraw
+   -- account.move:39:3
+   |
+39 |    invariant forall acc: address where exists<Account>(acc):
+40 |      bal(acc) >= AccountLimits::min_balance();
+   |
+   =     at account.move:6: withdraw
+   =         account = 0x0
+   =         amount = 11u8
+   =     at account.move:7: withdraw
+   =         balance = &15u8
+   =     at ...
 \end{MoveDiag}
 
 \noindent This happens because in the program in Fig.~\ref{fig:AccountDef}, we
-did not made any attempt to respect the limits in |MIN_BALANCE| and
-|MAX_DECREASE|. We leave it open here how to fix this problem, which would
-require to add some more |assert| statements to the code and abort if the limits
-are not met.
+did not made any attempt to respect the limits in |min_balance()| and
+|max_decrease()|. We leave it open here (but covered it in
+App.~\ref{sec:CorrectedAccount}) how to fix this problem, which requires
+to add some more |assert| statements to the code and abort if the limits are not
+met.
+
+In reality, the programs and specifications \MVP deals with are significant larger than
+in this example. For example, the conditions under which a transaction
+in the Diem framework can abort typically has dozens of individual predicates,
+stemming from other functions called by this transaction. Moreover, there are
+hundreds of memory invariants specified, encoding access control and other
+requirements for the Diem blockchain.
 
 %%% Local Variables:
 %%% mode: latex

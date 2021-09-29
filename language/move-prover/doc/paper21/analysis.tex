@@ -1,13 +1,175 @@
 \Section{Analysis}
 
-\TODO{wrwg}{complete}
+\Paragraph{Predictability and Performance Improvements}
 
-\begin{itemize}
-\item Benchmarks
-\item Open Problems
-\item Related Work
-\item \ldots
-\end{itemize}
+Compared to the version of the Move Prover which was released in September 2020
+as part of version 1.0 of the Diem project we observe many improvements in
+verification speed and predictability of verification outcome, which we track
+back to the bytecode transformations we have described here. These results are,
+however, not so easy to quantify, as the Move language has evolved and sources
+written today are not compatible with sources this time back. Moreover, the Diem
+framework and its specification, which is the basis of our benchmarking, has
+evolved as well, adding more functionality and tighter specifications.
+
+As one data point we use the |DiemAccount| module, the biggest module in the
+Diem framework. This module encapsulates basic functionality to create and
+maintain multiple types of accounts on the blockchain, as well as manage their
+coin balances. It was called |LibraAccount| in release 1.0 of \MVP. The below
+table lists the number of lines, functions, invariants, conditions (requires, ensures,
+and aborts-if), as well as the verification times:
+
+{
+\setlength{\tabcolsep}{6pt}
+\vspace{2ex}
+\begin{tabular*}{0.9\textwidth}{cccccc}
+  \hline
+  \hline
+  Module & Lines & Functions & Invariants & Conditions & Timing \\
+  \hline
+  LibraAccount & 1975 & 72 & 10 & 113 & \textbf{9.131s} \\
+  DiemAccount & 2554 & 64 & 32 & 171 & \textbf{6.290s} \\
+  \hline
+\end{tabular*}
+\vspace{2ex}
+}
+
+\noindent Notice that |DiemAccount| has significantly grown in size compared to
+|LibraAccount|.  Specifically, additional specifications have been
+added. Moreover, in the original |LibraAccount|, some of the most complex
+functions had to be disabled for verification because the old version of \MVP
+would timeout on them. In contrast, in |DiemAccount| and with the new version,
+all functions are verified. Nevertheless, verification time has been improved by
+roughly 30\%, in the presence of 3x more global invariants, and .5x more
+function conditions.
+
+We were able to observe similar improvements for the remaining of the 40 modules
+of the Diem framework. All of the roughly 1/2 dozen timeouts in verification in
+the framework resolved after introduction of the transformations described in
+this paper. Also, specifications which were introduced after the new
+transformations did not introduce new timeouts. A further improvement is that
+often, in cases where specification and program disagree, a timeout occurred
+which went away only after fixing the spec or the code, making debugging of such
+verification failures rather hard. This problem also disappeared.
+
+
+\Paragraph{Causes for the Improvements}
+
+It is hard to clearly identify the reasons for improvements when dealing with
+heuristic systems like SMT solvers. Moreover, besides of the transformations
+described in this paper, many more smaller changes had been made to \MVP,
+including micro-tuning the SMT encoding of the verification problem in
+Boogie. Tracking the causes of improvements incrementally was not the highest
+priority of our work.
+
+Nevertheless, we believe that one of the biggest impacts, specifically regards
+removal of timeouts and predictability of verification, is monomorphization. The
+reason for this is that monomorphization allows a multi-sorted representation
+of values in Boogie (and eventually the SMT solver). In contrast, before
+monomorphization, we used a universal domain for values in order to represent
+values in generic functions, roughly as follows:
+
+\begin{Move}
+  type Value = Num(int) | Address(int) | Struct(Vector<Value>) | ...
+\end{Move}
+
+\noindent This creates a large overhead for the SMT solver, as we need to
+exhaustively inject type assumptions (e.g. that a |Value| is actually an
+|Address|), and pack/unpack values. Consider a quantifier like~%
+|forall a: address: P(x)| in Move. Before monomorphization, we have to represent
+this in Boogie as~%
+|forall a: Value: is#Address(a) => P(v#Address(a))|. This quantifier is
+triggered where ever |is#Address(a)| is present, independent of the structure of
+|P|. Over-triggering or inadequate triggering of quantifiers is one of the
+suspected sources of timeouts, as also discussed in~\cite{BUTTERFLY}.
+
+Moreover, before monomorphization, global memory was indexed in Boogie by an
+address and a type instantiation. That is, for |struct R<T>| we would
+have one Boogie array |[Type, int]Value|. With monomorphization, the type index
+is eliminated, as we create different memory variables for each type
+instantiation.  Quantification over memory content works now on a one-dimensional
+instead of an n-dimensional Boogie array.
+
+\Paragraph{Discussion and Related Work}
+
+A recent survey of formal verification applied to smart contracts is found
+in~\cite{CONTRACT_VERIFICATION}. The authors distinguish between \emph{contract}
+and \emph{program} level approaches. Our approach has aspects of both: we
+address program level properties via pre/post conditions, and contract
+(``blockchain state'') level properties via global invariants. In both cases, we
+use traditional predicate logic to write these properties, characterized as
+Hoare logic by the paper.
+
+While~\cite{CONTRACT_VERIFICATION} refers to at least two dozen systems for
+smart contract verification, to the best of our knowledge, the Move ecosystem is
+the first one where contract programming and specification language are fully
+integrated, and the language is designed from first principles influenced by
+verification. Methodologically, Move and the Move prover are therefore closer to
+systems like Dafny~\cite{DAFNY}, or the older Spec\# system~\cite{SPECSHARP},
+where instead of adding a specification approach posterior to an existing
+language, it is part from the beginning. This allows us not only to deliver a
+more consistent user experience, but also to make verification technically
+easier by curating the programming language, as reflected in Move's absence of
+dynamic dispatching and the notorious re-entrance problem~\cite{REENTRANCE}, as
+well as the borrow semantics which enables optimizations like reference
+elimination (Sec.~\ref{sec:RefElim}).
+
+As regards expressiveness of specification, to the best of our knowledge, no
+existing specification approach for smart contracts based on inductive Hoare
+logic has similar expressiveness. We support universal quantification over
+arbitrary memory content, a suspension mechanism of invariants to allow
+non-atomic construction of memory content, and generic invariants. The standard
+verification mechanism in Solidity does not support quantifiers, because it
+interprets programming language constructs a specifications and has no
+dedidacted specification language. While in Solidity one can simulate aspects of
+global invariants using modifiers by attaching pre/post conditions, this is not
+the same as our invariants, which are guaranteed to hold independent of whether
+a user may or (accidentally) may not attach a modifier.  Moreover, from
+experimenting with a similar approach in Move, we know that adding invariants as
+pre/post conditions can be highly inefficient, because they need to be verified
+independent from whether a function actually changes state. In contrast, our
+approach to inject invariants optimizes when an invariant is actually verified.
+While the expressiveness of Move specifications and \MVP comes with the price of
+undecidability and the dependency from heuristics in SMT solvers, \MVP is
+capable to deal with this by its elaborated translation to SMT logic, as
+partially described in this paper. The result is a practical verification system
+that is fully integrated into the Diem blockchain production process, which (to
+the best of our knowledge) is novel by itself.
+
+Borrow semantics is considered a good way to perform high-performance \emph{and}
+safe programming in the Rust community. Even though the kind of reference
+elimination we perform could also be done for the safe Rust language subset, to
+the best of our knowledge, this has not been attempted before. The same
+technique could likely not only be used for verification, but also for runtime
+execution, potentially obtaining higher speed for smaller data structures by
+improving processor cache locality.
+
+\Paragraph{Open Problems and Future Work}
+
+While currently \MVP is operating to our satisfaction, there are multiple open
+problems as well. For one, the set of smart contracts we are verifying still
+have only medium complexity, and specifically loops are rare in the Diem
+framework (loops were not discussed in this paper for reasons of space; we do
+incorporate loop invariants for their verification). We anticipate the problem
+of timeouts to hit us again down the road as the number of applications of \MVP
+grow, and further refinement of the translation will be needed. Furthermore,
+while currently there are no occurrences of false positives, we expect this problem
+to hit as well.
+
+The biggest obstacle for wider adoption, however, is seen in the complexity of
+authoring and reading specifications, related to a phenomena we refer to as
+``specification boilerplate''. Pre/post condition specifications are often
+verbose and difficult to read and write. At the time of this writing, function
+specifications in the Diem framework are often of similar size than function
+implementations.  A common problem is also sharing between aspects of specifications:
+for example, if function |f| calls function |g| and the later function aborts, the
+aborts condition propagates from |g| to the caller |f|. While the Move specification
+language has mechanisms to express this kind of sharing by referring to the aborts
+condition of |g| in the specification of |f|, this mechanism also makes specifications
+less readable, and leaks implementation details into the specification of |f|.
+We are currently experimenting with multiple strategies to cope with this, ranging
+from a better methodology and language support to structure specifications, to
+automatically inferring specs for some functions.
+
 
 
 %%% Local Variables:
