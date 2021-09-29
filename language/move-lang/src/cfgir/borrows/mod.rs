@@ -11,7 +11,7 @@ use crate::{
     shared::{unique_map::UniqueMap, CompilationEnv},
 };
 use move_ir_types::location::*;
-use state::*;
+use state::{Value, *};
 use std::collections::BTreeMap;
 
 //**************************************************************************************************
@@ -232,6 +232,13 @@ fn exp(context: &mut Context, parent_e: &Exp) -> Values {
             }
         }
 
+        E::Vector(_, n, _, e) => {
+            let evalues = exp(context, e);
+            debug_assert_eq!(*n, evalues.len());
+            evalues.into_iter().for_each(|v| assert!(!v.is_ref()));
+            svalue()
+        }
+
         E::ModuleCall(mcall) => {
             let evalues = exp(context, &mcall.arguments);
             let ret_ty = &parent_e.ty;
@@ -243,9 +250,9 @@ fn exp(context: &mut Context, parent_e: &Exp) -> Values {
             values
         }
 
-        E::Unit { .. } | E::Value(_) | E::Constant(_) | E::Spec(_, _) | E::UnresolvedError => {
-            svalue()
-        }
+        E::Unit { .. } => vec![],
+        E::Value(_) | E::Constant(_) | E::Spec(_, _) | E::UnresolvedError => svalue(),
+
         E::Cast(e, _) | E::UnaryExp(_, e) => {
             let v = exp(context, e);
             assert!(!assert_single_value(v).is_ref());

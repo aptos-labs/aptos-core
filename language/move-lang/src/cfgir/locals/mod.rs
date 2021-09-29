@@ -260,6 +260,7 @@ fn exp(context: &mut Context, parent_e: &Exp) {
 
         E::ModuleCall(mcall) => exp(context, &mcall.arguments),
         E::Builtin(_, e)
+        | E::Vector(_, _, _, e)
         | E::Freeze(e)
         | E::Dereference(e)
         | E::UnaryExp(_, e)

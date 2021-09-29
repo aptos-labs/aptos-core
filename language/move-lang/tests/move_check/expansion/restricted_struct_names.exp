@@ -70,7 +70,7 @@ error[E02010]: invalid name
 14 │     struct freeze {}
    │            ^^^^^^ Invalid struct name 'freeze'. Struct names must start with 'A'..'Z'
 
-error[E02010]: invalid name
+error[E03011]: invalid use of reserved name
    ┌─ tests/move_check/expansion/restricted_struct_names.move:15:12
    │
 15 │     struct Self {}

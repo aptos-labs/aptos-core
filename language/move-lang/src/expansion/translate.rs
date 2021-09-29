@@ -187,7 +187,6 @@ fn definition(
             module(context, module_map, module_addr, m)
         }
         P::Definition::Address(a) => {
-            check_valid_address_name(context, &a.addr);
             let addr = address(context, /* suggest_declaration */ false, a.addr);
             for mut m in a.modules {
                 let module_addr = check_module_address(context, a.loc, addr, &mut m);
@@ -213,26 +212,27 @@ fn address_without_value_error(suggest_declaration: bool, loc: Loc, n: &Name) ->
 
 // Access a top level address as declared, not affected by any aliasing/shadowing
 fn address(context: &mut Context, suggest_declaration: bool, ln: P::LeadingNameAccess) -> Address {
-    address_impl(context.env, suggest_declaration, ln)
+    address_(context.env, suggest_declaration, ln)
 }
 
-fn address_impl(
+fn address_(
     compilation_env: &mut CompilationEnv,
     suggest_declaration: bool,
-    sp!(loc, ln_): P::LeadingNameAccess,
+    ln: P::LeadingNameAccess,
 ) -> Address {
+    let name_res = check_valid_address_name_(compilation_env, &ln);
+    let sp!(loc, ln_) = ln;
     match ln_ {
-        P::LeadingNameAccess_::AnonymousAddress(bytes) => Address::Anonymous(sp(loc, bytes)),
+        P::LeadingNameAccess_::AnonymousAddress(bytes) => {
+            debug_assert!(name_res.is_ok()); //
+            Address::Anonymous(sp(loc, bytes))
+        }
         P::LeadingNameAccess_::Name(n) => {
-            if n.value.as_str() == ModuleName::SELF_NAME {
-                compilation_env.add_diag(diag!(
-                        Declarations::InvalidName,
-                        (loc, format!("Invalid named address '{0}'. '{0}' is restricted and cannot be used to name an address", ModuleName::SELF_NAME))
-                ))
-            } else if compilation_env
-                .named_address_mapping()
-                .get(&n.value)
-                .is_none()
+            if name_res.is_ok()
+                && compilation_env
+                    .named_address_mapping()
+                    .get(&n.value)
+                    .is_none()
             {
                 compilation_env.add_diag(address_without_value_error(suggest_declaration, loc, &n));
             }
@@ -337,7 +337,7 @@ fn module_(
     assert!(context.address == None);
     assert!(address == None);
     set_sender_address(context, &name, module_address);
-    let _ = check_restricted_self_name(context, "module", &name.0);
+    let _ = check_restricted_name_all_cases(context, "module", &name.0);
     if name.value().starts_with(|c| c == '_') {
         let msg = format!(
             "Invalid module name '{}'. Module names cannot start with '_'",
@@ -609,7 +609,7 @@ fn all_module_members<'a>(
             P::Definition::Module(m) => {
                 let addr = match &m.address {
                     Some(a) => {
-                        address_impl(compilation_env, /* suggest_declaration */ true, *a)
+                        address_(compilation_env, /* suggest_declaration */ true, *a)
                     }
                     // Error will be handled when the module is compiled
                     None => Address::Anonymous(sp(m.loc, NumericalAddress::DEFAULT_ERROR_ADDRESS)),
@@ -617,7 +617,7 @@ fn all_module_members<'a>(
                 module_members(members, always_add, addr, m)
             }
             P::Definition::Address(addr_def) => {
-                let addr = address_impl(
+                let addr = address_(
                     compilation_env,
                     /* suggest_declaration */ false,
                     addr_def.addr,
@@ -772,7 +772,7 @@ fn use_(context: &mut Context, acc: &mut AliasMapBuilder, u: P::Use) {
     macro_rules! add_module_alias {
         ($ident:expr, $alias_opt:expr) => {{
             let alias: Name = $alias_opt.unwrap_or_else(|| $ident.value.module.0.clone());
-            if let Err(()) = check_restricted_self_name(context, "module alias", &alias) {
+            if let Err(()) = check_restricted_name_all_cases(context, "module alias", &alias) {
                 return;
             }
 
@@ -1712,6 +1712,11 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
                 }
             }
         }
+        PE::Vector(vec_loc, ptys_opt, sp!(args_loc, pargs_)) => {
+            let tys_opt = optional_types(context, ptys_opt);
+            let args = sp(args_loc, exps(context, pargs_));
+            EE::Vector(vec_loc, tys_opt, args)
+        }
         PE::IfElse(pb, pt, pf_opt) => {
             let eb = exp(context, *pb);
             let et = exp(context, *pt);
@@ -2189,7 +2194,9 @@ fn unbound_names_exp(unbound: &mut BTreeSet<Name>, sp!(_, e_): &E::Exp) {
         EE::Name(sp!(_, E::ModuleAccess_::Name(n)), _) => {
             unbound.insert(*n);
         }
-        EE::Call(_, _, _, sp!(_, es_)) => unbound_names_exps(unbound, es_),
+        EE::Call(_, _, _, sp!(_, es_)) | EE::Vector(_, _, sp!(_, es_)) => {
+            unbound_names_exps(unbound, es_)
+        }
         EE::Pack(_, _, es) => unbound_names_exps(unbound, es.iter().map(|(_, _, (_, e))| e)),
         EE::IfElse(econd, et, ef) => {
             unbound_names_exp(unbound, ef);
@@ -2337,13 +2344,14 @@ fn unbound_names_dotted(unbound: &mut BTreeSet<Name>, sp!(_, edot_): &E::ExpDott
 // Valid names
 //**************************************************************************************************
 
-fn check_valid_address_name(context: &mut Context, sp!(_, ln_): &P::LeadingNameAccess) {
+fn check_valid_address_name_(
+    env: &mut CompilationEnv,
+    sp!(_, ln_): &P::LeadingNameAccess,
+) -> Result<(), ()> {
     use P::LeadingNameAccess_ as LN;
     match ln_ {
-        LN::AnonymousAddress(_) => (),
-        LN::Name(n) => {
-            let _ = check_restricted_self_name(context, "address", n);
-        }
+        LN::AnonymousAddress(_) => Ok(()),
+        LN::Name(n) => check_restricted_name_all_cases_(env, "address", n),
     }
 }
 
@@ -2361,6 +2369,7 @@ fn check_valid_local_name(context: &mut Context, v: &Var) {
             .env
             .add_diag(diag!(Declarations::InvalidName, (v.loc(), msg)));
     }
+    let _ = check_restricted_name_all_cases(context, "variable", &v.0);
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -2471,7 +2480,7 @@ fn check_valid_module_member_name_impl(
 
     // Restricting Self for now in the case where we ever have impls
     // Otherwise, we could allow it
-    check_restricted_self_name(context, lcase, n)?;
+    check_restricted_name_all_cases(context, lcase, n)?;
 
     Ok(())
 }
@@ -2480,11 +2489,20 @@ pub fn is_valid_struct_constant_or_schema_name(s: &str) -> bool {
     s.starts_with(|c| matches!(c, 'A'..='Z'))
 }
 
-fn check_restricted_self_name(context: &mut Context, case: &str, n: &Name) -> Result<(), ()> {
-    if n.value.as_str() == ModuleName::SELF_NAME {
-        context
-            .env
-            .add_diag(restricted_name_error(case, n.loc, ModuleName::SELF_NAME));
+// Checks for a restricted name in any decl case
+// Self and vector are not allowed
+fn check_restricted_name_all_cases(context: &mut Context, case: &str, n: &Name) -> Result<(), ()> {
+    check_restricted_name_all_cases_(context.env, case, n)
+}
+
+fn check_restricted_name_all_cases_(
+    env: &mut CompilationEnv,
+    case: &str,
+    n: &Name,
+) -> Result<(), ()> {
+    let n_str = n.value.as_str();
+    if n_str == ModuleName::SELF_NAME || n_str == crate::naming::ast::BuiltinTypeName_::VECTOR {
+        env.add_diag(restricted_name_error(case, n.loc, n_str));
         Err(())
     } else {
         Ok(())
@@ -2506,11 +2524,18 @@ fn check_restricted_names(
 }
 
 fn restricted_name_error(case: &str, loc: Loc, restricted: &str) -> Diagnostic {
+    let a_or_an = match case.chars().next().unwrap() {
+        // TODO this is not exhaustive to the indefinite article rules in English
+        // but 'case' is never user generated, so it should be okay for a while/forever...
+        'a' | 'e' | 'i' | 'o' | 'u' => "an",
+        _ => "a",
+    };
     let msg = format!(
         "Invalid {case} name '{restricted}'. '{restricted}' is restricted and cannot be used to \
-         name a {case}",
+         name {a_or_an} {case}",
+        a_or_an = a_or_an,
         case = case,
         restricted = restricted,
     );
-    diag!(Declarations::InvalidName, (loc, msg))
+    diag!(NameResolution::ReservedName, (loc, msg))
 }

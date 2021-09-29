@@ -3,7 +3,7 @@
 
 use crate::{
     diag,
-    expansion::ast::{AbilitySet, Fields, ModuleIdent, Value_},
+    expansion::ast::{self as E, AbilitySet, Fields, ModuleIdent},
     hlir::ast::{self as H, Block},
     naming::ast as N,
     parser::ast::{BinOp_, ConstantName, Field, FunctionName, StructName, Var},
@@ -885,14 +885,14 @@ fn exp_<'env>(
             TE::BinopExp(lhs, op, toperand_ty, rhs) => {
                 let operand_exp_ty_opt = match &op.value {
                     BinOp_::And if bind_for_short_circuit(&rhs) => {
-                        let tfalse_ = sp(loc, TE::Value(sp(loc, Value_::Bool(false))));
+                        let tfalse_ = sp(loc, TE::Value(sp(loc, E::Value_::Bool(false))));
                         let tfalse = Box::new(T::exp(N::Type_::bool(loc), tfalse_));
                         let if_else_ = sp(loc, TE::IfElse(lhs, rhs, tfalse));
                         let if_else = Box::new(T::exp(N::Type_::bool(ty.loc), if_else_));
                         return exp_loop(stack, result, cur_expected_type_opt, if_else);
                     }
                     BinOp_::Or if bind_for_short_circuit(&rhs) => {
-                        let ttrue_ = sp(loc, TE::Value(sp(loc, Value_::Bool(true))));
+                        let ttrue_ = sp(loc, TE::Value(sp(loc, E::Value_::Bool(true))));
                         let ttrue = Box::new(T::exp(N::Type_::bool(loc), ttrue_));
                         let if_else_ = sp(loc, TE::IfElse(lhs, ttrue, rhs));
                         let if_else = Box::new(T::exp(N::Type_::bool(ty.loc), if_else_));
@@ -1120,7 +1120,7 @@ fn exp_impl(
                 H::UnitCase::FromUser
             },
         },
-        TE::Value(v) => HE::Value(v),
+        TE::Value(ev) => HE::Value(value(context, ev)),
         TE::Constant(_m, c) => {
             // Currently only private constants exist
             HE::Constant(c)
@@ -1158,6 +1158,11 @@ fn exp_impl(
             HE::ModuleCall(Box::new(call))
         }
         TE::Builtin(bf, targ) => builtin(context, result, eloc, *bf, targ),
+        TE::Vector(vec_loc, n, tty, targ) => {
+            let ty = Box::new(base_type(context, *tty));
+            let arg = exp(context, result, None, *targ);
+            HE::Vector(vec_loc, n, ty, arg)
+        }
         TE::Dereference(te) => {
             let e = exp(context, result, None, *te);
             HE::Dereference(e)
@@ -1501,6 +1506,24 @@ fn builtin(
     }
 }
 
+fn value(context: &mut Context, sp!(loc, ev_): E::Value) -> H::Value {
+    use E::Value_ as EV;
+    use H::Value_ as HV;
+    let v_ = match ev_ {
+        EV::InferredNum(_) => panic!("ICE should have been expanded"),
+        EV::Address(a) => HV::Address(a.into_addr_bytes(context.env.named_address_mapping())),
+        EV::U8(u) => HV::U8(u),
+        EV::U64(u) => HV::U64(u),
+        EV::U128(u) => HV::U128(u),
+        EV::Bool(u) => HV::Bool(u),
+        EV::Bytearray(bytes) => HV::Vector(
+            Box::new(H::BaseType_::u8(loc)),
+            bytes.into_iter().map(|b| sp(loc, HV::U8(b))).collect(),
+        ),
+    };
+    sp(loc, v_)
+}
+
 //**************************************************************************************************
 // Freezing
 //**************************************************************************************************
@@ -1666,6 +1689,7 @@ fn bind_for_short_circuit(e: &T::Exp) -> bool {
         | TE::Assign(_, _, _)
         | TE::Mutate(_, _)
         | TE::Pack(_, _, _, _)
+        | TE::Vector(_, _, _, _)
         | TE::BorrowLocal(_, _)
         | TE::ExpList(_)
         | TE::Cast(_, _) => panic!("ICE unexpected exp in short circuit check: {:?}", e),

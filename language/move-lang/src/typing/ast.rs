@@ -140,6 +140,7 @@ pub enum UnannotatedExp_ {
 
     ModuleCall(Box<ModuleCall>),
     Builtin(Box<BuiltinFunction>, Box<Exp>),
+    Vector(Loc, usize, Box<Type>, Box<Exp>),
 
     IfElse(Box<Exp>, Box<Exp>, Box<Exp>),
     While(Box<Exp>, Box<Exp>),
@@ -431,6 +432,15 @@ impl AstDebug for UnannotatedExp_ {
                 w.write("(");
                 rhs.ast_debug(w);
                 w.write(")");
+            }
+            E::Vector(_loc, usize, ty, elems) => {
+                w.write(format!("vector#{}", usize));
+                w.write("<");
+                ty.ast_debug(w);
+                w.write(">");
+                w.write("[");
+                elems.ast_debug(w);
+                w.write("]");
             }
             E::Pack(m, s, tys, fields) => {
                 w.write(&format!("{}::{}", m, s));

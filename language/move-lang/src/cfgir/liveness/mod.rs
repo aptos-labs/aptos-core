@@ -131,6 +131,7 @@ fn exp(state: &mut LivenessState, parent_e: &Exp) {
 
         E::ModuleCall(mcall) => exp(state, &mcall.arguments),
         E::Builtin(_, e)
+        | E::Vector(_, _, _, e)
         | E::Freeze(e)
         | E::Dereference(e)
         | E::UnaryExp(_, e)
@@ -354,6 +355,7 @@ mod last_usage {
 
             E::ModuleCall(mcall) => exp(context, &mut mcall.arguments),
             E::Builtin(_, e)
+            | E::Vector(_, _, _, e)
             | E::Freeze(e)
             | E::Dereference(e)
             | E::UnaryExp(_, e)

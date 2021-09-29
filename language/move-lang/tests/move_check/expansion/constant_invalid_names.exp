@@ -10,7 +10,7 @@ error[E02010]: invalid name
 4 │     const _C1: u64 = 0;
   │           ^^^ Invalid constant name '_C1'. Constant names must start with 'A'..'Z'
 
-error[E02010]: invalid name
+error[E03011]: invalid use of reserved name
   ┌─ tests/move_check/expansion/constant_invalid_names.move:5:11
   │
 5 │     const Self: u64 = 0;
@@ -28,7 +28,7 @@ error[E02010]: invalid name
 12 │     const _C1: u64 = 0;
    │           ^^^ Invalid constant name '_C1'. Constant names must start with 'A'..'Z'
 
-error[E02010]: invalid name
+error[E03011]: invalid use of reserved name
    ┌─ tests/move_check/expansion/constant_invalid_names.move:13:11
    │
 13 │     const Self: u64 = 0;

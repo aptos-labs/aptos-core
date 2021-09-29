@@ -1,4 +1,4 @@
-error[E02010]: invalid name
+error[E03011]: invalid use of reserved name
    ┌─ tests/move_check/expansion/use_inner_scope_invalid.move:17:23
    │
 17 │         use 0x2::M as Self;

@@ -10,7 +10,8 @@ module M {
         Self as u8,
         Self as u64,
         Self as u128,
-        Self as vector,
+        // vector now keyworded in expressions, so this would be unusable
+        // Self as vector,
         Self as move_to,
         Self as move_from,
         Self as borrow_global,
@@ -27,7 +28,8 @@ module M {
         let u8 = 0;
         let u64 = 0;
         let u128 = 0;
-        let vector = 0;
+        // vector now keyworded in expressions, so this would be unusable
+        // let vector = 0;
         let move_to = 0;
         let move_from = 0;
         let borrow_global = 0;
@@ -41,7 +43,8 @@ module M {
         u8::t() +
         u64::t() +
         u128::t() +
-        vector::t() +
+        // vector now keyworded in expressions, so this would fail in parsing
+        // vector::t() +
         move_to::t() +
         move_from::t() +
         borrow_global::t() +
@@ -55,7 +58,8 @@ module M {
         u8 +
         u64 +
         u128 +
-        vector +
+        // vector now keyworded in expressions, so this would fail in parsing
+        // vector +
         move_to +
         move_from +
         borrow_global +

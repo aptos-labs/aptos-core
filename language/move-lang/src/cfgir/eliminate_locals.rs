@@ -151,6 +151,7 @@ mod count {
 
             E::ModuleCall(mcall) => exp(context, &mcall.arguments),
             E::Builtin(_, e)
+            | E::Vector(_, _, _, e)
             | E::Freeze(e)
             | E::Dereference(e)
             | E::UnaryExp(_, e)
@@ -222,6 +223,7 @@ mod count {
             }
             E::ExpList(es) => es.iter().all(|i| can_subst_exp_item(i)),
             E::Pack(_, _, fields) => fields.iter().all(|(_, _, e)| can_subst_exp_single(e)),
+            E::Vector(_, _, _, eargs) => can_subst_exp_single(eargs),
 
             E::Unreachable => panic!("ICE should not analyze dead code"),
         }
@@ -361,6 +363,7 @@ mod eliminate {
 
             E::ModuleCall(mcall) => exp(context, &mut mcall.arguments),
             E::Builtin(_, e)
+            | E::Vector(_, _, _, e)
             | E::Freeze(e)
             | E::Dereference(e)
             | E::UnaryExp(_, e)

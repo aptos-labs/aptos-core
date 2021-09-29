@@ -8,10 +8,10 @@ use crate::{
         cfg::BlockCFG,
     },
     diag,
-    expansion::ast::{AbilitySet, ModuleIdent, Value, Value_},
-    hlir::ast::{self as H, Label},
+    expansion::ast::{AbilitySet, ModuleIdent},
+    hlir::ast::{self as H, Label, Value, Value_},
     parser::ast::{ConstantName, FunctionName, StructName, Var},
-    shared::{unique_map::UniqueMap, CompilationEnv, NumericalAddress},
+    shared::{unique_map::UniqueMap, CompilationEnv},
     FullyCompiledProgram,
 };
 use cfgir::ast::LoopInfo;
@@ -252,7 +252,7 @@ fn constant(context: &mut Context, _name: ConstantName, c: H::Constant) -> G::Co
     } = c;
 
     let final_value = constant_(context, loc, signature.clone(), locals, block);
-    let value = final_value.and_then(|v| move_value_from_exp(context, v));
+    let value = final_value.and_then(move_value_from_exp);
 
     G::Constant {
         attributes,
@@ -348,40 +348,28 @@ fn check_constant_value(context: &mut Context, e: &H::Exp) {
     }
 }
 
-fn move_value_from_exp(context: &mut Context, e: H::Exp) -> Option<MoveValue> {
+fn move_value_from_exp(e: H::Exp) -> Option<MoveValue> {
     use H::UnannotatedExp_ as E;
     match e.exp.value {
-        E::Value(v) => Some(move_value_from_value(
-            context.env.named_address_mapping(),
-            v,
-        )),
+        E::Value(v) => Some(move_value_from_value(v)),
         _ => None,
     }
 }
 
-pub(crate) fn move_value_from_value(
-    address_mapping: &BTreeMap<Symbol, NumericalAddress>,
-    sp!(_, v_): Value,
-) -> MoveValue {
-    move_value_from_value_(address_mapping, v_)
+pub(crate) fn move_value_from_value(sp!(_, v_): Value) -> MoveValue {
+    move_value_from_value_(v_)
 }
 
-pub(crate) fn move_value_from_value_(
-    address_mapping: &BTreeMap<Symbol, NumericalAddress>,
-    v_: Value_,
-) -> MoveValue {
+pub(crate) fn move_value_from_value_(v_: Value_) -> MoveValue {
     use MoveValue as MV;
     use Value_ as V;
     match v_ {
-        V::InferredNum(_) => panic!("ICE inferred num should have been expanded"),
-        V::Address(a) => MV::Address(MoveAddress::new(
-            a.into_addr_bytes(address_mapping).into_bytes(),
-        )),
+        V::Address(a) => MV::Address(MoveAddress::new(a.into_bytes())),
         V::U8(u) => MV::U8(u),
         V::U64(u) => MV::U64(u),
         V::U128(u) => MV::U128(u),
         V::Bool(b) => MV::Bool(b),
-        V::Bytearray(v) => MV::Vector(v.into_iter().map(MV::U8).collect()),
+        V::Vector(_, vs) => MV::Vector(vs.into_iter().map(move_value_from_value).collect()),
     }
 }
 

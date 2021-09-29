@@ -227,6 +227,7 @@ pub enum Exp_ {
         Spanned<Vec<Exp>>,
     ),
     Builtin(BuiltinFunction, Spanned<Vec<Exp>>),
+    Vector(Loc, Option<Type>, Spanned<Vec<Exp>>),
 
     IfElse(Box<Exp>, Box<Exp>, Box<Exp>),
     While(Box<Exp>, Box<Exp>),
@@ -904,6 +905,17 @@ impl AstDebug for Exp_ {
                 w.write("(");
                 w.comma(rhs, |w, e| e.ast_debug(w));
                 w.write(")");
+            }
+            E::Vector(_loc, ty_opt, sp!(_, elems)) => {
+                w.write("vector");
+                if let Some(ty) = ty_opt {
+                    w.write("<");
+                    ty.ast_debug(w);
+                    w.write(">");
+                }
+                w.write("[");
+                w.comma(elems, |w, e| e.ast_debug(w));
+                w.write("]");
             }
             E::Pack(m, s, tys_opt, fields) => {
                 w.write(&format!("{}::{}", m, s));

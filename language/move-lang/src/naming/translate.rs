@@ -1020,6 +1020,24 @@ fn exp_(context: &mut Context, e: E::Exp) -> N::Exp {
                 },
             }
         }
+        EE::Vector(vec_loc, tys_opt, rhs) => {
+            let ty_args = tys_opt.map(|tys| types(context, tys));
+            let nes = call_args(context, rhs);
+            let ty_opt = check_builtin_ty_args_impl(
+                context,
+                vec_loc,
+                || "Invalid 'vector' instantation".to_string(),
+                eloc,
+                1,
+                ty_args,
+            )
+            .map(|mut v| {
+                assert!(v.len() == 1);
+                v.pop().unwrap()
+            });
+            NE::Vector(vec_loc, ty_opt, nes)
+        }
+
         EE::Spec(u, unbound_names) => {
             // Vars currently aren't shadowable by types/functions
             let used_locals = unbound_names.into_iter().map(Var).collect();
@@ -1188,6 +1206,25 @@ fn check_builtin_ty_args(
     arity: usize,
     ty_args: Option<Vec<N::Type>>,
 ) -> Option<Vec<N::Type>> {
+    check_builtin_ty_args_impl(
+        context,
+        b.loc,
+        || format!("Invalid call to builtin function: '{}'", b),
+        loc,
+        arity,
+        ty_args,
+    )
+}
+
+fn check_builtin_ty_args_impl(
+    context: &mut Context,
+    msg_loc: Loc,
+    fmsg: impl Fn() -> String,
+    targs_loc: Loc,
+    arity: usize,
+    ty_args: Option<Vec<N::Type>>,
+) -> Option<Vec<N::Type>> {
+    let mut msg_opt = None;
     ty_args.map(|mut args| {
         let args_len = args.len();
         if args_len != arity {
@@ -1196,14 +1233,11 @@ fn check_builtin_ty_args(
             } else {
                 NameResolution::TooFewTypeArguments
             };
-            context.env.add_diag(diag!(
-                diag_code,
-                (b.loc, format!("Invalid call to builtin function: '{}'", b)),
-                (
-                    loc,
-                    format!("Expected {} type argument(s) but got {}", arity, args_len),
-                ),
-            ));
+            let msg = msg_opt.get_or_insert_with(fmsg);
+            let targs_msg = format!("Expected {} type argument(s) but got {}", arity, args_len);
+            context
+                .env
+                .add_diag(diag!(diag_code, (msg_loc, msg), (targs_loc, targs_msg)));
         }
 
         while args.len() > arity {
@@ -1211,7 +1245,7 @@ fn check_builtin_ty_args(
         }
 
         while args.len() < arity {
-            args.push(sp(loc, N::Type_::UnresolvedError));
+            args.push(sp(targs_loc, N::Type_::UnresolvedError));
         }
 
         args

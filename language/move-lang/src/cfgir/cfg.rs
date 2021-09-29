@@ -217,6 +217,7 @@ fn unreachable_loc_exp(parent_e: &Exp) -> Option<Loc> {
         | E::Move { .. } => None,
         E::ModuleCall(mcall) => unreachable_loc_exp(&mcall.arguments),
         E::Builtin(_, e)
+        | E::Vector(_, _, _, e)
         | E::Freeze(e)
         | E::Dereference(e)
         | E::UnaryExp(_, e)

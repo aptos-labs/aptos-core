@@ -67,6 +67,12 @@ fn unexpected_token_error_(
     )
 }
 
+fn add_type_args_ambiguity_label(loc: Loc, mut diag: Diagnostic) -> Diagnostic {
+    const MSG: &str = "Perhaps you need a blank space before this '<' operator?";
+    diag.add_secondary_label((loc, MSG));
+    diag
+}
+
 //**************************************************************************************************
 // Miscellaneous Utilities
 //**************************************************************************************************
@@ -856,13 +862,15 @@ fn parse_sequence(context: &mut Context) -> Result<Sequence, Diagnostic> {
 //      Term =
 //          "break"
 //          | "continue"
-//          | <NameExp>
+//          | "vector" ("<" Comma<Type> ">")? "[" Comma<Exp> "]"
 //          | <Value>
 //          | "(" Comma<Exp> ")"
 //          | "(" <Exp> ":" <Type> ")"
 //          | "(" <Exp> "as" <Type> ")"
 //          | "{" <Sequence>
 fn parse_term(context: &mut Context) -> Result<Exp, Diagnostic> {
+    const VECTOR_IDENT: &str = "vector";
+
     let start_loc = context.tokens.start_loc();
     let term = match context.tokens.peek() {
         Tok::Break => {
@@ -873,6 +881,34 @@ fn parse_term(context: &mut Context) -> Result<Exp, Diagnostic> {
         Tok::Continue => {
             context.tokens.advance()?;
             Exp_::Continue
+        }
+
+        Tok::Identifier if context.tokens.content() == VECTOR_IDENT => {
+            consume_identifier(context.tokens, VECTOR_IDENT)?;
+            let vec_end_loc = context.tokens.previous_end_loc();
+            let vec_loc = make_loc(context.tokens.file_hash(), start_loc, vec_end_loc);
+            let targs_start_loc = context.tokens.start_loc();
+            let tys_opt = parse_optional_type_args(context).map_err(|diag| {
+                let targ_loc =
+                    make_loc(context.tokens.file_hash(), targs_start_loc, targs_start_loc);
+                add_type_args_ambiguity_label(targ_loc, diag)
+            })?;
+            let args_start_loc = context.tokens.start_loc();
+            let args_ = parse_comma_list(
+                context,
+                Tok::LBracket,
+                Tok::RBracket,
+                parse_exp,
+                "a vector argument expression",
+            )?;
+            let args_end_loc = context.tokens.previous_end_loc();
+            let args = spanned(
+                context.tokens.file_hash(),
+                args_start_loc,
+                args_end_loc,
+                args_,
+            );
+            Exp_::Vector(vec_loc, tys_opt, args)
         }
 
         Tok::Identifier => parse_name_exp(context)?,
@@ -979,13 +1015,10 @@ fn parse_name_exp(context: &mut Context) -> Result<Exp_, Diagnostic> {
         return Ok(Exp_::Call(n, is_macro, tys, rhs));
     }
 
-    if context.tokens.peek() == Tok::Less && start_loc == n.loc.end() as usize {
+    if context.tokens.peek() == Tok::Less && n.loc.end() as usize == start_loc {
         let loc = make_loc(context.tokens.file_hash(), start_loc, start_loc);
-        tys = parse_optional_type_args(context).map_err(|mut diag| {
-            let msg = "Perhaps you need a blank space before this '<' operator?";
-            diag.add_secondary_label((loc, msg.to_owned()));
-            diag
-        })?;
+        tys = parse_optional_type_args(context)
+            .map_err(|diag| add_type_args_ambiguity_label(loc, diag))?;
     }
 
     match context.tokens.peek() {

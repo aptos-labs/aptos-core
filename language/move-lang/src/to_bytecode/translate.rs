@@ -6,9 +6,9 @@ use crate::{
     cfgir::{ast as G, translate::move_value_from_value_},
     compiled_unit::*,
     diag,
-    expansion::ast::{AbilitySet, Address, ModuleIdent, ModuleIdent_, SpecId, Value_},
+    expansion::ast::{AbilitySet, Address, ModuleIdent, ModuleIdent_, SpecId},
     hlir::{
-        ast::{self as H},
+        ast::{self as H, Value_},
         translate::{display_var, DisplayVar},
     },
     naming::ast::{BuiltinTypeName_, StructTypeParameter, TParam},
@@ -921,7 +921,6 @@ fn exp_(context: &mut Context, code: &mut IR::BytecodeBlock, e: H::Exp) {
         E::Spec(id, used_locals) => code.push(sp(loc, B::Nop(Some(context.spec(id, used_locals))))),
         E::Value(sp!(_, v_)) => {
             let ld_value = match v_ {
-                V::InferredNum(_) => panic!("ICE inferred num should have been expanded"),
                 V::U8(u) => B::LdU8(u),
                 V::U64(u) => B::LdU64(u),
                 V::U128(u) => B::LdU128(u),
@@ -932,14 +931,11 @@ fn exp_(context: &mut Context, code: &mut IR::BytecodeBlock, e: H::Exp) {
                         B::LdFalse
                     }
                 }
-                v_ @ V::Address(_) | v_ @ V::Bytearray(_) => {
+                v_ @ V::Address(_) | v_ @ V::Vector(_, _) => {
                     let [ty]: [IR::Type; 1] = types(context, e.ty)
                         .try_into()
                         .expect("ICE value type should have one element");
-                    B::LdConst(
-                        ty,
-                        move_value_from_value_(context.env.named_address_mapping(), v_),
-                    )
+                    B::LdConst(ty, move_value_from_value_(v_))
                 }
             };
             code.push(sp(loc, ld_value));
@@ -1006,6 +1002,12 @@ fn exp_(context: &mut Context, code: &mut IR::BytecodeBlock, e: H::Exp) {
             }
             let n = context.struct_definition_name(context.current_module().unwrap(), s);
             code.push(sp(loc, B::Pack(n, base_types(context, tys))))
+        }
+
+        E::Vector(_, n, bt, args) => {
+            let ty = base_type(context, *bt);
+            exp(context, code, args);
+            code.push(sp(loc, B::VecPack(ty, n.try_into().unwrap())))
         }
 
         E::ExpList(items) => {

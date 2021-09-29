@@ -215,6 +215,10 @@ pub fn exp(context: &mut Context, e: &mut T::Exp) {
             builtin_function(context, b);
             exp(context, args);
         }
+        E::Vector(_vec_loc, _n, ty_arg, args) => {
+            type_(context, ty_arg);
+            exp(context, args);
+        }
 
         E::IfElse(eb, et, ef) => {
             exp(context, eb);

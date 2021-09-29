@@ -242,6 +242,7 @@ fn exp(context: &mut Context, e: &T::Exp) {
         E::Assign(_, _, er) => exp(context, er),
 
         E::Builtin(_, er)
+        | E::Vector(_, _, _, er)
         | E::Return(er)
         | E::Abort(er)
         | E::Dereference(er)

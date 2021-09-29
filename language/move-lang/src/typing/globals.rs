@@ -114,6 +114,7 @@ fn exp(
             builtin_function(context, annotated_acquires, seen, &e.exp.loc, b);
             exp(context, annotated_acquires, seen, args);
         }
+        E::Vector(_vec_loc, _n, _targ, args) => exp(context, annotated_acquires, seen, args),
 
         E::IfElse(eb, et, ef) => {
             exp(context, annotated_acquires, seen, eb);

@@ -1,23 +1,39 @@
 # Tuples and Unit
 
-Move does not fully support tuples as one might expect coming from another language with them as a first-class value. However, in order to support multiple return values, Move has tuple-like expressions. These expressions do not result in a concrete value at runtime (there are no tuples in the bytecode), and as a result they are very limited: they can only appear in expressions (usually in the return position for a function); they cannot be bound to local variables; they cannot be stored in structs; and tuple types cannot be used to instantiate generics.
+Move does not fully support tuples as one might expect coming from another language with them as a
+first-class value. However, in order to support multiple return values, Move has tuple-like
+expressions. These expressions do not result in a concrete value at runtime (there are no tuples in
+the bytecode), and as a result they are very limited: they can only appear in expressions (usually
+in the return position for a function); they cannot be bound to local variables; they cannot be
+stored in structs; and tuple types cannot be used to instantiate generics.
 
-Similarly, unit `()` is a type created by the Move source language in order to be expression based. The unit value `()` does not result in any runtime value. We can consider unit`()` to be an empty tuple, and any restrictions that apply to tuples also apply to unit.
+Similarly, unit `()` is a type created by the Move source language in order to be expression based.
+The unit value `()` does not result in any runtime value. We can consider unit`()` to be an empty
+tuple, and any restrictions that apply to tuples also apply to unit.
 
-It might feel weird to have tuples in the language at all given these restrictions. But one of the most common use cases for tuples in other languages is for functions to allow functions to return multiple values. Some languages work around this by forcing the users to write structs that contain the multiple return values. However in Move, you cannot put references inside of [structs](./structs-and-resources.md). This required Move to support multiple return values. These multiple return values are all pushed on the stack at the bytecode level. At the source level, these multiple return values are represented using tuples.
+It might feel weird to have tuples in the language at all given these restrictions. But one of the
+most common use cases for tuples in other languages is for functions to allow functions to return
+multiple values. Some languages work around this by forcing the users to write structs that contain
+the multiple return values. However in Move, you cannot put references inside of
+[structs](./structs-and-resources.md). This required Move to support multiple return values. These
+multiple return values are all pushed on the stack at the bytecode level. At the source level, these
+multiple return values are represented using tuples.
 
 ## Literals
 
 Tuples are created by a comma separated list of expressions inside of parentheses
 
-|Syntax | Type | Description |
-| -------- | -------- | -------- |
-| `()`     | `(): ()` | Unit, the empty tuple, or the tuple of arity 0
-| `(e0, ..., en)` |`(e0, ..., en): (T0, ..., Tn)` where `e_i: Ti` s.t. `0 <= i <= n` and `n > 0` | A `n`-tuple, a tuple of arity `n`, a tuple with `n` elements
+| Syntax          | Type                                                                         | Description                                                  |
+| --------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `()`            | `(): ()`                                                                     | Unit, the empty tuple, or the tuple of arity 0               |
+| `(e1, ..., en)` | `(e1, ..., en): (T1, ..., Tn)` where `e_i: Ti` s.t. `0 < i <= n` and `n > 0` | A `n`-tuple, a tuple of arity `n`, a tuple with `n` elements |
 
-Note that `(e)` does not have type `(e): (t)`, in other words there is no tuple with one element. If there is only a single element inside of the parentheses, the parentheses are only used for disambiguation and do not carry any other special meaning.
+Note that `(e)` does not have type `(e): (t)`, in other words there is no tuple with one element. If
+there is only a single element inside of the parentheses, the parentheses are only used for
+disambiguation and do not carry any other special meaning.
 
-Sometimes, tuples with two elements are called "pairs" and tuples with three elements are called "triples."
+Sometimes, tuples with two elements are called "pairs" and tuples with three elements are called
+"triples."
 
 ### Examples
 
@@ -91,7 +107,8 @@ For more details, see [Move Variables](./variables.md).
 
 ## Subtyping
 
-Along with references, tuples are the only types that have subtyping in Move. Tuples do have subtyping only in the sense that subtype with references (in a covariant way).
+Along with references, tuples are the only types that have subtyping in Move. Tuples do have
+subtyping only in the sense that subtype with references (in a covariant way).
 
 For example
 
@@ -112,4 +129,7 @@ let (e, f): (&mut u64, &mut u64) = (x, y);
 
 ## Ownership
 
-As mentioned above, tuple values don't really exist at runtime. And currently they cannot be stored into local variables because of this (but it is likely that this feature will come soon). As such, tuples can only be moved currently, as copying them would require putting them into a local variable first.
+As mentioned above, tuple values don't really exist at runtime. And currently they cannot be stored
+into local variables because of this (but it is likely that this feature will come soon). As such,
+tuples can only be moved currently, as copying them would require putting them into a local variable
+first.

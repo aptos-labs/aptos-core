@@ -3,11 +3,11 @@
 
 use crate::{
     expansion::ast::{
-        ability_modifiers_ast_debug, AbilitySet, Attributes, Friend, ModuleIdent, SpecId, Value,
+        ability_modifiers_ast_debug, AbilitySet, Attributes, Friend, ModuleIdent, SpecId,
     },
     naming::ast::{BuiltinTypeName, BuiltinTypeName_, StructTypeParameter, TParam},
     parser::ast::{BinOp, ConstantName, Field, FunctionName, StructName, UnaryOp, Var, Visibility},
-    shared::{ast_debug::*, unique_map::UniqueMap},
+    shared::{ast_debug::*, unique_map::UniqueMap, NumericalAddress},
 };
 use move_ir_types::location::*;
 use move_symbol_pool::Symbol;
@@ -253,6 +253,24 @@ pub enum BuiltinFunction_ {
 }
 pub type BuiltinFunction = Spanned<BuiltinFunction_>;
 
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum Value_ {
+    // @<address>
+    Address(NumericalAddress),
+    // <num>u8
+    U8(u8),
+    // <num>u64
+    U64(u64),
+    // <num>u128
+    U128(u128),
+    // true
+    // false
+    Bool(bool),
+    // vector<type> [ <value>,* ]
+    Vector(Box<BaseType>, Vec<Value>),
+}
+pub type Value = Spanned<Value_>;
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum UnannotatedExp_ {
     Unit { case: UnitCase },
@@ -264,6 +282,7 @@ pub enum UnannotatedExp_ {
     ModuleCall(Box<ModuleCall>),
     Builtin(Box<BuiltinFunction>, Box<Exp>),
     Freeze(Box<Exp>),
+    Vector(Loc, usize, Box<BaseType>, Box<Exp>),
 
     Dereference(Box<Exp>),
     UnaryExp(UnaryOp, Box<Exp>),
@@ -925,6 +944,28 @@ impl AstDebug for Command_ {
     }
 }
 
+impl AstDebug for Value_ {
+    fn ast_debug(&self, w: &mut AstWriter) {
+        use Value_ as V;
+        match self {
+            V::Address(addr) => w.write(&format!("@{}", addr)),
+            V::U8(u) => w.write(&format!("{}u8", u)),
+            V::U64(u) => w.write(&format!("{}u64", u)),
+            V::U128(u) => w.write(&format!("{}u128", u)),
+            V::Bool(b) => w.write(&format!("{}", b)),
+            V::Vector(ty, elems) => {
+                w.write("vector#value");
+                w.write("<");
+                ty.ast_debug(w);
+                w.write(">");
+                w.write("[");
+                w.comma(elems, |w, e| e.ast_debug(w));
+                w.write("]");
+            }
+        }
+    }
+}
+
 impl AstDebug for Exp {
     fn ast_debug(&self, w: &mut AstWriter) {
         let Exp { ty, exp } = self;
@@ -971,6 +1012,15 @@ impl AstDebug for UnannotatedExp_ {
                 w.write("(");
                 rhs.ast_debug(w);
                 w.write(")");
+            }
+            E::Vector(_loc, n, ty, elems) => {
+                w.write(&format!("vector#{}", n));
+                w.write("<");
+                ty.ast_debug(w);
+                w.write(">");
+                w.write("[");
+                elems.ast_debug(w);
+                w.write("]");
             }
             E::Freeze(e) => {
                 w.write("freeze(");

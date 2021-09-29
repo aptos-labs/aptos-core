@@ -2,10 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::cfg::BlockCFG;
-use crate::{
-    expansion::ast::Value_,
-    hlir::ast::{Command, Command_, Exp, UnannotatedExp_},
-};
+use crate::hlir::ast::{Command, Command_, Exp, UnannotatedExp_, Value_};
 
 /// returns true if anything changed
 pub fn optimize(cfg: &mut BlockCFG) -> bool {

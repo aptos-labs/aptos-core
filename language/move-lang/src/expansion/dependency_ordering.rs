@@ -439,15 +439,19 @@ fn exp(context: &mut Context, sp!(_loc, e_): &E::Exp) {
             module_access(context, ma);
             types_opt(context, tys_opt)
         }
-        E::Call(ma, _is_macro, tys_opt, args) => {
+        E::Call(ma, _is_macro, tys_opt, sp!(_, args_)) => {
             module_access(context, ma);
             types_opt(context, tys_opt);
-            args.value.iter().for_each(|e| exp(context, e))
+            args_.iter().for_each(|e| exp(context, e))
         }
         E::Pack(ma, tys_opt, fields) => {
             module_access(context, ma);
             types_opt(context, tys_opt);
             fields.iter().for_each(|(_, _, (_, e))| exp(context, e))
+        }
+        E::Vector(_vec_loc, tys_opt, sp!(_, args_)) => {
+            types_opt(context, tys_opt);
+            args_.iter().for_each(|e| exp(context, e))
         }
 
         E::IfElse(ec, et, ef) => {

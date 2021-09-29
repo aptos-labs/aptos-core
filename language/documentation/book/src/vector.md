@@ -6,6 +6,86 @@ collection of `T`'s that can grow or shrink by pushing/popping values off the "e
 A `vector<T>` can be instantiated with any type `T`. For example, `vector<u64>`, `vector<address>`,
 `vector<0x42::MyModule::MyResource>`, and `vector<vector<u8>>` are all valid vector types.
 
+## Literals
+
+### General `vector` Literals
+
+Vectors of any type can be created with `vector` literals.
+
+| Syntax                | Type                                                                          | Description                                |
+| --------------------- | ----------------------------------------------------------------------------- | ------------------------------------------ |
+| `vector[]`            | `vector[]: vector<T>` where `T` is any single, non-reference type             | An empty vector                            |
+| `vector[e1, ..., en]` | `vector[e1, ..., en]: vector<T>` where `e_i: T` s.t. `0 < i <= n` and `n > 0` | A vector with `n` elements (of length `n`) |
+
+In these cases, the type of the `vector` is inferred, either from the element type or from the
+vector's usage. If the type cannot be inferred, or simply for added clarity, the type can be
+specified explicitly:
+
+```move
+vector<T>[]: vector<T>
+vecctor<T>[e1, ..., en]: vector<T>
+```
+
+#### Example Vector Literals
+
+```move
+(vector[]: vector<bool>);
+(vector[0u8, 1u8, 2u8]: vector<u8>);
+(vector<u128>[]: vector<u128>);
+(vector<address>[@0x42, @0x100]: vector<address>);
+```
+
+### `vector<u8>` literals
+
+A common use-case for vectors in Move is to represent "byte arrays", which are represented with
+`vector<u8>`. These values are often used for cryptographic purposes, such as a public key or a hash
+result. These values are so common that specific syntax is provided to make the values more
+readable, as opposed to having to use `vector[]` where each individual `u8` value is specified in
+numeric form.
+
+There are currently two supported types of `vector<u8>` literals, byte strings and hex strings.
+
+#### Byte Strings
+
+Byte strings are quoted string literals prefixed by a `b`, e.g. `b"Hello!\n"`.
+
+These are ASCII encoded strings that allow for escape sequences. Currently, the supported escape
+sequences are
+
+| Escape Sequence | Description                                    |
+| --------------- | ---------------------------------------------- |
+| `\n`            | New line (or Line feed)                        |
+| `\r`            | Carriage return                                |
+| `\t`            | Tab                                            |
+| `\\`            | Backslash                                      |
+| `\0`            | Null                                           |
+| `\"`            | Quote                                          |
+| `\xHH`          | Hex escape, inserts the hex byte sequence `HH` |
+
+#### Hex Strings
+
+Hex strings are quoted string literals prefixed by a `x`, e.g. `x"48656C6C6F210A"`
+
+Each byte pair, ranging from `00` to `FF`, is interpreted as hex encoded `u8` value. So each byte
+pair corresponds to a single entry in the resulting `vector<u8>`
+
+#### Example String Literals
+
+```move
+script {
+fun byte_and_hex_strings() {
+    assert!(b"" == x"", 0);
+    assert!(b"Hello!\n" == x"48656C6C6F210A", 1);
+    assert!(b"\x48\x65\x6C\x6C\x6F\x21\x0A" == x"48656C6C6F210A", 2);
+    assert!(
+        b"\"Hello\tworld!\"\n \r \\Null=\0" ==
+            x"2248656C6C6F09776F726C6421220A200D205C4E756C6C3D00",
+        3
+    );
+}
+}
+```
+
 ## Operations
 
 `vector` supports the following operations via the `Std::Vector` module in the Move standard
@@ -75,63 +155,6 @@ Copies of large vectors can be expensive, so the compiler requires explicit `cop
 easier to see where they are happening.
 
 For more details see the sections on [type abilities](./abilities.md) and [generics](./generics.md).
-
-## Literals
-
-### `vector<u8>` literals
-
-A common use-case for vectors in Move is to represent "byte arrays", which are represented with
-`vector<u8>`. These values are often used for cryptographic purposes, such as a public key or a hash
-result.
-
-There are currently two supported types of `vector<u8>` literals, byte strings and hex strings.
-
-#### Byte Strings
-
-Byte strings are quoted string literals prefixed by a `b`, e.g. `b"Hello!\n"`.
-
-These are ASCII encoded strings that allow for escape sequences. Currently, the supported escape
-sequences are
-
-| Escape Sequence | Description                                    |
-| --------------- | ---------------------------------------------- |
-| `\n`            | New line (or Line feed)                        |
-| `\r`            | Carriage return                                |
-| `\t`            | Tab                                            |
-| `\\`            | Backslash                                      |
-| `\0`            | Null                                           |
-| `\"`            | Quote                                          |
-| `\xHH`          | Hex escape, inserts the hex byte sequence `HH` |
-
-#### Hex Strings
-
-Hex strings are quoted string literals prefixed by a `x`, e.g. `x"48656C6C6F210A"`
-
-Each byte pair, ranging from `00` to `FF`, is interpreted as hex encoded `u8` value. So each byte
-pair corresponds to a single entry in the resulting `vector<u8>`
-
-#### Examples
-
-```move
-script {
-fun byte_and_hex_strings() {
-    assert!(b"" == x"", 0);
-    assert!(b"Hello!\n" == x"48656C6C6F210A", 1);
-    assert!(b"\x48\x65\x6C\x6C\x6F\x21\x0A" == x"48656C6C6F210A", 2);
-    assert!(
-        b"\"Hello\tworld!\"\n \r \\Null=\0" ==
-            x"2248656C6C6F09776F726C6421220A200D205C4E756C6C3D00",
-        3
-    );
-}
-}
-```
-
-### Other `vector` literals
-
-Currently, there is no support for general `vector<T>` literals in Move where `T` is not a `u8`.
-However, Move bytecode supports `vector<T>` constants for any primitive type `T`. We plan to add
-`vector<T>` literals to the source language that can compile to bytecode constants.
 
 ## Ownership
 

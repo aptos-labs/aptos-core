@@ -559,6 +559,14 @@ pub enum Exp_ {
     // tn {f1: e1, ... , f_n: e_n }
     Pack(NameAccessChain, Option<Vec<Type>>, Vec<(Field, Exp)>),
 
+    // vector [ e1, ..., e_n ]
+    // vector<t> [e1, ..., en ]
+    Vector(
+        /* name loc */ Loc,
+        Option<Vec<Type>>,
+        Spanned<Vec<Exp>>,
+    ),
+
     // if (eb) et else ef
     IfElse(Box<Exp>, Box<Exp>, Option<Box<Exp>>),
     // while (eb) eloop
@@ -1669,6 +1677,17 @@ impl AstDebug for Exp_ {
                     e.ast_debug(w);
                 });
                 w.write("}");
+            }
+            E::Vector(_loc, tys_opt, sp!(_, elems)) => {
+                w.write("vector");
+                if let Some(ss) = tys_opt {
+                    w.write("<");
+                    ss.ast_debug(w);
+                    w.write(">");
+                }
+                w.write("[");
+                w.comma(elems, |w, e| e.ast_debug(w));
+                w.write("]");
             }
             E::IfElse(b, t, f_opt) => {
                 w.write("if (");

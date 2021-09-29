@@ -498,12 +498,16 @@ fn error_format_impl_(b_: &Type_, subst: &Subst, nested: bool) -> String {
     let res = match b_ {
         UnresolvedError | Anything => "_".to_string(),
         Unit => "()".to_string(),
-        Var(id) => match subst.get(*id) {
-            Some(t) => error_format_nested(t, subst),
-            None if nested && subst.is_num_var(*id) => "{integer}".to_string(),
-            None if subst.is_num_var(*id) => return "integer".to_string(),
-            None => "_".to_string(),
-        },
+        Var(id) => {
+            let last_id = forward_tvar(subst, *id);
+            match subst.get(last_id) {
+                Some(sp!(_, Var(_))) => unreachable!(),
+                Some(t) => error_format_nested(t, subst),
+                None if nested && subst.is_num_var(last_id) => "{integer}".to_string(),
+                None if subst.is_num_var(last_id) => return "integer".to_string(),
+                None => "_".to_string(),
+            }
+        }
         Apply(_, sp!(_, TypeName_::Multiple(_)), tys) => {
             let inner = format_comma(tys.iter().map(|s| error_format_nested(s, subst)));
             format!("({})", inner)
@@ -1177,10 +1181,14 @@ fn solve_single_type_constraint(context: &mut Context, loc: Loc, msg: String, ty
 
 pub fn unfold_type(subst: &Subst, sp!(loc, t_): Type) -> Type {
     match t_ {
-        Type_::Var(i) => match subst.get(i) {
-            None => sp(loc, Type_::Anything),
-            Some(inner) => unfold_type(subst, inner.clone()),
-        },
+        Type_::Var(i) => {
+            let last_tvar = forward_tvar(subst, i);
+            match subst.get(last_tvar) {
+                Some(sp!(_, Type_::Var(_))) => unreachable!(),
+                None => sp(loc, Type_::Anything),
+                Some(inner) => inner.clone(),
+            }
+        }
         x => sp(loc, x),
     }
 }
@@ -1190,10 +1198,14 @@ pub fn unfold_type(subst: &Subst, sp!(loc, t_): Type) -> Type {
 // actual type in the source code
 pub fn best_loc(subst: &Subst, sp!(loc, t_): &Type) -> Loc {
     match t_ {
-        Type_::Var(i) => match subst.get(*i) {
-            None => *loc,
-            Some(inner) => best_loc(subst, inner),
-        },
+        Type_::Var(i) => {
+            let last_tvar = forward_tvar(subst, *i);
+            match subst.get(last_tvar) {
+                Some(sp!(_, Type_::Var(_))) => unreachable!(),
+                None => *loc,
+                Some(sp!(inner_loc, _)) => *inner_loc,
+            }
+        }
         _ => *loc,
     }
 }
@@ -1245,10 +1257,14 @@ pub fn ready_tvars(subst: &Subst, sp!(loc, t_): Type) -> Type {
             let tys = tys.into_iter().map(|t| ready_tvars(subst, t)).collect();
             sp(loc, Apply(k, n, tys))
         }
-        Var(i) => match subst.get(i) {
-            None => sp(loc, Var(i)),
-            Some(t) => ready_tvars(subst, t.clone()),
-        },
+        Var(i) => {
+            let last_var = forward_tvar(subst, i);
+            match subst.get(last_var) {
+                Some(sp!(_, Var(_))) => unreachable!(),
+                None => sp(loc, Var(last_var)),
+                Some(t) => ready_tvars(subst, t.clone()),
+            }
+        }
     }
 }
 
@@ -1618,9 +1634,12 @@ fn join_tvar(
 }
 
 fn forward_tvar(subst: &Subst, id: TVar) -> TVar {
-    match subst.get(id) {
-        Some(sp!(_, Type_::Var(next))) => forward_tvar(subst, *next),
-        Some(_) | None => id,
+    let mut cur = id;
+    loop {
+        match subst.get(cur) {
+            Some(sp!(_, Type_::Var(next))) => cur = *next,
+            Some(_) | None => break cur,
+        }
     }
 }
 
@@ -1664,19 +1683,23 @@ fn join_bind_tvar(subst: &mut Subst, loc: Loc, tvar: TVar, ty: Type) -> Result<b
 }
 
 fn check_num_tvar(subst: &Subst, loc: Loc, tvar: TVar, ty: &Type) -> bool {
-    !subst.is_num_var(tvar) || check_num_tvar_(subst, loc, tvar, ty)
+    !subst.is_num_var(tvar) || check_num_tvar_(subst, loc, ty)
 }
 
-fn check_num_tvar_(subst: &Subst, loc: Loc, tvar: TVar, ty: &Type) -> bool {
+fn check_num_tvar_(subst: &Subst, loc: Loc, ty: &Type) -> bool {
     use Type_::*;
     match &ty.value {
         UnresolvedError | Anything => true,
         Apply(_, sp!(_, TypeName_::Builtin(sp!(_, bt))), _) => bt.is_numeric(),
 
-        Var(v) if subst.tvars.contains_key(v) => {
-            check_num_tvar_(subst, loc, tvar, subst.get(*v).unwrap())
+        Var(v) => {
+            let last_tvar = forward_tvar(subst, *v);
+            match subst.get(last_tvar) {
+                Some(sp!(_, Var(_))) => unreachable!(),
+                None => subst.is_num_var(last_tvar),
+                Some(t) => check_num_tvar_(subst, loc, t),
+            }
         }
-        Var(v) => subst.is_num_var(*v),
         _ => false,
     }
 }

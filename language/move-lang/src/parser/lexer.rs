@@ -309,13 +309,19 @@ impl<'input> Lexer<'input> {
         Ok(text)
     }
 
+    // Look ahead to the next token after the current one and return it, and its starting offset,
+    // without advancing the state of the lexer.
+    pub fn lookahead_with_start_loc(&mut self) -> Result<(Tok, usize), Diagnostic> {
+        let text = self.trim_whitespace_and_comments(self.cur_end)?;
+        let next_start = self.text.len() - text.len();
+        let (tok, _) = find_token(self.file_hash, text, next_start)?;
+        Ok((tok, next_start))
+    }
+
     // Look ahead to the next token after the current one and return it without advancing
     // the state of the lexer.
     pub fn lookahead(&mut self) -> Result<Tok, Diagnostic> {
-        let text = self.trim_whitespace_and_comments(self.cur_end)?;
-        let offset = self.text.len() - text.len();
-        let (tok, _) = find_token(self.file_hash, text, offset)?;
-        Ok(tok)
+        Ok(self.lookahead_with_start_loc()?.0)
     }
 
     // Look ahead to the next two tokens after the current one and return them without advancing

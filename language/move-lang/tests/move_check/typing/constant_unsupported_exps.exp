@@ -58,7 +58,7 @@ error[E04002]: requires script context
 22 │         f_script();
    │         ^^^^^^^^^^ Invalid call to '0x42::M::f_script'
    ·
-51 │     public(script) fun f_script() {}
+50 │     public(script) fun f_script() {}
    │     -------------- This function can only be called from a script context, i.e. a 'script' function or a 'public(script)' function
 
 error[E04013]: invalid statement or expression in constant
@@ -161,12 +161,6 @@ error[E04013]: invalid statement or expression in constant
    │         ^^^^^^^^^^^^^^^ 'move_to' is not supported in constants
 
 error[E04013]: invalid statement or expression in constant
-   ┌─ tests/move_check/typing/constant_unsupported_exps.move:31:16
-   │
-31 │         move_to(s, R{});
-   │                ^^^^^^^^ Expression lists are not supported in constants
-
-error[E04013]: invalid statement or expression in constant
    ┌─ tests/move_check/typing/constant_unsupported_exps.move:31:20
    │
 31 │         move_to(s, R{});
@@ -201,12 +195,6 @@ error[E04013]: invalid statement or expression in constant
    │
 34 │         assert!(true, 42);
    │         ^^^^^^^^^^^^^^^^^ 'assert' is not supported in constants
-
-error[E04013]: invalid statement or expression in constant
-   ┌─ tests/move_check/typing/constant_unsupported_exps.move:34:16
-   │
-34 │         assert!(true, 42);
-   │                ^^^^^^^^^^ Expression lists are not supported in constants
 
 error[E04013]: invalid statement or expression in constant
    ┌─ tests/move_check/typing/constant_unsupported_exps.move:35:9
@@ -313,12 +301,6 @@ error[E04013]: invalid statement or expression in constant
 error[E04013]: invalid statement or expression in constant
    ┌─ tests/move_check/typing/constant_unsupported_exps.move:46:9
    │
-46 │         (0, 1);
-   │         ^^^^^^ Expression lists are not supported in constants
-
-error[E04013]: invalid statement or expression in constant
-   ┌─ tests/move_check/typing/constant_unsupported_exps.move:47:9
-   │
-47 │         FLAG;
+46 │         FLAG;
    │         ^^^^ Other constants are not supported in constants
 

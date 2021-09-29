@@ -19,4 +19,8 @@ module 0x8675309::M {
         let _No;
     }
 
+    fun t5() {
+        let vector;
+    }
+
 }

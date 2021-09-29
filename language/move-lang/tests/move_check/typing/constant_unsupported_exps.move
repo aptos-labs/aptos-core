@@ -43,7 +43,6 @@ module M {
         b.f = 0;
         b.f;
         *&b.f;
-        (0, 1);
         FLAG;
         0
     };

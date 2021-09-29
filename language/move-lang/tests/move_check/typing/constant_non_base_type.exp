@@ -55,9 +55,3 @@ error[E04012]: invalid type for constant
   │               Unpermitted constant type
   │               Found: '(_, _)'. But expected one of: 'u8', 'u64', 'u128', 'bool', 'address', 'vector<_>'
 
-error[E04013]: invalid statement or expression in constant
-  ┌─ tests/move_check/typing/constant_non_base_type.move:6:33
-  │
-6 │     const C4: (address, bool) = (@0x0, false);
-  │                                 ^^^^^^^^^^^^^ Expression lists are not supported in constants
-

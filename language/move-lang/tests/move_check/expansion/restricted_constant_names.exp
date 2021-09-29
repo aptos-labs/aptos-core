@@ -76,7 +76,7 @@ error[E02010]: invalid name
 17 │     const assert: u64 = 0;
    │           ^^^^^^ Invalid constant name 'assert'. Constant names must start with 'A'..'Z'
 
-error[E02010]: invalid name
+error[E03011]: invalid use of reserved name
    ┌─ tests/move_check/expansion/restricted_constant_names.move:19:11
    │
 19 │     const Self: u64 = 0;
@@ -160,7 +160,7 @@ error[E02010]: invalid name
 38 │     const assert: u64 = 0;
    │           ^^^^^^ Invalid constant name 'assert'. Constant names must start with 'A'..'Z'
 
-error[E02010]: invalid name
+error[E03011]: invalid use of reserved name
    ┌─ tests/move_check/expansion/restricted_constant_names.move:40:11
    │
 40 │     const Self: u64 = 0;

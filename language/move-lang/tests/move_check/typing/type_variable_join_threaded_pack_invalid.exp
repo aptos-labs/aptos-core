@@ -4,9 +4,9 @@ error[E04007]: incompatible types
 35 │     fun t0(): Box<bool> {
    │                   ---- Expected: 'bool'
    ·
-40 │         let r = Container::get_ref(&v);
-   │                 ---------------------- Given: integer
-41 │         id(r);
+38 │         let b = Box { f1: x, f2: x };
+   │                 -------------------- Given: integer
+   ·
 42 │         b
    │         ^ Invalid return expression
 

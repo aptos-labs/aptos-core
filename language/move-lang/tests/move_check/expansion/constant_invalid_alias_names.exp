@@ -10,7 +10,7 @@ error[E02010]: invalid name
 8 │     use 0x42::N::{C as c1, C as _C1, C as Self};
   │                                 ^^^ Invalid constant alias name '_C1'. Constant alias names must start with 'A'..'Z'
 
-error[E02010]: invalid name
+error[E03011]: invalid use of reserved name
   ┌─ tests/move_check/expansion/constant_invalid_alias_names.move:8:43
   │
 8 │     use 0x42::N::{C as c1, C as _C1, C as Self};
@@ -28,7 +28,7 @@ error[E02010]: invalid name
 13 │     use 0x42::N::{C as c1, C as _C1, C as Self};
    │                                 ^^^ Invalid constant alias name '_C1'. Constant alias names must start with 'A'..'Z'
 
-error[E02010]: invalid name
+error[E03011]: invalid use of reserved name
    ┌─ tests/move_check/expansion/constant_invalid_alias_names.move:13:43
    │
 13 │     use 0x42::N::{C as c1, C as _C1, C as Self};

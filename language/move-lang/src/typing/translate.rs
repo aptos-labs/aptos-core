@@ -419,6 +419,14 @@ mod check_valid_constant {
                 exp(context, el);
                 return;
             }
+            E::Vector(_, _, _, eargs) => {
+                exp(context, eargs);
+                return;
+            }
+            E::ExpList(el) => {
+                exp_list(context, el);
+                return;
+            }
 
             //*****************************************
             // Invalid cases
@@ -475,10 +483,6 @@ mod check_valid_constant {
                     exp(context, fe)
                 }
                 "Structs are"
-            }
-            E::ExpList(el) => {
-                exp_list(context, el);
-                "Expression lists are"
             }
             E::Constant(_, _) => "Other constants are",
         };
@@ -1262,6 +1266,10 @@ fn exp_inner(context: &mut Context, sp!(eloc, ne_): N::Exp) -> T::Exp {
         NE::Builtin(b, sp!(argloc, nargs_)) => {
             let args = exp_vec(context, nargs_);
             builtin_call(context, eloc, b, argloc, args)
+        }
+        NE::Vector(vec_loc, ty_opt, sp!(argloc, nargs_)) => {
+            let args_ = exp_vec(context, nargs_);
+            vector_pack(context, eloc, vec_loc, ty_opt, argloc, args_)
         }
 
         NE::IfElse(nb, nt, nf) => {
@@ -2198,6 +2206,56 @@ fn builtin_call(
     }
     let call = T::UnannotatedExp_::Builtin(Box::new(sp(bloc, b_)), arguments);
     (ret_ty, call)
+}
+
+fn vector_pack(
+    context: &mut Context,
+    eloc: Loc,
+    vec_loc: Loc,
+    ty_arg_opt: Option<Type>,
+    argloc: Loc,
+    args_: Vec<T::Exp>,
+) -> (Type, T::UnannotatedExp_) {
+    let arity = args_.len();
+    let (eargs, args_ty) = call_args(
+        context,
+        eloc,
+        || -> String { panic!("ICE. could not create vector args") },
+        arity,
+        argloc,
+        args_,
+    );
+    let mut inferred_vec_ty_arg = core::make_tvar(context, eloc);
+    for arg_ty in args_ty {
+        // TODO this could be improved... A LOT
+        // this ends up generating a new tvar chain for each element in the vector
+        // which ends up being n^2 chains
+        inferred_vec_ty_arg = join(
+            context,
+            eloc,
+            || "Invalid 'vector' instantiation. Incompatible argument",
+            inferred_vec_ty_arg,
+            arg_ty,
+        );
+    }
+    let vec_ty_arg = match ty_arg_opt {
+        None => inferred_vec_ty_arg,
+        Some(ty_arg) => {
+            let ty_arg = core::instantiate(context, ty_arg);
+            subtype(
+                context,
+                eloc,
+                || "Invalid 'vector' instantiation. Invalid argument type",
+                inferred_vec_ty_arg,
+                ty_arg.clone(),
+            );
+            ty_arg
+        }
+    };
+    context.add_base_type_constraint(eloc, "Invalid 'vector' type", vec_ty_arg.clone());
+    let ty_vec = Type_::vector(eloc, vec_ty_arg.clone());
+    let e_ = T::UnannotatedExp_::Vector(vec_loc, arity, Box::new(vec_ty_arg), eargs);
+    (ty_vec, e_)
 }
 
 fn call_args<S: std::fmt::Display, F: Fn() -> S>(
