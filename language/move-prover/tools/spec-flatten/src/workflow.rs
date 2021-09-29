@@ -99,7 +99,7 @@ pub(crate) fn prove(
     options: &FlattenOptions,
     env: &GlobalEnv,
     targets: &FunctionTargetsHolder,
-) -> Result<()> {
+) -> Result<bool> {
     let cli_options = CliOptions {
         move_sources: options.srcs.clone(),
         move_deps: options.deps.clone(),
@@ -112,9 +112,5 @@ pub(crate) fn prove(
     }
 
     verify_boogie(env, &cli_options, targets, code_writer)?;
-    if env.has_errors() {
-        return Err(anyhow!("Error in verification"));
-    }
-
-    Ok(())
+    Ok(!env.has_errors())
 }

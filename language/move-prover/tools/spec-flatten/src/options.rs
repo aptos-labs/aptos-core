@@ -22,4 +22,8 @@ pub struct FlattenOptions {
     /// Extra mappings for named address
     #[structopt(short = "a", long = "address", parse(try_from_str = parse_named_address))]
     pub named_addresses_extra: Option<Vec<(String, AddressBytes)>>,
+
+    /// Verbose mode
+    #[structopt(short, long)]
+    pub verbose: bool,
 }

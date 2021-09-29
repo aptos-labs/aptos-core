@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 
 mod flatten;
 mod options;
@@ -17,7 +17,10 @@ pub fn run(options: &FlattenOptions) -> Result<()> {
     let (env, targets) = workflow::prepare(options)?;
 
     // make sure the original verification works
-    workflow::prove(options, &env, &targets)?;
+    let proved = workflow::prove(options, &env, &targets)?;
+    if !proved {
+        return Err(anyhow!("Original proof is not successful"));
+    }
 
     // collect spec in target modules
     for (fid, variant) in targets.get_funs_and_variants() {
@@ -37,7 +40,7 @@ pub fn run(options: &FlattenOptions) -> Result<()> {
         }
 
         let target = targets.get_target(&fun_env, &variant);
-        flatten::flatten_spec(target, &targets);
+        flatten::flatten_spec(options, target, &targets)?;
     }
 
     // everything is OK
