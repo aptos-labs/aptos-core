@@ -22,9 +22,19 @@ use diem_types::{
     },
 };
 use rand::{rngs::StdRng, SeedableRng};
-use std::{convert::TryFrom, sync::mpsc};
+use serde::{Deserialize, Serialize};
+use std::{
+    convert::TryFrom,
+    fs::File,
+    io::{Read, Write},
+    path::Path,
+    sync::mpsc,
+};
 use storage_interface::DbReader;
 
+const META_FILENAME: &str = "TXN_GEN_META";
+
+#[derive(Deserialize, Serialize)]
 struct AccountData {
     private_key: Ed25519PrivateKey,
     public_key: Ed25519PublicKey,
@@ -37,6 +47,26 @@ impl AccountData {
         AuthenticationKey::ed25519(&self.public_key)
             .prefix()
             .to_vec()
+    }
+}
+
+/// The base can be tranferred across different sessions to make sure the txns are consistent.
+#[derive(Deserialize, Serialize)]
+pub struct TransactionGeneratorBase {
+    /// The current state of the accounts. The main purpose is to keep track of the sequence number
+    /// so generated transactions are guaranteed to be successfully executed.
+    accounts: Vec<AccountData>,
+
+    /// Record the number of txns generated.
+    version: Version,
+}
+
+impl From<TransactionGenerator> for TransactionGeneratorBase {
+    fn from(gen: TransactionGenerator) -> Self {
+        Self {
+            accounts: gen.accounts,
+            version: gen.version,
+        }
     }
 }
 
@@ -101,6 +131,36 @@ impl TransactionGenerator {
             rng,
             block_sender,
         }
+    }
+
+    pub fn new_with_metafile<P: AsRef<Path>>(
+        genesis_key: Ed25519PrivateKey,
+        block_sender: mpsc::SyncSender<Vec<Transaction>>,
+        db_dir: P,
+    ) -> Self {
+        let path = db_dir.as_ref().join(META_FILENAME);
+        let mut file = File::open(&path).unwrap();
+        let mut contents = vec![];
+        file.read_to_end(&mut contents).unwrap();
+        let txn_gen_base = bcs::from_bytes::<TransactionGeneratorBase>(&contents).unwrap();
+
+        let seed = [1u8; 32];
+        let rng = StdRng::from_seed(seed);
+        Self {
+            accounts: txn_gen_base.accounts,
+            genesis_key,
+            version: txn_gen_base.version,
+            rng,
+            block_sender: Some(block_sender),
+        }
+    }
+
+    // Write metadata
+    pub fn write_meta<P: AsRef<Path>>(self, path: &P) {
+        let metadata = bcs::to_bytes(&TransactionGeneratorBase::from(self)).unwrap();
+        let meta_file = path.as_ref().join(META_FILENAME);
+        let mut file = File::create(meta_file).unwrap();
+        file.write_all(&metadata).unwrap();
     }
 
     pub fn version(&self) -> Version {

@@ -1,6 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+pub mod db_generator;
 pub mod transaction_committer;
 pub mod transaction_executor;
 pub mod transaction_generator;
@@ -9,20 +10,15 @@ use crate::{
     transaction_committer::TransactionCommitter, transaction_executor::TransactionExecutor,
     transaction_generator::TransactionGenerator,
 };
-use diem_config::{
-    config::{NodeConfig, RocksdbConfig},
-    utils::get_genesis_txn,
-};
+use diem_config::config::{NodeConfig, RocksdbConfig};
 use diem_logger::prelude::*;
 use diem_types::protocol_spec::DpnProto;
 use diem_vm::DiemVM;
 use diemdb::DiemDB;
-use executor::{
-    db_bootstrapper::{generate_waypoint, maybe_bootstrap},
-    Executor,
-};
+use executor::Executor;
 use std::{
-    path::PathBuf,
+    fs,
+    path::Path,
     sync::{mpsc, Arc},
 };
 use storage_client::StorageClient;
@@ -32,7 +28,7 @@ use storage_service::start_storage_service_with_db;
 pub fn create_storage_service_and_executor(
     config: &NodeConfig,
 ) -> (Arc<dyn DbReader<DpnProto>>, Executor<DpnProto, DiemVM>) {
-    let (db, db_rw) = DbReaderWriter::wrap(
+    let db = Arc::new(
         DiemDB::open(
             &config.storage.dir(),
             false, /* readonly */
@@ -41,8 +37,6 @@ pub fn create_storage_service_and_executor(
         )
         .expect("DB should open."),
     );
-    let waypoint = generate_waypoint::<DiemVM>(&db_rw, get_genesis_txn(config).unwrap()).unwrap();
-    maybe_bootstrap::<DiemVM>(&db_rw, get_genesis_txn(config).unwrap(), waypoint).unwrap();
 
     let _handle = start_storage_service_with_db(config, db.clone());
     let executor = Executor::new(DbReaderWriter::new(StorageClient::new(
@@ -55,16 +49,31 @@ pub fn create_storage_service_and_executor(
 
 /// Runs the benchmark with given parameters.
 pub fn run_benchmark(
-    num_accounts: usize,
-    init_account_balance: u64,
     block_size: usize,
     num_transfer_blocks: usize,
-    db_dir: Option<PathBuf>,
+    source_dir: impl AsRef<Path>,
+    checkpoint_dir: impl AsRef<Path>,
 ) {
-    let (mut config, genesis_key) = diem_genesis_tool::test_config();
-    if let Some(path) = db_dir {
-        config.storage.dir = path;
+    // Create rocksdb checkpoint.
+    if checkpoint_dir.as_ref().exists() {
+        fs::remove_dir_all(checkpoint_dir.as_ref().join("diemdb")).unwrap_or(());
     }
+    std::fs::create_dir_all(checkpoint_dir.as_ref()).unwrap();
+
+    {
+        DiemDB::open(
+            &source_dir,
+            false, /* readonly */
+            None,  /* pruner */
+            RocksdbConfig::default(),
+        )
+        .expect("db open failure.")
+        .create_checkpoint(checkpoint_dir.as_ref().join("diemdb"))
+        .expect("db checkpoint creation fails.");
+    }
+
+    let (mut config, genesis_key) = diem_genesis_tool::test_config();
+    config.storage.dir = checkpoint_dir.as_ref().to_path_buf();
 
     let (db, executor) = create_storage_service_and_executor(&config);
     let parent_block_id = executor.committed_block_id();
@@ -74,13 +83,14 @@ pub fn run_benchmark(
     let (block_sender, block_receiver) = mpsc::sync_channel(50 /* bound */);
     let (commit_sender, commit_receiver) = mpsc::channel();
 
+    let mut generator =
+        TransactionGenerator::new_with_metafile(genesis_key, block_sender, source_dir);
+    let start_version = generator.version();
+
     // Spawn two threads to run transaction generator and executor separately.
     let gen_thread = std::thread::Builder::new()
         .name("txn_generator".to_string())
         .spawn(move || {
-            let mut generator =
-                TransactionGenerator::new_with_sender(genesis_key, num_accounts, block_sender);
-            generator.run_mint(init_account_balance, block_size);
             generator.run_transfer(block_size, num_transfer_blocks);
             generator
         })
@@ -88,8 +98,12 @@ pub fn run_benchmark(
     let exe_thread = std::thread::Builder::new()
         .name("txn_executor".to_string())
         .spawn(move || {
-            let mut exe =
-                TransactionExecutor::new(executor_1, parent_block_id, Some(commit_sender));
+            let mut exe = TransactionExecutor::new(
+                executor_1,
+                parent_block_id,
+                start_version,
+                Some(commit_sender),
+            );
             while let Ok(transactions) = block_receiver.recv() {
                 info!("Received block of size {:?} to execute", transactions.len());
                 exe.execute_block(transactions);
@@ -99,7 +113,8 @@ pub fn run_benchmark(
     let commit_thread = std::thread::Builder::new()
         .name("txn_committer".to_string())
         .spawn(move || {
-            let mut committer = TransactionCommitter::new(executor_2, commit_receiver);
+            let mut committer =
+                TransactionCommitter::new(executor_2, start_version, commit_receiver);
             committer.run();
         })
         .expect("Failed to spawn transaction committer thread.");
@@ -117,14 +132,28 @@ pub fn run_benchmark(
 
 #[cfg(test)]
 mod tests {
+    use diem_temppath::TempPath;
+
     #[test]
     fn test_benchmark() {
+        let storage_dir = TempPath::new();
+        let checkpoint_dir = TempPath::new();
+        storage_dir.create_as_dir().unwrap();
+        checkpoint_dir.create_as_dir().unwrap();
+
+        crate::db_generator::run(
+            25, /* num_accounts */
+            10, /* init_account_balance */
+            5,  /* block_size */
+            storage_dir.as_ref(),
+            None, /* prune_window */
+        );
+
         super::run_benchmark(
-            25,   /* num_accounts */
-            10,   /* init_account_balance */
-            5,    /* block_size */
-            5,    /* num_transfer_blocks */
-            None, /* db_dir */
+            5, /* block_size */
+            5, /* num_transfer_blocks */
+            storage_dir.as_ref(),
+            checkpoint_dir,
         );
     }
 }

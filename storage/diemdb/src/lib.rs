@@ -442,6 +442,11 @@ impl DiemDB {
         )
     }
 
+    /// Creates new physical DB checkpoint in directory specified by `path`.
+    pub fn create_checkpoint<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+        self.db.create_checkpoint(path)
+    }
+
     // ================================== Private APIs ==================================
     fn get_events_with_proof_by_event_key(
         &self,

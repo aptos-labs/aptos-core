@@ -27,6 +27,7 @@ impl TransactionExecutor {
     pub fn new(
         executor: Arc<Executor<DpnProto, DiemVM>>,
         parent_block_id: HashValue,
+        version: Version,
         commit_sender: Option<
             mpsc::Sender<(HashValue, HashValue, Instant, Instant, Duration, usize)>,
         >,
@@ -34,7 +35,7 @@ impl TransactionExecutor {
         Self {
             executor,
             parent_block_id,
-            version: 0,
+            version,
             start_time: Instant::now(),
             commit_sender,
         }

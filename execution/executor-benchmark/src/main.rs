@@ -6,20 +6,42 @@ use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
 struct Opt {
-    #[structopt(long, default_value = "1000000")]
-    num_accounts: usize,
-
-    #[structopt(long, default_value = "1000000")]
-    init_account_balance: u64,
-
     #[structopt(long, default_value = "500")]
     block_size: usize,
 
-    #[structopt(long, default_value = "1000")]
-    num_transfer_blocks: usize,
+    #[structopt(subcommand)]
+    cmd: Command,
+}
 
-    #[structopt(long, parse(from_os_str))]
-    db_dir: Option<PathBuf>,
+#[derive(Debug, StructOpt)]
+enum Command {
+    CreateDb {
+        #[structopt(long, parse(from_os_str))]
+        data_dir: PathBuf,
+
+        #[structopt(long, default_value = "1000000")]
+        num_accounts: usize,
+
+        #[structopt(long, default_value = "1000000")]
+        init_account_balance: u64,
+
+        #[structopt(long)]
+        prune_window: Option<u64>,
+    },
+    RunExecutor {
+        #[structopt(
+            long,
+            default_value = "1000",
+            about = "number of transfer blocks to run"
+        )]
+        blocks: usize,
+
+        #[structopt(long, parse(from_os_str))]
+        data_dir: PathBuf,
+
+        #[structopt(long, parse(from_os_str))]
+        checkpoint_dir: PathBuf,
+    },
 }
 
 fn main() {
@@ -32,11 +54,27 @@ fn main() {
         .build_global()
         .expect("Failed to build rayon global thread pool.");
 
-    executor_benchmark::run_benchmark(
-        opt.num_accounts,
-        opt.init_account_balance,
-        opt.block_size,
-        opt.num_transfer_blocks,
-        opt.db_dir,
-    );
+    match opt.cmd {
+        Command::CreateDb {
+            data_dir,
+            num_accounts,
+            init_account_balance,
+            prune_window,
+        } => {
+            executor_benchmark::db_generator::run(
+                num_accounts,
+                init_account_balance,
+                opt.block_size,
+                data_dir,
+                prune_window,
+            );
+        }
+        Command::RunExecutor {
+            blocks,
+            data_dir,
+            checkpoint_dir,
+        } => {
+            executor_benchmark::run_benchmark(opt.block_size, blocks, data_dir, checkpoint_dir);
+        }
+    }
 }

@@ -2920,27 +2920,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "diemdb-benchmark"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "diem-config",
- "diem-crypto",
- "diem-genesis-tool",
- "diem-jellyfish-merkle",
- "diem-types",
- "diem-vm",
- "diem-workspace-hack",
- "diemdb",
- "executor",
- "executor-benchmark",
- "indicatif",
- "itertools 0.10.1",
- "storage-interface",
- "structopt 0.3.21",
-]
-
-[[package]]
 name = "diemsum"
 version = "0.1.0"
 dependencies = [
@@ -3315,12 +3294,15 @@ dependencies = [
 name = "executor-benchmark"
 version = "0.1.0"
 dependencies = [
+ "bcs",
  "criterion",
  "diem-config",
  "diem-crypto",
  "diem-genesis-tool",
  "diem-infallible",
+ "diem-jellyfish-merkle",
  "diem-logger",
+ "diem-temppath",
  "diem-transaction-builder",
  "diem-types",
  "diem-vm",
@@ -3328,9 +3310,12 @@ dependencies = [
  "diemdb",
  "executor",
  "executor-types",
+ "indicatif",
  "itertools 0.10.1",
  "rand 0.8.3",
  "rayon",
+ "schemadb",
+ "serde",
  "storage-client",
  "storage-interface",
  "storage-service",
@@ -7176,7 +7161,6 @@ dependencies = [
  "diem-types",
  "diem-workspace-hack",
  "diemdb",
- "diemdb-benchmark",
  "executor-types",
  "itertools 0.10.1",
  "rand 0.8.3",

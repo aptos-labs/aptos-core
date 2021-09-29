@@ -46,22 +46,26 @@ pub(crate) fn gen_li_with_sigs(
 
 pub struct TransactionCommitter {
     executor: Arc<Executor<DpnProto, DiemVM>>,
+    version: Version,
     block_receiver: mpsc::Receiver<(HashValue, HashValue, Instant, Instant, Duration, usize)>,
 }
 
 impl TransactionCommitter {
     pub fn new(
         executor: Arc<Executor<DpnProto, DiemVM>>,
+        version: Version,
         block_receiver: mpsc::Receiver<(HashValue, HashValue, Instant, Instant, Duration, usize)>,
     ) -> Self {
         Self {
+            version,
             executor,
             block_receiver,
         }
     }
 
     pub fn run(&mut self) {
-        let mut version = 0;
+        info!("Start with version: {}", self.version);
+
         while let Ok((
             block_id,
             root_hash,
@@ -71,15 +75,15 @@ impl TransactionCommitter {
             num_txns,
         )) = self.block_receiver.recv()
         {
-            version += num_txns as u64;
+            self.version += num_txns as u64;
             let commit_start = std::time::Instant::now();
-            let ledger_info_with_sigs = gen_li_with_sigs(block_id, root_hash, version);
+            let ledger_info_with_sigs = gen_li_with_sigs(block_id, root_hash, self.version);
             self.executor
                 .commit_blocks(vec![block_id], ledger_info_with_sigs)
                 .unwrap();
 
             report_block(
-                version,
+                self.version,
                 global_start_time,
                 execution_start_time,
                 execution_time,
