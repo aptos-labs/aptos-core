@@ -13,6 +13,7 @@ diem-workspace-hack = { path = "../../../../common/workspace-hack" }
 bytecode = { path = "../../bytecode" }
 move-lang = { path = "../../../move-lang" }
 move-model = { path = "../../../move-model" }
+move-prover = { path = "../.." }
 
 # external dependencies
 anyhow = "1.0.38"

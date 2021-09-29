@@ -1,0 +1,120 @@
+// Copyright (c) The Diem Core Contributors
+// SPDX-License-Identifier: Apache-2.0
+
+use anyhow::{anyhow, Result};
+use std::collections::BTreeMap;
+
+use bytecode::{
+    function_target_pipeline::FunctionTargetsHolder, options::ProverOptions,
+    pipeline_factory::default_pipeline_with_options,
+};
+use move_lang::shared::AddressBytes;
+use move_model::{
+    ast::Spec,
+    model::{FunId, GlobalEnv, QualifiedId},
+    options::ModelBuilderOptions,
+    run_model_builder_with_options,
+};
+use move_prover::{cli::Options as CliOptions, generate_boogie, verify_boogie};
+
+use crate::options::FlattenOptions;
+
+pub(crate) fn prepare(options: &FlattenOptions) -> Result<(GlobalEnv, FunctionTargetsHolder)> {
+    prepare_with_override(options, BTreeMap::new())
+}
+
+pub(crate) fn prepare_with_override(
+    options: &FlattenOptions,
+    spec_override: BTreeMap<QualifiedId<FunId>, Spec>,
+) -> Result<(GlobalEnv, FunctionTargetsHolder)> {
+    // build mapping for named addresses
+    let mut named_addresses = BTreeMap::new();
+    if !options.no_default_named_addresses {
+        let default_mapping = [
+            ("Std", "0x1"),
+            ("DiemFramework", "0x1"),
+            ("DiemRoot", "0xA550C18"),
+            ("CurrencyInfo", "0xA550C18"),
+            ("TreasuryCompliance", "0xB1E55ED"),
+            ("VMReserved", "0x0"),
+        ];
+        named_addresses.extend(
+            default_mapping
+                .iter()
+                .map(|(name, addr)| (name.to_string(), AddressBytes::parse_str(addr).unwrap())),
+        );
+    }
+
+    // run move model builder
+    let mut env = run_model_builder_with_options(
+        &options.srcs,
+        &options.deps,
+        ModelBuilderOptions::default(),
+        named_addresses,
+    )?;
+    if env.has_errors() {
+        return Err(anyhow!("Error in model building"));
+    }
+
+    // override the spec for functions (if requested)
+    for (fun_id, spec) in spec_override {
+        let module_data = env
+            .module_data
+            .iter_mut()
+            .find(|m| m.id == fun_id.module_id)
+            .ok_or_else(|| {
+                anyhow!(
+                    "Unable to find module with id `{}`",
+                    fun_id.module_id.to_usize()
+                )
+            })?;
+        let function_data = module_data
+            .function_data
+            .get_mut(&fun_id.id)
+            .ok_or_else(|| anyhow!("Unable to find function with id `{:?}`", fun_id.id.symbol()))?;
+        function_data.spec = spec;
+    }
+
+    // run bytecode transformation pipeline
+    let prover_options = ProverOptions::default();
+    let pipeline = default_pipeline_with_options(&prover_options);
+    env.set_extension(prover_options);
+
+    let mut targets = FunctionTargetsHolder::default();
+    for module_env in env.get_modules() {
+        for func_env in module_env.get_functions() {
+            targets.add_target(&func_env)
+        }
+    }
+    pipeline.run(&env, &mut targets);
+    if env.has_errors() {
+        return Err(anyhow!("Error in bytecode transformation"));
+    }
+
+    // return the GlobalEnv
+    Ok((env, targets))
+}
+
+pub(crate) fn prove(
+    options: &FlattenOptions,
+    env: &GlobalEnv,
+    targets: &FunctionTargetsHolder,
+) -> Result<()> {
+    let cli_options = CliOptions {
+        move_sources: options.srcs.clone(),
+        move_deps: options.deps.clone(),
+        ..Default::default()
+    };
+
+    let code_writer = generate_boogie(env, &cli_options, targets)?;
+    if env.has_errors() {
+        return Err(anyhow!("Error in boogie translation"));
+    }
+
+    verify_boogie(env, &cli_options, targets, code_writer)?;
+    if env.has_errors() {
+        return Err(anyhow!("Error in verification"));
+    }
+
+    Ok(())
+}

@@ -2689,7 +2689,7 @@ pub struct FunctionData {
     type_arg_names: Vec<Symbol>,
 
     /// Specification associated with this function.
-    spec: Spec,
+    pub spec: Spec,
 
     /// A cache for the called functions.
     called_funs: RefCell<Option<BTreeSet<QualifiedId<FunId>>>>,

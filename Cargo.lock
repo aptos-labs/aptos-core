@@ -7851,6 +7851,7 @@ dependencies = [
  "diem-workspace-hack",
  "move-lang",
  "move-model",
+ "move-prover",
  "structopt 0.3.21",
 ]
 
