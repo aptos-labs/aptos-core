@@ -25,7 +25,7 @@ use super::ModuleIdWithNamedAddress;
 /// Content for the move stdlib directory
 const DIR_MOVE_STDLIB: Dir = include_dir!("../../move-stdlib/sources");
 /// Content for the nursery directory
-const DIR_MOVE_STDLIB_NURSERY: Dir = include_dir!("../../move-stdlib/Nursery/sources");
+const DIR_MOVE_STDLIB_NURSERY: Dir = include_dir!("../../move-stdlib/nursery/sources");
 /// Content for diem framework directory
 const DIR_DIEM_FRAMEWORK: Dir = include_dir!("../../diem-framework/core/sources");
 
