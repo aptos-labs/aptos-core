@@ -85,7 +85,7 @@ impl ValidatorConfig {
         format!("{}{}", self.name, OPERATOR_NS)
     }
 
-    fn storage(&self) -> OnDiskStorage {
+    pub fn storage(&self) -> OnDiskStorage {
         OnDiskStorage::new(self.storage_config.path())
     }
 

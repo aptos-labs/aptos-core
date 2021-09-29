@@ -3,13 +3,18 @@
 
 mod address;
 mod error;
+mod event_key;
+mod hash;
 mod ledger_info;
+pub mod mime_types;
 mod move_types;
 mod response;
 mod transaction;
 
 pub use address::Address;
 pub use error::Error;
+pub use event_key::EventKey;
+pub use hash::HashValue;
 pub use ledger_info::LedgerInfo;
 pub use move_types::{
     HexEncodedBytes, MoveModule, MoveModuleId, MoveResource, MoveStructTag, MoveStructValue,

@@ -230,6 +230,11 @@ proptest! {
     }
 
     #[test]
+    fn test_hashvalue_to_hex_literal(hash in any::<HashValue>()) {
+        prop_assert_eq!(format!("0x{}", hash.to_hex()), hash.to_hex_literal());
+    }
+
+    #[test]
     fn test_hashvalue_from_bit_iter(hash in any::<HashValue>()) {
         let hash2 = HashValue::from_bit_iter(hash.iter_bits()).unwrap();
         prop_assert_eq!(hash, hash2);

@@ -104,7 +104,7 @@ fn transaction_not_found(version: u64, ledger_version: u64) -> Error {
 mod tests {
     use crate::test_utils::{assert_json, new_test_context};
 
-    use diem_types::transaction::TransactionInfoTrait;
+    use diem_types::transaction::{Transaction, TransactionInfoTrait};
 
     use serde_json::json;
 
@@ -122,18 +122,24 @@ mod tests {
         assert_eq!(resp[0]["version"], "0");
 
         let info = txns.proof.transaction_infos[0].clone();
-        assert_eq!(resp[0]["hash"], info.transaction_hash().to_hex());
-        assert_eq!(resp[0]["state_root_hash"], info.state_root_hash().to_hex());
-        assert_eq!(resp[0]["event_root_hash"], info.event_root_hash().to_hex());
+        assert_eq!(resp[0]["hash"], info.transaction_hash().to_hex_literal());
+        assert_eq!(
+            resp[0]["state_root_hash"],
+            info.state_root_hash().to_hex_literal()
+        );
+        assert_eq!(
+            resp[0]["event_root_hash"],
+            info.event_root_hash().to_hex_literal()
+        );
         assert!(resp[0]["data"].as_str().unwrap().starts_with("0x"));
 
         let first_event = resp[0]["events"][0].clone();
         assert_json(
             first_event,
             json!({
-                "key": "00000000000000000000000000000000000000000a550c18",
-                "sequence_number": 0,
-                "transaction_version": 0,
+                "key": "0x00000000000000000000000000000000000000000a550c18",
+                "sequence_number": "0",
+                "transaction_version": "0",
                 "type": {
                     "type": "struct",
                     "address": "0x1",
@@ -215,5 +221,84 @@ mod tests {
               "message": "invalid parameter: limit=2000, exceed limit 1000"
             }),
         );
+    }
+
+    #[tokio::test]
+    async fn test_get_transactions_output_user_transaction() {
+        let mut context = new_test_context();
+        let account = context.gen_account();
+        let txn = context.create_parent_vasp(&account);
+        context.commit_block(&vec![txn.clone()]);
+
+        let txns = context.get("/transactions?start=1").await;
+        assert_eq!(2, txns.as_array().unwrap().len());
+
+        let expected_txns = context.get_transactions(1, 2);
+        assert_eq!(2, expected_txns.proof.transaction_infos.len());
+
+        let metadata = expected_txns.proof.transaction_infos[0].clone();
+
+        let metadata_txn = match &expected_txns.transactions[0] {
+            Transaction::BlockMetadata(txn) => txn.clone(),
+            _ => panic!(
+                "unexpected transaction: {:?}",
+                expected_txns.transactions[0]
+            ),
+        };
+        assert_json(
+            txns[0].clone(),
+            json!(
+            {
+                "type": "block_metadata",
+                "version": "1",
+                "hash": metadata.transaction_hash().to_hex_literal(),
+                "state_root_hash": metadata.state_root_hash().to_hex_literal(),
+                "event_root_hash": metadata.event_root_hash().to_hex_literal(),
+                "gas_used": metadata.gas_used().to_string(),
+                "success": true,
+                "id": metadata_txn.id().to_hex_literal(),
+                "round": "1",
+                "previous_block_votes": [],
+                "proposer": context.validator_owner.to_hex_literal(),
+            }),
+        );
+
+        let user_txn_info = expected_txns.proof.transaction_infos[1].clone();
+        assert_json(
+            txns[1].clone(),
+            json!({
+                "type": "user_transaction",
+                "version": "2",
+                "hash": user_txn_info.transaction_hash().to_hex_literal(),
+                "state_root_hash": user_txn_info.state_root_hash().to_hex_literal(),
+                "event_root_hash": user_txn_info.event_root_hash().to_hex_literal(),
+                "gas_used": user_txn_info.gas_used().to_string(),
+                "success": true,
+                "sender": "0xb1e55ed",
+                "sequence_number": "0",
+                "max_gas_amount": "1000000",
+                "gas_unit_price": "0",
+                "gas_currency_code": "XUS",
+                "expiration_timestamp_secs": txn.expiration_timestamp_secs().to_string(),
+                "events": [
+                    {
+                        "key": "0x00000000000000000000000000000000000000000a550c18",
+                        "sequence_number": "5",
+                        "transaction_version": "2",
+                        "type": {
+                            "type": "struct",
+                            "address": "0x1",
+                            "module": "DiemAccount",
+                            "name": "CreateAccountEvent",
+                            "generic_type_params": []
+                        },
+                        "data": {
+                            "created": account.address().to_hex_literal(),
+                            "role_id": "5"
+                        }
+                    }
+                ]
+            }),
+        )
     }
 }

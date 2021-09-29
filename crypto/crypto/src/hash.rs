@@ -255,6 +255,11 @@ impl HashValue {
         format!("{:x}", self)
     }
 
+    /// Full hex representation of a given hash value with `0x` prefix.
+    pub fn to_hex_literal(&self) -> String {
+        format!("{:#x}", self)
+    }
+
     /// Parse a given hex string to a hash value.
     pub fn from_hex<T: AsRef<[u8]>>(hex: T) -> Result<Self, HashValueParseError> {
         <[u8; Self::LENGTH]>::from_hex(hex)
@@ -352,6 +357,9 @@ impl fmt::Binary for HashValue {
 
 impl fmt::LowerHex for HashValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if f.alternate() {
+            write!(f, "0x")?;
+        }
         for byte in &self.hash {
             write!(f, "{:02x}", byte)?;
         }
