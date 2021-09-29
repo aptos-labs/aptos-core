@@ -10,6 +10,7 @@ mod restore_test;
 use crate::{
     node_type::{
         get_child_and_sibling_half_start, Child, Children, InternalNode, LeafNode, Node, NodeKey,
+        NodeType,
     },
     NibbleExt, NodeBatch, TreeReader, TreeWriter, ROOT_NIBBLE_HEIGHT,
 };
@@ -47,16 +48,12 @@ where
     /// Converts `self` to a child, assuming the hash is known if it's an internal node.
     fn into_child(self, version: Version) -> Child {
         match self {
-            Self::Internal { hash } => {
-                Child::new(
-                    hash.expect("Must have been initialized."),
-                    version,
-                    false, /* is_leaf */
-                )
-            }
-            Self::Leaf { node } => {
-                Child::new(node.hash(), version, true /* is_leaf */)
-            }
+            Self::Internal { hash } => Child::new(
+                hash.expect("Must have been initialized."),
+                version,
+                NodeType::InternalLegacy,
+            ),
+            Self::Leaf { node } => Child::new(node.hash(), version, NodeType::Leaf),
         }
     }
 }

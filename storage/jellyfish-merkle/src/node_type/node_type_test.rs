@@ -5,7 +5,7 @@ use super::{
     deserialize_u64_varint, serialize_u64_varint, Child, Children, InternalNode, NodeDecodeError,
     NodeKey,
 };
-use crate::test_helper::ValueBlob;
+use crate::{node_type::NodeType, test_helper::ValueBlob};
 use diem_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
@@ -61,11 +61,11 @@ fn test_encode_decode() {
     let mut children = Children::default();
     children.insert(
         Nibble::from(1),
-        Child::new(leaf1_node.hash(), 0 /* version */, true),
+        Child::new(leaf1_node.hash(), 0 /* version */, NodeType::Leaf),
     );
     children.insert(
         Nibble::from(2),
-        Child::new(leaf2_node.hash(), 0 /* version */, true),
+        Child::new(leaf2_node.hash(), 0 /* version */, NodeType::Leaf),
     );
 
     let account_key = HashValue::random();
@@ -120,11 +120,7 @@ fn test_internal_validity() {
         let mut children = Children::default();
         children.insert(
             Nibble::from(1),
-            Child::new(
-                HashValue::random(),
-                0,    /* version */
-                true, /* is_leaf */
-            ),
+            Child::new(HashValue::random(), 0 /* version */, NodeType::Leaf),
         );
         InternalNode::new(children);
     });
@@ -154,8 +150,8 @@ proptest! {
         let hash1 = HashValue::random();
         let hash2 = HashValue::random();
 
-        children.insert(index1, Child::new(hash1, 0 /* version */, true));
-        children.insert(index2, Child::new(hash2, 1 /* version */, true));
+        children.insert(index1, Child::new(hash1, 0 /* version */, NodeType::Leaf));
+        children.insert(index2, Child::new(hash2, 1 /* version */, NodeType::Leaf));
         let internal_node = InternalNode::new(children);
 
         // Internal node will have a structure below
@@ -193,8 +189,8 @@ proptest! {
         let hash1 = HashValue::random();
         let hash2 = HashValue::random();
 
-        children.insert(index1, Child::new(hash1, 0 /* version */, true));
-        children.insert(index2, Child::new(hash2, 1 /* version */, true));
+        children.insert(index1, Child::new(hash1, 0 /* version */, NodeType::Leaf));
+        children.insert(index2, Child::new(hash2, 1 /* version */, NodeType::Leaf));
         let internal_node = InternalNode::new(children);
 
         // Internal node will have a structure below
@@ -272,9 +268,9 @@ proptest! {
         let hash2 = HashValue::random();
         let hash3 = HashValue::random();
 
-        children.insert(index1, Child::new(hash1, 0 /* version */, true));
-        children.insert(index2, Child::new(hash2, 1 /* version */, true));
-        children.insert(index3, Child::new(hash3, 2 /* version */, true));
+        children.insert(index1, Child::new(hash1, 0 /* version */, NodeType::Leaf));
+        children.insert(index2, Child::new(hash2, 1 /* version */, NodeType::Leaf));
+        children.insert(index3, Child::new(hash3, 2 /* version */, NodeType::Leaf));
         let internal_node = InternalNode::new(children);
         // Internal node will have a structure below
         //
@@ -325,10 +321,10 @@ proptest! {
         let hash2 = HashValue::random();
         let hash3 = HashValue::random();
         let hash4 = HashValue::random();
-        children.insert(index1, Child::new(hash1, 0, true));
-        children.insert(2.into(), Child::new(hash2, 1, false));
-        children.insert(7.into(), Child::new(hash3, 2, false));
-        children.insert(index2, Child::new(hash4, 3, true));
+        children.insert(index1, Child::new(hash1, 0, NodeType::Leaf));
+        children.insert(2.into(), Child::new(hash2, 1, NodeType::InternalLegacy));
+        children.insert(7.into(), Child::new(hash3, 2, NodeType::InternalLegacy));
+        children.insert(index2, Child::new(hash4, 3, NodeType::Leaf));
         let internal_node = InternalNode::new(children);
         // Internal node (B) will have a structure below
         //
@@ -454,8 +450,14 @@ fn test_internal_hash_and_proof() {
             index2,
         )
         .0;
-        children.insert(index1, Child::new(hash1, 0 /* version */, false));
-        children.insert(index2, Child::new(hash2, 1 /* version */, false));
+        children.insert(
+            index1,
+            Child::new(hash1, 0 /* version */, NodeType::InternalLegacy),
+        );
+        children.insert(
+            index2,
+            Child::new(hash2, 1 /* version */, NodeType::InternalLegacy),
+        );
         let internal_node = InternalNode::new(children);
         // Internal node (B) will have a structure below
         //
@@ -588,8 +590,14 @@ fn test_internal_hash_and_proof() {
         )
         .0;
 
-        children.insert(index1, Child::new(hash1, 0 /* version */, false));
-        children.insert(index2, Child::new(hash2, 1 /* version */, false));
+        children.insert(
+            index1,
+            Child::new(hash1, 0 /* version */, NodeType::InternalLegacy),
+        );
+        children.insert(
+            index2,
+            Child::new(hash2, 1 /* version */, NodeType::InternalLegacy),
+        );
         let internal_node = InternalNode::new(children);
         // Internal node will have a structure below
         //
@@ -708,7 +716,7 @@ impl BinaryTreeNode {
             index,
             version: child.version,
             hash: child.hash,
-            is_leaf: child.is_leaf,
+            is_leaf: child.is_leaf(),
         })
     }
 

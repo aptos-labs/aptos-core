@@ -130,11 +130,11 @@ fn test_insert_at_leaf_with_internal_created() {
     let mut children = HashMap::new();
     children.insert(
         Nibble::from(0),
-        Child::new(leaf1.hash(), 1 /* version */, true /* is_leaf */),
+        Child::new(leaf1.hash(), 1 /* version */, NodeType::Leaf),
     );
     children.insert(
         Nibble::from(15),
-        Child::new(leaf2.hash(), 1 /* version */, true /* is_leaf */),
+        Child::new(leaf2.hash(), 1 /* version */, NodeType::Leaf),
     );
     let internal = Node::new_internal(children);
     assert_eq!(db.get_node(&NodeKey::new_empty_path(0)).unwrap(), leaf1);
@@ -197,11 +197,11 @@ fn test_insert_at_leaf_with_multiple_internals_created() {
         let mut children = HashMap::new();
         children.insert(
             Nibble::from(0),
-            Child::new(leaf1.hash(), 1 /* version */, true /* is_leaf */),
+            Child::new(leaf1.hash(), 1 /* version */, NodeType::Leaf),
         );
         children.insert(
             Nibble::from(1),
-            Child::new(leaf2.hash(), 1 /* version */, true /* is_leaf */),
+            Child::new(leaf2.hash(), 1 /* version */, NodeType::Leaf),
         );
         Node::new_internal(children)
     };
@@ -212,8 +212,8 @@ fn test_insert_at_leaf_with_multiple_internals_created() {
             Nibble::from(0),
             Child::new(
                 internal.hash(),
-                1,     /* version */
-                false, /* is_leaf */
+                1, /* version */
+                NodeType::InternalLegacy,
             ),
         );
         Node::new_internal(children)

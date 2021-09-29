@@ -90,7 +90,7 @@ use diem_types::{
     proof::{SparseMerkleProof, SparseMerkleRangeProof},
     transaction::Version,
 };
-use node_type::{Child, Children, InternalNode, LeafNode, Node, NodeKey};
+use node_type::{Child, Children, InternalNode, LeafNode, Node, NodeKey, NodeType};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::arbitrary::Arbitrary;
 #[cfg(any(test, feature = "fuzzing"))]
@@ -365,7 +365,7 @@ where
                         Child::new(
                             Self::get_hash(&new_child_node_key, &new_child_node, hash_cache),
                             version,
-                            new_child_node.is_leaf(),
+                            new_child_node.node_type(),
                         ),
                     );
                 }
@@ -458,7 +458,7 @@ where
                     Child::new(
                         Self::get_hash(&new_child_node_key, &new_child_node, hash_cache),
                         version,
-                        new_child_node.is_leaf(),
+                        new_child_node.node_type(),
                     ),
                 );
             }
@@ -467,7 +467,7 @@ where
                     node_key.gen_child_node_key(version, existing_leaf_bucket);
                 children.insert(
                     existing_leaf_bucket,
-                    Child::new(existing_leaf_node.hash(), version, true /* is_leaf */),
+                    Child::new(existing_leaf_node.hash(), version, NodeType::Leaf),
                 );
 
                 tree_cache.put_node(existing_leaf_node_key, existing_leaf_node.into())?;
@@ -510,7 +510,7 @@ where
                     Child::new(
                         Self::get_hash(&new_child_node_key, &new_child_node, hash_cache),
                         version,
-                        new_child_node.is_leaf(),
+                        new_child_node.node_type(),
                     ),
                 );
             }
@@ -714,7 +714,7 @@ where
         let mut children: Children = internal_node.into();
         children.insert(
             child_index,
-            Child::new(new_child_node.hash(), version, new_child_node.is_leaf()),
+            Child::new(new_child_node.hash(), version, new_child_node.node_type()),
         );
         let new_internal_node = InternalNode::new(children);
 
@@ -790,7 +790,7 @@ where
         let mut children = Children::new();
         children.insert(
             existing_leaf_index,
-            Child::new(existing_leaf_node.hash(), version, true /* is_leaf */),
+            Child::new(existing_leaf_node.hash(), version, NodeType::Leaf),
         );
         node_key = NodeKey::new(version, common_nibble_path.clone());
         tree_cache.put_node(
@@ -806,7 +806,7 @@ where
         )?;
         children.insert(
             new_leaf_index,
-            Child::new(new_leaf_node.hash(), version, true /* is_leaf */),
+            Child::new(new_leaf_node.hash(), version, NodeType::Leaf),
         );
 
         let internal_node = InternalNode::new(children);
@@ -821,7 +821,7 @@ where
             let mut children = Children::new();
             children.insert(
                 nibble,
-                Child::new(next_internal_node.hash(), version, false /* is_leaf */),
+                Child::new(next_internal_node.hash(), version, next_internal_node.node_type()),
             );
             let internal_node = InternalNode::new(children);
             next_internal_node = internal_node.clone().into();

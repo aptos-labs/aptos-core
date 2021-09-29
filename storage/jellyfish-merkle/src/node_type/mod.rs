@@ -136,27 +136,39 @@ impl NodeKey {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+pub enum NodeType {
+    Leaf,
+    InternalLegacy,
+}
+
 /// Each child of [`InternalNode`] encapsulates a nibble forking at this node.
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct Child {
-    // The hash value of this child node.
+    /// The hash value of this child node.
     pub hash: HashValue,
-    // `version`, the `nibble_path` of the ['NodeKey`] of this [`InternalNode`] the child belongs
-    // to and the child's index constitute the [`NodeKey`] to uniquely identify this child node
-    // from the storage. Used by `[`NodeKey::gen_child_node_key`].
+    /// `version`, the `nibble_path` of the ['NodeKey`] of this [`InternalNode`] the child belongs
+    /// to and the child's index constitute the [`NodeKey`] to uniquely identify this child node
+    /// from the storage. Used by `[`NodeKey::gen_child_node_key`].
     pub version: Version,
-    // Whether the child is a leaf node.
-    pub is_leaf: bool,
+    /// Indicates if the child is a leaf, or if it's an internal node, the total number of leaves
+    /// under it (though it can be unknown during migration).
+    pub node_type: NodeType,
 }
 
 impl Child {
-    pub fn new(hash: HashValue, version: Version, is_leaf: bool) -> Self {
+    pub fn new(hash: HashValue, version: Version, node_type: NodeType) -> Self {
         Self {
             hash,
             version,
-            is_leaf,
+            node_type,
         }
+    }
+
+    pub fn is_leaf(&self) -> bool {
+        matches!(self.node_type, NodeType::Leaf)
     }
 }
 
@@ -231,7 +243,8 @@ impl Arbitrary for InternalNode {
             .prop_filter(
                 "InternalNode constructor panics when its only child is a leaf.",
                 |children| {
-                    !(children.len() == 1 && children.values().next().expect("Must exist.").is_leaf)
+                    !(children.len() == 1
+                        && children.values().next().expect("Must exist.").is_leaf())
                 },
             )
             .prop_map(InternalNode::new)
@@ -246,13 +259,11 @@ impl InternalNode {
         // a leaf node. Otherwise, the leaf node should be a child of this internal node's parent.
         assert!(!children.is_empty());
         if children.len() == 1 {
-            assert!(
-                !children
-                    .values()
-                    .next()
-                    .expect("Must have 1 element")
-                    .is_leaf
-            )
+            assert!(!children
+                .values()
+                .next()
+                .expect("Must have 1 element")
+                .is_leaf())
         }
         Self { children }
     }
@@ -317,7 +328,12 @@ impl InternalNode {
                 Child::new(
                     HashValue::from_slice(&reader.get_ref()[pos..pos + size_of::<HashValue>()])?,
                     version,
-                    (leaf_bitmap & child_bit) != 0,
+                    // TODO(aldenhu): make it real
+                    if (leaf_bitmap & child_bit) != 0 {
+                        NodeType::Leaf
+                    } else {
+                        NodeType::InternalLegacy
+                    },
                 ),
             );
             reader.seek(SeekFrom::Current(size_of::<HashValue>() as i64))?;
@@ -341,7 +357,7 @@ impl InternalNode {
         for (nibble, child) in self.children.iter() {
             let i = u8::from(*nibble);
             existence_bitmap |= 1u16 << i;
-            if child.is_leaf {
+            if child.is_leaf() {
                 leaf_bitmap |= 1u16 << i;
             }
         }
@@ -605,6 +621,16 @@ where
     /// Returns `true` if the node is a leaf node.
     pub fn is_leaf(&self) -> bool {
         matches!(self, Node::Leaf(_))
+    }
+
+    /// Returns `NodeType`
+    pub fn node_type(&self) -> NodeType {
+        // TODO(aldenhu): make it real
+        if self.is_leaf() {
+            NodeType::Leaf
+        } else {
+            NodeType::InternalLegacy
+        }
     }
 
     /// Serializes to bytes for physical storage.
