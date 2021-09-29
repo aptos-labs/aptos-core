@@ -7843,6 +7843,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "spec-flatten"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bytecode",
+ "diem-workspace-hack",
+ "move-lang",
+ "move-model",
+ "structopt 0.3.21",
+]
+
+[[package]]
 name = "spin"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"

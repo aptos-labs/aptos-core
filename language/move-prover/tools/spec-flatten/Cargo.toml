@@ -1,0 +1,19 @@
+[package]
+name = "spec-flatten"
+version = "0.1.0"
+authors = ["Diem Association <opensource@diem.com>"]
+publish = false
+edition = "2018"
+license = "Apache-2.0"
+
+[dependencies]
+diem-workspace-hack = { path = "../../../../common/workspace-hack" }
+
+# move dependencies
+bytecode = { path = "../../bytecode" }
+move-lang = { path = "../../../move-lang" }
+move-model = { path = "../../../move-model" }
+
+# external dependencies
+anyhow = "1.0.38"
+structopt = "0.3.21"
