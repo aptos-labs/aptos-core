@@ -11,7 +11,7 @@ use bytecode::{
 use move_lang::shared::AddressBytes;
 use move_model::{
     ast::Spec,
-    model::{FunId, GlobalEnv, QualifiedId},
+    model::{FunId, GlobalEnv, QualifiedId, VerificationScope},
     options::ModelBuilderOptions,
     run_model_builder_with_options,
 };
@@ -76,7 +76,7 @@ pub(crate) fn prepare_with_override(
     }
 
     // run bytecode transformation pipeline
-    let prover_options = ProverOptions::default();
+    let prover_options = get_prover_options(options);
     let pipeline = default_pipeline_with_options(&prover_options);
     env.set_extension(prover_options);
 
@@ -100,11 +100,7 @@ pub(crate) fn prove(
     env: &GlobalEnv,
     targets: &FunctionTargetsHolder,
 ) -> Result<bool> {
-    let cli_options = CliOptions {
-        move_sources: options.srcs.clone(),
-        move_deps: options.deps.clone(),
-        ..Default::default()
-    };
+    let cli_options = get_cli_options(options);
 
     let code_writer = generate_boogie(env, &cli_options, targets)?;
     if env.has_errors() {
@@ -113,4 +109,28 @@ pub(crate) fn prove(
 
     verify_boogie(env, &cli_options, targets, code_writer)?;
     Ok(!env.has_errors())
+}
+
+//
+// utilities
+//
+
+fn get_prover_options(options: &FlattenOptions) -> ProverOptions {
+    let verify_scope = match &options.target {
+        None => VerificationScope::All,
+        Some(target) => VerificationScope::Only(target.clone()),
+    };
+    ProverOptions {
+        verify_scope,
+        ..Default::default()
+    }
+}
+
+fn get_cli_options(options: &FlattenOptions) -> CliOptions {
+    CliOptions {
+        move_sources: options.srcs.clone(),
+        move_deps: options.deps.clone(),
+        prover: get_prover_options(options),
+        ..Default::default()
+    }
 }

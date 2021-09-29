@@ -6,7 +6,7 @@ use structopt::StructOpt;
 use move_lang::shared::{parse_named_address, AddressBytes};
 
 /// Options passed into the specification flattening tool.
-#[derive(StructOpt)]
+#[derive(StructOpt, Clone)]
 pub struct FlattenOptions {
     /// Sources of the target modules
     pub srcs: Vec<String>,
@@ -14,6 +14,10 @@ pub struct FlattenOptions {
     /// Dependencies
     #[structopt(short = "d", long = "dependency")]
     pub deps: Vec<String>,
+
+    /// Target function
+    #[structopt(short, long)]
+    pub target: Option<String>,
 
     /// Do not include default named address
     #[structopt(long = "no-default-named-addresses")]

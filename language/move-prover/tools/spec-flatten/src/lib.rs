@@ -34,9 +34,19 @@ pub fn run(options: &FlattenOptions) -> Result<()> {
             // only run on specs in target module
             continue;
         }
-        if !fun_env.has_unknown_callers() {
-            // only run on specs for external-facing functions
-            continue;
+        match &options.target {
+            None => {
+                if !fun_env.has_unknown_callers() {
+                    // only run on specs for external-facing functions
+                    continue;
+                }
+            }
+            Some(target) => {
+                if fun_env.get_simple_name_string().as_ref() != target {
+                    // only run on matched function name
+                    continue;
+                }
+            }
         }
 
         let target = targets.get_target(&fun_env, &variant);
