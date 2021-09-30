@@ -14,6 +14,7 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
+    transaction_argument::TransactionArgument,
 };
 use resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue};
 
@@ -185,6 +186,19 @@ impl From<AnnotatedMoveValue> for MoveValue {
             }
             AnnotatedMoveValue::Bytes(v) => MoveValue::Bytes(HexEncodedBytes(v)),
             AnnotatedMoveValue::Struct(v) => MoveValue::Struct(v.into()),
+        }
+    }
+}
+
+impl From<TransactionArgument> for MoveValue {
+    fn from(val: TransactionArgument) -> Self {
+        match val {
+            TransactionArgument::U8(v) => MoveValue::U8(v),
+            TransactionArgument::U64(v) => MoveValue::U64(U64(v)),
+            TransactionArgument::U128(v) => MoveValue::U128(U128(v)),
+            TransactionArgument::Bool(v) => MoveValue::Bool(v),
+            TransactionArgument::Address(v) => MoveValue::Address(v.into()),
+            TransactionArgument::U8Vector(bytes) => MoveValue::Bytes(HexEncodedBytes(bytes)),
         }
     }
 }

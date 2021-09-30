@@ -366,10 +366,17 @@ impl TransactionFactory {
                 new_key.to_vec(),
             ))
         } else {
-            self.script(stdlib::encode_rotate_authentication_key_script(
-                new_key.to_vec(),
-            ))
+            self.rotate_authentication_key_by_script(new_key)
         }
+    }
+
+    pub fn rotate_authentication_key_by_script(
+        &self,
+        new_key: AuthenticationKey,
+    ) -> TransactionBuilder {
+        self.script(stdlib::encode_rotate_authentication_key_script(
+            new_key.to_vec(),
+        ))
     }
 
     pub fn rotate_authentication_key_with_recovery_address(

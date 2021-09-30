@@ -137,9 +137,12 @@ mod tests {
     use crate::test_utils::{assert_json, new_test_context};
 
     use diem_crypto::hash::CryptoHash;
-    use diem_types::transaction::{Transaction, TransactionInfoTrait};
+    use diem_types::transaction::{
+        authenticator::AuthenticationKey, Transaction, TransactionInfoTrait,
+    };
 
     use serde_json::json;
+    use std::str::FromStr;
 
     #[tokio::test]
     async fn test_get_transactions() {
@@ -257,7 +260,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_get_transactions_output_user_transaction() {
+    async fn test_get_transactions_output_user_transaction_with_script_function_payload() {
         let mut context = new_test_context();
         let account = context.gen_account();
         let txn = context.create_parent_vasp(&account);
@@ -353,6 +356,57 @@ mod tests {
                         format!("0x{}", hex::encode(account.authentication_key().prefix())),
                         format!("0x{}", hex::encode("vasp".as_bytes())),
                         true
+                    ]
+                }
+            }),
+        )
+    }
+
+    #[tokio::test]
+    async fn test_get_transactions_output_user_transaction_with_script_payload() {
+        let context = new_test_context();
+        let new_key = AuthenticationKey::from_str(
+            "717d1d400311ff8797c2441ea9c2d2da1120ce38f66afb079c2bad0919d93a09",
+        )
+        .unwrap();
+        let mut tc_account = context.tc_account();
+        let txn = tc_account.sign_with_transaction_builder(
+            context
+                .transaction_factory()
+                .rotate_authentication_key_by_script(new_key),
+        );
+        context.commit_block(&vec![txn.clone()]);
+
+        let txns = context.get("/transactions?start=2").await;
+        assert_eq!(1, txns.as_array().unwrap().len());
+
+        let expected_txns = context.get_transactions(2, 1);
+        assert_eq!(1, expected_txns.proof.transaction_infos.len());
+
+        let user_txn_info = expected_txns.proof.transaction_infos[0].clone();
+        assert_json(
+            txns[0].clone(),
+            json!({
+                "type": "user_transaction",
+                "version": "2",
+                "hash": user_txn_info.transaction_hash().to_hex_literal(),
+                "state_root_hash": user_txn_info.state_root_hash().to_hex_literal(),
+                "event_root_hash": user_txn_info.event_root_hash().to_hex_literal(),
+                "gas_used": user_txn_info.gas_used().to_string(),
+                "success": true,
+                "sender": "0xb1e55ed",
+                "sequence_number": "0",
+                "max_gas_amount": "1000000",
+                "gas_unit_price": "0",
+                "gas_currency_code": "XUS",
+                "expiration_timestamp_secs": txn.expiration_timestamp_secs().to_string(),
+                "events": [],
+                "payload": {
+                    "type": "script_payload",
+                    "code": "0xa11ceb0b010000000601000202020403060f05151207277c08a3011000000001010000020001000003010200000403020001060c01080000020608000a0202060c0a020b4469656d4163636f756e74154b6579526f746174696f6e4361706162696c6974791f657874726163745f6b65795f726f746174696f6e5f6361706162696c6974791f726573746f72655f6b65795f726f746174696f6e5f6361706162696c69747919726f746174655f61757468656e7469636174696f6e5f6b657900000000000000000000000000000001000401090b0011000c020e020b0111020b02110102",
+                    "type_arguments": [],
+                    "arguments": [
+                        "0x717d1d400311ff8797c2441ea9c2d2da1120ce38f66afb079c2bad0919d93a09"
                     ]
                 }
             }),

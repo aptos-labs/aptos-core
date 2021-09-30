@@ -9,7 +9,7 @@ use diem_crypto::hash::CryptoHash;
 use diem_types::{
     block_metadata::BlockMetadata,
     contract_event::ContractEvent,
-    transaction::{SignedTransaction, TransactionInfoTrait, WriteSetPayload},
+    transaction::{Script, SignedTransaction, TransactionInfoTrait, WriteSetPayload},
 };
 use move_core_types::identifier::Identifier;
 use resource_viewer::AnnotatedMoveValue;
@@ -213,7 +213,28 @@ pub enum TransactionPayload {
         type_arguments: Vec<MoveType>,
         arguments: Vec<MoveValue>,
     },
-    ScriptPayload,
+    ScriptPayload(ScriptPayload),
     ModulePayload,
     WriteSetPayload,
+}
+
+impl From<&Script> for TransactionPayload {
+    fn from(script: &Script) -> Self {
+        TransactionPayload::ScriptPayload(ScriptPayload {
+            code: script.code().to_vec().into(),
+            type_arguments: script
+                .ty_args()
+                .iter()
+                .map(|arg| arg.clone().into())
+                .collect(),
+            arguments: script.args().iter().map(|arg| arg.clone().into()).collect(),
+        })
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct ScriptPayload {
+    pub code: HexEncodedBytes,
+    pub type_arguments: Vec<MoveType>,
+    pub arguments: Vec<MoveValue>,
 }
