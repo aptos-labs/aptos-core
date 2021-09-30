@@ -34,7 +34,7 @@ use diem_types::{
         Transaction, TransactionInfoTrait, TransactionListWithProof, TransactionOutput,
         TransactionPayload, TransactionStatus, TransactionToCommit, Version,
     },
-    write_set::{WriteOp, WriteSet},
+    write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use diem_vm::VMExecutor;
 use executor_types::{Error, ExecutedTrees, ProofReader};
@@ -357,6 +357,7 @@ where
             txn_data.push(TransactionData::new(
                 blobs,
                 new_node_hashes,
+                vm_output.write_set().clone(),
                 vm_output.events().to_vec(),
                 vm_output.status().clone(),
                 state_tree_hash,
@@ -374,6 +375,9 @@ where
                 TransactionData::new(
                     HashMap::new(),
                     HashMap::new(),
+                    WriteSetMut::new(vec![])
+                        .freeze()
+                        .expect("generated write sets should always be valid"),
                     vec![],
                     TransactionStatus::Retry,
                     current_state_tree.root_hash(),
@@ -556,6 +560,7 @@ where
                 txn,
                 txn_data.account_blobs().clone(),
                 Some(txn_data.jf_node_hashes().clone()),
+                txn_data.write_set().clone(),
                 txn_data.events().to_vec(),
                 txn_data.gas_used(),
                 recorded_status,

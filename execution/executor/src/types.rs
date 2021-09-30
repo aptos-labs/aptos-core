@@ -13,6 +13,7 @@ use diem_types::{
     on_chain_config,
     proof::accumulator::InMemoryAccumulator,
     transaction::{TransactionStatus, Version},
+    write_set::WriteSet,
 };
 use executor_types::{ExecutedTrees, StateComputeResult};
 use std::{collections::HashMap, sync::Arc};
@@ -30,6 +31,9 @@ pub struct TransactionData {
     /// Each entry in this map represents the the hash of a newly generated jellyfish node
     /// and its corresponding nibble path.
     jf_node_hashes: HashMap<NibblePath, HashValue>,
+
+    /// The writeset generated from this transaction.
+    write_set: WriteSet,
 
     /// The list of events emitted during this transaction.
     events: Vec<ContractEvent>,
@@ -54,6 +58,7 @@ impl TransactionData {
     pub fn new(
         account_blobs: HashMap<AccountAddress, AccountStateBlob>,
         jf_node_hashes: HashMap<NibblePath, HashValue>,
+        write_set: WriteSet,
         events: Vec<ContractEvent>,
         status: TransactionStatus,
         state_root_hash: HashValue,
@@ -64,6 +69,7 @@ impl TransactionData {
         TransactionData {
             account_blobs,
             jf_node_hashes,
+            write_set,
             events,
             status,
             state_root_hash,
@@ -79,6 +85,10 @@ impl TransactionData {
 
     pub fn jf_node_hashes(&self) -> &HashMap<NibblePath, HashValue> {
         &self.jf_node_hashes
+    }
+
+    pub fn write_set(&self) -> &WriteSet {
+        &self.write_set
     }
 
     pub fn events(&self) -> &[ContractEvent] {

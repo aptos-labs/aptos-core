@@ -792,6 +792,8 @@ pub struct TransactionToCommitGen {
     /// N.B. the transaction sender and event owners must be updated to reflect information such as
     /// sequence numbers so that test data generated through this is more realistic and logical.
     account_state_gens: Vec<(Index, AccountStateBlobGen)>,
+    /// Write set
+    write_set: WriteSet,
     /// Gas used.
     gas_used: u64,
     /// Transaction status
@@ -826,6 +828,7 @@ impl TransactionToCommitGen {
             Transaction::UserTransaction(transaction),
             account_states,
             None,
+            self.write_set,
             events,
             self.gas_used,
             self.status,
@@ -852,11 +855,12 @@ impl Arbitrary for TransactionToCommitGen {
                 0..=2,
             ),
             vec((any::<Index>(), any::<AccountStateBlobGen>()), 0..=1),
+            any::<WriteSet>(),
             any::<u64>(),
             any::<KeptVMStatus>(),
         )
             .prop_map(
-                |(sender, event_emitters, mut touched_accounts, gas_used, status)| {
+                |(sender, event_emitters, mut touched_accounts, write_set, gas_used, status)| {
                     // To reflect change of account/event sequence numbers, txn sender account and
                     // event emitter accounts must be updated.
                     let (sender_index, sender_blob_gen, txn_gen) = sender;
@@ -872,6 +876,7 @@ impl Arbitrary for TransactionToCommitGen {
                         transaction_gen: (sender_index, txn_gen),
                         event_gens,
                         account_state_gens: touched_accounts,
+                        write_set,
                         gas_used,
                         status,
                     }

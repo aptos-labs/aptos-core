@@ -8,7 +8,7 @@ use crate::{
     errors::DiemDbError,
     schema::{
         transaction::TransactionSchema, transaction_by_account::TransactionByAccountSchema,
-        transaction_by_hash::TransactionByHashSchema,
+        transaction_by_hash::TransactionByHashSchema, write_set::WriteSetSchema,
     },
 };
 use anyhow::{ensure, format_err, Result};
@@ -17,6 +17,7 @@ use diem_types::{
     account_address::AccountAddress,
     block_metadata::BlockMetadata,
     transaction::{Transaction, Version},
+    write_set::WriteSet,
 };
 use schemadb::{ReadOptions, SchemaIterator, DB};
 use std::sync::Arc;
@@ -158,6 +159,24 @@ impl TransactionStore {
         cs.batch.put::<TransactionSchema>(&version, transaction)?;
 
         Ok(())
+    }
+
+    #[cfg(test)]
+    /// Get executed transaction vm output given `version`
+    pub fn get_write_set(&self, version: Version) -> Result<WriteSet> {
+        self.db
+            .get::<WriteSetSchema>(&version)?
+            .ok_or_else(|| DiemDbError::NotFound(format!("WriteSet at version {}", version)).into())
+    }
+
+    /// Save executed transaction vm output given `version`
+    pub fn put_write_set(
+        &self,
+        version: Version,
+        write_set: &WriteSet,
+        cs: &mut ChangeSet,
+    ) -> Result<()> {
+        cs.batch.put::<WriteSetSchema>(&version, write_set)
     }
 }
 

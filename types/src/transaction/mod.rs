@@ -1018,6 +1018,7 @@ pub struct TransactionToCommit {
     transaction: Transaction,
     account_states: HashMap<AccountAddress, AccountStateBlob>,
     jf_node_hashes: Option<HashMap<NibblePath, HashValue>>,
+    write_set: WriteSet,
     events: Vec<ContractEvent>,
     gas_used: u64,
     status: KeptVMStatus,
@@ -1028,6 +1029,7 @@ impl TransactionToCommit {
         transaction: Transaction,
         account_states: HashMap<AccountAddress, AccountStateBlob>,
         jf_node_hashes: Option<HashMap<NibblePath, HashValue>>,
+        write_set: WriteSet,
         events: Vec<ContractEvent>,
         gas_used: u64,
         status: KeptVMStatus,
@@ -1036,6 +1038,7 @@ impl TransactionToCommit {
             transaction,
             account_states,
             jf_node_hashes,
+            write_set,
             events,
             gas_used,
             status,
@@ -1052,6 +1055,10 @@ impl TransactionToCommit {
 
     pub fn jf_node_hashes(&self) -> Option<&HashMap<NibblePath, HashValue>> {
         self.jf_node_hashes.as_ref()
+    }
+
+    pub fn write_set(&self) -> &WriteSet {
+        &self.write_set
     }
 
     pub fn events(&self) -> &[ContractEvent] {

@@ -19,18 +19,27 @@ proptest! {
     #[test]
     fn test_put_get(
         universe in any_with::<AccountInfoUniverse>(3),
-        gens in vec(
-            (any::<Index>(), any::<SignatureCheckedTransactionGen>()),
+        gens_and_write_sets in vec(
+            ((any::<Index>(), any::<SignatureCheckedTransactionGen>()), any::<WriteSet>()),
             1..10
         ),
     ) {
         let tmp_dir = TempPath::new();
         let db = DiemDB::new_for_test(&tmp_dir);
         let store = &db.transaction_store;
+        let (gens, write_sets):(Vec<_>, Vec<_>) = gens_and_write_sets.into_iter().unzip();
         let txns = init_store(universe, gens, store);
 
+
+        // write sets
+        let mut cs = ChangeSet::new();
+        for (ver, ws) in write_sets.iter().enumerate() {
+            store.put_write_set(ver as Version, ws, &mut cs).unwrap();
+        }
+        store.db.write_schemas(cs.batch).unwrap();
+
         let ledger_version = txns.len() as Version - 1;
-        for (ver, txn) in txns.iter().enumerate() {
+        for (ver, (txn, write_set)) in itertools::zip_eq(txns.iter(), write_sets.iter()).enumerate() {
             prop_assert_eq!(store.get_transaction(ver as Version).unwrap(), txn.clone());
             let user_txn = txn
                 .as_signed_user_txn()
@@ -45,9 +54,11 @@ proptest! {
                     .unwrap(),
                 Some(ver as Version)
             );
+            prop_assert_eq!(store.get_write_set(ver as Version).unwrap(), write_set.clone());
         }
 
         prop_assert!(store.get_transaction(ledger_version + 1).is_err());
+        prop_assert!(store.get_write_set(ledger_version + 1).is_err());
     }
 
     #[test]

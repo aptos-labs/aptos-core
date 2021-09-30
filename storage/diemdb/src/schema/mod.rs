@@ -20,6 +20,7 @@ pub(crate) mod transaction_accumulator;
 pub(crate) mod transaction_by_account;
 pub(crate) mod transaction_by_hash;
 pub(crate) mod transaction_info;
+pub(crate) mod write_set;
 
 use anyhow::{ensure, Result};
 use schemadb::ColumnFamilyName;
@@ -37,6 +38,7 @@ pub const TRANSACTION_ACCUMULATOR_CF_NAME: ColumnFamilyName = "transaction_accum
 pub const TRANSACTION_BY_ACCOUNT_CF_NAME: ColumnFamilyName = "transaction_by_account";
 pub const TRANSACTION_BY_HASH_CF_NAME: ColumnFamilyName = "transaction_by_hash";
 pub const TRANSACTION_INFO_CF_NAME: ColumnFamilyName = "transaction_info";
+pub const WRITE_SET_CF_NAME: ColumnFamilyName = "write_set";
 
 fn ensure_slice_len_eq(data: &[u8], len: usize) -> Result<()> {
     ensure!(
@@ -95,6 +97,7 @@ pub mod fuzzing {
             );
             decode_key_value!(super::transaction_by_hash::TransactionByHashSchema, data);
             decode_key_value!(super::transaction_info::TransactionInfoSchema, data);
+            decode_key_value!(super::write_set::WriteSetSchema, data);
         }
     }
 }

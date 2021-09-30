@@ -241,6 +241,7 @@ impl DiemDB {
             TRANSACTION_BY_ACCOUNT_CF_NAME,
             TRANSACTION_BY_HASH_CF_NAME,
             TRANSACTION_INFO_CF_NAME,
+            WRITE_SET_CF_NAME,
         ]
     }
 
@@ -586,11 +587,16 @@ impl DiemDB {
             })
             .collect::<Result<Vec<_>>>()?;
 
-        // Transaction updates. Gather transaction hashes.
         zip_eq(first_version..=last_version, txns_to_commit).try_for_each(
             |(ver, txn_to_commit)| {
+                // Transaction updates. Gather transaction hashes.
+                self.transaction_store.put_transaction(
+                    ver,
+                    txn_to_commit.transaction(),
+                    &mut cs,
+                )?;
                 self.transaction_store
-                    .put_transaction(ver, txn_to_commit.transaction(), &mut cs)
+                    .put_write_set(ver, txn_to_commit.write_set(), &mut cs)
             },
         )?;
 
