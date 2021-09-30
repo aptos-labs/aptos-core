@@ -1,9 +1,9 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{Event, Transaction, TransactionPayload};
+use crate::{Event, MoveResource, Transaction, TransactionPayload};
 use diem_types::{contract_event::ContractEvent, transaction::TransactionInfoTrait};
-use move_core_types::resolver::MoveResolver;
+use move_core_types::{language_storage::StructTag, resolver::MoveResolver};
 use resource_viewer::MoveValueAnnotator;
 
 use anyhow::Result;
@@ -17,6 +17,14 @@ impl<'a, R: MoveResolver> MoveConverter<'a, R> {
         Self {
             inner: MoveValueAnnotator::new(inner),
         }
+    }
+
+    pub fn try_into_resources<'b>(
+        &self,
+        data: impl Iterator<Item = (StructTag, &'b [u8])>,
+    ) -> Result<Vec<MoveResource>> {
+        data.map(|(typ, bytes)| Ok(self.inner.view_resource(&typ, bytes)?.into()))
+            .collect()
     }
 
     pub fn try_into_transaction<T: TransactionInfoTrait>(

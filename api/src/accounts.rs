@@ -3,9 +3,8 @@
 
 use crate::context::Context;
 
-use diem_api_types::{Address, Error, LedgerInfo, MoveModule, MoveResource, Response};
+use diem_api_types::{Address, Error, LedgerInfo, MoveConverter, MoveModule, Response};
 use diem_types::account_state::AccountState;
-use resource_viewer::MoveValueAnnotator;
 
 use anyhow::Result;
 use serde_json::json;
@@ -67,12 +66,8 @@ impl Account {
 
     pub fn resources(self) -> Result<impl Reply, Error> {
         let db = self.context.db();
-        let annotator = MoveValueAnnotator::new(&db);
-        let mut resources = vec![];
-        for (typ, bytes) in self.account_state()?.get_resources() {
-            let resource = annotator.view_resource(&typ, bytes)?;
-            resources.push(MoveResource::from(resource));
-        }
+        let converter = MoveConverter::new(&db);
+        let resources = converter.try_into_resources(self.account_state()?.get_resources())?;
         Response::new(self.ledger_info, &resources)
     }
 
