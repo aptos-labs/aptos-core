@@ -22,6 +22,7 @@ use diem_types::{
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    on_chain_config::VMPublishingOption,
     protocol_spec::DpnProto,
     transaction::{default_protocol::TransactionListWithProof, Transaction, TransactionStatus},
 };
@@ -45,7 +46,8 @@ pub fn new_test_context() -> TestContext {
     let builder = ValidatorBuilder::new(
         &tmp_dir,
         diem_framework_releases::current_module_blobs().to_vec(),
-    );
+    )
+    .publishing_option(VMPublishingOption::open());
 
     let (root_keys, genesis, genesis_waypoint, validators) = builder.build(&mut rng).unwrap();
     let validator_owner = validators[0].storage().get(OWNER_ACCOUNT).unwrap().value;

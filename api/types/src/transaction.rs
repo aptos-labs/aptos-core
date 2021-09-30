@@ -214,7 +214,9 @@ pub enum TransactionPayload {
         arguments: Vec<MoveValue>,
     },
     ScriptPayload(ScriptPayload),
-    ModulePayload,
+    ModulePayload {
+        code: HexEncodedBytes,
+    },
     WriteSetPayload,
 }
 

@@ -55,7 +55,9 @@ impl<'a, R: MoveResolver> MoveConverter<'a, R> {
         let payload = match payload {
             WriteSet(_) => TransactionPayload::WriteSetPayload,
             Script(s) => s.into(),
-            Module(_) => TransactionPayload::ModulePayload,
+            Module(m) => TransactionPayload::ModulePayload {
+                code: m.code().to_vec().into(),
+            },
             ScriptFunction(fun) => TransactionPayload::ScriptFunctionPayload {
                 module: fun.module().clone().into(),
                 function: fun.function().into(),

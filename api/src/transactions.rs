@@ -414,6 +414,50 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_get_transactions_output_user_transaction_with_module_payload() {
+        let context = new_test_context();
+        let code = "a11ceb0b0300000006010002030205050703070a0c0816100c260900000001000100000102084d794d6f64756c650269640000000000000000000000000b1e55ed00010000000231010200";
+        let mut tc_account = context.tc_account();
+        let txn = tc_account.sign_with_transaction_builder(
+            context
+                .transaction_factory()
+                .module(hex::decode(code).unwrap()),
+        );
+        context.commit_block(&vec![txn.clone()]);
+
+        let txns = context.get("/transactions?start=2").await;
+        assert_eq!(1, txns.as_array().unwrap().len());
+
+        let expected_txns = context.get_transactions(2, 1);
+        assert_eq!(1, expected_txns.proof.transaction_infos.len());
+
+        let user_txn_info = expected_txns.proof.transaction_infos[0].clone();
+        assert_json(
+            txns[0].clone(),
+            json!({
+                "type": "user_transaction",
+                "version": "2",
+                "hash": user_txn_info.transaction_hash().to_hex_literal(),
+                "state_root_hash": user_txn_info.state_root_hash().to_hex_literal(),
+                "event_root_hash": user_txn_info.event_root_hash().to_hex_literal(),
+                "gas_used": user_txn_info.gas_used().to_string(),
+                "success": true,
+                "sender": "0xb1e55ed",
+                "sequence_number": "0",
+                "max_gas_amount": "1000000",
+                "gas_unit_price": "0",
+                "gas_currency_code": "XUS",
+                "expiration_timestamp_secs": txn.expiration_timestamp_secs().to_string(),
+                "events": [],
+                "payload": {
+                    "type": "module_payload",
+                    "code": format!("0x{}", code),
+                }
+            }),
+        )
+    }
+
+    #[tokio::test]
     async fn test_post_bcs_format_transaction() {
         let mut context = new_test_context();
         let account = context.gen_account();

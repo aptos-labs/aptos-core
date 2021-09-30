@@ -6,7 +6,9 @@ use crate::{
     types::{
         account_config::{xdx_type_tag, xus_tag, XDX_NAME, XUS_NAME},
         chain_id::ChainId,
-        transaction::{authenticator::AuthenticationKey, RawTransaction, TransactionPayload},
+        transaction::{
+            authenticator::AuthenticationKey, Module, RawTransaction, TransactionPayload,
+        },
     },
 };
 use serde::{Deserialize, Serialize};
@@ -131,6 +133,10 @@ impl TransactionFactory {
 
     pub fn payload(&self, payload: TransactionPayload) -> TransactionBuilder {
         self.transaction_builder(payload)
+    }
+
+    pub fn module(&self, code: Vec<u8>) -> TransactionBuilder {
+        self.payload(TransactionPayload::Module(Module::new(code)))
     }
 
     pub fn add_currency_to_account(&self, currency: Currency) -> TransactionBuilder {
