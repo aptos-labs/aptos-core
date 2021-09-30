@@ -88,9 +88,9 @@ impl Account {
     fn account_state(&self) -> Result<AccountState, Error> {
         let state = self
             .context
-            .get_account_state_blob(self.address.into(), self.ledger_info.version())?
+            .get_account_state(self.address.into(), self.ledger_info.version())?
             .ok_or_else(|| self.account_not_found())?;
-        Ok(AccountState::try_from(&state)?)
+        Ok(state)
     }
 
     fn account_not_found(&self) -> Error {

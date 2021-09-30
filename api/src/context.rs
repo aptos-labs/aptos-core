@@ -5,6 +5,7 @@ use diem_api_types::{Error, LedgerInfo};
 use diem_mempool::{MempoolClientSender, SubmissionStatus};
 use diem_types::{
     account_address::AccountAddress,
+    account_state::AccountState,
     account_state_blob::AccountStateBlob,
     chain_id::ChainId,
     ledger_info::LedgerInfoWithSignatures,
@@ -15,7 +16,11 @@ use storage_interface::MoveDbReader;
 
 use anyhow::Result;
 use futures::{channel::oneshot, SinkExt};
-use std::{borrow::Borrow, convert::Infallible, sync::Arc};
+use std::{
+    borrow::Borrow,
+    convert::{Infallible, TryFrom},
+    sync::Arc,
+};
 use warp::Filter;
 
 // Context holds application scope context
@@ -67,6 +72,18 @@ impl Context {
 
     pub fn get_latest_ledger_info_with_signatures(&self) -> Result<LedgerInfoWithSignatures> {
         self.db.get_latest_ledger_info()
+    }
+
+    pub fn get_account_state(
+        &self,
+        address: AccountAddress,
+        version: u64,
+    ) -> Result<Option<AccountState>> {
+        let state = self.get_account_state_blob(address, version)?;
+        Ok(match state {
+            Some(blob) => Some(AccountState::try_from(&blob)?),
+            None => None,
+        })
     }
 
     pub fn get_account_state_blob(
