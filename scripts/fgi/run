@@ -223,9 +223,14 @@ except Exception as e:
     job_status = {"failed": 1}
 
 end_ts_ms = int(time.time() * 1000)
+DASHBOARD_LINK = f"{grafana_url}/d/overview/overview?from={start_ts_ms}&to={end_ts_ms}&orgId=1"
+LOGGING_LINK = "https://diem-development.kb.us-west1.gcp.cloud.es.io:9243/app/discover#/?_g=(filters:!()," \
+               "refreshInterval:(pause:!t,value:0),time:(from:now-15m,to:now))&_a=(columns:!(),filters:!()," \
+               "index:'2da2a6e0-f70a-11eb-ad53-b979a6c9b83a',interval:auto,query:(language:kuery,query:'')," \
+               "sort:!(!('@timestamp',desc)))"
 print("\n**********")
 print(
-    f"{OKBLUE}Dashboard snapshot:{RESTORE} {grafana_url}/d/overview/overview?from={start_ts_ms}&to={end_ts_ms}&orgId=1"
+    f"{OKBLUE}Dashboard snapshot:{RESTORE} {DASHBOARD_LINK}"
 )
 print("**********\n")
 
@@ -239,12 +244,14 @@ if args.report:
             if read_lines:
                 test_report.append(line)
             if 'json-report-begin' in line: read_lines = True
+    if len(test_report) == 0:
+        test_report.append("{\"text\": \"Forge test runner is terminated\"}")
+    temp = json.loads(''.join(test_report))
+    temp["logs"] = "Logs: " + LOGGING_LINK
+    temp["dashboard"] = "Dashboard: " + DASHBOARD_LINK
     with open(f"{REPORT}", 'w') as file_object:
-        if len(test_report) == 0:
-            file_object.write("{\"text\": \"Forge test runner is terminated\"}")
-        else:
-            for line in test_report:
-                file_object.write(f"{line}\n")
+        file_object.write(json.dumps(temp))
+
 
 if "failed" in job_status and job_status["failed"] == 1:
     print()

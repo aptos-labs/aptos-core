@@ -1035,6 +1035,8 @@ jobs:
               body = `Forge Test Result
             \`\`\`
             ${result.text}
+            ${result.logs}
+            ${result.dashboard}
             \`\`\`
             `;
               // Check FGI exit code for errors
