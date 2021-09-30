@@ -12,10 +12,11 @@ use move_binary_format::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    identifier::Identifier,
-    language_storage::{StructTag, TypeTag},
+    identifier::{IdentStr, Identifier},
+    language_storage::{ModuleId, StructTag, TypeTag},
     resolver::MoveResolver,
     value::{MoveStruct, MoveValue},
+    vm_status::VMStatus,
 };
 use serde::ser::{SerializeMap, SerializeSeq};
 use std::{
@@ -81,20 +82,46 @@ impl<'a, T: MoveResolver> MoveValueAnnotator<'a, T> {
         self.cache.state.get_resource(addr, tag).ok()?
     }
 
+    pub fn view_function_arguments(
+        &self,
+        module: &ModuleId,
+        function: &IdentStr,
+        args: &[Vec<u8>],
+    ) -> Result<Vec<AnnotatedMoveValue>> {
+        let types: Vec<FatType> = self
+            .cache
+            .resolve_function_arguments(module, function)?
+            .into_iter()
+            .filter(|t| !matches!(t, FatType::Signer))
+            .collect();
+        anyhow::ensure!(
+            types.len() == args.len(),
+            "unexpected error: argument types({}) and values({}) are not matched",
+            types.len(),
+            args.len(),
+        );
+        types
+            .iter()
+            .enumerate()
+            .map(|(i, ty)| {
+                let arg = &args[i];
+                let layout = (ty).try_into().map_err(into_vm_status)?;
+                let move_value = MoveValue::simple_deserialize(arg, &layout)?;
+                self.annotate_value(&move_value, ty)
+            })
+            .collect::<Result<_>>()
+    }
+
     pub fn view_resource(&self, tag: &StructTag, blob: &[u8]) -> Result<AnnotatedMoveStruct> {
         let ty = self.cache.resolve_struct(tag)?;
-        let struct_def = (&ty)
-            .try_into()
-            .map_err(|e: PartialVMError| e.finish(Location::Undefined).into_vm_status())?;
+        let struct_def = (&ty).try_into().map_err(into_vm_status)?;
         let move_struct = MoveStruct::simple_deserialize(blob, &struct_def)?;
         self.annotate_struct(&move_struct, &ty)
     }
 
     pub fn view_value(&self, ty_tag: &TypeTag, blob: &[u8]) -> Result<AnnotatedMoveValue> {
         let ty = self.cache.resolve_type(ty_tag)?;
-        let layout = (&ty)
-            .try_into()
-            .map_err(|e: PartialVMError| e.finish(Location::Undefined).into_vm_status())?;
+        let layout = (&ty).try_into().map_err(into_vm_status)?;
         let move_value = MoveValue::simple_deserialize(blob, &layout)?;
         self.annotate_value(&move_value, &ty)
     }
@@ -157,6 +184,10 @@ impl<'a, T: MoveResolver> MoveValueAnnotator<'a, T> {
             }
         })
     }
+}
+
+fn into_vm_status(e: PartialVMError) -> VMStatus {
+    e.finish(Location::Undefined).into_vm_status()
 }
 
 fn write_indent(f: &mut Formatter, indent: u64) -> std::fmt::Result {

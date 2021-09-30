@@ -86,6 +86,12 @@ pub enum KeptVMStatus {
     MiscellaneousError,
 }
 
+impl KeptVMStatus {
+    pub fn is_success(&self) -> bool {
+        matches!(self, KeptVMStatus::Executed)
+    }
+}
+
 pub type DiscardedVMStatus = StatusCode;
 
 /// An `AbortLocation` specifies where a Move program `abort` occurred, either in a function in

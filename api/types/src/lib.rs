@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod address;
+mod convert;
 mod error;
 mod event_key;
 mod hash;
@@ -12,6 +13,7 @@ mod response;
 mod transaction;
 
 pub use address::Address;
+pub use convert::MoveConverter;
 pub use error::Error;
 pub use event_key::EventKey;
 pub use hash::HashValue;
@@ -21,4 +23,7 @@ pub use move_types::{
     MoveType, MoveValue, U128, U64,
 };
 pub use response::{Response, X_DIEM_CHAIN_ID, X_DIEM_LEDGER_TIMESTAMP, X_DIEM_LEDGER_VERSION};
-pub use transaction::{Event, Transaction};
+pub use transaction::{
+    BlockMetadataTransaction, Event, GenesisTransaction, PendingTransaction, Transaction,
+    TransactionPayload, UserTransaction,
+};

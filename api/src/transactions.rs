@@ -3,12 +3,8 @@
 
 use crate::{context::Context, page::Page};
 
-use diem_api_types::{mime_types, Error, Event, LedgerInfo, Response, Transaction};
-use diem_types::{
-    contract_event::ContractEvent, mempool_status::MempoolStatusCode,
-    transaction::SignedTransaction,
-};
-use resource_viewer::MoveValueAnnotator;
+use diem_api_types::{mime_types, Error, LedgerInfo, MoveConverter, Response, Transaction};
+use diem_types::{mempool_status::MempoolStatusCode, transaction::SignedTransaction};
 
 use anyhow::{format_err, Result};
 use serde_json::json;
@@ -107,45 +103,25 @@ impl Transactions {
             return Err(transaction_not_found(start_version, ledger_version));
         }
         let limit = page.limit()?;
+
         let data = self
             .context
             .get_transactions(start_version, limit, ledger_version)?;
 
-        let txn_start_version = data.first_transaction_version.unwrap_or(0);
-        let submitted = data.transactions;
+        let db = self.context.db();
+        let converter = MoveConverter::new(&db);
+
         let infos = data.proof.transaction_infos;
         let events = data.events.unwrap_or_default();
-
-        if submitted.len() != infos.len() || submitted.len() != events.len() {
-            return Err(format_err!(
-                "invalid data size from database: {}, {}, {}",
-                submitted.len(),
-                infos.len(),
-                events.len(),
-            )
-            .into());
-        }
-
-        let txns: Vec<Transaction> = submitted
+        let txns: Vec<Transaction> = data
+            .transactions
             .iter()
             .enumerate()
-            .map(|(i, txn)| (txn_start_version + i as u64, txn, &infos[i], &events[i]))
-            .map(|(version, txn, info, events)| {
-                Ok((version, txn, info, self.events(version, events)?).into())
+            .map(|(i, txn)| {
+                converter.try_into_transaction(start_version + i as u64, txn, &infos[i], &events[i])
             })
             .collect::<Result<_>>()?;
         Response::new(self.ledger_info, &txns)
-    }
-
-    fn events(&self, txn_version: u64, events: &[ContractEvent]) -> Result<Vec<Event>> {
-        let db = self.context.db();
-        let annotator = MoveValueAnnotator::new(&db);
-        let mut ret = vec![];
-        for event in events {
-            let data = annotator.view_value(event.type_tag(), event.event_data())?;
-            ret.push((txn_version, event, data).into());
-        }
-        Ok(ret)
     }
 }
 
@@ -306,7 +282,7 @@ mod tests {
             txns[0].clone(),
             json!(
             {
-                "type": "block_metadata",
+                "type": "block_metadata_transaction",
                 "version": "1",
                 "hash": metadata.transaction_hash().to_hex_literal(),
                 "state_root_hash": metadata.state_root_hash().to_hex_literal(),
@@ -354,7 +330,31 @@ mod tests {
                             "role_id": "5"
                         }
                     }
-                ]
+                ],
+                "payload": {
+                    "type": "script_function_payload",
+                    "module": {
+                        "address": "0x1",
+                        "name": "AccountCreationScripts"
+                    },
+                    "function": "create_parent_vasp_account",
+                    "type_arguments": [
+                        {
+                            "type": "struct",
+                            "address": "0x1",
+                            "module": "XUS",
+                            "name": "XUS",
+                            "generic_type_params": []
+                        }
+                    ],
+                    "arguments": [
+                        "0",
+                        account.address().to_hex_literal(),
+                        format!("0x{}", hex::encode(account.authentication_key().prefix())),
+                        format!("0x{}", hex::encode("vasp".as_bytes())),
+                        true
+                    ]
+                }
             }),
         )
     }

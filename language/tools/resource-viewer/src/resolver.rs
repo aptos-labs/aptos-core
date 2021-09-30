@@ -12,6 +12,7 @@ use move_binary_format::{
     file_format::{
         SignatureToken, StructDefinitionIndex, StructFieldInformation, StructHandleIndex,
     },
+    views::FunctionHandleView,
     CompiledModule,
 };
 use move_core_types::{
@@ -37,12 +38,16 @@ impl<'a, T: MoveResolver> Resolver<'a, T> {
 
     fn get_module(&self, address: &AccountAddress, name: &IdentStr) -> Result<Rc<CompiledModule>> {
         let module_id = ModuleId::new(*address, name.to_owned());
-        if let Some(module) = self.cache.get(&module_id) {
+        self.get_module_by_id(&module_id)
+    }
+
+    fn get_module_by_id(&self, module_id: &ModuleId) -> Result<Rc<CompiledModule>> {
+        if let Some(module) = self.cache.get(module_id) {
             return Ok(module);
         }
         let blob = self
             .state
-            .get_module(&module_id)
+            .get_module(module_id)
             .map_err(|e| anyhow!("Error retrieving module {:?}: {:?}", module_id, e))?
             .ok_or_else(|| anyhow!("Module {:?} can't be found", module_id))?;
         let compiled_module = CompiledModule::deserialize(&blob).map_err(|status| {
@@ -52,7 +57,28 @@ impl<'a, T: MoveResolver> Resolver<'a, T> {
                 status
             )
         })?;
-        Ok(self.cache.insert(module_id, compiled_module))
+        Ok(self.cache.insert(module_id.clone(), compiled_module))
+    }
+
+    pub fn resolve_function_arguments(
+        &self,
+        module: &ModuleId,
+        function: &IdentStr,
+    ) -> Result<Vec<FatType>> {
+        let m = self.get_module_by_id(module)?;
+        for def in m.function_defs.iter() {
+            let fhandle = m.function_handle_at(def.function);
+            let fhandle_view = FunctionHandleView::new(m.as_ref(), fhandle);
+            if fhandle_view.name() == function {
+                return fhandle_view
+                    .parameters()
+                    .0
+                    .iter()
+                    .map(|signature| self.resolve_signature(m.clone(), signature))
+                    .collect::<Result<_>>();
+            }
+        }
+        Err(anyhow!("Function {:?} not found in {:?}", function, module))
     }
 
     pub fn resolve_type(&self, type_tag: &TypeTag) -> Result<FatType> {

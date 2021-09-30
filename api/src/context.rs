@@ -14,7 +14,7 @@ use diem_types::{
 };
 use storage_interface::MoveDbReader;
 
-use anyhow::Result;
+use anyhow::{ensure, format_err, Result};
 use futures::{channel::oneshot, SinkExt};
 use std::{
     borrow::Borrow,
@@ -103,7 +103,30 @@ impl Context {
         limit: u16,
         ledger_version: u64,
     ) -> Result<TransactionListWithProof> {
-        self.db
-            .get_transactions(start_version, limit as u64, ledger_version, true)
+        let data = self
+            .db
+            .get_transactions(start_version, limit as u64, ledger_version, true)?;
+
+        let txn_start_version = data
+            .first_transaction_version
+            .ok_or_else(|| format_err!("no start version from database"))?;
+        ensure!(
+            txn_start_version == start_version,
+            "invalid start version from database: {} != {}",
+            txn_start_version,
+            start_version
+        );
+
+        let txns_len = data.transactions.len();
+        let infos_len = data.proof.transaction_infos.len();
+        let events_len = data.events.as_ref().map(|e| e.len()).unwrap_or_default();
+        ensure!(
+            txns_len == infos_len && txns_len == events_len,
+            "invalid data size from database: {}, {}, {}",
+            txns_len,
+            infos_len,
+            events_len
+        );
+        Ok(data)
     }
 }

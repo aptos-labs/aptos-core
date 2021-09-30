@@ -1,85 +1,42 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{Address, EventKey, HashValue, HexEncodedBytes, MoveType, MoveValue, U64};
+use crate::{
+    Address, EventKey, HashValue, HexEncodedBytes, MoveModuleId, MoveType, MoveValue, U64,
+};
 
 use diem_crypto::hash::CryptoHash;
 use diem_types::{
+    block_metadata::BlockMetadata,
     contract_event::ContractEvent,
-    transaction::{SignedTransaction, Transaction as DiemTransaction, TransactionInfoTrait},
-    vm_status::KeptVMStatus,
+    transaction::{SignedTransaction, TransactionInfoTrait, WriteSetPayload},
 };
+use move_core_types::identifier::Identifier;
 use resource_viewer::AnnotatedMoveValue;
 
 use serde::Serialize;
-use std::convert::From;
+use std::{boxed::Box, convert::From};
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Transaction {
-    PendingTransaction {
-        hash: HashValue,
-        sender: Address,
-        sequence_number: U64,
-        max_gas_amount: U64,
-        gas_unit_price: U64,
-        gas_currency_code: String,
-        expiration_timestamp_secs: U64,
-    },
-    UserTransaction {
-        version: U64,
-        hash: HashValue,
-        state_root_hash: HashValue,
-        event_root_hash: HashValue,
-        gas_used: U64,
-        success: bool,
-
-        // user txn specific fields
-        sender: Address,
-        sequence_number: U64,
-        max_gas_amount: U64,
-        gas_unit_price: U64,
-        gas_currency_code: String,
-        expiration_timestamp_secs: U64,
-        events: Vec<Event>,
-    },
-    GenesisTransaction {
-        version: U64,
-        hash: HashValue,
-        state_root_hash: HashValue,
-        event_root_hash: HashValue,
-        gas_used: U64,
-        success: bool,
-
-        // genesis txn specific fields
-        data: HexEncodedBytes,
-        events: Vec<Event>,
-    },
-    BlockMetadata {
-        version: U64,
-        hash: HashValue,
-        state_root_hash: HashValue,
-        event_root_hash: HashValue,
-        gas_used: U64,
-        success: bool,
-
-        // block metadata txn specific fields
-        id: HashValue,
-        round: U64,
-        previous_block_votes: Vec<Address>,
-        proposer: Address,
-    },
+    PendingTransaction(PendingTransaction),
+    UserTransaction(Box<UserTransaction>),
+    GenesisTransaction(GenesisTransaction),
+    BlockMetadataTransaction(BlockMetadataTransaction),
 }
 
 impl Transaction {
     pub fn hash(txn: SignedTransaction) -> HashValue {
-        DiemTransaction::UserTransaction(txn).hash().into()
+        diem_types::transaction::Transaction::UserTransaction(txn)
+            .hash()
+            .into()
     }
 }
 
 impl From<SignedTransaction> for Transaction {
     fn from(txn: SignedTransaction) -> Self {
-        Transaction::PendingTransaction {
+        Transaction::PendingTransaction(PendingTransaction {
             sender: txn.sender().into(),
             sequence_number: txn.sequence_number().into(),
             max_gas_amount: txn.max_gas_amount().into(),
@@ -87,60 +44,140 @@ impl From<SignedTransaction> for Transaction {
             gas_currency_code: txn.gas_currency_code().to_owned(),
             expiration_timestamp_secs: txn.expiration_timestamp_secs().into(),
             hash: Transaction::hash(txn),
-        }
+        })
     }
 }
 
-impl<T: TransactionInfoTrait> From<(u64, &DiemTransaction, &T, Vec<Event>)> for Transaction {
-    fn from((version, submitted, info, events): (u64, &DiemTransaction, &T, Vec<Event>)) -> Self {
-        match submitted {
-            DiemTransaction::UserTransaction(txn) => Transaction::UserTransaction {
-                version: version.into(),
-                hash: info.transaction_hash().into(),
-                state_root_hash: info.state_root_hash().into(),
-                event_root_hash: info.event_root_hash().into(),
-                gas_used: info.gas_used().into(),
-                success: info.status() == &KeptVMStatus::Executed,
+impl<T: TransactionInfoTrait> From<(u64, &SignedTransaction, &T, Vec<Event>, TransactionPayload)>
+    for Transaction
+{
+    fn from(
+        (version, txn, info, events, payload): (
+            u64,
+            &SignedTransaction,
+            &T,
+            Vec<Event>,
+            TransactionPayload,
+        ),
+    ) -> Self {
+        Transaction::UserTransaction(Box::new(UserTransaction {
+            version: version.into(),
+            hash: info.transaction_hash().into(),
+            state_root_hash: info.state_root_hash().into(),
+            event_root_hash: info.event_root_hash().into(),
+            gas_used: info.gas_used().into(),
+            success: info.status().is_success(),
 
-                sender: txn.sender().into(),
-                sequence_number: txn.sequence_number().into(),
-                max_gas_amount: txn.max_gas_amount().into(),
-                gas_unit_price: txn.gas_unit_price().into(),
-                gas_currency_code: txn.gas_currency_code().to_owned(),
-                expiration_timestamp_secs: txn.expiration_timestamp_secs().into(),
-                events,
-            },
-            DiemTransaction::GenesisTransaction(txn) => Transaction::GenesisTransaction {
-                version: version.into(),
-                hash: info.transaction_hash().into(),
-                state_root_hash: info.state_root_hash().into(),
-                event_root_hash: info.event_root_hash().into(),
-                gas_used: info.gas_used().into(),
-                success: info.status() == &KeptVMStatus::Executed,
-
-                data: bcs::to_bytes(&txn).unwrap_or_default().into(),
-                events,
-            },
-            DiemTransaction::BlockMetadata(txn) => Transaction::BlockMetadata {
-                version: version.into(),
-                hash: info.transaction_hash().into(),
-                state_root_hash: info.state_root_hash().into(),
-                event_root_hash: info.event_root_hash().into(),
-                gas_used: info.gas_used().into(),
-                success: info.status() == &KeptVMStatus::Executed,
-
-                id: txn.id().into(),
-                round: txn.round().into(),
-                previous_block_votes: txn
-                    .previous_block_votes()
-                    .clone()
-                    .iter()
-                    .map(|a| (*a).into())
-                    .collect(),
-                proposer: txn.proposer().into(),
-            },
-        }
+            sender: txn.sender().into(),
+            sequence_number: txn.sequence_number().into(),
+            max_gas_amount: txn.max_gas_amount().into(),
+            gas_unit_price: txn.gas_unit_price().into(),
+            gas_currency_code: txn.gas_currency_code().to_owned(),
+            expiration_timestamp_secs: txn.expiration_timestamp_secs().into(),
+            events,
+            payload,
+        }))
     }
+}
+
+impl<T: TransactionInfoTrait> From<(u64, &WriteSetPayload, &T, Vec<Event>)> for Transaction {
+    fn from((version, txn, info, events): (u64, &WriteSetPayload, &T, Vec<Event>)) -> Self {
+        Transaction::GenesisTransaction(GenesisTransaction {
+            version: version.into(),
+            hash: info.transaction_hash().into(),
+            state_root_hash: info.state_root_hash().into(),
+            event_root_hash: info.event_root_hash().into(),
+            gas_used: info.gas_used().into(),
+            success: info.status().is_success(),
+
+            data: bcs::to_bytes(&txn).unwrap_or_default().into(),
+            events,
+        })
+    }
+}
+
+impl<T: TransactionInfoTrait> From<(u64, &BlockMetadata, &T)> for Transaction {
+    fn from((version, txn, info): (u64, &BlockMetadata, &T)) -> Self {
+        Transaction::BlockMetadataTransaction(BlockMetadataTransaction {
+            version: version.into(),
+            hash: info.transaction_hash().into(),
+            state_root_hash: info.state_root_hash().into(),
+            event_root_hash: info.event_root_hash().into(),
+            gas_used: info.gas_used().into(),
+            success: info.status().is_success(),
+
+            id: txn.id().into(),
+            round: txn.round().into(),
+            previous_block_votes: txn
+                .previous_block_votes()
+                .clone()
+                .iter()
+                .map(|a| (*a).into())
+                .collect(),
+            proposer: txn.proposer().into(),
+        })
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct PendingTransaction {
+    pub hash: HashValue,
+    pub sender: Address,
+    pub sequence_number: U64,
+    pub max_gas_amount: U64,
+    pub gas_unit_price: U64,
+    pub gas_currency_code: String,
+    pub expiration_timestamp_secs: U64,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct UserTransaction {
+    pub version: U64,
+    pub hash: HashValue,
+    pub state_root_hash: HashValue,
+    pub event_root_hash: HashValue,
+    pub gas_used: U64,
+    pub success: bool,
+
+    // user txn specific fields
+    pub sender: Address,
+    pub sequence_number: U64,
+    pub max_gas_amount: U64,
+    pub gas_unit_price: U64,
+    pub gas_currency_code: String,
+    pub expiration_timestamp_secs: U64,
+    pub events: Vec<Event>,
+    pub payload: TransactionPayload,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct GenesisTransaction {
+    pub version: U64,
+    pub hash: HashValue,
+    pub state_root_hash: HashValue,
+    pub event_root_hash: HashValue,
+    pub gas_used: U64,
+    pub success: bool,
+
+    // genesis txn specific fields
+    pub data: HexEncodedBytes,
+    pub events: Vec<Event>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct BlockMetadataTransaction {
+    pub version: U64,
+    pub hash: HashValue,
+    pub state_root_hash: HashValue,
+    pub event_root_hash: HashValue,
+    pub gas_used: U64,
+    pub success: bool,
+
+    // block metadata txn specific fields
+    pub id: HashValue,
+    pub round: U64,
+    pub previous_block_votes: Vec<Address>,
+    pub proposer: Address,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -165,4 +202,18 @@ impl From<(u64, &ContractEvent, AnnotatedMoveValue)> for Event {
             },
         }
     }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum TransactionPayload {
+    ScriptFunctionPayload {
+        module: MoveModuleId,
+        function: Identifier,
+        type_arguments: Vec<MoveType>,
+        arguments: Vec<MoveValue>,
+    },
+    ScriptPayload,
+    ModulePayload,
+    WriteSetPayload,
 }

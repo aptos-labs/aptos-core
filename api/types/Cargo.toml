@@ -11,11 +11,11 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0.38"
+bcs = "0.1.2"
 hex = "0.4.3"
 serde = { version = "1.0.124", default-features = false }
 serde_json = "1.0.64"
 warp = { version = "0.3.0", features = ["default"] }
-bcs = "0.1.2"
 
 diem-crypto = { path = "../../crypto/crypto" }
 diem-types = { path = "../../types" }
