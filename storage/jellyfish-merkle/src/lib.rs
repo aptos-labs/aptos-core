@@ -821,7 +821,11 @@ where
             let mut children = Children::new();
             children.insert(
                 nibble,
-                Child::new(next_internal_node.hash(), version, next_internal_node.node_type()),
+                Child::new(
+                    next_internal_node.hash(),
+                    version,
+                    next_internal_node.node_type(),
+                ),
             );
             let internal_node = InternalNode::new(children);
             next_internal_node = internal_node.clone().into();

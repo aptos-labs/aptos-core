@@ -141,6 +141,11 @@ impl StateStore {
 
         Ok(ret)
     }
+
+    #[allow(dead_code)]
+    pub fn get_account_count(&self, version: Version) -> Result<Option<usize>> {
+        JellyfishMerkleTree::new(self).get_leaf_count(version)
+    }
 }
 
 impl TreeReader<AccountStateBlob> for StateStore {

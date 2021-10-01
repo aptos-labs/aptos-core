@@ -49,7 +49,7 @@ fn gen_leaf_keys(
     (NodeKey::new(version, np), account_key)
 }
 
-pub(crate) fn to_legacy_internal(mut node: InternalNode) -> InternalNode {
+fn to_legacy_internal(mut node: InternalNode) -> InternalNode {
     node.children.iter_mut().for_each(|(_, mut child)| {
         if matches!(child.node_type, NodeType::Internal { .. }) {
             child.node_type = NodeType::InternalLegacy
@@ -58,14 +58,6 @@ pub(crate) fn to_legacy_internal(mut node: InternalNode) -> InternalNode {
     node.leaf_count = None;
 
     node
-}
-
-pub(crate) fn to_legacy(node: Node) -> Node {
-    if let Node::Internal(internal_node) = node {
-        Node::Internal(to_legacy_internal(internal_node))
-    } else {
-        node
-    }
 }
 
 #[test]
@@ -94,7 +86,7 @@ fn test_encode_decode() {
     ];
     for n in &nodes {
         let v = n.encode().unwrap();
-        assert_eq!(to_legacy(n.clone()), Node::decode(&v).unwrap());
+        assert_eq!(*n, Node::decode(&v).unwrap());
     }
     // Error cases
     if let Err(e) = Node::decode(&[]) {
@@ -120,10 +112,16 @@ proptest! {
     }
 
     #[test]
-    fn test_internal_node_roundtrip(input in any::<InternalNode>()) {
+    fn test_internal_node_roundtrip(input in any::<InternalNode>(), try_persist_leaf_counts in any::<bool>()) {
         let mut vec = vec![];
-        input.serialize(&mut vec).unwrap();
-        assert_eq!(InternalNode::deserialize(&vec).unwrap(), input);
+        let persist_leaf_counts = !input.is_legacy() && try_persist_leaf_counts;
+        input.serialize(&mut vec, persist_leaf_counts).unwrap();
+        let deserialized = InternalNode::deserialize(&vec, persist_leaf_counts).unwrap();
+        if persist_leaf_counts {
+            assert_eq!(deserialized, input)
+        } else {
+            assert_eq!(to_legacy_internal(deserialized), to_legacy_internal(input))
+        }
     }
 }
 

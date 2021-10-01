@@ -10,7 +10,7 @@
 //! chidren at the lowest level. [`LeafNode`] stores the full key and the value associated.
 
 #[cfg(test)]
-pub(crate) mod node_type_test;
+mod node_type_test;
 
 use crate::metrics::{DIEM_JELLYFISH_INTERNAL_ENCODED_BYTES, DIEM_JELLYFISH_LEAF_ENCODED_BYTES};
 use anyhow::{ensure, Context, Result};
@@ -329,7 +329,7 @@ impl InternalNode {
         )
     }
 
-    pub fn serialize(&self, binary: &mut Vec<u8>) -> Result<()> {
+    pub fn serialize(&self, binary: &mut Vec<u8>, persist_leaf_counts: bool) -> Result<()> {
         let (mut existence_bitmap, leaf_bitmap) = self.generate_bitmaps();
         binary.write_u16::<LittleEndian>(existence_bitmap)?;
         binary.write_u16::<LittleEndian>(leaf_bitmap)?;
@@ -338,12 +338,21 @@ impl InternalNode {
             let child = &self.children[&Nibble::from(next_child)];
             serialize_u64_varint(child.version, binary);
             binary.extend(child.hash.to_vec());
+            match child.node_type {
+                NodeType::Leaf => (),
+                NodeType::InternalLegacy => assert!(!persist_leaf_counts),
+                NodeType::Internal { leaf_count } => {
+                    if persist_leaf_counts {
+                        serialize_u64_varint(leaf_count as u64, binary);
+                    }
+                }
+            };
             existence_bitmap &= !(1 << next_child);
         }
         Ok(())
     }
 
-    pub fn deserialize(data: &[u8]) -> Result<Self> {
+    pub fn deserialize(data: &[u8], read_leaf_counts: bool) -> Result<Self> {
         let mut reader = Cursor::new(data);
         let len = data.len();
 
@@ -364,38 +373,50 @@ impl InternalNode {
 
         // Reconstruct children
         let mut children = HashMap::new();
+        let mut sum_leaf_count = 0;
         for _ in 0..existence_bitmap.count_ones() {
             let next_child = existence_bitmap.trailing_zeros() as u8;
             let version = deserialize_u64_varint(&mut reader)?;
             let pos = reader.position() as usize;
             let remaining = len - pos;
+
             ensure!(
                 remaining >= size_of::<HashValue>(),
                 "not enough bytes left, children: {}, bytes: {}",
                 existence_bitmap.count_ones(),
                 remaining
             );
+            let hash = HashValue::from_slice(&reader.get_ref()[pos..pos + size_of::<HashValue>()])?;
+            reader.seek(SeekFrom::Current(size_of::<HashValue>() as i64))?;
+
             let child_bit = 1 << next_child;
+            let node_type = if (leaf_bitmap & child_bit) != 0 {
+                sum_leaf_count += 1;
+                NodeType::Leaf
+            } else if read_leaf_counts {
+                let leaf_count = deserialize_u64_varint(&mut reader)? as usize;
+                sum_leaf_count += leaf_count;
+                NodeType::Internal { leaf_count }
+            } else {
+                NodeType::InternalLegacy
+            };
+
             children.insert(
                 Nibble::from(next_child),
-                Child::new(
-                    HashValue::from_slice(&reader.get_ref()[pos..pos + size_of::<HashValue>()])?,
-                    version,
-                    // TODO(aldenhu): make it real
-                    if (leaf_bitmap & child_bit) != 0 {
-                        NodeType::Leaf
-                    } else {
-                        NodeType::InternalLegacy
-                    },
-                ),
+                Child::new(hash, version, node_type),
             );
-            reader.seek(SeekFrom::Current(size_of::<HashValue>() as i64))?;
             existence_bitmap &= !child_bit;
         }
         assert_eq!(existence_bitmap, 0);
+
+        let leaf_count = if read_leaf_counts {
+            Some(sum_leaf_count)
+        } else {
+            None
+        };
         Ok(Self {
             children,
-            leaf_count: None,
+            leaf_count,
         })
     }
 
@@ -622,8 +643,9 @@ impl<V> From<LeafNode<V>> for SparseMerkleLeafNode {
 #[derive(FromPrimitive, ToPrimitive)]
 enum NodeTag {
     Null = 0,
-    Internal = 1,
+    InternalLegacy = 1,
     Leaf = 2,
+    Internal = 3,
 }
 
 /// The concrete node type of [`JellyfishMerkleTree`](crate::JellyfishMerkleTree).
@@ -702,13 +724,21 @@ where
     /// Serializes to bytes for physical storage.
     pub fn encode(&self) -> Result<Vec<u8>> {
         let mut out = vec![];
+
         match self {
             Node::Null => {
                 out.push(NodeTag::Null as u8);
             }
             Node::Internal(internal_node) => {
-                out.push(NodeTag::Internal as u8);
-                internal_node.serialize(&mut out)?;
+                // TODO(aldenhu): add migration control
+                let persist_leaf_count = !internal_node.is_legacy();
+                let tag = if persist_leaf_count {
+                    NodeTag::Internal
+                } else {
+                    NodeTag::InternalLegacy
+                };
+                out.push(tag as u8);
+                internal_node.serialize(&mut out, persist_leaf_count)?;
                 DIEM_JELLYFISH_INTERNAL_ENCODED_BYTES.inc_by(out.len() as u64);
             }
             Node::Leaf(leaf_node) => {
@@ -738,7 +768,12 @@ where
         let node_tag = NodeTag::from_u8(tag);
         match node_tag {
             Some(NodeTag::Null) => Ok(Node::Null),
-            Some(NodeTag::Internal) => Ok(Node::Internal(InternalNode::deserialize(&val[1..])?)),
+            Some(NodeTag::InternalLegacy) => {
+                Ok(Node::Internal(InternalNode::deserialize(&val[1..], false)?))
+            }
+            Some(NodeTag::Internal) => {
+                Ok(Node::Internal(InternalNode::deserialize(&val[1..], true)?))
+            }
             Some(NodeTag::Leaf) => Ok(Node::Leaf(bcs::from_bytes(&val[1..])?)),
             None => Err(NodeDecodeError::UnknownTag { unknown_tag: tag }.into()),
         }

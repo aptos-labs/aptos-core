@@ -2,13 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::*;
-use crate::{
-    node_type::node_type_test::to_legacy,
-    test_helper::{
-        arb_existent_kvs_and_nonexistent_keys, arb_kv_pair_with_distinct_last_nibble,
-        arb_tree_with_index, test_get_leaf_count, test_get_range_proof, test_get_with_proof,
-        test_get_with_proof_with_distinct_last_nibble, ValueBlob,
-    },
+use crate::test_helper::{
+    arb_existent_kvs_and_nonexistent_keys, arb_kv_pair_with_distinct_last_nibble,
+    arb_tree_with_index, test_get_leaf_count, test_get_range_proof, test_get_with_proof,
+    test_get_with_proof_with_distinct_last_nibble, ValueBlob,
 };
 use diem_crypto::HashValue;
 use diem_types::{nibble::Nibble, transaction::PRE_GENESIS_VERSION};
@@ -216,7 +213,7 @@ fn test_insert_at_leaf_with_multiple_internals_created() {
             Child::new(
                 internal.hash(),
                 1, /* version */
-                NodeType::InternalLegacy,
+                NodeType::Internal { leaf_count: 2 },
             ),
         );
         Node::new_internal(children)
@@ -235,7 +232,7 @@ fn test_insert_at_leaf_with_multiple_internals_created() {
     );
     assert_eq!(db.get_node(&internal_node_key).unwrap(), internal);
     assert_eq!(
-        to_legacy(db.get_node(&NodeKey::new_empty_path(1)).unwrap()),
+        db.get_node(&NodeKey::new_empty_path(1)).unwrap(),
         root_internal,
     );
 

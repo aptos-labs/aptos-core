@@ -9,7 +9,11 @@ use diem_types::{
     account_address::{AccountAddress, HashAccountAddress},
     account_state_blob::AccountStateBlob,
 };
-use proptest::{collection::hash_map, prelude::*};
+use proptest::{
+    collection::{hash_map, vec},
+    prelude::*,
+};
+use std::collections::HashSet;
 
 fn put_account_state_set(
     store: &StateStore,
@@ -360,6 +364,20 @@ proptest! {
         let expected = store2.get_rightmost_leaf_naive().unwrap();
         let actual = store2.get_rightmost_leaf().unwrap();
         prop_assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_get_account_count(
+        input in vec((any::<AccountAddress>(), any::<AccountStateBlob>()), 1..200)
+    ) {
+        let version = (input.len() - 1) as Version;
+        let account_count = input.iter().map(|(k, _)| k).collect::<HashSet<_>>().len();
+
+        let tmp_dir = TempPath::new();
+        let db = DiemDB::new_for_test(&tmp_dir);
+        let store = &db.state_store;
+        init_store(store, input.into_iter());
+        assert_eq!(store.get_account_count(version).unwrap().unwrap(), account_count);
     }
 }
 
