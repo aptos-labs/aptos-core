@@ -90,7 +90,7 @@ fn test_that_typescript_generation_runs() {
     eprintln!("{}", std::str::from_utf8(&output.stderr).unwrap());
     assert_eq!(
         std::str::from_utf8(&output.stdout).unwrap(),
-        EXPECTED_TX_SCRIPT_OUTPUT
+        EXPECTED_OUTPUT,
     );
     assert!(output.status.success());
 }
