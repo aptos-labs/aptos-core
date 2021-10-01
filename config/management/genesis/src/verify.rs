@@ -214,8 +214,14 @@ fn compute_genesis(
     genesis_path: &Path,
     db_path: &Path,
 ) -> Result<(DbReaderWriter, Waypoint), Error> {
-    let diemdb = DiemDB::open(db_path, false, None, RocksdbConfig::default())
-        .map_err(|e| Error::UnexpectedError(e.to_string()))?;
+    let diemdb = DiemDB::open(
+        db_path,
+        false,
+        None,
+        RocksdbConfig::default(),
+        true, /* account_count_migration */
+    )
+    .map_err(|e| Error::UnexpectedError(e.to_string()))?;
     let db_rw = DbReaderWriter::new(diemdb);
 
     let mut file = File::open(genesis_path)

@@ -34,6 +34,7 @@ pub fn create_storage_service_and_executor(
             false, /* readonly */
             None,  /* pruner */
             RocksdbConfig::default(),
+            true, /* account_count_migration */
         )
         .expect("DB should open."),
     );
@@ -66,6 +67,7 @@ pub fn run_benchmark(
             false, /* readonly */
             None,  /* pruner */
             RocksdbConfig::default(),
+            true, /* account_count_migration */
         )
         .expect("db open failure.")
         .create_checkpoint(checkpoint_dir.as_ref().join("diemdb"))

@@ -35,7 +35,10 @@ enum ChildInfo<V> {
     /// This child is an internal node. The hash of the internal node is stored here if it is
     /// known, otherwise it is `None`. In the process of restoring a tree, we will only know the
     /// hash of an internal node after we see all the keys that share the same prefix.
-    Internal { hash: Option<HashValue> },
+    Internal {
+        hash: Option<HashValue>,
+        leaf_count: Option<usize>,
+    },
 
     /// This child is a leaf node.
     Leaf { node: LeafNode<V> },
@@ -48,10 +51,12 @@ where
     /// Converts `self` to a child, assuming the hash is known if it's an internal node.
     fn into_child(self, version: Version) -> Child {
         match self {
-            Self::Internal { hash } => Child::new(
+            Self::Internal { hash, leaf_count } => Child::new(
                 hash.expect("Must have been initialized."),
                 version,
-                NodeType::InternalLegacy,
+                leaf_count
+                    .map(|n| NodeType::Internal { leaf_count: n })
+                    .unwrap_or(NodeType::InternalLegacy),
             ),
             Self::Leaf { node } => Child::new(node.hash(), version, NodeType::Leaf),
         }
@@ -87,7 +92,11 @@ where
 
     /// Converts `self` to an internal node, assuming all of its children are already known and
     /// fully initialized.
-    fn into_internal_node(mut self, version: Version) -> (NodeKey, InternalNode) {
+    fn into_internal_node(
+        mut self,
+        version: Version,
+        leaf_count_migration: bool,
+    ) -> (NodeKey, InternalNode) {
         let mut children = Children::new();
 
         // Calling `into_iter` on an array is equivalent to calling `iter`:
@@ -98,7 +107,10 @@ where
             }
         }
 
-        (self.node_key, InternalNode::new(children))
+        (
+            self.node_key,
+            InternalNode::new_migration(children, leaf_count_migration),
+        )
     }
 }
 
@@ -153,6 +165,9 @@ pub struct JellyfishMerkleRestore<V> {
 
     /// When the restoration process finishes, we expect the tree to have this root hash.
     expected_root_hash: HashValue,
+
+    /// Whether to use the new internal node format where leaf counts are written.
+    leaf_count_migration: bool,
 }
 
 impl<V> JellyfishMerkleRestore<V>
@@ -163,6 +178,7 @@ where
         store: Arc<D>,
         version: Version,
         expected_root_hash: HashValue,
+        leaf_count_migration: bool,
     ) -> Result<Self> {
         let tree_reader = Arc::clone(&store);
         let (partial_nodes, previous_leaf) =
@@ -189,6 +205,7 @@ where
             previous_leaf,
             num_keys_received: 0,
             expected_root_hash,
+            leaf_count_migration,
         })
     }
 
@@ -196,6 +213,7 @@ where
         store: Arc<D>,
         version: Version,
         expected_root_hash: HashValue,
+        leaf_count_migration: bool,
     ) -> Result<Self> {
         Ok(Self {
             store,
@@ -205,6 +223,7 @@ where
             previous_leaf: None,
             num_keys_received: 0,
             expected_root_hash,
+            leaf_count_migration,
         })
     }
 
@@ -247,6 +266,7 @@ where
                     let child_info = match node {
                         Node::Internal(internal_node) => ChildInfo::Internal {
                             hash: Some(internal_node.hash()),
+                            leaf_count: internal_node.leaf_count(),
                         },
                         Node::Leaf(leaf_node) => ChildInfo::Leaf { node: leaf_node },
                         Node::Null => bail!("Null node should not appear in storage."),
@@ -260,7 +280,13 @@ where
             // partial node and we do not know its hash yet. For the lowest partial node, we just
             // find all its known children from storage in the loop above.
             if let Some(index) = previous_child_index {
-                internal_info.set_child(index, ChildInfo::Internal { hash: None });
+                internal_info.set_child(
+                    index,
+                    ChildInfo::Internal {
+                        hash: None,
+                        leaf_count: None,
+                    },
+                );
             }
 
             partial_nodes.push(internal_info);
@@ -375,8 +401,13 @@ where
 
         // The node at this position becomes an internal node. Since we may insert more nodes at
         // this position in the future, we do not know its hash yet.
-        self.partial_nodes[num_existing_partial_nodes - 1]
-            .set_child(child_index, ChildInfo::Internal { hash: None });
+        self.partial_nodes[num_existing_partial_nodes - 1].set_child(
+            child_index,
+            ChildInfo::Internal {
+                hash: None,
+                leaf_count: None,
+            },
+        );
 
         // Next we build the new internal nodes from top to bottom. All these internal node except
         // the bottom one will now have a single internal node child.
@@ -391,7 +422,10 @@ where
             let mut internal_info = InternalInfo::new_empty(new_node_key);
             internal_info.set_child(
                 u8::from(next_nibble) as usize,
-                ChildInfo::Internal { hash: None },
+                ChildInfo::Internal {
+                    hash: None,
+                    leaf_count: None,
+                },
             );
             self.partial_nodes.push(internal_info);
         }
@@ -474,10 +508,12 @@ where
     fn freeze_internal_nodes(&mut self, num_remaining_nodes: usize) {
         while self.partial_nodes.len() > num_remaining_nodes {
             let last_node = self.partial_nodes.pop().expect("This node must exist.");
-            let (node_key, internal_node) = last_node.into_internal_node(self.version);
+            let (node_key, internal_node) =
+                last_node.into_internal_node(self.version, self.leaf_count_migration);
             // Keep the hash of this node before moving it into `frozen_nodes`, so we can update
             // its parent later.
             let node_hash = internal_node.hash();
+            let node_leaf_count = internal_node.leaf_count();
             self.frozen_nodes.insert(node_key, internal_node.into());
 
             // Now that we have computed the hash of the internal node above, we will also update
@@ -491,8 +527,13 @@ where
                     .expect("Must have at least one child.");
 
                 match parent_node.children[rightmost_child_index] {
-                    Some(ChildInfo::Internal { ref mut hash }) => {
+                    Some(ChildInfo::Internal {
+                        ref mut hash,
+                        ref mut leaf_count,
+                    }) => {
                         assert_eq!(hash.replace(node_hash), None);
+                        assert!(leaf_count.is_none());
+                        node_leaf_count.map(|n| leaf_count.replace(n));
                     }
                     _ => panic!(
                         "Must have at least one child and the rightmost child must not be a leaf."
@@ -592,7 +633,7 @@ where
 
         if num_children == 1 {
             match &children[0] {
-                Some(ChildInfo::Internal { hash }) => {
+                Some(ChildInfo::Internal { hash, .. }) => {
                     (*hash.as_ref().expect("The hash must be known."), false)
                 }
                 Some(ChildInfo::Leaf { node }) => (node.hash(), true),

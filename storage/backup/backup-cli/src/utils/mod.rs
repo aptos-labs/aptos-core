@@ -92,6 +92,13 @@ pub struct GlobalRestoreOpt {
 
     #[structopt(flatten)]
     pub concurernt_downloads: ConcurrentDownloadsOpt,
+
+    #[structopt(
+        long,
+        help = "If StateDB is written into, write in the new format supporting account counting, \
+        but incompatible with older node versions."
+    )]
+    pub account_count_migration: bool,
 }
 
 pub enum RestoreRunMode {
@@ -126,15 +133,19 @@ impl RestoreRunMode {
         &self,
         version: Version,
         expected_root_hash: HashValue,
+        account_count_migration: bool,
     ) -> Result<JellyfishMerkleRestore<AccountStateBlob>> {
         match self {
-            Self::Restore { restore_handler } => {
-                restore_handler.get_state_restore_receiver(version, expected_root_hash)
-            }
+            Self::Restore { restore_handler } => restore_handler.get_state_restore_receiver(
+                version,
+                expected_root_hash,
+                account_count_migration,
+            ),
             Self::Verify => JellyfishMerkleRestore::new_overwrite(
                 Arc::new(MockTreeWriter),
                 version,
                 expected_root_hash,
+                account_count_migration,
             ),
         }
     }
@@ -146,6 +157,7 @@ pub struct GlobalRestoreOptions {
     pub trusted_waypoints: Arc<HashMap<Version, Waypoint>>,
     pub run_mode: Arc<RestoreRunMode>,
     pub concurrent_downloads: usize,
+    pub account_count_migration: bool,
 }
 
 impl TryFrom<GlobalRestoreOpt> for GlobalRestoreOptions {
@@ -160,6 +172,7 @@ impl TryFrom<GlobalRestoreOpt> for GlobalRestoreOptions {
                 false, /* read_only */
                 None,  /* pruner */
                 opt.rocksdb_opt.into(),
+                opt.account_count_migration,
             )?)
             .get_restore_handler();
             RestoreRunMode::Restore { restore_handler }
@@ -171,6 +184,7 @@ impl TryFrom<GlobalRestoreOpt> for GlobalRestoreOptions {
             trusted_waypoints: Arc::new(opt.trusted_waypoints.verify()?),
             run_mode: Arc::new(run_mode),
             concurrent_downloads,
+            account_count_migration: opt.account_count_migration,
         })
     }
 }

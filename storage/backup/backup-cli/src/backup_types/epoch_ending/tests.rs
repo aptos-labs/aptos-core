@@ -15,7 +15,7 @@ use crate::{
     },
 };
 use backup_service::start_backup_service;
-use diem_config::{config::RocksdbConfig, utils::get_available_port};
+use diem_config::utils::get_available_port;
 use diem_temppath::TempPath;
 use diem_types::{
     ledger_info::LedgerInfoWithSignatures,
@@ -83,6 +83,7 @@ fn end_to_end() {
                 trusted_waypoints: TrustedWaypointOpt::default(),
                 rocksdb_opt: RocksdbOpt::default(),
                 concurernt_downloads: ConcurrentDownloadsOpt::default(),
+                account_count_migration: true,
             }
             .try_into()
             .unwrap(),
@@ -102,13 +103,7 @@ fn end_to_end() {
         .map(|li| li.ledger_info().next_block_epoch())
         .unwrap_or(0);
 
-    let tgt_db = DiemDB::open(
-        &tgt_db_dir,
-        true, /* read_only */
-        None, /* pruner */
-        RocksdbConfig::default(),
-    )
-    .unwrap();
+    let tgt_db = DiemDB::new_for_test(&tgt_db_dir);
     assert_eq!(
         tgt_db
             .get_epoch_ending_ledger_infos(0, target_version_next_block_epoch)
@@ -220,6 +215,7 @@ async fn test_trusted_waypoints_impl(
             trusted_waypoints: TrustedWaypointOpt::default(),
             rocksdb_opt: RocksdbOpt::default(),
             concurernt_downloads: ConcurrentDownloadsOpt::default(),
+            account_count_migration: true,
         }
         .try_into()
         .unwrap(),
@@ -240,6 +236,7 @@ async fn test_trusted_waypoints_impl(
             },
             rocksdb_opt: RocksdbOpt::default(),
             concurernt_downloads: ConcurrentDownloadsOpt::default(),
+            account_count_migration: true,
         }
         .try_into()
         .unwrap(),

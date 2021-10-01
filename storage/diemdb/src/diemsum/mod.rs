@@ -25,6 +25,7 @@ impl Diemsum {
             true, /* read only */
             None, /* no prune_window */
             RocksdbConfig::default(),
+            true, /* account_count_migration, ignored anyway */
         )?;
         Ok(Diemsum { db })
     }

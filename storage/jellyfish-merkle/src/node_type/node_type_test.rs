@@ -49,15 +49,15 @@ fn gen_leaf_keys(
     (NodeKey::new(version, np), account_key)
 }
 
-fn to_legacy_internal(mut node: InternalNode) -> InternalNode {
-    node.children.iter_mut().for_each(|(_, mut child)| {
+fn to_legacy_internal(node: InternalNode) -> InternalNode {
+    let mut children = node.children;
+    children.iter_mut().for_each(|(_, mut child)| {
         if matches!(child.node_type, NodeType::Internal { .. }) {
             child.node_type = NodeType::InternalLegacy
         }
     });
-    node.leaf_count = None;
 
-    node
+    InternalNode::new_migration(children, false /* leaf_count_migration */)
 }
 
 #[test]
@@ -112,16 +112,16 @@ proptest! {
     }
 
     #[test]
-    fn test_internal_node_roundtrip(input in any::<InternalNode>(), try_persist_leaf_counts in any::<bool>()) {
+    fn test_internal_node_roundtrip(input in any::<InternalNode>()) {
         let mut vec = vec![];
-        let persist_leaf_counts = !input.is_legacy() && try_persist_leaf_counts;
-        input.serialize(&mut vec, persist_leaf_counts).unwrap();
-        let deserialized = InternalNode::deserialize(&vec, persist_leaf_counts).unwrap();
-        if persist_leaf_counts {
-            assert_eq!(deserialized, input)
-        } else {
-            assert_eq!(to_legacy_internal(deserialized), to_legacy_internal(input))
-        }
+        input.serialize(&mut vec, false /* persist_leaf_count */).unwrap();
+        let deserialized = InternalNode::deserialize(&vec, false /* read_leaf_count */).unwrap();
+        assert_eq!(deserialized, to_legacy_internal(input.clone()));
+
+        let mut vec = vec![];
+        input.serialize(&mut vec, true /* persist_leaf_count */).unwrap();
+        let deserialized = InternalNode::deserialize(&vec, true /* read_leaf_count */).unwrap();
+        assert_eq!(deserialized, input);
     }
 }
 

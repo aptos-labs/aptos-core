@@ -25,6 +25,7 @@ impl DBDebuggerInterface {
             true,
             None,
             RocksdbConfig::default(),
+            true, /* account_count_migration, ignored anyway */
         )?)))
     }
 }

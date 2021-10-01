@@ -172,6 +172,7 @@ fn main() {
         true, /* readonly */
         None, /* pruner */
         RocksdbConfig::default(),
+        true, /* account_count_migration, ignored anyway */
     )
     .expect("Unable to open DiemDB");
     info!("DB opened successfully.");

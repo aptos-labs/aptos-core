@@ -40,8 +40,14 @@ impl CreateWaypoint {
 
 pub fn create_genesis_waypoint(genesis: &Transaction) -> Result<Waypoint, Error> {
     let path = TempPath::new();
-    let diemdb = DiemDB::open(&path, false, None, RocksdbConfig::default())
-        .map_err(|e| Error::UnexpectedError(e.to_string()))?;
+    let diemdb = DiemDB::open(
+        &path,
+        false,
+        None,
+        RocksdbConfig::default(),
+        true, /* account_count_migration */
+    )
+    .map_err(|e| Error::UnexpectedError(e.to_string()))?;
     let db_rw = DbReaderWriter::new(diemdb);
 
     db_bootstrapper::generate_waypoint::<DiemVM>(&db_rw, genesis)

@@ -13,7 +13,6 @@ use crate::{
         ConcurrentDownloadsOpt, GlobalBackupOpt, GlobalRestoreOpt, RocksdbOpt, TrustedWaypointOpt,
     },
 };
-use diem_config::config::RocksdbConfig;
 use diem_temppath::TempPath;
 use diem_types::transaction::Version;
 use diemdb::DiemDB;
@@ -85,6 +84,7 @@ fn end_to_end() {
                 trusted_waypoints: TrustedWaypointOpt::default(),
                 rocksdb_opt: RocksdbOpt::default(),
                 concurernt_downloads: ConcurrentDownloadsOpt::default(),
+                account_count_migration: true,
             }
             .try_into()
             .unwrap(),
@@ -98,13 +98,7 @@ fn end_to_end() {
     // We don't write down any ledger infos when recovering transactions. State-sync needs to take
     // care of it before running consensus. The latest transactions are deemed "synced" instead of
     // "committed" most likely.
-    let tgt_db = DiemDB::open(
-        &tgt_db_dir,
-        true, /* read_only */
-        None, /* pruner */
-        RocksdbConfig::default(),
-    )
-    .unwrap();
+    let tgt_db = DiemDB::new_for_test(&tgt_db_dir);
     assert_eq!(
         tgt_db
             .get_latest_transaction_info_option()

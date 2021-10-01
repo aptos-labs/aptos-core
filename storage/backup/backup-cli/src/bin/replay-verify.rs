@@ -58,6 +58,7 @@ async fn main_impl() -> Result<()> {
         false, /* read_only */
         None,  /* pruner */
         opt.rocksdb_opt.into(),
+        true, /* account_count_migration */
     )?)
     .get_restore_handler();
     ReplayVerifyCoordinator::new(

@@ -51,6 +51,14 @@ pub static DIEM_STORAGE_NEXT_BLOCK_EPOCH: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static DIEM_STORAGE_LATEST_ACCOUNT_COUNT: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "diem_storage_latest_account_count",
+        "Total number of account in the StateDB at the latest version."
+    )
+    .unwrap()
+});
+
 pub static DIEM_STORAGE_PRUNE_WINDOW: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!("diem_storage_prune_window", "Diem storage prune window").unwrap()
 });

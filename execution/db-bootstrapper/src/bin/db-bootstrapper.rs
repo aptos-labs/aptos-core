@@ -33,6 +33,9 @@ struct Opt {
 
     #[structopt(long, requires("waypoint-to-verify"))]
     commit: bool,
+
+    #[structopt(long)]
+    account_count_migration: bool,
 }
 
 fn main() -> Result<()> {
@@ -53,6 +56,7 @@ fn main() -> Result<()> {
             false,
             None, /* pruner */
             RocksdbConfig::default(),
+            opt.account_count_migration,
         )
     } else {
         // When not committing, we open the DB as secondary so the tool is usable along side a

@@ -139,8 +139,12 @@ impl NodeKey {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum NodeType {
     Leaf,
+    /// A internal node that haven't been finished the leaf count migration, i.e. None or not all
+    /// of the children leaf counts are known.
     InternalLegacy,
-    Internal { leaf_count: usize },
+    Internal {
+        leaf_count: usize,
+    },
 }
 
 #[cfg(any(test, feature = "fuzzing"))]
@@ -210,6 +214,8 @@ pub struct InternalNode {
     children: Children,
     /// Total number of leaves under this internal node
     leaf_count: Option<usize>,
+    /// serialize leaf counts
+    leaf_count_migration: bool,
 }
 
 /// Computes the hash of internal node according to [`JellyfishTree`](crate::JellyfishTree)
@@ -279,7 +285,12 @@ impl Arbitrary for InternalNode {
 
 impl InternalNode {
     /// Creates a new Internal node.
+    #[cfg(any(test, feature = "fuzzing"))]
     pub fn new(children: Children) -> Self {
+        Self::new_migration(children, true /* leaf_count_migration */)
+    }
+
+    pub fn new_migration(children: Children, leaf_count_migration: bool) -> Self {
         // Assert the internal node must have >= 1 children. If it only has one child, it cannot be
         // a leaf node. Otherwise, the leaf node should be a child of this internal node's parent.
         assert!(!children.is_empty());
@@ -295,6 +306,7 @@ impl InternalNode {
         Self {
             children,
             leaf_count,
+            leaf_count_migration,
         }
     }
 
@@ -310,8 +322,8 @@ impl InternalNode {
         Some(leaf_count)
     }
 
-    pub fn is_legacy(&self) -> bool {
-        self.leaf_count.is_none()
+    pub fn leaf_count(&self) -> Option<usize> {
+        self.leaf_count
     }
 
     pub fn node_type(&self) -> NodeType {
@@ -340,7 +352,16 @@ impl InternalNode {
             binary.extend(child.hash.to_vec());
             match child.node_type {
                 NodeType::Leaf => (),
-                NodeType::InternalLegacy => assert!(!persist_leaf_counts),
+                NodeType::InternalLegacy => {
+                    if persist_leaf_counts {
+                        // It's impossible that a internal node has 0 leaves, use 0 to indicate
+                        // "known".
+                        // Also n.b., a not-fully-migrated internal is of `NodeType::InternalLegacy`
+                        // in memory, but serialized with `NodeTag::Internal` anyway once the
+                        // migration starts.
+                        serialize_u64_varint(0, binary);
+                    }
+                }
                 NodeType::Internal { leaf_count } => {
                     if persist_leaf_counts {
                         serialize_u64_varint(leaf_count as u64, binary);
@@ -373,7 +394,6 @@ impl InternalNode {
 
         // Reconstruct children
         let mut children = HashMap::new();
-        let mut sum_leaf_count = 0;
         for _ in 0..existence_bitmap.count_ones() {
             let next_child = existence_bitmap.trailing_zeros() as u8;
             let version = deserialize_u64_varint(&mut reader)?;
@@ -391,12 +411,14 @@ impl InternalNode {
 
             let child_bit = 1 << next_child;
             let node_type = if (leaf_bitmap & child_bit) != 0 {
-                sum_leaf_count += 1;
                 NodeType::Leaf
             } else if read_leaf_counts {
                 let leaf_count = deserialize_u64_varint(&mut reader)? as usize;
-                sum_leaf_count += leaf_count;
-                NodeType::Internal { leaf_count }
+                if leaf_count == 0 {
+                    NodeType::InternalLegacy
+                } else {
+                    NodeType::Internal { leaf_count }
+                }
             } else {
                 NodeType::InternalLegacy
             };
@@ -409,15 +431,12 @@ impl InternalNode {
         }
         assert_eq!(existence_bitmap, 0);
 
-        let leaf_count = if read_leaf_counts {
-            Some(sum_leaf_count)
-        } else {
-            None
-        };
-        Ok(Self {
+        // The "leaf_count_migration" flag doesn't matter here, since a deserialized node should
+        // not be persisted again to the DB.
+        Ok(Self::new_migration(
             children,
-            leaf_count,
-        })
+            read_leaf_counts, /* leaf_count_migration */
+        ))
     }
 
     /// Gets the `n`-th child.
@@ -687,6 +706,7 @@ where
     }
 
     /// Creates the [`Internal`](Node::Internal) variant.
+    #[cfg(any(test, feature = "fuzzing"))]
     pub fn new_internal(children: Children) -> Self {
         Node::Internal(InternalNode::new(children))
     }
@@ -730,8 +750,7 @@ where
                 out.push(NodeTag::Null as u8);
             }
             Node::Internal(internal_node) => {
-                // TODO(aldenhu): add migration control
-                let persist_leaf_count = !internal_node.is_legacy();
+                let persist_leaf_count = internal_node.leaf_count_migration;
                 let tag = if persist_leaf_count {
                     NodeTag::Internal
                 } else {

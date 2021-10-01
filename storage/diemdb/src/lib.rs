@@ -45,9 +45,9 @@ use crate::{
     ledger_store::LedgerStore,
     metrics::{
         DIEM_STORAGE_API_LATENCY_SECONDS, DIEM_STORAGE_COMMITTED_TXNS,
-        DIEM_STORAGE_LATEST_TXN_VERSION, DIEM_STORAGE_LEDGER_VERSION,
-        DIEM_STORAGE_NEXT_BLOCK_EPOCH, DIEM_STORAGE_OTHER_TIMERS_SECONDS,
-        DIEM_STORAGE_ROCKSDB_PROPERTIES,
+        DIEM_STORAGE_LATEST_ACCOUNT_COUNT, DIEM_STORAGE_LATEST_TXN_VERSION,
+        DIEM_STORAGE_LEDGER_VERSION, DIEM_STORAGE_NEXT_BLOCK_EPOCH,
+        DIEM_STORAGE_OTHER_TIMERS_SECONDS, DIEM_STORAGE_ROCKSDB_PROPERTIES,
     },
     pruner::Pruner,
     schema::*,
@@ -244,14 +244,14 @@ impl DiemDB {
         ]
     }
 
-    fn new_with_db(db: DB, prune_window: Option<u64>) -> Self {
+    fn new_with_db(db: DB, prune_window: Option<u64>, account_count_migration: bool) -> Self {
         let db = Arc::new(db);
 
         DiemDB {
             db: Arc::clone(&db),
             event_store: Arc::new(EventStore::new(Arc::clone(&db))),
             ledger_store: Arc::new(LedgerStore::new(Arc::clone(&db))),
-            state_store: Arc::new(StateStore::new(Arc::clone(&db))),
+            state_store: Arc::new(StateStore::new(Arc::clone(&db), account_count_migration)),
             transaction_store: Arc::new(TransactionStore::new(Arc::clone(&db))),
             system_store: SystemStore::new(Arc::clone(&db)),
             rocksdb_property_reporter: RocksdbPropertyReporter::new(Arc::clone(&db)),
@@ -264,6 +264,7 @@ impl DiemDB {
         readonly: bool,
         prune_window: Option<u64>,
         rocksdb_config: RocksdbConfig,
+        account_count_migration: bool, // ignored when opening readonly
     ) -> Result<Self> {
         ensure!(
             prune_window.is_none() || !readonly,
@@ -275,25 +276,31 @@ impl DiemDB {
 
         let mut rocksdb_opts = gen_rocksdb_options(&rocksdb_config);
 
-        let db = if readonly {
-            DB::open_readonly(
-                path.clone(),
-                "diemdb_ro",
-                Self::column_families(),
-                &rocksdb_opts,
-            )?
+        let (db, account_count_migration) = if readonly {
+            (
+                DB::open_readonly(
+                    path.clone(),
+                    "diemdb_ro",
+                    Self::column_families(),
+                    &rocksdb_opts,
+                )?,
+                true,
+            )
         } else {
             rocksdb_opts.create_if_missing(true);
             rocksdb_opts.create_missing_column_families(true);
-            DB::open(
-                path.clone(),
-                "diemdb",
-                Self::column_families(),
-                &rocksdb_opts,
-            )?
+            (
+                DB::open(
+                    path.clone(),
+                    "diemdb",
+                    Self::column_families(),
+                    &rocksdb_opts,
+                )?,
+                account_count_migration,
+            )
         };
 
-        let ret = Self::new_with_db(db, prune_window);
+        let ret = Self::new_with_db(db, prune_window, account_count_migration);
         info!(
             path = path,
             time_ms = %instant.elapsed().as_millis(),
@@ -322,6 +329,7 @@ impl DiemDB {
                 &rocksdb_opts,
             )?,
             None, // prune_window
+            true, // account_count_migration
         ))
     }
 
@@ -333,6 +341,7 @@ impl DiemDB {
             false, /* readonly */
             None,  /* pruner */
             RocksdbConfig::default(),
+            true, /* account_count_migration */
         )
         .expect("Unable to open DiemDB")
     }
@@ -1194,6 +1203,13 @@ impl DbWriter<DpnProto> for DiemDB {
                 counters
                     .expect("Counters should be bumped with transactions being saved.")
                     .bump_op_counters();
+                // -1 for "not fully migrated", -2 for "error on get_account_count()"
+                DIEM_STORAGE_LATEST_ACCOUNT_COUNT.set(
+                    self.state_store
+                        .get_account_count(last_version)
+                        .map(|opt| opt.map_or(-1, |n| n as i64))
+                        .unwrap_or(-2),
+                );
 
                 self.wake_pruner(last_version);
             }

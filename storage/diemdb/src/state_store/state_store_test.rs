@@ -3,6 +3,7 @@
 
 use super::*;
 use crate::{pruner, DiemDB};
+use diem_config::config::RocksdbConfig;
 use diem_jellyfish_merkle::restore::JellyfishMerkleRestore;
 use diem_temppath::TempPath;
 use diem_types::{
@@ -284,7 +285,7 @@ proptest! {
         let store2 = &db2.state_store;
 
         let mut restore =
-            JellyfishMerkleRestore::new(Arc::clone(store2), version, expected_root_hash).unwrap();
+            JellyfishMerkleRestore::new(Arc::clone(store2), version, expected_root_hash, true /* leaf_count_migration */).unwrap();
 
         let mut ordered_input: Vec<_> = input
             .into_iter()
@@ -322,6 +323,63 @@ proptest! {
     }
 
     #[test]
+    fn test_restore_account_count_migration(
+        // When the tree has 17 or more nodes, it's not possible that the root node has all children
+        // being leaves, in which case the leaf_count will be returned as soon as the migration is
+        // turned on, without any internal node to be created in the new format.
+        input in hash_map(any::<AccountAddress>(), any::<AccountStateBlob>(), 17..1000)
+    ) {
+        let src_tmp_dir = TempPath::new();
+        let src_db = DiemDB::new_for_test(&src_tmp_dir);
+        let src_store = &src_db.state_store;
+        init_store(src_store, input.clone().into_iter());
+
+        let version = (input.len() - 1) as Version;
+        let expected_root_hash = src_store.get_root_hash(version).unwrap();
+        let mut chunk: Vec<_> = input
+            .into_iter()
+            .map(|(addr, value)| (addr.hash(), value))
+            .collect();
+        chunk.sort_unstable_by_key(|(key, _value)| *key);
+        let rightmost_leaf = chunk.last().map(|(key, _value)| *key).unwrap();
+        let proof = src_store
+            .get_account_state_range_proof(rightmost_leaf, version)
+            .unwrap();
+
+        let tgt_tmp_dir = TempPath::new();
+
+        // restore in non-migration mode
+        {
+            let db1 = DiemDB::new_for_test(&tgt_tmp_dir);
+            let store1 = &db1.state_store;
+            let mut restore1 =
+                JellyfishMerkleRestore::new(Arc::clone(store1), version, expected_root_hash, false /* leaf_count_migration */).unwrap();
+            restore1.add_chunk(chunk.clone(), proof.clone()).unwrap();
+            restore1.finish().unwrap();
+        }
+
+        // reopen db in migration mode
+        {
+            let db2 = DiemDB::open(
+                &tgt_tmp_dir,
+                false, /* readonly */
+                None,  /* pruner */
+                RocksdbConfig::default(),
+                true, /* account_count_migration */
+            ).unwrap();
+            let store2 = &db2.state_store;
+            // confirm that leaf counts were not written
+            prop_assert!(store2.get_account_count(version).unwrap().is_none());
+            // restore again in migration mode
+            let mut restore2 =
+                JellyfishMerkleRestore::new_overwrite(Arc::clone(store2), version, expected_root_hash, true /* leaf_count_migration */).unwrap();
+            restore2.add_chunk(chunk, proof).unwrap();
+            restore2.finish().unwrap();
+            prop_assert_eq!(store2.get_account_count(version).unwrap().unwrap(), version as usize + 1);
+        }
+    }
+
+    #[test]
     fn test_get_rightmost_leaf(
         (input, batch1_size) in hash_map(any::<AccountAddress>(), any::<AccountStateBlob>(), 2..1000)
             .prop_flat_map(|input| {
@@ -342,7 +400,7 @@ proptest! {
         let store2 = &db2.state_store;
 
         let mut restore =
-            JellyfishMerkleRestore::new(Arc::clone(store2), version, expected_root_hash).unwrap();
+            JellyfishMerkleRestore::new(Arc::clone(store2), version, expected_root_hash, true /* leaf_count_migration */).unwrap();
 
         let mut ordered_input: Vec<_> = input
             .into_iter()
@@ -379,15 +437,64 @@ proptest! {
         init_store(store, input.into_iter());
         assert_eq!(store.get_account_count(version).unwrap().unwrap(), account_count);
     }
+
+    #[test]
+    fn test_account_count_migration(
+        (before, after) in vec((any::<AccountAddress>(), any::<AccountStateBlob>()), 1..100).prop_flat_map(
+            |v| (Just(v.clone()), Just(v).prop_shuffle())
+        )
+    ) {
+        let num_updates = before.len();
+        let account_count = before.iter().map(|(k, _)| k).collect::<HashSet<_>>().len();
+        let tmp_dir = TempPath::new();
+
+        // build state in legacy mode
+        {
+            let db = DiemDB::open(
+                &tmp_dir,
+                false, /* read_only */
+                None,
+                RocksdbConfig::default(),
+                false, /* account_count_migration */
+            ).unwrap();
+            let store = &db.state_store;
+            init_store(store, before.into_iter());
+            assert!(store.get_account_count(num_updates as Version - 1).unwrap().is_none());
+        }
+
+        // migrate by touching all accounts
+        {
+            let db = DiemDB::new_for_test(&tmp_dir);
+            let store = &db.state_store;
+            update_store(store, after.into_iter(), num_updates as Version);
+            assert_eq!(
+                store.get_account_count((2 * num_updates) as Version - 1).unwrap().unwrap(),
+                account_count
+            );
+        }
+    }
 }
 
 // Initializes the state store by inserting one key at each version.
 fn init_store(store: &StateStore, input: impl Iterator<Item = (AccountAddress, AccountStateBlob)>) {
+    update_store(store, input, 0);
+}
+
+fn update_store(
+    store: &StateStore,
+    input: impl Iterator<Item = (AccountAddress, AccountStateBlob)>,
+    first_version: Version,
+) {
     for (i, (key, value)) in input.enumerate() {
         let mut cs = ChangeSet::new();
         let account_state_set: HashMap<_, _> = std::iter::once((key, value)).collect();
         store
-            .put_account_state_sets(vec![account_state_set], None, i as Version, &mut cs)
+            .put_account_state_sets(
+                vec![account_state_set],
+                None,
+                first_version + i as Version,
+                &mut cs,
+            )
             .unwrap();
         store.db.write_schemas(cs.batch).unwrap();
     }

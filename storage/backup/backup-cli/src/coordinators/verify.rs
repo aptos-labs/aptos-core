@@ -79,6 +79,7 @@ impl VerifyCoordinator {
             trusted_waypoints: Arc::new(self.trusted_waypoints_opt.verify()?),
             run_mode: Arc::new(RestoreRunMode::Verify),
             concurrent_downloads: self.concurrent_downloads,
+            account_count_migration: true,
         };
 
         let epoch_history = Arc::new(

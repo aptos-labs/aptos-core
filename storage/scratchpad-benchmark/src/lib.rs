@@ -37,6 +37,7 @@ pub fn run_benchmark(num_updates: usize, max_accounts: u64, blob_size: usize, db
         false, /* readonly */
         None,  /* pruner */
         RocksdbConfig::default(),
+        true, /* account_count_migration, ignored anyway */
     )
     .expect("DB should open.");
 

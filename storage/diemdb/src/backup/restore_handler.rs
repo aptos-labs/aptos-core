@@ -54,11 +54,13 @@ impl RestoreHandler {
         &self,
         version: Version,
         expected_root_hash: HashValue,
+        account_count_migration: bool,
     ) -> Result<JellyfishMerkleRestore<AccountStateBlob>> {
         JellyfishMerkleRestore::new_overwrite(
             Arc::clone(&self.state_store),
             version,
             expected_root_hash,
+            account_count_migration,
         )
     }
 

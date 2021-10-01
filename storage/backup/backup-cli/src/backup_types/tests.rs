@@ -19,7 +19,6 @@ use crate::{
         RocksdbOpt, TrustedWaypointOpt,
     },
 };
-use diem_config::config::RocksdbConfig;
 use diem_temppath::TempPath;
 use diem_types::transaction::Version;
 use diemdb::DiemDB;
@@ -114,6 +113,7 @@ fn test_end_to_end_impl(d: TestData) {
         trusted_waypoints: TrustedWaypointOpt::default(),
         rocksdb_opt: RocksdbOpt::default(),
         concurernt_downloads: ConcurrentDownloadsOpt::default(),
+        account_count_migration: true,
     }
     .try_into()
     .unwrap();
@@ -149,13 +149,7 @@ fn test_end_to_end_impl(d: TestData) {
     .unwrap();
 
     // Check
-    let tgt_db = DiemDB::open(
-        &tgt_db_dir,
-        false, /* read_only */
-        None,  /* pruner */
-        RocksdbConfig::default(),
-    )
-    .unwrap();
+    let tgt_db = DiemDB::new_for_test(&tgt_db_dir);
     assert_eq!(
         d.db.get_transactions(
             d.txn_start_ver,
