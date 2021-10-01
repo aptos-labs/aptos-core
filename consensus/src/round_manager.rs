@@ -46,10 +46,7 @@ use fail::fail_point;
 use safety_rules::ConsensusState;
 use safety_rules::TSafetyRules;
 use serde::Serialize;
-use std::{
-    sync::{atomic::AtomicU64, Arc},
-    time::Duration,
-};
+use std::{sync::Arc, time::Duration};
 use termion::color::*;
 
 #[derive(Serialize, Clone)]
@@ -223,7 +220,6 @@ pub struct RoundManager {
     txn_manager: Arc<dyn TxnManager>,
     storage: Arc<dyn PersistentLivenessStorage>,
     sync_only: bool,
-    back_pressure: Arc<AtomicU64>,
     decoupled_execution: bool,
     back_pressure_limit: u64,
     onchain_config: OnChainConsensusConfig,
@@ -262,7 +258,6 @@ impl RoundManager {
             txn_manager,
             storage,
             sync_only,
-            back_pressure: Arc::new(AtomicU64::new(0)), // dummy value
             decoupled_execution: false,
             back_pressure_limit: 1, // arbitrary dummy value
             onchain_config,
@@ -280,7 +275,6 @@ impl RoundManager {
         txn_manager: Arc<dyn TxnManager>,
         storage: Arc<dyn PersistentLivenessStorage>,
         sync_only: bool,
-        back_pressure: Arc<AtomicU64>,
         back_pressure_limit: u64,
         onchain_config: OnChainConsensusConfig,
     ) -> Self {
@@ -295,7 +289,6 @@ impl RoundManager {
             txn_manager,
             storage,
             sync_only,
-            back_pressure,
             decoupled_execution: true,
             back_pressure_limit,
             onchain_config,

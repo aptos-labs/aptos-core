@@ -8,6 +8,7 @@ use std::{
     cell::{Ref, RefCell, RefMut},
     rc::Rc,
 };
+use diem_infallible::{Mutex, MutexGuard};
 
 pub struct List<T> {
     pub head: Link<T>,

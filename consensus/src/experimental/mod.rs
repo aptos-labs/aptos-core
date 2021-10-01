@@ -22,12 +22,13 @@
  */
 
 #![allow(dead_code)]
+pub mod buffer;
 pub mod buffer_item;
 pub mod buffer_manager;
 pub mod decoupled_execution_utils;
 pub mod errors;
 pub mod execution_phase;
-pub mod linkedlist;
+pub mod hashable;
 pub mod ordering_state_computer;
 pub mod persisting_phase;
 pub mod pipeline_phase;

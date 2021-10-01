@@ -48,11 +48,7 @@ use event_notifications::ReconfigNotificationListener;
 use futures::{channel::mpsc::unbounded, select, StreamExt};
 use network::protocols::network::Event;
 use safety_rules::SafetyRulesManager;
-use std::{
-    cmp::Ordering,
-    sync::{atomic::AtomicU64, Arc},
-    time::Duration,
-};
+use std::{cmp::Ordering, sync::Arc, time::Duration};
 
 /// RecoveryManager is used to process events in order to sync up with peer if we can't recover from local consensusdb
 /// RoundManager is used for normal event handling.
@@ -94,7 +90,6 @@ pub struct EpochManager {
     processor: Option<RoundProcessor>,
     reconfig_events: ReconfigNotificationListener,
     commit_msg_tx: Option<diem_channel::Sender<AccountAddress, VerifiedEvent>>,
-    back_pressure: Arc<AtomicU64>,
 }
 
 impl EpochManager {
@@ -116,7 +111,6 @@ impl EpochManager {
             panic!("Inconsistent decoupled-execution configuration of consensus and safety-rules\nMake sure consensus.decoupled = safety_rules.decoupled_execution.")
         }
         let safety_rules_manager = SafetyRulesManager::new(sr_config);
-        let back_pressure = Arc::new(AtomicU64::new(0));
         Self {
             author,
             config,
@@ -131,7 +125,6 @@ impl EpochManager {
             processor: None,
             reconfig_events,
             commit_msg_tx: None,
-            back_pressure,
         }
     }
 
@@ -319,7 +312,7 @@ impl EpochManager {
 
         self.commit_msg_tx = Some(commit_msg_tx);
 
-        let (execution_phase, signing_phase, persisting_phase, _buffer_manager) =
+        let (execution_phase, signing_phase, persisting_phase, buffer_manager) =
             prepare_phases_and_buffer_manager(
                 self.author,
                 self.commit_state_computer.clone(),
@@ -335,9 +328,7 @@ impl EpochManager {
         tokio::spawn(execution_phase.start());
         tokio::spawn(signing_phase.start());
         tokio::spawn(persisting_phase.start());
-
-        // TODO: make buffer manager channels sync
-        // tokio::spawn(buffer_manager.start());
+        tokio::spawn(buffer_manager.start());
 
         OrderingStateComputer::new(block_tx, self.commit_state_computer.clone(), reset_tx)
     }
@@ -415,7 +406,7 @@ impl EpochManager {
                 self.config.max_block_size,
             );
 
-            RoundManager::new(
+            RoundManager::new_with_decoupled_execution(
                 epoch_state,
                 block_store,
                 round_state,
@@ -426,6 +417,7 @@ impl EpochManager {
                 self.txn_manager.clone(),
                 self.storage.clone(),
                 self.config.sync_only,
+                self.config.back_pressure_limit,
                 onchain_config,
             )
         } else {

@@ -17,7 +17,7 @@ use diem_types::{
     validator_verifier::ValidatorVerifier,
 };
 
-use crate::state_replication::StateComputerCommitCallBackType;
+use crate::{experimental::hashable::Hashable, state_replication::StateComputerCommitCallBackType};
 use diem_crypto::HashValue;
 
 fn generate_commit_proof(
@@ -78,6 +78,12 @@ pub enum BufferItem {
     Executed(Box<ExecutedItem>),
     Signed(Box<SignedItem>),
     Aggregated(Box<AggregatedItem>),
+}
+
+impl Hashable for BufferItem {
+    fn hash(&self) -> HashValue {
+        self.block_id()
+    }
 }
 
 impl BufferItem {
