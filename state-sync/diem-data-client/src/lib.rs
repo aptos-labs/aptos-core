@@ -80,13 +80,15 @@ pub trait DiemDataClient {
 
     /// Returns a transaction list with proof object, with transactions from
     /// start to end versions (inclusive). The proof is relative to the specified
-    /// `proof_version`. If the data cannot be fetched (e.g., the number of
-    /// transactions is too large), an error is returned.
+    /// `proof_version`. If `include_events` is true, events are included in the
+    /// proof. If the data cannot be fetched (e.g., the number of transactions is
+    /// too large), an error is returned.
     async fn get_transactions_with_proof(
         &self,
         proof_version: u64,
         start_version: u64,
         end_version: u64,
+        include_events: bool,
     ) -> Result<DataClientResponse, Error>;
 
     /// Notifies the Diem Data Client about a previously received response that
