@@ -6,7 +6,9 @@ use crate::{
     WriteSetPayload,
 };
 use diem_types::{
-    access_path::Path, contract_event::ContractEvent, transaction::TransactionInfoTrait,
+    access_path::Path,
+    contract_event::ContractEvent,
+    transaction::{SignedTransaction, TransactionInfoTrait},
     write_set::WriteOp,
 };
 use move_core_types::{language_storage::StructTag, resolver::MoveResolver};
@@ -38,6 +40,11 @@ impl<'a, R: MoveResolver> MoveConverter<'a, R> {
         Ok(self.inner.view_resource(typ, bytes)?.into())
     }
 
+    pub fn try_into_pending_transaction(&self, txn: SignedTransaction) -> Result<Transaction> {
+        let payload = self.try_into_transaction_payload(txn.payload())?;
+        Ok((txn, payload).into())
+    }
+
     pub fn try_into_transaction<T: TransactionInfoTrait>(
         &self,
         version: u64,
@@ -46,14 +53,14 @@ impl<'a, R: MoveResolver> MoveConverter<'a, R> {
         contract_events: &[ContractEvent],
     ) -> Result<Transaction> {
         use diem_types::transaction::Transaction::*;
-        let events = self.try_into_events(version, contract_events)?;
+        let events = self.try_into_events(contract_events)?;
         let ret = match submitted {
             UserTransaction(txn) => {
-                let payload = self.try_into_transaction_payload(version, txn.payload())?;
+                let payload = self.try_into_transaction_payload(txn.payload())?;
                 (version, txn, info, payload, events).into()
             }
             GenesisTransaction(write_set) => {
-                let payload = self.try_into_write_set_payload(version, write_set)?;
+                let payload = self.try_into_write_set_payload(write_set)?;
                 (version, info, payload, events).into()
             }
             BlockMetadata(txn) => (version, txn, info).into(),
@@ -63,14 +70,11 @@ impl<'a, R: MoveResolver> MoveConverter<'a, R> {
 
     pub fn try_into_transaction_payload(
         &self,
-        txn_version: u64,
         payload: &diem_types::transaction::TransactionPayload,
     ) -> Result<TransactionPayload> {
         use diem_types::transaction::TransactionPayload::*;
         let ret = match payload {
-            WriteSet(v) => TransactionPayload::WriteSetPayload(
-                self.try_into_write_set_payload(txn_version, v)?,
-            ),
+            WriteSet(v) => TransactionPayload::WriteSetPayload(self.try_into_write_set_payload(v)?),
             Script(s) => TransactionPayload::ScriptPayload(s.into()),
             Module(m) => TransactionPayload::ModulePayload {
                 code: m.code().to_vec().into(),
@@ -92,7 +96,6 @@ impl<'a, R: MoveResolver> MoveConverter<'a, R> {
 
     pub fn try_into_write_set_payload(
         &self,
-        txn_version: u64,
         payload: &diem_types::transaction::WriteSetPayload,
     ) -> Result<WriteSetPayload> {
         use diem_types::transaction::WriteSetPayload::*;
@@ -107,7 +110,7 @@ impl<'a, R: MoveResolver> MoveConverter<'a, R> {
                     .iter()
                     .map(|(access_path, op)| self.try_into_write_set_change(access_path, op))
                     .collect::<Result<_>>()?,
-                events: self.try_into_events(txn_version, d.events())?,
+                events: self.try_into_events(d.events())?,
             },
         };
         Ok(ret)
@@ -143,17 +146,13 @@ impl<'a, R: MoveResolver> MoveConverter<'a, R> {
         Ok(ret)
     }
 
-    pub fn try_into_events(
-        &self,
-        txn_version: u64,
-        events: &[ContractEvent],
-    ) -> Result<Vec<Event>> {
+    pub fn try_into_events(&self, events: &[ContractEvent]) -> Result<Vec<Event>> {
         let mut ret = vec![];
         for event in events {
             let data = self
                 .inner
                 .view_value(event.type_tag(), event.event_data())?;
-            ret.push((txn_version, event, data).into());
+            ret.push((event, data).into());
         }
         Ok(ret)
     }

@@ -77,10 +77,10 @@ impl Transactions {
         let (mempool_status, vm_status_opt) = self.context.submit_transaction(txn.clone()).await?;
         match mempool_status.code {
             MempoolStatusCode::Accepted => {
-                let resp = Response::new(
-                    self.context.get_latest_ledger_info()?,
-                    &Transaction::from(txn),
-                )?;
+                let db = self.context.db();
+                let converter = MoveConverter::new(&db);
+                let pending_txn = converter.try_into_pending_transaction(txn)?;
+                let resp = Response::new(self.ledger_info, &pending_txn)?;
                 Ok(reply::with_status(resp, StatusCode::ACCEPTED))
             }
             MempoolStatusCode::VmError => Err(Error::bad_request(format_err!(
@@ -268,7 +268,6 @@ mod tests {
             json!({
                 "key": "0x00000000000000000000000000000000000000000a550c18",
                 "sequence_number": "0",
-                "transaction_version": "0",
                 "type": {
                     "type": "struct",
                     "address": "0x1",
@@ -413,7 +412,6 @@ mod tests {
                     {
                         "key": "0x00000000000000000000000000000000000000000a550c18",
                         "sequence_number": "5",
-                        "transaction_version": "2",
                         "type": {
                             "type": "struct",
                             "address": "0x1",
@@ -573,6 +571,30 @@ mod tests {
                 "gas_unit_price": "0",
                 "gas_currency_code": "XUS",
                 "expiration_timestamp_secs": expiration_timestamp.to_string(),
+                "payload": {
+                    "type": "script_function_payload",
+                    "module": {
+                        "address": "0x1",
+                        "name": "AccountCreationScripts"
+                    },
+                    "function": "create_parent_vasp_account",
+                    "type_arguments": [
+                        {
+                            "type": "struct",
+                            "address": "0x1",
+                            "module": "XUS",
+                            "name": "XUS",
+                            "generic_type_params": []
+                        }
+                    ],
+                    "arguments": [
+                        "0",
+                        account.address().to_hex_literal(),
+                        format!("0x{}", hex::encode(account.authentication_key().prefix())),
+                        format!("0x{}", hex::encode("vasp".as_bytes())),
+                        true
+                    ]
+                }
             }),
         );
     }

@@ -35,8 +35,8 @@ impl Transaction {
     }
 }
 
-impl From<SignedTransaction> for Transaction {
-    fn from(txn: SignedTransaction) -> Self {
+impl From<(SignedTransaction, TransactionPayload)> for Transaction {
+    fn from((txn, payload): (SignedTransaction, TransactionPayload)) -> Self {
         Transaction::PendingTransaction(PendingTransaction {
             sender: txn.sender().into(),
             sequence_number: txn.sequence_number().into(),
@@ -45,6 +45,7 @@ impl From<SignedTransaction> for Transaction {
             gas_currency_code: txn.gas_currency_code().to_owned(),
             expiration_timestamp_secs: txn.expiration_timestamp_secs().into(),
             hash: Transaction::hash(txn),
+            payload,
         })
     }
 }
@@ -129,6 +130,7 @@ pub struct PendingTransaction {
     pub gas_unit_price: U64,
     pub gas_currency_code: String,
     pub expiration_timestamp_secs: U64,
+    pub payload: TransactionPayload,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -185,19 +187,17 @@ pub struct BlockMetadataTransaction {
 pub struct Event {
     pub key: EventKey,
     pub sequence_number: U64,
-    pub transaction_version: U64,
     #[serde(rename = "type")]
     pub typ: MoveType,
     pub data: MoveValue,
 }
 
-impl From<(u64, &ContractEvent, AnnotatedMoveValue)> for Event {
-    fn from((txn_version, event, data): (u64, &ContractEvent, AnnotatedMoveValue)) -> Self {
+impl From<(&ContractEvent, AnnotatedMoveValue)> for Event {
+    fn from((event, data): (&ContractEvent, AnnotatedMoveValue)) -> Self {
         match event {
             ContractEvent::V0(v0) => Self {
                 key: (*v0.key()).into(),
                 sequence_number: v0.sequence_number().into(),
-                transaction_version: txn_version.into(),
                 typ: v0.type_tag().clone().into(),
                 data: data.into(),
             },
