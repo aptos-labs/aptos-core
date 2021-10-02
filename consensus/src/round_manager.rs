@@ -867,6 +867,10 @@ impl RoundManager {
             if let Some(executed_block) = self.block_store.get_block(id) {
                 id = executed_block.parent_id();
                 blocks.push(executed_block.block().clone());
+                if request.req.match_target_id(id) {
+                    status = BlockRetrievalStatus::SucceededWithTarget;
+                    break;
+                }
             } else {
                 status = BlockRetrievalStatus::NotEnoughBlocks;
                 break;

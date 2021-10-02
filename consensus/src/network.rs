@@ -101,11 +101,7 @@ impl NetworkSender {
             _ => return Err(anyhow!("Invalid response to request")),
         };
         response
-            .verify(
-                retrieval_request.block_id(),
-                retrieval_request.num_blocks(),
-                &self.validators,
-            )
+            .verify(retrieval_request, &self.validators)
             .map_err(|e| {
                 error!(
                     SecurityEvent::InvalidRetrievedBlock,

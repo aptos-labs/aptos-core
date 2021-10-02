@@ -9,7 +9,7 @@ use crate::{
     persistent_liveness_storage::{PersistentLivenessStorage, RecoveryData},
     state_replication::StateComputer,
 };
-use anyhow::{bail, format_err};
+use anyhow::bail;
 
 use consensus_types::{
     block::Block,
@@ -151,7 +151,9 @@ impl BlockStore {
             if self.block_exists(retrieve_qc.certified_block().id()) {
                 break;
             }
-            let mut blocks = retriever.retrieve_block_for_qc(&retrieve_qc, 1).await?;
+            let mut blocks = retriever
+                .retrieve_block_for_qc(&retrieve_qc, 1, retrieve_qc.certified_block().id())
+                .await?;
             // retrieve_block_for_qc guarantees that blocks has exactly 1 element
             let block = blocks.remove(0);
             retrieve_qc = block.quorum_cert().clone();
@@ -166,12 +168,11 @@ impl BlockStore {
         self.insert_single_quorum_cert(qc)
     }
 
-    /// Check the highest commit cert sent by peer to see if we're behind and start a fast
+    /// Check the highest ordered cert sent by peer to see if we're behind and start a fast
     /// forward sync if the committed block doesn't exist in our tree.
     /// It works as follows:
-    /// 1. request the committed 3-chain from the peer, if C2 is the highest_commit_cert
-    /// we request for B0 <- C0 <- B1 <- C1 <- B2 (<- C2)
-    /// 2. We persist the 3-chain to storage before start sync to ensure we could restart if we
+    /// 1. request the gap blocks from the peer (from highest_ledger_info to highest_ordered_cert)
+    /// 2. We persist the gap blocks to storage before start sync to ensure we could restart if we
     /// crash in the middle of the sync.
     /// 3. We prune the old tree and replace with a new tree built with the 3-chain.
     async fn sync_to_highest_ordered_cert(
@@ -231,17 +232,24 @@ impl BlockStore {
             + 1;
 
         let blocks = retriever
-            .retrieve_block_for_qc(highest_ordered_cert, num_blocks)
+            .retrieve_block_for_qc(
+                highest_ordered_cert,
+                num_blocks,
+                highest_ledger_info.commit_info().id(),
+            )
             .await?;
 
         assert_eq!(
-            blocks.first().expect("should have at least 3-chain").id(),
+            blocks.first().expect("blocks are empty").id(),
             highest_ordered_cert.certified_block().id(),
+            "Expecting in the retrieval response, first block should be {}, but got {}",
+            highest_ordered_cert.certified_block().id(),
+            blocks.first().expect("blocks are empty").id(),
         );
 
         assert_eq!(
-            blocks.last().expect("should have at least 3-chain").id(),
-            highest_ledger_info.commit_info().id(),
+            blocks.last().expect("blocks are empty").id(),
+            highest_ledger_info.ledger_info().commit_info().id()
         );
 
         // although unlikely, we might wrap num_blocks around on a 32-bit machine
@@ -304,9 +312,7 @@ impl BlockRetriever {
 
     /// Retrieve n blocks for given block_id from peers
     ///
-    /// Returns Result with Vec that has a guaranteed size of num_blocks
-    /// This guarantee is based on BlockRetrievalResponse::verify that ensures that number of
-    /// blocks in response is equal to number of blocks requested.  This method will
+    /// Returns Result with Vec that if succeeded. This method will
     /// continue until the quorum certificate members all fail to return the missing chain.
     ///
     /// The first attempt of block retrieval will always be sent to preferred_peer to allow the
@@ -316,9 +322,14 @@ impl BlockRetriever {
     async fn retrieve_block_for_id(
         &mut self,
         block_id: HashValue,
+        target_block_id: HashValue,
         peers: &mut Vec<&AccountAddress>,
         num_blocks: u64,
     ) -> anyhow::Result<Vec<Block>> {
+        info!(
+            "Retrieving {} blocks starting from {}",
+            num_blocks, block_id
+        );
         let mut attempt = 0_u32;
         let mut progress = 0;
         let mut last_block_id = block_id;
@@ -348,29 +359,38 @@ impl BlockRetriever {
             let response = self
                 .network
                 .request_block(
-                    BlockRetrievalRequest::new(last_block_id, retrieve_batch_size),
+                    BlockRetrievalRequest::new_with_target_block_id(
+                        last_block_id,
+                        retrieve_batch_size,
+                        target_block_id,
+                    ),
                     peer,
                     retrieval_timeout(attempt),
                 )
                 .await;
-            match response.and_then(|result| {
-                if result.status() == BlockRetrievalStatus::Succeeded {
-                    Ok(result.blocks().clone())
-                } else {
-                    Err(format_err!("{:?}", result.status()))
-                }
-            }) {
-                Ok(batch) => {
+
+            match response {
+                Ok(result) if matches!(result.status(), BlockRetrievalStatus::Succeeded) => {
                     // extend the result blocks
+                    let batch = result.blocks().clone();
                     progress += batch.len() as u64;
                     last_block_id = batch.last().unwrap().parent_id();
                     result_blocks.extend(batch);
                 }
-                Err(e) => {
+                Ok(result)
+                    if matches!(result.status(), BlockRetrievalStatus::SucceededWithTarget) =>
+                {
+                    // if we found the target, end the loop
+                    let batch = result.blocks().clone();
+                    result_blocks.extend(batch);
+                    break;
+                }
+                e => {
                     warn!(
                         remote_peer = peer,
                         block_id = block_id,
-                        error = ?e, "Failed to fetch block, trying another peer",
+                        "{:?}, Failed to fetch block, trying another peer",
+                        e,
                     );
                     // select next peer to try
                     if peers.is_empty() {
@@ -384,7 +404,7 @@ impl BlockRetriever {
                 }
             }
         }
-        assert_eq!(result_blocks.len() as u64, num_blocks);
+        assert_eq!(result_blocks.last().unwrap().id(), target_block_id);
         Ok(result_blocks)
     }
 
@@ -393,14 +413,20 @@ impl BlockRetriever {
         &'a mut self,
         qc: &'a QuorumCert,
         num_blocks: u64,
+        target_block_id: HashValue,
     ) -> anyhow::Result<Vec<Block>> {
         let mut peers = qc
             .ledger_info()
             .signatures()
             .keys()
             .collect::<Vec<&AccountAddress>>();
-        self.retrieve_block_for_id(qc.certified_block().id(), &mut peers, num_blocks)
-            .await
+        self.retrieve_block_for_id(
+            qc.certified_block().id(),
+            target_block_id,
+            &mut peers,
+            num_blocks,
+        )
+        .await
     }
 
     fn pick_peer(&self, attempt: u32, peers: &mut Vec<&AccountAddress>) -> AccountAddress {

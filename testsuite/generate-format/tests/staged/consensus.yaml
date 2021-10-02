@@ -70,6 +70,9 @@ BlockRetrievalRequest:
     - block_id:
         TYPENAME: HashValue
     - num_blocks: U64
+    - target_block_id:
+        OPTION:
+          TYPENAME: HashValue
 BlockRetrievalResponse:
   STRUCT:
     - status:
@@ -85,6 +88,8 @@ BlockRetrievalStatus:
       IdNotFound: UNIT
     2:
       NotEnoughBlocks: UNIT
+    3:
+      SucceededWithTarget: UNIT
 BlockType:
   ENUM:
     0:
