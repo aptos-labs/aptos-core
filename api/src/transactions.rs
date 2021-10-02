@@ -134,7 +134,7 @@ fn transaction_not_found(version: u64, ledger_version: u64) -> Error {
 
 #[cfg(any(test))]
 mod tests {
-    use crate::test_utils::{assert_json, new_test_context};
+    use crate::test_utils::{assert_json, find_value, new_test_context};
 
     use diem_crypto::hash::CryptoHash;
     use diem_types::transaction::{
@@ -145,7 +145,7 @@ mod tests {
     use std::str::FromStr;
 
     #[tokio::test]
-    async fn test_get_transactions() {
+    async fn test_get_transactions_output_genesis_transaction() {
         let context = new_test_context();
         let ledger_info = context.get_latest_ledger_info();
         let txns = context
@@ -154,22 +154,115 @@ mod tests {
             .unwrap();
 
         let resp = context.get("/transactions").await;
-        assert_eq!(resp[0]["type"], "genesis_transaction");
-        assert_eq!(resp[0]["version"], "0");
+        assert_eq!(1, resp.as_array().unwrap().len());
+        let txn = &resp[0];
+        assert_eq!(txn["type"], "genesis_transaction");
+        assert_eq!(txn["version"], "0");
 
         let info = txns.proof.transaction_infos[0].clone();
-        assert_eq!(resp[0]["hash"], info.transaction_hash().to_hex_literal());
+        assert_eq!(txn["hash"], info.transaction_hash().to_hex_literal());
         assert_eq!(
-            resp[0]["state_root_hash"],
+            txn["state_root_hash"],
             info.state_root_hash().to_hex_literal()
         );
         assert_eq!(
-            resp[0]["event_root_hash"],
+            txn["event_root_hash"],
             info.event_root_hash().to_hex_literal()
         );
-        assert!(resp[0]["data"].as_str().unwrap().starts_with("0x"));
 
-        let first_event = resp[0]["events"][0].clone();
+        let chain_id = find_value(&txn["payload"]["changes"], |val| {
+            val["type"] == "write_module" && val["data"]["name"] == "ChainId"
+        });
+        assert_json(
+            chain_id,
+            json!({
+                "type": "write_module",
+                "address": "0x1",
+                "data": {
+                    "address": "0x1",
+                    "name": "ChainId",
+                    "friends": [],
+                    "exposed_functions": [
+                        {
+                            "name": "get",
+                            "visibility": "public",
+                            "generic_type_params": [],
+                            "params": [],
+                            "return": [
+                                {
+                                    "type": "u8"
+                                }
+                            ]
+                        },
+                        {
+                            "name": "initialize",
+                            "visibility": "public",
+                            "generic_type_params": [],
+                            "params": [
+                                {
+                                    "type": "reference",
+                                    "mutable": false,
+                                    "to": {
+                                        "type": "signer"
+                                    }
+                                },
+                                {
+                                    "type": "u8"
+                                }
+                            ],
+                            "return": []
+                        }
+                    ],
+                    "structs": [
+                        {
+                            "name": "ChainId",
+                            "is_native": false,
+                            "abilities": [
+                                "key"
+                            ],
+                            "generic_type_params": [],
+                            "fields": [
+                                {
+                                    "name": "id",
+                                    "type": {
+                                        "type": "u8"
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }),
+        );
+
+        let chain_id = find_value(&txn["payload"]["changes"], |val| {
+            val["type"] == "write_resource"
+                && val["address"] == "0xdd"
+                && val["data"]["type"]["name"] == "RoleId"
+        });
+        assert_json(
+            chain_id,
+            json!({
+                "type": "write_resource",
+                "address": "0xdd",
+                "data": {
+                    "type": {
+                        "type": "struct",
+                        "address": "0x1",
+                        "module": "Roles",
+                        "name": "RoleId",
+                        "generic_type_params": []
+                    },
+                    "value": {
+                        "role_id": "2"
+                    }
+                }
+            }),
+        );
+
+        let first_event = txn["events"][0].clone();
+        // transaction events are same with events from payload
+        assert_json(first_event.clone(), txn["payload"]["events"][0].clone());
         assert_json(
             first_event,
             json!({

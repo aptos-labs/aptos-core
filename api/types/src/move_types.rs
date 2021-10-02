@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{Address, Error};
+use crate::Address;
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{
@@ -34,18 +34,24 @@ pub struct MoveResource {
     pub value: MoveStructValue,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum MoveResourceType {
-    Struct(MoveStructTag),
-}
-
 impl From<AnnotatedMoveStruct> for MoveResource {
     fn from(s: AnnotatedMoveStruct) -> Self {
         Self {
             typ: MoveResourceType::Struct(s.type_.clone().into()),
             value: s.into(),
         }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum MoveResourceType {
+    Struct(MoveStructTag),
+}
+
+impl From<StructTag> for MoveResourceType {
+    fn from(s: StructTag) -> Self {
+        MoveResourceType::Struct(s.into())
     }
 }
 
@@ -323,8 +329,8 @@ pub struct MoveModule {
 }
 
 impl TryFrom<&Vec<u8>> for MoveModule {
-    type Error = Error;
-    fn try_from(bytes: &Vec<u8>) -> anyhow::Result<Self, Error> {
+    type Error = anyhow::Error;
+    fn try_from(bytes: &Vec<u8>) -> anyhow::Result<Self> {
         let m = CompiledModule::deserialize(bytes)?;
         let (address, name) = <(AccountAddress, Identifier)>::from(m.self_id());
         Ok(Self {

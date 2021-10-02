@@ -298,9 +298,8 @@ pub fn find_value(val: &Value, filter: for<'r> fn(&'r &Value) -> bool) -> Value 
 }
 
 pub fn assert_json(ret: Value, expected: Value) {
-    assert_eq!(
-        &ret,
-        &expected,
+    assert!(
+        ret == expected,
         "\nexpected: {}, \nbut got: {}",
         pretty(&expected),
         pretty(&ret)

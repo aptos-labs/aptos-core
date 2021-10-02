@@ -76,7 +76,7 @@ impl Account {
             .account_state()?
             .get_modules()
             .map(MoveModule::try_from)
-            .collect::<Result<Vec<MoveModule>, Error>>()?;
+            .collect::<Result<_>>()?;
         Response::new(self.ledger_info, &modules)
     }
 
