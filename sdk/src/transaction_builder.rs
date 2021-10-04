@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 pub use diem_transaction_builder::stdlib;
-use diem_types::transaction::Script;
+use diem_types::transaction::{ChangeSet, Script, WriteSetPayload};
 
 pub struct TransactionBuilder {
     sender: Option<AccountAddress>,
@@ -137,6 +137,12 @@ impl TransactionFactory {
 
     pub fn module(&self, code: Vec<u8>) -> TransactionBuilder {
         self.payload(TransactionPayload::Module(Module::new(code)))
+    }
+
+    pub fn change_set(&self, change_set: ChangeSet) -> TransactionBuilder {
+        self.payload(TransactionPayload::WriteSet(WriteSetPayload::Direct(
+            change_set,
+        )))
     }
 
     pub fn add_currency_to_account(&self, currency: Currency) -> TransactionBuilder {

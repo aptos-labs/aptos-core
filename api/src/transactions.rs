@@ -137,10 +137,19 @@ mod tests {
     use crate::test_utils::{assert_json, find_value, new_test_context};
 
     use diem_crypto::hash::CryptoHash;
-    use diem_types::transaction::{
-        authenticator::AuthenticationKey, Transaction, TransactionInfoTrait,
+    use diem_types::{
+        access_path::{AccessPath, Path},
+        account_address::AccountAddress,
+        transaction::{
+            authenticator::AuthenticationKey, ChangeSet, Transaction, TransactionInfoTrait,
+        },
+        write_set::{WriteOp, WriteSetMut},
     };
 
+    use move_core_types::{
+        identifier::Identifier,
+        language_storage::{ModuleId, StructTag},
+    };
     use serde_json::json;
     use std::str::FromStr;
 
@@ -591,6 +600,79 @@ mod tests {
                         "structs": []
                     }
                 }
+            }),
+        )
+    }
+
+    #[tokio::test]
+    async fn test_get_transactions_output_user_transaction_with_write_set_payload() {
+        let context = new_test_context();
+        let mut root_account = context.root_account();
+        let code_address = AccountAddress::from_hex_literal("0x1").unwrap();
+        let txn = root_account.sign_with_transaction_builder(
+            context.transaction_factory().change_set(ChangeSet::new(
+                WriteSetMut::new(vec![
+                    (
+                        AccessPath::new(
+                            code_address,
+                            bcs::to_bytes(&Path::Code(ModuleId::new(
+                                code_address,
+                                Identifier::new("AccountAdministrationScripts").unwrap(),
+                            )))
+                            .unwrap(),
+                        ),
+                        WriteOp::Deletion,
+                    ),
+                    (
+                        AccessPath::new(
+                            context.tc_account().address(),
+                            bcs::to_bytes(&Path::Resource(StructTag {
+                                address: code_address,
+                                module: Identifier::new("AccountFreezing").unwrap(),
+                                name: Identifier::new("FreezingBit").unwrap(),
+                                type_params: vec![],
+                            }))
+                            .unwrap(),
+                        ),
+                        WriteOp::Deletion,
+                    ),
+                ])
+                .freeze()
+                .unwrap(),
+                vec![],
+            )),
+        );
+        context.commit_block(&vec![txn.clone()]);
+
+        let txns = context.get("/transactions?start=2").await;
+        assert_eq!(1, txns.as_array().unwrap().len());
+
+        assert_json(
+            txns[0]["payload"].clone(),
+            json!({
+                "type": "direct_write_set",
+                "changes": [
+                    {
+                        "type": "delete_module",
+                        "address": "0x1",
+                        "module": {
+                            "address": "0x1",
+                            "name": "AccountAdministrationScripts"
+                        }
+                    },
+                    {
+                        "type": "delete_resource",
+                        "address": "0xb1e55ed",
+                        "resource": {
+                            "type": "struct",
+                            "address": "0x1",
+                            "module": "AccountFreezing",
+                            "name": "FreezingBit",
+                            "generic_type_params": []
+                        }
+                    }
+                ],
+                "events": []
             }),
         )
     }

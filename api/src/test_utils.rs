@@ -10,7 +10,8 @@ use diem_mempool::mocks::MockSharedMempool;
 use diem_sdk::{
     transaction_builder::{Currency, TransactionFactory},
     types::{
-        account_config::treasury_compliance_account_address, transaction::SignedTransaction,
+        account_config::{diem_root_address, treasury_compliance_account_address},
+        transaction::SignedTransaction,
         AccountKey, LocalAccount,
     },
 };
@@ -114,6 +115,10 @@ impl TestContext {
             self.root_keys.root_key.clone(),
             0,
         )
+    }
+
+    pub fn root_account(&self) -> LocalAccount {
+        LocalAccount::new(diem_root_address(), self.root_keys.root_key.clone(), 1)
     }
 
     pub fn gen_account(&mut self) -> LocalAccount {
