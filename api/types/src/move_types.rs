@@ -22,7 +22,7 @@ use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     borrow::Borrow,
     collections::BTreeMap,
-    convert::{From, Into, TryFrom},
+    convert::{From, Into, TryFrom, TryInto},
     fmt,
     result::Result,
 };
@@ -328,12 +328,10 @@ pub struct MoveModule {
     pub structs: Vec<MoveStruct>,
 }
 
-impl TryFrom<&Vec<u8>> for MoveModule {
-    type Error = anyhow::Error;
-    fn try_from(bytes: &Vec<u8>) -> anyhow::Result<Self> {
-        let m = CompiledModule::deserialize(bytes)?;
+impl From<CompiledModule> for MoveModule {
+    fn from(m: CompiledModule) -> Self {
         let (address, name) = <(AccountAddress, Identifier)>::from(m.self_id());
-        Ok(Self {
+        Self {
             address: address.into(),
             name,
             friends: m
@@ -351,7 +349,7 @@ impl TryFrom<&Vec<u8>> for MoveModule {
                 .map(|def| (&m, def).into())
                 .collect(),
             structs: m.struct_defs.iter().map(|def| (&m, def).into()).collect(),
-        })
+        }
     }
 }
 
@@ -562,6 +560,32 @@ impl From<&AbilitySet> for MoveFunctionGenericTypeParam {
         Self {
             constraints: constraints.into_iter().map(MoveAbility::from).collect(),
         }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct MoveModuleBytecode {
+    bytecode: HexEncodedBytes,
+    abi: MoveModule,
+}
+
+impl TryFrom<&[u8]> for MoveModuleBytecode {
+    type Error = anyhow::Error;
+    fn try_from(bytes: &[u8]) -> anyhow::Result<Self> {
+        Ok(Self {
+            bytecode: HexEncodedBytes(bytes.to_vec()),
+            abi: CompiledModule::deserialize(bytes)?.try_into()?,
+        })
+    }
+}
+
+impl TryFrom<&Vec<u8>> for MoveModuleBytecode {
+    type Error = anyhow::Error;
+    fn try_from(bytes: &Vec<u8>) -> anyhow::Result<Self> {
+        Ok(Self {
+            bytecode: HexEncodedBytes(bytes.clone()),
+            abi: CompiledModule::deserialize(bytes)?.try_into()?,
+        })
     }
 }
 

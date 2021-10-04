@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    Address, EventKey, HashValue, HexEncodedBytes, MoveModule, MoveModuleId, MoveResource,
-    MoveResourceType, MoveType, MoveValue, U64,
+    MoveModuleBytecode, Address, EventKey, HashValue, HexEncodedBytes,
+    MoveModuleId, MoveResource, MoveResourceType, MoveType, MoveValue, U64,
 };
 
 use diem_crypto::hash::CryptoHash;
@@ -221,9 +221,7 @@ pub enum TransactionPayload {
         arguments: Vec<MoveValue>,
     },
     ScriptPayload(ScriptPayload),
-    ModulePayload {
-        code: HexEncodedBytes,
-    },
+    ModulePayload(MoveModuleBytecode),
     WriteSetPayload(WriteSetPayload),
 }
 
@@ -274,7 +272,7 @@ pub enum WriteSetChange {
     },
     WriteModule {
         address: Address,
-        data: MoveModule,
+        data: MoveModuleBytecode,
     },
     WriteResource {
         address: Address,

@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    Event, MoveModule, MoveResource, Transaction, TransactionPayload, WriteSetChange,
-    WriteSetPayload,
+    Event, MoveResource, Transaction, TransactionPayload, WriteSetChange, WriteSetPayload,
 };
 use diem_types::{
     access_path::Path,
@@ -15,7 +14,7 @@ use move_core_types::{language_storage::StructTag, resolver::MoveResolver};
 use resource_viewer::MoveValueAnnotator;
 
 use anyhow::Result;
-use std::convert::TryFrom;
+use std::convert::TryInto;
 
 pub struct MoveConverter<'a, R> {
     inner: MoveValueAnnotator<'a, R>,
@@ -76,9 +75,7 @@ impl<'a, R: MoveResolver> MoveConverter<'a, R> {
         let ret = match payload {
             WriteSet(v) => TransactionPayload::WriteSetPayload(self.try_into_write_set_payload(v)?),
             Script(s) => TransactionPayload::ScriptPayload(s.into()),
-            Module(m) => TransactionPayload::ModulePayload {
-                code: m.code().to_vec().into(),
-            },
+            Module(m) => TransactionPayload::ModulePayload(m.code().try_into()?),
             ScriptFunction(fun) => TransactionPayload::ScriptFunctionPayload {
                 module: fun.module().clone().into(),
                 function: fun.function().into(),
@@ -135,7 +132,7 @@ impl<'a, R: MoveResolver> MoveConverter<'a, R> {
             WriteOp::Value(val) => match access_path.get_path() {
                 Path::Code(_) => WriteSetChange::WriteModule {
                     address: access_path.address.into(),
-                    data: MoveModule::try_from(val)?,
+                    data: val.try_into()?,
                 },
                 Path::Resource(typ) => WriteSetChange::WriteResource {
                     address: access_path.address.into(),

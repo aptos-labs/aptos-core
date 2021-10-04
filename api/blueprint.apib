@@ -35,7 +35,7 @@ Accounts API for querying data under an account address.
 ### Get Account Modules [GET]
 
 - Response 200 (application/json)
-  - Attributes (array[MoveModule], fixed-type)
+  - Attributes (array[MoveModuleBytecode], fixed-type)
 
 # Data Structures
 
@@ -49,6 +49,11 @@ Accounts API for querying data under an account address.
 
 - type (MoveTypeStruct, required) - resource data type, it is also access path of the resource on server.
 - value (object, required) - resource data, field name map to field value, use `type` data to decode.
+
+## MoveModuleBytecode
+
+- bytecode: 0xa11ceb0b0300000006010002030205050703070a0c0816100c260900000001000100000102084d794d6f64756c650269640000000000000000000000000b1e55ed00010000000231010200 (string, required)
+- abi (MoveModule, required)
 
 ## MoveModule
 

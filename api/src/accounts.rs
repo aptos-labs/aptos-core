@@ -3,7 +3,7 @@
 
 use crate::context::Context;
 
-use diem_api_types::{Address, Error, LedgerInfo, MoveConverter, MoveModule, Response};
+use diem_api_types::{Address, Error, LedgerInfo, MoveConverter, MoveModuleBytecode, Response};
 use diem_types::account_state::AccountState;
 
 use anyhow::Result;
@@ -72,11 +72,11 @@ impl Account {
     }
 
     pub fn modules(self) -> Result<impl Reply, Error> {
-        let modules: Vec<MoveModule> = self
+        let modules = self
             .account_state()?
             .get_modules()
-            .map(MoveModule::try_from)
-            .collect::<Result<_>>()?;
+            .map(MoveModuleBytecode::try_from)
+            .collect::<Result<Vec<MoveModuleBytecode>>>()?;
         Response::new(self.ledger_info, &modules)
     }
 
@@ -225,9 +225,11 @@ mod tests {
         let address = "0x1";
 
         let resp = context.get(&account_modules(address)).await;
-        let res = find_value(&resp, |v| v["name"] == "BCS");
+
+        let res = find_value(&resp, |v| v["abi"]["name"] == "BCS");
+        assert!(res["bytecode"].as_str().unwrap().starts_with("0x"));
         assert_json(
-            res,
+            res["abi"].clone(),
             json!({
                 "address": "0x1",
                 "name": "BCS",
@@ -272,9 +274,9 @@ mod tests {
         let address = "0x1";
 
         let resp = context.get(&account_modules(address)).await;
-        let res = find_value(&resp, |v| v["name"] == "PaymentScripts");
+        let res = find_value(&resp, |v| v["abi"]["name"] == "PaymentScripts");
         assert_json(
-            res,
+            res["abi"].clone(),
             json!({
                 "address": "0x1",
                 "name": "PaymentScripts",
@@ -334,9 +336,9 @@ mod tests {
         let address = "0x1";
 
         let resp = context.get(&account_modules(address)).await;
-        let res = find_value(&resp, |v| v["name"] == "DiemConfig");
+        let res = find_value(&resp, |v| v["abi"]["name"] == "DiemConfig");
         assert_json(
-            res,
+            res["abi"].clone(),
             json!({
                 "address": "0x1",
                 "name": "DiemConfig",
@@ -683,9 +685,10 @@ mod tests {
 
         let resp = context.get(&account_modules(address)).await;
 
-        let diem_account_module = find_value(&resp, |v| v["name"] == "DiemAccount");
-        let balance_struct =
-            find_value(&diem_account_module["structs"], |v| v["name"] == "Balance");
+        let diem_account_module = find_value(&resp, |v| v["abi"]["name"] == "DiemAccount");
+        let balance_struct = find_value(&diem_account_module["abi"]["structs"], |v| {
+            v["name"] == "Balance"
+        });
         assert_json(
             balance_struct,
             json!({
@@ -720,8 +723,8 @@ mod tests {
             }),
         );
 
-        let diem_module = find_value(&resp, |f| f["name"] == "Diem");
-        let diem_struct = find_value(&diem_module["structs"], |f| f["name"] == "Diem");
+        let diem_module = find_value(&resp, |f| f["abi"]["name"] == "Diem");
+        let diem_struct = find_value(&diem_module["abi"]["structs"], |f| f["name"] == "Diem");
         assert_json(
             diem_struct,
             json!({

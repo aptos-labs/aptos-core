@@ -171,66 +171,71 @@ mod tests {
         );
 
         let chain_id = find_value(&txn["payload"]["changes"], |val| {
-            val["type"] == "write_module" && val["data"]["name"] == "ChainId"
+            val["type"] == "write_module" && val["data"]["abi"]["name"] == "ChainId"
         });
+        let bytecode = chain_id["data"]["bytecode"].clone();
+        assert!(bytecode.as_str().unwrap().starts_with("0x"));
         assert_json(
             chain_id,
             json!({
                 "type": "write_module",
                 "address": "0x1",
                 "data": {
-                    "address": "0x1",
-                    "name": "ChainId",
-                    "friends": [],
-                    "exposed_functions": [
-                        {
-                            "name": "get",
-                            "visibility": "public",
-                            "generic_type_params": [],
-                            "params": [],
-                            "return": [
-                                {
-                                    "type": "u8"
-                                }
-                            ]
-                        },
-                        {
-                            "name": "initialize",
-                            "visibility": "public",
-                            "generic_type_params": [],
-                            "params": [
-                                {
-                                    "type": "reference",
-                                    "mutable": false,
-                                    "to": {
-                                        "type": "signer"
-                                    }
-                                },
-                                {
-                                    "type": "u8"
-                                }
-                            ],
-                            "return": []
-                        }
-                    ],
-                    "structs": [
-                        {
-                            "name": "ChainId",
-                            "is_native": false,
-                            "abilities": [
-                                "key"
-                            ],
-                            "generic_type_params": [],
-                            "fields": [
-                                {
-                                    "name": "id",
-                                    "type": {
+                    "bytecode": bytecode.as_str().unwrap(),
+                    "abi": {
+                        "address": "0x1",
+                        "name": "ChainId",
+                        "friends": [],
+                        "exposed_functions": [
+                            {
+                                "name": "get",
+                                "visibility": "public",
+                                "generic_type_params": [],
+                                "params": [],
+                                "return": [
+                                    {
                                         "type": "u8"
                                     }
-                                }
-                            ]
-                        }
-                    ]
+                                ]
+                            },
+                            {
+                                "name": "initialize",
+                                "visibility": "public",
+                                "generic_type_params": [],
+                                "params": [
+                                    {
+                                        "type": "reference",
+                                        "mutable": false,
+                                        "to": {
+                                            "type": "signer"
+                                        }
+                                    },
+                                    {
+                                        "type": "u8"
+                                    }
+                                ],
+                                "return": []
+                            }
+                        ],
+                        "structs": [
+                            {
+                                "name": "ChainId",
+                                "is_native": false,
+                                "abilities": [
+                                    "key"
+                                ],
+                                "generic_type_params": [],
+                                "fields": [
+                                    {
+                                        "name": "id",
+                                        "type": {
+                                            "type": "u8"
+                                        }
+                                    }
+                                ]
+                            }
+                        ]
+                    }
                 }
             }),
         );
@@ -542,7 +547,26 @@ mod tests {
                 "events": [],
                 "payload": {
                     "type": "module_payload",
-                    "code": format!("0x{}", code),
+                    "bytecode": format!("0x{}", code),
+                    "abi": {
+                        "address": "0xb1e55ed",
+                        "name": "MyModule",
+                        "friends": [],
+                        "exposed_functions": [
+                            {
+                                "name": "id",
+                                "visibility": "public",
+                                "generic_type_params": [],
+                                "params": [],
+                                "return": [
+                                    {
+                                        "type": "u8"
+                                    }
+                                ]
+                            }
+                        ],
+                        "structs": []
+                    }
                 }
             }),
         )

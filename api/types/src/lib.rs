@@ -19,8 +19,8 @@ pub use event_key::EventKey;
 pub use hash::HashValue;
 pub use ledger_info::LedgerInfo;
 pub use move_types::{
-    HexEncodedBytes, MoveModule, MoveModuleId, MoveResource, MoveResourceType, MoveStructTag,
-    MoveStructValue, MoveType, MoveValue, U128, U64,
+    HexEncodedBytes, MoveModule, MoveModuleBytecode, MoveModuleId, MoveResource, MoveResourceType,
+    MoveStructTag, MoveStructValue, MoveType, MoveValue, U128, U64,
 };
 pub use response::{Response, X_DIEM_CHAIN_ID, X_DIEM_LEDGER_TIMESTAMP, X_DIEM_LEDGER_VERSION};
 pub use transaction::{
