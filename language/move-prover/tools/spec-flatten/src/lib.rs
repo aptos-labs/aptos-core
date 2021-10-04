@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{anyhow, Result};
+use std::collections::BTreeMap;
+
+use bytecode::function_target_pipeline::{FunctionVariant, VerificationFlavor};
 
 mod flatten;
 mod options;
@@ -22,14 +25,18 @@ pub fn run(options: &FlattenOptions) -> Result<()> {
         return Err(anyhow!("Original proof is not successful"));
     }
 
-    // collect spec in target modules
-    for (fid, variant) in targets.get_funs_and_variants() {
-        if !variant.is_verified() {
-            // only care for functions that are marked as verified
+    // flatten spec in target modules
+    let mut flattened_specs = BTreeMap::new();
+    for (fun_id, variant) in targets.get_funs_and_variants() {
+        if !matches!(
+            variant,
+            FunctionVariant::Verification(VerificationFlavor::Regular)
+        ) {
+            // only care for functions that have the regular verification variant
             continue;
         }
 
-        let fun_env = env.get_function(fid);
+        let fun_env = env.get_function(fun_id);
         if !fun_env.module_env.is_target() {
             // only run on specs in target module
             continue;
@@ -50,7 +57,20 @@ pub fn run(options: &FlattenOptions) -> Result<()> {
         }
 
         let target = targets.get_target(&fun_env, &variant);
-        flatten::flatten_spec(options, target, &targets)?;
+        let new_spec = flatten::flatten_spec(options, target, &targets)?;
+        flattened_specs.insert(fun_id, new_spec);
+    }
+
+    // dump the result
+    for (fun_id, spec) in flattened_specs {
+        let fun_env = env.get_function(fun_id);
+        if !spec.conditions.is_empty() {
+            println!(
+                "fun {}\n{}",
+                fun_env.get_full_name_str(),
+                env.display(&spec)
+            );
+        }
     }
 
     // everything is OK
