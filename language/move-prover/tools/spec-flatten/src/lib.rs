@@ -5,11 +5,14 @@ use anyhow::{anyhow, Result};
 use std::collections::BTreeMap;
 
 use bytecode::function_target_pipeline::{FunctionVariant, VerificationFlavor};
+use move_model::ast::SpecBlockTarget;
 
+mod ast_print;
 mod flatten;
 mod options;
 mod workflow;
 
+pub use ast_print::SpecPrinter;
 pub use options::FlattenOptions;
 
 //**************************************************************************************************
@@ -64,12 +67,14 @@ pub fn run(options: &FlattenOptions) -> Result<()> {
     // dump the result
     for (fun_id, spec) in flattened_specs {
         let fun_env = env.get_function(fun_id);
+        let fun_scope = SpecBlockTarget::Function(fun_id.module_id, fun_id.id);
+        let printer = SpecPrinter::new(&env, &fun_scope);
         if !spec.conditions.is_empty() {
-            println!(
-                "fun {}\n{}",
-                fun_env.get_full_name_str(),
-                env.display(&spec)
-            );
+            println!("fun {}{{", fun_env.get_full_name_str());
+            for cond in &spec.conditions {
+                println!("\t{}", SpecPrinter::convert(printer.print_condition(cond)));
+            }
+            println!("}}");
         }
     }
 

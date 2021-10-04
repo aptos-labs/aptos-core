@@ -7818,9 +7818,11 @@ dependencies = [
  "anyhow",
  "bytecode",
  "diem-workspace-hack",
+ "itertools 0.10.1",
  "move-lang",
  "move-model",
  "move-prover",
+ "pretty",
  "structopt 0.3.21",
 ]
 
