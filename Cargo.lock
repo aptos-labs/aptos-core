@@ -1456,6 +1456,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "data-streaming-service"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "channel",
+ "diem-types",
+ "diem-workspace-hack",
+ "futures",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "datatest-stable"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

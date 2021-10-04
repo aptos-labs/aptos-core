@@ -194,6 +194,7 @@ members = [
     "diem-proptest-helpers",
     "diem-read-write-set",
     "diem-retrier",
+    "data-streaming-service", # Will be removed once state sync v2 is plugged into diem-node.
     "diem-swarm",
     "diem-transactional-test-harness",
     "diem-transaction-benchmarks",
