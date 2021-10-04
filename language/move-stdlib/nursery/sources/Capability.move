@@ -9,7 +9,7 @@
 /// called within a transaction which has a capability as a parameter, it is guaranteed that the capability
 /// has been obtained via a proper signer-based authorization step previously in the transaction's execution.
 ///
-/// ## Basic Usage
+/// ## Usage
 ///
 /// Capabilities are used typically as follows:
 ///
@@ -18,12 +18,14 @@
 ///
 ///   public fun initialize(s: &signer) {
 ///     // Create capability. This happens once at module initialization time.
-///     Capability::create<ProtectedFeature>(s);
+///     // One needs to provide a witness for being the owner of `ProtectedFeature`
+///     // in the 2nd parameter.
+///     Capability::create<ProtectedFeature>(s, &ProtectedFeature{});
 ///   }
 ///
 ///   public fun do_something(s: &signer) {
 ///     // Acquire the capability. This is the authorization step. Must have a signer to do so.
-///     let cap = Capability::acquire<ProtectedFeature>(s);
+///     let cap = Capability::acquire<ProtectedFeature>(s, &ProtectedFeature{});
 ///     // Pass the capability on to functions which require authorization.
 ///     critical(cap);
 ///   }
@@ -36,29 +38,6 @@
 ///
 /// Notice that a key feature of capabilities is that they do not require extra verification steps
 /// to ensure authorization is valid.
-///
-/// ## Advanced Authorization Scenarios
-///
-/// In the basic usage above, in order to acquire `Cap<ProtectedFeature>`, we needed a signer
-/// that owns this capability. Because `Capability::acquires` is a public function, everybody can
-/// acquire the capability provided the right signer is presented. But what if there authorization
-/// scenarios which go beyond having a signer?
-///
-/// The current way how to achieve this in Move is to build a wrapper around `Capability::Cap<T>`.
-/// The wrapper type will be owned by a specific module, restricting how values of it can be created.
-/// Below, we extend the example from above to illustrate this pattern:
-///
-/// ```
-/// struct ProtectedFeatureCap has copy, drop {
-///     cap: Capability::Cap<ProtectedFeature>
-/// }
-///
-/// public fun acquire_protected_feature_access(s: &signer): ProtectedFeatureCap {
-///   let cap = Capability::acquire<ProtectedFeature>(s);
-///   validate_authorization(s, cap); // Do any additional authorization validation
-///   ProtectedFeatureCap{cap}
-/// }
-/// ```
 ///
 /// ## Delegation
 ///
@@ -109,16 +88,18 @@ module Std::Capability {
         root: address
     }
 
-    /// Creates a new capability class, owned by the passed signer.
-    public fun create<Feature>(owner: &signer) {
+    /// Creates a new capability class, owned by the passed signer. A caller must pass a witness that
+    /// they own the `Feature` type parameter.
+    public fun create<Feature>(owner: &signer, _feature_witness: &Feature) {
         let addr = Signer::address_of(owner);
         assert(!exists<CapState<Feature>>(addr), Errors::already_published(ECAP));
         move_to<CapState<Feature>>(owner, CapState{ delegates: Vector::empty() });
     }
 
     /// Acquires a capability token. Only the owner of the capability class, or an authorized delegate,
-    /// can succeed with this operation.
-    public fun acquire<Feature>(requester: &signer): Cap<Feature>
+    /// can succeed with this operation. A caller must pass a witness that they own the `Feature` type
+    /// parameter.
+    public fun acquire<Feature>(requester: &signer, _feature_witness: &Feature): Cap<Feature>
     acquires CapState, CapDelegateState {
         let addr = Signer::address_of(requester);
         if (exists<CapDelegateState<Feature>>(addr)) {

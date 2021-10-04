@@ -19,9 +19,9 @@ called within a transaction which has a capability as a parameter, it is guarant
 has been obtained via a proper signer-based authorization step previously in the transaction's execution.
 
 
-<a name="@Basic_Usage_1"></a>
+<a name="@Usage_1"></a>
 
-### Basic Usage
+### Usage
 
 
 Capabilities are used typically as follows:
@@ -31,12 +31,14 @@ struct ProtectedFeature { ... } // this can be just a type tag, or actually some
 
 public fun initialize(s: &signer) {
 // Create capability. This happens once at module initialization time.
-Capability::create<ProtectedFeature>(s);
+// One needs to provide a witness for being the owner of <code>ProtectedFeature</code>
+// in the 2nd parameter.
+Capability::create<ProtectedFeature>(s, &ProtectedFeature{});
 }
 
 public fun do_something(s: &signer) {
 // Acquire the capability. This is the authorization step. Must have a signer to do so.
-let cap = Capability::acquire<ProtectedFeature>(s);
+let cap = Capability::acquire<ProtectedFeature>(s, &ProtectedFeature{});
 // Pass the capability on to functions which require authorization.
 critical(cap);
 }
@@ -51,34 +53,7 @@ Notice that a key feature of capabilities is that they do not require extra veri
 to ensure authorization is valid.
 
 
-<a name="@Advanced_Authorization_Scenarios_2"></a>
-
-### Advanced Authorization Scenarios
-
-
-In the basic usage above, in order to acquire <code><a href="Capability.md#0x1_Capability_Cap">Cap</a>&lt;ProtectedFeature&gt;</code>, we needed a signer
-that owns this capability. Because <code>Capability::acquires</code> is a public function, everybody can
-acquire the capability provided the right signer is presented. But what if there authorization
-scenarios which go beyond having a signer?
-
-The current way how to achieve this in Move is to build a wrapper around <code><a href="Capability.md#0x1_Capability_Cap">Capability::Cap</a>&lt;T&gt;</code>.
-The wrapper type will be owned by a specific module, restricting how values of it can be created.
-Below, we extend the example from above to illustrate this pattern:
-
-```
-struct ProtectedFeatureCap has copy, drop {
-cap: Capability::Cap<ProtectedFeature>
-}
-
-public fun acquire_protected_feature_access(s: &signer): ProtectedFeatureCap {
-let cap = Capability::acquire<ProtectedFeature>(s);
-validate_authorization(s, cap); // Do any additional authorization validation
-ProtectedFeatureCap{cap}
-}
-```
-
-
-<a name="@Delegation_3"></a>
+<a name="@Delegation_2"></a>
 
 ### Delegation
 
@@ -109,20 +84,19 @@ is_valid_delegate_for_protected_feature(d);
 
 
 -  [Overview](#@Overview_0)
-    -  [Basic Usage](#@Basic_Usage_1)
-    -  [Advanced Authorization Scenarios](#@Advanced_Authorization_Scenarios_2)
-    -  [Delegation](#@Delegation_3)
+    -  [Usage](#@Usage_1)
+    -  [Delegation](#@Delegation_2)
 -  [Struct `Cap`](#0x1_Capability_Cap)
 -  [Resource `CapState`](#0x1_Capability_CapState)
 -  [Resource `CapDelegateState`](#0x1_Capability_CapDelegateState)
--  [Constants](#@Constants_4)
+-  [Constants](#@Constants_3)
 -  [Function `create`](#0x1_Capability_create)
 -  [Function `acquire`](#0x1_Capability_acquire)
 -  [Function `delegate`](#0x1_Capability_delegate)
 -  [Function `revoke`](#0x1_Capability_revoke)
 -  [Function `remove_element`](#0x1_Capability_remove_element)
 -  [Function `add_element`](#0x1_Capability_add_element)
--  [Module Specification](#@Module_Specification_5)
+-  [Module Specification](#@Module_Specification_4)
 
 
 <pre><code><b>use</b> <a href="">0x1::Errors</a>;
@@ -216,7 +190,7 @@ An internal data structure for representing a configured delegated capability.
 
 </details>
 
-<a name="@Constants_4"></a>
+<a name="@Constants_3"></a>
 
 ## Constants
 
@@ -243,10 +217,11 @@ An internal data structure for representing a configured delegated capability.
 
 ## Function `create`
 
-Creates a new capability class, owned by the passed signer.
+Creates a new capability class, owned by the passed signer. A caller must pass a witness that
+they own the <code>Feature</code> type parameter.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="Capability.md#0x1_Capability_create">create</a>&lt;Feature&gt;(owner: &signer)
+<pre><code><b>public</b> <b>fun</b> <a href="Capability.md#0x1_Capability_create">create</a>&lt;Feature&gt;(owner: &signer, _feature_witness: &Feature)
 </code></pre>
 
 
@@ -255,7 +230,7 @@ Creates a new capability class, owned by the passed signer.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="Capability.md#0x1_Capability_create">create</a>&lt;Feature&gt;(owner: &signer) {
+<pre><code><b>public</b> <b>fun</b> <a href="Capability.md#0x1_Capability_create">create</a>&lt;Feature&gt;(owner: &signer, _feature_witness: &Feature) {
     <b>let</b> addr = <a href="_address_of">Signer::address_of</a>(owner);
     <b>assert</b>(!<b>exists</b>&lt;<a href="Capability.md#0x1_Capability_CapState">CapState</a>&lt;Feature&gt;&gt;(addr), <a href="_already_published">Errors::already_published</a>(<a href="Capability.md#0x1_Capability_ECAP">ECAP</a>));
     move_to&lt;<a href="Capability.md#0x1_Capability_CapState">CapState</a>&lt;Feature&gt;&gt;(owner, <a href="Capability.md#0x1_Capability_CapState">CapState</a>{ delegates: <a href="_empty">Vector::empty</a>() });
@@ -271,10 +246,11 @@ Creates a new capability class, owned by the passed signer.
 ## Function `acquire`
 
 Acquires a capability token. Only the owner of the capability class, or an authorized delegate,
-can succeed with this operation.
+can succeed with this operation. A caller must pass a witness that they own the <code>Feature</code> type
+parameter.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="Capability.md#0x1_Capability_acquire">acquire</a>&lt;Feature&gt;(requester: &signer): <a href="Capability.md#0x1_Capability_Cap">Capability::Cap</a>&lt;Feature&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="Capability.md#0x1_Capability_acquire">acquire</a>&lt;Feature&gt;(requester: &signer, _feature_witness: &Feature): <a href="Capability.md#0x1_Capability_Cap">Capability::Cap</a>&lt;Feature&gt;
 </code></pre>
 
 
@@ -283,7 +259,7 @@ can succeed with this operation.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="Capability.md#0x1_Capability_acquire">acquire</a>&lt;Feature&gt;(requester: &signer): <a href="Capability.md#0x1_Capability_Cap">Cap</a>&lt;Feature&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="Capability.md#0x1_Capability_acquire">acquire</a>&lt;Feature&gt;(requester: &signer, _feature_witness: &Feature): <a href="Capability.md#0x1_Capability_Cap">Cap</a>&lt;Feature&gt;
 <b>acquires</b> <a href="Capability.md#0x1_Capability_CapState">CapState</a>, <a href="Capability.md#0x1_Capability_CapDelegateState">CapDelegateState</a> {
     <b>let</b> addr = <a href="_address_of">Signer::address_of</a>(requester);
     <b>if</b> (<b>exists</b>&lt;<a href="Capability.md#0x1_Capability_CapDelegateState">CapDelegateState</a>&lt;Feature&gt;&gt;(addr)) {
@@ -419,7 +395,7 @@ Helper to add an element to a vector.
 
 </details>
 
-<a name="@Module_Specification_5"></a>
+<a name="@Module_Specification_4"></a>
 
 ## Module Specification
 
