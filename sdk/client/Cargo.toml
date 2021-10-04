@@ -1,6 +1,6 @@
 [package]
 name = "diem-client"
-version = "0.0.2"
+version = "0.0.3"
 authors = ["Diem Association <opensource@diem.com>"]
 description = "Diem JSON-RPC client"
 repository = "https://github.com/diem/diem"
@@ -24,10 +24,10 @@ serde = { version = "1.0.124", features = ["derive"] }
 serde_json = "1.0.64"
 tracing = "0.1.26"
 
-diem-crypto = { path = "../../crypto/crypto", version = "0.0.2" }
-diem-json-rpc-types = { path = "../../json-rpc/types", version = "0.0.2" }
-move-core-types = { path = "../../language/move-core/types", version = "0.0.2" }
-diem-types = { path = "../../types", version = "0.0.2" }
+diem-crypto = { path = "../../crypto/crypto", version = "0.0.3" }
+diem-json-rpc-types = { path = "../../json-rpc/types", version = "0.0.3" }
+move-core-types = { path = "../../language/move-core/types", version = "0.0.3" }
+diem-types = { path = "../../types", version = "0.0.3" }
 
 # Optional Dependencies
 futures = {version = "0.3.12", optional = true }
@@ -42,7 +42,7 @@ ipnet = { version = "2.3", optional = true }
 winapi = "0.3.9"
 
 [dev-dependencies]
-diem-types = { path = "../../types", version = "0.0.2", features = ["fuzzing"] }
+diem-types = { path = "../../types", version = "0.0.3", features = ["fuzzing"] }
 diem-workspace-hack = { path = "../../common/workspace-hack" }
 proptest = "1.0.0"
 tempfile = "3.2.0"
