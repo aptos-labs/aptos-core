@@ -6,3 +6,6 @@
 mod data_stream;
 mod error;
 mod streaming_client;
+
+#[cfg(test)]
+mod streaming_client_tests;
