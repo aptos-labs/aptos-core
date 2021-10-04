@@ -103,12 +103,7 @@ impl<'a, T: MoveResolver> MoveValueAnnotator<'a, T> {
         types
             .iter()
             .enumerate()
-            .map(|(i, ty)| {
-                let arg = &args[i];
-                let layout = (ty).try_into().map_err(into_vm_status)?;
-                let move_value = MoveValue::simple_deserialize(arg, &layout)?;
-                self.annotate_value(&move_value, ty)
-            })
+            .map(|(i, ty)| self.view_value_by_fat_type(ty, &args[i]))
             .collect::<Result<_>>()
     }
 
@@ -121,9 +116,13 @@ impl<'a, T: MoveResolver> MoveValueAnnotator<'a, T> {
 
     pub fn view_value(&self, ty_tag: &TypeTag, blob: &[u8]) -> Result<AnnotatedMoveValue> {
         let ty = self.cache.resolve_type(ty_tag)?;
-        let layout = (&ty).try_into().map_err(into_vm_status)?;
+        self.view_value_by_fat_type(&ty, blob)
+    }
+
+    fn view_value_by_fat_type(&self, ty: &FatType, blob: &[u8]) -> Result<AnnotatedMoveValue> {
+        let layout = ty.try_into().map_err(into_vm_status)?;
         let move_value = MoveValue::simple_deserialize(blob, &layout)?;
-        self.annotate_value(&move_value, &ty)
+        self.annotate_value(&move_value, ty)
     }
 
     fn annotate_struct(
