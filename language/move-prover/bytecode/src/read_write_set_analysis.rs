@@ -190,32 +190,21 @@ impl ReadWriteSetState {
         self.accesses.join(&new_callee_accesses);
     }
 
-    /// Copy the contents of `rhs_index` into `lhs_index`. Fails if `rhs_index` is not bound
-    pub fn copy_local(
-        &mut self,
-        lhs_index: TempIndex,
-        rhs_index: TempIndex,
-        fun_env: &FunctionEnv,
-    ) {
-        let rhs_value = self
-            .locals
-            .get_local(rhs_index, fun_env)
-            .unwrap_or_else(|| panic!("Unbound local {:?}", rhs_index))
-            .clone();
-        self.locals.bind_local(lhs_index, rhs_value, fun_env)
-    }
-
     pub fn assign_local(
         &mut self,
         lhs_index: TempIndex,
         rhs_index: TempIndex,
         func_env: &FunctionEnv,
     ) {
+        self.assign_root(Root::from_index(lhs_index, func_env), rhs_index, func_env)
+    }
+
+    pub fn assign_root(&mut self, lhs: Root, rhs_index: TempIndex, func_env: &FunctionEnv) {
         if let Some(rhs_data) = self.locals.get_local(rhs_index, func_env).cloned() {
-            self.locals.bind_local(lhs_index, rhs_data, func_env);
+            self.locals.bind_root(lhs, rhs_data);
             self.record_access(rhs_index, Access::Read, func_env)
         } else if let Some(rhs_node) = self.locals.get_local_node(rhs_index, func_env).cloned() {
-            self.locals.bind_local_node(lhs_index, rhs_node, func_env);
+            self.locals.bind_node(lhs, rhs_node);
         }
     }
 
@@ -274,7 +263,7 @@ impl ReadWriteSetState {
         for p in self
             .locals
             .get_local(local_idx, fun_env)
-            .expect("Unbound local")
+            .unwrap_or_else(|| panic!("Unbound local {:?}", local_idx))
             .iter()
         {
             if let Addr::Footprint(ap) = p {
@@ -295,7 +284,7 @@ impl ReadWriteSetState {
         let borrowed = self
             .locals
             .get_local(base, fun_env)
-            .expect("Unbound local")
+            .unwrap_or_else(|| panic!("Unbound local {:?}", base))
             .clone();
         let extended_aps = borrowed.add_offset(offset);
         for ap in extended_aps.footprint_paths() {
@@ -440,7 +429,6 @@ impl<'a> TransferFunctions for ReadWriteSetAnalysis<'a> {
         use Operation::*;
 
         let func_env = &self.func_env;
-
         match instr {
             Call(_, rets, oper, args, _abort_action) => match oper {
                 BorrowField(_mid, _sid, _types, fld) => {
@@ -450,9 +438,8 @@ impl<'a> TransferFunctions for ReadWriteSetAnalysis<'a> {
                 }
                 ReadRef => {
                     if state.locals.local_exists(args[0], func_env) {
-                        state.record_access(args[0], Access::Read, func_env);
                         // rets[0] = args[0]
-                        state.copy_local(rets[0], args[0], func_env)
+                        state.assign_local(rets[0], args[0], func_env)
                     }
                 }
                 WriteRef => {
@@ -505,7 +492,6 @@ impl<'a> TransferFunctions for ReadWriteSetAnalysis<'a> {
                     let fun_id = mid.qualified(*fid);
                     let global_env = self.cache.global_env();
                     let callee_fun_env = global_env.get_function(fun_id);
-                    // TODO: fix crash here
                     if let Some(callee_summary) = self
                         .cache
                         .get::<ReadWriteSetState>(fun_id, &FunctionVariant::Baseline)
@@ -606,22 +592,8 @@ impl<'a> TransferFunctions for ReadWriteSetAnalysis<'a> {
             }
             Assign(_attr_id, lhs, rhs, _assign_kind) => state.assign_local(*lhs, *rhs, func_env),
             Ret(_attr_id, rets) => {
-                let ret_vals: Vec<Option<AbsAddr>> = rets
-                    .iter()
-                    .map(|ret| state.locals.get_local(*ret, func_env).cloned())
-                    .collect();
-                for (ret_index, ret_val_opt) in ret_vals.iter().enumerate() {
-                    if let Some(ret_val) = ret_val_opt {
-                        /*assert!(
-                            !ret_val.is_empty(),
-                            "empty return value bound to ret index {:?}",
-                            ret_index
-                        );*/
-                        // TODO: replace with assertion above
-                        if !ret_val.is_empty() {
-                            state.locals.bind_return(ret_index, ret_val.clone())
-                        }
-                    }
+                for (ret_index, ret_val) in rets.iter().enumerate() {
+                    state.assign_root(Root::Return(ret_index), *ret_val, func_env)
                 }
             }
             Abort(..) => {}
@@ -650,7 +622,7 @@ fn call_native_function(
         ("Signer", "borrow_address") => {
             if state.locals.local_exists(args[0], func_env) {
                 // treat as identity function
-                state.copy_local(rets[0], args[0], func_env)
+                state.assign_local(rets[0], args[0], func_env)
             }
         }
         ("Vector", "borrow_mut") | ("Vector", "borrow") => {
@@ -696,7 +668,7 @@ fn call_native_function(
             if state.locals.local_exists(args[0], func_env) {
                 state.record_access(args[0], Access::Read, func_env); // reads the input address
                                                                       // treat as assignment
-                state.copy_local(rets[0], args[0], func_env)
+                state.assign_local(rets[0], args[0], func_env)
             }
         }
         ("Vector", "empty") | ("Vector", "destroy_empty") | ("Vector", "reverse") => (),

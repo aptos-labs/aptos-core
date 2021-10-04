@@ -367,7 +367,12 @@ impl<T: FootprintDomain> AccessPathTrie<T> {
         node: TrieNode<T>,
         fun_env: &FunctionEnv,
     ) {
-        self.0.insert(Root::from_index(local_index, fun_env), node);
+        self.bind_node(Root::from_index(local_index, fun_env), node);
+    }
+
+    /// Bind `node` to `lhs` in the trie, overwriting the old value of `lhs`
+    pub fn bind_node(&mut self, lhs: Root, node: TrieNode<T>) {
+        self.0.insert(lhs, node);
     }
 
     /// Remove the value bound to the local variable `local_index`
@@ -380,7 +385,8 @@ impl<T: FootprintDomain> AccessPathTrie<T> {
         self.bind_root(Root::ret(return_index), data)
     }
 
-    fn bind_root(&mut self, root: Root, data: T) {
+    /// Bind `root` to `data`
+    pub fn bind_root(&mut self, root: Root, data: T) {
         self.0.insert(root, TrieNode::new(data));
     }
 

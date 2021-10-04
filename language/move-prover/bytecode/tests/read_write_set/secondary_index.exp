@@ -228,6 +228,7 @@ fun SecondaryIndex::read_secondary_index_from_formal_interproc($t0|a_addr: addre
      var $t5: address
      # Accesses:
      # Formal(0): Read
+     # Formal(0)/0x1::SecondaryIndex::B/b_addr: Read
      #
      # Locals:
      # Ret(0): Formal(0)/0x1::SecondaryIndex::B/b_addr
