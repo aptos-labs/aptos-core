@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    MoveModuleBytecode, Address, EventKey, HashValue, HexEncodedBytes,
-    MoveModuleId, MoveResource, MoveResourceType, MoveType, MoveValue, U64,
+    Address, EventKey, HashValue, MoveModuleBytecode, MoveModuleId, MoveResource, MoveResourceType,
+    MoveScriptBytecode, MoveType, MoveValue, U64,
 };
 
 use diem_crypto::hash::CryptoHash;
@@ -16,7 +16,10 @@ use move_core_types::identifier::Identifier;
 use resource_viewer::AnnotatedMoveValue;
 
 use serde::Serialize;
-use std::{boxed::Box, convert::From};
+use std::{
+    boxed::Box,
+    convert::{From, Into, TryFrom, TryInto},
+};
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -227,22 +230,24 @@ pub enum TransactionPayload {
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct ScriptPayload {
-    pub code: HexEncodedBytes,
+    pub code: MoveScriptBytecode,
     pub type_arguments: Vec<MoveType>,
     pub arguments: Vec<MoveValue>,
 }
 
-impl From<&Script> for ScriptPayload {
-    fn from(script: &Script) -> Self {
-        Self {
-            code: script.code().to_vec().into(),
+impl TryFrom<&Script> for ScriptPayload {
+    type Error = anyhow::Error;
+
+    fn try_from(script: &Script) -> anyhow::Result<Self> {
+        Ok(Self {
+            code: script.code().try_into()?,
             type_arguments: script
                 .ty_args()
                 .iter()
                 .map(|arg| arg.clone().into())
                 .collect(),
             arguments: script.args().iter().map(|arg| arg.clone().into()).collect(),
-        }
+        })
     }
 }
 

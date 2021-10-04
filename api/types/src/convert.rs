@@ -74,8 +74,8 @@ impl<'a, R: MoveResolver> MoveConverter<'a, R> {
         use diem_types::transaction::TransactionPayload::*;
         let ret = match payload {
             WriteSet(v) => TransactionPayload::WriteSetPayload(self.try_into_write_set_payload(v)?),
-            Script(s) => TransactionPayload::ScriptPayload(s.into()),
-            Module(m) => TransactionPayload::ModulePayload(m.code().try_into()?),
+            Script(s) => TransactionPayload::ScriptPayload(s.try_into()?),
+            Module(m) => TransactionPayload::ModulePayload(m.try_into()?),
             ScriptFunction(fun) => TransactionPayload::ScriptFunctionPayload {
                 module: fun.module().clone().into(),
                 function: fun.function().into(),
@@ -99,7 +99,7 @@ impl<'a, R: MoveResolver> MoveConverter<'a, R> {
         let ret = match payload {
             Script { execute_as, script } => WriteSetPayload::ScriptWriteSet {
                 execute_as: (*execute_as).into(),
-                script: script.into(),
+                script: script.try_into()?,
             },
             Direct(d) => WriteSetPayload::DirectWriteSet {
                 changes: d

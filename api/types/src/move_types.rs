@@ -1,13 +1,14 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::Address;
+use crate::{Address, Bytecode};
+use diem_types::transaction::Module;
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{
-        Ability, AbilitySet, CompiledModule, FieldDefinition, FunctionDefinition, SignatureToken,
-        StructDefinition, StructFieldInformation, StructHandleIndex, StructTypeParameter,
-        Visibility,
+        Ability, AbilitySet, CompiledModule, CompiledScript, FieldDefinition, FunctionDefinition,
+        SignatureToken, StructDefinition, StructFieldInformation, StructHandleIndex,
+        StructTypeParameter, Visibility,
     },
 };
 use move_core_types::{
@@ -243,10 +244,8 @@ impl From<StructTag> for MoveStructTag {
     }
 }
 
-impl From<(&CompiledModule, &StructHandleIndex, &Vec<SignatureToken>)> for MoveStructTag {
-    fn from(
-        (m, shi, type_params): (&CompiledModule, &StructHandleIndex, &Vec<SignatureToken>),
-    ) -> Self {
+impl<T: Bytecode> From<(&T, &StructHandleIndex, &Vec<SignatureToken>)> for MoveStructTag {
+    fn from((m, shi, type_params): (&T, &StructHandleIndex, &Vec<SignatureToken>)) -> Self {
         let s_handle = m.struct_handle_at(*shi);
         let m_handle = m.module_handle_at(s_handle.module);
         Self {
@@ -290,8 +289,8 @@ impl From<TypeTag> for MoveType {
     }
 }
 
-impl From<(&CompiledModule, &SignatureToken)> for MoveType {
-    fn from((m, token): (&CompiledModule, &SignatureToken)) -> Self {
+impl<T: Bytecode> From<(&T, &SignatureToken)> for MoveType {
+    fn from((m, token): (&T, &SignatureToken)) -> Self {
         match token {
             SignatureToken::Bool => MoveType::Bool,
             SignatureToken::U8 => MoveType::U8,
@@ -384,8 +383,8 @@ pub struct MoveStruct {
     pub fields: Vec<MoveStructField>,
 }
 
-impl From<(&CompiledModule, &StructDefinition)> for MoveStruct {
-    fn from((m, def): (&CompiledModule, &StructDefinition)) -> Self {
+impl<T: Bytecode> From<(&T, &StructDefinition)> for MoveStruct {
+    fn from((m, def): (&T, &StructDefinition)) -> Self {
         let handle = m.struct_handle_at(def.struct_handle);
         let (is_native, fields) = match &def.field_information {
             StructFieldInformation::Native => (true, vec![]),
@@ -472,8 +471,8 @@ pub struct MoveStructField {
     typ: MoveType,
 }
 
-impl From<(&CompiledModule, &FieldDefinition)> for MoveStructField {
-    fn from((m, def): (&CompiledModule, &FieldDefinition)) -> Self {
+impl<T: Bytecode> From<(&T, &FieldDefinition)> for MoveStructField {
+    fn from((m, def): (&T, &FieldDefinition)) -> Self {
         Self {
             name: m.identifier_at(def.name).to_owned(),
             typ: (m, &def.signature.0).into(),
@@ -491,8 +490,8 @@ pub struct MoveFunction {
     pub return_: Vec<MoveType>,
 }
 
-impl From<(&CompiledModule, &FunctionDefinition)> for MoveFunction {
-    fn from((m, def): (&CompiledModule, &FunctionDefinition)) -> Self {
+impl<T: Bytecode> From<(&T, &FunctionDefinition)> for MoveFunction {
+    fn from((m, def): (&T, &FunctionDefinition)) -> Self {
         let fhandle = m.function_handle_at(def.function);
         let name = m.identifier_at(fhandle.name).to_owned();
         Self {
@@ -515,6 +514,27 @@ impl From<(&CompiledModule, &FunctionDefinition)> for MoveFunction {
                 .iter()
                 .map(|s| (m, s).into())
                 .collect(),
+        }
+    }
+}
+
+impl From<CompiledScript> for MoveFunction {
+    fn from(script: CompiledScript) -> Self {
+        Self {
+            name: Identifier::new("main").unwrap(),
+            visibility: MoveFunctionVisibility::Script,
+            generic_type_params: script
+                .type_parameters
+                .iter()
+                .map(MoveFunctionGenericTypeParam::from)
+                .collect(),
+            params: script
+                .signature_at(script.parameters)
+                .0
+                .iter()
+                .map(|s| (&script, s).into())
+                .collect(),
+            return_: vec![],
         }
     }
 }
@@ -569,12 +589,12 @@ pub struct MoveModuleBytecode {
     abi: MoveModule,
 }
 
-impl TryFrom<&[u8]> for MoveModuleBytecode {
+impl TryFrom<&Module> for MoveModuleBytecode {
     type Error = anyhow::Error;
-    fn try_from(bytes: &[u8]) -> anyhow::Result<Self> {
+    fn try_from(m: &Module) -> anyhow::Result<Self> {
         Ok(Self {
-            bytecode: HexEncodedBytes(bytes.to_vec()),
-            abi: CompiledModule::deserialize(bytes)?.try_into()?,
+            bytecode: m.code().to_vec().into(),
+            abi: CompiledModule::deserialize(m.code())?.try_into()?,
         })
     }
 }
@@ -583,8 +603,24 @@ impl TryFrom<&Vec<u8>> for MoveModuleBytecode {
     type Error = anyhow::Error;
     fn try_from(bytes: &Vec<u8>) -> anyhow::Result<Self> {
         Ok(Self {
-            bytecode: HexEncodedBytes(bytes.clone()),
+            bytecode: bytes.clone().into(),
             abi: CompiledModule::deserialize(bytes)?.try_into()?,
+        })
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct MoveScriptBytecode {
+    bytecode: HexEncodedBytes,
+    abi: MoveFunction,
+}
+
+impl TryFrom<&[u8]> for MoveScriptBytecode {
+    type Error = anyhow::Error;
+    fn try_from(bytes: &[u8]) -> anyhow::Result<Self> {
+        Ok(Self {
+            bytecode: bytes.to_vec().into(),
+            abi: CompiledScript::deserialize(bytes)?.try_into()?,
         })
     }
 }
