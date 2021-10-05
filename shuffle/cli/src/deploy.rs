@@ -1,9 +1,8 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{new::MESSAGE_EXAMPLE_PATH, shared::send};
-use anyhow::{anyhow, Context, Result};
-use diem_config::config::NodeConfig;
+use crate::shared::{send, MAIN_PKG_PATH};
+use anyhow::{anyhow, Result};
 use diem_crypto::PrivateKey;
 use diem_sdk::{
     client::BlockingClient,
@@ -20,25 +19,19 @@ use diem_types::{
 use generate_key::load_key;
 use move_binary_format::{file_format::CompiledModule, normalized};
 use move_lang::compiled_unit::{CompiledUnit, NamedCompiledModule};
-use move_package::compilation::{
-    compiled_package::{CompiledPackage, OnDiskCompiledPackage},
-    package_layout::CompiledPackageLayout,
-};
+use move_package::compilation::compiled_package::CompiledPackage;
 use std::{collections::HashSet, convert::TryFrom, path::Path};
 
-// TODO: Deploys the Message Move Package to the sender's address
-// 0x24163afcc6e33b0a9473852e18327fa9. This has been hardcoded via named
-// addresses in diem_framework_named_addresses.
+/// Deploys shuffle's main Move Package to the sender's address.
 pub fn handle(project_path: &Path, account_key_path: &Path) -> Result<()> {
-    let _compiled_packages = build_move_packages(project_path)?;
-    // TODO: Feed the compiled packages into method below for remote publishing
-    publish_packages_as_transaction(project_path, account_key_path)
+    let compiled_package = build_move_packages(project_path)?;
+    publish_packages_as_transaction(account_key_path, compiled_package)
 }
 
 /// Builds the packages in the shuffle project using the move package system.
 fn build_move_packages(project_path: &Path) -> Result<CompiledPackage> {
     println!("Building Examples...");
-    let pkgdir = project_path.join(MESSAGE_EXAMPLE_PATH);
+    let pkgdir = project_path.join(MAIN_PKG_PATH);
     let config = move_package::BuildConfig {
         dev_mode: true,
         test_mode: false,
@@ -49,12 +42,12 @@ fn build_move_packages(project_path: &Path) -> Result<CompiledPackage> {
     config.compile_package(pkgdir.as_path(), &mut std::io::stdout())
 }
 
-fn publish_packages_as_transaction(project_path: &Path, account_key_path: &Path) -> Result<()> {
-    let config_path = project_path.join("nodeconfig/0").join("node.yaml");
-    let config = NodeConfig::load(&config_path)
-        .with_context(|| format!("Failed to load NodeConfig from file: {:?}", config_path))?;
+fn publish_packages_as_transaction(
+    account_key_path: &Path,
+    compiled_package: CompiledPackage,
+) -> Result<()> {
     let new_account_key = load_key(account_key_path);
-    let json_rpc_url = format!("http://0.0.0.0:{}", config.json_rpc.address.port());
+    let json_rpc_url = format!("http://0.0.0.0:{}", 8080); // TODO: Hardcoded to local devnet
     let factory = TransactionFactory::new(ChainId::test());
     println!("Connecting to {}", json_rpc_url);
 
@@ -71,13 +64,7 @@ fn publish_packages_as_transaction(project_path: &Path, account_key_path: &Path)
     // ================= Send a module transaction ========================
 
     let mut new_account = LocalAccount::new(derived_address, new_account_key, 0);
-    let pkg_path = project_path
-        .join(MESSAGE_EXAMPLE_PATH)
-        .join(CompiledPackageLayout::Root.path())
-        .join(MESSAGE_EXAMPLE_PATH)
-        .join(CompiledPackageLayout::BuildInfo.path());
-    let package = OnDiskCompiledPackage::from_path(pkg_path.as_path())?.into_compiled_package()?;
-    let compiled_units = package.compiled_units;
+    let compiled_units = compiled_package.compiled_units;
     let mut uniq_modules: HashSet<String> = HashSet::new(); // Apparently modules can appear twice in compiled units, ensure uniq
     for unit in compiled_units {
         match unit {

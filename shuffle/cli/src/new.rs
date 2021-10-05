@@ -16,7 +16,6 @@ pub const DEFAULT_BLOCKCHAIN: &str = "goodday";
 
 /// Directory of generated transaction builders for helloblockchain.
 const EXAMPLES_DIR: Dir = include_dir!("../move/examples");
-pub const MESSAGE_EXAMPLE_PATH: &str = "Message";
 
 const REPL_FILE_CONTENT: &[u8] = include_bytes!("../repl.ts");
 
@@ -97,10 +96,10 @@ mod test {
 
         // spot check move starter files
         let expected_example_content = String::from_utf8_lossy(include_bytes!(
-            "../../move/examples/Message/sources/Message.move"
+            "../../move/examples/main/sources/Message.move"
         ));
         let actual_example_content =
-            fs::read_to_string(dir.path().join("Message/sources/Message.move")).unwrap();
+            fs::read_to_string(dir.path().join("main/sources/Message.move")).unwrap();
         assert_eq!(expected_example_content, actual_example_content);
 
         // check if we can load generated node.yaml config file

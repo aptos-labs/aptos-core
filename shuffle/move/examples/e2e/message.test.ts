@@ -5,7 +5,7 @@
 
 // deno-lint-ignore-file no-explicit-any
 import { assert, assertEquals } from "https://deno.land/std/testing/asserts.ts";
-import * as MessageHelper from "../Message/txn_builders/helper.ts";
+import * as MessageHelper from "../main/txn_builders/helper.ts";
 import * as Shuffle from "../repl.ts";
 import * as utils from "./utils.ts";
 

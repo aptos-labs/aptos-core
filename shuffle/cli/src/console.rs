@@ -5,18 +5,17 @@ use crate::shared;
 use anyhow::Result;
 use std::{path::Path, process::Command};
 
+/// Launches a Deno REPL for the shuffle project, generating transaction
+/// builders and loading them into the REPL namespace for easy on chain interaction.
 pub fn handle(project_path: &Path) -> Result<()> {
     let _config = shared::read_config(project_path)?;
 
-    // TODO: Fix hardcoding of mod.ts by copying it into project path and referencing
-    // it via project_path.join(...). Remove Message pkg hardcode and iterate over pkgs.
     let deno_bootstrap = format!(
-        r#"import * as Shuffle from "{}/repl.ts";
-        import * as TxnBuilder from "{}/Message/txn_builders/mod.ts";
-        import * as Helper from "{}/Message/txn_builders/helper.ts";"#,
-        project_path.display(),
-        project_path.display(),
-        project_path.display(),
+        r#"import * as Shuffle from "{project}/repl.ts";
+        import * as TxnBuilder from "{project}/{pkg}/txn_builders/mod.ts";
+        import * as Helper from "{project}/{pkg}/txn_builders/helper.ts";"#,
+        project = project_path.display(),
+        pkg = shared::MAIN_PKG_PATH,
     );
 
     Command::new("deno")

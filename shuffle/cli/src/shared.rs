@@ -6,6 +6,8 @@ use diem_sdk::client::BlockingClient;
 use serde::{Deserialize, Serialize};
 use std::{fs, path::Path};
 
+pub const MAIN_PKG_PATH: &str = "main";
+
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "kebab-case")]
 pub struct Config {
