@@ -113,6 +113,7 @@ impl<T: TransactionInfoTrait> From<(u64, &BlockMetadata, &T)> for Transaction {
                 .map(|a| (*a).into())
                 .collect(),
             proposer: txn.proposer().into(),
+            timestamp: txn.timestamp_usec().into(),
         })
     }
 }
@@ -184,6 +185,7 @@ pub struct BlockMetadataTransaction {
     pub round: U64,
     pub previous_block_votes: Vec<Address>,
     pub proposer: Address,
+    pub timestamp: U64,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]

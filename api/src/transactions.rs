@@ -408,6 +408,7 @@ mod tests {
                 "round": "1",
                 "previous_block_votes": [],
                 "proposer": context.validator_owner.to_hex_literal(),
+                "timestamp": metadata_txn.timestamp_usec().to_string(),
             }),
         );
 
