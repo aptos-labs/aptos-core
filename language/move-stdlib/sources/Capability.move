@@ -1,6 +1,8 @@
 /// A module which defines the basic concept of
 /// [*capabilities*](https://en.wikipedia.org/wiki/Capability-based_security) for managing access control.
 ///
+/// EXPERIMENTAL
+///
 /// # Overview
 ///
 /// A capability is a unforgeable token which testifies that a signer has authorized a certain operation.
@@ -11,40 +13,44 @@
 ///
 /// ## Usage
 ///
-/// Capabilities are used typically as follows:
+/// Initializing and acquiring capabilities is usually encapsulated in a module with a type
+/// tag which can only be constructed by this module.
 ///
 /// ```
-///   struct ProtectedFeature { ... } // this can be just a type tag, or actually some protected data
+/// module Pkg::Feature {
+///   use Std::Capability::Cap;
 ///
+///   /// A type tag used in Cap<Feature>. Only this module can create an instance,
+///   /// and there is no public function other than Self::acquire which returns a value of this type.
+///   /// This way, this module has full control how Cap<Feature> is given out.
+///   struct Feature has drop {}
+///
+///   /// Initializes this module.
 ///   public fun initialize(s: &signer) {
 ///     // Create capability. This happens once at module initialization time.
-///     // One needs to provide a witness for being the owner of `ProtectedFeature`
+///     // One needs to provide a witness for being the owner of Feature
 ///     // in the 2nd parameter.
-///     Capability::create<ProtectedFeature>(s, &ProtectedFeature{});
+///     <<additional conditions allowing to initialize this capability>>
+///     Capability::create<Feature>(s, &Feature{});
 ///   }
 ///
-///   public fun do_something(s: &signer) {
-///     // Acquire the capability. This is the authorization step. Must have a signer to do so.
-///     let cap = Capability::acquire<ProtectedFeature>(s, &ProtectedFeature{});
-///     // Pass the capability on to functions which require authorization.
-///     critical(cap);
+///   /// Acquires the capability to work with this feature.
+///   public fun acquire(s: &signer): Cap<Feature> {
+///     <<additional conditions allowing to acquire this capability>>
+///     Capability::acquire<Feature>(s, &Feature{});
 ///   }
 ///
-///   fun critical(cap: Capability::Cap<ProtectedFeature>) {
-///     // Authorization guaranteed by construction -- no verification needed!
-///     ...
-///   }
+///   /// Does something related to the feature. The caller must pass a Cap<Feature>.
+///   public fun do_something(_cap: Cap<Feature>) { ... }
+/// }
 /// ```
-///
-/// Notice that a key feature of capabilities is that they do not require extra verification steps
-/// to ensure authorization is valid.
 ///
 /// ## Delegation
 ///
-/// Capabilities come with the optional feature of *delegation*. Via delegation, an owner of a capability
-/// can designate another signer to be also capable of acquiring the capability. Like the original owner,
+/// Capabilities come with the optional feature of *delegation*. Via `Self::delegate`, an owner of a capability
+/// can designate another signer to be also capable of acquiring the capability. Like the original creator,
 /// the delegate needs to present his signer to obtain the capability in his transactions. Delegation can
-/// be revoked, removing this access right from the delegate.
+/// be revoked via `Self::revoke`, removing this access right from the delegate.
 ///
 /// While the basic authorization mechanism for delegates is the same as with core capabilities, the
 /// target of delegation might be subject of restrictions which need to be specified and verified. This can
@@ -52,17 +58,17 @@
 /// all together for a capability, one can use the following invariant:
 ///
 /// ```
-///   invariant forall a: address where exists<CapState<ProtectedFeature>>(addr):
-///               len(Capability::spec_delegates<ProtectedFeature>(a)) == 0;
+///   invariant forall a: address where Capability::spec_has_cap<Feature>(a):
+///               len(Capability::spec_delegates<Feature>(a)) == 0;
 /// ```
 ///
 /// Similarly, the following invariant would enforce that delegates, if existent, must satisfy a certain
 /// predicate:
 ///
 /// ```
-///   invariant forall a: address where exists<CapState<ProtectedFeature>>(addr):
-///               forall d in Capability::spec_delegates<ProtectedFeature>(a):
-///                  is_valid_delegate_for_protected_feature(d);
+///   invariant forall a: address where Capability::spec_has_cap<Feature>(a):
+///               forall d in Capability::spec_delegates<Feature>(a):
+///                  is_valid_delegate_for_feature(d);
 /// ```
 ///
 module Std::Capability {
@@ -75,6 +81,12 @@ module Std::Capability {
 
     /// The token representing an acquired capability. Cannot be stored in memory, but copied and dropped freely.
     struct Cap<phantom Feature> has copy, drop {
+        root: address
+    }
+
+    /// A linear version of a capability token. This can be used if an acquired capability should be enforced
+    /// to be used only once for an authorization.
+    struct LinearCap<phantom Feature> has drop {
         root: address
     }
 
@@ -101,6 +113,19 @@ module Std::Capability {
     /// parameter.
     public fun acquire<Feature>(requester: &signer, _feature_witness: &Feature): Cap<Feature>
     acquires CapState, CapDelegateState {
+        Cap<Feature>{root: validate_acquire<Feature>(requester)}
+    }
+
+    /// Acquires a linear capability token. It is up to the module which owns `Feature` to decide
+    /// whether to expose a linear or non-linear capability.
+    public fun acquire_linear<Feature>(requester: &signer, _feature_witness: &Feature): LinearCap<Feature>
+    acquires CapState, CapDelegateState {
+        LinearCap<Feature>{root: validate_acquire<Feature>(requester)}
+    }
+
+    /// Helper to validate an acquire. Returns the root address of the capability.
+    fun validate_acquire<Feature>(requester: &signer): address
+    acquires CapState, CapDelegateState {
         let addr = Signer::address_of(requester);
         if (exists<CapDelegateState<Feature>>(addr)) {
             let root_addr = borrow_global<CapDelegateState<Feature>>(addr).root;
@@ -108,29 +133,41 @@ module Std::Capability {
             assert(exists<CapState<Feature>>(root_addr), Errors::invalid_state(EDELEGATE));
             assert(Vector::contains(&borrow_global<CapState<Feature>>(root_addr).delegates, &addr),
                    Errors::invalid_state(EDELEGATE));
-            Cap<Feature>{root: root_addr}
+            root_addr
         } else {
             assert(exists<CapState<Feature>>(addr), Errors::not_published(ECAP));
-            Cap<Feature>{root: addr}
+            addr
         }
     }
 
-    /// Registers a delegation relation.
-    public fun delegate<Feature>(cap: Cap<Feature>, to: &signer)
+    /// Returns the root address associated with the given capability token. Only the owner
+    /// of the feature can do this.
+    public fun root_addr<Feature>(cap: Cap<Feature>, _feature_witness: &Feature): address {
+        cap.root
+    }
+
+    /// Returns the root address associated with the given linear capability token.
+    public fun linear_root_addr<Feature>(cap: LinearCap<Feature>, _feature_witness: &Feature): address {
+        cap.root
+    }
+
+    /// Registers a delegation relation. If the relation already exists, this function does
+    /// nothing.
+    // TODO: explore whether this should be idempotent like now or abort
+    public fun delegate<Feature>(cap: Cap<Feature>, _feature_witness: &Feature, to: &signer)
     acquires CapState {
         let addr = Signer::address_of(to);
-        assert(!exists<CapDelegateState<Feature>>(addr), Errors::already_published(EDELEGATE));
-        assert(exists<CapState<Feature>>(cap.root), Errors::invalid_state(ECAP));
+        if (exists<CapDelegateState<Feature>>(addr)) return;
         move_to(to, CapDelegateState<Feature>{root: cap.root});
         add_element(&mut borrow_global_mut<CapState<Feature>>(cap.root).delegates, addr);
     }
 
-    /// Revokes a delegation relation.
-    public fun revoke<Feature>(cap: Cap<Feature>, from: address)
+    /// Revokes a delegation relation. If no relation exists, this function does nothing.
+    // TODO: explore whether this should be idempotent like now or abort
+    public fun revoke<Feature>(cap: Cap<Feature>, _feature_witness: &Feature, from: address)
     acquires CapState, CapDelegateState
     {
-        assert(exists<CapDelegateState<Feature>>(from), Errors::not_published(EDELEGATE));
-        assert(exists<CapState<Feature>>(cap.root), Errors::invalid_state(ECAP));
+        if (!exists<CapDelegateState<Feature>>(from)) return;
         let CapDelegateState{root: _root} = move_from<CapDelegateState<Feature>>(from);
         remove_element(&mut borrow_global_mut<CapState<Feature>>(cap.root).delegates, &from);
     }
@@ -148,6 +185,11 @@ module Std::Capability {
         if (!Vector::contains(v, &x)) {
             Vector::push_back(v, x)
         }
+    }
+
+    /// Helper specification function to check whether a capability exists at address.
+    spec fun spec_has_cap<Feature>(addr: address): bool {
+        exists<CapState<Feature>>(addr)
     }
 
     /// Helper specification function to obtain the delegates of a capability.

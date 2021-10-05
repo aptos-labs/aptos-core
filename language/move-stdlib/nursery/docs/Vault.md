@@ -633,15 +633,6 @@ A modify accessor for the content of the vault.
 ## Constants
 
 
-<a name="0x1_Vault_EDELEGATE"></a>
-
-
-
-<pre><code><b>const</b> <a href="Vault.md#0x1_Vault_EDELEGATE">EDELEGATE</a>: u64 = 1;
-</code></pre>
-
-
-
 <a name="0x1_Vault_EACCESSOR_INCONSISTENCY"></a>
 
 
@@ -656,6 +647,15 @@ A modify accessor for the content of the vault.
 
 
 <pre><code><b>const</b> <a href="Vault.md#0x1_Vault_EACCESSOR_IN_USE">EACCESSOR_IN_USE</a>: u64 = 2;
+</code></pre>
+
+
+
+<a name="0x1_Vault_EDELEGATE"></a>
+
+
+
+<pre><code><b>const</b> <a href="Vault.md#0x1_Vault_EDELEGATE">EDELEGATE</a>: u64 = 1;
 </code></pre>
 
 
