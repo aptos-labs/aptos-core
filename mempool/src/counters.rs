@@ -4,8 +4,8 @@
 use diem_config::network_id::{NetworkId, PeerNetworkId};
 use diem_metrics::{
     register_histogram, register_histogram_vec, register_int_counter, register_int_counter_vec,
-    register_int_gauge, register_int_gauge_vec, DurationHistogram, HistogramTimer, HistogramVec,
-    IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
+    register_int_gauge_vec, DurationHistogram, HistogramTimer, HistogramVec, IntCounter,
+    IntCounterVec, IntGauge, IntGaugeVec,
 };
 use diem_types::PeerId;
 use once_cell::sync::Lazy;
@@ -408,20 +408,6 @@ pub static DB_ERROR: Lazy<IntCounter> = Lazy::new(|| {
     )
     .unwrap()
 });
-
-/// Gauge for the preference ranking of the current chosen upstream network
-/// to broadcast to
-static UPSTREAM_NETWORK: Lazy<IntGauge> = Lazy::new(|| {
-    register_int_gauge!(
-        "diem_mempool_upstream_network",
-        "The preference of the network mempool is broadcasting to"
-    )
-    .unwrap()
-});
-
-pub fn upstream_network(network: usize) {
-    UPSTREAM_NETWORK.set(network as i64)
-}
 
 /// Counter for the current number of active upstream peers mempool can
 /// broadcast to, summed across each of its networks
