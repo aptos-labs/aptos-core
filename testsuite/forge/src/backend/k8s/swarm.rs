@@ -257,7 +257,7 @@ impl Swarm for K8sSwarm {
 }
 
 pub(crate) fn k8s_retry_strategy() -> impl Iterator<Item = Duration> {
-    diem_retrier::exp_retry_strategy(1000, 5000, 30)
+    diem_retrier::exp_retry_strategy(1000, 10000, 30)
 }
 
 #[derive(Clone, Debug)]
