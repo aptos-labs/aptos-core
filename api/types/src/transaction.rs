@@ -66,13 +66,7 @@ impl<T: TransactionInfoTrait> From<(u64, &SignedTransaction, &T, TransactionPayl
         ),
     ) -> Self {
         Transaction::UserTransaction(Box::new(UserTransaction {
-            version: version.into(),
-            hash: info.transaction_hash().into(),
-            state_root_hash: info.state_root_hash().into(),
-            event_root_hash: info.event_root_hash().into(),
-            gas_used: info.gas_used().into(),
-            success: info.status().is_success(),
-
+            info: (version, info).into(),
             sender: txn.sender().into(),
             sequence_number: txn.sequence_number().into(),
             max_gas_amount: txn.max_gas_amount().into(),
@@ -88,13 +82,7 @@ impl<T: TransactionInfoTrait> From<(u64, &SignedTransaction, &T, TransactionPayl
 impl<T: TransactionInfoTrait> From<(u64, &T, WriteSetPayload, Vec<Event>)> for Transaction {
     fn from((version, info, payload, events): (u64, &T, WriteSetPayload, Vec<Event>)) -> Self {
         Transaction::GenesisTransaction(GenesisTransaction {
-            version: version.into(),
-            hash: info.transaction_hash().into(),
-            state_root_hash: info.state_root_hash().into(),
-            event_root_hash: info.event_root_hash().into(),
-            gas_used: info.gas_used().into(),
-            success: info.status().is_success(),
-
+            info: (version, info).into(),
             payload: GenesisPayload::WriteSetPayload(payload),
             events,
         })
@@ -104,13 +92,7 @@ impl<T: TransactionInfoTrait> From<(u64, &T, WriteSetPayload, Vec<Event>)> for T
 impl<T: TransactionInfoTrait> From<(u64, &BlockMetadata, &T)> for Transaction {
     fn from((version, txn, info): (u64, &BlockMetadata, &T)) -> Self {
         Transaction::BlockMetadataTransaction(BlockMetadataTransaction {
-            version: version.into(),
-            hash: info.transaction_hash().into(),
-            state_root_hash: info.state_root_hash().into(),
-            event_root_hash: info.event_root_hash().into(),
-            gas_used: info.gas_used().into(),
-            success: info.status().is_success(),
-
+            info: (version, info).into(),
             id: txn.id().into(),
             round: txn.round().into(),
             previous_block_votes: txn
@@ -121,6 +103,29 @@ impl<T: TransactionInfoTrait> From<(u64, &BlockMetadata, &T)> for Transaction {
                 .collect(),
             proposer: txn.proposer().into(),
         })
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct TransactionInfo {
+    pub version: U64,
+    pub hash: HashValue,
+    pub state_root_hash: HashValue,
+    pub event_root_hash: HashValue,
+    pub gas_used: U64,
+    pub success: bool,
+}
+
+impl<T: TransactionInfoTrait> From<(u64, &T)> for TransactionInfo {
+    fn from((version, info): (u64, &T)) -> Self {
+        Self {
+            version: version.into(),
+            hash: info.transaction_hash().into(),
+            state_root_hash: info.state_root_hash().into(),
+            event_root_hash: info.event_root_hash().into(),
+            gas_used: info.gas_used().into(),
+            success: info.status().is_success(),
+        }
     }
 }
 
@@ -138,14 +143,8 @@ pub struct PendingTransaction {
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct UserTransaction {
-    pub version: U64,
-    pub hash: HashValue,
-    pub state_root_hash: HashValue,
-    pub event_root_hash: HashValue,
-    pub gas_used: U64,
-    pub success: bool,
-
-    // user txn specific fields
+    #[serde(flatten)]
+    pub info: TransactionInfo,
     pub sender: Address,
     pub sequence_number: U64,
     pub max_gas_amount: U64,
@@ -158,28 +157,16 @@ pub struct UserTransaction {
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct GenesisTransaction {
-    pub version: U64,
-    pub hash: HashValue,
-    pub state_root_hash: HashValue,
-    pub event_root_hash: HashValue,
-    pub gas_used: U64,
-    pub success: bool,
-
-    // genesis txn specific fields
+    #[serde(flatten)]
+    pub info: TransactionInfo,
     pub payload: GenesisPayload,
     pub events: Vec<Event>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct BlockMetadataTransaction {
-    pub version: U64,
-    pub hash: HashValue,
-    pub state_root_hash: HashValue,
-    pub event_root_hash: HashValue,
-    pub gas_used: U64,
-    pub success: bool,
-
-    // block metadata txn specific fields
+    #[serde(flatten)]
+    pub info: TransactionInfo,
     pub id: HashValue,
     pub round: U64,
     pub previous_block_votes: Vec<Address>,
