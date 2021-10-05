@@ -3,8 +3,7 @@
 
 use crate::{
     backend::k8s::node::K8sNode, create_k8s_client, query_sequence_numbers, remove_helm_release,
-    set_eks_nodegroup_size, set_validator_image_tag, uninstall_from_k8s_cluster, ChainInfo,
-    FullNode, Node, Result, Swarm, Validator, Version,
+    set_validator_image_tag, ChainInfo, FullNode, Node, Result, Swarm, Validator, Version,
 };
 use anyhow::{anyhow, bail, format_err};
 use diem_config::config::NodeConfig;
@@ -139,14 +138,6 @@ impl K8sSwarm {
     #[allow(dead_code)]
     fn get_kube_client(&self) -> K8sClient {
         self.kube_client.clone()
-    }
-}
-
-impl Drop for K8sSwarm {
-    // When the K8sSwarm struct goes out of scope we need to wipe the chain state and scale down
-    fn drop(&mut self) {
-        uninstall_from_k8s_cluster().unwrap();
-        set_eks_nodegroup_size(self.cluster_name.clone(), 0, true).unwrap();
     }
 }
 

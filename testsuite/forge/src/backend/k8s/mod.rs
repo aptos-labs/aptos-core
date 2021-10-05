@@ -80,6 +80,14 @@ impl K8sFactory {
     }
 }
 
+impl Drop for K8sFactory {
+    // When the K8sSwarm struct goes out of scope we need to wipe the chain state and scale down
+    fn drop(&mut self) {
+        uninstall_from_k8s_cluster().unwrap();
+        set_eks_nodegroup_size(self.cluster_name.clone(), 0, true).unwrap();
+    }
+}
+
 impl Factory for K8sFactory {
     fn versions<'a>(&'a self) -> Box<dyn Iterator<Item = Version> + 'a> {
         let version = vec![
