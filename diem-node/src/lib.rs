@@ -493,6 +493,7 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
             diem_db,
             consensus_reconfig_subscription
                 .expect("Consensus requires a reconfiguration subscription!"),
+            peer_metadata_storage,
         ));
         debug!("Consensus started in {} ms", instant.elapsed().as_millis());
     }

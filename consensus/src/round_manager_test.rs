@@ -35,6 +35,7 @@ use consensus_types::{
     timeout_certificate::TimeoutCertificate,
     vote_msg::VoteMsg,
 };
+use diem_config::network_id::NetworkId;
 use diem_crypto::{ed25519::Ed25519PrivateKey, HashValue, Uniform};
 use diem_infallible::Mutex;
 use diem_secure_storage::Storage;
@@ -58,6 +59,7 @@ use network::{
         network::{Event, NewNetworkEvents, NewNetworkSender},
         wire::handshake::v1::ProtocolIdSet,
     },
+    transport::ConnectionMetadata,
     ProtocolId,
 };
 use safety_rules::{PersistentSafetyStorage, SafetyRulesManager};
@@ -103,16 +105,15 @@ impl NodeSetup {
 
         let mut nodes = vec![];
         // pre-initialize the mapping to avoid race conditions (peer try to broadcast to someone not added yet)
-        let shared_connections = playground.peer_protocols();
+        let peer_metadata_storage = playground.peer_protocols();
         for signer in signers.iter().take(num_nodes) {
-            shared_connections.write().insert(
-                signer.author(),
-                ProtocolIdSet::from_iter([
-                    ProtocolId::ConsensusDirectSendJSON,
-                    ProtocolId::ConsensusDirectSend,
-                    ProtocolId::ConsensusRpc,
-                ]),
-            );
+            let mut conn_meta = ConnectionMetadata::mock(signer.author());
+            conn_meta.application_protocols = ProtocolIdSet::from_iter([
+                ProtocolId::ConsensusDirectSendJSON,
+                ProtocolId::ConsensusDirectSend,
+                ProtocolId::ConsensusRpc,
+            ]);
+            peer_metadata_storage.insert_connection(NetworkId::Validator, conn_meta);
         }
         for (id, signer) in signers.iter().take(num_nodes).enumerate() {
             let (initial_data, storage) = MockStorage::start_for_testing((&validators).into());

@@ -18,6 +18,7 @@ use diem_config::{
         NodeConfig, WaypointConfig,
     },
     generator::{self, ValidatorSwarm},
+    network_id::NetworkId,
 };
 use diem_mempool::mocks::MockSharedMempool;
 use diem_types::{
@@ -34,6 +35,7 @@ use network::{
         network::{NewNetworkEvents, NewNetworkSender},
         wire::handshake::v1::ProtocolIdSet,
     },
+    transport::ConnectionMetadata,
     ProtocolId,
 };
 use std::{collections::HashMap, iter::FromIterator, sync::Arc};
@@ -133,8 +135,7 @@ impl SMRNode {
             storage.clone(),
             reconfig_listener,
         );
-        let (network_task, network_receiver) =
-            NetworkTask::new(network_events, self_receiver, playground.peer_protocols());
+        let (network_task, network_receiver) = NetworkTask::new(network_events, self_receiver);
 
         runtime.spawn(network_task.start());
         runtime.spawn(epoch_mgr.start(timeout_receiver, network_receiver));
@@ -160,16 +161,15 @@ impl SMRNode {
         let ValidatorSwarm {
             nodes: mut node_configs,
         } = generator::validator_swarm_for_testing(num_nodes);
-        let shared_connections = playground.peer_protocols();
+        let peer_metadata_storage = playground.peer_protocols();
         node_configs.iter().for_each(|config| {
-            shared_connections.write().insert(
-                author_from_config(config),
-                ProtocolIdSet::from_iter([
-                    ProtocolId::ConsensusDirectSendJSON,
-                    ProtocolId::ConsensusDirectSend,
-                    ProtocolId::ConsensusRpc,
-                ]),
-            );
+            let mut conn_meta = ConnectionMetadata::mock(author_from_config(config));
+            conn_meta.application_protocols = ProtocolIdSet::from_iter([
+                ProtocolId::ConsensusDirectSendJSON,
+                ProtocolId::ConsensusDirectSend,
+                ProtocolId::ConsensusRpc,
+            ]);
+            peer_metadata_storage.insert_connection(NetworkId::Validator, conn_meta);
         });
 
         let validator_set = ValidatorSet::new(

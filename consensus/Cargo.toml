@@ -63,6 +63,7 @@ consensus-types = { path = "consensus-types", default-features = false, features
 executor-test-helpers = { path = "../execution/executor-test-helpers" }
 diem-config = { path = "../config", features = ["fuzzing"] }
 diem-mempool = { path = "../mempool", features = ["fuzzing"] }
+network = { path = "../network", features = ["fuzzing"] }
 safety-rules = { path = "safety-rules", features = ["testing"] }
 vm-genesis = { path = "../language/tools/vm-genesis" }
 vm-validator = { path = "../vm-validator" }

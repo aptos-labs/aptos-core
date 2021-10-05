@@ -15,10 +15,11 @@ use consensus_types::{
     sync_info::SyncInfo,
     vote_msg::VoteMsg,
 };
-use diem_infallible::RwLock;
+use diem_config::network_id::{NetworkId, PeerNetworkId};
 use diem_logger::prelude::*;
 use diem_types::{epoch_change::EpochChangeProof, PeerId};
 use network::{
+    application::storage::PeerMetadataStorage,
     constants::NETWORK_CHANNEL_SIZE,
     error::NetworkError,
     peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
@@ -82,7 +83,7 @@ pub type ConsensusNetworkEvents = NetworkEvents<ConsensusMsg>;
 #[derive(Clone)]
 pub struct ConsensusNetworkSender {
     network_sender: NetworkSender<ConsensusMsg>,
-    peers_protocols: Option<Arc<RwLock<HashMap<PeerId, ProtocolIdSet>>>>,
+    peer_metadata_storage: Option<Arc<PeerMetadataStorage>>,
 }
 
 /// Supported protocols in preferred order (from highest priority to lowest).
@@ -114,23 +115,24 @@ impl NewNetworkSender for ConsensusNetworkSender {
     ) -> Self {
         Self {
             network_sender: NetworkSender::new(peer_mgr_reqs_tx, connection_reqs_tx),
-            peers_protocols: None,
+            peer_metadata_storage: None,
         }
     }
 }
 
 impl ConsensusNetworkSender {
     /// Initialize a shared hashmap about connections metadata that is updated by the receiver.
-    pub fn initialize(&mut self, connections: Arc<RwLock<HashMap<PeerId, ProtocolIdSet>>>) {
-        self.peers_protocols = Some(connections);
+    pub fn initialize(&mut self, peer_metadata_storage: Arc<PeerMetadataStorage>) {
+        self.peer_metadata_storage = Some(peer_metadata_storage);
     }
 
     /// Query the supported protocols from this peer's connection.
     fn supported_protocols(&self, peer: PeerId) -> anyhow::Result<ProtocolIdSet> {
-        if let Some(map) = &self.peers_protocols {
-            map.read()
-                .get(&peer)
-                .cloned()
+        if let Some(peer_metadata_storage) = &self.peer_metadata_storage {
+            let peer_network_id = PeerNetworkId::new(NetworkId::Validator, peer);
+            peer_metadata_storage
+                .read(peer_network_id)
+                .map(|peer_info| peer_info.active_connection.application_protocols)
                 .ok_or_else(|| anyhow!("Peer not connected"))
         } else {
             Err(anyhow!("ConsensusNetworkSender not initialized"))

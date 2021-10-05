@@ -16,10 +16,12 @@ use consensus_types::{
     vote_data::VoteData,
     vote_msg::VoteMsg,
 };
+use diem_config::network_id::NetworkId;
 use diem_infallible::{Mutex, RwLock};
 use diem_types::{block_info::BlockInfo, PeerId};
 use futures::{channel::mpsc, SinkExt, StreamExt};
 use network::{
+    application::storage::PeerMetadataStorage,
     peer_manager::{
         conn_notifs_channel, ConnectionRequestSender, PeerManagerNotification, PeerManagerRequest,
         PeerManagerRequestSender,
@@ -79,8 +81,8 @@ pub struct NetworkPlayground {
     /// Maps authors to twins IDs
     /// An author may have multiple twin IDs for Twins
     author_to_twin_ids: Arc<RwLock<AuthorToTwinIds>>,
-    /// Supported protocols for peers.
-    shared_connections: Arc<RwLock<HashMap<PeerId, ProtocolIdSet>>>,
+    /// Information about connections
+    peer_metadata_storage: Arc<PeerMetadataStorage>,
 }
 
 impl NetworkPlayground {
@@ -95,13 +97,13 @@ impl NetworkPlayground {
             drop_config_round: DropConfigRound::default(),
             executor,
             author_to_twin_ids: Arc::new(RwLock::new(AuthorToTwinIds::default())),
-            shared_connections: Arc::new(RwLock::new(HashMap::new())),
+            peer_metadata_storage: PeerMetadataStorage::new(&[NetworkId::Validator]),
         }
     }
 
     /// HashMap of supported protocols to initialize ConsensusNetworkSender.
-    pub fn peer_protocols(&self) -> Arc<RwLock<HashMap<PeerId, ProtocolIdSet>>> {
-        self.shared_connections.clone()
+    pub fn peer_protocols(&self) -> Arc<PeerMetadataStorage> {
+        self.peer_metadata_storage.clone()
     }
 
     /// Create a new async task that handles outbound messages sent by a node.
@@ -479,10 +481,14 @@ mod tests {
     use consensus_types::block_retrieval::{
         BlockRetrievalRequest, BlockRetrievalResponse, BlockRetrievalStatus,
     };
+    use diem_config::network_id::NetworkId;
     use diem_crypto::HashValue;
     use diem_types::validator_verifier::random_validator_verifier;
     use futures::{channel::oneshot, future};
-    use network::protocols::direct_send::Message;
+    use network::{
+        application::storage::PeerMetadataStorage, protocols::direct_send::Message,
+        transport::ConnectionMetadata,
+    };
 
     #[test]
     fn test_split_network_round() {
@@ -532,6 +538,16 @@ mod tests {
         assert!(!playground.is_message_dropped_round(&nodes[0], &nodes[3], 2));
     }
 
+    fn add_peer_to_storage(
+        peer_metadata_storage: &PeerMetadataStorage,
+        peer: &PeerId,
+        protocols: &[ProtocolId],
+    ) {
+        let mut conn_meta = ConnectionMetadata::mock(*peer);
+        conn_meta.application_protocols = ProtocolIdSet::from_iter(protocols);
+        peer_metadata_storage.insert_connection(NetworkId::Validator, conn_meta);
+    }
+
     #[test]
     fn test_network_api() {
         let mut runtime = consensus_runtime();
@@ -541,7 +557,7 @@ mod tests {
         let mut nodes = Vec::new();
         let (signers, validator_verifier) = random_validator_verifier(num_nodes, None, false);
         let peers: Vec<_> = signers.iter().map(|signer| signer.author()).collect();
-        let shared_connections = Arc::new(RwLock::new(HashMap::new()));
+        let peer_metadata_storage = PeerMetadataStorage::new(&[NetworkId::Validator]);
 
         for (peer_id, peer) in peers.iter().enumerate() {
             let (network_reqs_tx, network_reqs_rx) = diem_channel::new(QueueStyle::FIFO, 8, None);
@@ -549,19 +565,20 @@ mod tests {
             let (consensus_tx, consensus_rx) = diem_channel::new(QueueStyle::FIFO, 8, None);
             let (_conn_mgr_reqs_tx, conn_mgr_reqs_rx) = channel::new_test(8);
             let (_, conn_status_rx) = conn_notifs_channel::new();
-            shared_connections.write().insert(
-                *peer,
-                ProtocolIdSet::from_iter([
+            add_peer_to_storage(
+                &peer_metadata_storage,
+                peer,
+                &[
                     ProtocolId::ConsensusDirectSendJSON,
                     ProtocolId::ConsensusDirectSend,
                     ProtocolId::ConsensusRpc,
-                ]),
+                ],
             );
             let mut network_sender = ConsensusNetworkSender::new(
                 PeerManagerRequestSender::new(network_reqs_tx),
                 ConnectionRequestSender::new(connection_reqs_tx),
             );
-            network_sender.initialize(shared_connections.clone());
+            network_sender.initialize(peer_metadata_storage.clone());
             let network_events = ConsensusNetworkEvents::new(consensus_rx, conn_status_rx);
 
             let twin_id = TwinId {
@@ -578,8 +595,7 @@ mod tests {
                 self_sender,
                 validator_verifier.clone(),
             );
-            let (task, receiver) =
-                NetworkTask::new(network_events, self_receiver, shared_connections.clone());
+            let (task, receiver) = NetworkTask::new(network_events, self_receiver);
             receivers.push(receiver);
             runtime.handle().spawn(task.start());
             nodes.push(node);
@@ -638,7 +654,7 @@ mod tests {
         let mut nodes = Vec::new();
         let (signers, validator_verifier) = random_validator_verifier(num_nodes, None, false);
         let peers: Vec<_> = signers.iter().map(|signer| signer.author()).collect();
-        let shared_connections = Arc::new(RwLock::new(HashMap::new()));
+        let peer_metadata_storage = PeerMetadataStorage::new(&[NetworkId::Validator]);
 
         for (peer_id, peer) in peers.iter().enumerate() {
             let (network_reqs_tx, network_reqs_rx) = diem_channel::new(QueueStyle::FIFO, 8, None);
@@ -650,15 +666,17 @@ mod tests {
                 PeerManagerRequestSender::new(network_reqs_tx),
                 ConnectionRequestSender::new(connection_reqs_tx),
             );
-            shared_connections.write().insert(
-                *peer,
-                ProtocolIdSet::from_iter([
+
+            add_peer_to_storage(
+                &peer_metadata_storage,
+                peer,
+                &[
                     ProtocolId::ConsensusDirectSendJSON,
                     ProtocolId::ConsensusDirectSend,
                     ProtocolId::ConsensusRpc,
-                ]),
+                ],
             );
-            network_sender.initialize(shared_connections.clone());
+            network_sender.initialize(peer_metadata_storage.clone());
             let network_events = ConsensusNetworkEvents::new(consensus_rx, conn_status_rx);
 
             let twin_id = TwinId {
@@ -675,8 +693,7 @@ mod tests {
                 self_sender,
                 validator_verifier.clone(),
             );
-            let (task, receiver) =
-                NetworkTask::new(network_events, self_receiver, shared_connections.clone());
+            let (task, receiver) = NetworkTask::new(network_events, self_receiver);
             senders.push(network_sender);
             receivers.push(receiver);
             runtime.handle().spawn(task.start());
@@ -738,10 +755,9 @@ mod tests {
         let consensus_network_events =
             ConsensusNetworkEvents::new(peer_mgr_notifs_rx, connection_notifs_rx);
         let (self_sender, self_receiver) = channel::new_test(8);
-        let shared_connections = Arc::new(RwLock::new(HashMap::new()));
 
         let (network_task, mut network_receivers) =
-            NetworkTask::new(consensus_network_events, self_receiver, shared_connections);
+            NetworkTask::new(consensus_network_events, self_receiver);
 
         let peer_id = PeerId::random();
         let protocol_id = ProtocolId::ConsensusDirectSend;
