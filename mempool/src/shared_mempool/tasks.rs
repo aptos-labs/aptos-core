@@ -51,9 +51,9 @@ pub(crate) fn execute_broadcast<V>(
 ) where
     V: TransactionValidation,
 {
-    let peer_manager = &smp.peer_manager.clone();
-    peer_manager.execute_broadcast(peer, backoff, smp);
-    let schedule_backoff = peer_manager.is_backoff_mode(&peer);
+    let network_interface = &smp.network_interface.clone();
+    network_interface.execute_broadcast(peer, backoff, smp);
+    let schedule_backoff = network_interface.is_backoff_mode(&peer);
 
     let interval_ms = if schedule_backoff {
         smp.config.shared_mempool_backoff_interval_ms
@@ -120,7 +120,7 @@ pub(crate) async fn process_transaction_broadcast<V>(
     log_txn_process_results(&results, Some(peer));
 
     let ack_response = gen_ack_response(request_id, results, &peer);
-    let mut network_sender = smp.network_interface().sender();
+    let mut network_sender = smp.network_interface.sender();
     if let Err(e) = network_sender.send_to(peer, ack_response) {
         counters::network_send_fail_inc(counters::ACK_TXNS);
         error!(

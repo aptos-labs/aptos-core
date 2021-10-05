@@ -204,8 +204,10 @@ async fn handle_event<V>(
         Event::NewPeer(metadata) => {
             counters::shared_mempool_event_inc("new_peer");
             let peer = PeerNetworkId::new(network_id, metadata.remote_peer_id);
-            let is_new_peer = smp.peer_manager.add_peer(peer, metadata.clone());
-            let is_upstream_peer = smp.peer_manager.is_upstream_peer(&peer, Some(&metadata));
+            let is_new_peer = smp.network_interface.add_peer(peer, metadata.clone());
+            let is_upstream_peer = smp
+                .network_interface
+                .is_upstream_peer(&peer, Some(&metadata));
             debug!(LogSchema::new(LogEntry::NewPeer)
                 .peer(&peer)
                 .is_upstream_peer(is_upstream_peer));
@@ -219,8 +221,11 @@ async fn handle_event<V>(
             let peer = PeerNetworkId::new(network_id, metadata.remote_peer_id);
             debug!(LogSchema::new(LogEntry::LostPeer)
                 .peer(&peer)
-                .is_upstream_peer(smp.peer_manager.is_upstream_peer(&peer, Some(&metadata))));
-            smp.peer_manager.disable_peer(peer);
+                .is_upstream_peer(
+                    smp.network_interface
+                        .is_upstream_peer(&peer, Some(&metadata))
+                ));
+            smp.network_interface.disable_peer(peer);
             notify_subscribers(SharedMempoolNotification::PeerStateChange, &smp.subscribers);
         }
         Event::Message(peer_id, msg) => {
@@ -232,7 +237,7 @@ async fn handle_event<V>(
                 } => {
                     let smp_clone = smp.clone();
                     let peer = PeerNetworkId::new(network_id, peer_id);
-                    let timeline_state = match smp.peer_manager.is_upstream_peer(&peer, None) {
+                    let timeline_state = match smp.network_interface.is_upstream_peer(&peer, None) {
                         true => TimelineState::NonQualified,
                         false => TimelineState::NotReady,
                     };
@@ -265,7 +270,7 @@ async fn handle_event<V>(
                     backoff,
                 } => {
                     let ack_timestamp = SystemTime::now();
-                    smp.peer_manager.process_broadcast_ack(
+                    smp.network_interface.process_broadcast_ack(
                         PeerNetworkId::new(network_id, peer_id),
                         request_id,
                         retry,

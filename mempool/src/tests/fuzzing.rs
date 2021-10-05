@@ -3,7 +3,7 @@
 
 use crate::{
     core_mempool::{CoreMempool, TimelineState},
-    shared_mempool::{peer_manager::PeerManager, tasks, types::SharedMempool},
+    shared_mempool::{tasks, types::SharedMempool},
 };
 use diem_config::config::NodeConfig;
 use diem_infallible::{Mutex, RwLock};
@@ -41,8 +41,8 @@ pub fn test_mempool_process_incoming_transactions_impl(
         HashMap::new(),
         Arc::new(mock_db),
         vm_validator,
-        Arc::new(PeerManager::new(config.base.role, config.mempool)),
         vec![],
+        config.base.role,
     );
 
     let _ = tasks::process_incoming_transactions(&smp, txns, timeline_state);

@@ -144,9 +144,9 @@ pub enum LogEntry {
     CleanRejectedTxn,
     ProcessReadyTxns,
     DBError,
-    UpstreamNetwork,
     UnexpectedNetworkMsg,
     MempoolSnapshot,
+    UpstreamNetwork,
 }
 
 #[derive(Clone, Copy, Serialize)]

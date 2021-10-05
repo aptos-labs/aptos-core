@@ -3,13 +3,12 @@
 
 //! Objects used by/related to shared mempool
 use crate::{
-    core_mempool::CoreMempool,
-    network::MempoolNetworkInterface,
-    shared_mempool::{network::MempoolNetworkSender, peer_manager::PeerManager},
+    core_mempool::CoreMempool, network::MempoolNetworkInterface,
+    shared_mempool::network::MempoolNetworkSender,
 };
 use anyhow::Result;
 use diem_config::{
-    config::MempoolConfig,
+    config::{MempoolConfig, RoleType},
     network_id::{NetworkId, PeerNetworkId},
 };
 use diem_infallible::{Mutex, RwLock};
@@ -39,7 +38,6 @@ where
     pub(crate) network_interface: MempoolNetworkInterface,
     pub db: Arc<dyn DbReader<DpnProto>>,
     pub validator: Arc<RwLock<V>>,
-    pub peer_manager: Arc<PeerManager>,
     pub subscribers: Vec<UnboundedSender<SharedMempoolNotification>>,
 }
 
@@ -50,12 +48,14 @@ impl<V: TransactionValidation + 'static> SharedMempool<V> {
         network_senders: HashMap<NetworkId, MempoolNetworkSender>,
         db: Arc<dyn DbReader<DpnProto>>,
         validator: Arc<RwLock<V>>,
-        peer_manager: Arc<PeerManager>,
         subscribers: Vec<UnboundedSender<SharedMempoolNotification>>,
+        role: RoleType,
     ) -> Self {
         let network_interface = MempoolNetworkInterface::new(
             PeerMetadataStorage::new(&[NetworkId::Public, NetworkId::Validator, NetworkId::Vfn]),
             network_senders,
+            role,
+            config.clone(),
         );
         SharedMempool {
             mempool,
@@ -63,13 +63,8 @@ impl<V: TransactionValidation + 'static> SharedMempool<V> {
             network_interface,
             db,
             validator,
-            peer_manager,
             subscribers,
         }
-    }
-
-    pub fn network_interface(&self) -> &MempoolNetworkInterface {
-        &self.network_interface
     }
 }
 

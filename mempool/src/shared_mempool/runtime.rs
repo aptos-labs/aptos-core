@@ -6,7 +6,6 @@ use crate::{
     network::{MempoolNetworkEvents, MempoolNetworkSender},
     shared_mempool::{
         coordinator::{coordinator, gc_coordinator, snapshot_job},
-        peer_manager::PeerManager,
         types::{MempoolEventsReceiver, SharedMempool, SharedMempoolNotification},
     },
     ConsensusRequest,
@@ -44,8 +43,6 @@ pub(crate) fn start_shared_mempool<V>(
 ) where
     V: TransactionValidation + 'static,
 {
-    let peer_manager = Arc::new(PeerManager::new(config.base.role, config.mempool.clone()));
-
     let mut all_network_events = vec![];
     let mut network_senders = HashMap::new();
     for (network_id, network_sender, network_events) in mempool_network_handles.into_iter() {
@@ -59,8 +56,8 @@ pub(crate) fn start_shared_mempool<V>(
         network_senders,
         db,
         validator,
-        peer_manager,
         subscribers,
+        config.base.role,
     );
 
     executor.spawn(coordinator(
