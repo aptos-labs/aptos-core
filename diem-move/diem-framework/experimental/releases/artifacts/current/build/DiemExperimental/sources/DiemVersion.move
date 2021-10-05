@@ -1,106 +1,75 @@
-/// Maintains the version number for the Diem blockchain. The version is stored in a
-/// DiemConfig, and may be updated by Diem root.
-module DiemFramework::DiemVersion {
-    use DiemFramework::DiemConfig::{Self, DiemConfig};
-    use DiemFramework::DiemTimestamp;
-    use DiemFramework::Roles;
+/// Maintains the version number for the blockchain.
+module CoreFramework::DiemVersion {
+    use Std::Capability::Cap;
     use Std::Errors;
+    use Std::Signer;
 
-    struct DiemVersion has copy, drop, store {
+    /// Marker to be stored under 0x1 during genesis
+    struct VersionChainMarker<phantom T> has key {}
+
+    struct DiemVersion has key, copy, drop, store {
         major: u64,
     }
 
+    /// Error with chain marker
+    const ECHAIN_MARKER: u64 = 0;
+    /// Error with config
+    const ECONFIG: u64 = 1;
     /// Tried to set an invalid major version for the VM. Major versions must be strictly increasing
-    const EINVALID_MAJOR_VERSION_NUMBER: u64 = 0;
+    const EINVALID_MAJOR_VERSION_NUMBER: u64 = 2;
 
-    /// Publishes the DiemVersion config. Must be called during Genesis.
-    public fun initialize(dr_account: &signer, initial_version: u64) {
-        DiemTimestamp::assert_genesis();
-        Roles::assert_diem_root(dr_account);
-        DiemConfig::publish_new_config<DiemVersion>(
-            dr_account,
+    /// Publishes the Version config.
+    public fun initialize<T>(account: &signer, initial_version: u64) {
+        assert!(Signer::address_of(account) == @ConfigStorage, Errors::requires_address(ECONFIG));
+
+        assert!(
+            !exists<VersionChainMarker<T>>(@ConfigStorage),
+            Errors::already_published(ECHAIN_MARKER)
+        );
+
+        assert!(
+            !exists<DiemVersion>(@ConfigStorage),
+            Errors::already_published(ECONFIG)
+        );
+
+        move_to(
+            account,
+            VersionChainMarker<T> {},
+        );
+        move_to(
+            account,
             DiemVersion { major: initial_version },
         );
     }
-    spec initialize {
-        /// Must abort if the signer does not have the DiemRoot role [[H10]][PERMISSION].
-        include Roles::AbortsIfNotDiemRoot{account: dr_account};
 
-        include DiemTimestamp::AbortsIfNotGenesis;
-        include DiemConfig::PublishNewConfigAbortsIf<DiemVersion>;
-        include DiemConfig::PublishNewConfigEnsures<DiemVersion>{payload: DiemVersion { major: initial_version }};
+    spec initialize {
+        aborts_if Signer::address_of(account) != @ConfigStorage with Errors::REQUIRES_ADDRESS;
+        aborts_if exists<VersionChainMarker<T>>(@ConfigStorage) with Errors::ALREADY_PUBLISHED;
+        aborts_if exists<DiemVersion>(@ConfigStorage) with Errors::ALREADY_PUBLISHED;
+        ensures exists<VersionChainMarker<T>>(@ConfigStorage);
+        ensures exists<DiemVersion>(@ConfigStorage);
+        ensures global<DiemVersion>(@ConfigStorage).major == initial_version;
     }
 
-    /// Allows Diem root to update the major version to a larger version.
-    public fun set(dr_account: &signer, major: u64) {
-        DiemTimestamp::assert_operating();
-
-        Roles::assert_diem_root(dr_account);
-
-        let old_config = DiemConfig::get<DiemVersion>();
+    /// Updates the major version to a larger version.
+    public fun set<T>(major: u64, _cap: &Cap<T>) acquires DiemVersion {
+        assert!(exists<VersionChainMarker<T>>(@ConfigStorage), Errors::not_published(ECHAIN_MARKER));
+        assert!(exists<DiemVersion>(@ConfigStorage), Errors::not_published(ECONFIG));
+        let old_major = *&borrow_global<DiemVersion>(@ConfigStorage).major;
 
         assert!(
-            old_config.major < major,
+            old_major < major,
             Errors::invalid_argument(EINVALID_MAJOR_VERSION_NUMBER)
         );
 
-        DiemConfig::set<DiemVersion>(
-            dr_account,
-            DiemVersion { major }
-        );
+        let config = borrow_global_mut<DiemVersion>(@ConfigStorage);
+        config.major = major;
     }
+
     spec set {
-        /// Must abort if the signer does not have the DiemRoot role [[H10]][PERMISSION].
-        include Roles::AbortsIfNotDiemRoot{account: dr_account};
-
-        include DiemTimestamp::AbortsIfNotOperating;
-        aborts_if DiemConfig::get<DiemVersion>().major >= major with Errors::INVALID_ARGUMENT;
-        include DiemConfig::SetAbortsIf<DiemVersion>{account: dr_account};
-        include DiemConfig::SetEnsures<DiemVersion>{payload: DiemVersion { major }};
+        aborts_if !exists<VersionChainMarker<T>>(@ConfigStorage) with Errors::NOT_PUBLISHED;
+        aborts_if !exists<DiemVersion>(@ConfigStorage) with Errors::NOT_PUBLISHED;
+        aborts_if global<DiemVersion>(@ConfigStorage).major >= major with Errors::INVALID_ARGUMENT;
+        ensures global<DiemVersion>(@ConfigStorage).major == major;
     }
-
-    // =================================================================
-    // Module Specification
-
-    spec module {} // Switch to module documentation context
-
-    /// # Initialization
-    spec module {
-        /// After genesis, version is published.
-        invariant [suspendable] DiemTimestamp::is_operating() ==> DiemConfig::spec_is_published<DiemVersion>();
-    }
-
-    /// # Access Control
-
-    /// The permission "UpdateDiemProtocolVersion" is granted to DiemRoot [[H10]][PERMISSION].
-    spec module {
-        invariant [suspendable] forall addr: address
-            where exists<DiemConfig<DiemVersion>>(addr): addr == @DiemRoot;
-
-        invariant update [suspendable] old(DiemConfig::spec_is_published<DiemVersion>())
-            && DiemConfig::spec_is_published<DiemVersion>()
-            && old(DiemConfig::get<DiemVersion>().major) != DiemConfig::get<DiemVersion>().major
-                ==> Roles::spec_signed_by_diem_root_role();
-    }
-
-    // TODO: The following is the old style spec, which can removed later.
-    /// Only "set" can modify the DiemVersion config [[H10]][PERMISSION]
-    spec schema DiemVersionRemainsSame {
-        ensures old(DiemConfig::spec_is_published<DiemVersion>()) ==>
-            global<DiemConfig<DiemVersion>>(@DiemRoot) ==
-                old(global<DiemConfig<DiemVersion>>(@DiemRoot));
-    }
-    /// The permission "UpdateDiemProtocolVersion" is granted to DiemRoot [[H10]][PERMISSION].
-    spec module {
-        apply DiemVersionRemainsSame to * except set;
-    }
-
-    /// # Other Invariants
-    spec module {
-        /// Version number never decreases
-        invariant update [suspendable]
-            DiemTimestamp::is_operating() ==>
-                (old(DiemConfig::get<DiemVersion>().major) <= DiemConfig::get<DiemVersion>().major);
-    }
-
 }

@@ -1,7 +1,10 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::on_chain_config::OnChainConfig;
+use crate::on_chain_config::{
+    default_access_path_for_config, experimental_access_path_for_config, ConfigStorage,
+    OnChainConfig,
+};
 use serde::{Deserialize, Serialize};
 
 /// Defines the version of Diem Validator software.
@@ -12,6 +15,19 @@ pub struct DiemVersion {
 
 impl OnChainConfig for DiemVersion {
     const IDENTIFIER: &'static str = "DiemVersion";
+
+    fn fetch_config<T>(storage: &T) -> Option<Self>
+    where
+        T: ConfigStorage,
+    {
+        let experimental_path = experimental_access_path_for_config(Self::CONFIG_ID);
+        match storage.fetch_config(experimental_path) {
+            Some(bytes) => Self::deserialize_into_config(&bytes).ok(),
+            None => storage
+                .fetch_config(default_access_path_for_config(Self::CONFIG_ID))
+                .and_then(|bytes| Self::deserialize_into_config(&bytes).ok()),
+        }
+    }
 }
 
 // NOTE: version number for release 1.2 Diem

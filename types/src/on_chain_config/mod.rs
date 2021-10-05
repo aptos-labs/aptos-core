@@ -4,7 +4,7 @@
 use crate::{
     access_path::AccessPath,
     account_address::AccountAddress,
-    account_config::CORE_CODE_ADDRESS,
+    account_config::{config_storage_address, CORE_CODE_ADDRESS},
     event::{EventHandle, EventKey},
 };
 use anyhow::{format_err, Result};
@@ -51,11 +51,8 @@ pub fn config_address() -> AccountAddress {
 }
 
 impl ConfigID {
-    pub fn access_path(self) -> AccessPath {
-        access_path_for_config(
-            AccountAddress::from_hex_literal(self.0).expect("failed to get address"),
-            Identifier::new(self.1).expect("failed to get Identifier"),
-        )
+    pub fn name(&self) -> String {
+        self.1.to_string()
     }
 }
 
@@ -160,7 +157,7 @@ pub trait OnChainConfig: Send + Sync + DeserializeOwned {
         T: ConfigStorage,
     {
         storage
-            .fetch_config(Self::CONFIG_ID.access_path())
+            .fetch_config(default_access_path_for_config(Self::CONFIG_ID))
             .and_then(|bytes| Self::deserialize_into_config(&bytes).ok())
     }
 }
@@ -169,11 +166,10 @@ pub fn new_epoch_event_key() -> EventKey {
     EventKey::new_from_address(&config_address(), 4)
 }
 
-pub fn access_path_for_config(address: AccountAddress, config_name: Identifier) -> AccessPath {
-    AccessPath::new(
-        address,
-        AccessPath::resource_access_vec(config_struct_tag(config_name)),
-    )
+pub fn default_access_path_for_config(config_id: ConfigID) -> AccessPath {
+    AccessPath::new(config_address(),AccessPath::resource_access_vec(config_struct_tag(
+        Identifier::new(config_id.1).expect("fail to make identifier"),
+    )))
 }
 
 pub fn config_struct_tag(config_name: Identifier) -> StructTag {
@@ -188,6 +184,19 @@ pub fn config_struct_tag(config_name: Identifier) -> StructTag {
             type_params: vec![],
         })],
     }
+}
+
+pub fn experimental_access_path_for_config(config_id: ConfigID) -> AccessPath {
+    let struct_tag = StructTag {
+        address: CORE_CODE_ADDRESS,
+        module: Identifier::new(config_id.1).expect("fail to make identifier"),
+        name: Identifier::new(config_id.1).expect("fail to make identifier"),
+        type_params: vec![],
+    };
+    AccessPath::new(
+        config_address(),
+        AccessPath::resource_access_vec(struct_tag),
+    )
 }
 
 #[derive(Debug, Deserialize, Serialize)]

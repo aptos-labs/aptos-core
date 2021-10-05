@@ -27,3 +27,9 @@ pub fn testnet_dd_account_address() -> AccountAddress {
     AccountAddress::from_hex_literal("0xDD")
         .expect("Parsing valid hex literal should always succeed")
 }
+
+pub fn config_storage_address() -> AccountAddress {
+    AccountAddress::new([
+        0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 1u8,
+    ])
+}

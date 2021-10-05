@@ -17,10 +17,9 @@ module DiemFramework::Genesis {
     use DiemFramework::DiemSystem;
     use DiemFramework::DiemTimestamp;
     use DiemFramework::DiemTransactionPublishingOption;
-    use DiemFramework::DiemVersion;
+    use ExperimentalFramework::ExperimentalVersion;
     use DiemFramework::TransactionFee;
     use DiemFramework::DiemVMConfig;
-    use DiemFramework::ParallelExecutionConfig;
     use DiemFramework::ValidatorConfig;
     use DiemFramework::ValidatorOperatorConfig;
     use Std::Signer;
@@ -39,6 +38,7 @@ module DiemFramework::Genesis {
         chain_id: u8,
         initial_diem_version: u64,
         consensus_config: vector<u8>,
+        config_storage_signer: signer,
     ) {
         initialize_internal(
             &dr_account,
@@ -52,6 +52,7 @@ module DiemFramework::Genesis {
             chain_id,
             initial_diem_version,
             consensus_config,
+            &config_storage_signer,
         )
     }
 
@@ -68,6 +69,7 @@ module DiemFramework::Genesis {
         chain_id: u8,
         initial_diem_version: u64,
         consensus_config: vector<u8>,
+        config_storage_signer: &signer,
     ) {
         DiemAccount::initialize(dr_account, x"00000000000000000000000000000000");
 
@@ -78,9 +80,6 @@ module DiemFramework::Genesis {
 
         // Consensus config setup
         DiemConsensusConfig::initialize(dr_account);
-
-        // Parallel execution config setup
-        ParallelExecutionConfig::initialize_parallel_execution(dr_account);
 
         // Currency setup
         Diem::initialize(dr_account);
@@ -94,7 +93,8 @@ module DiemFramework::Genesis {
         TransactionFee::initialize(tc_account);
 
         DiemSystem::initialize_validator_set(dr_account);
-        DiemVersion::initialize(dr_account, initial_diem_version);
+
+        ExperimentalVersion::initialize(config_storage_signer, dr_account, initial_diem_version);
         DualAttestation::initialize(dr_account);
         DiemBlock::initialize_block_metadata(dr_account);
 
@@ -233,7 +233,7 @@ module DiemFramework::Genesis {
     }
 
     #[test_only]
-    public fun setup(dr_account: &signer, tc_account: &signer) {
+    public fun setup(dr_account: &signer, tc_account: &signer, config_storage_signer: &signer) {
         initialize_internal(
             dr_account,
             tc_account,
@@ -246,6 +246,7 @@ module DiemFramework::Genesis {
             4u8, // TESTING chain ID
             0,
             Vector::empty(),
+            config_storage_signer,
         )
     }
 }

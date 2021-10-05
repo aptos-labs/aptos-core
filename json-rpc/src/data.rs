@@ -16,6 +16,7 @@ use diem_types::{
     account_state::AccountState, chain_id::ChainId, event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
 };
+use move_core_types::language_storage::CORE_CODE_ADDRESS;
 use move_resource_viewer::{AnnotatedMoveStruct, MoveValueAnnotator};
 use std::{
     collections::BTreeMap,
@@ -55,8 +56,24 @@ pub fn get_metadata(
         if let Some(diem_root) = get_account_state(db, diem_root_address(), version)? {
             metadata_view.with_diem_root(&diem_root)?;
         }
+        metadata_view.diem_version = get_diem_version(db, version)?;
     }
     Ok(metadata_view)
+}
+
+/// Returns the DiemVersion for a specified version, if the version exists.
+pub fn get_diem_version(db: &dyn MoveDbReader, version: u64) -> Result<Option<u64>> {
+    if let Some(config_storage_state) = get_account_state(db, CORE_CODE_ADDRESS, version)? {
+        if let Some(diem_version) = config_storage_state.get_diem_version()? {
+            return Ok(Some(diem_version.major));
+        }
+    }
+    match get_account_state(db, diem_root_address(), version)? {
+        Some(state) => Ok(state
+            .get_diem_version()?
+            .map(|diem_version| diem_version.major)),
+        _ => Ok(None),
+    }
 }
 
 /// Returns account state (AccountView) by given address

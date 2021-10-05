@@ -3,9 +3,12 @@ compiled_package_info:
   package_name: DiemExperimental
   address_alias_instantiation:
     BARS: 06505ccd81e562b524d8f656abd92a15
+    ConfigStorage: "00000000000000000000000000000001"
+    CoreFramework: "00000000000000000000000000000001"
     CurrencyInfo: 0000000000000000000000000a550c18
     DiemFramework: "00000000000000000000000000000001"
     DiemRoot: 0000000000000000000000000a550c18
+    ExperimentalFramework: "00000000000000000000000000000001"
     Std: "00000000000000000000000000000001"
     TreasuryCompliance: 0000000000000000000000000b1e55ed
     VMReserved: "00000000000000000000000000000000"
@@ -81,7 +84,7 @@ compiled_package_info:
     : DiemFramework
     ? address: "00000000000000000000000000000001"
       name: DiemVersion
-    : DiemFramework
+    : CoreFramework
     ? address: "00000000000000000000000000000001"
       name: DualAttestation
     : DiemFramework
@@ -91,6 +94,9 @@ compiled_package_info:
     ? address: "00000000000000000000000000000001"
       name: Event
     : Std
+    ? address: "00000000000000000000000000000001"
+      name: ExperimentalVersion
+    : ExperimentalFramework
     ? address: "00000000000000000000000000000001"
       name: FixedPoint32
     : Std
@@ -175,7 +181,7 @@ compiled_package_info:
     ? address: "00000000000000000000000000000001"
       name: XUS
     : DiemFramework
-  source_digest: 1954EFD06232AEBE28628FD75906C88D2E873D3500B3500EA11A118CCDB70B2C
+  source_digest: AFCAE53ED557D9315BB6E33C8F10CBBCCADD795F28403FA1FFAA8A5711A968EB
   build_flags:
     dev_mode: false
     test_mode: false
