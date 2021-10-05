@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::shared_mempool::{peer_manager::BatchId, types::ConsensusRequest};
+use crate::shared_mempool::types::{BatchId, ConsensusRequest};
 use anyhow::Error;
 use diem_config::network_id::{NetworkId, PeerNetworkId};
 use diem_logger::Schema;

@@ -7,9 +7,10 @@ use crate::{
     counters,
     logging::{LogEntry, LogEvent, LogSchema},
     shared_mempool::{
-        peer_manager::{BatchId, PeerSyncState},
         tasks,
-        types::{notify_subscribers, SharedMempool, SharedMempoolNotification},
+        types::{
+            notify_subscribers, BatchId, PeerSyncState, SharedMempool, SharedMempoolNotification,
+        },
     },
 };
 use async_trait::async_trait;
