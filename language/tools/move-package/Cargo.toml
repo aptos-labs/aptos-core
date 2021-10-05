@@ -18,8 +18,8 @@ structopt = "0.3.21"
 bcs = "0.1.2"
 colored = "2.0.0"
 serde_yaml = "0.8.17"
-checksumdir = "0.3.0"
 tempfile = "3.2.0"
+sha2 = "0.9.3"
 
 diem-workspace-hack = { path = "../../../common/workspace-hack" }
 move-binary-format = { path = "../../move-binary-format" }

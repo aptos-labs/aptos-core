@@ -5,7 +5,7 @@ use move_command_line_common::testing::{format_diff, read_env_update_baseline, E
 use move_package::{
     compilation::{build_plan::BuildPlan, model_builder::ModelBuilder},
     resolution::resolution_graph as RG,
-    source_package::manifest_parser as MP,
+    source_package::{manifest_parser as MP, parsed_manifest::PackageDigest},
     BuildConfig,
 };
 use std::{
@@ -59,7 +59,8 @@ pub fn run_test(path: &Path) -> datatest_stable::Result<()> {
                 .and_then(|bp| bp.compile(&mut Vec::new()))
             {
                 Ok(mut pkg) => {
-                    pkg.compiled_package_info.source_digest = Some("ELIDED_FOR_TEST".to_string());
+                    pkg.compiled_package_info.source_digest =
+                        Some(PackageDigest::from("ELIDED_FOR_TEST"));
                     format!("{:#?}\n", pkg.compiled_package_info)
                 }
                 Err(error) => format!("{:#}\n", error),
@@ -71,7 +72,7 @@ pub fn run_test(path: &Path) -> datatest_stable::Result<()> {
             (_, _) => {
                 for (_, package) in resolved_package.package_table.iter_mut() {
                     package.package_path = PathBuf::from("ELIDED_FOR_TEST");
-                    package.source_digest = "ELIDED_FOR_TEST".to_string();
+                    package.source_digest = PackageDigest::from("ELIDED_FOR_TEST");
                 }
                 format!("{:#?}\n", resolved_package)
             }

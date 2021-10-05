@@ -2,11 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    resolution::digest::compute_digest,
     source_package::{
         layout::SourcePackageLayout,
         manifest_parser::{parse_move_manifest_string, parse_source_manifest},
         parsed_manifest::{
-            Dependency, FileName, NamedAddress, PackageName, SourceManifest, SubstOrRename,
+            Dependency, FileName, NamedAddress, PackageDigest, PackageName, SourceManifest,
+            SubstOrRename,
         },
     },
     BuildConfig,
@@ -19,7 +21,7 @@ use petgraph::{algo, graphmap::DiGraphMap};
 use std::{
     cell::RefCell,
     collections::{BTreeMap, BTreeSet},
-    path::PathBuf,
+    path::{Path, PathBuf},
     rc::Rc,
 };
 
@@ -78,7 +80,7 @@ pub struct ResolutionPackage<T> {
     /// The mapping of addresses for this package (and that are in scope for it)
     pub resolution_table: ResolutionTable<T>,
     /// The digest of the contents of all files under the package root
-    pub source_digest: String,
+    pub source_digest: PackageDigest,
 }
 
 impl ResolvingGraph {
@@ -248,7 +250,8 @@ impl ResolvingGraph {
         self.unify_addresses_in_package(&package, &mut resolution_table, is_root_package)?;
 
         let package_path = package_path.canonicalize()?;
-        let source_digest = checksumdir::checksumdir(&package_path.to_string_lossy().to_string())?;
+        let source_digest =
+            ResolvingPackage::get_package_digest_for_config(&package_path, &self.build_options)?;
 
         let resolved_package = ResolutionPackage {
             resolution_graph_index: package_node_id,
@@ -346,6 +349,23 @@ impl ResolvingGraph {
                 dep_name_in_pkg,
                 dep_package.package.name
             );
+        }
+        match dep.digest {
+            None => (),
+            Some(fixed_digest) => {
+                let resolved_pkg = self
+                    .package_table
+                    .get(&dep_name_in_pkg)
+                    .context("Unable to find resolved package by name")?;
+                if fixed_digest != resolved_pkg.source_digest {
+                    bail!(
+                        "Source digest mismatch in dependency '{}'. Expected '{}' but got '{}'.",
+                        dep_name_in_pkg,
+                        fixed_digest,
+                        resolved_pkg.source_digest
+                    )
+                }
+            }
         }
 
         let resolving_dep = &self.package_table[&dep_name_in_pkg];
@@ -498,6 +518,38 @@ impl ResolvingPackage {
 
         Ok(())
     }
+
+    fn get_source_paths_for_config(
+        package_path: &Path,
+        config: &BuildConfig,
+    ) -> Result<Vec<PathBuf>> {
+        let mut places_to_look = Vec::new();
+        let mut add_path = |layout_path: SourcePackageLayout| {
+            let path = package_path.join(layout_path.path());
+            if layout_path.is_optional() && !path.exists() {
+                return;
+            }
+            places_to_look.push(path)
+        };
+
+        add_path(SourcePackageLayout::Sources);
+        add_path(SourcePackageLayout::Scripts);
+
+        if config.dev_mode {
+            add_path(SourcePackageLayout::Examples);
+            add_path(SourcePackageLayout::Tests);
+        }
+        Ok(places_to_look)
+    }
+
+    fn get_package_digest_for_config(
+        package_path: &Path,
+        config: &BuildConfig,
+    ) -> Result<PackageDigest> {
+        let mut source_paths = Self::get_source_paths_for_config(package_path, config)?;
+        source_paths.push(package_path.join(SourcePackageLayout::Manifest.path()));
+        compute_digest(source_paths.as_slice())
+    }
 }
 
 impl ResolvingNamedAddress {
@@ -533,23 +585,11 @@ impl ResolvedGraph {
 
 impl ResolvedPackage {
     pub fn get_sources(&self, config: &BuildConfig) -> Result<Vec<FileName>> {
-        let mut places_to_look = Vec::new();
-        let mut add_path = |layout_path: SourcePackageLayout| {
-            let path = self.package_path.join(layout_path.path());
-            if layout_path.is_optional() && !path.exists() {
-                return;
-            }
-            places_to_look.push(path.to_string_lossy().to_string())
-        };
-
-        add_path(SourcePackageLayout::Sources);
-        add_path(SourcePackageLayout::Scripts);
-
-        if config.dev_mode {
-            add_path(SourcePackageLayout::Examples);
-            add_path(SourcePackageLayout::Tests);
-        }
-
+        let places_to_look =
+            ResolvingPackage::get_source_paths_for_config(&self.package_path, config)?
+                .into_iter()
+                .map(|p| p.to_string_lossy().to_string())
+                .collect::<Vec<_>>();
         Ok(find_move_filenames(&places_to_look, false)?
             .into_iter()
             .map(Symbol::from)

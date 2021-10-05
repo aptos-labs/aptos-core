@@ -1,0 +1,9 @@
+[package]
+name = "Root"
+version = "0.0.0"
+
+[addresses]
+A = "0x1"
+
+[dependencies]
+OtherDep = { local = "./deps_only/other_dep", addr_subst = { "A" = "B" }, digest = "98051FC9E21CC5A667DB6B47072E2095E97F9D47C0A32BF3A9FBE2BA67F910B4"}

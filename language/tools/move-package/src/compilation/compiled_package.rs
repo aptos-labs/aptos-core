@@ -6,7 +6,7 @@ use crate::{
     resolution::resolution_graph::{Renaming, ResolvedGraph, ResolvedPackage, ResolvedTable},
     source_package::{
         layout::SourcePackageLayout,
-        parsed_manifest::{FileName, NamedAddress, PackageName},
+        parsed_manifest::{FileName, NamedAddress, PackageDigest, PackageName},
     },
     BuildConfig,
 };
@@ -53,7 +53,7 @@ pub struct CompiledPackageInfo {
     pub module_resolution_metadata: ModuleResolutionMetadata,
     /// The hash of the source directory at the time of compilation. `None` if the source for this
     /// package is not available/this package was not compiled.
-    pub source_digest: Option<String>,
+    pub source_digest: Option<PackageDigest>,
     /// The build flags that were used when compiling this package.
     pub build_flags: BuildConfig,
 }

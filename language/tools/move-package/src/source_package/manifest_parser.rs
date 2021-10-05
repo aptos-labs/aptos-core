@@ -354,11 +354,11 @@ fn parse_version(tval: TV) -> Result<PM::Version> {
     ))
 }
 
-fn parse_digest(tval: TV) -> Result<Vec<u8>> {
+fn parse_digest(tval: TV) -> Result<PM::PackageDigest> {
     let digest_str = tval
         .as_str()
         .ok_or_else(|| format_err!("Invalid package digest"))?;
-    Ok(digest_str.as_bytes().to_vec())
+    Ok(PM::PackageDigest::from(digest_str))
 }
 
 // check that only recognized names are provided at the top-level

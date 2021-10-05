@@ -8,6 +8,7 @@ use std::{collections::BTreeMap, path::PathBuf};
 pub type NamedAddress = Symbol;
 pub type PackageName = Symbol;
 pub type FileName = Symbol;
+pub type PackageDigest = Symbol;
 
 pub type AddressDeclarations = BTreeMap<NamedAddress, Option<AccountAddress>>;
 pub type DevAddressDeclarations = BTreeMap<NamedAddress, AccountAddress>;
@@ -38,7 +39,7 @@ pub struct Dependency {
     pub local: PathBuf,
     pub subst: Option<Substitution>,
     pub version: Option<Version>,
-    pub digest: Option<Vec<u8>>,
+    pub digest: Option<PackageDigest>,
 }
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
