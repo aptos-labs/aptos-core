@@ -136,12 +136,18 @@ fn transaction_not_found(version: u64, ledger_version: u64) -> Error {
 mod tests {
     use crate::test_utils::{assert_json, find_value, new_test_context};
 
-    use diem_crypto::hash::CryptoHash;
+    use diem_crypto::{
+        hash::CryptoHash,
+        multi_ed25519::{MultiEd25519PrivateKey, MultiEd25519PublicKey},
+        SigningKey, Uniform,
+    };
+    use diem_sdk::{client::SignedTransaction, transaction_builder::Currency};
     use diem_types::{
         access_path::{AccessPath, Path},
         account_address::AccountAddress,
         transaction::{
-            authenticator::AuthenticationKey, ChangeSet, Transaction, TransactionInfoTrait,
+            authenticator::{AuthenticationKey, TransactionAuthenticator},
+            ChangeSet, Transaction, TransactionInfoTrait,
         },
         write_set::{WriteOp, WriteSetMut},
     };
@@ -406,6 +412,13 @@ mod tests {
         );
 
         let user_txn_info = expected_txns.proof.transaction_infos[1].clone();
+        let (pk, sig) = match txn.authenticator() {
+            TransactionAuthenticator::Ed25519 {
+                public_key,
+                signature,
+            } => (public_key, signature),
+            _ => panic!(),
+        };
         assert_json(
             txns[1].clone(),
             json!({
@@ -462,7 +475,12 @@ mod tests {
                         format!("0x{}", hex::encode("vasp".as_bytes())),
                         true
                     ]
-                }
+                },
+                "signature": {
+                    "type": "ed25519_signature",
+                    "public_key": format!("0x{}", hex::encode(pk.unvalidated().to_bytes())),
+                    "signature": format!("0x{}", hex::encode(sig.to_bytes())),
+                },
             }),
         )
     }
@@ -488,55 +506,38 @@ mod tests {
         let expected_txns = context.get_transactions(2, 1);
         assert_eq!(1, expected_txns.proof.transaction_infos.len());
 
-        let user_txn_info = expected_txns.proof.transaction_infos[0].clone();
         assert_json(
-            txns[0].clone(),
+            txns[0]["payload"].clone(),
             json!({
-                "type": "user_transaction",
-                "version": "2",
-                "hash": user_txn_info.transaction_hash().to_hex_literal(),
-                "state_root_hash": user_txn_info.state_root_hash().to_hex_literal(),
-                "event_root_hash": user_txn_info.event_root_hash().to_hex_literal(),
-                "gas_used": user_txn_info.gas_used().to_string(),
-                "success": true,
-                "sender": "0xb1e55ed",
-                "sequence_number": "0",
-                "max_gas_amount": "1000000",
-                "gas_unit_price": "0",
-                "gas_currency_code": "XUS",
-                "expiration_timestamp_secs": txn.expiration_timestamp_secs().to_string(),
-                "events": [],
-                "payload": {
-                    "type": "script_payload",
-                    "code": {
-                        "bytecode": "0xa11ceb0b010000000601000202020403060f05151207277c08a3011000000001010000020001000003010200000403020001060c01080000020608000a0202060c0a020b4469656d4163636f756e74154b6579526f746174696f6e4361706162696c6974791f657874726163745f6b65795f726f746174696f6e5f6361706162696c6974791f726573746f72655f6b65795f726f746174696f6e5f6361706162696c69747919726f746174655f61757468656e7469636174696f6e5f6b657900000000000000000000000000000001000401090b0011000c020e020b0111020b02110102",
-                        "abi": {
-                            "name": "main",
-                            "visibility": "script",
-                            "generic_type_params": [],
-                            "params": [
-                                {
-                                    "type": "reference",
-                                    "mutable": false,
-                                    "to": {
-                                        "type": "signer"
-                                    }
-                                },
-                                {
-                                    "type": "vector",
-                                    "items": {
-                                        "type": "u8"
-                                    }
+                "type": "script_payload",
+                "code": {
+                    "bytecode": "0xa11ceb0b010000000601000202020403060f05151207277c08a3011000000001010000020001000003010200000403020001060c01080000020608000a0202060c0a020b4469656d4163636f756e74154b6579526f746174696f6e4361706162696c6974791f657874726163745f6b65795f726f746174696f6e5f6361706162696c6974791f726573746f72655f6b65795f726f746174696f6e5f6361706162696c69747919726f746174655f61757468656e7469636174696f6e5f6b657900000000000000000000000000000001000401090b0011000c020e020b0111020b02110102",
+                    "abi": {
+                        "name": "main",
+                        "visibility": "script",
+                        "generic_type_params": [],
+                        "params": [
+                            {
+                                "type": "reference",
+                                "mutable": false,
+                                "to": {
+                                    "type": "signer"
                                 }
-                            ],
-                            "return": []
-                        }
-                    },
-                    "type_arguments": [],
-                    "arguments": [
-                        "0x717d1d400311ff8797c2441ea9c2d2da1120ce38f66afb079c2bad0919d93a09"
-                    ]
-                }
+                            },
+                            {
+                                "type": "vector",
+                                "items": {
+                                    "type": "u8"
+                                }
+                            }
+                        ],
+                        "return": []
+                    }
+                },
+                "type_arguments": [],
+                "arguments": [
+                    "0x717d1d400311ff8797c2441ea9c2d2da1120ce38f66afb079c2bad0919d93a09"
+                ]
             }),
         )
     }
@@ -559,46 +560,29 @@ mod tests {
         let expected_txns = context.get_transactions(2, 1);
         assert_eq!(1, expected_txns.proof.transaction_infos.len());
 
-        let user_txn_info = expected_txns.proof.transaction_infos[0].clone();
         assert_json(
-            txns[0].clone(),
+            txns[0]["payload"].clone(),
             json!({
-                "type": "user_transaction",
-                "version": "2",
-                "hash": user_txn_info.transaction_hash().to_hex_literal(),
-                "state_root_hash": user_txn_info.state_root_hash().to_hex_literal(),
-                "event_root_hash": user_txn_info.event_root_hash().to_hex_literal(),
-                "gas_used": user_txn_info.gas_used().to_string(),
-                "success": true,
-                "sender": "0xb1e55ed",
-                "sequence_number": "0",
-                "max_gas_amount": "1000000",
-                "gas_unit_price": "0",
-                "gas_currency_code": "XUS",
-                "expiration_timestamp_secs": txn.expiration_timestamp_secs().to_string(),
-                "events": [],
-                "payload": {
-                    "type": "module_payload",
-                    "bytecode": format!("0x{}", code),
-                    "abi": {
-                        "address": "0xb1e55ed",
-                        "name": "MyModule",
-                        "friends": [],
-                        "exposed_functions": [
-                            {
-                                "name": "id",
-                                "visibility": "public",
-                                "generic_type_params": [],
-                                "params": [],
-                                "return": [
-                                    {
-                                        "type": "u8"
-                                    }
-                                ]
-                            }
-                        ],
-                        "structs": []
-                    }
+                "type": "module_payload",
+                "bytecode": format!("0x{}", code),
+                "abi": {
+                    "address": "0xb1e55ed",
+                    "name": "MyModule",
+                    "friends": [],
+                    "exposed_functions": [
+                        {
+                            "name": "id",
+                            "visibility": "public",
+                            "generic_type_params": [],
+                            "params": [],
+                            "return": [
+                                {
+                                    "type": "u8"
+                                }
+                            ]
+                        }
+                    ],
+                    "structs": []
                 }
             }),
         )
@@ -688,6 +672,13 @@ mod tests {
             .post_bcs_txn("/transactions", body)
             .await;
         let expiration_timestamp = txn.expiration_timestamp_secs();
+        let (pk, sig) = match txn.authenticator() {
+            TransactionAuthenticator::Ed25519 {
+                public_key,
+                signature,
+            } => (public_key, signature),
+            _ => panic!(),
+        };
         let hash = Transaction::UserTransaction(txn).hash();
         assert_json(
             resp,
@@ -723,7 +714,12 @@ mod tests {
                         format!("0x{}", hex::encode("vasp".as_bytes())),
                         true
                     ]
-                }
+                },
+                "signature": {
+                    "type": "ed25519_signature",
+                    "public_key": format!("0x{}", hex::encode(pk.unvalidated().to_bytes())),
+                    "signature": format!("0x{}", hex::encode(sig.to_bytes())),
+                },
             }),
         );
     }
@@ -785,6 +781,115 @@ mod tests {
             json!({
               "code": 400,
               "message": "transaction is rejected: InvalidUpdate - Failed to update gas price to 0"
+            }),
+        );
+    }
+
+    #[tokio::test]
+    async fn test_multi_agent_signed_transaction() {
+        let mut context = new_test_context();
+        let account = context.gen_account();
+        let factory = context.transaction_factory();
+        let mut tc_account = context.tc_account();
+        let secondary = context.root_account();
+        let txn = tc_account.sign_multi_agent_with_transaction_builder(
+            vec![&secondary],
+            factory.create_parent_vasp_account(
+                Currency::XUS,
+                0,
+                account.authentication_key(),
+                "vasp",
+                true,
+            ),
+        );
+
+        let body = bcs::to_bytes(&txn).unwrap();
+        let resp = context
+            .expect_status_code(202)
+            .post_bcs_txn("/transactions", body)
+            .await;
+
+        let (sender, secondary_signers) = match txn.authenticator() {
+            TransactionAuthenticator::MultiAgent {
+                sender,
+                secondary_signer_addresses: _,
+                secondary_signers,
+            } => (sender, secondary_signers),
+            _ => panic!(),
+        };
+        assert_json(
+            resp["signature"].clone(),
+            json!({
+                "type": "multi_agent_signature",
+                "sender": {
+                    "type": "ed25519_signature",
+                    "public_key": format!("0x{}", hex::encode(sender.public_key_bytes())),
+                    "signature": format!("0x{}", hex::encode(sender.signature_bytes())),
+                },
+                "secondary_signer_addresses": [
+                    secondary.address().to_hex_literal(),
+                ],
+                "secondary_signers": [
+                    {
+                        "type": "ed25519_signature",
+                        "public_key": format!("0x{}",hex::encode(secondary_signers[0].public_key_bytes())),
+                        "signature": format!("0x{}", hex::encode(secondary_signers[0].signature_bytes())),
+                    }
+                ]
+            }),
+        );
+    }
+
+    #[tokio::test]
+    async fn test_multi_ed25519_signed_transaction() {
+        let context = new_test_context();
+
+        let private_key = MultiEd25519PrivateKey::generate_for_testing();
+        let public_key = MultiEd25519PublicKey::from(&private_key);
+        let auth_key = AuthenticationKey::multi_ed25519(&public_key);
+
+        let factory = context.transaction_factory();
+        let mut tc_account = context.tc_account();
+        let create_account_txn = tc_account.sign_with_transaction_builder(
+            factory.create_parent_vasp_account(Currency::XUS, 0, auth_key, "vasp", true),
+        );
+        context.commit_block(&vec![create_account_txn]);
+
+        let raw_txn = factory
+            .create_recovery_address()
+            .sender(auth_key.derived_address())
+            .sequence_number(0)
+            .build();
+
+        let signature = private_key.sign(&raw_txn);
+        let txn = SignedTransaction::new_multisig(raw_txn, public_key, signature.clone());
+
+        let body = bcs::to_bytes(&txn).unwrap();
+        let resp = context
+            .expect_status_code(202)
+            .post_bcs_txn("/transactions", body)
+            .await;
+
+        assert_json(
+            resp["signature"].clone(),
+            json!({
+                "type": "multi_ed25519_signature",
+                "signatures": [
+                    {
+                        "public_key": "0x9e4208caddd825f71957c9b12dbfbd13a23fb0ea23eb398fd7e1f418b51f8fbc",
+                        "signature": format!("0x{}", hex::encode(signature.signatures()[0].to_bytes())),
+                    },
+                    {
+                        "public_key": "0x4708a77bb9285ce3745ffdd48c51980326b625488209803228ff623f3768c64e",
+                        "signature": format!("0x{}", hex::encode(signature.signatures()[1].to_bytes())),
+                    },
+                    {
+                        "public_key": "0x852b13cd7a89b0c223d74504705e84c745d32261244ed233ef0285637a1dece0",
+                        "signature": format!("0x{}", hex::encode(signature.signatures()[2].to_bytes())),
+                    }
+                ],
+                "threshold": 3,
+                "bitmap": "0xe0000000"
             }),
         );
     }

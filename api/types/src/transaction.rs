@@ -2,15 +2,24 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    Address, EventKey, HashValue, MoveModuleBytecode, MoveModuleId, MoveResource, MoveResourceType,
-    MoveScriptBytecode, MoveType, MoveValue, U64,
+    Address, EventKey, HashValue, HexEncodedBytes, MoveModuleBytecode, MoveModuleId, MoveResource,
+    MoveResourceType, MoveScriptBytecode, MoveType, MoveValue, U64,
 };
 
-use diem_crypto::hash::CryptoHash;
+use diem_crypto::{
+    ed25519::{self, Ed25519PublicKey},
+    hash::CryptoHash,
+    multi_ed25519::{self, MultiEd25519PublicKey},
+    validatable::Validatable,
+};
 use diem_types::{
+    account_address::AccountAddress,
     block_metadata::BlockMetadata,
     contract_event::ContractEvent,
-    transaction::{Script, SignedTransaction, TransactionInfoTrait},
+    transaction::{
+        authenticator::{AccountAuthenticator, TransactionAuthenticator},
+        Script, SignedTransaction, TransactionInfoTrait,
+    },
 };
 use move_core_types::identifier::Identifier;
 use resource_viewer::AnnotatedMoveValue;
@@ -47,6 +56,7 @@ impl From<(SignedTransaction, TransactionPayload)> for Transaction {
             gas_unit_price: txn.gas_unit_price().into(),
             gas_currency_code: txn.gas_currency_code().to_owned(),
             expiration_timestamp_secs: txn.expiration_timestamp_secs().into(),
+            signature: txn.authenticator().into(),
             hash: Transaction::hash(txn),
             payload,
         })
@@ -73,8 +83,9 @@ impl<T: TransactionInfoTrait> From<(u64, &SignedTransaction, &T, TransactionPayl
             gas_unit_price: txn.gas_unit_price().into(),
             gas_currency_code: txn.gas_currency_code().to_owned(),
             expiration_timestamp_secs: txn.expiration_timestamp_secs().into(),
-            events,
+            signature: txn.authenticator().into(),
             payload,
+            events,
         }))
     }
 }
@@ -139,6 +150,7 @@ pub struct PendingTransaction {
     pub gas_currency_code: String,
     pub expiration_timestamp_secs: U64,
     pub payload: TransactionPayload,
+    pub signature: TransactionSignature,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -152,6 +164,7 @@ pub struct UserTransaction {
     pub gas_currency_code: String,
     pub expiration_timestamp_secs: U64,
     pub payload: TransactionPayload,
+    pub signature: TransactionSignature,
     pub events: Vec<Event>,
 }
 
@@ -270,4 +283,143 @@ pub enum WriteSetChange {
         address: Address,
         data: MoveResource,
     },
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum TransactionSignature {
+    Ed25519Signature(Ed25519Signature),
+    MultiEd25519Signature(MultiEd25519Signature),
+    MultiAgentSignature(MultiAgentSignature),
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct Ed25519Signature {
+    public_key: HexEncodedBytes,
+    signature: HexEncodedBytes,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct MultiEd25519Signature {
+    signatures: Vec<Ed25519Signature>,
+    threshold: u8,
+    bitmap: HexEncodedBytes,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum AccountSignature {
+    Ed25519Signature(Ed25519Signature),
+    MultiEd25519Signature(MultiEd25519Signature),
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct MultiAgentSignature {
+    sender: AccountSignature,
+    secondary_signer_addresses: Vec<Address>,
+    secondary_signers: Vec<AccountSignature>,
+}
+
+impl From<(&Validatable<Ed25519PublicKey>, &ed25519::Ed25519Signature)> for Ed25519Signature {
+    fn from((pk, sig): (&Validatable<Ed25519PublicKey>, &ed25519::Ed25519Signature)) -> Self {
+        Self {
+            public_key: pk.unvalidated().to_bytes().to_vec().into(),
+            signature: sig.to_bytes().to_vec().into(),
+        }
+    }
+}
+
+impl From<(&Ed25519PublicKey, &ed25519::Ed25519Signature)> for Ed25519Signature {
+    fn from((pk, sig): (&Ed25519PublicKey, &ed25519::Ed25519Signature)) -> Self {
+        Self {
+            public_key: pk.to_bytes().to_vec().into(),
+            signature: sig.to_bytes().to_vec().into(),
+        }
+    }
+}
+
+impl
+    From<(
+        &MultiEd25519PublicKey,
+        &multi_ed25519::MultiEd25519Signature,
+    )> for MultiEd25519Signature
+{
+    fn from(
+        (pk, sig): (
+            &MultiEd25519PublicKey,
+            &multi_ed25519::MultiEd25519Signature,
+        ),
+    ) -> Self {
+        Self {
+            signatures: pk
+                .public_keys()
+                .iter()
+                .zip(sig.signatures().iter())
+                .map(|(k, s)| (k, s).into())
+                .collect(),
+            threshold: *pk.threshold(),
+            bitmap: sig.bitmap().to_vec().into(),
+        }
+    }
+}
+
+impl From<&AccountAuthenticator> for AccountSignature {
+    fn from(auth: &AccountAuthenticator) -> Self {
+        use AccountAuthenticator::*;
+        match auth {
+            Ed25519 {
+                public_key,
+                signature,
+            } => Self::Ed25519Signature((public_key, signature).into()),
+            MultiEd25519 {
+                public_key,
+                signature,
+            } => Self::MultiEd25519Signature((public_key, signature).into()),
+        }
+    }
+}
+
+impl
+    From<(
+        &AccountAuthenticator,
+        &Vec<AccountAddress>,
+        &Vec<AccountAuthenticator>,
+    )> for MultiAgentSignature
+{
+    fn from(
+        (sender, addresses, signers): (
+            &AccountAuthenticator,
+            &Vec<AccountAddress>,
+            &Vec<AccountAuthenticator>,
+        ),
+    ) -> Self {
+        Self {
+            sender: sender.into(),
+            secondary_signer_addresses: addresses.iter().map(|address| (*address).into()).collect(),
+            secondary_signers: signers.iter().map(|s| s.into()).collect(),
+        }
+    }
+}
+
+impl From<TransactionAuthenticator> for TransactionSignature {
+    fn from(auth: TransactionAuthenticator) -> Self {
+        use TransactionAuthenticator::*;
+        match &auth {
+            Ed25519 {
+                public_key,
+                signature,
+            } => Self::Ed25519Signature((public_key, signature).into()),
+            MultiEd25519 {
+                public_key,
+                signature,
+            } => Self::MultiEd25519Signature((public_key, signature).into()),
+            MultiAgent {
+                sender,
+                secondary_signer_addresses,
+                secondary_signers,
+            } => Self::MultiAgentSignature(
+                (sender, secondary_signer_addresses, secondary_signers).into(),
+            ),
+        }
+    }
 }
