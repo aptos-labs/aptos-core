@@ -25,7 +25,7 @@ use diem_types::{
     vm_status::DiscardedVMStatus,
 };
 use futures::{channel::oneshot, stream::FuturesUnordered};
-use network::application::interface::{ApplicationPeerNetworkIdSender, NetworkInterface};
+use network::application::interface::NetworkInterface;
 use rayon::prelude::*;
 use short_hex_str::AsShortHexStr;
 use std::{

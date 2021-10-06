@@ -76,37 +76,6 @@ pub struct HealthCheckerNetworkSender {
     inner: NetworkSender<HealthCheckerMsg>,
 }
 
-#[async_trait]
-impl crate::application::interface::ApplicationPeerNetworkIdSender<HealthCheckerMsg>
-    for HealthCheckerNetworkSender
-{
-    fn send_to(
-        &mut self,
-        recipient: PeerNetworkId,
-        message: HealthCheckerMsg,
-    ) -> Result<(), NetworkError> {
-        ApplicationNetworkSender::send_to(self, recipient.peer_id(), message)
-    }
-
-    fn send_to_many(
-        &mut self,
-        recipients: impl Iterator<Item = PeerNetworkId>,
-        message: HealthCheckerMsg,
-    ) -> Result<(), NetworkError> {
-        let recipients = recipients.map(|peer_network_id| peer_network_id.peer_id());
-        ApplicationNetworkSender::send_to_many(self, recipients, message)
-    }
-
-    async fn send_rpc(
-        &mut self,
-        recipient: PeerNetworkId,
-        req_msg: HealthCheckerMsg,
-        timeout: Duration,
-    ) -> Result<HealthCheckerMsg, RpcError> {
-        ApplicationNetworkSender::send_rpc(self, recipient.peer_id(), req_msg, timeout).await
-    }
-}
-
 /// Configuration for the network endpoints to support HealthChecker.
 pub fn network_endpoint_config() -> AppConfig {
     AppConfig::p2p(

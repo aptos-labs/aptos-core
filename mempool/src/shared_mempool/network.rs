@@ -27,7 +27,7 @@ use itertools::Itertools;
 use netcore::transport::ConnectionOrigin;
 use network::{
     application::{
-        interface::{ApplicationPeerNetworkIdSender, MultiNetworkSender, NetworkInterface},
+        interface::{MultiNetworkSender, NetworkInterface},
         storage::{LockingHashMap, PeerMetadataStorage},
     },
     error::NetworkError,

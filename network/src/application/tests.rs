@@ -3,32 +3,19 @@
 
 use crate::{
     application::{
-        interface::{ApplicationPeerNetworkIdSender, NetworkInterface},
+        interface::NetworkInterface,
         storage::{LockingHashMap, PeerMetadataStorage},
         types::{PeerError, PeerState},
     },
-    protocols::{health_checker::HealthCheckerMsg, network::RpcError},
+    protocols::health_checker::HealthCheckerMsg,
     transport::ConnectionMetadata,
 };
-use async_trait::async_trait;
 use diem_config::network_id::{NetworkId, PeerNetworkId};
 use diem_types::PeerId;
-use std::{collections::hash_map::Entry, sync::Arc, time::Duration};
+use std::{collections::hash_map::Entry, sync::Arc};
 
 #[derive(Clone)]
 struct DummySender {}
-
-#[async_trait]
-impl ApplicationPeerNetworkIdSender<HealthCheckerMsg> for DummySender {
-    async fn send_rpc(
-        &mut self,
-        _recipient: PeerNetworkId,
-        _req_msg: HealthCheckerMsg,
-        _timeout: Duration,
-    ) -> Result<HealthCheckerMsg, RpcError> {
-        unimplemented!()
-    }
-}
 
 /// Dummy network so we can test the interfaces
 struct DummyNetworkInterface {
