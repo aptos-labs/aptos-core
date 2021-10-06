@@ -413,7 +413,7 @@ mod tests {
         );
 
         let user_txn_info = expected_txns.proof.transaction_infos[1].clone();
-        let (pk, sig) = match txn.authenticator() {
+        let (public_key, sig) = match txn.authenticator() {
             TransactionAuthenticator::Ed25519 {
                 public_key,
                 signature,
@@ -479,7 +479,7 @@ mod tests {
                 },
                 "signature": {
                     "type": "ed25519_signature",
-                    "public_key": format!("0x{}", hex::encode(pk.unvalidated().to_bytes())),
+                    "public_key": format!("0x{}", hex::encode(public_key.unvalidated().to_bytes())),
                     "signature": format!("0x{}", hex::encode(sig.to_bytes())),
                 },
             }),
@@ -673,7 +673,7 @@ mod tests {
             .post_bcs_txn("/transactions", body)
             .await;
         let expiration_timestamp = txn.expiration_timestamp_secs();
-        let (pk, sig) = match txn.authenticator() {
+        let (public_key, sig) = match txn.authenticator() {
             TransactionAuthenticator::Ed25519 {
                 public_key,
                 signature,
@@ -718,7 +718,7 @@ mod tests {
                 },
                 "signature": {
                     "type": "ed25519_signature",
-                    "public_key": format!("0x{}", hex::encode(pk.unvalidated().to_bytes())),
+                    "public_key": format!("0x{}", hex::encode(public_key.unvalidated().to_bytes())),
                     "signature": format!("0x{}", hex::encode(sig.to_bytes())),
                 },
             }),
