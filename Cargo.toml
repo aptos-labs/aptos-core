@@ -132,6 +132,7 @@ members = [
     "language/tools/move-package",
     "language/tools/move-unit-test",
     "language/tools/read-write-set",
+    "language/tools/read-write-set/dynamic",
     "language/tools/read-write-set/types",
     "language/tools/resource-viewer",
     "language/tools/vm-genesis",

@@ -37,6 +37,7 @@ move-symbol-pool = { path = "../../move-symbol-pool" }
 move-vm-types = { path = "../../move-vm/types" }
 move-vm-runtime = { path = "../../move-vm/runtime" }
 read-write-set = { path = "../read-write-set" }
+read-write-set-dynamic = { path = "../read-write-set/dynamic" }
 resource-viewer = { path = "../resource-viewer" }
 move-binary-format = { path = "../../move-binary-format" }
 move-package = { path = "../move-package" }

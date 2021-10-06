@@ -16,3 +16,4 @@ diem-types = { path = "../../../types" }
 diem-vm = { path = "../../diem-vm" }
 move-core-types = { path = "../../move-core/types" }
 read-write-set = { path = "../../tools/read-write-set" }
+read-write-set-dynamic = { path = "../../tools/read-write-set/dynamic" }

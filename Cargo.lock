@@ -2424,6 +2424,7 @@ dependencies = [
  "diem-workspace-hack",
  "move-core-types",
  "read-write-set",
+ "read-write-set-dynamic",
 ]
 
 [[package]]
@@ -4928,6 +4929,7 @@ dependencies = [
  "move-vm-types",
  "once_cell",
  "read-write-set",
+ "read-write-set-dynamic",
  "resource-viewer",
  "serde",
  "serde_yaml",
@@ -6615,8 +6617,20 @@ dependencies = [
  "move-bytecode-utils",
  "move-core-types",
  "move-model",
+ "read-write-set-dynamic",
  "read-write-set-types",
  "resource-viewer",
+]
+
+[[package]]
+name = "read-write-set-dynamic"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "diem-workspace-hack",
+ "move-binary-format",
+ "move-core-types",
+ "read-write-set-types",
 ]
 
 [[package]]

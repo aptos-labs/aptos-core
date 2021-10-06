@@ -18,7 +18,7 @@ use move_core_types::{
 };
 use std::ops::Deref;
 
-pub struct ReadWriteSetAnalysis(read_write_set::normalize::NormalizedReadWriteSetAnalysis);
+pub struct ReadWriteSetAnalysis(read_write_set_dynamic::NormalizedReadWriteSetAnalysis);
 
 const TRANSACTION_FEES_NAME: &IdentStr = ident_str!("TransactionFee");
 
@@ -147,7 +147,7 @@ impl ReadWriteSetAnalysis {
 }
 
 impl Deref for ReadWriteSetAnalysis {
-    type Target = read_write_set::normalize::NormalizedReadWriteSetAnalysis;
+    type Target = read_write_set_dynamic::NormalizedReadWriteSetAnalysis;
 
     fn deref(&self) -> &Self::Target {
         &self.0

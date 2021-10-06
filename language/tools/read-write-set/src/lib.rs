@@ -1,10 +1,6 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-pub mod dynamic_analysis;
-pub mod normalize;
-
-use crate::normalize::NormalizedReadWriteSetAnalysis;
 use anyhow::Result;
 use move_binary_format::file_format::CompiledModule;
 use move_bytecode_utils::Modules;
@@ -17,6 +13,7 @@ use prover_bytecode::{
     function_target_pipeline::{FunctionTargetPipeline, FunctionTargetsHolder, FunctionVariant},
     read_write_set_analysis::{ReadWriteSetProcessor, ReadWriteSetState},
 };
+use read_write_set_dynamic::NormalizedReadWriteSetAnalysis;
 use read_write_set_types::ReadWriteSet;
 use std::collections::BTreeMap;
 
