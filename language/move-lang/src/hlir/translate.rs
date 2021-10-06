@@ -14,7 +14,10 @@ use crate::{
 use move_ir_types::location::*;
 use move_symbol_pool::Symbol;
 use once_cell::sync::Lazy;
-use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use std::{
+    collections::{BTreeMap, BTreeSet, VecDeque},
+    convert::TryInto,
+};
 
 //**************************************************************************************************
 // Vars
@@ -918,7 +921,9 @@ fn exp_<'env>(
                 stack.frames.push(Box::new(f_rhs));
                 stack.frames.push(Box::new(f_lhs));
             }
-            TE::Builtin(bt, arguments) if matches!(&*bt, sp!(_, T::BuiltinFunction_::Assert)) => {
+            TE::Builtin(bt, arguments)
+                if matches!(&*bt, sp!(_, T::BuiltinFunction_::Assert(false))) =>
+            {
                 let tbool = N::Type_::bool(loc);
                 let tu64 = N::Type_::u64(loc);
                 let tunit = sp(loc, N::Type_::Unit);
@@ -954,6 +959,25 @@ fn exp_<'env>(
 
                 let block = T::exp(tunit, sp(loc, TE::Block(stmts)));
                 exp_loop(stack, result, cur_expected_type_opt, Box::new(block));
+            }
+            TE::Builtin(bt, arguments)
+                if matches!(&*bt, sp!(_, T::BuiltinFunction_::Assert(true))) =>
+            {
+                use T::ExpListItem as TI;
+                let tunit = sp(loc, N::Type_::Unit);
+                let [cond_item, code_item]: [TI; 2] = match arguments.exp.value {
+                    TE::ExpList(arg_list) => arg_list.try_into().unwrap(),
+                    _ => panic!("ICE type checking failed"),
+                };
+                let (econd, ecode) = match (cond_item, code_item) {
+                    (TI::Single(econd, _), TI::Single(ecode, _)) => (econd, ecode),
+                    _ => panic!("ICE type checking failed"),
+                };
+                let eabort = T::exp(tunit.clone(), sp(loc, TE::Abort(Box::new(ecode))));
+                let eunit = T::exp(tunit.clone(), sp(loc, TE::Unit { trailing: false }));
+                let if_else_ = TE::IfElse(Box::new(econd), Box::new(eunit), Box::new(eabort));
+                let if_else = T::exp(tunit, sp(loc, if_else_));
+                exp_loop(stack, result, cur_expected_type_opt, Box::new(if_else));
             }
             te_ => {
                 let result = &mut *result.borrow_mut();
@@ -1473,7 +1497,7 @@ fn builtin(
             let arg = exp(context, result, None, *targ);
             E::Freeze(arg)
         }
-        TB::Assert => unreachable!(),
+        TB::Assert(_) => unreachable!(),
     }
 }
 

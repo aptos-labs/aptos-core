@@ -18,7 +18,7 @@ module DiemFramework::CoreAddresses {
 
     /// Assert that the account is the Diem root address.
     public fun assert_diem_root(account: &signer) {
-        assert(Signer::address_of(account) == @DiemRoot, Errors::requires_address(EDIEM_ROOT))
+        assert!(Signer::address_of(account) == @DiemRoot, Errors::requires_address(EDIEM_ROOT))
     }
     spec assert_diem_root {
         pragma opaque;
@@ -33,7 +33,7 @@ module DiemFramework::CoreAddresses {
 
     /// Assert that the signer has the treasury compliance address.
     public fun assert_treasury_compliance(account: &signer) {
-        assert(
+        assert!(
             Signer::address_of(account) == @TreasuryCompliance,
             Errors::requires_address(ETREASURY_COMPLIANCE)
         )
@@ -52,7 +52,7 @@ module DiemFramework::CoreAddresses {
 
     /// Assert that the signer has the VM reserved address.
     public fun assert_vm(account: &signer) {
-        assert(Signer::address_of(account) == @VMReserved, Errors::requires_address(EVM))
+        assert!(Signer::address_of(account) == @VMReserved, Errors::requires_address(EVM))
     }
     spec assert_vm {
         pragma opaque;
@@ -67,7 +67,7 @@ module DiemFramework::CoreAddresses {
 
     /// Assert that the signer has the currency info address.
     public fun assert_currency_info(account: &signer) {
-        assert(Signer::address_of(account) == @CurrencyInfo, Errors::requires_address(ECURRENCY_INFO))
+        assert!(Signer::address_of(account) == @CurrencyInfo, Errors::requires_address(ECURRENCY_INFO))
     }
     spec assert_currency_info {
         pragma opaque;

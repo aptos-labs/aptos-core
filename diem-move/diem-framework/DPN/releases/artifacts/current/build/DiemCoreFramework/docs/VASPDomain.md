@@ -279,7 +279,7 @@ VASP domain was not found
 
 
 <pre><code><b>fun</b> <a href="VASPDomain.md#0x1_VASPDomain_create_vasp_domain">create_vasp_domain</a>(domain: vector&lt;u8&gt;): <a href="VASPDomain.md#0x1_VASPDomain">VASPDomain</a> {
-    <b>assert</b>(<a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_length">Vector::length</a>(&domain) &lt;= <a href="VASPDomain.md#0x1_VASPDomain_DOMAIN_LENGTH">DOMAIN_LENGTH</a>, <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="VASPDomain.md#0x1_VASPDomain_EINVALID_VASP_DOMAIN">EINVALID_VASP_DOMAIN</a>));
+    <b>assert</b>!(<a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_length">Vector::length</a>(&domain) &lt;= <a href="VASPDomain.md#0x1_VASPDomain_DOMAIN_LENGTH">DOMAIN_LENGTH</a>, <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="VASPDomain.md#0x1_VASPDomain_EINVALID_VASP_DOMAIN">EINVALID_VASP_DOMAIN</a>));
     <a href="VASPDomain.md#0x1_VASPDomain">VASPDomain</a>{ domain }
 }
 </code></pre>
@@ -335,7 +335,7 @@ a transaction that invokes <code>add_vasp_domain</code> to set the <code>domains
     vasp_account: &signer,
 ) {
     <a href="Roles.md#0x1_Roles_assert_parent_vasp_role">Roles::assert_parent_vasp_role</a>(vasp_account);
-    <b>assert</b>(
+    <b>assert</b>!(
         !<b>exists</b>&lt;<a href="VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomains</a>&gt;(<a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(vasp_account)),
         <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_already_published">Errors::already_published</a>(<a href="VASPDomain.md#0x1_VASPDomain_EVASP_DOMAINS">EVASP_DOMAINS</a>)
     );
@@ -448,7 +448,7 @@ When Treasury Compliance account sends a transaction that invokes either <code>a
     tc_account : &signer,
 ) {
     <a href="Roles.md#0x1_Roles_assert_treasury_compliance">Roles::assert_treasury_compliance</a>(tc_account);
-    <b>assert</b>(
+    <b>assert</b>!(
         !<b>exists</b>&lt;<a href="VASPDomain.md#0x1_VASPDomain_VASPDomainManager">VASPDomainManager</a>&gt;(<a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(tc_account)),
         <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_already_published">Errors::already_published</a>(<a href="VASPDomain.md#0x1_VASPDomain_EVASP_DOMAIN_MANAGER">EVASP_DOMAIN_MANAGER</a>)
     );
@@ -505,8 +505,8 @@ different lowercase and uppercase format gets added.
     domain: vector&lt;u8&gt;,
 ) <b>acquires</b> <a href="VASPDomain.md#0x1_VASPDomain_VASPDomainManager">VASPDomainManager</a>, <a href="VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomains</a> {
     <a href="Roles.md#0x1_Roles_assert_treasury_compliance">Roles::assert_treasury_compliance</a>(tc_account);
-    <b>assert</b>(<a href="VASPDomain.md#0x1_VASPDomain_tc_domain_manager_exists">tc_domain_manager_exists</a>(), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="VASPDomain.md#0x1_VASPDomain_EVASP_DOMAIN_MANAGER">EVASP_DOMAIN_MANAGER</a>));
-    <b>assert</b>(
+    <b>assert</b>!(<a href="VASPDomain.md#0x1_VASPDomain_tc_domain_manager_exists">tc_domain_manager_exists</a>(), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="VASPDomain.md#0x1_VASPDomain_EVASP_DOMAIN_MANAGER">EVASP_DOMAIN_MANAGER</a>));
+    <b>assert</b>!(
         <b>exists</b>&lt;<a href="VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomains</a>&gt;(address),
         <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="VASPDomain.md#0x1_VASPDomain_EVASP_DOMAINS_NOT_PUBLISHED">EVASP_DOMAINS_NOT_PUBLISHED</a>)
     );
@@ -514,7 +514,7 @@ different lowercase and uppercase format gets added.
     <b>let</b> account_domains = borrow_global_mut&lt;<a href="VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomains</a>&gt;(address);
     <b>let</b> vasp_domain = <a href="VASPDomain.md#0x1_VASPDomain_create_vasp_domain">create_vasp_domain</a>(domain);
 
-    <b>assert</b>(
+    <b>assert</b>!(
         !<a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_contains">Vector::contains</a>(&account_domains.domains, &vasp_domain),
         <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="VASPDomain.md#0x1_VASPDomain_EVASP_DOMAIN_ALREADY_EXISTS">EVASP_DOMAIN_ALREADY_EXISTS</a>)
     );
@@ -624,8 +624,8 @@ Remove a VASPDomain from a parent VASP's VASPDomains resource.
     domain: vector&lt;u8&gt;,
 ) <b>acquires</b> <a href="VASPDomain.md#0x1_VASPDomain_VASPDomainManager">VASPDomainManager</a>, <a href="VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomains</a> {
     <a href="Roles.md#0x1_Roles_assert_treasury_compliance">Roles::assert_treasury_compliance</a>(tc_account);
-    <b>assert</b>(<a href="VASPDomain.md#0x1_VASPDomain_tc_domain_manager_exists">tc_domain_manager_exists</a>(), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="VASPDomain.md#0x1_VASPDomain_EVASP_DOMAIN_MANAGER">EVASP_DOMAIN_MANAGER</a>));
-    <b>assert</b>(
+    <b>assert</b>!(<a href="VASPDomain.md#0x1_VASPDomain_tc_domain_manager_exists">tc_domain_manager_exists</a>(), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="VASPDomain.md#0x1_VASPDomain_EVASP_DOMAIN_MANAGER">EVASP_DOMAIN_MANAGER</a>));
+    <b>assert</b>!(
         <b>exists</b>&lt;<a href="VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomains</a>&gt;(address),
         <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="VASPDomain.md#0x1_VASPDomain_EVASP_DOMAINS_NOT_PUBLISHED">EVASP_DOMAINS_NOT_PUBLISHED</a>)
     );
@@ -738,7 +738,7 @@ Remove a VASPDomain from a parent VASP's VASPDomains resource.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="VASPDomain.md#0x1_VASPDomain_has_vasp_domain">has_vasp_domain</a>(addr: address, domain: vector&lt;u8&gt;): bool <b>acquires</b> <a href="VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomains</a> {
-    <b>assert</b>(
+    <b>assert</b>!(
         <b>exists</b>&lt;<a href="VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomains</a>&gt;(addr),
         <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="VASPDomain.md#0x1_VASPDomain_EVASP_DOMAINS_NOT_PUBLISHED">EVASP_DOMAINS_NOT_PUBLISHED</a>)
     );

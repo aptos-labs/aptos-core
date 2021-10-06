@@ -98,7 +98,7 @@ module DiemFramework::DualAttestation {
     ) {
         Roles::assert_parent_vasp_or_designated_dealer(created);
         Roles::assert_treasury_compliance(creator);
-        assert(
+        assert!(
             !exists<Credential>(Signer::address_of(created)),
             Errors::already_published(ECREDENTIAL)
         );
@@ -125,7 +125,7 @@ module DiemFramework::DualAttestation {
     /// Rotate the base URL for `account` to `new_url`
     public fun rotate_base_url(account: &signer, new_url: vector<u8>) acquires Credential {
         let addr = Signer::address_of(account);
-        assert(exists<Credential>(addr), Errors::not_published(ECREDENTIAL));
+        assert!(exists<Credential>(addr), Errors::not_published(ECREDENTIAL));
         let credential = borrow_global_mut<Credential>(addr);
         credential.base_url = copy new_url;
         Event::emit_event(&mut credential.base_url_rotation_events, BaseUrlRotationEvent {
@@ -179,8 +179,8 @@ module DiemFramework::DualAttestation {
         new_key: vector<u8>,
     ) acquires Credential {
         let addr = Signer::address_of(account);
-        assert(exists<Credential>(addr), Errors::not_published(ECREDENTIAL));
-        assert(Signature::ed25519_validate_pubkey(copy new_key), Errors::invalid_argument(EINVALID_PUBLIC_KEY));
+        assert!(exists<Credential>(addr), Errors::not_published(ECREDENTIAL));
+        assert!(Signature::ed25519_validate_pubkey(copy new_key), Errors::invalid_argument(EINVALID_PUBLIC_KEY));
         let credential = borrow_global_mut<Credential>(addr);
         credential.compliance_public_key = copy new_key;
         Event::emit_event(&mut credential.compliance_key_rotation_events, ComplianceKeyRotationEvent {
@@ -230,7 +230,7 @@ module DiemFramework::DualAttestation {
     /// Return the human-readable name for the VASP account.
     /// Aborts if `addr` does not have a `Credential` resource.
     public fun human_name(addr: address): vector<u8> acquires Credential {
-        assert(exists<Credential>(addr), Errors::not_published(ECREDENTIAL));
+        assert!(exists<Credential>(addr), Errors::not_published(ECREDENTIAL));
         *&borrow_global<Credential>(addr).human_name
     }
     spec human_name {
@@ -242,7 +242,7 @@ module DiemFramework::DualAttestation {
     /// Return the base URL for `addr`.
     /// Aborts if `addr` does not have a `Credential` resource.
     public fun base_url(addr: address): vector<u8> acquires Credential {
-        assert(exists<Credential>(addr), Errors::not_published(ECREDENTIAL));
+        assert!(exists<Credential>(addr), Errors::not_published(ECREDENTIAL));
         *&borrow_global<Credential>(addr).base_url
     }
     spec base_url {
@@ -258,7 +258,7 @@ module DiemFramework::DualAttestation {
     /// Return the compliance public key for `addr`.
     /// Aborts if `addr` does not have a `Credential` resource.
     public fun compliance_public_key(addr: address): vector<u8> acquires Credential {
-        assert(exists<Credential>(addr), Errors::not_published(ECREDENTIAL));
+        assert!(exists<Credential>(addr), Errors::not_published(ECREDENTIAL));
         *&borrow_global<Credential>(addr).compliance_public_key
     }
     spec compliance_public_key {
@@ -274,7 +274,7 @@ module DiemFramework::DualAttestation {
     /// Return the expiration date `addr`
     /// Aborts if `addr` does not have a `Credential` resource.
     public fun expiration_date(addr: address): u64  acquires Credential {
-        assert(exists<Credential>(addr), Errors::not_published(ECREDENTIAL));
+        assert!(exists<Credential>(addr), Errors::not_published(ECREDENTIAL));
         *&borrow_global<Credential>(addr).expiration_date
     }
     spec expiration_date {
@@ -381,25 +381,25 @@ module DiemFramework::DualAttestation {
         deposit_value: u64
     ) acquires Credential {
         // sanity check of signature validity
-        assert(
+        assert!(
             Vector::length(&metadata_signature) == 64,
             Errors::invalid_argument(EMALFORMED_METADATA_SIGNATURE)
         );
         // sanity check of payee compliance key validity
         let payee_compliance_key = compliance_public_key(credential_address(payee));
-        assert(
+        assert!(
             !Vector::is_empty(&payee_compliance_key),
             Errors::invalid_state(EPAYEE_COMPLIANCE_KEY_NOT_SET)
         );
         // sanity check of payee base URL validity
         let payee_base_url = base_url(credential_address(payee));
-        assert(
+        assert!(
             !Vector::is_empty(&payee_base_url),
             Errors::invalid_state(EPAYEE_BASE_URL_NOT_SET)
         );
         // cryptographic check of signature validity
         let message = dual_attestation_message(payer, metadata, deposit_value);
-        assert(
+        assert!(
             Signature::ed25519_verify(metadata_signature, payee_compliance_key, message),
             Errors::invalid_argument(EINVALID_METADATA_SIGNATURE),
         );
@@ -483,9 +483,9 @@ module DiemFramework::DualAttestation {
     public fun initialize(dr_account: &signer) {
         DiemTimestamp::assert_genesis();
         CoreAddresses::assert_diem_root(dr_account); // operational constraint.
-        assert(!exists<Limit>(@DiemRoot), Errors::already_published(ELIMIT));
+        assert!(!exists<Limit>(@DiemRoot), Errors::already_published(ELIMIT));
         let initial_limit = (INITIAL_DUAL_ATTESTATION_LIMIT as u128) * (Diem::scaling_factor<XDX>() as u128);
-        assert(initial_limit <= MAX_U64, Errors::limit_exceeded(ELIMIT));
+        assert!(initial_limit <= MAX_U64, Errors::limit_exceeded(ELIMIT));
         move_to(
             dr_account,
             Limit {
@@ -504,7 +504,7 @@ module DiemFramework::DualAttestation {
 
     /// Return the current dual attestation limit in microdiem
     public fun get_cur_microdiem_limit(): u64 acquires Limit {
-        assert(exists<Limit>(@DiemRoot), Errors::not_published(ELIMIT));
+        assert!(exists<Limit>(@DiemRoot), Errors::not_published(ELIMIT));
         borrow_global<Limit>(@DiemRoot).micro_xdx_limit
     }
     spec get_cur_microdiem_limit {
@@ -517,7 +517,7 @@ module DiemFramework::DualAttestation {
     /// Aborts if `tc_account` does not have the TreasuryCompliance role
     public fun set_microdiem_limit(tc_account: &signer, micro_xdx_limit: u64) acquires Limit {
         Roles::assert_treasury_compliance(tc_account);
-        assert(exists<Limit>(@DiemRoot), Errors::not_published(ELIMIT));
+        assert!(exists<Limit>(@DiemRoot), Errors::not_published(ELIMIT));
         borrow_global_mut<Limit>(@DiemRoot).micro_xdx_limit = micro_xdx_limit;
     }
     spec set_microdiem_limit {

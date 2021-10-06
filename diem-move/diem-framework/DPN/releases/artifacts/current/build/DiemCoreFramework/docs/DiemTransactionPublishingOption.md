@@ -411,7 +411,7 @@ If called, transactions cannot be sent from any account except DiemRoot
 
 <pre><code><b>public</b> <b>fun</b> <a href="DiemTransactionPublishingOption.md#0x1_DiemTransactionPublishingOption_halt_all_transactions">halt_all_transactions</a>(dr_account: &signer) {
     <a href="Roles.md#0x1_Roles_assert_diem_root">Roles::assert_diem_root</a>(dr_account);
-    <b>assert</b>(
+    <b>assert</b>!(
         !<b>exists</b>&lt;<a href="DiemTransactionPublishingOption.md#0x1_DiemTransactionPublishingOption_HaltAllTransactions">HaltAllTransactions</a>&gt;(<a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(dr_account)),
         <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_already_published">Errors::already_published</a>(<a href="DiemTransactionPublishingOption.md#0x1_DiemTransactionPublishingOption_EHALT_ALL_TRANSACTIONS">EHALT_ALL_TRANSACTIONS</a>),
     );
@@ -442,7 +442,7 @@ If called, transactions can be sent from any account once again
 <pre><code><b>public</b> <b>fun</b> <a href="DiemTransactionPublishingOption.md#0x1_DiemTransactionPublishingOption_resume_transactions">resume_transactions</a>(dr_account: &signer) <b>acquires</b> <a href="DiemTransactionPublishingOption.md#0x1_DiemTransactionPublishingOption_HaltAllTransactions">HaltAllTransactions</a> {
     <a href="Roles.md#0x1_Roles_assert_diem_root">Roles::assert_diem_root</a>(dr_account);
     <b>let</b> dr_address = <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(dr_account);
-    <b>assert</b>(
+    <b>assert</b>!(
         <b>exists</b>&lt;<a href="DiemTransactionPublishingOption.md#0x1_DiemTransactionPublishingOption_HaltAllTransactions">HaltAllTransactions</a>&gt;(dr_address),
         <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_already_published">Errors::already_published</a>(<a href="DiemTransactionPublishingOption.md#0x1_DiemTransactionPublishingOption_EHALT_ALL_TRANSACTIONS">EHALT_ALL_TRANSACTIONS</a>),
     );

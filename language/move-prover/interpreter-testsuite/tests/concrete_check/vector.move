@@ -6,16 +6,16 @@ module 0x2::A {
 
     fun test_natives<T>(x1: T, x2: T): (T, T) {
         let v: vector<T> = Vector::empty();
-        assert(Vector::length(&v) == 0, 100);
+        assert!(Vector::length(&v) == 0, 100);
         Vector::push_back(&mut v, x1);
-        assert(Vector::length(&v) == 1, 101);
+        assert!(Vector::length(&v) == 1, 101);
         Vector::push_back(&mut v, x2);
-        assert(Vector::length(&v) == 2, 102);
+        assert!(Vector::length(&v) == 2, 102);
         Vector::swap(&mut v, 0, 1);
         x1 = Vector::pop_back(&mut v);
-        assert(Vector::length(&v) == 1, 103);
+        assert!(Vector::length(&v) == 1, 103);
         x2 = Vector::pop_back(&mut v);
-        assert(Vector::length(&v) == 0, 104);
+        assert!(Vector::length(&v) == 0, 104);
         Vector::destroy_empty(v);
         (x1, x2)
     }

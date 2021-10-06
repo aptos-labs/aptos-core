@@ -8,7 +8,7 @@ fun main() {
         y = 0;
         y;
     };
-    assert(x == 42, 42);
+    assert!(x == 42, 42);
 }
 }
 

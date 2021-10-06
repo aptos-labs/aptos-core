@@ -9,7 +9,7 @@ fun main(account: signer) {
     let redeemed: M::T = Offer::redeem(&account, @0xA11CE);
 
     // offer should not longer exist
-    assert(!Offer::exists_at<M::T>(@0xA11CE), 79);
+    assert!(!Offer::exists_at<M::T>(@0xA11CE), 79);
 
     // create a new offer for Carl
     Offer::create(&account, redeemed, @0xCA21);

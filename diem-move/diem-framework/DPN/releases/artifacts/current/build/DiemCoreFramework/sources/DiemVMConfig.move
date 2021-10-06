@@ -151,11 +151,11 @@ module DiemFramework::DiemVMConfig {
     ) {
         DiemTimestamp::assert_operating();
         Roles::assert_diem_root(dr_account);
-        assert(
+        assert!(
             min_price_per_gas_unit <= max_price_per_gas_unit,
             Errors::invalid_argument(EGAS_CONSTANT_INCONSISTENCY)
         );
-        assert(
+        assert!(
             min_transaction_gas_units <= maximum_number_of_gas_units,
             Errors::invalid_argument(EGAS_CONSTANT_INCONSISTENCY)
         );

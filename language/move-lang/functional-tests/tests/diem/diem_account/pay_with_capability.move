@@ -54,8 +54,8 @@ fun main() {
     let carol_prev_balance = DiemAccount::balance<XUS>(@{{carol}});
     let alice_prev_balance = DiemAccount::balance<XUS>(@{{alice}});
     AlicePays::pay(@{{carol}}, 10);
-    assert(carol_prev_balance + 10 == DiemAccount::balance<XUS>(@{{carol}}), 0);
-    assert(alice_prev_balance - 10 == DiemAccount::balance<XUS>(@{{alice}}), 1);
+    assert!(carol_prev_balance + 10 == DiemAccount::balance<XUS>(@{{carol}}), 0);
+    assert!(alice_prev_balance - 10 == DiemAccount::balance<XUS>(@{{alice}}), 1);
 }
 }
 // check: "Keep(EXECUTED)"

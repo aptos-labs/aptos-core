@@ -28,7 +28,7 @@ module {{alice}}::SharedKeyRotation {
         let wallet_ref = borrow_global_mut<T>(wallet_address);
         let sender = Signer::address_of(account);
         let cap_addr = *DiemAccount::key_rotation_capability_address(&wallet_ref.cap);
-        assert((wallet_ref.master_key_address == sender) || (cap_addr == sender), 77);
+        assert!((wallet_ref.master_key_address == sender) || (cap_addr == sender), 77);
         DiemAccount::rotate_authentication_key(&wallet_ref.cap, new_key);
     }
 }
@@ -41,7 +41,7 @@ use DiemFramework::DiemAccount;
 // create a SharedKeyRotation for Alice's account with Bob's account key as the master key
 fun main(account: signer) {
     let account = &account;
-    assert(DiemAccount::sequence_number(@{{alice}}) == 1, 77);
+    assert!(DiemAccount::sequence_number(@{{alice}}) == 1, 77);
     SharedKeyRotation::publish(account, DiemAccount::extract_key_rotation_capability(account), @{{bob}});
 }
 }
@@ -54,7 +54,7 @@ use DiemFramework::DiemAccount;
 // Alice can rotate her key. Here, she rotates it to its original value
 fun main(account: signer) {
     let account = &account;
-    assert(DiemAccount::sequence_number(@{{alice}}) == 2, 78);
+    assert!(DiemAccount::sequence_number(@{{alice}}) == 2, 78);
     SharedKeyRotation::rotate(
         account,
         @{{alice}},
@@ -71,7 +71,7 @@ use DiemFramework::DiemAccount;
 // Bob can too. Here, he zeroes it out to stop Alice from sending any transactions
 fun main(account: signer) {
     let account = &account;
-    assert(DiemAccount::sequence_number(@{{alice}}) == 3, 78);
+    assert!(DiemAccount::sequence_number(@{{alice}}) == 3, 78);
     SharedKeyRotation::rotate(
         account,
         @{{alice}},
@@ -99,7 +99,7 @@ use Std::Vector;
 // Bob now rotates the key back to its old value
 fun main(account: signer) {
     let account = &account;
-    assert(DiemAccount::sequence_number(@{{alice}}) == 3, 78);
+    assert!(DiemAccount::sequence_number(@{{alice}}) == 3, 78);
     // simulates how an auth_key is created
     // details to be found in DiemAccount::make_account
     let newkey = Vector::empty();
@@ -115,6 +115,6 @@ fun main(account: signer) {
 script {
 use DiemFramework::DiemAccount;
 fun main() {
-    assert(DiemAccount::sequence_number(@{{alice}}) == 3, 79);
+    assert!(DiemAccount::sequence_number(@{{alice}}) == 3, 79);
 }
 }

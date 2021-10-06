@@ -7,7 +7,7 @@ module 0x42::TestPureFun {
     }
 
     public fun init(dr_account: &signer): bool {
-        assert(Signer::address_of(dr_account) == @0xA550C18, 0);
+        assert!(Signer::address_of(dr_account) == @0xA550C18, 0);
         move_to(dr_account, T { x: 2 });
         false
     }
@@ -19,8 +19,8 @@ module 0x42::TestPureFun {
     }
 
     public fun get_x(addr: address): u64 acquires T {
-        assert(exists<T>(addr), 10);
-        assert(true, 0); // assertions are ignored when translating Move funs to specs.
+        assert!(exists<T>(addr), 10);
+        assert!(true, 0); // assertions are ignored when translating Move funs to specs.
         *&borrow_global<T>(addr).x
     }
 

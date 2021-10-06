@@ -148,19 +148,19 @@ module DiemFramework::Genesis {
     ) {
         let num_owners = Vector::length(&owners);
         let num_owner_names = Vector::length(&owner_names);
-        assert(num_owners == num_owner_names, 0);
+        assert!(num_owners == num_owner_names, 0);
         let num_owner_keys = Vector::length(&owner_auth_keys);
-        assert(num_owner_names == num_owner_keys, 0);
+        assert!(num_owner_names == num_owner_keys, 0);
         let num_operators = Vector::length(&operators);
-        assert(num_owner_keys == num_operators, 0);
+        assert!(num_owner_keys == num_operators, 0);
         let num_operator_names = Vector::length(&operator_names);
-        assert(num_operators == num_operator_names, 0);
+        assert!(num_operators == num_operator_names, 0);
         let num_operator_keys = Vector::length(&operator_auth_keys);
-        assert(num_operator_names == num_operator_keys, 0);
+        assert!(num_operator_names == num_operator_keys, 0);
         let num_validator_network_addresses = Vector::length(&validator_network_addresses);
-        assert(num_operator_keys == num_validator_network_addresses, 0);
+        assert!(num_operator_keys == num_validator_network_addresses, 0);
         let num_full_node_network_addresses = Vector::length(&full_node_network_addresses);
-        assert(num_validator_network_addresses == num_full_node_network_addresses, 0);
+        assert!(num_validator_network_addresses == num_full_node_network_addresses, 0);
 
         let i = 0;
         let dummy_auth_key_prefix = x"00000000000000000000000000000000";
@@ -192,7 +192,7 @@ module DiemFramework::Genesis {
                 DiemAccount::restore_key_rotation_capability(rotation_cap);
             };
             // assign the operator to its validator
-            assert(ValidatorOperatorConfig::get_human_name(operator_address) == operator_name, 0);
+            assert!(ValidatorOperatorConfig::get_human_name(operator_address) == operator_name, 0);
             ValidatorConfig::set_operator(owner, operator_address);
 
             // use the operator account set up the validator config

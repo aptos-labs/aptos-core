@@ -12,6 +12,6 @@ fun main() {
             z = z + 1;
         }
     };
-    assert(z == 21, 42)
+    assert!(z == 21, 42)
 }
 }

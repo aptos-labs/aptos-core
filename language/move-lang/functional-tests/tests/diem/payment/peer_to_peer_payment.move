@@ -17,7 +17,7 @@ fun main(sender: signer) {
 
     let sender_new_balance = DiemAccount::balance<XUS>(sender_addr);
     let recipient_new_balance = DiemAccount::balance<XUS>(recipient_addr);
-    assert(sender_new_balance == sender_original_balance - 5, 77);
-    assert(recipient_new_balance == recipient_original_balance + 5, 77);
+    assert!(sender_new_balance == sender_original_balance - 5, 77);
+    assert!(recipient_new_balance == recipient_original_balance + 5, 77);
 }
 }

@@ -21,7 +21,7 @@ module 0x42::AddressQuant {
     }
 
     public fun initialize(sndr: &signer, special_addr: address) {
-        assert(Signer::address_of(sndr) == special_addr, 0);
+        assert!(Signer::address_of(sndr) == special_addr, 0);
         move_to<R>(sndr, R{x:1});
     }
     spec initialize {

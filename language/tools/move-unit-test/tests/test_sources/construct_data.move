@@ -21,13 +21,13 @@ module M {
     #[test]
     fun make_sure_number_matches() {
         let s = B::construct_with_number(0);
-        assert(B::get_struct_x_field(&s) == 0, 0);
+        assert!(B::get_struct_x_field(&s) == 0, 0);
     }
 
     #[test, expected_failure]
     fun make_sure_not_other_number() {
         let s = B::construct_with_number(0);
-        assert(B::get_struct_x_field(&s) != 0, 0);
+        assert!(B::get_struct_x_field(&s) != 0, 0);
     }
 }
 }

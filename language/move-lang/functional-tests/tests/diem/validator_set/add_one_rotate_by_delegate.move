@@ -31,12 +31,12 @@ script {
     // test alice can rotate bob's consensus public key
     fun main(account: signer) {
     let account = &account;
-        assert(ValidatorConfig::get_operator(@{{bob}}) == @{{alice}}, 44);
+        assert!(ValidatorConfig::get_operator(@{{bob}}) == @{{alice}}, 44);
         ValidatorConfig::set_config(account, @{{bob}}, x"3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c", x"", x"");
 
         // check new key is "20"
         let config = ValidatorConfig::get_config(@{{bob}});
-        assert(*ValidatorConfig::get_consensus_pubkey(&config) == x"3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c", 99);
+        assert!(*ValidatorConfig::get_consensus_pubkey(&config) == x"3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c", 99);
     }
 }
 
@@ -57,15 +57,15 @@ script {
     let account = &account;
         ValidatorConfig::set_config(account, @{{bob}}, x"d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a", x"", x"");
         // the local validator's key is now different from the one in the validator set
-        assert(ValidatorConfig::get_consensus_pubkey(&DiemSystem::get_validator_config(@{{bob}})) !=
+        assert!(ValidatorConfig::get_consensus_pubkey(&DiemSystem::get_validator_config(@{{bob}})) !=
                ValidatorConfig::get_consensus_pubkey(&ValidatorConfig::get_config(@{{bob}})), 99);
         DiemSystem::update_config_and_reconfigure(account, @{{bob}});
         // the local validator's key is now the same as the key in the validator set
-        assert(ValidatorConfig::get_consensus_pubkey(&DiemSystem::get_validator_config(@{{bob}})) ==
+        assert!(ValidatorConfig::get_consensus_pubkey(&DiemSystem::get_validator_config(@{{bob}})) ==
                ValidatorConfig::get_consensus_pubkey(&ValidatorConfig::get_config(@{{bob}})), 99);
         // check bob's public key is updated
         let validator_config = DiemSystem::get_validator_config(@{{bob}});
-        assert(*ValidatorConfig::get_consensus_pubkey(&validator_config) == x"d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a", 99);
+        assert!(*ValidatorConfig::get_consensus_pubkey(&validator_config) == x"d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a", 99);
     }
 }
 

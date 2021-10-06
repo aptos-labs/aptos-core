@@ -11,7 +11,7 @@ fun main() {
         x = 3;
         break
     };
-    assert(x == 3, 42);
-    assert(y == 5, 42);
+    assert!(x == 3, 42);
+    assert!(y == 5, 42);
 }
 }

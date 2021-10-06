@@ -59,7 +59,7 @@ module ValidatorAdministrationScripts {
         validator_address: address
     ) {
         SlidingNonce::record_nonce_or_abort(&dr_account, sliding_nonce);
-        assert(ValidatorConfig::get_human_name(validator_address) == validator_name, 0);
+        assert!(ValidatorConfig::get_human_name(validator_address) == validator_name, 0);
         DiemSystem::add_validator(&dr_account, validator_address);
     }
 
@@ -228,7 +228,7 @@ module ValidatorAdministrationScripts {
     ) {
         SlidingNonce::record_nonce_or_abort(&dr_account, sliding_nonce);
         // TODO: Use an error code from Errors.move
-        assert(ValidatorConfig::get_human_name(validator_address) == validator_name, 0);
+        assert!(ValidatorConfig::get_human_name(validator_address) == validator_name, 0);
         DiemSystem::remove_validator(&dr_account, validator_address);
     }
 
@@ -431,7 +431,7 @@ module ValidatorAdministrationScripts {
         operator_name: vector<u8>,
         operator_account: address
     ) {
-        assert(ValidatorOperatorConfig::get_human_name(operator_account) == operator_name, 0);
+        assert!(ValidatorOperatorConfig::get_human_name(operator_account) == operator_name, 0);
         ValidatorConfig::set_operator(&account, operator_account);
     }
 
@@ -517,7 +517,7 @@ module ValidatorAdministrationScripts {
         operator_account: address
     ) {
         SlidingNonce::record_nonce_or_abort(&dr_account, sliding_nonce);
-        assert(ValidatorOperatorConfig::get_human_name(operator_account) == operator_name, 0);
+        assert!(ValidatorOperatorConfig::get_human_name(operator_account) == operator_name, 0);
         ValidatorConfig::set_operator(&account, operator_account);
     }
 

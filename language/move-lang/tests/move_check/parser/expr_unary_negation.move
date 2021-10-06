@@ -2,6 +2,6 @@ script {
 
 fun main() {
     // Unary negation is not supported.
-    assert(((1 - -2) == 3) && (-(1 - 2) == 1), 100);
+    assert!(((1 - -2) == 3) && (-(1 - 2) == 1), 100);
 }
 }

@@ -24,7 +24,7 @@ use Std::Signer;
 fun main(account: signer) {
     let account = &account;
     let sender = Signer::address_of(account);
-    assert(DiemAccount::balance<XUS>(sender) == 100000 - 700, 42);
+    assert!(DiemAccount::balance<XUS>(sender) == 100000 - 700, 42);
 }
 }
 // check: "Keep(EXECUTED)"

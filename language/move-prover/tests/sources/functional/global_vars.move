@@ -87,7 +87,7 @@ module 0x42::TestGlobalVars {
 
     fun assert_access(s: &signer) {
         // Do some assertions which validate access
-        assert(Signer::address_of(s) == @0, 1);
+        assert!(Signer::address_of(s) == @0, 1);
     }
     spec assert_access {
         aborts_if Signer::address_of(s) != @0;

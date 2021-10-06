@@ -44,7 +44,7 @@ fn test_malformed_resource() {
 
             public fun check(s: &signer) acquires Foo {
                 let foo = borrow_global<Foo>(Signer::address_of(s));
-                assert(foo.x == 123 && foo.y == false, 42);
+                assert!(foo.x == 123 && foo.y == false, 42);
             }
         }
 

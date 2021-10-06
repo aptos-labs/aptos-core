@@ -2,30 +2,25 @@
 
 [variant baseline]
 public fun StructSpecRelevance::create($t0|i: u64, $t1|j: u64): StructSpecRelevance::Nonzero {
-     var $t2|tmp#$2: bool
-     var $t3|tmp#$3: u64
-     var $t4: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: bool
      var $t5: u64
-     var $t6: bool
-     var $t7: bool
-     var $t8: u64
-     var $t9: u64
-     var $t10: u64
-     var $t11: StructSpecRelevance::Nonzero
-  0: $t4 := copy($t0)
-  1: $t5 := 0
-  2: $t6 := >($t4, $t5)
-  3: $t2 := $t6
-  4: $t7 := move($t2)
-  5: if ($t7) goto 9 else goto 6
-  6: label L1
-  7: $t8 := 0
-  8: abort($t8)
-  9: label L0
- 10: $t9 := copy($t0)
- 11: $t10 := copy($t1)
- 12: $t11 := pack StructSpecRelevance::Nonzero($t9, $t10)
- 13: return $t11
+     var $t6: u64
+     var $t7: u64
+     var $t8: StructSpecRelevance::Nonzero
+  0: $t2 := copy($t0)
+  1: $t3 := 0
+  2: $t4 := >($t2, $t3)
+  3: if ($t4) goto 7 else goto 4
+  4: label L1
+  5: $t5 := 0
+  6: abort($t5)
+  7: label L0
+  8: $t6 := copy($t0)
+  9: $t7 := copy($t1)
+ 10: $t8 := pack StructSpecRelevance::Nonzero($t6, $t7)
+ 11: return $t8
 }
 
 
@@ -52,30 +47,25 @@ public fun StructSpecRelevance::leak_j_ok($t0|n: &mut StructSpecRelevance::Nonze
 
 [variant baseline]
 public fun StructSpecRelevance::create($t0|i: u64, $t1|j: u64): StructSpecRelevance::Nonzero {
-     var $t2|tmp#$2: bool
-     var $t3|tmp#$3: u64
-     var $t4: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: bool
      var $t5: u64
-     var $t6: bool
-     var $t7: bool
-     var $t8: u64
-     var $t9: u64
-     var $t10: u64
-     var $t11: StructSpecRelevance::Nonzero
-  0: $t4 := copy($t0)
-  1: $t5 := 0
-  2: $t6 := >($t4, $t5)
-  3: $t2 := $t6
-  4: $t7 := move($t2)
-  5: if ($t7) goto 9 else goto 6
-  6: label L1
-  7: $t8 := 0
-  8: abort($t8)
-  9: label L0
- 10: $t9 := copy($t0)
- 11: $t10 := copy($t1)
- 12: $t11 := pack StructSpecRelevance::Nonzero($t9, $t10)
- 13: return $t11
+     var $t6: u64
+     var $t7: u64
+     var $t8: StructSpecRelevance::Nonzero
+  0: $t2 := copy($t0)
+  1: $t3 := 0
+  2: $t4 := >($t2, $t3)
+  3: if ($t4) goto 7 else goto 4
+  4: label L1
+  5: $t5 := 0
+  6: abort($t5)
+  7: label L0
+  8: $t6 := copy($t0)
+  9: $t7 := copy($t1)
+ 10: $t8 := pack StructSpecRelevance::Nonzero($t6, $t7)
+ 11: return $t8
 }
 
 

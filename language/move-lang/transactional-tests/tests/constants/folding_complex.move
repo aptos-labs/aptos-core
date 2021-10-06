@@ -92,7 +92,7 @@ script {
     };
 
     fun main() {
-        assert(C1 == 0, 41);
-        assert(C2, 42)
+        assert!(C1 == 0, 41);
+        assert!(C2, 42)
     }
 }

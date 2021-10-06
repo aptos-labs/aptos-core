@@ -1,6 +1,8 @@
 # Local Variables and Scope
 
-Local variables in Move are lexically (statically) scoped. New variables are introduced with the keyword `let`, which will shadow any previous local with the same name. Locals are mutable and can be updated both directly and via a mutable reference.
+Local variables in Move are lexically (statically) scoped. New variables are introduced with the
+keyword `let`, which will shadow any previous local with the same name. Locals are mutable and can
+be updated both directly and via a mutable reference.
 
 ## Declaring Local Variables
 
@@ -30,7 +32,8 @@ if (cond) {
 }
 ```
 
-This can be very helpful when trying to extract a value from a loop when a default value cannot be provided.
+This can be very helpful when trying to extract a value from a loop when a default value cannot be
+provided.
 
 ```move
 let x;
@@ -66,7 +69,9 @@ x + x // ERROR!
 
 ### Valid variable names
 
-Variable names can contain underscores `_`, letters `a` to `z`, letters `A` to `Z`, and digits `0` to `9`. Variable names must start with either an underscore `_` or a letter `a` through `z`. They *cannot* start with uppercase letters.
+Variable names can contain underscores `_`, letters `a` to `z`, letters `A` to `Z`, and digits `0`
+to `9`. Variable names must start with either an underscore `_` or a letter `a` through `z`. They
+_cannot_ start with uppercase letters.
 
 ```move
 // all valid
@@ -84,7 +89,9 @@ let Foo = e; // ERROR!
 
 ### Type annotations
 
-The type of a local variable can almost always be inferred by Move's type system.  However, Move allows explicit type annotations that can be useful for readability, clarity, or debuggability. The syntax for adding a type annotation is:
+The type of a local variable can almost always be inferred by Move's type system. However, Move
+allows explicit type annotations that can be useful for readability, clarity, or debuggability. The
+syntax for adding a type annotation is:
 
 ```move
 let x: T = e; // "Variable x of type T is initialized to expression e"
@@ -117,7 +124,8 @@ let (x: &u64, y: &mut u64) = (&0, &mut 1); // ERROR! should be let (x, y): ... =
 
 ### When annotations are necessary
 
-In some cases, a local type annotation is required if the type system cannot infer the type. This commonly occurs when the type argument for a generic type cannot be inferred. For example:
+In some cases, a local type annotation is required if the type system cannot infer the type. This
+commonly occurs when the type argument for a generic type cannot be inferred. For example:
 
 ```move
 let _v1 = Vector::empty(); // ERROR!
@@ -125,8 +133,11 @@ let _v1 = Vector::empty(); // ERROR!
 let v2: vector<u64> = Vector::empty(); // no error
 ```
 
-In a rarer case, the type system might not be able to infer a type for divergent code (where all the following code is unreachable). Both `return` and [`abort`](./abort-and-assert.md) are expressions and can have any type. A [`loop`](./loops.md) has type `()` if it has a `break`, but if there is no break out of the `loop`, it could have any type.
-If these types cannot be inferred, a type annotation is required. For example, this code:
+In a rarer case, the type system might not be able to infer a type for divergent code (where all the
+following code is unreachable). Both `return` and [`abort`](./abort-and-assert.md) are expressions
+and can have any type. A [`loop`](./loops.md) has type `()` if it has a `break`, but if there is no
+break out of the `loop`, it could have any type. If these types cannot be inferred, a type
+annotation is required. For example, this code:
 
 ```move
 let a: u8 = return ();
@@ -141,11 +152,13 @@ let z = loop (); // ERROR!
 //  ^ Could not infer this type. Try adding an annotation
 ```
 
-Adding type annotations to this code will expose other errors about dead code or unused local variables, but the example is still helpful for understanding this problem.
+Adding type annotations to this code will expose other errors about dead code or unused local
+variables, but the example is still helpful for understanding this problem.
 
 ### Multiple declarations with tuples
 
-`let` can introduce more than one local at a time using tuples. The locals declared inside the parenthesis are initialized to the corresponding values from the tuple.
+`let` can introduce more than one local at a time using tuples. The locals declared inside the
+parenthesis are initialized to the corresponding values from the tuple.
 
 ```move
 let () = ();
@@ -169,7 +182,9 @@ let (x, x) = 0; // ERROR!
 
 ### Multiple declarations with structs
 
-`let` can also introduce more than one local at a time when destructuring (or matching against) a struct. In this form, the `let` creates a set of local variables that are initialized to the values of the fields from a struct. The syntax looks like this:
+`let` can also introduce more than one local at a time when destructuring (or matching against) a
+struct. In this form, the `let` creates a set of local variables that are initialized to the values
+of the fields from a struct. The syntax looks like this:
 
 ```move
 struct T { f1: u64, f2: u64 }
@@ -195,16 +210,17 @@ module Example {
 
     fun example() {
         let Y { x1: X { f }, x2 } = Y { x1: new_x(), x2: new_x() };
-        assert(f + x2.f == 2, 42);
+        assert!(f + x2.f == 2, 42);
 
         let Y { x1: X { f: f1 }, x2: X { f: f2 } } = Y { x1: new_x(), x2: new_x() };
-        assert(f1 + f2 == 2, 42);
+        assert!(f1 + f2 == 2, 42);
     }
 }
 }
 ```
 
-Fields of structs can serve double duty, identifying the field to bind *and* the name of the variable. This is sometimes referred to as punning.
+Fields of structs can serve double duty, identifying the field to bind _and_ the name of the
+variable. This is sometimes referred to as punning.
 
 ```move
 let X { f } = e;
@@ -224,7 +240,8 @@ let Y { x1: x, x2: x } = e; // ERROR!
 
 ### Destructuring against references
 
-In the examples above for structs, the bound value in the let was moved, destroying the struct value and binding its fields.
+In the examples above for structs, the bound value in the let was moved, destroying the struct value
+and binding its fields.
 
 ```move
 struct T { f1: u64, f2: u64 }
@@ -238,8 +255,8 @@ let T { f1: local1, f2: local2 } = T { f1: 1, f2: 2 };
 
 In this scenario the struct value `T { f1: 1, f2: 2 }` no longer exists after the `let`.
 
-If you wish instead to not move and destroy the struct value, you can borrow each of its fields.
-For example:
+If you wish instead to not move and destroy the struct value, you can borrow each of its fields. For
+example:
 
 ```move
 let t = T { f1: 1, f2: 2 };
@@ -273,12 +290,12 @@ module Example {
         let y = Y { x1: new_x(), x2: new_x() };
 
         let Y { x1: X { f }, x2 } = &y;
-        assert(*f + x2.f == 2, 42);
+        assert!(*f + x2.f == 2, 42);
 
         let Y { x1: X { f: f1 }, x2: X { f: f2 } } = &mut y;
         *f1 = *f1 + 1;
         *f2 = *f2 + 1;
-        assert(*f1 + *f2 == 4, 42);
+        assert!(*f1 + *f2 == 4, 42);
     }
 }
 }
@@ -286,7 +303,8 @@ module Example {
 
 ### Ignoring Values
 
-In `let` bindings, it is often helpful to ignore some values. Local variables that start with `_` will be ignored and not introduce a new variable
+In `let` bindings, it is often helpful to ignore some values. Local variables that start with `_`
+will be ignored and not introduce a new variable
 
 ```move
 fun three(): (u64, u64, u64) {
@@ -297,7 +315,7 @@ fun three(): (u64, u64, u64) {
 ```move
 let (x1, _, z1) = three();
 let (x2, _y, z2) = three();
-assert(x1 + z1 == x2 + z2)
+assert!(x1 + z1 == x2 + z2)
 ```
 
 This can be necessary at times as the compiler will error on unused local variables
@@ -309,19 +327,21 @@ let (x1, y, z1) = three(); // ERROR!
 
 ### General `let` grammar
 
-All of the different structures in `let` can be combined! With that we arrive at this general grammar for `let` statements:
+All of the different structures in `let` can be combined! With that we arrive at this general
+grammar for `let` statements:
 
-> *let-binding* → **let** *pattern-or-list* *type-annotation*<sub>*opt*</sub> *initializer*<sub>*opt*</sub>
-> *pattern-or-list* → *pattern* | **(** *pattern-list* **)**
-> *pattern-list* → *pattern* **,**<sub>*opt*</sub> | *pattern* **,** *pattern-list*
-> *type-annotation* → **:** *type*
->  *initializer* → **=** *expression*
+> _let-binding_ → **let** _pattern-or-list_ _type-annotation_<sub>_opt_</sub>
+> _initializer_<sub>_opt_</sub> > _pattern-or-list_ → _pattern_ | **(** _pattern-list_ **)** >
+> _pattern-list_ → _pattern_ **,**<sub>_opt_</sub> | _pattern_ **,** _pattern-list_ >
+> _type-annotation_ → **:** _type_ _initializer_ → **=** _expression_
 
-The general term for the item that introduces the bindings is a *pattern*. The pattern serves to both destructure data (possibly recursively) and introduce the bindings. The pattern grammar is as follows:
+The general term for the item that introduces the bindings is a _pattern_. The pattern serves to
+both destructure data (possibly recursively) and introduce the bindings. The pattern grammar is as
+follows:
 
-> *pattern* → *local-variable* | *struct-type* **{** *field-binding-list* **}**
-> *field-binding-list* → *field-binding* **,**<sub>*opt*</sub> | *field-binding* **,** *field-binding-list*
-> *field-binding* → *field* | *field* **:** *pattern*
+> _pattern_ → _local-variable_ | _struct-type_ **{** _field-binding-list_ **}** >
+> _field-binding-list_ → _field-binding_ **,**<sub>_opt_</sub> | _field-binding_ **,**
+> _field-binding-list_ > _field-binding_ → _field_ | _field_ **:** _pattern_
 
 A few concrete examples with this grammar applied:
 
@@ -357,19 +377,22 @@ A few concrete examples with this grammar applied:
 
 ### Assignments
 
-After the local is introduced (either by `let` or as a function parameter), the local can be modified via an assignment:
+After the local is introduced (either by `let` or as a function parameter), the local can be
+modified via an assignment:
 
 ```move
 x = e
 ```
 
-Unlike `let` bindings, assignments are expressions. In some languages, assignments return the value that was assigned, but in Move, the type of any assignment is always `()`.
+Unlike `let` bindings, assignments are expressions. In some languages, assignments return the value
+that was assigned, but in Move, the type of any assignment is always `()`.
 
 ```move
 (x = e: ())
 ```
 
-Practically, assignments being expressions means that they can be used without adding a new expression block with braces (`{`...`}`).
+Practically, assignments being expressions means that they can be used without adding a new
+expression block with braces (`{`...`}`).
 
 ```move
 let x = 0;
@@ -393,7 +416,7 @@ module Example {
        let (x, y, f, g);
 
        (X { f }, X { f: x }) = (new_x(), new_x());
-       assert(f + x == 2, 42);
+       assert!(f + x == 2, 42);
 
        (x, y, z, f, _, g) = (0, 0, 0, 0, 0, 0);
     }
@@ -401,7 +424,8 @@ module Example {
 }
 ```
 
-Note that a local variable can only have one type, so the type of the local cannot change between assignments.
+Note that a local variable can only have one type, so the type of the local cannot change between
+assignments.
 
 ```move
 let x;
@@ -411,13 +435,14 @@ x = false; // ERROR!
 
 ### Mutating through a reference
 
-In addition to directly modifying a local with assignment, a local can be modified via a mutable reference `&mut`.
+In addition to directly modifying a local with assignment, a local can be modified via a mutable
+reference `&mut`.
 
 ```move
 let x = 0;
 let r = &mut x;
 *r = 1;
-assert(x == 1, 42)
+assert!(x == 1, 42)
 }
 ```
 
@@ -444,14 +469,15 @@ This sort of modification is how you modify structs and vectors!
 ```move
 let v = Vector::empty();
 Vector::push_back(&mut v, 100);
-assert(*Vector::borrow(&v, 0) == 100, 42)
+assert!(*Vector::borrow(&v, 0) == 100, 42)
 ```
 
 For more details, see [Move references](./references.md).
 
 ## Scopes
 
-Any local declared with `let` is available for any subsequent expression, *within that scope*. Scopes are declared with expression blocks, `{`...`}`.
+Any local declared with `let` is available for any subsequent expression, _within that scope_.
+Scopes are declared with expression blocks, `{`...`}`.
 
 Locals cannot be used outside of the declared scope.
 
@@ -464,7 +490,7 @@ x + y // ERROR!
 //  ^ unbound local 'y'
 ```
 
-But, locals from an outer scope *can* be used in a nested scope.
+But, locals from an outer scope _can_ be used in a nested scope.
 
 ```move
 {
@@ -475,22 +501,24 @@ But, locals from an outer scope *can* be used in a nested scope.
 }
 ```
 
-Locals can be mutated in any scope where they are accessible. That mutation survives with the local, regardless of the scope that performed the mutation.
+Locals can be mutated in any scope where they are accessible. That mutation survives with the local,
+regardless of the scope that performed the mutation.
 
 ```move
 let x = 0;
 x = x + 1;
-assert(x == 1, 42);
+assert!(x == 1, 42);
 {
     x = x + 1;
-    assert(x == 2, 42);
+    assert!(x == 2, 42);
 };
-assert(x == 2, 42);
+assert!(x == 2, 42);
 ```
 
 ### Expression Blocks
 
-An expression block is a series of statements separated by semicolons (`;`). The resulting value of an expression block is the value of the last expression in the block.
+An expression block is a series of statements separated by semicolons (`;`). The resulting value of
+an expression block is the value of the last expression in the block.
 
 ```move
 { let x = 1; let y = 1; x + y }
@@ -498,13 +526,15 @@ An expression block is a series of statements separated by semicolons (`;`). The
 
 In this example, the result of the block is `x + y`.
 
-A statement can be either a `let` declaration or an expression. Remember that assignments (`x = e`) are expressions of type `()`.
+A statement can be either a `let` declaration or an expression. Remember that assignments (`x = e`)
+are expressions of type `()`.
 
 ```move
 { let x; let y = 1; x = 1; x + y }
 ```
 
-Function calls are another common expression of type `()`. Function calls that modify data are commonly used as statements.
+Function calls are another common expression of type `()`. Function calls that modify data are
+commonly used as statements.
 
 ```move
 { let v = Vector::empty(); Vector::push_back(&mut v, 1); v }
@@ -521,7 +551,10 @@ This is not just limited to `()` types---any expression can be used as a stateme
 }
 ```
 
-But! If the expression contains a resource (a value without the `drop` [ability](./abilities.md)), you will get an error. This is because Move's type system guarantees that any value that is dropped has the `drop` [ability](./abilities.md). (Ownership must be transferred or the value must be explicitly destroyed within its declaring module.)
+But! If the expression contains a resource (a value without the `drop` [ability](./abilities.md)),
+you will get an error. This is because Move's type system guarantees that any value that is dropped
+has the `drop` [ability](./abilities.md). (Ownership must be transferred or the value must be
+explicitly destroyed within its declaring module.)
 
 ```move
 {
@@ -532,7 +565,9 @@ But! If the expression contains a resource (a value without the `drop` [ability]
 }
 ```
 
-If a final expression is not present in a block---that is, if there is a trailing semicolon `;`, there is an implicit unit `()` value. Similarly, if the expression block is empty, there is an implicit unit `()` value.
+If a final expression is not present in a block---that is, if there is a trailing semicolon `;`,
+there is an implicit unit `()` value. Similarly, if the expression block is empty, there is an
+implicit unit `()` value.
 
 ```move
 // Both are equivalent
@@ -546,7 +581,9 @@ If a final expression is not present in a block---that is, if there is a trailin
 { () }
 ```
 
-An expression block is itself an expression and can be used anyplace an expression is used. (Note: The body of a function is also an expression block, but the function body cannot be replaced by another expression.)
+An expression block is itself an expression and can be used anyplace an expression is used. (Note:
+The body of a function is also an expression block, but the function body cannot be replaced by
+another expression.)
 
 ```move
 let my_vector: vector<vector<u8>> = {
@@ -561,27 +598,31 @@ let my_vector: vector<vector<u8>> = {
 
 ### Shadowing
 
-If a `let` introduces a local variable with a name already in scope, that previous variable can no longer be accessed for the rest of this scope. This is called *shadowing*.
+If a `let` introduces a local variable with a name already in scope, that previous variable can no
+longer be accessed for the rest of this scope. This is called _shadowing_.
 
 ```move
 let x = 0;
-assert(x == 0, 42);
+assert!(x == 0, 42);
 
 let x = 1; // x is shadowed
-assert(x == 1, 42);
+assert!(x == 1, 42);
 ```
 
 When a local is shadowed, it does not need to retain the same type as before.
 
 ```move
 let x = 0;
-assert(x == 0, 42);
+assert!(x == 0, 42);
 
 let x = b"hello"; // x is shadowed
-assert(x == b"hello", 42);
+assert!(x == b"hello", 42);
 ```
 
-After a local is shadowed, the value stored in the local still exists, but will no longer be accessible. This is important to keep in mind with values of types without the [`drop` ability](./abilities.md), as ownership of the value must be transferred by the end of the function.
+After a local is shadowed, the value stored in the local still exists, but will no longer be
+accessible. This is important to keep in mind with values of types without the
+[`drop` ability](./abilities.md), as ownership of the value must be transferred by the end of the
+function.
 
 ```move
 address 0x42 {
@@ -600,15 +641,16 @@ address 0x42 {
 }
 ```
 
-When a local is shadowed inside a scope, the shadowing only remains for that scope. The shadowing is gone once that scope ends.
+When a local is shadowed inside a scope, the shadowing only remains for that scope. The shadowing is
+gone once that scope ends.
 
 ```move
 let x = 0;
 {
     let x = 1;
-    assert(x == 1, 42);
+    assert!(x == 1, 42);
 };
-assert(x == 0, 42);
+assert!(x == 0, 42);
 ```
 
 Remember, locals can change type when they are shadowed.
@@ -617,16 +659,21 @@ Remember, locals can change type when they are shadowed.
 let x = 0;
 {
     let x = b"hello";
-    assert(x = b"hello", 42);
+    assert!(x = b"hello", 42);
 };
-assert(x == 0, 42);
+assert!(x == 0, 42);
 ```
 
 ## Move and Copy
 
-All local variables in Move can be used in two ways, either by `move` or `copy`. If one or the other is not specified, the Move compiler is able to infer whether a `copy` or a `move` should be used. This means that in all of the examples above, a `move` or a `copy` would be inserted by the compiler. A local variable cannot be used without the use of `move` or `copy`.
+All local variables in Move can be used in two ways, either by `move` or `copy`. If one or the other
+is not specified, the Move compiler is able to infer whether a `copy` or a `move` should be used.
+This means that in all of the examples above, a `move` or a `copy` would be inserted by the
+compiler. A local variable cannot be used without the use of `move` or `copy`.
 
-`copy` will likely feel the most familiar coming from other programming languages, as it creates a new copy of the value inside of the variable to use in that expression. With `copy`, the local variable can be used more than once.
+`copy` will likely feel the most familiar coming from other programming languages, as it creates a
+new copy of the value inside of the variable to use in that expression. With `copy`, the local
+variable can be used more than once.
 
 ```move
 let x = 0;
@@ -636,7 +683,8 @@ let z = copy x + 2;
 
 Any value with the `copy` [ability](./abilities.md) can be copied in this way.
 
-`move` takes the value out of the local variable *without* copying the data. After a `move` occurs, the local variable is unavailable.
+`move` takes the value out of the local variable _without_ copying the data. After a `move` occurs,
+the local variable is unavailable.
 
 ```move
 let x = 1;
@@ -649,20 +697,25 @@ y + z
 
 ### Safety
 
-Move's type system will prevent a value from being used after it is moved. This is the same safety check described in [`let` declaration](#let-bindings) that prevents local variables from being used before it is assigned a value.
+Move's type system will prevent a value from being used after it is moved. This is the same safety
+check described in [`let` declaration](#let-bindings) that prevents local variables from being used
+before it is assigned a value.
 
 <!-- For more information, see TODO future section on ownership and move semantics. -->
 
 ### Inference
 
-As mentioned above, the Move compiler will infer a `copy` or `move` if one is not indicated. The algorithm for doing so is quite simple:
+As mentioned above, the Move compiler will infer a `copy` or `move` if one is not indicated. The
+algorithm for doing so is quite simple:
 
 - Any scalar value with the `copy` [ability](./abilities.md) is given a `copy`.
 - Any reference (both mutable `&mut` and immutable `&`) is given a `copy`.
-    - Except under special circumstances where it is made a `move` for predictable borrow checker errors.
+  - Except under special circumstances where it is made a `move` for predictable borrow checker
+    errors.
 - Any other value is given a `move`.
-    - This means that even though other values might be have the `copy` [ability](./abilities.md), it must be done *explicitly* by the programmer.
-    - This is to prevent accidental copies of large data structures.
+  - This means that even though other values might be have the `copy` [ability](./abilities.md), it
+    must be done _explicitly_ by the programmer.
+  - This is to prevent accidental copies of large data structures.
 
 For example:
 

@@ -17,18 +17,18 @@ use {{default}}::Holder;
 fun main(account: signer) {
     let account = &account;
     let xus = Diem::mint<XUS>(account, 10000);
-    assert(Diem::value<XUS>(&xus) == 10000, 0);
+    assert!(Diem::value<XUS>(&xus) == 10000, 0);
 
     let (xus1, xus2) = Diem::split(xus, 5000);
-    assert(Diem::value<XUS>(&xus1) == 5000 , 0);
-    assert(Diem::value<XUS>(&xus2) == 5000 , 2);
+    assert!(Diem::value<XUS>(&xus1) == 5000 , 0);
+    assert!(Diem::value<XUS>(&xus2) == 5000 , 2);
     let tmp = Diem::withdraw(&mut xus1, 1000);
-    assert(Diem::value<XUS>(&xus1) == 4000 , 4);
-    assert(Diem::value<XUS>(&tmp) == 1000 , 5);
+    assert!(Diem::value<XUS>(&xus1) == 4000 , 4);
+    assert!(Diem::value<XUS>(&tmp) == 1000 , 5);
     Diem::deposit(&mut xus1, tmp);
-    assert(Diem::value<XUS>(&xus1) == 5000 , 6);
+    assert!(Diem::value<XUS>(&xus1) == 5000 , 6);
     let xus = Diem::join(xus1, xus2);
-    assert(Diem::value<XUS>(&xus) == 10000, 7);
+    assert!(Diem::value<XUS>(&xus) == 10000, 7);
     Holder::hold(account, xus);
 
     Diem::destroy_zero(Diem::zero<XUS>());
@@ -79,9 +79,9 @@ script {
     use DiemFramework::XDX::XDX;
     use DiemFramework::XUS::XUS;
     fun main()  {
-        assert(!Diem::is_synthetic_currency<XUS>(), 9);
-        assert(Diem::is_synthetic_currency<XDX>(), 10);
-        assert(!Diem::is_synthetic_currency<u64>(), 11);
+        assert!(!Diem::is_synthetic_currency<XUS>(), 9);
+        assert!(Diem::is_synthetic_currency<XDX>(), 10);
+        assert!(!Diem::is_synthetic_currency<u64>(), 11);
     }
 }
 // check: "Keep(EXECUTED)"
@@ -208,10 +208,10 @@ use DiemFramework::Diem;
 use DiemFramework::XUS::XUS;
 use DiemFramework::XDX::XDX;
 fun main() {
-    assert(Diem::is_SCS_currency<XUS>(), 99);
-    assert(!Diem::is_SCS_currency<XDX>(), 98);
-    assert(!Diem::is_synthetic_currency<XUS>(), 97);
-    assert(Diem::is_synthetic_currency<XDX>(), 96);
+    assert!(Diem::is_SCS_currency<XUS>(), 99);
+    assert!(!Diem::is_SCS_currency<XDX>(), 98);
+    assert!(!Diem::is_synthetic_currency<XUS>(), 97);
+    assert!(Diem::is_synthetic_currency<XDX>(), 96);
 }
 }
 // check: "Keep(EXECUTED)"

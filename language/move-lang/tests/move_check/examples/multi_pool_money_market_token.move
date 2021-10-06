@@ -42,7 +42,7 @@ module Token {
     }
 
     public fun withdraw<ATy: copy + drop>(coin: &mut Coin<ATy>, amount: u64): Coin<ATy> {
-        assert(coin.value >= amount, 10);
+        assert!(coin.value >= amount, 10);
         coin.value = coin.value - amount;
         Coin { type: *&coin.type, value: amount }
     }
@@ -54,13 +54,13 @@ module Token {
 
     public fun deposit<ATy: copy + drop>(coin: &mut Coin<ATy>, check: Coin<ATy>) {
         let Coin { value, type } = check;
-        assert(&coin.type == &type, 42);
+        assert!(&coin.type == &type, 42);
         coin.value = coin.value + value;
     }
 
     public fun destroy_zero<ATy: copy + drop>(coin: Coin<ATy>) {
         let Coin { value, type: _ } = coin;
-        assert(value == 0, 11)
+        assert!(value == 0, 11)
     }
 
 }
@@ -94,7 +94,7 @@ module OneToOneMarket {
 
     fun accept<AssetType: copy + drop + store>(account: &signer, init: Token::Coin<AssetType>) {
         let sender = Signer::address_of(account);
-        assert(!exists<Pool<AssetType>>(sender), 42);
+        assert!(!exists<Pool<AssetType>>(sender), 42);
         move_to(account, Pool<AssetType> { coin: init })
     }
 
@@ -127,7 +127,7 @@ module OneToOneMarket {
     ): Token::Coin<Out>
         acquires Price, Pool, DepositRecord, BorrowRecord
     {
-        assert(amount <= max_borrow_amount<In, Out>(account, pool_owner), 1025);
+        assert!(amount <= max_borrow_amount<In, Out>(account, pool_owner), 1025);
 
         update_borrow_record<In, Out>(account, pool_owner, amount);
 
@@ -222,12 +222,12 @@ module ToddNickels {
     }
 
     public fun init(account: &signer) {
-        assert(Signer::address_of(account) == @0x70DD, 42);
+        assert!(Signer::address_of(account) == @0x70DD, 42);
         move_to(account, Wallet { nickels: Token::create(T{}, 0) })
     }
 
     public fun mint(account: &signer): Token::Coin<T> {
-        assert(Signer::address_of(account) == @0x70DD, 42);
+        assert!(Signer::address_of(account) == @0x70DD, 42);
         Token::create(T{}, 5)
     }
 

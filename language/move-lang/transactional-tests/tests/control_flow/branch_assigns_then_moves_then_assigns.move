@@ -11,6 +11,6 @@ fun main() {
     } else {
         x = 0;
     };
-    assert(copy x == 5, 42);
+    assert!(copy x == 5, 42);
 }
 }

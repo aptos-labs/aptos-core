@@ -1,3 +1,5 @@
+// separate_baseline: cvc4
+
 // A module providing functionality to the script*.move tests
 address 0x1 {
 
@@ -15,7 +17,7 @@ module ScriptProvider {
     struct Info<phantom T> has key {}
 
     public fun register<T: store>(account: &signer) {
-        assert(Signer::address_of(account) == @0x1, 1);
+        assert!(Signer::address_of(account) == @0x1, 1);
         move_to(account, Info<T>{})
     }
     spec schema RegisterConditions<T> {

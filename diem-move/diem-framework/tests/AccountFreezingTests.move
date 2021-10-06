@@ -13,7 +13,7 @@ module DiemFramework::AccountFreezingTests {
 
     #[test]
     fun non_existent_account_not_frozen() {
-        assert(!AF::account_is_frozen(@0x2), 0);
+        assert!(!AF::account_is_frozen(@0x2), 0);
         AF::assert_not_frozen(@0x2);
     }
 
@@ -81,7 +81,7 @@ module DiemFramework::AccountFreezingTests {
         AF::create_for_test(&a);
         AF::assert_not_frozen(a_addr);
         AF::freeze_account(&tc, @0x2);
-        assert(AF::account_is_frozen(a_addr), 0);
+        assert!(AF::account_is_frozen(a_addr), 0);
     }
 
     #[test(tc = @TreasuryCompliance, a = @0x2)]
@@ -115,7 +115,7 @@ module DiemFramework::AccountFreezingTests {
         AF::assert_not_frozen(a_addr);
         AF::freeze_account(&tc, @0x2);
 
-        assert(AF::account_is_frozen(a_addr), 0);
+        assert!(AF::account_is_frozen(a_addr), 0);
         AF::unfreeze_account(&tc, @0x2);
         AF::assert_not_frozen(a_addr);
     }

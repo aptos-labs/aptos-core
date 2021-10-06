@@ -7,11 +7,7 @@ use anyhow::anyhow;
 use move_command_line_common::testing::read_env_update_baseline;
 use prettydiff::{basic::DiffOp, diff_lines};
 use regex::Regex;
-use std::{
-    fs::{self, remove_file, File},
-    io::{Read, Write},
-    path::Path,
-};
+use std::{fs, path::Path};
 
 /// Verifies or updates baseline file for the given generated text.
 pub fn verify_or_update_baseline(baseline_file_name: &Path, text: &str) -> anyhow::Result<()> {
@@ -20,21 +16,23 @@ pub fn verify_or_update_baseline(baseline_file_name: &Path, text: &str) -> anyho
     if update_baseline {
         if !text.is_empty() {
             // Update the baseline file.
-            baseline_file_name.parent().map(fs::create_dir_all);
-            let mut file = File::create(baseline_file_name)?;
-            write!(file, "{}", clean_for_baseline(text))?;
-        } else {
-            // Remove the baseline file.
-            let _ = remove_file(baseline_file_name);
+            if let Some(parent) = baseline_file_name.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            let clean_text = clean_for_baseline(text);
+            fs::write(baseline_file_name, &clean_text)?;
+        } else if baseline_file_name.exists() {
+            fs::remove_file(baseline_file_name)?;
         }
+
         Ok(())
     } else {
         // Read the baseline and diff it.
-        let mut contents = String::new();
-        if baseline_file_name.exists() {
-            let mut file = File::open(baseline_file_name)?;
-            file.read_to_string(&mut contents)?;
-        }
+        let contents = if baseline_file_name.exists() {
+            fs::read_to_string(baseline_file_name)?
+        } else {
+            String::new()
+        };
         diff(clean_for_baseline(text).as_ref(), &contents)
     }
 }

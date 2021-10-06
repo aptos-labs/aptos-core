@@ -595,7 +595,7 @@ Create a ballot under the signer's address and return the <code><a href="Vote.md
 ): <a href="Vote.md#0x1_Vote_BallotID">BallotID</a> <b>acquires</b> <a href="Vote.md#0x1_Vote_Ballots">Ballots</a>, <a href="Vote.md#0x1_Vote_BallotCounter">BallotCounter</a> {
     <b>let</b> ballot_address = <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(ballot_account);
 
-    <b>assert</b>(<a href="DiemTimestamp.md#0x1_DiemTimestamp_now_seconds">DiemTimestamp::now_seconds</a>() &lt; expiration_timestamp_secs, <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="Vote.md#0x1_Vote_EINVALID_TIMESTAMP">EINVALID_TIMESTAMP</a>));
+    <b>assert</b>!(<a href="DiemTimestamp.md#0x1_DiemTimestamp_now_seconds">DiemTimestamp::now_seconds</a>() &lt; expiration_timestamp_secs, <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="Vote.md#0x1_Vote_EINVALID_TIMESTAMP">EINVALID_TIMESTAMP</a>));
 
     <b>if</b> (!<b>exists</b>&lt;<a href="Vote.md#0x1_Vote_BallotCounter">BallotCounter</a>&gt;(ballot_address)) {
         move_to(ballot_account, <a href="Vote.md#0x1_Vote_BallotCounter">BallotCounter</a> {
@@ -618,7 +618,7 @@ Create a ballot under the signer's address and return the <code><a href="Vote.md
     <a href="Vote.md#0x1_Vote_gc_internal">gc_internal</a>&lt;Proposal&gt;(ballot_data);
     <b>let</b> ballots = &<b>mut</b> ballot_data.ballots;
 
-    <b>assert</b>(<a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_length">Vector::length</a>(ballots) &lt; <a href="Vote.md#0x1_Vote_MAX_BALLOTS_PER_PROPOSAL_TYPE_PER_ADDRESS">MAX_BALLOTS_PER_PROPOSAL_TYPE_PER_ADDRESS</a>, <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_limit_exceeded">Errors::limit_exceeded</a>(<a href="Vote.md#0x1_Vote_ETOO_MANY_BALLOTS">ETOO_MANY_BALLOTS</a>));
+    <b>assert</b>!(<a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_length">Vector::length</a>(ballots) &lt; <a href="Vote.md#0x1_Vote_MAX_BALLOTS_PER_PROPOSAL_TYPE_PER_ADDRESS">MAX_BALLOTS_PER_PROPOSAL_TYPE_PER_ADDRESS</a>, <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_limit_exceeded">Errors::limit_exceeded</a>(<a href="Vote.md#0x1_Vote_ETOO_MANY_BALLOTS">ETOO_MANY_BALLOTS</a>));
     <b>let</b> ballot_id = <a href="Vote.md#0x1_Vote_new_ballot_id">new_ballot_id</a>(<a href="Vote.md#0x1_Vote_incr_counter">incr_counter</a>(ballot_account), ballot_address);
     <b>let</b> ballot = <a href="Vote.md#0x1_Vote_Ballot">Ballot</a>&lt;Proposal&gt; {
         proposal,
@@ -721,21 +721,21 @@ approved after this vote
         <b>if</b> (&<a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_borrow">Vector::borrow</a>(ballots, i).ballot_id == &ballot_id) <b>break</b>;
         i = i + 1;
     };
-    <b>assert</b>(i &lt; len, <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="Vote.md#0x1_Vote_EBALLOT_NOT_FOUND">EBALLOT_NOT_FOUND</a>));
+    <b>assert</b>!(i &lt; len, <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="Vote.md#0x1_Vote_EBALLOT_NOT_FOUND">EBALLOT_NOT_FOUND</a>));
     <b>let</b> ballot_index = i;
     <b>let</b> ballot = <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_borrow_mut">Vector::borrow_mut</a>(ballots, ballot_index);
 
-    <b>assert</b>(&ballot.proposal == &proposal, <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="Vote.md#0x1_Vote_EBALLOT_PROPOSAL_MISMATCH">EBALLOT_PROPOSAL_MISMATCH</a>));
-    <b>assert</b>(&ballot.proposal_type == &proposal_type, <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="Vote.md#0x1_Vote_EBALLOT_PROPOSAL_MISMATCH">EBALLOT_PROPOSAL_MISMATCH</a>));
+    <b>assert</b>!(&ballot.proposal == &proposal, <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="Vote.md#0x1_Vote_EBALLOT_PROPOSAL_MISMATCH">EBALLOT_PROPOSAL_MISMATCH</a>));
+    <b>assert</b>!(&ballot.proposal_type == &proposal_type, <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="Vote.md#0x1_Vote_EBALLOT_PROPOSAL_MISMATCH">EBALLOT_PROPOSAL_MISMATCH</a>));
 
     <b>let</b> voter_address = <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(voter_account);
     <b>let</b> voter_address_bcs = <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/BCS.md#0x1_BCS_to_bytes">BCS::to_bytes</a>(&voter_address);
     <b>let</b> allowed_voters = &ballot.allowed_voters;
 
-    <b>assert</b>(<a href="Vote.md#0x1_Vote_check_voter_present">check_voter_present</a>(allowed_voters, &voter_address_bcs), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="Vote.md#0x1_Vote_EINVALID_VOTER">EINVALID_VOTER</a>));
-    <b>assert</b>(<a href="DiemTimestamp.md#0x1_DiemTimestamp_now_seconds">DiemTimestamp::now_seconds</a>() &lt;= ballot.expiration_timestamp_secs, <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="Vote.md#0x1_Vote_EBALLOT_EXPIRED">EBALLOT_EXPIRED</a>));
+    <b>assert</b>!(<a href="Vote.md#0x1_Vote_check_voter_present">check_voter_present</a>(allowed_voters, &voter_address_bcs), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="Vote.md#0x1_Vote_EINVALID_VOTER">EINVALID_VOTER</a>));
+    <b>assert</b>!(<a href="DiemTimestamp.md#0x1_DiemTimestamp_now_seconds">DiemTimestamp::now_seconds</a>() &lt;= ballot.expiration_timestamp_secs, <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="Vote.md#0x1_Vote_EBALLOT_EXPIRED">EBALLOT_EXPIRED</a>));
 
-    <b>assert</b>(!<a href="Vote.md#0x1_Vote_check_voter_present">check_voter_present</a>(&ballot.votes_received, &voter_address_bcs), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="Vote.md#0x1_Vote_EALREADY_VOTED">EALREADY_VOTED</a>));
+    <b>assert</b>!(!<a href="Vote.md#0x1_Vote_check_voter_present">check_voter_present</a>(&ballot.votes_received, &voter_address_bcs), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="Vote.md#0x1_Vote_EALREADY_VOTED">EALREADY_VOTED</a>));
 
     <b>let</b> i = 0;
     <b>let</b> len = <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_length">Vector::length</a>(allowed_voters);

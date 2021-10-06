@@ -303,7 +303,7 @@ fn builtin_function(context: &mut Context, b: &mut T::BuiltinFunction) {
         | B::Freeze(bt) => {
             type_(context, bt);
         }
-        B::Assert => (),
+        B::Assert(_) => (),
     }
 }
 

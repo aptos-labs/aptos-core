@@ -18,15 +18,15 @@ module 0x8675309::Tester {
         let b1 = move_from<Box>(sender);
         let b2 = move_from<Box>(drop);
 
-        assert(b1.f == 0, 42);
-        assert(b2.f == 0, 42);
+        assert!(b1.f == 0, 42);
+        assert!(b2.f == 0, 42);
 
         let returned_ref = bump_and_pick(account, &mut b1, &mut b2);
 
         // imagine some more interesting check than these asserts
-        assert(b1.f != 0, 42);
-        assert(b2.f != 0, 42);
-        assert((returned_ref == &b1.f) != (returned_ref == &b2.f), 42);
+        assert!(b1.f != 0, 42);
+        assert!(b2.f != 0, 42);
+        assert!((returned_ref == &b1.f) != (returned_ref == &b2.f), 42);
 
         *result = *returned_ref;
         move_to<Box>(account, b1);

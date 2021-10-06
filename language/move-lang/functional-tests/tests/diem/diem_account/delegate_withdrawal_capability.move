@@ -21,7 +21,7 @@ module {{alice}}::SillyColdWallet {
     public fun withdraw(account: &signer, wallet_address: address, _amount: u64): Diem::Diem<XUS> acquires T {
         let wallet_ref = borrow_global_mut<T>(wallet_address);
         let sender = Signer::address_of(account);
-        assert(wallet_ref.owner == sender, 77);
+        assert!(wallet_ref.owner == sender, 77);
         // TODO: the withdraw_from API is no longer exposed in DiemAccount
         Diem::zero()
     }

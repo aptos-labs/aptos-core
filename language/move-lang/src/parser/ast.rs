@@ -553,7 +553,8 @@ pub enum Exp_ {
     Name(NameAccessChain, Option<Vec<Type>>),
 
     // f(earg,*)
-    Call(NameAccessChain, Option<Vec<Type>>, Spanned<Vec<Exp>>),
+    // f!(earg,*)
+    Call(NameAccessChain, bool, Option<Vec<Type>>, Spanned<Vec<Exp>>),
 
     // tn {f1: e1, ... , f_n: e_n }
     Pack(NameAccessChain, Option<Vec<Type>>, Vec<(Field, Exp)>),
@@ -1641,8 +1642,11 @@ impl AstDebug for Exp_ {
                     w.write(">");
                 }
             }
-            E::Call(ma, tys_opt, sp!(_, rhs)) => {
+            E::Call(ma, is_macro, tys_opt, sp!(_, rhs)) => {
                 ma.ast_debug(w);
+                if *is_macro {
+                    w.write("!");
+                }
                 if let Some(ss) = tys_opt {
                     w.write("<");
                     ss.ast_debug(w);

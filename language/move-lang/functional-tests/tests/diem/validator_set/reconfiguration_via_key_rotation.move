@@ -71,12 +71,12 @@ script{
     // rotate vivian's pubkey and then run the block prologue. Now, reconfiguration should be triggered.
     fun main(account: signer) {
     let account = &account;
-        assert(*ValidatorConfig::get_consensus_pubkey(&DiemSystem::get_validator_config(@{{vivian}})) !=
+        assert!(*ValidatorConfig::get_consensus_pubkey(&DiemSystem::get_validator_config(@{{vivian}})) !=
                x"d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a", 98);
         ValidatorConfig::set_config(account, @{{vivian}}, x"d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a", x"", x"");
         DiemSystem::update_config_and_reconfigure(account, @{{vivian}});
         // check that the validator set contains Vivian's new key after reconfiguration
-        assert(*ValidatorConfig::get_consensus_pubkey(&DiemSystem::get_validator_config(@{{vivian}})) ==
+        assert!(*ValidatorConfig::get_consensus_pubkey(&DiemSystem::get_validator_config(@{{vivian}})) ==
                x"d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a", 99);
     }
 }

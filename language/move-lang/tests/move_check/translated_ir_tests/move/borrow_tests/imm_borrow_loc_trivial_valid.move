@@ -11,7 +11,7 @@ module 0x8675309::Tester {
         let other = 100;
         let returned_ref = bump_and_give(&mut x, &other);
         // imagine some more interesting check than this assert
-        assert(*returned_ref == freeze(&mut x).f, 42);
+        assert!(*returned_ref == freeze(&mut x).f, 42);
         *result = *returned_ref;
         X { f: _ } = x;
     }

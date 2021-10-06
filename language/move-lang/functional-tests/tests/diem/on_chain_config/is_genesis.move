@@ -9,6 +9,6 @@ script {
 use DiemFramework::DiemTimestamp;
 
 fun main() {
-    assert(!DiemTimestamp::is_genesis(), 10)
+    assert!(!DiemTimestamp::is_genesis(), 10)
 }
 }

@@ -43,8 +43,8 @@ fun main(account: signer) {
     // bucket should increase in size by 100
     DiemAccount::preburn<XUS>(account, &with_cap, 55);
     DiemAccount::preburn<XUS>(account, &with_cap, 45);
-    assert(Diem::market_cap<XUS>() == old_market_cap, 8002);
-    assert(Diem::preburn_value<XUS>() == 100, 8003);
+    assert!(Diem::market_cap<XUS>() == old_market_cap, 8002);
+    assert!(Diem::preburn_value<XUS>() == 100, 8003);
     DiemAccount::pay_from<XUS>(&with_cap, @{{default}}, 2, x"", x"");
     DiemAccount::restore_withdraw_capability(with_cap);
 }
@@ -110,8 +110,8 @@ fun main(account: signer) {
     // send the coins to the preburn area. market cap should not be affected, but the preburn
     // bucket should increase in size by 100
     DiemAccount::preburn<XUS>(account, &with_cap, 100);
-    assert(Diem::market_cap<XUS>() == old_market_cap, 8002);
-    assert(Diem::preburn_value<XUS>() == 100, 8003);
+    assert!(Diem::market_cap<XUS>() == old_market_cap, 8002);
+    assert!(Diem::preburn_value<XUS>() == 100, 8003);
     DiemAccount::restore_withdraw_capability(with_cap);
 }
 }
@@ -176,8 +176,8 @@ fun main(account: signer) {
     // do the burn. the market cap should now decrease, and the preburn area should be empty
     Diem::burn<XUS>(account, @{{dd}}, 100);
     Diem::burn<XUS>(account, @{{dd}}, 200);
-    assert(Diem::market_cap<XUS>() == old_market_cap - 300, 8004);
-    assert(Diem::preburn_value<XUS>() == 0, 8005);
+    assert!(Diem::market_cap<XUS>() == old_market_cap - 300, 8004);
+    assert!(Diem::preburn_value<XUS>() == 0, 8005);
     }
 }
 // check: BurnEvent

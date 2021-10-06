@@ -55,7 +55,7 @@ module DiemFramework::TransactionFee {
     public fun add_txn_fee_currency<CoinType>(tc_account: &signer) {
         Roles::assert_treasury_compliance(tc_account);
         Diem::assert_is_currency<CoinType>();
-        assert(
+        assert!(
             !is_coin_initialized<CoinType>(),
             Errors::already_published(ETRANSACTION_FEE)
         );
@@ -71,7 +71,7 @@ module DiemFramework::TransactionFee {
     /// Deposit `coin` into the transaction fees bucket
     public fun pay_fee<CoinType>(coin: Diem<CoinType>) acquires TransactionFee {
         DiemTimestamp::assert_operating();
-        assert(is_coin_initialized<CoinType>(), Errors::not_published(ETRANSACTION_FEE));
+        assert!(is_coin_initialized<CoinType>(), Errors::not_published(ETRANSACTION_FEE));
         let fees = borrow_global_mut<TransactionFee<CoinType>>(@TreasuryCompliance);
         Diem::deposit(&mut fees.balance, coin)
     }
@@ -93,7 +93,7 @@ module DiemFramework::TransactionFee {
     ) acquires TransactionFee {
         DiemTimestamp::assert_operating();
         Roles::assert_treasury_compliance(tc_account);
-        assert(is_coin_initialized<CoinType>(), Errors::not_published(ETRANSACTION_FEE));
+        assert!(is_coin_initialized<CoinType>(), Errors::not_published(ETRANSACTION_FEE));
         if (XDX::is_xdx<CoinType>()) {
             // TODO: Once the composition of XDX is determined fill this in to
             // unpack and burn the backing coins of the XDX coin.

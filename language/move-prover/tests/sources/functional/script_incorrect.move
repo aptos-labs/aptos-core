@@ -1,3 +1,4 @@
+// separate_baseline: cvc4
 // flag: --dependency=tests/sources/functional/script_provider.move
 script {
 use 0x1::ScriptProvider;

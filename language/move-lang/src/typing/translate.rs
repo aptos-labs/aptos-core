@@ -2172,8 +2172,8 @@ fn builtin_call(
             params_ty = vec![sp(bloc, Type_::Ref(true, Box::new(ty_arg.clone())))];
             ret_ty = sp(loc, Type_::Ref(false, Box::new(ty_arg)));
         }
-        NB::Assert => {
-            b_ = TB::Assert;
+        NB::Assert(is_macro) => {
+            b_ = TB::Assert(is_macro);
             params_ty = vec![Type_::bool(bloc), Type_::u64(bloc)];
             ret_ty = sp(loc, Type_::Unit);
         }

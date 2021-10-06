@@ -5,6 +5,6 @@ fun main() {
     } else {
         y = 0;
     };
-    assert(y == 5, 42);
+    assert!(y == 5, 42);
 }
 }

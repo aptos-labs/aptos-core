@@ -31,7 +31,7 @@ module M {
         move_to(s, R{});
         R{} = move_from(@0x42);
         freeze(&mut x);
-        assert(true, 42);
+        assert!(true, 42);
         if (true) 0 else 1;
         loop ();
         loop { break; continue; };

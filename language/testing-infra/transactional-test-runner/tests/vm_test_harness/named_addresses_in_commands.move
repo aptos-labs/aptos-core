@@ -7,7 +7,7 @@ script {
     use Std::Signer;
 
     fun main(s: signer) {
-        assert(Signer::address_of(&s) == @42, 1000);
+        assert!(Signer::address_of(&s) == @42, 1000);
     }
 }
 

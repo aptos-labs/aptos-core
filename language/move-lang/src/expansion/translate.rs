@@ -226,7 +226,7 @@ fn address_impl(
         P::LeadingNameAccess_::Name(n) => {
             if n.value.as_str() == ModuleName::SELF_NAME {
                 compilation_env.add_diag(diag!(
-                        NameResolution::ReservedName,
+                        Declarations::InvalidName,
                         (loc, format!("Invalid named address '{0}'. '{0}' is restricted and cannot be used to name an address", ModuleName::SELF_NAME))
                 ))
             } else if compilation_env
@@ -1684,12 +1684,12 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
                 }
             }
         }
-        PE::Call(pn, ptys_opt, sp!(rloc, prs)) => {
+        PE::Call(pn, is_macro, ptys_opt, sp!(rloc, prs)) => {
             let tys_opt = optional_types(context, ptys_opt);
             let ers = sp(rloc, exps(context, prs));
             let en_opt = name_access_chain(context, Access::ApplyPositional, pn);
             match en_opt {
-                Some(en) => EE::Call(en, tys_opt, ers),
+                Some(en) => EE::Call(en, is_macro, tys_opt, ers),
                 None => {
                     assert!(context.env.has_diags());
                     EE::UnresolvedError
@@ -2189,7 +2189,7 @@ fn unbound_names_exp(unbound: &mut BTreeSet<Name>, sp!(_, e_): &E::Exp) {
         EE::Name(sp!(_, E::ModuleAccess_::Name(n)), _) => {
             unbound.insert(*n);
         }
-        EE::Call(_, _, sp!(_, es_)) => unbound_names_exps(unbound, es_),
+        EE::Call(_, _, _, sp!(_, es_)) => unbound_names_exps(unbound, es_),
         EE::Pack(_, _, es) => unbound_names_exps(unbound, es.iter().map(|(_, _, (_, e))| e)),
         EE::IfElse(econd, et, ef) => {
             unbound_names_exp(unbound, ef);

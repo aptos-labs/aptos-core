@@ -151,7 +151,7 @@ restrictions are enforced in the <code><a href="Diem.md#0x1_Diem_register_curren
     // Operational constraint
     <a href="CoreAddresses.md#0x1_CoreAddresses_assert_currency_info">CoreAddresses::assert_currency_info</a>(dr_account);
     // <a href="XDX.md#0x1_XDX_Reserve">Reserve</a> must not exist.
-    <b>assert</b>(!<b>exists</b>&lt;<a href="XDX.md#0x1_XDX_Reserve">Reserve</a>&gt;(@DiemRoot), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_already_published">Errors::already_published</a>(<a href="XDX.md#0x1_XDX_ERESERVE">ERESERVE</a>));
+    <b>assert</b>!(!<b>exists</b>&lt;<a href="XDX.md#0x1_XDX_Reserve">Reserve</a>&gt;(@DiemRoot), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_already_published">Errors::already_published</a>(<a href="XDX.md#0x1_XDX_ERESERVE">ERESERVE</a>));
     <b>let</b> (mint_cap, burn_cap) = <a href="Diem.md#0x1_Diem_register_currency">Diem::register_currency</a>&lt;<a href="XDX.md#0x1_XDX">XDX</a>&gt;(
         dr_account,
         <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/FixedPoint32.md#0x1_FixedPoint32_create_from_rational">FixedPoint32::create_from_rational</a>(1, 1), // exchange rate <b>to</b> <a href="XDX.md#0x1_XDX">XDX</a>

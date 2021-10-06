@@ -43,17 +43,17 @@ module DiemFramework::RecoveryAddress {
     public fun publish(recovery_account: &signer, rotation_cap: KeyRotationCapability) {
         let addr = Signer::address_of(recovery_account);
         // Only VASPs can create a recovery address
-        assert(VASP::is_vasp(addr), Errors::invalid_argument(ENOT_A_VASP));
+        assert!(VASP::is_vasp(addr), Errors::invalid_argument(ENOT_A_VASP));
         // put the rotation capability for the recovery account itself in `rotation_caps`. This
         // ensures two things:
         // (1) It's not possible to get into a "recovery cycle" where A is the recovery account for
         //     B and B is the recovery account for A
         // (2) rotation_caps is always nonempty
-        assert(
+        assert!(
             *DiemAccount::key_rotation_capability_address(&rotation_cap) == addr,
              Errors::invalid_argument(EKEY_ROTATION_DEPENDENCY_CYCLE)
         );
-        assert(!exists<RecoveryAddress>(addr), Errors::already_published(ERECOVERY_ADDRESS));
+        assert!(!exists<RecoveryAddress>(addr), Errors::already_published(ERECOVERY_ADDRESS));
         move_to(
             recovery_account,
             RecoveryAddress { rotation_caps: Vector::singleton(rotation_cap) }
@@ -91,9 +91,9 @@ module DiemFramework::RecoveryAddress {
         new_key: vector<u8>
     ) acquires RecoveryAddress {
         // Check that `recovery_address` has a `RecoveryAddress` resource
-        assert(exists<RecoveryAddress>(recovery_address), Errors::not_published(ERECOVERY_ADDRESS));
+        assert!(exists<RecoveryAddress>(recovery_address), Errors::not_published(ERECOVERY_ADDRESS));
         let sender = Signer::address_of(account);
-        assert(
+        assert!(
             // The original owner of a key rotation capability can rotate its own key
             sender == to_recover ||
             // The owner of the `RecoveryAddress` resource can rotate any key
@@ -154,16 +154,16 @@ module DiemFramework::RecoveryAddress {
     public fun add_rotation_capability(to_recover: KeyRotationCapability, recovery_address: address)
     acquires RecoveryAddress {
         // Check that `recovery_address` has a `RecoveryAddress` resource
-        assert(exists<RecoveryAddress>(recovery_address), Errors::not_published(ERECOVERY_ADDRESS));
+        assert!(exists<RecoveryAddress>(recovery_address), Errors::not_published(ERECOVERY_ADDRESS));
         // Only accept the rotation capability if both accounts belong to the same VASP
         let to_recover_address = *DiemAccount::key_rotation_capability_address(&to_recover);
-        assert(
+        assert!(
             VASP::is_same_vasp(recovery_address, to_recover_address),
             Errors::invalid_argument(EINVALID_KEY_ROTATION_DELEGATION)
         );
 
         let recovery_caps = &mut borrow_global_mut<RecoveryAddress>(recovery_address).rotation_caps;
-        assert(
+        assert!(
             Vector::length(recovery_caps) < MAX_REGISTERED_KEYS,
             Errors::limit_exceeded(EMAX_KEYS_REGISTERED)
         );

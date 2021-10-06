@@ -231,7 +231,7 @@ script {
 use DiemFramework::AccountLimits;
 use DiemFramework::XUS::XUS;
 fun main() {
-    assert(AccountLimits::limits_definition_address<XUS>(@{{bob}}) == @{{bob}}, 0);
+    assert!(AccountLimits::limits_definition_address<XUS>(@{{bob}}) == @{{bob}}, 0);
 }
 }
 
@@ -241,9 +241,9 @@ script {
 use DiemFramework::AccountLimits;
 use DiemFramework::XUS::XUS;
 fun main() {
-    assert(AccountLimits::has_limits_published<XUS>(@{{bob}}), 1);
+    assert!(AccountLimits::has_limits_published<XUS>(@{{bob}}), 1);
 
-    assert(!AccountLimits::has_limits_published<XUS>(@{{alice}}), 3);
+    assert!(!AccountLimits::has_limits_published<XUS>(@{{alice}}), 3);
 }
 }
 

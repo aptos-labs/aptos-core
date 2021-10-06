@@ -2,22 +2,17 @@
 
 [variant baseline]
 public fun BoolFootprint::call_get($t0|a: address) {
-     var $t1|tmp#$1: bool
-     var $t2|tmp#$2: u64
-     var $t3: address
-     var $t4: bool
-     var $t5: bool
-     var $t6: u64
-  0: $t3 := copy($t0)
-  1: $t4 := BoolFootprint::global_get($t3)
-  2: $t1 := $t4
-  3: $t5 := move($t1)
-  4: if ($t5) goto 8 else goto 5
-  5: label L1
-  6: $t6 := 22
-  7: abort($t6)
-  8: label L0
-  9: return ()
+     var $t1: address
+     var $t2: bool
+     var $t3: u64
+  0: $t1 := copy($t0)
+  1: $t2 := BoolFootprint::global_get($t1)
+  2: if ($t2) goto 6 else goto 3
+  3: label L1
+  4: $t3 := 22
+  5: abort($t3)
+  6: label L0
+  7: return ()
 }
 
 
@@ -57,12 +52,9 @@ public fun BoolFootprint::global_get($t0|a: address): bool {
 
 [variant baseline]
 public fun BoolFootprint::call_get($t0|a: address) {
-     var $t1|tmp#$1: bool
-     var $t2|tmp#$2: u64
-     var $t3: address
-     var $t4: bool
-     var $t5: bool
-     var $t6: u64
+     var $t1: address
+     var $t2: bool
+     var $t3: u64
      # Accesses:
      # Formal(0): Read
      # Formal(0)/0x1::BoolFootprint::B: Read
@@ -70,16 +62,14 @@ public fun BoolFootprint::call_get($t0|a: address) {
      #
      # Locals:
      #
-  0: $t3 := copy($t0)
-  1: $t4 := BoolFootprint::global_get($t3)
-  2: $t1 := $t4
-  3: $t5 := move($t1)
-  4: if ($t5) goto 8 else goto 5
-  5: label L1
-  6: $t6 := 22
-  7: abort($t6)
-  8: label L0
-  9: return ()
+  0: $t1 := copy($t0)
+  1: $t2 := BoolFootprint::global_get($t1)
+  2: if ($t2) goto 6 else goto 3
+  3: label L1
+  4: $t3 := 22
+  5: abort($t3)
+  6: label L0
+  7: return ()
 }
 
 

@@ -5,7 +5,7 @@ fun main() {
         let y = move x;
         y;
     };
-    assert(x == 0, 42);
+    assert!(x == 0, 42);
 }
 }
 

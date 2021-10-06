@@ -14,7 +14,7 @@ module TestTransaction {
     }
 
     fun check_sender1(sender: &signer) {
-        assert(Signer::address_of(sender) == @0xdeadbeef, 1);
+        assert!(Signer::address_of(sender) == @0xdeadbeef, 1);
     }
     spec check_sender1 {
         aborts_if Signer::address_of(sender) != @0xdeadbeef;
@@ -29,7 +29,7 @@ module TestTransaction {
 
     fun exists_account(account: &signer) {
         DiemTimestamp::assert_operating();
-        assert(DiemAccount::exists_at(Signer::address_of(account)), 1);
+        assert!(DiemAccount::exists_at(Signer::address_of(account)), 1);
     }
     spec exists_account {
         include DiemTimestamp::AbortsIfNotOperating;

@@ -8,6 +8,6 @@ fun main() {
     while (!Vector::is_empty(&v)) {
         sum = sum + (Vector::pop_back(&mut v) as u64);
     };
-    assert(sum == 10, sum);
+    assert!(sum == 10, sum);
 }
 }

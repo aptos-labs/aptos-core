@@ -971,7 +971,25 @@ fn exp_(context: &mut Context, e: E::Exp) -> N::Exp {
         EE::Cast(e, t) => NE::Cast(exp(context, *e), type_(context, t)),
         EE::Annotate(e, t) => NE::Annotate(exp(context, *e), type_(context, t)),
 
-        EE::Call(sp!(mloc, ma_), tys_opt, rhs) => {
+        EE::Call(sp!(mloc, ma_), true, tys_opt, rhs) => {
+            use E::ModuleAccess_ as EA;
+            use N::BuiltinFunction_ as BF;
+            assert!(tys_opt.is_none(), "ICE macros do not have type arguments");
+            let nes = call_args(context, rhs);
+            match ma_ {
+                EA::Name(n) if n.value.as_str() == BF::ASSERT_MACRO => {
+                    NE::Builtin(sp(mloc, BF::Assert(true)), nes)
+                }
+                ma_ => {
+                    context.env.add_diag(diag!(
+                        NameResolution::UnboundMacro,
+                        (mloc, format!("Unbound macro '{}'", ma_)),
+                    ));
+                    NE::UnresolvedError
+                }
+            }
+        }
+        EE::Call(sp!(mloc, ma_), false, tys_opt, rhs) => {
             use E::ModuleAccess_ as EA;
             let ty_args = tys_opt.map(|tys| types(context, tys));
             let nes = call_args(context, rhs);
@@ -1121,9 +1139,24 @@ fn resolve_builtin_function(
         B::BORROW_GLOBAL_MUT => BorrowGlobal(true, check_builtin_ty_arg(context, loc, b, ty_args)),
         B::EXISTS => Exists(check_builtin_ty_arg(context, loc, b, ty_args)),
         B::FREEZE => Freeze(check_builtin_ty_arg(context, loc, b, ty_args)),
-        B::ASSERT => {
+        B::ASSERT_MACRO => {
+            let dep_msg = format!(
+                "'{}' function syntax has been deprecated and will be removed",
+                B::ASSERT_MACRO
+            );
+            // TODO make this a tip/hint?
+            let help_msg = format!(
+                "Replace with '{0}!'. \
+                '{0}' has been replaced with a '{0}!' built-in macro so that arguments are no longer eagerly evaluated",
+                B::ASSERT_MACRO
+            );
+            context.env.add_diag(diag!(
+                Uncategorized::DeprecatedWillBeRemoved,
+                (b.loc, dep_msg),
+                (b.loc, help_msg),
+            ));
             check_builtin_ty_args(context, loc, b, 0, ty_args);
-            Assert
+            Assert(false)
         }
         _ => {
             context.env.add_diag(diag!(

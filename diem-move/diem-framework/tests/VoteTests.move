@@ -75,7 +75,7 @@ module DiemFramework::VoteTests {
             Vector::singleton(Vote::new_weighted_voter(1, *(&addr_bcs))),
             10,
         );
-        assert(&ballot_id == &Vote::new_ballot_id(0, addr), 0);
+        assert!(&ballot_id == &Vote::new_ballot_id(0, addr), 0);
 
         let ballot_id = Vote::create_ballot(
             &proposer,
@@ -87,7 +87,7 @@ module DiemFramework::VoteTests {
             Vector::singleton(Vote::new_weighted_voter(1, *(&addr_bcs))),
             10,
         );
-        assert(&ballot_id == &Vote::new_ballot_id(1, addr), 0);
+        assert!(&ballot_id == &Vote::new_ballot_id(1, addr), 0);
 
         let ballot_id = Vote::create_ballot(
             &proposer,
@@ -99,7 +99,7 @@ module DiemFramework::VoteTests {
             Vector::singleton(Vote::new_weighted_voter(1, addr_bcs)),
             10,
         );
-        assert(&ballot_id == &Vote::new_ballot_id(2, addr), 0);
+        assert!(&ballot_id == &Vote::new_ballot_id(2, addr), 0);
     }
 
     #[test(tc = @TreasuryCompliance, dr = @DiemRoot)]
@@ -167,9 +167,9 @@ module DiemFramework::VoteTests {
 
         DiemTimestamp::update_global_time(&vm, @0xCAFE, 3000000);
         let remove_ballots = Vote::gc_test_helper<TestProposal>(addr);
-        assert(Vector::length(&remove_ballots) == 2, 0);
-        assert(&Vector::pop_back(&mut remove_ballots) == &Vote::new_ballot_id(1, addr), 0);
-        assert(&Vector::pop_back(&mut remove_ballots) == &Vote::new_ballot_id(0, addr), 0);
+        assert!(Vector::length(&remove_ballots) == 2, 0);
+        assert!(&Vector::pop_back(&mut remove_ballots) == &Vote::new_ballot_id(1, addr), 0);
+        assert!(&Vector::pop_back(&mut remove_ballots) == &Vote::new_ballot_id(0, addr), 0);
     }
 
     #[test(tc = @TreasuryCompliance, dr = @DiemRoot)]
@@ -207,9 +207,9 @@ module DiemFramework::VoteTests {
     fun vote_simple(tc: signer, dr: signer) {
         let (voter1, voter2, voter3, ballot_id, proposal) = vote_test_helper(&tc, &dr, 10);
         // First vote does not approve the ballot
-        assert(!Vote::vote(&voter1, *(&ballot_id), b"test_proposal", *(&proposal)), 0);
+        assert!(!Vote::vote(&voter1, *(&ballot_id), b"test_proposal", *(&proposal)), 0);
         // Second vote approves the ballot
-        assert(Vote::vote(&voter2, *(&ballot_id), b"test_proposal", *(&proposal)), 0);
+        assert!(Vote::vote(&voter2, *(&ballot_id), b"test_proposal", *(&proposal)), 0);
         // Third vote aborts
         Vote::vote(&voter3, *(&ballot_id), b"test_proposal", *(&proposal));
     }
@@ -237,9 +237,9 @@ module DiemFramework::VoteTests {
 
 
         // First vote does not approve the ballot
-        assert(!Vote::vote(&voter1, *(&ballot_id), b"test_proposal", *(&proposal)), 0);
+        assert!(!Vote::vote(&voter1, *(&ballot_id), b"test_proposal", *(&proposal)), 0);
         // Second vote approves the ballot
-        assert(Vote::vote(&voter2, *(&ballot_id), b"test_proposal", *(&proposal)), 0);
+        assert!(Vote::vote(&voter2, *(&ballot_id), b"test_proposal", *(&proposal)), 0);
     }
 
     #[test(tc = @TreasuryCompliance, dr = @DiemRoot)]
@@ -255,7 +255,7 @@ module DiemFramework::VoteTests {
     fun vote_repeat(tc: signer, dr: signer) {
         let (voter1, _voter2, _voter3, ballot_id, proposal) = vote_test_helper(&tc, &dr, 10);
         // First vote does not approve the ballot
-        assert(!Vote::vote(&voter1, *(&ballot_id), b"test_proposal", *(&proposal)), 0);
+        assert!(!Vote::vote(&voter1, *(&ballot_id), b"test_proposal", *(&proposal)), 0);
         // Cannot vote again
         Vote::vote(&voter1, *(&ballot_id), b"test_proposal", *(&proposal));
     }

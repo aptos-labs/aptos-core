@@ -19,25 +19,25 @@ module DiemFramework::SignatureTests{
         let message = x"0000000000000000000000000000000000000000000000000000000000000000";
         let pubkey = x"7013b6ed7dde3cfb1251db1b04ae9cd7853470284085693590a75def645a926d";
 
-        assert(Signature::ed25519_validate_pubkey(copy valid_pubkey), 9003);
-        assert(!Signature::ed25519_validate_pubkey(copy short_pubkey), 9004);
-        assert(!Signature::ed25519_validate_pubkey(copy long_pubkey), 9005);
-        assert(!Signature::ed25519_validate_pubkey(copy invalid_pubkey), 9006);
+        assert!(Signature::ed25519_validate_pubkey(copy valid_pubkey), 9003);
+        assert!(!Signature::ed25519_validate_pubkey(copy short_pubkey), 9004);
+        assert!(!Signature::ed25519_validate_pubkey(copy long_pubkey), 9005);
+        assert!(!Signature::ed25519_validate_pubkey(copy invalid_pubkey), 9006);
 
 
         // now check that Signature::ed25519_verify works with well- and ill-formed data and never aborts
         // valid signature, invalid pubkey (too short, too long, bad small subgroup)
-        assert(!Signature::ed25519_verify(copy valid_signature, copy short_pubkey, x""), 9004);
-        assert(!Signature::ed25519_verify(copy valid_signature, copy long_pubkey, x""), 9005);
-        assert(!Signature::ed25519_verify(copy valid_signature, copy invalid_pubkey, x""), 9006);
+        assert!(!Signature::ed25519_verify(copy valid_signature, copy short_pubkey, x""), 9004);
+        assert!(!Signature::ed25519_verify(copy valid_signature, copy long_pubkey, x""), 9005);
+        assert!(!Signature::ed25519_verify(copy valid_signature, copy invalid_pubkey, x""), 9006);
         // invalid signature, valid pubkey
-        assert(!Signature::ed25519_verify(copy short_signature, copy valid_pubkey, x""), 9007);
-        assert(!Signature::ed25519_verify(copy long_signature, copy valid_pubkey, x""), 9008);
+        assert!(!Signature::ed25519_verify(copy short_signature, copy valid_pubkey, x""), 9007);
+        assert!(!Signature::ed25519_verify(copy long_signature, copy valid_pubkey, x""), 9008);
 
         // valid (lengthwise) signature, valid pubkey, but signature doesn't match message
-        assert(!Signature::ed25519_verify(copy valid_signature, copy valid_pubkey, x""), 9009);
+        assert!(!Signature::ed25519_verify(copy valid_signature, copy valid_pubkey, x""), 9009);
 
         // all three valid
-        assert(Signature::ed25519_verify(valid_signature, pubkey, message), 9010);
+        assert!(Signature::ed25519_verify(valid_signature, pubkey, message), 9010);
     }
 }

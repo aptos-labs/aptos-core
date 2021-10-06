@@ -721,7 +721,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             EA::Exp_::Name(maccess, type_params) => {
                 self.translate_name(&loc, maccess, type_params.as_deref(), expected_type)
             }
-            EA::Exp_::Call(maccess, type_params, args) => {
+            EA::Exp_::Call(maccess, _is_macro, type_params, args) => {
                 // Need to make a &[&Exp] out of args.
                 let args = args.value.iter().collect_vec();
                 self.translate_fun_call(expected_type, &loc, maccess, type_params.as_deref(), &args)

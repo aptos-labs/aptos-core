@@ -125,13 +125,13 @@ script {
     fun main(sender: signer) {
     let sender = &sender;
         let cap = DiemAccount::extract_key_rotation_capability(sender);
-        assert(
+        assert!(
             *DiemAccount::key_rotation_capability_address(&cap) == Signer::address_of(sender), 0
         );
         DiemAccount::restore_key_rotation_capability(cap);
         let with_cap = DiemAccount::extract_withdraw_capability(sender);
 
-        assert(
+        assert!(
             *DiemAccount::withdraw_capability_address(&with_cap) == Signer::address_of(sender),
             0
         );
@@ -150,7 +150,7 @@ script {
         let with_cap = DiemAccount::extract_withdraw_capability(account);
         DiemAccount::pay_from<XDX>(&with_cap, @{{alice}}, 10000, x"", x"");
         DiemAccount::restore_withdraw_capability(with_cap);
-        assert(DiemAccount::balance<XDX>(@{{alice}}) == 10000, 60)
+        assert!(DiemAccount::balance<XDX>(@{{alice}}) == 10000, 60)
     }
 }
 // check: "Keep(EXECUTED)"

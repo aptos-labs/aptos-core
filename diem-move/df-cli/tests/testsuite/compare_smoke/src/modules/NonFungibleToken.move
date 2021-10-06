@@ -34,7 +34,7 @@ module NonFungibleToken {
 
     public fun initialize<Token: store>(account: &signer, limited: bool, total: u64) {
         let sender = Signer::address_of(account);
-        assert(sender == NFT_PUBLISHER, 8000);
+        assert!(sender == NFT_PUBLISHER, 8000);
 
         let limited_meta = LimitedMeta {
             limited: limited,
@@ -55,17 +55,17 @@ module NonFungibleToken {
 
     public fun accept_token<Token: store>(account: &signer) {
         let sender = Signer::address_of(account);
-        assert(!exists<NonFungibleToken<Token>>(sender), 8001);
+        assert!(!exists<NonFungibleToken<Token>>(sender), 8001);
         SimpleSortedLinkedList::empty_node<vector<u8>>(account, Vector::empty());
         move_to<NonFungibleToken<Token>>(account, NonFungibleToken<Token>{token: Option::none()});
     }
 
     public fun safe_transfer<Token: drop + store>(account: &signer, _nft_service_address: address, token_id: vector<u8>, receiver: address) acquires NonFungibleToken {
         let sender = Signer::address_of(account);
-        assert(exists<NonFungibleToken<Token>>(receiver), 8002);
-        assert(Option::is_none(&borrow_global<NonFungibleToken<Token>>(receiver).token), 8005);
-        assert(Self::get_token_id(sender) == token_id, 8003);
-        assert(!exists<TokenLock<Token>>(sender), 8004);
+        assert!(exists<NonFungibleToken<Token>>(receiver), 8002);
+        assert!(Option::is_none(&borrow_global<NonFungibleToken<Token>>(receiver).token), 8005);
+        assert!(Self::get_token_id(sender) == token_id, 8003);
+        assert!(!exists<TokenLock<Token>>(sender), 8004);
 
         SimpleSortedLinkedList::move_node_to<vector<u8>>(account, receiver);
         let NonFungibleToken<Token>{ token } = move_from<NonFungibleToken<Token>>(sender);
@@ -83,15 +83,15 @@ module NonFungibleToken {
 
     public fun get_nft<Token: store>(account: &signer): NonFungibleToken<Token> acquires NonFungibleToken {
         let sender = Signer::address_of(account);
-        assert(exists<NonFungibleToken<Token>>(sender), 8006);
-        assert(!exists<TokenLock<Token>>(sender), 8007);
+        assert!(exists<NonFungibleToken<Token>>(sender), 8006);
+        assert!(!exists<TokenLock<Token>>(sender), 8007);
         Self::lock<Token>(account);
         move_from<NonFungibleToken<Token>>(sender)
     }
 
     public fun put_nft<Token: store>(account: &signer, nft: NonFungibleToken<Token>) acquires TokenLock {
         let sender = Signer::address_of(account);
-        assert(exists<TokenLock<Token>>(sender), 8008);
+        assert!(exists<TokenLock<Token>>(sender), 8008);
         Self::unlock<Token>(account);
         move_to<NonFungibleToken<Token>>(account, nft)
     }

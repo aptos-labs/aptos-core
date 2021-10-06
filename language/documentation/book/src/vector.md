@@ -1,23 +1,26 @@
 # Vector
 
-`vector<T>` is the only primitive collection type provided by Move. A `vector<T>` is a homogenous collection of `T`'s that can grow or shrink by pushing/popping values off the "end".
+`vector<T>` is the only primitive collection type provided by Move. A `vector<T>` is a homogenous
+collection of `T`'s that can grow or shrink by pushing/popping values off the "end".
 
-A `vector<T>` can be instantiated with any type `T`. For example, `vector<u64>`, `vector<address>`, `vector<0x42::MyModule::MyResource>`, and `vector<vector<u8>>` are all valid vector types.
+A `vector<T>` can be instantiated with any type `T`. For example, `vector<u64>`, `vector<address>`,
+`vector<0x42::MyModule::MyResource>`, and `vector<vector<u8>>` are all valid vector types.
 
 ## Operations
 
-`vector` supports the following operations via the `Std::Vector` module in the Move standard library:
+`vector` supports the following operations via the `Std::Vector` module in the Move standard
+library:
 
-| Function | Description | Aborts?
-| ---------- | ----------|----------
-| `Vector::empty<T>(): vector<T>` | Create an empty vector that can store values of type `T` | Never
-| `Vector::singleton<T>(t: T): vector<T>` | Create a vector of size 1 containing `t` | Never
-| `Vector::push_back<T>(v: &mut T, t: T)` | Add `t` to the end of `v` | Never
-| `Vector::pop_back<T>(v: &mut T): T` | Remove and return the last element in `v` | If `v` is empty
-| `Vector::borrow<T>(v: &vector<T>, i: u64): &T` | Return an immutable reference to the `T` at index `i` | If `i` is not in bounds
-| `Vector::borrow_mut<T>(v: &mut vector<T>, i: u64): &mut T` | Return an mutable reference to the `T` at index `i` | If `i` is not in bounds
-| `Vector::destroy_empty<T>(v: vector<T>)` | Delete `v` | If `v` is not empty
-| `Vector::append<T>(v1: &mut vector<T>, v2: vector<T>)` | Add the elements in `v2` to the end of `v1` | If `i` is not in bounds
+| Function                                                   | Description                                              | Aborts?                 |
+| ---------------------------------------------------------- | -------------------------------------------------------- | ----------------------- |
+| `Vector::empty<T>(): vector<T>`                            | Create an empty vector that can store values of type `T` | Never                   |
+| `Vector::singleton<T>(t: T): vector<T>`                    | Create a vector of size 1 containing `t`                 | Never                   |
+| `Vector::push_back<T>(v: &mut T, t: T)`                    | Add `t` to the end of `v`                                | Never                   |
+| `Vector::pop_back<T>(v: &mut T): T`                        | Remove and return the last element in `v`                | If `v` is empty         |
+| `Vector::borrow<T>(v: &vector<T>, i: u64): &T`             | Return an immutable reference to the `T` at index `i`    | If `i` is not in bounds |
+| `Vector::borrow_mut<T>(v: &mut vector<T>, i: u64): &mut T` | Return an mutable reference to the `T` at index `i`      | If `i` is not in bounds |
+| `Vector::destroy_empty<T>(v: vector<T>)`                   | Delete `v`                                               | If `v` is not empty     |
+| `Vector::append<T>(v1: &mut vector<T>, v2: vector<T>)`     | Add the elements in `v2` to the end of `v1`              | If `i` is not in bounds |
 
 More operations may be added overtime
 
@@ -30,15 +33,17 @@ let v = Vector::empty<u64>();
 Vector::push_back(&mut v, 5);
 Vector::push_back(&mut v, 6);
 
-assert(*Vector::borrow(&v, 0) == 5, 42);
-assert(*Vector::borrow(&v, 1) == 6, 42);
-assert(Vector::pop_back(&mut v) == 6, 42);
-assert(Vector::pop_back(&mut v) == 5, 42);
+assert!(*Vector::borrow(&v, 0) == 5, 42);
+assert!(*Vector::borrow(&v, 1) == 6, 42);
+assert!(Vector::pop_back(&mut v) == 6, 42);
+assert!(Vector::pop_back(&mut v) == 5, 42);
 ```
 
 ## Destroying and copying `vector`s
 
-Some behaviors of `vector<T>` depend on the abilities of the element type, `T`. For example, vectors containing elements that do not have `drop` cannot be implicitly discarded like `v` in the example above--they must be explicitly destroyed with `Vector::destroy_empty`.
+Some behaviors of `vector<T>` depend on the abilities of the element type, `T`. For example, vectors
+containing elements that do not have `drop` cannot be implicitly discarded like `v` in the example
+above--they must be explicitly destroyed with `Vector::destroy_empty`.
 
 Note that `Vector::destroy_empty` will abort at runtime unless `vec` contains zero elements:
 
@@ -57,14 +62,17 @@ fun destroy_droppable_vector<T: drop>(vec: vector<T>) {
 }
 ```
 
-Similarly, vectors cannot be copied unless the element type has `copy`. In other words, a `vector<T>` has `copy` if and only if `T` has `copy`. However, even copyable vectors are never implicitly copied:
+Similarly, vectors cannot be copied unless the element type has `copy`. In other words, a
+`vector<T>` has `copy` if and only if `T` has `copy`. However, even copyable vectors are never
+implicitly copied:
 
 ```move
 let x = Vector::singleton<u64>(10);
 let y = copy x; // compiler error without the copy!
 ```
 
-Copies of large vectors can be expensive, so the compiler requires explicit `copy`'s to make it easier to see where they are happening.
+Copies of large vectors can be expensive, so the compiler requires explicit `copy`'s to make it
+easier to see where they are happening.
 
 For more details see the sections on [type abilities](./abilities.md) and [generics](./generics.md).
 
@@ -72,7 +80,9 @@ For more details see the sections on [type abilities](./abilities.md) and [gener
 
 ### `vector<u8>` literals
 
-A common use-case for vectors in Move is to represent "byte arrays", which are represented with `vector<u8>`. These values are often used for cryptographic purposes, such as a public key or a hash result.
+A common use-case for vectors in Move is to represent "byte arrays", which are represented with
+`vector<u8>`. These values are often used for cryptographic purposes, such as a public key or a hash
+result.
 
 There are currently two supported types of `vector<u8>` literals, byte strings and hex strings.
 
@@ -80,33 +90,35 @@ There are currently two supported types of `vector<u8>` literals, byte strings a
 
 Byte strings are quoted string literals prefixed by a `b`, e.g. `b"Hello!\n"`.
 
-These are ASCII encoded strings that allow for escape sequences. Currently, the supported escape sequences are
+These are ASCII encoded strings that allow for escape sequences. Currently, the supported escape
+sequences are
 
-| Escape Sequence | Description
-| -------- | --------
-| `\n` | New line (or Line feed)
-| `\r` | Carriage return
-| `\t` | Tab
-| `\\` | Backslash
-| `\0` | Null
-| `\"` | Quote
-| `\xHH` | Hex escape, inserts the hex byte sequence `HH`
+| Escape Sequence | Description                                    |
+| --------------- | ---------------------------------------------- |
+| `\n`            | New line (or Line feed)                        |
+| `\r`            | Carriage return                                |
+| `\t`            | Tab                                            |
+| `\\`            | Backslash                                      |
+| `\0`            | Null                                           |
+| `\"`            | Quote                                          |
+| `\xHH`          | Hex escape, inserts the hex byte sequence `HH` |
 
 #### Hex Strings
 
 Hex strings are quoted string literals prefixed by a `x`, e.g. `x"48656C6C6F210A"`
 
-Each byte pair, ranging from `00` to `FF`, is interpreted as hex encoded `u8` value. So each byte pair corresponds to a single entry in the resulting `vector<u8>`
+Each byte pair, ranging from `00` to `FF`, is interpreted as hex encoded `u8` value. So each byte
+pair corresponds to a single entry in the resulting `vector<u8>`
 
 #### Examples
 
 ```move
 script {
 fun byte_and_hex_strings() {
-    assert(b"" == x"", 0);
-    assert(b"Hello!\n" == x"48656C6C6F210A", 1);
-    assert(b"\x48\x65\x6C\x6C\x6F\x21\x0A" == x"48656C6C6F210A", 2);
-    assert(
+    assert!(b"" == x"", 0);
+    assert!(b"Hello!\n" == x"48656C6C6F210A", 1);
+    assert!(b"\x48\x65\x6C\x6C\x6F\x21\x0A" == x"48656C6C6F210A", 2);
+    assert!(
         b"\"Hello\tworld!\"\n \r \\Null=\0" ==
             x"2248656C6C6F09776F726C6421220A200D205C4E756C6C3D00",
         3
@@ -117,8 +129,12 @@ fun byte_and_hex_strings() {
 
 ### Other `vector` literals
 
-Currently, there is no support for general `vector<T>` literals in Move where `T` is not a `u8`. However, Move bytecode supports `vector<T>` constants for any primitive type `T`. We plan to add `vector<T>` literals to the source language that can compile to bytecode constants.
+Currently, there is no support for general `vector<T>` literals in Move where `T` is not a `u8`.
+However, Move bytecode supports `vector<T>` constants for any primitive type `T`. We plan to add
+`vector<T>` literals to the source language that can compile to bytecode constants.
 
 ## Ownership
 
-As mentioned [above](#destroying-and-copying-vectors), `vector` values can be copied only if the elements can be copied. In that case, the copy must be explicit via a [`copy`](./variables.md#move-and-copy) or a [dereference `*`](./references.md#reference-operators).
+As mentioned [above](#destroying-and-copying-vectors), `vector` values can be copied only if the
+elements can be copied. In that case, the copy must be explicit via a
+[`copy`](./variables.md#move-and-copy) or a [dereference `*`](./references.md#reference-operators).

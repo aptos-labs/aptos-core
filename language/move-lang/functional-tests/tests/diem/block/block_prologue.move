@@ -14,8 +14,8 @@ use DiemFramework::DiemTimestamp;
 use DiemFramework::DiemBlock;
 
 fun main() {
-    assert(DiemBlock::get_current_block_height() == 1, 73);
-    assert(DiemTimestamp::now_microseconds() == 1000000, 76);
+    assert!(DiemBlock::get_current_block_height() == 1, 73);
+    assert!(DiemTimestamp::now_microseconds() == 1000000, 76);
 }
 }
 
@@ -24,7 +24,7 @@ script{
 use DiemFramework::DiemTimestamp;
 
 fun main() {
-    assert(DiemTimestamp::now_microseconds() != 2000000, 77);
+    assert!(DiemTimestamp::now_microseconds() != 2000000, 77);
 }
 }
 

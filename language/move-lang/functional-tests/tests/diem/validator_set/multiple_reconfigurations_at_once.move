@@ -54,13 +54,13 @@ script{
     // from the set and trigger reconfiguration
     fun main(account: signer) {
     let account = &account;
-        assert(DiemSystem::is_validator(@{{alice}}) == true, 98);
-        assert(DiemSystem::is_validator(@{{vivian}}) == true, 99);
-        assert(DiemSystem::is_validator(@{{viola}}) == true, 100);
+        assert!(DiemSystem::is_validator(@{{alice}}) == true, 98);
+        assert!(DiemSystem::is_validator(@{{vivian}}) == true, 99);
+        assert!(DiemSystem::is_validator(@{{viola}}) == true, 100);
         DiemSystem::remove_validator(account, @{{vivian}});
-        assert(DiemSystem::is_validator(@{{alice}}) == true, 101);
-        assert(DiemSystem::is_validator(@{{vivian}}) == false, 102);
-        assert(DiemSystem::is_validator(@{{viola}}) == true, 103);
+        assert!(DiemSystem::is_validator(@{{alice}}) == true, 101);
+        assert!(DiemSystem::is_validator(@{{vivian}}) == false, 102);
+        assert!(DiemSystem::is_validator(@{{viola}}) == true, 103);
     }
 }
 
@@ -82,19 +82,19 @@ script{
     fun main(account: signer) {
     let account = &account;
         // the local validator's key was the same as the key in the validator set
-        assert(ValidatorConfig::get_consensus_pubkey(&DiemSystem::get_validator_config(@{{viola}})) ==
+        assert!(ValidatorConfig::get_consensus_pubkey(&DiemSystem::get_validator_config(@{{viola}})) ==
                ValidatorConfig::get_consensus_pubkey(&ValidatorConfig::get_config(@{{viola}})), 99);
         ValidatorConfig::set_config(account, @{{viola}},
                                     x"d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
                                     x"", x"");
         // the local validator's key is now different from the one in the validator set
-        assert(ValidatorConfig::get_consensus_pubkey(&DiemSystem::get_validator_config(@{{viola}})) !=
+        assert!(ValidatorConfig::get_consensus_pubkey(&DiemSystem::get_validator_config(@{{viola}})) !=
                ValidatorConfig::get_consensus_pubkey(&ValidatorConfig::get_config(@{{viola}})), 99);
         let old_num_validators = DiemSystem::validator_set_size();
         DiemSystem::update_config_and_reconfigure(account, @{{viola}});
-        assert(old_num_validators == DiemSystem::validator_set_size(), 98);
+        assert!(old_num_validators == DiemSystem::validator_set_size(), 98);
         // the local validator's key is now the same as the key in the validator set
-        assert(ValidatorConfig::get_consensus_pubkey(&DiemSystem::get_validator_config(@{{viola}})) ==
+        assert!(ValidatorConfig::get_consensus_pubkey(&DiemSystem::get_validator_config(@{{viola}})) ==
                ValidatorConfig::get_consensus_pubkey(&ValidatorConfig::get_config(@{{viola}})), 99);
     }
 }
@@ -122,10 +122,10 @@ script {
     use DiemFramework::AccountFreezing;
     fun main(tc_account: signer) {
     let tc_account = &tc_account;
-        assert(DiemSystem::is_validator(@{{alice}}) == true, 101);
+        assert!(DiemSystem::is_validator(@{{alice}}) == true, 101);
         AccountFreezing::freeze_account(tc_account, @{{alice}});
-        assert(AccountFreezing::account_is_frozen(@{{alice}}), 1);
-        assert(DiemSystem::is_validator(@{{alice}}) == true, 102);
+        assert!(AccountFreezing::account_is_frozen(@{{alice}}), 1);
+        assert!(DiemSystem::is_validator(@{{alice}}) == true, 102);
     }
 }
 // check: "Keep(EXECUTED)"

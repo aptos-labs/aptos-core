@@ -126,7 +126,7 @@ either the <code>for</code> address or the transaction sender.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="Offer.md#0x1_Offer_create">create</a>&lt;Offered: store&gt;(account: &signer, offered: Offered, for: address) {
-  <b>assert</b>(!<b>exists</b>&lt;<a href="Offer.md#0x1_Offer">Offer</a>&lt;Offered&gt;&gt;(<a href="_address_of">Signer::address_of</a>(account)), <a href="_already_published">Errors::already_published</a>(<a href="Offer.md#0x1_Offer_EOFFER_ALREADY_CREATED">EOFFER_ALREADY_CREATED</a>));
+  <b>assert</b>!(!<b>exists</b>&lt;<a href="Offer.md#0x1_Offer">Offer</a>&lt;Offered&gt;&gt;(<a href="_address_of">Signer::address_of</a>(account)), <a href="_already_published">Errors::already_published</a>(<a href="Offer.md#0x1_Offer_EOFFER_ALREADY_CREATED">EOFFER_ALREADY_CREATED</a>));
   move_to(account, <a href="Offer.md#0x1_Offer">Offer</a>&lt;Offered&gt; { offered, for });
 }
 </code></pre>
@@ -173,10 +173,10 @@ Also fails if there is no <code><a href="Offer.md#0x1_Offer">Offer</a>&lt;Offere
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="Offer.md#0x1_Offer_redeem">redeem</a>&lt;Offered: store&gt;(account: &signer, offer_address: address): Offered <b>acquires</b> <a href="Offer.md#0x1_Offer">Offer</a> {
-  <b>assert</b>(<b>exists</b>&lt;<a href="Offer.md#0x1_Offer">Offer</a>&lt;Offered&gt;&gt;(offer_address), <a href="_not_published">Errors::not_published</a>(<a href="Offer.md#0x1_Offer_EOFFER_DOES_NOT_EXIST">EOFFER_DOES_NOT_EXIST</a>));
+  <b>assert</b>!(<b>exists</b>&lt;<a href="Offer.md#0x1_Offer">Offer</a>&lt;Offered&gt;&gt;(offer_address), <a href="_not_published">Errors::not_published</a>(<a href="Offer.md#0x1_Offer_EOFFER_DOES_NOT_EXIST">EOFFER_DOES_NOT_EXIST</a>));
   <b>let</b> <a href="Offer.md#0x1_Offer">Offer</a>&lt;Offered&gt; { offered, for } = move_from&lt;<a href="Offer.md#0x1_Offer">Offer</a>&lt;Offered&gt;&gt;(offer_address);
   <b>let</b> sender = <a href="_address_of">Signer::address_of</a>(account);
-  <b>assert</b>(sender == for || sender == offer_address, <a href="_invalid_argument">Errors::invalid_argument</a>(<a href="Offer.md#0x1_Offer_EOFFER_DNE_FOR_ACCOUNT">EOFFER_DNE_FOR_ACCOUNT</a>));
+  <b>assert</b>!(sender == for || sender == offer_address, <a href="_invalid_argument">Errors::invalid_argument</a>(<a href="Offer.md#0x1_Offer_EOFFER_DNE_FOR_ACCOUNT">EOFFER_DNE_FOR_ACCOUNT</a>));
   offered
 }
 </code></pre>
@@ -265,7 +265,7 @@ Returns whether or not an <code><a href="Offer.md#0x1_Offer">Offer</a></code> re
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="Offer.md#0x1_Offer_address_of">address_of</a>&lt;Offered: store&gt;(offer_address: address): address <b>acquires</b> <a href="Offer.md#0x1_Offer">Offer</a> {
-  <b>assert</b>(<b>exists</b>&lt;<a href="Offer.md#0x1_Offer">Offer</a>&lt;Offered&gt;&gt;(offer_address), <a href="_not_published">Errors::not_published</a>(<a href="Offer.md#0x1_Offer_EOFFER_DOES_NOT_EXIST">EOFFER_DOES_NOT_EXIST</a>));
+  <b>assert</b>!(<b>exists</b>&lt;<a href="Offer.md#0x1_Offer">Offer</a>&lt;Offered&gt;&gt;(offer_address), <a href="_not_published">Errors::not_published</a>(<a href="Offer.md#0x1_Offer_EOFFER_DOES_NOT_EXIST">EOFFER_DOES_NOT_EXIST</a>));
   borrow_global&lt;<a href="Offer.md#0x1_Offer">Offer</a>&lt;Offered&gt;&gt;(offer_address).for
 }
 </code></pre>

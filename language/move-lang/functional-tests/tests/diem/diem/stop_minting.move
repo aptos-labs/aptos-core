@@ -105,8 +105,8 @@ fun main(account: signer) {
         100,
         0,
     );
-    assert(Diem::market_cap<XUS>() - prev_mcap1 == 10, 7);
-    assert(Diem::market_cap<COIN>() - prev_mcap2 == 100, 8);
+    assert!(Diem::market_cap<XUS>() - prev_mcap1 == 10, 7);
+    assert!(Diem::market_cap<COIN>() - prev_mcap2 == 100, 8);
 }
 }
 // check: "Keep(EXECUTED)"
@@ -158,8 +158,8 @@ fun main(account: signer) {
     let prev_mcap2 = Diem::market_cap<COIN>();
     Diem::burn<XUS>(account, @{{dd1}}, 10);
     Diem::burn<COIN>(account, @{{dd2}}, 100);
-    assert(prev_mcap1 - Diem::market_cap<XUS>() == 10, 9);
-    assert(prev_mcap2 - Diem::market_cap<COIN>() == 100, 10);
+    assert!(prev_mcap1 - Diem::market_cap<XUS>() == 10, 9);
+    assert!(prev_mcap2 - Diem::market_cap<COIN>() == 100, 10);
 }
 }
 // check: "Keep(EXECUTED)"

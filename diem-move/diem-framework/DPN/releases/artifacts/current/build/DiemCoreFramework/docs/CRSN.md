@@ -261,7 +261,7 @@ The size given to the CRSN at the time of publishing was zero, which is not supp
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="CRSN.md#0x1_CRSN_allow_crsns">allow_crsns</a>(account: &signer) {
     <a href="Roles.md#0x1_Roles_assert_diem_root">Roles::assert_diem_root</a>(account);
-    <b>assert</b>(!<b>exists</b>&lt;<a href="CRSN.md#0x1_CRSN_CRSNsAllowed">CRSNsAllowed</a>&gt;(<a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account)), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="CRSN.md#0x1_CRSN_EALREADY_INITIALIZED">EALREADY_INITIALIZED</a>));
+    <b>assert</b>!(!<b>exists</b>&lt;<a href="CRSN.md#0x1_CRSN_CRSNsAllowed">CRSNsAllowed</a>&gt;(<a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account)), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="CRSN.md#0x1_CRSN_EALREADY_INITIALIZED">EALREADY_INITIALIZED</a>));
     move_to(account, <a href="CRSN.md#0x1_CRSN_CRSNsAllowed">CRSNsAllowed</a> { })
 }
 </code></pre>
@@ -287,10 +287,10 @@ Publish a DSN under <code>account</code>. Cannot already have a DSN published.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="CRSN.md#0x1_CRSN_publish">publish</a>(account: &signer, min_nonce: u64, size: u64) {
-    <b>assert</b>(!<a href="CRSN.md#0x1_CRSN_has_crsn">has_crsn</a>(<a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account)), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="CRSN.md#0x1_CRSN_EHAS_CRSN">EHAS_CRSN</a>));
-    <b>assert</b>(size &gt; 0, <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="CRSN.md#0x1_CRSN_EZERO_SIZE_CRSN">EZERO_SIZE_CRSN</a>));
-    <b>assert</b>(size &lt;= <a href="CRSN.md#0x1_CRSN_MAX_CRSN_SIZE">MAX_CRSN_SIZE</a>, <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="CRSN.md#0x1_CRSN_ECRSN_SIZE_TOO_LARGE">ECRSN_SIZE_TOO_LARGE</a>));
-    <b>assert</b>(<b>exists</b>&lt;<a href="CRSN.md#0x1_CRSN_CRSNsAllowed">CRSNsAllowed</a>&gt;(@DiemRoot), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="CRSN.md#0x1_CRSN_ENOT_INITIALIZED">ENOT_INITIALIZED</a>));
+    <b>assert</b>!(!<a href="CRSN.md#0x1_CRSN_has_crsn">has_crsn</a>(<a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account)), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="CRSN.md#0x1_CRSN_EHAS_CRSN">EHAS_CRSN</a>));
+    <b>assert</b>!(size &gt; 0, <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="CRSN.md#0x1_CRSN_EZERO_SIZE_CRSN">EZERO_SIZE_CRSN</a>));
+    <b>assert</b>!(size &lt;= <a href="CRSN.md#0x1_CRSN_MAX_CRSN_SIZE">MAX_CRSN_SIZE</a>, <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="CRSN.md#0x1_CRSN_ECRSN_SIZE_TOO_LARGE">ECRSN_SIZE_TOO_LARGE</a>));
+    <b>assert</b>!(<b>exists</b>&lt;<a href="CRSN.md#0x1_CRSN_CRSNsAllowed">CRSNsAllowed</a>&gt;(@DiemRoot), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="CRSN.md#0x1_CRSN_ENOT_INITIALIZED">ENOT_INITIALIZED</a>));
     move_to(account, <a href="CRSN.md#0x1_CRSN">CRSN</a> {
         min_nonce,
         size,
@@ -382,7 +382,7 @@ will be accepted, and <code><b>false</b></code> otherwise.
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="CRSN.md#0x1_CRSN_check">check</a>(account: &signer, sequence_nonce: u64): bool
 <b>acquires</b> <a href="CRSN.md#0x1_CRSN">CRSN</a> {
     <b>let</b> addr = <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
-    <b>assert</b>(<a href="CRSN.md#0x1_CRSN_has_crsn">has_crsn</a>(addr), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="CRSN.md#0x1_CRSN_ENO_CRSN">ENO_CRSN</a>));
+    <b>assert</b>!(<a href="CRSN.md#0x1_CRSN_has_crsn">has_crsn</a>(addr), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="CRSN.md#0x1_CRSN_ENO_CRSN">ENO_CRSN</a>));
     <b>let</b> crsn = borrow_global_mut&lt;<a href="CRSN.md#0x1_CRSN">CRSN</a>&gt;(addr);
 
     // Don't accept <b>if</b> it's outside of the window
@@ -472,9 +472,9 @@ then shifted over set bits as define by the <code>shift_window_right</code> func
 
 <pre><code><b>public</b> <b>fun</b> <a href="CRSN.md#0x1_CRSN_force_expire">force_expire</a>(account: &signer, shift_amount: u64)
 <b>acquires</b> <a href="CRSN.md#0x1_CRSN">CRSN</a> {
-    <b>assert</b>(shift_amount &gt; 0, <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="CRSN.md#0x1_CRSN_EINVALID_SHIFT">EINVALID_SHIFT</a>));
+    <b>assert</b>!(shift_amount &gt; 0, <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="CRSN.md#0x1_CRSN_EINVALID_SHIFT">EINVALID_SHIFT</a>));
     <b>let</b> addr = <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
-    <b>assert</b>(<a href="CRSN.md#0x1_CRSN_has_crsn">has_crsn</a>(addr), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="CRSN.md#0x1_CRSN_ENO_CRSN">ENO_CRSN</a>));
+    <b>assert</b>!(<a href="CRSN.md#0x1_CRSN_has_crsn">has_crsn</a>(addr), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="CRSN.md#0x1_CRSN_ENO_CRSN">ENO_CRSN</a>));
     <b>let</b> crsn = borrow_global_mut&lt;<a href="CRSN.md#0x1_CRSN">CRSN</a>&gt;(addr);
 
     <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event_emit_event">Event::emit_event</a>(&<b>mut</b> crsn.force_shift_events, <a href="CRSN.md#0x1_CRSN_ForceShiftEvent">ForceShiftEvent</a> {

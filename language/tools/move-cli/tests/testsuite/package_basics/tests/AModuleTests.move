@@ -4,7 +4,7 @@ module Std::AModuleTests {
 
     #[test]
     fun double_zero_zero() {
-        assert(AModule::double_except_three(0) == 0, 0)
+        assert!(AModule::double_except_three(0) == 0, 0)
     }
 
     #[test]
@@ -16,11 +16,11 @@ module Std::AModuleTests {
     #[test]
     #[expected_failure(abort_code = 0)]
     fun double_zero_zero_wrong() {
-        assert(AModule::double_except_three(0) == 1, 0)
+        assert!(AModule::double_except_three(0) == 1, 0)
     }
 
     #[test]
     fun double_one_one() {
-        assert(AModule::double_except_three(1) == 1, 0)
+        assert!(AModule::double_except_three(1) == 1, 0)
     }
 }

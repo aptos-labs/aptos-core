@@ -15,38 +15,38 @@ module Std::BCSTests {
     fun bcs_address() {
         let addr = @0x89b9f9d1fadc027cf9532d6f99041522;
         let expected_output = x"89b9f9d1fadc027cf9532d6f99041522";
-        assert(BCS::to_bytes(&addr) == expected_output, 0);
+        assert!(BCS::to_bytes(&addr) == expected_output, 0);
     }
 
     #[test]
     fun bcs_bool() {
         let expected_output = x"01";
-        assert(BCS::to_bytes(&true) == expected_output, 0);
+        assert!(BCS::to_bytes(&true) == expected_output, 0);
     }
 
     #[test]
     fun bcs_u8() {
         let expected_output = x"01";
-        assert(BCS::to_bytes(&1u8) == expected_output, 0);
+        assert!(BCS::to_bytes(&1u8) == expected_output, 0);
     }
 
     #[test]
     fun bcs_u64() {
         let expected_output = x"0100000000000000";
-        assert(BCS::to_bytes(&1) == expected_output, 0);
+        assert!(BCS::to_bytes(&1) == expected_output, 0);
     }
 
     #[test]
     fun bcs_u128() {
         let expected_output = x"01000000000000000000000000000000";
-        assert(BCS::to_bytes(&1u128) == expected_output, 0);
+        assert!(BCS::to_bytes(&1u128) == expected_output, 0);
     }
 
     #[test]
     fun bcs_vec_u8() {
         let v = x"0f";
         let expected_output = x"010f";
-        assert(BCS::to_bytes(&v) == expected_output, 0);
+        assert!(BCS::to_bytes(&v) == expected_output, 0);
     }
 
     fun box3<T>(x: T): Box3<T> {

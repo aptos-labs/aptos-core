@@ -60,7 +60,7 @@ module 0x42::Test {
         let generator = EventHandleGenerator{counter: 0};
         let authentication_key = auth_key_prefix;
         Vector::append(&mut authentication_key, BCS::to_bytes(&fresh_address));
-        assert(Vector::length(&authentication_key) == 32, 12);
+        assert!(Vector::length(&authentication_key) == 32, 12);
 
 
         move_to<T>(sender, T{

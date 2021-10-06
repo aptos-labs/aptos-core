@@ -27,7 +27,7 @@ module 0x1::M {
 
         i = 0;
         while (i < num_signers) {
-            assert(has_a(Signer::address_of(Vector::borrow(&signers, i))), 0);
+            assert!(has_a(Signer::address_of(Vector::borrow(&signers, i))), 0);
             i = i + 1;
         }
     }
@@ -56,7 +56,7 @@ module 0x1::M {
         let other_signers = UnitTest::create_signers_for_testing(num_signers);
 
         while (i < num_signers) {
-            assert(
+            assert!(
                 Signer::address_of(Vector::borrow(&signers, i)) ==
                   Signer::address_of(Vector::borrow(&other_signers, i)),
                 i

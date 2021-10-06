@@ -6,7 +6,7 @@ use Std::BCS;
 fun main(account: signer) {
     let account = &account;
     let addr: address = @0x111101;
-    assert(!DiemAccount::exists_at(addr), 83);
+    assert!(!DiemAccount::exists_at(addr), 83);
     DiemAccount::create_parent_vasp_account<XUS>(account, addr, BCS::to_bytes(&addr), x"aa", false);
 }
 }
@@ -21,7 +21,7 @@ fun main(account: signer) {
     let with_cap = DiemAccount::extract_withdraw_capability(account);
     DiemAccount::pay_from<XUS>(&with_cap, addr, 10, x"", x"");
     DiemAccount::restore_withdraw_capability(with_cap);
-    assert(DiemAccount::balance<XUS>(addr) == 10, 84);
-    assert(DiemAccount::sequence_number(addr) == 0, 84);
+    assert!(DiemAccount::balance<XUS>(addr) == 10, 84);
+    assert!(DiemAccount::sequence_number(addr) == 0, 84);
 }
 }

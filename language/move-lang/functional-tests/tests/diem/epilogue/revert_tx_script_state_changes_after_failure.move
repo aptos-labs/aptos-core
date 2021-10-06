@@ -11,7 +11,7 @@ fun main(account: signer) {
     let with_cap = DiemAccount::extract_withdraw_capability(account);
     DiemAccount::pay_from<XUS>(&with_cap, @{{bob}}, 514, x"", x"");
     DiemAccount::restore_withdraw_capability(with_cap);
-    assert(false, 42);
+    assert!(false, 42);
 }
 }
 // check: "Keep(ABORTED { code: 42,"
@@ -23,7 +23,7 @@ use DiemFramework::XUS::XUS;
 use DiemFramework::DiemAccount;
 
 fun main() {
-    assert(DiemAccount::balance<XUS>(@{{bob}}) == 1000000, 43);
+    assert!(DiemAccount::balance<XUS>(@{{bob}}) == 1000000, 43);
 }
 }
 // check: "Keep(EXECUTED)"

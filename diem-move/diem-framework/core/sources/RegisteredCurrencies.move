@@ -51,7 +51,7 @@ module DiemFramework::RegisteredCurrencies {
         currency_code: vector<u8>,
     ) {
         let config = DiemConfig::get<RegisteredCurrencies>();
-        assert(
+        assert!(
             !Vector::contains(&config.currency_codes, &currency_code),
             Errors::invalid_argument(ECURRENCY_CODE_ALREADY_TAKEN)
         );

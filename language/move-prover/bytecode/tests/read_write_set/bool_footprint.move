@@ -8,7 +8,7 @@ module BoolFootprint {
     }
 
     public fun call_get(a: address) acquires B {
-        assert(global_get(a), 22)
+        assert!(global_get(a), 22)
     }
 }
 }

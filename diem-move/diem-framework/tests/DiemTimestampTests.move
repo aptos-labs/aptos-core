@@ -53,16 +53,16 @@ module DiemFramework::DiemTimestampTests {
     #[test(dr = @DiemRoot, tc = @TreasuryCompliance, vm = @VMReserved)]
     fun update_global_time_post_genesis_vm_nil_proposer_equal_timestamp(dr: signer, tc: signer, vm: signer) {
         Genesis::setup(&dr, &tc);
-        assert(DiemTimestamp::now_microseconds() == 0, 0);
+        assert!(DiemTimestamp::now_microseconds() == 0, 0);
         DiemTimestamp::update_global_time(&vm, @VMReserved, 0);
-        assert(DiemTimestamp::now_microseconds() == 0, 1);
+        assert!(DiemTimestamp::now_microseconds() == 0, 1);
     }
 
     #[test(dr = @DiemRoot, tc = @TreasuryCompliance, vm = @VMReserved)]
     #[expected_failure(abort_code = 519)]
     fun update_global_time_post_genesis_vm_nil_proposer_increasing_timestamp(dr: signer, tc: signer, vm: signer) {
         Genesis::setup(&dr, &tc);
-        assert(DiemTimestamp::now_microseconds() == 0, 0);
+        assert!(DiemTimestamp::now_microseconds() == 0, 0);
         DiemTimestamp::update_global_time(&vm, @VMReserved, 1);
     }
 
@@ -70,16 +70,16 @@ module DiemFramework::DiemTimestampTests {
     #[expected_failure(abort_code = 519)]
     fun update_global_time_post_genesis_vm_not_nil_proposer_equal_timestamp(dr: signer, tc: signer, vm: signer) {
         Genesis::setup(&dr, &tc);
-        assert(DiemTimestamp::now_microseconds() == 0, 0);
+        assert!(DiemTimestamp::now_microseconds() == 0, 0);
         DiemTimestamp::update_global_time(&vm, @0x1, 0);
     }
 
     #[test(dr = @DiemRoot, tc = @TreasuryCompliance, vm = @VMReserved)]
     fun update_global_time_post_genesis_vm_not_nil_proposer_increasing_timestamp(dr: signer, tc: signer, vm: signer) {
         Genesis::setup(&dr, &tc);
-        assert(DiemTimestamp::now_microseconds() == 0, 0);
+        assert!(DiemTimestamp::now_microseconds() == 0, 0);
         DiemTimestamp::update_global_time(&vm, @0x1, 1);
-        assert(DiemTimestamp::now_microseconds() == 1, 1);
+        assert!(DiemTimestamp::now_microseconds() == 1, 1);
     }
 
     #[test]
@@ -91,7 +91,7 @@ module DiemFramework::DiemTimestampTests {
     #[test(dr = @DiemRoot, tc = @TreasuryCompliance)]
     fun now_microseconds_post_genesis(dr: signer, tc: signer) {
         Genesis::setup(&dr, &tc);
-        assert(DiemTimestamp::now_microseconds() == 0, 0);
+        assert!(DiemTimestamp::now_microseconds() == 0, 0);
     }
 
     #[test]
@@ -103,15 +103,15 @@ module DiemFramework::DiemTimestampTests {
     #[test(dr = @DiemRoot, tc = @TreasuryCompliance)]
     fun now_seconds_post_genesis(dr: signer, tc: signer) {
         Genesis::setup(&dr, &tc);
-        assert(DiemTimestamp::now_seconds() == 0, 0);
+        assert!(DiemTimestamp::now_seconds() == 0, 0);
     }
 
     #[test(dr = @DiemRoot, tc = @TreasuryCompliance)]
     fun is_genesis(dr: signer, tc: signer) {
-        assert(DiemTimestamp::is_genesis(), 0);
+        assert!(DiemTimestamp::is_genesis(), 0);
         DiemTimestamp::assert_genesis();
         Genesis::setup(&dr, &tc);
-        assert(!DiemTimestamp::is_genesis(), 1);
+        assert!(!DiemTimestamp::is_genesis(), 1);
     }
 
     #[test(dr = @DiemRoot, tc = @TreasuryCompliance)]
@@ -123,10 +123,10 @@ module DiemFramework::DiemTimestampTests {
 
     #[test(dr = @DiemRoot, tc = @TreasuryCompliance)]
     fun is_operating(dr: signer, tc: signer) {
-        assert(!DiemTimestamp::is_operating(), 0);
+        assert!(!DiemTimestamp::is_operating(), 0);
         Genesis::setup(&dr, &tc);
         DiemTimestamp::assert_operating();
-        assert(DiemTimestamp::is_operating(), 1);
+        assert!(DiemTimestamp::is_operating(), 1);
     }
 
     #[test]

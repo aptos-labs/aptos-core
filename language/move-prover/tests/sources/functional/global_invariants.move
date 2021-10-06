@@ -41,7 +41,7 @@ module 0x42::TestGlobalInvariants {
     }
 
     public fun get_S_x(account: &signer): u64 acquires S {
-        assert(exists<R>(Signer::address_of(account)), 0);
+        assert!(exists<R>(Signer::address_of(account)), 0);
         borrow_global<S>(Signer::address_of(account)).x
     }
     spec get_S_x {
@@ -52,7 +52,7 @@ module 0x42::TestGlobalInvariants {
 
     public fun remove_S_invalid(account: &signer) acquires S {
         // We cannot remove an S if there is an R.
-        assert(exists<R>(Signer::address_of(account)), 0);
+        assert!(exists<R>(Signer::address_of(account)), 0);
         let S{x:_} = move_from<S>(Signer::address_of(account));
     }
     spec remove_S_invalid {
@@ -61,7 +61,7 @@ module 0x42::TestGlobalInvariants {
 
     public fun remove_R_invalid(account: &signer) acquires R {
         // We cannot remove an R because of the update invariant.
-        assert(exists<R>(Signer::address_of(account)), 0);
+        assert!(exists<R>(Signer::address_of(account)), 0);
         let R{x:_} = move_from<R>(Signer::address_of(account));
     }
 }

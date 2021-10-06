@@ -5,7 +5,7 @@ fun main() {
     if (true) {
         ref = &x;
     };
-    assert(*move ref == 5, 42);
+    assert!(*move ref == 5, 42);
 }
 }
 

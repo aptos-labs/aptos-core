@@ -19,13 +19,13 @@ module DiemFramework::CurrenciesTests {
             account, @0x3, dummy_auth_key_prefix, b"other_name", true
         );
 
-        assert(DiemAccount::accepts_currency<XUS>(@0x2), 0);
-        assert(!DiemAccount::accepts_currency<XDX>(@0x2), 2);
-        assert(DualAttestation::human_name(@0x2) == b"name", 77);
-        assert(DualAttestation::base_url(@0x2) == b"", 78);
-        assert(DualAttestation::compliance_public_key(@0x2) == b"", 79);
+        assert!(DiemAccount::accepts_currency<XUS>(@0x2), 0);
+        assert!(!DiemAccount::accepts_currency<XDX>(@0x2), 2);
+        assert!(DualAttestation::human_name(@0x2) == b"name", 77);
+        assert!(DualAttestation::base_url(@0x2) == b"", 78);
+        assert!(DualAttestation::compliance_public_key(@0x2) == b"", 79);
 
-        assert(DiemAccount::accepts_currency<XUS>(@0x3), 3);
-        assert(DiemAccount::accepts_currency<XDX>(@0x3), 5);
+        assert!(DiemAccount::accepts_currency<XUS>(@0x3), 3);
+        assert!(DiemAccount::accepts_currency<XDX>(@0x3), 5);
     }
 }

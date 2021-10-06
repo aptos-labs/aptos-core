@@ -17,8 +17,8 @@ Failures in 0x1::Module:
 │  95 │     fun tests_d(a1: signer, a2: signer)
 │     │         ------- In this function in 0x1::Module
 │     ·
-│ 102 │         assert(d<u64>(@0x2, 6), 3);
-│     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^ Test was not expected to abort but it aborted with 3 here
+│ 102 │         assert!(d<u64>(@0x2, 6), 3);
+│     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^ Test was not expected to abort but it aborted with 3 here
 │ 
 │ 
 └──────────────────

@@ -42,7 +42,7 @@ module Set {
                 if (mid == 0) {
                     return (0, false)
                 };
-                assert(mid != 0, 88);
+                assert!(mid != 0, 88);
                 right = mid -1
             }
         };

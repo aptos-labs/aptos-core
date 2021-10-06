@@ -6,6 +6,6 @@ fun main() {
         x = x + 1;
         break
     };
-    assert(x == 1, 42);
+    assert!(x == 1, 42);
 }
 }

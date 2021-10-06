@@ -21,7 +21,7 @@ script {
 use DiemFramework::DiemTransactionPublishingOption;
 fun main(account: signer) {
     let account = &account;
-    assert(DiemTransactionPublishingOption::is_script_allowed(account, &x""), 0);
+    assert!(DiemTransactionPublishingOption::is_script_allowed(account, &x""), 0);
 }
 }
 // check: "Keep(EXECUTED)"

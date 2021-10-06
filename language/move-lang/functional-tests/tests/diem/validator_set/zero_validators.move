@@ -21,7 +21,7 @@ script {
     fun main(account: signer) {
     let account = &account;
         let num_validators = DiemSystem::validator_set_size();
-        assert(num_validators == 1, 98);
+        assert!(num_validators == 1, 98);
         let index = 0;
         while (index < num_validators) {
             let addr = DiemSystem::get_ith_validator_address(index);

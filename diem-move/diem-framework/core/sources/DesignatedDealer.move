@@ -67,7 +67,7 @@ module DiemFramework::DesignatedDealer {
     ){
         Roles::assert_treasury_compliance(tc_account);
         Roles::assert_designated_dealer(dd);
-        assert(!exists<Dealer>(Signer::address_of(dd)), Errors::already_published(EDEALER));
+        assert!(!exists<Dealer>(Signer::address_of(dd)), Errors::already_published(EDEALER));
         move_to(dd, Dealer { mint_event_handle: Event::new_event_handle<ReceivedMintEvent>(dd) });
         if (add_all_currencies) {
             add_currency<XUS>(dd, tc_account);
@@ -103,7 +103,7 @@ module DiemFramework::DesignatedDealer {
     public(friend) fun add_currency<CoinType>(dd: &signer, tc_account: &signer) {
         Roles::assert_treasury_compliance(tc_account);
         let dd_addr = Signer::address_of(dd);
-        assert(exists_at(dd_addr), Errors::not_published(EDEALER));
+        assert!(exists_at(dd_addr), Errors::not_published(EDEALER));
         Diem::publish_preburn_queue_to_account<CoinType>(dd, tc_account);
     }
     // #[test_only] TODO: uncomment once unit tests are fully migrated
@@ -139,8 +139,8 @@ module DiemFramework::DesignatedDealer {
         _tier_index: u64,
     ): Diem::Diem<CoinType> acquires Dealer, TierInfo {
         Roles::assert_treasury_compliance(tc_account);
-        assert(amount > 0, Errors::invalid_argument(EINVALID_MINT_AMOUNT));
-        assert(exists_at(dd_addr), Errors::not_published(EDEALER));
+        assert!(amount > 0, Errors::invalid_argument(EINVALID_MINT_AMOUNT));
+        assert!(exists_at(dd_addr), Errors::not_published(EDEALER));
 
         // Delete deprecated `TierInfo` resources.
         // TODO: delete this code once there are no more TierInfo resources in the system

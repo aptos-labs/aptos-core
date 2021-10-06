@@ -40,7 +40,7 @@ module DiemFramework::ValidatorOperatorConfigTests {
         let s = get_signer();
         Roles::new_validator_operator_role(&dr, &s);
         VOC::publish(&s, &dr, x"");
-        assert(VOC::has_validator_operator_config(Signer::address_of(&s)), 0);
+        assert!(VOC::has_validator_operator_config(Signer::address_of(&s)), 0);
     }
 
     #[test(tc = @TreasuryCompliance, dr = @DiemRoot)]
@@ -65,6 +65,6 @@ module DiemFramework::ValidatorOperatorConfigTests {
         let s = get_signer();
         Roles::new_validator_operator_role(&dr, &s);
         VOC::publish(&s, &dr, b"test");
-        assert(VOC::get_human_name(Signer::address_of(&s)) == b"test", 0);
+        assert!(VOC::get_human_name(Signer::address_of(&s)) == b"test", 0);
     }
 }

@@ -11,7 +11,7 @@ module Escape {
 
     public fun initialize(account: &signer) {
         let owner = Signer::address_of(account);
-        assert(owner == @0x123, 0);
+        assert!(owner == @0x123, 0);
         move_to<Wrapper<IndoorThing>>(account, Wrapper{ thing: IndoorThing {} });
         move_to<Wrapper<OutdoorThing>>(account, Wrapper { thing: OutdoorThing {}});
     }

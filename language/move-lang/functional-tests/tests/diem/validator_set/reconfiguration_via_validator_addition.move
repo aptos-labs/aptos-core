@@ -15,8 +15,8 @@ script{
     fun main(account: signer) {
     let account = &account;
         DiemSystem::remove_validator(account, @{{alice}});
-        assert(!DiemSystem::is_validator(@{{alice}}), 77);
-        assert(DiemSystem::is_validator(@{{bob}}), 78);
+        assert!(!DiemSystem::is_validator(@{{alice}}), 77);
+        assert!(DiemSystem::is_validator(@{{bob}}), 78);
     }
 }
 // check: NewEpochEvent
@@ -75,8 +75,8 @@ script{
     let account = &account;
         DiemSystem::add_validator(account, @{{alice}});
 
-        assert(DiemSystem::is_validator(@{{alice}}), 77);
-        assert(DiemSystem::is_validator(@{{bob}}), 78);
+        assert!(DiemSystem::is_validator(@{{alice}}), 77);
+        assert!(DiemSystem::is_validator(@{{bob}}), 78);
     }
 }
 // check: NewEpochEvent

@@ -23,12 +23,12 @@ script {
 use 0x42::Test;
 fun main() {
     let x = Test::new();
-    assert(Test::len(&x) == 10, 70002);
+    assert!(Test::len(&x) == 10, 70002);
 
     let i = 0;
     while (i < Test::len(&x)) {
         // if inline blocks skips relabelling this will cause a bytecode verifier error
-        assert(Test::modify(&mut x) == i, 70003);
+        assert!(Test::modify(&mut x) == i, 70003);
         i = i + 1
     }
 }

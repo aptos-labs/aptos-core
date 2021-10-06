@@ -45,7 +45,7 @@ module Sender::NFT { // TODO: Swap {Sender,TroveFramework}
     /* const ENOT_ADMIN: u64 = 0; */
 
     public(script) fun initialize<Type: store + drop>(account: &signer) {
-        /* assert(Signer::address_of(account) == ADMIN, ENOT_ADMIN); */
+        /* assert!(Signer::address_of(account) == ADMIN, ENOT_ADMIN); */
         // dimroc: work around for hackathon to allow duplicate initialize invocations
         if (!exists<Admin<Type>>(Signer::address_of(account))) { // Added dup initialize check
           move_to(account, Admin { mint_events: Event::new_event_handle<MintEvent<Type>>(account) })

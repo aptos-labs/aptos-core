@@ -26,7 +26,6 @@ error: global memory invariant does not hold
    =     at ../move-stdlib/sources/Signer.move:13: address_of
    =         result = <redacted>
    =     at ../move-stdlib/sources/Signer.move:14: address_of
-   =         <redacted> = <redacted>
    =     at ../move-stdlib/sources/Signer.move:12: address_of
    =         s = <redacted>
    =     at ../move-stdlib/sources/Signer.move:13: address_of
@@ -51,7 +50,6 @@ error: global memory invariant does not hold
    =     at ../move-stdlib/sources/Signer.move:13: address_of
    =         result = <redacted>
    =     at ../move-stdlib/sources/Signer.move:14: address_of
-   =         <redacted> = <redacted>
    =     at ../move-stdlib/sources/Signer.move:12: address_of
    =         s = <redacted>
    =     at ../move-stdlib/sources/Signer.move:13: address_of

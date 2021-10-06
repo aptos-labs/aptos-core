@@ -32,9 +32,9 @@ script{
 script{
     use DiemFramework::DiemSystem;
     fun main() {
-        assert(!DiemSystem::is_validator(@{{vivian}}), 70);
-        assert(!DiemSystem::is_validator(@{{alice}}), 71);
-        assert(DiemSystem::is_validator(@{{viola}}), 72);
+        assert!(!DiemSystem::is_validator(@{{vivian}}), 70);
+        assert!(!DiemSystem::is_validator(@{{alice}}), 71);
+        assert!(DiemSystem::is_validator(@{{viola}}), 72);
     }
 }
 

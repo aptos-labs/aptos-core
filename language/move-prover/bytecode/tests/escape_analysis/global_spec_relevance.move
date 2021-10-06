@@ -18,7 +18,7 @@ module 0x1::GlobalSpecRelevance {
     }
 
     public fun publish(account: &signer, n: Nonzero) {
-        assert(n.i > 0, 0);
+        assert!(n.i > 0, 0);
         move_to(account, n)
     }
 }

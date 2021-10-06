@@ -8,11 +8,11 @@ module Std::BitVectorTests {
         let index = 0;
         while (index < k) {
             BitVector::set(&mut bitvector, index);
-            assert(BitVector::is_index_set(&bitvector, index), 0);
+            assert!(BitVector::is_index_set(&bitvector, index), 0);
             index = index + 1;
             let index_to_right = index;
             while (index_to_right < k) {
-                assert(!BitVector::is_index_set(&bitvector, index_to_right), 1);
+                assert!(!BitVector::is_index_set(&bitvector, index_to_right), 1);
                 index_to_right = index_to_right + 1;
             };
         };
@@ -21,11 +21,11 @@ module Std::BitVectorTests {
 
         while (index < k) {
             BitVector::unset(&mut bitvector, index);
-            assert(!BitVector::is_index_set(&bitvector, index), 0);
+            assert!(!BitVector::is_index_set(&bitvector, index), 0);
             index = index + 1;
             let index_to_right = index;
             while (index_to_right < k) {
-                assert(BitVector::is_index_set(&bitvector, index_to_right), 1);
+                assert!(BitVector::is_index_set(&bitvector, index_to_right), 1);
                 index_to_right = index_to_right + 1;
             };
         };
@@ -65,20 +65,20 @@ module Std::BitVectorTests {
     #[test]
     fun longest_sequence_no_set_zero_index() {
         let bitvector = BitVector::new(100);
-        assert(BitVector::longest_set_sequence_starting_at(&bitvector, 0) == 0, 0);
+        assert!(BitVector::longest_set_sequence_starting_at(&bitvector, 0) == 0, 0);
     }
 
     #[test]
     fun longest_sequence_one_set_zero_index() {
         let bitvector = BitVector::new(100);
         BitVector::set(&mut bitvector, 1);
-        assert(BitVector::longest_set_sequence_starting_at(&bitvector, 0) == 0, 0);
+        assert!(BitVector::longest_set_sequence_starting_at(&bitvector, 0) == 0, 0);
     }
 
     #[test]
     fun longest_sequence_no_set_nonzero_index() {
         let bitvector = BitVector::new(100);
-        assert(BitVector::longest_set_sequence_starting_at(&bitvector, 51) == 0, 0);
+        assert!(BitVector::longest_set_sequence_starting_at(&bitvector, 51) == 0, 0);
     }
 
     #[test]
@@ -86,7 +86,7 @@ module Std::BitVectorTests {
         let bitvector = BitVector::new(100);
         BitVector::set(&mut bitvector, 50);
         BitVector::set(&mut bitvector, 52);
-        assert(BitVector::longest_set_sequence_starting_at(&bitvector, 51) == 0, 0);
+        assert!(BitVector::longest_set_sequence_starting_at(&bitvector, 51) == 0, 0);
     }
 
     #[test]
@@ -103,9 +103,9 @@ module Std::BitVectorTests {
             BitVector::set(&mut bitvector, i);
             i = i + 1;
         };
-        assert(BitVector::longest_set_sequence_starting_at(&bitvector, 0) == 20, 0);
-        assert(BitVector::longest_set_sequence_starting_at(&bitvector, 20) == 0, 0);
-        assert(BitVector::longest_set_sequence_starting_at(&bitvector, 21) == 100 - 21, 0);
+        assert!(BitVector::longest_set_sequence_starting_at(&bitvector, 0) == 20, 0);
+        assert!(BitVector::longest_set_sequence_starting_at(&bitvector, 20) == 0, 0);
+        assert!(BitVector::longest_set_sequence_starting_at(&bitvector, 21) == 100 - 21, 0);
     }
 
     #[test]
@@ -121,9 +121,9 @@ module Std::BitVectorTests {
 
         i = bitlen - 1;
         while (i > 0) {
-            assert(BitVector::is_index_set(&bitvector, i), 0);
+            assert!(BitVector::is_index_set(&bitvector, i), 0);
             BitVector::shift_left(&mut bitvector, 1);
-            assert(!BitVector::is_index_set(&bitvector,  i), 1);
+            assert!(!BitVector::is_index_set(&bitvector,  i), 1);
             i = i - 1;
         };
     }
@@ -135,18 +135,18 @@ module Std::BitVectorTests {
         let bitvector = BitVector::new(bitlen);
 
         BitVector::set(&mut bitvector, 201);
-        assert(BitVector::is_index_set(&bitvector, 201), 0);
+        assert!(BitVector::is_index_set(&bitvector, 201), 0);
 
         BitVector::shift_left(&mut bitvector, shift_amount);
-        assert(BitVector::is_index_set(&bitvector, 201 - shift_amount), 1);
-        assert(!BitVector::is_index_set(&bitvector, 201), 2);
+        assert!(BitVector::is_index_set(&bitvector, 201 - shift_amount), 1);
+        assert!(!BitVector::is_index_set(&bitvector, 201), 2);
 
         // Make sure this shift clears all the bits
         BitVector::shift_left(&mut bitvector, bitlen  - 1);
 
         let i = 0;
         while (i < bitlen) {
-            assert(!BitVector::is_index_set(&bitvector, i), 3);
+            assert!(!BitVector::is_index_set(&bitvector, i), 3);
             i = i + 1;
         }
     }
@@ -166,7 +166,7 @@ module Std::BitVectorTests {
         };
 
         BitVector::unset(&mut bitvector, chosen_index);
-        assert(!BitVector::is_index_set(&bitvector, chosen_index), 0);
+        assert!(!BitVector::is_index_set(&bitvector, chosen_index), 0);
 
         BitVector::shift_left(&mut bitvector, shift_amount);
 
@@ -175,9 +175,9 @@ module Std::BitVectorTests {
         while (i < bitlen) {
             // only chosen_index - shift_amount and the remaining bits should be BitVector::unset
             if ((i == chosen_index - shift_amount) || (i >= bitlen - shift_amount)) {
-                assert(!BitVector::is_index_set(&bitvector, i), 1);
+                assert!(!BitVector::is_index_set(&bitvector, i), 1);
             } else {
-                assert(BitVector::is_index_set(&bitvector, i), 2);
+                assert!(BitVector::is_index_set(&bitvector, i), 2);
             };
             i = i + 1;
         }
@@ -197,7 +197,7 @@ module Std::BitVectorTests {
         BitVector::shift_left(&mut bitvector, bitlen - 1);
         i = bitlen - 1;
         while (i > 0) {
-            assert(!BitVector::is_index_set(&bitvector,  i), 1);
+            assert!(!BitVector::is_index_set(&bitvector,  i), 1);
             i = i - 1;
         };
     }
@@ -218,6 +218,6 @@ module Std::BitVectorTests {
     #[test]
     fun single_bit_bitvector() {
         let bitvector = BitVector::new(1);
-        assert(BitVector::length(&bitvector) == 1, 0);
+        assert!(BitVector::length(&bitvector) == 1, 0);
     }
 }

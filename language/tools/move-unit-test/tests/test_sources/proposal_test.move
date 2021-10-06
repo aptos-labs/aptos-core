@@ -68,38 +68,38 @@ module Module {
 
     #[test] // test entry point.
     fun tests_a() { // an actual test that will be run
-        assert(a(0) == false, 0);
-        assert(a(10), 1);
+        assert!(a(0) == false, 0);
+        assert!(a(10), 1);
     }
 
     #[test(a1=@0x1, a2=@0x2)] // testing framework will create and pass-in signers with these addresses
     fun tests_b(a1: signer, a2: signer) {
-        assert(b(@0x1) == false, 0);
+        assert!(b(@0x1) == false, 0);
         setup_storage_tests_b(&a1, &a2);
-        assert(b(@0x1), 1);
-        assert(b(@0x2), 2);
-        assert(!b(@0x3), 3);
+        assert!(b(@0x1), 1);
+        assert!(b(@0x2), 2);
+        assert!(!b(@0x3), 3);
     }
 
     #[test(a1=@0x1, a2=@0x2)]
     fun tests_c(a1: signer, a2: signer)
     acquires A {
         setup_storage_tests_c(&a1, &a2);
-        assert(c(@0x1, 5), 0);
-        assert(!c(@0x1, 6), 1);
-        assert(!c(@0x2, 5), 2);
-        assert(c(@0x2, 6), 3);
+        assert!(c(@0x1, 5), 0);
+        assert!(!c(@0x1, 6), 1);
+        assert!(!c(@0x2, 5), 2);
+        assert!(c(@0x2, 6), 3);
     }
 
     #[test(a1=@0x1, a2=@0x2)]
     fun tests_d(a1: signer, a2: signer)
     acquires B {
         setup_storage_tests_d(&a1, &a2);
-        assert(d<u64>(@0x1, 5), 0);
-        assert(!d<u64>(@0x1, 6), 1);
-        assert(!d<bool>(@0x2, 5), 2);
+        assert!(d<u64>(@0x1, 5), 0);
+        assert!(!d<u64>(@0x1, 6), 1);
+        assert!(!d<bool>(@0x2, 5), 2);
         // This should fail, and the error should be reported against the source
-        assert(d<u64>(@0x2, 6), 3);
+        assert!(d<u64>(@0x2, 6), 3);
     }
 
     #[test]

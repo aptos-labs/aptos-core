@@ -67,16 +67,16 @@ module DiemFramework::CRSN {
 
     public(script) fun allow_crsns(account: &signer) {
         Roles::assert_diem_root(account);
-        assert(!exists<CRSNsAllowed>(Signer::address_of(account)), Errors::invalid_state(EALREADY_INITIALIZED));
+        assert!(!exists<CRSNsAllowed>(Signer::address_of(account)), Errors::invalid_state(EALREADY_INITIALIZED));
         move_to(account, CRSNsAllowed { })
     }
 
     /// Publish a DSN under `account`. Cannot already have a DSN published.
     public(friend) fun publish(account: &signer, min_nonce: u64, size: u64) {
-        assert(!has_crsn(Signer::address_of(account)), Errors::invalid_state(EHAS_CRSN));
-        assert(size > 0, Errors::invalid_argument(EZERO_SIZE_CRSN));
-        assert(size <= MAX_CRSN_SIZE, Errors::invalid_argument(ECRSN_SIZE_TOO_LARGE));
-        assert(exists<CRSNsAllowed>(@DiemRoot), Errors::invalid_state(ENOT_INITIALIZED));
+        assert!(!has_crsn(Signer::address_of(account)), Errors::invalid_state(EHAS_CRSN));
+        assert!(size > 0, Errors::invalid_argument(EZERO_SIZE_CRSN));
+        assert!(size <= MAX_CRSN_SIZE, Errors::invalid_argument(ECRSN_SIZE_TOO_LARGE));
+        assert!(exists<CRSNsAllowed>(@DiemRoot), Errors::invalid_state(ENOT_INITIALIZED));
         move_to(account, CRSN {
             min_nonce,
             size,
@@ -119,7 +119,7 @@ module DiemFramework::CRSN {
     public(friend) fun check(account: &signer, sequence_nonce: u64): bool
     acquires CRSN {
         let addr = Signer::address_of(account);
-        assert(has_crsn(addr), Errors::invalid_state(ENO_CRSN));
+        assert!(has_crsn(addr), Errors::invalid_state(ENO_CRSN));
         let crsn = borrow_global_mut<CRSN>(addr);
 
         // Don't accept if it's outside of the window
@@ -164,9 +164,9 @@ module DiemFramework::CRSN {
     /// then shifted over set bits as define by the `shift_window_right` function.
     public fun force_expire(account: &signer, shift_amount: u64)
     acquires CRSN {
-        assert(shift_amount > 0, Errors::invalid_argument(EINVALID_SHIFT));
+        assert!(shift_amount > 0, Errors::invalid_argument(EINVALID_SHIFT));
         let addr = Signer::address_of(account);
-        assert(has_crsn(addr), Errors::invalid_state(ENO_CRSN));
+        assert!(has_crsn(addr), Errors::invalid_state(ENO_CRSN));
         let crsn = borrow_global_mut<CRSN>(addr);
 
         Event::emit_event(&mut crsn.force_shift_events, ForceShiftEvent {

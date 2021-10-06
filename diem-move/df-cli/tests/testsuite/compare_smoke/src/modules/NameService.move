@@ -23,7 +23,7 @@ module NameService {
 
     public fun initialize(account: &signer) {
         let sender = Signer::address_of(account);
-        assert(sender == NAMESERVICE_ADDR, 8000);
+        assert!(sender == NAMESERVICE_ADDR, 8000);
 
         SortedLinkedList::create_new_list<vector<u8>>(account, Vector::empty());
         move_to<Expiration>(account, Expiration { expire_on_block_height: Vector::singleton(0u64)});
@@ -152,7 +152,7 @@ use {{nameservice}}::NameService;
 fun main() {
     let entry = NameService::entry_handle({{alice}}, 0);
     let name = NameService::get_name_for(entry);
-    assert(name == b"alice", 26);
+    assert!(name == b"alice", 26);
 }
 }
 // check: "Keep(EXECUTED)"
@@ -176,7 +176,7 @@ script {
 use {{nameservice}}::NameService;
 fun main(account: signer) {
     let entry = NameService::entry_handle({{bob}}, 0);
-    assert(NameService::is_expired(copy entry), 27);
+    assert!(NameService::is_expired(copy entry), 27);
     NameService::remove_entry_by_service_owner(account, entry);
 }
 }
@@ -214,7 +214,7 @@ script {
 use {{nameservice}}::NameService;
 fun main(account: signer) {
     let entry = NameService::entry_handle({{bob}}, 0);
-    assert(NameService::is_expired(copy entry), 27);
+    assert!(NameService::is_expired(copy entry), 27);
     NameService::remove_entry_by_service_owner(account, entry);
 }
 }

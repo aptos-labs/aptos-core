@@ -15,7 +15,7 @@ pub enum Tok {
     NumValue,
     NumTypedValue,
     ByteStringValue,
-    IdentifierValue,
+    Identifier,
     Exclaim,
     ExclaimEqual,
     Percent,
@@ -89,7 +89,7 @@ impl fmt::Display for Tok {
             NumValue => "[Num]",
             NumTypedValue => "[NumTyped]",
             ByteStringValue => "[ByteString]",
-            IdentifierValue => "[Identifier]",
+            Identifier => "[Identifier]",
             Exclaim => "!",
             ExclaimEqual => "!=",
             Percent => "%",
@@ -627,6 +627,6 @@ fn get_name_token(name: &str) -> Tok {
         "true" => Tok::True,
         "use" => Tok::Use,
         "while" => Tok::While,
-        _ => Tok::IdentifierValue,
+        _ => Tok::Identifier,
     }
 }

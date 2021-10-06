@@ -123,15 +123,15 @@ use DiemFramework::AccountFreezing;
 fun main(account: signer) {
     let account = &account;
     AccountFreezing::freeze_account(account, @{{child}});
-    assert(AccountFreezing::account_is_frozen(@{{child}}), 3);
-    assert(!AccountFreezing::account_is_frozen(@{{vasp}}), 4);
+    assert!(AccountFreezing::account_is_frozen(@{{child}}), 3);
+    assert!(!AccountFreezing::account_is_frozen(@{{vasp}}), 4);
     AccountFreezing::unfreeze_account(account, @{{child}});
-    assert(!AccountFreezing::account_is_frozen(@{{child}}), 5);
+    assert!(!AccountFreezing::account_is_frozen(@{{child}}), 5);
     AccountFreezing::freeze_account(account, @{{vasp}});
-    assert(AccountFreezing::account_is_frozen(@{{vasp}}), 6);
-    assert(!AccountFreezing::account_is_frozen(@{{child}}), 7);
+    assert!(AccountFreezing::account_is_frozen(@{{vasp}}), 6);
+    assert!(!AccountFreezing::account_is_frozen(@{{child}}), 7);
     AccountFreezing::unfreeze_account(account, @{{vasp}});
-    assert(!AccountFreezing::account_is_frozen(@{{vasp}}), 8);
+    assert!(!AccountFreezing::account_is_frozen(@{{vasp}}), 8);
 }
 }
 
@@ -174,7 +174,7 @@ script {
     fun main(account: signer) {
         let account = &account;
         AccountFreezing::freeze_account(account, @{{vasp}});
-        assert(AccountFreezing::account_is_frozen(@{{vasp}}), 1);
+        assert!(AccountFreezing::account_is_frozen(@{{vasp}}), 1);
     }
 }
 // check: "Keep(EXECUTED)"
@@ -186,7 +186,7 @@ script {
     fun main(account: signer) {
         let account = &account;
         AccountFreezing::freeze_account(account, @{{vasp}});
-        assert(AccountFreezing::account_is_frozen(@{{vasp}}), 1);
+        assert!(AccountFreezing::account_is_frozen(@{{vasp}}), 1);
     }
 }
 // check: "Keep(EXECUTED)"

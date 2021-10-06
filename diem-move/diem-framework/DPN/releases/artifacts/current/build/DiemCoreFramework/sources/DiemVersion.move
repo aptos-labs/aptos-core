@@ -39,7 +39,7 @@ module DiemFramework::DiemVersion {
 
         let old_config = DiemConfig::get<DiemVersion>();
 
-        assert(
+        assert!(
             old_config.major < major,
             Errors::invalid_argument(EINVALID_MAJOR_VERSION_NUMBER)
         );

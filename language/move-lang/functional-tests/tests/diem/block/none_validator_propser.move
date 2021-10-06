@@ -11,8 +11,8 @@ use DiemFramework::DiemBlock;
 use DiemFramework::DiemTimestamp;
 
 fun main() {
-    assert(DiemBlock::get_current_block_height() == 1, 77);
-    assert(DiemTimestamp::now_microseconds() == 1000000, 78);
+    assert!(DiemBlock::get_current_block_height() == 1, 77);
+    assert!(DiemTimestamp::now_microseconds() == 1000000, 78);
 }
 }
 

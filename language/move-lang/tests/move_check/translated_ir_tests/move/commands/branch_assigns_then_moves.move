@@ -9,7 +9,7 @@ fun main() {
     } else {
         x = 0;
     };
-    assert(x == 5, 42);
+    assert!(x == 5, 42);
 }
 }
 

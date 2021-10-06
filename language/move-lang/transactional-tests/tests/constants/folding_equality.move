@@ -35,38 +35,38 @@ script {
     const COMPLEX: bool = ((0 == 0) == (b"hello" != b"bye")) == false;
 
     fun main() {
-        assert(EQ_T_U8, 42);
-        assert(EQ_T_U64, 42);
-        assert(EQ_T_U128, 42);
-        assert(EQ_T_BOOL, 42);
-        assert(EQ_T_ADDR, 42);
-        assert(EQ_T_HEX, 42);
-        assert(EQ_T_BYTES, 42);
+        assert!(EQ_T_U8, 42);
+        assert!(EQ_T_U64, 42);
+        assert!(EQ_T_U128, 42);
+        assert!(EQ_T_BOOL, 42);
+        assert!(EQ_T_ADDR, 42);
+        assert!(EQ_T_HEX, 42);
+        assert!(EQ_T_BYTES, 42);
 
-        assert(!EQ_F_U8, 42);
-        assert(!EQ_F_U64, 42);
-        assert(!EQ_F_U128, 42);
-        assert(!EQ_F_BOOL, 42);
-        assert(!EQ_F_ADDR, 42);
-        assert(!EQ_F_HEX, 42);
-        assert(!EQ_F_BYTES, 42);
+        assert!(!EQ_F_U8, 42);
+        assert!(!EQ_F_U64, 42);
+        assert!(!EQ_F_U128, 42);
+        assert!(!EQ_F_BOOL, 42);
+        assert!(!EQ_F_ADDR, 42);
+        assert!(!EQ_F_HEX, 42);
+        assert!(!EQ_F_BYTES, 42);
 
-        assert(NEQ_T_U8, 42);
-        assert(NEQ_T_U64, 42);
-        assert(NEQ_T_U128, 42);
-        assert(NEQ_T_BOOL, 42);
-        assert(NEQ_T_ADDR, 42);
-        assert(NEQ_T_HEX, 42);
-        assert(NEQ_T_BYTES, 42);
+        assert!(NEQ_T_U8, 42);
+        assert!(NEQ_T_U64, 42);
+        assert!(NEQ_T_U128, 42);
+        assert!(NEQ_T_BOOL, 42);
+        assert!(NEQ_T_ADDR, 42);
+        assert!(NEQ_T_HEX, 42);
+        assert!(NEQ_T_BYTES, 42);
 
-        assert(!NEQ_F_U8, 42);
-        assert(!NEQ_F_U64, 42);
-        assert(!NEQ_F_U128, 42);
-        assert(!NEQ_F_BOOL, 42);
-        assert(!NEQ_F_ADDR, 42);
-        assert(!NEQ_F_HEX, 42);
-        assert(!NEQ_F_BYTES, 42);
+        assert!(!NEQ_F_U8, 42);
+        assert!(!NEQ_F_U64, 42);
+        assert!(!NEQ_F_U128, 42);
+        assert!(!NEQ_F_BOOL, 42);
+        assert!(!NEQ_F_ADDR, 42);
+        assert!(!NEQ_F_HEX, 42);
+        assert!(!NEQ_F_BYTES, 42);
 
-        assert(!COMPLEX, 42);
+        assert!(!COMPLEX, 42);
     }
 }

@@ -40,13 +40,13 @@ module DiemFramework::Authenticator {
     ): MultiEd25519PublicKey {
         // check threshold requirements
         let len = Vector::length(&public_keys);
-        assert(threshold != 0, Errors::invalid_argument(EZERO_THRESHOLD));
-        assert(
+        assert!(threshold != 0, Errors::invalid_argument(EZERO_THRESHOLD));
+        assert!(
             (threshold as u64) <= len,
             Errors::invalid_argument(ENOT_ENOUGH_KEYS_FOR_THRESHOLD)
         );
         // the multied25519 signature scheme allows at most 32 keys
-        assert(
+        assert!(
             len <= MAX_MULTI_ED25519_KEYS,
             Errors::invalid_argument(ENUM_KEYS_ABOVE_MAX_THRESHOLD)
         );

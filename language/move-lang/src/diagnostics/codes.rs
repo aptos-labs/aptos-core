@@ -96,7 +96,9 @@ macro_rules! codes {
 
 codes!(
     // bucket for random one off errors. unlikely to be used
-    Uncategorized: [],
+    Uncategorized: [
+        DeprecatedWillBeRemoved: { msg: "DEPRECATED. will be removed", severity: Warning },
+    ],
     // syntax errors
     Syntax: [
         InvalidCharacter: { msg: "invalid character", severity: NonblockingError },
@@ -145,7 +147,8 @@ codes!(
         TooFewTypeArguments: { msg: "too few type arguments", severity: BlockingError },
         UnboundVariable: { msg: "unbound variable", severity: BlockingError },
         UnboundField: { msg: "unbound field", severity: BlockingError },
-        ReservedName: { msg: "Invalid use of reserved name", severity: BlockingError },
+        ReservedName: { msg: "invalid use of reserved name", severity: BlockingError },
+        UnboundMacro: { msg: "unbound macro", severity: BlockingError },
     ],
     // errors for typing rules. mostly typing/translate
     TypeSafety: [

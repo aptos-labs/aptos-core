@@ -5,21 +5,21 @@ module 0x42::Account {
   }
 
   fun withdraw(account: address, amount: u64) acquires Account {
-    // assert(amount <= AccountLimits::max_decrease(), Errors::invalid_argument()); // MISSING
+    // assert!(amount <= AccountLimits::max_decrease(), Errors::invalid_argument()); // MISSING
     let balance = &mut borrow_global_mut<Account>(account).balance;
-    assert(*balance >= amount, Errors::limit_exceeded());
-    // assert(*balance - amount >= AccountLimits::min_balance(), Errors::invalid_argument()); // MISSING
+    assert!(*balance >= amount, Errors::limit_exceeded());
+    // assert!(*balance - amount >= AccountLimits::min_balance(), Errors::invalid_argument()); // MISSING
     *balance = *balance - amount;
   }
 
   fun deposit(account: address, amount: u64) acquires Account {
     let balance = &mut borrow_global_mut<Account>(account).balance;
-    assert(*balance <= Limits::max_u64() - amount, Errors::limit_exceeded());
+    assert!(*balance <= Limits::max_u64() - amount, Errors::limit_exceeded());
     *balance = *balance + amount;
   }
 
   public(script) fun transfer(from: &signer, to: address, amount: u64) acquires Account {
-    assert(Signer::address_of(from) != to, Errors::invalid_argument());
+    assert!(Signer::address_of(from) != to, Errors::invalid_argument());
     withdraw(Signer::address_of(from), amount);
     deposit(to, amount);
   }

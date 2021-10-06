@@ -34,7 +34,7 @@ module DiemFramework::SlidingNonce {
     /// Calls `try_record_nonce` and aborts transaction if returned code is non-0
     public fun record_nonce_or_abort(account: &signer, seq_nonce: u64) acquires SlidingNonce {
         let code = try_record_nonce(account, seq_nonce);
-        assert(code == 0, Errors::invalid_argument(code));
+        assert!(code == 0, Errors::invalid_argument(code));
     }
 
     spec record_nonce_or_abort {
@@ -193,7 +193,7 @@ module DiemFramework::SlidingNonce {
         if (seq_nonce == 0) {
             return 0
         };
-        assert(exists<SlidingNonce>(Signer::address_of(account)), Errors::not_published(ESLIDING_NONCE));
+        assert!(exists<SlidingNonce>(Signer::address_of(account)), Errors::not_published(ESLIDING_NONCE));
         let t = borrow_global_mut<SlidingNonce>(Signer::address_of(account));
         // The `seq_nonce` is outside the current window to the "left" and is
         // no longer valid since we can't shift the window back.
@@ -260,7 +260,7 @@ module DiemFramework::SlidingNonce {
     /// Publishes nonce resource for `account`
     /// This is required before other functions in this module can be called for `account`
     public(friend) fun publish(account: &signer) {
-        assert(!exists<SlidingNonce>(Signer::address_of(account)), Errors::already_published(ENONCE_ALREADY_PUBLISHED));
+        assert!(!exists<SlidingNonce>(Signer::address_of(account)), Errors::already_published(ENONCE_ALREADY_PUBLISHED));
         move_to(account, SlidingNonce {  min_nonce: 0, nonce_mask: 0 });
     }
     spec publish {

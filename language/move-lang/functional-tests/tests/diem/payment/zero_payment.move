@@ -12,7 +12,7 @@ fun main(account: signer) {
     DiemAccount::pay_from<XUS>(&with_cap, addr, 0, x"", x"");
     DiemAccount::restore_withdraw_capability(with_cap);
 
-    assert(DiemAccount::balance<XUS>(addr) == old_balance, 42);
+    assert!(DiemAccount::balance<XUS>(addr) == old_balance, 42);
 }
 }
 // check: "Keep(ABORTED { code: 519,"

@@ -8,21 +8,21 @@ module Std::VectorTests {
 
     #[test]
     fun test_singleton_contains() {
-        assert(*V::borrow(&V::singleton(0), 0) == 0, 0);
-        assert(*V::borrow(&V::singleton(true), 0) == true, 0);
-        assert(*V::borrow(&V::singleton(@0x1), 0) == @0x1, 0);
+        assert!(*V::borrow(&V::singleton(0), 0) == 0, 0);
+        assert!(*V::borrow(&V::singleton(true), 0) == true, 0);
+        assert!(*V::borrow(&V::singleton(@0x1), 0) == @0x1, 0);
     }
 
     #[test]
     fun test_singleton_len() {
-        assert(V::length(&V::singleton(0)) == 1, 0);
-        assert(V::length(&V::singleton(true)) == 1, 0);
-        assert(V::length(&V::singleton(@0x1)) == 1, 0);
+        assert!(V::length(&V::singleton(0)) == 1, 0);
+        assert!(V::length(&V::singleton(true)) == 1, 0);
+        assert!(V::length(&V::singleton(@0x1)) == 1, 0);
     }
 
     #[test]
     fun test_empty_is_empty() {
-        assert(V::is_empty(&V::empty<u64>()), 0);
+        assert!(V::is_empty(&V::empty<u64>()), 0);
     }
 
     #[test]
@@ -30,7 +30,7 @@ module Std::VectorTests {
         let v1 = V::empty<u64>();
         let v2 = V::empty<u64>();
         V::append(&mut v1, v2);
-        assert(V::is_empty(&v1), 0);
+        assert!(V::is_empty(&v1), 0);
     }
 
     #[test]
@@ -42,12 +42,12 @@ module Std::VectorTests {
         V::push_back(&mut v2, 2);
         V::push_back(&mut v2, 3);
         V::append(&mut v1, v2);
-        assert(!V::is_empty(&v1), 0);
-        assert(V::length(&v1) == 4, 1);
-        assert(*V::borrow(&v1, 0) == 0, 2);
-        assert(*V::borrow(&v1, 1) == 1, 3);
-        assert(*V::borrow(&v1, 2) == 2, 4);
-        assert(*V::borrow(&v1, 3) == 3, 5);
+        assert!(!V::is_empty(&v1), 0);
+        assert!(V::length(&v1) == 4, 1);
+        assert!(*V::borrow(&v1, 0) == 0, 2);
+        assert!(*V::borrow(&v1, 1) == 1, 3);
+        assert!(*V::borrow(&v1, 2) == 2, 4);
+        assert!(*V::borrow(&v1, 3) == 3, 5);
     }
 
     #[test]
@@ -59,12 +59,12 @@ module Std::VectorTests {
         V::push_back(&mut v1, 2);
         V::push_back(&mut v1, 3);
         V::append(&mut v1, v2);
-        assert(!V::is_empty(&v1), 0);
-        assert(V::length(&v1) == 4, 1);
-        assert(*V::borrow(&v1, 0) == 0, 2);
-        assert(*V::borrow(&v1, 1) == 1, 3);
-        assert(*V::borrow(&v1, 2) == 2, 4);
-        assert(*V::borrow(&v1, 3) == 3, 5);
+        assert!(!V::is_empty(&v1), 0);
+        assert!(V::length(&v1) == 4, 1);
+        assert!(*V::borrow(&v1, 0) == 0, 2);
+        assert!(*V::borrow(&v1, 1) == 1, 3);
+        assert!(*V::borrow(&v1, 2) == 2, 4);
+        assert!(*V::borrow(&v1, 3) == 3, 5);
     }
 
     #[test]
@@ -80,11 +80,11 @@ module Std::VectorTests {
         V::push_back(&mut v2, 6);
         V::push_back(&mut v2, 7);
         V::append(&mut v1, v2);
-        assert(!V::is_empty(&v1), 0);
-        assert(V::length(&v1) == 8, 1);
+        assert!(!V::is_empty(&v1), 0);
+        assert!(V::length(&v1) == 8, 1);
         let i = 0;
         while (i < 8) {
-            assert(*V::borrow(&v1, i) == i, i);
+            assert!(*V::borrow(&v1, i) == i, i);
             i = i + 1;
         }
     }
@@ -100,22 +100,22 @@ module Std::VectorTests {
     #[test]
     fun vector_contains() {
         let vec = V::empty();
-        assert(!V::contains(&vec, &0), 1);
+        assert!(!V::contains(&vec, &0), 1);
 
         V::push_back(&mut vec, 0);
-        assert(V::contains(&vec, &0), 2);
-        assert(!V::contains(&vec, &1), 3);
+        assert!(V::contains(&vec, &0), 2);
+        assert!(!V::contains(&vec, &1), 3);
 
         V::push_back(&mut vec, 1);
-        assert(V::contains(&vec, &0), 4);
-        assert(V::contains(&vec, &1), 5);
-        assert(!V::contains(&vec, &2), 6);
+        assert!(V::contains(&vec, &0), 4);
+        assert!(V::contains(&vec, &1), 5);
+        assert!(!V::contains(&vec, &2), 6);
 
         V::push_back(&mut vec, 2);
-        assert(V::contains(&vec, &0), 7);
-        assert(V::contains(&vec, &1), 8);
-        assert(V::contains(&vec, &2), 9);
-        assert(!V::contains(&vec, &3), 10);
+        assert!(V::contains(&vec, &0), 7);
+        assert!(V::contains(&vec, &1), 8);
+        assert!(V::contains(&vec, &2), 9);
+        assert!(!V::contains(&vec, &3), 10);
     }
 
     #[test]
@@ -145,12 +145,12 @@ module Std::VectorTests {
         let vec = V::empty();
         V::push_back(&mut vec, 0);
         V::push_back(&mut vec, 1);
-        assert(*V::borrow(&vec, 1) == 1, 0);
-        assert(*V::borrow(&vec, 0) == 0, 1);
+        assert!(*V::borrow(&vec, 1) == 1, 0);
+        assert!(*V::borrow(&vec, 0) == 0, 1);
 
         *V::borrow_mut(&mut vec, 0) = 17;
-        assert(*V::borrow(&vec, 1) == 1, 0);
-        assert(*V::borrow(&vec, 0) == 17, 0);
+        assert!(*V::borrow(&vec, 1) == 1, 0);
+        assert!(*V::borrow(&vec, 0) == 17, 0);
     }
 
     #[test]
@@ -169,10 +169,10 @@ module Std::VectorTests {
         V::push_back(&mut vec, 3);
         V::swap(&mut vec, 0, 3);
         V::swap(&mut vec, 1, 2);
-        assert(*V::borrow(&vec, 0) == 3, 0);
-        assert(*V::borrow(&vec, 1) == 2, 0);
-        assert(*V::borrow(&vec, 2) == 1, 0);
-        assert(*V::borrow(&vec, 3) == 0, 0);
+        assert!(*V::borrow(&vec, 0) == 3, 0);
+        assert!(*V::borrow(&vec, 1) == 2, 0);
+        assert!(*V::borrow(&vec, 2) == 1, 0);
+        assert!(*V::borrow(&vec, 3) == 0, 0);
     }
 
     #[test]
@@ -183,18 +183,18 @@ module Std::VectorTests {
         V::push_back(&mut vec, 2);
         V::push_back(&mut vec, 3);
         V::swap(&mut vec, 1, 1);
-        assert(*V::borrow(&vec, 0) == 0, 0);
-        assert(*V::borrow(&vec, 1) == 1, 0);
-        assert(*V::borrow(&vec, 2) == 2, 0);
-        assert(*V::borrow(&vec, 3) == 3, 0);
+        assert!(*V::borrow(&vec, 0) == 0, 0);
+        assert!(*V::borrow(&vec, 1) == 1, 0);
+        assert!(*V::borrow(&vec, 2) == 2, 0);
+        assert!(*V::borrow(&vec, 3) == 3, 0);
     }
 
     #[test]
     fun remove_singleton_vector() {
         let v = V::empty();
         V::push_back(&mut v, 0);
-        assert(V::remove(&mut v, 0) == 0, 0);
-        assert(V::length(&v) == 0, 0);
+        assert!(V::remove(&mut v, 0) == 0, 0);
+        assert!(V::length(&v) == 0, 0);
     }
 
     #[test]
@@ -205,11 +205,11 @@ module Std::VectorTests {
         V::push_back(&mut v, 2);
         V::push_back(&mut v, 3);
 
-        assert(V::remove(&mut v, 1) == 1, 0);
-        assert(V::length(&v) == 3, 0);
-        assert(*V::borrow(&v, 0) == 0, 0);
-        assert(*V::borrow(&v, 1) == 2, 0);
-        assert(*V::borrow(&v, 2) == 3, 0);
+        assert!(V::remove(&mut v, 1) == 1, 0);
+        assert!(V::length(&v) == 3, 0);
+        assert!(*V::borrow(&v, 0) == 0, 0);
+        assert!(*V::borrow(&v, 1) == 2, 0);
+        assert!(*V::borrow(&v, 2) == 3, 0);
     }
 
     #[test]
@@ -220,11 +220,11 @@ module Std::VectorTests {
         V::push_back(&mut v, 2);
         V::push_back(&mut v, 3);
 
-        assert(V::remove(&mut v, 3) == 3, 0);
-        assert(V::length(&v) == 3, 0);
-        assert(*V::borrow(&v, 0) == 0, 0);
-        assert(*V::borrow(&v, 1) == 1, 0);
-        assert(*V::borrow(&v, 2) == 2, 0);
+        assert!(V::remove(&mut v, 3) == 3, 0);
+        assert!(V::length(&v) == 3, 0);
+        assert!(*V::borrow(&v, 0) == 0, 0);
+        assert!(*V::borrow(&v, 1) == 1, 0);
+        assert!(*V::borrow(&v, 2) == 2, 0);
     }
 
     #[test]
@@ -247,16 +247,16 @@ module Std::VectorTests {
         let v = V::empty<u64>();
         let is_empty = V::is_empty(&v);
         V::reverse(&mut v);
-        assert(is_empty == V::is_empty(&v), 0);
+        assert!(is_empty == V::is_empty(&v), 0);
     }
 
     #[test]
     fun reverse_singleton_vector() {
         let v = V::empty();
         V::push_back(&mut v, 0);
-        assert(*V::borrow(&v, 0) == 0, 1);
+        assert!(*V::borrow(&v, 0) == 0, 1);
         V::reverse(&mut v);
-        assert(*V::borrow(&v, 0) == 0, 2);
+        assert!(*V::borrow(&v, 0) == 0, 2);
     }
 
     #[test]
@@ -267,17 +267,17 @@ module Std::VectorTests {
         V::push_back(&mut v, 2);
         V::push_back(&mut v, 3);
 
-        assert(*V::borrow(&v, 0) == 0, 1);
-        assert(*V::borrow(&v, 1) == 1, 2);
-        assert(*V::borrow(&v, 2) == 2, 3);
-        assert(*V::borrow(&v, 3) == 3, 4);
+        assert!(*V::borrow(&v, 0) == 0, 1);
+        assert!(*V::borrow(&v, 1) == 1, 2);
+        assert!(*V::borrow(&v, 2) == 2, 3);
+        assert!(*V::borrow(&v, 3) == 3, 4);
 
         V::reverse(&mut v);
 
-        assert(*V::borrow(&v, 3) == 0, 5);
-        assert(*V::borrow(&v, 2) == 1, 6);
-        assert(*V::borrow(&v, 1) == 2, 7);
-        assert(*V::borrow(&v, 0) == 3, 8);
+        assert!(*V::borrow(&v, 3) == 0, 5);
+        assert!(*V::borrow(&v, 2) == 1, 6);
+        assert!(*V::borrow(&v, 1) == 2, 7);
+        assert!(*V::borrow(&v, 0) == 3, 8);
     }
 
     #[test]
@@ -287,15 +287,15 @@ module Std::VectorTests {
         V::push_back(&mut v, 1);
         V::push_back(&mut v, 2);
 
-        assert(*V::borrow(&v, 0) == 0, 1);
-        assert(*V::borrow(&v, 1) == 1, 2);
-        assert(*V::borrow(&v, 2) == 2, 3);
+        assert!(*V::borrow(&v, 0) == 0, 1);
+        assert!(*V::borrow(&v, 1) == 1, 2);
+        assert!(*V::borrow(&v, 2) == 2, 3);
 
         V::reverse(&mut v);
 
-        assert(*V::borrow(&v, 2) == 0, 4);
-        assert(*V::borrow(&v, 1) == 1, 5);
-        assert(*V::borrow(&v, 0) == 2, 6);
+        assert!(*V::borrow(&v, 2) == 0, 4);
+        assert!(*V::borrow(&v, 1) == 1, 5);
+        assert!(*V::borrow(&v, 0) == 2, 6);
     }
 
     #[test]
@@ -329,8 +329,8 @@ module Std::VectorTests {
     fun swap_remove_singleton() {
         let v = V::empty<u64>();
         V::push_back(&mut v, 0);
-        assert(V::swap_remove(&mut v, 0) == 0, 0);
-        assert(V::is_empty(&v), 1);
+        assert!(V::swap_remove(&mut v, 0) == 0, 0);
+        assert!(V::is_empty(&v), 1);
     }
 
     #[test]
@@ -341,17 +341,17 @@ module Std::VectorTests {
         V::push_back(&mut v, 2);
         V::push_back(&mut v, 3);
 
-        assert(*V::borrow(&v, 0) == 0, 1);
-        assert(*V::borrow(&v, 1) == 1, 2);
-        assert(*V::borrow(&v, 2) == 2, 3);
-        assert(*V::borrow(&v, 3) == 3, 4);
+        assert!(*V::borrow(&v, 0) == 0, 1);
+        assert!(*V::borrow(&v, 1) == 1, 2);
+        assert!(*V::borrow(&v, 2) == 2, 3);
+        assert!(*V::borrow(&v, 3) == 3, 4);
 
-        assert(V::swap_remove(&mut v, 1) == 1, 5);
-        assert(V::length(&v) == 3, 6);
+        assert!(V::swap_remove(&mut v, 1) == 1, 5);
+        assert!(V::length(&v) == 3, 6);
 
-        assert(*V::borrow(&v, 0) == 0, 7);
-        assert(*V::borrow(&v, 1) == 3, 8);
-        assert(*V::borrow(&v, 2) == 2, 9);
+        assert!(*V::borrow(&v, 0) == 0, 7);
+        assert!(*V::borrow(&v, 1) == 3, 8);
+        assert!(*V::borrow(&v, 2) == 2, 9);
 
     }
 
@@ -363,17 +363,17 @@ module Std::VectorTests {
         V::push_back(&mut v, 2);
         V::push_back(&mut v, 3);
 
-        assert(*V::borrow(&v, 0) == 0, 1);
-        assert(*V::borrow(&v, 1) == 1, 2);
-        assert(*V::borrow(&v, 2) == 2, 3);
-        assert(*V::borrow(&v, 3) == 3, 4);
+        assert!(*V::borrow(&v, 0) == 0, 1);
+        assert!(*V::borrow(&v, 1) == 1, 2);
+        assert!(*V::borrow(&v, 2) == 2, 3);
+        assert!(*V::borrow(&v, 3) == 3, 4);
 
-        assert(V::swap_remove(&mut v, 3) == 3, 5);
-        assert(V::length(&v) == 3, 6);
+        assert!(V::swap_remove(&mut v, 3) == 3, 5);
+        assert!(V::length(&v) == 3, 6);
 
-        assert(*V::borrow(&v, 0) == 0, 7);
-        assert(*V::borrow(&v, 1) == 1, 8);
-        assert(*V::borrow(&v, 2) == 2, 9);
+        assert!(*V::borrow(&v, 0) == 0, 7);
+        assert!(*V::borrow(&v, 1) == 1, 8);
+        assert!(*V::borrow(&v, 2) == 2, 9);
     }
 
     #[test]
@@ -388,22 +388,22 @@ module Std::VectorTests {
     fun push_back_and_borrow() {
         let v = V::empty();
         V::push_back(&mut v, 7);
-        assert(!V::is_empty(&v), 0);
-        assert(V::length(&v) == 1, 1);
-        assert(*V::borrow(&v, 0) == 7, 2);
+        assert!(!V::is_empty(&v), 0);
+        assert!(V::length(&v) == 1, 1);
+        assert!(*V::borrow(&v, 0) == 7, 2);
 
         V::push_back(&mut v, 8);
-        assert(V::length(&v) == 2, 3);
-        assert(*V::borrow(&v, 0) == 7, 4);
-        assert(*V::borrow(&v, 1) == 8, 5);
+        assert!(V::length(&v) == 2, 3);
+        assert!(*V::borrow(&v, 0) == 7, 4);
+        assert!(*V::borrow(&v, 1) == 8, 5);
     }
 
     #[test]
     fun index_of_empty_not_has() {
         let v = V::empty();
         let (has, index) = V::index_of(&v, &true);
-        assert(!has, 0);
-        assert(index == 0, 1);
+        assert!(!has, 0);
+        assert!(index == 0, 1);
     }
 
     #[test]
@@ -411,8 +411,8 @@ module Std::VectorTests {
         let v = V::empty();
         V::push_back(&mut v, false);
         let (has, index) = V::index_of(&v, &true);
-        assert(!has, 0);
-        assert(index == 0, 1);
+        assert!(!has, 0);
+        assert!(index == 0, 1);
     }
 
     #[test]
@@ -421,8 +421,8 @@ module Std::VectorTests {
         V::push_back(&mut v, false);
         V::push_back(&mut v, true);
         let (has, index) = V::index_of(&v, &true);
-        assert(has, 0);
-        assert(index == 1, 1);
+        assert!(has, 0);
+        assert!(index == 1, 1);
     }
 
     // index_of will return the index first occurence that is equal
@@ -433,19 +433,19 @@ module Std::VectorTests {
         V::push_back(&mut v, true);
         V::push_back(&mut v, true);
         let (has, index) = V::index_of(&v, &true);
-        assert(has, 0);
-        assert(index == 1, 1);
+        assert!(has, 0);
+        assert!(index == 1, 1);
     }
 
     #[test]
     fun length() {
         let empty = V::empty();
-        assert(V::length(&empty) == 0, 0);
+        assert!(V::length(&empty) == 0, 0);
         let i = 0;
         let max_len = 42;
         while (i < max_len) {
             V::push_back(&mut empty, i);
-            assert(V::length(&empty) == i + 1, i);
+            assert!(V::length(&empty) == i + 1, i);
             i = i + 1;
         }
     }
@@ -462,7 +462,7 @@ module Std::VectorTests {
         };
 
         while (i > 0) {
-            assert(V::pop_back(&mut v) == i - 1, i);
+            assert!(V::pop_back(&mut v) == i - 1, i);
             i = i - 1;
         };
     }
@@ -470,16 +470,16 @@ module Std::VectorTests {
     #[test_only]
     fun test_natives_with_type<T>(x1: T, x2: T): (T, T) {
         let v = V::empty();
-        assert(V::length(&v) == 0, 0);
+        assert!(V::length(&v) == 0, 0);
         V::push_back(&mut v, x1);
-        assert(V::length(&v) == 1, 1);
+        assert!(V::length(&v) == 1, 1);
         V::push_back(&mut v, x2);
-        assert(V::length(&v) == 2, 2);
+        assert!(V::length(&v) == 2, 2);
         V::swap(&mut v, 0, 1);
         x1 = V::pop_back(&mut v);
-        assert(V::length(&v) == 1, 3);
+        assert!(V::length(&v) == 1, 3);
         x2 = V::pop_back(&mut v);
-        assert(V::length(&v) == 0, 4);
+        assert!(V::length(&v) == 0, 4);
         V::destroy_empty(v);
         (x1, x2)
     }

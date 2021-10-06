@@ -6,6 +6,6 @@ fun main() {
         if (x >= 5) break;
         x = x + 1;
     };
-    assert(x == 5, 42);
+    assert!(x == 5, 42);
 }
 }

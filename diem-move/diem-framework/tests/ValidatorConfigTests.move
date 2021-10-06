@@ -101,7 +101,7 @@ module DiemFramework::ValidatorConfigTests {
         let operator_addr = Signer::address_of(&operator);
         let validator_addr = Signer::address_of(&validator);
         set_operator(&dr, &validator, &operator);
-        assert(VC::get_operator(validator_addr) == operator_addr, 0);
+        assert!(VC::get_operator(validator_addr) == operator_addr, 0);
     }
 
     #[test]
@@ -129,7 +129,7 @@ module DiemFramework::ValidatorConfigTests {
         let operator_addr = Signer::address_of(&operator);
         let validator_addr = Signer::address_of(&validator);
         set_operator(&dr, &validator, &operator);
-        assert(VC::get_operator(validator_addr) == operator_addr, 0);
+        assert!(VC::get_operator(validator_addr) == operator_addr, 0);
         VC::remove_operator(&validator);
         VC::get_operator(validator_addr);
     }
@@ -166,12 +166,12 @@ module DiemFramework::ValidatorConfigTests {
         let operator_addr = Signer::address_of(&operator);
         set_operator(&dr, &validator, &operator);
         VC::set_config(&operator, validator_addr, VALID_PUBKEY, x"AA", x"BB");
-        assert(VC::is_valid(validator_addr), 0);
-        assert(VC::get_human_name(validator_addr) == x"FF", 1);
-        assert(VC::get_operator(validator_addr) == operator_addr, 2);
+        assert!(VC::is_valid(validator_addr), 0);
+        assert!(VC::get_human_name(validator_addr) == x"FF", 1);
+        assert!(VC::get_operator(validator_addr) == operator_addr, 2);
         let config = VC::get_config(validator_addr);
-        assert(*VC::get_consensus_pubkey(&config) == VALID_PUBKEY, 3);
-        assert(*VC::get_validator_network_addresses(&config) == x"AA", 4);
+        assert!(*VC::get_consensus_pubkey(&config) == VALID_PUBKEY, 3);
+        assert!(*VC::get_validator_network_addresses(&config) == x"AA", 4);
     }
 
     #[test]

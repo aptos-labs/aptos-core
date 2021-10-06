@@ -62,7 +62,7 @@ module DiemFramework::VASPDomain {
     const EINVALID_VASP_DOMAIN: u64 = 5;
 
     fun create_vasp_domain(domain: vector<u8>): VASPDomain {
-        assert(Vector::length(&domain) <= DOMAIN_LENGTH, Errors::invalid_argument(EINVALID_VASP_DOMAIN));
+        assert!(Vector::length(&domain) <= DOMAIN_LENGTH, Errors::invalid_argument(EINVALID_VASP_DOMAIN));
         VASPDomain{ domain }
     }
     spec create_vasp_domain {
@@ -81,7 +81,7 @@ module DiemFramework::VASPDomain {
         vasp_account: &signer,
     ) {
         Roles::assert_parent_vasp_role(vasp_account);
-        assert(
+        assert!(
             !exists<VASPDomains>(Signer::address_of(vasp_account)),
             Errors::already_published(EVASP_DOMAINS)
         );
@@ -120,7 +120,7 @@ module DiemFramework::VASPDomain {
         tc_account : &signer,
     ) {
         Roles::assert_treasury_compliance(tc_account);
-        assert(
+        assert!(
             !exists<VASPDomainManager>(Signer::address_of(tc_account)),
             Errors::already_published(EVASP_DOMAIN_MANAGER)
         );
@@ -148,8 +148,8 @@ module DiemFramework::VASPDomain {
         domain: vector<u8>,
     ) acquires VASPDomainManager, VASPDomains {
         Roles::assert_treasury_compliance(tc_account);
-        assert(tc_domain_manager_exists(), Errors::not_published(EVASP_DOMAIN_MANAGER));
-        assert(
+        assert!(tc_domain_manager_exists(), Errors::not_published(EVASP_DOMAIN_MANAGER));
+        assert!(
             exists<VASPDomains>(address),
             Errors::not_published(EVASP_DOMAINS_NOT_PUBLISHED)
         );
@@ -157,7 +157,7 @@ module DiemFramework::VASPDomain {
         let account_domains = borrow_global_mut<VASPDomains>(address);
         let vasp_domain = create_vasp_domain(domain);
 
-        assert(
+        assert!(
             !Vector::contains(&account_domains.domains, &vasp_domain),
             Errors::invalid_argument(EVASP_DOMAIN_ALREADY_EXISTS)
         );
@@ -214,8 +214,8 @@ module DiemFramework::VASPDomain {
         domain: vector<u8>,
     ) acquires VASPDomainManager, VASPDomains {
         Roles::assert_treasury_compliance(tc_account);
-        assert(tc_domain_manager_exists(), Errors::not_published(EVASP_DOMAIN_MANAGER));
-        assert(
+        assert!(tc_domain_manager_exists(), Errors::not_published(EVASP_DOMAIN_MANAGER));
+        assert!(
             exists<VASPDomains>(address),
             Errors::not_published(EVASP_DOMAINS_NOT_PUBLISHED)
         );
@@ -275,7 +275,7 @@ module DiemFramework::VASPDomain {
     }
 
     public fun has_vasp_domain(addr: address, domain: vector<u8>): bool acquires VASPDomains {
-        assert(
+        assert!(
             exists<VASPDomains>(addr),
             Errors::not_published(EVASP_DOMAINS_NOT_PUBLISHED)
         );

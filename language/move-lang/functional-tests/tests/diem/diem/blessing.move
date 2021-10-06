@@ -6,9 +6,9 @@ use DiemFramework::XUS::XUS;
 // Make sure that XUS is registered. Make sure that the rules
 // relating to SCS and synthetic currencies are consistent
 fun main() {
-    assert(Diem::is_currency<XUS>(), 1);
-    assert(!Diem::is_synthetic_currency<XUS>(), 2);
-    assert(Diem::is_SCS_currency<XUS>(), 4);
+    assert!(Diem::is_currency<XUS>(), 1);
+    assert!(!Diem::is_synthetic_currency<XUS>(), 2);
+    assert!(Diem::is_SCS_currency<XUS>(), 4);
     Diem::assert_is_currency<XUS>();
     Diem::assert_is_SCS_currency<XUS>();
 }

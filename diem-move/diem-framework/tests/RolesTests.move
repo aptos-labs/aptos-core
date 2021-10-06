@@ -33,10 +33,10 @@ module DiemFramework::RolesTests{
     fun genesis_root_roles_exist(tc: signer, dr: signer) {
         Genesis::setup(&dr, &tc);
         Roles::assert_diem_root(&dr);
-        assert(Roles::has_diem_root_role(&dr), 0);
+        assert!(Roles::has_diem_root_role(&dr), 0);
 
         Roles::assert_treasury_compliance(&tc);
-        assert(Roles::has_treasury_compliance_role(&tc), 0);
+        assert!(Roles::has_treasury_compliance_role(&tc), 0);
     }
 
     #[test(tc = @TreasuryCompliance, dr = @DiemRoot)]
@@ -123,9 +123,9 @@ module DiemFramework::RolesTests{
     fun grant_dd_role_tc_granter(tc: signer, dr: signer) {
         Genesis::setup(&dr, &tc);
         let account = get_account();
-        assert(!Roles::has_designated_dealer_role(&account), 0);
+        assert!(!Roles::has_designated_dealer_role(&account), 0);
         Roles::new_designated_dealer_role(&tc, &account);
-        assert(Roles::has_designated_dealer_role(&account), 1);
+        assert!(Roles::has_designated_dealer_role(&account), 1);
         Roles::assert_designated_dealer(&account);
         Roles::assert_parent_vasp_or_designated_dealer(&account);
     }
@@ -165,9 +165,9 @@ module DiemFramework::RolesTests{
     fun grant_validator_role_dr_granter(tc: signer, dr: signer) {
         Genesis::setup(&dr, &tc);
         let account = get_account();
-        assert(!Roles::has_validator_role(&account), 0);
+        assert!(!Roles::has_validator_role(&account), 0);
         Roles::new_validator_role(&dr, &account);
-        assert(Roles::has_validator_role(&account), 1);
+        assert!(Roles::has_validator_role(&account), 1);
         Roles::assert_validator(&account);
     }
 
@@ -206,9 +206,9 @@ module DiemFramework::RolesTests{
     fun grant_validator_operator_role_dr_granter(tc: signer, dr: signer) {
         Genesis::setup(&dr, &tc);
         let account = get_account();
-        assert(!Roles::has_validator_operator_role(&account), 0);
+        assert!(!Roles::has_validator_operator_role(&account), 0);
         Roles::new_validator_operator_role(&dr, &account);
-        assert(Roles::has_validator_operator_role(&account), 1);
+        assert!(Roles::has_validator_operator_role(&account), 1);
         Roles::assert_validator_operator(&account);
     }
 
@@ -240,9 +240,9 @@ module DiemFramework::RolesTests{
     fun grant_parent_vasp_role_tc_granter(tc: signer, dr: signer) {
         Genesis::setup(&dr, &tc);
         let account = get_account();
-        assert(!Roles::has_parent_VASP_role(&account), 0);
+        assert!(!Roles::has_parent_VASP_role(&account), 0);
         Roles::new_parent_vasp_role(&tc, &account);
-        assert(Roles::has_parent_VASP_role(&account), 1);
+        assert!(Roles::has_parent_VASP_role(&account), 1);
         Roles::assert_parent_vasp_role(&account);
         Roles::assert_parent_vasp_or_designated_dealer(&account);
         Roles::assert_parent_vasp_or_child_vasp(&account);
@@ -288,10 +288,10 @@ module DiemFramework::RolesTests{
             let accounts = UnitTest::create_signers_for_testing(2);
             (Vector::pop_back(&mut accounts), Vector::pop_back(&mut accounts))
         };
-        assert(!Roles::has_child_VASP_role(&account), 0);
+        assert!(!Roles::has_child_VASP_role(&account), 0);
         Roles::new_parent_vasp_role(&tc, &pvasp);
         Roles::new_child_vasp_role(&pvasp, &account);
-        assert(Roles::has_child_VASP_role(&account), 1);
+        assert!(Roles::has_child_VASP_role(&account), 1);
         Roles::assert_child_vasp_role(&account);
         Roles::assert_parent_vasp_or_child_vasp(&account);
     }
@@ -325,9 +325,9 @@ module DiemFramework::RolesTests{
         Roles::new_child_vasp_role(&pvasp, &child_account);
         Roles::new_designated_dealer_role(&tc, &dd_account);
 
-        assert(Roles::can_hold_balance(&dd_account), 0);
-        assert(Roles::can_hold_balance(&child_account), 1);
-        assert(Roles::can_hold_balance(&pvasp), 2);
+        assert!(Roles::can_hold_balance(&dd_account), 0);
+        assert!(Roles::can_hold_balance(&child_account), 1);
+        assert!(Roles::can_hold_balance(&pvasp), 2);
     }
 
 
@@ -351,13 +351,13 @@ module DiemFramework::RolesTests{
         Roles::new_validator_role(&dr, &validator_account);
         Roles::new_validator_operator_role(&dr, &validator_operator_account);
 
-        assert(Roles::get_role_id(Signer::address_of(&dr)) == 0, 0);
-        assert(Roles::get_role_id(Signer::address_of(&tc)) == 1, 1);
-        assert(Roles::get_role_id(Signer::address_of(&dd_account)) == 2, 2);
-        assert(Roles::get_role_id(Signer::address_of(&validator_account)) == 3, 3);
-        assert(Roles::get_role_id(Signer::address_of(&validator_operator_account)) == 4, 4);
-        assert(Roles::get_role_id(Signer::address_of(&pvasp)) == 5, 5);
-        assert(Roles::get_role_id(Signer::address_of(&child_account)) == 6, 6);
+        assert!(Roles::get_role_id(Signer::address_of(&dr)) == 0, 0);
+        assert!(Roles::get_role_id(Signer::address_of(&tc)) == 1, 1);
+        assert!(Roles::get_role_id(Signer::address_of(&dd_account)) == 2, 2);
+        assert!(Roles::get_role_id(Signer::address_of(&validator_account)) == 3, 3);
+        assert!(Roles::get_role_id(Signer::address_of(&validator_operator_account)) == 4, 4);
+        assert!(Roles::get_role_id(Signer::address_of(&pvasp)) == 5, 5);
+        assert!(Roles::get_role_id(Signer::address_of(&child_account)) == 6, 6);
     }
 
     #[test(tc = @TreasuryCompliance, dr = @DiemRoot)]

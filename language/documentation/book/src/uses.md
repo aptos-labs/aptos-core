@@ -1,10 +1,12 @@
 # Uses and Aliases
 
-The `use` syntax can be used to create aliases to members in other modules. `use` can be used to create aliases that last either for the entire module, or for a given expression block scope.
+The `use` syntax can be used to create aliases to members in other modules. `use` can be used to
+create aliases that last either for the entire module, or for a given expression block scope.
 
 ## Syntax
 
-There are several different syntax cases for `use`. Starting with the most simple, we have the following for creating aliases to other modules
+There are several different syntax cases for `use`. Starting with the most simple, we have the
+following for creating aliases to other modules
 
 ```move
 use <address>::<module name>;
@@ -18,7 +20,9 @@ use Std::Vector;
 use Std::Vector as V;
 ```
 
-`use Std::Vector;` introduces an alias `Vector` for `Std::Vector`. This means that anywhere you would want to use the module name `Std::Vector` (assuming this `use` is in scope), you could use `Vector` instead. `use Std::Vector;`  is equivalent to `use Std::Vector as Vector;`
+`use Std::Vector;` introduces an alias `Vector` for `Std::Vector`. This means that anywhere you
+would want to use the module name `Std::Vector` (assuming this `use` is in scope), you could use
+`Vector` instead. `use Std::Vector;` is equivalent to `use Std::Vector as Vector;`
 
 Similarly `use Std::Vector as V;` would let you use `V` instead of `Std::Vector`
 
@@ -34,7 +38,8 @@ fun new_vecs(): (vector<u8>, vector<u8>, vector<u8>) {
 }
 ```
 
-If you want to import a specific module member (such as a function, struct, or constant). You can use the following syntax.
+If you want to import a specific module member (such as a function, struct, or constant). You can
+use the following syntax.
 
 ```move
 use <address>::<module name>::<module member>;
@@ -48,7 +53,9 @@ use Std::Vector::empty;
 use Std::Vector::empty as empty_vec;
 ```
 
-This would let you use the function `Std::Vector::empty` without full qualification. Instead you could use `empty` and `empty_vec` respectively. Again, `use Std::Vector::empty;` is equivalent to `use Std::Vector::empty as empty;`
+This would let you use the function `Std::Vector::empty` without full qualification. Instead you
+could use `empty` and `empty_vec` respectively. Again, `use Std::Vector::empty;` is equivalent to
+`use Std::Vector::empty as empty;`
 
 ```move=
 use Std::Vector::empty;
@@ -62,7 +69,8 @@ fun new_vecs(): (vector<u8>, vector<u8>, vector<u8>) {
 }
 ```
 
-If you want to add aliases for multiple module members at once, you can do so with the following syntax
+If you want to add aliases for multiple module members at once, you can do so with the following
+syntax
 
 ```move
 use <address>::<module name>::{<module member>, <module member> as <member alias> ... };
@@ -74,7 +82,7 @@ For example
 use Std::Vector::{push_back, length as len, pop_back};
 
 fun swap_last_two<T>(v: &mut vector<T>) {
-    assert(len(v) >= 2, 42);
+    assert!(len(v) >= 2, 42);
     let last = pop_back(v);
     let second_to_last = pop_back(v);
     push_back(v, last);
@@ -82,7 +90,8 @@ fun swap_last_two<T>(v: &mut vector<T>) {
 }
 ```
 
-If you need to add an alias to the Module itself in addition to module members, you can do that in a single `use` using `Self`. `Self` is a member of sorts that refers to the module.
+If you need to add an alias to the Module itself in addition to module members, you can do that in a
+single `use` using `Self`. `Self` is a member of sorts that refers to the module.
 
 ```move
 use Std::Vector::{Self, empty};
@@ -111,10 +120,10 @@ use Std::Vector::{
 
 fun pop_twice<T>(v: &mut vector<T>): (T, T) {
     // all options available given the `use` above
-    assert(Vector::length(v) > 1, 42);
-    assert(V::length(v) > 1, 42);
-    assert(length(v) > 1, 42);
-    assert(len(v) > 1, 42);
+    assert!(Vector::length(v) > 1, 42);
+    assert!(V::length(v) > 1, 42);
+    assert!(length(v) > 1, 42);
+    assert!(len(v) > 1, 42);
 
     (Vector::pop_back(v), Vector::pop_back(v))
 }
@@ -143,7 +152,8 @@ module Example {
 
 The aliases declared by `use` in the module usable within that module.
 
-Additionally, the aliases introduced cannot conflict with other module members. See [Uniqueness](#uniqueness) for more details
+Additionally, the aliases introduced cannot conflict with other module members. See
+[Uniqueness](#uniqueness) for more details
 
 ## Inside an expression
 
@@ -165,7 +175,8 @@ module Example {
 }
 ```
 
-As with `let`, the aliases introduced by `use` in an expression block are removed at the end of that block.
+As with `let`, the aliases introduced by `use` in an expression block are removed at the end of that
+block.
 
 ```move=
 address 0x42 {
@@ -203,7 +214,8 @@ fun example(): vector<u8> {
 }
 ```
 
-Any `use` must be the first item in the block. If the `use` comes after any expression or `let`, it will result in a parsing error
+Any `use` must be the first item in the block. If the `use` comes after any expression or `let`, it
+will result in a parsing error
 
 ```move=
 {
@@ -215,7 +227,8 @@ Any `use` must be the first item in the block. If the `use` comes after any expr
 
 ## Naming rules
 
-Aliases must follow the same rules as other module members. This means that aliases to structs or constants must start with `A` to `Z`
+Aliases must follow the same rules as other module members. This means that aliases to structs or
+constants must start with `A` to `Z`
 
 ```move=
 address 0x42 {
@@ -273,11 +286,13 @@ module Example {
 }
 ```
 
-Inside of an expression block, they cannot overlap with each other, but they can [shadow](#shadowing) other aliases or names from an outer scope
+Inside of an expression block, they cannot overlap with each other, but they can
+[shadow](#shadowing) other aliases or names from an outer scope
 
 ## Shadowing
 
-`use` aliases inside of an expression block can shadow names (module members or aliases) from the outer scope. As with shadowing of locals, the shadowing ends at the end of the expression block;
+`use` aliases inside of an expression block can shadow names (module members or aliases) from the
+outer scope. As with shadowing of locals, the shadowing ends at the end of the expression block;
 
 ```move=
 address 0x42 {

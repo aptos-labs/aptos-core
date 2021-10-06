@@ -131,7 +131,7 @@ module DiemFramework::DiemTransactionPublishingOption {
     /// If called, transactions cannot be sent from any account except DiemRoot
     public fun halt_all_transactions(dr_account: &signer) {
         Roles::assert_diem_root(dr_account);
-        assert(
+        assert!(
             !exists<HaltAllTransactions>(Signer::address_of(dr_account)),
             Errors::already_published(EHALT_ALL_TRANSACTIONS),
         );
@@ -142,7 +142,7 @@ module DiemFramework::DiemTransactionPublishingOption {
     public fun resume_transactions(dr_account: &signer) acquires HaltAllTransactions {
         Roles::assert_diem_root(dr_account);
         let dr_address = Signer::address_of(dr_account);
-        assert(
+        assert!(
             exists<HaltAllTransactions>(dr_address),
             Errors::already_published(EHALT_ALL_TRANSACTIONS),
         );

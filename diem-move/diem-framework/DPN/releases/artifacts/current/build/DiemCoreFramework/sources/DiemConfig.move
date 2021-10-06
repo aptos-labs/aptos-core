@@ -60,7 +60,7 @@ module DiemFramework::DiemConfig {
     ) {
         DiemTimestamp::assert_genesis();
         CoreAddresses::assert_diem_root(dr_account);
-        assert(!exists<Configuration>(@DiemRoot), Errors::already_published(ECONFIGURATION));
+        assert!(!exists<Configuration>(@DiemRoot), Errors::already_published(ECONFIGURATION));
         move_to<Configuration>(
             dr_account,
             Configuration {
@@ -95,7 +95,7 @@ module DiemFramework::DiemConfig {
     public fun get<Config: copy + drop + store>(): Config
     acquires DiemConfig {
         let addr = @DiemRoot;
-        assert(exists<DiemConfig<Config>>(addr), Errors::not_published(EDIEM_CONFIG));
+        assert!(exists<DiemConfig<Config>>(addr), Errors::not_published(EDIEM_CONFIG));
         *&borrow_global<DiemConfig<Config>>(addr).payload
     }
     spec get {
@@ -114,10 +114,10 @@ module DiemFramework::DiemConfig {
     acquires DiemConfig, Configuration {
         let signer_address = Signer::address_of(account);
         // Next should always be true if properly initialized.
-        assert(exists<ModifyConfigCapability<Config>>(signer_address), Errors::requires_capability(EMODIFY_CAPABILITY));
+        assert!(exists<ModifyConfigCapability<Config>>(signer_address), Errors::requires_capability(EMODIFY_CAPABILITY));
 
         let addr = @DiemRoot;
-        assert(exists<DiemConfig<Config>>(addr), Errors::not_published(EDIEM_CONFIG));
+        assert!(exists<DiemConfig<Config>>(addr), Errors::not_published(EDIEM_CONFIG));
         let config = borrow_global_mut<DiemConfig<Config>>(addr);
         config.payload = payload;
 
@@ -161,7 +161,7 @@ module DiemFramework::DiemConfig {
         payload: Config
     ) acquires DiemConfig, Configuration {
         let addr = @DiemRoot;
-        assert(exists<DiemConfig<Config>>(addr), Errors::not_published(EDIEM_CONFIG));
+        assert!(exists<DiemConfig<Config>>(addr), Errors::not_published(EDIEM_CONFIG));
         let config = borrow_global_mut<DiemConfig<Config>>(addr);
         config.payload = payload;
         reconfigure_();
@@ -181,25 +181,25 @@ module DiemFramework::DiemConfig {
     /// Private function to temporarily halt reconfiguration.
     /// This function should only be used for offline WriteSet generation purpose and should never be invoked on chain.
     fun disable_reconfiguration(dr_account: &signer) {
-        assert(
+        assert!(
             Signer::address_of(dr_account) == @DiemRoot,
             Errors::requires_address(EDIEM_CONFIG)
         );
         Roles::assert_diem_root(dr_account);
-        assert(reconfiguration_enabled(), Errors::invalid_state(ECONFIGURATION));
+        assert!(reconfiguration_enabled(), Errors::invalid_state(ECONFIGURATION));
         move_to(dr_account, DisableReconfiguration {} )
     }
 
     /// Private function to resume reconfiguration.
     /// This function should only be used for offline WriteSet generation purpose and should never be invoked on chain.
     fun enable_reconfiguration(dr_account: &signer) acquires DisableReconfiguration {
-        assert(
+        assert!(
             Signer::address_of(dr_account) == @DiemRoot,
             Errors::requires_address(EDIEM_CONFIG)
         );
         Roles::assert_diem_root(dr_account);
 
-        assert(!reconfiguration_enabled(), Errors::invalid_state(ECONFIGURATION));
+        assert!(!reconfiguration_enabled(), Errors::invalid_state(ECONFIGURATION));
         DisableReconfiguration {} = move_from<DisableReconfiguration>(Signer::address_of(dr_account));
     }
 
@@ -216,7 +216,7 @@ module DiemFramework::DiemConfig {
         payload: Config,
     ): ModifyConfigCapability<Config> {
         Roles::assert_diem_root(dr_account);
-        assert(
+        assert!(
             !exists<DiemConfig<Config>>(Signer::address_of(dr_account)),
             Errors::already_published(EDIEM_CONFIG)
         );
@@ -243,7 +243,7 @@ module DiemFramework::DiemConfig {
         payload: Config
     ) {
         let capability = publish_new_config_and_get_capability<Config>(dr_account, payload);
-        assert(
+        assert!(
             !exists<ModifyConfigCapability<Config>>(Signer::address_of(dr_account)),
             Errors::already_published(EMODIFY_CAPABILITY)
         );
@@ -313,7 +313,7 @@ module DiemFramework::DiemConfig {
             return
         };
 
-        assert(current_time > config_ref.last_reconfiguration_time, Errors::invalid_state(EINVALID_BLOCK_TIME));
+        assert!(current_time > config_ref.last_reconfiguration_time, Errors::invalid_state(EINVALID_BLOCK_TIME));
         config_ref.last_reconfiguration_time = current_time;
         config_ref.epoch = config_ref.epoch + 1;
 
@@ -386,9 +386,9 @@ module DiemFramework::DiemConfig {
     /// Emit a `NewEpochEvent` event. This function will be invoked by genesis directly to generate the very first
     /// reconfiguration event.
     fun emit_genesis_reconfiguration_event() acquires Configuration {
-        assert(exists<Configuration>(@DiemRoot), Errors::not_published(ECONFIGURATION));
+        assert!(exists<Configuration>(@DiemRoot), Errors::not_published(ECONFIGURATION));
         let config_ref = borrow_global_mut<Configuration>(@DiemRoot);
-        assert(config_ref.epoch == 0 && config_ref.last_reconfiguration_time == 0, Errors::invalid_state(ECONFIGURATION));
+        assert!(config_ref.epoch == 0 && config_ref.last_reconfiguration_time == 0, Errors::invalid_state(ECONFIGURATION));
         config_ref.epoch = 1;
 
         Event::emit_event<NewEpochEvent>(

@@ -243,6 +243,7 @@ fn insert_test_poison(context: &mut Context, mloc: Loc, members: &mut Vec<P::Mod
     )];
     let nop_call = P::Exp_::Call(
         sp(mloc, P::NameAccessChain_::Three(mod_addr_name, fn_name)),
+        false,
         None,
         sp(mloc, args_),
     );

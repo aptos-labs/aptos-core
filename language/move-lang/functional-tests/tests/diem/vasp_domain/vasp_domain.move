@@ -9,9 +9,9 @@ script {
     fun main(account: signer) {
         let tc_account = &account;
         let addr: address = @{{bob}};
-        assert(!DiemAccount::exists_at(addr), 83);
+        assert!(!DiemAccount::exists_at(addr), 83);
         DiemAccount::create_parent_vasp_account<XUS>(tc_account, addr, {{bob::auth_key}}, x"aa", false);
-        assert(VASPDomain::tc_domain_manager_exists(), 77);
+        assert!(VASPDomain::tc_domain_manager_exists(), 77);
     }
 }
 // check: "Keep(EXECUTED)"
@@ -24,7 +24,7 @@ script{
 
     fun main(tc_account: signer) {
         let addr: address = @{{bob}};
-        assert(DiemAccount::exists_at(addr), 455);
+        assert!(DiemAccount::exists_at(addr), 455);
         let tc_account = &tc_account;
         let domain_name = b"diem";
 
@@ -32,7 +32,7 @@ script{
         VASPDomain::add_vasp_domain(tc_account, addr, copy domain_name);
 
         /// check if diem id domain is added to VASPDomains
-        assert(VASPDomain::has_vasp_domain(addr, domain_name), 5);
+        assert!(VASPDomain::has_vasp_domain(addr, domain_name), 5);
     }
 }
 // check: VASPDomainEvent
@@ -46,7 +46,7 @@ script{
 
     fun main(tc_account: signer) {
         let addr: address = @{{bob}};
-        assert(DiemAccount::exists_at(addr), 455);
+        assert!(DiemAccount::exists_at(addr), 455);
         let tc_account = &tc_account;
         let domain_name = b"diem";
 
@@ -54,7 +54,7 @@ script{
         VASPDomain::add_vasp_domain(tc_account, addr, copy domain_name);
 
         /// check if the previously added domain is still there
-        assert(VASPDomain::has_vasp_domain(addr, domain_name), 389);
+        assert!(VASPDomain::has_vasp_domain(addr, domain_name), 389);
     }
 }
 // check: "Keep(ABORTED { code: 775,"
@@ -67,7 +67,7 @@ script{
 
     fun main(tc_account: signer) {
         let addr: address = @{{bob}};
-        assert(DiemAccount::exists_at(addr), 2);
+        assert!(DiemAccount::exists_at(addr), 2);
         let tc_account = &tc_account;
         let domain_name = b"diem";
 
@@ -75,7 +75,7 @@ script{
         VASPDomain::remove_vasp_domain(tc_account, addr, copy domain_name);
 
         /// check if diem id domain is removed from VASPDomains
-        assert(!VASPDomain::has_vasp_domain(addr, domain_name), 205);
+        assert!(!VASPDomain::has_vasp_domain(addr, domain_name), 205);
     }
 }
 // check: VASPDomainEvent
@@ -89,7 +89,7 @@ script{
 
     fun main(tc_account: signer) {
         let addr: address = @{{bob}};
-        assert(DiemAccount::exists_at(addr), 455);
+        assert!(DiemAccount::exists_at(addr), 455);
         let tc_account = &tc_account;
         let domain_name = b"aaaaaaaaaabbbbbbbbbbccccccccccddddddddddeeeeeeeeeeffffffffffgggg";
 
@@ -97,7 +97,7 @@ script{
         VASPDomain::add_vasp_domain(tc_account, addr, copy domain_name);
 
         /// check that diem id domain is not added to VASPDomains
-        assert(!VASPDomain::has_vasp_domain(addr, domain_name), 888);
+        assert!(!VASPDomain::has_vasp_domain(addr, domain_name), 888);
     }
 }
 // check: "Keep(ABORTED { code: 1287,"

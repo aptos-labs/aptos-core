@@ -16,7 +16,7 @@ module 0x1::StructSpecRelevance {
     }
 
     public fun create(i: u64, j: u64): Nonzero {
-        assert(i > 0, 0);
+        assert!(i > 0, 0);
         Nonzero { i, j }
     }
 }

@@ -225,10 +225,10 @@ Updates the wall clock time by consensus. Requires VM privilege and will be invo
     <b>let</b> now = global_timer.microseconds;
     <b>if</b> (proposer == @VMReserved) {
         // NIL block <b>with</b> null address <b>as</b> proposer. Timestamp must be equal.
-        <b>assert</b>(now == timestamp, <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="DiemTimestamp.md#0x1_DiemTimestamp_ETIMESTAMP">ETIMESTAMP</a>));
+        <b>assert</b>!(now == timestamp, <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="DiemTimestamp.md#0x1_DiemTimestamp_ETIMESTAMP">ETIMESTAMP</a>));
     } <b>else</b> {
         // Normal block. Time must advance
-        <b>assert</b>(now &lt; timestamp, <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="DiemTimestamp.md#0x1_DiemTimestamp_ETIMESTAMP">ETIMESTAMP</a>));
+        <b>assert</b>!(now &lt; timestamp, <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="DiemTimestamp.md#0x1_DiemTimestamp_ETIMESTAMP">ETIMESTAMP</a>));
     };
     global_timer.microseconds = timestamp;
 }
@@ -419,7 +419,7 @@ Helper function to assert genesis state.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="DiemTimestamp.md#0x1_DiemTimestamp_assert_genesis">assert_genesis</a>() {
-    <b>assert</b>(<a href="DiemTimestamp.md#0x1_DiemTimestamp_is_genesis">is_genesis</a>(), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="DiemTimestamp.md#0x1_DiemTimestamp_ENOT_GENESIS">ENOT_GENESIS</a>));
+    <b>assert</b>!(<a href="DiemTimestamp.md#0x1_DiemTimestamp_is_genesis">is_genesis</a>(), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="DiemTimestamp.md#0x1_DiemTimestamp_ENOT_GENESIS">ENOT_GENESIS</a>));
 }
 </code></pre>
 
@@ -495,7 +495,7 @@ Helper function to assert operating (!genesis) state.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="DiemTimestamp.md#0x1_DiemTimestamp_assert_operating">assert_operating</a>() {
-    <b>assert</b>(<a href="DiemTimestamp.md#0x1_DiemTimestamp_is_operating">is_operating</a>(), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="DiemTimestamp.md#0x1_DiemTimestamp_ENOT_OPERATING">ENOT_OPERATING</a>));
+    <b>assert</b>!(<a href="DiemTimestamp.md#0x1_DiemTimestamp_is_operating">is_operating</a>(), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="DiemTimestamp.md#0x1_DiemTimestamp_ENOT_OPERATING">ENOT_OPERATING</a>));
 }
 </code></pre>
 

@@ -31,7 +31,6 @@ error: unknown assertion failed
    =     at ../move-stdlib/sources/Signer.move:13: address_of
    =         result = <redacted>
    =     at ../move-stdlib/sources/Signer.move:14: address_of
-   =         <redacted> = <redacted>
 
 error: precondition does not hold at this call
    ┌─ tests/sources/functional/is_txn_signer.move:39:9

@@ -15,7 +15,7 @@ script {
         DiemAccount::create_designated_dealer<XUS>(
             account, @0xDEADBEEF, dummy_auth_key_prefix, x"", false
         );
-        assert(DesignatedDealer::exists_at(@0xDEADBEEF), 0);
+        assert!(DesignatedDealer::exists_at(@0xDEADBEEF), 0);
     }
 }
 

@@ -16,21 +16,3 @@ error[E03008]: too few type arguments
   │         Expected 1 type argument(s) but got 0
   │         Invalid call to builtin function: 'freeze'
 
-error[E03007]: too many type arguments
-  ┌─ tests/move_check/naming/other_builtins_invalid.move:5:9
-  │
-5 │         assert<u64>(true, 42);
-  │         ^^^^^^---------------
-  │         │
-  │         Expected 0 type argument(s) but got 1
-  │         Invalid call to builtin function: 'assert'
-
-error[E03007]: too many type arguments
-  ┌─ tests/move_check/naming/other_builtins_invalid.move:6:9
-  │
-6 │         assert<u64, bool>(true, 42);
-  │         ^^^^^^---------------------
-  │         │
-  │         Expected 0 type argument(s) but got 2
-  │         Invalid call to builtin function: 'assert'
-

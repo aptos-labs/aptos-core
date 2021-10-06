@@ -5,8 +5,8 @@
 script {
 use Std::Signer;
 fun main(dr: signer, bob: signer) {
-    assert(Signer::address_of(&dr) == @DiemRoot, 0);
-    assert(Signer::address_of(&bob) == @{{bob}}, 1);
+    assert!(Signer::address_of(&dr) == @DiemRoot, 0);
+    assert!(Signer::address_of(&bob) == @{{bob}}, 1);
 }
 }
 
@@ -16,7 +16,7 @@ fun main(dr: signer, bob: signer) {
 script {
 use Std::Signer;
 fun main(dr: signer, bob: signer) {
-    assert(Signer::address_of(&dr) == @TreasuryCompliance, 0);
-    assert(Signer::address_of(&bob) == @{{bob}}, 1);
+    assert!(Signer::address_of(&dr) == @TreasuryCompliance, 0);
+    assert!(Signer::address_of(&bob) == @{{bob}}, 1);
 }
 }

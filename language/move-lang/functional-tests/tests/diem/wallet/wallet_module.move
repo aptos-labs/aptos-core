@@ -50,7 +50,7 @@ module {{default}}::ApprovalGroup {
         sig2: vector<u8>,
         hash: vector<u8>,
     ): bool {
-        assert(copy pk1 != copy pk2, 1000);
+        assert!(copy pk1 != copy pk2, 1000);
         let result1 = verify_sig(group, pk1, sig1, copy hash);
         let result2 = verify_sig(group, pk2, sig2, hash);
         result1 && result2
@@ -155,7 +155,7 @@ module {{default}}::ColdWallet {
         let payer = Signer::address_of(payer_);
         let payer_ref = borrow_global_mut<ColdWallet>(payer);
         let account_balance = Diem::value(&payer_ref.balance);
-        assert(amount <= account_balance, 1001);
+        assert!(amount <= account_balance, 1001);
 
         // obtain the expected serialization of the transaction struct
         let transaction_bytes = get_transaction_bytes(

@@ -6,7 +6,7 @@ script {
 use DiemFramework::DiemAccount;
 
 fun main() {
-    assert(DiemAccount::sequence_number(@{{alice}}) == 10, 72);
+    assert!(DiemAccount::sequence_number(@{{alice}}) == 10, 72);
 }
 }
 // check: "Keep(EXECUTED)"

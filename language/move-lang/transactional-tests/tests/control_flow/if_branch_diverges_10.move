@@ -4,7 +4,7 @@ fun main() {
     if (true) {
         loop return ()
     } else {
-        assert(false, 42);
+        assert!(false, 42);
         return ()
     }
 }

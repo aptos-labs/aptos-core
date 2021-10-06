@@ -46,7 +46,7 @@ module SortedLinkedList {
 
     public fun get_data<T: copy + drop + store>(entry: EntryHandle): T acquires NodeVector {
         //make sure a node exists in entry
-        assert(node_exists<T>(copy entry), 1);
+        assert!(node_exists<T>(copy entry), 1);
         let nodes = &borrow_global<NodeVector<T>>(entry.addr).nodes;
         let node = Vector::borrow<Node<T>>(nodes, entry.index);
         *&node.data
@@ -54,7 +54,7 @@ module SortedLinkedList {
 
     public fun get_prev_node_addr<T: copy + drop + store>(entry: EntryHandle): address acquires NodeVector {
         //make sure a node exists in entry
-        assert(node_exists<T>(copy entry), 2);
+        assert!(node_exists<T>(copy entry), 2);
         let nodes = &borrow_global<NodeVector<T>>(entry.addr).nodes;
         let node = Vector::borrow<Node<T>>(nodes, entry.index);
         *&node.prev.addr
@@ -63,7 +63,7 @@ module SortedLinkedList {
     //checks whether this entry is the head of a list
     public fun is_head_node<T: copy + drop + store>(entry: &EntryHandle): bool acquires NodeVector {
 		//check that a node exists
-        assert(node_exists<T>(*entry), 3);
+        assert!(node_exists<T>(*entry), 3);
         let nodes = &borrow_global<NodeVector<T>>(entry.addr).nodes;
         //find the head node
         let node = Vector::borrow<Node<T>>(nodes, entry.index);
@@ -77,7 +77,7 @@ module SortedLinkedList {
         let sender = Signer::address_of(account);
 
         //make sure no node/list is already stored in this account
-        assert(!exists<NodeVector<T>>(sender), 3);
+        assert!(!exists<NodeVector<T>>(sender), 3);
         let head_handle = entry_handle(sender, 0);
         let head = Self::Node<T> {
             prev: copy head_handle,
@@ -95,7 +95,7 @@ module SortedLinkedList {
         let sender_address = Signer::address_of(account);
 
         //make sure a node exists in prev_entry
-        assert(node_exists<T>(copy prev_entry), 1);
+        assert!(node_exists<T>(copy prev_entry), 1);
         let prev_nodes = &borrow_global<NodeVector<T>>(prev_entry.addr).nodes;
 
         //get a reference to prev_node and find the address and reference to next_node, head
@@ -116,8 +116,8 @@ module SortedLinkedList {
         let next_is_head = Self::is_head_node<T>(&next_entry);
 
         //check the order -- the list must be sorted
-        assert(prev_is_head || cmp_with_prev == 2u8, 6); // prev_is_head || data > prev_data
-        assert(next_is_head || cmp_with_next == 1u8, 7); // next_is_head || data < next_data
+        assert!(prev_is_head || cmp_with_prev == 2u8, 6); // prev_is_head || data > prev_data
+        assert!(next_is_head || cmp_with_next == 1u8, 7); // next_is_head || data < next_data
 
         //create the new node
         let node = Self::Node<T> {
@@ -152,7 +152,7 @@ module SortedLinkedList {
     //private function used for removing a non-head node -- does not check permissions
     fun remove_node<T: copy + drop + store>(entry: EntryHandle) acquires NodeVector {
         //check that a node exists
-        assert(node_exists<T>(copy entry), 1);
+        assert!(node_exists<T>(copy entry), 1);
         let nodes = &borrow_global<NodeVector<T>>(entry.addr).nodes;
 
         //find prev and next
@@ -179,15 +179,15 @@ module SortedLinkedList {
 
     public fun remove_node_by_list_owner<T: copy + drop + store>(account: &signer, entry: EntryHandle) acquires NodeVector {
         //check that a node exists
-        assert(node_exists<T>(copy entry), 1);
+        assert!(node_exists<T>(copy entry), 1);
         //make sure it is not a head node
-        assert(!Self::is_head_node<T>(&copy entry), 10);
+        assert!(!Self::is_head_node<T>(&copy entry), 10);
         //make sure the caller owns the list
 
         let nodes = &borrow_global<NodeVector<T>>(entry.addr).nodes;
         let current_node = Vector::borrow(nodes, entry.index);
         let list_owner = current_node.head.addr;
-        assert(list_owner == Signer::address_of(account), 11);
+        assert!(list_owner == Signer::address_of(account), 11);
 
         //remove it
         Self::remove_node<T>(entry);
@@ -196,11 +196,11 @@ module SortedLinkedList {
     //removes the current non-head node -- fails if the passed node is the head of a list
     public fun remove_node_by_node_owner<T: copy + drop + store>(account: &signer, entry: EntryHandle) acquires NodeVector {
         //check that a node exists
-        assert(node_exists<T>(copy entry), 1);
+        assert!(node_exists<T>(copy entry), 1);
         //make sure it is not a head node
-        assert(!Self::is_head_node<T>(&copy entry), 10);
+        assert!(!Self::is_head_node<T>(&copy entry), 10);
         //make sure the caller owns the node
-        assert(entry.addr == Signer::address_of(account), 11);
+        assert!(entry.addr == Signer::address_of(account), 11);
 
         //remove it
         Self::remove_node<T>(entry);
@@ -212,16 +212,16 @@ module SortedLinkedList {
         let sender_address = Signer::address_of(account);
 
         //fail if the caller does not own a list
-        assert(Self::is_head_node<T>(&Self::entry_handle(sender_address, 0)), 14);
+        assert!(Self::is_head_node<T>(&Self::entry_handle(sender_address, 0)), 14);
 
         let node_vector = &borrow_global<NodeVector<T>>(sender_address).nodes;
         let current_node = Vector::borrow(node_vector, 0);
 
         //check that the list is empty
-        assert(current_node.next.addr == sender_address, 15);
-        assert(current_node.next.index == 0, 16);
-        assert(current_node.prev.addr == sender_address, 17);
-        assert(current_node.prev.index == 0, 18);
+        assert!(current_node.next.addr == sender_address, 15);
+        assert!(current_node.next.index == 0, 16);
+        assert!(current_node.prev.addr == sender_address, 17);
+        assert!(current_node.prev.index == 0, 18);
 
         //destroy the Node
         let NodeVector { nodes: nodes } = move_from<NodeVector<T>>(sender_address);
@@ -230,7 +230,7 @@ module SortedLinkedList {
     }
 
     public fun find_position_and_insert<T: copy + drop + store>(account: &signer, data: T, head: EntryHandle): bool acquires NodeVector {
-        assert(Self::is_head_node<T>(&copy head), 18);
+        assert!(Self::is_head_node<T>(&copy head), 18);
 
         let data_bcs_bytes = BCS::to_bytes(&data);
         let nodes = &borrow_global<NodeVector<T>>(head.addr).nodes;
@@ -333,17 +333,17 @@ script {
 use {{sys}}::SortedLinkedList;
 fun main() {
     let entry0 = SortedLinkedList::entry_handle({{alice}}, 0);
-    assert(SortedLinkedList::get_data(copy entry0) == 0, 29);
-    assert(SortedLinkedList::get_prev_node_addr<u64>(entry0) == {{carol}}, 30);
+    assert!(SortedLinkedList::get_data(copy entry0) == 0, 29);
+    assert!(SortedLinkedList::get_prev_node_addr<u64>(entry0) == {{carol}}, 30);
     let entry1 = SortedLinkedList::entry_handle({{bob}}, 0);
-    assert(SortedLinkedList::get_data(copy entry1) == 10, 31);
-    assert(SortedLinkedList::get_prev_node_addr<u64>(entry1) == {{alice}}, 34);
+    assert!(SortedLinkedList::get_data(copy entry1) == 10, 31);
+    assert!(SortedLinkedList::get_prev_node_addr<u64>(entry1) == {{alice}}, 34);
     let entry2 = SortedLinkedList::entry_handle({{carol}}, 1);
-    assert(SortedLinkedList::get_data(copy entry2) == 11, 32);
-    assert(SortedLinkedList::get_prev_node_addr<u64>(entry2) == {{bob}}, 35);
+    assert!(SortedLinkedList::get_data(copy entry2) == 11, 32);
+    assert!(SortedLinkedList::get_prev_node_addr<u64>(entry2) == {{bob}}, 35);
     let entry3 = SortedLinkedList::entry_handle({{carol}}, 0);
-    assert(SortedLinkedList::get_data(copy entry3) == 12, 33);
-    assert(SortedLinkedList::get_prev_node_addr<u64>(entry3) == {{carol}}, 36);
+    assert!(SortedLinkedList::get_data(copy entry3) == 12, 33);
+    assert!(SortedLinkedList::get_prev_node_addr<u64>(entry3) == {{carol}}, 36);
 }
 }
 // check: "Keep(EXECUTED)"

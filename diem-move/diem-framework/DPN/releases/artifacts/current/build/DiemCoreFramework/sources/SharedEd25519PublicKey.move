@@ -33,7 +33,7 @@ module DiemFramework::SharedEd25519PublicKey {
             rotation_cap: DiemAccount::extract_key_rotation_capability(account)
         };
         rotate_key_(&mut t, key);
-        assert(!exists_at(Signer::address_of(account)), Errors::already_published(ESHARED_KEY));
+        assert!(!exists_at(Signer::address_of(account)), Errors::already_published(ESHARED_KEY));
         move_to(account, t);
     }
     spec publish {
@@ -65,7 +65,7 @@ module DiemFramework::SharedEd25519PublicKey {
 
     fun rotate_key_(shared_key: &mut SharedEd25519PublicKey, new_public_key: vector<u8>) {
         // Cryptographic check of public key validity
-        assert(
+        assert!(
             Signature::ed25519_validate_pubkey(copy new_public_key),
             Errors::invalid_argument(EMALFORMED_PUBLIC_KEY)
         );
@@ -102,7 +102,7 @@ module DiemFramework::SharedEd25519PublicKey {
     /// Aborts if the length of `new_public_key` is not 32.
     public fun rotate_key(account: &signer, new_public_key: vector<u8>) acquires SharedEd25519PublicKey {
         let addr = Signer::address_of(account);
-        assert(exists_at(addr), Errors::not_published(ESHARED_KEY));
+        assert!(exists_at(addr), Errors::not_published(ESHARED_KEY));
         rotate_key_(borrow_global_mut<SharedEd25519PublicKey>(addr), new_public_key);
     }
     spec rotate_key {
@@ -126,7 +126,7 @@ module DiemFramework::SharedEd25519PublicKey {
     /// Return the public key stored under `addr`.
     /// Aborts if `addr` does not hold a `SharedEd25519PublicKey` resource.
     public fun key(addr: address): vector<u8> acquires SharedEd25519PublicKey {
-        assert(exists_at(addr), Errors::not_published(ESHARED_KEY));
+        assert!(exists_at(addr), Errors::not_published(ESHARED_KEY));
         *&borrow_global<SharedEd25519PublicKey>(addr).key
     }
 

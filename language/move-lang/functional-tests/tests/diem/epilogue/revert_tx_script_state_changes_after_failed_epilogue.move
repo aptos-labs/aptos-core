@@ -58,8 +58,8 @@ use DiemFramework::DiemAccount;
 use DiemFramework::XUS::XUS;
 
 fun main() {
-    assert(DiemAccount::balance<XUS>(@{{carol}}) == 1000, 42);
-    assert(DiemAccount::balance<XUS>(@{{alice}}) == DiemAccount::balance<XUS>(@{{bob}}) + 1000, 43)
+    assert!(DiemAccount::balance<XUS>(@{{carol}}) == 1000, 42);
+    assert!(DiemAccount::balance<XUS>(@{{alice}}) == DiemAccount::balance<XUS>(@{{bob}}) + 1000, 43)
 }
 }
 // check: "Keep(EXECUTED)"

@@ -109,7 +109,7 @@ module DiemFramework::DiemSystem {
                 validators: Vector::empty(),
             },
         );
-        assert(
+        assert!(
             !exists<CapabilityHolder>(@DiemRoot),
             Errors::already_published(ECAPABILITY_HOLDER)
         );
@@ -133,7 +133,7 @@ module DiemFramework::DiemSystem {
     /// Called by the add, remove, and update functions.
     fun set_diem_system_config(value: DiemSystem) acquires CapabilityHolder {
         DiemTimestamp::assert_operating();
-        assert(
+        assert!(
             exists<CapabilityHolder>(@DiemRoot),
             Errors::not_published(ECAPABILITY_HOLDER)
         );
@@ -174,13 +174,13 @@ module DiemFramework::DiemSystem {
         Roles::assert_diem_root(dr_account);
 
         // A prospective validator must have a validator config resource
-        assert(
+        assert!(
             ValidatorConfig::is_valid(validator_addr),
             Errors::invalid_argument(EINVALID_PROSPECTIVE_VALIDATOR)
         );
 
         // Bound the validator set size
-        assert(
+        assert!(
             validator_set_size() < MAX_VALIDATORS,
             Errors::limit_exceeded(EMAX_VALIDATORS)
         );
@@ -188,7 +188,7 @@ module DiemFramework::DiemSystem {
         let diem_system_config = get_diem_system_config();
 
         // Ensure that this address is not already a validator
-        assert(
+        assert!(
             !is_validator_(validator_addr, &diem_system_config.validators),
             Errors::invalid_argument(EALREADY_A_VALIDATOR)
         );
@@ -253,7 +253,7 @@ module DiemFramework::DiemSystem {
         let diem_system_config = get_diem_system_config();
         // Ensure that this address is an active validator
         let to_remove_index_vec = get_validator_index_(&diem_system_config.validators, validator_addr);
-        assert(Option::is_some(&to_remove_index_vec), Errors::invalid_argument(ENOT_AN_ACTIVE_VALIDATOR));
+        assert!(Option::is_some(&to_remove_index_vec), Errors::invalid_argument(ENOT_AN_ACTIVE_VALIDATOR));
         let to_remove_index = *Option::borrow(&to_remove_index_vec);
         // Remove corresponding ValidatorInfo from the validator set
         _  = Vector::swap_remove(&mut diem_system_config.validators, to_remove_index);
@@ -294,22 +294,22 @@ module DiemFramework::DiemSystem {
     ) acquires CapabilityHolder {
         DiemTimestamp::assert_operating();
         Roles::assert_validator_operator(validator_operator_account);
-        assert(
+        assert!(
             ValidatorConfig::get_operator(validator_addr) == Signer::address_of(validator_operator_account),
             Errors::invalid_argument(EINVALID_TRANSACTION_SENDER)
         );
         let diem_system_config = get_diem_system_config();
         let to_update_index_vec = get_validator_index_(&diem_system_config.validators, validator_addr);
-        assert(Option::is_some(&to_update_index_vec), Errors::invalid_argument(ENOT_AN_ACTIVE_VALIDATOR));
+        assert!(Option::is_some(&to_update_index_vec), Errors::invalid_argument(ENOT_AN_ACTIVE_VALIDATOR));
         let to_update_index = *Option::borrow(&to_update_index_vec);
         let is_validator_info_updated = update_ith_validator_info_(&mut diem_system_config.validators, to_update_index);
         if (is_validator_info_updated) {
             let validator_info = Vector::borrow_mut(&mut diem_system_config.validators, to_update_index);
-            assert(
+            assert!(
                 validator_info.last_config_update_time <= MAX_U64 - FIVE_MINUTES,
                 Errors::limit_exceeded(ECONFIG_UPDATE_TIME_OVERFLOWS)
             );
-            assert(
+            assert!(
                 DiemTimestamp::now_microseconds() > validator_info.last_config_update_time + FIVE_MINUTES,
                 Errors::limit_exceeded(ECONFIG_UPDATE_RATE_LIMITED)
             );
@@ -420,7 +420,7 @@ module DiemFramework::DiemSystem {
     public fun get_validator_config(addr: address): ValidatorConfig::Config {
         let diem_system_config = get_diem_system_config();
         let validator_index_vec = get_validator_index_(&diem_system_config.validators, addr);
-        assert(Option::is_some(&validator_index_vec), Errors::invalid_argument(ENOT_AN_ACTIVE_VALIDATOR));
+        assert!(Option::is_some(&validator_index_vec), Errors::invalid_argument(ENOT_AN_ACTIVE_VALIDATOR));
         *&(Vector::borrow(&diem_system_config.validators, *Option::borrow(&validator_index_vec))).config
     }
     spec get_validator_config {
@@ -444,7 +444,7 @@ module DiemFramework::DiemSystem {
 
     /// Get the `i`'th validator address in the validator set.
     public fun get_ith_validator_address(i: u64): address {
-        assert(i < validator_set_size(), Errors::invalid_argument(EVALIDATOR_INDEX));
+        assert!(i < validator_set_size(), Errors::invalid_argument(EVALIDATOR_INDEX));
         Vector::borrow(&get_diem_system_config().validators, i).addr
     }
     spec get_ith_validator_address {

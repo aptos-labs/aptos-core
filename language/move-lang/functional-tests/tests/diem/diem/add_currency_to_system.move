@@ -87,11 +87,11 @@ use 0x1::COIN::COIN;
 use Std::FixedPoint32;
 fun main(account: signer) {
     let account = &account;
-    assert(Diem::approx_xdx_for_value<COIN>(10) == 5, 1);
-    assert(Diem::scaling_factor<COIN>() == 1000000, 2);
-    assert(Diem::fractional_part<COIN>() == 100, 3);
+    assert!(Diem::approx_xdx_for_value<COIN>(10) == 5, 1);
+    assert!(Diem::scaling_factor<COIN>() == 1000000, 2);
+    assert!(Diem::fractional_part<COIN>() == 100, 3);
     Diem::update_xdx_exchange_rate<COIN>(account, FixedPoint32::create_from_rational(1, 3));
-    assert(Diem::approx_xdx_for_value<COIN>(10) == 3, 4);
+    assert!(Diem::approx_xdx_for_value<COIN>(10) == 3, 4);
 }
 }
 // check: ToXDXExchangeRateUpdateEvent
@@ -119,7 +119,7 @@ fun main(account: signer) {
         10000,
         0,
     );
-    assert(Diem::market_cap<COIN>() - prev_mcap3 == 10000, 8);
+    assert!(Diem::market_cap<COIN>() - prev_mcap3 == 10000, 8);
 }
 }
 // check: "Keep(EXECUTED)"

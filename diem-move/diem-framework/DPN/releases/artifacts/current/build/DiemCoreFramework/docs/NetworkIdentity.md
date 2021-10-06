@@ -208,7 +208,7 @@ No identities provided for changes
 
 <pre><code><b>public</b> <b>fun</b> <a href="NetworkIdentity.md#0x1_NetworkIdentity_initialize_network_identity_event_handle">initialize_network_identity_event_handle</a>(tc_account: &signer) {
     <a href="Roles.md#0x1_Roles_assert_treasury_compliance">Roles::assert_treasury_compliance</a>(tc_account);
-    <b>assert</b>(
+    <b>assert</b>!(
         !<b>exists</b>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityEventHandle">NetworkIdentityEventHandle</a>&gt;(<a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(tc_account)),
         <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_already_published">Errors::already_published</a>(<a href="NetworkIdentity.md#0x1_NetworkIdentity_ENETWORK_ID_EVENT_HANDLE_INVALID">ENETWORK_ID_EVENT_HANDLE_INVALID</a>)
     );
@@ -306,7 +306,7 @@ Return the underlying <code><a href="NetworkIdentity.md#0x1_NetworkIdentity">Net
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="NetworkIdentity.md#0x1_NetworkIdentity_get">get</a>(account_addr: address): vector&lt;vector&lt;u8&gt;&gt; <b>acquires</b> <a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a> {
-    <b>assert</b>(
+    <b>assert</b>!(
         <b>exists</b>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a>&gt;(account_addr),
         <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="NetworkIdentity.md#0x1_NetworkIdentity_ENETWORK_ID_DOESNT_EXIST">ENETWORK_ID_DOESNT_EXIST</a>)
     );
@@ -348,9 +348,9 @@ Update and create if not exist <code><a href="NetworkIdentity.md#0x1_NetworkIden
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="NetworkIdentity.md#0x1_NetworkIdentity_add_identities">add_identities</a>(account: &signer, to_add: vector&lt;vector&lt;u8&gt;&gt;) <b>acquires</b> <a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a>, <a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityEventHandle">NetworkIdentityEventHandle</a> {
-    <b>assert</b>(<a href="NetworkIdentity.md#0x1_NetworkIdentity_tc_network_identity_event_handle_exists">tc_network_identity_event_handle_exists</a>(), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="NetworkIdentity.md#0x1_NetworkIdentity_ENETWORK_ID_EVENT_HANDLE_INVALID">ENETWORK_ID_EVENT_HANDLE_INVALID</a>));
+    <b>assert</b>!(<a href="NetworkIdentity.md#0x1_NetworkIdentity_tc_network_identity_event_handle_exists">tc_network_identity_event_handle_exists</a>(), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="NetworkIdentity.md#0x1_NetworkIdentity_ENETWORK_ID_EVENT_HANDLE_INVALID">ENETWORK_ID_EVENT_HANDLE_INVALID</a>));
     <b>let</b> num_to_add = <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_length">Vector::length</a>(&to_add);
-    <b>assert</b>(num_to_add &gt; 0, <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="NetworkIdentity.md#0x1_NetworkIdentity_ENETWORK_ID_NO_INPUT">ENETWORK_ID_NO_INPUT</a>));
+    <b>assert</b>!(num_to_add &gt; 0, <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="NetworkIdentity.md#0x1_NetworkIdentity_ENETWORK_ID_NO_INPUT">ENETWORK_ID_NO_INPUT</a>));
 
     <b>if</b> (!<b>exists</b>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a>&gt;(<a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account))) {
         <a href="NetworkIdentity.md#0x1_NetworkIdentity_initialize_network_identity">initialize_network_identity</a>(account);
@@ -359,7 +359,7 @@ Update and create if not exist <code><a href="NetworkIdentity.md#0x1_NetworkIden
     <b>let</b> identity = borrow_global_mut&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a>&gt;(account_addr);
     <b>let</b> identities = &<b>mut</b> identity.identities;
 
-    <b>assert</b>(
+    <b>assert</b>!(
         <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_length">Vector::length</a>(identities) + num_to_add &lt;= <a href="NetworkIdentity.md#0x1_NetworkIdentity_MAX_ADDR_IDENTITIES">MAX_ADDR_IDENTITIES</a>,
         <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_limit_exceeded">Errors::limit_exceeded</a>(<a href="NetworkIdentity.md#0x1_NetworkIdentity_ENETWORK_ID_LIMIT_EXCEEDED">ENETWORK_ID_LIMIT_EXCEEDED</a>)
     );
@@ -435,16 +435,16 @@ Remove <code><a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="NetworkIdentity.md#0x1_NetworkIdentity_remove_identities">remove_identities</a>(account: &signer, to_remove: vector&lt;vector&lt;u8&gt;&gt;) <b>acquires</b> <a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a>, <a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityEventHandle">NetworkIdentityEventHandle</a> {
-    <b>assert</b>(<a href="NetworkIdentity.md#0x1_NetworkIdentity_tc_network_identity_event_handle_exists">tc_network_identity_event_handle_exists</a>(), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="NetworkIdentity.md#0x1_NetworkIdentity_ENETWORK_ID_EVENT_HANDLE_INVALID">ENETWORK_ID_EVENT_HANDLE_INVALID</a>));
+    <b>assert</b>!(<a href="NetworkIdentity.md#0x1_NetworkIdentity_tc_network_identity_event_handle_exists">tc_network_identity_event_handle_exists</a>(), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="NetworkIdentity.md#0x1_NetworkIdentity_ENETWORK_ID_EVENT_HANDLE_INVALID">ENETWORK_ID_EVENT_HANDLE_INVALID</a>));
     <b>let</b> num_to_remove = <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_length">Vector::length</a>(&to_remove);
-    <b>assert</b>(num_to_remove &gt; 0, <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="NetworkIdentity.md#0x1_NetworkIdentity_ENETWORK_ID_NO_INPUT">ENETWORK_ID_NO_INPUT</a>));
-    <b>assert</b>(
+    <b>assert</b>!(num_to_remove &gt; 0, <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="NetworkIdentity.md#0x1_NetworkIdentity_ENETWORK_ID_NO_INPUT">ENETWORK_ID_NO_INPUT</a>));
+    <b>assert</b>!(
         num_to_remove &lt;= <a href="NetworkIdentity.md#0x1_NetworkIdentity_MAX_ADDR_IDENTITIES">MAX_ADDR_IDENTITIES</a>,
         <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_limit_exceeded">Errors::limit_exceeded</a>(<a href="NetworkIdentity.md#0x1_NetworkIdentity_ENETWORK_ID_LIMIT_EXCEEDED">ENETWORK_ID_LIMIT_EXCEEDED</a>)
     );
 
     <b>let</b> account_addr = <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
-    <b>assert</b>(
+    <b>assert</b>!(
         <b>exists</b>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a>&gt;(account_addr),
         <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="NetworkIdentity.md#0x1_NetworkIdentity_ENETWORK_ID_DOESNT_EXIST">ENETWORK_ID_DOESNT_EXIST</a>)
     );

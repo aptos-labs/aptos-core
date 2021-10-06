@@ -240,19 +240,19 @@ Finally, each validator must specify the network address
 ) {
     <b>let</b> num_owners = <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_length">Vector::length</a>(&owners);
     <b>let</b> num_owner_names = <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_length">Vector::length</a>(&owner_names);
-    <b>assert</b>(num_owners == num_owner_names, 0);
+    <b>assert</b>!(num_owners == num_owner_names, 0);
     <b>let</b> num_owner_keys = <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_length">Vector::length</a>(&owner_auth_keys);
-    <b>assert</b>(num_owner_names == num_owner_keys, 0);
+    <b>assert</b>!(num_owner_names == num_owner_keys, 0);
     <b>let</b> num_operators = <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_length">Vector::length</a>(&operators);
-    <b>assert</b>(num_owner_keys == num_operators, 0);
+    <b>assert</b>!(num_owner_keys == num_operators, 0);
     <b>let</b> num_operator_names = <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_length">Vector::length</a>(&operator_names);
-    <b>assert</b>(num_operators == num_operator_names, 0);
+    <b>assert</b>!(num_operators == num_operator_names, 0);
     <b>let</b> num_operator_keys = <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_length">Vector::length</a>(&operator_auth_keys);
-    <b>assert</b>(num_operator_names == num_operator_keys, 0);
+    <b>assert</b>!(num_operator_names == num_operator_keys, 0);
     <b>let</b> num_validator_network_addresses = <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_length">Vector::length</a>(&validator_network_addresses);
-    <b>assert</b>(num_operator_keys == num_validator_network_addresses, 0);
+    <b>assert</b>!(num_operator_keys == num_validator_network_addresses, 0);
     <b>let</b> num_full_node_network_addresses = <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_length">Vector::length</a>(&full_node_network_addresses);
-    <b>assert</b>(num_validator_network_addresses == num_full_node_network_addresses, 0);
+    <b>assert</b>!(num_validator_network_addresses == num_full_node_network_addresses, 0);
 
     <b>let</b> i = 0;
     <b>let</b> dummy_auth_key_prefix = x"00000000000000000000000000000000";
@@ -284,7 +284,7 @@ Finally, each validator must specify the network address
             <a href="DiemAccount.md#0x1_DiemAccount_restore_key_rotation_capability">DiemAccount::restore_key_rotation_capability</a>(rotation_cap);
         };
         // assign the operator <b>to</b> its validator
-        <b>assert</b>(<a href="ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_get_human_name">ValidatorOperatorConfig::get_human_name</a>(operator_address) == operator_name, 0);
+        <b>assert</b>!(<a href="ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_get_human_name">ValidatorOperatorConfig::get_human_name</a>(operator_address) == operator_name, 0);
         <a href="ValidatorConfig.md#0x1_ValidatorConfig_set_operator">ValidatorConfig::set_operator</a>(owner, operator_address);
 
         // <b>use</b> the operator account set up the validator config

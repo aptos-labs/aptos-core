@@ -32,7 +32,7 @@ module Std::Offer {
   /// Publish a value of type `Offered` under the sender's account. The value can be claimed by
   /// either the `for` address or the transaction sender.
   public fun create<Offered: store>(account: &signer, offered: Offered, for: address) {
-    assert(!exists<Offer<Offered>>(Signer::address_of(account)), Errors::already_published(EOFFER_ALREADY_CREATED));
+    assert!(!exists<Offer<Offered>>(Signer::address_of(account)), Errors::already_published(EOFFER_ALREADY_CREATED));
     move_to(account, Offer<Offered> { offered, for });
   }
   spec create {
@@ -49,10 +49,10 @@ module Std::Offer {
   /// publisher `offer_address`.
   /// Also fails if there is no `Offer<Offered>` published.
   public fun redeem<Offered: store>(account: &signer, offer_address: address): Offered acquires Offer {
-    assert(exists<Offer<Offered>>(offer_address), Errors::not_published(EOFFER_DOES_NOT_EXIST));
+    assert!(exists<Offer<Offered>>(offer_address), Errors::not_published(EOFFER_DOES_NOT_EXIST));
     let Offer<Offered> { offered, for } = move_from<Offer<Offered>>(offer_address);
     let sender = Signer::address_of(account);
-    assert(sender == for || sender == offer_address, Errors::invalid_argument(EOFFER_DNE_FOR_ACCOUNT));
+    assert!(sender == for || sender == offer_address, Errors::invalid_argument(EOFFER_DNE_FOR_ACCOUNT));
     offered
   }
   spec redeem {
@@ -81,7 +81,7 @@ module Std::Offer {
   // Returns the address of the `Offered` type stored at `offer_address.
   // Fails if no such `Offer` exists.
   public fun address_of<Offered: store>(offer_address: address): address acquires Offer {
-    assert(exists<Offer<Offered>>(offer_address), Errors::not_published(EOFFER_DOES_NOT_EXIST));
+    assert!(exists<Offer<Offered>>(offer_address), Errors::not_published(EOFFER_DOES_NOT_EXIST));
     borrow_global<Offer<Offered>>(offer_address).for
   }
   spec address_of {

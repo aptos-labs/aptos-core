@@ -16,6 +16,6 @@ script {
 use 0x42::Test;
 
 fun main() {
-    assert(Test::t() == 100, 42);
+    assert!(Test::t() == 100, 42);
 }
 }

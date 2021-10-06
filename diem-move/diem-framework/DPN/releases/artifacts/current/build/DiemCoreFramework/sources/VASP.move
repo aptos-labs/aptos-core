@@ -45,7 +45,7 @@ module DiemFramework::VASP {
         Roles::assert_treasury_compliance(tc_account);
         Roles::assert_parent_vasp_role(vasp);
         let vasp_addr = Signer::address_of(vasp);
-        assert(!is_vasp(vasp_addr), Errors::already_published(EPARENT_OR_CHILD_VASP));
+        assert!(!is_vasp(vasp_addr), Errors::already_published(EPARENT_OR_CHILD_VASP));
         move_to(vasp, ParentVASP { num_children: 0 });
     }
 
@@ -73,12 +73,12 @@ module DiemFramework::VASP {
         Roles::assert_parent_vasp_role(parent);
         Roles::assert_child_vasp_role(child);
         let child_vasp_addr = Signer::address_of(child);
-        assert(!is_vasp(child_vasp_addr), Errors::already_published(EPARENT_OR_CHILD_VASP));
+        assert!(!is_vasp(child_vasp_addr), Errors::already_published(EPARENT_OR_CHILD_VASP));
         let parent_vasp_addr = Signer::address_of(parent);
-        assert(is_parent(parent_vasp_addr), Errors::invalid_argument(ENOT_A_PARENT_VASP));
+        assert!(is_parent(parent_vasp_addr), Errors::invalid_argument(ENOT_A_PARENT_VASP));
         let num_children = &mut borrow_global_mut<ParentVASP>(parent_vasp_addr).num_children;
         // Abort if creating this child account would put the parent VASP over the limit
-        assert(*num_children < MAX_CHILD_ACCOUNTS, Errors::limit_exceeded(ETOO_MANY_CHILDREN));
+        assert!(*num_children < MAX_CHILD_ACCOUNTS, Errors::limit_exceeded(ETOO_MANY_CHILDREN));
         *num_children = *num_children + 1;
         move_to(child, ChildVASP { parent_vasp_addr });
     }

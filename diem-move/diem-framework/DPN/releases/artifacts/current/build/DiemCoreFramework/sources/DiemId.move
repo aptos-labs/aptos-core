@@ -60,7 +60,7 @@ module DiemFramework::DiemId {
     const EINVALID_DIEM_ID_DOMAIN: u64 = 5;
 
     fun create_diem_id_domain(domain: vector<u8>): DiemIdDomain {
-        assert(Vector::length(&domain) <= DOMAIN_LENGTH, Errors::invalid_argument(EINVALID_DIEM_ID_DOMAIN));
+        assert!(Vector::length(&domain) <= DOMAIN_LENGTH, Errors::invalid_argument(EINVALID_DIEM_ID_DOMAIN));
         DiemIdDomain{ domain }
     }
     spec create_diem_id_domain {
@@ -79,7 +79,7 @@ module DiemFramework::DiemId {
         vasp_account: &signer,
     ) {
         Roles::assert_parent_vasp_role(vasp_account);
-        assert(
+        assert!(
             !exists<DiemIdDomains>(Signer::address_of(vasp_account)),
             Errors::already_published(EDIEM_ID_DOMAIN)
         );
@@ -118,7 +118,7 @@ module DiemFramework::DiemId {
         tc_account : &signer,
     ) {
         Roles::assert_treasury_compliance(tc_account);
-        assert(
+        assert!(
             !exists<DiemIdDomainManager>(Signer::address_of(tc_account)),
             Errors::already_published(EDIEM_ID_DOMAIN_MANAGER)
         );
@@ -146,8 +146,8 @@ module DiemFramework::DiemId {
         domain: vector<u8>,
     ) acquires DiemIdDomainManager, DiemIdDomains {
         Roles::assert_treasury_compliance(tc_account);
-        assert(tc_domain_manager_exists(), Errors::not_published(EDIEM_ID_DOMAIN_MANAGER));
-        assert(
+        assert!(tc_domain_manager_exists(), Errors::not_published(EDIEM_ID_DOMAIN_MANAGER));
+        assert!(
             exists<DiemIdDomains>(address),
             Errors::not_published(EDIEM_ID_DOMAINS_NOT_PUBLISHED)
         );
@@ -155,7 +155,7 @@ module DiemFramework::DiemId {
         let account_domains = borrow_global_mut<DiemIdDomains>(address);
         let diem_id_domain = create_diem_id_domain(domain);
 
-        assert(
+        assert!(
             !Vector::contains(&account_domains.domains, &diem_id_domain),
             Errors::invalid_argument(EDOMAIN_ALREADY_EXISTS)
         );
@@ -212,8 +212,8 @@ module DiemFramework::DiemId {
         domain: vector<u8>,
     ) acquires DiemIdDomainManager, DiemIdDomains {
         Roles::assert_treasury_compliance(tc_account);
-        assert(tc_domain_manager_exists(), Errors::not_published(EDIEM_ID_DOMAIN_MANAGER));
-        assert(
+        assert!(tc_domain_manager_exists(), Errors::not_published(EDIEM_ID_DOMAIN_MANAGER));
+        assert!(
             exists<DiemIdDomains>(address),
             Errors::not_published(EDIEM_ID_DOMAINS_NOT_PUBLISHED)
         );
@@ -273,7 +273,7 @@ module DiemFramework::DiemId {
     }
 
     public fun has_diem_id_domain(addr: address, domain: vector<u8>): bool acquires DiemIdDomains {
-        assert(
+        assert!(
             exists<DiemIdDomains>(addr),
             Errors::not_published(EDIEM_ID_DOMAINS_NOT_PUBLISHED)
         );

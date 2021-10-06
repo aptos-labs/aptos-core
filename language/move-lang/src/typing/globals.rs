@@ -204,7 +204,7 @@ fn builtin_function(
             check_global_access(context, loc, msg, bt);
         }
 
-        B::Freeze(_) | B::Assert => (),
+        B::Freeze(_) | B::Assert(_) => (),
     }
 }
 

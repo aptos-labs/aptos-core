@@ -10,6 +10,6 @@ fun main() {
     };
     y;
 
-    assert(x == 0, 42);
+    assert!(x == 0, 42);
 }
 }

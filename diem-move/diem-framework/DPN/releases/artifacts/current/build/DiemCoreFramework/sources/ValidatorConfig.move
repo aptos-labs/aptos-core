@@ -56,7 +56,7 @@ module DiemFramework::ValidatorConfig {
         DiemTimestamp::assert_operating();
         Roles::assert_diem_root(dr_account);
         Roles::assert_validator(validator_account);
-        assert(
+        assert!(
             !exists<ValidatorConfig>(Signer::address_of(validator_account)),
             Errors::already_published(EVALIDATOR_CONFIG)
         );
@@ -104,12 +104,12 @@ module DiemFramework::ValidatorConfig {
         Roles::assert_validator(validator_account);
         // Check for validator role is not necessary since the role is checked when the config
         // resource is published.
-        assert(
+        assert!(
             ValidatorOperatorConfig::has_validator_operator_config(operator_addr),
             Errors::invalid_argument(ENOT_A_VALIDATOR_OPERATOR)
         );
         let sender = Signer::address_of(validator_account);
-        assert(exists_config(sender), Errors::not_published(EVALIDATOR_CONFIG));
+        assert!(exists_config(sender), Errors::not_published(EVALIDATOR_CONFIG));
         (borrow_global_mut<ValidatorConfig>(sender)).operator_account = Option::some(operator_addr);
     }
     spec set_operator {
@@ -148,7 +148,7 @@ module DiemFramework::ValidatorConfig {
         Roles::assert_validator(validator_account);
         let sender = Signer::address_of(validator_account);
         // Config field remains set
-        assert(exists_config(sender), Errors::not_published(EVALIDATOR_CONFIG));
+        assert!(exists_config(sender), Errors::not_published(EVALIDATOR_CONFIG));
         (borrow_global_mut<ValidatorConfig>(sender)).operator_account = Option::none();
     }
 
@@ -178,16 +178,16 @@ module DiemFramework::ValidatorConfig {
         validator_network_addresses: vector<u8>,
         fullnode_network_addresses: vector<u8>,
     ) acquires ValidatorConfig {
-        assert(
+        assert!(
             Signer::address_of(validator_operator_account) == get_operator(validator_addr),
             Errors::invalid_argument(EINVALID_TRANSACTION_SENDER)
         );
-        assert(
+        assert!(
             Signature::ed25519_validate_pubkey(copy consensus_pubkey),
             Errors::invalid_argument(EINVALID_CONSENSUS_KEY)
         );
         // TODO(valerini): verify the proof of posession for consensus_pubkey
-        assert(exists_config(validator_addr), Errors::not_published(EVALIDATOR_CONFIG));
+        assert!(exists_config(validator_addr), Errors::not_published(EVALIDATOR_CONFIG));
         let t_ref = borrow_global_mut<ValidatorConfig>(validator_addr);
         t_ref.config = Option::some(Config {
             consensus_pubkey,
@@ -242,9 +242,9 @@ module DiemFramework::ValidatorConfig {
     /// Get Config
     /// Aborts if there is no ValidatorConfig resource or if its config is empty
     public fun get_config(addr: address): Config acquires ValidatorConfig {
-        assert(exists_config(addr), Errors::not_published(EVALIDATOR_CONFIG));
+        assert!(exists_config(addr), Errors::not_published(EVALIDATOR_CONFIG));
         let config = &borrow_global<ValidatorConfig>(addr).config;
-        assert(Option::is_some(config), Errors::invalid_argument(EVALIDATOR_CONFIG));
+        assert!(Option::is_some(config), Errors::invalid_argument(EVALIDATOR_CONFIG));
         *Option::borrow(config)
     }
 
@@ -263,7 +263,7 @@ module DiemFramework::ValidatorConfig {
     /// Get validator's account human name
     /// Aborts if there is no ValidatorConfig resource
     public fun get_human_name(addr: address): vector<u8> acquires ValidatorConfig {
-        assert(exists<ValidatorConfig>(addr), Errors::not_published(EVALIDATOR_CONFIG));
+        assert!(exists<ValidatorConfig>(addr), Errors::not_published(EVALIDATOR_CONFIG));
         let t_ref = borrow_global<ValidatorConfig>(addr);
         *&t_ref.human_name
     }
@@ -278,9 +278,9 @@ module DiemFramework::ValidatorConfig {
     /// Aborts if there is no ValidatorConfig resource or
     /// if the operator_account is unset
     public fun get_operator(addr: address): address acquires ValidatorConfig {
-        assert(exists<ValidatorConfig>(addr), Errors::not_published(EVALIDATOR_CONFIG));
+        assert!(exists<ValidatorConfig>(addr), Errors::not_published(EVALIDATOR_CONFIG));
         let t_ref = borrow_global<ValidatorConfig>(addr);
-        assert(Option::is_some(&t_ref.operator_account), Errors::invalid_argument(EVALIDATOR_CONFIG));
+        assert!(Option::is_some(&t_ref.operator_account), Errors::invalid_argument(EVALIDATOR_CONFIG));
         *Option::borrow(&t_ref.operator_account)
     }
 

@@ -53,7 +53,7 @@ module DiemFramework::XDX {
         // Operational constraint
         CoreAddresses::assert_currency_info(dr_account);
         // Reserve must not exist.
-        assert(!exists<Reserve>(@DiemRoot), Errors::already_published(ERESERVE));
+        assert!(!exists<Reserve>(@DiemRoot), Errors::already_published(ERESERVE));
         let (mint_cap, burn_cap) = Diem::register_currency<XDX>(
             dr_account,
             FixedPoint32::create_from_rational(1, 1), // exchange rate to XDX

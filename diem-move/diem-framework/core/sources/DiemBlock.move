@@ -34,7 +34,7 @@ module DiemFramework::DiemBlock {
         // Operational constraint, only callable by the Association address
         CoreAddresses::assert_diem_root(account);
 
-        assert(!is_initialized(), Errors::already_published(EBLOCK_METADATA));
+        assert!(!is_initialized(), Errors::already_published(EBLOCK_METADATA));
         move_to<BlockMetadata>(
             account,
             BlockMetadata {
@@ -70,7 +70,7 @@ module DiemFramework::DiemBlock {
         CoreAddresses::assert_vm(&vm);
 
         // Authorization
-        assert(
+        assert!(
             proposer == @VMReserved || DiemSystem::is_validator(proposer),
             Errors::requires_address(EVM_OR_VALIDATOR)
         );
@@ -116,7 +116,7 @@ module DiemFramework::DiemBlock {
 
     /// Get the current block height
     public fun get_current_block_height(): u64 acquires BlockMetadata {
-        assert(is_initialized(), Errors::not_published(EBLOCK_METADATA));
+        assert!(is_initialized(), Errors::not_published(EBLOCK_METADATA));
         borrow_global<BlockMetadata>(@DiemRoot).height
     }
 

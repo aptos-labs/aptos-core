@@ -6,8 +6,8 @@ module 0x1::ConcretizeVector {
     struct T has key { f: u64 }
 
     public(script) fun publish(account1: signer, account2: signer) {
-        assert(Signer::address_of(&account1) == @0x1, 1);
-        assert(Signer::address_of(&account2) == @0x2, 2);
+        assert!(Signer::address_of(&account1) == @0x1, 1);
+        assert!(Signer::address_of(&account2) == @0x2, 2);
         move_to(&account1, T { f: 1 });
         move_to(&account2, T { f: 2 });
 

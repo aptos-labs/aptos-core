@@ -3,7 +3,7 @@ module 0x2::Token {
 
     public fun burn<T>(_unused: bool, token: Token<T>) {
         let Token { value } = token;
-        assert(value != 0, 42);
+        assert!(value != 0, 42);
     }
     spec burn {
         let token_value = token.value;

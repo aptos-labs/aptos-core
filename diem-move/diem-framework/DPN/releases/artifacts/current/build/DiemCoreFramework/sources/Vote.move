@@ -165,7 +165,7 @@ module DiemFramework::Vote {
     ): BallotID acquires Ballots, BallotCounter {
         let ballot_address = Signer::address_of(ballot_account);
 
-        assert(DiemTimestamp::now_seconds() < expiration_timestamp_secs, Errors::invalid_argument(EINVALID_TIMESTAMP));
+        assert!(DiemTimestamp::now_seconds() < expiration_timestamp_secs, Errors::invalid_argument(EINVALID_TIMESTAMP));
 
         if (!exists<BallotCounter>(ballot_address)) {
             move_to(ballot_account, BallotCounter {
@@ -188,7 +188,7 @@ module DiemFramework::Vote {
         gc_internal<Proposal>(ballot_data);
         let ballots = &mut ballot_data.ballots;
 
-        assert(Vector::length(ballots) < MAX_BALLOTS_PER_PROPOSAL_TYPE_PER_ADDRESS, Errors::limit_exceeded(ETOO_MANY_BALLOTS));
+        assert!(Vector::length(ballots) < MAX_BALLOTS_PER_PROPOSAL_TYPE_PER_ADDRESS, Errors::limit_exceeded(ETOO_MANY_BALLOTS));
         let ballot_id = new_ballot_id(incr_counter(ballot_account), ballot_address);
         let ballot = Ballot<Proposal> {
             proposal,
@@ -252,21 +252,21 @@ module DiemFramework::Vote {
             if (&Vector::borrow(ballots, i).ballot_id == &ballot_id) break;
             i = i + 1;
         };
-        assert(i < len, Errors::invalid_state(EBALLOT_NOT_FOUND));
+        assert!(i < len, Errors::invalid_state(EBALLOT_NOT_FOUND));
         let ballot_index = i;
         let ballot = Vector::borrow_mut(ballots, ballot_index);
 
-        assert(&ballot.proposal == &proposal, Errors::invalid_argument(EBALLOT_PROPOSAL_MISMATCH));
-        assert(&ballot.proposal_type == &proposal_type, Errors::invalid_argument(EBALLOT_PROPOSAL_MISMATCH));
+        assert!(&ballot.proposal == &proposal, Errors::invalid_argument(EBALLOT_PROPOSAL_MISMATCH));
+        assert!(&ballot.proposal_type == &proposal_type, Errors::invalid_argument(EBALLOT_PROPOSAL_MISMATCH));
 
         let voter_address = Signer::address_of(voter_account);
         let voter_address_bcs = BCS::to_bytes(&voter_address);
         let allowed_voters = &ballot.allowed_voters;
 
-        assert(check_voter_present(allowed_voters, &voter_address_bcs), Errors::invalid_state(EINVALID_VOTER));
-        assert(DiemTimestamp::now_seconds() <= ballot.expiration_timestamp_secs, Errors::invalid_state(EBALLOT_EXPIRED));
+        assert!(check_voter_present(allowed_voters, &voter_address_bcs), Errors::invalid_state(EINVALID_VOTER));
+        assert!(DiemTimestamp::now_seconds() <= ballot.expiration_timestamp_secs, Errors::invalid_state(EBALLOT_EXPIRED));
 
-        assert(!check_voter_present(&ballot.votes_received, &voter_address_bcs), Errors::invalid_state(EALREADY_VOTED));
+        assert!(!check_voter_present(&ballot.votes_received, &voter_address_bcs), Errors::invalid_state(EALREADY_VOTED));
 
         let i = 0;
         let len = Vector::length(allowed_voters);

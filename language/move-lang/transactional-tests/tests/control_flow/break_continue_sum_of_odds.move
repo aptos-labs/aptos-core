@@ -12,6 +12,6 @@ fun main() {
             break
         }
     };
-    assert(y == 25, 42);
+    assert!(y == 25, 42);
 }
 }

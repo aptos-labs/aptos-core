@@ -45,7 +45,7 @@ module DiemFramework::NetworkIdentity {
 
     public fun initialize_network_identity_event_handle(tc_account: &signer) {
         Roles::assert_treasury_compliance(tc_account);
-        assert(
+        assert!(
             !exists<NetworkIdentityEventHandle>(Signer::address_of(tc_account)),
             Errors::already_published(ENETWORK_ID_EVENT_HANDLE_INVALID)
         );
@@ -74,7 +74,7 @@ module DiemFramework::NetworkIdentity {
 
     /// Return the underlying `NetworkIdentity` bytes
     public fun get(account_addr: address): vector<vector<u8>> acquires NetworkIdentity {
-        assert(
+        assert!(
             exists<NetworkIdentity>(account_addr),
             Errors::not_published(ENETWORK_ID_DOESNT_EXIST)
         );
@@ -87,9 +87,9 @@ module DiemFramework::NetworkIdentity {
 
     /// Update and create if not exist `NetworkIdentity`
     public fun add_identities(account: &signer, to_add: vector<vector<u8>>) acquires NetworkIdentity, NetworkIdentityEventHandle {
-        assert(tc_network_identity_event_handle_exists(), Errors::not_published(ENETWORK_ID_EVENT_HANDLE_INVALID));
+        assert!(tc_network_identity_event_handle_exists(), Errors::not_published(ENETWORK_ID_EVENT_HANDLE_INVALID));
         let num_to_add = Vector::length(&to_add);
-        assert(num_to_add > 0, Errors::invalid_argument(ENETWORK_ID_NO_INPUT));
+        assert!(num_to_add > 0, Errors::invalid_argument(ENETWORK_ID_NO_INPUT));
 
         if (!exists<NetworkIdentity>(Signer::address_of(account))) {
             initialize_network_identity(account);
@@ -98,7 +98,7 @@ module DiemFramework::NetworkIdentity {
         let identity = borrow_global_mut<NetworkIdentity>(account_addr);
         let identities = &mut identity.identities;
 
-        assert(
+        assert!(
             Vector::length(identities) + num_to_add <= MAX_ADDR_IDENTITIES,
             Errors::limit_exceeded(ENETWORK_ID_LIMIT_EXCEEDED)
         );
@@ -147,16 +147,16 @@ module DiemFramework::NetworkIdentity {
 
     /// Remove `NetworkIdentity`, skipping if it doesn't exist
     public fun remove_identities(account: &signer, to_remove: vector<vector<u8>>) acquires NetworkIdentity, NetworkIdentityEventHandle {
-        assert(tc_network_identity_event_handle_exists(), Errors::not_published(ENETWORK_ID_EVENT_HANDLE_INVALID));
+        assert!(tc_network_identity_event_handle_exists(), Errors::not_published(ENETWORK_ID_EVENT_HANDLE_INVALID));
         let num_to_remove = Vector::length(&to_remove);
-        assert(num_to_remove > 0, Errors::invalid_argument(ENETWORK_ID_NO_INPUT));
-        assert(
+        assert!(num_to_remove > 0, Errors::invalid_argument(ENETWORK_ID_NO_INPUT));
+        assert!(
             num_to_remove <= MAX_ADDR_IDENTITIES,
             Errors::limit_exceeded(ENETWORK_ID_LIMIT_EXCEEDED)
         );
 
         let account_addr = Signer::address_of(account);
-        assert(
+        assert!(
             exists<NetworkIdentity>(account_addr),
             Errors::not_published(ENETWORK_ID_DOESNT_EXIST)
         );

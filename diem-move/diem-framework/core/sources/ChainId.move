@@ -18,7 +18,7 @@ module DiemFramework::ChainId {
     public fun initialize(dr_account: &signer, id: u8) {
         DiemTimestamp::assert_genesis();
         CoreAddresses::assert_diem_root(dr_account);
-        assert(!exists<ChainId>(Signer::address_of(dr_account)), Errors::already_published(ECHAIN_ID));
+        assert!(!exists<ChainId>(Signer::address_of(dr_account)), Errors::already_published(ECHAIN_ID));
         move_to(dr_account, ChainId { id })
     }
 

@@ -9,8 +9,8 @@ script {
     use DiemFramework::ValidatorConfig;
     fun main() {
         // test bob is a validator
-        assert(ValidatorConfig::is_valid(@{{bob}}) == true, 98);
-        assert(DiemSystem::is_validator(@{{bob}}) == true, 98);
+        assert!(ValidatorConfig::is_valid(@{{bob}}) == true, 98);
+        assert!(DiemSystem::is_validator(@{{bob}}) == true, 98);
     }
 }
 // check: "Keep(EXECUTED)"

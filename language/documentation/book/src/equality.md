@@ -4,10 +4,10 @@ Move supports two equality operations `==` and `!=`
 
 ## Operations
 
-| Syntax   | Operation | Description
-| -------- | ----------|------------
-| `==`     | equal     | Returns `true` if the two operands have the same value, `false` otherwise
-| `!=`     | not equal | Returns `true` if the two operands have different values, `false` otherwise
+| Syntax | Operation | Description                                                                 |
+| ------ | --------- | --------------------------------------------------------------------------- |
+| `==`   | equal     | Returns `true` if the two operands have the same value, `false` otherwise   |
+| `!=`   | not equal | Returns `true` if the two operands have different values, `false` otherwise |
 
 ### Typing
 
@@ -52,7 +52,9 @@ b"" != 0; // ERROR!
 
 ### Typing with references
 
-When comparing [references](./references.md), the type of the reference (immutable or mutable) does not matter. This means that you can compare an immutable `&` reference with a mutable one `&mut` of the same underlying type.
+When comparing [references](./references.md), the type of the reference (immutable or mutable) does
+not matter. This means that you can compare an immutable `&` reference with a mutable one `&mut` of
+the same underlying type.
 
 ```move
 let i = &0;
@@ -88,7 +90,12 @@ i == s; // ERROR!
 
 ## Restrictions
 
-Both `==` and `!=` consume the value when comparing them. As a result, the type system enforces that the type must have [`drop`](./abilities.md). Recall that without the [`drop` ability](./abilities.md), ownership must be transferred by the end of the function, and such values can only be explicitly destroyed within their declaring module. If these were used directly with either equality `==` or non-equality `!=`, the value would be destroyed which would break [`drop` ability](./abilities.md) safety guarantees!
+Both `==` and `!=` consume the value when comparing them. As a result, the type system enforces that
+the type must have [`drop`](./abilities.md). Recall that without the
+[`drop` ability](./abilities.md), ownership must be transferred by the end of the function, and such
+values can only be explicitly destroyed within their declaring module. If these were used directly
+with either equality `==` or non-equality `!=`, the value would be destroyed which would break
+[`drop` ability](./abilities.md) safety guarantees!
 
 ```move=
 address 0x42 {
@@ -102,7 +109,8 @@ module Example {
 }
 ```
 
-But, a programmer can *always* borrow the value first instead of directly comparing the value, and reference types have the [`drop` ability](./abilities.md). For example
+But, a programmer can _always_ borrow the value first instead of directly comparing the value, and
+reference types have the [`drop` ability](./abilities.md). For example
 
 ```move=
 address 0x42 {
@@ -118,36 +126,39 @@ module Example {
 
 ## Avoid Extra Copies
 
-While a programmer *can* compare any value whose type has [`drop`](./abilities.md), a programmer should often compare by reference to avoid expensive copies.
+While a programmer _can_ compare any value whose type has [`drop`](./abilities.md), a programmer
+should often compare by reference to avoid expensive copies.
 
 ```move=
 let v1: vector<u8> = function_that_returns_vector();
 let v2: vector<u8> = function_that_returns_vector();
-assert(copy v1 == copy v2, 42);
+assert!(copy v1 == copy v2, 42);
 //     ^^^^       ^^^^
 use_two_vectors(v1, v2);
 
 let s1: Foo = function_that_returns_large_struct();
 let s2: Foo = function_that_returns_large_struct();
-assert(copy s1 == copy s2, 42);
+assert!(copy s1 == copy s2, 42);
 //     ^^^^       ^^^^
 use_two_foos(s1, s2);
 ```
 
-This code is perfectly acceptable (assuming `Foo` has [`drop`](./abilities.md)), just not efficient. The highlighted copies can be removed and replaced with borrows
+This code is perfectly acceptable (assuming `Foo` has [`drop`](./abilities.md)), just not efficient.
+The highlighted copies can be removed and replaced with borrows
 
 ```move=
 let v1: vector<u8> = function_that_returns_vector();
 let v2: vector<u8> = function_that_returns_vector();
-assert(&v1 == &v2, 42);
+assert!(&v1 == &v2, 42);
 //     ^      ^
 use_two_vectors(v1, v2);
 
 let s1: Foo = function_that_returns_large_struct();
 let s2: Foo = function_that_returns_large_struct();
-assert(&s1 == &s2, 42);
+assert!(&s1 == &s2, 42);
 //     ^      ^
 use_two_foos(s1, s2);
 ```
 
-The efficiency of the `==` itself remains the same, but the `copy`s are removed and thus the program is more efficient.
+The efficiency of the `==` itself remains the same, but the `copy`s are removed and thus the program
+is more efficient.

@@ -16,7 +16,7 @@ module SimpleSortedLinkedList {
     }
 
     public fun get_key_of_node<T: copy + drop + store>(node_address: address): T acquires Node {
-        assert(exists<Node<T>>(node_address), 1);
+        assert!(exists<Node<T>>(node_address), 1);
 
         let node = borrow_global<Node<T>>(node_address);
         *&node.key
@@ -25,7 +25,7 @@ module SimpleSortedLinkedList {
     //checks whether this address is the head of a list -- fails if there is no node here
     public fun is_head_node<T: copy + drop + store>(current_node_address: address): bool acquires Node {
 		//check that a node exists
-		assert(exists<Node<T>>(current_node_address), 2);
+		assert!(exists<Node<T>>(current_node_address), 2);
 
         //find the head node
 		let current_node = borrow_global<Node<T>>(current_node_address);
@@ -40,7 +40,7 @@ module SimpleSortedLinkedList {
         let sender = Signer::address_of(account);
 
         //make sure no node/list is already stored in this account
-        assert(!exists<Node<T>>(sender), 3);
+        assert!(!exists<Node<T>>(sender), 3);
 
         let head = Self::Node<T> {
             prev: sender,
@@ -56,10 +56,10 @@ module SimpleSortedLinkedList {
         let sender_address = Signer::address_of(account);
 
         //make sure no node is already stored in this account
-        assert(!exists<Node<T>>(sender_address), 4);
+        assert!(!exists<Node<T>>(sender_address), 4);
 
         //make sure a node exists in prev_node_address
-        assert(exists<Node<T>>(prev_node_address), 5);
+        assert!(exists<Node<T>>(prev_node_address), 5);
 
         //get a reference to prev_node and find the address and reference to next_node, head
         let prev_node = borrow_global<Node<T>>(prev_node_address);
@@ -78,8 +78,8 @@ module SimpleSortedLinkedList {
         let next_is_head = Self::is_head_node<T>(next_node_address);
 
         //check the order -- the list must be sorted
-        assert(prev_is_head || cmp_with_prev == 2u8, 6); // prev_is_head || key > prev_key
-        assert(next_is_head || cmp_with_next == 1u8, 7); // next_is_head || key < next_key
+        assert!(prev_is_head || cmp_with_prev == 2u8, 6); // prev_is_head || key > prev_key
+        assert!(next_is_head || cmp_with_next == 1u8, 7); // next_is_head || key < next_key
 
         //create the new node
         let current_node = Node<T> {
@@ -102,7 +102,7 @@ module SimpleSortedLinkedList {
     //private function used for removing a non-head node -- does not check permissions
     fun remove_node<T: copy + drop + store>(node_address: address) acquires Node {
         //make sure the node exists
-        assert(exists<Node<T>>(node_address), 8);
+        assert!(exists<Node<T>>(node_address), 8);
 
         //find prev and next
         let current_node = borrow_global<Node<T>>(node_address);
@@ -123,15 +123,15 @@ module SimpleSortedLinkedList {
 
     public fun remove_node_by_list_owner<T: copy + drop + store>(account: &signer, node_address: address) acquires Node {
         //make sure the node exists
-        assert(exists<Node<T>>(node_address), 9);
+        assert!(exists<Node<T>>(node_address), 9);
 
         //make sure it is not a head node
-        assert(!Self::is_head_node<T>(node_address), 10);
+        assert!(!Self::is_head_node<T>(node_address), 10);
 
         //make sure the caller owns the list
         let node = borrow_global<Node<T>>(node_address);
         let list_owner = node.head;
-        assert(list_owner == Signer::address_of(account), 11);
+        assert!(list_owner == Signer::address_of(account), 11);
 
         //remove it
         Self::remove_node<T>(node_address);
@@ -142,10 +142,10 @@ module SimpleSortedLinkedList {
         let sender_address = Signer::address_of(account);
 
         //make sure a node exists
-        assert(exists<Node<T>>(sender_address), 12);
+        assert!(exists<Node<T>>(sender_address), 12);
 
         //make sure it is not a head node (heads can be removed using remove_list)
-        assert(!Self::is_head_node<T>(sender_address), 13);
+        assert!(!Self::is_head_node<T>(sender_address), 13);
 
         //remove it
         Self::remove_node<T>(sender_address);
@@ -157,23 +157,23 @@ module SimpleSortedLinkedList {
         let sender_address = Signer::address_of(account);
 
         //fail if the caller does not own a list
-        assert(Self::is_head_node<T>(sender_address), 14);
+        assert!(Self::is_head_node<T>(sender_address), 14);
 
-        assert(exists<Node<T>>(sender_address), 15);
+        assert!(exists<Node<T>>(sender_address), 15);
         let current_node = borrow_global<Node<T>>(sender_address);
 
         //check that the list is empty
         let next_node_address = current_node.next;
         let prev_node_address = current_node.prev;
-        assert(next_node_address == sender_address, 16);
-        assert(prev_node_address == sender_address, 17);
+        assert!(next_node_address == sender_address, 16);
+        assert!(prev_node_address == sender_address, 17);
 
         //destroy the Node
         let Node<T> { prev: _, next: _, head: _, key: _ } = move_from<Node<T>>(sender_address);
     }
 
     public fun find<T: copy + drop + store>(key: T, head_address: address): (bool, address) acquires Node {
-        assert(Self::is_head_node<T>(head_address), 18);
+        assert!(Self::is_head_node<T>(head_address), 18);
 
         let key_bcs_bytes = BCS::to_bytes(&key);
         let head_node = borrow_global<Node<T>>(head_address);
@@ -200,7 +200,7 @@ module SimpleSortedLinkedList {
         let sender = Signer::address_of(account);
 
         //make sure no node/list is already stored in this account
-        assert(!exists<Node<T>>(sender), 19);
+        assert!(!exists<Node<T>>(sender), 19);
 
         let empty = Self::Node<T> {
             prev: sender,
@@ -214,8 +214,8 @@ module SimpleSortedLinkedList {
     public fun move_node_to<T: copy + drop + store>(account: &signer, receiver: address) acquires Node {
         let sender_address = Signer::address_of(account);
         //make sure the node exists
-        assert(exists<Node<T>>(sender_address), 20);
-        assert(exists<Node<T>>(receiver), 21);  //empty node
+        assert!(exists<Node<T>>(sender_address), 20);
+        assert!(exists<Node<T>>(receiver), 21);  //empty node
 
         //find prev and next
         let current_node = borrow_global<Node<T>>(sender_address);

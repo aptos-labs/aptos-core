@@ -34,36 +34,31 @@ public fun GlobalSpecRelevance::leak_j_ok($t0|n: &mut GlobalSpecRelevance::Nonze
 
 [variant baseline]
 public fun GlobalSpecRelevance::publish($t0|account: &signer, $t1|n: GlobalSpecRelevance::Nonzero) {
-     var $t2|tmp#$2: bool
-     var $t3|tmp#$3: u64
-     var $t4: &GlobalSpecRelevance::Nonzero
-     var $t5: &u64
-     var $t6: u64
-     var $t7: u64
-     var $t8: bool
-     var $t9: bool
-     var $t10: &signer
-     var $t11: u64
-     var $t12: &signer
-     var $t13: GlobalSpecRelevance::Nonzero
-  0: $t4 := borrow_local($t1)
-  1: $t5 := borrow_field<GlobalSpecRelevance::Nonzero>.i($t4)
-  2: $t6 := read_ref($t5)
-  3: $t7 := 0
-  4: $t8 := >($t6, $t7)
-  5: $t2 := $t8
-  6: $t9 := move($t2)
-  7: if ($t9) goto 13 else goto 8
-  8: label L1
-  9: $t10 := move($t0)
- 10: destroy($t10)
- 11: $t11 := 0
- 12: abort($t11)
- 13: label L0
- 14: $t12 := move($t0)
- 15: $t13 := move($t1)
- 16: move_to<GlobalSpecRelevance::Nonzero>($t13, $t12)
- 17: return ()
+     var $t2: &GlobalSpecRelevance::Nonzero
+     var $t3: &u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: bool
+     var $t7: &signer
+     var $t8: u64
+     var $t9: &signer
+     var $t10: GlobalSpecRelevance::Nonzero
+  0: $t2 := borrow_local($t1)
+  1: $t3 := borrow_field<GlobalSpecRelevance::Nonzero>.i($t2)
+  2: $t4 := read_ref($t3)
+  3: $t5 := 0
+  4: $t6 := >($t4, $t5)
+  5: if ($t6) goto 11 else goto 6
+  6: label L1
+  7: $t7 := move($t0)
+  8: destroy($t7)
+  9: $t8 := 0
+ 10: abort($t8)
+ 11: label L0
+ 12: $t9 := move($t0)
+ 13: $t10 := move($t1)
+ 14: move_to<GlobalSpecRelevance::Nonzero>($t10, $t9)
+ 15: return ()
 }
 
 ============ after pipeline `escape_analysis` ================
@@ -102,36 +97,31 @@ public fun GlobalSpecRelevance::leak_j_ok($t0|n: &mut GlobalSpecRelevance::Nonze
 
 [variant baseline]
 public fun GlobalSpecRelevance::publish($t0|account: &signer, $t1|n: GlobalSpecRelevance::Nonzero) {
-     var $t2|tmp#$2: bool
-     var $t3|tmp#$3: u64
-     var $t4: &GlobalSpecRelevance::Nonzero
-     var $t5: &u64
-     var $t6: u64
-     var $t7: u64
-     var $t8: bool
-     var $t9: bool
-     var $t10: &signer
-     var $t11: u64
-     var $t12: &signer
-     var $t13: GlobalSpecRelevance::Nonzero
-  0: $t4 := borrow_local($t1)
-  1: $t5 := borrow_field<GlobalSpecRelevance::Nonzero>.i($t4)
-  2: $t6 := read_ref($t5)
-  3: $t7 := 0
-  4: $t8 := >($t6, $t7)
-  5: $t2 := $t8
-  6: $t9 := move($t2)
-  7: if ($t9) goto 13 else goto 8
-  8: label L1
-  9: $t10 := move($t0)
- 10: destroy($t10)
- 11: $t11 := 0
- 12: abort($t11)
- 13: label L0
- 14: $t12 := move($t0)
- 15: $t13 := move($t1)
- 16: move_to<GlobalSpecRelevance::Nonzero>($t13, $t12)
- 17: return ()
+     var $t2: &GlobalSpecRelevance::Nonzero
+     var $t3: &u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: bool
+     var $t7: &signer
+     var $t8: u64
+     var $t9: &signer
+     var $t10: GlobalSpecRelevance::Nonzero
+  0: $t2 := borrow_local($t1)
+  1: $t3 := borrow_field<GlobalSpecRelevance::Nonzero>.i($t2)
+  2: $t4 := read_ref($t3)
+  3: $t5 := 0
+  4: $t6 := >($t4, $t5)
+  5: if ($t6) goto 11 else goto 6
+  6: label L1
+  7: $t7 := move($t0)
+  8: destroy($t7)
+  9: $t8 := 0
+ 10: abort($t8)
+ 11: label L0
+ 12: $t9 := move($t0)
+ 13: $t10 := move($t1)
+ 14: move_to<GlobalSpecRelevance::Nonzero>($t10, $t9)
+ 15: return ()
 }
 
 ============ Diagnostics ================

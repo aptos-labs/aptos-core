@@ -7,6 +7,6 @@ fun main(account: signer) {
     let account = &account;
     let addr = Signer::address_of(account);
     let balance = DiemAccount::balance<XUS>(addr);
-    assert(balance > 10, 77);
+    assert!(balance > 10, 77);
 }
 }

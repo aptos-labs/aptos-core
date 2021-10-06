@@ -31,9 +31,9 @@ module DiemFramework::CRSNTests {
         let addr = Signer::address_of(&a);
 
         CRSN::test_publish(&a, 0, 10);
-        assert(CRSN::has_crsn(addr), 0);
-        assert(CRSN::min_nonce(addr)  == 0, 1);
-        assert(BitVector::length(&CRSN::slots(addr)) == 10, 2);
+        assert!(CRSN::has_crsn(addr), 0);
+        assert!(CRSN::min_nonce(addr)  == 0, 1);
+        assert!(BitVector::length(&CRSN::slots(addr)) == 10, 2);
     }
 
     #[test(a=@0xCAFE, tc = @TreasuryCompliance, dr = @DiemRoot)]
@@ -42,9 +42,9 @@ module DiemFramework::CRSNTests {
         let addr = Signer::address_of(&a);
 
         CRSN::test_publish(&a, 20, 128);
-        assert(CRSN::has_crsn(addr), 0);
-        assert(CRSN::min_nonce(addr) == 20, 1);
-        assert(BitVector::length(&CRSN::slots(addr)) == 128, 2);
+        assert!(CRSN::has_crsn(addr), 0);
+        assert!(CRSN::min_nonce(addr) == 20, 1);
+        assert!(BitVector::length(&CRSN::slots(addr)) == 128, 2);
     }
 
     #[test(a=@0xCAFE, tc = @TreasuryCompliance, dr = @DiemRoot)]
@@ -53,9 +53,9 @@ module DiemFramework::CRSNTests {
         let addr = Signer::address_of(&a);
 
         CRSN::test_publish(&a, 505, CRSN::max_crsn_size());
-        assert(CRSN::has_crsn(addr), 0);
-        assert(CRSN::min_nonce(addr) == 505, 1);
-        assert(BitVector::length(&CRSN::slots(addr)) == CRSN::max_crsn_size(), 2);
+        assert!(CRSN::has_crsn(addr), 0);
+        assert!(CRSN::min_nonce(addr) == 505, 1);
+        assert!(BitVector::length(&CRSN::slots(addr)) == CRSN::max_crsn_size(), 2);
     }
 
 
@@ -91,9 +91,9 @@ module DiemFramework::CRSNTests {
     public(script) fun test_has_crsn(a: signer, tc: signer, dr: signer) {
         setup(&dr, &tc, &a);
         let addr = Signer::address_of(&a);
-        assert(!CRSN::has_crsn(addr), 0);
+        assert!(!CRSN::has_crsn(addr), 0);
         CRSN::test_publish(&a, 0, 10);
-        assert(CRSN::has_crsn(addr), 1);
+        assert!(CRSN::has_crsn(addr), 1);
     }
 
     #[test(a=@0xCAFE)]
@@ -106,33 +106,33 @@ module DiemFramework::CRSNTests {
     public(script) fun record_too_high_low_accept(a: signer, tc: signer, dr: signer) {
         setup(&dr, &tc, &a);
         CRSN::test_publish(&a, 100, 10);
-        assert(!CRSN::test_record(&a, 110), 0);
-        assert(!CRSN::test_record(&a, 111), 1);
+        assert!(!CRSN::test_record(&a, 110), 0);
+        assert!(!CRSN::test_record(&a, 111), 1);
         // We allow recording in the past
-        assert(CRSN::test_record(&a, 99), 2);
+        assert!(CRSN::test_record(&a, 99), 2);
         // But the check will fail since that happens in the prologue
-        assert(!CRSN::test_check(&a, 99), 2);
-        assert(CRSN::test_record(&a, 100), 3);
-        assert(CRSN::test_record(&a, 109), 4);
-        assert(!CRSN::test_record(&a, 109), 5);
+        assert!(!CRSN::test_check(&a, 99), 2);
+        assert!(CRSN::test_record(&a, 100), 3);
+        assert!(CRSN::test_record(&a, 109), 4);
+        assert!(!CRSN::test_record(&a, 109), 5);
     }
 
     #[test(a=@0xCAFE, tc = @TreasuryCompliance, dr = @DiemRoot)]
     public(script) fun prevent_replay(a: signer, tc: signer, dr: signer) {
         setup(&dr, &tc, &a);
         CRSN::test_publish(&a, 100, 10);
-        assert(CRSN::test_record(&a, 101), 0);
-        assert(!CRSN::test_record(&a, 101), 1);
+        assert!(CRSN::test_record(&a, 101), 0);
+        assert!(!CRSN::test_record(&a, 101), 1);
     }
 
     #[test(a=@0xCAFE, tc = @TreasuryCompliance, dr = @DiemRoot)]
     public(script) fun prevent_replay_with_shift(a: signer, tc: signer, dr: signer) {
         setup(&dr, &tc, &a);
         CRSN::test_publish(&a, 100, 10);
-        assert(CRSN::test_record(&a, 100), 0);
-        assert(!CRSN::test_check(&a, 100), 1);
-        assert(CRSN::test_record(&a, 100), 1);
-        assert(CRSN::min_nonce(Signer::address_of(&a)) == 101, 2);
+        assert!(CRSN::test_record(&a, 100), 0);
+        assert!(!CRSN::test_check(&a, 100), 1);
+        assert!(CRSN::test_record(&a, 100), 1);
+        assert!(CRSN::min_nonce(Signer::address_of(&a)) == 101, 2);
     }
 
     #[test(a=@0xCAFE, tc = @TreasuryCompliance, dr = @DiemRoot)]
@@ -140,34 +140,34 @@ module DiemFramework::CRSNTests {
         setup(&dr, &tc, &a);
         let addr = Signer::address_of(&a);
         CRSN::test_publish(&a, 100, 10);
-        assert(CRSN::test_record(&a, 101), 0);
-        assert(CRSN::test_record(&a, 102), 0);
-        assert(CRSN::test_record(&a, 103), 0);
+        assert!(CRSN::test_record(&a, 101), 0);
+        assert!(CRSN::test_record(&a, 102), 0);
+        assert!(CRSN::test_record(&a, 103), 0);
 
-        assert(CRSN::test_record(&a, 106), 0);
-        assert(CRSN::test_record(&a, 107), 0);
-        assert(CRSN::test_record(&a, 108), 0);
+        assert!(CRSN::test_record(&a, 106), 0);
+        assert!(CRSN::test_record(&a, 107), 0);
+        assert!(CRSN::test_record(&a, 108), 0);
 
         // The window should not have shifted
-        assert(CRSN::min_nonce(addr) == 100, 1);
-        assert(CRSN::test_record(&a, 100), 0);
+        assert!(CRSN::min_nonce(addr) == 100, 1);
+        assert!(CRSN::test_record(&a, 100), 0);
         // The window should now shift until it gets stuck on 104
-        assert(CRSN::min_nonce(addr) == 104, 1);
-        assert(CRSN::test_record(&a, 104), 0);
-        assert(CRSN::min_nonce(addr) == 105, 1);
-        assert(CRSN::test_record(&a, 105), 0);
-        assert(CRSN::min_nonce(addr) == 109, 1);
+        assert!(CRSN::min_nonce(addr) == 104, 1);
+        assert!(CRSN::test_record(&a, 104), 0);
+        assert!(CRSN::min_nonce(addr) == 105, 1);
+        assert!(CRSN::test_record(&a, 105), 0);
+        assert!(CRSN::min_nonce(addr) == 109, 1);
 
         // Now make sure that the window has shifted and opened-up higher slots
-        assert(CRSN::test_record(&a, 110), 0);
-        assert(CRSN::test_record(&a, 111), 0);
-        assert(CRSN::test_record(&a, 112), 0);
-        assert(CRSN::test_record(&a, 113), 0);
-        assert(CRSN::test_record(&a, 114), 0);
-        assert(CRSN::test_record(&a, 115), 0);
-        assert(CRSN::min_nonce(addr) == 109, 1);
-        assert(CRSN::test_record(&a, 109), 0);
-        assert(CRSN::min_nonce(addr) == 116, 1);
+        assert!(CRSN::test_record(&a, 110), 0);
+        assert!(CRSN::test_record(&a, 111), 0);
+        assert!(CRSN::test_record(&a, 112), 0);
+        assert!(CRSN::test_record(&a, 113), 0);
+        assert!(CRSN::test_record(&a, 114), 0);
+        assert!(CRSN::test_record(&a, 115), 0);
+        assert!(CRSN::min_nonce(addr) == 109, 1);
+        assert!(CRSN::test_record(&a, 109), 0);
+        assert!(CRSN::min_nonce(addr) == 116, 1);
     }
 
     #[test(a=@0xCAFE, tc = @TreasuryCompliance, dr = @DiemRoot)]
@@ -185,7 +185,7 @@ module DiemFramework::CRSNTests {
         let addr = Signer::address_of(&a);
         CRSN::test_publish(&a, 100, 10);
         CRSN::test_force_expire(&a, 1);
-        assert(CRSN::min_nonce(addr) == 101, 1);
+        assert!(CRSN::min_nonce(addr) == 101, 1);
     }
 
     #[test(a=@0xCAFE, tc = @TreasuryCompliance, dr = @DiemRoot)]
@@ -193,11 +193,11 @@ module DiemFramework::CRSNTests {
         setup(&dr, &tc, &a);
         let addr = Signer::address_of(&a);
         CRSN::test_publish(&a, 0, 100);
-        assert(CRSN::test_record(&a, 1), 0);
-        assert(CRSN::test_record(&a, 2), 0);
-        assert(CRSN::test_record(&a, 3), 0);
+        assert!(CRSN::test_record(&a, 1), 0);
+        assert!(CRSN::test_record(&a, 2), 0);
+        assert!(CRSN::test_record(&a, 3), 0);
         CRSN::test_force_expire(&a, 1);
-        assert(CRSN::min_nonce(addr) == 4, 1);
+        assert!(CRSN::min_nonce(addr) == 4, 1);
     }
 
     #[test(a=@0xCAFE, tc = @TreasuryCompliance, dr = @DiemRoot)]
@@ -205,17 +205,17 @@ module DiemFramework::CRSNTests {
         setup(&dr, &tc, &a);
         let addr = Signer::address_of(&a);
         CRSN::test_publish(&a, 0, 100);
-        assert(CRSN::test_record(&a, 1), 0);
-        assert(CRSN::test_record(&a, 2), 0);
-        assert(CRSN::test_record(&a, 3), 0);
+        assert!(CRSN::test_record(&a, 1), 0);
+        assert!(CRSN::test_record(&a, 2), 0);
+        assert!(CRSN::test_record(&a, 3), 0);
         CRSN::test_force_expire(&a, 15);
-        assert(CRSN::min_nonce(addr) == 15, 1);
+        assert!(CRSN::min_nonce(addr) == 15, 1);
         let i = 0;
         let len = 100;
         let slots = CRSN::slots(addr);
 
         while (i < len) {
-            assert(!BitVector::is_index_set(&slots, i), 2);
+            assert!(!BitVector::is_index_set(&slots, i), 2);
             i = i + 1;
         }
     }
@@ -225,17 +225,17 @@ module DiemFramework::CRSNTests {
         setup(&dr, &tc, &a);
         let addr = Signer::address_of(&a);
         CRSN::test_publish(&a, 0, 100);
-        assert(CRSN::test_record(&a, 1), 0);
-        assert(CRSN::test_record(&a, 2), 0);
-        assert(CRSN::test_record(&a, 3), 0);
+        assert!(CRSN::test_record(&a, 1), 0);
+        assert!(CRSN::test_record(&a, 2), 0);
+        assert!(CRSN::test_record(&a, 3), 0);
         CRSN::test_force_expire(&a, 10000);
-        assert(CRSN::min_nonce(addr) == 10000, 1);
+        assert!(CRSN::min_nonce(addr) == 10000, 1);
         let i = 0;
         let len = 100;
         let slots = CRSN::slots(addr);
 
         while (i < len) {
-            assert(!BitVector::is_index_set(&slots, i), 2);
+            assert!(!BitVector::is_index_set(&slots, i), 2);
             i = i + 1;
         }
     }

@@ -8,7 +8,7 @@ use Std::Signer;
 fun main(account: signer) {
     let sender = Signer::address_of(&account);
     Offer::create(&account, M::create(), @0xB0B);
-    assert(Offer::exists_at<M::T>(sender), 77);
-    assert(Offer::address_of<M::T>(sender) == @0xB0B , 78);
+    assert!(Offer::exists_at<M::T>(sender), 77);
+    assert!(Offer::address_of<M::T>(sender) == @0xB0B , 78);
 }
 }

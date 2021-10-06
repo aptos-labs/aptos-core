@@ -7,7 +7,7 @@ use Std::Signer;
 fun main(account: signer) {
     let sender = Signer::address_of(&account);
     Offer::create(&account, 7, @0xA11CE);
-    assert(Offer::address_of<u64>(sender) == @0xA11CE , 100);
-    assert(Offer::redeem(&account, @0xA11CE) == 7, 101);
+    assert!(Offer::address_of<u64>(sender) == @0xA11CE , 100);
+    assert!(Offer::redeem(&account, @0xA11CE) == 7, 101);
 }
 }

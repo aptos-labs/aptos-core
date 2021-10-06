@@ -28,7 +28,7 @@ module Std::FixedPoint32Tests {
     #[test]
     fun create_zero() {
         let x = FixedPoint32::create_from_rational(0, 1);
-        assert(FixedPoint32::is_zero(x), 0);
+        assert!(FixedPoint32::is_zero(x), 0);
     }
 
     #[test]
@@ -75,14 +75,14 @@ module Std::FixedPoint32Tests {
     fun exact_multiply() {
         let f = FixedPoint32::create_from_rational(3, 4); // 0.75
         let nine = FixedPoint32::multiply_u64(12, f); // 12 * 0.75
-        assert(nine == 9, 0);
+        assert!(nine == 9, 0);
     }
 
     #[test]
     fun exact_divide() {
         let f = FixedPoint32::create_from_rational(3, 4); // 0.75
         let twelve = FixedPoint32::divide_u64(9, f); // 9 / 0.75
-        assert(twelve == 12, 0);
+        assert!(twelve == 12, 0);
     }
 
     #[test]
@@ -91,12 +91,12 @@ module Std::FixedPoint32Tests {
         let not_three = FixedPoint32::multiply_u64(9, copy f); // 9 * 0.333...
         // multiply_u64 does NOT round -- it truncates -- so values that
         // are not perfectly representable in binary may be off by one.
-        assert(not_three == 2, 0);
+        assert!(not_three == 2, 0);
 
         // Try again with a fraction slightly larger than 1/3.
         let f = FixedPoint32::create_from_raw_value(FixedPoint32::get_raw_value(f) + 1);
         let three = FixedPoint32::multiply_u64(9, f);
-        assert(three == 3, 1);
+        assert!(three == 3, 1);
     }
 
     #[test]
@@ -104,6 +104,6 @@ module Std::FixedPoint32Tests {
         // Test creating a 1.0 fraction from the maximum u64 value.
         let f = FixedPoint32::create_from_rational(18446744073709551615, 18446744073709551615);
         let one = FixedPoint32::get_raw_value(f);
-        assert(one == 4294967296, 0); // 0x1.00000000
+        assert!(one == 4294967296, 0); // 0x1.00000000
     }
 }

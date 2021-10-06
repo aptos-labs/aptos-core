@@ -1,10 +1,19 @@
 # Structs and Resources
 
-A *struct* is a user-defined data structure containing typed fields. Structs can store any non-reference type, including other structs.
+A _struct_ is a user-defined data structure containing typed fields. Structs can store any
+non-reference type, including other structs.
 
-We often refer to struct values as *resources* if they cannot be copied and cannot be dropped. In this case, resource values must have ownership transferred by the end of the function. This property makes resources particularly well served for defining global storage schemas or for representing important values (such as a token).
+We often refer to struct values as _resources_ if they cannot be copied and cannot be dropped. In
+this case, resource values must have ownership transferred by the end of the function. This property
+makes resources particularly well served for defining global storage schemas or for representing
+important values (such as a token).
 
-By default, structs are linear and ephemeral. By this we mean that they: cannot be copied, cannot be dropped, and cannot be stored in global storage. This means that all values have to have ownership transferred (linear) and the values must be dealt with by the end of the program's execution (ephemeral). We can relax this behavior by giving the struct [abilities](./abilities.md) which allow values to be copied or dropped and also to be stored in global storage or to define gobal storage schemas.
+By default, structs are linear and ephemeral. By this we mean that they: cannot be copied, cannot be
+dropped, and cannot be stored in global storage. This means that all values have to have ownership
+transferred (linear) and the values must be dealt with by the end of the program's execution
+(ephemeral). We can relax this behavior by giving the struct [abilities](./abilities.md) which allow
+values to be copied or dropped and also to be stored in global storage or to define gobal storage
+schemas.
 
 ## Defining Structs
 
@@ -28,7 +37,10 @@ struct Foo { x: Foo }
 //              ^ error! Foo cannot contain Foo
 ```
 
-As mentioned above: by default, a struct declaration is linear and ephemeral. So to allow the value to be used with certain operations (that copy it, drop it, store it in global storage, or use it as a storage schema), structs can be granted [abilities](./abilities.md) by annotating them with `has <ability>`:
+As mentioned above: by default, a struct declaration is linear and ephemeral. So to allow the value
+to be used with certain operations (that copy it, drop it, store it in global storage, or use it as
+a storage schema), structs can be granted [abilities](./abilities.md) by annotating them with
+`has <ability>`:
 
 ```move=
 address 0x2 {
@@ -42,7 +54,8 @@ For more details, see the [annotating structs](./abilities.md#annotating-structs
 
 ### Naming
 
-Structs must start with a capital letter `A` to `Z`. After the first letter, constant names can contain underscores `_`, letters `a` to `z`, letters `A` to `Z`, or digits `0` to `9`.
+Structs must start with a capital letter `A` to `Z`. After the first letter, constant names can
+contain underscores `_`, letters `a` to `z`, letters `A` to `Z`, or digits `0` to `9`.
 
 ```move
 struct Foo {}
@@ -50,13 +63,15 @@ struct BAR {}
 struct B_a_z_4_2 {}
 ```
 
-This naming restriction of starting with `A` to `Z` is in place to give room for future language features. It may or may not be removed later.
+This naming restriction of starting with `A` to `Z` is in place to give room for future language
+features. It may or may not be removed later.
 
 ## Using Structs
 
 ### Creating Structs
 
-Values of a struct type can be created (or "packed") by indicating the struct name, followed by value for each field:
+Values of a struct type can be created (or "packed") by indicating the struct name, followed by
+value for each field:
 
 ```move=
 address 0x2 {
@@ -72,7 +87,8 @@ module M {
 }
 ```
 
-If you initialize a struct field with a local variable whose name is the same as the field, you can use the following shorthand:
+If you initialize a struct field with a local variable whose name is the same as the field, you can
+use the following shorthand:
 
 ```move
 let baz = Baz { foo: foo };
@@ -153,7 +169,8 @@ module M {
 
 ### Borrowing Structs and Fields
 
-The `&` and `&mut` operator can be used to create references to structs or fields. These examples include some optional type annotations (e.g., `: &Foo`) to demonstrate the type of operations.
+The `&` and `&mut` operator can be used to create references to structs or fields. These examples
+include some optional type annotations (e.g., `: &Foo`) to demonstrate the type of operations.
 
 ```move=
 let foo = Foo { x: 3, y: true };
@@ -195,7 +212,8 @@ let y: bool = *&foo.y;
 let foo2: Foo = *&bar.foo;
 ```
 
-If the field is implicitly copyable, the dot operator can be used to read fields of a struct without any borrowing. (Only scalar values with the `copy` ability are implicitly copyable.)
+If the field is implicitly copyable, the dot operator can be used to read fields of a struct without
+any borrowing. (Only scalar values with the `copy` ability are implicitly copyable.)
 
 ```move=
 let foo = Foo { x: 3, y: true };
@@ -210,7 +228,8 @@ let baz = Baz { foo: Foo { x: 3, y: true } };
 let x = baz.foo.x; // x = 3;
 ```
 
-However, this is not permitted for fields that contain non-primitive types, such a vector or another struct
+However, this is not permitted for fields that contain non-primitive types, such a vector or another
+struct
 
 ```move=
 let foo = Foo { x: 3, y: true };
@@ -219,9 +238,12 @@ let foo2: Foo = *&bar.foo;
 let foo3: Foo = bar.foo; // error! add an explicit copy with *&
 ```
 
-The reason behind this design decision is that copying a vector or another struct might be an expensive operation. It is important for a programmer to be aware of this copy and make others aware with the explicit syntax `*&`
+The reason behind this design decision is that copying a vector or another struct might be an
+expensive operation. It is important for a programmer to be aware of this copy and make others aware
+with the explicit syntax `*&`
 
-In addition reading from fields, the dot syntax can be used to modify fields, regardless of the field being a primitive type or some other struct
+In addition reading from fields, the dot syntax can be used to modify fields, regardless of the
+field being a primitive type or some other struct
 
 ```move=
 let foo = Foo { x: 3, y: true };
@@ -242,14 +264,17 @@ foo_ref.x = foo_ref.x + 1;
 
 ## Privileged Struct Operations
 
-Most struct operations on a struct type `T` can only be performed inside the module that declares `T`:
+Most struct operations on a struct type `T` can only be performed inside the module that declares
+`T`:
 
-- Struct types can only be created ("packed"), destroyed ("unpacked") inside the module that defines the struct.
+- Struct types can only be created ("packed"), destroyed ("unpacked") inside the module that defines
+  the struct.
 - The fields of a struct are only accessible inside the module that defines the struct.
 
-Following these rules, if you want to modify your struct outside the module, you will need to provide publis APIs for them. The end of the chapter contains some examples of this.
+Following these rules, if you want to modify your struct outside the module, you will need to
+provide publis APIs for them. The end of the chapter contains some examples of this.
 
-However, struct *types* are always visible to another module or script:
+However, struct _types_ are always visible to another module or script:
 
 ```move=
 // M.move
@@ -290,7 +315,10 @@ Note that structs do not have visibility modifiers (e.g., `public` or `private`)
 
 ## Ownership
 
-As mentioned above in [Defining Structs](#defining-structs), structs are by default linear and ephemeral. This means they cannot be copied or dropped. This property can be very useful when modeling real world resources like money, as you do not want money to be duplicated or get lost in circulation.
+As mentioned above in [Defining Structs](#defining-structs), structs are by default linear and
+ephemeral. This means they cannot be copied or dropped. This property can be very useful when
+modeling real world resources like money, as you do not want money to be duplicated or get lost in
+circulation.
 
 ```move=
 address 0x2 {
@@ -319,7 +347,8 @@ module M {
 }
 ```
 
-To fix the second example (`fun dropping_resource`), you would need to manually "unpack" the resource:
+To fix the second example (`fun dropping_resource`), you would need to manually "unpack" the
+resource:
 
 ```move=
 address 0x2 {
@@ -363,15 +392,20 @@ module M {
 
 ## Storing Resources in Global Storage
 
-Only structs with the `key` ability can be saved directly in [persistent global storage](./global-storage-operators.md). All values stored within those `key` structs must have the `store` abilities. See the [ability](./abilities] and [global storage](./global-storage-operators.md) chapters for more detail.
+Only structs with the `key` ability can be saved directly in
+[persistent global storage](./global-storage-operators.md). All values stored within those `key`
+structs must have the `store` abilities. See the [ability](./abilities] and
+[global storage](./global-storage-operators.md) chapters for more detail.
 
 ## Examples
 
-Here are two short examples of how you might use structs to represent valuable data (in the case of `Coin`) or more classical data (in the case of `Point` and `Circle`)
+Here are two short examples of how you might use structs to represent valuable data (in the case of
+`Coin`) or more classical data (in the case of `Point` and `Circle`)
 
 ### Example 1: Coin
 
 <!-- TODO link to access control for mint -->
+
 ```move=
 address 0x2 {
 module M {
@@ -393,7 +427,7 @@ module M {
     }
 
     public fun withdraw(coin: &mut Coin, amount: u64): Coin {
-        assert(coin.balance >= amount, 1000);
+        assert!(coin.balance >= amount, 1000);
         coin.value = coin.value - amount;
         Coin { value: amount }
     }
@@ -415,7 +449,7 @@ module M {
 
     public fun destroy_zero(coin: Coin) {
         let Coin { value } = coin;
-        assert(value == 0, 1001);
+        assert!(value == 0, 1001);
     }
 }
 }

@@ -9,12 +9,12 @@ script {
     const BYTES: vector<u8> = b"hello";
 
     fun main() {
-        assert(U8 == 0, 42);
-        assert(U64 == 0, 42);
-        assert(U128 == 0, 42);
-        assert(BOOL == false, 42);
-        assert(ADDR == @0x42, 42);
-        assert(HEX == x"42", 42);
-        assert(BYTES == b"hello", 42);
+        assert!(U8 == 0, 42);
+        assert!(U64 == 0, 42);
+        assert!(U128 == 0, 42);
+        assert!(BOOL == false, 42);
+        assert!(ADDR == @0x42, 42);
+        assert!(HEX == x"42", 42);
+        assert!(BYTES == b"hello", 42);
     }
 }

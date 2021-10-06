@@ -23,12 +23,12 @@ module 0x42::SimpleIsTxnSigner {
     }
 
     public fun f3(account: &signer) {
-        assert(Signer::address_of(account) == @0x7, 1);
+        assert!(Signer::address_of(account) == @0x7, 1);
         spec { assert Signer::is_txn_signer_addr(@0x7); } // It's true in general.
     }
 
     public fun f4_incorrect(account: &signer) {
-        assert(Signer::address_of(account) == @0x3, 1);
+        assert!(Signer::address_of(account) == @0x3, 1);
         spec { assert Signer::is_txn_signer_addr(@0x7); } // This is unprovable because it is not true in general.
     }
 
@@ -40,7 +40,7 @@ module 0x42::SimpleIsTxnSigner {
     }
 
     public fun f6(account: &signer) { // This function produces no error because it satisfies f5's requires condition.
-        assert(Signer::address_of(account) == @0x7, 1);
+        assert!(Signer::address_of(account) == @0x7, 1);
         f5();
     }
 
@@ -79,7 +79,7 @@ module 0x42::SimpleIsTxnSigner {
     }
 
     public fun g2(a: &signer, _b: &signer) {
-        assert (hasPermission(a), 1);
+        assert!(hasPermission(a), 1);
         spec {
             assert exists addr:address: (Signer::is_txn_signer_addr(addr) && hasPermissionAddr(addr));
         };
@@ -87,7 +87,7 @@ module 0x42::SimpleIsTxnSigner {
     }
 
     public fun g3(a: &signer, _b: &signer) {
-        assert (hasPermission(a), 1);
+        assert!(hasPermission(a), 1);
         helper()
     }
 
@@ -117,7 +117,7 @@ module 0x42::SimpleIsTxnSigner {
     public fun publish(account: &signer) {
         spec { assume Signer::is_txn_signer_addr(Signer::address_of(account)); };
 
-        assert(Signer::address_of(account) == ADMIN_ADDRESS(), AUTH_FAILED);
+        assert!(Signer::address_of(account) == ADMIN_ADDRESS(), AUTH_FAILED);
         move_to(account, Counter { i: 0 });
     }
 
@@ -126,7 +126,7 @@ module 0x42::SimpleIsTxnSigner {
     }
 
     public fun increment(account: &signer) acquires Counter {
-        assert(Signer::address_of(account) == ADMIN_ADDRESS(), AUTH_FAILED); // permission check
+        assert!(Signer::address_of(account) == ADMIN_ADDRESS(), AUTH_FAILED); // permission check
         let c_ref = &mut borrow_global_mut<Counter>(ADMIN_ADDRESS()).i;
         *c_ref = *c_ref + 1;
     }

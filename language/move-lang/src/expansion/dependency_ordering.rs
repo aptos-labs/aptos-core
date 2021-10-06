@@ -439,7 +439,7 @@ fn exp(context: &mut Context, sp!(_loc, e_): &E::Exp) {
             module_access(context, ma);
             types_opt(context, tys_opt)
         }
-        E::Call(ma, tys_opt, args) => {
+        E::Call(ma, _is_macro, tys_opt, args) => {
             module_access(context, ma);
             types_opt(context, tys_opt);
             args.value.iter().for_each(|e| exp(context, e))

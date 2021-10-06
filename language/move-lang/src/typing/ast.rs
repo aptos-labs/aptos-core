@@ -125,7 +125,7 @@ pub enum BuiltinFunction_ {
     BorrowGlobal(bool, Type),
     Exists(Type),
     Freeze(Type),
-    Assert,
+    Assert(/* is_macro */ bool),
 }
 pub type BuiltinFunction = Spanned<BuiltinFunction_>;
 
@@ -224,7 +224,7 @@ impl BuiltinFunction_ {
             B::BorrowGlobal(true, _) => NB::BORROW_GLOBAL_MUT,
             B::Exists(_) => NB::EXISTS,
             B::Freeze(_) => NB::FREEZE,
-            B::Assert => NB::ASSERT,
+            B::Assert(_) => NB::ASSERT_MACRO,
         }
     }
 }
@@ -624,7 +624,7 @@ impl AstDebug for BuiltinFunction_ {
             F::BorrowGlobal(false, bt) => (NF::BORROW_GLOBAL, Some(bt)),
             F::Exists(bt) => (NF::EXISTS, Some(bt)),
             F::Freeze(bt) => (NF::FREEZE, Some(bt)),
-            F::Assert => (NF::ASSERT, None),
+            F::Assert(_) => (NF::ASSERT_MACRO, None),
         };
         w.write(n);
         if let Some(bt) = bt_opt {

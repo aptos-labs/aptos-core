@@ -16,19 +16,19 @@ script {
     const COMPLEX: bool = !((true && false) || (false || true) && true) || true;
 
     fun main() {
-        assert(AND_TT, 42);
-        assert(!AND_TF, 42);
-        assert(!AND_FT, 42);
-        assert(!AND_FF, 42);
+        assert!(AND_TT, 42);
+        assert!(!AND_TF, 42);
+        assert!(!AND_FT, 42);
+        assert!(!AND_FF, 42);
 
-        assert(OR_TT, 42);
-        assert(OR_TF, 42);
-        assert(OR_FT, 42);
-        assert(!OR_FF, 42);
+        assert!(OR_TT, 42);
+        assert!(OR_TF, 42);
+        assert!(OR_FT, 42);
+        assert!(!OR_FF, 42);
 
-        assert(!NEG_T, 42);
-        assert(NEG_F, 42);
+        assert!(!NEG_T, 42);
+        assert!(NEG_F, 42);
 
-        assert(COMPLEX, 42);
+        assert!(COMPLEX, 42);
     }
 }

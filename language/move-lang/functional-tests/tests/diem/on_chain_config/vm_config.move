@@ -130,7 +130,7 @@ use DiemFramework::DiemAccount;
 use DiemFramework::XUS::XUS;
 fun main() {
     // Alice processed before the bump in min transaction gas units so should have more money left
-    assert(DiemAccount::balance<XUS>(@{{bob}}) < DiemAccount::balance<XUS>(@{{alice}}), 42);
+    assert!(DiemAccount::balance<XUS>(@{{bob}}) < DiemAccount::balance<XUS>(@{{alice}}), 42);
 }
 }
 // check: "Keep(EXECUTED)"
