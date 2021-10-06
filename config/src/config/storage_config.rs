@@ -53,7 +53,7 @@ pub struct StorageConfig {
     /// This is supposed to be enabled after other aspects of the new release has been confirmed
     /// safe. And once enabled, an older node won't be able to read the state DB, unless the DB is
     /// wiped and re-synced.
-    #[serde(default, skip_serializing)]
+    #[serde(default)]
     pub account_count_migration: bool,
 }
 
