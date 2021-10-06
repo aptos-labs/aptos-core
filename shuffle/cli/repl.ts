@@ -8,8 +8,8 @@
 // Developer API: https://docs.google.com/document/d/1KEPnGGU3zg_RmN8V4r2ms_MFPwsTMNyK7jCUFygviDg/edit#heading=h.hesw425dw9gz
 
 // deno-lint-ignore-file no-explicit-any
-import { green } from 'https://deno.land/x/nanocolors/mod.ts';
-import { createRemote } from "https://deno.land/x/gentle_rpc/mod.ts";
+import { green } from 'https://deno.land/x/nanocolors@0.1.12/mod.ts';
+import { createRemote } from "https://deno.land/x/gentle_rpc@v3.0/mod.ts";
 
 function highlight(content: string) {
   return green(content);

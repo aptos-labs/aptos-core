@@ -3,10 +3,10 @@
 
 // deno-lint-ignore-file no-explicit-any
 import * as TxnBuilder from "./mod.ts";
-import * as ed from 'https://deno.land/x/ed25519/mod.ts';
+import * as ed from 'https://deno.land/x/ed25519@1.0.1/mod.ts';
 import * as util from "https://deno.land/std@0.85.0/node/util.ts";
 import { ListTuple, uint8 } from './serde/types.ts';
-import { createRemote } from "https://deno.land/x/gentle_rpc/mod.ts";
+import { createRemote } from "https://deno.land/x/gentle_rpc@v3.0/mod.ts";
 import { hashPrefix } from "./signer.ts";
 
 const textEncoder = new util.TextEncoder();
