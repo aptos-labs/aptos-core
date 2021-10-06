@@ -335,7 +335,7 @@ fn log_txn_process_results(results: &[SubmissionStatusBundle], sender: Option<Pe
 // intra-node communication handlers //
 // ================================= //
 
-pub(crate) async fn process_consensus_request(mempool: &Mutex<CoreMempool>, req: ConsensusRequest) {
+pub(crate) fn process_consensus_request(mempool: &Mutex<CoreMempool>, req: ConsensusRequest) {
     // Start latency timer
     let start_time = Instant::now();
     debug!(LogSchema::event_log(LogEntry::Consensus, LogEvent::Received).consensus_msg(&req));

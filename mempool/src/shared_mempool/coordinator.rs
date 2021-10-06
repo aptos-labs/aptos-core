@@ -77,7 +77,7 @@ pub(crate) async fn coordinator<V>(
                 handle_client_event(&mut smp, &bounded_executor, msg, callback).await;
             },
             msg = consensus_requests.select_next_some() => {
-                tasks::process_consensus_request(&smp.mempool, msg).await;
+                tasks::process_consensus_request(&smp.mempool, msg);
             },
             msg = mempool_listener.select_next_some() => {
                 handle_state_sync_request(&mut smp, msg, &mut mempool_listener);
