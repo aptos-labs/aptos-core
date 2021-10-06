@@ -32,6 +32,7 @@ move-stdlib = { path = "../move-stdlib" }
 diem-framework = { path = "../diem-framework" }
 serde_json = "1.0.64"
 serde = { version = "1.0.124", default-features = false }
+read-write-set-dynamic = { path = "../tools/read-write-set/dynamic"}
 
 
 [dev-dependencies]

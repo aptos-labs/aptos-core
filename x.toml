@@ -192,7 +192,6 @@ members = [
     "diem-keygen",
     "diem-parallel-executor", # Will be removed once parallel execution is used in production.
     "diem-proptest-helpers",
-    "diem-read-write-set",
     "diem-retrier",
     "data-streaming-service", # Will be removed once state sync v2 is plugged into diem-node.
     "diem-swarm",
@@ -261,7 +260,6 @@ diem_crates_in_language = [
     "diem-framework-releases",
     "diem-events-fetcher",
     "diem-keygen",
-    "diem-read-write-set",
     "diem-validator-interface",
     "diem-transactional-test-harness",
     "diem-transaction-replay",

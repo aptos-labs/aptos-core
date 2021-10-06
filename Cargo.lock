@@ -2415,19 +2415,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "diem-read-write-set"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "diem-types",
- "diem-vm",
- "diem-workspace-hack",
- "move-core-types",
- "read-write-set",
- "read-write-set-dynamic",
-]
-
-[[package]]
 name = "diem-resource-viewer"
 version = "0.1.0"
 dependencies = [
@@ -2749,6 +2736,7 @@ dependencies = [
  "once_cell",
  "proptest",
  "rayon",
+ "read-write-set-dynamic",
  "serde",
  "serde_json",
  "tracing",

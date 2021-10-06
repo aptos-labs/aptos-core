@@ -120,6 +120,7 @@ pub mod transaction_metadata;
 // pub mod diem_transaction_validator;
 pub mod diem_vm;
 pub mod logging;
+pub mod read_write_set_analysis;
 pub mod script_to_script_function;
 pub mod system_module_names;
 

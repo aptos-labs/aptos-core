@@ -1,13 +1,13 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::system_module_names::{
+    BLOCK_PROLOGUE, DIEM_BLOCK_MODULE, SCRIPT_PROLOGUE_NAME, USER_EPILOGUE_NAME,
+};
 use anyhow::{bail, Result};
 use diem_types::{
     account_config,
     transaction::{SignedTransaction, TransactionPayload},
-};
-use diem_vm::system_module_names::{
-    BLOCK_PROLOGUE, DIEM_BLOCK_MODULE, SCRIPT_PROLOGUE_NAME, USER_EPILOGUE_NAME,
 };
 use move_core_types::{
     ident_str,
@@ -16,9 +16,10 @@ use move_core_types::{
     resolver::MoveResolver,
     value::{serialize_values, MoveValue},
 };
+use read_write_set_dynamic::NormalizedReadWriteSetAnalysis;
 use std::ops::Deref;
 
-pub struct ReadWriteSetAnalysis(read_write_set_dynamic::NormalizedReadWriteSetAnalysis);
+pub struct ReadWriteSetAnalysis(NormalizedReadWriteSetAnalysis);
 
 const TRANSACTION_FEES_NAME: &IdentStr = ident_str!("TransactionFee");
 
@@ -39,8 +40,8 @@ pub fn add_on_functions_list() -> Vec<(ModuleId, Identifier)> {
 impl ReadWriteSetAnalysis {
     /// Create a Diem transaction read/write set analysis from a generic Move module read/write set
     /// analysis
-    pub fn new(rw: read_write_set::ReadWriteSetAnalysis) -> Self {
-        ReadWriteSetAnalysis(rw.normalize_all_scripts(add_on_functions_list()))
+    pub fn new(rw: NormalizedReadWriteSetAnalysis) -> Self {
+        ReadWriteSetAnalysis(rw)
     }
 
     /// Returns an overapproximation of the `ResourceKey`'s in global storage that will be written
@@ -147,7 +148,7 @@ impl ReadWriteSetAnalysis {
 }
 
 impl Deref for ReadWriteSetAnalysis {
-    type Target = read_write_set_dynamic::NormalizedReadWriteSetAnalysis;
+    type Target = NormalizedReadWriteSetAnalysis;
 
     fn deref(&self) -> &Self::Target {
         &self.0
