@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{accounts, context::Context, transactions};
+use crate::{accounts, context::Context, log, transactions};
 use diem_api_types::{Error, Response};
 
 use std::convert::Infallible;
@@ -12,6 +12,7 @@ pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Inf
         .or(accounts::routes(context.clone()))
         .or(transactions::routes(context))
         .recover(handle_rejection)
+        .with(log::logger())
 }
 
 // GET /

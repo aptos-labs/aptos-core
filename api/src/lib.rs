@@ -4,6 +4,7 @@
 mod accounts;
 mod context;
 mod index;
+pub(crate) mod log;
 mod page;
 pub mod runtime;
 mod transactions;

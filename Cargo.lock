@@ -1564,6 +1564,7 @@ dependencies = [
  "diem-framework-releases",
  "diem-genesis-tool",
  "diem-global-constants",
+ "diem-logger",
  "diem-mempool",
  "diem-sdk",
  "diem-secure-storage",
