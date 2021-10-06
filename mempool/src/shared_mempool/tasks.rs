@@ -85,8 +85,7 @@ pub(crate) async fn process_client_transaction_submission<V>(
     timer.stop_and_record();
     let _timer =
         counters::process_txn_submit_latency_timer(counters::CLIENT_LABEL, counters::CLIENT_LABEL);
-    let statuses =
-        process_incoming_transactions(&smp, vec![transaction], TimelineState::NotReady).await;
+    let statuses = process_incoming_transactions(&smp, vec![transaction], TimelineState::NotReady);
     log_txn_process_results(&statuses, None);
 
     if let Some(status) = statuses.get(0) {
@@ -116,7 +115,7 @@ pub(crate) async fn process_transaction_broadcast<V>(
         peer.network_id().as_str(),
         peer.peer_id().short_str().as_str(),
     );
-    let results = process_incoming_transactions(&smp, transactions.clone(), timeline_state).await;
+    let results = process_incoming_transactions(&smp, transactions, timeline_state);
     log_txn_process_results(&results, Some(peer));
 
     let ack_response = gen_ack_response(request_id, results, &peer);
@@ -186,7 +185,7 @@ fn is_txn_retryable(result: SubmissionStatus) -> bool {
 
 /// Submits a list of SignedTransaction to the local mempool
 /// and returns a vector containing AdmissionControlStatus.
-pub(crate) async fn process_incoming_transactions<V>(
+pub(crate) fn process_incoming_transactions<V>(
     smp: &SharedMempool<V>,
     transactions: Vec<SignedTransaction>,
     timeline_state: TimelineState,
