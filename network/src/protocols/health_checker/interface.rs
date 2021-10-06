@@ -71,7 +71,7 @@ impl HealthCheckNetworkInterface {
         let peer_id = peer_network_id.peer_id();
         let result = self.sender.disconnect_peer(peer_id).await;
         if result.is_ok() {
-            self.remove_app_data(&peer_id);
+            self.app_data().remove(&peer_id);
         }
         result
     }
@@ -112,24 +112,8 @@ impl NetworkInterface<HealthCheckerMsg, HealthCheckerNetworkSender>
         self.sender.clone()
     }
 
-    fn insert_app_data(&self, peer_id: PeerId, data: Self::AppData) {
-        self.app_data.insert(peer_id, data)
-    }
-
-    fn remove_app_data(&self, peer_id: &PeerId) {
-        self.app_data.remove(peer_id)
-    }
-
-    fn read_app_data(&self, peer_id: &PeerId) -> Option<Self::AppData> {
-        self.app_data.read(peer_id)
-    }
-
-    fn write_app_data<F: FnOnce(&mut Entry<PeerId, Self::AppData>) -> Result<(), PeerError>>(
-        &self,
-        peer_id: PeerId,
-        modifier: F,
-    ) -> Result<(), PeerError> {
-        self.app_data.write(peer_id, modifier)
+    fn app_data(&self) -> &LockingHashMap<PeerId, HealthCheckData> {
+        &self.app_data
     }
 }
 

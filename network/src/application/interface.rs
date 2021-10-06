@@ -3,8 +3,8 @@
 
 use crate::{
     application::{
-        storage::PeerMetadataStorage,
-        types::{PeerError, PeerInfo, PeerState},
+        storage::{LockingHashMap, PeerMetadataStorage},
+        types::{PeerInfo, PeerState},
     },
     error::NetworkError,
     protocols::network::{ApplicationNetworkSender, Message, RpcError},
@@ -13,11 +13,7 @@ use async_trait::async_trait;
 use diem_config::network_id::{NetworkId, PeerNetworkId};
 use diem_types::PeerId;
 use itertools::Itertools;
-use std::{
-    collections::{hash_map::Entry, HashMap},
-    marker::PhantomData,
-    time::Duration,
-};
+use std::{collections::HashMap, fmt::Debug, hash::Hash, marker::PhantomData, time::Duration};
 
 /// A generic `NetworkInterface` for applications to connect to networking
 ///
@@ -30,9 +26,9 @@ pub trait NetworkInterface<
 >
 {
     /// The application specific key for `AppData`
-    type AppDataKey;
+    type AppDataKey: Clone + Debug + Eq + Hash;
     /// The application specific data to be stored
-    type AppData;
+    type AppData: Clone + Debug;
 
     /// Provides the `PeerMetadataStorage` for other functions.  Not expected to be used externally.
     fn peer_metadata_storage(&self) -> &PeerMetadataStorage;
@@ -62,23 +58,8 @@ pub trait NetworkInterface<
         self.peer_metadata_storage().read_all(network_id)
     }
 
-    /// Insert application specific data
-    fn insert_app_data(&self, app_data_key: Self::AppDataKey, data: Self::AppData);
-
-    /// Removes application specific data
-    fn remove_app_data(&self, app_data_key: &Self::AppDataKey);
-
-    /// Read application specific data
-    fn read_app_data(&self, app_data_key: &Self::AppDataKey) -> Option<Self::AppData>;
-
-    /// Write application specific data, allows for read before write operations
-    fn write_app_data<
-        F: FnOnce(&mut Entry<Self::AppDataKey, Self::AppData>) -> Result<(), PeerError>,
-    >(
-        &self,
-        app_data_key: Self::AppDataKey,
-        modifier: F,
-    ) -> Result<(), PeerError>;
+    /// Application specific data interface
+    fn app_data(&self) -> &LockingHashMap<Self::AppDataKey, Self::AppData>;
 }
 
 #[derive(Clone, Debug)]
@@ -147,13 +128,21 @@ impl<TMessage: Clone + Message + Send, Sender: ApplicationNetworkSender<TMessage
 
 #[async_trait]
 pub trait ApplicationPeerNetworkIdSender<TMessage: Message + Send>: Clone {
-    fn send_to(&mut self, recipient: PeerNetworkId, message: TMessage) -> Result<(), NetworkError>;
+    fn send_to(
+        &mut self,
+        _recipient: PeerNetworkId,
+        _message: TMessage,
+    ) -> Result<(), NetworkError> {
+        unimplemented!()
+    }
 
     fn send_to_many(
         &mut self,
-        recipients: impl Iterator<Item = PeerNetworkId>,
-        message: TMessage,
-    ) -> Result<(), NetworkError>;
+        _recipients: impl Iterator<Item = PeerNetworkId>,
+        _message: TMessage,
+    ) -> Result<(), NetworkError> {
+        unimplemented!()
+    }
 
     async fn send_rpc(
         &mut self,

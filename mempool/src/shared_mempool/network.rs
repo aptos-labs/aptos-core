@@ -29,7 +29,6 @@ use network::{
     application::{
         interface::{ApplicationPeerNetworkIdSender, MultiNetworkSender, NetworkInterface},
         storage::{LockingHashMap, PeerMetadataStorage},
-        types::PeerError,
     },
     error::NetworkError,
     peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
@@ -44,7 +43,7 @@ use serde::{Deserialize, Serialize};
 use short_hex_str::AsShortHexStr;
 use std::{
     cmp::Ordering,
-    collections::{hash_map::Entry, BTreeMap, HashMap},
+    collections::{BTreeMap, HashMap},
     ops::Add,
     sync::Arc,
     time::{Duration, Instant, SystemTime},
@@ -535,26 +534,8 @@ impl NetworkInterface<MempoolSyncMsg, MempoolMultiNetworkSender> for MempoolNetw
         self.sender.clone()
     }
 
-    fn insert_app_data(&self, app_data_key: Self::AppDataKey, data: Self::AppData) {
-        self.sync_states.insert(app_data_key, data)
-    }
-
-    fn remove_app_data(&self, app_data_key: &Self::AppDataKey) {
-        self.sync_states.remove(app_data_key)
-    }
-
-    fn read_app_data(&self, app_data_key: &Self::AppDataKey) -> Option<Self::AppData> {
-        self.sync_states.read(app_data_key)
-    }
-
-    fn write_app_data<
-        F: FnOnce(&mut Entry<Self::AppDataKey, Self::AppData>) -> Result<(), PeerError>,
-    >(
-        &self,
-        app_data_key: Self::AppDataKey,
-        modifier: F,
-    ) -> Result<(), PeerError> {
-        self.sync_states.write(app_data_key, modifier)
+    fn app_data(&self) -> &LockingHashMap<PeerNetworkId, PeerSyncState> {
+        &self.sync_states
     }
 }
 

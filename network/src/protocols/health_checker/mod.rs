@@ -246,13 +246,13 @@ impl HealthChecker {
 
                     match event {
                         Event::NewPeer(metadata) => {
-                            self.network_interface.insert_app_data(
+                            self.network_interface.app_data().insert(
                                 metadata.remote_peer_id,
                                 HealthCheckData::new(self.round)
                             );
                         }
                         Event::LostPeer(metadata) => {
-                            self.network_interface.remove_app_data(
+                            self.network_interface.app_data().remove(
                                 &metadata.remote_peer_id
                             );
                         }
@@ -381,7 +381,7 @@ impl HealthChecker {
                     );
                     // Update last successful ping to current round.
                     // If it's not in storage, don't bother updating it
-                    let _ = self.network_interface.write_app_data(peer_id, |entry| {
+                    let _ = self.network_interface.app_data().write(peer_id, |entry| {
                         match entry {
                             Entry::Vacant(..) => {
                                 // Don't do anything if there isn't an entry
@@ -422,7 +422,7 @@ impl HealthChecker {
                     round,
                     err
                 );
-                let _ = self.network_interface.write_app_data(peer_id, |entry| {
+                let _ = self.network_interface.app_data().write(peer_id, |entry| {
                     // Don't add in a default in case it's already disconnected
                     match entry {
                         Entry::Vacant(..) => {
@@ -446,7 +446,8 @@ impl HealthChecker {
                 // ConnectivityManager or the remote peer to re-establish the connection.
                 let failures = self
                     .network_interface
-                    .read_app_data(&peer_id)
+                    .app_data()
+                    .read(&peer_id)
                     .map(|data| data.failures)
                     .unwrap_or(0);
                 if failures > self.ping_failures_tolerated {
