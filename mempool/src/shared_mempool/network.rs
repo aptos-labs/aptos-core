@@ -126,14 +126,6 @@ impl ApplicationNetworkSender<MempoolSyncMsg> for MempoolNetworkSender {
         self.inner.send_to(recipient, protocol, message)
     }
 
-    fn send_to_many(
-        &mut self,
-        _recipients: impl Iterator<Item = PeerId>,
-        _message: MempoolSyncMsg,
-    ) -> Result<(), NetworkError> {
-        unimplemented!()
-    }
-
     async fn send_rpc(
         &mut self,
         _recipient: PeerId,

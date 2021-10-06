@@ -7,7 +7,6 @@ use crate::{
         storage::{LockingHashMap, PeerMetadataStorage},
         types::{PeerError, PeerState},
     },
-    error::NetworkError,
     protocols::{health_checker::HealthCheckerMsg, network::RpcError},
     transport::ConnectionMetadata,
 };
@@ -21,22 +20,6 @@ struct DummySender {}
 
 #[async_trait]
 impl ApplicationPeerNetworkIdSender<HealthCheckerMsg> for DummySender {
-    fn send_to(
-        &mut self,
-        _recipient: PeerNetworkId,
-        _message: HealthCheckerMsg,
-    ) -> Result<(), NetworkError> {
-        unimplemented!()
-    }
-
-    fn send_to_many(
-        &mut self,
-        _recipients: impl Iterator<Item = PeerNetworkId>,
-        _message: HealthCheckerMsg,
-    ) -> Result<(), NetworkError> {
-        unimplemented!()
-    }
-
     async fn send_rpc(
         &mut self,
         _recipient: PeerNetworkId,

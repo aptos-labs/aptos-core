@@ -367,13 +367,17 @@ impl<TMessage: Message> NetworkSender<TMessage> {
 /// It was already being implemented for every application, but is now standardized
 #[async_trait]
 pub trait ApplicationNetworkSender<TMessage: Send>: Clone {
-    fn send_to(&mut self, recipient: PeerId, message: TMessage) -> Result<(), NetworkError>;
+    fn send_to(&mut self, _recipient: PeerId, _message: TMessage) -> Result<(), NetworkError> {
+        unimplemented!()
+    }
 
     fn send_to_many(
         &mut self,
-        recipients: impl Iterator<Item = PeerId>,
-        message: TMessage,
-    ) -> Result<(), NetworkError>;
+        _recipients: impl Iterator<Item = PeerId>,
+        _message: TMessage,
+    ) -> Result<(), NetworkError> {
+        unimplemented!()
+    }
 
     async fn send_rpc(
         &mut self,
