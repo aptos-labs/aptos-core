@@ -148,7 +148,7 @@ impl MempoolNotificationListener {
     }
 
     /// Respond (succesfully) to the commit notification previously sent by state sync.
-    pub async fn ack_commit_notification(
+    pub fn ack_commit_notification(
         &self,
         mempool_commit_notification: MempoolCommitNotification,
     ) -> Result<(), Error> {
@@ -347,8 +347,7 @@ mod tests {
             if let Some(mempool_commit_notification) =
                 mempool_listener.select_next_some().now_or_never()
             {
-                let _result =
-                    block_on(mempool_listener.ack_commit_notification(mempool_commit_notification));
+                let _result = mempool_listener.ack_commit_notification(mempool_commit_notification);
             }
         });
 

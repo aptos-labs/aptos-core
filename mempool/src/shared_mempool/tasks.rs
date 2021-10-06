@@ -371,7 +371,7 @@ pub(crate) async fn process_consensus_request(mempool: &Mutex<CoreMempool>, req:
                 counters::COMMIT_CONSENSUS_LABEL,
                 transactions.len(),
             );
-            commit_txns(mempool, transactions, 0, true).await;
+            commit_txns(mempool, transactions, 0, true);
             (
                 ConsensusResponse::CommitResponse(),
                 callback,
@@ -393,7 +393,7 @@ pub(crate) async fn process_consensus_request(mempool: &Mutex<CoreMempool>, req:
     counters::mempool_service_latency(counter_label, result, latency);
 }
 
-pub async fn commit_txns(
+pub fn commit_txns(
     mempool: &Mutex<CoreMempool>,
     transactions: Vec<TransactionSummary>,
     block_timestamp_usecs: u64,

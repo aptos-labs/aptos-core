@@ -80,7 +80,7 @@ pub(crate) async fn coordinator<V>(
                 tasks::process_consensus_request(&smp.mempool, msg).await;
             },
             msg = mempool_listener.select_next_some() => {
-                handle_state_sync_request(&mut smp, msg, &mut mempool_listener).await;
+                handle_state_sync_request(&mut smp, msg, &mut mempool_listener);
             },
             reconfig_notification = mempool_reconfig_events.select_next_some() => {
                 handle_mempool_reconfig_event(&mut smp, &bounded_executor, reconfig_notification.on_chain_configs).await;
@@ -125,7 +125,7 @@ async fn handle_client_event<V>(
         .await;
 }
 
-async fn handle_state_sync_request<V>(
+fn handle_state_sync_request<V>(
     smp: &mut SharedMempool<V>,
     msg: MempoolCommitNotification,
     mempool_listener: &mut MempoolNotificationListener,
@@ -153,9 +153,8 @@ async fn handle_state_sync_request<V>(
             .collect(),
         msg.block_timestamp_usecs,
         false,
-    )
-    .await;
-    let counter_result = if mempool_listener.ack_commit_notification(msg).await.is_err() {
+    );
+    let counter_result = if mempool_listener.ack_commit_notification(msg).is_err() {
         error!(LogSchema::event_log(
             LogEntry::StateSyncCommit,
             LogEvent::CallbackFail
