@@ -418,7 +418,10 @@ mod tests {
                 public_key,
                 signature,
             } => (public_key, signature),
-            _ => panic!(),
+            _ => panic!(
+                "expecting TransactionAuthenticator::Ed25519, but got: {:?}",
+                txn.authenticator()
+            ),
         };
         assert_json(
             txns[1].clone(),
@@ -678,7 +681,10 @@ mod tests {
                 public_key,
                 signature,
             } => (public_key, signature),
-            _ => panic!(),
+            _ => panic!(
+                "expecting TransactionAuthenticator::Ed25519, but got: {:?}",
+                txn.authenticator()
+            ),
         };
         let hash = Transaction::UserTransaction(txn).hash();
         assert_json(
@@ -816,7 +822,10 @@ mod tests {
                 secondary_signer_addresses: _,
                 secondary_signers,
             } => (sender, secondary_signers),
-            _ => panic!(),
+            _ => panic!(
+                "expecting TransactionAuthenticator::MultiAgent, but got: {:?}",
+                txn.authenticator()
+            ),
         };
         assert_json(
             resp["signature"].clone(),
