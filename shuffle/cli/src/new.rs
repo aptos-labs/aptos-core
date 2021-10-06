@@ -3,8 +3,6 @@
 
 use crate::shared;
 use anyhow::Result;
-use diem_genesis_tool::validator_builder::ValidatorConfig;
-use diem_types::on_chain_config::VMPublishingOption;
 use include_dir::{include_dir, Dir};
 use std::{
     fs,
@@ -27,7 +25,6 @@ pub fn handle(blockchain: String, pathbuf: PathBuf) -> Result<()> {
     let config = shared::Config { blockchain };
     write_project_files(project_path, &config)?;
     write_example_move_packages(project_path)?;
-    generate_validator_config(project_path)?;
     Ok(())
 }
 
@@ -58,19 +55,9 @@ fn write_example_move_packages(root_path: &Path) -> Result<()> {
     Ok(())
 }
 
-fn generate_validator_config(project_path: &Path) -> Result<ValidatorConfig> {
-    let publishing_option = VMPublishingOption::open();
-    shuffle_custom_node::generate_validator_config(
-        project_path.join("nodeconfig").as_path(),
-        diem_framework_releases::current_module_blobs().to_vec(),
-        publishing_option,
-    )
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
-    use diem_config::config::NodeConfig;
     use shared::Config;
     use tempfile::tempdir;
 
@@ -101,9 +88,5 @@ mod test {
         let actual_example_content =
             fs::read_to_string(dir.path().join("main/sources/Message.move")).unwrap();
         assert_eq!(expected_example_content, actual_example_content);
-
-        // check if we can load generated node.yaml config file
-        let _node_config =
-            NodeConfig::load(dir.path().join("nodeconfig/0/node.yaml").as_path()).unwrap();
     }
 }

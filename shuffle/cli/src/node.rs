@@ -1,20 +1,18 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::shared::read_config;
 use anyhow::Result;
-use diem_config::config::NodeConfig;
+use diem_types::on_chain_config::VMPublishingOption;
 use std::path::Path;
 
 pub fn handle(project_path: &Path) -> Result<()> {
-    // TODO: Generate prefunded accounts
-    let node_config = NodeConfig::load(project_path.join("nodeconfig/0/node.yaml").as_path())?;
-    let config = read_config(project_path)?;
-    println!(
-        "running shuffle node configured for {} in {}",
-        &config.blockchain,
-        project_path.display()
+    let publishing_option = VMPublishingOption::open();
+    diem_node::load_test_environment(
+        Some(project_path.join("nodeconfig")),
+        false,
+        Some(publishing_option),
+        diem_framework_releases::current_module_blobs().to_vec(),
+        rand::rngs::OsRng,
     );
-    diem_node::start(&node_config, None);
     Ok(())
 }
