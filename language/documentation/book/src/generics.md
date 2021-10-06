@@ -187,30 +187,28 @@ does not appear in any of the fields defined in `Coin`.
 
 ### Phantom Type Parameters
 
-Discerning readers might have noticed that
-in the example above,
+In the example above,
 although `struct Coin` asks for the `store` ability,
-based on the rules for
-[Conditional Abilities and Generic Types](./abilities.md#conditional-abilities-and-generic-types),
 neither `Coin<Currency1>` nor `Coin<Currency2>` will have the `store` ability.
-This is bacause `Currency1` and `Currency2` don't have the `store` ability
+This is because of the rules for
+[Conditional Abilities and Generic Types](./abilities.md#conditional-abilities-and-generic-types)
+and the fact that `Currency1` and `Currency2` don't have the `store` ability,
 despite the fact that they are not even used in the body of `struct Coin`.
 This might cause some unpleasant consequences.
-For example, we are unable to put `Coin<Currency1>` into a wallet that is stored in the global storage.
+For example, we are unable to put `Coin<Currency1>` into a wallet in the global storage.
 
-To solve this issue,
-one possibility is to
+One possible solution would be to
 add spurious ability annotations to `Currency1` and `Currency2`
 (i.e., `struct Currency1 has store {}`).
-But this might lead to unexpected programs
-(which could result in bugs or security vulnerabilities)
-because types had to be weakened with unnecessary ability declarations.
+But, this might lead to bugs or security vulnerabilities
+because it weakens the types with unnecessary ability declarations.
 For example, we would never expect a resource in the global storage to have a field in type `Currency1`,
-but this is now possible with the spurious `store` ability.
-Moreover, the spurious annotations were infectious,
+but this would be possible with the spurious `store` ability.
+Moreover, the spurious annotations would be infectious,
 requiring many functions generic on the unused type parameter to also include the necessary constraints.
 
-The solution is to explicitly mark unused type parameters as *phantom* type parameters,
+Phantom type parameters solve this problem.
+Unused type parameters can be marked as *phantom* type parameters,
 which do not participate in the ability derivation for structs.
 In this way,
 arguments to phantom type parameters are not considered when deriving the abilities for generic types,
