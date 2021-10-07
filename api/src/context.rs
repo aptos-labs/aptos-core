@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use diem_api_types::{Error, LedgerInfo};
+use diem_crypto::HashValue;
 use diem_mempool::{MempoolClientSender, SubmissionStatus};
 use diem_types::{
     account_address::AccountAddress,
@@ -10,7 +11,10 @@ use diem_types::{
     chain_id::ChainId,
     ledger_info::LedgerInfoWithSignatures,
     protocol_spec::DpnProto,
-    transaction::{default_protocol::TransactionListWithProof, SignedTransaction},
+    transaction::{
+        default_protocol::{TransactionListWithProof, TransactionWithProof},
+        SignedTransaction,
+    },
 };
 use storage_interface::MoveDbReader;
 
@@ -128,5 +132,22 @@ impl Context {
             events_len
         );
         Ok(data)
+    }
+
+    pub fn get_transaction_by_hash(
+        &self,
+        hash: HashValue,
+        ledger_version: u64,
+    ) -> Result<Option<TransactionWithProof>> {
+        self.db.get_transaction_by_hash(hash, ledger_version, true)
+    }
+
+    pub fn get_transaction_by_version(
+        &self,
+        version: u64,
+        ledger_version: u64,
+    ) -> Result<TransactionWithProof> {
+        self.db
+            .get_transaction_by_version(version, ledger_version, true)
     }
 }

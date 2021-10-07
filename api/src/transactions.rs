@@ -1,9 +1,13 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{fmt, str::FromStr};
+
 use crate::{context::Context, page::Page};
 
-use diem_api_types::{mime_types, Error, LedgerInfo, MoveConverter, Response, Transaction};
+use diem_api_types::{
+    mime_types, Error, HashValue, LedgerInfo, MoveConverter, Response, Transaction,
+};
 use diem_types::{mempool_status::MempoolStatusCode, transaction::SignedTransaction};
 
 use anyhow::{format_err, Result};
@@ -14,7 +18,26 @@ use warp::{
 };
 
 pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
-    get_transactions(context.clone()).or(post_bcs_transactions(context))
+    get_transaction(context.clone())
+        .or(get_transactions(context.clone()))
+        .or(post_bcs_transactions(context))
+}
+
+// GET /transactions/{txn-hash / version}
+pub fn get_transaction(
+    context: Context,
+) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+    warp::path!("transactions" / String)
+        .and(warp::get())
+        .and(context.filter())
+        .and_then(handle_get_transaction)
+}
+
+async fn handle_get_transaction(
+    hash_or_version: String,
+    context: Context,
+) -> Result<impl Reply, Rejection> {
+    Ok(Transactions::new(context)?.one(TransactionId::from_str(&hash_or_version)?)?)
 }
 
 // GET /transactions?start={u64}&limit={u16}
@@ -100,7 +123,7 @@ impl Transactions {
         let ledger_version = self.ledger_info.version();
         let start_version = page.start(ledger_version)?;
         if start_version > ledger_version {
-            return Err(transaction_not_found(start_version, ledger_version));
+            return Err(self.transaction_not_found(TransactionId::Version(start_version)));
         }
         let limit = page.limit()?;
 
@@ -123,13 +146,72 @@ impl Transactions {
             .collect::<Result<_>>()?;
         Response::new(self.ledger_info, &txns)
     }
+
+    pub fn one(self, id: TransactionId) -> Result<impl Reply, Error> {
+        let txn = match &id {
+            TransactionId::Hash(hash) => self
+                .context
+                .get_transaction_by_hash((*hash).into(), self.ledger_info.version())?
+                .ok_or_else(|| self.transaction_not_found(id))?,
+            TransactionId::Version(version) => {
+                if version > &self.ledger_info.version() {
+                    return Err(self.transaction_not_found(id));
+                }
+                self.context
+                    .get_transaction_by_version(*version, self.ledger_info.version())?
+            }
+        };
+
+        let db = self.context.db();
+        let converter = MoveConverter::new(&db);
+
+        let ret = converter.try_into_transaction(
+            txn.version,
+            &txn.transaction,
+            txn.proof.transaction_info(),
+            &txn.events.unwrap_or_default(),
+        )?;
+        Response::new(self.ledger_info, &ret)
+    }
+
+    fn transaction_not_found(&self, id: TransactionId) -> Error {
+        Error::not_found(
+            format!("could not find transaction by: {}", id),
+            json!({"ledger_version": self.ledger_info.version().to_string()}),
+        )
+    }
 }
 
-fn transaction_not_found(version: u64, ledger_version: u64) -> Error {
-    Error::not_found(
-        format!("could not find transaction by version: {}", version),
-        json!({"ledger_version": ledger_version.to_string()}),
-    )
+#[derive(Clone, Debug)]
+enum TransactionId {
+    Hash(HashValue),
+    Version(u64),
+}
+
+impl FromStr for TransactionId {
+    type Err = Error;
+
+    fn from_str(hash_or_version: &str) -> Result<Self, Error> {
+        let id = match hash_or_version.parse::<u64>() {
+            Ok(version) => TransactionId::Version(version),
+            Err(_) => TransactionId::Hash(HashValue::from_str(hash_or_version).map_err(|_| {
+                Error::bad_request(format_err!(
+                    "invalid path paramenter transaction hash or version: {:?}",
+                    hash_or_version,
+                ))
+            })?),
+        };
+        Ok(id)
+    }
+}
+
+impl fmt::Display for TransactionId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Hash(h) => write!(f, "Hash({})", h),
+            Self::Version(v) => write!(f, "Version({})", v),
+        }
+    }
 }
 
 #[cfg(any(test))]
@@ -315,7 +397,7 @@ mod tests {
             resp,
             json!({
               "code": 404,
-              "message": "could not find transaction by version: 1000000",
+              "message": "could not find transaction by: Version(1000000)",
               "data": {
                 "ledger_version": ledger_version.to_string()
               }
@@ -902,5 +984,98 @@ mod tests {
                 "bitmap": "0xe0000000"
             }),
         );
+    }
+
+    #[tokio::test]
+    async fn test_get_transaction_by_hash() {
+        let mut context = new_test_context();
+        let account = context.gen_account();
+        let txn = context.create_parent_vasp(&account);
+        context.commit_block(&vec![txn.clone()]);
+
+        let txns = context.get("/transactions?start=2").await;
+        assert_eq!(1, txns.as_array().unwrap().len());
+
+        let resp = context
+            .get(&format!(
+                "/transactions/{}",
+                txns[0]["hash"].as_str().unwrap()
+            ))
+            .await;
+        assert_json(resp, txns[0].clone())
+    }
+
+    #[tokio::test]
+    async fn test_get_transaction_by_hash_not_found() {
+        let context = new_test_context();
+
+        let resp = context
+            .expect_status_code(404)
+            .get(&format!(
+                "/transactions/{}",
+                "0xdadfeddcca7cb6396c735e9094c76c6e4e9cb3e3ef814730693aed59bd87b31d",
+            ))
+            .await;
+        assert_json(
+            resp,
+            json!({
+                "code": 404,
+                "message": "could not find transaction by: Hash(0xdadfeddcca7cb6396c735e9094c76c6e4e9cb3e3ef814730693aed59bd87b31d)",
+                "data": {
+                    "ledger_version": "0"
+                }
+            }),
+        )
+    }
+
+    #[tokio::test]
+    async fn test_get_transaction_by_invalid_hash() {
+        let context = new_test_context();
+
+        let resp = context
+            .expect_status_code(400)
+            .get(&format!("/transactions/{}", "0x1",))
+            .await;
+        assert_json(
+            resp,
+            json!({
+                "code": 400,
+                "message": "invalid path paramenter transaction hash or version: \"0x1\""
+            }),
+        )
+    }
+
+    #[tokio::test]
+    async fn test_get_transaction_by_version_not_found() {
+        let context = new_test_context();
+
+        let resp = context
+            .expect_status_code(404)
+            .get("/transactions/10000")
+            .await;
+        assert_json(
+            resp,
+            json!({
+                "code": 404,
+                "message": "could not find transaction by: Version(10000)",
+                "data": {
+                    "ledger_version": "0"
+                }
+            }),
+        )
+    }
+
+    #[tokio::test]
+    async fn test_get_transaction_by_version() {
+        let mut context = new_test_context();
+        let account = context.gen_account();
+        let txn = context.create_parent_vasp(&account);
+        context.commit_block(&vec![txn.clone()]);
+
+        let txns = context.get("/transactions?start=2").await;
+        assert_eq!(1, txns.as_array().unwrap().len());
+
+        let resp = context.get("/transactions/2").await;
+        assert_json(resp, txns[0].clone())
     }
 }

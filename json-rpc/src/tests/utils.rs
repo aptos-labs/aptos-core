@@ -281,6 +281,15 @@ impl DbReader<DpnProto> for MockDiemDB {
         unimplemented!()
     }
 
+    fn get_transaction_by_version(
+        &self,
+        _version: u64,
+        _ledger_version: Version,
+        _fetch_events: bool,
+    ) -> Result<TransactionWithProof> {
+        unimplemented!()
+    }
+
     fn get_transaction_outputs(
         &self,
         _start_version: Version,

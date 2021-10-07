@@ -731,6 +731,16 @@ impl DbReader<DpnProto> for DiemDB {
             .transpose()
     }
 
+    /// Get transaction by version, delegates to `DiemDB::get_transaction_by_hash`
+    fn get_transaction_by_version(
+        &self,
+        version: Version,
+        ledger_version: Version,
+        fetch_events: bool,
+    ) -> Result<TransactionWithProof> {
+        self.get_transaction_with_proof(version, ledger_version, fetch_events)
+    }
+
     // ======================= State Synchronizer Internal APIs ===================================
     /// Gets a batch of transactions for the purpose of synchronizing state to another node.
     ///
