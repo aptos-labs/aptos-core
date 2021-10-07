@@ -132,32 +132,30 @@ pub(crate) async fn process_transaction_broadcast<V>(
     notify_subscribers(SharedMempoolNotification::ACK, &smp.subscribers);
 }
 
+/// If `MempoolIsFull` on any of the transactions, provide backpressure to the downstream peer.
 fn gen_ack_response(
     request_id: Vec<u8>,
     results: Vec<SubmissionStatusBundle>,
     peer: &PeerNetworkId,
 ) -> MempoolSyncMsg {
-    let mut backoff = false;
-    let mut retry = false;
-    for r in results.into_iter() {
-        let submission_status = r.1;
-        if submission_status.0.code == MempoolStatusCode::MempoolIsFull {
-            backoff = true;
-        }
-        if is_txn_retryable(submission_status) {
-            retry = true;
-        }
-
-        if backoff && retry {
+    let mut backoff_and_retry = false;
+    for (_, (mempool_status, _)) in results.into_iter() {
+        if mempool_status.code == MempoolStatusCode::MempoolIsFull {
+            backoff_and_retry = true;
             break;
         }
     }
 
-    update_ack_counter(peer, counters::SENT_LABEL, retry, backoff);
+    update_ack_counter(
+        peer,
+        counters::SENT_LABEL,
+        backoff_and_retry,
+        backoff_and_retry,
+    );
     MempoolSyncMsg::BroadcastTransactionsResponse {
         request_id,
-        retry,
-        backoff,
+        retry: backoff_and_retry,
+        backoff: backoff_and_retry,
     }
 }
 
@@ -177,10 +175,6 @@ pub(crate) fn update_ack_counter(
             counters::BACKPRESSURE_BROADCAST_LABEL,
         );
     }
-}
-
-fn is_txn_retryable(result: SubmissionStatus) -> bool {
-    result.0.code == MempoolStatusCode::MempoolIsFull
 }
 
 /// Submits a list of SignedTransaction to the local mempool
