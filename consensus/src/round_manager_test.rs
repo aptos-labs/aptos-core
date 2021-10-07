@@ -109,7 +109,7 @@ impl NodeSetup {
         for signer in signers.iter().take(num_nodes) {
             let mut conn_meta = ConnectionMetadata::mock(signer.author());
             conn_meta.application_protocols = ProtocolIdSet::from_iter([
-                ProtocolId::ConsensusDirectSendJSON,
+                ProtocolId::ConsensusDirectSendJson,
                 ProtocolId::ConsensusDirectSend,
                 ProtocolId::ConsensusRpc,
             ]);

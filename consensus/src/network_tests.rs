@@ -569,7 +569,7 @@ mod tests {
                 &peer_metadata_storage,
                 peer,
                 &[
-                    ProtocolId::ConsensusDirectSendJSON,
+                    ProtocolId::ConsensusDirectSendJson,
                     ProtocolId::ConsensusDirectSend,
                     ProtocolId::ConsensusRpc,
                 ],
@@ -671,9 +671,9 @@ mod tests {
                 &peer_metadata_storage,
                 peer,
                 &[
-                    ProtocolId::ConsensusDirectSendJSON,
+                    ProtocolId::ConsensusDirectSendJson,
                     ProtocolId::ConsensusDirectSend,
-                    ProtocolId::ConsensusRpc,
+                    ProtocolId::ConsensusRpcJson,
                 ],
             );
             network_sender.initialize(peer_metadata_storage.clone());
@@ -727,8 +727,8 @@ mod tests {
                 let response =
                     BlockRetrievalResponse::new(BlockRetrievalStatus::IdNotFound, vec![]);
                 let response = ConsensusMsg::BlockRetrievalResponse(Box::new(response));
-                let bytes = bcs::to_bytes(&response).unwrap();
-                request.response_sender.send(Ok(bytes.into())).unwrap();
+                let bytes = Bytes::from(serde_json::to_vec(&response).unwrap());
+                request.response_sender.send(Ok(bytes)).unwrap();
             }
         };
         runtime.handle().spawn(on_request_block);
@@ -776,13 +776,13 @@ mod tests {
             BlockRetrievalRequest::new(HashValue::random(), 1),
         ));
 
-        let protocol_id = ProtocolId::ConsensusRpc;
+        let protocol_id = ProtocolId::ConsensusRpcJson;
         let (res_tx, _res_rx) = oneshot::channel();
         let liveness_check_msg = PeerManagerNotification::RecvRpc(
             peer_id,
             InboundRpcRequest {
                 protocol_id,
-                data: Bytes::from(bcs::to_bytes(&liveness_check_msg).unwrap()),
+                data: Bytes::from(serde_json::to_vec(&liveness_check_msg).unwrap()),
                 res_tx,
             },
         );

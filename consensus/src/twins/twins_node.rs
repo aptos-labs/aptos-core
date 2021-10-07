@@ -165,7 +165,7 @@ impl SMRNode {
         node_configs.iter().for_each(|config| {
             let mut conn_meta = ConnectionMetadata::mock(author_from_config(config));
             conn_meta.application_protocols = ProtocolIdSet::from_iter([
-                ProtocolId::ConsensusDirectSendJSON,
+                ProtocolId::ConsensusDirectSendJson,
                 ProtocolId::ConsensusDirectSend,
                 ProtocolId::ConsensusRpc,
             ]);

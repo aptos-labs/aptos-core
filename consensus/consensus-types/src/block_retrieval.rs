@@ -13,7 +13,7 @@ use std::fmt;
 // (so block retrievals can be done in a single request)
 // but it should not be too large as the response size is bounded.
 // TODO: add a test
-pub const MAX_BLOCKS_PER_REQUEST: u64 = 20;
+pub const MAX_BLOCKS_PER_REQUEST: u64 = 10;
 
 /// RPC to get a chain of block of the given length starting from the given block id.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]

@@ -865,12 +865,12 @@ impl RoundManager {
         let mut id = request.req.block_id();
         while (blocks.len() as u64) < request.req.num_blocks() {
             if let Some(executed_block) = self.block_store.get_block(id) {
-                id = executed_block.parent_id();
                 blocks.push(executed_block.block().clone());
                 if request.req.match_target_id(id) {
                     status = BlockRetrievalStatus::SucceededWithTarget;
                     break;
                 }
+                id = executed_block.parent_id();
             } else {
                 status = BlockRetrievalStatus::NotEnoughBlocks;
                 break;
