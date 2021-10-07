@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    data_stream::{DataNotification, DataStreamListener},
+    data_notification::DataNotification,
+    data_stream::DataStreamListener,
     error::Error,
     streaming_client::{
         new_streaming_service_client_listener_pair, ContinuouslyStreamTransactionOutputsRequest,
