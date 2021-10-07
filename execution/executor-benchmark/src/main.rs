@@ -47,8 +47,6 @@ enum Command {
 fn main() {
     let opt = Opt::from_args();
 
-    diem_logger::Logger::new().init();
-
     rayon::ThreadPoolBuilder::new()
         .thread_name(|index| format!("rayon-global-{}", index))
         .build_global()
@@ -74,6 +72,7 @@ fn main() {
             data_dir,
             checkpoint_dir,
         } => {
+            diem_logger::Logger::new().init();
             executor_benchmark::run_benchmark(opt.block_size, blocks, data_dir, checkpoint_dir);
         }
     }
