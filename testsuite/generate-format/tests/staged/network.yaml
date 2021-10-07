@@ -129,9 +129,9 @@ Protocol:
 ProtocolId:
   ENUM:
     0:
-      ConsensusRpc: UNIT
+      ConsensusRpcBcs: UNIT
     1:
-      ConsensusDirectSend: UNIT
+      ConsensusDirectSendBcs: UNIT
     2:
       MempoolDirectSend: UNIT
     3:

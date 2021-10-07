@@ -11,7 +11,7 @@ use proptest::{collection::vec, prelude::*};
 // Ensure serialization of ProtocolId enum takes 1 byte.
 #[test]
 fn protocol_id_serialization() -> bcs::Result<()> {
-    let protocol = ProtocolId::ConsensusRpc;
+    let protocol = ProtocolId::ConsensusRpcBcs;
     assert_eq!(bcs::to_bytes(&protocol)?, vec![0x00]);
     Ok(())
 }
@@ -30,7 +30,7 @@ fn error_code() -> bcs::Result<()> {
 fn rpc_request() -> bcs::Result<()> {
     let rpc_request = RpcRequest {
         request_id: 25,
-        protocol_id: ProtocolId::ConsensusRpc,
+        protocol_id: ProtocolId::ConsensusRpcBcs,
         priority: 0,
         raw_request: [0, 1, 2, 3].to_vec(),
     };
@@ -95,7 +95,7 @@ fn send_fails_when_larger_than_frame_limit() {
     // attempting to send an outbound message larger than your frame size will
     // return an Err
     let message = NetworkMessage::DirectSendMsg(DirectSendMsg {
-        protocol_id: ProtocolId::ConsensusRpc,
+        protocol_id: ProtocolId::ConsensusRpcBcs,
         priority: 0,
         raw_msg: vec![0; 123],
     });
@@ -111,7 +111,7 @@ fn recv_fails_when_larger_than_frame_limit() {
     let mut message_rx = NetworkMessageStream::new(memsocket_rx, 64, None);
 
     let message = NetworkMessage::DirectSendMsg(DirectSendMsg {
-        protocol_id: ProtocolId::ConsensusRpc,
+        protocol_id: ProtocolId::ConsensusRpcBcs,
         priority: 0,
         raw_msg: vec![0; 80],
     });

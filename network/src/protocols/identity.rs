@@ -69,7 +69,7 @@ mod tests {
         supported_protocols.insert(
             MessagingProtocolVersion::V1,
             ProtocolIdSet::from_iter([
-                ProtocolId::ConsensusDirectSend,
+                ProtocolId::ConsensusDirectSendBcs,
                 ProtocolId::MempoolDirectSend,
             ]),
         );
@@ -81,7 +81,10 @@ mod tests {
         let mut supported_protocols = BTreeMap::new();
         supported_protocols.insert(
             MessagingProtocolVersion::V1,
-            ProtocolIdSet::from_iter([ProtocolId::ConsensusRpc, ProtocolId::ConsensusDirectSend]),
+            ProtocolIdSet::from_iter([
+                ProtocolId::ConsensusRpcBcs,
+                ProtocolId::ConsensusDirectSendBcs,
+            ]),
         );
         let client_handshake = HandshakeMsg {
             supported_protocols,

@@ -40,8 +40,8 @@ use std::{
 };
 use tokio::runtime::Runtime;
 
-const TEST_RPC_PROTOCOL: ProtocolId = ProtocolId::ConsensusRpc;
-const TEST_DIRECT_SEND_PROTOCOL: ProtocolId = ProtocolId::ConsensusDirectSend;
+const TEST_RPC_PROTOCOL: ProtocolId = ProtocolId::ConsensusRpcBcs;
+const TEST_DIRECT_SEND_PROTOCOL: ProtocolId = ProtocolId::ConsensusDirectSendBcs;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct DummyMsg(pub Vec<u8>);

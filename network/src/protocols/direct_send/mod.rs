@@ -11,7 +11,7 @@ pub struct Message {
     /// The [`ProtocolId`] for which of our upstream application modules should
     /// handle (i.e., deserialize and then respond to) this inbound rpc request.
     ///
-    /// For example, if `protocol_id == ProtocolId::ConsensusRpc`, then this
+    /// For example, if `protocol_id == ProtocolId::ConsensusRpcBcs`, then this
     /// inbound rpc request will be dispatched to consensus for handling.
     pub protocol_id: ProtocolId,
     /// The serialized request data received from the sender. At this layer in

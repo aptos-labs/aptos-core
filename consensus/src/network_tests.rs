@@ -164,7 +164,7 @@ impl NetworkPlayground {
 
                     node_consensus_tx
                         .push(
-                            (src_twin_id.author, ProtocolId::ConsensusRpc),
+                            (src_twin_id.author, ProtocolId::ConsensusRpcBcs),
                             PeerManagerNotification::RecvRpc(src_twin_id.author, inbound_req),
                         )
                         .unwrap();
@@ -236,7 +236,7 @@ impl NetworkPlayground {
             ),
         };
         let _ = node_consensus_tx.push(
-            (src_twin_id.author, ProtocolId::ConsensusDirectSend),
+            (src_twin_id.author, ProtocolId::ConsensusDirectSendBcs),
             msg_notif,
         );
         msg_copy
@@ -570,8 +570,8 @@ mod tests {
                 peer,
                 &[
                     ProtocolId::ConsensusDirectSendJson,
-                    ProtocolId::ConsensusDirectSend,
-                    ProtocolId::ConsensusRpc,
+                    ProtocolId::ConsensusDirectSendBcs,
+                    ProtocolId::ConsensusRpcBcs,
                 ],
             );
             let mut network_sender = ConsensusNetworkSender::new(
@@ -672,7 +672,7 @@ mod tests {
                 peer,
                 &[
                     ProtocolId::ConsensusDirectSendJson,
-                    ProtocolId::ConsensusDirectSend,
+                    ProtocolId::ConsensusDirectSendBcs,
                     ProtocolId::ConsensusRpcJson,
                 ],
             );
@@ -759,7 +759,7 @@ mod tests {
             NetworkTask::new(consensus_network_events, self_receiver);
 
         let peer_id = PeerId::random();
-        let protocol_id = ProtocolId::ConsensusDirectSend;
+        let protocol_id = ProtocolId::ConsensusDirectSendBcs;
         let bad_msg = PeerManagerNotification::RecvMessage(
             peer_id,
             Message {

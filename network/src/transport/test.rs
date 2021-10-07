@@ -144,7 +144,7 @@ where
         };
 
     let supported_protocols =
-        ProtocolIdSet::from_iter([ProtocolId::ConsensusRpc, ProtocolId::DiscoveryDirectSend]);
+        ProtocolIdSet::from_iter([ProtocolId::ConsensusRpcBcs, ProtocolId::DiscoveryDirectSend]);
     let chain_id = ChainId::default();
     let listener_transport = DiemNetTransport::new(
         base_transport.clone(),

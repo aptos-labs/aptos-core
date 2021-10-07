@@ -166,8 +166,8 @@ impl SMRNode {
             let mut conn_meta = ConnectionMetadata::mock(author_from_config(config));
             conn_meta.application_protocols = ProtocolIdSet::from_iter([
                 ProtocolId::ConsensusDirectSendJson,
-                ProtocolId::ConsensusDirectSend,
-                ProtocolId::ConsensusRpc,
+                ProtocolId::ConsensusDirectSendBcs,
+                ProtocolId::ConsensusRpcBcs,
             ]);
             peer_metadata_storage.insert_connection(NetworkId::Validator, conn_meta);
         });

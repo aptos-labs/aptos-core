@@ -15,7 +15,7 @@ fn net_protocol() -> bcs::Result<()> {
 #[test]
 fn protocols_to_from_iter() {
     let supported_protocols: ProtocolIdSet =
-        ProtocolIdSet::from_iter([ProtocolId::ConsensusRpc, ProtocolId::MempoolDirectSend]);
+        ProtocolIdSet::from_iter([ProtocolId::ConsensusRpcBcs, ProtocolId::MempoolDirectSend]);
     assert_eq!(
         ProtocolIdSet::from_iter(supported_protocols.iter()),
         supported_protocols,
@@ -63,7 +63,7 @@ fn common_protocols() {
     let mut supported_protocols = BTreeMap::new();
     supported_protocols.insert(
         MessagingProtocolVersion::V1,
-        ProtocolIdSet::from_iter([ProtocolId::ConsensusRpc, ProtocolId::DiscoveryDirectSend]),
+        ProtocolIdSet::from_iter([ProtocolId::ConsensusRpcBcs, ProtocolId::DiscoveryDirectSend]),
     );
 
     let h1 = HandshakeMsg {
@@ -76,7 +76,7 @@ fn common_protocols() {
     let mut supported_protocols = BTreeMap::new();
     supported_protocols.insert(
         MessagingProtocolVersion::V1,
-        ProtocolIdSet::from_iter([ProtocolId::ConsensusRpc, ProtocolId::MempoolDirectSend]),
+        ProtocolIdSet::from_iter([ProtocolId::ConsensusRpcBcs, ProtocolId::MempoolDirectSend]),
     );
     let h2 = HandshakeMsg {
         chain_id,
@@ -87,7 +87,7 @@ fn common_protocols() {
     assert_eq!(
         (
             MessagingProtocolVersion::V1,
-            ProtocolIdSet::from_iter([ProtocolId::ConsensusRpc]),
+            ProtocolIdSet::from_iter([ProtocolId::ConsensusRpcBcs]),
         ),
         h1.perform_handshake(&h2).unwrap()
     );

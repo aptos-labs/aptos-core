@@ -39,8 +39,8 @@ mod test;
 #[derive(Clone, Copy, Hash, Eq, PartialEq, Deserialize, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub enum ProtocolId {
-    ConsensusRpc = 0,
-    ConsensusDirectSend = 1,
+    ConsensusRpcBcs = 0,
+    ConsensusDirectSendBcs = 1,
     MempoolDirectSend = 2,
     StateSyncDirectSend = 3,
     // UNUSED
@@ -55,8 +55,8 @@ impl ProtocolId {
     pub fn as_str(self) -> &'static str {
         use ProtocolId::*;
         match self {
-            ConsensusRpc => "ConsensusRpc",
-            ConsensusDirectSend => "ConsensusDirectSend",
+            ConsensusRpcBcs => "ConsensusRpcBcs",
+            ConsensusDirectSendBcs => "ConsensusDirectSendBcs",
             MempoolDirectSend => "MempoolDirectSend",
             StateSyncDirectSend => "StateSyncDirectSend",
             DiscoveryDirectSend => "DiscoveryDirectSend",
@@ -68,8 +68,8 @@ impl ProtocolId {
 
     pub fn all() -> &'static [ProtocolId] {
         &[
-            ProtocolId::ConsensusRpc,
-            ProtocolId::ConsensusDirectSend,
+            ProtocolId::ConsensusRpcBcs,
+            ProtocolId::ConsensusDirectSendBcs,
             ProtocolId::MempoolDirectSend,
             ProtocolId::StateSyncDirectSend,
             ProtocolId::DiscoveryDirectSend,
