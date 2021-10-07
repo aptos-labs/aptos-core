@@ -25,6 +25,16 @@ module A::M {
 
 
 
+// The private key can be omitted if an entry with the same name is already present in the private
+// key mapping set by the init command.
+//
+//# publish
+module A::N {
+    public(script) fun bar() {}
+}
+
+
+
 // In order to get authenticated and run a transaction script successfully, you *must* provide
 // the correct private key that corresponds to the address and auth key prefix used to create
 // the account, as an additional argument to the run command.
@@ -35,6 +45,14 @@ module A::M {
 //
 //# run --signers A
 //#     --private-key A
+//#     -- 0x4777eb94491650dd3f095ce6f778acb6::M::foo
+
+
+
+// Again, the private key can be omitted if an entry with the same name is already present in the
+// private key mapping set by the init command.
+//
+//# run --signers A
 //#     -- 0x4777eb94491650dd3f095ce6f778acb6::M::foo
 
 

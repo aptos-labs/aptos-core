@@ -4,8 +4,8 @@
 #![forbid(unsafe_code)]
 
 use crate::tasks::{
-    taskify, InitCommand, PublishCommand, RunCommand, SyntaxChoice, TaskCommand, TaskInput,
-    ViewCommand,
+    taskify, InitCommand, PublishCommand, RawAddress, RunCommand, SyntaxChoice, TaskCommand,
+    TaskInput, ViewCommand,
 };
 use anyhow::*;
 use move_binary_format::file_format::{CompiledModule, CompiledScript};
@@ -16,7 +16,7 @@ use move_command_line_common::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    identifier::IdentStr,
+    identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, TypeTag},
     transaction_argument::TransactionArgument,
 };
@@ -48,25 +48,19 @@ pub struct CompiledState<'a> {
     modules: BTreeMap<ModuleId, ProcessedModule>,
 }
 
-fn parse_account_address(s: &str) -> Result<AccountAddress> {
-    let (number, _number_format) = move_lang::shared::parse_u128(s)
-        .map_err(|e| anyhow!("Failed to parse address. Got error: {}", e))?;
-
-    Ok(AccountAddress::new(number.to_be_bytes()))
-}
-
 impl<'a> CompiledState<'a> {
-    pub fn resolve_address(&self, s: &str) -> AccountAddress {
+    pub fn resolve_named_address(&self, s: &str) -> AccountAddress {
         if let Some(addr) = self.named_address_mapping.get(&Symbol::from(s)) {
             return AccountAddress::new(addr.into_bytes());
         }
-        if let Ok(addr) = parse_account_address(s) {
-            return addr;
+        panic!("Failed to resolve named address '{}'", s)
+    }
+
+    pub fn resolve_address(&self, addr: &RawAddress) -> AccountAddress {
+        match addr {
+            RawAddress::Named(named_addr) => self.resolve_named_address(named_addr.as_str()),
+            RawAddress::Literal(addr) => *addr,
         }
-        panic!(
-            "Invalid address! Must be a valid hex string or known name, but found '{}'",
-            s
-        )
     }
 }
 
@@ -86,6 +80,7 @@ pub trait MoveTestAdapter<'a> {
     fn publish_module(
         &mut self,
         module: CompiledModule,
+        named_addr_opt: Option<Identifier>,
         gas_budget: Option<u64>,
         extra: Self::ExtraPublishArgs,
     ) -> Result<()>;
@@ -93,7 +88,7 @@ pub trait MoveTestAdapter<'a> {
         &mut self,
         script: CompiledScript,
         type_args: Vec<TypeTag>,
-        signers: Vec<AccountAddress>,
+        signers: Vec<RawAddress>,
         args: Vec<TransactionArgument>,
         gas_budget: Option<u64>,
         extra: Self::ExtraRunArgs,
@@ -103,7 +98,7 @@ pub trait MoveTestAdapter<'a> {
         module: &ModuleId,
         function: &IdentStr,
         type_args: Vec<TypeTag>,
-        signers: Vec<AccountAddress>,
+        signers: Vec<RawAddress>,
         args: Vec<TransactionArgument>,
         gas_budget: Option<u64>,
         extra: Self::ExtraRunArgs,
@@ -181,7 +176,12 @@ pub trait MoveTestAdapter<'a> {
                     }
                 };
                 state.add(named_addr_opt, module.clone());
-                self.publish_module(module, gas_budget, extra_args)?;
+                self.publish_module(
+                    module,
+                    named_addr_opt.map(|s| Identifier::new(s.as_str()).unwrap()),
+                    gas_budget,
+                    extra_args,
+                )?;
                 Ok(warnings_opt)
             }
             TaskCommand::Run(
@@ -223,10 +223,6 @@ pub trait MoveTestAdapter<'a> {
                     }
                     SyntaxChoice::IR => (compile_ir_script(state.dep_modules(), data_path)?, None),
                 };
-                let signers: Vec<_> = signers
-                    .into_iter()
-                    .map(|addr| self.compiled_state().resolve_address(&addr))
-                    .collect();
                 self.execute_script(script, type_args, signers, args, gas_budget, extra_args)?;
                 Ok(warning_opt)
             }
@@ -245,10 +241,6 @@ pub trait MoveTestAdapter<'a> {
                     syntax.is_none(),
                     "syntax flag meaningless with function execution"
                 );
-                let signers: Vec<_> = signers
-                    .into_iter()
-                    .map(|addr| self.compiled_state().resolve_address(&addr))
-                    .collect();
                 self.call_function(
                     &module,
                     name.as_ident_str(),

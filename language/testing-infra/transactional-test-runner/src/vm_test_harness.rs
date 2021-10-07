@@ -5,7 +5,7 @@ use std::{collections::BTreeMap, path::Path};
 
 use crate::{
     framework::{run_test_impl, CompiledState, MoveTestAdapter},
-    tasks::{EmptyCommand, InitCommand, SyntaxChoice, TaskInput},
+    tasks::{EmptyCommand, InitCommand, RawAddress, SyntaxChoice, TaskInput},
 };
 use anyhow::*;
 use move_binary_format::{
@@ -16,7 +16,7 @@ use move_binary_format::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    identifier::IdentStr,
+    identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
     resolver::MoveResolver,
     transaction_argument::{convert_txn_args, TransactionArgument},
@@ -141,6 +141,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
     fn publish_module(
         &mut self,
         module: CompiledModule,
+        _named_addr_opt: Option<Identifier>,
         gas_budget: Option<u64>,
         _extra_args: Self::ExtraPublishArgs,
     ) -> Result<()> {
@@ -165,11 +166,16 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         &mut self,
         script: CompiledScript,
         type_args: Vec<TypeTag>,
-        signers: Vec<AccountAddress>,
+        signers: Vec<RawAddress>,
         txn_args: Vec<TransactionArgument>,
         gas_budget: Option<u64>,
         _extra_args: Self::ExtraRunArgs,
     ) -> Result<()> {
+        let signers: Vec<_> = signers
+            .into_iter()
+            .map(|addr| self.compiled_state().resolve_address(&addr))
+            .collect();
+
         let mut script_bytes = vec![];
         script.serialize(&mut script_bytes)?;
         let args = convert_txn_args(&txn_args);
@@ -189,11 +195,16 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         module: &ModuleId,
         function: &IdentStr,
         type_args: Vec<TypeTag>,
-        signers: Vec<AccountAddress>,
+        signers: Vec<RawAddress>,
         txn_args: Vec<TransactionArgument>,
         gas_budget: Option<u64>,
         _extra_args: Self::ExtraRunArgs,
     ) -> Result<()> {
+        let signers: Vec<_> = signers
+            .into_iter()
+            .map(|addr| self.compiled_state().resolve_address(&addr))
+            .collect();
+
         let args = convert_txn_args(&txn_args);
         self.perform_session_action(gas_budget, |session, gas_status| {
             session.execute_script_function(module, function, type_args, args, signers, gas_status)

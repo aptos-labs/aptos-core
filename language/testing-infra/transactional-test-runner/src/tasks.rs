@@ -6,6 +6,7 @@
 use anyhow::*;
 use move_command_line_common::files::{MOVE_EXTENSION, MOVE_IR_EXTENSION};
 use move_core_types::{
+    account_address::AccountAddress,
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
     parser,
@@ -15,6 +16,30 @@ use move_lang::shared::NumericalAddress;
 use std::{fmt::Debug, path::Path, str::FromStr};
 use structopt::*;
 use tempfile::NamedTempFile;
+
+#[derive(Debug)]
+pub enum RawAddress {
+    Named(Identifier),
+    Literal(AccountAddress),
+}
+
+fn parse_address_literal(s: &str) -> Result<AccountAddress> {
+    let (number, _number_format) = move_lang::shared::parse_u128(s)
+        .map_err(|e| anyhow!("Failed to parse address. Got error: {}", e))?;
+
+    Ok(AccountAddress::new(number.to_be_bytes()))
+}
+
+impl RawAddress {
+    pub fn parse(s: &str) -> Result<Self> {
+        if let Ok(addr) = parse_address_literal(s) {
+            return Ok(Self::Literal(addr));
+        }
+        let name =
+            Identifier::new(s).map_err(|_| anyhow!("Failed to parse \"{}\" as address.", s))?;
+        Ok(Self::Named(name))
+    }
+}
 
 #[derive(Debug)]
 pub struct TaskInput<Command> {
@@ -212,8 +237,8 @@ pub struct PublishCommand {
 
 #[derive(Debug, StructOpt)]
 pub struct RunCommand {
-    #[structopt(long = "signers")]
-    pub signers: Vec<String>,
+    #[structopt(long = "signers", parse(try_from_str = RawAddress::parse))]
+    pub signers: Vec<RawAddress>,
     #[structopt(long = "args", parse(try_from_str = parser::parse_transaction_argument))]
     pub args: Vec<TransactionArgument>,
     #[structopt(long = "type-args", parse(try_from_str = parser::parse_type_tag))]
@@ -228,8 +253,8 @@ pub struct RunCommand {
 
 #[derive(Debug, StructOpt)]
 pub struct ViewCommand {
-    #[structopt(long = "address")]
-    pub address: String,
+    #[structopt(long = "address", parse(try_from_str = RawAddress::parse))]
+    pub address: RawAddress,
     #[structopt(long = "resource", parse(try_from_str = parse_qualified_module_access_with_type_args))]
     pub resource: (ModuleId, Identifier, Vec<TypeTag>),
 }
