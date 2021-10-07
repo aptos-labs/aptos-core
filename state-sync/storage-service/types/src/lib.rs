@@ -143,8 +143,13 @@ pub struct CompleteDataRange<T> {
     pub highest: T,
 }
 
-impl<T> CompleteDataRange<T> {
+impl<T: Ord> CompleteDataRange<T> {
     pub fn new(lowest: T, highest: T) -> Self {
         Self { lowest, highest }
+    }
+
+    /// Returns true iff the given data item is within this range
+    pub fn contains(&self, data_item: T) -> bool {
+        data_item >= self.lowest && data_item <= self.highest
     }
 }

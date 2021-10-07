@@ -115,12 +115,14 @@ pub trait DiemDataClient {
 /// response payload is bad (e.g., it contains invalid or malformed data, or
 /// the proof failed verification). This can be done using the
 /// `notify_bad_response()` API call above.
+#[derive(Clone, Debug)]
 pub struct DataClientResponse {
     pub response_id: u64,
     pub response_payload: DataClientPayload,
 }
 
 /// The payload returned in a Data Client response.
+#[derive(Clone, Debug)]
 pub enum DataClientPayload {
     AccountStatesWithProof(AccountStatesChunkWithProof),
     EpochEndingLedgerInfos(Vec<LedgerInfoWithSignatures>),
@@ -131,13 +133,37 @@ pub enum DataClientPayload {
 }
 
 /// A snapshot of the global state of data available in the Diem network.
+#[derive(Clone, Debug)]
 pub struct GlobalDataSummary {
     pub advertised_data: AdvertisedData,
     pub optimal_chunk_sizes: OptimalChunkSizes,
 }
 
+impl GlobalDataSummary {
+    /// Returns an empty global data summary. This can be used on startup
+    /// before the global state is known, or for testing.
+    pub fn empty() -> Self {
+        GlobalDataSummary {
+            advertised_data: AdvertisedData {
+                account_states: vec![],
+                epoch_ending_ledger_infos: vec![],
+                synced_ledger_infos: vec![],
+                transactions: vec![],
+                transaction_outputs: vec![],
+            },
+            optimal_chunk_sizes: OptimalChunkSizes {
+                account_states_chunk_size: 0,
+                epoch_chunk_size: 0,
+                transaction_chunk_size: 0,
+                transaction_output_chunk_size: 0,
+            },
+        }
+    }
+}
+
 /// Holds the optimal chunk sizes that clients should use when
 /// requesting data. This makes the request *more likely* to succeed.
+#[derive(Clone, Debug)]
 pub struct OptimalChunkSizes {
     pub account_states_chunk_size: u64,
     pub epoch_chunk_size: u64,
@@ -146,6 +172,7 @@ pub struct OptimalChunkSizes {
 }
 
 /// A summary of all data that is currently advertised in the network.
+#[derive(Clone, Debug)]
 pub struct AdvertisedData {
     /// The ranges of account states advertised, e.g., if a range is
     /// (X,Y), it means all account states are held for every version X->Y
