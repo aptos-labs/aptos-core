@@ -878,13 +878,13 @@ impl RoundManager {
         }
 
         let response = Box::new(BlockRetrievalResponse::new(status, blocks));
-        bcs::to_bytes(&ConsensusMsg::BlockRetrievalResponse(response))
-            .and_then(|bytes| {
-                request
-                    .response_sender
-                    .send(Ok(bytes.into()))
-                    .map_err(|e| bcs::Error::Custom(format!("{:?}", e)))
-            })
+        let response_bytes = request
+            .protocol
+            .to_bytes(&ConsensusMsg::BlockRetrievalResponse(response))?;
+        request
+            .response_sender
+            .send(Ok(response_bytes.into()))
+            .map_err(|e| anyhow::anyhow!("{:?}", e))
             .context("[RoundManager] Failed to process block retrieval")
     }
 

@@ -577,6 +577,7 @@ fn response_on_block_retrieval() {
         let (tx1, rx1) = oneshot::channel();
         let single_block_request = IncomingBlockRetrievalRequest {
             req: BlockRetrievalRequest::new(block_id, 1),
+            protocol: ProtocolId::ConsensusRpc,
             response_sender: tx1,
         };
         node.round_manager
@@ -599,6 +600,7 @@ fn response_on_block_retrieval() {
         let (tx2, rx2) = oneshot::channel();
         let missing_block_request = IncomingBlockRetrievalRequest {
             req: BlockRetrievalRequest::new(HashValue::random(), 1),
+            protocol: ProtocolId::ConsensusRpc,
             response_sender: tx2,
         };
 
@@ -622,6 +624,7 @@ fn response_on_block_retrieval() {
         let (tx3, rx3) = oneshot::channel();
         let many_block_request = IncomingBlockRetrievalRequest {
             req: BlockRetrievalRequest::new(block_id, 3),
+            protocol: ProtocolId::ConsensusRpc,
             response_sender: tx3,
         };
         node.round_manager

@@ -23,9 +23,12 @@ use diem_types::{
     ledger_info::LedgerInfoWithSignatures, validator_verifier::ValidatorVerifier,
 };
 use futures::{channel::oneshot, stream::select, SinkExt, Stream, StreamExt};
-use network::protocols::{
-    network::{ApplicationNetworkSender, Event},
-    rpc::error::RpcError,
+use network::{
+    protocols::{
+        network::{ApplicationNetworkSender, Event},
+        rpc::error::RpcError,
+    },
+    ProtocolId,
 };
 use std::{
     mem::{discriminant, Discriminant},
@@ -37,6 +40,7 @@ use std::{
 #[derive(Debug)]
 pub struct IncomingBlockRetrievalRequest {
     pub req: BlockRetrievalRequest,
+    pub protocol: ProtocolId,
     pub response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
 }
 
@@ -246,7 +250,7 @@ impl NetworkTask {
                         );
                     }
                 }
-                Event::RpcRequest(peer_id, msg, callback) => match msg {
+                Event::RpcRequest(peer_id, msg, protocol, callback) => match msg {
                     ConsensusMsg::BlockRetrievalRequest(request) => {
                         debug!(
                             remote_peer = peer_id,
@@ -264,6 +268,7 @@ impl NetworkTask {
                         }
                         let req_with_callback = IncomingBlockRetrievalRequest {
                             req: *request,
+                            protocol,
                             response_sender: callback,
                         };
                         if let Err(e) = self.block_retrieval_tx.push(peer_id, req_with_callback) {

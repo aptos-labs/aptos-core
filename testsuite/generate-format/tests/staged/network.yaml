@@ -142,6 +142,8 @@ ProtocolId:
       HealthCheckerRpc: UNIT
     6:
       ConsensusDirectSendJSON: UNIT
+    7:
+      ConsensusRpcJson: UNIT
 ProtocolIdSet:
   NEWTYPESTRUCT: BYTES
 PublicKey:

@@ -256,9 +256,9 @@ impl HealthChecker {
                                 &metadata.remote_peer_id
                             );
                         }
-                        Event::RpcRequest(peer_id, msg, res_tx) => {
+                        Event::RpcRequest(peer_id, msg, protocol, res_tx) => {
                             match msg {
-                                HealthCheckerMsg::Ping(ping) => self.handle_ping_request(peer_id, ping, res_tx),
+                                HealthCheckerMsg::Ping(ping) => self.handle_ping_request(peer_id, ping, protocol, res_tx),
                                 _ => {
                                     warn!(
                                         SecurityEvent::InvalidHealthCheckerMsg,
@@ -337,9 +337,10 @@ impl HealthChecker {
         &mut self,
         peer_id: PeerId,
         ping: Ping,
+        protocol: ProtocolId,
         res_tx: oneshot::Sender<Result<Bytes, RpcError>>,
     ) {
-        let message = match bcs::to_bytes(&HealthCheckerMsg::Pong(Pong(ping.0))) {
+        let message = match protocol.to_bytes(&HealthCheckerMsg::Pong(Pong(ping.0))) {
             Ok(msg) => msg,
             Err(e) => {
                 warn!(

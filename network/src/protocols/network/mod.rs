@@ -50,7 +50,12 @@ pub enum Event<TMessage> {
     /// New inbound rpc request. The request is fulfilled by sending the
     /// serialized response `Bytes` over the `oneshot::Sender`, where the network
     /// layer will handle sending the response over-the-wire.
-    RpcRequest(PeerId, TMessage, oneshot::Sender<Result<Bytes, RpcError>>),
+    RpcRequest(
+        PeerId,
+        TMessage,
+        ProtocolId,
+        oneshot::Sender<Result<Bytes, RpcError>>,
+    ),
     /// Peer which we have a newly established connection with.
     NewPeer(ConnectionMetadata),
     /// Peer with which we've lost our connection.
@@ -64,7 +69,9 @@ impl<TMessage: PartialEq> PartialEq for Event<TMessage> {
         match (self, other) {
             (Message(pid1, msg1), Message(pid2, msg2)) => pid1 == pid2 && msg1 == msg2,
             // ignore oneshot::Sender in comparison
-            (RpcRequest(pid1, msg1, _), RpcRequest(pid2, msg2, _)) => pid1 == pid2 && msg1 == msg2,
+            (RpcRequest(pid1, msg1, proto1, _), RpcRequest(pid2, msg2, proto2, _)) => {
+                pid1 == pid2 && msg1 == msg2 && proto1 == proto2
+            }
             (NewPeer(metadata1), NewPeer(metadata2)) => metadata1 == metadata2,
             (LostPeer(metadata1), LostPeer(metadata2)) => metadata1 == metadata2,
             _ => false,
@@ -192,7 +199,12 @@ fn peer_mgr_notif_to_event<TMessage: Message>(
     let maybe_event = match notif {
         PeerManagerNotification::RecvRpc(peer_id, rpc_req) => {
             match rpc_req.protocol_id.from_bytes(&rpc_req.data) {
-                Ok(req_msg) => Some(Event::RpcRequest(peer_id, req_msg, rpc_req.res_tx)),
+                Ok(req_msg) => Some(Event::RpcRequest(
+                    peer_id,
+                    req_msg,
+                    rpc_req.protocol_id,
+                    rpc_req.res_tx,
+                )),
                 Err(err) => {
                     let data = &rpc_req.data;
                     warn!(

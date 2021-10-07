@@ -280,7 +280,7 @@ async fn handle_event<V>(
                 }
             }
         }
-        Event::RpcRequest(peer_id, _msg, _res_tx) => {
+        Event::RpcRequest(peer_id, _msg, _, _res_tx) => {
             counters::unexpected_msg_count_inc(&network_id, &peer_id);
             sample!(
                 SampleRate::Duration(Duration::from_secs(60)),
