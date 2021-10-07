@@ -17,13 +17,17 @@ function highlight(content: string) {
 
 // TODO: Replace all hardcoding with calculated or env retrieved values.
 export const projectPath = Deno.env.get("PROJECT_PATH") || "unknown";
-export const nodeUrl = 'http://127.0.0.1:8081'
-export const senderAddress = "0x24163afcc6e33b0a9473852e18327fa9"; //fix this
-export const privateKeyPath = "/Users/droc/workspace/diem/shuffle/cli/new_account.key"; //fix this
+export const nodeUrl = 'http://127.0.0.1:8081';
+export const senderAddressPath = Deno.env.get("HOME") + "/.shuffle/accounts/latest/address";
+export const senderAddress = await Deno.readTextFile(senderAddressPath);
+export const fullSenderAddress = await "0x" + senderAddress;
+export const privateKeyPath = Deno.env.get("HOME") + "/.shuffle/accounts/latest/dev.key";
+
+//make export async function await getAddress() -> reads file senderAddressPath
 
 console.log(`Loading Project ${highlight(projectPath)}`);
 console.log(`Connected to Node ${highlight(nodeUrl)}`);
-console.log(`Sender Account Address ${highlight(senderAddress)}`);
+console.log(`Sender Account Address ${highlight(fullSenderAddress)}`);
 console.log(`"Shuffle", "TxnBuilder", "Helper" top level objects available`);
 console.log(await ledgerInfo());
 console.log();
@@ -41,14 +45,14 @@ export async function transactions() {
 export async function accountTransactions() {
   const remote = createRemote("http://127.0.0.1:8080/v1");
   return await remote.call(
-    "get_account_transactions",
-    ["24163afcc6e33b0a9473852e18327fa9", 0, 10, true] // fix this
+      "get_account_transactions",
+      [senderAddress, 0, 10, true]
   );
 }
 
 export async function resources(addr: string | undefined) {
   if(addr === undefined) {
-    addr = senderAddress;
+    addr = fullSenderAddress;
   }
   const res = await fetch(relativeUrl(`/accounts/${addr}/resources`));
   return await res.json();
@@ -56,7 +60,7 @@ export async function resources(addr: string | undefined) {
 
 export async function modules(addr: string | undefined) {
   if(addr === undefined) {
-    addr = senderAddress;
+    addr = fullSenderAddress;
   }
   const res = await fetch(relativeUrl(`/accounts/${addr}/modules`));
   return await res.json();
@@ -75,11 +79,11 @@ export async function modules(addr: string | undefined) {
 //   "value": {
 //     "sequence_number": "2",
 export async function account() {
-  const res = await resources(senderAddress);
+  const res = await resources(fullSenderAddress);
   return res.
-    find(
+  find(
       (entry: any) => entry["type"]["name"] == "DiemAccount"
-    );
+  );
 }
 
 export async function sequenceNumber() {

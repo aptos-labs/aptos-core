@@ -12,7 +12,6 @@ edition = "2018"
 [dependencies]
 anyhow = "1.0.38"
 bcs = "0.1.2"
-chrono = "0.4"
 directories = "4.0.1"
 hex = "0.4.3"
 include_dir = { version = "0.6.0", features = ["glob"] }
@@ -31,6 +30,7 @@ diem-crypto = { path = "../../crypto/crypto" }
 diem-framework = { path = "../../language/diem-framework" }
 diem-framework-releases = { path = "../../language/diem-framework/DPN/releases" }
 diem-genesis-tool = { path = "../../config/management/genesis" }
+diem-infallible = { path = "../../common/infallible" }
 diem-json-rpc-types = { path = "../../json-rpc/types" }
 diem-node = { path = "../../diem-node" }
 diem-sdk = { path = "../../sdk" }
@@ -48,6 +48,7 @@ move-prover = { path = "../../language/move-prover" }
 shuffle-custom-node = { path = "../genesis" }
 shuffle-transaction-builder = { path = "../transaction-builder" }
 transaction-builder-generator = { path = "../../language/transaction-builder/generator" }
+
 
 [[bin]]
 name = "shuffle"

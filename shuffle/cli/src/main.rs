@@ -47,7 +47,7 @@ pub enum Subcommand {
         project_path: PathBuf,
         account_key_path: PathBuf,
     },
-    #[structopt(about = "Creates new account")]
+    #[structopt(about = "Creates new account with randomly generated private/public key")]
     Account {
         #[structopt(subcommand)]
         cmd: account::AccountCommand,
