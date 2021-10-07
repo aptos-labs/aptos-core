@@ -6,13 +6,17 @@ use bytes::Bytes;
 use serde::Serialize;
 use std::fmt::Debug;
 
-// TODO(philiphayes): just use wire::DirectSendMsg directly
-
 #[derive(Clone, Eq, PartialEq, Serialize)]
 pub struct Message {
-    /// Message type.
+    /// The [`ProtocolId`] for which of our upstream application modules should
+    /// handle (i.e., deserialize and then respond to) this inbound rpc request.
+    ///
+    /// For example, if `protocol_id == ProtocolId::ConsensusRpc`, then this
+    /// inbound rpc request will be dispatched to consensus for handling.
     pub protocol_id: ProtocolId,
-    /// Serialized message data.
+    /// The serialized request data received from the sender. At this layer in
+    /// the stack, the request data is just an opaque blob and will only be fully
+    /// deserialized later in the handling application module.
     #[serde(skip)]
     pub mdata: Bytes,
 }
