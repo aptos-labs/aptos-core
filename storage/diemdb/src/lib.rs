@@ -78,9 +78,11 @@ use diem_types::{
     state_proof::StateProof,
     transaction::{
         default_protocol::{
-            AccountTransactionsWithProof, TransactionListWithProof, TransactionWithProof,
+            AccountTransactionsWithProof, TransactionListWithProof, TransactionOutputListWithProof,
+            TransactionWithProof,
         },
-        TransactionInfo, TransactionInfoTrait, TransactionToCommit, Version, PRE_GENESIS_VERSION,
+        TransactionInfo, TransactionInfoTrait, TransactionOutput, TransactionToCommit, Version,
+        PRE_GENESIS_VERSION,
     },
 };
 use itertools::{izip, zip_eq};
@@ -776,6 +778,57 @@ impl DbReader<DpnProto> for DiemDB {
             Ok(TransactionListWithProof::new(
                 txns,
                 events,
+                Some(start_version),
+                proof,
+            ))
+        })
+    }
+
+    /// Gets a batch of transactions for the purpose of synchronizing state to another node.
+    ///
+    /// This is used by the State Synchronizer module internally.
+    fn get_transaction_outputs(
+        &self,
+        start_version: Version,
+        limit: u64,
+        ledger_version: Version,
+    ) -> Result<TransactionOutputListWithProof> {
+        gauged_api("get_transactions_outputs", || {
+            error_if_too_many_requested(limit, MAX_LIMIT)?;
+
+            if start_version > ledger_version || limit == 0 {
+                return Ok(TransactionOutputListWithProof::new_empty());
+            }
+
+            let limit = std::cmp::min(limit, ledger_version - start_version + 1);
+
+            let (txn_infos, txn_outputs) = (start_version..start_version + limit)
+                .map(|version| {
+                    let txn_info = self.ledger_store.get_transaction_info(version)?;
+                    let events = self.event_store.get_events_by_version(version)?;
+                    let write_set = self.transaction_store.get_write_set(version)?;
+                    let txn_output = TransactionOutput::new(
+                        write_set,
+                        events,
+                        txn_info.gas_used(),
+                        txn_info.status().clone().into(),
+                    );
+                    Ok((txn_info, txn_output))
+                })
+                .collect::<Result<Vec<_>>>()?
+                .into_iter()
+                .unzip();
+            let proof = TransactionInfoListWithProof::new(
+                self.ledger_store.get_transaction_range_proof(
+                    Some(start_version),
+                    limit,
+                    ledger_version,
+                )?,
+                txn_infos,
+            );
+
+            Ok(TransactionOutputListWithProof::new(
+                txn_outputs,
                 Some(start_version),
                 proof,
             ))

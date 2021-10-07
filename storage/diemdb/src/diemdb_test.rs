@@ -530,6 +530,14 @@ fn verify_committed_transactions(
             .unwrap();
         assert_eq!(txn_list_with_proof.transactions.len(), 1);
 
+        let txn_output_list_with_proof = db
+            .get_transaction_outputs(cur_ver, 1, ledger_version)
+            .unwrap();
+        txn_output_list_with_proof
+            .verify(ledger_info, Some(cur_ver))
+            .unwrap();
+        assert_eq!(txn_output_list_with_proof.transaction_outputs.len(), 1);
+
         // Fetch and verify account states.
         for (addr, expected_blob) in txn_to_commit.account_states() {
             let account_state_with_proof = db
@@ -609,6 +617,7 @@ fn test_too_many_requested() {
     let db = DiemDB::new_for_test(&tmp_dir);
 
     assert!(db.get_transactions(0, 1001 /* limit */, 0, true).is_err());
+    assert!(db.get_transaction_outputs(0, 1001 /* limit */, 0).is_err());
 }
 
 #[test]

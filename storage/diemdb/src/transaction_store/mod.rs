@@ -161,7 +161,6 @@ impl TransactionStore {
         Ok(())
     }
 
-    #[cfg(test)]
     /// Get executed transaction vm output given `version`
     pub fn get_write_set(&self, version: Version) -> Result<WriteSet> {
         self.db

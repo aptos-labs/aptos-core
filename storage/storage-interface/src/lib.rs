@@ -22,7 +22,7 @@ use diem_types::{
     state_proof::StateProof,
     transaction::{
         AccountTransactionsWithProof, TransactionInfo, TransactionListWithProof,
-        TransactionToCommit, TransactionWithProof, Version,
+        TransactionOutputListWithProof, TransactionToCommit, TransactionWithProof, Version,
     },
 };
 use itertools::Itertools;
@@ -200,6 +200,16 @@ pub trait DbReader<PS: ProtocolSpec>: Send + Sync {
         ledger_version: Version,
         fetch_events: bool,
     ) -> Result<Option<TransactionWithProof<PS::TransactionInfo>>>;
+
+    /// See [`DiemDB::get_transaction_outputs`].
+    ///
+    /// [`DiemDB::get_transaction_outputs`]: ../diemdb/struct.DiemDB.html#method.get_transaction_outputs
+    fn get_transaction_outputs(
+        &self,
+        start_version: Version,
+        limit: u64,
+        ledger_version: Version,
+    ) -> Result<TransactionOutputListWithProof<PS::TransactionInfo>>;
 
     /// Returns events by given event key
     fn get_events(

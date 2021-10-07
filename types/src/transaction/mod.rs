@@ -758,6 +758,12 @@ impl From<VMStatus> for TransactionStatus {
     }
 }
 
+impl From<KeptVMStatus> for TransactionStatus {
+    fn from(kept_vm_status: KeptVMStatus) -> Self {
+        TransactionStatus::Keep(kept_vm_status)
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum GovernanceRole {
     DiemRoot,

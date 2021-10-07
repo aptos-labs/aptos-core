@@ -23,7 +23,8 @@ use diem_types::{
     state_proof::StateProof,
     transaction::{
         default_protocol::{
-            AccountTransactionsWithProof, TransactionListWithProof, TransactionWithProof,
+            AccountTransactionsWithProof, TransactionListWithProof, TransactionOutputListWithProof,
+            TransactionWithProof,
         },
         TransactionToCommit, Version,
     },
@@ -167,6 +168,15 @@ impl DbReader<DpnProto> for StorageClient {
         _ledger_version: Version,
         _fetch_events: bool,
     ) -> Result<Option<TransactionWithProof>> {
+        unimplemented!()
+    }
+
+    fn get_transaction_outputs(
+        &self,
+        _start_version: Version,
+        _limit: u64,
+        _ledger_version: Version,
+    ) -> Result<TransactionOutputListWithProof> {
         unimplemented!()
     }
 
