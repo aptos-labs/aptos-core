@@ -58,6 +58,7 @@ pub(crate) async fn coordinator<V>(
         LogEntry::CoordinatorRuntime,
         LogEvent::Start
     ));
+    // Combine `NetworkEvents` for each `NetworkId` into one stream
     let smp_events: Vec<_> = network_events
         .into_iter()
         .map(|(network_id, events)| events.map(move |e| (network_id, e)))
@@ -100,6 +101,7 @@ pub(crate) async fn coordinator<V>(
     ));
 }
 
+/// Spawn a task for processing incoming transactions and putting them in local mempool
 async fn handle_incoming_transactions<V>(
     smp: &mut SharedMempool<V>,
     bounded_executor: &BoundedExecutor,
@@ -125,6 +127,8 @@ async fn handle_incoming_transactions<V>(
         .await;
 }
 
+/// Handle removing committed transactions from local mempool immediately.  This should be done
+/// immediately to ensure broadcasts of committed transactions stop as soon as possible.
 fn handle_commit_notification<V>(
     smp: &mut SharedMempool<V>,
     msg: MempoolCommitNotification,
@@ -167,6 +171,7 @@ fn handle_commit_notification<V>(
     counters::mempool_service_latency(counters::COMMIT_STATE_SYNC_LABEL, counter_result, latency);
 }
 
+/// Spawn a task to restart the transaction validator with the new reconfig data.
 async fn handle_mempool_reconfig_event<V>(
     smp: &mut SharedMempool<V>,
     bounded_executor: &BoundedExecutor,
@@ -189,6 +194,11 @@ async fn handle_mempool_reconfig_event<V>(
         .await;
 }
 
+/// Handles all NewPeer, LostPeer, and network messages.
+/// - NewPeer events start new automatic broadcasts if the peer is upstream. If the peer is not upstream, we ignore it.
+/// - LostPeer events disable the upstream peer, which will cancel ongoing broadcasts.
+/// - Network messages follow a simple Request/Response framework to accept new transactions
+/// TODO: Move to RPC off of DirectSend
 async fn handle_network_event<V>(
     executor: &Handle,
     bounded_executor: &BoundedExecutor,
