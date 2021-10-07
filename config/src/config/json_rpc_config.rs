@@ -22,7 +22,7 @@ pub const DEFAULT_JSON_RPC_ADDRESS: &str = "127.0.0.1";
 pub const DEFAULT_JSON_RPC_PORT: u16 = 8080;
 pub const DEFAULT_BATCH_SIZE_LIMIT: u16 = 20;
 pub const DEFAULT_PAGE_SIZE_LIMIT: u16 = 1000;
-pub const DEFAULT_CONTENT_LENGTH_LIMIT: usize = 32 * 1024; // 32kb
+pub const DEFAULT_CONTENT_LENGTH_LIMIT: usize = 128 * 1024; // 128kb
 
 impl Default for JsonRpcConfig {
     fn default() -> JsonRpcConfig {
