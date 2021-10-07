@@ -57,6 +57,7 @@ pub use self::error::PeerManagerError;
 use crate::{
     application::storage::PeerMetadataStorage,
     peer_manager::transport::{TransportHandler, TransportRequest},
+    protocols::network::SerializedRequest,
 };
 use diem_config::config::{PeerRole, PeerSet};
 use diem_infallible::RwLock;
@@ -501,6 +502,7 @@ where
         }
     }
 
+    /// Sends an outbound request for `RPC` or `DirectSend` to the peer
     async fn handle_outbound_request(&mut self, request: PeerManagerRequest) {
         trace!(
             NetworkSchema::new(&self.network_context),
@@ -510,54 +512,33 @@ where
             request
         );
         self.sample_connected_peers();
-        match request {
+        let (peer_id, protocol_id, peer_request) = match request {
             PeerManagerRequest::SendDirectSend(peer_id, msg) => {
-                let protocol_id = msg.protocol_id;
-                if let Some((conn_metadata, sender)) = self.active_peers.get_mut(&peer_id) {
-                    if let Err(err) = sender.push(msg.protocol_id, PeerRequest::SendDirectSend(msg))
-                    {
-                        info!(
-                            NetworkSchema::new(&self.network_context).connection_metadata(conn_metadata),
-                            protocol_id = %protocol_id,
-                            error = ?err,
-                            "{} Failed to forward outbound message to downstream actor. Error: {:?}",
-                            self.network_context, err
-                        );
-                    }
-                } else {
-                    warn!(
-                        NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
-                        protocol_id = %protocol_id,
-                        "{} Can't send message to peer.  Peer {} is currently not connected",
-                        self.network_context,
-                        peer_id.short_str()
-                    );
-                }
+                (peer_id, msg.protocol_id(), PeerRequest::SendDirectSend(msg))
             }
             PeerManagerRequest::SendRpc(peer_id, req) => {
-                let protocol_id = req.protocol_id;
-                if let Some((conn_metadata, sender)) = self.active_peers.get_mut(&peer_id) {
-                    if let Err(err) = sender.push(req.protocol_id, PeerRequest::SendRpc(req)) {
-                        info!(
-                            NetworkSchema::new(&self.network_context)
-                                .connection_metadata(conn_metadata),
-                            protocol_id = %protocol_id,
-                            error = ?err,
-                            "{} Failed to forward outbound rpc to downstream actor. Error: {:?}",
-                            self.network_context,
-                            err
-                        );
-                    }
-                } else {
-                    warn!(
-                        NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
-                        protocol_id = %protocol_id,
-                        "{} Can't send RPC message to peer.  Peer {} is currently not connected",
-                        self.network_context,
-                        peer_id.short_str()
-                    );
-                }
+                (peer_id, req.protocol_id(), PeerRequest::SendRpc(req))
             }
+        };
+
+        if let Some((conn_metadata, sender)) = self.active_peers.get_mut(&peer_id) {
+            if let Err(err) = sender.push(protocol_id, peer_request) {
+                info!(
+                    NetworkSchema::new(&self.network_context).connection_metadata(conn_metadata),
+                    protocol_id = %protocol_id,
+                    error = ?err,
+                    "{} Failed to forward outbound message to downstream actor. Error: {:?}",
+                    self.network_context, err
+                );
+            }
+        } else {
+            warn!(
+                NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
+                protocol_id = %protocol_id,
+                "{} Can't send message to peer.  Peer {} is currently not connected",
+                self.network_context,
+                peer_id.short_str()
+            );
         }
     }
 
@@ -752,7 +733,7 @@ where
         self.executor.spawn(network_events.for_each_concurrent(
             self.max_concurrent_network_reqs,
             move |inbound_event| {
-                Self::handle_inbound_event(
+                handle_inbound_request(
                     network_context,
                     inbound_event,
                     peer_id,
@@ -762,67 +743,48 @@ where
             },
         ));
     }
+}
 
-    fn handle_inbound_event(
-        network_context: NetworkContext,
-        inbound_event: PeerNotification,
-        peer_id: PeerId,
-        upstream_handlers: &mut HashMap<
-            ProtocolId,
-            diem_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
-        >,
-    ) {
-        match inbound_event {
-            PeerNotification::RecvMessage(msg) => {
-                let protocol_id = msg.protocol_id;
-                if let Some(handler) = upstream_handlers.get_mut(&protocol_id) {
-                    // Send over diem channel for fairness.
-                    if let Err(send_err) = handler.push(
-                        (peer_id, protocol_id),
-                        PeerManagerNotification::RecvMessage(peer_id, msg),
-                    ) {
-                        warn!(
-                            NetworkSchema::new(&network_context),
-                            error = ?send_err,
-                            protocol_id = protocol_id,
-                            "{} Upstream handler unable to handle messages for protocol: {}. Error: {:?}",
-                            network_context, protocol_id, send_err
-                        );
-                    }
-                } else {
-                    debug!(
-                        NetworkSchema::new(&network_context),
-                        message = format!("{:?}", msg),
-                        "{} Received network message for unregistered protocol. Message: {:?}",
-                        network_context,
-                        msg,
-                    );
-                }
-            }
-            PeerNotification::RecvRpc(rpc_req) => {
-                let protocol_id = rpc_req.protocol_id;
-                if let Some(handler) = upstream_handlers.get_mut(&protocol_id) {
-                    // Send over diem channel for fairness.
-                    if let Err(err) = handler.push(
-                        (peer_id, protocol_id),
-                        PeerManagerNotification::RecvRpc(peer_id, rpc_req),
-                    ) {
-                        warn!(
-                            NetworkSchema::new(&network_context),
-                            error = ?err,
-                            "{} Upstream handler unable to handle rpc for protocol: {}. Error: {:?}",
-                            network_context, protocol_id, err
-                        );
-                    }
-                } else {
-                    debug!(
-                        NetworkSchema::new(&network_context),
-                        "{} Received network rpc request for unregistered protocol. RPC: {:?}",
-                        network_context,
-                        rpc_req,
-                    );
-                }
-            }
+/// A task for consuming inbound network messages
+fn handle_inbound_request(
+    network_context: NetworkContext,
+    inbound_event: PeerNotification,
+    peer_id: PeerId,
+    upstream_handlers: &mut HashMap<
+        ProtocolId,
+        diem_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
+    >,
+) {
+    let (protocol_id, notification) = match inbound_event {
+        PeerNotification::RecvMessage(msg) => (
+            msg.protocol_id(),
+            PeerManagerNotification::RecvMessage(peer_id, msg),
+        ),
+        PeerNotification::RecvRpc(req) => (
+            req.protocol_id(),
+            PeerManagerNotification::RecvRpc(peer_id, req),
+        ),
+    };
+
+    if let Some(handler) = upstream_handlers.get_mut(&protocol_id) {
+        // Send over diem channel for fairness.
+        if let Err(err) = handler.push((peer_id, protocol_id), notification) {
+            warn!(
+                NetworkSchema::new(&network_context),
+                error = ?err,
+                protocol_id = protocol_id,
+                "{} Upstream handler unable to handle message for protocol: {}. Error: {:?}",
+                network_context, protocol_id, err
+            );
         }
+    } else {
+        debug!(
+            NetworkSchema::new(&network_context),
+            protocol_id = protocol_id,
+            message = format!("{:?}", notification),
+            "{} Received network message for unregistered protocol: {:?}",
+            network_context,
+            notification,
+        );
     }
 }

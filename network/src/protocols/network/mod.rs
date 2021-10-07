@@ -30,6 +30,7 @@ use short_hex_str::AsShortHexStr;
 use std::{cmp::min, iter::FromIterator, marker::PhantomData, pin::Pin, time::Duration};
 
 use super::wire::handshake::v1::ProtocolIdSet;
+use std::fmt::Debug;
 
 pub trait Message: DeserializeOwned + Serialize {}
 impl<T: DeserializeOwned + Serialize> Message for T {}
@@ -197,41 +198,36 @@ fn peer_mgr_notif_to_event<TMessage: Message>(
     notif: PeerManagerNotification,
 ) -> future::Ready<Option<Event<TMessage>>> {
     let maybe_event = match notif {
-        PeerManagerNotification::RecvRpc(peer_id, rpc_req) => match rpc_req.to_message() {
-            Ok(req_msg) => Some(Event::RpcRequest(
-                peer_id,
-                req_msg,
-                rpc_req.protocol_id,
-                rpc_req.res_tx,
-            )),
-            Err(err) => {
-                let data = &rpc_req.data;
-                warn!(
-                    SecurityEvent::InvalidNetworkEvent,
-                    error = ?err,
-                    remote_peer_id = peer_id.short_str(),
-                    protocol_id = rpc_req.protocol_id,
-                    data_prefix = hex::encode(&data[..min(16, data.len())]),
-                );
-                None
-            }
-        },
-        PeerManagerNotification::RecvMessage(peer_id, msg) => match msg.to_message() {
-            Ok(msg) => Some(Event::Message(peer_id, msg)),
-            Err(err) => {
-                let data = &msg.mdata;
-                warn!(
-                    SecurityEvent::InvalidNetworkEvent,
-                    error = ?err,
-                    remote_peer_id = peer_id.short_str(),
-                    protocol_id = msg.protocol_id,
-                    data_prefix = hex::encode(&data[..min(16, data.len())]),
-                );
-                None
-            }
-        },
+        PeerManagerNotification::RecvRpc(peer_id, rpc_req) => {
+            request_to_network_event(peer_id, &rpc_req)
+                .map(|msg| Event::RpcRequest(peer_id, msg, rpc_req.protocol_id, rpc_req.res_tx))
+        }
+        PeerManagerNotification::RecvMessage(peer_id, request) => {
+            request_to_network_event(peer_id, &request).map(|msg| Event::Message(peer_id, msg))
+        }
     };
     future::ready(maybe_event)
+}
+
+/// Converts a `SerializedRequest` into a network `Event` for sending to other nodes
+fn request_to_network_event<TMessage: Message, Request: SerializedRequest>(
+    peer_id: PeerId,
+    request: &Request,
+) -> Option<TMessage> {
+    match request.to_message() {
+        Ok(msg) => Some(msg),
+        Err(err) => {
+            let data = &request.data();
+            warn!(
+                SecurityEvent::InvalidNetworkEvent,
+                error = ?err,
+                remote_peer_id = peer_id.short_str(),
+                protocol_id = request.protocol_id(),
+                data_prefix = hex::encode(&data[..min(16, data.len())]),
+            );
+            None
+        }
+    }
 }
 
 fn control_msg_to_event<TMessage>(notif: ConnectionNotification) -> Event<TMessage> {
