@@ -9,7 +9,7 @@ use crate::{
     network::{MempoolNetworkEvents, MempoolSyncMsg},
     shared_mempool::{
         tasks,
-        tasks::commit_txns,
+        tasks::process_committed_transactions,
         types::{notify_subscribers, ScheduledBroadcast, SharedMempool, SharedMempoolNotification},
     },
     ConsensusRequest, SubmissionStatus, TransactionSummary,
@@ -74,13 +74,13 @@ pub(crate) async fn coordinator<V>(
         let _timer = counters::MAIN_LOOP.start_timer();
         ::futures::select! {
             (msg, callback) = client_events.select_next_some() => {
-                handle_client_event(&mut smp, &bounded_executor, msg, callback).await;
+                handle_incoming_transactions(&mut smp, &bounded_executor, msg, callback).await;
             },
             msg = consensus_requests.select_next_some() => {
                 tasks::process_consensus_request(&smp.mempool, msg);
             },
             msg = mempool_listener.select_next_some() => {
-                handle_state_sync_request(&mut smp, msg, &mut mempool_listener);
+                handle_commit_notification(&mut smp, msg, &mut mempool_listener);
             },
             reconfig_notification = mempool_reconfig_events.select_next_some() => {
                 handle_mempool_reconfig_event(&mut smp, &bounded_executor, reconfig_notification.on_chain_configs).await;
@@ -89,7 +89,7 @@ pub(crate) async fn coordinator<V>(
                 tasks::execute_broadcast(peer, backoff, &mut smp, &mut scheduled_broadcasts, executor.clone());
             },
             (network_id, event) = events.select_next_some() => {
-                handle_event(&executor, &bounded_executor, &mut scheduled_broadcasts, &mut smp, network_id, event).await;
+                handle_network_event(&executor, &bounded_executor, &mut scheduled_broadcasts, &mut smp, network_id, event).await;
             },
             complete => break,
         }
@@ -100,7 +100,7 @@ pub(crate) async fn coordinator<V>(
     ));
 }
 
-async fn handle_client_event<V>(
+async fn handle_incoming_transactions<V>(
     smp: &mut SharedMempool<V>,
     bounded_executor: &BoundedExecutor,
     msg: SignedTransaction,
@@ -125,7 +125,7 @@ async fn handle_client_event<V>(
         .await;
 }
 
-fn handle_state_sync_request<V>(
+fn handle_commit_notification<V>(
     smp: &mut SharedMempool<V>,
     msg: MempoolCommitNotification,
     mempool_listener: &mut MempoolNotificationListener,
@@ -142,7 +142,7 @@ fn handle_state_sync_request<V>(
         counters::COMMIT_STATE_SYNC_LABEL,
         msg.transactions.len(),
     );
-    commit_txns(
+    process_committed_transactions(
         &smp.mempool.clone(),
         msg.transactions
             .iter()
@@ -189,7 +189,7 @@ async fn handle_mempool_reconfig_event<V>(
         .await;
 }
 
-async fn handle_event<V>(
+async fn handle_network_event<V>(
     executor: &Handle,
     bounded_executor: &BoundedExecutor,
     scheduled_broadcasts: &mut FuturesUnordered<ScheduledBroadcast>,
