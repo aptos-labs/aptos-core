@@ -1462,11 +1462,16 @@ dependencies = [
  "async-trait",
  "channel",
  "claim",
+ "diem-crypto",
+ "diem-data-client",
  "diem-types",
  "diem-workspace-hack",
  "futures",
+ "itertools 0.10.1",
  "serde",
+ "storage-service-types",
  "thiserror",
+ "tokio",
 ]
 
 [[package]]

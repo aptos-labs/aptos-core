@@ -1,10 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    data_stream::{DataStreamListener, NotificationId},
-    error::Error,
-};
+use crate::{data_notification::NotificationId, data_stream::DataStreamListener, error::Error};
 use async_trait::async_trait;
 use diem_types::transaction::Version;
 use futures::{
@@ -173,7 +170,6 @@ pub struct RefetchNotificationPayloadRequest {
 
 /// The reason for having to refetch a data payload in a data notification.
 #[derive(Clone, Debug, Eq, PartialEq)]
-#[allow(dead_code)]
 pub enum PayloadRefetchReason {
     InvalidPayloadData,
     PayloadTypeIsIncorrect,
@@ -181,12 +177,12 @@ pub enum PayloadRefetchReason {
 }
 
 /// The streaming service client that talks to the streaming service.
+#[derive(Clone)]
 pub struct StreamingServiceClient {
     request_sender: mpsc::UnboundedSender<StreamRequestMessage>,
 }
 
 impl StreamingServiceClient {
-    #[allow(dead_code)]
     pub fn new(request_sender: mpsc::UnboundedSender<StreamRequestMessage>) -> Self {
         Self { request_sender }
     }
@@ -307,7 +303,6 @@ pub struct StreamingServiceListener {
 }
 
 impl StreamingServiceListener {
-    #[allow(dead_code)]
     pub fn new(request_receiver: mpsc::UnboundedReceiver<StreamRequestMessage>) -> Self {
         Self { request_receiver }
     }
@@ -329,7 +324,6 @@ impl FusedStream for StreamingServiceListener {
 
 /// This method returns a (StreamingServiceClient, StreamingServiceListener) pair that can be used
 /// to allow clients to make requests to the streaming service.
-#[allow(dead_code)]
 pub fn new_streaming_service_client_listener_pair(
 ) -> (StreamingServiceClient, StreamingServiceListener) {
     let (request_sender, request_listener) = mpsc::unbounded();
