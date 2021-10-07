@@ -22,7 +22,7 @@ pub fn main() -> Result<()> {
             project_path,
             account_key_path,
         } => deploy::handle(project_path.as_path(), account_key_path.as_path()),
-        Subcommand::Account { cmd } => account::handle_package_commands(cmd),
+        Subcommand::Account {} => account::handle(),
         Subcommand::Console { project_path } => console::handle(project_path.as_path()),
         Subcommand::Test { project_path } => test::handle(project_path.as_path()),
     }
@@ -48,10 +48,7 @@ pub enum Subcommand {
         account_key_path: PathBuf,
     },
     #[structopt(about = "Creates new account with randomly generated private/public key")]
-    Account {
-        #[structopt(subcommand)]
-        cmd: account::AccountCommand,
-    },
+    Account {},
     #[structopt(about = "Starts a REPL for onchain inspection")]
     Console { project_path: PathBuf },
     #[structopt(about = "Runs end to end .ts tests")]

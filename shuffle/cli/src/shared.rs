@@ -42,6 +42,5 @@ pub fn send(client: &BlockingClient, tx: diem_types::transaction::SignedTransact
 
 // returns ~/.shuffle
 pub fn get_shuffle_dir() -> PathBuf {
-    let dir = BaseDirs::new().unwrap().home_dir().join(".shuffle");
-    dir
+    BaseDirs::new().unwrap().home_dir().join(".shuffle")
 }

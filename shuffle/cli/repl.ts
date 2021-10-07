@@ -8,22 +8,22 @@
 // Developer API: https://docs.google.com/document/d/1KEPnGGU3zg_RmN8V4r2ms_MFPwsTMNyK7jCUFygviDg/edit#heading=h.hesw425dw9gz
 
 // deno-lint-ignore-file no-explicit-any
-import { green } from 'https://deno.land/x/nanocolors@0.1.12/mod.ts';
-import { createRemote } from "https://deno.land/x/gentle_rpc@v3.0/mod.ts";
+import * as path from "https://deno.land/std@0.110.0/path/mod.ts";
+import { green } from 'https://deno.land/x/nanocolors/mod.ts';
+import { createRemote } from "https://deno.land/x/gentle_rpc/mod.ts";
 
 function highlight(content: string) {
   return green(content);
 }
 
-// TODO: Replace all hardcoding with calculated or env retrieved values.
+export const shuffleDir = Deno.env.get("SHUFFLE_HOME") || "unknown";
 export const projectPath = Deno.env.get("PROJECT_PATH") || "unknown";
 export const nodeUrl = 'http://127.0.0.1:8081';
-export const senderAddressPath = Deno.env.get("HOME") + "/.shuffle/accounts/latest/address";
+export const senderAddressPath = path.join(shuffleDir,"accounts/latest/address");
 export const senderAddress = await Deno.readTextFile(senderAddressPath);
-export const fullSenderAddress = await "0x" + senderAddress;
-export const privateKeyPath = Deno.env.get("HOME") + "/.shuffle/accounts/latest/dev.key";
+export const fullSenderAddress = "0x" + senderAddress;
+export const privateKeyPath = path.join(shuffleDir,"accounts/latest/dev.key");
 
-//make export async function await getAddress() -> reads file senderAddressPath
 
 console.log(`Loading Project ${highlight(projectPath)}`);
 console.log(`Connected to Node ${highlight(nodeUrl)}`);
