@@ -87,12 +87,7 @@ where
             match signature_verified_block
                 .par_iter()
                 .with_min_len(chunks_size)
-                .map(|txn| {
-                    Ok((
-                        self.inferencer.infer_reads(txn)?,
-                        self.inferencer.infer_writes(txn)?,
-                    ))
-                })
+                .map(|txn| self.inferencer.infer_reads_writes(txn))
                 .collect::<AResult<Vec<_>>>()
             {
                 Ok(res) => res,
@@ -107,8 +102,14 @@ where
             .par_iter()
             .enumerate()
             .with_min_len(chunks_size)
-            .fold(Vec::new, |mut acc, (idx, (_, txn_writes))| {
-                acc.extend(txn_writes.clone().into_iter().map(|ap| (ap, idx)));
+            .fold(Vec::new, |mut acc, (idx, accesses)| {
+                acc.extend(
+                    accesses
+                        .keys_written
+                        .clone()
+                        .into_iter()
+                        .map(|ap| (ap, idx)),
+                );
                 acc
             })
             .flatten()
@@ -133,16 +134,15 @@ where
 
                     while let Some(idx) = scheduler.next_txn_to_execute() {
                         let txn = &signature_verified_block[idx];
-                        let (reads, writes) = &infer_result[idx];
+                        let txn_accesses = &infer_result[idx];
 
                         // If the txn has unresolved dependency, adds the txn to deps_mapping of its dependency (only the first one) and continue
-                        if reads
-                            .iter()
-                            .any(|k| match versioned_data_cache.read(k, idx) {
+                        if txn_accesses.keys_read.iter().any(|k| {
+                            match versioned_data_cache.read(k, idx) {
                                 Err(Some(dep_id)) => scheduler.add_dependency(idx, dep_id),
                                 Ok(_) | Err(None) => false,
-                            })
-                        {
+                            }
+                        }) {
                             // This causes a PAUSE on an x64 arch, and takes 140 cycles. Allows other
                             // core to take resources and better HT.
                             ::std::hint::spin_loop();
@@ -199,7 +199,7 @@ where
                                 }
                             };
 
-                        for write in writes.iter() {
+                        for write in txn_accesses.keys_written.iter() {
                             // Unwrap here is fine because all writes here should be in the mvhashmap.
                             assert!(versioned_data_cache.skip_if_not_set(write, idx).is_ok());
                         }

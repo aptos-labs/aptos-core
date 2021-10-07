@@ -5,8 +5,8 @@ use crate::{
     errors::{Error, Result},
     executor::MVHashMapView,
     task::{
-        ExecutionStatus, ExecutorTask, ReadWriteSetInferencer, Transaction as TransactionType,
-        TransactionOutput,
+        Accesses, ExecutionStatus, ExecutorTask, ReadWriteSetInferencer,
+        Transaction as TransactionType, TransactionOutput,
     },
 };
 use anyhow::Result as AResult;
@@ -132,32 +132,27 @@ where
 {
     type T = Transaction<K, V>;
 
-    fn infer_writes(&self, txn: &Self::T) -> AResult<Vec<K>> {
+    fn infer_reads_writes(&self, txn: &Self::T) -> AResult<Accesses<K>> {
         match txn {
             Transaction::Write {
                 actual_writes,
                 skipped_writes,
-                reads: _,
+                reads,
             } => {
                 let mut writes = actual_writes
                     .iter()
                     .map(|(k, _)| k.clone())
                     .collect::<Vec<_>>();
                 writes.append(&mut skipped_writes.clone());
-                Ok(writes)
+                Ok(Accesses {
+                    keys_read: reads.clone(),
+                    keys_written: writes,
+                })
             }
-            Transaction::SkipRest | Transaction::Abort => Ok(vec![]),
-        }
-    }
-
-    fn infer_reads(&self, txn: &Self::T) -> AResult<Vec<K>> {
-        match txn {
-            Transaction::Write {
-                actual_writes: _,
-                skipped_writes: _,
-                reads,
-            } => Ok(reads.clone()),
-            Transaction::SkipRest | Transaction::Abort => Ok(vec![]),
+            Transaction::SkipRest | Transaction::Abort => Ok(Accesses {
+                keys_read: vec![],
+                keys_written: vec![],
+            }),
         }
     }
 }
@@ -177,37 +172,32 @@ where
 {
     type T = Transaction<K, V>;
 
-    fn infer_writes(&self, txn: &Self::T) -> AResult<Vec<K>> {
+    fn infer_reads_writes(&self, txn: &Self::T) -> AResult<Accesses<K>> {
         match txn {
             Transaction::Write {
                 actual_writes,
                 skipped_writes,
-                reads: _,
+                reads,
             } => {
                 let mut writes = actual_writes
                     .iter()
                     .map(|(k, _)| k.clone())
                     .collect::<Vec<_>>();
                 writes.append(&mut skipped_writes.clone());
-                Ok(writes)
-            }
-            Transaction::SkipRest | Transaction::Abort => Ok(vec![]),
-        }
-    }
 
-    fn infer_reads(&self, txn: &Self::T) -> AResult<Vec<K>> {
-        match txn {
-            Transaction::Write {
-                actual_writes: _,
-                skipped_writes: _,
-                reads,
-            } => {
-                let mut results = reads.clone();
+                let mut reads_result = reads.clone();
                 // Drop one read entry to simulate imprecise read estimation
-                results.pop();
-                Ok(results)
+                reads_result.pop();
+
+                Ok(Accesses {
+                    keys_read: reads_result,
+                    keys_written: writes,
+                })
             }
-            Transaction::SkipRest | Transaction::Abort => Ok(vec![]),
+            Transaction::SkipRest | Transaction::Abort => Ok(Accesses {
+                keys_read: vec![],
+                keys_written: vec![],
+            }),
         }
     }
 }
