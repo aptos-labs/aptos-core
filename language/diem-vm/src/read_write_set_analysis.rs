@@ -1,10 +1,13 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::system_module_names::{
-    BLOCK_PROLOGUE, DIEM_BLOCK_MODULE, SCRIPT_PROLOGUE_NAME, USER_EPILOGUE_NAME,
+use crate::{
+    adapter_common::PreprocessedTransaction,
+    system_module_names::{
+        BLOCK_PROLOGUE, DIEM_BLOCK_MODULE, SCRIPT_PROLOGUE_NAME, USER_EPILOGUE_NAME,
+    },
 };
-use anyhow::{bail, Result};
+use anyhow::{anyhow, bail, Result};
 use diem_types::{
     account_config,
     transaction::{SignedTransaction, TransactionPayload},
@@ -53,7 +56,9 @@ impl ReadWriteSetAnalysis {
         tx: &SignedTransaction,
         blockchain_view: &impl MoveResolver,
     ) -> Result<Vec<ResourceKey>> {
-        self.get_concretized_keys_tx(tx, blockchain_view, true)
+        Ok(self
+            .get_concretized_keys_user_transaction(tx, blockchain_view)?
+            .1)
     }
 
     /// Returns an overapproximation of the `ResourceKey`'s in global storage that will be read
@@ -65,22 +70,23 @@ impl ReadWriteSetAnalysis {
         tx: &SignedTransaction,
         blockchain_view: &impl MoveResolver,
     ) -> Result<Vec<ResourceKey>> {
-        self.get_concretized_keys_tx(tx, blockchain_view, false)
+        Ok(self
+            .get_concretized_keys_user_transaction(tx, blockchain_view)?
+            .0)
     }
 
-    fn get_concretized_keys_tx(
+    fn get_concretized_keys_user_transaction(
         &self,
         tx: &SignedTransaction,
         blockchain_view: &impl MoveResolver,
-        is_write: bool,
-    ) -> Result<Vec<ResourceKey>> {
+    ) -> Result<(Vec<ResourceKey>, Vec<ResourceKey>)> {
         match tx.payload() {
             TransactionPayload::ScriptFunction(s) => {
                 let signers = vec![tx.sender()];
                 let gas_currency = account_config::type_tag_for_currency_code(
                     account_config::from_currency_code_string(tx.gas_currency_code())?,
                 );
-                let prologue_accesses = self.get_concretized_keys(
+                let prologue_accesses = self.get_concretized_summary(
                     &account_config::constants::ACCOUNT_MODULE,
                     SCRIPT_PROLOGUE_NAME,
                     &signers,
@@ -95,9 +101,8 @@ impl ReadWriteSetAnalysis {
                     ]),
                     &[gas_currency.clone()],
                     blockchain_view,
-                    is_write,
                 )?;
-                let mut epilogue_accesses = self.get_concretized_keys(
+                let epilogue_accesses = self.get_concretized_summary(
                     &account_config::constants::ACCOUNT_MODULE,
                     USER_EPILOGUE_NAME,
                     &signers,
@@ -109,19 +114,58 @@ impl ReadWriteSetAnalysis {
                     ]),
                     &[gas_currency.clone()],
                     blockchain_view,
-                    is_write,
                 )?;
-                let mut script_accesses = self.get_concretized_keys(
+                let script_accesses = self.get_concretized_summary(
                     s.module(),
                     s.function(),
                     &signers,
                     s.args(),
                     s.ty_args(),
                     blockchain_view,
-                    is_write,
                 )?;
+
+                let mut keys_read = vec![];
+                let mut keys_written = vec![];
+
+                keys_read.extend(
+                    prologue_accesses
+                        .get_keys_read()
+                        .ok_or_else(|| anyhow!("Failed to get read set for prologue"))?,
+                );
+                keys_read.extend(
+                    epilogue_accesses
+                        .get_keys_read()
+                        .ok_or_else(|| anyhow!("Failed to get read set for epilogue"))?,
+                );
+                keys_read.extend(
+                    script_accesses
+                        .get_keys_read()
+                        .ok_or_else(|| anyhow!("Failed to get read set for script body"))?,
+                );
+
+                keys_written.extend(
+                    prologue_accesses
+                        .get_keys_written()
+                        .ok_or_else(|| anyhow!("Failed to get read set for prologue"))?,
+                );
+                keys_written.extend(
+                    epilogue_accesses
+                        .get_keys_written()
+                        .ok_or_else(|| anyhow!("Failed to get read set for epilogue"))?,
+                );
+                keys_written.extend(
+                    script_accesses
+                        .get_keys_written()
+                        .ok_or_else(|| anyhow!("Failed to get read set for script body"))?,
+                );
+
+                keys_read.sort();
+                keys_read.dedup();
+
+                keys_written.sort();
+                keys_written.dedup();
                 // Hack: remove GasFees accesses from epilogue if gas_price is zero. This is sound
-                // to do as of Diem 1.4, but should be re-evaluated if the epilogue changes
+                // to do as of Diem 1.3, but should be re-evaluated if the epilogue changes
                 if tx.gas_unit_price() == 0 {
                     let tx_fees_tag = StructTag {
                         address: account_config::CORE_CODE_ADDRESS,
@@ -129,19 +173,58 @@ impl ReadWriteSetAnalysis {
                         name: TRANSACTION_FEES_NAME.to_owned(),
                         type_params: vec![gas_currency],
                     };
-                    epilogue_accesses.retain(|r| r.type_() != &tx_fees_tag);
+                    keys_written.retain(|r| r.type_() != &tx_fees_tag);
                 }
-                // combine prologue, epilogue, and script accesses, then dedup and return result
-                script_accesses.extend(prologue_accesses);
-                script_accesses.extend(epilogue_accesses);
-                script_accesses.sort();
-                script_accesses.dedup();
-                Ok(script_accesses)
+
+                Ok((keys_read, keys_written))
             }
             payload => {
                 // TODO: support tx scripts here. Slightly tricky since we will need to run
                 // analyzer on the fly
                 bail!("Unsupported transaction payload type {:?}", payload)
+            }
+        }
+    }
+
+    pub fn get_concretized_keys_tx(
+        &self,
+        tx: &PreprocessedTransaction,
+        blockchain_view: &impl MoveResolver,
+    ) -> Result<(Vec<ResourceKey>, Vec<ResourceKey>)> {
+        match tx {
+            PreprocessedTransaction::UserTransaction(tx) => {
+                self.get_concretized_keys_user_transaction(tx, blockchain_view)
+            }
+            PreprocessedTransaction::BlockMetadata(block_metadata) => {
+                let (round, timestamp, previous_vote, proposer) =
+                    block_metadata.clone().into_inner();
+                let args = serialize_values(&vec![
+                    MoveValue::Signer(account_config::reserved_vm_address()),
+                    MoveValue::U64(round),
+                    MoveValue::U64(timestamp),
+                    MoveValue::Vector(previous_vote.into_iter().map(MoveValue::Address).collect()),
+                    MoveValue::Address(proposer),
+                ]);
+                let metadata_access = self.get_concretized_summary(
+                    &DIEM_BLOCK_MODULE,
+                    BLOCK_PROLOGUE,
+                    &[],
+                    &args,
+                    &[],
+                    blockchain_view,
+                )?;
+                Ok((
+                    metadata_access
+                        .get_keys_read()
+                        .ok_or_else(|| anyhow!("Failed to get read set for block prologue"))?,
+                    metadata_access
+                        .get_keys_written()
+                        .ok_or_else(|| anyhow!("Failed to get read set for block prologue"))?,
+                ))
+            }
+            PreprocessedTransaction::InvalidSignature => Ok((vec![], vec![])),
+            PreprocessedTransaction::WriteSet(_) | PreprocessedTransaction::WaypointWriteSet(_) => {
+                bail!("Unsupported writeset transaction")
             }
         }
     }
