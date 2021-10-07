@@ -6,7 +6,6 @@
 use anyhow::*;
 use move_command_line_common::files::{MOVE_EXTENSION, MOVE_IR_EXTENSION};
 use move_core_types::{
-    account_address::AccountAddress,
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
     parser,
@@ -213,8 +212,8 @@ pub struct PublishCommand {
 
 #[derive(Debug, StructOpt)]
 pub struct RunCommand {
-    #[structopt(long = "signers", parse(try_from_str = parse_account_address))]
-    pub signers: Vec<AccountAddress>,
+    #[structopt(long = "signers")]
+    pub signers: Vec<String>,
     #[structopt(long = "args", parse(try_from_str = parser::parse_transaction_argument))]
     pub args: Vec<TransactionArgument>,
     #[structopt(long = "type-args", parse(try_from_str = parser::parse_type_tag))]
@@ -229,8 +228,8 @@ pub struct RunCommand {
 
 #[derive(Debug, StructOpt)]
 pub struct ViewCommand {
-    #[structopt(long = "address", parse(try_from_str = parse_account_address))]
-    pub address: AccountAddress,
+    #[structopt(long = "address")]
+    pub address: String,
     #[structopt(long = "resource", parse(try_from_str = parse_qualified_module_access_with_type_args))]
     pub resource: (ModuleId, Identifier, Vec<TypeTag>),
 }
@@ -314,12 +313,6 @@ where
 
 #[derive(Debug, StructOpt)]
 pub struct EmptyCommand {}
-
-fn parse_account_address(s: &str) -> Result<AccountAddress> {
-    let a = move_lang::shared::NumericalAddress::parse_str(s)
-        .map_err(|e| anyhow!("Failed to parse address. Got error: {}", e))?;
-    Ok(a.into_inner())
-}
 
 fn parse_qualified_module_access(s: &str) -> Result<(ModuleId, Identifier)> {
     match move_core_types::parser::parse_type_tag(s)? {

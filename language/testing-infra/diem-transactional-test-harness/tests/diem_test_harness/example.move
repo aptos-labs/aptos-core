@@ -5,7 +5,7 @@
 // To create new accounts for testing, you need to call the account creation scripts in
 // `module AccountCreationScripts`.
 //
-//# run --signers 0xA550C18
+//# run --signers DiemRoot
 //#     --private-key 1b8c20cde2dbb43cd3c709b290ac50dcd2be2a87a3a24544b5a5109bc76ea7fb
 //#     --args 0 0x4777eb94491650dd3f095ce6f778acb6 x"f75daa73fc071f93593335eb9033da80" x"40"
 //#     -- 0x1::AccountCreationScripts::create_validator_operator_account
@@ -32,7 +32,7 @@ module A::M {
 // the real world use cases. If you want to execute custom code as a normal user, wrap your
 // code in a script function, publish it, and then call the script function instead.
 //
-//# run --signers 0x4777eb94491650dd3f095ce6f778acb6
+//# run --signers A
 //#     --private-key 56a26140eb233750cd14fb168c3eb4bd0782b099cde626ec8aff7f3cceb6364f
 //#     -- 0x4777eb94491650dd3f095ce6f778acb6::M::foo
 
@@ -40,14 +40,14 @@ module A::M {
 
 // Use the view command to inspect on-chain resources.
 //
-//# view --address 0x4777eb94491650dd3f095ce6f778acb6 --resource 0x1::DiemAccount::DiemAccount
+//# view --address A --resource 0x1::DiemAccount::DiemAccount
 
 
 
 // To send an admin script transaction, append the `--admin-script` option to the run command.
 // Admin scripts do not require a private key -- they are signed using the (test) genesis key pair.
 //
-//# run --signers 0x4777eb94491650dd3f095ce6f778acb6
+//# run --signers A
 //#     --admin-script
 script {
     fun main() {}

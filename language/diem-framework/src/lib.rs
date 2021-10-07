@@ -68,6 +68,7 @@ pub fn diem_framework_named_addresses() -> BTreeMap<String, NumericalAddress> {
         ("DiemRoot", "0xA550C18"),
         ("CurrencyInfo", "0xA550C18"),
         ("TreasuryCompliance", "0xB1E55ED"),
+        ("DesignatedDealer", "0xDD"),
         ("VMReserved", "0x0"),
     ];
     mapping

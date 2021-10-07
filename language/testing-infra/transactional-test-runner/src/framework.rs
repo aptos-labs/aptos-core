@@ -48,6 +48,28 @@ pub struct CompiledState<'a> {
     modules: BTreeMap<ModuleId, ProcessedModule>,
 }
 
+fn parse_account_address(s: &str) -> Result<AccountAddress> {
+    let (number, _number_format) = move_lang::shared::parse_u128(s)
+        .map_err(|e| anyhow!("Failed to parse address. Got error: {}", e))?;
+
+    Ok(AccountAddress::new(number.to_be_bytes()))
+}
+
+impl<'a> CompiledState<'a> {
+    pub fn resolve_address(&self, s: &str) -> AccountAddress {
+        if let Some(addr) = self.named_address_mapping.get(&Symbol::from(s)) {
+            return AccountAddress::new(addr.into_bytes());
+        }
+        if let Ok(addr) = parse_account_address(s) {
+            return addr;
+        }
+        panic!(
+            "Invalid address! Must be a valid hex string or known name, but found '{}'",
+            s
+        )
+    }
+}
+
 pub trait MoveTestAdapter<'a> {
     type ExtraPublishArgs;
     type ExtraRunArgs;
@@ -201,6 +223,10 @@ pub trait MoveTestAdapter<'a> {
                     }
                     SyntaxChoice::IR => (compile_ir_script(state.dep_modules(), data_path)?, None),
                 };
+                let signers: Vec<_> = signers
+                    .into_iter()
+                    .map(|addr| self.compiled_state().resolve_address(&addr))
+                    .collect();
                 self.execute_script(script, type_args, signers, args, gas_budget, extra_args)?;
                 Ok(warning_opt)
             }
@@ -219,6 +245,10 @@ pub trait MoveTestAdapter<'a> {
                     syntax.is_none(),
                     "syntax flag meaningless with function execution"
                 );
+                let signers: Vec<_> = signers
+                    .into_iter()
+                    .map(|addr| self.compiled_state().resolve_address(&addr))
+                    .collect();
                 self.call_function(
                     &module,
                     name.as_ident_str(),
@@ -233,12 +263,15 @@ pub trait MoveTestAdapter<'a> {
             TaskCommand::View(ViewCommand {
                 address,
                 resource: (module, name, type_arguments),
-            }) => Ok(Some(self.view_data(
-                address,
-                &module,
-                name.as_ident_str(),
-                type_arguments,
-            )?)),
+            }) => {
+                let address = self.compiled_state().resolve_address(&address);
+                Ok(Some(self.view_data(
+                    address,
+                    &module,
+                    name.as_ident_str(),
+                    type_arguments,
+                )?))
+            }
             TaskCommand::Subcommand(c) => self.handle_subcommand(TaskInput {
                 command: c,
                 name,
