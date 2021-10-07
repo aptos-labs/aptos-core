@@ -1,4 +1,5 @@
 //# init --addresses A=0x4777eb94491650dd3f095ce6f778acb6
+//#      --private-keys A=56a26140eb233750cd14fb168c3eb4bd0782b099cde626ec8aff7f3cceb6364f
 
 
 
@@ -6,7 +7,7 @@
 // `module AccountCreationScripts`.
 //
 //# run --signers DiemRoot
-//#     --private-key 1b8c20cde2dbb43cd3c709b290ac50dcd2be2a87a3a24544b5a5109bc76ea7fb
+//#     --private-key DiemRoot
 //#     --args 0 0x4777eb94491650dd3f095ce6f778acb6 x"f75daa73fc071f93593335eb9033da80" x"40"
 //#     -- 0x1::AccountCreationScripts::create_validator_operator_account
 
@@ -15,7 +16,7 @@
 // To publish a module, sign the transaction using the private key associated with the address
 // under which the module will be published.
 //
-//# publish --private-key 56a26140eb233750cd14fb168c3eb4bd0782b099cde626ec8aff7f3cceb6364f
+//# publish --private-key A
 module A::M {
     public(script) fun foo() {
         abort 42
@@ -33,7 +34,7 @@ module A::M {
 // code in a script function, publish it, and then call the script function instead.
 //
 //# run --signers A
-//#     --private-key 56a26140eb233750cd14fb168c3eb4bd0782b099cde626ec8aff7f3cceb6364f
+//#     --private-key A
 //#     -- 0x4777eb94491650dd3f095ce6f778acb6::M::foo
 
 

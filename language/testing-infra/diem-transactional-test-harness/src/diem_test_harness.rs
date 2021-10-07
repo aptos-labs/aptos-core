@@ -56,6 +56,7 @@ struct DiemTestAdapter<'a> {
     compiled_state: CompiledState<'a>,
     storage: FakeDataStore,
     default_syntax: SyntaxChoice,
+    private_key_mapping: BTreeMap<String, Ed25519PrivateKey>,
 }
 
 /// Parameters *required* to create a Diem transaction.
@@ -67,28 +68,70 @@ struct TransactionParameters {
     pub expiration_timestamp_secs: u64,
 }
 
-fn parse_ed25519_private_key(s: &str) -> Result<Ed25519PrivateKey> {
-    Ok(Ed25519PrivateKey::from_encoded_string(s)?)
-}
-
 /// Diem-specific arguments for the publish command.
 #[derive(StructOpt, Debug)]
 struct DiemPublishArgs {
-    #[structopt(short = "k", long = "private-key", parse(try_from_str = parse_ed25519_private_key))]
-    privkey: Ed25519PrivateKey,
+    #[structopt(short = "k", long = "private-key")]
+    private_key: String,
 }
 
 /// Diem-specifc arguments for the run command,
 #[derive(StructOpt, Debug)]
 struct DiemRunArgs {
-    #[structopt(short = "k", long = "private-key", parse(try_from_str = parse_ed25519_private_key))]
-    privkey: Option<Ed25519PrivateKey>,
+    #[structopt(short = "k", long = "private-key")]
+    private_key: Option<String>,
 
     #[structopt(long = "--admin-script")]
     admin_script: bool,
 }
 
+#[derive(StructOpt, Debug)]
+struct DiemInitArgs {
+    #[structopt(long = "private-keys", parse(try_from_str = parse_named_private_key))]
+    private_keys: Option<Vec<(String, Ed25519PrivateKey)>>,
+}
+
+fn parse_ed25519_private_key(s: &str) -> Result<Ed25519PrivateKey> {
+    Ok(Ed25519PrivateKey::from_encoded_string(s)?)
+}
+
+fn parse_named_private_key(s: &str) -> Result<(String, Ed25519PrivateKey)> {
+    let before_after = s.split('=').collect::<Vec<_>>();
+
+    if before_after.len() != 2 {
+        bail!("Invalid named private key assignment. Must be of the form <private_key_name>=<private_key>, but found '{}'", s);
+    }
+
+    let name = before_after[0].to_string();
+    let private_key = parse_ed25519_private_key(before_after[1])?;
+
+    Ok((name, private_key))
+}
+
+/// Default private key mappings for special Diem accounts.
+fn diem_framework_private_key_mapping() -> Vec<(String, Ed25519PrivateKey)> {
+    vec![
+        ("DiemRoot".to_string(), GENESIS_KEYPAIR.0.clone()),
+        ("TreasuryCompliance".to_string(), GENESIS_KEYPAIR.0.clone()),
+        ("DesignatedDealer".to_string(), GENESIS_KEYPAIR.0.clone()),
+    ]
+}
+
 impl<'a> DiemTestAdapter<'a> {
+    /// Parses the private key if it is a hex string, or look it up if it is an alias.
+    fn resolve_private_key(&self, s: &str) -> Ed25519PrivateKey {
+        if let Some(private_key) = self.private_key_mapping.get(s) {
+            return private_key.clone();
+        }
+        if let Ok(private_key) = parse_ed25519_private_key(s) {
+            return private_key;
+        }
+        panic!(
+            "Invalid private key! Must be a valid hex string or known alias, but found '{}'",
+            s
+        )
+    }
+
     /// Obtain a Rust representation of the account resource from storage, which is used to derive
     /// a few default transaction parameters.
     fn fetch_account_resource(&self, signer_addr: &AccountAddress) -> Result<AccountResource> {
@@ -204,7 +247,7 @@ impl<'a> DiemTestAdapter<'a> {
 }
 
 impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
-    type ExtraInitArgs = EmptyCommand;
+    type ExtraInitArgs = DiemInitArgs;
     type ExtraPublishArgs = DiemPublishArgs;
     type ExtraRunArgs = DiemRunArgs;
     type Subcommand = EmptyCommand;
@@ -222,20 +265,17 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
         pre_compiled_deps: Option<&'a FullyCompiledProgram>,
         task_opt: Option<TaskInput<(InitCommand, Self::ExtraInitArgs)>>,
     ) -> Self {
-        let additional_mapping = match task_opt.map(|t| t.command) {
+        let additional_named_address_mapping = match task_opt.as_ref().map(|t| &t.command) {
             Some((InitCommand { named_addresses }, _)) => {
-                verify_and_create_named_address_mapping(named_addresses).unwrap()
+                verify_and_create_named_address_mapping(named_addresses.clone()).unwrap()
             }
             None => BTreeMap::new(),
         };
 
         let mut named_address_mapping = diem_framework::diem_framework_named_addresses();
-        for (name, addr) in additional_mapping {
+        for (name, addr) in additional_named_address_mapping {
             if named_address_mapping.contains_key(&name) {
-                panic!(
-                    "Invalid init. The named address '{}' is reserved by either the move-stdlib or diem-framework",
-                    name
-                )
+                panic!("Invalid init. The named address '{}' already exists.", name)
             }
             named_address_mapping.insert(name, addr);
         }
@@ -244,10 +284,38 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
         let mut storage = FakeDataStore::new(HashMap::new());
         storage.add_write_set(GENESIS_CHANGE_SET_FRESH.write_set());
 
+        let mut private_key_mapping = BTreeMap::new();
+        for (name, private_key) in diem_framework_private_key_mapping() {
+            private_key_mapping.insert(name, private_key);
+        }
+        if let Some(TaskInput {
+            command:
+                (
+                    _,
+                    DiemInitArgs {
+                        private_keys: Some(additional_private_key_mapping),
+                        ..
+                    },
+                ),
+            ..
+        }) = task_opt
+        {
+            for (name, private_key) in additional_private_key_mapping {
+                if private_key_mapping.contains_key(&name) {
+                    panic!(
+                        "Invalid init. The named private key '{}' already exists",
+                        name
+                    )
+                }
+                private_key_mapping.insert(name, private_key);
+            }
+        }
+
         Self {
             compiled_state: CompiledState::new(named_address_mapping, pre_compiled_deps),
             default_syntax,
             storage,
+            private_key_mapping,
         }
     }
 
@@ -264,6 +332,8 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
         let mut module_blob = vec![];
         module.serialize(&mut module_blob).unwrap();
 
+        let private_key = self.resolve_private_key(&extra_args.private_key);
+
         let txn = RawTransaction::new_module(
             *signer,
             params.sequence_number,
@@ -274,10 +344,7 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
             params.expiration_timestamp_secs,
             ChainId::test(),
         )
-        .sign(
-            &extra_args.privkey,
-            Ed25519PublicKey::from(&extra_args.privkey),
-        )?
+        .sign(&private_key, Ed25519PublicKey::from(&private_key))?
         .into_inner();
 
         self.run_transaction(txn)?;
@@ -314,9 +381,9 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
 
         let params = self.fetch_default_transaction_parameters(&diem_root)?;
 
-        let privkey = match &extra_args.privkey {
-            Some(privkey) => privkey,
-            None => &GENESIS_KEYPAIR.0,
+        let private_key = match &extra_args.private_key {
+            Some(private_key) => self.resolve_private_key(private_key),
+            None => GENESIS_KEYPAIR.0.clone(),
         };
 
         let txn = RawTransaction::new_writeset_script(
@@ -326,7 +393,7 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
             signers[0],
             ChainId::test(),
         )
-        .sign(privkey, Ed25519PublicKey::from(privkey))
+        .sign(&private_key, Ed25519PublicKey::from(&private_key))
         .unwrap()
         .into_inner();
 
@@ -351,8 +418,8 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
             panic!("Admin script functions are not supported.")
         }
 
-        let privkey = match extra_args.privkey {
-            Some(privkey) => privkey,
+        let private_key = match extra_args.private_key {
+            Some(private_key) => self.resolve_private_key(&private_key),
             None => panic!("Missing private key."),
         };
 
@@ -372,7 +439,7 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
             params.expiration_timestamp_secs,
             ChainId::test(),
         )
-        .sign(&privkey, Ed25519PublicKey::from(&privkey))?
+        .sign(&private_key, Ed25519PublicKey::from(&private_key))?
         .into_inner();
 
         self.run_transaction(txn)?;
