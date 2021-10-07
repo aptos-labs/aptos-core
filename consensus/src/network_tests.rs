@@ -153,7 +153,7 @@ impl NetworkPlayground {
                         None => continue, // drop rpc
                     };
 
-                    let mut node_consensus_tx =
+                    let node_consensus_tx =
                         node_consensus_txs.lock().get(dst_twin_id).unwrap().clone();
 
                     let inbound_req = InboundRpcRequest {
@@ -217,7 +217,7 @@ impl NetworkPlayground {
         dst_twin_id: TwinId,
         msg_notif: PeerManagerNotification,
     ) -> (Author, ConsensusMsg) {
-        let mut node_consensus_tx = self
+        let node_consensus_tx = self
             .node_consensus_txs
             .lock()
             .get(&dst_twin_id)
@@ -748,8 +748,7 @@ mod tests {
 
     #[test]
     fn test_bad_message() {
-        let (mut peer_mgr_notifs_tx, peer_mgr_notifs_rx) =
-            diem_channel::new(QueueStyle::FIFO, 8, None);
+        let (peer_mgr_notifs_tx, peer_mgr_notifs_rx) = diem_channel::new(QueueStyle::FIFO, 8, None);
         let (connection_notifs_tx, connection_notifs_rx) =
             diem_channel::new(QueueStyle::FIFO, 8, None);
         let consensus_network_events =

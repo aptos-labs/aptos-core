@@ -62,17 +62,13 @@ impl NewNetworkSender for StateSyncSender {
 
 #[async_trait]
 impl ApplicationNetworkSender<StateSyncMessage> for StateSyncSender {
-    fn send_to(
-        &mut self,
-        recipient: PeerId,
-        message: StateSyncMessage,
-    ) -> Result<(), NetworkError> {
+    fn send_to(&self, recipient: PeerId, message: StateSyncMessage) -> Result<(), NetworkError> {
         let protocol = ProtocolId::StateSyncDirectSend;
         self.inner.send_to(recipient, protocol, message)
     }
 
     async fn send_rpc(
-        &mut self,
+        &self,
         _recipient: PeerId,
         _req_msg: StateSyncMessage,
         _timeout: Duration,

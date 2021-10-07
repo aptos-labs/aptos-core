@@ -495,7 +495,7 @@ where
         // newly eligible, but not connected to peers, have their counter initialized properly.
         counters::peer_connected(&self.network_context, &peer_id, 0);
 
-        let mut connection_reqs_tx = self.connection_reqs_tx.clone();
+        let connection_reqs_tx = self.connection_reqs_tx.clone();
         // The initial dial state; it has zero dial delay and uses the first
         // address.
         let init_dial_state = DialState::new(self.backoff_strategy.clone());

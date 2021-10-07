@@ -42,7 +42,7 @@ impl PeerManagerRequestSender {
     /// It therefore makes no reliable delivery guarantees. An error is returned if the event queue
     /// is unexpectedly shutdown.
     pub fn send_to(
-        &mut self,
+        &self,
         peer_id: PeerId,
         protocol_id: ProtocolId,
         mdata: Bytes,
@@ -66,7 +66,7 @@ impl PeerManagerRequestSender {
     /// actor's event queue. It therefore makes no reliable delivery guarantees.
     /// An error is returned if the event queue is unexpectedly shutdown.
     pub fn send_to_many(
-        &mut self,
+        &self,
         recipients: impl Iterator<Item = PeerId>,
         protocol_id: ProtocolId,
         mdata: Bytes,
@@ -87,7 +87,7 @@ impl PeerManagerRequestSender {
 
     /// Sends a unary RPC to a remote peer and waits to either receive a response or times out.
     pub async fn send_rpc(
-        &mut self,
+        &self,
         peer_id: PeerId,
         protocol_id: ProtocolId,
         req: Bytes,
@@ -115,7 +115,7 @@ impl ConnectionRequestSender {
     }
 
     pub async fn dial_peer(
-        &mut self,
+        &self,
         peer: PeerId,
         addr: NetworkAddress,
     ) -> Result<(), PeerManagerError> {
@@ -125,7 +125,7 @@ impl ConnectionRequestSender {
         oneshot_rx.await?
     }
 
-    pub async fn disconnect_peer(&mut self, peer: PeerId) -> Result<(), PeerManagerError> {
+    pub async fn disconnect_peer(&self, peer: PeerId) -> Result<(), PeerManagerError> {
         let (oneshot_tx, oneshot_rx) = oneshot::channel();
         self.inner
             .push(peer, ConnectionRequest::DisconnectPeer(peer, oneshot_tx))?;

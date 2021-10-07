@@ -82,14 +82,14 @@ impl<M: Debug> Debug for ElementStatus<M> {
 impl<K: Eq + Hash + Clone, M> Sender<K, M> {
     /// This adds the message into the internal queue data structure. This is a
     /// synchronous call.
-    pub fn push(&mut self, key: K, message: M) -> Result<()> {
+    pub fn push(&self, key: K, message: M) -> Result<()> {
         self.push_with_feedback(key, message, None)
     }
 
     /// Same as `push`, but this function also accepts a oneshot::Sender over which the sender can
     /// be notified when the message eventually gets delivered or dropped.
     pub fn push_with_feedback(
-        &mut self,
+        &self,
         key: K,
         message: M,
         status_ch: Option<oneshot::Sender<ElementStatus<M>>>,
@@ -148,7 +148,7 @@ pub struct Receiver<K: Eq + Hash + Clone, M> {
 impl<K: Eq + Hash + Clone, M> Receiver<K, M> {
     /// Removes all the previously sent transactions that have not been consumed yet and cleans up
     /// the internal queue structure (GC of the previous keys).
-    pub fn clear(&mut self) {
+    pub fn clear(&self) {
         let mut shared_state = self.shared_state.lock();
         shared_state.internal_queue.clear();
     }

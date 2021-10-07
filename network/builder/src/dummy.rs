@@ -75,13 +75,13 @@ impl NewNetworkSender for DummyNetworkSender {
 
 #[async_trait]
 impl ApplicationNetworkSender<DummyMsg> for DummyNetworkSender {
-    fn send_to(&mut self, recipient: PeerId, message: DummyMsg) -> Result<(), NetworkError> {
+    fn send_to(&self, recipient: PeerId, message: DummyMsg) -> Result<(), NetworkError> {
         let protocol = TEST_DIRECT_SEND_PROTOCOL;
         self.inner.send_to(recipient, protocol, message)
     }
 
     async fn send_rpc(
-        &mut self,
+        &self,
         recipient: PeerId,
         message: DummyMsg,
         timeout: Duration,

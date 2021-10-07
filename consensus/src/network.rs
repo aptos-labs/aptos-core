@@ -147,7 +147,7 @@ impl NetworkSender {
 
     /// Tries to send msg to given recipients.
     pub async fn send(&self, msg: ConsensusMsg, recipients: Vec<Author>) {
-        let mut network_sender = self.network_sender.clone();
+        let network_sender = self.network_sender.clone();
         let mut self_sender = self.self_sender.clone();
         for peer in recipients {
             if self.author == peer {

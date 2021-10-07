@@ -119,7 +119,7 @@ pub(crate) async fn process_transaction_broadcast<V>(
     log_txn_process_results(&results, Some(peer));
 
     let ack_response = gen_ack_response(request_id, results, &peer);
-    let mut network_sender = smp.network_interface.sender();
+    let network_sender = smp.network_interface.sender();
     if let Err(e) = network_sender.send_to(peer, ack_response) {
         counters::network_send_fail_inc(counters::ACK_TXNS);
         error!(

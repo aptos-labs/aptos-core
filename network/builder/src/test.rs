@@ -18,10 +18,10 @@ fn test_direct_send() {
     let tn = setup_network();
     let dialer_peer_id = tn.dialer_peer_id;
     let mut dialer_events = tn.dialer_events;
-    let mut dialer_sender = tn.dialer_sender;
+    let dialer_sender = tn.dialer_sender;
     let listener_peer_id = tn.listener_peer_id;
     let mut listener_events = tn.listener_events;
-    let mut listener_sender = tn.listener_sender;
+    let listener_sender = tn.listener_sender;
 
     let msg = DummyMsg(vec![]);
 
@@ -63,10 +63,10 @@ fn test_rpc() {
     let tn = setup_network();
     let dialer_peer_id = tn.dialer_peer_id;
     let mut dialer_events = tn.dialer_events;
-    let mut dialer_sender = tn.dialer_sender;
+    let dialer_sender = tn.dialer_sender;
     let listener_peer_id = tn.listener_peer_id;
     let mut listener_events = tn.listener_events;
-    let mut listener_sender = tn.listener_sender;
+    let listener_sender = tn.listener_sender;
 
     let msg = DummyMsg(vec![]);
 

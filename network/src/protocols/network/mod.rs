@@ -296,18 +296,14 @@ impl<TMessage> NewNetworkSender for NetworkSender<TMessage> {
 impl<TMessage> NetworkSender<TMessage> {
     /// Request that a given Peer be dialed at the provided `NetworkAddress` and
     /// synchronously wait for the request to be performed.
-    pub async fn dial_peer(
-        &mut self,
-        peer: PeerId,
-        addr: NetworkAddress,
-    ) -> Result<(), NetworkError> {
+    pub async fn dial_peer(&self, peer: PeerId, addr: NetworkAddress) -> Result<(), NetworkError> {
         self.connection_reqs_tx.dial_peer(peer, addr).await?;
         Ok(())
     }
 
     /// Request that a given Peer be disconnected and synchronously wait for the request to be
     /// performed.
-    pub async fn disconnect_peer(&mut self, peer: PeerId) -> Result<(), NetworkError> {
+    pub async fn disconnect_peer(&self, peer: PeerId) -> Result<(), NetworkError> {
         self.connection_reqs_tx.disconnect_peer(peer).await?;
         Ok(())
     }
@@ -317,7 +313,7 @@ impl<TMessage: Message> NetworkSender<TMessage> {
     /// Send a protobuf message to a single recipient. Provides a wrapper over
     /// `[peer_manager::PeerManagerRequestSender::send_to]`.
     pub fn send_to(
-        &mut self,
+        &self,
         recipient: PeerId,
         protocol: ProtocolId,
         message: TMessage,
@@ -330,7 +326,7 @@ impl<TMessage: Message> NetworkSender<TMessage> {
     /// Send a protobuf message to a many recipients. Provides a wrapper over
     /// `[peer_manager::PeerManagerRequestSender::send_to_many]`.
     pub fn send_to_many(
-        &mut self,
+        &self,
         recipients: impl Iterator<Item = PeerId>,
         protocol: ProtocolId,
         message: TMessage,
@@ -346,7 +342,7 @@ impl<TMessage: Message> NetworkSender<TMessage> {
     /// serialization and deserialization of the request and response respectively.
     /// Assumes that the request and response both have the same message type.
     pub async fn send_rpc(
-        &mut self,
+        &self,
         recipient: PeerId,
         protocol: ProtocolId,
         req_msg: TMessage,
@@ -367,12 +363,12 @@ impl<TMessage: Message> NetworkSender<TMessage> {
 /// It was already being implemented for every application, but is now standardized
 #[async_trait]
 pub trait ApplicationNetworkSender<TMessage: Send>: Clone {
-    fn send_to(&mut self, _recipient: PeerId, _message: TMessage) -> Result<(), NetworkError> {
+    fn send_to(&self, _recipient: PeerId, _message: TMessage) -> Result<(), NetworkError> {
         unimplemented!()
     }
 
     fn send_to_many(
-        &mut self,
+        &self,
         _recipients: impl Iterator<Item = PeerId>,
         _message: TMessage,
     ) -> Result<(), NetworkError> {
@@ -380,7 +376,7 @@ pub trait ApplicationNetworkSender<TMessage: Send>: Clone {
     }
 
     async fn send_rpc(
-        &mut self,
+        &self,
         recipient: PeerId,
         req_msg: TMessage,
         timeout: Duration,

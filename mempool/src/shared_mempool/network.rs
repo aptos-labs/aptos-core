@@ -118,7 +118,7 @@ impl NewNetworkSender for MempoolNetworkSender {
 
 #[async_trait]
 impl ApplicationNetworkSender<MempoolSyncMsg> for MempoolNetworkSender {
-    fn send_to(&mut self, recipient: PeerId, message: MempoolSyncMsg) -> Result<(), NetworkError> {
+    fn send_to(&self, recipient: PeerId, message: MempoolSyncMsg) -> Result<(), NetworkError> {
         fail_point!("mempool::send_to", |_| {
             Err(anyhow::anyhow!("Injected error in mempool::send_to").into())
         });
@@ -127,7 +127,7 @@ impl ApplicationNetworkSender<MempoolSyncMsg> for MempoolNetworkSender {
     }
 
     async fn send_rpc(
-        &mut self,
+        &self,
         _recipient: PeerId,
         _req_msg: MempoolSyncMsg,
         _timeout: Duration,
@@ -451,7 +451,7 @@ impl MempoolNetworkInterface {
             return;
         }
 
-        let mut network_sender = smp.network_interface.sender();
+        let network_sender = smp.network_interface.sender();
 
         let num_txns = transactions.len();
         if let Err(e) = network_sender.send_to(

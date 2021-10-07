@@ -158,14 +158,14 @@ impl ConsensusNetworkSender {
 #[async_trait]
 impl ApplicationNetworkSender<ConsensusMsg> for ConsensusNetworkSender {
     /// Send a single message to the destination peer using available ProtocolId.
-    fn send_to(&mut self, recipient: PeerId, message: ConsensusMsg) -> Result<(), NetworkError> {
+    fn send_to(&self, recipient: PeerId, message: ConsensusMsg) -> Result<(), NetworkError> {
         let protocol = self.preferred_protocol_for_peer(recipient, DIRECT_SEND)?;
         self.network_sender.send_to(recipient, protocol, message)
     }
 
     /// Send a single message to the destination peers using available ProtocolId.
     fn send_to_many(
-        &mut self,
+        &self,
         recipients: impl Iterator<Item = PeerId>,
         message: ConsensusMsg,
     ) -> Result<(), NetworkError> {
@@ -188,7 +188,7 @@ impl ApplicationNetworkSender<ConsensusMsg> for ConsensusNetworkSender {
 
     /// Send a RPC to the destination peer using the `CONSENSUS_RPC_PROTOCOL` ProtocolId.
     async fn send_rpc(
-        &mut self,
+        &self,
         recipient: PeerId,
         message: ConsensusMsg,
         timeout: Duration,

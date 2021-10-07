@@ -277,7 +277,7 @@ impl RequestManager {
         let mut failed_peer_sends = vec![];
 
         for peer in peers {
-            let mut sender = self.get_network_sender(&peer);
+            let sender = self.get_network_sender(&peer);
             let peer_id = peer.peer_id();
             let send_result = sender.send_to(peer_id, msg.clone());
             let curr_log = log.clone().peer(&peer);

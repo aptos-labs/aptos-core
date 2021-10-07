@@ -37,7 +37,7 @@ const TOLERANCE: u32 = 20;
 fn direct_send_bench(b: &mut Bencher, msg_len: &usize) {
     let tn = setup_network();
     let runtime = tn.runtime;
-    let mut dialer_sender = tn.dialer_sender;
+    let dialer_sender = tn.dialer_sender;
     let listener_peer_id = tn.listener_peer_id;
     let mut listener_events = tn.listener_events;
 
@@ -118,7 +118,7 @@ fn rpc_bench(b: &mut Bencher, msg_len: &usize) {
 }
 
 async fn send_rpc(
-    mut sender: DummyNetworkSender,
+    sender: DummyNetworkSender,
     recipient: PeerId,
     req_msg: DummyMsg,
 ) -> Result<DummyMsg, RpcError> {

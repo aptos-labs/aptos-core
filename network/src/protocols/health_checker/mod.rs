@@ -111,7 +111,7 @@ impl ApplicationNetworkSender<HealthCheckerMsg> for HealthCheckerNetworkSender {
     /// The rpc request can be canceled at any point by dropping the returned
     /// future.
     async fn send_rpc(
-        &mut self,
+        &self,
         recipient: PeerId,
         req_msg: HealthCheckerMsg,
         timeout: Duration,
@@ -434,7 +434,7 @@ impl HealthChecker {
 
     async fn ping_peer(
         network_context: NetworkContext,
-        mut network_tx: HealthCheckerNetworkSender,
+        network_tx: HealthCheckerNetworkSender,
         peer_id: PeerId,
         round: u64,
         nonce: u32,

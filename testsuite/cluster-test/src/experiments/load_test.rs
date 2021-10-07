@@ -316,7 +316,7 @@ impl StubbedNode {
 
 async fn mempool_load_test(
     duration: Duration,
-    mut sender: MempoolNetworkSender,
+    sender: MempoolNetworkSender,
     mut events: MempoolNetworkEvents,
 ) -> Result<MempoolStats> {
     let new_peer_event = events.select_next_some().await;
@@ -410,7 +410,7 @@ impl fmt::Display for MempoolStatsRate {
 
 async fn state_sync_load_test(
     duration: Duration,
-    mut sender: StateSyncSender,
+    sender: StateSyncSender,
     mut events: StateSyncEvents,
 ) -> Result<StateSyncStats> {
     let new_peer_event = events.select_next_some().await;

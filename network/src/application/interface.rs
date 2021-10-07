@@ -77,21 +77,17 @@ impl<TMessage: Clone + Message + Send, Sender: ApplicationNetworkSender<TMessage
         }
     }
 
-    fn sender(&mut self, network_id: &NetworkId) -> &mut Sender {
-        self.senders.get_mut(network_id).expect("Unknown NetworkId")
+    fn sender(&self, network_id: &NetworkId) -> &Sender {
+        self.senders.get(network_id).expect("Unknown NetworkId")
     }
 
-    pub fn send_to(
-        &mut self,
-        recipient: PeerNetworkId,
-        message: TMessage,
-    ) -> Result<(), NetworkError> {
+    pub fn send_to(&self, recipient: PeerNetworkId, message: TMessage) -> Result<(), NetworkError> {
         self.sender(&recipient.network_id())
             .send_to(recipient.peer_id(), message)
     }
 
     pub fn send_to_many(
-        &mut self,
+        &self,
         recipients: impl Iterator<Item = PeerNetworkId>,
         message: TMessage,
     ) -> Result<(), NetworkError> {
@@ -106,7 +102,7 @@ impl<TMessage: Clone + Message + Send, Sender: ApplicationNetworkSender<TMessage
     }
 
     pub async fn send_rpc(
-        &mut self,
+        &self,
         recipient: PeerNetworkId,
         req_msg: TMessage,
         timeout: Duration,

@@ -88,7 +88,7 @@ impl SMRNode {
         let txn_manager = Arc::new(MockTransactionManager::new(Some(
             consensus_to_mempool_sender,
         )));
-        let (mut reconfig_sender, reconfig_events) = diem_channel::new(QueueStyle::LIFO, 1, None);
+        let (reconfig_sender, reconfig_events) = diem_channel::new(QueueStyle::LIFO, 1, None);
         let reconfig_listener = ReconfigNotificationListener {
             notification_receiver: reconfig_events,
         };
