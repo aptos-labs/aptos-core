@@ -25,7 +25,7 @@ use futures::{
     task::{Context, Poll},
 };
 use pin_project::pin_project;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use short_hex_str::AsShortHexStr;
 use std::{cmp::min, iter::FromIterator, marker::PhantomData, pin::Pin, time::Duration};
 
@@ -197,43 +197,39 @@ fn peer_mgr_notif_to_event<TMessage: Message>(
     notif: PeerManagerNotification,
 ) -> future::Ready<Option<Event<TMessage>>> {
     let maybe_event = match notif {
-        PeerManagerNotification::RecvRpc(peer_id, rpc_req) => {
-            match rpc_req.protocol_id.from_bytes(&rpc_req.data) {
-                Ok(req_msg) => Some(Event::RpcRequest(
-                    peer_id,
-                    req_msg,
-                    rpc_req.protocol_id,
-                    rpc_req.res_tx,
-                )),
-                Err(err) => {
-                    let data = &rpc_req.data;
-                    warn!(
-                        SecurityEvent::InvalidNetworkEvent,
-                        error = ?err,
-                        remote_peer_id = peer_id.short_str(),
-                        protocol_id = rpc_req.protocol_id,
-                        data_prefix = hex::encode(&data[..min(16, data.len())]),
-                    );
-                    None
-                }
+        PeerManagerNotification::RecvRpc(peer_id, rpc_req) => match rpc_req.to_message() {
+            Ok(req_msg) => Some(Event::RpcRequest(
+                peer_id,
+                req_msg,
+                rpc_req.protocol_id,
+                rpc_req.res_tx,
+            )),
+            Err(err) => {
+                let data = &rpc_req.data;
+                warn!(
+                    SecurityEvent::InvalidNetworkEvent,
+                    error = ?err,
+                    remote_peer_id = peer_id.short_str(),
+                    protocol_id = rpc_req.protocol_id,
+                    data_prefix = hex::encode(&data[..min(16, data.len())]),
+                );
+                None
             }
-        }
-        PeerManagerNotification::RecvMessage(peer_id, msg) => {
-            match msg.protocol_id.from_bytes(&msg.mdata) {
-                Ok(msg) => Some(Event::Message(peer_id, msg)),
-                Err(err) => {
-                    let data = &msg.mdata;
-                    warn!(
-                        SecurityEvent::InvalidNetworkEvent,
-                        error = ?err,
-                        remote_peer_id = peer_id.short_str(),
-                        protocol_id = msg.protocol_id,
-                        data_prefix = hex::encode(&data[..min(16, data.len())]),
-                    );
-                    None
-                }
+        },
+        PeerManagerNotification::RecvMessage(peer_id, msg) => match msg.to_message() {
+            Ok(msg) => Some(Event::Message(peer_id, msg)),
+            Err(err) => {
+                let data = &msg.mdata;
+                warn!(
+                    SecurityEvent::InvalidNetworkEvent,
+                    error = ?err,
+                    remote_peer_id = peer_id.short_str(),
+                    protocol_id = msg.protocol_id,
+                    data_prefix = hex::encode(&data[..min(16, data.len())]),
+                );
+                None
             }
-        }
+        },
     };
     future::ready(maybe_event)
 }
@@ -381,4 +377,16 @@ pub trait ApplicationNetworkSender<TMessage: Send>: Clone {
         req_msg: TMessage,
         timeout: Duration,
     ) -> Result<TMessage, RpcError>;
+}
+
+/// Generalized functionality for any request across `DirectSend` and `Rpc`.
+pub trait SerializedRequest {
+    fn protocol_id(&self) -> ProtocolId;
+    fn data(&self) -> &Bytes;
+
+    /// Converts the `SerializedMessage` into its deserialized version of `TMessage` based on the
+    /// `ProtocolId`.  See: [`ProtocolId::from_bytes`]
+    fn to_message<'a, TMessage: Deserialize<'a>>(&'a self) -> anyhow::Result<TMessage> {
+        self.protocol_id().from_bytes(self.data())
+    }
 }

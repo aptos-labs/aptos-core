@@ -27,7 +27,7 @@ use network::{
         PeerManagerRequestSender,
     },
     protocols::{
-        network::{NewNetworkEvents, NewNetworkSender},
+        network::{NewNetworkEvents, NewNetworkSender, SerializedRequest},
         rpc::InboundRpcRequest,
         wire::handshake::v1::ProtocolIdSet,
     },
@@ -227,7 +227,7 @@ impl NetworkPlayground {
         // copy message data
         let msg_copy = match &msg_notif {
             PeerManagerNotification::RecvMessage(src, msg) => {
-                let msg: ConsensusMsg = msg.protocol_id.from_bytes(&msg.mdata).unwrap();
+                let msg: ConsensusMsg = msg.to_message().unwrap();
                 (*src, msg)
             }
             msg_notif => panic!(
@@ -274,7 +274,7 @@ impl NetworkPlayground {
 
             let dst_twin_ids = self.get_twin_ids(dst);
             for (idx, dst_twin_id) in dst_twin_ids.iter().enumerate() {
-                let consensus_msg = msg.protocol_id.from_bytes(&msg.mdata).unwrap();
+                let consensus_msg = msg.to_message().unwrap();
 
                 // Deliver and copy message if it's not dropped
                 if !self.is_message_dropped(&src_twin_id, dst_twin_id, consensus_msg) {
@@ -390,7 +390,7 @@ impl NetworkPlayground {
             for dst_twin_id in dst_twin_ids.iter() {
                 let msg_notif =
                     PeerManagerNotification::RecvMessage(src_twin_id.author, msg.clone());
-                let consensus_msg = msg.protocol_id.from_bytes(&msg.mdata).unwrap();
+                let consensus_msg = msg.to_message().unwrap();
 
                 // Deliver and copy message it if it's not dropped
                 if !self.is_message_dropped(&src_twin_id, dst_twin_id, consensus_msg) {

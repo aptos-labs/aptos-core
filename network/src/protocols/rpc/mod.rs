@@ -51,8 +51,9 @@ use crate::{
     logging::NetworkSchema,
     peer::PeerNotification,
     peer_manager::PeerManagerError,
-    protocols::wire::messaging::v1::{
-        NetworkMessage, Priority, RequestId, RpcRequest, RpcResponse,
+    protocols::{
+        network::SerializedRequest,
+        wire::messaging::v1::{NetworkMessage, Priority, RequestId, RpcRequest, RpcResponse},
     },
     ProtocolId,
 };
@@ -104,6 +105,16 @@ pub struct InboundRpcRequest {
     pub res_tx: oneshot::Sender<Result<Bytes, RpcError>>,
 }
 
+impl SerializedRequest for InboundRpcRequest {
+    fn protocol_id(&self) -> ProtocolId {
+        self.protocol_id
+    }
+
+    fn data(&self) -> &Bytes {
+        &self.data
+    }
+}
+
 /// A wrapper struct for an outbound rpc request and its associated context.
 #[derive(Debug, Serialize)]
 pub struct OutboundRpcRequest {
@@ -129,6 +140,16 @@ pub struct OutboundRpcRequest {
     /// rpc layer will send an [`RpcError::TimedOut`] error over the
     /// `res_tx` channel to the upper client layer.
     pub timeout: Duration,
+}
+
+impl SerializedRequest for OutboundRpcRequest {
+    fn protocol_id(&self) -> ProtocolId {
+        self.protocol_id
+    }
+
+    fn data(&self) -> &Bytes {
+        &self.data
+    }
 }
 
 // Wraps the task of request id generation. Request ids start at 0 and increment till they hit

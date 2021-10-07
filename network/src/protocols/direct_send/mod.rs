@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::ProtocolId;
+use crate::{protocols::network::SerializedRequest, ProtocolId};
 use bytes::Bytes;
 use serde::Serialize;
 use std::fmt::Debug;
@@ -29,5 +29,15 @@ impl Debug for Message {
             "Message {{ protocol: {:?}, mdata: {} }}",
             self.protocol_id, mdata_str
         )
+    }
+}
+
+impl SerializedRequest for Message {
+    fn protocol_id(&self) -> ProtocolId {
+        self.protocol_id
+    }
+
+    fn data(&self) -> &Bytes {
+        &self.mdata
     }
 }
