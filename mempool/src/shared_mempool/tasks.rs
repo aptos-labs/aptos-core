@@ -334,6 +334,8 @@ fn log_txn_process_results(results: &[SubmissionStatusBundle], sender: Option<Pe
 // intra-node communication handlers //
 // ================================= //
 
+/// Only applies to Validators. Either provides transactions to consensus [`GetBlockRequest`] or
+/// handles rejecting transactions [`RejectNotification`]
 pub(crate) fn process_consensus_request(mempool: &Mutex<CoreMempool>, req: ConsensusRequest) {
     // Start latency timer
     let start_time = Instant::now();
@@ -392,6 +394,7 @@ pub(crate) fn process_consensus_request(mempool: &Mutex<CoreMempool>, req: Conse
     counters::mempool_service_latency(counter_label, result, latency);
 }
 
+/// Remove transactions that are committed (or rejected) so that we can stop broadcasting them.
 pub fn process_committed_transactions(
     mempool: &Mutex<CoreMempool>,
     transactions: Vec<TransactionSummary>,
@@ -413,7 +416,7 @@ pub fn process_committed_transactions(
     }
 }
 
-/// Processes on-chain reconfiguration notification.
+/// Processes on-chain reconfiguration notifications.  Restarts validator with the new info.
 pub(crate) async fn process_config_update<V>(
     config_update: OnChainConfigPayload,
     validator: Arc<RwLock<V>>,
