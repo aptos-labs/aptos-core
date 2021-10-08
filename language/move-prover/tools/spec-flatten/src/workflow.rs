@@ -3,12 +3,13 @@
 
 use anyhow::{anyhow, Result};
 use std::collections::BTreeMap;
+use structopt::StructOpt;
 
 use bytecode::{
     function_target_pipeline::FunctionTargetsHolder, options::ProverOptions,
     pipeline_factory::default_pipeline_with_options,
 };
-use move_lang::shared::NumericalAddress;
+use move_lang::shared::{parse_named_address, NumericalAddress};
 use move_model::{
     ast::Spec,
     model::{FunId, GlobalEnv, QualifiedId, VerificationScope},
@@ -17,14 +18,39 @@ use move_model::{
 };
 use move_prover::{cli::Options as CliOptions, generate_boogie, verify_boogie};
 
-use crate::options::FlattenOptions;
+/// Options passed into the workflow pipeline.
+#[derive(StructOpt, Clone)]
+pub struct WorkflowOptions {
+    /// Sources of the target modules
+    pub srcs: Vec<String>,
 
-pub(crate) fn prepare(options: &FlattenOptions) -> Result<(GlobalEnv, FunctionTargetsHolder)> {
+    /// Dependencies
+    #[structopt(short = "d", long = "dependency")]
+    pub deps: Vec<String>,
+
+    /// Target function
+    #[structopt(short, long)]
+    pub target: Option<String>,
+
+    /// Do not include default named address
+    #[structopt(long = "no-default-named-addresses")]
+    pub no_default_named_addresses: bool,
+
+    /// Extra mappings for named address
+    #[structopt(short = "a", long = "address", parse(try_from_str = parse_named_address))]
+    pub named_addresses_extra: Option<Vec<(String, NumericalAddress)>>,
+
+    /// Verbose mode
+    #[structopt(short, long)]
+    pub verbose: bool,
+}
+
+pub(crate) fn prepare(options: &WorkflowOptions) -> Result<(GlobalEnv, FunctionTargetsHolder)> {
     prepare_with_override(options, BTreeMap::new())
 }
 
 pub(crate) fn prepare_with_override(
-    options: &FlattenOptions,
+    options: &WorkflowOptions,
     spec_override: BTreeMap<QualifiedId<FunId>, Spec>,
 ) -> Result<(GlobalEnv, FunctionTargetsHolder)> {
     // build mapping for named addresses
@@ -96,7 +122,7 @@ pub(crate) fn prepare_with_override(
 }
 
 pub(crate) fn prove(
-    options: &FlattenOptions,
+    options: &WorkflowOptions,
     env: &GlobalEnv,
     targets: &FunctionTargetsHolder,
 ) -> Result<bool> {
@@ -115,7 +141,7 @@ pub(crate) fn prove(
 // utilities
 //
 
-fn get_prover_options(options: &FlattenOptions) -> ProverOptions {
+fn get_prover_options(options: &WorkflowOptions) -> ProverOptions {
     let verify_scope = match &options.target {
         None => VerificationScope::All,
         Some(target) => VerificationScope::Only(target.clone()),
@@ -126,7 +152,7 @@ fn get_prover_options(options: &FlattenOptions) -> ProverOptions {
     }
 }
 
-fn get_cli_options(options: &FlattenOptions) -> CliOptions {
+fn get_cli_options(options: &WorkflowOptions) -> CliOptions {
     CliOptions {
         move_sources: options.srcs.clone(),
         move_deps: options.deps.clone(),
