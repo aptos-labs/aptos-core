@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_api_types::{Error, LedgerInfo, MoveConverter};
+use diem_api_types::{Error, LedgerInfo, MoveConverter, TransactionOnChainData};
 use diem_crypto::HashValue;
 use diem_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
 use diem_types::{
@@ -11,10 +11,7 @@ use diem_types::{
     chain_id::ChainId,
     ledger_info::LedgerInfoWithSignatures,
     protocol_spec::DpnProto,
-    transaction::{
-        default_protocol::{TransactionListWithProof, TransactionWithProof},
-        SignedTransaction,
-    },
+    transaction::{SignedTransaction, TransactionInfo},
 };
 use storage_interface::MoveDbReader;
 
@@ -109,7 +106,7 @@ impl Context {
         start_version: u64,
         limit: u16,
         ledger_version: u64,
-    ) -> Result<TransactionListWithProof> {
+    ) -> Result<Vec<TransactionOnChainData<TransactionInfo>>> {
         let data = self
             .db
             .get_transactions(start_version, limit as u64, ledger_version, true)?;
@@ -124,25 +121,35 @@ impl Context {
             start_version
         );
 
-        let txns_len = data.transactions.len();
-        let infos_len = data.proof.transaction_infos.len();
-        let events_len = data.events.as_ref().map(|e| e.len()).unwrap_or_default();
+        let txns = data.transactions;
+        let infos = data.proof.transaction_infos;
+        let events = data.events.unwrap_or_default();
         ensure!(
-            txns_len == infos_len && txns_len == events_len,
+            txns.len() == infos.len() && txns.len() == events.len(),
             "invalid data size from database: {}, {}, {}",
-            txns_len,
-            infos_len,
-            events_len
+            txns.len(),
+            infos.len(),
+            events.len()
         );
-        Ok(data)
+
+        Ok(txns
+            .into_iter()
+            .zip(infos.into_iter())
+            .zip(events.into_iter())
+            .enumerate()
+            .map(|(i, ((txn, info), events))| (start_version + i as u64, txn, info, events).into())
+            .collect())
     }
 
     pub fn get_transaction_by_hash(
         &self,
         hash: HashValue,
         ledger_version: u64,
-    ) -> Result<Option<TransactionWithProof>> {
-        self.db.get_transaction_by_hash(hash, ledger_version, true)
+    ) -> Result<Option<TransactionOnChainData<TransactionInfo>>> {
+        Ok(self
+            .db
+            .get_transaction_by_hash(hash, ledger_version, true)?
+            .map(|t| t.into()))
     }
 
     pub async fn get_pending_transaction_by_hash(
@@ -164,8 +171,10 @@ impl Context {
         &self,
         version: u64,
         ledger_version: u64,
-    ) -> Result<TransactionWithProof> {
-        self.db
-            .get_transaction_by_version(version, ledger_version, true)
+    ) -> Result<TransactionOnChainData<TransactionInfo>> {
+        Ok(self
+            .db
+            .get_transaction_by_version(version, ledger_version, true)?
+            .into())
     }
 }

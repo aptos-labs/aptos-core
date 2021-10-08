@@ -6,11 +6,11 @@ use std::{fmt, str::FromStr};
 use crate::{context::Context, page::Page};
 
 use diem_api_types::{
-    mime_types, Error, HashValue, LedgerInfo, Response, Transaction,
+    mime_types, Error, HashValue, LedgerInfo, Response, Transaction, TransactionData,
 };
 use diem_types::{
     mempool_status::MempoolStatusCode,
-    transaction::{default_protocol::TransactionWithProof, SignedTransaction},
+    transaction::{SignedTransaction, TransactionInfo},
 };
 
 use anyhow::{format_err, Result};
@@ -135,15 +135,10 @@ impl Transactions {
             .get_transactions(start_version, limit, ledger_version)?;
 
         let converter = self.context.move_converter();
-        let infos = data.proof.transaction_infos;
-        let events = data.events.unwrap_or_default();
+
         let txns: Vec<Transaction> = data
-            .transactions
-            .iter()
-            .enumerate()
-            .map(|(i, txn)| {
-                converter.try_into_transaction(start_version + i as u64, txn, &infos[i], &events[i])
-            })
+            .into_iter()
+            .map(|t| converter.try_into_onchain_transaction(t))
             .collect::<Result<_>>()?;
         Response::new(self.ledger_info, &txns)
     }
@@ -156,15 +151,7 @@ impl Transactions {
         .ok_or_else(|| self.transaction_not_found(id))?;
 
         let converter = self.context.move_converter();
-        let ret = match txn_data {
-            TransactionData::OnChain(txn) => converter.try_into_transaction(
-                txn.version,
-                &txn.transaction,
-                txn.proof.transaction_info(),
-                &txn.events.unwrap_or_default(),
-            )?,
-            TransactionData::Pending(txn) => converter.try_into_pending_transaction(txn)?,
-        };
+        let ret = converter.try_into_transaction(txn_data)?;
 
         Response::new(self.ledger_info, &ret)
     }
@@ -176,32 +163,35 @@ impl Transactions {
         )
     }
 
-    fn get_by_version(&self, version: u64) -> Result<Option<TransactionData>> {
+    fn get_by_version(&self, version: u64) -> Result<Option<TransactionData<TransactionInfo>>> {
         if version > self.ledger_info.version() {
             return Ok(None);
         }
-        Ok(Some(TransactionData::OnChain(
+        Ok(Some(
             self.context
-                .get_transaction_by_version(version, self.ledger_info.version())?,
-        )))
+                .get_transaction_by_version(version, self.ledger_info.version())?
+                .into(),
+        ))
     }
 
     // This function looks for the transaction by hash in database and then mempool,
     // because the period a transaction stay in the mempool is likely short.
     // Although the mempool get transation is async, but looking up txn in database is a sync call,
     // thus we keep it simple and call them in sequence.
-    async fn get_by_hash(&self, hash: diem_crypto::HashValue) -> Result<Option<TransactionData>> {
+    async fn get_by_hash(
+        &self,
+        hash: diem_crypto::HashValue,
+    ) -> Result<Option<TransactionData<TransactionInfo>>> {
         let from_db = self
             .context
-            .get_transaction_by_hash(hash, self.ledger_info.version())?
-            .map(TransactionData::OnChain);
+            .get_transaction_by_hash(hash, self.ledger_info.version())?;
         Ok(match from_db {
             None => self
                 .context
                 .get_pending_transaction_by_hash(hash)
                 .await?
-                .map(TransactionData::Pending),
-            _ => from_db,
+                .map(|t| t.into()),
+            _ => from_db.map(|t| t.into()),
         })
     }
 }
@@ -236,12 +226,6 @@ impl fmt::Display for TransactionId {
             Self::Version(v) => write!(f, "Version({})", v),
         }
     }
-}
-
-#[derive(Clone, Debug)]
-enum TransactionData {
-    OnChain(TransactionWithProof),
-    Pending(SignedTransaction),
 }
 
 #[cfg(any(test))]
@@ -286,7 +270,7 @@ mod tests {
         assert_eq!(txn["type"], "genesis_transaction");
         assert_eq!(txn["version"], "0");
 
-        let info = txns.proof.transaction_infos[0].clone();
+        let info = txns[0].info.clone();
         assert_eq!(txn["hash"], info.transaction_hash().to_hex_literal());
         assert_eq!(
             txn["state_root_hash"],
@@ -494,16 +478,13 @@ mod tests {
         assert_eq!(2, txns.as_array().unwrap().len());
 
         let expected_txns = context.get_transactions(1, 2);
-        assert_eq!(2, expected_txns.proof.transaction_infos.len());
+        assert_eq!(2, expected_txns.len());
 
-        let metadata = expected_txns.proof.transaction_infos[0].clone();
+        let metadata = expected_txns[0].info.clone();
 
-        let metadata_txn = match &expected_txns.transactions[0] {
+        let metadata_txn = match &expected_txns[0].transaction {
             Transaction::BlockMetadata(txn) => txn.clone(),
-            _ => panic!(
-                "unexpected transaction: {:?}",
-                expected_txns.transactions[0]
-            ),
+            _ => panic!("unexpected transaction: {:?}", expected_txns[0].transaction),
         };
         assert_json(
             txns[0].clone(),
@@ -524,7 +505,7 @@ mod tests {
             }),
         );
 
-        let user_txn_info = expected_txns.proof.transaction_infos[1].clone();
+        let user_txn_info = expected_txns[1].info.clone();
         let (public_key, sig) = match txn.authenticator() {
             TransactionAuthenticator::Ed25519 {
                 public_key,
@@ -620,7 +601,7 @@ mod tests {
         assert_eq!(1, txns.as_array().unwrap().len());
 
         let expected_txns = context.get_transactions(2, 1);
-        assert_eq!(1, expected_txns.proof.transaction_infos.len());
+        assert_eq!(1, expected_txns.len());
 
         assert_json(
             txns[0]["payload"].clone(),
@@ -674,7 +655,7 @@ mod tests {
         assert_eq!(1, txns.as_array().unwrap().len());
 
         let expected_txns = context.get_transactions(2, 1);
-        assert_eq!(1, expected_txns.proof.transaction_infos.len());
+        assert_eq!(1, expected_txns.len());
 
         assert_json(
             txns[0]["payload"].clone(),

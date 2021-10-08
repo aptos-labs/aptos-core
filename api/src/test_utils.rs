@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{context::Context, index};
-use diem_api_types::{mime_types, X_DIEM_CHAIN_ID, X_DIEM_LEDGER_TIMESTAMP, X_DIEM_LEDGER_VERSION};
+use diem_api_types::{
+    mime_types, TransactionOnChainData, X_DIEM_CHAIN_ID, X_DIEM_LEDGER_TIMESTAMP,
+    X_DIEM_LEDGER_VERSION,
+};
 use diem_crypto::hash::HashValue;
 use diem_genesis_tool::validator_builder::{RootKeys, ValidatorBuilder};
 use diem_global_constants::OWNER_ACCOUNT;
@@ -25,7 +28,7 @@ use diem_types::{
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::VMPublishingOption,
     protocol_spec::DpnProto,
-    transaction::{default_protocol::TransactionListWithProof, Transaction, TransactionStatus},
+    transaction::{Transaction, TransactionInfo, TransactionStatus},
 };
 use diem_vm::DiemVM;
 use diemdb::DiemDB;
@@ -155,7 +158,11 @@ impl TestContext {
         self.context.get_latest_ledger_info().unwrap()
     }
 
-    pub fn get_transactions(&self, start: u64, limit: u16) -> TransactionListWithProof {
+    pub fn get_transactions(
+        &self,
+        start: u64,
+        limit: u16,
+    ) -> Vec<TransactionOnChainData<TransactionInfo>> {
         self.context
             .get_transactions(start, limit, self.get_latest_ledger_info().version())
             .unwrap()

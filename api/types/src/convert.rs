@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    Event, MoveResource, Transaction, TransactionPayload, WriteSetChange, WriteSetPayload,
+    transaction::TransactionOnChainData, Event, MoveResource, Transaction, TransactionData,
+    TransactionPayload, WriteSetChange, WriteSetPayload,
 };
 use diem_types::{
     access_path::Path,
@@ -46,23 +47,30 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
 
     pub fn try_into_transaction<T: TransactionInfoTrait>(
         &self,
-        version: u64,
-        submitted: &diem_types::transaction::Transaction,
-        info: &T,
-        contract_events: &[ContractEvent],
+        data: TransactionData<T>,
+    ) -> Result<Transaction> {
+        match data {
+            TransactionData::OnChain(txn) => self.try_into_onchain_transaction(txn),
+            TransactionData::Pending(txn) => self.try_into_pending_transaction(*txn),
+        }
+    }
+
+    pub fn try_into_onchain_transaction<T: TransactionInfoTrait>(
+        &self,
+        data: TransactionOnChainData<T>,
     ) -> Result<Transaction> {
         use diem_types::transaction::Transaction::*;
-        let events = self.try_into_events(contract_events)?;
-        let ret = match submitted {
+        let events = self.try_into_events(&data.events)?;
+        let ret = match data.transaction {
             UserTransaction(txn) => {
                 let payload = self.try_into_transaction_payload(txn.payload())?;
-                (version, txn, info, payload, events).into()
+                (data.version, &txn, &data.info, payload, events).into()
             }
             GenesisTransaction(write_set) => {
-                let payload = self.try_into_write_set_payload(write_set)?;
-                (version, info, payload, events).into()
+                let payload = self.try_into_write_set_payload(&write_set)?;
+                (data.version, &data.info, payload, events).into()
             }
-            BlockMetadata(txn) => (version, txn, info).into(),
+            BlockMetadata(txn) => (data.version, &txn, &data.info).into(),
         };
         Ok(ret)
     }

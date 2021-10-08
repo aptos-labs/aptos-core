@@ -17,6 +17,7 @@ use diem_types::{
     contract_event::ContractEvent,
     transaction::{
         authenticator::{AccountAuthenticator, TransactionAuthenticator},
+        default_protocol::TransactionWithProof,
         Script, SignedTransaction, TransactionInfoTrait,
     },
 };
@@ -28,6 +29,70 @@ use std::{
     boxed::Box,
     convert::{From, Into, TryFrom, TryInto},
 };
+
+#[derive(Clone, Debug)]
+pub enum TransactionData<T: TransactionInfoTrait> {
+    OnChain(TransactionOnChainData<T>),
+    Pending(Box<SignedTransaction>),
+}
+
+impl<T: TransactionInfoTrait> From<TransactionOnChainData<T>> for TransactionData<T> {
+    fn from(txn: TransactionOnChainData<T>) -> Self {
+        Self::OnChain(txn)
+    }
+}
+
+impl<T: TransactionInfoTrait> From<SignedTransaction> for TransactionData<T> {
+    fn from(txn: SignedTransaction) -> Self {
+        Self::Pending(Box::new(txn))
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TransactionOnChainData<T: TransactionInfoTrait> {
+    pub version: u64,
+    pub transaction: diem_types::transaction::Transaction,
+    pub info: T,
+    pub events: Vec<ContractEvent>,
+}
+
+impl From<TransactionWithProof>
+    for TransactionOnChainData<diem_types::transaction::TransactionInfo>
+{
+    fn from(txn: TransactionWithProof) -> Self {
+        Self {
+            version: txn.version,
+            transaction: txn.transaction,
+            info: txn.proof.transaction_info,
+            events: txn.events.unwrap_or_default(),
+        }
+    }
+}
+
+impl<T: TransactionInfoTrait>
+    From<(
+        u64,
+        diem_types::transaction::Transaction,
+        T,
+        Vec<ContractEvent>,
+    )> for TransactionOnChainData<T>
+{
+    fn from(
+        (version, transaction, info, events): (
+            u64,
+            diem_types::transaction::Transaction,
+            T,
+            Vec<ContractEvent>,
+        ),
+    ) -> Self {
+        Self {
+            version,
+            transaction,
+            info,
+            events,
+        }
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
