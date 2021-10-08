@@ -5,6 +5,7 @@ use crate::{experimental::pipeline_phase::StatelessPipeline, state_replication::
 use anyhow::Result;
 use async_trait::async_trait;
 use consensus_types::executed_block::ExecutedBlock;
+use diem_crypto::HashValue;
 use executor_types::Error as ExecutionError;
 use std::{
     fmt::{Debug, Display, Formatter},
@@ -34,6 +35,7 @@ impl Display for ExecutionRequest {
 }
 
 pub struct ExecutionResponse {
+    pub block_id: HashValue,
     pub inner: Result<Vec<ExecutedBlock>, ExecutionError>,
 }
 
@@ -53,6 +55,7 @@ impl StatelessPipeline for ExecutionPhase {
     type Response = ExecutionResponse;
     async fn process(&self, req: ExecutionRequest) -> ExecutionResponse {
         let ExecutionRequest { ordered_blocks } = req;
+        let block_id = ordered_blocks.last().unwrap().id();
 
         // execute the blocks with execution_correctness_client
         let inner = ordered_blocks
@@ -64,6 +67,6 @@ impl StatelessPipeline for ExecutionPhase {
             })
             .collect::<Result<Vec<ExecutedBlock>, ExecutionError>>();
 
-        ExecutionResponse { inner }
+        ExecutionResponse { block_id, inner }
     }
 }

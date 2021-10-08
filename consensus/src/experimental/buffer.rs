@@ -70,7 +70,7 @@ impl<T: Hashable> Buffer<T> {
 
     pub fn pop_front(&mut self) -> Option<T> {
         self.head.take().map(|head| {
-            let item = self.map.get_mut(&head).unwrap();
+            let mut item = self.map.remove(&head).unwrap();
             let elem = item.elem.take();
             self.head = item.next;
             if self.head.is_none() {
@@ -112,10 +112,17 @@ impl<T: Hashable> Buffer<T> {
             .unwrap()
     }
 
+    pub fn exist(&self, cursor: &Cursor) -> bool {
+        cursor.map_or(false, |key| self.map.contains_key(&key))
+    }
+
     /// find_elem returns the first item non-prior to `cursor` that compare(item) is true
     /// if no such item exists, the function returns None
     pub fn find_elem_from<F: Fn(&T) -> bool>(&self, cursor: Cursor, compare: F) -> Cursor {
         let mut current = cursor;
+        if !self.exist(&cursor) {
+            return None;
+        }
         while current.is_some() {
             if compare(self.get(&current)) {
                 return current;

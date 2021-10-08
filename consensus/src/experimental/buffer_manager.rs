@@ -142,6 +142,7 @@ impl BufferManager {
             ordered_proof,
             callback,
         } = ordered_blocks;
+        debug!("Receive ordered block {}", ordered_proof.commit_info());
 
         let item = BufferItem::new_ordered(ordered_blocks, ordered_proof, callback);
         self.buffer.push_back(item);
@@ -152,6 +153,10 @@ impl BufferManager {
     async fn advance_execution_root(&mut self) {
         let cursor = self.execution_root.or_else(|| *self.buffer.head_cursor());
         self.execution_root = self.buffer.find_elem_from(cursor, |item| item.is_ordered());
+        debug!(
+            "Advance execution root from {:?} to {:?}",
+            cursor, self.execution_root
+        );
         if self.execution_root.is_some() {
             let ordered_blocks = self.buffer.get(&self.execution_root).get_blocks().clone();
             self.execution_phase_tx
@@ -168,6 +173,10 @@ impl BufferManager {
         self.signing_root = self
             .buffer
             .find_elem_from(cursor, |item| item.is_executed());
+        debug!(
+            "Advance signing root from {:?} to {:?}",
+            cursor, self.signing_root
+        );
         if self.signing_root.is_some() {
             let item = self.buffer.get(&self.signing_root);
             let executed_item = item.unwrap_executed_ref();
@@ -192,14 +201,6 @@ impl BufferManager {
     /// Send persist request.
     async fn advance_head(&mut self, target_block_id: HashValue) {
         let mut blocks_to_persist: Vec<Arc<ExecutedBlock>> = vec![];
-        // reset if signing root is part of the aggregated prefix, this is not efficient we probably should revisit it later
-        let reset_signing = self
-            .buffer
-            .find_elem_by_key(self.signing_root, target_block_id)
-            .is_some();
-        if reset_signing {
-            self.signing_root = None;
-        }
 
         while let Some(item) = self.buffer.pop_front() {
             blocks_to_persist.extend(
@@ -208,6 +209,12 @@ impl BufferManager {
                     .map(|eb| Arc::new(eb.clone()))
                     .collect::<Vec<Arc<ExecutedBlock>>>(),
             );
+            if self.signing_root == Some(item.block_id()) {
+                self.signing_root = None;
+            }
+            if self.execution_root == Some(item.block_id()) {
+                self.execution_root = None;
+            }
             if item.block_id() == target_block_id {
                 let aggregated_item = item.unwrap_aggregated();
                 self.persisting_phase_tx
@@ -224,9 +231,7 @@ impl BufferManager {
                     })
                     .await
                     .expect("Failed to send persist request");
-                if reset_signing {
-                    self.advance_signing_root().await;
-                }
+                debug!("Advance head to {:?}", self.buffer.head_cursor());
                 return;
             }
         }
@@ -236,6 +241,7 @@ impl BufferManager {
     /// It pops everything in the buffer and if reconfig flag is set, it stops the main loop
     fn process_reset_request(&mut self, request: ResetRequest) {
         let ResetRequest { tx, reconfig } = request;
+        debug!("Receive reset");
 
         self.epoch_ends = reconfig;
         self.buffer = Buffer::new();
@@ -247,21 +253,31 @@ impl BufferManager {
 
     /// If the response is successful, advance the item to Executed, otherwise panic (TODO fix).
     async fn process_execution_response(&mut self, response: ExecutionResponse) {
-        let ExecutionResponse { inner } = response;
-        let executed_blocks = inner.expect("Execution failure");
-        let block_id = executed_blocks.last().unwrap().id();
-
+        let ExecutionResponse { block_id, inner } = response;
         // find the corresponding item, may not exist if a reset or aggregated happened
         let current_cursor = self.buffer.find_elem_by_key(self.execution_root, block_id);
+        if current_cursor.is_none() {
+            return;
+        }
 
-        if current_cursor.is_some() {
-            let item = self.buffer.take(&current_cursor);
-            let new_item = item.advance_to_executed_or_aggregated(executed_blocks, &self.verifier);
-            let aggregated = new_item.is_aggregated();
-            self.buffer.set(&current_cursor, new_item);
-            if aggregated {
-                self.advance_head(block_id).await;
+        let executed_blocks = match inner {
+            Ok(result) => result,
+            Err(e) => {
+                error!("Execution error {:?}", e);
+                return;
             }
+        };
+        debug!(
+            "Receive executed response {}",
+            executed_blocks.last().unwrap().block_info()
+        );
+
+        let item = self.buffer.take(&current_cursor);
+        let new_item = item.advance_to_executed_or_aggregated(executed_blocks, &self.verifier);
+        let aggregated = new_item.is_aggregated();
+        self.buffer.set(&current_cursor, new_item);
+        if aggregated {
+            self.advance_head(block_id).await;
         }
     }
 
@@ -278,6 +294,10 @@ impl BufferManager {
                 return;
             }
         };
+        debug!(
+            "Receive signing response {}",
+            commit_ledger_info.commit_info()
+        );
         // find the corresponding item, may not exist if a reset or aggregated happened
         let current_cursor = self
             .buffer
@@ -295,6 +315,8 @@ impl BufferManager {
                 self.commit_msg_tx
                     .broadcast(ConsensusMsg::CommitVoteMsg(Box::new(commit_vote)))
                     .await;
+            } else {
+                self.buffer.set(&current_cursor, item);
             }
         }
     }
@@ -306,6 +328,7 @@ impl BufferManager {
         match commit_msg {
             VerifiedEvent::CommitVote(vote) => {
                 // find the corresponding item
+                debug!("Receive commit vote {}", vote.commit_info());
                 let target_block_id = vote.commit_info().id();
                 let current_cursor = self
                     .buffer
@@ -327,6 +350,10 @@ impl BufferManager {
             }
             VerifiedEvent::CommitDecision(commit_proof) => {
                 let target_block_id = commit_proof.ledger_info().commit_info().id();
+                debug!(
+                    "Receive commit decision {}",
+                    commit_proof.ledger_info().commit_info()
+                );
                 let cursor = self
                     .buffer
                     .find_elem_by_key(*self.buffer.head_cursor(), target_block_id);
@@ -353,9 +380,12 @@ impl BufferManager {
     /// note that there might be other signed items after the signing root
     async fn retry_broadcasting_commit_votes(&mut self) {
         let mut cursor = *self.buffer.head_cursor();
-        while cursor.is_some() && !cursor_eq(&cursor, &self.signing_root) {
+        while cursor.is_some() {
             {
                 let item = self.buffer.get(&cursor);
+                if !item.is_signed() {
+                    break;
+                }
                 let signed_item = item.unwrap_signed_ref();
                 self.commit_msg_tx
                     .broadcast(ConsensusMsg::CommitVoteMsg(Box::new(
@@ -397,6 +427,12 @@ impl BufferManager {
                 Some(commit_msg) = self.commit_msg_rx.next() => {
                     if let Some(aggregated_block_id) = self.process_commit_message(commit_msg) {
                         self.advance_head(aggregated_block_id).await;
+                        if self.execution_root.is_none() {
+                            self.advance_execution_root().await;
+                        }
+                        if self.signing_root.is_none() {
+                            self.advance_signing_root().await;
+                        }
                     }
                 }
                 _ = interval.tick() => {

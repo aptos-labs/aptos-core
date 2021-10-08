@@ -10,6 +10,7 @@ use consensus_types::{
     common::Author, executed_block::ExecutedBlock, experimental::commit_vote::CommitVote,
 };
 use diem_crypto::ed25519::Ed25519Signature;
+use diem_logger::prelude::*;
 use diem_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
@@ -124,12 +125,20 @@ impl BufferItem {
                     validator,
                 );
                 if commit_proof.check_voting_power(validator).is_ok() {
+                    debug!(
+                        "{} advance to aggregated from ordered",
+                        commit_proof.commit_info().id()
+                    );
                     Self::Aggregated(Box::new(AggregatedItem {
                         executed_blocks,
                         commit_proof,
                         callback,
                     }))
                 } else {
+                    debug!(
+                        "{} advance to executed from ordered",
+                        commit_proof.commit_info().id()
+                    );
                     Self::Executed(Box::new(ExecutedItem {
                         executed_blocks,
                         commit_proof,
@@ -161,6 +170,7 @@ impl BufferItem {
                     commit_proof.ledger_info().clone(),
                     signature,
                 );
+                debug!("{} advance to signed", commit_proof.commit_info().id());
 
                 Self::Signed(Box::new(SignedItem {
                     executed_blocks,
@@ -186,10 +196,14 @@ impl BufferItem {
                 let SignedItem {
                     executed_blocks,
                     callback,
-                    commit_proof,
+                    commit_proof: local_commit_proof,
                     ..
                 } = *signed_item;
-                assert_eq!(commit_proof.commit_info(), commit_proof.commit_info(),);
+                assert_eq!(local_commit_proof.commit_info(), commit_proof.commit_info(),);
+                debug!(
+                    "{} advance to aggregated with commit decision",
+                    commit_proof.commit_info()
+                );
                 Self::Aggregated(Box::new(AggregatedItem {
                     executed_blocks,
                     callback,
@@ -204,6 +218,10 @@ impl BufferItem {
                     ..
                 } = *executed_item;
                 assert_eq!(commit_info, *commit_proof.commit_info());
+                debug!(
+                    "{} advance to aggregated with commit decision",
+                    commit_proof.commit_info()
+                );
                 Self::Aggregated(Box::new(AggregatedItem {
                     executed_blocks,
                     callback,
@@ -217,6 +235,10 @@ impl BufferItem {
                     .commit_info()
                     .match_ordered_only(commit_proof.commit_info()));
                 // can't aggregate it without execution, only store the signatures
+                debug!(
+                    "{} received commit decision in ordered stage",
+                    commit_proof.commit_info()
+                );
                 Self::Ordered(Box::new(OrderedItem {
                     unverified_signatures: commit_proof.signatures().clone(),
                     ..ordered
