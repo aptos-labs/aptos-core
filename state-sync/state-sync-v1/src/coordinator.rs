@@ -428,15 +428,11 @@ impl<T: ExecutorProxyTrait, M: MempoolNotificationSender> StateSyncCoordinator<T
     /// Notifies consensus of the given commit response.
     async fn notify_consensus_of_commit_response(
         &mut self,
-        result: Result<(), Error>,
         commit_notification: ConsensusCommitNotification,
     ) -> Result<(), Error> {
-        let result = result.map_err(|error| {
-            consensus_notifications::Error::UnexpectedErrorEncountered(format!("{:?}", error))
-        });
         if let Err(error) = self
             .consensus_listener
-            .respond_to_commit_notification(commit_notification, result)
+            .respond_to_commit_notification(commit_notification, Ok(()))
             .await
         {
             counters::COMMIT_FLOW_FAIL
@@ -469,18 +465,13 @@ impl<T: ExecutorProxyTrait, M: MempoolNotificationSender> StateSyncCoordinator<T
         self.update_sync_state_metrics_and_logs()?;
 
         // Notify mempool of the new commit
-        let commit_response = self
-            .notify_mempool_of_committed_transactions(committed_transactions)
-            .await
-            .map_err(|error| {
-                error!(LogSchema::new(LogEntry::CommitFlow).error(&error));
-                error
-            });
+        self.notify_mempool_of_committed_transactions(committed_transactions)
+            .await;
 
         // Notify consensus of the commit response
         if let Some(commit_notification) = commit_notification {
             if let Err(error) = self
-                .notify_consensus_of_commit_response(commit_response, commit_notification)
+                .notify_consensus_of_commit_response(commit_notification)
                 .await
             {
                 error!(LogSchema::new(LogEntry::CommitFlow).error(&error));
@@ -573,27 +564,30 @@ impl<T: ExecutorProxyTrait, M: MempoolNotificationSender> StateSyncCoordinator<T
     async fn notify_mempool_of_committed_transactions(
         &mut self,
         committed_transactions: Vec<Transaction>,
-    ) -> Result<(), Error> {
+    ) {
         let block_timestamp_usecs = self
             .local_state
             .committed_ledger_info()
             .ledger_info()
             .timestamp_usecs();
 
-        // Notify mempool of committed transactions
-        let send_notification = self.mempool_notifier.notify_new_commit(
-            committed_transactions,
-            block_timestamp_usecs,
-            self.config.mempool_commit_timeout_ms,
-        );
-        if let Err(error) = send_notification.await {
-            counters::COMMIT_FLOW_FAIL
-                .with_label_values(&[counters::MEMPOOL_LABEL])
-                .inc();
-            Err(error.into())
-        } else {
-            Ok(())
-        }
+        let mempool_notifier = self.mempool_notifier.clone();
+        let mempool_commit_timeout_ms = self.config.mempool_commit_timeout_ms;
+
+        // Spawn new task to asynchronously notify mempool of committed transactions
+        tokio::spawn(async move {
+            let send_notification = mempool_notifier.notify_new_commit(
+                committed_transactions,
+                block_timestamp_usecs,
+                mempool_commit_timeout_ms,
+            );
+            if let Err(error) = send_notification.await {
+                counters::COMMIT_FLOW_FAIL
+                    .with_label_values(&[counters::MEMPOOL_LABEL])
+                    .inc();
+                error!(LogSchema::new(LogEntry::CommitFlow).error(&error.into()));
+            }
+        });
     }
 
     /// Updates the metrics and logs based on the current (local) sync state.
@@ -1852,8 +1846,8 @@ mod tests {
         // update storage in the unit tests.
     }
 
-    #[test]
-    fn test_process_commit_notification() {
+    #[tokio::test]
+    async fn test_process_commit_notification() {
         // Create a coordinator for a validator node
         let mut validator_coordinator = test_utils::create_validator_coordinator();
 

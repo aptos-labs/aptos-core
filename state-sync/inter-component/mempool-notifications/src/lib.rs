@@ -34,7 +34,7 @@ pub enum Error {
 /// The interface between state sync and mempool, allowing state sync to notify
 /// mempool of events (e.g., newly committed transactions).
 #[async_trait]
-pub trait MempoolNotificationSender: Send {
+pub trait MempoolNotificationSender: Send + Clone + Sync + 'static {
     /// Notify mempool of the newly committed transactions at the specified block timestamp.
     async fn notify_new_commit(
         &self,

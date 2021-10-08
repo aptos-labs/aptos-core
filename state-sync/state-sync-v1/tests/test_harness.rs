@@ -74,6 +74,7 @@ use std::{
     collections::{BTreeMap, HashMap},
     ops::DerefMut,
     sync::Arc,
+    time::Duration,
 };
 use tokio::runtime::Runtime;
 use vm_genesis::GENESIS_KEYPAIR;
@@ -114,6 +115,9 @@ impl StateSyncPeer {
                 .unwrap()
                 .notify_new_commit(committed_txns, vec![]),
         ));
+
+        // TODO(joshlind): clean this up once we migrate to a new test harness.
+        std::thread::sleep(Duration::from_secs(1));
         let mempool_txns = mempool.read_timeline(0, signed_txns.len());
         for txn in signed_txns.iter() {
             assert!(!mempool_txns.contains(txn));
