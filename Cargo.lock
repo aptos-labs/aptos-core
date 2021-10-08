@@ -8098,7 +8098,6 @@ dependencies = [
  "bcs",
  "claim",
  "diem-crypto",
- "diem-infallible",
  "diem-types",
  "diem-workspace-hack",
  "move-core-types",

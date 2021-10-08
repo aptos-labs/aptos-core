@@ -4,10 +4,10 @@
 #![forbid(unsafe_code)]
 
 use diem_crypto::HashValue;
-use diem_infallible::RwLock;
 use diem_types::{
     account_state_blob::AccountStatesChunkWithProof,
     epoch_change::EpochChangeProof,
+    protocol_spec::DpnProto,
     transaction::{
         default_protocol::{TransactionListWithProof, TransactionOutputListWithProof},
         Version,
@@ -15,7 +15,7 @@ use diem_types::{
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use storage_interface::default_protocol::DbReaderWriter;
+use storage_interface::DbReader;
 use storage_service_types::{
     AccountStatesChunkWithProofRequest, CompleteDataRange, DataSummary,
     EpochEndingLedgerInfoRequest, ProtocolMetadata, ServerProtocolVersion, StorageServerSummary,
@@ -188,7 +188,7 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
 
 /// The interface into local storage (e.g., the Diem DB) used by the storage
 /// server to handle client requests.
-pub trait StorageReaderInterface {
+pub trait StorageReaderInterface: Clone {
     /// Returns a data summary of the underlying storage state.
     fn get_data_summary(&self) -> Result<DataSummary, Error>;
 
@@ -238,12 +238,13 @@ pub trait StorageReaderInterface {
 
 /// The underlying implementation of the StorageReaderInterface, used by the
 /// storage server.
+#[derive(Clone)]
 pub struct StorageReader {
-    storage: Arc<RwLock<DbReaderWriter>>,
+    storage: Arc<dyn DbReader<DpnProto>>,
 }
 
 impl StorageReader {
-    pub fn new(storage: Arc<RwLock<DbReaderWriter>>) -> Self {
+    pub fn new(storage: Arc<dyn DbReader<DpnProto>>) -> Self {
         Self { storage }
     }
 }
@@ -253,8 +254,6 @@ impl StorageReaderInterface for StorageReader {
         // Fetch the latest ledger info
         let latest_ledger_info_with_sigs = self
             .storage
-            .read()
-            .reader
             .get_latest_ledger_info()
             .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
         let latest_ledger_info = latest_ledger_info_with_sigs.ledger_info();
@@ -284,8 +283,6 @@ impl StorageReaderInterface for StorageReader {
     ) -> Result<TransactionListWithProof, Error> {
         let transaction_list_with_proof = self
             .storage
-            .read()
-            .reader
             .get_transactions(
                 start_version,
                 expected_num_transactions,
@@ -303,8 +300,6 @@ impl StorageReaderInterface for StorageReader {
     ) -> Result<EpochChangeProof, Error> {
         let epoch_change_proof = self
             .storage
-            .read()
-            .reader
             .get_epoch_ending_ledger_infos(start_epoch, expected_end_epoch)
             .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
         Ok(epoch_change_proof)

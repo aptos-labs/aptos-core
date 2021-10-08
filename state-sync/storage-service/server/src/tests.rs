@@ -7,7 +7,6 @@ use crate::{StorageReader, StorageServiceServer};
 use anyhow::Result;
 use claim::{assert_matches, assert_none, assert_some};
 use diem_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
-use diem_infallible::RwLock;
 use diem_types::{
     account_address::AccountAddress,
     account_state_blob::{default_protocol::AccountStateWithProof, AccountStateBlob},
@@ -28,13 +27,12 @@ use diem_types::{
             AccountTransactionsWithProof, TransactionListWithProof, TransactionOutputListWithProof,
             TransactionWithProof,
         },
-        RawTransaction, Script, SignedTransaction, Transaction, TransactionPayload,
-        TransactionToCommit, Version,
+        RawTransaction, Script, SignedTransaction, Transaction, TransactionPayload, Version,
     },
 };
 use move_core_types::language_storage::TypeTag;
 use std::{collections::BTreeMap, sync::Arc};
-use storage_interface::{DbReader, DbReaderWriter, DbWriter, Order, StartupInfo, TreeState};
+use storage_interface::{DbReader, Order, StartupInfo, TreeState};
 use storage_service_types::{
     AccountStatesChunkWithProofRequest, CompleteDataRange, DataSummary,
     EpochEndingLedgerInfoRequest, ProtocolMetadata, ServerProtocolVersion, StorageServerSummary,
@@ -290,7 +288,7 @@ fn test_get_epoch_ending_ledger_infos() {
 }
 
 fn create_storage_server() -> StorageServiceServer<StorageReader> {
-    let storage = Arc::new(RwLock::new(DbReaderWriter::new(MockDbReaderWriter)));
+    let storage = Arc::new(MockDbReaderWriter);
     let storage_reader = StorageReader::new(storage);
     StorageServiceServer::new(storage_reader)
 }
@@ -346,6 +344,7 @@ fn create_test_ledger_info_with_sigs(epoch: u64, version: u64) -> LedgerInfoWith
 }
 
 /// This is a mock of the DbReader and DbWriter for unit testing.
+#[derive(Clone)]
 struct MockDbReaderWriter;
 
 impl DbReader<DpnProto> for MockDbReaderWriter {
@@ -541,17 +540,6 @@ impl DbReader<DpnProto> for MockDbReaderWriter {
         &self,
         _known_version: u64,
     ) -> Result<LedgerInfoWithSignatures> {
-        unimplemented!()
-    }
-}
-
-impl DbWriter<DpnProto> for MockDbReaderWriter {
-    fn save_transactions(
-        &self,
-        _txns_to_commit: &[TransactionToCommit],
-        _first_version: Version,
-        _ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
-    ) -> Result<()> {
         unimplemented!()
     }
 }
