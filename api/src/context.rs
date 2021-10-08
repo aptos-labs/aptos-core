@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_api_types::{Error, LedgerInfo};
+use diem_api_types::{Error, LedgerInfo, MoveConverter};
 use diem_crypto::HashValue;
 use diem_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
 use diem_types::{
@@ -48,8 +48,8 @@ impl Context {
         }
     }
 
-    pub fn db(&self) -> &dyn MoveDbReader<DpnProto> {
-        self.db.borrow()
+    pub fn move_converter(&self) -> MoveConverter<dyn MoveDbReader<DpnProto> + '_> {
+        MoveConverter::new(self.db.borrow())
     }
 
     pub fn chain_id(&self) -> ChainId {

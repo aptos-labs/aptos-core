@@ -67,11 +67,11 @@ impl AnnotatedMoveValue {
     }
 }
 
-pub struct MoveValueAnnotator<'a, T> {
+pub struct MoveValueAnnotator<'a, T: ?Sized> {
     cache: Resolver<'a, T>,
 }
 
-impl<'a, T: MoveResolver> MoveValueAnnotator<'a, T> {
+impl<'a, T: MoveResolver + ?Sized> MoveValueAnnotator<'a, T> {
     pub fn new(view: &'a T) -> Self {
         Self {
             cache: Resolver::new(view),

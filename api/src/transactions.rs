@@ -6,7 +6,7 @@ use std::{fmt, str::FromStr};
 use crate::{context::Context, page::Page};
 
 use diem_api_types::{
-    mime_types, Error, HashValue, LedgerInfo, MoveConverter, Response, Transaction,
+    mime_types, Error, HashValue, LedgerInfo, Response, Transaction,
 };
 use diem_types::{
     mempool_status::MempoolStatusCode,
@@ -104,8 +104,7 @@ impl Transactions {
         let (mempool_status, vm_status_opt) = self.context.submit_transaction(txn.clone()).await?;
         match mempool_status.code {
             MempoolStatusCode::Accepted => {
-                let db = self.context.db();
-                let converter = MoveConverter::new(&db);
+                let converter = self.context.move_converter();
                 let pending_txn = converter.try_into_pending_transaction(txn)?;
                 let resp = Response::new(self.ledger_info, &pending_txn)?;
                 Ok(reply::with_status(resp, StatusCode::ACCEPTED))
@@ -135,9 +134,7 @@ impl Transactions {
             .context
             .get_transactions(start_version, limit, ledger_version)?;
 
-        let db = self.context.db();
-        let converter = MoveConverter::new(&db);
-
+        let converter = self.context.move_converter();
         let infos = data.proof.transaction_infos;
         let events = data.events.unwrap_or_default();
         let txns: Vec<Transaction> = data
@@ -158,8 +155,7 @@ impl Transactions {
         }
         .ok_or_else(|| self.transaction_not_found(id))?;
 
-        let db = self.context.db();
-        let converter = MoveConverter::new(&db);
+        let converter = self.context.move_converter();
         let ret = match txn_data {
             TransactionData::OnChain(txn) => converter.try_into_transaction(
                 txn.version,

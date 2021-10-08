@@ -3,7 +3,7 @@
 
 use crate::context::Context;
 
-use diem_api_types::{Address, Error, LedgerInfo, MoveConverter, MoveModuleBytecode, Response};
+use diem_api_types::{Address, Error, LedgerInfo, MoveModuleBytecode, Response};
 use diem_types::account_state::AccountState;
 
 use anyhow::Result;
@@ -65,9 +65,10 @@ impl Account {
     }
 
     pub fn resources(self) -> Result<impl Reply, Error> {
-        let db = self.context.db();
-        let converter = MoveConverter::new(&db);
-        let resources = converter.try_into_resources(self.account_state()?.get_resources())?;
+        let resources = self
+            .context
+            .move_converter()
+            .try_into_resources(self.account_state()?.get_resources())?;
         Response::new(self.ledger_info, &resources)
     }
 
