@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use criterion::{measurement::Measurement, BatchSize, Bencher};
-use diem_types::transaction::SignedTransaction;
+use diem_framework_releases::current_modules;
+use diem_types::transaction::{SignedTransaction, Transaction};
+use diem_vm::{parallel_executor::ParallelDiemVM, read_write_set_analysis::add_on_functions_list};
 use language_e2e_tests::{
     account_universe::{log_balance_strategy, AUTransactionGen, AccountUniverseGen},
     executor::FakeExecutor,
@@ -13,6 +15,8 @@ use proptest::{
     strategy::{Strategy, ValueTree},
     test_runner::TestRunner,
 };
+use read_write_set::analyze;
+use read_write_set_dynamic::NormalizedReadWriteSetAnalysis;
 
 /// Benchmarking support for transactions.
 #[derive(Clone, Debug)]
@@ -31,7 +35,7 @@ where
     pub const DEFAULT_NUM_ACCOUNTS: usize = 100;
 
     /// The number of transactions created by default.
-    pub const DEFAULT_NUM_TRANSACTIONS: usize = 500;
+    pub const DEFAULT_NUM_TRANSACTIONS: usize = 1000;
 
     /// Creates a new transaction bencher with default settings.
     pub fn new(strategy: S) -> Self {
@@ -59,6 +63,22 @@ where
         b.iter_batched(
             || {
                 TransactionBenchState::with_size(
+                    &self.strategy,
+                    self.num_accounts,
+                    self.num_transactions,
+                )
+            },
+            |state| state.execute(),
+            // The input here is the entire list of signed transactions, so it's pretty large.
+            BatchSize::LargeInput,
+        )
+    }
+
+    /// Runs the bencher.
+    pub fn bench_parallel<M: Measurement>(&self, b: &mut Bencher<M>) {
+        b.iter_batched(
+            || {
+                ParallelBenchState::with_size(
                     &self.strategy,
                     self.num_accounts,
                     self.num_transactions,
@@ -157,4 +177,42 @@ fn universe_strategy(
     let max_balance = TXN_RESERVED * num_transactions as u64 * 5;
     let balance_strategy = log_balance_strategy(max_balance);
     AccountUniverseGen::strategy(num_accounts, balance_strategy)
+}
+
+struct ParallelBenchState {
+    bench_state: TransactionBenchState,
+    infer_results: NormalizedReadWriteSetAnalysis,
+}
+
+impl ParallelBenchState {
+    /// Creates a new benchmark state with the given number of accounts and transactions.
+    fn with_size<S>(strategy: S, num_accounts: usize, num_transactions: usize) -> Self
+    where
+        S: Strategy,
+        S::Value: AUTransactionGen,
+    {
+        Self {
+            bench_state: TransactionBenchState::with_universe(
+                strategy,
+                universe_strategy(num_accounts, num_transactions),
+                num_transactions,
+            ),
+            infer_results: analyze(current_modules().iter())
+                .unwrap()
+                .normalize_all_scripts(add_on_functions_list()),
+        }
+    }
+
+    fn execute(self) {
+        ParallelDiemVM::execute_block(
+            &self.infer_results,
+            self.bench_state
+                .transactions
+                .into_iter()
+                .map(Transaction::UserTransaction)
+                .collect(),
+            self.bench_state.executor.get_state_view(),
+        )
+        .expect("VM should not fail to start");
+    }
 }
