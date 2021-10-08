@@ -3,6 +3,12 @@
 
 #![forbid(unsafe_code)]
 
+pub mod network;
+
+#[cfg(test)]
+mod tests;
+
+use crate::network::StorageServiceNetworkEvents;
 use diem_crypto::HashValue;
 use diem_types::{
     account_state_blob::AccountStatesChunkWithProof,
@@ -13,19 +19,17 @@ use diem_types::{
         Version,
     },
 };
+use futures::stream::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use storage_interface::DbReader;
 use storage_service_types::{
     AccountStatesChunkWithProofRequest, CompleteDataRange, DataSummary,
-    EpochEndingLedgerInfoRequest, ProtocolMetadata, ServerProtocolVersion, StorageServerSummary,
-    StorageServiceError, StorageServiceRequest, StorageServiceResponse,
+    EpochEndingLedgerInfoRequest, ProtocolMetadata, Result, ServerProtocolVersion,
+    StorageServerSummary, StorageServiceError, StorageServiceRequest, StorageServiceResponse,
     TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
 };
 use thiserror::Error;
-
-#[cfg(test)]
-mod tests;
 
 // TODO(joshlind): make these configurable.
 /// Storage server constants.
@@ -43,21 +47,47 @@ pub enum Error {
     UnexpectedErrorEncountered(String),
 }
 
-/// The server-side implementation of the storage service. This provides all the
-/// functionality required to handle storage service requests (i.e., from clients).
+/// The server-side actor for the storage service. Handles inbound storage
+/// service requests from clients.
 pub struct StorageServiceServer<T> {
     storage: T,
+    // TODO(philiphayes): would like a "multi-network" stream here, so we only
+    // need one service for all networks.
+    network_requests: StorageServiceNetworkEvents,
 }
 
 impl<T: StorageReaderInterface> StorageServiceServer<T> {
+    pub fn new(storage: T, network_requests: StorageServiceNetworkEvents) -> Self {
+        Self {
+            storage,
+            network_requests,
+        }
+    }
+
+    pub async fn start(mut self) {
+        while let Some(request) = self.network_requests.next().await {
+            // TODO(philiphayes): spawn tasks for each request
+            let (_peer, _protocol, request, response_sender) = request;
+            let response = Handler::new(self.storage.clone()).call(request);
+            response_sender.send(response);
+        }
+    }
+}
+
+/// The `Handler` is the "pure" inbound request handler. It contains all the
+/// necessary context and state needed to construct a response to an inbound
+/// request. We usually clone/create a new handler for every request.
+#[derive(Clone)]
+pub struct Handler<T> {
+    storage: T,
+}
+
+impl<T: StorageReaderInterface> Handler<T> {
     pub fn new(storage: T) -> Self {
         Self { storage }
     }
 
-    pub fn handle_request(
-        &self,
-        request: StorageServiceRequest,
-    ) -> Result<StorageServiceResponse, Error> {
+    pub fn call(&self, request: StorageServiceRequest) -> Result<StorageServiceResponse> {
         let response = match request {
             StorageServiceRequest::GetAccountStatesChunkWithProof(request) => {
                 self.get_account_states_chunk_with_proof(request)
@@ -80,14 +110,10 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
 
         // If any requests resulted in an unexpected error, return an InternalStorageError to the
         // client and log the actual error.
-        if let Err(_error) = response {
+        response.map_err(|_err| {
             // TODO(joshlind): add logging support to this library so we can log _error
-            Ok(StorageServiceResponse::StorageServiceError(
-                StorageServiceError::InternalError,
-            ))
-        } else {
-            response
-        }
+            StorageServiceError::InternalError
+        })
     }
 
     fn get_account_states_chunk_with_proof(

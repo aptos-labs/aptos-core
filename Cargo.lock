@@ -8096,15 +8096,20 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bcs",
+ "bytes",
+ "channel",
  "claim",
  "diem-crypto",
  "diem-types",
  "diem-workspace-hack",
+ "futures",
  "move-core-types",
+ "network",
  "serde",
  "storage-interface",
  "storage-service-types",
  "thiserror",
+ "tokio",
 ]
 
 [[package]]
@@ -8114,6 +8119,8 @@ dependencies = [
  "diem-crypto",
  "diem-types",
  "diem-workspace-hack",
+ "serde",
+ "thiserror",
 ]
 
 [[package]]

@@ -200,7 +200,7 @@ pub mod default_protocol {
 /// A single chunk of all account states at a specific version.
 /// Note: this is similar to `StateSnapshotChunk` but all data is included
 /// in the struct itself and not behind pointers/handles to file locations.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct AccountStatesChunkWithProof {
     pub first_index: u64,
     // The first account index in chunk
@@ -214,6 +214,7 @@ pub struct AccountStatesChunkWithProof {
     // The account blobs in the chunk
     pub proof: SparseMerkleRangeProof, // The proof to ensure the chunk is in the account states
 }
+
 #[cfg(test)]
 mod tests {
     use super::{default_protocol::AccountStateWithProof, *};

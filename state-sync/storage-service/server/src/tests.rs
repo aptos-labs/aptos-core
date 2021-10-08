@@ -3,8 +3,9 @@
 
 #![forbid(unsafe_code)]
 
-use crate::{StorageReader, StorageServiceServer};
+use crate::{network::StorageServiceNetworkEvents, StorageReader, StorageServiceServer};
 use anyhow::Result;
+use channel::diem_channel;
 use claim::{assert_matches, assert_none, assert_some};
 use diem_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use diem_types::{
@@ -29,27 +30,51 @@ use diem_types::{
         },
         RawTransaction, Script, SignedTransaction, Transaction, TransactionPayload, Version,
     },
+    PeerId,
 };
+use futures::channel::oneshot;
 use move_core_types::language_storage::TypeTag;
+use network::{
+    peer_manager::PeerManagerNotification,
+    protocols::{
+        network::NewNetworkEvents, rpc::InboundRpcRequest, wire::handshake::v1::ProtocolId,
+    },
+};
 use std::{collections::BTreeMap, sync::Arc};
 use storage_interface::{DbReader, Order, StartupInfo, TreeState};
 use storage_service_types::{
     AccountStatesChunkWithProofRequest, CompleteDataRange, DataSummary,
     EpochEndingLedgerInfoRequest, ProtocolMetadata, ServerProtocolVersion, StorageServerSummary,
-    StorageServiceError, StorageServiceRequest, StorageServiceResponse,
+    StorageServiceError, StorageServiceMessage, StorageServiceRequest, StorageServiceResponse,
     TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
 };
 
 // TODO(joshlind): Expand these test cases to better test storage interaction
 // and functionality. This will likely require a better mock db abstraction.
 
-#[test]
-fn test_get_account_states_chunk_with_proof() {
-    // Create a storage service server
-    let storage_server = create_storage_server();
+#[tokio::test]
+async fn test_get_server_protocol_version() {
+    let (mut mock_client, service) = MockClient::new();
+    tokio::spawn(service.start());
+
+    // Process a request to fetch the protocol version
+    let request = StorageServiceRequest::GetServerProtocolVersion;
+    let response = mock_client.send_request(request).await.unwrap();
+
+    // Verify the response is correct
+    let expected_response = StorageServiceResponse::ServerProtocolVersion(ServerProtocolVersion {
+        protocol_version: 1,
+    });
+    assert_eq!(response, expected_response);
+}
+
+#[tokio::test]
+async fn test_get_account_states_chunk_with_proof() {
+    let (mut mock_client, service) = MockClient::new();
+    tokio::spawn(service.start());
 
     // Create a request to fetch an account states chunk with a proof
-    let account_states_chunk_request =
+    let request =
         StorageServiceRequest::GetAccountStatesChunkWithProof(AccountStatesChunkWithProofRequest {
             version: 0,
             start_account_key: HashValue::random(),
@@ -57,64 +82,35 @@ fn test_get_account_states_chunk_with_proof() {
         });
 
     // Process the request
-    let account_states_chunk_response = storage_server
-        .handle_request(account_states_chunk_request)
-        .unwrap();
+    let error = mock_client.send_request(request).await.unwrap_err();
 
     // Verify the response is correct (the API call is currently unsupported)
-    assert_matches!(
-        account_states_chunk_response,
-        StorageServiceResponse::StorageServiceError(StorageServiceError::InternalError)
-    );
+    assert_matches!(error, StorageServiceError::InternalError);
 }
 
-#[test]
-fn test_get_server_protocol_version() {
-    // Create a storage service server
-    let storage_server = create_storage_server();
-
-    // Process a request to fetch the protocol version
-    let version_request = StorageServiceRequest::GetServerProtocolVersion;
-    let version_response = storage_server.handle_request(version_request).unwrap();
-
-    // Verify the response is correct
-    let expected_protocol_version = ServerProtocolVersion {
-        protocol_version: 1,
-    };
-    assert_eq!(
-        version_response,
-        StorageServiceResponse::ServerProtocolVersion(expected_protocol_version)
-    );
-}
-
-#[test]
-fn test_get_number_of_accounts_at_version() {
-    // Create a storage service server
-    let storage_server = create_storage_server();
+#[tokio::test]
+async fn test_get_number_of_accounts_at_version() {
+    let (mut mock_client, service) = MockClient::new();
+    tokio::spawn(service.start());
 
     // Create a request to fetch the number of accounts at the specified version
-    let number_of_accounts_request = StorageServiceRequest::GetNumberOfAccountsAtVersion(10);
+    let request = StorageServiceRequest::GetNumberOfAccountsAtVersion(10);
 
     // Process the request
-    let number_of_accounts_response = storage_server
-        .handle_request(number_of_accounts_request)
-        .unwrap();
+    let error = mock_client.send_request(request).await.unwrap_err();
 
     // Verify the response is correct (the API call is currently unsupported)
-    assert_matches!(
-        number_of_accounts_response,
-        StorageServiceResponse::StorageServiceError(StorageServiceError::InternalError)
-    );
+    assert_matches!(error, StorageServiceError::InternalError);
 }
 
-#[test]
-fn test_get_storage_server_summary() {
-    // Create a storage service server
-    let storage_server = create_storage_server();
+#[tokio::test]
+async fn test_get_storage_server_summary() {
+    let (mut mock_client, service) = MockClient::new();
+    tokio::spawn(service.start());
 
     // Process a request to fetch the storage summary
-    let summary_request = StorageServiceRequest::GetStorageServerSummary;
-    let summary_response = storage_server.handle_request(summary_request).unwrap();
+    let request = StorageServiceRequest::GetStorageServerSummary;
+    let response = mock_client.send_request(request).await.unwrap();
 
     // Verify the response is correct
     let highest_version = 100;
@@ -135,34 +131,31 @@ fn test_get_storage_server_summary() {
         },
     };
     assert_eq!(
-        summary_response,
+        response,
         StorageServiceResponse::StorageServerSummary(expected_server_summary)
     );
 }
 
-#[test]
-fn test_get_transactions_with_proof_events() {
-    // Create a storage service server
-    let storage_server = create_storage_server();
+#[tokio::test]
+async fn test_get_transactions_with_proof_events() {
+    let (mut mock_client, service) = MockClient::new();
+    tokio::spawn(service.start());
 
     // Create a request to fetch transactions with a proof
     let start_version = 0;
     let expected_num_transactions = 10;
-    let transactions_proof_request =
-        StorageServiceRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
-            proof_version: 100,
-            start_version,
-            expected_num_transactions,
-            include_events: true,
-        });
+    let request = StorageServiceRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
+        proof_version: 100,
+        start_version,
+        expected_num_transactions,
+        include_events: true,
+    });
 
     // Process the request
-    let transactions_proof_response = storage_server
-        .handle_request(transactions_proof_request)
-        .unwrap();
+    let response = mock_client.send_request(request).await.unwrap();
 
     // Verify the response is correct
-    match transactions_proof_response {
+    match response {
         StorageServiceResponse::TransactionsWithProof(transactions_with_proof) => {
             assert_eq!(
                 transactions_with_proof.transactions.len(),
@@ -174,60 +167,32 @@ fn test_get_transactions_with_proof_events() {
             );
             assert_some!(transactions_with_proof.events);
         }
-        result => {
-            panic!("Expected transactions with proof but got: {:?}", result);
+        _ => {
+            panic!("Expected transactions with proof but got: {:?}", response);
         }
     };
 }
 
-#[test]
-fn test_get_transaction_outputs_with_proof() {
-    // Create a storage service server
-    let storage_server = create_storage_server();
-
-    // Create a request to fetch transaction outputs with a proof
-    let transaction_outputs_proof_request =
-        StorageServiceRequest::GetTransactionOutputsWithProof(TransactionOutputsWithProofRequest {
-            proof_version: 1000,
-            start_version: 0,
-            expected_num_outputs: 10,
-        });
-
-    // Process the request
-    let transactions_proof_response = storage_server
-        .handle_request(transaction_outputs_proof_request)
-        .unwrap();
-
-    // Verify the response is correct (the API call is currently unsupported)
-    assert_matches!(
-        transactions_proof_response,
-        StorageServiceResponse::StorageServiceError(StorageServiceError::InternalError)
-    );
-}
-
-#[test]
-fn test_get_transactions_with_proof_no_events() {
-    // Create a storage service server
-    let storage_server = create_storage_server();
+#[tokio::test]
+async fn test_get_transactions_with_proof_no_events() {
+    let (mut mock_client, service) = MockClient::new();
+    tokio::spawn(service.start());
 
     // Create a request to fetch transactions with a proof (excluding events)
     let start_version = 10;
     let expected_num_transactions = 20;
-    let transactions_proof_request =
-        StorageServiceRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
-            proof_version: 1000,
-            start_version,
-            expected_num_transactions,
-            include_events: false,
-        });
+    let request = StorageServiceRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
+        proof_version: 1000,
+        start_version,
+        expected_num_transactions,
+        include_events: false,
+    });
 
     // Process the request
-    let transactions_proof_response = storage_server
-        .handle_request(transactions_proof_request)
-        .unwrap();
+    let response = mock_client.send_request(request).await.unwrap();
 
     // Verify the response is correct
-    match transactions_proof_response {
+    match response {
         StorageServiceResponse::TransactionsWithProof(transactions_with_proof) => {
             assert_eq!(
                 transactions_with_proof.transactions.len(),
@@ -239,33 +204,50 @@ fn test_get_transactions_with_proof_no_events() {
             );
             assert_none!(transactions_with_proof.events);
         }
-        result => {
-            panic!("Expected transactions with proof but got: {:?}", result);
+        _ => {
+            panic!("Expected transactions with proof but got: {:?}", response);
         }
     };
 }
 
-#[test]
-fn test_get_epoch_ending_ledger_infos() {
-    // Create a storage service server
-    let storage_server = create_storage_server();
+#[tokio::test]
+async fn test_get_transaction_outputs_with_proof() {
+    let (mut mock_client, service) = MockClient::new();
+    tokio::spawn(service.start());
+
+    // Create a request to fetch transaction outputs with a proof
+    let request =
+        StorageServiceRequest::GetTransactionOutputsWithProof(TransactionOutputsWithProofRequest {
+            proof_version: 1000,
+            start_version: 0,
+            expected_num_outputs: 10,
+        });
+
+    // Process the request
+    let error = mock_client.send_request(request).await.unwrap_err();
+
+    // Verify the response is correct (the API call is currently unsupported)
+    assert_matches!(error, StorageServiceError::InternalError);
+}
+
+#[tokio::test]
+async fn test_get_epoch_ending_ledger_infos() {
+    let (mut mock_client, service) = MockClient::new();
+    tokio::spawn(service.start());
 
     // Create a request to fetch transactions with a proof (excluding events)
     let start_epoch = 11;
     let expected_end_epoch = 21;
-    let epoch_ending_li_request =
-        StorageServiceRequest::GetEpochEndingLedgerInfos(EpochEndingLedgerInfoRequest {
-            start_epoch,
-            expected_end_epoch,
-        });
+    let request = StorageServiceRequest::GetEpochEndingLedgerInfos(EpochEndingLedgerInfoRequest {
+        start_epoch,
+        expected_end_epoch,
+    });
 
     // Process the request
-    let epoch_ending_li_response = storage_server
-        .handle_request(epoch_ending_li_request)
-        .unwrap();
+    let response = mock_client.send_request(request).await.unwrap();
 
     // Verify the response is correct
-    match epoch_ending_li_response {
+    match response {
         StorageServiceResponse::EpochEndingLedgerInfos(epoch_change_proof) => {
             assert_eq!(
                 epoch_change_proof.ledger_info_with_sigs.len(),
@@ -281,16 +263,68 @@ fn test_get_epoch_ending_ledger_infos() {
                 );
             }
         }
-        result => {
-            panic!("Expected epoch ending ledger infos but got: {:?}", result);
+        _ => {
+            panic!("Expected epoch ending ledger infos but got: {:?}", response);
         }
     };
 }
 
-fn create_storage_server() -> StorageServiceServer<StorageReader> {
-    let storage = Arc::new(MockDbReaderWriter);
-    let storage_reader = StorageReader::new(storage);
-    StorageServiceServer::new(storage_reader)
+/// A wrapper around the inbound network interface/channel for easily sending
+/// mock client requests to a [`StorageServiceServer`].
+struct MockClient {
+    peer_mgr_notifs_tx: diem_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
+}
+
+impl MockClient {
+    fn new() -> (Self, StorageServiceServer<StorageReader>) {
+        let storage = StorageReader::new(Arc::new(MockDbReader));
+
+        let queue_cfg = crate::network::network_endpoint_config()
+            .inbound_queue
+            .unwrap();
+        let (peer_mgr_notifs_tx, peer_mgr_notifs_rx) = queue_cfg.build();
+        let (_connection_notifs_tx, connection_notifs_rx) = queue_cfg.build();
+        let network_requests =
+            StorageServiceNetworkEvents::new(peer_mgr_notifs_rx, connection_notifs_rx);
+
+        let storage_server = StorageServiceServer::new(storage, network_requests);
+
+        (Self { peer_mgr_notifs_tx }, storage_server)
+    }
+
+    async fn send_request(
+        &mut self,
+        request: StorageServiceRequest,
+    ) -> Result<StorageServiceResponse, StorageServiceError> {
+        // craft the inbound Rpc notification
+        let peer_id = PeerId::ZERO;
+        let protocol_id = ProtocolId::StorageServiceRpc;
+        let data = protocol_id
+            .to_bytes(&StorageServiceMessage::Request(request))
+            .unwrap();
+        let (res_tx, res_rx) = oneshot::channel();
+        let inbound_rpc = InboundRpcRequest {
+            protocol_id,
+            data: data.into(),
+            res_tx,
+        };
+        let notif = PeerManagerNotification::RecvRpc(peer_id, inbound_rpc);
+
+        // push it up to the storage service
+        self.peer_mgr_notifs_tx
+            .push((peer_id, protocol_id), notif)
+            .unwrap();
+
+        // wait for the response and deserialize
+        let response = res_rx.await.unwrap().unwrap();
+        let response = protocol_id
+            .from_bytes::<StorageServiceMessage>(&response)
+            .unwrap();
+        match response {
+            StorageServiceMessage::Response(response) => response,
+            _ => panic!("Unexpected response message: {:?}", response),
+        }
+    }
 }
 
 fn create_test_event(sequence_number: u64) -> ContractEvent {
@@ -343,11 +377,11 @@ fn create_test_ledger_info_with_sigs(epoch: u64, version: u64) -> LedgerInfoWith
     LedgerInfoWithSignatures::new(ledger_info, BTreeMap::new())
 }
 
-/// This is a mock of the DbReader and DbWriter for unit testing.
+/// This is a mock implementation of the `DbReader` trait.
 #[derive(Clone)]
-struct MockDbReaderWriter;
+struct MockDbReader;
 
-impl DbReader<DpnProto> for MockDbReaderWriter {
+impl DbReader<DpnProto> for MockDbReader {
     fn get_epoch_ending_ledger_infos(
         &self,
         start_epoch: u64,

@@ -144,6 +144,8 @@ ProtocolId:
       ConsensusDirectSendJson: UNIT
     7:
       ConsensusRpcJson: UNIT
+    8:
+      StorageServiceRpc: UNIT
 ProtocolIdSet:
   NEWTYPESTRUCT: BYTES
 PublicKey:

@@ -10,6 +10,9 @@ publish = false
 edition = "2018"
 
 [dependencies]
+serde = { version = "1.0.124", default-features = false }
+thiserror = "1.0.24"
+
 diem-crypto = { path = "../../../crypto/crypto" }
 diem-types = { path = "../../../types" }
 diem-workspace-hack = { path = "../../../common/workspace-hack" }

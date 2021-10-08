@@ -49,6 +49,7 @@ pub enum ProtocolId {
     // json provides flexibility for backwards compatible upgrade
     ConsensusDirectSendJson = 6,
     ConsensusRpcJson = 7,
+    StorageServiceRpc = 8,
 }
 
 impl ProtocolId {
@@ -63,6 +64,7 @@ impl ProtocolId {
             HealthCheckerRpc => "HealthCheckerRpc",
             ConsensusDirectSendJson => "ConsensusDirectSendJson",
             ConsensusRpcJson => "ConsensusRpcJson",
+            StorageServiceRpc => "StorageServiceRpc",
         }
     }
 
@@ -76,6 +78,7 @@ impl ProtocolId {
             ProtocolId::HealthCheckerRpc,
             ProtocolId::ConsensusDirectSendJson,
             ProtocolId::ConsensusRpcJson,
+            ProtocolId::StorageServiceRpc,
         ]
     }
 

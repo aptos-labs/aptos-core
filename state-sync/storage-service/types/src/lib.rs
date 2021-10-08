@@ -13,9 +13,33 @@ use diem_types::{
         Version,
     },
 };
+use serde::{Deserialize, Serialize};
+use thiserror::Error;
+
+pub type Result<T, E = StorageServiceError> = ::std::result::Result<T, E>;
+
+/// A storage service error that can be returned to the client on a failure
+/// to process a service request.
+#[derive(Clone, Debug, Deserialize, Eq, Error, PartialEq, Serialize)]
+pub enum StorageServiceError {
+    #[error("Internal service error")]
+    InternalError,
+}
+
+/// A single storage service message sent or received over DiemNet.
+#[derive(Debug, Deserialize, Serialize)]
+// TODO(philiphayes): do something about this without making it ugly :(
+#[allow(clippy::large_enum_variant)]
+pub enum StorageServiceMessage {
+    /// A request to the storage service.
+    Request(StorageServiceRequest),
+    /// A response from the storage service. If there was an error while handling
+    /// the request, the service will return an [`StorageServiceError`] error.
+    Response(Result<StorageServiceResponse>),
+}
 
 /// A storage service request.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum StorageServiceRequest {
     GetAccountStatesChunkWithProof(AccountStatesChunkWithProofRequest), // Fetches a list of account states with a proof
     GetEpochEndingLedgerInfos(EpochEndingLedgerInfoRequest), // Fetches a list of epoch ending ledger infos
@@ -27,13 +51,12 @@ pub enum StorageServiceRequest {
 }
 
 /// A storage service response.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum StorageServiceResponse {
     AccountStatesChunkWithProof(AccountStatesChunkWithProof),
     EpochEndingLedgerInfos(EpochChangeProof),
     NumberOfAccountsAtVersion(u64),
     ServerProtocolVersion(ServerProtocolVersion),
-    StorageServiceError(StorageServiceError),
     StorageServerSummary(StorageServerSummary),
     TransactionOutputsWithProof(TransactionOutputListWithProof),
     TransactionsWithProof(TransactionListWithProof),
@@ -41,7 +64,7 @@ pub enum StorageServiceResponse {
 
 /// A storage service request for fetching a list of account states at a
 /// specified version.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct AccountStatesChunkWithProofRequest {
     pub version: u64,                     // The version to fetch the account states at
     pub start_account_key: HashValue,     // The account key to start fetching account states
@@ -50,7 +73,7 @@ pub struct AccountStatesChunkWithProofRequest {
 
 /// A storage service request for fetching a transaction output list with a
 /// corresponding proof.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct TransactionOutputsWithProofRequest {
     pub proof_version: u64,        // The version the proof should be relative to
     pub start_version: u64,        // The starting version of the transaction output list
@@ -59,7 +82,7 @@ pub struct TransactionOutputsWithProofRequest {
 
 /// A storage service request for fetching a transaction list with a
 /// corresponding proof.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct TransactionsWithProofRequest {
     pub proof_version: u64, // The version the proof should be relative to
     pub start_version: u64, // The starting version of the transaction list
@@ -68,22 +91,15 @@ pub struct TransactionsWithProofRequest {
 }
 
 /// A storage service request for fetching a list of epoch ending ledger infos.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct EpochEndingLedgerInfoRequest {
     pub start_epoch: u64,
     pub expected_end_epoch: u64,
 }
 
-/// A storage service error that can be returned to the client on a failure
-/// to process a service request.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum StorageServiceError {
-    InternalError,
-}
-
 /// The protocol version run by this server. Clients request this first to
 /// identify what API calls and data requests the server supports.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ServerProtocolVersion {
     pub protocol_version: u64, // The storage server version run by this instance.
 }
@@ -91,7 +107,7 @@ pub struct ServerProtocolVersion {
 /// A storage server summary, containing a summary of the information held
 /// by the corresponding server instance. This is useful for identifying the
 /// data that a server instance can provide, as well as relevant metadata.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct StorageServerSummary {
     pub protocol_metadata: ProtocolMetadata,
     pub data_summary: DataSummary,
@@ -99,7 +115,7 @@ pub struct StorageServerSummary {
 
 /// A summary of the protocol metadata for the storage service instance, such as
 /// the maximum chunk sizes supported for different requests.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ProtocolMetadata {
     pub max_epoch_chunk_size: u64, // The max number of epochs the server can return in a single chunk
     pub max_transaction_chunk_size: u64, // The max number of transactions the server can return in a single chunk
@@ -111,7 +127,7 @@ pub struct ProtocolMetadata {
 pub type Epoch = u64;
 
 /// A summary of the data actually held by the storage service instance.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct DataSummary {
     /// The ledger info corresponding to the highest synced version in storage.
     /// This indicates the highest version and epoch that storage can prove.
@@ -137,7 +153,7 @@ pub struct DataSummary {
 /// is complete (i.e. there are no missing pieces of data).
 /// This is used to provide a summary of the data currently held in storage, e.g.
 /// a CompleteDataRange<Version> of (A,B) means all versions A->B (inclusive).
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct CompleteDataRange<T> {
     pub lowest: T,
     pub highest: T,
