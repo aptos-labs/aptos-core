@@ -12,21 +12,17 @@ use crate::{
         tasks::process_committed_transactions,
         types::{notify_subscribers, ScheduledBroadcast, SharedMempool, SharedMempoolNotification},
     },
-    ConsensusRequest, SubmissionStatus, TransactionSummary,
+    ConsensusRequest, MempoolEventsReceiver, TransactionSummary,
 };
 use ::network::protocols::network::Event;
-use anyhow::Result;
 use bounded_executor::BoundedExecutor;
 use diem_config::network_id::{NetworkId, PeerNetworkId};
 use diem_infallible::Mutex;
 use diem_logger::prelude::*;
-use diem_types::{
-    mempool_status::MempoolStatus, on_chain_config::OnChainConfigPayload,
-    transaction::SignedTransaction, vm_status::DiscardedVMStatus,
-};
+use diem_types::on_chain_config::OnChainConfigPayload;
 use event_notifications::ReconfigNotificationListener;
 use futures::{
-    channel::{mpsc, oneshot},
+    channel::mpsc,
     stream::{select_all, FuturesUnordered},
     StreamExt,
 };
@@ -39,15 +35,14 @@ use tokio::{runtime::Handle, time::interval};
 use tokio_stream::wrappers::IntervalStream;
 use vm_validator::vm_validator::TransactionValidation;
 
+use super::types::MempoolClientRequest;
+
 /// Coordinator that handles inbound network events and outbound txn broadcasts.
 pub(crate) async fn coordinator<V>(
     mut smp: SharedMempool<V>,
     executor: Handle,
     network_events: Vec<(NetworkId, MempoolNetworkEvents)>,
-    mut client_events: mpsc::Receiver<(
-        SignedTransaction,
-        oneshot::Sender<Result<SubmissionStatus>>,
-    )>,
+    mut client_events: MempoolEventsReceiver,
     mut consensus_requests: mpsc::Receiver<ConsensusRequest>,
     mut mempool_listener: MempoolNotificationListener,
     mut mempool_reconfig_events: ReconfigNotificationListener,
@@ -74,8 +69,8 @@ pub(crate) async fn coordinator<V>(
     loop {
         let _timer = counters::MAIN_LOOP.start_timer();
         ::futures::select! {
-            (msg, callback) = client_events.select_next_some() => {
-                handle_incoming_transactions(&mut smp, &bounded_executor, msg, callback).await;
+            msg = client_events.select_next_some() => {
+                handle_client_request(&mut smp, &bounded_executor, msg).await;
             },
             msg = consensus_requests.select_next_some() => {
                 tasks::process_consensus_request(&smp.mempool, msg);
@@ -101,30 +96,58 @@ pub(crate) async fn coordinator<V>(
     ));
 }
 
-/// Spawn a task for processing incoming transactions and putting them in local mempool
-async fn handle_incoming_transactions<V>(
+/// Spawn a task for processing `MempoolClientRequest`
+async fn handle_client_request<V>(
     smp: &mut SharedMempool<V>,
     bounded_executor: &BoundedExecutor,
-    msg: SignedTransaction,
-    callback: oneshot::Sender<anyhow::Result<(MempoolStatus, Option<DiscardedVMStatus>)>>,
+    request: MempoolClientRequest,
 ) where
     V: TransactionValidation,
 {
-    // This timer measures how long it took for the bounded executor to *schedule* the
-    // task.
-    let _timer =
-        counters::task_spawn_latency_timer(counters::CLIENT_EVENT_LABEL, counters::SPAWN_LABEL);
-    // This timer measures how long it took for the task to go from scheduled to started.
-    let task_start_timer =
-        counters::task_spawn_latency_timer(counters::CLIENT_EVENT_LABEL, counters::START_LABEL);
-    bounded_executor
-        .spawn(tasks::process_client_transaction_submission(
-            smp.clone(),
-            msg,
-            callback,
-            task_start_timer,
-        ))
-        .await;
+    match request {
+        MempoolClientRequest::SubmitTransaction(txn, callback) => {
+            // This timer measures how long it took for the bounded executor to *schedule* the
+            // task.
+            let _timer = counters::task_spawn_latency_timer(
+                counters::CLIENT_EVENT_LABEL,
+                counters::SPAWN_LABEL,
+            );
+            // This timer measures how long it took for the task to go from scheduled to started.
+            let task_start_timer = counters::task_spawn_latency_timer(
+                counters::CLIENT_EVENT_LABEL,
+                counters::START_LABEL,
+            );
+            bounded_executor
+                .spawn(tasks::process_client_transaction_submission(
+                    smp.clone(),
+                    txn,
+                    callback,
+                    task_start_timer,
+                ))
+                .await;
+        }
+        MempoolClientRequest::GetTransaction(hash, callback) => {
+            // This timer measures how long it took for the bounded executor to *schedule* the
+            // task.
+            let _timer = counters::task_spawn_latency_timer(
+                counters::CLIENT_EVENT_GET_TXN_LABEL,
+                counters::SPAWN_LABEL,
+            );
+            // This timer measures how long it took for the task to go from scheduled to started.
+            let task_start_timer = counters::task_spawn_latency_timer(
+                counters::CLIENT_EVENT_GET_TXN_LABEL,
+                counters::START_LABEL,
+            );
+            bounded_executor
+                .spawn(tasks::process_client_get_transaction(
+                    smp.clone(),
+                    hash,
+                    callback,
+                    task_start_timer,
+                ))
+                .await;
+        }
+    }
 }
 
 /// Handle removing committed transactions from local mempool immediately.  This should be done

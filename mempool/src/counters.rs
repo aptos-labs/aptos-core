@@ -18,6 +18,7 @@ pub const EXPIRATION_TIME_INDEX_LABEL: &str = "expiration";
 pub const SYSTEM_TTL_INDEX_LABEL: &str = "system_ttl";
 pub const TIMELINE_INDEX_LABEL: &str = "timeline";
 pub const PARKING_LOT_INDEX_LABEL: &str = "parking_lot";
+pub const TRANSACTION_HASH_INDEX_LABEL: &str = "transaction_hash";
 
 // Core mempool commit stages labels
 pub const GET_BLOCK_STAGE_LABEL: &str = "get_block";
@@ -51,6 +52,7 @@ pub const SUCCESS_LABEL: &str = "success";
 
 // Bounded executor task labels
 pub const CLIENT_EVENT_LABEL: &str = "client_event";
+pub const CLIENT_EVENT_GET_TXN_LABEL: &str = "client_event_get_txn";
 pub const RECONFIG_EVENT_LABEL: &str = "reconfig";
 pub const PEER_BROADCAST_EVENT_LABEL: &str = "peer_broadcast";
 
@@ -201,6 +203,22 @@ static PROCESS_TXN_SUBMISSION_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
 
 pub fn process_txn_submit_latency_timer(network: &str, sender: &str) -> HistogramTimer {
     PROCESS_TXN_SUBMISSION_LATENCY
+        .with_label_values(&[network, sender])
+        .start_timer()
+}
+
+/// Counter for tracking e2e latency for mempool to process get txn by hash requests from clients and peers
+static PROCESS_GET_TXN_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "diem_shared_mempool_get_txn_request_latency",
+        "Latency of mempool processing get txn by hash requests",
+        &["network", "sender"] // sender of txn(s)
+    )
+    .unwrap()
+});
+
+pub fn process_get_txn_latency_timer(network: &str, sender: &str) -> HistogramTimer {
+    PROCESS_GET_TXN_LATENCY
         .with_label_values(&[network, sender])
         .start_timer()
 }

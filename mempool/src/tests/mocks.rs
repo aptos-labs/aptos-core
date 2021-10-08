@@ -5,7 +5,7 @@ use crate::{
     core_mempool::{CoreMempool, TimelineState},
     network::{MempoolNetworkEvents, MempoolNetworkSender},
     shared_mempool::start_shared_mempool,
-    ConsensusRequest, SubmissionStatus,
+    ConsensusRequest, MempoolClientSender,
 };
 use anyhow::{format_err, Result};
 use channel::{self, diem_channel, message_queues::QueueStyle};
@@ -22,7 +22,7 @@ use diem_types::{
     transaction::{GovernanceRole, SignedTransaction},
 };
 use event_notifications::EventSubscriptionService;
-use futures::channel::{mpsc, oneshot};
+use futures::channel::mpsc;
 use mempool_notifications::{self, MempoolNotifier};
 use network::{
     peer_manager::{conn_notifs_channel, ConnectionRequestSender, PeerManagerRequestSender},
@@ -39,7 +39,7 @@ use vm_validator::{
 pub struct MockSharedMempool {
     _runtime: Option<Runtime>,
     _handle: Option<Handle>,
-    pub ac_client: mpsc::Sender<(SignedTransaction, oneshot::Sender<Result<SubmissionStatus>>)>,
+    pub ac_client: MempoolClientSender,
     pub mempool: Arc<Mutex<CoreMempool>>,
     pub consensus_sender: mpsc::Sender<ConsensusRequest>,
     pub mempool_notifier: MempoolNotifier,
@@ -94,7 +94,7 @@ impl MockSharedMempool {
         db: &DbReaderWriter<DpnProto>,
         validator: V,
     ) -> (
-        mpsc::Sender<(SignedTransaction, oneshot::Sender<Result<SubmissionStatus>>)>,
+        MempoolClientSender,
         Arc<Mutex<CoreMempool>>,
         mpsc::Sender<ConsensusRequest>,
         MempoolNotifier,

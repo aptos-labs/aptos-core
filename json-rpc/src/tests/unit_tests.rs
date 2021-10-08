@@ -14,6 +14,7 @@ use crate::{
 use diem_client::{views::TransactionDataView, BlockingClient, MethodRequest};
 use diem_config::{config::DEFAULT_CONTENT_LENGTH_LIMIT, utils};
 use diem_crypto::{ed25519::Ed25519PrivateKey, hash::CryptoHash, HashValue, PrivateKey, Uniform};
+use diem_mempool::MempoolClientRequest;
 use diem_metrics::get_all_metrics;
 use diem_types::{
     account_address::AccountAddress,
@@ -1078,7 +1079,7 @@ fn test_transaction_submission() {
     // future that mocks shared mempool execution
     runtime.spawn(async move {
         let validator = MockVMValidator;
-        while let Some((txn, cb)) = mp_events.next().await {
+        while let Some(MempoolClientRequest::SubmitTransaction(txn, cb)) = mp_events.next().await {
             let vm_status = validator.validate_transaction(txn).unwrap().status();
             let result = if vm_status.is_some() {
                 (MempoolStatus::new(MempoolStatusCode::VmError), vm_status)

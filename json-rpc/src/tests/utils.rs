@@ -12,7 +12,7 @@ use diem_config::{
     utils,
 };
 use diem_crypto::HashValue;
-use diem_mempool::{MempoolClientSender, SubmissionStatus};
+use diem_mempool::{MempoolClientSender, MempoolEventsReceiver};
 use diem_types::{
     account_address::AccountAddress,
     account_state::AccountState,
@@ -37,7 +37,7 @@ use diem_types::{
             AccountTransactionsWithProof, TransactionListWithProof, TransactionOutputListWithProof,
             TransactionWithProof,
         },
-        SignedTransaction, Transaction, TransactionInfo, TransactionInfoTrait, Version,
+        Transaction, TransactionInfo, TransactionInfoTrait, Version,
     },
     vm_status::KeptVMStatus,
 };
@@ -47,10 +47,7 @@ use crate::tests::genesis::generate_genesis_state;
 use diem_client::BlockingClient;
 use diem_proptest_helpers::ValueGenerator;
 use diem_types::account_config::FreezingBit;
-use futures::channel::{
-    mpsc::{channel, Receiver},
-    oneshot,
-};
+use futures::channel::mpsc::channel;
 use move_core_types::{
     language_storage::{ModuleId, StructTag, TypeTag},
     move_resource::MoveResource,
@@ -556,15 +553,7 @@ pub fn create_database_client_and_runtime() -> (MockDiemDB, BlockingClient, Runt
 }
 
 #[allow(unused)]
-pub fn create_db_and_runtime() -> (
-    MockDiemDB,
-    Runtime,
-    String,
-    Receiver<(
-        SignedTransaction,
-        oneshot::Sender<anyhow::Result<SubmissionStatus>>,
-    )>,
-) {
+pub fn create_db_and_runtime() -> (MockDiemDB, Runtime, String, MempoolEventsReceiver) {
     let mock_db = mock_db();
 
     let host = "127.0.0.1";

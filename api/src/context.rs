@@ -3,7 +3,7 @@
 
 use diem_api_types::{Error, LedgerInfo};
 use diem_crypto::HashValue;
-use diem_mempool::{MempoolClientSender, SubmissionStatus};
+use diem_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
 use diem_types::{
     account_address::AccountAddress,
     account_state::AccountState,
@@ -62,7 +62,10 @@ impl Context {
 
     pub async fn submit_transaction(&self, txn: SignedTransaction) -> Result<SubmissionStatus> {
         let (req_sender, callback) = oneshot::channel();
-        self.mp_sender.clone().send((txn, req_sender)).await?;
+        self.mp_sender
+            .clone()
+            .send(MempoolClientRequest::SubmitTransaction(txn, req_sender))
+            .await?;
 
         callback.await?
     }
@@ -140,6 +143,21 @@ impl Context {
         ledger_version: u64,
     ) -> Result<Option<TransactionWithProof>> {
         self.db.get_transaction_by_hash(hash, ledger_version, true)
+    }
+
+    pub async fn get_pending_transaction_by_hash(
+        &self,
+        hash: HashValue,
+    ) -> Result<Option<SignedTransaction>> {
+        let (req_sender, callback) = oneshot::channel();
+
+        self.mp_sender
+            .clone()
+            .send(MempoolClientRequest::GetTransaction(hash, req_sender))
+            .await
+            .map_err(anyhow::Error::from)?;
+
+        callback.await.map_err(anyhow::Error::from)
     }
 
     pub fn get_transaction_by_version(

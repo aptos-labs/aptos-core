@@ -3,6 +3,7 @@
 
 use crate::{methods, runtime, tests};
 use diem_config::config;
+use diem_mempool::MempoolClientRequest;
 use diem_proptest_helpers::ValueGenerator;
 use diem_types::account_state_blob::default_protocol::AccountStateWithProof;
 use futures::{channel::mpsc::channel, StreamExt};
@@ -153,7 +154,7 @@ pub fn request_fuzzer(json_request: serde_json::Value) {
         .unwrap();
 
     rt.spawn(async move {
-        if let Some((_, cb)) = mp_events.next().await {
+        if let Some(MempoolClientRequest::SubmitTransaction(_, cb)) = mp_events.next().await {
             cb.send(Ok((
                 diem_types::mempool_status::MempoolStatus::new(
                     diem_types::mempool_status::MempoolStatusCode::Accepted,

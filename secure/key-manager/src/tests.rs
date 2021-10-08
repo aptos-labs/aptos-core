@@ -15,6 +15,7 @@ use diem_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, Uniform};
 use diem_global_constants::{
     CONSENSUS_KEY, OPERATOR_ACCOUNT, OPERATOR_KEY, OWNER_ACCOUNT, OWNER_KEY,
 };
+use diem_mempool::MempoolClientRequest;
 use diem_secure_storage::{InMemoryStorage, KVStorage};
 use diem_time_service::{MockTimeService, TimeService, TimeServiceTrait};
 use diem_types::{
@@ -417,7 +418,7 @@ fn setup_diem_interface_and_json_server(
 
     // Provide a VMValidator to the runtime.
     server.spawn(async move {
-        while let Some((txn, cb)) = mp_events.next().await {
+        while let Some(MempoolClientRequest::SubmitTransaction(txn, cb)) = mp_events.next().await {
             let vm_status = MockVMValidator.validate_transaction(txn).unwrap().status();
             let result = if vm_status.is_some() {
                 (MempoolStatus::new(MempoolStatusCode::VmError), vm_status)

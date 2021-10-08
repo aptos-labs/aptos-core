@@ -11,6 +11,7 @@ use diem_config::{
     config::{MempoolConfig, RoleType},
     network_id::{NetworkId, PeerNetworkId},
 };
+use diem_crypto::HashValue;
 use diem_infallible::{Mutex, RwLock};
 use diem_types::{
     account_address::AccountAddress, mempool_status::MempoolStatus, protocol_spec::DpnProto,
@@ -211,10 +212,13 @@ pub type SubmissionStatus = (MempoolStatus, Option<DiscardedVMStatus>);
 
 pub type SubmissionStatusBundle = (SignedTransaction, SubmissionStatus);
 
-pub type MempoolClientSender =
-    mpsc::Sender<(SignedTransaction, oneshot::Sender<Result<SubmissionStatus>>)>;
-pub type MempoolEventsReceiver =
-    mpsc::Receiver<(SignedTransaction, oneshot::Sender<Result<SubmissionStatus>>)>;
+pub enum MempoolClientRequest {
+    SubmitTransaction(SignedTransaction, oneshot::Sender<Result<SubmissionStatus>>),
+    GetTransaction(HashValue, oneshot::Sender<Option<SignedTransaction>>),
+}
+
+pub type MempoolClientSender = mpsc::Sender<MempoolClientRequest>;
+pub type MempoolEventsReceiver = mpsc::Receiver<MempoolClientRequest>;
 
 /// State of last sync with peer:
 /// `timeline_id` is position in log of ready transactions

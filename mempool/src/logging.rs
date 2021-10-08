@@ -129,6 +129,7 @@ pub enum LogEntry {
     GCRuntime,
     ReconfigUpdate,
     JsonRpc,
+    GetTransaction,
     GetBlock,
     Consensus,
     StateSyncCommit,

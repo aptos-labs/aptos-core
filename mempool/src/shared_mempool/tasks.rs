@@ -15,6 +15,7 @@ use crate::{
 };
 use anyhow::Result;
 use diem_config::network_id::PeerNetworkId;
+use diem_crypto::HashValue;
 use diem_infallible::{Mutex, RwLock};
 use diem_logger::prelude::*;
 use diem_metrics::HistogramTimer;
@@ -96,6 +97,32 @@ pub(crate) async fn process_client_transaction_submission<V>(
             ));
             counters::CLIENT_CALLBACK_FAIL.inc();
         }
+    }
+}
+
+/// Processes get transaction by hash request by client.
+pub(crate) async fn process_client_get_transaction<V>(
+    smp: SharedMempool<V>,
+    hash: HashValue,
+    callback: oneshot::Sender<Option<SignedTransaction>>,
+    timer: HistogramTimer,
+) where
+    V: TransactionValidation,
+{
+    timer.stop_and_record();
+    let _timer =
+        counters::process_get_txn_latency_timer(counters::CLIENT_LABEL, counters::CLIENT_LABEL);
+    let txn = {
+        let mempool = smp.mempool.lock();
+        mempool.get_by_hash(hash)
+    };
+
+    if callback.send(txn).is_err() {
+        error!(LogSchema::event_log(
+            LogEntry::GetTransaction,
+            LogEvent::CallbackFail
+        ));
+        counters::CLIENT_CALLBACK_FAIL.inc();
     }
 }
 

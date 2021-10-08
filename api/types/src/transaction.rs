@@ -8,7 +8,6 @@ use crate::{
 
 use diem_crypto::{
     ed25519::{self, Ed25519PublicKey},
-    hash::CryptoHash,
     multi_ed25519::{self, MultiEd25519PublicKey},
     validatable::Validatable,
 };
@@ -39,14 +38,6 @@ pub enum Transaction {
     BlockMetadataTransaction(BlockMetadataTransaction),
 }
 
-impl Transaction {
-    pub fn hash(txn: SignedTransaction) -> HashValue {
-        diem_types::transaction::Transaction::UserTransaction(txn)
-            .hash()
-            .into()
-    }
-}
-
 impl From<(SignedTransaction, TransactionPayload)> for Transaction {
     fn from((txn, payload): (SignedTransaction, TransactionPayload)) -> Self {
         Transaction::PendingTransaction(PendingTransaction {
@@ -57,7 +48,7 @@ impl From<(SignedTransaction, TransactionPayload)> for Transaction {
             gas_currency_code: txn.gas_currency_code().to_owned(),
             expiration_timestamp_secs: txn.expiration_timestamp_secs().into(),
             signature: txn.authenticator().into(),
-            hash: Transaction::hash(txn),
+            hash: txn.committed_hash().into(),
             payload,
         })
     }

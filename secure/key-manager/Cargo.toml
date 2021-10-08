@@ -39,6 +39,7 @@ executor-test-helpers = { path = "../../execution/executor-test-helpers" }
 executor-types = { path = "../../execution/executor-types" }
 diem-genesis-tool = {path = "../../config/management/genesis", features = ["testing"] }
 diem-json-rpc = { path = "../../json-rpc", features = ["fuzzing"] }
+diem-mempool = { path = "../../mempool"}
 diem-secure-storage = { path = "../storage", features = ["testing"] }
 diem-time-service = { path = "../../common/time-service", features = ["testing"] }
 diem-vm = { path = "../../language/diem-vm" }

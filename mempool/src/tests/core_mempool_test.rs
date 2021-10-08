@@ -9,6 +9,7 @@ use crate::{
     },
 };
 use diem_config::config::NodeConfig;
+use diem_crypto::HashValue;
 use diem_types::{
     account_config::AccountSequenceInfo,
     transaction::{GovernanceRole, SignedTransaction},
@@ -683,4 +684,59 @@ fn test_ttl_cache() {
         .checked_add(Duration::from_secs(10))
         .unwrap());
     assert_eq!(cache.size(), 0);
+}
+
+#[test]
+fn test_get_transaction_by_hash() {
+    let mut pool = setup_mempool().0;
+    let db_sequence_number = 10;
+    let txn = TestTransaction::new(0, db_sequence_number, 1).make_signed_transaction();
+    pool.add_txn(
+        txn.clone(),
+        0,
+        1,
+        AccountSequenceInfo::Sequential(db_sequence_number),
+        TimelineState::NotReady,
+        GovernanceRole::NonGovernanceRole,
+    );
+    let hash = txn.clone().committed_hash();
+    let ret = pool.get_by_hash(hash);
+    assert_eq!(ret, Some(txn));
+
+    let ret = pool.get_by_hash(HashValue::random());
+    assert!(ret.is_none());
+}
+
+#[test]
+fn test_get_transaction_by_hash_after_the_txn_is_updated() {
+    let mut pool = setup_mempool().0;
+    let db_sequence_number = 10;
+    let txn = TestTransaction::new(0, db_sequence_number, 1).make_signed_transaction();
+    pool.add_txn(
+        txn.clone(),
+        0,
+        1,
+        AccountSequenceInfo::Sequential(db_sequence_number),
+        TimelineState::NotReady,
+        GovernanceRole::NonGovernanceRole,
+    );
+    let hash = txn.committed_hash();
+
+    // new txn with higher gas price
+    let new_txn = TestTransaction::new(0, db_sequence_number, 100).make_signed_transaction();
+    pool.add_txn(
+        new_txn.clone(),
+        0,
+        1,
+        AccountSequenceInfo::Sequential(db_sequence_number),
+        TimelineState::NotReady,
+        GovernanceRole::NonGovernanceRole,
+    );
+    let new_txn_hash = new_txn.clone().committed_hash();
+
+    let txn_by_old_hash = pool.get_by_hash(hash);
+    assert!(txn_by_old_hash.is_none());
+
+    let txn_by_new_hash = pool.get_by_hash(new_txn_hash);
+    assert_eq!(txn_by_new_hash, Some(new_txn));
 }

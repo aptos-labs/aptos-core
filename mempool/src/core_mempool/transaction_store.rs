@@ -14,6 +14,7 @@ use crate::{
     logging::{LogEntry, LogEvent, LogSchema, TxnsLog},
 };
 use diem_config::config::MempoolConfig;
+use diem_crypto::HashValue;
 use diem_logger::prelude::*;
 use diem_types::{
     account_address::AccountAddress,
@@ -22,7 +23,7 @@ use diem_types::{
     transaction::SignedTransaction,
 };
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     ops::Bound,
     time::{Duration, SystemTime},
 };
@@ -44,6 +45,8 @@ pub struct TransactionStore {
     // keeps track of "non-ready" txns (transactions that can't be included in next block)
     parking_lot_index: ParkingLotIndex,
 
+    hash_index: BTreeMap<HashValue, (AccountAddress, u64)>,
+
     // configuration
     capacity: usize,
     capacity_per_user: usize,
@@ -63,6 +66,7 @@ impl TransactionStore {
             priority_index: PriorityIndex::new(),
             timeline_index: TimelineIndex::new(),
             parking_lot_index: ParkingLotIndex::new(),
+            hash_index: BTreeMap::new(),
 
             // configuration
             capacity: config.capacity,
@@ -84,6 +88,13 @@ impl TransactionStore {
             return Some(txn.txn.clone());
         }
         None
+    }
+
+    pub(crate) fn get_by_hash(&self, hash: HashValue) -> Option<SignedTransaction> {
+        match self.hash_index.get(&hash) {
+            Some((address, seq)) => self.get(address, *seq),
+            None => None,
+        }
     }
 
     /// Fetch mempool transaction by account address + sequence_number.
@@ -166,6 +177,13 @@ impl TransactionStore {
             // insert into storage and other indexes
             self.system_ttl_index.insert(&txn);
             self.expiration_time_index.insert(&txn);
+            self.hash_index.insert(
+                txn.get_committed_hash(),
+                (
+                    txn.get_sender(),
+                    sequence_number.transaction_sequence_number,
+                ),
+            );
             txns.insert(sequence_number.transaction_sequence_number, txn);
             self.track_indices();
         }
@@ -193,6 +211,10 @@ impl TransactionStore {
         counters::core_mempool_index_size(
             counters::TIMELINE_INDEX_LABEL,
             self.timeline_index.size(),
+        );
+        counters::core_mempool_index_size(
+            counters::TRANSACTION_HASH_INDEX_LABEL,
+            self.hash_index.len(),
         );
     }
 
@@ -383,6 +405,7 @@ impl TransactionStore {
         self.priority_index.remove(txn);
         self.timeline_index.remove(txn);
         self.parking_lot_index.remove(txn);
+        self.hash_index.remove(&txn.get_committed_hash());
         self.track_indices();
     }
 

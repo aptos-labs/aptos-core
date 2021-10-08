@@ -2114,6 +2114,7 @@ dependencies = [
  "diem-global-constants",
  "diem-json-rpc",
  "diem-logger",
+ "diem-mempool",
  "diem-secure-push-metrics",
  "diem-secure-storage",
  "diem-time-service",

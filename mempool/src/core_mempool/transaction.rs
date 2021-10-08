@@ -1,6 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use diem_crypto::HashValue;
 use diem_types::{
     account_address::AccountAddress,
     account_config::AccountSequenceInfo,
@@ -49,6 +50,9 @@ impl MempoolTransaction {
     }
     pub(crate) fn get_gas_price(&self) -> u64 {
         self.txn.gas_unit_price()
+    }
+    pub(crate) fn get_committed_hash(&self) -> HashValue {
+        self.txn.clone().committed_hash()
     }
 }
 

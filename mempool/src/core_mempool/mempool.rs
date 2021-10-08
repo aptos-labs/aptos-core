@@ -14,6 +14,7 @@ use crate::{
     logging::{LogEntry, LogSchema, TxnsLog},
 };
 use diem_config::config::NodeConfig;
+use diem_crypto::HashValue;
 use diem_logger::prelude::*;
 use diem_types::{
     account_address::AccountAddress,
@@ -116,6 +117,10 @@ impl Mempool {
                     .observe(time_delta.as_secs_f64());
             }
         }
+    }
+
+    pub(crate) fn get_by_hash(&self, hash: HashValue) -> Option<SignedTransaction> {
+        self.transactions.get_by_hash(hash)
     }
 
     /// Used to add a transaction to the Mempool.

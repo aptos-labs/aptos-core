@@ -22,7 +22,7 @@ use diem_json_rpc_types::request::{
     GetResourcesParams, GetStateProofParams, GetTransactionsParams,
     GetTransactionsWithProofsParams, MethodRequest, SubmitParams,
 };
-use diem_mempool::{MempoolClientSender, SubmissionStatus};
+use diem_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
 use diem_types::{
     chain_id::ChainId, ledger_info::LedgerInfoWithSignatures, mempool_status::MempoolStatusCode,
     protocol_spec::DpnProto, transaction::SignedTransaction,
@@ -71,7 +71,10 @@ impl JsonRpcService {
 
         self.mempool_sender
             .clone()
-            .send((transaction, req_sender))
+            .send(MempoolClientRequest::SubmitTransaction(
+                transaction,
+                req_sender,
+            ))
             .await?;
 
         callback.await?

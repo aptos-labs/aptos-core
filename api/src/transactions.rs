@@ -8,7 +8,10 @@ use crate::{context::Context, page::Page};
 use diem_api_types::{
     mime_types, Error, HashValue, LedgerInfo, MoveConverter, Response, Transaction,
 };
-use diem_types::{mempool_status::MempoolStatusCode, transaction::SignedTransaction};
+use diem_types::{
+    mempool_status::MempoolStatusCode,
+    transaction::{default_protocol::TransactionWithProof, SignedTransaction},
+};
 
 use anyhow::{format_err, Result};
 use serde_json::json;
@@ -37,7 +40,8 @@ async fn handle_get_transaction(
     hash_or_version: String,
     context: Context,
 ) -> Result<impl Reply, Rejection> {
-    Ok(Transactions::new(context)?.one(TransactionId::from_str(&hash_or_version)?)?)
+    let id = TransactionId::from_str(&hash_or_version)?;
+    Ok(Transactions::new(context)?.one(id).await?)
 }
 
 // GET /transactions?start={u64}&limit={u16}
@@ -147,30 +151,25 @@ impl Transactions {
         Response::new(self.ledger_info, &txns)
     }
 
-    pub fn one(self, id: TransactionId) -> Result<impl Reply, Error> {
-        let txn = match &id {
-            TransactionId::Hash(hash) => self
-                .context
-                .get_transaction_by_hash((*hash).into(), self.ledger_info.version())?
-                .ok_or_else(|| self.transaction_not_found(id))?,
-            TransactionId::Version(version) => {
-                if version > &self.ledger_info.version() {
-                    return Err(self.transaction_not_found(id));
-                }
-                self.context
-                    .get_transaction_by_version(*version, self.ledger_info.version())?
-            }
-        };
+    pub async fn one(self, id: TransactionId) -> Result<impl Reply, Error> {
+        let txn_data = match id.clone() {
+            TransactionId::Hash(hash) => self.get_by_hash(hash.into()).await?,
+            TransactionId::Version(version) => self.get_by_version(version)?,
+        }
+        .ok_or_else(|| self.transaction_not_found(id))?;
 
         let db = self.context.db();
         let converter = MoveConverter::new(&db);
+        let ret = match txn_data {
+            TransactionData::OnChain(txn) => converter.try_into_transaction(
+                txn.version,
+                &txn.transaction,
+                txn.proof.transaction_info(),
+                &txn.events.unwrap_or_default(),
+            )?,
+            TransactionData::Pending(txn) => converter.try_into_pending_transaction(txn)?,
+        };
 
-        let ret = converter.try_into_transaction(
-            txn.version,
-            &txn.transaction,
-            txn.proof.transaction_info(),
-            &txn.events.unwrap_or_default(),
-        )?;
         Response::new(self.ledger_info, &ret)
     }
 
@@ -179,6 +178,35 @@ impl Transactions {
             format!("could not find transaction by: {}", id),
             json!({"ledger_version": self.ledger_info.version().to_string()}),
         )
+    }
+
+    fn get_by_version(&self, version: u64) -> Result<Option<TransactionData>> {
+        if version > self.ledger_info.version() {
+            return Ok(None);
+        }
+        Ok(Some(TransactionData::OnChain(
+            self.context
+                .get_transaction_by_version(version, self.ledger_info.version())?,
+        )))
+    }
+
+    // This function looks for the transaction by hash in database and then mempool,
+    // because the period a transaction stay in the mempool is likely short.
+    // Although the mempool get transation is async, but looking up txn in database is a sync call,
+    // thus we keep it simple and call them in sequence.
+    async fn get_by_hash(&self, hash: diem_crypto::HashValue) -> Result<Option<TransactionData>> {
+        let from_db = self
+            .context
+            .get_transaction_by_hash(hash, self.ledger_info.version())?
+            .map(TransactionData::OnChain);
+        Ok(match from_db {
+            None => self
+                .context
+                .get_pending_transaction_by_hash(hash)
+                .await?
+                .map(TransactionData::Pending),
+            _ => from_db,
+        })
     }
 }
 
@@ -212,6 +240,12 @@ impl fmt::Display for TransactionId {
             Self::Version(v) => write!(f, "Version({})", v),
         }
     }
+}
+
+#[derive(Clone, Debug)]
+enum TransactionData {
+    OnChain(TransactionWithProof),
+    Pending(SignedTransaction),
 }
 
 #[cfg(any(test))]
@@ -1011,10 +1045,7 @@ mod tests {
 
         let resp = context
             .expect_status_code(404)
-            .get(&format!(
-                "/transactions/{}",
-                "0xdadfeddcca7cb6396c735e9094c76c6e4e9cb3e3ef814730693aed59bd87b31d",
-            ))
+            .get("/transactions/0xdadfeddcca7cb6396c735e9094c76c6e4e9cb3e3ef814730693aed59bd87b31d")
             .await;
         assert_json(
             resp,
@@ -1077,5 +1108,37 @@ mod tests {
 
         let resp = context.get("/transactions/2").await;
         assert_json(resp, txns[0].clone())
+    }
+
+    #[tokio::test]
+    async fn test_get_pending_transaction_by_hash() {
+        let mut context = new_test_context();
+        let account = context.gen_account();
+        let txn = context.create_parent_vasp(&account);
+        let body = bcs::to_bytes(&txn).unwrap();
+        let pending_txn = context
+            .expect_status_code(202)
+            .post_bcs_txn("/transactions", body)
+            .await;
+
+        let txn_hash = pending_txn["hash"].as_str().unwrap();
+
+        let txn = context.get(&format!("/transactions/{}", txn_hash)).await;
+        assert_json(txn, pending_txn);
+
+        let not_found = context
+            .expect_status_code(404)
+            .get("/transactions/0xdadfeddcca7cb6396c735e9094c76c6e4e9cb3e3ef814730693aed59bd87b31d")
+            .await;
+        assert_json(
+            not_found,
+            json!({
+                "code": 404,
+                "message": "could not find transaction by: Hash(0xdadfeddcca7cb6396c735e9094c76c6e4e9cb3e3ef814730693aed59bd87b31d)",
+                "data": {
+                    "ledger_version": "0"
+                }
+            }),
+        )
     }
 }
