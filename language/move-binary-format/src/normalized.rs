@@ -11,7 +11,7 @@ use crate::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    identifier::Identifier,
+    identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
 };
 use std::collections::BTreeMap;
@@ -305,6 +305,16 @@ impl Function {
                 .collect(),
         };
         (name, f)
+    }
+
+    /// Create a `Function` for function named `func_name` in module `m`.
+    pub fn new_from_name(m: &CompiledModule, func_name: &IdentStr) -> Option<Self> {
+        for func_defs in &m.function_defs {
+            if m.identifier_at(m.function_handle_at(func_defs.function).name) == func_name {
+                return Some(Self::new(m, func_defs).1);
+            }
+        }
+        None
     }
 }
 

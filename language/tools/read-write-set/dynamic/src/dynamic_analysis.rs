@@ -4,7 +4,7 @@
 use anyhow::{anyhow, bail, Result};
 use move_binary_format::{
     layout::{ModuleCache, TypeLayoutBuilder},
-    normalized::{Module, Type},
+    normalized::{Function, Type},
     CompiledModule,
 };
 use move_core_types::{
@@ -262,10 +262,7 @@ pub fn concretize(
     )
     .map_err(|_| anyhow!("Failed to deserialize module"))?;
 
-    let module = Module::new(&compiled_module);
-    let func_type = module
-        .exposed_functions
-        .get(fun)
+    let func_type = Function::new_from_name(&compiled_module, fun)
         .ok_or_else(|| anyhow!("Failed to find function"))?
         .parameters
         .iter()
@@ -279,6 +276,7 @@ pub fn concretize(
         func_type.as_slice(),
         type_actuals,
     )?;
+
     concretized_formals
         .concretize_secondary_indexes(blockchain_view)
         .ok_or_else(|| anyhow!("Failed to concretize secondary index"))
