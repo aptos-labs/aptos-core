@@ -23,7 +23,7 @@ use diem_types::{
     transaction::SignedTransaction,
 };
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::HashMap,
     ops::Bound,
     time::{Duration, SystemTime},
 };
@@ -45,7 +45,12 @@ pub struct TransactionStore {
     // keeps track of "non-ready" txns (transactions that can't be included in next block)
     parking_lot_index: ParkingLotIndex,
 
-    hash_index: BTreeMap<HashValue, (AccountAddress, u64)>,
+    // Index for looking up transaction by hash.
+    // Transactions are stored by AccountAddress + sequence number.
+    // This index stores map of transaction committed hash to (AccountAddress, sequence number) pair.
+    // Using transaction commited hash because from end user's point view, a transaction should only have
+    // one valid hash.
+    hash_index: HashMap<HashValue, (AccountAddress, u64)>,
 
     // configuration
     capacity: usize,
@@ -66,7 +71,7 @@ impl TransactionStore {
             priority_index: PriorityIndex::new(),
             timeline_index: TimelineIndex::new(),
             parking_lot_index: ParkingLotIndex::new(),
-            hash_index: BTreeMap::new(),
+            hash_index: HashMap::new(),
 
             // configuration
             capacity: config.capacity,
