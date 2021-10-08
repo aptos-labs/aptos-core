@@ -96,7 +96,7 @@ pub(crate) async fn coordinator<V>(
     ));
 }
 
-/// Spawn a task for processing `MempoolClientRequest`
+/// Spawn a task for processing `MempoolClientRequest`s from a client such as API service
 async fn handle_client_request<V>(
     smp: &mut SharedMempool<V>,
     bounded_executor: &BoundedExecutor,
@@ -126,7 +126,7 @@ async fn handle_client_request<V>(
                 ))
                 .await;
         }
-        MempoolClientRequest::GetTransaction(hash, callback) => {
+        MempoolClientRequest::GetTransactionByHash(hash, callback) => {
             // This timer measures how long it took for the bounded executor to *schedule* the
             // task.
             let _timer = counters::task_spawn_latency_timer(

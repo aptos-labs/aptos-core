@@ -214,7 +214,7 @@ pub type SubmissionStatusBundle = (SignedTransaction, SubmissionStatus);
 
 pub enum MempoolClientRequest {
     SubmitTransaction(SignedTransaction, oneshot::Sender<Result<SubmissionStatus>>),
-    GetTransaction(HashValue, oneshot::Sender<Option<SignedTransaction>>),
+    GetTransactionByHash(HashValue, oneshot::Sender<Option<SignedTransaction>>),
 }
 
 pub type MempoolClientSender = mpsc::Sender<MempoolClientRequest>;

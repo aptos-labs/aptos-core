@@ -160,7 +160,7 @@ impl Context {
 
         self.mp_sender
             .clone()
-            .send(MempoolClientRequest::GetTransaction(hash, req_sender))
+            .send(MempoolClientRequest::GetTransactionByHash(hash, req_sender))
             .await
             .map_err(anyhow::Error::from)?;
 

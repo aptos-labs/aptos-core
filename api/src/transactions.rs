@@ -41,7 +41,7 @@ async fn handle_get_transaction(
     context: Context,
 ) -> Result<impl Reply, Rejection> {
     let id = TransactionId::from_str(&hash_or_version)?;
-    Ok(Transactions::new(context)?.one(id).await?)
+    Ok(Transactions::new(context)?.get_transaction(id).await?)
 }
 
 // GET /transactions?start={u64}&limit={u16}
@@ -143,7 +143,7 @@ impl Transactions {
         Response::new(self.ledger_info, &txns)
     }
 
-    pub async fn one(self, id: TransactionId) -> Result<impl Reply, Error> {
+    pub async fn get_transaction(self, id: TransactionId) -> Result<impl Reply, Error> {
         let txn_data = match id.clone() {
             TransactionId::Hash(hash) => self.get_by_hash(hash.into()).await?,
             TransactionId::Version(version) => self.get_by_version(version)?,
@@ -210,7 +210,7 @@ impl FromStr for TransactionId {
             Ok(version) => TransactionId::Version(version),
             Err(_) => TransactionId::Hash(HashValue::from_str(hash_or_version).map_err(|_| {
                 Error::bad_request(format_err!(
-                    "invalid path paramenter transaction hash or version: {:?}",
+                    "invalid path parameter transaction hash or version: {:?}",
                     hash_or_version,
                 ))
             })?),
@@ -1048,7 +1048,7 @@ mod tests {
             resp,
             json!({
                 "code": 400,
-                "message": "invalid path paramenter transaction hash or version: \"0x1\""
+                "message": "invalid path parameter transaction hash or version: \"0x1\""
             }),
         )
     }
