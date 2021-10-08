@@ -70,9 +70,6 @@ pub enum MempoolSyncMsg {
     },
 }
 
-/// Protocol id for mempool direct-send calls.
-pub const MEMPOOL_DIRECT_SEND_PROTOCOL: &[u8] = b"/diem/direct-send/0.1.0/mempool/0.1.0";
-
 /// The interface from Network to Mempool layer.
 ///
 /// `MempoolNetworkEvents` is a `Stream` of `PeerManagerNotification` where the
@@ -94,8 +91,6 @@ pub struct MempoolNetworkSender {
     inner: NetworkSender<MempoolSyncMsg>,
 }
 
-/// Create a new Sender that only sends for the `MEMPOOL_DIRECT_SEND_PROTOCOL` ProtocolId and a
-/// Receiver (Events) that explicitly returns only said ProtocolId..
 pub fn network_endpoint_config(max_broadcasts_per_peer: usize) -> AppConfig {
     AppConfig::p2p(
         [ProtocolId::MempoolDirectSend],
