@@ -1,56 +1,130 @@
 \Section{Introduction}
 
-Smart contracts have been for longer considered a promising domain to employ
-formal verification~\cite{CONTRACT_VERIFICATION}.  Smart contracts deal with
-computations which require highest correctness assurance, as they manipulate
-assets of large value in an irrevocable way. Those computations need to follow
-a growing set of rules, reflecting a large diversity of regulations in place,
-and therefore are vulnerable to bugs.
+The Move Prover (MVP) is a formal verification tool for smart contracts
+that can be used routinely during the development.
+It runs about predictably as compilers,
+linters, and other development tools.
+We would like to share the most important engineering and architectural
+decisions that have made this possible.
 
-On the other hand, from the viewpoint of verification techniques, smart
-contracts are relatively \emph{easier} to verify than general programs,
-because they exist in a well-defined, isolated execution environment.
-Computations are typically sequential, not i/o-bound, and deterministic.
-These basic advantages of smart contracts can be further augmented by
-choice of a verification friendly language and virtual machine design.
+One factor that made verification easier was applying it to smart contracts.
+Additional effort for verification is easy to justify because of the
+large financial and regulatory risks that they may entail, as evidence
+be large losses that have occurred already~\cite{???}.  Smart
+contracts are also easier to verify than conventional software,
+because they are often small and because they execute in a
+well-defined, isolated environment, and because computations are
+typically sequential, not i/o-bound, and deterministic.
 
-In this paper we report about the \emph{Move prover} (abbreviated \MVP), a tool
-for the \emph{Move} smart contract language~\cite{MOVE_LANG}. Move has been
-developed together with the Diem blockchain~\cite{DIEM}, and has been designed
-from the beginning with verification in mind.  The language supports specifying
-pre, post, and aborts conditions of functions, as well as invariants over data
-structures and over the content of the global persistent memory (which
-represents programmable ``storage'' in smart contracts). Specification
-constructs include universal and existential quantification over arbitrary data
-types and are therefore generally not decidable.
+* Other keys to success
+- coupled with programming language
 
-Despite this specification richness, \MVP is capable of verifying the full Diem
-framework~\cite{DIEM_FRAMEWORK}, the Move implementation of the Diem
-blockchain~\cite{DIEM}. The framework provides functionality for managing
+
+%% Smart contracts have been for longer considered a promising domain to employ
+%% formal verification~\cite{CONTRACT_VERIFICATION}.  Smart contracts deal with
+%% computations which require highest correctness assurance, as they manipulate
+%% assets of large value in an irrevocable way. Those computations need to follow
+%% a growing set of rules, reflecting a large diversity of regulations in place,
+%% and therefore are vulnerable to bugs.
+
+%% On the other hand, from the viewpoint of verification techniques, smart
+%% contracts are relatively \emph{easier} to verify than general programs,
+%% because they exist in a well-defined, isolated execution environment.
+%% Computations are typically sequential, not i/o-bound, and deterministic.
+%% These basic advantages of smart contracts can be further augmented by
+%% choice of a verification friendly language and virtual machine design.
+
+Verification is also easier because we have a new programming language,
+\emph{Move}~\cite{MOVE_LANG}, which was developed as part of the
+Diem blockchain~\cite{DIEM}, which was designed to be used with formal
+verification, and is integrated with MVP.
+The language supports specifying
+pre-, post-, and aborts conditions of functions, as well as invariants over data
+structures and over the content of the global persistent memory
+(i.e., the contents of the blockchain).
+One feature that makes verification harder is that universal and existential
+quantification is used freely in specifications. This makes verification harder,
+but reduces errors in specification by allowing users to write properties directly,
+without clever encodings that might lead to more errors.
+
+%% In this paper we report about the \emph{Move prover} (abbreviated \MVP), a tool
+%% for the \emph{Move} smart contract language~\cite{MOVE_LANG}. Move has been
+%% developed together with the Diem blockchain~\cite{DIEM}, and has been designed
+%% from the beginning with verification in mind.  The language supports specifying
+%% pre, post, and aborts conditions of functions, as well as invariants over data
+%% structures and over the content of the global persistent memory (which
+%% represents programmable ``storage'' in smart contracts). Specification
+%% constructs include universal and existential quantification over arbitrary data
+%% types and are therefore generally not decidable.
+
+%% Despite this specification richness,
+\MVP is capable of verifying the full
+the Move implementation of the Diem
+blockchain~\cite{DIEM} (called the Diem framework~\cite{DIEM_FRAMEWORK})
+in a few minutes.
+The framework provides functionality for managing
 accounts and their interaction, including multiple currencies, account roles,
-and rules for transactions.  It consists of approximately 12,000 lines of Move
-program code and specifications.  The framework is exhaustively specified, and
-\emph{verification runs fully automated alongside with unit and integration
-  tests}, which we consider a significant practical result for formal
-verification adoption.
+and rules for transactions.  It consists of
+about 8,800 lines of Move code and 6,500 lines of specifications (including comments for both).
+%% approximately 12,000 lines of Move
+%% program code and specifications.
+The framework is %% exhaustively
+extensively specified.
+Importantly,
+\emph{verification is fully automatic and is run interactively with unit and integration
+  tests},
+%% which we consider a significant practical result for formal
+%% verification adoption.
+which we consider a testament to the practicality of the approach.
+Running the prover in integration tests requires more than speed: It requires
+reliability, because tests that work sometimes and fail or time out other
+times are unacceptable in that context.
 
-From the point of the first Move Prover publication in \cite{MOVE_PROVER}, many
-improvements have been made to make such usage possible.  Those are along speed,
-predictability, error reporting, and absence of false positives and timeouts.
-We developed a number of novel translation techniques which optimized SMT
-performance and, more importantly, resulted in generally more predictable
-behavior. While in previous versions of the tool, we saw timeouts frequently,
-plagued by the Butterfly effect~\cite{BUTTERFLY}, the current version only
-rarely runs into those problems.
+The Prover is a substantial and evolving piece of software that has
+been tuned and optimized in many ways, so it is not easy to define
+exactly what implementation decisions lead to fast and reliable
+performance.  However, we can identify three major ideas that
+resulted in dramatic improvements in speed and reliability since the
+description of an early prototype of \MVP~\cite{MOVE_PROVER},
+which are the focus of the rest of this paper:
+\begin{itemize}
+\item An \emph{alias-free memory model}, based on Move's semantics, which are similar to the Rust programming language;
+\item \emph{fine-grained invariant checking}, which ensures that invariants hold at every state, except when developer explicitly suspends them;
+\item and monomorphization, which instantiates type parameters in Move's generic
+  structures and functions
+\end{itemize}
+The combined effect of all these improvements transformed a tool that worked, but
+often exhibited frustrating, sometimes random~\cite{BUTTERFLY},
+timeouts on complex and especially
+on erroneous specifications, to a tool that almost always completes in less than 30 seconds.
+In addition, there have been many other improvements, including in the specification language,
+reducing false positives, and error reporting.
 
-This paper is organized as follows. We first give an introduction into the Move
-language and how \MVP is used with it. We then discuss in more detail the design
-of \MVP, and the most important translation techniques it uses, including
-elimination of references from Move programs, evaluating global memory
-invariants by injection them at the right places into the code, monomorphization
-of generic programs, and modular verification. For furthergoing study, the
-appendix discusses injection of function specifications, and the mapping to the
+%% From the point of the first Move Prover publication in \cite{MOVE_PROVER}, many
+%% improvements have been made to make such usage possible.  Those are along speed,
+%% predictability, error reporting, and absence of false positives and timeouts.
+%% We developed a number of novel translation techniques which optimized SMT
+%% performance and, more importantly, resulted in generally more predictable
+%% behavior. While in previous versions of the tool, we saw timeouts frequently,
+%% plagued by the Butterfly effect~\cite{BUTTERFLY}, the current version only
+%% rarely runs into those problems.
+
+The remainder of the paper first introduces the Move language and how \MVP is used with it,
+then discusses the design of \MVP and the three main optimizations above.
+There is also an
+appendix that describes
+%% discusses
+injection of function specifications, and the mapping to the
 Boogie intermediate verification language~\cite{BOOGIE}.
+
+%% This paper is organized as follows. We first give an introduction into the Move
+%% language and how \MVP is used with it. We then discuss in more detail the design
+%% of \MVP, and the most important translation techniques it uses, including
+%% elimination of references from Move programs, evaluating global memory
+%% invariants by injection them at the right places into the code, monomorphization
+%% of generic programs, and modular verification. For furthergoing study, the
+%% appendix discusses injection of function specifications, and the mapping to the
+%% Boogie intermediate verification language~\cite{BOOGIE}.
 
 
 %%% Local Variables:

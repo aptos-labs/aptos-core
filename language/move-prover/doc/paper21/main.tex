@@ -7,7 +7,9 @@
 
 \begin{document}
 
-\title{Verifying Smart Contracts\\ with the Move Prover}
+\title{Fast and Reliable Formal Verification of Smart Contracts with the Move Prover}
+
+%% \title{Verifying Smart Contracts\\ with the Move Prover}
 
 
 \author{
@@ -21,8 +23,20 @@
 
 \maketitle
 \begin{abstract}
-TBD.
-\keywords{First keyword  \and Second keyword \and Another keyword.}
+  The Move Prover (\MVP) is a formal verifier for smart contracts
+  written in the Move programming language. \MVP has an expressive
+  specification language, and is fast and reliable enough that it can
+  be run routinely by developers and in integration testing in a few
+  minutes. Besides the simplicity of smart contracts and the Move
+  language, three transformations are responsible for the practicality
+  of \MVP: (1) an alias-free memory model, (2) fine-grained invariant
+  checking, (3) and monomorphization.  The entirety of the Move code for
+  the Diem blockchain has been extensively specified and can be
+  completely verified by \MVP in a few minutes. Changes in the Diem
+  framework must be successfully verified before being integrated into
+  the open source repository on Github.
+  \keywords{Smart contracts \and
+    formal verification \and Move language \and Diem blockchain}
 \end{abstract}
 
 
@@ -30,6 +44,7 @@ TBD.
 \input{move.tex}
 \input{design.tex}
 \input{analysis.tex}
+\TODO{Dave}{I don't think the conclusion is adding much value, so I think we could cut it.}
 \input{conclusion.tex}
 
 \bibliographystyle{splncs04}
@@ -38,6 +53,7 @@ TBD.
 \appendix
 
 \newpage
+\TODO{Dave}{I think we could cut the appendices}
 \input{function-injection-apx.tex}
 \newpage
 \input{corrected_example-apx.tex}
