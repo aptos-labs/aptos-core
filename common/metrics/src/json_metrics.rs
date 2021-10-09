@@ -14,3 +14,7 @@ fn add_revision_hash(mut json_metrics: HashMap<String, String>) -> HashMap<Strin
     json_metrics.insert("revision".to_string(), env!("GIT_REV").to_string());
     json_metrics
 }
+
+pub fn get_git_rev() -> String {
+    env!("GIT_REV").to_string()
+}

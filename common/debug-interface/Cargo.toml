@@ -12,10 +12,13 @@ edition = "2018"
 [dependencies]
 anyhow = "1.0.38"
 bytes = "1.0.1"
-tokio = { version = "1.8.1", features = ["full"] }
 reqwest = { version = "0.11.2", features = ["blocking", "json"], default_features = false }
+serde = { version = "1.0.124", features = ["derive"], default-features = false }
+serde_json = "1.0.64"
+tokio = { version = "1.8.1", features = ["full"] }
 warp = "0.3.0"
 
+diem-config = { path = "../../config" }
 diem-logger = { path = "../logger" }
 diem-metrics = { path = "../metrics" }
 diem-workspace-hack = { path = "../workspace-hack" }

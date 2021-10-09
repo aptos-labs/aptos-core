@@ -215,7 +215,7 @@ fn setup_debug_interface(config: &NodeConfig, logger: Option<Arc<Logger>>) -> No
     .next()
     .unwrap();
 
-    NodeDebugService::new(addr, logger)
+    NodeDebugService::new(addr, logger, config)
 }
 
 async fn periodic_state_dump(node_config: NodeConfig, db: DbReaderWriter) {

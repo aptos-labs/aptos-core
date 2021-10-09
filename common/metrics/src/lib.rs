@@ -48,7 +48,7 @@
 #![recursion_limit = "128"]
 
 mod json_encoder;
-mod json_metrics;
+pub mod json_metrics;
 pub mod metric_server;
 mod public_metrics;
 

@@ -1510,10 +1510,13 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bytes",
+ "diem-config",
  "diem-logger",
  "diem-metrics",
  "diem-workspace-hack",
  "reqwest",
+ "serde",
+ "serde_json",
  "tokio",
  "warp",
 ]

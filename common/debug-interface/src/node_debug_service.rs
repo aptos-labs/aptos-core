@@ -3,7 +3,10 @@
 
 //! Debug interface to access information in a specific node.
 
+use diem_config::config::NodeConfig;
 use diem_logger::{info, json_log, Filter, Logger};
+use diem_metrics::json_metrics::get_git_rev;
+use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, sync::Arc};
 use tokio::runtime::{Builder, Runtime};
 use warp::Filter as _;
@@ -13,8 +16,16 @@ pub struct NodeDebugService {
     runtime: Runtime,
 }
 
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+struct NodeInfo {
+    #[serde(default)]
+    node_config: NodeConfig,
+    #[serde(default)]
+    git_revision: String,
+}
+
 impl NodeDebugService {
-    pub fn new(address: SocketAddr, logger: Option<Arc<Logger>>) -> Self {
+    pub fn new(address: SocketAddr, logger: Option<Arc<Logger>>, node_config: &NodeConfig) -> Self {
         let runtime = Builder::new_multi_thread()
             .thread_name("nodedebug")
             .enable_all()
@@ -65,7 +76,14 @@ impl NodeDebugService {
             .and(warp::path("log"))
             .and(local_filter.or(remote_filter));
 
-        let routes = log.or(warp::get().and(metrics.or(events)));
+        // Get /node-info (git revision the node was built at and the node config being used)
+        let node_info = NodeInfo {
+            git_revision: get_git_rev(),
+            node_config: node_config.clone(),
+        };
+        let node_info_route = warp::path("node-info").map(move || warp::reply::json(&node_info));
+
+        let routes = log.or(warp::get().and(metrics.or(events).or(node_info_route)));
 
         runtime
             .handle()
