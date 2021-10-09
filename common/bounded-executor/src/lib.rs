@@ -32,17 +32,25 @@ impl BoundedExecutor {
         }
     }
 
+    async fn acquire_permit(&self) -> OwnedSemaphorePermit {
+        self.semaphore.clone().acquire_owned().await.unwrap()
+    }
+
+    fn try_acquire_permit(&self) -> Option<OwnedSemaphorePermit> {
+        self.semaphore.clone().try_acquire_owned().ok()
+    }
+
     /// Spawn a [`Future`] on the `BoundedExecutor`. This function is async and
     /// will block if the executor is at capacity until one of the other spawned
     /// futures completes. This function returns a [`JoinHandle`] that the caller
     /// can `.await` on for the results of the [`Future`].
-    pub async fn spawn<F>(&self, f: F) -> JoinHandle<F::Output>
+    pub async fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
     where
         F: Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        let permit = self.semaphore.clone().acquire_owned().await.unwrap();
-        self.spawn_with_permit(f, permit)
+        let permit = self.acquire_permit().await;
+        self.executor.spawn(future_with_permit(future, permit))
     }
 
     /// Try to spawn a [`Future`] on the `BoundedExecutor`. If the `BoundedExecutor`
@@ -50,32 +58,70 @@ impl BoundedExecutor {
     /// caller attempted to spawn. Otherwise, this will spawn the future on the
     /// executor and send back a [`JoinHandle`] that the caller can `.await` on
     /// for the results of the [`Future`].
-    pub fn try_spawn<F>(&self, f: F) -> Result<JoinHandle<F::Output>, F>
+    pub fn try_spawn<F>(&self, future: F) -> Result<JoinHandle<F::Output>, F>
     where
         F: Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        match self.semaphore.clone().try_acquire_owned().ok() {
-            Some(permit) => Ok(self.spawn_with_permit(f, permit)),
-            None => Err(f),
+        match self.try_acquire_permit() {
+            Some(permit) => Ok(self.executor.spawn(future_with_permit(future, permit))),
+            None => Err(future),
         }
     }
 
-    fn spawn_with_permit<F>(
-        &self,
-        f: F,
-        spawn_permit: OwnedSemaphorePermit,
-    ) -> JoinHandle<F::Output>
+    /// Like [`BoundedExecutor::spawn`] but spawns the given closure onto a
+    /// blocking task (see [`tokio::task::spawn_blocking`] for details).
+    pub async fn spawn_blocking<F, R>(&self, func: F) -> JoinHandle<R>
     where
-        F: Future + Send + 'static,
-        F::Output: Send + 'static,
+        F: FnOnce() -> R + Send + 'static,
+        R: Send + 'static,
     {
-        // Release the permit back to the semaphore when this task completes.
-        let f = f.map(move |ret| {
-            drop(spawn_permit);
-            ret
-        });
-        self.executor.spawn(f)
+        let permit = self.acquire_permit().await;
+        self.executor
+            .spawn_blocking(function_with_permit(func, permit))
+    }
+
+    /// Like [`BoundedExecutor::try_spawn`] but spawns the given closure
+    /// onto a blocking task (see [`tokio::task::spawn_blocking`] for details).
+    pub async fn try_spawn_blocking<F, R>(&self, func: F) -> Result<JoinHandle<R>, F>
+    where
+        F: FnOnce() -> R + Send + 'static,
+        R: Send + 'static,
+    {
+        match self.try_acquire_permit() {
+            Some(permit) => Ok(self
+                .executor
+                .spawn_blocking(function_with_permit(func, permit))),
+            None => Err(func),
+        }
+    }
+}
+
+/// Wrap a `Future` so it releases the spawn permit back to the semaphore when
+/// it completes.
+fn future_with_permit<F>(future: F, permit: OwnedSemaphorePermit) -> impl Future<Output = F::Output>
+where
+    F: Future + Send + 'static,
+    F::Output: Send + 'static,
+{
+    future.map(move |ret| {
+        drop(permit);
+        ret
+    })
+}
+
+fn function_with_permit<F, R>(
+    func: F,
+    permit: OwnedSemaphorePermit,
+) -> impl FnOnce() -> R + Send + 'static
+where
+    F: FnOnce() -> R + Send + 'static,
+    R: Send + 'static,
+{
+    move || {
+        let ret = func();
+        drop(permit);
+        ret
     }
 }
 
