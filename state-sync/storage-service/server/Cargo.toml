@@ -15,7 +15,9 @@ bytes = "1.0.1"
 futures = "0.3.12"
 serde = { version = "1.0.124", default-features = false }
 thiserror = "1.0.24"
+tokio = { version = "1.8.1", features = ["rt", "macros"], default-features = false }
 
+bounded-executor = { path = "../../../common/bounded-executor" }
 channel = { path = "../../../common/channel" }
 diem-crypto = { path = "../../../crypto/crypto" }
 diem-types = { path = "../../../types" }
@@ -27,7 +29,6 @@ storage-service-types = { path = "../types" }
 [dev-dependencies]
 anyhow = "1.0.38"
 claim = "0.5.0"
-tokio = { version = "1.8.1", features = ["rt", "macros"], default-features = false }
 
 diem-crypto = { path = "../../../crypto/crypto" }
 diem-types = { path = "../../../types" }

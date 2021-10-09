@@ -287,7 +287,8 @@ impl MockClient {
         let network_requests =
             StorageServiceNetworkEvents::new(peer_mgr_notifs_rx, connection_notifs_rx);
 
-        let storage_server = StorageServiceServer::new(storage, network_requests);
+        let executor = tokio::runtime::Handle::current();
+        let storage_server = StorageServiceServer::new(executor, storage, network_requests);
 
         (Self { peer_mgr_notifs_tx }, storage_server)
     }

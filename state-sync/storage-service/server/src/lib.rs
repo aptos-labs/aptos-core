@@ -9,6 +9,7 @@ pub mod network;
 mod tests;
 
 use crate::network::StorageServiceNetworkEvents;
+use bounded_executor::BoundedExecutor;
 use diem_crypto::HashValue;
 use diem_types::{
     account_state_blob::AccountStatesChunkWithProof,
@@ -30,6 +31,7 @@ use storage_service_types::{
     TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
 };
 use thiserror::Error;
+use tokio::runtime::Handle;
 
 // TODO(joshlind): make these configurable.
 /// Storage server constants.
@@ -38,7 +40,9 @@ pub const MAX_TRANSACTION_CHUNK_SIZE: u64 = 1000;
 pub const MAX_TRANSACTION_OUTPUT_CHUNK_SIZE: u64 = 1000;
 pub const MAX_ACCOUNT_STATES_CHUNK_SIZE: u64 = 1000;
 pub const STORAGE_SERVER_VERSION: u64 = 1;
+pub const MAX_CONCURRENT_REQUESTS: u64 = 100;
 
+// TODO(philiphayes): is this error type providing enough value?
 #[derive(Clone, Debug, Deserialize, Error, PartialEq, Serialize)]
 pub enum Error {
     #[error("Storage error encountered: {0}")]
@@ -50,6 +54,7 @@ pub enum Error {
 /// The server-side actor for the storage service. Handles inbound storage
 /// service requests from clients.
 pub struct StorageServiceServer<T> {
+    bounded_executor: BoundedExecutor,
     storage: T,
     // TODO(philiphayes): would like a "multi-network" stream here, so we only
     // need one service for all networks.
@@ -57,8 +62,13 @@ pub struct StorageServiceServer<T> {
 }
 
 impl<T: StorageReaderInterface> StorageServiceServer<T> {
-    pub fn new(storage: T, network_requests: StorageServiceNetworkEvents) -> Self {
+    pub fn new(
+        executor: Handle,
+        storage: T,
+        network_requests: StorageServiceNetworkEvents,
+    ) -> Self {
         Self {
+            bounded_executor: BoundedExecutor::new(MAX_CONCURRENT_REQUESTS as usize, executor),
             storage,
             network_requests,
         }
@@ -66,10 +76,18 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
 
     pub async fn start(mut self) {
         while let Some(request) = self.network_requests.next().await {
-            // TODO(philiphayes): spawn tasks for each request
-            let (_peer, _protocol, request, response_sender) = request;
-            let response = Handler::new(self.storage.clone()).call(request);
-            response_sender.send(response);
+            let storage = self.storage.clone();
+
+            // All handler methods are currently CPU-bound and synchronous
+            // I/O-bound, so we want to spawn on the blocking thread pool to
+            // avoid starving other async tasks on the same runtime.
+            self.bounded_executor
+                .spawn_blocking(move || {
+                    let (_peer, _protocol, request, response_sender) = request;
+                    let response = Handler::new(storage).call(request);
+                    response_sender.send(response);
+                })
+                .await;
         }
     }
 }
@@ -214,7 +232,7 @@ impl<T: StorageReaderInterface> Handler<T> {
 
 /// The interface into local storage (e.g., the Diem DB) used by the storage
 /// server to handle client requests.
-pub trait StorageReaderInterface: Clone {
+pub trait StorageReaderInterface: Clone + Send + 'static {
     /// Returns a data summary of the underlying storage state.
     fn get_data_summary(&self) -> Result<DataSummary, Error>;
 
