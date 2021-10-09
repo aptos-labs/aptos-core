@@ -1,24 +1,26 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{error::StateSyncError, state_replication::StateComputer};
-use anyhow::Result;
-use consensus_types::{block::Block, executed_block::ExecutedBlock};
-use diem_crypto::HashValue;
-use diem_types::ledger_info::LedgerInfoWithSignatures;
-use executor_types::{Error as ExecutionError, StateComputeResult};
-use fail::fail_point;
-use futures::SinkExt;
-use std::{boxed::Box, sync::Arc};
-
 use crate::{
+    error::StateSyncError,
     experimental::{
         buffer_manager::{OrderedBlocks, ResetAck, ResetRequest},
         errors::Error,
     },
-    state_replication::StateComputerCommitCallBackType,
+    state_replication::{StateComputer, StateComputerCommitCallBackType},
 };
-use futures::channel::{mpsc::UnboundedSender, oneshot};
+use anyhow::Result;
+use consensus_types::{block::Block, executed_block::ExecutedBlock};
+use diem_crypto::HashValue;
+use diem_logger::prelude::*;
+use diem_types::ledger_info::LedgerInfoWithSignatures;
+use executor_types::{Error as ExecutionError, StateComputeResult};
+use fail::fail_point;
+use futures::{
+    channel::{mpsc::UnboundedSender, oneshot},
+    SinkExt,
+};
+use std::{boxed::Box, sync::Arc};
 
 /// Ordering-only execution proxy
 /// implements StateComputer traits.
@@ -71,7 +73,8 @@ impl StateComputer for OrderingStateComputer {
     ) -> Result<(), ExecutionError> {
         assert!(!blocks.is_empty());
 
-        self.executor_channel
+        if let Err(_) = self
+            .executor_channel
             .clone()
             .send(OrderedBlocks {
                 ordered_blocks: blocks
@@ -82,7 +85,9 @@ impl StateComputer for OrderingStateComputer {
                 callback,
             })
             .await
-            .expect("Sending failure in OrderingStateComputer::commit");
+        {
+            debug!("Failed to send to buffer manager, maybe epoch ends");
+        }
 
         Ok(())
     }

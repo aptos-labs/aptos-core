@@ -22,7 +22,7 @@ use diem_types::{
 
 use crate::{
     experimental::{
-        buffer::{cursor_eq, Buffer, Cursor},
+        buffer::{Buffer, Cursor},
         buffer_item::BufferItem,
         execution_phase::{ExecutionRequest, ExecutionResponse},
         persisting_phase::PersistingRequest,
@@ -34,6 +34,7 @@ use crate::{
     state_replication::StateComputerCommitCallBackType,
 };
 use diem_crypto::HashValue;
+use diem_types::epoch_change::EpochChangeProof;
 use futures::channel::mpsc::unbounded;
 
 pub const BUFFER_MANAGER_RETRY_INTERVAL: u64 = 1000;
@@ -217,6 +218,15 @@ impl BufferManager {
             }
             if item.block_id() == target_block_id {
                 let aggregated_item = item.unwrap_aggregated();
+                if aggregated_item.commit_proof.ledger_info().ends_epoch() {
+                    self.epoch_ends = true;
+                    self.commit_msg_tx
+                        .notify_epoch_change(EpochChangeProof::new(
+                            vec![aggregated_item.commit_proof.clone()],
+                            false,
+                        ))
+                        .await;
+                }
                 self.persisting_phase_tx
                     .send(PersistingRequest {
                         blocks: blocks_to_persist,

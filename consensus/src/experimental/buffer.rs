@@ -24,14 +24,6 @@ pub struct Buffer<T: Hashable> {
     tail: Cursor,
 }
 
-/// This function compares two cursors if they are not None
-/// It returns true if and only if both aare not None and their keys are the same
-pub fn cursor_eq(cursor_a: &Cursor, cursor_b: &Cursor) -> bool {
-    cursor_a.is_some()
-        && cursor_b.is_some()
-        && cursor_a.as_ref().unwrap() == cursor_b.as_ref().unwrap()
-}
-
 impl<T: Hashable> Buffer<T> {
     pub fn new() -> Self {
         Self {
