@@ -73,7 +73,7 @@ impl StateComputer for OrderingStateComputer {
     ) -> Result<(), ExecutionError> {
         assert!(!blocks.is_empty());
 
-        if let Err(_) = self
+        if self
             .executor_channel
             .clone()
             .send(OrderedBlocks {
@@ -85,6 +85,7 @@ impl StateComputer for OrderingStateComputer {
                 callback,
             })
             .await
+            .is_err()
         {
             debug!("Failed to send to buffer manager, maybe epoch ends");
         }

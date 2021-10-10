@@ -71,6 +71,7 @@ fn build_empty_store(
         Arc::new(EmptyStateComputer),
         10, // max pruned blocks in mem
         Arc::new(SimulatedTimeService::new()),
+        10,
     ))
 }
 

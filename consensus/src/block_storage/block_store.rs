@@ -17,8 +17,9 @@ use crate::{
 use anyhow::{bail, ensure, format_err, Context};
 
 use consensus_types::{
-    block::Block, executed_block::ExecutedBlock, quorum_cert::QuorumCert, sync_info::SyncInfo,
-    timeout_2chain::TwoChainTimeoutCertificate, timeout_certificate::TimeoutCertificate,
+    block::Block, common::Round, executed_block::ExecutedBlock, quorum_cert::QuorumCert,
+    sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutCertificate,
+    timeout_certificate::TimeoutCertificate,
 };
 use diem_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
 use diem_infallible::RwLock;
@@ -102,6 +103,8 @@ pub struct BlockStore {
     storage: Arc<dyn PersistentLivenessStorage>,
     /// Used to ensure that any block stored will have a timestamp < the local time
     time_service: Arc<dyn TimeService>,
+    // consistent with round type
+    back_pressure_limit: Round,
 }
 
 impl BlockStore {
@@ -111,6 +114,7 @@ impl BlockStore {
         state_computer: Arc<dyn StateComputer>,
         max_pruned_blocks_in_mem: usize,
         time_service: Arc<dyn TimeService>,
+        back_pressure_limit: Round,
     ) -> Self {
         let highest_tc = initial_data.highest_timeout_certificate();
         let highest_2chain_tc = initial_data.highest_2chain_timeout_certificate();
@@ -126,6 +130,7 @@ impl BlockStore {
             storage,
             max_pruned_blocks_in_mem,
             time_service,
+            back_pressure_limit,
         );
         block_on(block_store.try_commit());
         block_store
@@ -163,6 +168,7 @@ impl BlockStore {
         storage: Arc<dyn PersistentLivenessStorage>,
         max_pruned_blocks_in_mem: usize,
         time_service: Arc<dyn TimeService>,
+        back_pressure_limit: Round,
     ) -> Self {
         let RootInfo(root_block, root_qc, root_ordered_cert, root_commit_li) = root;
 
@@ -217,6 +223,7 @@ impl BlockStore {
             state_computer,
             storage,
             time_service,
+            back_pressure_limit,
         };
         for block in blocks {
             block_store
@@ -309,6 +316,7 @@ impl BlockStore {
             Arc::clone(&self.storage),
             max_pruned_blocks_in_mem,
             Arc::clone(&self.time_service),
+            self.back_pressure_limit,
         );
 
         let to_remove = self.inner.read().get_all_block_id();

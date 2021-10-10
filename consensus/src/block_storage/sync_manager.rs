@@ -54,8 +54,10 @@ impl BlockStore {
         // If we have the block locally, we're not far from this QC thus don't need to sync.
         // In case root().round() is greater than that the committed
         // block carried by LI is older than my current commit.
-        !(self.block_exists(qc.commit_info().id())
-            || self.commit_root().round() >= li.commit_info().round())
+        self.commit_root().round() < li.commit_info().round()
+            && (!self.block_exists(qc.commit_info().id())
+                // even if we have the block, but the gap is too large, we need sync
+                || self.ordered_root().round() - self.commit_root().round() > self.back_pressure_limit)
     }
 
     /// Checks if quorum certificate can be inserted in block store without RPC

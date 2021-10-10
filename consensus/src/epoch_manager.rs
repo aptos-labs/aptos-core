@@ -393,6 +393,7 @@ impl EpochManager {
                 ordering_state_computer,
                 self.config.max_pruned_blocks_in_mem,
                 Arc::clone(&self.time_service),
+                self.config.back_pressure_limit,
             ));
 
             info!(epoch = epoch, "Create ProposalGenerator");
@@ -428,6 +429,7 @@ impl EpochManager {
                 self.commit_state_computer.clone(),
                 self.config.max_pruned_blocks_in_mem,
                 Arc::clone(&self.time_service),
+                self.config.back_pressure_limit,
             ));
 
             info!(epoch = epoch, "Create ProposalGenerator");

@@ -196,6 +196,7 @@ impl NodeSetup {
             state_computer,
             10, // max pruned blocks in mem
             time_service.clone(),
+            10,
         ));
 
         let proposal_generator = ProposalGenerator::new(

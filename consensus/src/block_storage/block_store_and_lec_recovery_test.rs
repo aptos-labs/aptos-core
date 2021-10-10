@@ -82,6 +82,7 @@ fn build_inserter(
             state_computer,
             10, // max pruned blocks in mem
             Arc::new(SimulatedTimeService::new()),
+            10,
         )),
     )
 }
