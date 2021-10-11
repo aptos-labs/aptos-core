@@ -77,7 +77,21 @@ fn publish_packages_as_transaction(
         .ok_or_else(|| anyhow::anyhow!("missing AccountView"))?
         .sequence_number;
     let mut new_account = LocalAccount::new(derived_address, new_account_key, seq_number);
-    let compiled_units = compiled_package.compiled_units;
+    send_module_transaction(&compiled_package, &client, &mut new_account, &factory)?;
+
+    // ================= Get modules in the account  ========================
+    // Assumes we've deployed to the shuffle developer's address.
+
+    check_module_exists(&client, &new_account)
+}
+
+pub fn send_module_transaction(
+    compiled_package: &CompiledPackage,
+    client: &BlockingClient,
+    account: &mut LocalAccount,
+    factory: &TransactionFactory,
+) -> Result<()> {
+    let compiled_units = compiled_package.clone().compiled_units;
     let mut uniq_modules: HashSet<String> = HashSet::new(); // Apparently modules can appear twice in compiled units, ensure uniq
     for unit in compiled_units {
         match unit {
@@ -90,11 +104,11 @@ fn publish_packages_as_transaction(
                 uniq_modules.insert(namecpy);
                 let mut binary = vec![];
                 module.serialize(&mut binary)?;
-                let publish_txn = new_account.sign_with_transaction_builder(
+                let publish_txn = account.sign_with_transaction_builder(
                     factory.payload(TransactionPayload::Module(Module::new(binary))),
                 );
 
-                send(&client, publish_txn)?;
+                send(client, publish_txn)?;
             }
             _ => {
                 continue;
@@ -102,10 +116,10 @@ fn publish_packages_as_transaction(
         }
     }
     println!("Success!");
+    Ok(())
+}
 
-    // ================= Get modules in the account  ========================
-    // Assumes we've deployed to the shuffle developer's address.
-
+pub fn check_module_exists(client: &BlockingClient, account: &LocalAccount) -> Result<()> {
     let account_state_blob: AccountStateBlob = {
         let blob = client
             .get_account_state_with_proof(new_account.address(), None, None)?

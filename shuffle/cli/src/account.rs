@@ -35,23 +35,12 @@ pub fn handle() -> Result<()> {
     let config = NodeConfig::load(&config_path)
         .with_context(|| format!("Failed to load NodeConfig from file: {:?}", config_path))?;
 
-    let root_key_path = &shuffle_dir.join("nodeconfig").join("mint.key");
-    let root_account_key = load_key(root_key_path);
-
     let json_rpc_url = format!("http://0.0.0.0:{}", config.json_rpc.address.port());
     println!("Connecting to {}...", json_rpc_url);
     let client = BlockingClient::new(json_rpc_url);
+    let factory = TransactionFactory::new(ChainId::test());
 
-    let root_seq_num = client
-        .get_account(account_config::treasury_compliance_account_address())?
-        .into_inner()
-        .unwrap()
-        .sequence_number;
-    let mut root_account = LocalAccount::new(
-        account_config::treasury_compliance_account_address(),
-        root_account_key,
-        root_seq_num,
-    );
+    let mut root_account = get_root_account(&client, &shuffle_dir);
 
     generate_shuffle_accounts_dir(&shuffle_dir)?;
     let new_account_key = generate_key_file(&shuffle_dir).unwrap();
@@ -64,43 +53,8 @@ pub fn handle() -> Result<()> {
         0,
     );
 
-    if client
-        .get_account(new_account.address())
-        .unwrap()
-        .into_inner()
-        .is_some()
-    {
-        println!("Account already exists: {}", new_account.address());
-        println!(
-            "Private key: {}",
-            ::hex::encode(new_account.private_key().to_bytes())
-        );
-        println!("Public key: {}", new_account.public_key());
-        return Ok(());
-    }
-
     // Create a new account.
-    println!("Create a new account...",);
-    let create_new_account_txn = root_account.sign_with_transaction_builder(
-        TransactionFactory::new(ChainId::test()).payload(
-            encode_create_parent_vasp_account_script_function(
-                Currency::XUS.type_tag(),
-                0,
-                new_account.address(),
-                new_account.authentication_key().prefix().to_vec(),
-                vec![],
-                false,
-            ),
-        ),
-    );
-    send(&client, create_new_account_txn)?;
-    println!("Successfully created account {}", new_account.address());
-    println!(
-        "Private key: {}",
-        ::hex::encode(new_account.private_key().to_bytes())
-    );
-    println!("Public key: {}", new_account.public_key());
-    Ok(())
+    create_account_onchain(&mut root_account, &new_account, &factory, &client)
 }
 
 pub fn generate_shuffle_accounts_dir(shuffle_dir: &Path) -> Result<()> {
@@ -130,6 +84,59 @@ pub fn generate_address_file(shuffle_dir: &Path, public_key: &Ed25519PublicKey) 
     let account_filepath = &latest_dir.join("address");
     let mut file = File::create(account_filepath)?;
     file.write_all(address.to_string().as_ref())?;
+    Ok(())
+}
+
+pub fn get_root_account(client: &BlockingClient, shuffle_dir: &Path) -> LocalAccount {
+    let root_key_path = shuffle_dir.join("nodeconfig").join("mint.key");
+    let root_account_key = load_key(root_key_path);
+
+    let root_seq_num = client
+        .get_account(account_config::treasury_compliance_account_address())
+        .unwrap()
+        .into_inner()
+        .unwrap()
+        .sequence_number;
+    LocalAccount::new(
+        account_config::treasury_compliance_account_address(),
+        root_account_key,
+        root_seq_num,
+    )
+}
+
+pub fn create_account_onchain(
+    root_account: &mut LocalAccount,
+    new_account: &LocalAccount,
+    factory: &TransactionFactory,
+    client: &BlockingClient,
+) -> Result<()> {
+    println!("Creating a new account onchain...");
+    if client
+        .get_account(new_account.address())
+        .unwrap()
+        .into_inner()
+        .is_some()
+    {
+        println!("Account already exists: {}", new_account.address());
+    } else {
+        let create_new_account_txn = root_account.sign_with_transaction_builder(factory.payload(
+            encode_create_parent_vasp_account_script_function(
+                Currency::XUS.type_tag(),
+                0,
+                new_account.address(),
+                new_account.authentication_key().prefix().to_vec(),
+                vec![],
+                false,
+            ),
+        ));
+        send(client, create_new_account_txn)?;
+        println!("Successfully created account {}", new_account.address());
+    }
+    println!(
+        "Private key: {}",
+        ::hex::encode(new_account.private_key().to_bytes())
+    );
+    println!("Public key: {}", new_account.public_key());
     Ok(())
 }
 
