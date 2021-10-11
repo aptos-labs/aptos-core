@@ -3076,6 +3076,7 @@ dependencies = [
  "move-core-types",
  "move-coverage",
  "move-ir-types",
+ "move-lang",
  "structopt 0.3.21",
 ]
 
@@ -5015,6 +5016,7 @@ dependencies = [
  "include_dir",
  "move-binary-format",
  "move-bytecode-utils",
+ "move-bytecode-viewer",
  "move-command-line-common",
  "move-core-types",
  "move-coverage",
@@ -7744,6 +7746,7 @@ dependencies = [
  "diem-node",
  "diem-sdk",
  "diem-types",
+ "diem-vm",
  "diem-workspace-hack",
  "diemdb",
  "directories",

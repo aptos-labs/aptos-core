@@ -72,6 +72,7 @@ static DPN_FRAMEWORK_PKG: Lazy<CompiledPackage> = Lazy::new(|| {
         generate_docs: true,
         generate_abis: true,
         install_dir: None,
+        force_recompilation: false,
     };
     build_config
         .compile_package(&path_in_crate("DPN"), &mut Vec::new())

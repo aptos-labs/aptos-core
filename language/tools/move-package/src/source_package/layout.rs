@@ -1,7 +1,9 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
+use anyhow::{bail, Result};
 
 /// References file for documentation generation
 pub const REFERENCE_TEMPLATE_FILENAME: &str = "references.md";
@@ -29,6 +31,21 @@ impl SourcePackageLayout {
     /// └── tests          (optional, test mode)
     pub fn path(&self) -> &Path {
         Path::new(self.location_str())
+    }
+
+    pub fn try_find_root(starting_path: &Path) -> Result<PathBuf> {
+        let mut current_path = starting_path.to_path_buf();
+        loop {
+            if current_path.join(Self::Manifest.path()).is_file() {
+                break Ok(current_path);
+            }
+            if !current_path.pop() {
+                bail!(
+                    "Unable to find package manifest in '{}' or in its parents",
+                    starting_path.to_string_lossy()
+                )
+            }
+        }
     }
 
     pub fn location_str(&self) -> &'static str {

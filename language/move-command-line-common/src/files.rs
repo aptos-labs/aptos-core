@@ -46,6 +46,8 @@ pub const MOVE_COMPILED_EXTENSION: &str = "mv";
 pub const SOURCE_MAP_EXTENSION: &str = "mvsm";
 /// Extension for error description map for compiled releases
 pub const MOVE_ERROR_DESC_EXTENSION: &str = "errmap";
+/// Extension for coverage maps
+pub const MOVE_COVERAGE_MAP_EXTENSION: &str = "mvcov";
 
 /// - For each directory in `paths`, it will return all files that satisfy the predicate
 /// - Any file explicitly passed in `paths`, it will include that file in the result, regardless

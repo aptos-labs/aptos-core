@@ -22,6 +22,7 @@ module 2.A {
 
 
 public(friend) foo() {
+B0:
 	0: Ret
 }
 }
@@ -31,6 +32,7 @@ module 2.B {
 
 
 bar() {
+B0:
 	0: Call[1](foo())
 	1: Ret
 }

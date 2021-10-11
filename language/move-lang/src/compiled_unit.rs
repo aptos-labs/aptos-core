@@ -199,6 +199,13 @@ impl CompiledUnit {
         }
     }
 
+    pub fn source_map(&self) -> &SourceMap {
+        match self {
+            Self::Module(NamedCompiledModule { source_map, .. })
+            | Self::Script(NamedCompiledScript { source_map, .. }) => source_map,
+        }
+    }
+
     pub fn serialize(&self) -> Vec<u8> {
         let mut serialized = Vec::<u8>::new();
         match self {

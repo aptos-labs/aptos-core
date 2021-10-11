@@ -11,6 +11,7 @@ struct S {
 }
 
 public foo(): S {
+B0:
 	0: CopyLoc[0](Arg0: u64)
 	1: Pack[0](S)
 	2: Ret

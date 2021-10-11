@@ -8,6 +8,7 @@ ResolutionGraph {
         install_dir: Some(
             "ELIDED_FOR_TEST",
         ),
+        force_recompilation: false,
     },
     root_package: SourceManifest {
         package: PackageInfo {

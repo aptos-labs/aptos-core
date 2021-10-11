@@ -155,6 +155,7 @@ fn run_move_unit_tests(project_path: &Path) -> Result<()> {
         report_storage_on_error: true,
         check_stackless_vm: false,
         verbose_mode: false,
+        compute_coverage: false,
     };
 
     panic::set_hook(Box::new(|_info| {
@@ -167,6 +168,7 @@ fn run_move_unit_tests(project_path: &Path) -> Result<()> {
             &Some(project_path.join(MAIN_PKG_PATH)),
             generate_build_config_for_testing()?,
             &unit_test_cmd,
+            diem_vm::natives::diem_natives(),
         )
     });
 
@@ -183,6 +185,7 @@ fn generate_build_config_for_testing() -> Result<BuildConfig> {
         generate_docs: false,
         generate_abis: true,
         install_dir: None,
+        force_recompilation: false,
     })
 }
 

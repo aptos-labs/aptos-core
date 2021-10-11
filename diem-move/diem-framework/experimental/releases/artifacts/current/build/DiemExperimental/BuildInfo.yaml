@@ -169,6 +169,7 @@ compiled_package_info:
     generate_docs: true
     generate_abis: true
     install_dir: experimental/releases/artifacts/current
+    force_recompilation: false
 dependencies:
   - MoveStdlib
   - DiemCoreFramework

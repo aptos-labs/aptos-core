@@ -6,8 +6,10 @@ pub mod resolution;
 pub mod source_package;
 
 use anyhow::Result;
+use compilation::compiled_package::CompilationCachingStatus;
 use move_model::model::GlobalEnv;
 use serde::{Deserialize, Serialize};
+use source_package::layout::SourcePackageLayout;
 use std::{
     io::Write,
     path::{Path, PathBuf},
@@ -46,9 +48,14 @@ pub struct BuildConfig {
     /// Generate ABIs for packages
     #[structopt(name = "generate-abis", long = "abi")]
     pub generate_abis: bool,
+
     /// Optional installation directory for this after it has been generated.
     #[structopt(long = "install-dir", parse(from_os_str))]
     pub install_dir: Option<PathBuf>,
+
+    /// Force recompilation of all packages
+    #[structopt(name = "force-recompilation", long = "force", short = "f")]
+    pub force_recompilation: bool,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd)]
@@ -57,7 +64,18 @@ pub struct ModelConfig {
 }
 
 impl BuildConfig {
+    /// Compile the package at `path` or the containing Move package.
     pub fn compile_package<W: Write>(self, path: &Path, writer: &mut W) -> Result<CompiledPackage> {
+        Ok(self.compile_package_with_caching_info(path, writer)?.0)
+    }
+
+    /// Compile the package at `path` or the containing Move package and return whether or not all
+    /// packages and dependencies were cached or not.
+    pub fn compile_package_with_caching_info<W: Write>(
+        self,
+        path: &Path,
+        writer: &mut W,
+    ) -> Result<(CompiledPackage, CompilationCachingStatus)> {
         let resolved_graph = self.resolution_graph_for_package(path)?;
         BuildPlan::create(resolved_graph)?.compile(writer)
     }
@@ -80,11 +98,12 @@ impl BuildConfig {
         if self.test_mode {
             self.dev_mode = true;
         }
+        let path = SourcePackageLayout::try_find_root(path)?;
         let manifest_string =
             std::fs::read_to_string(path.join(layout::SourcePackageLayout::Manifest.path()))?;
         let toml_manifest = manifest_parser::parse_move_manifest_string(manifest_string)?;
         let manifest = manifest_parser::parse_source_manifest(toml_manifest)?;
-        let resolution_graph = ResolutionGraph::new(manifest, path.to_path_buf(), self)?;
+        let resolution_graph = ResolutionGraph::new(manifest, path, self)?;
         resolution_graph.resolve()
     }
 }

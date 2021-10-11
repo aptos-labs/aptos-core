@@ -35,6 +35,7 @@ diem-json-rpc-types = { path = "../../json-rpc/types" }
 diem-node = { path = "../../diem-node" }
 diem-sdk = { path = "../../sdk" }
 diem-types = { path = "../../types" }
+diem-vm = { path = "../../diem-move/diem-vm" }
 diem-workspace-hack = { path = "../../common/workspace-hack" }
 generate-key = { path = "../../config/generate-key" }
 move-lang = { path = "../../language/move-lang" }

@@ -404,6 +404,7 @@ pub fn build_move_package(pkg_path: &Path) -> Result<CompiledPackage> {
         test_mode: false,
         generate_docs: false,
         generate_abis: true,
+        force_recompilation: false,
         install_dir: None,
     };
 

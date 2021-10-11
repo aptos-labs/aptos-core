@@ -6,7 +6,7 @@
 use move_binary_format::file_format::CompiledModule;
 use move_coverage::{
     coverage_map::{CoverageMap, TraceMap},
-    summary::{self, ModuleSummary},
+    format_csv_summary, format_human_summary, summary,
 };
 use std::{
     fs::{self, File},
@@ -71,56 +71,6 @@ fn get_modules(args: &Args) -> Vec<CompiledModule> {
     modules
 }
 
-fn format_human_summary<M, F, W: Write>(
-    args: &Args,
-    coverage_map: &M,
-    summary_func: F,
-    summary_writer: &mut W,
-) where
-    F: Fn(&CompiledModule, &M) -> ModuleSummary,
-{
-    writeln!(summary_writer, "+-------------------------+").unwrap();
-    writeln!(summary_writer, "| Move Coverage Summary   |").unwrap();
-    writeln!(summary_writer, "+-------------------------+").unwrap();
-
-    let mut total_covered = 0;
-    let mut total_instructions = 0;
-
-    for module in get_modules(args).iter() {
-        let coverage_summary = summary_func(module, coverage_map);
-        let (total, covered) = coverage_summary
-            .summarize_human(summary_writer, args.summarize_functions)
-            .unwrap();
-        total_covered += covered;
-        total_instructions += total;
-    }
-
-    writeln!(summary_writer, "+-------------------------+").unwrap();
-    writeln!(
-        summary_writer,
-        "| % Move Coverage: {:.2}  |",
-        (total_covered as f64 / total_instructions as f64) * 100f64
-    )
-    .unwrap();
-    writeln!(summary_writer, "+-------------------------+").unwrap();
-}
-
-fn format_csv_summary<M, F, W: Write>(
-    args: &Args,
-    coverage_map: &M,
-    summary_func: F,
-    summary_writer: &mut W,
-) where
-    F: Fn(&CompiledModule, &M) -> ModuleSummary,
-{
-    writeln!(summary_writer, "ModuleName,FunctionName,Covered,Uncovered").unwrap();
-
-    for module in get_modules(args).iter() {
-        let coverage_summary = summary_func(module, coverage_map);
-        coverage_summary.summarize_csv(summary_writer).unwrap();
-    }
-}
-
 fn main() {
     let args = Args::from_args();
     let input_trace_path = Path::new(&args.input_trace_path);
@@ -133,6 +83,7 @@ fn main() {
         None => Box::new(io::stdout()),
     };
 
+    let modules = get_modules(&args);
     if args.derive_path_coverage {
         let trace_map = if args.is_raw_trace_file {
             TraceMap::from_trace_file(&input_trace_path)
@@ -141,14 +92,15 @@ fn main() {
         };
         if !args.csv_output {
             format_human_summary(
-                &args,
+                &modules,
                 &trace_map,
                 summary::summarize_path_cov,
                 &mut summary_writer,
+                args.summarize_functions,
             )
         } else {
             format_csv_summary(
-                &args,
+                &modules,
                 &trace_map,
                 summary::summarize_path_cov,
                 &mut summary_writer,
@@ -163,14 +115,15 @@ fn main() {
         let unified_exec_map = coverage_map.to_unified_exec_map();
         if !args.csv_output {
             format_human_summary(
-                &args,
+                &modules,
                 &unified_exec_map,
                 summary::summarize_inst_cov,
                 &mut summary_writer,
+                args.summarize_functions,
             )
         } else {
             format_csv_summary(
-                &args,
+                &modules,
                 &unified_exec_map,
                 summary::summarize_inst_cov,
                 &mut summary_writer,

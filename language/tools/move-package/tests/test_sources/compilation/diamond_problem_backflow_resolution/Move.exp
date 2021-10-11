@@ -41,5 +41,6 @@ CompiledPackageInfo {
         install_dir: Some(
             "ELIDED_FOR_TEST",
         ),
+        force_recompilation: false,
     },
 }

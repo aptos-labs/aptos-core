@@ -82,6 +82,7 @@ impl ReleaseOptions {
             generate_docs: !self.build_docs,
             generate_abis: !self.script_abis,
             install_dir: Some(output_path.clone()),
+            force_recompilation: false,
         };
 
         let package_path = Path::new(std::env!("CARGO_MANIFEST_DIR")).join(&self.package);

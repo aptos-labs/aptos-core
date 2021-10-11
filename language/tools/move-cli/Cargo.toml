@@ -45,6 +45,7 @@ move-prover = { path = "../../move-prover" }
 move-unit-test = { path = "../move-unit-test" }
 errmapgen = { path = "../../move-prover/errmapgen" }
 bytecode-source-map = { path = "../../compiler/bytecode-source-map" }
+move-bytecode-viewer = { path = "../move-bytecode-viewer" }
 
 [dev-dependencies]
 datatest-stable = "0.1.1"

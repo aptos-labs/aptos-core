@@ -10,6 +10,8 @@ use move_lang::{compiled_unit::AnnotatedCompiledUnit, diagnostics::FilesSourceTe
 use petgraph::algo::toposort;
 use std::{collections::BTreeMap, io::Write};
 
+use super::compiled_package::CompilationCachingStatus;
+
 #[derive(Debug, Clone)]
 pub struct BuildPlan {
     root: PackageName,
@@ -36,7 +38,10 @@ impl BuildPlan {
         })
     }
 
-    pub fn compile<W: Write>(&self, writer: &mut W) -> Result<CompiledPackage> {
+    pub fn compile<W: Write>(
+        &self,
+        writer: &mut W,
+    ) -> Result<(CompiledPackage, CompilationCachingStatus)> {
         self.compile_with_driver(writer, |compiler, _| compiler.build_and_report())
     }
 
@@ -48,13 +53,14 @@ impl BuildPlan {
             bool,
         )
             -> anyhow::Result<(FilesSourceText, Vec<AnnotatedCompiledUnit>)>,
-    ) -> Result<CompiledPackage> {
+    ) -> Result<(CompiledPackage, CompilationCachingStatus)> {
         let package_root = &self.resolution_graph.package_table[&self.root];
         let project_root = match &self.resolution_graph.build_options.install_dir {
             Some(under_path) => under_path.clone(),
             None => self.resolution_graph.root_package_path.clone(),
         };
-        let mut compiled: BTreeMap<PackageName, CompiledPackage> = BTreeMap::new();
+        let mut compiled: BTreeMap<PackageName, (CompiledPackage, CompilationCachingStatus)> =
+            BTreeMap::new();
         for package_ident in &self.sorted_deps {
             let resolved_package = self.resolution_graph.get_package(package_ident);
             let dependencies: Vec<_> = resolved_package

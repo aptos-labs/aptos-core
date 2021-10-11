@@ -1,13 +1,159 @@
 Command `package build`:
 BUILDING MoveStdlib
 BUILDING PackageBasics
-Command `package test`:
+Command `package test --coverage`:
 BUILDING MoveStdlib
 BUILDING PackageBasics
 Running Move unit tests
+[ PASS    ] 0x1::AModule::double_three
 [ PASS    ] 0x1::AModuleTests::double_one_one
+[ PASS    ] 0x1::AModule::double_two
 [ PASS    ] 0x1::AModuleTests::double_three
 [ PASS    ] 0x1::AModuleTests::double_zero_zero
 [ PASS    ] 0x1::AModuleTests::double_zero_zero_wrong
-Test result: OK. Total tests: 4; passed: 4; failed: 0
+Test result: OK. Total tests: 6; passed: 6; failed: 0
+Command `package coverage summary --summarize-functions`:
++-------------------------+
+| Move Coverage Summary   |
++-------------------------+
+Module 00000000000000000000000000000001::AModule
+	fun double_except_three
+		total: 11
+		covered: 11
+		% coverage: 100.00
+>>> % Module coverage: 100.00
++-------------------------+
+| % Move Coverage: 100.00  |
++-------------------------+
+Command `package coverage source --module AModule`:
+module Std::AModule {
+    use Std::Errors;
+
+    /// x was three
+    const E_IS_THREE: u64 = 0;
+
+    public fun double_except_three(x: u64): u64 {
+        assert!(x != 3, Errors::invalid_argument(E_IS_THREE));
+        x * x
+    }
+
+    #[test]
+    fun double_two() {
+        assert!(double_except_three(4) == 16, 0)
+    }
+
+    #[test]
+    #[expected_failure]
+    fun double_three() {
+        double_except_three(3);
+    }
+}
+Command `package coverage bytecode --module AModule`:
+// Move bytecode v4
+module 1.AModule {
+
+
+public double_except_three(): u64 {
+B0:
+[6]	0: CopyLoc[0](x: u64)
+[6]	1: LdU64(3)
+[6]	2: Neq
+[6]	3: BrTrue(7)
+B1:
+[2]	4: LdAddr[0](U64: [0, 0, 0, 0, 0, 0, 0, 0])
+[2]	5: Call[1](invalid_argument(u64): u64)
+[2]	6: Abort
+B2:
+[4]	7: CopyLoc[0](x: u64)
+[4]	8: CopyLoc[0](x: u64)
+[4]	9: Mul
+[4]	10: Ret
+}
+}
+Command `package disassemble --package MoveStdlib --name Errors`:
+// Move bytecode v4
+module 1.Errors {
+
+
+public already_published(): u64 {
+B0:
+	0: LdAddr[0](U8: [6])
+	1: CopyLoc[0](reason: u64)
+	2: Call[6](make(u8, u64): u64)
+	3: Ret
+}
+public custom(): u64 {
+B0:
+	0: LdAddr[1](U8: [255])
+	1: CopyLoc[0](reason: u64)
+	2: Call[6](make(u8, u64): u64)
+	3: Ret
+}
+public internal(): u64 {
+B0:
+	0: LdAddr[2](U8: [10])
+	1: CopyLoc[0](reason: u64)
+	2: Call[6](make(u8, u64): u64)
+	3: Ret
+}
+public invalid_argument(): u64 {
+B0:
+	0: LdAddr[3](U8: [7])
+	1: CopyLoc[0](reason: u64)
+	2: Call[6](make(u8, u64): u64)
+	3: Ret
+}
+public invalid_state(): u64 {
+B0:
+	0: LdAddr[4](U8: [1])
+	1: CopyLoc[0](reason: u64)
+	2: Call[6](make(u8, u64): u64)
+	3: Ret
+}
+public limit_exceeded(): u64 {
+B0:
+	0: LdAddr[5](U8: [8])
+	1: CopyLoc[0](reason: u64)
+	2: Call[6](make(u8, u64): u64)
+	3: Ret
+}
+make(): u64 {
+B0:
+	0: CopyLoc[0](category: u8)
+	1: CastU64
+	2: CopyLoc[1](reason: u64)
+	3: LdU8(8)
+	4: Shl
+	5: Add
+	6: Ret
+}
+public not_published(): u64 {
+B0:
+	0: LdAddr[6](U8: [5])
+	1: CopyLoc[0](reason: u64)
+	2: Call[6](make(u8, u64): u64)
+	3: Ret
+}
+public requires_address(): u64 {
+B0:
+	0: LdAddr[7](U8: [2])
+	1: CopyLoc[0](reason: u64)
+	2: Call[6](make(u8, u64): u64)
+	3: Ret
+}
+public requires_capability(): u64 {
+B0:
+	0: LdAddr[8](U8: [4])
+	1: CopyLoc[0](reason: u64)
+	2: Call[6](make(u8, u64): u64)
+	3: Ret
+}
+public requires_role(): u64 {
+B0:
+	0: LdAddr[9](U8: [3])
+	1: CopyLoc[0](reason: u64)
+	2: Call[6](make(u8, u64): u64)
+	3: Ret
+}
+}
 Command `package errmap`:

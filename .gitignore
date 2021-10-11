@@ -45,6 +45,10 @@ diem-move/vm-genesis/genesis/vm_config.toml
 # Move Build Output
 build/
 
+# Move coverage and tracing information
+.trace
+*.mvcov
+
 # Do not ignore the Move build output under the releases for DPN, core, and
 # experimental -- these are the release code.
 !diem-move/diem-framework/DPN/releases/artifacts/**

@@ -45,6 +45,7 @@ pub fn run_test(path: &Path) -> datatest_stable::Result<()> {
                     generate_docs: false,
                     generate_abis: false,
                     install_dir: Some(tempdir().unwrap().path().to_path_buf()),
+                    force_recompilation: false,
                 },
             )
         })
@@ -61,11 +62,11 @@ pub fn run_test(path: &Path) -> datatest_stable::Result<()> {
                 .and_then(|bp| bp.compile(&mut Vec::new()))
             {
                 Ok(mut pkg) => {
-                    pkg.compiled_package_info.source_digest =
+                    pkg.0.compiled_package_info.source_digest =
                         Some(PackageDigest::from("ELIDED_FOR_TEST"));
-                    pkg.compiled_package_info.build_flags.install_dir =
+                    pkg.0.compiled_package_info.build_flags.install_dir =
                         Some(PathBuf::from("ELIDED_FOR_TEST"));
-                    format!("{:#?}\n", pkg.compiled_package_info)
+                    format!("{:#?}\n", pkg.0.compiled_package_info)
                 }
                 Err(error) => format!("{:#}\n", error),
             },

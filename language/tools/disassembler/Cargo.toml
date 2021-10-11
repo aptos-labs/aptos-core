@@ -18,6 +18,7 @@ move-core-types = { path = "../../move-core/types" }
 move-ir-types = { path = "../../move-ir/types" }
 move-binary-format = { path = "../../move-binary-format" }
 move-coverage = { path = "../move-coverage" }
+move-lang = { path = "../../move-lang" }
 
 structopt = "0.3.21"
 

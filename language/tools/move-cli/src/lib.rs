@@ -172,7 +172,7 @@ pub fn run_cli(
         }
         Command::Experimental { cmd } => cmd.handle_command(move_args, &mode),
         Command::Package { path, config, cmd } => {
-            package::cli::handle_package_commands(path, config.clone(), cmd)
+            package::cli::handle_package_commands(path, config.clone(), cmd, natives)
         }
     }
 }

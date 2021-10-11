@@ -20,20 +20,26 @@ use move_binary_format::{
 use move_core_types::identifier::IdentStr;
 use move_coverage::coverage_map::{ExecCoverageMap, FunctionCoverage};
 use move_ir_types::location::Loc;
+use move_lang::compiled_unit::{CompiledUnit, NamedCompiledModule, NamedCompiledScript};
+use structopt::StructOpt;
 
 /// Holds the various options that we support while disassembling code.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, StructOpt)]
 pub struct DisassemblerOptions {
     /// Only print non-private functions
+    #[structopt(long = "only-public")]
     pub only_externally_visible: bool,
 
     /// Print the bytecode for the instructions within the function.
+    #[structopt(long = "print-code")]
     pub print_code: bool,
 
     /// Print the basic blocks of the bytecode.
+    #[structopt(long = "print-basic-blocks")]
     pub print_basic_blocks: bool,
 
     /// Print the locals inside each function body.
+    #[structopt(long = "print-locals")]
     pub print_locals: bool,
 }
 
@@ -41,9 +47,9 @@ impl DisassemblerOptions {
     pub fn new() -> Self {
         Self {
             only_externally_visible: false,
-            print_code: false,
-            print_basic_blocks: false,
-            print_locals: false,
+            print_code: true,
+            print_basic_blocks: true,
+            print_locals: true,
         }
     }
 }
@@ -73,6 +79,22 @@ impl<'a> Disassembler<'a> {
             options,
             coverage_map: None,
         })
+    }
+
+    pub fn from_unit(unit: &'a CompiledUnit) -> Self {
+        let options = DisassemblerOptions::new();
+        let source_map = unit.source_map().clone();
+        let index_view = match unit {
+            CompiledUnit::Module(NamedCompiledModule { module, .. }) => {
+                BinaryIndexedView::Module(module)
+            }
+            CompiledUnit::Script(NamedCompiledScript { script, .. }) => {
+                BinaryIndexedView::Script(script)
+            }
+        };
+
+        let source_mapping = SourceMapping::new(source_map, index_view);
+        Disassembler::new(source_mapping, options)
     }
 
     pub fn add_coverage_map(&mut self, coverage_map: ExecCoverageMap) {
