@@ -1,7 +1,7 @@
 
-import { Serializer } from '../serde/serializer.ts';
-import { Deserializer } from '../serde/deserializer.ts';
-import { Optional, Seq, Tuple, ListTuple, unit, bool, int8, int16, int32, int64, int128, uint8, uint16, uint32, uint64, uint128, float32, float64, char, str, bytes} from '../serde/types.ts';
+import { Serializer, Deserializer } from '../serde/mod.ts';
+import { BcsSerializer, BcsDeserializer } from '../bcs/mod.ts';
+import { Optional, Seq, Tuple, ListTuple, unit, bool, int8, int16, int32, int64, int128, uint8, uint16, uint32, uint64, uint128, float32, float64, char, str, bytes } from '../serde/mod.ts';
 
 export class AccessPath {
 
@@ -799,22 +799,22 @@ static deserialize(deserializer: Deserializer): Script {
 }
 export class ScriptFunction {
 
-constructor (public module_arg: ModuleId, public function_arg: Identifier, public ty_args: Seq<TypeTag>, public args: Seq<bytes>) {
+constructor (public module_name: ModuleId, public function_name: Identifier, public ty_args: Seq<TypeTag>, public args: Seq<bytes>) {
 }
 
 public serialize(serializer: Serializer): void {
-  this.module_arg.serialize(serializer);
-  this.function_arg.serialize(serializer);
+  this.module_name.serialize(serializer);
+  this.function_name.serialize(serializer);
   Helpers.serializeVectorTypeTag(this.ty_args, serializer);
   Helpers.serializeVectorBytes(this.args, serializer);
 }
 
 static deserialize(deserializer: Deserializer): ScriptFunction {
-  const module_arg = ModuleId.deserialize(deserializer);
-  const function_arg = Identifier.deserialize(deserializer);
+  const module_name = ModuleId.deserialize(deserializer);
+  const function_name = Identifier.deserialize(deserializer);
   const ty_args = Helpers.deserializeVectorTypeTag(deserializer);
   const args = Helpers.deserializeVectorBytes(deserializer);
-  return new ScriptFunction(module_arg,function_arg,ty_args,args);
+  return new ScriptFunction(module_name,function_name,ty_args,args);
 }
 
 }
@@ -837,22 +837,22 @@ static deserialize(deserializer: Deserializer): SignedTransaction {
 }
 export class StructTag {
 
-constructor (public address: AccountAddress, public module: Identifier, public name: Identifier, public type_params: Seq<TypeTag>) {
+constructor (public address: AccountAddress, public module_name: Identifier, public name: Identifier, public type_params: Seq<TypeTag>) {
 }
 
 public serialize(serializer: Serializer): void {
   this.address.serialize(serializer);
-  this.module.serialize(serializer);
+  this.module_name.serialize(serializer);
   this.name.serialize(serializer);
   Helpers.serializeVectorTypeTag(this.type_params, serializer);
 }
 
 static deserialize(deserializer: Deserializer): StructTag {
   const address = AccountAddress.deserialize(deserializer);
-  const module = Identifier.deserialize(deserializer);
+  const module_name = Identifier.deserialize(deserializer);
   const name = Identifier.deserialize(deserializer);
   const type_params = Helpers.deserializeVectorTypeTag(deserializer);
-  return new StructTag(address,module,name,type_params);
+  return new StructTag(address,module_name,name,type_params);
 }
 
 }

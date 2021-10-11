@@ -1,17 +1,17 @@
-import { Deserializer } from './deserializer.ts';
-import * as util from "https://deno.land/std@0.85.0/node/util.ts"
+import { Deserializer } from "./deserializer.ts";
+import * as util from "https://deno.land/std@0.85.0/node/util.ts";
 
 export abstract class BinaryDeserializer implements Deserializer {
-  private static readonly BIG_32 = BigInt(32);
-  private static readonly BIG_64 = BigInt(64);
-  private static readonly textDecoder =
-      typeof window === 'undefined' ? new util.TextDecoder() : new TextDecoder();
+  private static readonly BIG_32: bigint = BigInt(32);
+  private static readonly BIG_64: bigint = BigInt(64);
+  private static readonly textDecoder = typeof window === "undefined"
+    ? new util.TextDecoder()
+    : new TextDecoder();
   public buffer: ArrayBuffer;
   public offset: number;
 
-  protected constructor(data: Uint8Array) {
-    // As we can't be sure about the origin of the data, it's better to copy it to a new buffer
-    // e.g. if the data originated by: Buffer.from('16a9', 'hex'), the internal buffer would be much longer and/or different (as Buffer is some sort of a view)
+  constructor(data: Uint8Array) {
+    // copies data to prevent outside mutation of buffer.
     this.buffer = new ArrayBuffer(data.length);
     new Uint8Array(this.buffer).set(data, 0);
     this.offset = 0;
@@ -28,8 +28,8 @@ export abstract class BinaryDeserializer implements Deserializer {
   abstract deserializeVariantIndex(): number;
 
   abstract checkThatKeySlicesAreIncreasing(
-      key1: [number, number],
-      key2: [number, number]
+    key1: [number, number],
+    key2: [number, number],
   ): void;
 
   public deserializeStr(): string {
@@ -66,20 +66,26 @@ export abstract class BinaryDeserializer implements Deserializer {
     return new DataView(this.read(4)).getUint32(0, true);
   }
 
-  public deserializeU64(): BigInt {
+  public deserializeU64(): bigint {
     const low = this.deserializeU32();
     const high = this.deserializeU32();
 
     // combine the two 32-bit values and return (little endian)
-    return (BigInt(high.toString()) << BinaryDeserializer.BIG_32) | BigInt(low.toString());
+    return BigInt(
+      (BigInt(high.toString()) << BinaryDeserializer.BIG_32) |
+        BigInt(low.toString()),
+    );
   }
 
-  public deserializeU128(): BigInt {
+  public deserializeU128(): bigint {
     const low = this.deserializeU64();
     const high = this.deserializeU64();
 
     // combine the two 64-bit values and return (little endian)
-    return (BigInt(high.toString()) << BinaryDeserializer.BIG_64) | BigInt(low.toString());
+    return BigInt(
+      (BigInt(high.toString()) << BinaryDeserializer.BIG_64) |
+        BigInt(low.toString()),
+    );
   }
 
   public deserializeI8(): number {
@@ -94,20 +100,22 @@ export abstract class BinaryDeserializer implements Deserializer {
     return new DataView(this.read(4)).getInt32(0, true);
   }
 
-  public deserializeI64(): BigInt {
+  public deserializeI64(): bigint {
     const low = this.deserializeI32();
     const high = this.deserializeI32();
 
     // combine the two 32-bit values and return (little endian)
-    return (BigInt(high.toString()) << BinaryDeserializer.BIG_32) | BigInt(low.toString());
+    return (BigInt(high.toString()) << BinaryDeserializer.BIG_32) |
+      BigInt(low.toString());
   }
 
-  public deserializeI128(): BigInt {
+  public deserializeI128(): bigint {
     const low = this.deserializeI64();
     const high = this.deserializeI64();
 
     // combine the two 64-bit values and return (little endian)
-    return (BigInt(high.toString()) << BinaryDeserializer.BIG_64) | BigInt(low.toString());
+    return (BigInt(high.toString()) << BinaryDeserializer.BIG_64) |
+      BigInt(low.toString());
   }
 
   public deserializeOptionTag(): boolean {
@@ -119,7 +127,7 @@ export abstract class BinaryDeserializer implements Deserializer {
   }
 
   public deserializeChar(): string {
-    throw new Error('Method deserializeChar not implemented.');
+    throw new Error("Method deserializeChar not implemented.");
   }
 
   public deserializeF32(): number {

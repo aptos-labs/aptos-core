@@ -1,11 +1,7 @@
-import { BinaryDeserializer } from '../serde/binaryDeserializer.ts';
+import { BinaryDeserializer } from "../serde/binaryDeserializer.ts";
 
 export class BcsDeserializer extends BinaryDeserializer {
   private static readonly MAX_UINT_32 = 2 ** 32 - 1;
-
-  constructor(data: Uint8Array) {
-    super(data);
-  }
 
   public deserializeUleb128AsU32(): number {
     let value = 0;
@@ -14,16 +10,16 @@ export class BcsDeserializer extends BinaryDeserializer {
       const digit = x & 0x7f;
       value = value | (digit << shift);
       if (value < 0 || value > BcsDeserializer.MAX_UINT_32) {
-        throw new Error('Overflow while parsing uleb128-encoded uint32 value');
+        throw new Error("Overflow while parsing uleb128-encoded uint32 value");
       }
       if (digit == x) {
         if (shift > 0 && digit == 0) {
-          throw new Error('Invalid uleb128 number (unexpected zero digit)');
+          throw new Error("Invalid uleb128 number (unexpected zero digit)");
         }
         return value;
       }
     }
-    throw new Error('Overflow while parsing uleb128-encoded uint32 value');
+    throw new Error("Overflow while parsing uleb128-encoded uint32 value");
   }
 
   deserializeLen(): number {
@@ -35,10 +31,10 @@ export class BcsDeserializer extends BinaryDeserializer {
   }
 
   public checkThatKeySlicesAreIncreasing(
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      key1: [number, number],
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      key2: [number, number]
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _key1: [number, number],
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _key2: [number, number],
   ): void {
     return;
   }

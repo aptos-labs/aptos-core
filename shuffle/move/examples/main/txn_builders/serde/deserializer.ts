@@ -19,9 +19,9 @@ export interface Deserializer {
 
   deserializeU32(): number;
 
-  deserializeU64(): BigInt;
+  deserializeU64(): bigint;
 
-  deserializeU128(): BigInt;
+  deserializeU128(): bigint;
 
   deserializeI8(): number;
 
@@ -29,9 +29,9 @@ export interface Deserializer {
 
   deserializeI32(): number;
 
-  deserializeI64(): BigInt;
+  deserializeI64(): bigint;
 
-  deserializeI128(): BigInt;
+  deserializeI128(): bigint;
 
   deserializeLen(): number;
 
@@ -42,7 +42,7 @@ export interface Deserializer {
   getBufferOffset(): number;
 
   checkThatKeySlicesAreIncreasing(
-      key1: [number, number],
-      key2: [number, number]
+    key1: [number, number],
+    key2: [number, number],
   ): void;
 }

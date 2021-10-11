@@ -1,0 +1,21 @@
+---
+Identifier:
+  NEWTYPESTRUCT: STR
+ModuleId:
+  STRUCT:
+    - name:
+        TYPENAME: Identifier
+ScriptFunction:
+  STRUCT:
+    - module_name:
+        TYPENAME: ModuleId
+    - function_name:
+        TYPENAME: Identifier
+StructTag:
+  STRUCT:
+    - address:
+        TYPENAME: STR
+    - module_name:
+        TYPENAME: Identifier
+    - name:
+        TYPENAME: Identifier

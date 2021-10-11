@@ -39,6 +39,23 @@ const EXPECTED_TX_SCRIPT_OUTPUT: &str = "224 1 161 28 235 11 1 0 0 0 7 1 0 2 2 2
 
 const EXPECTED_SCRIPT_FUN_OUTPUT: &str = "3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 14 80 97 121 109 101 110 116 83 99 114 105 112 116 115 26 112 101 101 114 95 116 111 95 112 101 101 114 95 119 105 116 104 95 109 101 116 97 100 97 116 97 1 7 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 3 88 68 88 3 88 68 88 0 4 16 34 34 34 34 34 34 34 34 34 34 34 34 34 34 34 34 8 135 214 18 0 0 0 0 0 1 0 1 0 \n";
 
+#[test]
+fn test_typescript_replace_keywords() {
+    let yamlpath = "./tests/keyworded_registry.yaml";
+    let yaml_content = std::fs::read_to_string(yamlpath).unwrap();
+    let mut registry = serde_yaml::from_str::<Registry>(yaml_content.as_str()).unwrap();
+    buildgen::typescript::replace_keywords(&mut registry);
+    let actual_content = serde_yaml::to_string(&registry).unwrap();
+    let expected_content =
+        std::fs::read_to_string("./tests/keyworded_registry.goldenfile.yaml").unwrap();
+
+    let mut linecount = 1;
+    for (expected_line, line) in expected_content.lines().zip(actual_content.lines()) {
+        assert_eq!(expected_line, line, "error on line {}", linecount);
+        linecount += 1;
+    }
+}
+
 // Cannot run this test in the CI of Diem.
 #[test]
 #[ignore]

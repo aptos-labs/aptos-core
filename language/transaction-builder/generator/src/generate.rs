@@ -154,7 +154,10 @@ fn main() {
         }
         let content =
             std::fs::read_to_string(registry_file).expect("registry file must be readable");
-        let registry = serde_yaml::from_str::<Registry>(content.as_str()).unwrap();
+        let mut registry = serde_yaml::from_str::<Registry>(content.as_str()).unwrap();
+        if let Language::TypeScript = options.language {
+            buildgen::typescript::replace_keywords(&mut registry);
+        };
         let (diem_package_name, diem_package_path) = match options.language {
             Language::Rust => (
                 if options.diem_version_number == "0.1.0" {

@@ -374,9 +374,9 @@ checksum = "7b8a45dc8036c7e52889226a96edacd45831c0dbdb8b803a58b8e0e12613b1a6"
 
 [[package]]
 name = "bcs"
-version = "0.1.2"
+version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a86ab68e515a8b195b2be6ff544a83b626eb3b15ea435be1fa6b9d4ccd1591ac"
+checksum = "510fd83e3eaf7263b06182f3550b4c0af2af42cb36ab8024969ff5ea7fcb2833"
 dependencies = [
  "serde",
  "thiserror",
@@ -7319,9 +7319,9 @@ dependencies = [
 
 [[package]]
 name = "serde-generate"
-version = "0.19.1"
+version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b53e80288353f538b8a6aff447ce08fd59b81f3e56ca4c45326e6585155188ce"
+checksum = "de20e2b2d06400b323456354bd978c50a25ae6e45b1453b8b507ce0a4d4e2463"
 dependencies = [
  "bcs",
  "bincode",
@@ -7348,10 +7348,11 @@ dependencies = [
 
 [[package]]
 name = "serde-reflection"
-version = "0.3.2"
+version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "695ca48311bdeac687d09bbd558de507f0874a401c56cce52ee5665705f817f3"
+checksum = "f1ff587c6f7c8444aaa5ba43c90baa7cafd46e756c00b77a6a7226dfa7b31deb"
 dependencies = [
+ "once_cell",
  "serde",
  "thiserror",
 ]
@@ -8857,7 +8858,7 @@ version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f559b464de2e2bdabcac6a210d12e9b5a5973c251e102c44c585c71d51bd78e"
 dependencies = [
- "cfg-if 0.1.10",
+ "cfg-if 1.0.0",
  "static_assertions",
 ]
 

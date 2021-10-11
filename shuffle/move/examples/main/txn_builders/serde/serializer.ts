@@ -19,9 +19,9 @@ export interface Serializer {
 
   serializeU32(value: number): void;
 
-  serializeU64(value: BigInt | number): void;
+  serializeU64(value: bigint | number): void;
 
-  serializeU128(value: BigInt | number): void;
+  serializeU128(value: bigint | number): void;
 
   serializeI8(value: number): void;
 
@@ -29,9 +29,9 @@ export interface Serializer {
 
   serializeI32(value: number): void;
 
-  serializeI64(value: BigInt | number): void;
+  serializeI64(value: bigint | number): void;
 
-  serializeI128(value: BigInt | number): void;
+  serializeI128(value: bigint | number): void;
 
   serializeLen(value: number): void;
 

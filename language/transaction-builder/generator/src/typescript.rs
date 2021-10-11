@@ -8,6 +8,7 @@ use serde_generate::{
     indent::{IndentConfig, IndentedWriter},
     typescript, CodeGeneratorConfig,
 };
+use serde_reflection::ContainerFormat;
 
 use heck::{CamelCase, MixedCase, ShoutySnakeCase};
 use std::{
@@ -32,7 +33,7 @@ export interface TypeTagDef {{
   type: Types;
   arrayType?: TypeTagDef;
   name?: string;
-  module?: string;
+  moduleName?: string;
   address?: string;
   typeParams?: TypeTagDef[];
 }}
@@ -434,7 +435,7 @@ return new DiemTypes.Script(code, tyArgs, args);"#,
             U128 => "{type: Types.U128}".to_string(),
             Address => "{type: Types.Address}".to_string(),
             Vector(type_tag) => format!("{{type: Types.Array, arrayType: {}}}", Self::quote_script_arg_type(type_tag)),
-            Struct(struct_tag) => format!("{{type: Types.Struct, name: \"{}\", module: \"{}\", address: \"{}\", typeParams: [{}]}}",
+            Struct(struct_tag) => format!("{{type: Types.Struct, name: \"{}\", moduleName: \"{}\", address: \"{}\", typeParams: [{}]}}",
                                           struct_tag.name,
                                           struct_tag.module,
                                           struct_tag.address,
@@ -467,5 +468,27 @@ impl crate::SourceInstaller for Installer {
         let mut file = std::fs::File::create(dir_path.join("index.ts"))?;
         output(&mut file, abis)?;
         Ok(())
+    }
+}
+
+/// Walks through the registry replacing variables known to be named as a
+/// javascript keyword, making the resulting codegen invalid.
+/// ie: public function: Identifier => public function_name: Identifier
+pub fn replace_keywords(registry: &mut BTreeMap<String, ContainerFormat>) {
+    swap_keyworded_fields(registry.get_mut("StructTag"));
+    swap_keyworded_fields(registry.get_mut("ScriptFunction"));
+}
+
+fn swap_keyworded_fields(fields: Option<&mut ContainerFormat>) {
+    if let Some(fields) = fields {
+        if let ContainerFormat::Struct(fields) = fields {
+            for entry in fields.iter_mut() {
+                match entry.name.as_str() {
+                    "module" => entry.name = String::from("module_name"),
+                    "function" => entry.name = String::from("function_name"),
+                    _ => {}
+                }
+            }
+        }
     }
 }
