@@ -4,7 +4,7 @@
     "description": "A language server and basic grammar for the Move programming language.",
     "publisher": "move",
     "license": "Apache-2.0",
-    "version": "0.0.1-dev",
+    "version": "0.0.1",
     "preview": true,
     "homepage": "https://developers.diem.com/docs/move/move-overview",
     "repository": {
@@ -46,13 +46,14 @@
         ]
     },
     "scripts": {
-        "package": "vsce package -o move-analyzer.vsix",
         "compile": "tsc -p ./",
         "watch": "tsc -watch -p ./",
         "lint": "tsfmt --verify && eslint . --ext ts --max-warnings 0",
         "fix": "tsfmt --replace && eslint . --ext ts --fix",
         "pretest": "npm run compile && npm run lint",
-        "test": "node ./out/tests/runTests.js"
+        "test": "node ./out/tests/runTests.js",
+        "vscode:prepublish": "npm run pretest",
+        "package": "vsce package -o move-analyzer.vsix"
     },
     "devDependencies": {
         "@types/glob": "^7.1.4",
