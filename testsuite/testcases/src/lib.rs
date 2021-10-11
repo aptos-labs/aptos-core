@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod compatibility_test;
+pub mod partial_nodes_down_test;
 pub mod performance_test;
 
 use diem_sdk::types::PeerId;

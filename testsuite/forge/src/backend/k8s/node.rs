@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{FullNode, HealthCheckError, Node, Result, Validator, Version};
+use crate::{scale_sts_replica, FullNode, HealthCheckError, Node, Result, Validator, Version};
 use anyhow::format_err;
 use diem_config::config::NodeConfig;
 use diem_sdk::{client::Client as JsonRpcClient, types::PeerId};
@@ -14,6 +14,7 @@ use tokio::runtime::Runtime;
 
 pub struct K8sNode {
     pub(crate) name: String,
+    pub(crate) sts_name: String,
     pub(crate) peer_id: PeerId,
     pub(crate) node_id: usize,
     pub(crate) dns: String,
@@ -50,6 +51,10 @@ impl K8sNode {
     pub(crate) fn json_rpc_client(&self) -> JsonRpcClient {
         JsonRpcClient::new(self.json_rpc_endpoint().to_string())
     }
+
+    fn sts_name(&self) -> &str {
+        &self.sts_name
+    }
 }
 
 impl Node for K8sNode {
@@ -65,13 +70,13 @@ impl Node for K8sNode {
         self.version.clone()
     }
 
+    fn json_rpc_endpoint(&self) -> Url {
+        Url::from_str(&format!("http://{}:{}/v1", self.ip(), self.port())).expect("Invalid URL.")
+    }
+
     fn rest_api_endpoint(&self) -> Url {
         Url::from_str(&format!("http://{}:{}", self.ip(), self.rest_api_port()))
             .expect("Invalid URL.")
-    }
-
-    fn json_rpc_endpoint(&self) -> Url {
-        Url::from_str(&format!("http://{}:{}/v1", self.ip(), self.port())).expect("Invalid URL.")
     }
 
     fn debug_endpoint(&self) -> Url {
@@ -83,11 +88,12 @@ impl Node for K8sNode {
     }
 
     fn start(&mut self) -> Result<()> {
-        todo!()
+        scale_sts_replica(self.sts_name(), 1)
     }
 
     fn stop(&mut self) -> Result<()> {
-        todo!()
+        println!("going to stop node {}", self.sts_name());
+        scale_sts_replica(self.sts_name(), 0)
     }
 
     fn clear_storage(&mut self) -> Result<()> {

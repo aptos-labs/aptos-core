@@ -513,3 +513,25 @@ pub fn set_eks_nodegroup_size(
 
     Ok(())
 }
+
+pub fn scale_sts_replica(sts_name: &str, replica_num: u64) -> Result<()> {
+    let scale_sts_args = [
+        "scale",
+        "sts",
+        &sts_name.to_string(),
+        &format!("--replicas={}", replica_num),
+    ];
+    println!("{:?}", scale_sts_args);
+    let scale_output = Command::new(KUBECTL_BIN)
+        .stdout(Stdio::inherit())
+        .args(&scale_sts_args)
+        .output()
+        .expect("failed to scale sts replicas");
+    assert!(
+        scale_output.status.success(),
+        "{}",
+        String::from_utf8(scale_output.stderr).unwrap()
+    );
+
+    Ok(())
+}

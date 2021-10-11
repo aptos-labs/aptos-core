@@ -301,6 +301,7 @@ pub(crate) async fn get_validators(
             let node_id = parse_node_id(&s.name).expect("error to parse node id");
             let node = K8sNode {
                 name: format!("val{}", node_id),
+                sts_name: format!("val{}-diem-validator-validator", node_id),
                 // TODO: fetch this from running node
                 peer_id: PeerId::random(),
                 node_id,
