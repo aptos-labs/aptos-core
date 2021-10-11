@@ -12,13 +12,13 @@
 	},
 	{
 		"c": "test_only",
-		"t": "source.move meta.identifier.move support.variable.move",
+		"t": "source.move meta.identifier.move variable.other.move",
 		"r": {
-			"dark_plus": "support.variable: #9CDCFE",
-			"light_plus": "support.variable: #001080",
+			"dark_plus": "variable: #9CDCFE",
+			"light_plus": "variable: #001080",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.variable: #9CDCFE"
+			"hc_black": "variable: #9CDCFE"
 		}
 	},
 	{
@@ -67,13 +67,13 @@
 	},
 	{
 		"c": "test_only",
-		"t": "source.move meta.identifier.move support.variable.move",
+		"t": "source.move meta.identifier.move variable.other.move",
 		"r": {
-			"dark_plus": "support.variable: #9CDCFE",
-			"light_plus": "support.variable: #001080",
+			"dark_plus": "variable: #9CDCFE",
+			"light_plus": "variable: #001080",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.variable: #9CDCFE"
+			"hc_black": "variable: #9CDCFE"
 		}
 	},
 	{
@@ -122,13 +122,13 @@
 	},
 	{
 		"c": "test",
-		"t": "source.move meta.identifier.move support.variable.move",
+		"t": "source.move meta.identifier.move variable.other.move",
 		"r": {
-			"dark_plus": "support.variable: #9CDCFE",
-			"light_plus": "support.variable: #001080",
+			"dark_plus": "variable: #9CDCFE",
+			"light_plus": "variable: #001080",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.variable: #9CDCFE"
+			"hc_black": "variable: #9CDCFE"
 		}
 	},
 	{
@@ -177,13 +177,13 @@
 	},
 	{
 		"c": "abort_code",
-		"t": "source.move meta.identifier.move support.variable.move",
+		"t": "source.move meta.identifier.move variable.other.move",
 		"r": {
-			"dark_plus": "support.variable: #9CDCFE",
-			"light_plus": "support.variable: #001080",
+			"dark_plus": "variable: #9CDCFE",
+			"light_plus": "variable: #001080",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.variable: #9CDCFE"
+			"hc_black": "variable: #9CDCFE"
 		}
 	},
 	{
@@ -221,7 +221,7 @@
 	},
 	{
 		"c": "1",
-		"t": "source.move meta.value.number.move constant.numeric.move",
+		"t": "source.move meta.value.number.decimal.move constant.numeric.move",
 		"r": {
 			"dark_plus": "constant.numeric: #B5CEA8",
 			"light_plus": "constant.numeric: #098658",
@@ -265,13 +265,13 @@
 	},
 	{
 		"c": "test",
-		"t": "source.move meta.identifier.move support.variable.move",
+		"t": "source.move meta.identifier.move variable.other.move",
 		"r": {
-			"dark_plus": "support.variable: #9CDCFE",
-			"light_plus": "support.variable: #001080",
+			"dark_plus": "variable: #9CDCFE",
+			"light_plus": "variable: #001080",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.variable: #9CDCFE"
+			"hc_black": "variable: #9CDCFE"
 		}
 	},
 	{
@@ -342,13 +342,13 @@
 	},
 	{
 		"c": "abort_code",
-		"t": "source.move meta.identifier.move support.variable.move",
+		"t": "source.move meta.identifier.move variable.other.move",
 		"r": {
-			"dark_plus": "support.variable: #9CDCFE",
-			"light_plus": "support.variable: #001080",
+			"dark_plus": "variable: #9CDCFE",
+			"light_plus": "variable: #001080",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.variable: #9CDCFE"
+			"hc_black": "variable: #9CDCFE"
 		}
 	},
 	{
@@ -408,7 +408,7 @@
 	},
 	{
 		"c": "1",
-		"t": "source.move meta.value.number.move constant.numeric.move",
+		"t": "source.move meta.value.number.decimal.move constant.numeric.move",
 		"r": {
 			"dark_plus": "constant.numeric: #B5CEA8",
 			"light_plus": "constant.numeric: #098658",
@@ -485,13 +485,13 @@
 	},
 	{
 		"c": "address_value",
-		"t": "source.move meta.identifier.move support.variable.move",
+		"t": "source.move meta.identifier.move variable.other.move",
 		"r": {
-			"dark_plus": "support.variable: #9CDCFE",
-			"light_plus": "support.variable: #001080",
+			"dark_plus": "variable: #9CDCFE",
+			"light_plus": "variable: #001080",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.variable: #9CDCFE"
+			"hc_black": "variable: #9CDCFE"
 		}
 	},
 	{
@@ -551,13 +551,13 @@
 	},
 	{
 		"c": "@0x1",
-		"t": "source.move meta.value.address.move support.variable.move",
+		"t": "source.move meta.value.address.hexadecimal.move variable.other.move",
 		"r": {
-			"dark_plus": "support.variable: #9CDCFE",
-			"light_plus": "support.variable: #001080",
+			"dark_plus": "variable: #9CDCFE",
+			"light_plus": "variable: #001080",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.variable: #9CDCFE"
+			"hc_black": "variable: #9CDCFE"
 		}
 	},
 	{
@@ -584,13 +584,13 @@
 	},
 	{
 		"c": "byte_value",
-		"t": "source.move meta.identifier.move support.variable.move",
+		"t": "source.move meta.identifier.move variable.other.move",
 		"r": {
-			"dark_plus": "support.variable: #9CDCFE",
-			"light_plus": "support.variable: #001080",
+			"dark_plus": "variable: #9CDCFE",
+			"light_plus": "variable: #001080",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.variable: #9CDCFE"
+			"hc_black": "variable: #9CDCFE"
 		}
 	},
 	{
@@ -627,19 +627,8 @@
 		}
 	},
 	{
-		"c": "b",
+		"c": "b\"",
 		"t": "source.move meta.value.bytestring.move string.quoted.double.move meta.value.bytestring.prefix.move",
-		"r": {
-			"dark_plus": "string: #CE9178",
-			"light_plus": "string: #A31515",
-			"dark_vs": "string: #CE9178",
-			"light_vs": "string: #A31515",
-			"hc_black": "string: #CE9178"
-		}
-	},
-	{
-		"c": "\"",
-		"t": "source.move meta.value.bytestring.move string.quoted.double.move meta.value.bytestring.quote.open.move",
 		"r": {
 			"dark_plus": "string: #CE9178",
 			"light_plus": "string: #A31515",
@@ -672,7 +661,7 @@
 	},
 	{
 		"c": "\"",
-		"t": "source.move meta.value.bytestring.move string.quoted.double.move meta.value.bytestring.quote.close.move",
+		"t": "source.move meta.value.bytestring.move string.quoted.double.move meta.value.bytestring.suffix.move",
 		"r": {
 			"dark_plus": "string: #CE9178",
 			"light_plus": "string: #A31515",
@@ -749,13 +738,13 @@
 	},
 	{
 		"c": "hex_value",
-		"t": "source.move meta.identifier.move support.variable.move",
+		"t": "source.move meta.identifier.move variable.other.move",
 		"r": {
-			"dark_plus": "support.variable: #9CDCFE",
-			"light_plus": "support.variable: #001080",
+			"dark_plus": "variable: #9CDCFE",
+			"light_plus": "variable: #001080",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.variable: #9CDCFE"
+			"hc_black": "variable: #9CDCFE"
 		}
 	},
 	{
@@ -792,19 +781,8 @@
 		}
 	},
 	{
-		"c": "x",
-		"t": "source.move meta.value.bytestring.move string.quoted.double.move meta.value.bytestring.prefix.move",
-		"r": {
-			"dark_plus": "string: #CE9178",
-			"light_plus": "string: #A31515",
-			"dark_vs": "string: #CE9178",
-			"light_vs": "string: #A31515",
-			"hc_black": "string: #CE9178"
-		}
-	},
-	{
-		"c": "\"",
-		"t": "source.move meta.value.bytestring.move string.quoted.double.move meta.value.bytestring.quote.open.move",
+		"c": "x\"",
+		"t": "source.move meta.value.hexadecimal-string.move string.quoted.double.move meta.value.hexadecimal-string.prefix.move",
 		"r": {
 			"dark_plus": "string: #CE9178",
 			"light_plus": "string: #A31515",
@@ -815,7 +793,7 @@
 	},
 	{
 		"c": "beef",
-		"t": "source.move meta.value.bytestring.move string.quoted.double.move",
+		"t": "source.move meta.value.hexadecimal-string.move string.quoted.double.move",
 		"r": {
 			"dark_plus": "string: #CE9178",
 			"light_plus": "string: #A31515",
@@ -826,7 +804,7 @@
 	},
 	{
 		"c": "\"",
-		"t": "source.move meta.value.bytestring.move string.quoted.double.move meta.value.bytestring.quote.close.move",
+		"t": "source.move meta.value.hexadecimal-string.move string.quoted.double.move meta.value.hexadecimal-string.suffix.move",
 		"r": {
 			"dark_plus": "string: #CE9178",
 			"light_plus": "string: #A31515",
@@ -859,13 +837,13 @@
 	},
 	{
 		"c": "boolean_value",
-		"t": "source.move meta.identifier.move support.variable.move",
+		"t": "source.move meta.identifier.move variable.other.move",
 		"r": {
-			"dark_plus": "support.variable: #9CDCFE",
-			"light_plus": "support.variable: #001080",
+			"dark_plus": "variable: #9CDCFE",
+			"light_plus": "variable: #001080",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.variable: #9CDCFE"
+			"hc_black": "variable: #9CDCFE"
 		}
 	},
 	{
@@ -969,13 +947,13 @@
 	},
 	{
 		"c": "number_value",
-		"t": "source.move meta.identifier.move support.variable.move",
+		"t": "source.move meta.identifier.move variable.other.move",
 		"r": {
-			"dark_plus": "support.variable: #9CDCFE",
-			"light_plus": "support.variable: #001080",
+			"dark_plus": "variable: #9CDCFE",
+			"light_plus": "variable: #001080",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.variable: #9CDCFE"
+			"hc_black": "variable: #9CDCFE"
 		}
 	},
 	{
@@ -1013,7 +991,7 @@
 	},
 	{
 		"c": "0x123u8",
-		"t": "source.move meta.value.number.move constant.numeric.move",
+		"t": "source.move meta.value.number.hexadecimal.move constant.numeric.move",
 		"r": {
 			"dark_plus": "constant.numeric: #B5CEA8",
 			"light_plus": "constant.numeric: #098658",

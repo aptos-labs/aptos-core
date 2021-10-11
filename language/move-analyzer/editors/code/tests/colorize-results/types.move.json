@@ -23,7 +23,7 @@
 	},
 	{
 		"c": "0x1",
-		"t": "source.move meta.value.number.move constant.numeric.move",
+		"t": "source.move meta.value.number.hexadecimal.move constant.numeric.move",
 		"r": {
 			"dark_plus": "constant.numeric: #B5CEA8",
 			"light_plus": "constant.numeric: #098658",
@@ -188,13 +188,13 @@
 	},
 	{
 		"c": "key",
-		"t": "source.move meta.identifier.camel-case-type-list.move meta.ability.move support.type.move",
+		"t": "source.move meta.identifier.camel-case-type-list.move meta.ability.move entity.name.type.move",
 		"r": {
-			"dark_plus": "support.type: #4EC9B0",
-			"light_plus": "support.type: #267F99",
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.type: #4EC9B0"
+			"hc_black": "entity.name.type: #4EC9B0"
 		}
 	},
 	{
@@ -210,18 +210,18 @@
 	},
 	{
 		"c": "store",
-		"t": "source.move meta.identifier.camel-case-type-list.move meta.ability.move support.type.move",
+		"t": "source.move meta.identifier.camel-case-type-list.move meta.ability.move entity.name.type.move",
 		"r": {
-			"dark_plus": "support.type: #4EC9B0",
-			"light_plus": "support.type: #267F99",
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.type: #4EC9B0"
+			"hc_black": "entity.name.type: #4EC9B0"
 		}
 	},
 	{
 		"c": ">",
-		"t": "source.move meta.identifier.camel-case-type-list.move meta.punctuation.less.move",
+		"t": "source.move meta.identifier.camel-case-type-list.move meta.punctuation.greater.move",
 		"r": {
 			"dark_plus": "default: #D4D4D4",
 			"light_plus": "default: #000000",
@@ -265,13 +265,13 @@
 	},
 	{
 		"c": "copy",
-		"t": "source.move meta.ability.move support.type.move",
+		"t": "source.move meta.ability.move entity.name.type.move",
 		"r": {
-			"dark_plus": "support.type: #4EC9B0",
-			"light_plus": "support.type: #267F99",
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.type: #4EC9B0"
+			"hc_black": "entity.name.type: #4EC9B0"
 		}
 	},
 	{
@@ -287,13 +287,13 @@
 	},
 	{
 		"c": "drop",
-		"t": "source.move meta.ability.move support.type.move",
+		"t": "source.move meta.ability.move entity.name.type.move",
 		"r": {
-			"dark_plus": "support.type: #4EC9B0",
-			"light_plus": "support.type: #267F99",
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.type: #4EC9B0"
+			"hc_black": "entity.name.type: #4EC9B0"
 		}
 	},
 	{
@@ -331,13 +331,13 @@
 	},
 	{
 		"c": "k",
-		"t": "source.move meta.identifier.move support.variable.move",
+		"t": "source.move meta.identifier.move variable.other.move",
 		"r": {
-			"dark_plus": "support.variable: #9CDCFE",
-			"light_plus": "support.variable: #001080",
+			"dark_plus": "variable: #9CDCFE",
+			"light_plus": "variable: #001080",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.variable: #9CDCFE"
+			"hc_black": "variable: #9CDCFE"
 		}
 	},
 	{
@@ -485,13 +485,13 @@
 	},
 	{
 		"c": "copy",
-		"t": "source.move meta.ability.move support.type.move",
+		"t": "source.move meta.ability.move entity.name.type.move",
 		"r": {
-			"dark_plus": "support.type: #4EC9B0",
-			"light_plus": "support.type: #267F99",
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.type: #4EC9B0"
+			"hc_black": "entity.name.type: #4EC9B0"
 		}
 	},
 	{
@@ -507,13 +507,13 @@
 	},
 	{
 		"c": "drop",
-		"t": "source.move meta.ability.move support.type.move",
+		"t": "source.move meta.ability.move entity.name.type.move",
 		"r": {
-			"dark_plus": "support.type: #4EC9B0",
-			"light_plus": "support.type: #267F99",
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.type: #4EC9B0"
+			"hc_black": "entity.name.type: #4EC9B0"
 		}
 	},
 	{
@@ -540,13 +540,13 @@
 	},
 	{
 		"c": "b",
-		"t": "source.move meta.identifier.move support.variable.move",
+		"t": "source.move meta.identifier.move variable.other.move",
 		"r": {
-			"dark_plus": "support.variable: #9CDCFE",
-			"light_plus": "support.variable: #001080",
+			"dark_plus": "variable: #9CDCFE",
+			"light_plus": "variable: #001080",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.variable: #9CDCFE"
+			"hc_black": "variable: #9CDCFE"
 		}
 	},
 	{
@@ -573,13 +573,13 @@
 	},
 	{
 		"c": "bool",
-		"t": "source.move meta.type.builtin.bool.move support.type.primitive.move",
+		"t": "source.move meta.type.builtin.bool.move entity.name.type.move",
 		"r": {
-			"dark_plus": "support.type: #4EC9B0",
-			"light_plus": "support.type: #267F99",
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.type: #4EC9B0"
+			"hc_black": "entity.name.type: #4EC9B0"
 		}
 	},
 	{
@@ -606,13 +606,13 @@
 	},
 	{
 		"c": "a",
-		"t": "source.move meta.identifier.move support.variable.move",
+		"t": "source.move meta.identifier.move variable.other.move",
 		"r": {
-			"dark_plus": "support.variable: #9CDCFE",
-			"light_plus": "support.variable: #001080",
+			"dark_plus": "variable: #9CDCFE",
+			"light_plus": "variable: #001080",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.variable: #9CDCFE"
+			"hc_black": "variable: #9CDCFE"
 		}
 	},
 	{
@@ -639,13 +639,13 @@
 	},
 	{
 		"c": "address",
-		"t": "source.move meta.type-address.move meta.type.builtin.address.move support.type.primitive.move",
+		"t": "source.move meta.type-address.move meta.type.builtin.address.move entity.name.type.move",
 		"r": {
-			"dark_plus": "support.type: #4EC9B0",
-			"light_plus": "support.type: #267F99",
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.type: #4EC9B0"
+			"hc_black": "entity.name.type: #4EC9B0"
 		}
 	},
 	{
@@ -672,13 +672,13 @@
 	},
 	{
 		"c": "ra",
-		"t": "source.move meta.identifier.move support.variable.move",
+		"t": "source.move meta.identifier.move variable.other.move",
 		"r": {
-			"dark_plus": "support.variable: #9CDCFE",
-			"light_plus": "support.variable: #001080",
+			"dark_plus": "variable: #9CDCFE",
+			"light_plus": "variable: #001080",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.variable: #9CDCFE"
+			"hc_black": "variable: #9CDCFE"
 		}
 	},
 	{
@@ -716,13 +716,13 @@
 	},
 	{
 		"c": "address",
-		"t": "source.move meta.type-address.move meta.type.builtin.address.move support.type.primitive.move",
+		"t": "source.move meta.type-address.move meta.type.builtin.address.move entity.name.type.move",
 		"r": {
-			"dark_plus": "support.type: #4EC9B0",
-			"light_plus": "support.type: #267F99",
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.type: #4EC9B0"
+			"hc_black": "entity.name.type: #4EC9B0"
 		}
 	},
 	{
@@ -749,13 +749,13 @@
 	},
 	{
 		"c": "s",
-		"t": "source.move meta.identifier.move support.variable.move",
+		"t": "source.move meta.identifier.move variable.other.move",
 		"r": {
-			"dark_plus": "support.variable: #9CDCFE",
-			"light_plus": "support.variable: #001080",
+			"dark_plus": "variable: #9CDCFE",
+			"light_plus": "variable: #001080",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.variable: #9CDCFE"
+			"hc_black": "variable: #9CDCFE"
 		}
 	},
 	{
@@ -793,13 +793,13 @@
 	},
 	{
 		"c": "signer",
-		"t": "source.move meta.type.builtin.signer.move support.type.primitive.move",
+		"t": "source.move meta.type.builtin.signer.move entity.name.type.move",
 		"r": {
-			"dark_plus": "support.type: #4EC9B0",
-			"light_plus": "support.type: #267F99",
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.type: #4EC9B0"
+			"hc_black": "entity.name.type: #4EC9B0"
 		}
 	},
 	{
@@ -826,13 +826,13 @@
 	},
 	{
 		"c": "vu",
-		"t": "source.move meta.identifier.move support.variable.move",
+		"t": "source.move meta.identifier.move variable.other.move",
 		"r": {
-			"dark_plus": "support.variable: #9CDCFE",
-			"light_plus": "support.variable: #001080",
+			"dark_plus": "variable: #9CDCFE",
+			"light_plus": "variable: #001080",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.variable: #9CDCFE"
+			"hc_black": "variable: #9CDCFE"
 		}
 	},
 	{
@@ -859,13 +859,13 @@
 	},
 	{
 		"c": "vector",
-		"t": "source.move meta.type.builtin.vector.move support.type.primitive.move",
+		"t": "source.move meta.type.builtin.vector.move entity.name.type.move",
 		"r": {
-			"dark_plus": "support.type: #4EC9B0",
-			"light_plus": "support.type: #267F99",
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.type: #4EC9B0"
+			"hc_black": "entity.name.type: #4EC9B0"
 		}
 	},
 	{
@@ -881,13 +881,13 @@
 	},
 	{
 		"c": "u8",
-		"t": "source.move meta.type.builtin.vector.move meta.type.builtin.number.move support.type.primitive.move",
+		"t": "source.move meta.type.builtin.vector.move meta.type.builtin.number.move entity.name.type.move",
 		"r": {
-			"dark_plus": "support.type: #4EC9B0",
-			"light_plus": "support.type: #267F99",
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.type: #4EC9B0"
+			"hc_black": "entity.name.type: #4EC9B0"
 		}
 	},
 	{
@@ -925,13 +925,13 @@
 	},
 	{
 		"c": "va",
-		"t": "source.move meta.identifier.move support.variable.move",
+		"t": "source.move meta.identifier.move variable.other.move",
 		"r": {
-			"dark_plus": "support.variable: #9CDCFE",
-			"light_plus": "support.variable: #001080",
+			"dark_plus": "variable: #9CDCFE",
+			"light_plus": "variable: #001080",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.variable: #9CDCFE"
+			"hc_black": "variable: #9CDCFE"
 		}
 	},
 	{
@@ -958,13 +958,13 @@
 	},
 	{
 		"c": "vector",
-		"t": "source.move meta.type.builtin.vector.move support.type.primitive.move",
+		"t": "source.move meta.type.builtin.vector.move entity.name.type.move",
 		"r": {
-			"dark_plus": "support.type: #4EC9B0",
-			"light_plus": "support.type: #267F99",
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.type: #4EC9B0"
+			"hc_black": "entity.name.type: #4EC9B0"
 		}
 	},
 	{
@@ -980,13 +980,13 @@
 	},
 	{
 		"c": "address",
-		"t": "source.move meta.type.builtin.vector.move meta.type.builtin.address.move support.type.primitive.move",
+		"t": "source.move meta.type.builtin.vector.move meta.type.builtin.address.move entity.name.type.move",
 		"r": {
-			"dark_plus": "support.type: #4EC9B0",
-			"light_plus": "support.type: #267F99",
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.type: #4EC9B0"
+			"hc_black": "entity.name.type: #4EC9B0"
 		}
 	},
 	{
@@ -1046,13 +1046,13 @@
 	},
 	{
 		"c": "address",
-		"t": "source.move meta.type-address.move meta.type.builtin.address.move support.type.primitive.move",
+		"t": "source.move meta.type-address.move meta.type.builtin.address.move entity.name.type.move",
 		"r": {
-			"dark_plus": "support.type: #4EC9B0",
-			"light_plus": "support.type: #267F99",
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.type: #4EC9B0"
+			"hc_black": "entity.name.type: #4EC9B0"
 		}
 	},
 	{
@@ -1112,13 +1112,13 @@
 	},
 	{
 		"c": "bool_true",
-		"t": "source.move meta.identifier.move support.variable.move",
+		"t": "source.move meta.identifier.move variable.other.move",
 		"r": {
-			"dark_plus": "support.variable: #9CDCFE",
-			"light_plus": "support.variable: #001080",
+			"dark_plus": "variable: #9CDCFE",
+			"light_plus": "variable: #001080",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.variable: #9CDCFE"
+			"hc_black": "variable: #9CDCFE"
 		}
 	},
 	{
@@ -1145,13 +1145,13 @@
 	},
 	{
 		"c": "bool",
-		"t": "source.move meta.type.builtin.bool.move support.type.primitive.move",
+		"t": "source.move meta.type.builtin.bool.move entity.name.type.move",
 		"r": {
-			"dark_plus": "support.type: #4EC9B0",
-			"light_plus": "support.type: #267F99",
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.type: #4EC9B0"
+			"hc_black": "entity.name.type: #4EC9B0"
 		}
 	},
 	{
@@ -1244,13 +1244,13 @@
 	},
 	{
 		"c": "bool_false",
-		"t": "source.move meta.identifier.move support.variable.move",
+		"t": "source.move meta.identifier.move variable.other.move",
 		"r": {
-			"dark_plus": "support.variable: #9CDCFE",
-			"light_plus": "support.variable: #001080",
+			"dark_plus": "variable: #9CDCFE",
+			"light_plus": "variable: #001080",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.variable: #9CDCFE"
+			"hc_black": "variable: #9CDCFE"
 		}
 	},
 	{
@@ -1277,13 +1277,13 @@
 	},
 	{
 		"c": "bool",
-		"t": "source.move meta.type.builtin.bool.move support.type.primitive.move",
+		"t": "source.move meta.type.builtin.bool.move entity.name.type.move",
 		"r": {
-			"dark_plus": "support.type: #4EC9B0",
-			"light_plus": "support.type: #267F99",
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.type: #4EC9B0"
+			"hc_black": "entity.name.type: #4EC9B0"
 		}
 	},
 	{
@@ -1376,13 +1376,13 @@
 	},
 	{
 		"c": "addr",
-		"t": "source.move meta.identifier.move support.variable.move",
+		"t": "source.move meta.identifier.move variable.other.move",
 		"r": {
-			"dark_plus": "support.variable: #9CDCFE",
-			"light_plus": "support.variable: #001080",
+			"dark_plus": "variable: #9CDCFE",
+			"light_plus": "variable: #001080",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.variable: #9CDCFE"
+			"hc_black": "variable: #9CDCFE"
 		}
 	},
 	{
@@ -1409,13 +1409,13 @@
 	},
 	{
 		"c": "address",
-		"t": "source.move meta.type-address.move meta.type.builtin.address.move support.type.primitive.move",
+		"t": "source.move meta.type-address.move meta.type.builtin.address.move entity.name.type.move",
 		"r": {
-			"dark_plus": "support.type: #4EC9B0",
-			"light_plus": "support.type: #267F99",
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.type: #4EC9B0"
+			"hc_black": "entity.name.type: #4EC9B0"
 		}
 	},
 	{
@@ -1464,13 +1464,13 @@
 	},
 	{
 		"c": "ref_addr",
-		"t": "source.move meta.identifier.move support.variable.move",
+		"t": "source.move meta.identifier.move variable.other.move",
 		"r": {
-			"dark_plus": "support.variable: #9CDCFE",
-			"light_plus": "support.variable: #001080",
+			"dark_plus": "variable: #9CDCFE",
+			"light_plus": "variable: #001080",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.variable: #9CDCFE"
+			"hc_black": "variable: #9CDCFE"
 		}
 	},
 	{
@@ -1508,13 +1508,13 @@
 	},
 	{
 		"c": "address",
-		"t": "source.move meta.type-address.move meta.type.builtin.address.move support.type.primitive.move",
+		"t": "source.move meta.type-address.move meta.type.builtin.address.move entity.name.type.move",
 		"r": {
-			"dark_plus": "support.type: #4EC9B0",
-			"light_plus": "support.type: #267F99",
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.type: #4EC9B0"
+			"hc_black": "entity.name.type: #4EC9B0"
 		}
 	},
 	{
@@ -1563,13 +1563,13 @@
 	},
 	{
 		"c": "addr_fixme",
-		"t": "source.move meta.identifier.move support.variable.move",
+		"t": "source.move meta.identifier.move variable.other.move",
 		"r": {
-			"dark_plus": "support.variable: #9CDCFE",
-			"light_plus": "support.variable: #001080",
+			"dark_plus": "variable: #9CDCFE",
+			"light_plus": "variable: #001080",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.variable: #9CDCFE"
+			"hc_black": "variable: #9CDCFE"
 		}
 	},
 	{
@@ -1673,13 +1673,13 @@
 	},
 	{
 		"c": "ref_addr_fixme",
-		"t": "source.move meta.identifier.move support.variable.move",
+		"t": "source.move meta.identifier.move variable.other.move",
 		"r": {
-			"dark_plus": "support.variable: #9CDCFE",
-			"light_plus": "support.variable: #001080",
+			"dark_plus": "variable: #9CDCFE",
+			"light_plus": "variable: #001080",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.variable: #9CDCFE"
+			"hc_black": "variable: #9CDCFE"
 		}
 	},
 	{
@@ -1794,13 +1794,13 @@
 	},
 	{
 		"c": "sign",
-		"t": "source.move meta.identifier.move support.variable.move",
+		"t": "source.move meta.identifier.move variable.other.move",
 		"r": {
-			"dark_plus": "support.variable: #9CDCFE",
-			"light_plus": "support.variable: #001080",
+			"dark_plus": "variable: #9CDCFE",
+			"light_plus": "variable: #001080",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.variable: #9CDCFE"
+			"hc_black": "variable: #9CDCFE"
 		}
 	},
 	{
@@ -1838,13 +1838,13 @@
 	},
 	{
 		"c": "signer",
-		"t": "source.move meta.type.builtin.signer.move support.type.primitive.move",
+		"t": "source.move meta.type.builtin.signer.move entity.name.type.move",
 		"r": {
-			"dark_plus": "support.type: #4EC9B0",
-			"light_plus": "support.type: #267F99",
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.type: #4EC9B0"
+			"hc_black": "entity.name.type: #4EC9B0"
 		}
 	},
 	{
@@ -1893,13 +1893,13 @@
 	},
 	{
 		"c": "vec_1",
-		"t": "source.move meta.identifier.move support.variable.move",
+		"t": "source.move meta.identifier.move variable.other.move",
 		"r": {
-			"dark_plus": "support.variable: #9CDCFE",
-			"light_plus": "support.variable: #001080",
+			"dark_plus": "variable: #9CDCFE",
+			"light_plus": "variable: #001080",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.variable: #9CDCFE"
+			"hc_black": "variable: #9CDCFE"
 		}
 	},
 	{
@@ -1926,13 +1926,13 @@
 	},
 	{
 		"c": "vector",
-		"t": "source.move meta.type.builtin.vector.move support.type.primitive.move",
+		"t": "source.move meta.type.builtin.vector.move entity.name.type.move",
 		"r": {
-			"dark_plus": "support.type: #4EC9B0",
-			"light_plus": "support.type: #267F99",
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.type: #4EC9B0"
+			"hc_black": "entity.name.type: #4EC9B0"
 		}
 	},
 	{
@@ -1948,13 +1948,13 @@
 	},
 	{
 		"c": "u8",
-		"t": "source.move meta.type.builtin.vector.move meta.type.builtin.number.move support.type.primitive.move",
+		"t": "source.move meta.type.builtin.vector.move meta.type.builtin.number.move entity.name.type.move",
 		"r": {
-			"dark_plus": "support.type: #4EC9B0",
-			"light_plus": "support.type: #267F99",
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.type: #4EC9B0"
+			"hc_black": "entity.name.type: #4EC9B0"
 		}
 	},
 	{
@@ -2014,13 +2014,13 @@
 	},
 	{
 		"c": "vec_2",
-		"t": "source.move meta.identifier.move support.variable.move",
+		"t": "source.move meta.identifier.move variable.other.move",
 		"r": {
-			"dark_plus": "support.variable: #9CDCFE",
-			"light_plus": "support.variable: #001080",
+			"dark_plus": "variable: #9CDCFE",
+			"light_plus": "variable: #001080",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.variable: #9CDCFE"
+			"hc_black": "variable: #9CDCFE"
 		}
 	},
 	{
@@ -2047,13 +2047,13 @@
 	},
 	{
 		"c": "vector",
-		"t": "source.move meta.type.builtin.vector.move support.type.primitive.move",
+		"t": "source.move meta.type.builtin.vector.move entity.name.type.move",
 		"r": {
-			"dark_plus": "support.type: #4EC9B0",
-			"light_plus": "support.type: #267F99",
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.type: #4EC9B0"
+			"hc_black": "entity.name.type: #4EC9B0"
 		}
 	},
 	{
@@ -2080,13 +2080,13 @@
 	},
 	{
 		"c": "u8",
-		"t": "source.move meta.type.builtin.vector.move meta.type.builtin.number.move support.type.primitive.move",
+		"t": "source.move meta.type.builtin.vector.move meta.type.builtin.number.move entity.name.type.move",
 		"r": {
-			"dark_plus": "support.type: #4EC9B0",
-			"light_plus": "support.type: #267F99",
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.type: #4EC9B0"
+			"hc_black": "entity.name.type: #4EC9B0"
 		}
 	},
 	{
@@ -2146,13 +2146,13 @@
 	},
 	{
 		"c": "vec_3",
-		"t": "source.move meta.identifier.move support.variable.move",
+		"t": "source.move meta.identifier.move variable.other.move",
 		"r": {
-			"dark_plus": "support.variable: #9CDCFE",
-			"light_plus": "support.variable: #001080",
+			"dark_plus": "variable: #9CDCFE",
+			"light_plus": "variable: #001080",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.variable: #9CDCFE"
+			"hc_black": "variable: #9CDCFE"
 		}
 	},
 	{
@@ -2179,13 +2179,13 @@
 	},
 	{
 		"c": "vector",
-		"t": "source.move meta.type.builtin.vector.move support.type.primitive.move",
+		"t": "source.move meta.type.builtin.vector.move entity.name.type.move",
 		"r": {
-			"dark_plus": "support.type: #4EC9B0",
-			"light_plus": "support.type: #267F99",
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.type: #4EC9B0"
+			"hc_black": "entity.name.type: #4EC9B0"
 		}
 	},
 	{
@@ -2201,13 +2201,13 @@
 	},
 	{
 		"c": "address",
-		"t": "source.move meta.type.builtin.vector.move meta.type.builtin.address.move support.type.primitive.move",
+		"t": "source.move meta.type.builtin.vector.move meta.type.builtin.address.move entity.name.type.move",
 		"r": {
-			"dark_plus": "support.type: #4EC9B0",
-			"light_plus": "support.type: #267F99",
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.type: #4EC9B0"
+			"hc_black": "entity.name.type: #4EC9B0"
 		}
 	},
 	{
@@ -2278,13 +2278,13 @@
 	},
 	{
 		"c": "ra",
-		"t": "source.move meta.identifier.move support.variable.move",
+		"t": "source.move meta.identifier.move variable.other.move",
 		"r": {
-			"dark_plus": "support.variable: #9CDCFE",
-			"light_plus": "support.variable: #001080",
+			"dark_plus": "variable: #9CDCFE",
+			"light_plus": "variable: #001080",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.variable: #9CDCFE"
+			"hc_black": "variable: #9CDCFE"
 		}
 	},
 	{

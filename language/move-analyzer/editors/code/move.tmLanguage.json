@@ -111,7 +111,7 @@
             "captures": {
                 "1": { "name": "meta.punctuation.colon.move" },
                 "2": { "name": "meta.punctuation.ampersand.move" },
-                "3": { "name": "meta.type.builtin.address.move support.type.primitive.move" }
+                "3": { "name": "meta.type.builtin.address.move entity.name.type.move" }
             }
         },
         "keyword": {
@@ -149,14 +149,15 @@
                 {
                     "name": "meta.name-access-chain.three-elements.move",
                     "comment": "A name access chain with a leading-name-access followed by two other names. The last element in the chain could be anything: a module, struct, constant, etc. Leave it to the `#identifier` matcher to classify.",
-                    "begin": "\\b(([_a-zA-Z][_a-zA-Z0-9]*)|((?:0x)?[0-9]+(?:u(?:8|64|128))?))(::)([_a-zA-Z][_a-zA-Z0-9]*)(::)",
+                    "begin": "\\b((0x[a-fA-F0-9]+(?:u(?:8|64|128))?)|([0-9]+(?:u(?:8|64|128))?)|([_a-zA-Z][_a-zA-Z0-9]*))(::)([_a-zA-Z][_a-zA-Z0-9]*)(::)",
                     "beginCaptures": {
                         "1": { "name": "meta.leading-name-access.move" },
-                        "2": { "name": "meta.identifier.move entity.name.namespace.move" },
+                        "2": { "name": "meta.value.number.hexadecimal.move constant.numeric.move" },
                         "3": { "name": "meta.value.number.move constant.numeric.move" },
-                        "4": { "name": "meta.punctuation.coloncolon.move" },
-                        "5": { "name": "meta.identifier.move support.variable.move" },
-                        "6": { "name": "meta.punctuation.coloncolon.move" }
+                        "4": { "name": "meta.identifier.move entity.name.namespace.move" },
+                        "5": { "name": "meta.punctuation.coloncolon.move" },
+                        "6": { "name": "meta.identifier.move variable.other.move" },
+                        "7": { "name": "meta.punctuation.coloncolon.move" }
                     },
                     "end": "(?![_a-zA-Z0-9])",
                     "patterns": [
@@ -166,13 +167,14 @@
                 },
                 {
                     "name": "meta.name-access-chain.two-elements.move",
-                    "comment": "A name access chain with a leading-name-access followed by one other name. As with the three-element case, the last identifier is left to",
-                    "begin": "\\b(([_a-zA-Z][_a-zA-Z0-9]*)|((?:0x)?[0-9]+(?:u(?:8|64|128))?))(::)",
+                    "comment": "A name access chain with a leading-name-access followed by one other name.",
+                    "begin": "\\b((0x[a-fA-F0-9]+(?:u(?:8|64|128))?)|([0-9]+(?:u(?:8|64|128))?)|([_a-zA-Z][_a-zA-Z0-9]*))(::)",
                     "beginCaptures": {
                         "1": { "name": "meta.leading-name-access.move" },
-                        "2": { "name": "meta.identifier.move entity.name.namespace.move" },
+                        "2": { "name": "meta.value.number.hexadecimal.move constant.numeric.move" },
                         "3": { "name": "meta.value.number.move constant.numeric.move" },
-                        "4": { "name": "meta.punctuation.coloncolon.move" }
+                        "4": { "name": "meta.identifier.move entity.name.namespace.move" },
+                        "5": { "name": "meta.punctuation.coloncolon.move" }
                     },
                     "end": "(?![_a-zA-Z0-9])",
                     "patterns": [
@@ -186,26 +188,26 @@
             "comment": "A type name, such as `u128` or `&mut 0x2::M::S<u8>`.",
             "patterns": [
                 {
-                    "name": "meta.type.builtin.number.move support.type.primitive.move",
+                    "name": "meta.type.builtin.number.move entity.name.type.move",
                     "match": "\\bu(?:8|64|128)\\b"
                 },
                 {
-                    "name": "meta.type.builtin.bool.move support.type.primitive.move",
+                    "name": "meta.type.builtin.bool.move entity.name.type.move",
                     "match": "\\bbool\\b"
                 },
                 {
-                    "name": "meta.type.builtin.address.move support.type.primitive.move",
+                    "name": "meta.type.builtin.address.move entity.name.type.move",
                     "match": "\\baddress\\b"
                 },
                 {
-                    "name": "meta.type.builtin.signer.move support.type.primitive.move",
+                    "name": "meta.type.builtin.signer.move entity.name.type.move",
                     "match": "\\bsigner\\b"
                 },
                 {
                     "name": "meta.type.builtin.vector.move",
                     "begin": "(vector)(<)",
                     "beginCaptures": {
-                        "1": { "name": "support.type.primitive.move" },
+                        "1": { "name": "entity.name.type.move" },
                         "2": { "name": "meta.punctuation.left-angle-bracket.move" }
                     },
                     "end": "(>)",
@@ -258,31 +260,59 @@
             "name": "meta.value.move",
             "patterns": [
                 {
-                    "name": "meta.value.address.move support.variable.move",
-                    "match": "@((0x)?[0-9]+(u(8|64|128))?|[_a-zA-Z][_a-zA-Z0-9]+)\\b"
+                    "comment": "An address value with a hexadecimal constant, for example `@0x1bEeF`.",
+                    "name": "meta.value.address.hexadecimal.move variable.other.move",
+                    "match": "@0x[a-fA-F0-9]+(u(8|64|128))?"
                 },
                 {
+                    "comment": "An address value with a non-hexadecimal numeric constant, for example `@42u8`.",
+                    "name": "meta.value.address.decimal.move variable.other.move",
+                    "match": "@[0-9]+(u(8|64|128))?"
+                },
+                {
+                    "comment": "An address value with an identifier, for example `@addr`.",
+                    "name": "meta.value.address.identifier.move variable.other.move",
+                    "match": "@[_a-zA-Z][_a-zA-Z0-9]*"
+                },
+                {
+                    "comment": "A boolean constant: `true` or `false`.",
                     "name": "meta.value.boolean.move constant.language.boolean.move",
                     "match": "\\b(true|false)\\b"
                 },
                 {
-                    "name": "meta.value.number.move constant.numeric.move",
-                    "match": "\\b(0x)?[0-9]+(u(8|64|128))?\\b"
+                    "comment": "A hexadecimal constant number, for example `0x11Eeu64`.",
+                    "name": "meta.value.number.hexadecimal.move constant.numeric.move",
+                    "match": "\\b0x[a-fA-F0-9]+(u(8|64|128))?\\b"
                 },
                 {
+                    "comment": "A non-hexadecimal constant number, for example `42u128`.",
+                    "name": "meta.value.number.decimal.move constant.numeric.move",
+                    "match": "\\b[0-9]+(u(8|64|128))?\\b"
+                },
+                {
+                    "comment": "A byte string, for example b\"hel\tlo\".",
                     "name": "meta.value.bytestring.move string.quoted.double.move",
-                    "begin": "(b|x)?(\")",
-                    "beginCaptures": {
-                        "1": { "name": "meta.value.bytestring.prefix.move" },
-                        "2": { "name": "meta.value.bytestring.quote.open.move" }
-                    },
+                    "begin": "(b\")",
+                    "beginCaptures": { "1": { "name": "meta.value.bytestring.prefix.move" } },
                     "end": "(\")",
-                    "endCaptures": {
-                        "1": { "name": "meta.value.bytestring.quote.close.move" }
-                    },
+                    "endCaptures": { "1": { "name": "meta.value.bytestring.suffix.move" } },
                     "patterns": [{
+                        "comment": "An escaped character within a string.",
                         "name": "constant.character.escape.move",
                         "match": "\\\\."
+                    }]
+                },
+                {
+                    "comment": "A hexadecimal string, for example x\"01dF\".",
+                    "name": "meta.value.hexadecimal-string.move string.quoted.double.move",
+                    "begin": "(x\")",
+                    "beginCaptures": { "1": { "name": "meta.value.hexadecimal-string.prefix.move" } },
+                    "end": "(\")",
+                    "endCaptures": { "1": { "name": "meta.value.hexadecimal-string.suffix.move" } },
+                    "patterns": [{
+                        "comment": "Invalid hexadecimal character within a string.",
+                        "name": "meta.value.hexadecimal-string.invalid.move invalid.illegal.move",
+                        "match": "[^a-fA-F0-9]"
                     }]
                 }
             ]
@@ -290,7 +320,7 @@
         "identifier": {
             "patterns": [
                 {
-                    "name": "meta.identifier.all-capitals.move support.constant.move",
+                    "name": "meta.identifier.all-capitals.move constant.other.move",
                     "comment": "We assume any identifier composed of two or more capital letters is a constant.",
                     "match": "\\b[A-Z][_A-Z0-9]+\\b"
                 },
@@ -303,7 +333,7 @@
                         "2": { "name": "meta.punctuation.less.move" }
                     },
                     "end": "(>)",
-                    "endCaptures": { "1": { "name": "meta.punctuation.less.move" } },
+                    "endCaptures": { "1": { "name": "meta.punctuation.greater.move" } },
                     "patterns": [
                         { "include": "#type" },
                         { "include": "#ability" },
@@ -320,11 +350,11 @@
                     "comment": "This pattern matches an identifier followed by angle brackets `<...>`.",
                     "begin": "\\b([_a-zA-Z][_a-zA-Z0-9]*)(<)",
                     "beginCaptures": {
-                        "1": { "name": "support.variable.move" },
+                        "1": { "name": "variable.other.move" },
                         "2": { "name": "meta.punctuation.less.move" }
                     },
                     "end": "(>)",
-                    "endCaptures": { "1": { "name": "meta.punctuation.less.move" } },
+                    "endCaptures": { "1": { "name": "meta.punctuation.greater.move" } },
                     "patterns": [
                         { "include": "#type" },
                         { "include": "#ability" },
@@ -332,13 +362,13 @@
                     ]
                 },
                 {
-                    "name": "meta.identifier.move support.variable.move",
+                    "name": "meta.identifier.move variable.other.move",
                     "match": "\\b[_a-zA-Z][_a-zA-Z0-9]*\\b"
                 }
             ]
         },
         "ability": {
-            "name": "meta.ability.move support.type.move",
+            "name": "meta.ability.move entity.name.type.move",
             "comment": "This pattern matches any of the built-in type abilities.",
             "match": "\\b(copy|drop|key|store)\\b"
         },

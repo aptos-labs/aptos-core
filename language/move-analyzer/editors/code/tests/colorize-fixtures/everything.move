@@ -20,7 +20,8 @@ module MTest {
 
     #[test, expected_failure(abort_code = 9)]
     fun create_test() {
-        // ...
+        let ident: u128;
+        ident = 0xaD1f;
     }
 
     #[test]

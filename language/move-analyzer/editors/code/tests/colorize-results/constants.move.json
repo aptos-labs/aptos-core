@@ -23,7 +23,7 @@
 	},
 	{
 		"c": "0x1",
-		"t": "source.move meta.name-access-chain.two-elements.move meta.leading-name-access.move meta.value.number.move constant.numeric.move",
+		"t": "source.move meta.name-access-chain.two-elements.move meta.leading-name-access.move meta.value.number.hexadecimal.move constant.numeric.move",
 		"r": {
 			"dark_plus": "constant.numeric: #B5CEA8",
 			"light_plus": "constant.numeric: #098658",
@@ -132,8 +132,8 @@
 		}
 	},
 	{
-		"c": "MAX_U64",
-		"t": "source.move meta.identifier.all-capitals.move support.constant.move",
+		"c": "SUFFIX_U64",
+		"t": "source.move meta.identifier.all-capitals.move constant.other.move",
 		"r": {
 			"dark_plus": "default: #D4D4D4",
 			"light_plus": "default: #000000",
@@ -166,13 +166,13 @@
 	},
 	{
 		"c": "u64",
-		"t": "source.move meta.type.builtin.number.move support.type.primitive.move",
+		"t": "source.move meta.type.builtin.number.move entity.name.type.move",
 		"r": {
-			"dark_plus": "support.type: #4EC9B0",
-			"light_plus": "support.type: #267F99",
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.type: #4EC9B0"
+			"hc_black": "entity.name.type: #4EC9B0"
 		}
 	},
 	{
@@ -210,7 +210,7 @@
 	},
 	{
 		"c": "18446744073709551615u64",
-		"t": "source.move meta.value.number.move constant.numeric.move",
+		"t": "source.move meta.value.number.decimal.move constant.numeric.move",
 		"r": {
 			"dark_plus": "constant.numeric: #B5CEA8",
 			"light_plus": "constant.numeric: #098658",
@@ -264,8 +264,8 @@
 		}
 	},
 	{
-		"c": "MAX_U128",
-		"t": "source.move meta.identifier.all-capitals.move support.constant.move",
+		"c": "SUFFIX_U128",
+		"t": "source.move meta.identifier.all-capitals.move constant.other.move",
 		"r": {
 			"dark_plus": "default: #D4D4D4",
 			"light_plus": "default: #000000",
@@ -331,13 +331,13 @@
 	},
 	{
 		"c": "u128",
-		"t": "source.move meta.type.builtin.number.move support.type.primitive.move",
+		"t": "source.move meta.type.builtin.number.move entity.name.type.move",
 		"r": {
-			"dark_plus": "support.type: #4EC9B0",
-			"light_plus": "support.type: #267F99",
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.type: #4EC9B0"
+			"hc_black": "entity.name.type: #4EC9B0"
 		}
 	},
 	{
@@ -375,7 +375,139 @@
 	},
 	{
 		"c": "340282366920938463463374607431768211455u128",
-		"t": "source.move meta.value.number.move constant.numeric.move",
+		"t": "source.move meta.value.number.decimal.move constant.numeric.move",
+		"r": {
+			"dark_plus": "constant.numeric: #B5CEA8",
+			"light_plus": "constant.numeric: #098658",
+			"dark_vs": "constant.numeric: #B5CEA8",
+			"light_vs": "constant.numeric: #098658",
+			"hc_black": "constant.numeric: #B5CEA8"
+		}
+	},
+	{
+		"c": ";",
+		"t": "source.move meta.punctuation.semicolon.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "    ",
+		"t": "source.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "const",
+		"t": "source.move storage.type.move",
+		"r": {
+			"dark_plus": "storage.type: #569CD6",
+			"light_plus": "storage.type: #0000FF",
+			"dark_vs": "storage.type: #569CD6",
+			"light_vs": "storage.type: #0000FF",
+			"hc_black": "storage.type: #569CD6"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "HEX",
+		"t": "source.move meta.identifier.all-capitals.move constant.other.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": ":",
+		"t": "source.move meta.punctuation.colon.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "u64",
+		"t": "source.move meta.type.builtin.number.move entity.name.type.move",
+		"r": {
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "entity.name.type: #4EC9B0"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "=",
+		"t": "source.move meta.punctuation.equal.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "0x0Dead1Beef2",
+		"t": "source.move meta.value.number.hexadecimal.move constant.numeric.move",
 		"r": {
 			"dark_plus": "constant.numeric: #B5CEA8",
 			"light_plus": "constant.numeric: #098658",
@@ -430,7 +562,7 @@
 	},
 	{
 		"c": "TRUE",
-		"t": "source.move meta.identifier.all-capitals.move support.constant.move",
+		"t": "source.move meta.identifier.all-capitals.move constant.other.move",
 		"r": {
 			"dark_plus": "default: #D4D4D4",
 			"light_plus": "default: #000000",
@@ -485,13 +617,13 @@
 	},
 	{
 		"c": "bool",
-		"t": "source.move meta.type.builtin.bool.move support.type.primitive.move",
+		"t": "source.move meta.type.builtin.bool.move entity.name.type.move",
 		"r": {
-			"dark_plus": "support.type: #4EC9B0",
-			"light_plus": "support.type: #267F99",
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.type: #4EC9B0"
+			"hc_black": "entity.name.type: #4EC9B0"
 		}
 	},
 	{
@@ -584,7 +716,7 @@
 	},
 	{
 		"c": "FALSE",
-		"t": "source.move meta.identifier.all-capitals.move support.constant.move",
+		"t": "source.move meta.identifier.all-capitals.move constant.other.move",
 		"r": {
 			"dark_plus": "default: #D4D4D4",
 			"light_plus": "default: #000000",
@@ -617,13 +749,13 @@
 	},
 	{
 		"c": "bool",
-		"t": "source.move meta.type.builtin.bool.move support.type.primitive.move",
+		"t": "source.move meta.type.builtin.bool.move entity.name.type.move",
 		"r": {
-			"dark_plus": "support.type: #4EC9B0",
-			"light_plus": "support.type: #267F99",
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.type: #4EC9B0"
+			"hc_black": "entity.name.type: #4EC9B0"
 		}
 	},
 	{
@@ -737,8 +869,8 @@
 		}
 	},
 	{
-		"c": "ADDRESS",
-		"t": "source.move meta.identifier.all-capitals.move support.constant.move",
+		"c": "ADDRESS_HEX",
+		"t": "source.move meta.identifier.all-capitals.move constant.other.move",
 		"r": {
 			"dark_plus": "default: #D4D4D4",
 			"light_plus": "default: #000000",
@@ -782,13 +914,13 @@
 	},
 	{
 		"c": "address",
-		"t": "source.move meta.type-address.move meta.type.builtin.address.move support.type.primitive.move",
+		"t": "source.move meta.type-address.move meta.type.builtin.address.move entity.name.type.move",
 		"r": {
-			"dark_plus": "support.type: #4EC9B0",
-			"light_plus": "support.type: #267F99",
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.type: #4EC9B0"
+			"hc_black": "entity.name.type: #4EC9B0"
 		}
 	},
 	{
@@ -847,14 +979,14 @@
 		}
 	},
 	{
-		"c": "@0x42",
-		"t": "source.move meta.value.address.move support.variable.move",
+		"c": "@0xAb34C",
+		"t": "source.move meta.value.address.hexadecimal.move variable.other.move",
 		"r": {
-			"dark_plus": "support.variable: #9CDCFE",
-			"light_plus": "support.variable: #001080",
+			"dark_plus": "variable: #9CDCFE",
+			"light_plus": "variable: #001080",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.variable: #9CDCFE"
+			"hc_black": "variable: #9CDCFE"
 		}
 	},
 	{
@@ -902,8 +1034,8 @@
 		}
 	},
 	{
-		"c": "SHIFTED",
-		"t": "source.move meta.identifier.all-capitals.move support.constant.move",
+		"c": "ADDRESS_HEX_SUFFIX_U8",
+		"t": "source.move meta.identifier.all-capitals.move constant.other.move",
 		"r": {
 			"dark_plus": "default: #D4D4D4",
 			"light_plus": "default: #000000",
@@ -914,7 +1046,7 @@
 	},
 	{
 		"c": ":",
-		"t": "source.move meta.punctuation.colon.move",
+		"t": "source.move meta.type-address.move meta.punctuation.colon.move",
 		"r": {
 			"dark_plus": "default: #D4D4D4",
 			"light_plus": "default: #000000",
@@ -925,7 +1057,7 @@
 	},
 	{
 		"c": " ",
-		"t": "source.move",
+		"t": "source.move meta.type-address.move",
 		"r": {
 			"dark_plus": "default: #D4D4D4",
 			"light_plus": "default: #000000",
@@ -935,14 +1067,25 @@
 		}
 	},
 	{
-		"c": "u8",
-		"t": "source.move meta.type.builtin.number.move support.type.primitive.move",
+		"c": "&",
+		"t": "source.move meta.type-address.move meta.punctuation.ampersand.move",
 		"r": {
-			"dark_plus": "support.type: #4EC9B0",
-			"light_plus": "support.type: #267F99",
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.type: #4EC9B0"
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "address",
+		"t": "source.move meta.type-address.move meta.type.builtin.address.move entity.name.type.move",
+		"r": {
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "entity.name.type: #4EC9B0"
 		}
 	},
 	{
@@ -979,14 +1122,14 @@
 		}
 	},
 	{
-		"c": "1",
-		"t": "source.move meta.value.number.move constant.numeric.move",
+		"c": "@0xD23fu8",
+		"t": "source.move meta.value.address.hexadecimal.move variable.other.move",
 		"r": {
-			"dark_plus": "constant.numeric: #B5CEA8",
-			"light_plus": "constant.numeric: #098658",
-			"dark_vs": "constant.numeric: #B5CEA8",
-			"light_vs": "constant.numeric: #098658",
-			"hc_black": "constant.numeric: #B5CEA8"
+			"dark_plus": "variable: #9CDCFE",
+			"light_plus": "variable: #001080",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "variable: #9CDCFE"
 		}
 	},
 	{
@@ -1001,51 +1144,7 @@
 		}
 	},
 	{
-		"c": "<<",
-		"t": "source.move meta.punctuation.less-less.move",
-		"r": {
-			"dark_plus": "default: #D4D4D4",
-			"light_plus": "default: #000000",
-			"dark_vs": "default: #D4D4D4",
-			"light_vs": "default: #000000",
-			"hc_black": "default: #FFFFFF"
-		}
-	},
-	{
-		"c": " ",
-		"t": "source.move",
-		"r": {
-			"dark_plus": "default: #D4D4D4",
-			"light_plus": "default: #000000",
-			"dark_vs": "default: #D4D4D4",
-			"light_vs": "default: #000000",
-			"hc_black": "default: #FFFFFF"
-		}
-	},
-	{
-		"c": "8",
-		"t": "source.move meta.value.number.move constant.numeric.move",
-		"r": {
-			"dark_plus": "constant.numeric: #B5CEA8",
-			"light_plus": "constant.numeric: #098658",
-			"dark_vs": "constant.numeric: #B5CEA8",
-			"light_vs": "constant.numeric: #098658",
-			"hc_black": "constant.numeric: #B5CEA8"
-		}
-	},
-	{
-		"c": " ",
-		"t": "source.move",
-		"r": {
-			"dark_plus": "default: #D4D4D4",
-			"light_plus": "default: #000000",
-			"dark_vs": "default: #D4D4D4",
-			"light_vs": "default: #000000",
-			"hc_black": "default: #FFFFFF"
-		}
-	},
-	{
-		"c": "/* shifted constant */",
+		"c": "/* address constant */",
 		"t": "source.move comment.block.move",
 		"r": {
 			"dark_plus": "comment: #6A9955",
@@ -1100,8 +1199,8 @@
 		}
 	},
 	{
-		"c": "BYTES",
-		"t": "source.move meta.identifier.all-capitals.move support.constant.move",
+		"c": "ADDRESS_DECIMAL",
+		"t": "source.move meta.identifier.all-capitals.move constant.other.move",
 		"r": {
 			"dark_plus": "default: #D4D4D4",
 			"light_plus": "default: #000000",
@@ -1112,7 +1211,7 @@
 	},
 	{
 		"c": ":",
-		"t": "source.move meta.punctuation.colon.move",
+		"t": "source.move meta.type-address.move meta.punctuation.colon.move",
 		"r": {
 			"dark_plus": "default: #D4D4D4",
 			"light_plus": "default: #000000",
@@ -1123,7 +1222,7 @@
 	},
 	{
 		"c": " ",
-		"t": "source.move",
+		"t": "source.move meta.type-address.move",
 		"r": {
 			"dark_plus": "default: #D4D4D4",
 			"light_plus": "default: #000000",
@@ -1133,19 +1232,8 @@
 		}
 	},
 	{
-		"c": "vector",
-		"t": "source.move meta.type.builtin.vector.move support.type.primitive.move",
-		"r": {
-			"dark_plus": "support.type: #4EC9B0",
-			"light_plus": "support.type: #267F99",
-			"dark_vs": "default: #D4D4D4",
-			"light_vs": "default: #000000",
-			"hc_black": "support.type: #4EC9B0"
-		}
-	},
-	{
-		"c": "<",
-		"t": "source.move meta.type.builtin.vector.move meta.punctuation.left-angle-bracket.move",
+		"c": "&",
+		"t": "source.move meta.type-address.move meta.punctuation.ampersand.move",
 		"r": {
 			"dark_plus": "default: #D4D4D4",
 			"light_plus": "default: #000000",
@@ -1155,25 +1243,14 @@
 		}
 	},
 	{
-		"c": "u8",
-		"t": "source.move meta.type.builtin.vector.move meta.type.builtin.number.move support.type.primitive.move",
+		"c": "address",
+		"t": "source.move meta.type-address.move meta.type.builtin.address.move entity.name.type.move",
 		"r": {
-			"dark_plus": "support.type: #4EC9B0",
-			"light_plus": "support.type: #267F99",
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.type: #4EC9B0"
-		}
-	},
-	{
-		"c": ">",
-		"t": "source.move meta.type.builtin.vector.move meta.punctuation.right-angle-bracket.move",
-		"r": {
-			"dark_plus": "default: #D4D4D4",
-			"light_plus": "default: #000000",
-			"dark_vs": "default: #D4D4D4",
-			"light_vs": "default: #000000",
-			"hc_black": "default: #FFFFFF"
+			"hc_black": "entity.name.type: #4EC9B0"
 		}
 	},
 	{
@@ -1210,47 +1287,14 @@
 		}
 	},
 	{
-		"c": "b",
-		"t": "source.move meta.value.bytestring.move string.quoted.double.move meta.value.bytestring.prefix.move",
+		"c": "@98760",
+		"t": "source.move meta.value.address.decimal.move variable.other.move",
 		"r": {
-			"dark_plus": "string: #CE9178",
-			"light_plus": "string: #A31515",
-			"dark_vs": "string: #CE9178",
-			"light_vs": "string: #A31515",
-			"hc_black": "string: #CE9178"
-		}
-	},
-	{
-		"c": "\"",
-		"t": "source.move meta.value.bytestring.move string.quoted.double.move meta.value.bytestring.quote.open.move",
-		"r": {
-			"dark_plus": "string: #CE9178",
-			"light_plus": "string: #A31515",
-			"dark_vs": "string: #CE9178",
-			"light_vs": "string: #A31515",
-			"hc_black": "string: #CE9178"
-		}
-	},
-	{
-		"c": "hello",
-		"t": "source.move meta.value.bytestring.move string.quoted.double.move",
-		"r": {
-			"dark_plus": "string: #CE9178",
-			"light_plus": "string: #A31515",
-			"dark_vs": "string: #CE9178",
-			"light_vs": "string: #A31515",
-			"hc_black": "string: #CE9178"
-		}
-	},
-	{
-		"c": "\"",
-		"t": "source.move meta.value.bytestring.move string.quoted.double.move meta.value.bytestring.quote.close.move",
-		"r": {
-			"dark_plus": "string: #CE9178",
-			"light_plus": "string: #A31515",
-			"dark_vs": "string: #CE9178",
-			"light_vs": "string: #A31515",
-			"hc_black": "string: #CE9178"
+			"dark_plus": "variable: #9CDCFE",
+			"light_plus": "variable: #001080",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "variable: #9CDCFE"
 		}
 	},
 	{
@@ -1287,7 +1331,7 @@
 		}
 	},
 	{
-		"c": " bytes constant",
+		"c": " address constant",
 		"t": "source.move comment.line.move",
 		"r": {
 			"dark_plus": "comment: #6A9955",
@@ -1331,8 +1375,327 @@
 		}
 	},
 	{
-		"c": "KEY",
-		"t": "source.move meta.identifier.all-capitals.move support.constant.move",
+		"c": "ADDRESS_DECIMAL_SUFFIX_U128",
+		"t": "source.move meta.identifier.all-capitals.move constant.other.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": ":",
+		"t": "source.move meta.type-address.move meta.punctuation.colon.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move meta.type-address.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "&",
+		"t": "source.move meta.type-address.move meta.punctuation.ampersand.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "address",
+		"t": "source.move meta.type-address.move meta.type.builtin.address.move entity.name.type.move",
+		"r": {
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "entity.name.type: #4EC9B0"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "=",
+		"t": "source.move meta.punctuation.equal.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "@1248u128",
+		"t": "source.move meta.value.address.decimal.move variable.other.move",
+		"r": {
+			"dark_plus": "variable: #9CDCFE",
+			"light_plus": "variable: #001080",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "variable: #9CDCFE"
+		}
+	},
+	{
+		"c": ";",
+		"t": "source.move meta.punctuation.semicolon.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "    ",
+		"t": "source.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "const",
+		"t": "source.move storage.type.move",
+		"r": {
+			"dark_plus": "storage.type: #569CD6",
+			"light_plus": "storage.type: #0000FF",
+			"dark_vs": "storage.type: #569CD6",
+			"light_vs": "storage.type: #0000FF",
+			"hc_black": "storage.type: #569CD6"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "SHIFTED",
+		"t": "source.move meta.identifier.all-capitals.move constant.other.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": ":",
+		"t": "source.move meta.punctuation.colon.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "u8",
+		"t": "source.move meta.type.builtin.number.move entity.name.type.move",
+		"r": {
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "entity.name.type: #4EC9B0"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "=",
+		"t": "source.move meta.punctuation.equal.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "1",
+		"t": "source.move meta.value.number.decimal.move constant.numeric.move",
+		"r": {
+			"dark_plus": "constant.numeric: #B5CEA8",
+			"light_plus": "constant.numeric: #098658",
+			"dark_vs": "constant.numeric: #B5CEA8",
+			"light_vs": "constant.numeric: #098658",
+			"hc_black": "constant.numeric: #B5CEA8"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "<<",
+		"t": "source.move meta.punctuation.less-less.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "8",
+		"t": "source.move meta.value.number.decimal.move constant.numeric.move",
+		"r": {
+			"dark_plus": "constant.numeric: #B5CEA8",
+			"light_plus": "constant.numeric: #098658",
+			"dark_vs": "constant.numeric: #B5CEA8",
+			"light_vs": "constant.numeric: #098658",
+			"hc_black": "constant.numeric: #B5CEA8"
+		}
+	},
+	{
+		"c": ";",
+		"t": "source.move meta.punctuation.semicolon.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "    ",
+		"t": "source.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "const",
+		"t": "source.move storage.type.move",
+		"r": {
+			"dark_plus": "storage.type: #569CD6",
+			"light_plus": "storage.type: #0000FF",
+			"dark_vs": "storage.type: #569CD6",
+			"light_vs": "storage.type: #0000FF",
+			"hc_black": "storage.type: #569CD6"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "BYTE_STRING",
+		"t": "source.move meta.identifier.all-capitals.move constant.other.move",
 		"r": {
 			"dark_plus": "default: #D4D4D4",
 			"light_plus": "default: #000000",
@@ -1365,13 +1728,13 @@
 	},
 	{
 		"c": "vector",
-		"t": "source.move meta.type.builtin.vector.move support.type.primitive.move",
+		"t": "source.move meta.type.builtin.vector.move entity.name.type.move",
 		"r": {
-			"dark_plus": "support.type: #4EC9B0",
-			"light_plus": "support.type: #267F99",
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.type: #4EC9B0"
+			"hc_black": "entity.name.type: #4EC9B0"
 		}
 	},
 	{
@@ -1387,13 +1750,13 @@
 	},
 	{
 		"c": "u8",
-		"t": "source.move meta.type.builtin.vector.move meta.type.builtin.number.move support.type.primitive.move",
+		"t": "source.move meta.type.builtin.vector.move meta.type.builtin.number.move entity.name.type.move",
 		"r": {
-			"dark_plus": "support.type: #4EC9B0",
-			"light_plus": "support.type: #267F99",
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.type: #4EC9B0"
+			"hc_black": "entity.name.type: #4EC9B0"
 		}
 	},
 	{
@@ -1441,7 +1804,7 @@
 		}
 	},
 	{
-		"c": "x",
+		"c": "b\"",
 		"t": "source.move meta.value.bytestring.move string.quoted.double.move meta.value.bytestring.prefix.move",
 		"r": {
 			"dark_plus": "string: #CE9178",
@@ -1452,8 +1815,8 @@
 		}
 	},
 	{
-		"c": "\"",
-		"t": "source.move meta.value.bytestring.move string.quoted.double.move meta.value.bytestring.quote.open.move",
+		"c": "he",
+		"t": "source.move meta.value.bytestring.move string.quoted.double.move",
 		"r": {
 			"dark_plus": "string: #CE9178",
 			"light_plus": "string: #A31515",
@@ -1463,7 +1826,18 @@
 		}
 	},
 	{
-		"c": "deadbeef",
+		"c": "\\n",
+		"t": "source.move meta.value.bytestring.move string.quoted.double.move constant.character.escape.move",
+		"r": {
+			"dark_plus": "constant.character.escape: #D7BA7D",
+			"light_plus": "constant.character.escape: #EE0000",
+			"dark_vs": "string: #CE9178",
+			"light_vs": "string: #A31515",
+			"hc_black": "constant.character: #569CD6"
+		}
+	},
+	{
+		"c": "llo",
 		"t": "source.move meta.value.bytestring.move string.quoted.double.move",
 		"r": {
 			"dark_plus": "string: #CE9178",
@@ -1475,7 +1849,447 @@
 	},
 	{
 		"c": "\"",
-		"t": "source.move meta.value.bytestring.move string.quoted.double.move meta.value.bytestring.quote.close.move",
+		"t": "source.move meta.value.bytestring.move string.quoted.double.move meta.value.bytestring.suffix.move",
+		"r": {
+			"dark_plus": "string: #CE9178",
+			"light_plus": "string: #A31515",
+			"dark_vs": "string: #CE9178",
+			"light_vs": "string: #A31515",
+			"hc_black": "string: #CE9178"
+		}
+	},
+	{
+		"c": ";",
+		"t": "source.move meta.punctuation.semicolon.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "    ",
+		"t": "source.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "const",
+		"t": "source.move storage.type.move",
+		"r": {
+			"dark_plus": "storage.type: #569CD6",
+			"light_plus": "storage.type: #0000FF",
+			"dark_vs": "storage.type: #569CD6",
+			"light_vs": "storage.type: #0000FF",
+			"hc_black": "storage.type: #569CD6"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "HEX_STRING",
+		"t": "source.move meta.identifier.all-capitals.move constant.other.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": ":",
+		"t": "source.move meta.punctuation.colon.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "vector",
+		"t": "source.move meta.type.builtin.vector.move entity.name.type.move",
+		"r": {
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "entity.name.type: #4EC9B0"
+		}
+	},
+	{
+		"c": "<",
+		"t": "source.move meta.type.builtin.vector.move meta.punctuation.left-angle-bracket.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "u8",
+		"t": "source.move meta.type.builtin.vector.move meta.type.builtin.number.move entity.name.type.move",
+		"r": {
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "entity.name.type: #4EC9B0"
+		}
+	},
+	{
+		"c": ">",
+		"t": "source.move meta.type.builtin.vector.move meta.punctuation.right-angle-bracket.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "=",
+		"t": "source.move meta.punctuation.equal.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "x\"",
+		"t": "source.move meta.value.hexadecimal-string.move string.quoted.double.move meta.value.hexadecimal-string.prefix.move",
+		"r": {
+			"dark_plus": "string: #CE9178",
+			"light_plus": "string: #A31515",
+			"dark_vs": "string: #CE9178",
+			"light_vs": "string: #A31515",
+			"hc_black": "string: #CE9178"
+		}
+	},
+	{
+		"c": "0a1B2c3D4e5F6A7b8C9d0Ef",
+		"t": "source.move meta.value.hexadecimal-string.move string.quoted.double.move",
+		"r": {
+			"dark_plus": "string: #CE9178",
+			"light_plus": "string: #A31515",
+			"dark_vs": "string: #CE9178",
+			"light_vs": "string: #A31515",
+			"hc_black": "string: #CE9178"
+		}
+	},
+	{
+		"c": "\"",
+		"t": "source.move meta.value.hexadecimal-string.move string.quoted.double.move meta.value.hexadecimal-string.suffix.move",
+		"r": {
+			"dark_plus": "string: #CE9178",
+			"light_plus": "string: #A31515",
+			"dark_vs": "string: #CE9178",
+			"light_vs": "string: #A31515",
+			"hc_black": "string: #CE9178"
+		}
+	},
+	{
+		"c": ";",
+		"t": "source.move meta.punctuation.semicolon.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "    ",
+		"t": "source.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "const",
+		"t": "source.move storage.type.move",
+		"r": {
+			"dark_plus": "storage.type: #569CD6",
+			"light_plus": "storage.type: #0000FF",
+			"dark_vs": "storage.type: #569CD6",
+			"light_vs": "storage.type: #0000FF",
+			"hc_black": "storage.type: #569CD6"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "HEX_STRING_INVALID",
+		"t": "source.move meta.identifier.all-capitals.move constant.other.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": ":",
+		"t": "source.move meta.punctuation.colon.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "vector",
+		"t": "source.move meta.type.builtin.vector.move entity.name.type.move",
+		"r": {
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "entity.name.type: #4EC9B0"
+		}
+	},
+	{
+		"c": "<",
+		"t": "source.move meta.type.builtin.vector.move meta.punctuation.left-angle-bracket.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "u8",
+		"t": "source.move meta.type.builtin.vector.move meta.type.builtin.number.move entity.name.type.move",
+		"r": {
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "entity.name.type: #4EC9B0"
+		}
+	},
+	{
+		"c": ">",
+		"t": "source.move meta.type.builtin.vector.move meta.punctuation.right-angle-bracket.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "=",
+		"t": "source.move meta.punctuation.equal.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": " ",
+		"t": "source.move",
+		"r": {
+			"dark_plus": "default: #D4D4D4",
+			"light_plus": "default: #000000",
+			"dark_vs": "default: #D4D4D4",
+			"light_vs": "default: #000000",
+			"hc_black": "default: #FFFFFF"
+		}
+	},
+	{
+		"c": "x\"",
+		"t": "source.move meta.value.hexadecimal-string.move string.quoted.double.move meta.value.hexadecimal-string.prefix.move",
+		"r": {
+			"dark_plus": "string: #CE9178",
+			"light_plus": "string: #A31515",
+			"dark_vs": "string: #CE9178",
+			"light_vs": "string: #A31515",
+			"hc_black": "string: #CE9178"
+		}
+	},
+	{
+		"c": "00",
+		"t": "source.move meta.value.hexadecimal-string.move string.quoted.double.move",
+		"r": {
+			"dark_plus": "string: #CE9178",
+			"light_plus": "string: #A31515",
+			"dark_vs": "string: #CE9178",
+			"light_vs": "string: #A31515",
+			"hc_black": "string: #CE9178"
+		}
+	},
+	{
+		"c": "-",
+		"t": "source.move meta.value.hexadecimal-string.move string.quoted.double.move meta.value.hexadecimal-string.invalid.move invalid.illegal.move",
+		"r": {
+			"dark_plus": "invalid: #F44747",
+			"light_plus": "invalid: #CD3131",
+			"dark_vs": "invalid: #F44747",
+			"light_vs": "invalid: #CD3131",
+			"hc_black": "invalid: #F44747"
+		}
+	},
+	{
+		"c": "ad",
+		"t": "source.move meta.value.hexadecimal-string.move string.quoted.double.move",
+		"r": {
+			"dark_plus": "string: #CE9178",
+			"light_plus": "string: #A31515",
+			"dark_vs": "string: #CE9178",
+			"light_vs": "string: #A31515",
+			"hc_black": "string: #CE9178"
+		}
+	},
+	{
+		"c": "\\tZ",
+		"t": "source.move meta.value.hexadecimal-string.move string.quoted.double.move meta.value.hexadecimal-string.invalid.move invalid.illegal.move",
+		"r": {
+			"dark_plus": "invalid: #F44747",
+			"light_plus": "invalid: #CD3131",
+			"dark_vs": "invalid: #F44747",
+			"light_vs": "invalid: #CD3131",
+			"hc_black": "invalid: #F44747"
+		}
+	},
+	{
+		"c": "bee",
+		"t": "source.move meta.value.hexadecimal-string.move string.quoted.double.move",
+		"r": {
+			"dark_plus": "string: #CE9178",
+			"light_plus": "string: #A31515",
+			"dark_vs": "string: #CE9178",
+			"light_vs": "string: #A31515",
+			"hc_black": "string: #CE9178"
+		}
+	},
+	{
+		"c": "hx",
+		"t": "source.move meta.value.hexadecimal-string.move string.quoted.double.move meta.value.hexadecimal-string.invalid.move invalid.illegal.move",
+		"r": {
+			"dark_plus": "invalid: #F44747",
+			"light_plus": "invalid: #CD3131",
+			"dark_vs": "invalid: #F44747",
+			"light_vs": "invalid: #CD3131",
+			"hc_black": "invalid: #F44747"
+		}
+	},
+	{
+		"c": "f",
+		"t": "source.move meta.value.hexadecimal-string.move string.quoted.double.move",
+		"r": {
+			"dark_plus": "string: #CE9178",
+			"light_plus": "string: #A31515",
+			"dark_vs": "string: #CE9178",
+			"light_vs": "string: #A31515",
+			"hc_black": "string: #CE9178"
+		}
+	},
+	{
+		"c": "\"",
+		"t": "source.move meta.value.hexadecimal-string.move string.quoted.double.move meta.value.hexadecimal-string.suffix.move",
 		"r": {
 			"dark_plus": "string: #CE9178",
 			"light_plus": "string: #A31515",
@@ -1530,7 +2344,7 @@
 	},
 	{
 		"c": "CASTED",
-		"t": "source.move meta.identifier.all-capitals.move support.constant.move",
+		"t": "source.move meta.identifier.all-capitals.move constant.other.move",
 		"r": {
 			"dark_plus": "default: #D4D4D4",
 			"light_plus": "default: #000000",
@@ -1563,13 +2377,13 @@
 	},
 	{
 		"c": "u64",
-		"t": "source.move meta.type.builtin.number.move support.type.primitive.move",
+		"t": "source.move meta.type.builtin.number.move entity.name.type.move",
 		"r": {
-			"dark_plus": "support.type: #4EC9B0",
-			"light_plus": "support.type: #267F99",
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.type: #4EC9B0"
+			"hc_black": "entity.name.type: #4EC9B0"
 		}
 	},
 	{
@@ -1618,7 +2432,7 @@
 	},
 	{
 		"c": "0",
-		"t": "source.move meta.value.number.move constant.numeric.move",
+		"t": "source.move meta.value.number.decimal.move constant.numeric.move",
 		"r": {
 			"dark_plus": "constant.numeric: #B5CEA8",
 			"light_plus": "constant.numeric: #098658",
@@ -1651,13 +2465,13 @@
 	},
 	{
 		"c": "u128",
-		"t": "source.move meta.type.builtin.number.move support.type.primitive.move",
+		"t": "source.move meta.type.builtin.number.move entity.name.type.move",
 		"r": {
-			"dark_plus": "support.type: #4EC9B0",
-			"light_plus": "support.type: #267F99",
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.type: #4EC9B0"
+			"hc_black": "entity.name.type: #4EC9B0"
 		}
 	},
 	{
@@ -1706,13 +2520,13 @@
 	},
 	{
 		"c": "u64",
-		"t": "source.move meta.type.builtin.number.move support.type.primitive.move",
+		"t": "source.move meta.type.builtin.number.move entity.name.type.move",
 		"r": {
-			"dark_plus": "support.type: #4EC9B0",
-			"light_plus": "support.type: #267F99",
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.type: #4EC9B0"
+			"hc_black": "entity.name.type: #4EC9B0"
 		}
 	},
 	{

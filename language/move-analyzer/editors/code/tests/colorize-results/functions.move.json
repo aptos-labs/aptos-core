@@ -23,7 +23,7 @@
 	},
 	{
 		"c": "0x1",
-		"t": "source.move meta.name-access-chain.two-elements.move meta.leading-name-access.move meta.value.number.move constant.numeric.move",
+		"t": "source.move meta.name-access-chain.two-elements.move meta.leading-name-access.move meta.value.number.hexadecimal.move constant.numeric.move",
 		"r": {
 			"dark_plus": "constant.numeric: #B5CEA8",
 			"light_plus": "constant.numeric: #098658",
@@ -419,13 +419,13 @@
 	},
 	{
 		"c": "copy",
-		"t": "source.move meta.ability.move support.type.move",
+		"t": "source.move meta.ability.move entity.name.type.move",
 		"r": {
-			"dark_plus": "support.type: #4EC9B0",
-			"light_plus": "support.type: #267F99",
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.type: #4EC9B0"
+			"hc_black": "entity.name.type: #4EC9B0"
 		}
 	},
 	{
@@ -441,13 +441,13 @@
 	},
 	{
 		"c": "drop",
-		"t": "source.move meta.ability.move support.type.move",
+		"t": "source.move meta.ability.move entity.name.type.move",
 		"r": {
-			"dark_plus": "support.type: #4EC9B0",
-			"light_plus": "support.type: #267F99",
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.type: #4EC9B0"
+			"hc_black": "entity.name.type: #4EC9B0"
 		}
 	},
 	{
@@ -507,13 +507,13 @@
 	},
 	{
 		"c": "vector",
-		"t": "source.move meta.type.builtin.vector.move support.type.primitive.move",
+		"t": "source.move meta.type.builtin.vector.move entity.name.type.move",
 		"r": {
-			"dark_plus": "support.type: #4EC9B0",
-			"light_plus": "support.type: #267F99",
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.type: #4EC9B0"
+			"hc_black": "entity.name.type: #4EC9B0"
 		}
 	},
 	{
@@ -529,13 +529,13 @@
 	},
 	{
 		"c": "u8",
-		"t": "source.move meta.type.builtin.vector.move meta.type.builtin.number.move support.type.primitive.move",
+		"t": "source.move meta.type.builtin.vector.move meta.type.builtin.number.move entity.name.type.move",
 		"r": {
-			"dark_plus": "support.type: #4EC9B0",
-			"light_plus": "support.type: #267F99",
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.type: #4EC9B0"
+			"hc_black": "entity.name.type: #4EC9B0"
 		}
 	},
 	{
@@ -606,13 +606,13 @@
 	},
 	{
 		"c": "vector",
-		"t": "source.move meta.type.builtin.vector.move support.type.primitive.move",
+		"t": "source.move meta.type.builtin.vector.move entity.name.type.move",
 		"r": {
-			"dark_plus": "support.type: #4EC9B0",
-			"light_plus": "support.type: #267F99",
+			"dark_plus": "entity.name.type: #4EC9B0",
+			"light_plus": "entity.name.type: #267F99",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "support.type: #4EC9B0"
+			"hc_black": "entity.name.type: #4EC9B0"
 		}
 	},
 	{
