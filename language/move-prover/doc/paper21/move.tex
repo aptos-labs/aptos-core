@@ -6,14 +6,14 @@ specific to blockchains.  A Move execution consists of a sequence of updates
 evolving a \emph{global persistent memory state}, which we just call the
 \emph{(global) memory}.
 %% Updates are executed in a \emph{transactional} style.
-As with other blockchains, updates are a series of atomic transactions.
+Similar to other blockchains, updates are a series of atomic transactions.
 All runtime errors result in a transaction abort, which does not change
 the blockchain state except to transfer some currency (``gas'') from the account that
 sent the transaction to pay for cost of executing the transaction.
 
 The global memory is organized as a collection of resources, described by Move
 structures (data types). A resource in memory is indexed by a pair of a type
-(possibly instantiated) and an address (for example the address of a user
+(fully instantiated) and an address (for example the address of a user
 account). For instance, the expression |exists<Coin<USD>>(addr)| will be true if
 there is a value of type |Coin<USD>| stored at |addr|. As seen in this example,
 Move uses type generics, and working with generic functions and types is rather
@@ -137,12 +137,17 @@ memory. Developers can also provide invariants over data structures, as well as
 the
 %% (state-dependent)
 contents of the global memory.
+%
 Universal and existential
 quantification %% both
 over bounded domains, such as like the indices of a vector, as well as
 effectively unbounded domains, such as memory addresses and integers, are
-supported. Quantifiers make the verification problem undecidable
-and cause difficulties with timeouts, in practice, but have the advantage
+supported.
+%
+Quantifiers make the verification problem undecidable
+and cause difficulties with timeouts.
+%
+However, in practice, we notice that quantifiers have the advantage
 of allowing more direct formalization of many properties, which increases the
 clarity of specifications.
 %% The latter makes the specification language very expressive, but also

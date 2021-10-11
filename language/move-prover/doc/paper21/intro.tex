@@ -1,24 +1,31 @@
 \Section{Introduction}
 
-The Move Prover (MVP) is a formal verification tool for smart contracts
-that can be used routinely during the development.
-It runs about predictably as compilers,
-linters, and other development tools.
-We would like to share the most important engineering and architectural
+The Move Prover (\MVP) is a formal verification tool for smart contracts
+that intends to be used routinely during code development.
+%
+The verification finishes fast and predictably,
+making the experience of running \MVP similar to the experience of
+running compilers, linters, type checkers, and other development tools.
+%
+Building a fast verifier is non-trivial, and in this paper,
+we would like to share the most important engineering and architectural
 decisions that have made this possible.
 
-One factor that made verification easier was applying it to smart contracts.
-Additional effort for verification is easy to justify because of the
-large financial and regulatory risks that they may entail, as evidence
-be large losses that have occurred already~\cite{???}.  Smart
-contracts are also easier to verify than conventional software,
-because they are often small and because they execute in a
-well-defined, isolated environment, and because computations are
-typically sequential, not i/o-bound, and deterministic.
-
-* Other keys to success
-- coupled with programming language
-
+One factor that makes verification easier is applying it to smart contracts.
+%
+Smart contracts are easier to verify than conventional software for at least
+three reasons:
+1) they are small in code size,
+2) they execute in a well-defined, isolated environment, and
+3) their computations are typically sequential, deterministic, and have
+   minimal interactions with the environment
+   (e.g., no explicit I/O operations).
+%
+At the same time,
+formal verification is more appealing to the advocates for smart contracts
+becaues of the large financial and regulatory risks that smart contracts may
+entail if misbehaved,
+as evidence by large losses that have occurred already~\cite{???}.
 
 %% Smart contracts have been for longer considered a promising domain to employ
 %% formal verification~\cite{CONTRACT_VERIFICATION}.  Smart contracts deal with
@@ -34,14 +41,21 @@ typically sequential, not i/o-bound, and deterministic.
 %% These basic advantages of smart contracts can be further augmented by
 %% choice of a verification friendly language and virtual machine design.
 
-Verification is also easier because we have a new programming language,
-\emph{Move}~\cite{MOVE_LANG}, which was developed as part of the
-Diem blockchain~\cite{DIEM}, which was designed to be used with formal
-verification, and is integrated with MVP.
+The other crucial factor to the success of \MVP is a tight coupling with
+the \emph{Move} programming language~\cite{MOVE_LANG}.
+%
+Move is developed as part of the Diem blockchain~\cite{DIEM} and
+is designed to be used with formal verification from day one.
+%
+Move is currently co-evolving with \MVP.
+%
 The language supports specifying
-pre-, post-, and aborts conditions of functions, as well as invariants over data
-structures and over the content of the global persistent memory
+pre-, post-, and aborts conditions of functions,
+as well as invariants
+over data structures and
+over the content of the global persistent memory
 (i.e., the contents of the blockchain).
+%
 One feature that makes verification harder is that universal and existential
 quantification is used freely in specifications. This makes verification harder,
 but reduces errors in specification by allowing users to write properties directly,
@@ -59,46 +73,55 @@ without clever encodings that might lead to more errors.
 
 %% Despite this specification richness,
 \MVP is capable of verifying the full
-the Move implementation of the Diem
-blockchain~\cite{DIEM} (called the Diem framework~\cite{DIEM_FRAMEWORK})
+Move implementation of the Diem blockchain
+(called the Diem framework~\cite{DIEM_FRAMEWORK})
 in a few minutes.
+%
 The framework provides functionality for managing
-accounts and their interaction, including multiple currencies, account roles,
-and rules for transactions.  It consists of
-about 8,800 lines of Move code and 6,500 lines of specifications (including comments for both).
+accounts and their interactions, including multiple currencies, account roles,
+and rules for transactions.
+%
+It consists of
+about 8,800 lines of Move code and
+6,500 lines of specifications (including comments for both),
+which shows that the framework is extensively specified.
 %% approximately 12,000 lines of Move
 %% program code and specifications.
-The framework is %% exhaustively
-extensively specified.
-Importantly,
-\emph{verification is fully automatic and is run interactively with unit and integration
+More importantly,
+\emph{verification is fully automated and runs continuously with unit and integration
   tests},
 %% which we consider a significant practical result for formal
 %% verification adoption.
 which we consider a testament to the practicality of the approach.
-Running the prover in integration tests requires more than speed: It requires
-reliability, because tests that work sometimes and fail or time out other
-times are unacceptable in that context.
+%
+Running the prover in integration tests requires more than speed:
+it requires reliability,
+because tests that work sometimes and fail or time out other times
+are unacceptable in that context.
 
-The Prover is a substantial and evolving piece of software that has
-been tuned and optimized in many ways, so it is not easy to define
-exactly what implementation decisions lead to fast and reliable
-performance.  However, we can identify three major ideas that
+\MVP is a substantial and evolving piece of software that has
+been tuned and optimized in many ways.
+As a result, it is not easy to define exactly what implementation decisions
+lead to fast and reliable performance.
+%
+However, we can at least identify three major ideas that
 resulted in dramatic improvements in speed and reliability since the
-description of an early prototype of \MVP~\cite{MOVE_PROVER},
-which are the focus of the rest of this paper:
+description of an early prototype of \MVP~\cite{MOVE_PROVER}.
+%
+The rest of this paper focuses on these three core ideas:
 \begin{itemize}
-\item An \emph{alias-free memory model}, based on Move's semantics, which are similar to the Rust programming language;
-\item \emph{fine-grained invariant checking}, which ensures that invariants hold at every state, except when developer explicitly suspends them;
-\item and monomorphization, which instantiates type parameters in Move's generic
-  structures and functions
+\item an \emph{alias-free memory model} based on Move's semantics, which are similar to the Rust programming language;
+\item \emph{fine-grained invariant checking}, which ensures that invariants hold at every state, except when developer explicitly suspends them; and
+\item monomorphization, which instantiates type parameters in Move's generic structures, functions, and specification properties.
 \end{itemize}
 The combined effect of all these improvements transformed a tool that worked, but
 often exhibited frustrating, sometimes random~\cite{BUTTERFLY},
 timeouts on complex and especially
 on erroneous specifications, to a tool that almost always completes in less than 30 seconds.
-In addition, there have been many other improvements, including in the specification language,
-reducing false positives, and error reporting.
+In addition, there have been many other improvements, including
+a more expressive specification language,
+reducing false positives,
+and error reporting.
 
 %% From the point of the first Move Prover publication in \cite{MOVE_PROVER}, many
 %% improvements have been made to make such usage possible.  Those are along speed,
