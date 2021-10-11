@@ -4,7 +4,7 @@
     "description": "A language server and basic grammar for the Move programming language.",
     "publisher": "move",
     "license": "Apache-2.0",
-    "version": "0.0.1",
+    "version": "0.0.2",
     "preview": true,
     "homepage": "https://developers.diem.com/docs/move/move-overview",
     "repository": {
