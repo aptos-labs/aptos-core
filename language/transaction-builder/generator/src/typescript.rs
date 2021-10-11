@@ -168,13 +168,6 @@ where
     T: Write,
 {
     fn output_preamble(&mut self) -> Result<()> {
-        writeln!(
-            self.out,
-            r#"
-import {{ BcsSerializer }} from '../bcs/bcsSerializer';
-
-"#,
-        )?;
         Ok(())
     }
 
@@ -465,7 +458,7 @@ impl crate::SourceInstaller for Installer {
     ) -> std::result::Result<(), Self::Error> {
         let dir_path = self.install_dir.join(name);
         std::fs::create_dir_all(&dir_path)?;
-        let mut file = std::fs::File::create(dir_path.join("index.ts"))?;
+        let mut file = std::fs::File::create(dir_path.join("mod.ts"))?;
         output(&mut file, abis)?;
         Ok(())
     }

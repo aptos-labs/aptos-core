@@ -9,8 +9,8 @@
 
 // deno-lint-ignore-file no-explicit-any
 import * as path from "https://deno.land/std@0.110.0/path/mod.ts";
-import { green } from 'https://deno.land/x/nanocolors/mod.ts';
-import { createRemote } from "https://deno.land/x/gentle_rpc/mod.ts";
+import { green } from 'https://deno.land/x/nanocolors@0.1.12/mod.ts';
+import { createRemote } from "https://deno.land/x/gentle_rpc@v3.1/mod.ts";
 
 function highlight(content: string) {
   return green(content);

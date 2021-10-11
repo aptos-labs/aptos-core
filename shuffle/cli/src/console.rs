@@ -13,9 +13,9 @@ pub fn handle(project_path: &Path) -> Result<()> {
     let _config = shared::read_config(project_path)?;
 
     let deno_bootstrap = format!(
-        r#"import * as Shuffle from "{project}/repl.ts";
-        import * as TxnBuilder from "{project}/{pkg}/txn_builders/mod.ts";
-        import * as Helper from "{project}/{pkg}/txn_builders/helper.ts";"#,
+        r#"import * as shuffle from "{project}/repl.ts";
+        import * as main from "{project}/{pkg}/mod.ts";
+        import * as DiemHelpers from "{project}/{pkg}/helpers.ts";"#,
         project = project_path.display(),
         pkg = shared::MAIN_PKG_PATH,
     );
