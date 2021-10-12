@@ -15,8 +15,7 @@ use tokio::time::Duration;
 use consensus_types::{common::Author, executed_block::ExecutedBlock};
 use diem_logger::prelude::*;
 use diem_types::{
-    account_address::AccountAddress,
-    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    account_address::AccountAddress, ledger_info::LedgerInfoWithSignatures,
     validator_verifier::ValidatorVerifier,
 };
 
@@ -45,7 +44,7 @@ pub fn sync_ack_new() -> ResetAck {}
 
 pub struct ResetRequest {
     pub tx: oneshot::Sender<ResetAck>,
-    pub reconfig: bool,
+    pub stop: bool,
 }
 
 pub struct OrderedBlocks {
@@ -88,7 +87,7 @@ pub struct BufferManager {
 
     block_rx: UnboundedReceiver<OrderedBlocks>,
     reset_rx: UnboundedReceiver<ResetRequest>,
-    epoch_ends: bool,
+    stop: bool,
 
     verifier: ValidatorVerifier,
 }
@@ -129,7 +128,7 @@ impl BufferManager {
 
             block_rx,
             reset_rx: sync_rx,
-            epoch_ends: false,
+            stop: false,
 
             verifier,
         }
@@ -181,17 +180,10 @@ impl BufferManager {
         if self.signing_root.is_some() {
             let item = self.buffer.get(&self.signing_root);
             let executed_item = item.unwrap_executed_ref();
-            let commit_ledger_info = LedgerInfo::new(
-                executed_item.executed_blocks.last().unwrap().block_info(),
-                executed_item
-                    .ordered_proof
-                    .ledger_info()
-                    .consensus_data_hash(),
-            );
             self.signing_phase_tx
                 .send(SigningRequest {
                     ordered_ledger_info: executed_item.ordered_proof.clone(),
-                    commit_ledger_info,
+                    commit_ledger_info: executed_item.commit_proof.ledger_info().clone(),
                 })
                 .await
                 .expect("Failed to send signing request");
@@ -219,7 +211,6 @@ impl BufferManager {
             if item.block_id() == target_block_id {
                 let aggregated_item = item.unwrap_aggregated();
                 if aggregated_item.commit_proof.ledger_info().ends_epoch() {
-                    self.epoch_ends = true;
                     self.commit_msg_tx
                         .notify_epoch_change(EpochChangeProof::new(
                             vec![aggregated_item.commit_proof.clone()],
@@ -250,10 +241,10 @@ impl BufferManager {
 
     /// It pops everything in the buffer and if reconfig flag is set, it stops the main loop
     fn process_reset_request(&mut self, request: ResetRequest) {
-        let ResetRequest { tx, reconfig } = request;
+        let ResetRequest { tx, stop } = request;
         debug!("Receive reset");
 
-        self.epoch_ends = reconfig;
+        self.stop = stop;
         self.buffer = Buffer::new();
         self.execution_root = None;
         self.signing_root = None;
@@ -277,6 +268,12 @@ impl BufferManager {
                 return;
             }
         };
+        // if this batch of blocks are all suffix blocks (reconfiguration block is in one of previous batch)
+        // we pause the execution from here and wait for the reconfiguration to be committed.
+        if executed_blocks.first().unwrap().is_reconfiguration_suffix() {
+            debug!("Ignore reconfiguration suffix execution, waiting for epoch to be committed");
+            return;
+        }
         debug!(
             "Receive executed response {}",
             executed_blocks.last().unwrap().block_info()
@@ -338,7 +335,7 @@ impl BufferManager {
         match commit_msg {
             VerifiedEvent::CommitVote(vote) => {
                 // find the corresponding item
-                debug!("Receive commit vote {}", vote.commit_info());
+                trace!("Receive commit vote {}", vote.commit_info());
                 let target_block_id = vote.commit_info().id();
                 let current_cursor = self
                     .buffer
@@ -411,7 +408,7 @@ impl BufferManager {
         info!("Buffer manager starts.");
         let mut interval =
             tokio::time::interval(Duration::from_millis(BUFFER_MANAGER_RETRY_INTERVAL));
-        while !self.epoch_ends {
+        while !self.stop {
             // advancing the root will trigger sending requests to the pipeline
             tokio::select! {
                 Some(blocks) = self.block_rx.next() => {
@@ -451,5 +448,6 @@ impl BufferManager {
                 // no else branch here because interval.tick will always be available
             }
         }
+        info!("Buffer manager stops.");
     }
 }

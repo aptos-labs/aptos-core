@@ -56,12 +56,13 @@ impl Display for Block {
         let nil_marker = if self.is_nil_block() { " (NIL)" } else { "" };
         write!(
             f,
-            "[id: {}{}, epoch: {}, round: {:02}, parent_id: {}]",
+            "[id: {}{}, epoch: {}, round: {:02}, parent_id: {}, timestamp: {}]",
             self.id,
             nil_marker,
             self.epoch(),
             self.round(),
             self.quorum_cert().certified_block().id(),
+            self.timestamp_usecs(),
         )
     }
 }

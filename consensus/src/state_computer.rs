@@ -77,13 +77,8 @@ impl StateComputer for ExecutionProxy {
 
         for block in blocks {
             block_ids.push(block.id());
-            // is_reconfiguraiton_suffix doesn't work after decoupled execution
-            // the invariant we rely on here is that reconfig should be the last txn of an epoch
-            // anything after should be no-op
-            if reconfig_events.is_empty() {
-                txns.extend(block.transactions_to_commit());
-                reconfig_events.extend(block.reconfig_event());
-            }
+            txns.extend(block.transactions_to_commit());
+            reconfig_events.extend(block.reconfig_event());
         }
 
         monitor!(

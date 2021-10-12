@@ -118,7 +118,27 @@ impl BufferItem {
                 for (b1, b2) in zip_eq(ordered_blocks.iter(), executed_blocks.iter()) {
                     assert_eq!(b1.id(), b2.id());
                 }
-                let commit_info = executed_blocks.last().unwrap().block_info();
+                let mut commit_info = executed_blocks.last().unwrap().block_info();
+                // Since proposal_generator is not aware of reconfiguration any more, the suffix blocks
+                // will not have the same timestamp as the reconfig block which violates the invariant
+                // that block.timestamp == state.timestamp because no txn is executed in suffix blocks.
+                // We change the timestamp field of the block info to maintain the invariant.
+                // If the executed blocks are b1 <- b2 <- r <- b4 <- b5 with timestamp t1..t5
+                // we replace t5 with t3 (from reconfiguration block) since that's the last timestamp
+                // being updated on-chain.
+                let reconfig_ts = executed_blocks
+                    .iter()
+                    .find(|b| b.block_info().has_reconfiguration())
+                    .map(|b| b.timestamp_usecs())
+                    .filter(|ts| *ts != commit_info.timestamp_usecs());
+                if let Some(ts) = reconfig_ts {
+                    assert!(executed_blocks.last().unwrap().is_reconfiguration_suffix());
+                    debug!(
+                        "Reconfig happens, change timestamp of {} to {}",
+                        commit_info, ts
+                    );
+                    commit_info.change_timestamp(ts);
+                }
                 let commit_proof = aggregate_ledger_info(
                     &generate_commit_proof(&commit_info, &ordered_proof),
                     unverified_signatures,
@@ -127,7 +147,7 @@ impl BufferItem {
                 if commit_proof.check_voting_power(validator).is_ok() {
                     debug!(
                         "{} advance to aggregated from ordered",
-                        commit_proof.commit_info().id()
+                        commit_proof.commit_info()
                     );
                     Self::Aggregated(Box::new(AggregatedItem {
                         executed_blocks,
@@ -137,7 +157,7 @@ impl BufferItem {
                 } else {
                     debug!(
                         "{} advance to executed from ordered",
-                        commit_proof.commit_info().id()
+                        commit_proof.commit_info()
                     );
                     Self::Executed(Box::new(ExecutedItem {
                         executed_blocks,
@@ -170,7 +190,7 @@ impl BufferItem {
                     commit_proof.ledger_info().clone(),
                     signature,
                 );
-                debug!("{} advance to signed", commit_proof.commit_info().id());
+                debug!("{} advance to signed", commit_proof.commit_info());
 
                 Self::Signed(Box::new(SignedItem {
                     executed_blocks,

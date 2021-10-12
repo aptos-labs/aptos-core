@@ -45,7 +45,13 @@ use diem_types::{
     validator_verifier::ValidatorVerifier,
 };
 use event_notifications::ReconfigNotificationListener;
-use futures::{channel::mpsc::unbounded, select, StreamExt};
+use futures::{
+    channel::{
+        mpsc::{unbounded, UnboundedSender},
+        oneshot,
+    },
+    select, SinkExt, StreamExt,
+};
 use network::protocols::network::{ApplicationNetworkSender, Event};
 use safety_rules::SafetyRulesManager;
 use std::{cmp::Ordering, sync::Arc, time::Duration};
@@ -89,7 +95,9 @@ pub struct EpochManager {
     safety_rules_manager: SafetyRulesManager,
     processor: Option<RoundProcessor>,
     reconfig_events: ReconfigNotificationListener,
-    commit_msg_tx: Option<diem_channel::Sender<AccountAddress, VerifiedEvent>>,
+    // channels to buffer manager
+    buffer_manager_msg_tx: Option<diem_channel::Sender<AccountAddress, VerifiedEvent>>,
+    buffer_manager_reset_tx: Option<UnboundedSender<ResetRequest>>,
 }
 
 impl EpochManager {
@@ -124,7 +132,8 @@ impl EpochManager {
             safety_rules_manager,
             processor: None,
             reconfig_events,
-            commit_msg_tx: None,
+            buffer_manager_msg_tx: None,
+            buffer_manager_reset_tx: None,
         }
     }
 
@@ -310,7 +319,8 @@ impl EpochManager {
             Some(&counters::PENDING_COMMIT_VOTES),
         );
 
-        self.commit_msg_tx = Some(commit_msg_tx);
+        self.buffer_manager_msg_tx = Some(commit_msg_tx);
+        self.buffer_manager_reset_tx = Some(reset_tx.clone());
 
         let (execution_phase, signing_phase, persisting_phase, buffer_manager) =
             prepare_phases_and_buffer_manager(
@@ -333,15 +343,31 @@ impl EpochManager {
         OrderingStateComputer::new(block_tx, self.commit_state_computer.clone(), reset_tx)
     }
 
+    async fn shutdown_current_processor(&mut self) {
+        // Release the previous RoundManager, especially the SafetyRule client
+        self.processor = None;
+        self.buffer_manager_msg_tx = None;
+        // Shutdown the previous buffer manager, to release the SafetyRule client
+        if let Some(mut tx) = self.buffer_manager_reset_tx.take() {
+            let (ack_tx, ack_rx) = oneshot::channel();
+            tx.send(ResetRequest {
+                tx: ack_tx,
+                stop: true,
+            })
+            .await
+            .expect("[EpochManager] Fail to drop buffer manager");
+            ack_rx
+                .await
+                .expect("[EpochManager] Fail to drop buffer manager");
+        }
+    }
+
     async fn start_round_manager(
         &mut self,
         recovery_data: RecoveryData,
         epoch_state: EpochState,
         onchain_config: OnChainConsensusConfig,
     ) {
-        // Release the previous RoundManager, especially the SafetyRule client
-        self.processor = None;
-        self.commit_msg_tx = None;
         let epoch = epoch_state.epoch;
         counters::EPOCH.set(epoch_state.epoch as i64);
         counters::CURRENT_EPOCH_VALIDATORS.set(epoch_state.verifier.len() as i64);
@@ -481,8 +507,6 @@ impl EpochManager {
             epoch_state.verifier.clone(),
         );
 
-        // TODO: create a ordering only state computer
-
         self.processor = Some(RoundProcessor::Recovery(RecoveryManager::new(
             epoch_state,
             network_sender,
@@ -503,6 +527,7 @@ impl EpochManager {
             verifier: (&validator_set).into(),
         };
         let onchain_config: OnChainConsensusConfig = payload.get().unwrap_or_default();
+        self.shutdown_current_processor().await;
 
         match self.storage.start() {
             LivenessStorageData::RecoveryData(initial_data) => {
@@ -639,7 +664,7 @@ impl EpochManager {
                 ),
                 verified_event @ VerifiedEvent::CommitVote(_)
                 | verified_event @ VerifiedEvent::CommitDecision(_) => {
-                    if let Some(sender) = &mut self.commit_msg_tx {
+                    if let Some(sender) = &mut self.buffer_manager_msg_tx {
                         sender.push(peer_id, verified_event).map_err(|err| {
                             anyhow!("Error in Passing Commit Vote/Decision Message: {}", err)
                         })

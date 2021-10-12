@@ -106,7 +106,7 @@ impl ExecutedBlock {
 
     pub fn transactions_to_commit(&self) -> Vec<Transaction> {
         // reconfiguration suffix don't execute
-        if self.block.block_data().is_reconfiguration_suffix() {
+        if self.is_reconfiguration_suffix() {
             return vec![];
         }
         itertools::zip_eq(
@@ -122,9 +122,16 @@ impl ExecutedBlock {
 
     pub fn reconfig_event(&self) -> Vec<ContractEvent> {
         // reconfiguration suffix don't count, the state compute result is carried over from parents
-        if self.block.block_data().is_reconfiguration_suffix() {
+        if self.is_reconfiguration_suffix() {
             return vec![];
         }
         self.state_compute_result.reconfig_events().to_vec()
+    }
+
+    /// The block is suffix of a reconfiguration block if the state result carries over the epoch state
+    /// from parent but has no transaction.
+    pub fn is_reconfiguration_suffix(&self) -> bool {
+        self.state_compute_result.has_reconfiguration()
+            && self.state_compute_result.compute_status().is_empty()
     }
 }

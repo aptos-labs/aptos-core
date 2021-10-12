@@ -39,16 +39,12 @@ impl Debug for SyncInfo {
 
 impl Display for SyncInfo {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        let htc_repr = match self.highest_timeout_certificate() {
-            Some(tc) => format!("{}", tc.round()),
-            None => "None".to_string(),
-        };
         write!(
             f,
-            "SyncInfo[HQC: {}, HOC: {}, HTC: {}, HLI: {}]",
+            "SyncInfo[certified_round: {}, ordered_round: {}, timeout round: {}, ledger info: {}]",
             self.highest_certified_round(),
             self.highest_ordered_round(),
-            htc_repr,
+            self.highest_timeout_round(),
             self.highest_ledger_info(),
         )
     }

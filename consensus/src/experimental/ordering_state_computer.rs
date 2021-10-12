@@ -99,19 +99,19 @@ impl StateComputer for OrderingStateComputer {
             Err(anyhow::anyhow!("Injected error in sync_to").into())
         });
 
-        let reconfig = target.ledger_info().ends_epoch();
-
-        self.state_computer_for_sync.sync_to(target).await?;
-
         // reset execution phase and commit phase
         let (tx, rx) = oneshot::channel::<ResetAck>();
         self.reset_event_channel_tx
             .clone()
-            .send(ResetRequest { tx, reconfig })
+            .send(ResetRequest {
+                tx,
+                stop: false, // epoch manager is responsible for sending stop request
+            })
             .await
             .map_err(|_| Error::ResetDropped)?;
         rx.await.map_err(|_| Error::ResetDropped)?;
 
+        self.state_computer_for_sync.sync_to(target).await?;
         Ok(())
     }
 }

@@ -89,7 +89,7 @@ impl CommitVote {
     pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
         validator
             .verify(self.author(), &self.ledger_info, &self.signature)
-            .context("Failed to verify Commit Proposal")
+            .context("Failed to verify Commit Vote")
     }
 
     pub fn commit_info(&self) -> &BlockInfo {

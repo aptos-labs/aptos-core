@@ -124,6 +124,19 @@ impl BlockInfo {
         self.next_epoch_state().map_or(self.epoch(), |e| e.epoch)
     }
 
+    pub fn change_timestamp(&mut self, timestamp: u64) {
+        assert!(self.allow_timestamp_change(timestamp));
+        self.timestamp_usecs = timestamp;
+    }
+
+    /// For reconfiguration suffix blocks only, with decoupled-execution proposal-generator can't
+    /// guarantee suffix blocks have the same timestamp as parent thus violate the invariant that
+    /// block.timestamp should always equal timestamp stored onchain.
+    /// We allow it to be updated backwards to the actual reconfiguration block's timestamp.
+    fn allow_timestamp_change(&self, timestamp: u64) -> bool {
+        self.has_reconfiguration() && self.timestamp_usecs >= timestamp
+    }
+
     pub fn epoch(&self) -> u64 {
         self.epoch
     }
@@ -158,12 +171,15 @@ impl BlockInfo {
 
     /// This function checks if the current BlockInfo has
     /// exactly the same values in those fields that will not change
-    /// after execution, compred to a given BlockInfo
-    pub fn match_ordered_only(&self, block_info: &BlockInfo) -> bool {
-        self.epoch == block_info.epoch
-            && self.round == block_info.round
-            && self.id == block_info.id
-            && self.timestamp_usecs == block_info.timestamp_usecs
+    /// after execution, compared to a given BlockInfo
+    pub fn match_ordered_only(&self, executed_block_info: &BlockInfo) -> bool {
+        self.epoch == executed_block_info.epoch
+            && self.round == executed_block_info.round
+            && self.id == executed_block_info.id
+            && (self.timestamp_usecs == executed_block_info.timestamp_usecs
+            // executed block info has changed its timestamp because it's a reconfiguration suffix
+                || (self.timestamp_usecs > executed_block_info.timestamp_usecs
+                    && executed_block_info.has_reconfiguration()))
     }
 
     /// This function checks if the current BlockInfo is consistent
