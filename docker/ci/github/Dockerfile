@@ -49,7 +49,8 @@ RUN [ -x "$(set -x; command -v shellcheck)" ] \
     && [ -x "$(set -x; command -v clang)" ] \
     && [ -x "$(set -x; command -v python3)" ] \
     && [ -x "$(set -x; command -v go)" ] \
-    && [ -x "$(set -x; command -v npm)" ]
+    && [ -x "$(set -x; command -v npm)" ] \
+    && [ -x "$(set -x; command -v deno)" ]
 
 # should be a no-op
 # sccache builds fine, but is not executable ??? in alpine, ends up being recompiled.  Wierd.

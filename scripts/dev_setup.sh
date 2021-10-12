@@ -553,6 +553,12 @@ function install_golang {
     fi
 }
 
+function install_deno {
+  curl -fsSL https://deno.land/x/install/install.sh | sh
+  cp "${HOME}/.deno/bin/deno" "${INSTALL_DIR}"
+  chmod +x "${INSTALL_DIR}deno"
+}
+
 function install_java {
     if [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
       "${PRE_COMMAND[@]}" apt-get install -y default-jdk
@@ -646,6 +652,7 @@ Codegen tools (since -s was provided):
   * Golang
   * Java
   * Node-js/NPM
+  * Deno
 EOF
   fi
 
@@ -880,6 +887,7 @@ if [[ "$INSTALL_CODEGEN" == "true" ]]; then
   fi
   install_pkg nodejs "$PACKAGE_MANAGER"
   install_pkg npm "$PACKAGE_MANAGER"
+  install_deno
   install_java
   install_golang
   if [[ "$PACKAGE_MANAGER" != "apk" ]]; then
