@@ -24,18 +24,18 @@ const NEW_KEY_FILE_CONTENT: &[u8] = include_bytes!("../new_account.key");
 
 // Creates new account from randomly generated private/public key pair.
 pub fn handle() -> Result<()> {
-    let shuffle_dir = &get_shuffle_dir();
+    let shuffle_dir = get_shuffle_dir();
     if !Path::new(shuffle_dir.as_path()).is_dir() {
         return Err(anyhow!(
             "A node hasn't been created yet! Run shuffle node first"
         ));
     }
-    println!("{:?}", shuffle_dir);
-    let config_path = shuffle_dir.join("nodeconfig/0").join("node.yaml");
+    println!("{:?}", &shuffle_dir);
+    let config_path = &shuffle_dir.join("nodeconfig/0").join("node.yaml");
     let config = NodeConfig::load(&config_path)
         .with_context(|| format!("Failed to load NodeConfig from file: {:?}", config_path))?;
 
-    let root_key_path = shuffle_dir.join("nodeconfig").join("mint.key");
+    let root_key_path = &shuffle_dir.join("nodeconfig").join("mint.key");
     let root_account_key = load_key(root_key_path);
 
     let json_rpc_url = format!("http://0.0.0.0:{}", config.json_rpc.address.port());
@@ -53,10 +53,10 @@ pub fn handle() -> Result<()> {
         root_seq_num,
     );
 
-    generate_shuffle_accounts_dir(shuffle_dir)?;
-    let new_account_key = generate_key_file(shuffle_dir).unwrap();
+    generate_shuffle_accounts_dir(&shuffle_dir)?;
+    let new_account_key = generate_key_file(&shuffle_dir).unwrap();
     let public_key = new_account_key.public_key();
-    generate_address_file(shuffle_dir, &public_key)?;
+    generate_address_file(&shuffle_dir, &public_key)?;
 
     let new_account = LocalAccount::new(
         AuthenticationKey::ed25519(&public_key).derived_address(),
