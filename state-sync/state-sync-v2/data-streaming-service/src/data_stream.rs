@@ -200,33 +200,33 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStream<T> {
             // Get the data client response at the head of the queue if it's ready
             if let Some(pending_response) = self.pop_pending_response_queue() {
                 let pending_response = pending_response.lock();
-                if let Some(client_response) = &pending_response.client_response {
-                    match client_response {
-                        Ok(client_response) => {
-                            if sanity_check_client_response(
+                let client_response = pending_response
+                    .client_response
+                    .as_ref()
+                    .expect("The client response should be ready!");
+                match client_response {
+                    Ok(client_response) => {
+                        if sanity_check_client_response(
+                            &pending_response.client_request,
+                            client_response,
+                        ) {
+                            // Send a data notification and make the next data client request
+                            self.send_data_notification_to_client(
                                 &pending_response.client_request,
                                 client_response,
-                            ) {
-                                // Send a data notification and make the next data client request
-                                self.send_data_notification_to_client(
-                                    &pending_response.client_request,
-                                    client_response,
-                                )?;
-                                self.create_and_send_client_requests(1, &optimal_chunk_sizes)?;
-                            } else {
-                                // Notify the data client and re-fetch the data
-                                self.notify_bad_response(client_response);
-                                return self
-                                    .resend_data_client_request(&pending_response.client_request);
-                            }
-                        }
-                        Err(error) => {
+                            )?;
+                            self.create_and_send_client_requests(1, &optimal_chunk_sizes)?;
+                        } else {
+                            // Notify the data client and re-fetch the data
+                            self.notify_bad_response(client_response);
                             return self
-                                .handle_data_client_error(&pending_response.client_request, error);
+                                .resend_data_client_request(&pending_response.client_request);
                         }
                     }
-                } else {
-                    panic!("The client response should be ready!");
+                    Err(error) => {
+                        return self
+                            .handle_data_client_error(&pending_response.client_request, error);
+                    }
                 }
             } else {
                 return Ok(()); // The first response hasn't arrived yet.
@@ -338,12 +338,12 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStream<T> {
             .ensure_data_is_available(advertised_data)
     }
 
+    /// Assumes the caller has already verified that `sent_data_requests` has
+    /// been initialized.
     fn get_sent_data_requests(&mut self) -> &mut VecDeque<PendingClientResponse> {
-        if let Some(sent_data_requests) = &mut self.sent_data_requests {
-            sent_data_requests
-        } else {
-            panic!("Sent data requests should be initialized!");
-        }
+        self.sent_data_requests
+            .as_mut()
+            .expect("Sent data requests should be initialized!")
     }
 
     #[cfg(test)]

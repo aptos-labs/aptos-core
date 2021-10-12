@@ -112,6 +112,7 @@ impl StreamProgressTracker {
     }
 
     /// Updates the progress of the requested data using the given data request
+    /// TODO(joshlind): look to clean up a lot of these range contains methods
     pub fn update_request_progress(
         &mut self,
         client_request: &DataClientRequest,
@@ -192,8 +193,9 @@ impl EpochEndingStreamTracker {
         for epoch in start_epoch..=end_epoch {
             let mut epoch_exists = false;
             for epoch_range in &advertised_data.epoch_ending_ledger_infos {
-                if !epoch_exists && epoch_range.contains(epoch) {
+                if epoch_range.contains(epoch) {
                     epoch_exists = true;
+                    break;
                 }
             }
 

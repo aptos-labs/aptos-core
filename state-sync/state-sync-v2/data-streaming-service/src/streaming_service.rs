@@ -151,7 +151,7 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStreamingService<T> {
     fn check_progress_of_all_data_streams(&mut self) {
         let data_stream_ids = self.get_all_data_stream_ids();
         for data_stream_id in &data_stream_ids {
-            if let Err(_error) = self.check_progress_of_data_stream(data_stream_id) {
+            if let Err(_error) = self.update_progress_of_data_stream(data_stream_id) {
                 // TODO(joshlind): once we support logging, log this error!
             }
         }
@@ -159,7 +159,7 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStreamingService<T> {
 
     /// Ensures that a data stream has in-flight data requests and handles
     /// any new responses that have arrived since we last checked.
-    fn check_progress_of_data_stream(
+    fn update_progress_of_data_stream(
         &mut self,
         data_stream_id: &DataStreamId,
     ) -> Result<(), Error> {
@@ -184,16 +184,17 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStreamingService<T> {
             .collect::<Vec<DataStreamId>>()
     }
 
+    /// Returns the data stream associated with the given `data_stream_id`.
+    /// Note: this method assumes the caller has already verified the stream exists.
     fn get_data_stream(&mut self, data_stream_id: &DataStreamId) -> &mut DataStream<T> {
-        match self.data_streams.get_mut(data_stream_id) {
-            Some(data_stream) => data_stream,
-            None => {
+        self.data_streams
+            .get_mut(data_stream_id)
+            .unwrap_or_else(|| {
                 panic!(
                     "Expected a data stream with ID: {:?}, but found None!",
                     data_stream_id
                 )
-            }
-        }
+            })
     }
 }
 
