@@ -21,17 +21,11 @@ pub enum RpcError {
     #[error("Bcs error: {0:?}")]
     BcsError(#[from] bcs::Error),
 
-    #[error("Failed to open substream, not connected with peer: {0}")]
+    #[error("Not connected with peer: {0}")]
     NotConnected(PeerId),
 
     #[error("Received invalid rpc response message")]
     InvalidRpcResponse,
-
-    #[error("Received unexpected rpc response message; expected remote to half-close.")]
-    UnexpectedRpcResponse,
-
-    #[error("Received unexpected rpc request message; expected remote to half-close.")]
-    UnexpectedRpcRequest,
 
     #[error("Application layer unexpectedly dropped response channel")]
     UnexpectedResponseChannelCancel,
@@ -39,7 +33,7 @@ pub enum RpcError {
     #[error("Error in application layer handling rpc request: {0:?}")]
     ApplicationError(anyhow::Error),
 
-    #[error("Error sending on mpsc channel: {0:?}")]
+    #[error("Error sending on mpsc channel, connection likely shutting down: {0:?}")]
     MpscSendError(#[from] mpsc::SendError),
 
     #[error("Too many pending RPCs: {0}")]
