@@ -4,50 +4,28 @@
 Move was developed for the Diem blockchain \cite{DIEM}, but its design is not
 specific to blockchains.  A Move execution consists of a sequence of updates
 evolving a \emph{global persistent memory state}, which we just call the
-\emph{(global) memory}.
-%% Updates are executed in a \emph{transactional} style.
-Similar to other blockchains, updates are a series of atomic transactions.
-All runtime errors result in a transaction abort, which does not change
-the blockchain state except to transfer some currency (``gas'') from the account that
-sent the transaction to pay for cost of executing the transaction.
+\emph{(global) memory}.  Similar to other blockchains, updates are a series of
+atomic transactions.  All runtime errors result in a transaction abort, which
+does not change the blockchain state except to transfer some currency (``gas'')
+from the account that sent the transaction to pay for cost of executing the
+transaction.
 
 The global memory is organized as a collection of resources, described by Move
-structures (data types). A resource in memory is indexed by a pair of a type
-(fully instantiated) and an address (for example the address of a user
-account). For instance, the expression |exists<Coin<USD>>(addr)| will be true if
-there is a value of type |Coin<USD>| stored at |addr|. As seen in this example,
-Move uses type generics, and working with generic functions and types is rather
-idiomatic for Move.  Notice that account addresses are not just arbitrary values
-but have a specific role in Move's programming methodology related to access
-control via the builtin type of \emph{signers}, as will be discussed later.
+structures (data types). A resource in memory is indexed by a pair of a type and
+an address (for example the address of a user account). For instance, the
+expression |exists<Coin<USD>>(addr)| will be true if there is a value of type
+|Coin<USD>| stored at |addr|. As seen in this example, Move uses type generics,
+and working with generic functions and types is rather idiomatic for Move.
+%Notice that account addresses are not just arbitrary values but have a specific
+%role in Move's programming methodology related to access control via the builtin
+%type of \emph{signers}, as will be discussed later.
 
 A Move application consists of a set of \emph{transaction scripts}. Each
 script defines a Move function with input parameters but no output
 parameters.  This function updates the global memory and may emit
-event records. The execution of this function can abort because of an abort
+events. The execution of this function can abort because of an abort
 instruction or implicitly because of a runtime error such as an out-of-bounds
 vector index.
-
-%% mechanism, in which case the memory stays unmodified. An environment emits a
-%% sequence of calls to such scripts, thereby evolving the memory.
-
-% A transaction script is written in Move as an imperative function which can read
-% and write the global memory. Move uses a specific style of
-% imperative programming based on \emph{borrow semantics} \cite{BORROW_SEM}, as
-% popularized in the programming language Rust \cite{RUST,RUST_TYPES}. For the
-% verification problem borrow semantics is very important.  While allowing
-% references into structured data, those are guaranteed to be safe by the
-% \emph{borrow checker} \cite{BORROW_CHECKER}, which is run during bytecode
-% loading time, and which verification can assume. Furthermore, the notorious hard
-% verification problem of aliasing of references in the presence of mutation is
-% eliminated.  Mutation always starts from a root location either in global memory
-% or on the execution stack, and while a tree starting from this root is mutated,
-% no other access can happen anywhere in the tree. Intuitively, borrow semantics
-% allows to move a mutation 'cursor' down the tree, which follows linear typing
-% discipline. Because of this property, mutable reference parameters to functions
-% can be converted to input/output parameters, and verification of Move can avoid
-% the traditionally hard problems caused by aliasing of mutable references.
-
 
 \Paragraph{Programming in Move}
 
@@ -81,24 +59,21 @@ module Account {
 \end{MoveBox}
 \end{Figure}
 
-\noindent In Move, one defines transactions via so-called \emph{script functions} which
-take a set of parameters.  Those functions can call other functions. Script and
-regular functions are encapsulated in \emph{modules}. Move modules are also the
-place where structs are defined. An illustration of a Move contract is given in
-Fig.~\ref{fig:AccountDef} (for a more complete description see the Move
-Book~\cite{MOVE_LANG_DEF}). The example is a simple account which holds a
-balance, defined in the script function |transfer|.
-%% Scripts get passed in so
-Scripts generally have
-\emph{signer} arguments, which are tokens which represent an account
-address that has been authenticated by a cryptographic signature.
-%% The caller of the script -- an external program -- has ensured that the
-%% owner of the signer account address has agreed to execute this script.
-%% Notice that in the code,
-The |assert| statement in the example causes a Move transaction to abort
-execution if the condition is not met.  Abortion can also happen implicitly; for
-example, the expression |borrow_global_mut<T>(addr)| will abort if no resource
-|T| exists at |addr|.
+\noindent In Move, one defines transactions via so-called \emph{script
+  functions} which take a set of parameters.  Those functions can call other
+functions. Script and regular functions are encapsulated in \emph{modules}. Move
+modules are also the place where structs are defined. An illustration of a Move
+contract is given in Fig.~\ref{fig:AccountDef} (for a more complete description
+see the Move Book~\cite{MOVE_LANG}). The example is a simple account which
+holds a balance, and offers the script function |transfer|.  Scripts generally
+have \emph{signer} arguments, which are tokens which represent an account
+address that has been authenticated by a cryptographic signature.  The |assert|
+statement in the example causes a Move transaction to abort execution if the
+condition is not met.
+
+%Abortion can also happen implicitly; for example, the
+%expression |borrow_global_mut<T>(addr)| will abort if no resource |T| exists at
+%|addr|.
 
 \Paragraph{Specifying in Move}
 
@@ -130,26 +105,15 @@ module Account {
 
 \noindent The specification language supports {\em Design By Contract}
 \cite{DESIGN_BY_CONTRACT}. Developers can provide pre and post conditions for
-functions, which include conditions over
-%% (mutable)
-parameters and global
+functions, which include conditions over parameters and global
 memory. Developers can also provide invariants over data structures, as well as
-the
-%% (state-dependent)
-contents of the global memory.
-%
-Universal and existential
-quantification %% both
+the contents of the global memory.  Universal and existential quantification
 over bounded domains, such as like the indices of a vector, as well as
 effectively unbounded domains, such as memory addresses and integers, are
-supported.
-%
-Quantifiers make the verification problem undecidable
-and cause difficulties with timeouts.
-%
-However, in practice, we notice that quantifiers have the advantage
-of allowing more direct formalization of many properties, which increases the
-clarity of specifications.
+supported.  Quantifiers make the verification problem undecidable and cause
+difficulties with timeouts.  However, in practice, we notice that quantifiers
+have the advantage of allowing more direct formalization of many properties,
+which increases the clarity of specifications.
 %% The latter makes the specification language very expressive, but also
 %% renders the verification problem in theory undecidable (and in practice
 %% dependent on heuristic decision procedures).
@@ -164,18 +128,11 @@ to an update of global memory with pre and post state: the balance on an account
 can never decrease in one step more than a certain amount.  Note that while the
 Move programming language has only unsigned integers, the specification language
 uses arbitrary precision signed integers, making it convenient to specify
-something like |x + y <= limit|,
-%% without need to worry about overflow.
-without the complication of arithmetic overflow.
+something like |x + y <= limit|, without the complication of arithmetic
+overflow.
 
 Specifications for the |withdraw| and |deposit| functions have been omitted in
-this example.
-
-\TODO{Dave}{Maybe we don't need to mention inlining? It's not
-  necessary to understand the rest of the paper, and it doesn't fit in
-  any obvious paragraph here.}
-
-\MVP supports omitting specs for non-recursive functions, in
+this example.  \MVP supports omitting specs for non-recursive functions, in
 which case they are treated as being inlined at caller site.
 
 %% A discerning reader may have noted that the program in Fig.~\ref{fig:AccountDef}
@@ -196,10 +153,6 @@ which case they are treated as being inlined at caller site.
 
 \Paragraph{Running the Prover}
 \label{sec:RunningProver}
-
-\TODO{Dave}{If we need to cut for space, this can go. The error
-  reporting doesn't support our main topic, which is how we made it
-  fast and reliable.}
 
 \MVP is fully automatic, like a type checker or linter, and is
 expected to finish in a reasonable time, so it can be integrated in
@@ -251,17 +204,10 @@ error: global memory invariant does not hold
 
 \noindent This happens because in the program in Fig.~\ref{fig:AccountDef}, we
 %% did not made any
-made no attempt to respect the limits in |min_balance()| and
-|max_decrease()|.
-The problem can be fixed by adding more |assert| statements to check that
-the limits are met (see App.~\ref{sec:CorrectedAccount}).
+made no attempt to respect the limits in |min_balance()| and |max_decrease()|.
+The problem can be fixed by adding more |assert| statements to check that the
+limits are met (see App.~\ref{sec:CorrectedAccount}).
 
-%% We leave it open here (but covered it in
-%% App.~\ref{sec:CorrectedAccount}) how to fix this problem, which requires
-%% to add some more |assert| statements to the code and abort if the limits are not
-%% met.
-
-%% In reality,
 The programs and specifications \MVP deals with are much larger than
 this example. The conditions under which a transaction
 in the Diem framework can abort typically involve dozens of individual predicates,

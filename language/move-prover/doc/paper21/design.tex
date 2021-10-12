@@ -7,8 +7,6 @@
   \includegraphics[trim=0 250 0 0, width=\textwidth]{arch.png}
 \end{Figure}
 
-\TODO{Dave}{If short on spaced, we could cut this figure.  It's nice, but not essential to make our points.}
-
 The architecture of \MVP is illustrated in Fig.~\ref{fig:Arch}. Move code
 (containing specifications) is given as input to the Move tool chain, which
 produces two artifacts: the abstract syntax tree (AST) of the specifications,
@@ -54,15 +52,14 @@ the explosion in number of possible aliasing relationships between
 references leads either to high computational complexity or harsh
 approximations.
 
-The Move language supports references to global memory and local variables (both referred to
-as \emph{locations} from now on).
-References can point to fields of records. The reference
-system is based on \emph{borrow semantics} \cite{BORROW_SEM} as
-in the Rust programming language.  One can create immutable references (with syntax |&x|)
-and mutable references (with syntax |&mut x|). New references can be
-derived by field selection
-(|&mut x.f| and |&x.f|). Move provides the following
-guarantees, which are enforced by the borrow checker~\cite{BORROW_CHECKER}:
+The Move language supports references to global memory and local variables (both
+referred to as \emph{locations} from now on).  References can point to fields of
+records. The reference system is based on \emph{borrow semantics}
+\cite{BORROW_SEM} as in the Rust programming language.  One can create immutable
+references (with syntax |&x|) and mutable references (with syntax |&mut x|). New
+references can be derived by field selection (|&mut x.f| and |&x.f|). Move
+provides the following guarantees, which are enforced by the borrow
+checker. % ~\cite{BORROW_CHECKER}:
 
 \begin{itemize}
 \item For any given location,
@@ -78,19 +75,10 @@ guarantees, which are enforced by the borrow checker~\cite{BORROW_CHECKER}:
   cannot exceed the lifetime of the stack location.
 \end{itemize}
 
-\noindent These properties permit the \emph{effectively elimination of references} from the Move
-program,
-%% reducing the verification complexity significantly, as we do not
-eliminating need to
-reason about aliasing.
-%% It comes as no surprise that the same discipline of borrowing
-%% which makes Move (and Rust) programs safer by design also makes verification simpler.
+\noindent These properties permit the \emph{effectively elimination of
+  references} from the Move program, eliminating need to reason about aliasing.
 
 \Paragraph{Immutable References}
-
-%% Since during the existence of an immutable reference no mutation on the
-%% referenced data can occur, we can simply replace references by the referred
-%% value.
 
 Immutable references are replaced by values.
 An example of the applied transformation is shown below. We remove the reference
@@ -100,15 +88,11 @@ type constructor and all reference-taking operations from the code:
   fun select_f(s: &S): &T { &s.f } @\transform@ fun select_f(s: S): T { s.f }
 \end{Move}
 
-\noindent %% Notice that at Move execution time,
-When executing a Move program
-immutable references are important to avoid
-copies for performance and to enforce ownership;
-however, for symbolic reasoning on correct Move programs, the distinction
-between immutable references and values is unimportant.
-%% the symbolic
-%% reasoning engines we use have a different representation of values, in which
-%% structure sharing is common and copying is cheap.
+\noindent
+When executing a Move program, immutable references are important to avoid copies
+for performance and to enforce ownership; however, for symbolic reasoning on
+correct Move programs, the distinction between immutable references and values
+is unimportant.
 
 \Paragraph{Mutable References}
 \label{sec:RefElimMut}
@@ -244,34 +228,13 @@ following operations:
 \end{MoveBoxNumbered}
 \end{figure}
 
-The Move Prover has a partial implementation of the illustrated transformation.
-%% The completeness of this implementation has not yet been formally investigated,
-%% but we believe that it covers all of Move, with the language's simplification
-%% that we do not need to distinguish addresses in global memory
-%% locations.
-\footnote{\TODO{wrwg}{Need to investigate loops!}} (See discussion of
-|Mvp::mkglobal| above.)
-%% The transformation also relies on that in Move there are
-Move has
-no recursive data types, so field selection paths are statically known.
-%% While
-%% those things can be potentially generalized, we have not yet investigated this
-%% direction.
-
-This transformation needs to know when references go out of scope.
-The implementation constructs a \emph{borrow graph} from the program via a data
-flow analysis. The borrow graph tracks both when references are released as well
-as how they relate to each other: e.g. |r' = &mut r.f| creates a edge from |r|
-to |r'| labeled with |f|, and |r' = &mut r.g| creates another also starting
-from |r|.
-%% For the matter of this problem,
-For our purposes, a reference is not released until a
-direct or indirect borrow on it goes out of scope.
-%% ; notice that its lifetimes in
-%% terms of borrowing is larger than the scope of its usage.
-The borrow analysis is
-inter-procedural, requiring computed summaries for the borrow graph of
-called functions.
+\MVP implements the illustrated transformation by construction a \emph{borrow
+  graph} from the program via data flow analysis.  This graph tracks both when
+references are released as well as how they relate to each other: e.g.~%
+|r' = &mut r.f| creates an edge from |r| to |r'| labeled with |f|, and~%
+|r' = &mut r.g| creates another also starting from |r|.  The borrow analysis is
+inter-procedural, requiring computed summaries for the borrow graph of called
+functions.
 
 The resulting borrow graph is then used to guide the transformation, inserting
 the operations of the |Mut<T>| type as illustrated in
@@ -301,31 +264,21 @@ to prove that invariants are preserved by public functions, since
 invariants are often violated internally in the implementation of a module or
 class. An earlier version of the Move Prover used exactly this approach.
 
-The current implementation of the Prover takes the opposite approach:
-it ensures that invariants hold after every instruction, unless
-explicitly directed to suspend some invariants by a user.  This
-\emph{fine-grained} approach has performance advantages, because,
-unless suspended,
-\emph{invariants are only proven when an instruction is executed that could
-invalidate them}, and the proofs are often computationally simple
-because \emph{the change from a single instruction is usually small}.
-Relatively few invariants are suspended, and, when they are, it is
-over a relatively small span of instructions, preserving these advantages.
-There is another important advantage, which is that invariants hold
-almost everywhere in the code, so they are available to approve other
-properties, such as abort conditions. For example, if a function
-accesses type |T1| and then type |T2|, the access to |T2| will
-never abort if the presence of |T1|
-implies the presence of |T2| at every state in the body of the function.
-This situation occurs with some frequency in the Diem framework.
+The current implementation of the Prover takes the opposite approach: it ensures
+that invariants hold after every instruction, unless explicitly directed to
+suspend some invariants by a user.  This \emph{fine-grained} approach has
+performance advantages, because, unless suspended, \emph{invariants are only
+  proven when an instruction is executed that could invalidate them}, and the
+proofs are often computationally simple because \emph{the change from a single
+  instruction is usually small}.  Relatively few invariants are suspended, and,
+when they are, it is over a relatively small span of instructions, preserving
+these advantages.  There is another important advantage, which is that
+invariants hold almost everywhere in the code, so they are available to approve
+other properties, such as abort conditions. For example, if a function accesses
+type |T1| and then type |T2|, the access to |T2| will never abort if the
+presence of |T1| implies the presence of |T2| at every state in the body of the
+function.  This situation occurs with some frequency in the Diem framework.
 
-%% The goal of global invariant injection is to ensure that invariants over global
-%% memory are enforced at any time but with the minimal
-%% number of verification
-%% steps.  A naive implementation which is semantically correct could evaluate all
-%% invariants whenever the memory state changes, but this is not practical.  To
-%% understand how we optimize the implementation, the concept of global invariants
-%% need to be more precisely defined.
 
 \Paragraph{Invariant Types and Proof Methodology}
 
@@ -336,27 +289,21 @@ Move's borrow semantics, inductive invariants don't need to hold while memory is
 mutated because the changes are not visible to other code until the change is written back.
 This is reflected by the reference elimination described in
 Sec.~\ref{sec:RefElim},
-%% and based on that the state of mutation is not visible
-%% to anybody until it is written back to global memory.
 
-\emph{Update} invariants are properties that relate two states,
-a previous state and the current state.
-Typically they
-are enforced after an update of global memory. The |old| operator
-is used to evaluate specification expressions in the previous state.
+\emph{Update} invariants are properties that relate two states, a previous state
+and the current state.  Typically they are enforced after an update of global
+memory. The |old| operator is used to evaluate specification expressions in the
+previous state.
 
 Verification of both kinds of invariants can be \emph{suspended}. That means,
 instead of being verified at the time a memory update happens, they are verified
-at the call site of the function which updates memory. This feature is necessitated
-by fine-grained invariant checking, because invariants sometimes do not hold
-in the midst of internal computations of a module. For example, a relationship
-between state variables may not hold then the variables are being updated sequentially.
-%% necessary to describe invariants over dependent parts of the global memory which
-%% cannot be atomically updated.
-Functions with external callers (public or script
-functions) cannot suspend invariant verification,
-since the invariants are assumed to hold at the beginning and end of each such function.
-%% ensuring verification is preserved.
+at the call site of the function which updates memory. This feature is
+necessitated by fine-grained invariant checking, because invariants sometimes do
+not hold in the midst of internal computations of a module. For example, a
+relationship between state variables may not hold when the variables are being
+updated sequentially.  Functions with external callers (public or script
+functions) cannot suspend invariant verification, since the invariants are
+assumed to hold at the beginning and end of each such function.
 
 
 Inductive invariants are proven by induction over the evolution of the global
@@ -367,57 +314,9 @@ suspended, and now must prove that it holds after program points which are
 either direct updates of global memory, or calls to functions which suspend
 invariants.
 
-For update invariants,
-%% no soundness issue exist,
-no induction proof is needed,
-since they just relate two
+For update invariants, no induction proof is needed, since they just relate two
 memories.  The pre-state is some memory captured before an update happens, and
 the post state the current state.
-%% DD: I don't think we should commit to this.  Example: Suppose we want to say
-%% DD: that an account balance can only change when the account is not frozen.  I
-%% DD: think that's reasonable, but not transitive.
-%% When an update invariant is suspended, it
-%% should be designed to be transitive, such that its evaluation is not dependent
-%% from the time of pre-state capture (e.g.~%
-%% |invariant update [suspendable] version() >= old(version())| satisfies this
-%% property).
-
-%% Dave comment: I just noticed the next issue after writing the above paragraph.
-%% If we only want to instrument instructions that change the types in invariant,
-%% we need to make sure the invariant is valid when there are no changes.}
-%% wrwg: only for suspended invariants, and then only if the update actually does
-%% not happen in every path. However, the worst can happen is that if fails
-%% verification, so seems no issue.
-%% DD: It's kind of a theoretical soundness problem, because no one would do it.
-%% DD: Suppose the property is old(P) <-> !P.  Instructions that don't change
-%% any state will always violate this property, and we won't catch it because
-%% we only check instructions that do change it.
-%% It's not necessary to discuss in the paper, I guess.
-% We assume that an instruction that doesn't modify any of the types
-% mentioned in an update invariant also does alter the validity of the invariant.
-% Hence, an update invariant, regarded as a binary relation, must be reflexive.
-% This property is not currently enforced by the prover.
-
-
-% wrwg: This is discussed already
-% Note that the induction proof
-% allows the assumption of \textit{all} invariants at the beginning of each
-% verified function to prove that an invariant holds after the function.  In
-% practice, a subset of the available invariants are actually assumed on entry to
-% a function. Some are not visible to the prover because they are specified
-% outside of the cluster being verified, and others are excluded heuristically to
-% reduce computational cost.
-
-
-%% wrwg: we never tried this so don't know whether it is practical
-%% DD: I think that being able to do this is a design goal of the blockcchain.
-%% Not necessary for paper, but we should eventually get the answer.
-% In some situations (such as blockchains), we would like
-% users to be able to write transactions ``on-the-fly'' and submit
-% them to the system, which does not allow time to run \MVP
-% on individual transactions. The coarsest granularity we can
-% practically achieve is to verify that each public and script function preserves
-% inductive invariants.
 
 \Paragraph{Modular Verification}
 
@@ -432,13 +331,14 @@ callers of such a function.  Importantly, functions outside the cluster can
 never invalidate an invariant. Those functions trivially preserve the
 invariant, so it is only necessary to verify functions defined in the cluster.
 
-\TODO{Dave}{Is the next paragraph accurate? My original plan was that
-  there would be one target module, we would verify its invariants,
-  and would pull in dependencies, friends of dependencies, and
-  dependencies of friends (I think we don't need the dependencies of
-  friends).  Some subset of the functions in this set would be
-  instrumented.  It isn't the SMALLEST set of functions or modules --
-  but it includes (at least) all of the clusters for all of the invariants.}
+% \TODO{Dave}{Is the next paragraph accurate? My original plan was that
+%   there would be one target module, we would verify its invariants,
+%   and would pull in dependencies, friends of dependencies, and
+%   dependencies of friends (I think we don't need the dependencies of
+%   friends).  Some subset of the functions in this set would be
+%   instrumented.  It isn't the SMALLEST set of functions or modules --
+%   but it includes (at least) all of the clusters for all of the invariants.}
+
 \MVP verifies a given set of modules at a time (typically one).  The modules
 being verified are called the \textit{target modules}, and the global invariants
 to be verified are called \textit{target invariants}, which are all invariants
@@ -471,26 +371,6 @@ above such that all target modules are contained.
 \end{Figure}
 
 
-%% Dave comment: Do we have standard terminology for the state
-%%  variables upon which an invariant depends and that a function can
-%%  access or modify? We should explain the concepts and terminology
-%%  earlier and use them consistently throughout.
-%%  wrwg: yes we do: "global memory", "memory update", "memory type"
-%%    its defined in the move.tex but perhaps not consistently used
-
-%%  wrwg: this is all already described below. Perhaps we should improve it
-%%    instead of double writing
-% The injection of assumes and asserts of global invariants into functions
-% requires knowing whether a function reads or modifies memory that is mentioned
-% in the invariant.  Without generic type parameters, this is a relatively simple
-% analysis. First, the prover collects the set of memory types mentioned in the
-% invariant.  For choosing the invariants to assume on entry to a function, \MVP
-% collects all the types that are read or modified by the function or indirectly
-% by functions that it calls, and intersects this set with the set of types in the
-% invariant.  For choosing the invariants to assert, \MVP collects types that are
-% modified by the function or by an individual instruction or function call and
-% intersects that set with the set of types in the invariant.
-
 We first look at injection of global invariants in the absence of memory and
 functions with type parameters. Fig.~\ref{fig:GlobalInvariants} contains an
 example for the supported invariant types and their injection into code. The
@@ -516,6 +396,7 @@ calls).
   a memory snaptshot before the update or call.
 \end{itemize}
 
+\vspace{-1ex}
 \Paragraph{Genericity}
 
 \begin{Figure}
@@ -534,11 +415,9 @@ calls).
     spec assert I2[T = u8];
   }
   fun g<R>(a: address) {
-    spec assume I1;
-    spec assume I2[T = R];
+    spec assume I1; spec assume I2[T = R];
     <<mutate>>
-    spec assert I1;
-    spec assert I2[T = R];
+    spec assert I1; spec assert I2[T = R];
   }
 \end{MoveBox}
 \end{Figure}
@@ -555,33 +434,19 @@ however, does not apply for this function, because there is no overlap with
 |S<u64>|.  In contrast, |g| is generic in type |R|, which could be instantiated
 to |u64|. So, |I1|, which applies to |S<u64>| needs to be injected
 in addition to |I1|.
-%% we have to inject both
-%% invariants. Because this function works on arbitrary instances, it is also
 %% relevant for the specific case of |S<u64>|.
 
-%% In the general case, we are looking at a unification problem of the following
-%% kind.
-The general solution depends on unification.
-Given the accessed memory of a function |f<R>| and an invariant |I<T>|, we
-compute the pairwise unification of memory types. Those types are parameterized
-over |R| resp. |T|. Successful unification results in a substitution for
-both type parameters, and
-%% On successful unification,
-we include the invariant with |T| specialized
-according to the substitution.
-
-%% DD: I prefer not to have single sentence paragraphs.  Do we need to say this?
-%% Notice that there are implications related to monomorphization coming from the
-%% injection of global invariants; those are discussed in Sec.~\ref{sec:Mono}.
-
+The general solution depends on type unification.  Given the accessed memory of
+a function |f<R>| and an invariant |I<T>|, we compute the pairwise unification
+of memory types. Those types are parameterized over |R| resp. |T|. Successful
+unification results in a substitution for both type parameters, and we include
+the invariant with |T| specialized according to the substitution.
 
 \SubSection{Monomorphization}
 \label{sec:Mono}
 
 Monomorphization is the process of removing all generic types from a Move
 program by \emph{specializing the program for all relevant type instantiations}.
-
-\Paragraph{Basic Monomorphization}
 
 \begin{Figure}
 \caption{Basic Monomorphization}
@@ -599,38 +464,16 @@ program by \emph{specializing the program for all relevant type instantiations}.
 \end{MoveBox}
 \end{Figure}
 
-\TODO{Dave}{I didn't understand this and tried to clarify it, but I
-  may have gotten it wrong.  Please check it.}
-To verify a generic function for all possible instantiations,
-monomorphization skolemizes the type parameter.
-%% into a given type.
-(I.e., the function is verified for a new type with no special properties
-that represents an arbitrary
-type.)
-It then,
-%% for all functions which are called, inserts their code
-instantiates all called functions (or, if they are not inlined, the specifications
-of the called functions) with this new type.
-%% (or specification, depending on whether the called function is inlined or
-%% not) specializing it for the given type instantiation, including specialization
-%% of all used types.
-Fig.~\ref{fig:Mono} sketches this approach.
+To verify a generic function for all possible instantiations, monomorphization
+skolemizes the type parameter, i.e.~ the function is verified for a new type
+with no special properties that represents an arbitrary type.  It then
+specializes all called functions and used data types with this new type and any
+other concrete types they may use.  Fig.~\ref{fig:Mono} sketches this approach.
 
-%% DD: Is this previewing the next section? I didn't understand it.
-%% The underlying conjecture is that if we verify |f_T|, we have also
-%% verified it for all possible instantiations. However, this statement is
-%% only correct for code which does not depend on runtime type information.
-
-\Paragraph{Type Dependent Code}
-
-The type of genericity Move provides does not allow for full type erasure,
-unlike many programming languages,
-%% as
-%% often found in programming languages.
-%% That is
-because types are used to
-\emph{index} global memory (e.g. |global<S<T>>(addr)| where |T| is a generic
-type). Consider the following Move function:
+However, this approach has one issue: the type of genericity Move provides does
+not allow for full type erasure (unlike many programming languages) because
+types are used to \emph{index} global memory (e.g. |global<S<T>>(addr)| where
+|T| is a generic type). Consider the following Move function:
 
 \begin{Move}
   fun f<T>(..) { move_to<S<T>>(s, ..); move_to<S<u64>>(s, ..) }
@@ -649,36 +492,30 @@ the example above, verifying both |f_T| and an instantiation |f_u64| will cover
 all relevant cases of the function behavior.
 This instantiation is only for verification; executable Move code is not
 instantiated explicitly.
-%% Notice that this treatment of type
-%% dependent code is specific to the problem of verification, and cannot directly
-%% be applied to execution.
-
-\TODO{Dave}{Is there a reason to use T1, T2 for type parameters in some places
-  and t, t' in others?}
 
 The algorithm for computing the instances that require verification works as
 follows. Let |f<T1,..,Tn>| be a verified target function which has all
 specifications injected and inlined function calls expanded.
 \begin{itemize}
-\item For each memory |M in modified(f)|, if there is a memory~%
+\item For each memory~~|M in modified(f)|, if there is a memory~%
   |M' in modified(f) + accessed(f)| such that |M| and |M'| can unify via
   |T1,..,Tn|, collect an instantiation of the type parameters |Ti| from the
   resulting substitution. This instantiation may not assign values to all type
   parameters, and those unassigned parameters stay as is. For instance,~%
   |f<T1, T2>| might have a partial instantiation |f<T1, u8>|.
 \item Once the set of all those partial instantiations is computed, it is
-  extended by unifying the instantiations against each other. If |<t>| and
-  |<t'>| are in the set, and they unify under the substitution |s|, then
-  |<s(t)>| will also be part of the set.  For example, consider |f<T1, T2>|
+  extended by unifying the instantiations against each other. If |<T>| and
+  |<T'>| are in the set, and they unify under the substitution |s|, then
+  |<s(T)>| will also be part of the set.  For example, consider |f<T1, T2>|
   which modifies |M<T1>| and |R<T2>|, as well as accesses |M<u64>| and
   |R<u8>|. From this the instantiations |<u64, T2>| and |<T1, u8>| are computed,
   and the additional instantiation |<u64, u8>| will be added to the set.
 \item If after computing and extending instantiations any type parameters
-  remain, they are skolemized into a given type as described in the previous
-  section.
+  remain, they are skolemized into a given type as described earlier.
 \end{itemize}
 
-\noindent To understand the correctness of this procedure, consider the following arguments:
+\noindent To understand the correctness of this procedure, consider the
+following arguments:
 
 \begin{itemize}
 \item \emph{Direct interaction} Whenever a modified memory |M<t>| can influence

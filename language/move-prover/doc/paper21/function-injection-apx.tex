@@ -1,12 +1,13 @@
-\Section{Injection of Function Specifications}
+\Section{Injection of Function and Data Specifications}
 
-During function specification injection, Move specifications are reduced to basic
-assume/assert statements added to the Move code.  Those statements represent
-instructions to the solver backend about what propositions can be assumed and
-which need to be asserted (verified) at a given program point.  In this appendix,
-we cover how \emph{function specification conditions} are injected.
+In this appendix we describe, for the interested reader, the design of function
+and data specification injection (requires, ensures, aborts\_if, modifies,
+emits, and data invariants).  While the impact on speed and reliability of
+verification might have been not that significant, these designs were fine tuned
+over time as well. With this, a comprehensive coverage of the translation of all
+specification constructs in \MVP is provided.
 
-\SubSection{Pre- and Post conditions}
+\SubSection{Function Specifications}
 
 The injection of basic function specifications is illustrated in
 Fig.~\ref{fig:RequiresEnsuresAbortsIf}.  An extension of the Move source
@@ -83,7 +84,7 @@ Notice we have not discussed the way how to deal with relating pre and post
 states yet, which requires taking snapshots of state (e.g.~%
 |ensures x == old(x) + 1|); the example in
 Fig.~\ref{fig:RequiresEnsuresAbortsIf} does not need it. Snapshots of state
-will be discussed for global update invariants in Sec.~\ref{sec:GlobalInvariants}.
+are discussed for global update invariants in Sec.~\ref{sec:GlobalInvariants}.
 
 \Paragraph{Modifies}
 
@@ -126,8 +127,8 @@ It comes in the form |modifies global<T>(addr)|, and its injection is
 illustrated in Fig.~\ref{fig:Modifies}.
 
 A type check is used to ensure that if a function has one or more~%
-|modifies| conditions all called functions which are \emph{opaque} have a matching
-modifies declaration. This is important so we can relate the callees
+|modifies| conditions all called functions which are \emph{opaque} have a
+matching modifies declaration. This is important so we can relate the callees
 memory modifications to that what is allowed at caller side.
 
 At verification time, when an operation is performed which modifies memory, an
@@ -183,13 +184,43 @@ subsequent assumptions, are further constraining the modified memory.
 \end{MoveBoxNumbered}
 \end{Figure}
 
-The injection for the |emits| clause is illustrated in Fig.~\ref{fig:Emits}. The |emits| clause specifies the events that a function is expected to emit. It comes in the form |emits message to handle if condition| (e.g., line~\ref{line:emits_if}). The condition part (i.e., |if condition|) can be omitted if the event is expected to be emitted unconditionally (e.g., line~\ref{line:emits}).
+The injection for the |emits| clause is illustrated in Fig.~\ref{fig:Emits}. The
+|emits| clause specifies the events that a function is expected to emit. It
+comes in the form |emits message to handle if condition| (e.g.,
+line~\ref{line:emits_if}). The condition part (i.e., |if condition|) can be
+omitted if the event is expected to be emitted unconditionally (e.g.,
+line~\ref{line:emits}).
 
-The function call to |Event::emit_event| (e.g., line~\ref{line:emit_event}) is transformed into the statement to extend |es| with the event to emit (e.g., line~\ref{line:extend_es}). |es| is a global variable of type |EventStore| which is a map where the key is an event handle and the value is the event stream of the handle (modeled as a bag of messages).
+The function call to |Event::emit_event| (e.g., line~\ref{line:emit_event}) is
+transformed into the statement to extend |es| with the event to emit (e.g.,
+line~\ref{line:extend_es}). |es| is a global variable of type |EventStore| which
+is a map where the key is an event handle and the value is the event stream of
+the handle (modeled as a bag of messages).
 
-In line~\ref{line:actual_es}, |actual_es| represents the portion of the EventStore that only comprises the events that the program (i.e., |f|) actually emits. In line~\ref{line:expected_es}, |expected_es| is constructed from the |emits| specification which contains all of the expected events specified by the |emits| clauses. Having these, two assertions using |Mvp::includes| (multiset inclusion relation per event handle) are injected. One asserts that |expected_es| includes |actual_es|, meaning that the function only emits the events that are expected (e.g., line~\ref{line:emits_completeness}). This would be violated if there is any event emitted by |f| that is not covered by some |emits| clause. Another asserts that |actual_es| includes |expected_es|, meaning that the function emits all of the events that are expected (e.g., line~\ref{line:emits_relevance}). This would be violated if |f| does not emit the expected event which a |emits| clause specifies.
+In line~\ref{line:actual_es}, |actual_es| represents the portion of the
+EventStore that only comprises the events that the program (i.e., |f|) actually
+emits. In line~\ref{line:expected_es}, |expected_es| is constructed from the
+|emits| specification which contains all of the expected events specified by the
+|emits| clauses. Having these, two assertions using |Mvp::includes| (multiset
+inclusion relation per event handle) are injected.
 
-We also handle opaque calls properly although it is not illustrated in Fig.~\ref{fig:Emits}. Suppose |f| is an opaque function, and another function |g| calls |f|. In the transformation of |g|, the event store |es| extends with the expected events of |f| (i.e., the events specified by the |emits| clauses of |f|) in a similar way to how |expected_es| is constructed in line~\ref{line:expected_es}.
+\begin{itemize}
+\item One asserts that |expected_es| includes |actual_es|, meaning that the
+  function only emits the events that are expected (e.g.,
+  line~\ref{line:emits_completeness}). This would be violated if there is any
+  event emitted by |f| that is not covered by some |emits| clause.
+\item The other asserts that |actual_es| includes |expected_es|, meaning that
+  the function emits all of the events that are expected (e.g.,
+  line~\ref{line:emits_relevance}). This would be violated if |f| does not emit
+  the expected event which a |emits| clause specifies.
+\end{itemize}
+
+We also handle opaque calls properly although it is not illustrated in
+Fig.~\ref{fig:Emits}. Suppose |f| is an opaque function, and another function
+|g| calls |f|. In the transformation of |g|, the event store |es| extends with
+the expected events of |f| (i.e., the events specified by the |emits| clauses of
+|f|) in a similar way to how |expected_es| is constructed in
+line~\ref{line:expected_es}.
 
 \vspace{-2ex}
 \SubSection{Data Invariants}
@@ -237,11 +268,11 @@ specification formalisms, we would need a special language construct for
 invariant suspension. Fig.~\ref{fig:DataInvariants} gives an example, and shows
 how data invariants are reduced to assert/assume statements.
 
-The implementation of data invariants hooks into the reference elimination
-(Sec.~\ref{sec:RefElim}). As part of this the lifetime of references is
-computed. Whenever a reference is released and the mutated value is written
-back, we also enforce the data invariant. In addition, the data invariant is
-enforced when a struct value is directly constructed.
+The implementation of data invariants hooks into reference elimination,
+described in Sec.~\ref{sec:RefElim}. As part of this the lifetime of references
+is computed. Whenever a reference is released and the mutated value is written
+back, we also assert the data invariant. In addition, the data invariant is
+asserted when a struct value is directly constructed.
 
 
 %%% Local Variables:

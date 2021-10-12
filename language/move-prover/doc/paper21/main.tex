@@ -4,12 +4,10 @@
 
 \input{prelude.tex}
 
+%\overfullrule=1mm
+
 
 \begin{document}
-
-\title{Fast and Reliable Formal Verification of Smart Contracts with the Move Prover}
-
-%% \title{Verifying Smart Contracts\\ with the Move Prover}
 
 
 \author{
@@ -18,8 +16,10 @@
   \and Emma Zhong\inst{1}
 }
 
-\institute{Facebook}
+\institute{Novi Research, Facebook}
 \authorrunning{D. Dill, W. Grieskamp et. al.}
+
+\title{Fast and Reliable Formal Verification of Smart Contracts with the Move Prover}
 
 \maketitle
 \begin{abstract}
@@ -44,19 +44,25 @@
 \input{move.tex}
 \input{design.tex}
 \input{analysis.tex}
-\TODO{Dave}{I don't think the conclusion is adding much value, so I think we could cut it.}
 \input{conclusion.tex}
+
+\vspace{-0.5ex}
+\Paragraph{Acknowledgements}
+
+This work would not have been possible without the many contributions of the
+Move platform team and collaborators.  We specifically like to thank Bob Wilson,
+Clark Barrett, Dario Russi, Jack Moffitt, Mathieu Baudet, Runtian Zhou, Sam
+Blackshear, Tim Zakian, Todd Nowacki, and Victor Gao.
 
 \bibliographystyle{splncs04}
 \bibliography{biblio}
 
 \appendix
-
 \newpage
-\TODO{Dave}{I think we could cut the appendices}
 \input{function-injection-apx.tex}
 \newpage
 \input{corrected_example-apx.tex}
+
 
 \end{document}
 

@@ -62,7 +62,7 @@
 	year = {2013},
 	bdsk-url-1 = {https://doi.org/10.1007/978-3-642-36946-9%5C_3}}
 
-@misc{BORROW_CHECKER,
+@misc{UNAVAILABLE_BORROW_CHECKER,
 	author = {Sam Blackshear and Todd Nowacki and Shaz Qadeer and John Mitchell},
 	title = {The Move Borrow Checker},
 	url = {TBD},
@@ -163,7 +163,7 @@
 	title = {Formal Specification and Verification of Solidity Contracts with Events},
 	year = {2020}}
 
-@misc{MOVE_LANG,
+@misc{OLD_MOVE_LANG,
 	author = {Sam Blackshear and Evan Cheng and David L. Dill and Victor Gao and Ben Maurer and Todd Nowacki and Alistair Pott and Shaz Qadeer and Rain and Dario Russi and Stephane Sezer and Tim Zakian and Runtian Zho},
 	title = {{Move: A Language With Programmable Resources}},
 	url = {https://developers.libra.org/docs/move-paper},
@@ -173,9 +173,9 @@
 @misc{DIEM_FRAMEWORK,
 	author = {{The Diem Association}},
 	title = {{The Diem Framework}},
-	url = {https://github.com/libra/libra/tree/master/language/stdlib},
+	url = {https://github.com/diem/diem/tree/release-1.5/language/diem-framework},
 	year = {2020},
-	bdsk-url-1 = {https://github.com/libra/libra/tree/master/language/stdlib}}
+	bdsk-url-1 = {https://github.com/diem/diem/tree/release-1.5/language/diem-framework}}
 
 @inproceedings{LINEAR_TYPES,
 	author = {Philip Wadler},
@@ -198,19 +198,21 @@
 	year = {2019},
 	bdsk-url-1 = {http://arxiv.org/abs/1903.00982}}
 
-@misc{MOVE_LANG_DEF,
+@misc{MOVE_LANG,
 	author = {{The Move Team}},
-	title = {{The Move Language Definition}},
-	url = {TBD},
+	title = {{The Move Programming Language}},
+	url = {https://move-book.com/index.html},
 	year = {2020},
-	bdsk-url-1 = {TBD}}
+	bdsk-url-1 = {https://move-book.com/index.html}
+}
 
 @misc{MOVE_SPEC_LANG_DEF,
 	author = {{The Move Team}},
 	title = {{The Move Specification Language}},
-	url = {TBD},
-	year = {2020},
-	bdsk-url-1 = {TBD}}
+	url = {https://github.com/diem/diem/blob/release-1.5/language/move-prover/doc/user/spec-lang.md},
+	year = 2020,
+	bdsk-url-1 = {https://github.com/diem/diem/blob/release-1.5/language/move-prover/doc/user/spec-lang.md}
+}
 
 @misc{CVC,
 	author = {{The CVC Team}},
@@ -219,13 +221,16 @@
 	bdsk-url-1 = {https://github.com/cvc5/cvc5}}
 
 @inproceedings{BUTTERFLY,
-	abstract = {SMT-based program verifiers often suffer from the so-called butterfly effect, in which minor modifications to the program source cause significant instabilities in verification times, which in turn may lead to spurious verification failures and a degraded user experience. This paper identifies matching loops (ill-behaved quantifiers causing an SMT solver to repeatedly instantiate a small set of quantified formulas) as a significant contributor to these instabilities, and describes some techniques to detect and prevent them. At their core, the contributed techniques move the trigger selection logic away from the SMT solver and into the high-level verifier: this move allows authors of verifiers to annotate, rewrite, and analyze user-written quantifiers to improve the solver's performance, using information that is easily available at the source level but would be hard to extract from the heavily encoded terms that the solver works with. The paper demonstrates three core techniques (quantifier splitting, trigger sharing, and matching loop detection) by extending the Dafny verifier with its own trigger selection routine, and demonstrates significant predictability and performance gains on both Dafny's test suite and large verification efforts using Dafny.},
-	author = {Leino, Rustan and Pit-Claudel, Cl{\'e}ment},
-	month = {January},
-	title = {Trigger Selection Strategies to Stabilize Program Verifiers},
-	url = {https://www.microsoft.com/en-us/research/publication/trigger-selection-strategies-stabilize-program-verifiers/},
-	year = {2016},
-	bdsk-url-1 = {https://www.microsoft.com/en-us/research/publication/trigger-selection-strategies-stabilize-program-verifiers/}}
+	author        = "K. Rustan M. Leino and Clément Pit-Claudel",
+	booktitle     = "{Proceedings of the 28th International Conference on Computer Aided Verification, Part I}",
+	doi           = {10.1007/978-3-319-41528-4\_20},
+	isbn          = "978-3-319-41527-7",
+	pages         = "361--381",
+	publisher     = "{Springer}",
+	title         = "{Trigger Selection Strategies to Stabilize Program Verifiers}",
+	year          = 2016,
+}
+
 
 @misc{blackshear2020resources,
 	archiveprefix = {arXiv},
