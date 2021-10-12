@@ -14,7 +14,7 @@ use move_vm_types::{
 use smallvec::smallvec;
 use std::collections::VecDeque;
 
-pub fn native_write_to_event_store(
+pub fn write_to_event_store(
     context: &mut NativeContext,
     mut ty_args: Vec<Type>,
     mut arguments: VecDeque<Value>,

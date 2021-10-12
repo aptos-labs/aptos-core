@@ -11,7 +11,6 @@ module 0x2::A {
 
     #[test(a=@0x2)]
     public fun emit(a: &signer) {
-        Event::publish_generator(a);
         do_emit<u64>(a);
     }
 }

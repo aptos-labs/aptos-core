@@ -9,11 +9,27 @@ Changed resource(s) under 2 address(es):
       key 0x1::AccountFreezing::FreezeEventsHolder {
           freeze_event_handle: store 0x1::Event::EventHandle<0x1::AccountFreezing::FreezeAccountEvent> {
               counter: 0
-              guid: 0f000000000000000000000000000000000000000a550c18
+              guid: drop store 0x1::Event::GUIDWrapper {
+                  len_bytes: 24u8
+                  guid: drop store 0x1::GUID::GUID {
+                      id: copy drop store 0x1::GUID::ID {
+                          creation_num: 15
+                          addr: a550c18
+                      }
+                  }
+              }
           }
           unfreeze_event_handle: store 0x1::Event::EventHandle<0x1::AccountFreezing::UnfreezeAccountEvent> {
               counter: 0
-              guid: 10000000000000000000000000000000000000000a550c18
+              guid: drop store 0x1::Event::GUIDWrapper {
+                  len_bytes: 24u8
+                  guid: drop store 0x1::GUID::GUID {
+                      id: copy drop store 0x1::GUID::ID {
+                          creation_num: 16
+                          addr: a550c18
+                      }
+                  }
+              }
           }
       }
     Added type 0x1::AccountFreezing::FreezingBit: [0] (wrote 47 bytes)
@@ -52,23 +68,63 @@ Changed resource(s) under 2 address(es):
           can_mint: false
           mint_events: store 0x1::Event::EventHandle<0x1::Diem::MintEvent> {
               counter: 0
-              guid: 0a000000000000000000000000000000000000000a550c18
+              guid: drop store 0x1::Event::GUIDWrapper {
+                  len_bytes: 24u8
+                  guid: drop store 0x1::GUID::GUID {
+                      id: copy drop store 0x1::GUID::ID {
+                          creation_num: 10
+                          addr: a550c18
+                      }
+                  }
+              }
           }
           burn_events: store 0x1::Event::EventHandle<0x1::Diem::BurnEvent> {
               counter: 0
-              guid: 0b000000000000000000000000000000000000000a550c18
+              guid: drop store 0x1::Event::GUIDWrapper {
+                  len_bytes: 24u8
+                  guid: drop store 0x1::GUID::GUID {
+                      id: copy drop store 0x1::GUID::ID {
+                          creation_num: 11
+                          addr: a550c18
+                      }
+                  }
+              }
           }
           preburn_events: store 0x1::Event::EventHandle<0x1::Diem::PreburnEvent> {
               counter: 0
-              guid: 0c000000000000000000000000000000000000000a550c18
+              guid: drop store 0x1::Event::GUIDWrapper {
+                  len_bytes: 24u8
+                  guid: drop store 0x1::GUID::GUID {
+                      id: copy drop store 0x1::GUID::ID {
+                          creation_num: 12
+                          addr: a550c18
+                      }
+                  }
+              }
           }
           cancel_burn_events: store 0x1::Event::EventHandle<0x1::Diem::CancelBurnEvent> {
               counter: 0
-              guid: 0d000000000000000000000000000000000000000a550c18
+              guid: drop store 0x1::Event::GUIDWrapper {
+                  len_bytes: 24u8
+                  guid: drop store 0x1::GUID::GUID {
+                      id: copy drop store 0x1::GUID::ID {
+                          creation_num: 13
+                          addr: a550c18
+                      }
+                  }
+              }
           }
           exchange_rate_update_events: store 0x1::Event::EventHandle<0x1::Diem::ToXDXExchangeRateUpdateEvent> {
               counter: 0
-              guid: 0e000000000000000000000000000000000000000a550c18
+              guid: drop store 0x1::Event::GUIDWrapper {
+                  len_bytes: 24u8
+                  guid: drop store 0x1::GUID::GUID {
+                      id: copy drop store 0x1::GUID::ID {
+                          creation_num: 14
+                          addr: a550c18
+                      }
+                  }
+              }
           }
       }
     Added type 0x1::Diem::CurrencyInfo<0x1::XUS::XUS>: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 64, 66, 15, 0, 0, 0, 0, 0, 100, 0, 0, 0, 0, 0, 0, 0, 3, 88, 85, 83, 1, 0, 0, 0, 0, 0, 0, 0, 0, 24, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 85, 12, 24, 0, 0, 0, 0, 0, 0, 0, 0, 24, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 85, 12, 24, 0, 0, 0, 0, 0, 0, 0, 0, 24, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 85, 12, 24, 0, 0, 0, 0, 0, 0, 0, 0, 24, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 85, 12, 24, 0, 0, 0, 0, 0, 0, 0, 0, 24, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 85, 12, 24] (wrote 281 bytes)
@@ -85,23 +141,63 @@ Changed resource(s) under 2 address(es):
           can_mint: true
           mint_events: store 0x1::Event::EventHandle<0x1::Diem::MintEvent> {
               counter: 0
-              guid: 05000000000000000000000000000000000000000a550c18
+              guid: drop store 0x1::Event::GUIDWrapper {
+                  len_bytes: 24u8
+                  guid: drop store 0x1::GUID::GUID {
+                      id: copy drop store 0x1::GUID::ID {
+                          creation_num: 5
+                          addr: a550c18
+                      }
+                  }
+              }
           }
           burn_events: store 0x1::Event::EventHandle<0x1::Diem::BurnEvent> {
               counter: 0
-              guid: 06000000000000000000000000000000000000000a550c18
+              guid: drop store 0x1::Event::GUIDWrapper {
+                  len_bytes: 24u8
+                  guid: drop store 0x1::GUID::GUID {
+                      id: copy drop store 0x1::GUID::ID {
+                          creation_num: 6
+                          addr: a550c18
+                      }
+                  }
+              }
           }
           preburn_events: store 0x1::Event::EventHandle<0x1::Diem::PreburnEvent> {
               counter: 0
-              guid: 07000000000000000000000000000000000000000a550c18
+              guid: drop store 0x1::Event::GUIDWrapper {
+                  len_bytes: 24u8
+                  guid: drop store 0x1::GUID::GUID {
+                      id: copy drop store 0x1::GUID::ID {
+                          creation_num: 7
+                          addr: a550c18
+                      }
+                  }
+              }
           }
           cancel_burn_events: store 0x1::Event::EventHandle<0x1::Diem::CancelBurnEvent> {
               counter: 0
-              guid: 08000000000000000000000000000000000000000a550c18
+              guid: drop store 0x1::Event::GUIDWrapper {
+                  len_bytes: 24u8
+                  guid: drop store 0x1::GUID::GUID {
+                      id: copy drop store 0x1::GUID::ID {
+                          creation_num: 8
+                          addr: a550c18
+                      }
+                  }
+              }
           }
           exchange_rate_update_events: store 0x1::Event::EventHandle<0x1::Diem::ToXDXExchangeRateUpdateEvent> {
               counter: 0
-              guid: 09000000000000000000000000000000000000000a550c18
+              guid: drop store 0x1::Event::GUIDWrapper {
+                  len_bytes: 24u8
+                  guid: drop store 0x1::GUID::GUID {
+                      id: copy drop store 0x1::GUID::ID {
+                          creation_num: 9
+                          addr: a550c18
+                      }
+                  }
+              }
           }
       }
     Added type 0x1::DiemAccount::AccountOperationsCapability: [0, 2, 0, 0, 0, 0, 0, 0, 0, 24, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 85, 12, 24] (wrote 92 bytes)
@@ -111,7 +207,15 @@ Changed resource(s) under 2 address(es):
           }
           creation_events: store 0x1::Event::EventHandle<0x1::DiemAccount::CreateAccountEvent> {
               counter: 2
-              guid: 00000000000000000000000000000000000000000a550c18
+              guid: drop store 0x1::Event::GUIDWrapper {
+                  len_bytes: 24u8
+                  guid: drop store 0x1::GUID::GUID {
+                      id: copy drop store 0x1::GUID::ID {
+                          creation_num: 0
+                          addr: a550c18
+                      }
+                  }
+              }
           }
       }
     Added type 0x1::DiemAccount::DiemAccount: [32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 85, 12, 24, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 85, 12, 24, 0, 0, 0, 0, 0, 0, 0, 0, 24, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 85, 12, 24, 0, 0, 0, 0, 0, 0, 0, 0, 24, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 85, 12, 24, 0, 0, 0, 0, 0, 0, 0, 0] (wrote 183 bytes)
@@ -133,11 +237,27 @@ Changed resource(s) under 2 address(es):
           }
           received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
               counter: 0
-              guid: 02000000000000000000000000000000000000000a550c18
+              guid: drop store 0x1::Event::GUIDWrapper {
+                  len_bytes: 24u8
+                  guid: drop store 0x1::GUID::GUID {
+                      id: copy drop store 0x1::GUID::ID {
+                          creation_num: 2
+                          addr: a550c18
+                      }
+                  }
+              }
           }
           sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
               counter: 0
-              guid: 03000000000000000000000000000000000000000a550c18
+              guid: drop store 0x1::Event::GUIDWrapper {
+                  len_bytes: 24u8
+                  guid: drop store 0x1::GUID::GUID {
+                      id: copy drop store 0x1::GUID::ID {
+                          creation_num: 3
+                          addr: a550c18
+                      }
+                  }
+              }
           }
           sequence_number: 0
       }
@@ -145,7 +265,15 @@ Changed resource(s) under 2 address(es):
       key 0x1::DiemAccount::DiemWriteSetManager {
           upgrade_events: store 0x1::Event::EventHandle<0x1::DiemAccount::AdminTransactionEvent> {
               counter: 0
-              guid: 01000000000000000000000000000000000000000a550c18
+              guid: drop store 0x1::Event::GUIDWrapper {
+                  len_bytes: 24u8
+                  guid: drop store 0x1::GUID::GUID {
+                      id: copy drop store 0x1::GUID::ID {
+                          creation_num: 1
+                          addr: a550c18
+                      }
+                  }
+              }
           }
       }
     Added type 0x1::DiemBlock::BlockMetadata: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 24, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 85, 12, 24] (wrote 83 bytes)
@@ -153,7 +281,15 @@ Changed resource(s) under 2 address(es):
           height: 0
           new_block_events: store 0x1::Event::EventHandle<0x1::DiemBlock::NewBlockEvent> {
               counter: 0
-              guid: 11000000000000000000000000000000000000000a550c18
+              guid: drop store 0x1::Event::GUIDWrapper {
+                  len_bytes: 24u8
+                  guid: drop store 0x1::GUID::GUID {
+                      id: copy drop store 0x1::GUID::ID {
+                          creation_num: 17
+                          addr: a550c18
+                      }
+                  }
+              }
           }
       }
     Added type 0x1::DiemConfig::Configuration: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 24, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 85, 12, 24] (wrote 92 bytes)
@@ -162,7 +298,15 @@ Changed resource(s) under 2 address(es):
           last_reconfiguration_time: 0
           events: store 0x1::Event::EventHandle<0x1::DiemConfig::NewEpochEvent> {
               counter: 0
-              guid: 04000000000000000000000000000000000000000a550c18
+              guid: drop store 0x1::Event::GUIDWrapper {
+                  len_bytes: 24u8
+                  guid: drop store 0x1::GUID::GUID {
+                      id: copy drop store 0x1::GUID::ID {
+                          creation_num: 4
+                          addr: a550c18
+                      }
+                  }
+              }
           }
       }
     Added type 0x1::DiemConfig::DiemConfig<0x1::DiemSystem::DiemSystem>: [0, 0] (wrote 82 bytes)
@@ -248,10 +392,9 @@ Changed resource(s) under 2 address(es):
       key 0x1::DualAttestation::Limit {
           micro_xdx_limit: 1000000000
       }
-    Added type 0x1::Event::EventHandleGenerator: [18, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 85, 12, 24] (wrote 69 bytes)
-      key 0x1::Event::EventHandleGenerator {
+    Added type 0x1::GUID::Generator: [18, 0, 0, 0, 0, 0, 0, 0] (wrote 41 bytes)
+      key 0x1::GUID::Generator {
           counter: 18
-          addr: a550c18
       }
     Added type 0x1::Roles::RoleId: [0, 0, 0, 0, 0, 0, 0, 0] (wrote 39 bytes)
       key 0x1::Roles::RoleId {
@@ -308,18 +451,33 @@ Changed resource(s) under 2 address(es):
           }
           received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
               counter: 0
-              guid: 01000000000000000000000000000000000000000b1e55ed
+              guid: drop store 0x1::Event::GUIDWrapper {
+                  len_bytes: 24u8
+                  guid: drop store 0x1::GUID::GUID {
+                      id: copy drop store 0x1::GUID::ID {
+                          creation_num: 1
+                          addr: b1e55ed
+                      }
+                  }
+              }
           }
           sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
               counter: 0
-              guid: 02000000000000000000000000000000000000000b1e55ed
+              guid: drop store 0x1::Event::GUIDWrapper {
+                  len_bytes: 24u8
+                  guid: drop store 0x1::GUID::GUID {
+                      id: copy drop store 0x1::GUID::ID {
+                          creation_num: 2
+                          addr: b1e55ed
+                      }
+                  }
+              }
           }
           sequence_number: 0
       }
-    Added type 0x1::Event::EventHandleGenerator: [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11, 30, 85, 237] (wrote 69 bytes)
-      key 0x1::Event::EventHandleGenerator {
+    Added type 0x1::GUID::Generator: [3, 0, 0, 0, 0, 0, 0, 0] (wrote 41 bytes)
+      key 0x1::GUID::Generator {
           counter: 3
-          addr: b1e55ed
       }
     Added type 0x1::Roles::RoleId: [1, 0, 0, 0, 0, 0, 0, 0] (wrote 39 bytes)
       key 0x1::Roles::RoleId {
@@ -345,10 +503,18 @@ Changed resource(s) under 2 address(es):
       key 0x1::VASPDomain::VASPDomainManager {
           vasp_domain_events: store 0x1::Event::EventHandle<0x1::VASPDomain::VASPDomainEvent> {
               counter: 0
-              guid: 00000000000000000000000000000000000000000b1e55ed
+              guid: drop store 0x1::Event::GUIDWrapper {
+                  len_bytes: 24u8
+                  guid: drop store 0x1::GUID::GUID {
+                      id: copy drop store 0x1::GUID::ID {
+                          creation_num: 0
+                          addr: b1e55ed
+                      }
+                  }
+              }
           }
       }
-Wrote 3610 bytes of resource ID's and data
+Wrote 3554 bytes of resource ID's and data
 Command `sandbox run scripts/create_designated_dealer.move --mode diem --type-args 0x1::XDX::XDX --signers 0xB1E55ED --args 0 0xDD x"00000000000000000000000000000000" b"DD" true -v`:
 Compiling transaction script...
 Emitted 1 events:
@@ -363,7 +529,15 @@ Changed resource(s) under 2 address(es):
       key 0x1::DesignatedDealer::Dealer {
           mint_event_handle: store 0x1::Event::EventHandle<0x1::DesignatedDealer::ReceivedMintEvent> {
               counter: 0
-              guid: 0000000000000000000000000000000000000000000000dd
+              guid: drop store 0x1::Event::GUIDWrapper {
+                  len_bytes: 24u8
+                  guid: drop store 0x1::GUID::GUID {
+                      id: copy drop store 0x1::GUID::ID {
+                          creation_num: 0
+                          addr: dd
+                      }
+                  }
+              }
           }
       }
     Added type 0x1::Diem::PreburnQueue<0x1::XUS::XUS>: [0] (wrote 63 bytes)
@@ -402,11 +576,27 @@ Changed resource(s) under 2 address(es):
           }
           received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
               counter: 0
-              guid: 0300000000000000000000000000000000000000000000dd
+              guid: drop store 0x1::Event::GUIDWrapper {
+                  len_bytes: 24u8
+                  guid: drop store 0x1::GUID::GUID {
+                      id: copy drop store 0x1::GUID::ID {
+                          creation_num: 3
+                          addr: dd
+                      }
+                  }
+              }
           }
           sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
               counter: 0
-              guid: 0400000000000000000000000000000000000000000000dd
+              guid: drop store 0x1::Event::GUIDWrapper {
+                  len_bytes: 24u8
+                  guid: drop store 0x1::GUID::GUID {
+                      id: copy drop store 0x1::GUID::ID {
+                          creation_num: 4
+                          addr: dd
+                      }
+                  }
+              }
           }
           sequence_number: 0
       }
@@ -418,17 +608,32 @@ Changed resource(s) under 2 address(es):
           expiration_date: 18446744073709551615
           compliance_key_rotation_events: store 0x1::Event::EventHandle<0x1::DualAttestation::ComplianceKeyRotationEvent> {
               counter: 0
-              guid: 0100000000000000000000000000000000000000000000dd
+              guid: drop store 0x1::Event::GUIDWrapper {
+                  len_bytes: 24u8
+                  guid: drop store 0x1::GUID::GUID {
+                      id: copy drop store 0x1::GUID::ID {
+                          creation_num: 1
+                          addr: dd
+                      }
+                  }
+              }
           }
           base_url_rotation_events: store 0x1::Event::EventHandle<0x1::DualAttestation::BaseUrlRotationEvent> {
               counter: 0
-              guid: 0200000000000000000000000000000000000000000000dd
+              guid: drop store 0x1::Event::GUIDWrapper {
+                  len_bytes: 24u8
+                  guid: drop store 0x1::GUID::GUID {
+                      id: copy drop store 0x1::GUID::ID {
+                          creation_num: 2
+                          addr: dd
+                      }
+                  }
+              }
           }
       }
-    Added type 0x1::Event::EventHandleGenerator: [5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 221] (wrote 69 bytes)
-      key 0x1::Event::EventHandleGenerator {
+    Added type 0x1::GUID::Generator: [5, 0, 0, 0, 0, 0, 0, 0] (wrote 41 bytes)
+      key 0x1::GUID::Generator {
           counter: 5
-          addr: dd
       }
     Added type 0x1::Roles::RoleId: [2, 0, 0, 0, 0, 0, 0, 0] (wrote 39 bytes)
       key 0x1::Roles::RoleId {
@@ -443,7 +648,15 @@ Changed resource(s) under 2 address(es):
             }
             creation_events: store 0x1::Event::EventHandle<0x1::DiemAccount::CreateAccountEvent> {
                 counter: 2
-                guid: 00000000000000000000000000000000000000000a550c18
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 0
+                            addr: a550c18
+                        }
+                    }
+                }
             }
         }
       New:
@@ -453,10 +666,18 @@ Changed resource(s) under 2 address(es):
             }
             creation_events: store 0x1::Event::EventHandle<0x1::DiemAccount::CreateAccountEvent> {
                 counter: 3
-                guid: 00000000000000000000000000000000000000000a550c18
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 0
+                            addr: a550c18
+                        }
+                    }
+                }
             }
         }
-Wrote 836 bytes of resource ID's and data
+Wrote 808 bytes of resource ID's and data
 Command `sandbox run scripts/create_parent_vasp_account.move --mode diem --type-args 0x1::XDX::XDX --signers 0xB1E55ED --args 0 0xA x"00000000000000000000000000000000" b"VASP_A" true -v`:
 Compiling transaction script...
 Emitted 1 events:
@@ -498,11 +719,27 @@ Changed resource(s) under 2 address(es):
           }
           received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
               counter: 0
-              guid: 02000000000000000000000000000000000000000000000a
+              guid: drop store 0x1::Event::GUIDWrapper {
+                  len_bytes: 24u8
+                  guid: drop store 0x1::GUID::GUID {
+                      id: copy drop store 0x1::GUID::ID {
+                          creation_num: 2
+                          addr: a
+                      }
+                  }
+              }
           }
           sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
               counter: 0
-              guid: 03000000000000000000000000000000000000000000000a
+              guid: drop store 0x1::Event::GUIDWrapper {
+                  len_bytes: 24u8
+                  guid: drop store 0x1::GUID::GUID {
+                      id: copy drop store 0x1::GUID::ID {
+                          creation_num: 3
+                          addr: a
+                      }
+                  }
+              }
           }
           sequence_number: 0
       }
@@ -514,17 +751,32 @@ Changed resource(s) under 2 address(es):
           expiration_date: 18446744073709551615
           compliance_key_rotation_events: store 0x1::Event::EventHandle<0x1::DualAttestation::ComplianceKeyRotationEvent> {
               counter: 0
-              guid: 00000000000000000000000000000000000000000000000a
+              guid: drop store 0x1::Event::GUIDWrapper {
+                  len_bytes: 24u8
+                  guid: drop store 0x1::GUID::GUID {
+                      id: copy drop store 0x1::GUID::ID {
+                          creation_num: 0
+                          addr: a
+                      }
+                  }
+              }
           }
           base_url_rotation_events: store 0x1::Event::EventHandle<0x1::DualAttestation::BaseUrlRotationEvent> {
               counter: 0
-              guid: 01000000000000000000000000000000000000000000000a
+              guid: drop store 0x1::Event::GUIDWrapper {
+                  len_bytes: 24u8
+                  guid: drop store 0x1::GUID::GUID {
+                      id: copy drop store 0x1::GUID::ID {
+                          creation_num: 1
+                          addr: a
+                      }
+                  }
+              }
           }
       }
-    Added type 0x1::Event::EventHandleGenerator: [4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10] (wrote 69 bytes)
-      key 0x1::Event::EventHandleGenerator {
+    Added type 0x1::GUID::Generator: [4, 0, 0, 0, 0, 0, 0, 0] (wrote 41 bytes)
+      key 0x1::GUID::Generator {
           counter: 4
-          addr: a
       }
     Added type 0x1::Roles::RoleId: [5, 0, 0, 0, 0, 0, 0, 0] (wrote 39 bytes)
       key 0x1::Roles::RoleId {
@@ -548,7 +800,15 @@ Changed resource(s) under 2 address(es):
             }
             creation_events: store 0x1::Event::EventHandle<0x1::DiemAccount::CreateAccountEvent> {
                 counter: 3
-                guid: 00000000000000000000000000000000000000000a550c18
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 0
+                            addr: a550c18
+                        }
+                    }
+                }
             }
         }
       New:
@@ -558,10 +818,18 @@ Changed resource(s) under 2 address(es):
             }
             creation_events: store 0x1::Event::EventHandle<0x1::DiemAccount::CreateAccountEvent> {
                 counter: 4
-                guid: 00000000000000000000000000000000000000000a550c18
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 0
+                            addr: a550c18
+                        }
+                    }
+                }
             }
         }
-Wrote 786 bytes of resource ID's and data
+Wrote 758 bytes of resource ID's and data
 Command `sandbox run scripts/create_parent_vasp_account.move --mode diem --type-args 0x1::XDX::XDX --signers 0xB1E55ED --args 0 0xB x"00000000000000000000000000000000" b"VASP_B" true -v`:
 Compiling transaction script...
 Emitted 1 events:
@@ -603,11 +871,27 @@ Changed resource(s) under 2 address(es):
           }
           received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
               counter: 0
-              guid: 02000000000000000000000000000000000000000000000b
+              guid: drop store 0x1::Event::GUIDWrapper {
+                  len_bytes: 24u8
+                  guid: drop store 0x1::GUID::GUID {
+                      id: copy drop store 0x1::GUID::ID {
+                          creation_num: 2
+                          addr: b
+                      }
+                  }
+              }
           }
           sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
               counter: 0
-              guid: 03000000000000000000000000000000000000000000000b
+              guid: drop store 0x1::Event::GUIDWrapper {
+                  len_bytes: 24u8
+                  guid: drop store 0x1::GUID::GUID {
+                      id: copy drop store 0x1::GUID::ID {
+                          creation_num: 3
+                          addr: b
+                      }
+                  }
+              }
           }
           sequence_number: 0
       }
@@ -619,17 +903,32 @@ Changed resource(s) under 2 address(es):
           expiration_date: 18446744073709551615
           compliance_key_rotation_events: store 0x1::Event::EventHandle<0x1::DualAttestation::ComplianceKeyRotationEvent> {
               counter: 0
-              guid: 00000000000000000000000000000000000000000000000b
+              guid: drop store 0x1::Event::GUIDWrapper {
+                  len_bytes: 24u8
+                  guid: drop store 0x1::GUID::GUID {
+                      id: copy drop store 0x1::GUID::ID {
+                          creation_num: 0
+                          addr: b
+                      }
+                  }
+              }
           }
           base_url_rotation_events: store 0x1::Event::EventHandle<0x1::DualAttestation::BaseUrlRotationEvent> {
               counter: 0
-              guid: 01000000000000000000000000000000000000000000000b
+              guid: drop store 0x1::Event::GUIDWrapper {
+                  len_bytes: 24u8
+                  guid: drop store 0x1::GUID::GUID {
+                      id: copy drop store 0x1::GUID::ID {
+                          creation_num: 1
+                          addr: b
+                      }
+                  }
+              }
           }
       }
-    Added type 0x1::Event::EventHandleGenerator: [4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11] (wrote 69 bytes)
-      key 0x1::Event::EventHandleGenerator {
+    Added type 0x1::GUID::Generator: [4, 0, 0, 0, 0, 0, 0, 0] (wrote 41 bytes)
+      key 0x1::GUID::Generator {
           counter: 4
-          addr: b
       }
     Added type 0x1::Roles::RoleId: [5, 0, 0, 0, 0, 0, 0, 0] (wrote 39 bytes)
       key 0x1::Roles::RoleId {
@@ -653,7 +952,15 @@ Changed resource(s) under 2 address(es):
             }
             creation_events: store 0x1::Event::EventHandle<0x1::DiemAccount::CreateAccountEvent> {
                 counter: 4
-                guid: 00000000000000000000000000000000000000000a550c18
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 0
+                            addr: a550c18
+                        }
+                    }
+                }
             }
         }
       New:
@@ -663,10 +970,18 @@ Changed resource(s) under 2 address(es):
             }
             creation_events: store 0x1::Event::EventHandle<0x1::DiemAccount::CreateAccountEvent> {
                 counter: 5
-                guid: 00000000000000000000000000000000000000000a550c18
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 0
+                            addr: a550c18
+                        }
+                    }
+                }
             }
         }
-Wrote 786 bytes of resource ID's and data
+Wrote 758 bytes of resource ID's and data
 Command `sandbox run scripts/tiered_mint.move --mode diem --type-args 0x1::XUS::XUS --signers 0xB1E55ED --args 0 0xDD 1000 0 -v`:
 Compiling transaction script...
 Emitted 3 events:
@@ -680,14 +995,30 @@ Changed resource(s) under 2 address(es):
         key 0x1::DesignatedDealer::Dealer {
             mint_event_handle: store 0x1::Event::EventHandle<0x1::DesignatedDealer::ReceivedMintEvent> {
                 counter: 0
-                guid: 0000000000000000000000000000000000000000000000dd
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 0
+                            addr: dd
+                        }
+                    }
+                }
             }
         }
       New:
         key 0x1::DesignatedDealer::Dealer {
             mint_event_handle: store 0x1::Event::EventHandle<0x1::DesignatedDealer::ReceivedMintEvent> {
                 counter: 1
-                guid: 0000000000000000000000000000000000000000000000dd
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 0
+                            addr: dd
+                        }
+                    }
+                }
             }
         }
     Changed type 0x1::DiemAccount::Balance<0x1::XUS::XUS>: [232, 3, 0, 0, 0, 0, 0, 0] (wrote 72 bytes)
@@ -723,11 +1054,27 @@ Changed resource(s) under 2 address(es):
             }
             received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
                 counter: 0
-                guid: 0300000000000000000000000000000000000000000000dd
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 3
+                            addr: dd
+                        }
+                    }
+                }
             }
             sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
                 counter: 0
-                guid: 0400000000000000000000000000000000000000000000dd
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 4
+                            addr: dd
+                        }
+                    }
+                }
             }
             sequence_number: 0
         }
@@ -750,11 +1097,27 @@ Changed resource(s) under 2 address(es):
             }
             received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
                 counter: 1
-                guid: 0300000000000000000000000000000000000000000000dd
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 3
+                            addr: dd
+                        }
+                    }
+                }
             }
             sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
                 counter: 0
-                guid: 0400000000000000000000000000000000000000000000dd
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 4
+                            addr: dd
+                        }
+                    }
+                }
             }
             sequence_number: 0
         }
@@ -774,23 +1137,63 @@ Changed resource(s) under 2 address(es):
             can_mint: true
             mint_events: store 0x1::Event::EventHandle<0x1::Diem::MintEvent> {
                 counter: 0
-                guid: 05000000000000000000000000000000000000000a550c18
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 5
+                            addr: a550c18
+                        }
+                    }
+                }
             }
             burn_events: store 0x1::Event::EventHandle<0x1::Diem::BurnEvent> {
                 counter: 0
-                guid: 06000000000000000000000000000000000000000a550c18
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 6
+                            addr: a550c18
+                        }
+                    }
+                }
             }
             preburn_events: store 0x1::Event::EventHandle<0x1::Diem::PreburnEvent> {
                 counter: 0
-                guid: 07000000000000000000000000000000000000000a550c18
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 7
+                            addr: a550c18
+                        }
+                    }
+                }
             }
             cancel_burn_events: store 0x1::Event::EventHandle<0x1::Diem::CancelBurnEvent> {
                 counter: 0
-                guid: 08000000000000000000000000000000000000000a550c18
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 8
+                            addr: a550c18
+                        }
+                    }
+                }
             }
             exchange_rate_update_events: store 0x1::Event::EventHandle<0x1::Diem::ToXDXExchangeRateUpdateEvent> {
                 counter: 0
-                guid: 09000000000000000000000000000000000000000a550c18
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 9
+                            addr: a550c18
+                        }
+                    }
+                }
             }
         }
       New:
@@ -807,23 +1210,63 @@ Changed resource(s) under 2 address(es):
             can_mint: true
             mint_events: store 0x1::Event::EventHandle<0x1::Diem::MintEvent> {
                 counter: 1
-                guid: 05000000000000000000000000000000000000000a550c18
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 5
+                            addr: a550c18
+                        }
+                    }
+                }
             }
             burn_events: store 0x1::Event::EventHandle<0x1::Diem::BurnEvent> {
                 counter: 0
-                guid: 06000000000000000000000000000000000000000a550c18
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 6
+                            addr: a550c18
+                        }
+                    }
+                }
             }
             preburn_events: store 0x1::Event::EventHandle<0x1::Diem::PreburnEvent> {
                 counter: 0
-                guid: 07000000000000000000000000000000000000000a550c18
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 7
+                            addr: a550c18
+                        }
+                    }
+                }
             }
             cancel_burn_events: store 0x1::Event::EventHandle<0x1::Diem::CancelBurnEvent> {
                 counter: 0
-                guid: 08000000000000000000000000000000000000000a550c18
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 8
+                            addr: a550c18
+                        }
+                    }
+                }
             }
             exchange_rate_update_events: store 0x1::Event::EventHandle<0x1::Diem::ToXDXExchangeRateUpdateEvent> {
                 counter: 0
-                guid: 09000000000000000000000000000000000000000a550c18
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 9
+                            addr: a550c18
+                        }
+                    }
+                }
             }
         }
 Wrote 611 bytes of resource ID's and data
@@ -867,11 +1310,27 @@ Changed resource(s) under 2 address(es):
             }
             received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
                 counter: 0
-                guid: 02000000000000000000000000000000000000000000000a
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 2
+                            addr: a
+                        }
+                    }
+                }
             }
             sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
                 counter: 0
-                guid: 03000000000000000000000000000000000000000000000a
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 3
+                            addr: a
+                        }
+                    }
+                }
             }
             sequence_number: 0
         }
@@ -894,11 +1353,27 @@ Changed resource(s) under 2 address(es):
             }
             received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
                 counter: 1
-                guid: 02000000000000000000000000000000000000000000000a
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 2
+                            addr: a
+                        }
+                    }
+                }
             }
             sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
                 counter: 0
-                guid: 03000000000000000000000000000000000000000000000a
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 3
+                            addr: a
+                        }
+                    }
+                }
             }
             sequence_number: 0
         }
@@ -936,11 +1411,27 @@ Changed resource(s) under 2 address(es):
             }
             received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
                 counter: 1
-                guid: 0300000000000000000000000000000000000000000000dd
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 3
+                            addr: dd
+                        }
+                    }
+                }
             }
             sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
                 counter: 0
-                guid: 0400000000000000000000000000000000000000000000dd
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 4
+                            addr: dd
+                        }
+                    }
+                }
             }
             sequence_number: 0
         }
@@ -963,11 +1454,27 @@ Changed resource(s) under 2 address(es):
             }
             received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
                 counter: 1
-                guid: 0300000000000000000000000000000000000000000000dd
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 3
+                            addr: dd
+                        }
+                    }
+                }
             }
             sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
                 counter: 1
-                guid: 0400000000000000000000000000000000000000000000dd
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 4
+                            addr: dd
+                        }
+                    }
+                }
             }
             sequence_number: 0
         }
@@ -1012,11 +1519,27 @@ Changed resource(s) under 2 address(es):
             }
             received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
                 counter: 1
-                guid: 02000000000000000000000000000000000000000000000a
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 2
+                            addr: a
+                        }
+                    }
+                }
             }
             sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
                 counter: 0
-                guid: 03000000000000000000000000000000000000000000000a
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 3
+                            addr: a
+                        }
+                    }
+                }
             }
             sequence_number: 0
         }
@@ -1039,11 +1562,27 @@ Changed resource(s) under 2 address(es):
             }
             received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
                 counter: 1
-                guid: 02000000000000000000000000000000000000000000000a
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 2
+                            addr: a
+                        }
+                    }
+                }
             }
             sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
                 counter: 1
-                guid: 03000000000000000000000000000000000000000000000a
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 3
+                            addr: a
+                        }
+                    }
+                }
             }
             sequence_number: 0
         }
@@ -1081,11 +1620,27 @@ Changed resource(s) under 2 address(es):
             }
             received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
                 counter: 0
-                guid: 02000000000000000000000000000000000000000000000b
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 2
+                            addr: b
+                        }
+                    }
+                }
             }
             sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
                 counter: 0
-                guid: 03000000000000000000000000000000000000000000000b
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 3
+                            addr: b
+                        }
+                    }
+                }
             }
             sequence_number: 0
         }
@@ -1108,11 +1663,27 @@ Changed resource(s) under 2 address(es):
             }
             received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
                 counter: 1
-                guid: 02000000000000000000000000000000000000000000000b
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 2
+                            addr: b
+                        }
+                    }
+                }
             }
             sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
                 counter: 0
-                guid: 03000000000000000000000000000000000000000000000b
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 3
+                            addr: b
+                        }
+                    }
+                }
             }
             sequence_number: 0
         }
@@ -1158,11 +1729,27 @@ Changed resource(s) under 3 address(es):
             }
             received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
                 counter: 1
-                guid: 02000000000000000000000000000000000000000000000a
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 2
+                            addr: a
+                        }
+                    }
+                }
             }
             sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
                 counter: 1
-                guid: 03000000000000000000000000000000000000000000000a
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 3
+                            addr: a
+                        }
+                    }
+                }
             }
             sequence_number: 0
         }
@@ -1185,11 +1772,27 @@ Changed resource(s) under 3 address(es):
             }
             received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
                 counter: 1
-                guid: 02000000000000000000000000000000000000000000000a
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 2
+                            addr: a
+                        }
+                    }
+                }
             }
             sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
                 counter: 2
-                guid: 03000000000000000000000000000000000000000000000a
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 3
+                            addr: a
+                        }
+                    }
+                }
             }
             sequence_number: 0
         }
@@ -1232,18 +1835,33 @@ Changed resource(s) under 3 address(es):
           }
           received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
               counter: 1
-              guid: 0000000000000000000000000000000000000000000000aa
+              guid: drop store 0x1::Event::GUIDWrapper {
+                  len_bytes: 24u8
+                  guid: drop store 0x1::GUID::GUID {
+                      id: copy drop store 0x1::GUID::ID {
+                          creation_num: 0
+                          addr: aa
+                      }
+                  }
+              }
           }
           sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
               counter: 0
-              guid: 0100000000000000000000000000000000000000000000aa
+              guid: drop store 0x1::Event::GUIDWrapper {
+                  len_bytes: 24u8
+                  guid: drop store 0x1::GUID::GUID {
+                      id: copy drop store 0x1::GUID::ID {
+                          creation_num: 1
+                          addr: aa
+                      }
+                  }
+              }
           }
           sequence_number: 0
       }
-    Added type 0x1::Event::EventHandleGenerator: [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 170] (wrote 69 bytes)
-      key 0x1::Event::EventHandleGenerator {
+    Added type 0x1::GUID::Generator: [2, 0, 0, 0, 0, 0, 0, 0] (wrote 41 bytes)
+      key 0x1::GUID::Generator {
           counter: 2
-          addr: aa
       }
     Added type 0x1::Roles::RoleId: [6, 0, 0, 0, 0, 0, 0, 0] (wrote 39 bytes)
       key 0x1::Roles::RoleId {
@@ -1262,7 +1880,15 @@ Changed resource(s) under 3 address(es):
             }
             creation_events: store 0x1::Event::EventHandle<0x1::DiemAccount::CreateAccountEvent> {
                 counter: 5
-                guid: 00000000000000000000000000000000000000000a550c18
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 0
+                            addr: a550c18
+                        }
+                    }
+                }
             }
         }
       New:
@@ -1272,10 +1898,18 @@ Changed resource(s) under 3 address(es):
             }
             creation_events: store 0x1::Event::EventHandle<0x1::DiemAccount::CreateAccountEvent> {
                 counter: 6
-                guid: 00000000000000000000000000000000000000000a550c18
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 0
+                            addr: a550c18
+                        }
+                    }
+                }
             }
         }
-Wrote 848 bytes of resource ID's and data
+Wrote 820 bytes of resource ID's and data
 Command `sandbox run scripts/create_child_vasp_account.move --mode diem --type-args 0x1::XUS::XUS --signers 0xB --args 0xBB x"00000000000000000000000000000000" false 0 -v`:
 Compiling transaction script...
 Emitted 1 events:
@@ -1321,18 +1955,33 @@ Changed resource(s) under 3 address(es):
           }
           received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
               counter: 0
-              guid: 0000000000000000000000000000000000000000000000bb
+              guid: drop store 0x1::Event::GUIDWrapper {
+                  len_bytes: 24u8
+                  guid: drop store 0x1::GUID::GUID {
+                      id: copy drop store 0x1::GUID::ID {
+                          creation_num: 0
+                          addr: bb
+                      }
+                  }
+              }
           }
           sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
               counter: 0
-              guid: 0100000000000000000000000000000000000000000000bb
+              guid: drop store 0x1::Event::GUIDWrapper {
+                  len_bytes: 24u8
+                  guid: drop store 0x1::GUID::GUID {
+                      id: copy drop store 0x1::GUID::ID {
+                          creation_num: 1
+                          addr: bb
+                      }
+                  }
+              }
           }
           sequence_number: 0
       }
-    Added type 0x1::Event::EventHandleGenerator: [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 187] (wrote 69 bytes)
-      key 0x1::Event::EventHandleGenerator {
+    Added type 0x1::GUID::Generator: [2, 0, 0, 0, 0, 0, 0, 0] (wrote 41 bytes)
+      key 0x1::GUID::Generator {
           counter: 2
-          addr: bb
       }
     Added type 0x1::Roles::RoleId: [6, 0, 0, 0, 0, 0, 0, 0] (wrote 39 bytes)
       key 0x1::Roles::RoleId {
@@ -1351,7 +2000,15 @@ Changed resource(s) under 3 address(es):
             }
             creation_events: store 0x1::Event::EventHandle<0x1::DiemAccount::CreateAccountEvent> {
                 counter: 6
-                guid: 00000000000000000000000000000000000000000a550c18
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 0
+                            addr: a550c18
+                        }
+                    }
+                }
             }
         }
       New:
@@ -1361,10 +2018,18 @@ Changed resource(s) under 3 address(es):
             }
             creation_events: store 0x1::Event::EventHandle<0x1::DiemAccount::CreateAccountEvent> {
                 counter: 7
-                guid: 00000000000000000000000000000000000000000a550c18
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 0
+                            addr: a550c18
+                        }
+                    }
+                }
             }
         }
-Wrote 593 bytes of resource ID's and data
+Wrote 565 bytes of resource ID's and data
 Command `sandbox run scripts/peer_to_peer_with_metadata.move --mode diem --type-args 0x1::XUS::XUS --signers 0xAA --args 0xBB 100 x"" x"" -v`:
 Compiling transaction script...
 Emitted 2 events:
@@ -1405,11 +2070,27 @@ Changed resource(s) under 2 address(es):
             }
             received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
                 counter: 1
-                guid: 0000000000000000000000000000000000000000000000aa
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 0
+                            addr: aa
+                        }
+                    }
+                }
             }
             sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
                 counter: 0
-                guid: 0100000000000000000000000000000000000000000000aa
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 1
+                            addr: aa
+                        }
+                    }
+                }
             }
             sequence_number: 0
         }
@@ -1432,11 +2113,27 @@ Changed resource(s) under 2 address(es):
             }
             received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
                 counter: 1
-                guid: 0000000000000000000000000000000000000000000000aa
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 0
+                            addr: aa
+                        }
+                    }
+                }
             }
             sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
                 counter: 1
-                guid: 0100000000000000000000000000000000000000000000aa
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 1
+                            addr: aa
+                        }
+                    }
+                }
             }
             sequence_number: 0
         }
@@ -1474,11 +2171,27 @@ Changed resource(s) under 2 address(es):
             }
             received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
                 counter: 0
-                guid: 0000000000000000000000000000000000000000000000bb
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 0
+                            addr: bb
+                        }
+                    }
+                }
             }
             sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
                 counter: 0
-                guid: 0100000000000000000000000000000000000000000000bb
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 1
+                            addr: bb
+                        }
+                    }
+                }
             }
             sequence_number: 0
         }
@@ -1501,11 +2214,27 @@ Changed resource(s) under 2 address(es):
             }
             received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
                 counter: 1
-                guid: 0000000000000000000000000000000000000000000000bb
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 0
+                            addr: bb
+                        }
+                    }
+                }
             }
             sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
                 counter: 0
-                guid: 0100000000000000000000000000000000000000000000bb
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 1
+                            addr: bb
+                        }
+                    }
+                }
             }
             sequence_number: 0
         }

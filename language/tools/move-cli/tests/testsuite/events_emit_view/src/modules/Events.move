@@ -9,7 +9,6 @@ module Events {
     public fun emit(account: &signer, i: u64) acquires Handle {
         let addr = Signer::address_of(account);
         if (!exists<Handle>(addr)) {
-            Event::publish_generator(account);
             move_to(account, Handle { h: Event::new_event_handle(account) })
         };
 

@@ -19,11 +19,7 @@ use move_vm_runtime::native_functions::{NativeFunction, NativeFunctionTable};
 pub fn all_natives(move_std_addr: AccountAddress) -> NativeFunctionTable {
     const NATIVES: &[(&str, &str, NativeFunction)] = &[
         ("BCS", "to_bytes", bcs::native_to_bytes),
-        (
-            "Event",
-            "write_to_event_store",
-            event::native_write_to_event_store,
-        ),
+        ("Event", "write_to_event_store", event::write_to_event_store),
         ("Hash", "sha2_256", hash::native_sha2_256),
         ("Hash", "sha3_256", hash::native_sha3_256),
         ("Signer", "borrow_address", signer::native_borrow_address),

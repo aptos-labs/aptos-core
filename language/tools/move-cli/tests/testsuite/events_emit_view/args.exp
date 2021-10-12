@@ -1,27 +1,34 @@
 Command `sandbox publish src/modules -v`:
 Compiling Move modules...
 Found and compiled 1 modules
-Publishing a new module 00000000000000000000000000000002::Events (wrote 369 bytes)
-Wrote 369 bytes of module ID's and code
+Publishing a new module 00000000000000000000000000000002::Events (wrote 342 bytes)
+Wrote 342 bytes of module ID's and code
 Command `sandbox run src/scripts/emit.move --signers 0xA --args 5 -v`:
 Compiling transaction script...
 Emitted 1 events:
 Emitted [5, 0, 0, 0, 0, 0, 0, 0] as the 0th event to stream [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10]
 Changed resource(s) under 1 address(es):
   Changed 2 resource(s) under address 0000000000000000000000000000000A:
-    Added type 0x1::Event::EventHandleGenerator: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10] (wrote 69 bytes)
-      key 0x1::Event::EventHandleGenerator {
+    Added type 0x1::GUID::Generator: [1, 0, 0, 0, 0, 0, 0, 0] (wrote 41 bytes)
+      key 0x1::GUID::Generator {
           counter: 1
-          addr: a
       }
     Added type 0x2::Events::Handle: [1, 0, 0, 0, 0, 0, 0, 0, 24, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10] (wrote 65 bytes)
       key 0x2::Events::Handle {
           h: store 0x1::Event::EventHandle<0x2::Events::AnEvent> {
               counter: 1
-              guid: 00000000000000000000000000000000000000000000000a
+              guid: drop store 0x1::Event::GUIDWrapper {
+                  len_bytes: 24u8
+                  guid: drop store 0x1::GUID::GUID {
+                      id: copy drop store 0x1::GUID::ID {
+                          creation_num: 0
+                          addr: a
+                      }
+                  }
+              }
           }
       }
-Wrote 134 bytes of resource ID's and data
+Wrote 106 bytes of resource ID's and data
 Command `sandbox view storage/0x0000000000000000000000000000000A/events/0.bcs`:
 copy drop store 0x2::Events::AnEvent {
     i: 5
@@ -37,14 +44,30 @@ Changed resource(s) under 1 address(es):
         key 0x2::Events::Handle {
             h: store 0x1::Event::EventHandle<0x2::Events::AnEvent> {
                 counter: 1
-                guid: 00000000000000000000000000000000000000000000000a
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 0
+                            addr: a
+                        }
+                    }
+                }
             }
         }
       New:
         key 0x2::Events::Handle {
             h: store 0x1::Event::EventHandle<0x2::Events::AnEvent> {
                 counter: 2
-                guid: 00000000000000000000000000000000000000000000000a
+                guid: drop store 0x1::Event::GUIDWrapper {
+                    len_bytes: 24u8
+                    guid: drop store 0x1::GUID::GUID {
+                        id: copy drop store 0x1::GUID::ID {
+                            creation_num: 0
+                            addr: a
+                        }
+                    }
+                }
             }
         }
 Wrote 65 bytes of resource ID's and data

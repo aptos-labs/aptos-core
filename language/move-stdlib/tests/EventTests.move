@@ -4,8 +4,10 @@ module Std::EventTests {
     // Storage tests
     //////////////////
 
+    use Std::BCS;
     use Std::Event::{Self, EventHandle, emit_event, new_event_handle};
     use Std::Signer::address_of;
+    use Std::Vector;
 
     struct Box<T> has copy, drop, store { x: T }
     struct Box3<T> has copy, drop, store { x: Box<Box<T>> }
@@ -78,20 +80,45 @@ module Std::EventTests {
 
     #[test(s = @0x42)]
     fun test_event_128(s: signer) acquires MyEvent {
-        Event::publish_generator(&s);
         event_128(&s);
     }
 
     #[test(s = @0x42)]
     fun test_event_256(s: signer) acquires MyEvent {
-        Event::publish_generator(&s);
         event_256(&s);
     }
 
     #[test(s = @0x42)]
     #[expected_failure(abort_code = 0)]
     fun test_event_257(s: signer) acquires MyEvent {
-        Event::publish_generator(&s);
         event_257(&s);
+    }
+
+    // More detailed version of the above--test BCS compatibility between the old event
+    // format and the new wrapper hack.
+    // this test lives here because it is important for the correctness of GUIDWrapper;
+    // see the comments there for more details
+    #[test(s = @0x42)]
+    fun test_guid_wrapper_backward_compatibility(s: signer) {
+        let sender_bytes = BCS::to_bytes(&address_of(&s));
+        let count_bytes = BCS::to_bytes(&0u64);
+        Vector::append(&mut count_bytes, sender_bytes);
+        let old_guid = count_bytes;
+        // should be 16 bytes of address + 8 byte integer
+        assert(Vector::length(&old_guid) == 24, 0);
+        let old_guid_bytes = BCS::to_bytes(&old_guid);
+        // old_guid_bytes should be length prefix (24), followed by content of vector
+        // the length prefix is a ULEB encoded 32-bit value, so for length prefix 24,
+        // this should only occupy 1 byte: https://github.com/diem/bcs#uleb128-encoded-integers
+        // hence, 24 byte contents + 1 byte length prefix = 25 bytes
+        assert(Vector::length(&old_guid_bytes) == 25, 1);
+
+        // now, build a new GUID and check byte-for-byte compatibility
+        let guid_wrapper = Event::create_guid_wrapper_for_test<u64>(&s);
+        let guid_wrapper_bytes = BCS::to_bytes(&guid_wrapper);
+
+        // check that the guid grapper bytes are identical to the old guid bytes
+        assert(Vector::length(&guid_wrapper_bytes) == Vector::length(&old_guid_bytes), 2);
+        assert(guid_wrapper_bytes == old_guid_bytes, 3)
     }
 }

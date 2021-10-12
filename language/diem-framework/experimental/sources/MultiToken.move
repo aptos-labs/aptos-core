@@ -2,7 +2,7 @@ address 0x1 {
 module MultiToken {
     use Std::Errors;
     use Std::Event;
-    use 0x1::GUID;
+    use Std::GUID;
     use Std::Option::{Self, Option};
     use Std::Signer;
     use Std::Vector;

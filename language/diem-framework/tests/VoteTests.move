@@ -2,7 +2,6 @@
 module DiemFramework::VoteTests {
 
     use Std::BCS;
-    use Std::Event;
     use Std::Signer;
     use Std::UnitTest;
     use Std::Vector;
@@ -58,7 +57,6 @@ module DiemFramework::VoteTests {
     fun ballot_setup(tc: &signer, dr: &signer): (signer, address, vector<u8>) {
         Genesis::setup(dr, tc);
         let proposer = get_proposer();
-        Event::publish_generator(&proposer);
         let addr = Signer::address_of(&proposer);
         let addr_bcs = BCS::to_bytes(&addr);
         (proposer, addr, addr_bcs)

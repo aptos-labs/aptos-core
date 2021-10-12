@@ -17,7 +17,7 @@ Command `experimental read-write-set storage/0x00000000000000000000000000000001/
 0xa/0x1::DiemAccount::DiemAccount/1/0/[_]/0: Read
 0xa/0x1::DiemAccount::DiemAccount/4: Read
 0xa/0x1::DiemAccount::DiemAccount/4/0: ReadWrite
-0xa/0x1::DiemAccount::DiemAccount/4/1: Read
+0xa/0x1::DiemAccount::DiemAccount/4/1/1: Read
 0xa/0x1::VASP::ParentVASP: Read
 0xb/0x1::AccountFreezing::FreezingBit: Read
 0xb/0x1::AccountFreezing::FreezingBit/0: Read
@@ -27,7 +27,7 @@ Command `experimental read-write-set storage/0x00000000000000000000000000000001/
 0xb/0x1::DiemAccount::DiemAccount: Read
 0xb/0x1::DiemAccount::DiemAccount/3: Read
 0xb/0x1::DiemAccount::DiemAccount/3/0: ReadWrite
-0xb/0x1::DiemAccount::DiemAccount/3/1: Read
+0xb/0x1::DiemAccount::DiemAccount/3/1/1: Read
 0xb/0x1::DualAttestation::Credential: Read
 0xb/0x1::DualAttestation::Credential/1: Read
 0xb/0x1::DualAttestation::Credential/2: Read

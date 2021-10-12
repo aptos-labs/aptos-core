@@ -1,6 +1,6 @@
 module 0x1::NFT {
     use Std::Event;
-    use 0x1::GUID::{Self, GUID};
+    use Std::GUID::{Self, GUID};
     use Std::Signer;
 
     /// A non-fungible token of a specific `Type`, created by `id.addr`.

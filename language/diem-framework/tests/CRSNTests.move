@@ -4,12 +4,10 @@ module DiemFramework::CRSNTests {
     use DiemFramework::Genesis;
     use Std::Signer;
     use Std::BitVector;
-    use Std::Event;
 
     #[test_only]
-    public(script) fun setup(dr: &signer, tc: &signer, acct: &signer) {
+    public(script) fun setup(dr: &signer, tc: &signer, _: &signer) {
         Genesis::setup(dr, tc);
-        Event::publish_generator(acct);
         CRSN::allow_crsns(dr)
     }
 

@@ -1,7 +1,6 @@
 module 0x1::MultiTokenBalance {
     use Std::Errors;
-//    use Std::Event;
-    use 0x1::GUID;
+    use Std::GUID;
     use 0x1::MultiToken::{Self, Token};
     use Std::Option::{Self, Option};
     use Std::Signer;

@@ -1,7 +1,6 @@
 #[test_only]
 module 0x1::MultiTokenTests {
-    use Std::Event;
-    use 0x1::GUID;
+    use Std::GUID;
     use 0x1::MultiToken;
     use 0x1::MultiTokenBalance;
 
@@ -21,7 +20,6 @@ module 0x1::MultiTokenTests {
             Initialization + preparation
         ===============================================================
         */
-        Event::publish_generator(&admin);
 
         let creator_addr = @0x42;
         let user_addr = @0x43;

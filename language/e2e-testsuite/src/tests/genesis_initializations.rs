@@ -169,15 +169,6 @@ fn test_diem_block_double_init() {
     let mut executor = FakeExecutor::stdlib_only_genesis();
 
     executor.exec(
-        "Event",
-        "publish_generator",
-        vec![],
-        serialize_values(&vec![
-            MoveValue::Signer(account_config::diem_root_address()),
-        ]),
-    );
-
-    executor.exec(
         "DiemBlock",
         "initialize_block_metadata",
         vec![],

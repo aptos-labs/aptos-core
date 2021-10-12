@@ -18,6 +18,7 @@ This is the root document for the Move stdlib module documentation. The Move std
 -  [`0x1::Errors`](Errors.md#0x1_Errors)
 -  [`0x1::Event`](Event.md#0x1_Event)
 -  [`0x1::FixedPoint32`](FixedPoint32.md#0x1_FixedPoint32)
+-  [`0x1::GUID`](GUID.md#0x1_GUID)
 -  [`0x1::Hash`](Hash.md#0x1_Hash)
 -  [`0x1::Option`](Option.md#0x1_Option)
 -  [`0x1::Signer`](Signer.md#0x1_Signer)

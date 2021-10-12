@@ -153,13 +153,6 @@ impl Account {
         self.make_access_path(AccountResource::struct_tag())
     }
 
-    /// Returns the AccessPath that describes the EventHandleGenerator resource instance.
-    ///
-    /// Use this to retrieve or publish the EventHandleGenerator blob.
-    pub fn make_event_generator_access_path(&self) -> AccessPath {
-        self.make_access_path(account_config::event_handle_generator_struct_tag())
-    }
-
     /// Returns the AccessPath that describes the Account balance resource instance.
     ///
     /// Use this to retrieve or publish the Account balance blob.
@@ -480,38 +473,6 @@ impl AccountRole {
     }
 }
 
-//---------------------------------------------------------------------------
-// Event generator resource represenation
-//---------------------------------------------------------------------------
-
-/// Struct that represents the event generator resource stored under accounts
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct EventHandleGenerator {
-    counter: u64,
-    addr: AccountAddress,
-}
-
-impl EventHandleGenerator {
-    pub fn new(addr: AccountAddress) -> Self {
-        Self { addr, counter: 0 }
-    }
-
-    pub fn new_with_event_count(addr: AccountAddress, counter: u64) -> Self {
-        Self { counter, addr }
-    }
-
-    pub fn to_value(&self) -> Value {
-        Value::struct_(Struct::pack(vec![
-            Value::u64(self.counter),
-            Value::address(self.addr),
-        ]))
-    }
-    pub fn layout() -> MoveStructLayout {
-        MoveStructLayout::new(vec![MoveTypeLayout::U64, MoveTypeLayout::Address])
-    }
-}
-
 /// Represents an account along with initial state about it.
 ///
 /// `AccountData` captures the initial state needed to create accounts for tests.
@@ -525,7 +486,6 @@ pub struct AccountData {
     received_events: EventHandle,
 
     balances: BTreeMap<Identifier, Balance>,
-    event_generator: EventHandleGenerator,
     account_role: AccountRole,
 }
 
@@ -626,7 +586,6 @@ impl AccountData {
         let addr = *account.address();
         Self {
             account_role: AccountRole::new(*account.address(), account_specifier),
-            event_generator: EventHandleGenerator::new_with_event_count(addr, 2),
             withdrawal_capability: Some(WithdrawCapability::new(addr)),
             key_rotation_capability: Some(KeyRotationCapability::new(addr)),
             account,
@@ -691,14 +650,13 @@ impl AccountData {
     }
 
     /// Creates and returns the top-level resources to be published under the account
-    pub fn to_value(&self) -> (Value, Vec<(Identifier, Value)>, Value, Value) {
+    pub fn to_value(&self) -> (Value, Vec<(Identifier, Value)>, Value) {
         // TODO: publish some concept of Account
         let balances: Vec<_> = self
             .balances
             .iter()
             .map(|(code, balance)| (code.clone(), balance.to_value()))
             .collect();
-        let event_generator = self.event_generator.to_value();
         let role_id = self.account_role.account_specifier.to_value();
         let account = Value::struct_(Struct::pack(vec![
             // TODO: this needs to compute the auth key instead
@@ -715,7 +673,7 @@ impl AccountData {
             ])),
             Value::u64(self.sequence_number),
         ]));
-        (account, balances, event_generator, role_id)
+        (account, balances, role_id)
     }
 
     /// Returns the AccessPath that describes the Account resource instance.
@@ -732,17 +690,10 @@ impl AccountData {
         self.account.make_balance_access_path(code)
     }
 
-    /// Returns the AccessPath that describes the EventHandleGenerator resource instance.
-    ///
-    /// Use this to retrieve or publish the EventHandleGenerator blob.
-    pub fn make_event_generator_access_path(&self) -> AccessPath {
-        self.account.make_event_generator_access_path()
-    }
-
     /// Creates a writeset that contains the account data and can be patched to the storage
     /// directly.
     pub fn to_writeset(&self) -> WriteSet {
-        let (account_blob, balance_blobs, event_generator_blob, role_id_blob) = self.to_value();
+        let (account_blob, balance_blobs, role_id_blob) = self.to_value();
         let mut write_set = Vec::new();
         let account = account_blob
             .value_as::<Struct>()
@@ -781,15 +732,6 @@ impl AccountData {
             WriteOp::Value(role_id),
         ));
 
-        let event_generator = event_generator_blob
-            .value_as::<Struct>()
-            .unwrap()
-            .simple_serialize(&EventHandleGenerator::layout())
-            .unwrap();
-        write_set.push((
-            self.make_event_generator_access_path(),
-            WriteOp::Value(event_generator),
-        ));
         WriteSetMut::new(write_set).freeze().unwrap()
     }
 

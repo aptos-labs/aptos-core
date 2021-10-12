@@ -22,11 +22,27 @@ key 0x1::DiemAccount::DiemAccount {
     }
     received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
         counter: 0
-        guid: 00000000000000004777eb94491650dd3f095ce6f778acb6
+        guid: drop store 0x1::Event::GUIDWrapper {
+            len_bytes: 24u8
+            guid: drop store 0x1::GUID::GUID {
+                id: copy drop store 0x1::GUID::ID {
+                    creation_num: 0
+                    addr: 4777eb94491650dd3f095ce6f778acb6
+                }
+            }
+        }
     }
     sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
         counter: 0
-        guid: 01000000000000004777eb94491650dd3f095ce6f778acb6
+        guid: drop store 0x1::Event::GUIDWrapper {
+            len_bytes: 24u8
+            guid: drop store 0x1::GUID::GUID {
+                id: copy drop store 0x1::GUID::ID {
+                    creation_num: 1
+                    addr: 4777eb94491650dd3f095ce6f778acb6
+                }
+            }
+        }
     }
     sequence_number: 1
 }

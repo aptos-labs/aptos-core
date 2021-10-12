@@ -256,24 +256,6 @@ mod tests {
                 }
             }),
         );
-
-        let res = find_value(&resp, |v| v["type"]["name"] == "EventHandleGenerator");
-        assert_json(
-            res,
-            json!({
-                "type": {
-                    "type": "struct",
-                    "address": "0x1",
-                    "module": "Event",
-                    "name": "EventHandleGenerator",
-                    "generic_type_params": []
-                },
-                "value": {
-                    "counter": "5",
-                    "addr": "0xdd"
-                }
-            }),
-        );
     }
 
     #[tokio::test]

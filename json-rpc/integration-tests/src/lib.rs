@@ -1752,37 +1752,78 @@ impl PublicUsageTest for GetResourcesTest {
         assert_eq!(
             currency_info,
             &json!({
-              "total_value": 0,
-              "preburn_value": 0,
-              "to_xdx_exchange_rate": {
-                "value": 4294967296_u64
-              },
-              "is_synthetic": true,
-              "scaling_factor": 1000000,
-              "fractional_part": 1000,
-              "currency_code": "XDX",
-              "can_mint": false,
-              "mint_events": {
-                "counter": 0,
-                "guid": "0a000000000000000000000000000000000000000a550c18"
-              },
-              "burn_events": {
-                "counter": 0,
-                "guid": "0b000000000000000000000000000000000000000a550c18"
-              },
-              "preburn_events": {
-                "counter": 0,
-                "guid": "0c000000000000000000000000000000000000000a550c18"
-              },
-              "cancel_burn_events": {
-                "counter": 0,
-                "guid": "0d000000000000000000000000000000000000000a550c18"
-              },
-              "exchange_rate_update_events": {
-                "counter": 0,
-                "guid": "0e000000000000000000000000000000000000000a550c18"
-              }
-            })
+                                    "total_value": 0,
+                                    "preburn_value": 0,
+                                    "to_xdx_exchange_rate": {
+                                        "value": 4294967296_u64
+                                    },
+                                    "is_synthetic": true,
+                                    "scaling_factor": 1000000,
+                                    "fractional_part": 1000,
+                                    "currency_code": "XDX",
+                                    "can_mint": false,
+                                    "mint_events": {
+                                        "counter": 0,
+                                        "guid": {
+                                "len_bytes": 24,
+                                "guid": {
+                        "id": {
+                                    "creation_num": 10,
+                                    "addr": "a550c18",
+                        }
+                                }
+                                }
+                                    },
+                                    "burn_events": {
+                                        "counter": 0,
+                                        "guid": {
+                                "len_bytes": 24,
+                                "guid": {
+                        "id": {
+                                    "creation_num": 11,
+                                    "addr": "a550c18",
+                        }
+                                }
+                                }
+                                    },
+                                    "preburn_events": {
+                                        "counter": 0,
+                                        "guid": {
+                                "len_bytes": 24,
+                                "guid": {
+                        "id": {
+                                    "creation_num": 12,
+                                    "addr": "a550c18",
+                        }
+                                }
+                                }
+                                    },
+                                    "cancel_burn_events": {
+                                        "counter": 0,
+                                        "guid": {
+                                "len_bytes": 24,
+                                "guid": {
+                        "id": {
+                                    "creation_num": 13,
+                                    "addr": "a550c18",
+                        }
+                                }
+                                }
+                                    },
+                                    "exchange_rate_update_events": {
+                                        "counter": 0,
+                                        "guid": {
+                                "len_bytes": 24,
+                                "guid": {
+                        "id": {
+                                    "creation_num": 14,
+                                    "addr": "a550c18",
+            }
+                                }
+                                }
+
+                                    }
+                                })
         );
 
         Ok(())
