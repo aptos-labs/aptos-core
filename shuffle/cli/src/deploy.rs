@@ -71,8 +71,13 @@ fn publish_packages_as_transaction(
     );
 
     // ================= Send a module transaction ========================
-
-    let mut new_account = LocalAccount::new(derived_address, new_account_key, 0);
+    let seq_number = client
+        .get_account(derived_address)
+        .unwrap()
+        .into_inner()
+        .unwrap()
+        .sequence_number;
+    let mut new_account = LocalAccount::new(derived_address, new_account_key, seq_number);
     let compiled_units = compiled_package.compiled_units;
     let mut uniq_modules: HashSet<String> = HashSet::new(); // Apparently modules can appear twice in compiled units, ensure uniq
     for unit in compiled_units {
