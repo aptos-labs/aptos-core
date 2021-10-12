@@ -7,6 +7,23 @@ import { BcsSerializer } from "./generated/bcs/mod.ts";
 import { ListTuple, uint8 } from "./generated/serde/types.ts";
 import { createHash } from "https://deno.land/std@0.77.0/hash/mod.ts";
 
+export function newRawTransaction(
+  addressStr: string,
+  payload: DiemTypes.TransactionPayloadVariantScript,
+  sequenceNumber: number,
+): DiemTypes.RawTransaction {
+  return new DiemTypes.RawTransaction(
+    hexToAccountAddress(addressStr),
+    BigInt(sequenceNumber),
+    payload, // txn payload
+    BigInt(1000000), // max gas amount
+    BigInt(0), // gas_unit_price
+    "XUS", // currency
+    BigInt(99999999999), // expiration_timestamp_secs
+    new DiemTypes.ChainId(4), // chain id, hardcoded to test
+  );
+}
+
 export function hashPrefix(name: string): Uint8Array {
   const hash = createHash("sha3-256");
   hash.update("DIEM::");
@@ -23,37 +40,6 @@ export function generateSigningMessage(
 
   const signingMsg = appendBuffer(hashPrefix("RawTransaction"), rawTxnBytes);
   return signingMsg;
-}
-
-export function newRawTransaction(
-  addressStr: string,
-  payload: DiemTypes.TransactionPayloadVariantScript,
-  sequenceNumber: number,
-): DiemTypes.RawTransaction {
-  if (addressStr.startsWith("0x")) {
-    addressStr = addressStr.slice(2);
-  }
-  const senderListTuple: ListTuple<[uint8]> = [];
-  for (const entry of hexToBytes(addressStr)) { // encode as bytes
-    senderListTuple.push([entry]);
-  }
-  return new DiemTypes.RawTransaction(
-    new DiemTypes.AccountAddress(senderListTuple), // sender
-    BigInt(sequenceNumber),
-    payload, // txn payload
-    BigInt(1000000), // max gas amount
-    BigInt(0), // gas_unit_price
-    "XUS", // currency
-    BigInt(99999999999), // expiration_timestamp_secs
-    new DiemTypes.ChainId(4), // chain id, hardcoded to test
-  );
-}
-
-function appendBuffer(buffer1: Uint8Array, buffer2: Uint8Array): Uint8Array {
-  const tmp = new Uint8Array(buffer1.byteLength + buffer2.byteLength);
-  tmp.set(new Uint8Array(buffer1));
-  tmp.set(new Uint8Array(buffer2), buffer1.byteLength);
-  return tmp;
 }
 
 export async function newSignedTransaction(
@@ -77,11 +63,29 @@ export async function newSignedTransaction(
   return bufferToHex(signedTxnSerializer.getBytes());
 }
 
+export function hexToAccountAddress(hex: string): DiemTypes.AccountAddress {
+  if (hex.startsWith("0x")) {
+    hex = hex.slice(2);
+  }
+  const senderListTuple: ListTuple<[uint8]> = [];
+  for (const entry of hexToBytes(hex)) { // encode as bytes
+    senderListTuple.push([entry]);
+  }
+  return new DiemTypes.AccountAddress(senderListTuple);
+}
+
 // deno-lint-ignore no-explicit-any
 export function bufferToHex(buffer: any) {
   return [...new Uint8Array(buffer)]
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
+}
+
+function appendBuffer(buffer1: Uint8Array, buffer2: Uint8Array): Uint8Array {
+  const tmp = new Uint8Array(buffer1.byteLength + buffer2.byteLength);
+  tmp.set(new Uint8Array(buffer1));
+  tmp.set(new Uint8Array(buffer2), buffer1.byteLength);
+  return tmp;
 }
 
 function hexToBytes(hex: string) {

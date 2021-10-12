@@ -13,20 +13,27 @@ pub fn handle(project_path: &Path) -> Result<()> {
     let _config = shared::read_config(project_path)?;
 
     let deno_bootstrap = format!(
-        r#"import * as shuffle from "{project}/repl.ts";
-        import * as main from "{project}/{pkg}/mod.ts";
-        import * as DiemHelpers from "{project}/{pkg}/helpers.ts";"#,
-        project = project_path.display(),
-        pkg = shared::MAIN_PKG_PATH,
+        r#"import * as Shuffle from "{shuffle}";
+        import * as main from "{main}";
+        import * as DiemHelpers from "{helpers}";"#,
+        shuffle = project_path.join("repl.ts").to_string_lossy(),
+        main = project_path
+            .join(shared::MAIN_PKG_PATH)
+            .join("mod.ts")
+            .to_string_lossy(),
+        helpers = project_path
+            .join(shared::MAIN_PKG_PATH)
+            .join("helpers.ts")
+            .to_string_lossy(),
     );
     let mut filtered_envs: HashMap<String, String> = HashMap::new();
     filtered_envs.insert(
         String::from("PROJECT_PATH"),
-        project_path.to_str().unwrap().to_string(),
+        project_path.to_string_lossy().to_string(),
     );
     filtered_envs.insert(
         String::from("SHUFFLE_HOME"),
-        get_shuffle_dir().to_str().unwrap().to_string(),
+        get_shuffle_dir().to_string_lossy().to_string(),
     );
 
     Command::new("deno")

@@ -1768,8 +1768,8 @@ dependencies = [
  "once_cell",
  "regex",
  "serde",
- "serde-generate 0.20.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde-reflection 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde-generate",
+ "serde-reflection",
  "serde_yaml",
  "structopt 0.3.21",
  "tempfile",
@@ -3704,7 +3704,7 @@ dependencies = [
  "network",
  "rand 0.8.4",
  "serde",
- "serde-reflection 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde-reflection",
  "serde_yaml",
  "structopt 0.3.21",
 ]
@@ -7319,26 +7319,9 @@ dependencies = [
 
 [[package]]
 name = "serde-generate"
-version = "0.20.1"
-dependencies = [
- "bcs",
- "bincode",
- "heck",
- "include_dir",
- "maplit",
- "serde",
- "serde-reflection 0.3.4",
- "serde_bytes",
- "serde_yaml",
- "structopt 0.3.21",
- "textwrap 0.13.4",
-]
-
-[[package]]
-name = "serde-generate"
-version = "0.20.1"
+version = "0.20.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cdaa583a12f24bdafb80fa3c5af7c926a74994101eee98c0df0770ce4dbf0760"
+checksum = "0c66e29197919812b7d72bc121016de85d84b4d52dec4aaf4dc245087545dc3b"
 dependencies = [
  "bcs",
  "bincode",
@@ -7346,7 +7329,7 @@ dependencies = [
  "include_dir",
  "maplit",
  "serde",
- "serde-reflection 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde-reflection",
  "serde_bytes",
  "serde_yaml",
  "structopt 0.3.21",
@@ -7359,15 +7342,6 @@ version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "87442b7a30baedc6e8875cb7156cb0e2cf41cdd9f13c34de73090c463f028bd8"
 dependencies = [
- "serde",
- "thiserror",
-]
-
-[[package]]
-name = "serde-reflection"
-version = "0.3.4"
-dependencies = [
- "once_cell",
  "serde",
  "thiserror",
 ]
@@ -8788,8 +8762,8 @@ dependencies = [
  "heck",
  "move-core-types",
  "regex",
- "serde-generate 0.20.1",
- "serde-reflection 0.3.4",
+ "serde-generate",
+ "serde-reflection",
  "serde_yaml",
  "structopt 0.3.21",
  "tempfile",

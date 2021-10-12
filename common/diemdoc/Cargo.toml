@@ -11,8 +11,8 @@ edition = "2018"
 
 [dependencies]
 serde_yaml = "0.8.17"
-serde-reflection = "0.3.2"
-serde-generate = "0.20.0"
+serde-reflection = "0.3.4"
+serde-generate = "0.20.2"
 anyhow = "1.0.38"
 regex = "1.4.3"
 structopt = "0.3.21"

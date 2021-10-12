@@ -382,8 +382,8 @@ return new DiemTypes.Script(code, tyArgs, args);"#,
         match type_tag {
             Bool => "boolean".into(),
             U8 => "number".into(),
-            U64 => "BigInt".into(),
-            U128 => "BigInt".into(),
+            U64 => "bigint".into(),
+            U128 => "bigint".into(),
             Address => "DiemTypes.AccountAddress".into(),
             Vector(type_tag) => match type_tag.as_ref() {
                 U8 => "Uint8Array".into(),
@@ -473,14 +473,12 @@ pub fn replace_keywords(registry: &mut BTreeMap<String, ContainerFormat>) {
 }
 
 fn swap_keyworded_fields(fields: Option<&mut ContainerFormat>) {
-    if let Some(fields) = fields {
-        if let ContainerFormat::Struct(fields) = fields {
-            for entry in fields.iter_mut() {
-                match entry.name.as_str() {
-                    "module" => entry.name = String::from("module_name"),
-                    "function" => entry.name = String::from("function_name"),
-                    _ => {}
-                }
+    if let Some(ContainerFormat::Struct(fields)) = fields {
+        for entry in fields.iter_mut() {
+            match entry.name.as_str() {
+                "module" => entry.name = String::from("module_name"),
+                "function" => entry.name = String::from("function_name"),
+                _ => {}
             }
         }
     }

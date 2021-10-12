@@ -56,6 +56,44 @@ fn test_typescript_replace_keywords() {
     }
 }
 
+#[test]
+#[ignore]
+fn test_that_typescript_generation_runs() {
+    let mut registry = get_diem_registry();
+
+    // clean typescript keywords from codegen
+    buildgen::typescript::replace_keywords(&mut registry);
+    let abis = get_stdlib_script_abis();
+    let dir = tempdir().unwrap();
+    let dir_path = dir.path();
+
+    let config = serdegen::CodeGeneratorConfig::new("diemTypes".to_string())
+        .with_encodings(vec![serdegen::Encoding::Bcs]);
+    let bcs_installer = serdegen::typescript::Installer::new(dir_path.to_path_buf());
+    bcs_installer.install_serde_runtime().unwrap();
+    bcs_installer.install_bcs_runtime().unwrap();
+    bcs_installer.install_module(&config, &registry).unwrap();
+
+    let abi_installer = buildgen::typescript::Installer::new(dir_path.to_path_buf());
+    abi_installer
+        .install_transaction_builders("diemStdlib", &abis)
+        .unwrap();
+
+    std::fs::copy("examples/typescript/mod.ts", dir_path.join("mod.ts")).unwrap();
+
+    let output = Command::new("deno")
+        .current_dir(dir_path)
+        .arg("run")
+        .arg(dir_path.join("mod.ts"))
+        .output()
+        .unwrap();
+    eprintln!("{}", std::str::from_utf8(&output.stderr).unwrap());
+    assert_eq!(
+        std::str::from_utf8(&output.stdout).unwrap(),
+        EXPECTED_TX_SCRIPT_OUTPUT
+    );
+    assert!(output.status.success());
+}
 // Cannot run this test in the CI of Diem.
 #[test]
 #[ignore]
