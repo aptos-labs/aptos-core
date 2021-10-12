@@ -14,7 +14,10 @@ use diem_writeset_generator::{
     verify_release,
 };
 use move_binary_format::CompiledModule;
-use std::path::PathBuf;
+use std::{
+    hash::{Hash, Hasher},
+    path::PathBuf,
+};
 use structopt::StructOpt;
 
 const GENESIS_MODULE_NAME: &str = "Genesis";
@@ -76,6 +79,13 @@ enum Command {
         /// The verification tool will automatically verify the payload against the latest blockchain state. Set this flag to false if we want to verify the payload against the height when the payload gets created.
         #[structopt(long)]
         use_latest_version: bool,
+    },
+    /// Print out hash of WriteSet blob that will be displayed by AOS portal.
+    #[structopt(name = "hash")]
+    GetHash {
+        /// Path to the serialized bytes of WriteSet.
+        #[structopt(parse(from_os_str))]
+        writeset_path: PathBuf,
     },
 }
 
@@ -178,6 +188,16 @@ fn main() -> Result<()> {
                 &release_modules,
                 use_latest_version,
             )?;
+            return Ok(());
+        }
+        Command::GetHash { writeset_path } => {
+            let raw_bytes = std::fs::read(writeset_path.as_path()).unwrap();
+            let mut hasher = ::std::collections::hash_map::DefaultHasher::new();
+            hex::encode(&raw_bytes).hash(&mut hasher);
+            println!(
+                "Hash of WriteSet that will be displayed: {:?}",
+                hasher.finish()
+            );
             return Ok(());
         }
     };
