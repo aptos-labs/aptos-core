@@ -1,0 +1,21 @@
+[package]
+name = "storage-service-client"
+version = "0.1.0"
+authors = ["Diem Association <opensource@diem.com>"]
+description = "The Diem storage service (client-side)"
+repository = "https://github.com/diem/diem"
+homepage = "https://diem.com"
+license = "Apache-2.0"
+publish = false
+edition = "2018"
+
+[dependencies]
+async-trait = "0.1.42"
+thiserror = "1.0.24"
+
+channel = { path = "../../../common/channel" }
+diem-config = { path = "../../../config" }
+diem-types = { path = "../../../types" }
+diem-workspace-hack = { path = "../../../common/workspace-hack" }
+network = { path = "../../../network" }
+storage-service-types = { path = "../types" }

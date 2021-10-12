@@ -8129,6 +8129,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "storage-service-client"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "channel",
+ "diem-config",
+ "diem-types",
+ "diem-workspace-hack",
+ "network",
+ "storage-service-types",
+ "thiserror",
+]
+
+[[package]]
 name = "storage-service-server"
 version = "0.1.0"
 dependencies = [

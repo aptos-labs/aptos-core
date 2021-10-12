@@ -26,7 +26,7 @@ pub enum StorageServiceError {
 }
 
 /// A single storage service message sent or received over DiemNet.
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 // TODO(philiphayes): do something about this without making it ugly :(
 #[allow(clippy::large_enum_variant)]
 pub enum StorageServiceMessage {
