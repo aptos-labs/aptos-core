@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::shared::{send, MAIN_PKG_PATH};
+use crate::shared::{get_shuffle_dir, send, MAIN_PKG_PATH};
 use anyhow::{anyhow, Result};
 use diem_crypto::PrivateKey;
 use diem_sdk::{
@@ -23,9 +23,18 @@ use move_package::compilation::compiled_package::CompiledPackage;
 use std::{collections::HashSet, convert::TryFrom, path::Path};
 
 /// Deploys shuffle's main Move Package to the sender's address.
-pub fn handle(project_path: &Path, account_key_path: &Path) -> Result<()> {
+pub fn handle(project_path: &Path) -> Result<()> {
+    let account_key_path = get_shuffle_dir()
+        .join("accounts")
+        .join("latest")
+        .join("dev.key");
+    if !account_key_path.exists() {
+        return Err(anyhow!(
+            "An account hasn't been created yet! Run shuffle account first."
+        ));
+    }
     let compiled_package = build_move_packages(project_path)?;
-    publish_packages_as_transaction(account_key_path, compiled_package)
+    publish_packages_as_transaction(&account_key_path, compiled_package)
 }
 
 /// Builds the packages in the shuffle project using the move package system.

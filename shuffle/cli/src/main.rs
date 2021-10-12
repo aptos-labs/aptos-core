@@ -18,10 +18,7 @@ pub fn main() -> Result<()> {
     match subcommand {
         Subcommand::New { blockchain, path } => new::handle(blockchain, path),
         Subcommand::Node {} => node::handle(),
-        Subcommand::Deploy {
-            project_path,
-            account_key_path,
-        } => deploy::handle(project_path.as_path(), account_key_path.as_path()),
+        Subcommand::Deploy { project_path } => deploy::handle(project_path.as_path()),
         Subcommand::Account {} => account::handle(),
         Subcommand::Console { project_path } => console::handle(project_path.as_path()),
         Subcommand::Test { project_path } => test::handle(project_path.as_path()),
@@ -43,10 +40,7 @@ pub enum Subcommand {
     #[structopt(about = "Runs a local devnet with prefunded accounts")]
     Node {},
     #[structopt(about = "Publishes a move module under an account")]
-    Deploy {
-        project_path: PathBuf,
-        account_key_path: PathBuf,
-    },
+    Deploy { project_path: PathBuf },
     #[structopt(about = "Creates new account with randomly generated private/public key")]
     Account {},
     #[structopt(about = "Starts a REPL for onchain inspection")]
