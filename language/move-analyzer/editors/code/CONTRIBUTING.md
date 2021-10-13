@@ -42,3 +42,54 @@ You can run the extensions tests from within the "Run and Debug" view:
 2. Open the "Run and Debug" view: open the command palette (keyboard shortcut `⇧⌘P` on macOS) and type in "View: Show Run and Debug".
 3. Toward the bottom of the Run and Debug view, you should see an option to enable breakpoints on "Uncaught Exceptions." Clicking the check-box to enable breakpoints will make test failures easier to debug.
 4. From the pull-down menu in the Run and Debug view, select "VS Code Tokenizer Tests" and click the green arrow button to run the tests. Should they fail, you will see a stack trace.
+
+## Releasing new versions of the extension
+
+To add new versions of the move-analyzer Visual Studio Code extension, you will need to:
+
+1. Request to be added to the `move` publisher team.
+2. Package and upload a new extension version.
+
+### 1: Become a member of the `move` publisher team
+
+As [Visual Studio Code's documentation](https://code.visualstudio.com/api/working-with-extensions/publishing-extension) explains, the Visual Studio Marketplace  uses [Azure DevOps](https://azure.microsoft.com/services/devops/) to authenticate users who are allowed to manage extensions. To register with Azure DevOps, you need a Microsoft account.
+
+> **NOTE:** If you work for a company that uses Microsoft Outlook to serve your corporate email, then you already have a Microsoft account associated with that email address.
+
+To be added to the group of maintainers allowed to release new versions of the move-analyzer Visual Studio Code extension:
+
+1. Open https://marketplace.visualstudio.com/vscode in your browser and click on "Sign in" on the upper-right of the page.
+2. Sign in with your Microsoft account's email address. If using a corporate email address, you'll go through an authentication flow specific to your organization (two-factor authentication, for example).
+3. Once you've signed in, contact someone who is already in the existing group of maintainers, and ask them to [please add you to this list of members](https://marketplace.visualstudio.com/manage/publishers/move). If you do not know anyone in this group personally, run `git log -- language/move-analyzer/editors/code` and send an email to one or more of the people who have committed to this directory.
+
+Once you've been added, confirm that you are able to access [the `move` publisher page](https://marketplace.visualstudio.com/manage/publishers/move). If you can see yourself listed in the "Members" tab, then you have successfully been added to the publisher team.
+
+### 2: Publish a new version
+
+To publish a new version of the extension, you'll need to:
+
+1. Create a personal access token (PAT) that allows your command line to authenticate with the Visual Studio Marketplace.
+2. Publish and merge a pull request to update the version number of the extension.
+3. Upload a new version of the extension to the Visual Studio Code Marketplace.
+
+#### 2.1: Create a personal access token
+
+Follow the instructions in [the Visual Studio Code documentation on creating a personal access token](https://code.visualstudio.com/api/working-with-extensions/publishing-extension#get-a-personal-access-token). To summarize:
+
+1. From the [`move` publisher page](https://marketplace.visualstudio.com/manage/publishers/move), click on your username in the upper-right of the page. This will load [your Azure DevOps page](https://aex.dev.azure.com/me).
+2. On that page, click on the `dev.azure.com/<name>` link below "Azure DevOps Organizations." If you have more than one organization listed there, choose the one you feel is best. This will load the `https://dev.azure.com/<name>` organization page.
+3. On that page, click on the "User Settings" icon in the upper-right, and select "Personal access tokens" from the drop-down menu. This will load the "Personal Access Tokens" page.
+4. On that page, click on "New Token." Name it whatever you like, but make sure to select an expiration of 30 days, and a "custom-defined scope" of just "Marketplace > Manage." Click "Create," and copy the token that is presented on the following page to your clipboard.
+5. Using your command line, enter the directory containing this `CONTRIBUTING.md` file, make sure you've installed the project's dependencies using `npm install`, and then run `npx vsce login move`. You will be prompted to enter the token you just copied in the previous step. Do so, and you'll have successfully authenticated on the command line.
+
+#### 2.2: Update the version number of the extension
+
+The `package.json` file in this directory specifies the extension's version number. The Visual Studio Code Marketplace will only allow an extension with a greater version number to be published.
+
+Update the version number, commit that change in Git, and submit a pull request to update the version number. Once the version number update pull request is merged, proceed to the next step.
+
+#### 2.3: Upload a new version of the extension
+
+You can publish a new version with `npm run publish`. This will lint the source code, run the extension's tests and, if they succeed, validate the extension and publish it to the Visual Studio Code Marketplace.
+
+The extension package may fail to validate, in which case it will print an error message that explains the problem. Please fix the problems, submit a pull request, and only once that pull request is merged, attempt once again to publish the extension update.

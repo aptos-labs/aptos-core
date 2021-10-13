@@ -82,7 +82,8 @@
         "pretest": "npm run compile && npm run lint",
         "test": "node ./out/tests/runTests.js",
         "vscode:prepublish": "npm run pretest",
-        "package": "vsce package -o move-analyzer.vsix"
+        "package": "vsce package -o move-analyzer.vsix",
+        "publish": "npm run pretest && npm run test && vsce publish"
     },
     "devDependencies": {
         "@types/glob": "^7.1.4",
