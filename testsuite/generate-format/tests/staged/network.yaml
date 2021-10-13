@@ -146,6 +146,8 @@ ProtocolId:
       ConsensusRpcJson: UNIT
     8:
       StorageServiceRpc: UNIT
+    9:
+      MempoolRpc: UNIT
 ProtocolIdSet:
   NEWTYPESTRUCT: BYTES
 PublicKey:

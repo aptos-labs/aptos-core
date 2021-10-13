@@ -50,6 +50,7 @@ pub enum ProtocolId {
     ConsensusDirectSendJson = 6,
     ConsensusRpcJson = 7,
     StorageServiceRpc = 8,
+    MempoolRpc = 9,
 }
 
 /// The encoding types for Protocols
@@ -71,6 +72,7 @@ impl ProtocolId {
             ConsensusDirectSendJson => "ConsensusDirectSendJson",
             ConsensusRpcJson => "ConsensusRpcJson",
             StorageServiceRpc => "StorageServiceRpc",
+            MempoolRpc => "MempoolRpc",
         }
     }
 
@@ -85,6 +87,7 @@ impl ProtocolId {
             ProtocolId::ConsensusDirectSendJson,
             ProtocolId::ConsensusRpcJson,
             ProtocolId::StorageServiceRpc,
+            ProtocolId::MempoolRpc,
         ]
     }
 

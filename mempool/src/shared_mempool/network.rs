@@ -93,7 +93,7 @@ pub struct MempoolNetworkSender {
 
 pub fn network_endpoint_config(max_broadcasts_per_peer: usize) -> AppConfig {
     AppConfig::p2p(
-        [ProtocolId::MempoolDirectSend],
+        [ProtocolId::MempoolDirectSend, ProtocolId::MempoolRpc],
         diem_channel::Config::new(max_broadcasts_per_peer)
             .queue_style(QueueStyle::KLAST)
             .counters(&counters::PENDING_MEMPOOL_NETWORK_EVENTS),
@@ -123,11 +123,17 @@ impl ApplicationNetworkSender<MempoolSyncMsg> for MempoolNetworkSender {
 
     async fn send_rpc(
         &self,
-        _recipient: PeerId,
-        _req_msg: MempoolSyncMsg,
-        _timeout: Duration,
+        recipient: PeerId,
+        req_msg: MempoolSyncMsg,
+        timeout: Duration,
     ) -> Result<MempoolSyncMsg, RpcError> {
-        unimplemented!()
+        fail_point!("mempool::send_to", |_| {
+            Err(anyhow::anyhow!("Injected error in mempool::send_rpc").into())
+        });
+        let protocol = ProtocolId::MempoolRpc;
+        self.inner
+            .send_rpc(recipient, protocol, req_msg, timeout)
+            .await
     }
 }
 
