@@ -258,7 +258,7 @@ mod test {
 
         let accounts_dir = &dir.path().join("accounts");
         let saved_dir = &dir.path().join("accounts").join(time.as_secs().to_string());
-        save_old_key(accounts_dir, &saved_dir).expect("Old key wasn't saved");
+        save_old_key(accounts_dir, saved_dir).expect("Old key wasn't saved");
         let saved_key = generate_key::load_key(saved_dir.join("dev.key"));
 
         let old_key_path = &dir.path().join("accounts").join("latest").join("dev.key");
@@ -282,7 +282,7 @@ mod test {
 
         let accounts_dir = &dir.path().join("accounts");
         let saved_dir = &dir.path().join("accounts").join(time.as_secs().to_string());
-        save_old_address(accounts_dir, &saved_dir).expect("Old address wasn't saved");
+        save_old_address(accounts_dir, saved_dir).expect("Old address wasn't saved");
         let saved_address = fs::read_to_string(saved_dir.join("address")).unwrap();
 
         let old_address_path = &dir.path().join("accounts").join("latest").join("address");
