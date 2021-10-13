@@ -2,13 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{Address, Bytecode};
+use anyhow::format_err;
 use diem_types::transaction::Module;
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{
-        Ability, AbilitySet, CompiledModule, CompiledScript, FieldDefinition, FunctionDefinition,
-        SignatureToken, StructDefinition, StructFieldInformation, StructHandleIndex,
-        StructTypeParameter, Visibility,
+        Ability, AbilitySet, CompiledModule, CompiledScript, StructTypeParameter, Visibility,
     },
 };
 use move_core_types::{
@@ -21,7 +20,6 @@ use resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue};
 
 use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
 use std::{
-    borrow::Borrow,
     collections::BTreeMap,
     convert::{From, Into, TryFrom, TryInto},
     fmt,
@@ -92,7 +90,11 @@ impl fmt::Display for U64 {
 
 impl Serialize for U64 {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        self.0.to_string().serialize(serializer)
+        if serializer.is_human_readable() {
+            self.0.to_string().serialize(serializer)
+        } else {
+            self.0.serialize(serializer)
+        }
     }
 }
 
@@ -101,10 +103,14 @@ impl<'de> Deserialize<'de> for U64 {
     where
         D: Deserializer<'de>,
     {
-        let s = <String>::deserialize(deserializer)?;
-        let data = s.parse::<u64>().map_err(D::Error::custom)?;
+        if deserializer.is_human_readable() {
+            let s = <String>::deserialize(deserializer)?;
+            let data = s.parse::<u64>().map_err(D::Error::custom)?;
 
-        Ok(U64(data))
+            Ok(U64(data))
+        } else {
+            Ok(Self(<u64>::deserialize(deserializer)?))
+        }
     }
 }
 
@@ -131,7 +137,11 @@ impl From<U128> for u128 {
 
 impl Serialize for U128 {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        self.0.to_string().serialize(serializer)
+        if serializer.is_human_readable() {
+            self.0.to_string().serialize(serializer)
+        } else {
+            self.0.serialize(serializer)
+        }
     }
 }
 
@@ -140,10 +150,14 @@ impl<'de> Deserialize<'de> for U128 {
     where
         D: Deserializer<'de>,
     {
-        let s = <String>::deserialize(deserializer)?;
-        let data = s.parse::<u128>().map_err(D::Error::custom)?;
+        if deserializer.is_human_readable() {
+            let s = <String>::deserialize(deserializer)?;
+            let data = s.parse::<u128>().map_err(D::Error::custom)?;
 
-        Ok(U128(data))
+            Ok(U128(data))
+        } else {
+            Ok(Self(<u128>::deserialize(deserializer)?))
+        }
     }
 }
 
@@ -164,7 +178,11 @@ impl FromStr for HexEncodedBytes {
 
 impl Serialize for HexEncodedBytes {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        format!("0x{}", &hex::encode(&self.0)).serialize(serializer)
+        if serializer.is_human_readable() {
+            format!("0x{}", &hex::encode(&self.0)).serialize(serializer)
+        } else {
+            self.0.serialize(serializer)
+        }
     }
 }
 
@@ -173,8 +191,12 @@ impl<'de> Deserialize<'de> for HexEncodedBytes {
     where
         D: Deserializer<'de>,
     {
-        let s = <String>::deserialize(deserializer)?;
-        s.parse().map_err(D::Error::custom)
+        if deserializer.is_human_readable() {
+            let s = <String>::deserialize(deserializer)?;
+            s.parse().map_err(D::Error::custom)
+        } else {
+            Ok(Self(<Vec<u8>>::deserialize(deserializer)?))
+        }
     }
 }
 
@@ -184,13 +206,19 @@ impl From<Vec<u8>> for HexEncodedBytes {
     }
 }
 
+impl From<HexEncodedBytes> for Vec<u8> {
+    fn from(bytes: HexEncodedBytes) -> Self {
+        bytes.0
+    }
+}
+
 impl HexEncodedBytes {
     pub fn inner(&self) -> &[u8] {
         &self.0
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct MoveStructValue(BTreeMap<Identifier, MoveValue>);
 
 impl From<AnnotatedMoveStruct> for MoveStructValue {
@@ -200,6 +228,23 @@ impl From<AnnotatedMoveStruct> for MoveStructValue {
             map.insert(id, MoveValue::from(val));
         }
         Self(map)
+    }
+}
+
+impl Serialize for MoveStructValue {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.0.serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for MoveStructValue {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Ok(Self(<BTreeMap<Identifier, MoveValue>>::deserialize(
+            deserializer,
+        )?))
     }
 }
 
@@ -246,6 +291,27 @@ impl From<TransactionArgument> for MoveValue {
     }
 }
 
+impl TryFrom<MoveValue> for TransactionArgument {
+    type Error = anyhow::Error;
+
+    fn try_from(val: MoveValue) -> anyhow::Result<Self> {
+        Ok(match val {
+            MoveValue::U8(v) => TransactionArgument::U8(v),
+            MoveValue::U64(v) => TransactionArgument::U64(v.into()),
+            MoveValue::U128(v) => TransactionArgument::U128(v.into()),
+            MoveValue::Bool(v) => TransactionArgument::Bool(v),
+            MoveValue::Address(v) => TransactionArgument::Address(v.into()),
+            MoveValue::Bytes(bytes) => TransactionArgument::U8Vector(bytes.into()),
+            _ => {
+                return Err(format_err!(
+                    "can't convert {:?} into TransactionArgument",
+                    val
+                ))
+            }
+        })
+    }
+}
+
 impl Serialize for MoveValue {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match &self {
@@ -267,8 +333,14 @@ impl<'de> Deserialize<'de> for MoveValue {
     where
         D: Deserializer<'de>,
     {
-        let value = serde_json::Value::deserialize(deserializer).map_err(D::Error::custom)?;
-        Ok(MoveValue::Json(value))
+        if deserializer.is_human_readable() {
+            let value = serde_json::Value::deserialize(deserializer).map_err(D::Error::custom)?;
+            Ok(MoveValue::Json(value))
+        } else {
+            Err(D::Error::custom(
+                "can't deserialize MoveValue from binary format",
+            ))
+        }
     }
 }
 
@@ -307,19 +379,6 @@ impl TryFrom<MoveStructTag> for StructTag {
     }
 }
 
-impl<T: Bytecode> From<(&T, &StructHandleIndex, &Vec<SignatureToken>)> for MoveStructTag {
-    fn from((m, shi, type_params): (&T, &StructHandleIndex, &Vec<SignatureToken>)) -> Self {
-        let s_handle = m.struct_handle_at(*shi);
-        let m_handle = m.module_handle_at(s_handle.module);
-        Self {
-            address: (*m.address_identifier_at(m_handle.address)).into(),
-            module: m.identifier_at(m_handle.name).to_owned(),
-            name: m.identifier_at(s_handle.name).to_owned(),
-            generic_type_params: type_params.iter().map(|t| (m, t).into()).collect(),
-        }
-    }
-}
-
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum MoveType {
@@ -333,6 +392,16 @@ pub enum MoveType {
     Struct(MoveStructTag),
     GenericTypeParam { index: u16 },
     Reference { mutable: bool, to: Box<MoveType> },
+}
+
+impl MoveType {
+    pub fn is_signer(&self) -> bool {
+        match self {
+            MoveType::Signer => true,
+            MoveType::Reference { mutable: _, to } => to.is_signer(),
+            _ => false,
+        }
+    }
 }
 
 impl From<TypeTag> for MoveType {
@@ -375,35 +444,6 @@ impl TryFrom<MoveType> for TypeTag {
     }
 }
 
-impl<T: Bytecode> From<(&T, &SignatureToken)> for MoveType {
-    fn from((m, token): (&T, &SignatureToken)) -> Self {
-        match token {
-            SignatureToken::Bool => MoveType::Bool,
-            SignatureToken::U8 => MoveType::U8,
-            SignatureToken::U64 => MoveType::U64,
-            SignatureToken::U128 => MoveType::U128,
-            SignatureToken::Address => MoveType::Address,
-            SignatureToken::Signer => MoveType::Signer,
-            SignatureToken::Vector(t) => MoveType::Vector {
-                items: Box::new((m, t.borrow()).into()),
-            },
-            SignatureToken::Struct(v) => MoveType::Struct((m, v, &vec![]).into()),
-            SignatureToken::StructInstantiation(shi, type_params) => {
-                MoveType::Struct((m, shi, type_params).into())
-            }
-            SignatureToken::TypeParameter(i) => MoveType::GenericTypeParam { index: *i },
-            SignatureToken::Reference(t) => MoveType::Reference {
-                mutable: false,
-                to: Box::new((m, t.borrow()).into()),
-            },
-            SignatureToken::MutableReference(t) => MoveType::Reference {
-                mutable: true,
-                to: Box::new((m, t.borrow()).into()),
-            },
-        }
-    }
-}
-
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct MoveModule {
     pub address: Address,
@@ -431,9 +471,13 @@ impl From<CompiledModule> for MoveModule {
                     Visibility::Public | Visibility::Friend | Visibility::Script => true,
                     Visibility::Private => false,
                 })
-                .map(|def| (&m, def).into())
+                .map(|def| m.new_move_function(def))
                 .collect(),
-            structs: m.struct_defs.iter().map(|def| (&m, def).into()).collect(),
+            structs: m
+                .struct_defs
+                .iter()
+                .map(|def| m.new_move_struct(def))
+                .collect(),
         }
     }
 }
@@ -473,35 +517,6 @@ pub struct MoveStruct {
     pub abilities: Vec<MoveAbility>,
     pub generic_type_params: Vec<MoveStructGenericTypeParam>,
     pub fields: Vec<MoveStructField>,
-}
-
-impl<T: Bytecode> From<(&T, &StructDefinition)> for MoveStruct {
-    fn from((m, def): (&T, &StructDefinition)) -> Self {
-        let handle = m.struct_handle_at(def.struct_handle);
-        let (is_native, fields) = match &def.field_information {
-            StructFieldInformation::Native => (true, vec![]),
-            StructFieldInformation::Declared(fields) => {
-                (false, fields.iter().map(|f| (m, f).into()).collect())
-            }
-        };
-        let name = m.identifier_at(handle.name).to_owned();
-        let abilities = handle
-            .abilities
-            .into_iter()
-            .map(MoveAbility::from)
-            .collect();
-        let generic_type_params = (&handle.type_parameters)
-            .iter()
-            .map(MoveStructGenericTypeParam::from)
-            .collect();
-        Self {
-            name,
-            is_native,
-            abilities,
-            generic_type_params,
-            fields,
-        }
-    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -582,18 +597,9 @@ impl From<&StructTypeParameter> for MoveStructGenericTypeParam {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct MoveStructField {
-    name: Identifier,
+    pub name: Identifier,
     #[serde(rename = "type")]
-    typ: MoveType,
-}
-
-impl<T: Bytecode> From<(&T, &FieldDefinition)> for MoveStructField {
-    fn from((m, def): (&T, &FieldDefinition)) -> Self {
-        Self {
-            name: m.identifier_at(def.name).to_owned(),
-            typ: (m, &def.signature.0).into(),
-        }
-    }
+    pub typ: MoveType,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -606,36 +612,8 @@ pub struct MoveFunction {
     pub return_: Vec<MoveType>,
 }
 
-impl<T: Bytecode> From<(&T, &FunctionDefinition)> for MoveFunction {
-    fn from((m, def): (&T, &FunctionDefinition)) -> Self {
-        let fhandle = m.function_handle_at(def.function);
-        let name = m.identifier_at(fhandle.name).to_owned();
-        Self {
-            name,
-            visibility: def.visibility.into(),
-            generic_type_params: fhandle
-                .type_parameters
-                .iter()
-                .map(MoveFunctionGenericTypeParam::from)
-                .collect(),
-            params: m
-                .signature_at(fhandle.parameters)
-                .0
-                .iter()
-                .map(|s| (m, s).into())
-                .collect(),
-            return_: m
-                .signature_at(fhandle.return_)
-                .0
-                .iter()
-                .map(|s| (m, s).into())
-                .collect(),
-        }
-    }
-}
-
-impl From<CompiledScript> for MoveFunction {
-    fn from(script: CompiledScript) -> Self {
+impl From<&CompiledScript> for MoveFunction {
+    fn from(script: &CompiledScript) -> Self {
         Self {
             name: Identifier::new("main").unwrap(),
             visibility: MoveFunctionVisibility::Script,
@@ -648,7 +626,7 @@ impl From<CompiledScript> for MoveFunction {
                 .signature_at(script.parameters)
                 .0
                 .iter()
-                .map(|s| (&script, s).into())
+                .map(|s| script.new_move_type(s).into())
                 .collect(),
             return_: vec![],
         }
@@ -748,7 +726,7 @@ impl MoveScriptBytecode {
 
     pub fn ensure_abi(mut self) -> anyhow::Result<Self> {
         if self.abi.is_none() {
-            let func = CompiledScript::deserialize(self.bytecode.inner())?.try_into()?;
+            let func = (&CompiledScript::deserialize(self.bytecode.inner())?).into();
             self.abi = Some(func);
         }
         Ok(self)
@@ -761,7 +739,7 @@ impl MoveScriptBytecode {
 
 #[cfg(test)]
 mod tests {
-    use crate::{MoveResource, MoveType, U128, U64};
+    use crate::{HexEncodedBytes, MoveResource, MoveType, U128, U64};
 
     use diem_types::account_address::AccountAddress;
     use move_binary_format::file_format::AbilitySet;
@@ -771,8 +749,9 @@ mod tests {
     };
     use resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue};
 
+    use serde::{de::DeserializeOwned, Serialize};
     use serde_json::{json, to_value, Value};
-    use std::boxed::Box;
+    use std::{boxed::Box, fmt::Debug};
 
     #[test]
     fn test_serialize_move_type_tag() {
@@ -937,25 +916,40 @@ mod tests {
 
     #[test]
     fn test_serialize_deserialize_u64() {
-        let val = to_value(&U64::from(u64::MAX)).unwrap();
-        assert_eq!(val, json!(u64::MAX.to_string()));
-
-        let data: U64 = serde_json::from_value(json!(u64::MAX.to_string())).unwrap();
-        assert_eq!(u64::from(data), u64::MAX);
-
-        assert_eq!(
-            bcs::to_bytes(&(0_u64)).unwrap(),
-            bcs::to_bytes(&serde_json::from_value::<U64>(json!("0")).unwrap().0).unwrap()
-        );
+        test_serialize_deserialize(u64::MAX, U64::from(u64::MAX), json!(u64::MAX.to_string()))
     }
 
     #[test]
     fn test_serialize_deserialize_u128() {
-        let val = to_value(&U128::from(u128::MAX)).unwrap();
-        assert_eq!(val, json!(u128::MAX.to_string()));
+        test_serialize_deserialize(
+            u128::MAX,
+            U128::from(u128::MAX),
+            json!(u128::MAX.to_string()),
+        )
+    }
 
-        let data: U128 = serde_json::from_value(json!(u128::MAX.to_string())).unwrap();
-        assert_eq!(u128::from(data), u128::MAX);
+    #[test]
+    fn test_serialize_deserialize_hex_encoded_bytes() {
+        let bytes = hex::decode("abcd").unwrap();
+        test_serialize_deserialize(bytes.clone(), HexEncodedBytes::from(bytes), json!("0xabcd"))
+    }
+
+    fn test_serialize_deserialize<I, O>(inner: I, outer: O, outer_json: Value)
+    where
+        O: Serialize + DeserializeOwned + PartialEq + Debug,
+        I: Serialize + Debug,
+    {
+        let val = serde_json::to_value(&outer).unwrap();
+        assert_eq!(val, outer_json);
+
+        let data: O = serde_json::from_value(val).unwrap();
+        assert_eq!(data, outer);
+
+        let bcs_bytes = bcs::to_bytes(&inner).unwrap();
+        assert_eq!(
+            bcs::to_bytes(&bcs::from_bytes::<O>(&bcs_bytes).unwrap()).unwrap(),
+            bcs_bytes,
+        );
     }
 
     fn create_nested_struct() -> StructTag {

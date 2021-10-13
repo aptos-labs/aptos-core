@@ -41,7 +41,7 @@ impl<'a, T: MoveResolver + ?Sized> Resolver<'a, T> {
         self.get_module_by_id(&module_id)
     }
 
-    fn get_module_by_id(&self, module_id: &ModuleId) -> Result<Rc<CompiledModule>> {
+    pub fn get_module_by_id(&self, module_id: &ModuleId) -> Result<Rc<CompiledModule>> {
         if let Some(module) = self.cache.get(module_id) {
             return Ok(module);
         }

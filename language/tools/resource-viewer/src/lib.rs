@@ -9,6 +9,7 @@ use anyhow::{anyhow, Result};
 use move_binary_format::{
     errors::{Location, PartialVMError},
     file_format::{Ability, AbilitySet},
+    CompiledModule,
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -22,6 +23,7 @@ use serde::ser::{SerializeMap, SerializeSeq};
 use std::{
     convert::{TryFrom, TryInto},
     fmt::{Display, Formatter},
+    rc::Rc,
 };
 
 mod fat_type;
@@ -82,8 +84,8 @@ impl<'a, T: MoveResolver + ?Sized> MoveValueAnnotator<'a, T> {
         self.cache.state.get_resource(addr, tag).ok()?
     }
 
-    pub fn get_module_bytes(&self, module: &ModuleId) -> Option<Vec<u8>> {
-        self.cache.state.get_module(module).ok()?
+    pub fn get_module(&self, module: &ModuleId) -> Result<Rc<CompiledModule>> {
+        self.cache.get_module_by_id(module)
     }
 
     pub fn view_function_arguments(
