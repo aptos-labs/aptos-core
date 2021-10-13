@@ -170,16 +170,15 @@ that is fully integrated into the Diem blockchain production process, which (to
 the best of our knowledge) is novel by itself.
 
 Because of the similarity of Move and Rust~\cite{rust} in the use of borrow
-semantics, some of the techniques described are also applicable to the
-verification of Rust (e.g.~\cite{prusti,smack,nopanic,crust}).  For example, we
-expect reference elimination to work for the safe subset of Rust.  To
-the best of our knowledge, this has not been attempted before.
+semantics, some of the techniques described here may also be applicable to the
+verification of Rust~\cite{rust}.  We expect reference elimination to apply for
+the safe subset of Rust, though some extra work would be needed to deal with
+embedded references.  To the best of our knowledge, something similar has not
+yet been attempted in existing Rust verification work
+\cite{prusti,smack,nopanic,crust}.
+
 
 \Paragraph{Future Work}
-
-%% DD Note: I'm taking a less specific and longer-term view of future work.
-%% This is all a matter of taste, so feel free to go back to the previous
-%% version if you prefer.
 
 \MVP is conceived as a tool for achieving higher assurance systems, not as a bug
 hunting tool. Having at least temporarily achieved satsifactory performance and
@@ -205,32 +204,6 @@ logic problems will reappear, and there will be more opportunities for improving
 performance and reliability.  In addition to translation techniques, it will be
 necessary to identify opportunities to improve SMT solvers for the particular
 kinds of problems we generate.
-
-%% While currently \MVP is performing to our satisfaction, there are multiple open
-%% problems as well. For one, the set of smart contracts we are verifying still
-%% have only medium complexity, and specifically loops are rare in the Diem
-%% framework (loops were not discussed in this paper for reasons of space; we do
-%% incorporate loop invariants for their verification). We anticipate the problem
-%% of timeouts to hit us again down the road as the number of applications of \MVP
-%% grow, and further refinement of the translation will be needed. Furthermore,
-%% while currently there are no occurrences of false positives, we expect this problem
-%% to hit as well.
-
-%% The biggest obstacle for wider adoption, however, is seen in the complexity of
-%% authoring and reading specifications, related to a phenomena we refer to as
-%% ``specification boilerplate''. Pre/post condition specifications are often
-%% verbose and difficult to read and write. At the time of this writing, function
-%% specifications in the Diem framework are often of similar size than function
-%% implementations.  A common problem is also sharing between aspects of specifications:
-%% for example, if function |f| calls function |g| and the later function aborts, the
-%% aborts condition propagates from |g| to the caller |f|. While the Move specification
-%% language has mechanisms to express this kind of sharing by referring to the aborts
-%% condition of |g| in the specification of |f|, this mechanism also makes specifications
-%% less readable, and leaks implementation details into the specification of |f|.
-%% We are currently experimenting with multiple strategies to cope with this, ranging
-%% from a better methodology and language support to structure specifications, to
-%% automatically inferring specs for some functions.
-
 
 
 %%% Local Variables:

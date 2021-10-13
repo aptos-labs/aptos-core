@@ -419,12 +419,11 @@ calls).
 \begin{itemize}
 \item Inject |assume I| at entry to |f| \emph{if} |accessed(f)| has overlap with
   |accessed(I)|.
-\item At every point in |f| where a memory location |M| is updated, or where a
-  return from a function |f'| happens where |I| is suspended in |f'|
-  and |M in modified(f')|,
-  inject |assert I| after the point \emph{if}~%
-  |M in accessed(I)|. Also, if |I| is an update invariant, inject a save of
-  a memory snaptshot before the update or call.
+\item Inject |assert I| after each program step if one of the following is true
+  (a) the step modifies a memory location |M in accessed(I)| or, (b) the step is
+  a call to function |f'| in which |I| is suspended and |modifies(f')|
+  intersects with |accessed(I)|.  Also, if |I| is an update invariant, inject a
+  save of a memory snaptshot before the update or call.
 \end{itemize}
 
 \vspace{-1ex}
@@ -476,8 +475,14 @@ the invariant with |T| specialized according to the substitution.
 \SubSection{Monomorphization}
 \label{sec:Mono}
 
-Monomorphization is the process of removing all generic types from a Move
-program by \emph{specializing the program for all relevant type instantiations}.
+Monomorphization is a transformation which removes generic types from a Move
+program by \emph{specializing} the program for relevant type instantiations.  In
+the context of verification, the goal is that the specialized program verifies
+if and only if the generic program verifies in an encoding which supports types
+as first class values. We expect the specialized program to verify faster
+because it avoids the problem of generic representation of values, supporting
+a multi-sorted representation in the SMT logic.
+
 
 \begin{Figure}
 \caption{Basic Monomorphization}
@@ -515,14 +520,12 @@ differently.  Specifically, if |T| is instantiated with |u64| the function will
 always abort at the second |move_to|, since the target location is already
 occupied.
 
-The important property enabling monomorphization in the presence of type
+The important property enabling monomorphization in the presence of such type
 dependent code is that one can identify the situation by looking at the memory
 accessed by code and injected specifications. From this one can derive
 \emph{additional instantiations of the function} which need to be verified. In
 the example above, verifying both |f_T| and an instantiation |f_u64| will cover
 all relevant cases of the function behavior.
-% This instantiation is only for verification; executable Move code is not
-% instantiated explicitly.
 
 The algorithm for computing the instances that require verification works as
 follows. Let |f<T1,..,Tn>| be a verified target function which has all

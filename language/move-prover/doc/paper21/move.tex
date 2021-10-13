@@ -59,17 +59,20 @@ module Account {
 \end{MoveBox}
 \end{Figure}
 
-\noindent In Move, one defines transactions via \emph{script functions}
-which take a set of parameters.  Those functions can call other
-functions. Script and regular functions are encapsulated in \emph{modules}. Move
-modules are also the place where structs are defined. An illustration of a Move
-contract is given in Fig.~\ref{fig:AccountDef} (for a more complete description
-see the Move Book~\cite{MOVE_LANG}). The example is a simple account which
-holds a balance, and offers the script function |transfer|.  Scripts generally
-have \emph{signer} arguments, which are tokens which represent an account
-address that has been authenticated by a cryptographic signature.  The |assert|
-statement in the example causes a Move transaction to abort execution if the
-condition is not met.
+\noindent In Move, one defines transactions via \emph{script functions} which
+take a set of parameters.  Those functions can call other functions. Script and
+regular functions are encapsulated in \emph{modules}. Move modules are also the
+place where structs are defined. An illustration of a Move contract is given in
+Fig.~\ref{fig:AccountDef} (for a more complete description see the Move
+Book~\cite{MOVE_LANG}). The example is a simple account which holds a balance in
+the struct |Account|, and offers the script function |transfer| to manipulate
+this resource.  Scripts generally have \emph{signer} arguments, which are tokens
+which represent an account address that has been authenticated by a
+cryptographic signature.  The |assert| statement in the example causes a Move
+transaction to abort execution if the condition is not met. Notice that Move,
+similar as Rust, supports references (as in |&signer|) and mutable references
+(as in |&mut T|).  However, references cannot be part of structs stored in
+global memory.
 
 %Abortion can also happen implicitly; for example, the
 %expression |borrow_global_mut<T>(addr)| will abort if no resource |T| exists at
@@ -182,31 +185,12 @@ assignment to variables where the program fails to meet the specification. In
 general, \MVP attempts to produce readable diagnostics for Move developers
 without the need of understanding any internals of the prover.
 
-The next errors produced are about the memory invariants in
-Fig.~\ref{fig:AccountSpec}. Neither holds, but
-%% Both of them do not hold;
-we show only the first failure:
+There are more verification errors in this example, related to the global
+invariants: the code makes no attempt to respect the limits in |min_balance()|
+and |max_decrease()|.  The problem can be fixed by adding more |assert|
+statements to check that the limits are met (see
+App.~\ref{sec:CorrectedAccount}).
 
-\begin{MoveDiag}
-error: global memory invariant does not hold
-   -- account.move:39:3
-   |
-39 |    invariant forall acc: address where exists<Account>(acc):
-40 |      bal(acc) >= AccountLimits::min_balance();
-   |
-   =     at account.move:6: withdraw
-   =         account = 0x0
-   =         amount = 11u8
-   =     at account.move:7: withdraw
-   =         balance = &15u8
-   =     at ...
-\end{MoveDiag}
-
-\noindent This happens because in the program in Fig.~\ref{fig:AccountDef}, we
-%% did not made any
-made no attempt to respect the limits in |min_balance()| and |max_decrease()|.
-The problem can be fixed by adding more |assert| statements to check that the
-limits are met (see App.~\ref{sec:CorrectedAccount}).
 
 The programs and specifications \MVP deals with are much larger than
 this example. The conditions under which a transaction
