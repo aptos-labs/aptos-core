@@ -206,7 +206,7 @@ fn malformed_simple() {
 
     // bad version
     let mut binary = BinaryConstants::DIEM_MAGIC.to_vec();
-    binary.extend(&(VERSION_NEXT.checked_add(1).unwrap()).to_le_bytes()); // version
+    binary.extend(&(VERSION_MAX.checked_add(1).unwrap()).to_le_bytes()); // version
     binary.push(10); // table count
     binary.push(0); // rest of binary
     let res = CompiledScript::deserialize(&binary);
@@ -216,7 +216,7 @@ fn malformed_simple() {
     );
 
     // versioned tests
-    for version in VERSION_1..VERSION_NEXT {
+    for version in VERSION_1..VERSION_MAX {
         malformed_simple_versioned_test(version);
     }
 }
