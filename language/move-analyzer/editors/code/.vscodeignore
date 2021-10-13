@@ -4,6 +4,7 @@
 # https://code.visualstudio.com/api/working-with-extensions/publishing-extension#.vscodeignore
 
 **/*
+out/src/**/*
 !language-configuration.json
 !move.tmLanguage.json
 !package-lock.json

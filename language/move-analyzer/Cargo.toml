@@ -8,3 +8,9 @@ homepage = "https://diem.com"
 license = "Apache-2.0"
 publish = false
 edition = "2018"
+
+[dependencies]
+structopt = "0.3.21"
+
+[dev-dependencies]
+diem-workspace-hack = { path = "../../common/workspace-hack" }

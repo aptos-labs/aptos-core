@@ -4846,6 +4846,10 @@ dependencies = [
 [[package]]
 name = "move-analyzer"
 version = "0.0.0"
+dependencies = [
+ "diem-workspace-hack",
+ "structopt 0.3.21",
+]
 
 [[package]]
 name = "move-binary-format"

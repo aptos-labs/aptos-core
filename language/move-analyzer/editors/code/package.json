@@ -15,7 +15,7 @@
         "url": "https://github.com/diem/diem/issues"
     },
     "engines": {
-        "vscode": "^1.60.0"
+        "vscode": "^1.60.1"
     },
     "categories": [
         "Programming Languages"
@@ -23,7 +23,36 @@
     "keywords": [
         "move"
     ],
+    "main": "./out/src/extension.js",
+    "activationEvents": [
+        "onLanguage:move"
+    ],
     "contributes": {
+        "commands": [
+            {
+                "command": "move-analyzer.serverVersion",
+                "title": "Show Server Version",
+                "category": "Move Analyzer"
+            }
+        ],
+        "configuration": {
+            "type": "object",
+            "title": "Move Analyzer",
+            "properties": {
+                "move-analyzer.server.path": {
+                    "type": "string",
+                    "default": "move-analyzer",
+                    "markdownDescription": "Path and filename of the move-analyzer executable, e.g. `/usr/bin/move-analyzer`."
+                }
+            }
+        },
+        "grammars": [
+            {
+                "language": "move",
+                "scopeName": "source.move",
+                "path": "./move.tmLanguage.json"
+            }
+        ],
         "languages": [
             {
                 "id": "move",
@@ -37,13 +66,13 @@
                 "configuration": "./language-configuration.json"
             }
         ],
-        "grammars": [
-            {
-                "language": "move",
-                "scopeName": "source.move",
-                "path": "./move.tmLanguage.json"
-            }
-        ]
+        "menus": {
+            "commandPalette": [
+                {
+                    "command": "move-analyzer.serverVersion"
+                }
+            ]
+        }
     },
     "scripts": {
         "compile": "tsc -p ./",
@@ -58,15 +87,16 @@
     "devDependencies": {
         "@types/glob": "^7.1.4",
         "@types/mocha": "^9.0.0",
-        "@types/node": "14.x",
-        "@types/vscode": "^1.60.0",
-        "@typescript-eslint/eslint-plugin": "^4.31.1",
-        "@typescript-eslint/parser": "^4.31.1",
+        "@types/node": "^14.17.22",
+        "@types/vscode": "^1.60.1",
+        "@typescript-eslint/eslint-plugin": "^4.33.0",
+        "@typescript-eslint/parser": "^4.33.0",
         "@vscode/test-electron": "^1.6.1",
         "eslint": "^7.32.0",
+        "eslint-plugin-tsdoc": "^0.2.14",
         "glob": "^7.1.7",
         "mocha": "^9.1.1",
-        "typescript": "^4.4.3",
+        "typescript": "^4.4.4",
         "typescript-formatter": "^7.2.2",
         "vsce": "^1.100.1",
         "vscode-test": "^1.6.1"

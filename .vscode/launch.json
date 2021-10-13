@@ -20,7 +20,8 @@
             "request": "launch",
             "args": [
                 "--extensionDevelopmentPath=${workspaceFolder}/language/move-analyzer/editors/code"
-            ]
+            ],
+            "preLaunchTask": "Pretest"
         },
         {
             "name": "VS Code Tokenizer Tests",
