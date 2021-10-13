@@ -88,8 +88,8 @@ $P_1 \wedge \ldots \wedge P_n$.  Simpler formulas result in fewer intermediate
 terms during solving, resulting in fewer opportunities to instantiate quantified
 formulas.
 
-We believe that one of the biggest impacts, specifically regards
-removal of timeouts and predictability of verification, is monomorphization. The
+We believe that one of the biggest impacts, specifically on
+removing timeouts and improving predictability, is monomorphization. The
 reason for this is that monomorphization allows a multi-sorted representation
 of values in Boogie (and eventually the SMT solver). In contrast, before
 monomorphization, we used a universal domain for values in order to represent
@@ -162,9 +162,9 @@ pre/post conditions, this is not the same as our invariants, which are
 guaranteed to hold independent of whether a user may or (accidentally) may not
 attach a modifier, and which are optimized to be only evaluated as needed.
 
-While the expressiveness of Move specifications and \MVP comes with the price of
-undecidability and the dependency from heuristics in SMT solvers, \MVP is
-capable to deal with this by its elaborated translation to SMT logic, as
+While the expressiveness of Move specifications comes with the price of
+undecidability and the dependency of heuristics in SMT solvers, \MVP deals with
+this by its elaborated translation to SMT logic, as
 partially described in this paper. The result is a practical verification system
 that is fully integrated into the Diem blockchain production process, which (to
 the best of our knowledge) is novel by itself.
@@ -172,7 +172,7 @@ the best of our knowledge) is novel by itself.
 Because of the similarity of Move and Rust~\cite{rust} in the use of borrow
 semantics, some of the techniques described are also applicable to the
 verification of Rust (e.g.~\cite{prusti,smack,nopanic,crust}).  For example, we
-expect reference elimination to work similar for the safe subset of Rust.  To
+expect reference elimination to work for the safe subset of Rust.  To
 the best of our knowledge, this has not been attempted before.
 
 \Paragraph{Future Work}
