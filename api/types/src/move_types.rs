@@ -626,7 +626,7 @@ impl From<&CompiledScript> for MoveFunction {
                 .signature_at(script.parameters)
                 .0
                 .iter()
-                .map(|s| script.new_move_type(s).into())
+                .map(|s| script.new_move_type(s))
                 .collect(),
             return_: vec![],
         }

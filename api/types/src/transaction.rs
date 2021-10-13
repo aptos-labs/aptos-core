@@ -27,7 +27,7 @@ use resource_viewer::AnnotatedMoveValue;
 use serde::{Deserialize, Serialize};
 use std::{
     boxed::Box,
-    convert::{From, Into, TryFrom},
+    convert::{From, Into, TryFrom, TryInto},
     fmt,
     str::FromStr,
 };
@@ -108,15 +108,8 @@ pub enum Transaction {
 impl From<(SignedTransaction, TransactionPayload)> for Transaction {
     fn from((txn, payload): (SignedTransaction, TransactionPayload)) -> Self {
         Transaction::PendingTransaction(PendingTransaction {
-            sender: txn.sender().into(),
-            sequence_number: txn.sequence_number().into(),
-            max_gas_amount: txn.max_gas_amount().into(),
-            gas_unit_price: txn.gas_unit_price().into(),
-            gas_currency_code: txn.gas_currency_code().to_owned(),
-            expiration_timestamp_secs: txn.expiration_timestamp_secs().into(),
-            signature: txn.authenticator().into(),
+            request: (&txn, payload).into(),
             hash: txn.committed_hash().into(),
-            payload,
         })
     }
 }
@@ -210,14 +203,8 @@ impl<T: TransactionInfoTrait> From<(u64, &T)> for TransactionInfo {
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct PendingTransaction {
     pub hash: HashValue,
-    pub sender: Address,
-    pub sequence_number: U64,
-    pub max_gas_amount: U64,
-    pub gas_unit_price: U64,
-    pub gas_currency_code: String,
-    pub expiration_timestamp_secs: U64,
-    pub payload: TransactionPayload,
-    pub signature: TransactionSignature,
+    #[serde(flatten)]
+    pub request: UserTransactionRequest,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -367,17 +354,119 @@ pub enum TransactionSignature {
     MultiAgentSignature(MultiAgentSignature),
 }
 
+impl TryFrom<TransactionSignature> for TransactionAuthenticator {
+    type Error = anyhow::Error;
+    fn try_from(ts: TransactionSignature) -> anyhow::Result<Self> {
+        Ok(match ts {
+            TransactionSignature::Ed25519Signature(sig) => sig.try_into()?,
+            TransactionSignature::MultiEd25519Signature(sig) => sig.try_into()?,
+            TransactionSignature::MultiAgentSignature(sig) => sig.try_into()?,
+        })
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Ed25519Signature {
     public_key: HexEncodedBytes,
     signature: HexEncodedBytes,
 }
 
+impl TryFrom<Ed25519Signature> for TransactionAuthenticator {
+    type Error = anyhow::Error;
+
+    fn try_from(value: Ed25519Signature) -> Result<Self, Self::Error> {
+        let Ed25519Signature {
+            public_key,
+            signature,
+        } = value;
+        Ok(TransactionAuthenticator::ed25519(
+            public_key.inner().try_into()?,
+            signature.inner().try_into()?,
+        ))
+    }
+}
+
+impl TryFrom<Ed25519Signature> for AccountAuthenticator {
+    type Error = anyhow::Error;
+
+    fn try_from(value: Ed25519Signature) -> Result<Self, Self::Error> {
+        let Ed25519Signature {
+            public_key,
+            signature,
+        } = value;
+        Ok(AccountAuthenticator::ed25519(
+            public_key.inner().try_into()?,
+            signature.inner().try_into()?,
+        ))
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct MultiEd25519Signature {
-    signatures: Vec<Ed25519Signature>,
+    public_keys: Vec<HexEncodedBytes>,
+    signatures: Vec<HexEncodedBytes>,
     threshold: u8,
     bitmap: HexEncodedBytes,
+}
+
+impl TryFrom<MultiEd25519Signature> for TransactionAuthenticator {
+    type Error = anyhow::Error;
+
+    fn try_from(value: MultiEd25519Signature) -> Result<Self, Self::Error> {
+        let MultiEd25519Signature {
+            public_keys,
+            signatures,
+            threshold,
+            bitmap,
+        } = value;
+
+        let ed25519_public_keys = public_keys
+            .into_iter()
+            .map(|s| Ok(s.inner().try_into()?))
+            .collect::<anyhow::Result<_>>()?;
+        let ed25519_signatures = signatures
+            .into_iter()
+            .map(|s| Ok(s.inner().try_into()?))
+            .collect::<anyhow::Result<_>>()?;
+
+        Ok(TransactionAuthenticator::multi_ed25519(
+            MultiEd25519PublicKey::new(ed25519_public_keys, threshold)?,
+            diem_crypto::multi_ed25519::MultiEd25519Signature::new_with_signatures_and_bitmap(
+                ed25519_signatures,
+                bitmap.inner().try_into()?,
+            ),
+        ))
+    }
+}
+
+impl TryFrom<MultiEd25519Signature> for AccountAuthenticator {
+    type Error = anyhow::Error;
+
+    fn try_from(value: MultiEd25519Signature) -> Result<Self, Self::Error> {
+        let MultiEd25519Signature {
+            public_keys,
+            signatures,
+            threshold,
+            bitmap,
+        } = value;
+
+        let ed25519_public_keys = public_keys
+            .into_iter()
+            .map(|s| Ok(s.inner().try_into()?))
+            .collect::<anyhow::Result<_>>()?;
+        let ed25519_signatures = signatures
+            .into_iter()
+            .map(|s| Ok(s.inner().try_into()?))
+            .collect::<anyhow::Result<_>>()?;
+
+        Ok(AccountAuthenticator::multi_ed25519(
+            MultiEd25519PublicKey::new(ed25519_public_keys, threshold)?,
+            diem_crypto::multi_ed25519::MultiEd25519Signature::new_with_signatures_and_bitmap(
+                ed25519_signatures,
+                bitmap.inner().try_into()?,
+            ),
+        ))
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -387,11 +476,45 @@ pub enum AccountSignature {
     MultiEd25519Signature(MultiEd25519Signature),
 }
 
+impl TryFrom<AccountSignature> for AccountAuthenticator {
+    type Error = anyhow::Error;
+
+    fn try_from(sig: AccountSignature) -> anyhow::Result<Self> {
+        Ok(match sig {
+            AccountSignature::Ed25519Signature(s) => s.try_into()?,
+            AccountSignature::MultiEd25519Signature(s) => s.try_into()?,
+        })
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct MultiAgentSignature {
     sender: AccountSignature,
     secondary_signer_addresses: Vec<Address>,
     secondary_signers: Vec<AccountSignature>,
+}
+
+impl TryFrom<MultiAgentSignature> for TransactionAuthenticator {
+    type Error = anyhow::Error;
+
+    fn try_from(value: MultiAgentSignature) -> Result<Self, Self::Error> {
+        let MultiAgentSignature {
+            sender,
+            secondary_signer_addresses,
+            secondary_signers,
+        } = value;
+        Ok(TransactionAuthenticator::multi_agent(
+            sender.try_into()?,
+            secondary_signer_addresses
+                .into_iter()
+                .map(|a| a.into())
+                .collect(),
+            secondary_signers
+                .into_iter()
+                .map(|s| s.try_into())
+                .collect::<anyhow::Result<_>>()?,
+        ))
+    }
 }
 
 impl From<(&Validatable<Ed25519PublicKey>, &ed25519::Ed25519Signature)> for Ed25519Signature {
@@ -425,11 +548,15 @@ impl
         ),
     ) -> Self {
         Self {
-            signatures: pk
+            public_keys: pk
                 .public_keys()
                 .iter()
-                .zip(sig.signatures().iter())
-                .map(|(k, s)| (k, s).into())
+                .map(|k| k.to_bytes().to_vec().into())
+                .collect(),
+            signatures: sig
+                .signatures()
+                .iter()
+                .map(|s| s.to_bytes().to_vec().into())
                 .collect(),
             threshold: *pk.threshold(),
             bitmap: sig.bitmap().to_vec().into(),

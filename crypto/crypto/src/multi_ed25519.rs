@@ -385,6 +385,14 @@ impl MultiEd25519Signature {
         })
     }
 
+    /// Creates a new MultiEd25519signature by given signatures and bitmap.
+    pub fn new_with_signatures_and_bitmap(
+        signatures: Vec<Ed25519Signature>,
+        bitmap: [u8; BITMAP_NUM_OF_BYTES],
+    ) -> Self {
+        Self { signatures, bitmap }
+    }
+
     /// Getter signatures.
     pub fn signatures(&self) -> &Vec<Ed25519Signature> {
         &self.signatures

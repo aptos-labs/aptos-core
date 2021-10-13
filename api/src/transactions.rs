@@ -21,7 +21,7 @@ use warp::{
 pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
     get_transaction(context.clone())
         .or(get_transactions(context.clone()))
-        .or(post_bcs_transactions(context.clone()))
+        .or(post_transactions(context.clone()))
         .or(post_signing_message(context))
 }
 
@@ -60,52 +60,76 @@ async fn handle_get_transactions(page: Page, context: Context) -> Result<impl Re
 }
 
 // POST /transactions
-pub fn post_bcs_transactions(
+pub fn post_transactions(
     context: Context,
 ) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
     warp::path!("transactions")
         .and(warp::post())
-        .and(warp::header::exact(
-            CONTENT_TYPE.as_str(),
-            mime_types::BCS_SIGNED_TRANSACTION,
-        ))
+        .and(warp::header::<String>(CONTENT_TYPE.as_str()))
         .and(warp::body::bytes())
         .and(context.filter())
-        .and_then(handle_post_bcs_transactions)
+        .and_then(handle_post_transactions)
 }
 
-async fn handle_post_bcs_transactions(
+async fn handle_post_transactions(
+    content_type: String,
     body: bytes::Bytes,
     context: Context,
 ) -> Result<impl Reply, Rejection> {
-    let txn = bcs::from_bytes(&body).map_err(|_| {
-        Error::invalid_request_body("deserialize SignedTransaction BCS bytes failed".to_owned())
-    })?;
+    let txn = match content_type.to_lowercase().as_str() {
+        mime_types::BCS_SIGNED_TRANSACTION => bcs::from_bytes(&body).map_err(|_| {
+            Error::invalid_request_body("deserialize SignedTransaction BCS bytes failed".to_owned())
+        })?,
+        mime_types::JSON => {
+            let txn = deserialize_user_transaction_request(body)?;
+            let converter = context.move_converter();
+            converter
+                .try_into_signed_transaction(txn, context.chain_id())
+                .map_err(|e| {
+                    Error::invalid_request_body(format!(
+                        "failed to create SignedTransaction from UserTransactionRequest: {}",
+                        e
+                    ))
+                })?
+        }
+        _ => {
+            return Err(
+                Error::bad_request(format!("unsupported content-type: {}", content_type)).into(),
+            )
+        }
+    };
     Ok(Transactions::new(context)?.create(txn).await?)
 }
 
+// POST /transactions/signing_message
 pub fn post_signing_message(
     context: Context,
 ) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
     warp::path!("transactions" / "signing_message")
         .and(warp::post())
         .and(warp::header::exact(CONTENT_TYPE.as_str(), mime_types::JSON))
-        .and(warp::body::json())
+        .and(warp::body::bytes())
         .and(context.filter())
         .and_then(handle_post_signing_message)
 }
 
 async fn handle_post_signing_message(
-    body: serde_json::Value,
+    body: bytes::Bytes,
     context: Context,
 ) -> Result<impl Reply, Rejection> {
-    let txn: UserTransactionRequest = serde_json::from_value(body).map_err(|e| {
+    let txn = deserialize_user_transaction_request(body)?;
+    Ok(Transactions::new(context)?.signing_message(txn)?)
+}
+
+fn deserialize_user_transaction_request(
+    body: bytes::Bytes,
+) -> Result<UserTransactionRequest, Error> {
+    serde_json::from_slice(&body).map_err(|e| {
         Error::invalid_request_body(format!(
             "deserialize into UserTransactionRequest failed: {:?}",
             e
         ))
-    })?;
-    Ok(Transactions::new(context)?.signing_message(txn)?)
+    })
 }
 
 struct Transactions {
@@ -778,7 +802,7 @@ mod tests {
         };
         let hash = Transaction::UserTransaction(txn).hash();
         assert_json(
-            resp,
+            resp.clone(),
             json!({
                 "type": "pending_transaction",
                 "hash": hash.to_hex_literal(),
@@ -819,6 +843,12 @@ mod tests {
                 },
             }),
         );
+
+        // ensure ed25519 sig txn can be submitted into mempool by JSON format
+        context
+            .expect_status_code(202)
+            .post("/transactions", resp)
+            .await;
     }
 
     #[tokio::test]
@@ -938,6 +968,12 @@ mod tests {
                 ]
             }),
         );
+
+        // ensure multi agent txns can be submitted into mempool by JSON format
+        context
+            .expect_status_code(202)
+            .post("/transactions", resp)
+            .await;
     }
 
     #[tokio::test]
@@ -959,6 +995,7 @@ mod tests {
             .create_recovery_address()
             .sender(auth_key.derived_address())
             .sequence_number(0)
+            .expiration_timestamp_secs(u64::MAX) // set timestamp to max to ensure static raw transaction
             .build();
 
         let signature = private_key.sign(&raw_txn);
@@ -973,25 +1010,35 @@ mod tests {
         assert_json(
             resp["signature"].clone(),
             json!({
-                "type": "multi_ed25519_signature",
-                "signatures": [
-                    {
-                        "public_key": "0x9e4208caddd825f71957c9b12dbfbd13a23fb0ea23eb398fd7e1f418b51f8fbc",
-                        "signature": format!("0x{}", hex::encode(signature.signatures()[0].to_bytes())),
-                    },
-                    {
-                        "public_key": "0x4708a77bb9285ce3745ffdd48c51980326b625488209803228ff623f3768c64e",
-                        "signature": format!("0x{}", hex::encode(signature.signatures()[1].to_bytes())),
-                    },
-                    {
-                        "public_key": "0x852b13cd7a89b0c223d74504705e84c745d32261244ed233ef0285637a1dece0",
-                        "signature": format!("0x{}", hex::encode(signature.signatures()[2].to_bytes())),
-                    }
-                ],
-                "threshold": 3,
-                "bitmap": "0xe0000000"
+              "type": "multi_ed25519_signature",
+              "public_keys": [
+                "0x9e4208caddd825f71957c9b12dbfbd13a23fb0ea23eb398fd7e1f418b51f8fbc",
+                "0x4708a77bb9285ce3745ffdd48c51980326b625488209803228ff623f3768c64e",
+                "0x852b13cd7a89b0c223d74504705e84c745d32261244ed233ef0285637a1dece0",
+                "0x77e7fe2a510e4f14e15071fc420469ee287b64f2c8f8c0221b946a3fd9cbfef3",
+                "0xd0c66cfef88b999f027347726bd54eda4675ae312af9146bfdc9e9fa702cc90a",
+                "0xd316059933e0dd6415f00ce350962c8e94b46373b7fb5fb49687f3d6b9e3cb30",
+                "0xf20e973e6dfeda74ca8e15f1a7aed9c87d67bd12e071fd3de4240368422712c9",
+                "0xead82d6e9e3f3baeaa557bd7a431a1c6fe9f35a82c10fed123f362615ee7c2cd",
+                "0x5c048c8c456ff9dd2810343bbd630fb45bf064317efae22c65a1535cf392c5d5",
+                "0x861546d0818178f2b5f37af0fa712fe8ce3cceeda894b553ee274f3fbcb4b32f",
+                "0xfe047a766a47719591348a4601afb3f38b0c77fa3f820e0298c064e7cde6763f"
+              ],
+              "signatures": [
+                "0xab0ffa0926dd765979c422572b4429d11161a2df6975e223ad4d75c87a117e6c790558e8286caf95550ab97515d2cfa8654365f54524688df91b3b4e91b69d0e",
+                "0x300774b6dd50658d4b693ad5cc1842944465a92b31f1652b445d36b911d4ca625260c451ab7d998534b61253f3bfcdd6bcb03adf4c048b03bd18678d56cd5a03",
+                "0x4bac0f0d9dde41196efae43849f8e4427ee142e04e57e7291ecdfb225528b0fe31eff8e17461a220430daea94a14f750a37b5e0360aa1c72cb956c402743c202"
+              ],
+              "threshold": 3,
+              "bitmap": "0xe0000000"
             }),
         );
+
+        // ensure multi sig txns can be submitted into mempool by JSON format
+        context
+            .expect_status_code(202)
+            .post("/transactions", resp)
+            .await;
     }
 
     #[tokio::test]
@@ -1277,7 +1324,7 @@ mod tests {
         payload: serde_json::Value,
     ) {
         let sender = context.tc_account();
-        let body = json!({
+        let mut body = json!({
             "sender": sender.address().to_hex_literal(),
             "sequence_number": sender.sequence_number().to_string(),
             "gas_unit_price": txn.gas_unit_price().to_string(),
@@ -1287,7 +1334,9 @@ mod tests {
             "payload": payload,
         });
 
-        let resp = context.post("/transactions/signing_message", body).await;
+        let resp = context
+            .post("/transactions/signing_message", body.clone())
+            .await;
 
         let signing_msg = resp["message"].as_str().unwrap();
         assert_eq!(
@@ -1311,5 +1360,22 @@ mod tests {
             _ => panic!("expect TransactionAuthenticator::Ed25519"),
         };
         assert_eq!(sig, expected_sig);
+
+        // assert transaction can be submitted into mempool and execute.
+        body["signature"] = json!({
+            "type": "ed25519_signature",
+            "public_key": format!("0x{}", hex::encode(sender.public_key().to_bytes())),
+            "signature": format!("0x{}", hex::encode(sig.to_bytes())),
+        });
+
+        context
+            .expect_status_code(202)
+            .post("/transactions", body)
+            .await;
+
+        context.commit_mempool_txns(10);
+
+        let ledger = context.get("/").await;
+        assert_eq!(ledger["ledger_version"].as_str().unwrap(), "2"); // one metadata + one txn
     }
 }
