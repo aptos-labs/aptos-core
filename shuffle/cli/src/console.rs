@@ -9,10 +9,9 @@ use std::{collections::HashMap, path::Path, process::Command};
 
 /// Launches a Deno REPL for the shuffle project, generating transaction
 /// builders and loading them into the REPL namespace for easy on chain interaction.
-pub fn handle(project_path: &Path) -> Result<()> {
-    let _config = shared::read_config(project_path)?;
+pub fn handle(project_path: &Path, network: Option<String>) -> Result<()> {
+    let config = shared::read_config(project_path)?;
     shared::generate_typescript_libraries(project_path)?;
-
     let deno_bootstrap = format!(
         r#"import * as Shuffle from "{shuffle}";
         import * as main from "{main}";
@@ -41,6 +40,12 @@ pub fn handle(project_path: &Path) -> Result<()> {
         String::from("SHUFFLE_HOME"),
         get_shuffle_dir().to_string_lossy().to_string(),
     );
+    let shuffle_network = match network {
+        Some(network) => network,
+        None => config.get_network().to_string(),
+    };
+
+    filtered_envs.insert(String::from("SHUFFLE_NETWORK"), shuffle_network);
 
     Command::new("deno")
         .args(["repl", "--unstable", "--eval", deno_bootstrap.as_str()])

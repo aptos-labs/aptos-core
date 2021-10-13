@@ -11,6 +11,7 @@ use std::{
 
 /// Default blockchain configuration
 pub const DEFAULT_BLOCKCHAIN: &str = "goodday";
+pub const DEFAULT_NETWORK: &str = "127.0.0.1:8081";
 
 /// Directory of generated transaction builders for helloblockchain.
 const EXAMPLES_DIR: Dir = include_dir!("../move/examples");
@@ -22,7 +23,7 @@ pub fn handle(blockchain: String, pathbuf: PathBuf) -> Result<()> {
     println!("Creating shuffle project in {}", project_path.display());
     fs::create_dir_all(project_path)?;
 
-    let config = shared::Config { blockchain };
+    let config = shared::Config::new(blockchain, Some(String::from(DEFAULT_NETWORK)));
     write_project_files(project_path, &config)?;
     write_example_move_packages(project_path)?;
 
@@ -67,9 +68,10 @@ mod test {
     #[test]
     fn test_write_project_config() {
         let dir = tempdir().unwrap();
-        let config = Config {
-            blockchain: String::from(DEFAULT_BLOCKCHAIN),
-        };
+        let config = Config::new(
+            String::from(DEFAULT_BLOCKCHAIN),
+            Some(String::from(DEFAULT_NETWORK)),
+        );
 
         write_project_files(dir.path(), &config).unwrap();
 

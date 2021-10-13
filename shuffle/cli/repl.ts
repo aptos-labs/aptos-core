@@ -11,6 +11,8 @@
 import * as path from "https://deno.land/std@0.110.0/path/mod.ts";
 import { green } from 'https://deno.land/x/nanocolors@0.1.12/mod.ts';
 import { createRemote } from "https://deno.land/x/gentle_rpc@v3.1/mod.ts";
+import urlcat from 'https://deno.land/x/urlcat@v2.0.4/src/index.ts';
+import { isURL } from "https://deno.land/x/is_url@v1.0.1/mod.ts";
 
 function highlight(content: string) {
   return green(content);
@@ -18,7 +20,7 @@ function highlight(content: string) {
 
 export const shuffleDir = Deno.env.get("SHUFFLE_HOME") || "unknown";
 export const projectPath = Deno.env.get("PROJECT_PATH") || "unknown";
-export const nodeUrl = 'http://127.0.0.1:8081';
+export const nodeUrl = getNetworkEndpoint(Deno.env.get("SHUFFLE_NETWORK") || "unknown");
 export const senderAddressPath = path.join(shuffleDir,"accounts/latest/address");
 export const senderAddress = await Deno.readTextFile(senderAddressPath);
 export const fullSenderAddress = "0x" + senderAddress;
@@ -46,7 +48,7 @@ export async function transactions() {
 }
 
 export async function accountTransactions() {
-  const remote = createRemote("http://127.0.0.1:8080/v1");
+  const remote = createRemote(path.join(nodeUrl,"v1"));
   return await remote.call(
       "get_account_transactions",
       [senderAddress, 0, 10, true]
@@ -105,4 +107,17 @@ export const test = Deno.test;
 
 function relativeUrl(tail: string) {
   return new URL(tail, nodeUrl).href;
+}
+
+function getNetworkEndpoint(input_network : string) {
+  if (input_network == "unknown") {
+    throw new Error("Invalid network.")
+  }
+  let network = "";
+  if (isURL(input_network)) {
+    network = input_network;
+  } else {
+    network = urlcat("http://",input_network);
+  }
+  return network;
 }

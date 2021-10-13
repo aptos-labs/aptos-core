@@ -1,6 +1,6 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
-
+use crate::new::DEFAULT_NETWORK;
 use anyhow::Result;
 use diem_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 use diem_sdk::client::BlockingClient;
@@ -27,7 +27,25 @@ const NEW_KEY_FILE_CONTENT: &[u8] = include_bytes!("../new_account.key");
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "kebab-case")]
 pub struct Config {
-    pub(crate) blockchain: String,
+    blockchain: String,
+    network: String,
+}
+
+impl Config {
+    pub fn new(config_blockchain: String, config_network: Option<String>) -> Self {
+        let normalized_network = match config_network {
+            Some(network) => network,
+            None => String::from(DEFAULT_NETWORK),
+        };
+        Self {
+            blockchain: config_blockchain,
+            network: normalized_network,
+        }
+    }
+
+    pub fn get_network(&self) -> &str {
+        &self.network
+    }
 }
 
 pub fn get_home_path() -> PathBuf {
@@ -283,6 +301,7 @@ mod test {
     use tempfile::tempdir;
 
     use super::{generate_typescript_libraries, get_shuffle_project_path};
+    use crate::shared::Config;
 
     #[test]
     fn test_get_shuffle_project_path() {
@@ -467,5 +486,14 @@ mod test {
         let home = Home::new(dir.path()).unwrap();
         let correct_dir = dir.path().join(".shuffle/accounts/latest/dev.key");
         assert_eq!(correct_dir, home.get_latest_key_path());
+    }
+
+    #[test]
+    fn test_get_network() {
+        let temp_config = Config::new(
+            String::from("goodday"),
+            Option::Some(String::from("127.0.0.1:8081")),
+        );
+        assert_eq!(temp_config.get_network(), "127.0.0.1:8081");
     }
 }

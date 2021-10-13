@@ -26,10 +26,11 @@ pub fn main() -> Result<()> {
         Subcommand::Deploy { project_path } => {
             deploy::handle(&normalized_project_path(project_path)?)
         }
-        Subcommand::Console { project_path } => {
-            console::handle(&normalized_project_path(project_path)?)
-        }
         Subcommand::Test { project_path } => test::handle(&normalized_project_path(project_path)?),
+        Subcommand::Console {
+            project_path,
+            network,
+        } => console::handle(&normalized_project_path(project_path)?, network),
     }
 }
 
@@ -63,6 +64,9 @@ pub enum Subcommand {
     Console {
         #[structopt(short, long)]
         project_path: Option<PathBuf>,
+
+        #[structopt(short, long)]
+        network: Option<String>,
     },
     #[structopt(about = "Runs end to end .ts tests")]
     Test {
