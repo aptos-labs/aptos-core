@@ -5,7 +5,7 @@ error: abort not covered by any of the `aborts_if` clauses
  8 │           move_to<S<u8>>(&account, S { x: 0 });
    │           ------- abort happened here with execution failure
  9 │       }
-10 │ ╭     spec extract {
+10 │ ╭     spec test1 {
 11 │ │         aborts_if exists<S<X>>(Signer::address_of(account));
 12 │ │         aborts_if exists<S<u8>>(Signer::address_of(account));
 13 │ │
@@ -14,32 +14,77 @@ error: abort not covered by any of the `aborts_if` clauses
 20 │ │     }
    │ ╰─────^
    │
-   =     at tests/sources/functional/type_dependent_code.move:6: extract
+   =     at tests/sources/functional/type_dependent_code.move:6: test1
    =         account = <redacted>
    =         x = <redacted>
-   =     at tests/sources/functional/type_dependent_code.move:7: extract
-   =     at tests/sources/functional/type_dependent_code.move:8: extract
-   =     at tests/sources/functional/type_dependent_code.move:8: extract
+   =     at tests/sources/functional/type_dependent_code.move:7: test1
+   =     at tests/sources/functional/type_dependent_code.move:8: test1
+   =     at tests/sources/functional/type_dependent_code.move:8: test1
    =         ABORTED
 
-error: function does not abort under this condition
-   ┌─ tests/sources/functional/type_dependent_code.move:35:9
+error: abort not covered by any of the `aborts_if` clauses
+   ┌─ tests/sources/functional/type_dependent_code.move:26:5
    │
-35 │         aborts_if !exists<S<X>>(Signer::address_of(account));
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+24 │           move_to<S<T2>>(&account, S { x: t2 });
+   │           ------- abort happened here with execution failure
+25 │       }
+26 │ ╭     spec test2 {
+27 │ │         aborts_if exists<S<T1>>(Signer::address_of(account));
+28 │ │         aborts_if exists<S<T2>>(Signer::address_of(account));
+29 │ │
+   · │
+35 │ │         // abort condition.
+36 │ │     }
+   │ ╰─────^
    │
-   =     at tests/sources/functional/type_dependent_code.move:28: extract
+   =     at tests/sources/functional/type_dependent_code.move:22: test2
+   =         account = <redacted>
+   =         t1 = <redacted>
+   =         t2 = <redacted>
+   =     at tests/sources/functional/type_dependent_code.move:23: test2
+   =     at tests/sources/functional/type_dependent_code.move:24: test2
+   =     at tests/sources/functional/type_dependent_code.move:24: test2
+   =         ABORTED
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/type_dependent_code.move:50:9
+   │
+50 │         ensures global<S<u8>>(Signer::address_of(account)).x == 0;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/type_dependent_code.move:44: test1
    =         account = <redacted>
    =         x = <redacted>
-   =     at tests/sources/functional/type_dependent_code.move:29: extract
-   =     at tests/sources/functional/type_dependent_code.move:30: extract
+   =     at tests/sources/functional/type_dependent_code.move:45: test1
+   =     at tests/sources/functional/type_dependent_code.move:46: test1
    =     at ../move-stdlib/sources/Signer.move:12: address_of
    =         s = <redacted>
    =     at ../move-stdlib/sources/Signer.move:13: address_of
    =         result = <redacted>
    =     at ../move-stdlib/sources/Signer.move:14: address_of
    =         r = <redacted>
-   =     at tests/sources/functional/type_dependent_code.move:31: extract
-   =     at tests/sources/functional/type_dependent_code.move:32: extract
-   =     at tests/sources/functional/type_dependent_code.move:34
-   =     at tests/sources/functional/type_dependent_code.move:35
+   =     at tests/sources/functional/type_dependent_code.move:47: test1
+   =     at tests/sources/functional/type_dependent_code.move:48: test1
+   =     at tests/sources/functional/type_dependent_code.move:50
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/type_dependent_code.move:66:9
+   │
+66 │         ensures global<S<T1>>(Signer::address_of(account)).x == t1;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/type_dependent_code.move:58: test2
+   =         account = <redacted>
+   =         t1 = <redacted>
+   =         t2 = <redacted>
+   =     at tests/sources/functional/type_dependent_code.move:61: test2
+   =     at tests/sources/functional/type_dependent_code.move:62: test2
+   =     at ../move-stdlib/sources/Signer.move:12: address_of
+   =         s = <redacted>
+   =     at ../move-stdlib/sources/Signer.move:13: address_of
+   =         result = <redacted>
+   =     at ../move-stdlib/sources/Signer.move:14: address_of
+   =         r = <redacted>
+   =     at tests/sources/functional/type_dependent_code.move:63: test2
+   =     at tests/sources/functional/type_dependent_code.move:64: test2
+   =     at tests/sources/functional/type_dependent_code.move:66

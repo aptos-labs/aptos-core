@@ -3,16 +3,32 @@ module 0x42::M {
 
     struct S<X: store> has key { x: X }
 
-    public fun extract<X: store>(account: signer, x: X) {
+    public fun test1<X: store>(account: signer, x: X) {
         move_to<S<X>>(&account, S { x });
         move_to<S<u8>>(&account, S { x: 0 });
     }
-    spec extract {
+    spec test1 {
         aborts_if exists<S<X>>(Signer::address_of(account));
         aborts_if exists<S<u8>>(Signer::address_of(account));
 
         // NOTE: besides the above aborts_if conditions, this function
         // also aborts if the type parameter `X` is instantiated with `u8`.
+        // This additional abort condition is not captured by the spec.
+        //
+        // TODO: currently we don't even have a way to specify this additional
+        // abort condition.
+    }
+
+    public fun test2<T1: store, T2: store>(account: signer, t1: T1, t2: T2) {
+        move_to<S<T1>>(&account, S { x: t1 });
+        move_to<S<T2>>(&account, S { x: t2 });
+    }
+    spec test2 {
+        aborts_if exists<S<T1>>(Signer::address_of(account));
+        aborts_if exists<S<T2>>(Signer::address_of(account));
+
+        // NOTE: besides the above aborts_if conditions, this function
+        // also aborts if type parameters `T1` and `T2` are the same.`
         // This additional abort condition is not captured by the spec.
         //
         // TODO: currently we don't even have a way to specify this additional
@@ -25,25 +41,42 @@ module 0x42::N {
 
     struct S<X: store + drop> has key { x: X }
 
-    public fun extract<X: store + drop>(account: signer, x: X) acquires S {
+    public fun test1<X: store + drop>(account: signer, x: X) acquires S {
         move_to<S<u8>>(&account, S { x: 0 });
         let r = borrow_global_mut<S<X>>(Signer::address_of(&account));
         *&mut r.x = x;
     }
-    spec extract {
-        aborts_if exists<S<u8>>(Signer::address_of(account));
-        aborts_if !exists<S<X>>(Signer::address_of(account));
+    spec test1 {
         ensures global<S<u8>>(Signer::address_of(account)).x == 0;
 
-        // NOTE: there are two issues with the spec
-        // 1) the second `aborts_if` condition is necessary only when X != u8
-        // 2) the `ensures` condition might not hold, as `extract<u8>(_, 1)`
-        //    will violate the `ensures` condition.
+        // NOTE: the `ensures` condition might not hold when `X == u8`.
         //
-        // TODO: currently the exp file does not show that the `ensures` is
-        // violated, not sure whehter this is shadowed by the `aborts_if`.
-        //
-        // In addition, similar to the test case above, we also don't have a
+        // Similar to the test cases above, we also don't have a
         // good way to specify these type equality conditions in spec.
+    }
+
+    public fun test2<T1: store + drop, T2: store + drop>(
+        account: signer, t1: T1, t2: T2
+    ) acquires S {
+        move_to<S<T1>>(&account, S { x: t1 });
+        let r = borrow_global_mut<S<T2>>(Signer::address_of(&account));
+        *&mut r.x = t2;
+    }
+    spec test2 {
+        ensures global<S<T1>>(Signer::address_of(account)).x == t1;
+
+        // NOTE: the `ensures` condition might not hold when `T1 == T2`.
+        //
+        // Similar to the test cases above, we also don't have a
+        // good way to specify these type equality conditions in spec.
+        //
+        // Further note that in the exp files, we see two error messages
+        // on that this `ensures` condition is violated. This is expected.
+        // If we take a look at the Boogie output, we will notice three
+        // verification targets generated:
+        // - test2<#0, #1>
+        // - test2<#0, #0>
+        // - test2<#1. #1>
+        // The `ensures` condition does not hold in the later two cases.
     }
 }
