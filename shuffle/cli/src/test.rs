@@ -8,6 +8,7 @@ use std::{path::Path, process::Command};
 
 pub fn handle(project_path: &Path) -> Result<()> {
     let _config = shared::read_config(project_path)?;
+    shared::generate_typescript_libraries(project_path)?;
     let tests_path_string = project_path
         .join("e2e")
         .as_path()

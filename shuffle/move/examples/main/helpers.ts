@@ -95,3 +95,12 @@ function hexToBytes(hex: string) {
   }
   return bytes;
 }
+
+export function hexToAscii(hexx: string) {
+  const hex = hexx.toString(); // normalize
+  let str = "";
+  for (let i = 0; i < hex.length; i += 2) {
+    str += String.fromCharCode(parseInt(hex.substr(i, 2), 16));
+  }
+  return str;
+}

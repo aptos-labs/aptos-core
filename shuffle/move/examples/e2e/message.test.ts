@@ -5,7 +5,8 @@
 
 // deno-lint-ignore-file no-explicit-any
 import { assert, assertEquals } from "https://deno.land/std@0.85.0/testing/asserts.ts";
-import * as MessageHelper from "../main/txn_builders/helper.ts";
+import * as DiemHelpers from "../main/helpers.ts";
+import * as main from "../main/mod.ts";
 import * as Shuffle from "../repl.ts";
 import * as utils from "./utils.ts";
 
@@ -19,10 +20,10 @@ Shuffle.test("Ability to set message", async () => {
 
   const sender = Shuffle.senderAddress;
   const resources = await Shuffle.resources(sender);
-  const messageResource = MessageHelper.messagesFrom(resources)[0];
+  const messageResource = main.messagesFrom(resources)[0];
 
   assertEquals(
-    MessageHelper.hex2a(messageResource["value"]["message"]),
+    DiemHelpers.hexToAscii(messageResource["value"]["message"]),
     "hello diem core eng",
   );
 });

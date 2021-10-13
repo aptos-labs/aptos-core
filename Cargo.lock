@@ -7621,11 +7621,15 @@ dependencies = [
  "once_cell",
  "rand 0.8.4",
  "serde",
+ "serde-generate",
+ "serde-reflection",
+ "serde_yaml",
  "shuffle-custom-node",
  "shuffle-transaction-builder",
  "structopt 0.3.21",
  "tempfile",
  "toml",
+ "transaction-builder-generator",
 ]
 
 [[package]]

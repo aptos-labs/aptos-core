@@ -25,6 +25,9 @@ pub fn handle(blockchain: String, pathbuf: PathBuf) -> Result<()> {
     let config = shared::Config { blockchain };
     write_project_files(project_path, &config)?;
     write_example_move_packages(project_path)?;
+
+    println!("Generating Typescript Libraries...");
+    shared::generate_typescript_libraries(project_path)?;
     Ok(())
 }
 
@@ -39,15 +42,15 @@ fn write_project_files(path: &Path, config: &shared::Config) -> Result<()> {
 }
 
 // Writes the move packages for a new project
-fn write_example_move_packages(root_path: &Path) -> Result<()> {
+pub(crate) fn write_example_move_packages(project_path: &Path) -> Result<()> {
     println!("Copying Examples...");
     for entry in EXAMPLES_DIR.find("**/*").unwrap() {
         match entry {
             include_dir::DirEntry::Dir(d) => {
-                fs::create_dir_all(root_path.join(d.path()))?;
+                fs::create_dir_all(project_path.join(d.path()))?;
             }
             include_dir::DirEntry::File(f) => {
-                let dst = root_path.join(f.path());
+                let dst = project_path.join(f.path());
                 fs::write(dst.as_path(), f.contents())?;
             }
         }

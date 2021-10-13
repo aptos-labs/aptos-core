@@ -89,15 +89,6 @@ export function setMessageRawTransaction(
   );
 }
 
-export function hex2a(hexx: string) {
-  const hex = hexx.toString(); // normalize
-  let str = "";
-  for (let i = 0; i < hex.length; i += 2) {
-    str += String.fromCharCode(parseInt(hex.substr(i, 2), 16));
-  }
-  return str;
-}
-
 export function messagesFrom(resources: any[]) {
   return resources
     .filter(
@@ -107,5 +98,5 @@ export function messagesFrom(resources: any[]) {
 
 export function decodedMessages(resources: any[]) {
   return messagesFrom(resources)
-    .map((entry) => hex2a(entry.value.message));
+    .map((entry) => DiemHelpers.hexToAscii(entry.value.message));
 }

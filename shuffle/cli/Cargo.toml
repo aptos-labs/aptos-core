@@ -38,6 +38,10 @@ move-package = { path = "../../language/tools/move-package" }
 move-binary-format = { path = "../../language/move-binary-format" }
 shuffle-custom-node = { path = "../genesis" }
 shuffle-transaction-builder = { path = "../transaction-builder" }
+serde-reflection = "0.3.4"
+serde-generate = "0.20.2"
+serde_yaml = "0.8.17"
+transaction-builder-generator = { path = "../../language/transaction-builder/generator" }
 
 [[bin]]
 name = "shuffle"

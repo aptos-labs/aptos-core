@@ -11,6 +11,7 @@ use std::{collections::HashMap, path::Path, process::Command};
 /// builders and loading them into the REPL namespace for easy on chain interaction.
 pub fn handle(project_path: &Path) -> Result<()> {
     let _config = shared::read_config(project_path)?;
+    shared::generate_typescript_libraries(project_path)?;
 
     let deno_bootstrap = format!(
         r#"import * as Shuffle from "{shuffle}";
