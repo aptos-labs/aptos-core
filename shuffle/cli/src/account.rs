@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::shared::{get_shuffle_dir, send};
+use crate::shared::{ get_shuffle_dir, send};
 use anyhow::{anyhow, Context, Result};
 use diem_config::config::NodeConfig;
 use diem_crypto::{
@@ -31,10 +31,29 @@ pub fn handle() -> Result<()> {
             "A node hasn't been created yet! Run shuffle node first"
         ));
     }
-    let config_path = &shuffle_dir.join("nodeconfig/0").join("node.yaml");
-    let config = NodeConfig::load(&config_path)
-        .with_context(|| format!("Failed to load NodeConfig from file: {:?}", config_path))?;
 
+
+    let accounts_dir = shuffle_dir.join("accounts");
+    let latest_dir = accounts_dir.join("latest");
+    if latest_dir.exists() {
+        let wants_another_key = confirm_user_decision(&latest_dir).unwrap();
+        if wants_another_key == "y" {
+            let time = duration_since_epoch();
+            let saved_dir = accounts_dir.join(time.as_secs().to_string());
+            fs::create_dir(&saved_dir)?;
+            save_old_key(&accounts_dir, &saved_dir)?;
+            save_old_address(&accounts_dir, &saved_dir)?;
+        } else {
+            return Ok(());
+        }
+    }
+
+    let config = NodeConfig::load(get_nodeconfig_path()).with_context(|| {
+        format!(
+            "Failed to load NodeConfig from file: {:?}",
+            get_nodeconfig_path()
+        )
+    })?;
     let json_rpc_url = format!("http://0.0.0.0:{}", config.json_rpc.address.port());
     println!("Connecting to {}...", json_rpc_url);
     let client = BlockingClient::new(json_rpc_url);
@@ -107,7 +126,6 @@ pub fn generate_shuffle_accounts_dir(shuffle_dir: &Path) -> Result<()> {
     if !latest_dir.as_path().is_dir() {
         fs::create_dir(latest_dir)?;
     }
-
     Ok(())
 }
 
