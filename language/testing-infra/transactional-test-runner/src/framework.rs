@@ -525,7 +525,7 @@ fn handle_expected_output(test_path: &Path, output: impl AsRef<str>) -> Result<(
     if output != expected_output {
         let msg = format!(
             "Expected errors differ from actual errors:\n{}",
-            format_diff(output, expected_output),
+            format_diff(expected_output, output),
         );
         anyhow::bail!(msg)
     } else {
