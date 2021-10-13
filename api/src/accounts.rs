@@ -815,21 +815,25 @@ mod tests {
         let txn = context.create_parent_vasp(&account);
         context.commit_block(&vec![txn.clone()]);
 
-        let resources = context
+        let ledger_version_1_resources = context
             .get(&account_resources(
                 &context.tc_account().address().to_hex_literal(),
             ))
             .await;
-        let tc_account = find_value(&resources, |f| f["type"]["name"] == "DiemAccount");
+        let tc_account = find_value(&ledger_version_1_resources, |f| {
+            f["type"]["name"] == "DiemAccount"
+        });
         assert_eq!(tc_account["value"]["sequence_number"], "1");
 
-        let resources = context
+        let ledger_version_0_resources = context
             .get(&account_resources_with_ledger_version(
                 &context.tc_account().address().to_hex_literal(),
                 0,
             ))
             .await;
-        let tc_account = find_value(&resources, |f| f["type"]["name"] == "DiemAccount");
+        let tc_account = find_value(&ledger_version_0_resources, |f| {
+            f["type"]["name"] == "DiemAccount"
+        });
         assert_eq!(tc_account["value"]["sequence_number"], "0");
     }
 

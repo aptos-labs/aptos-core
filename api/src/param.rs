@@ -11,12 +11,15 @@ pub type TransactionIdParam = Param<TransactionId>;
 pub type TransactionVersionParam = Param<u64>;
 pub type LedgerVersionParam = Param<u64>;
 
+/// `Param` is designed for parsing `warp` path parameter or query string
+/// into a type specified by the generic type parameter of `Param`.
 #[derive(Clone, Debug)]
 pub struct Param<T: FromStr> {
     data: String,
     _value: Option<T>,
 }
 
+/// `FromStr` is required for parsing `warp` path parameter into `Param` type.
 impl<T: FromStr> FromStr for Param<T> {
     type Err = Infallible;
 
@@ -36,6 +39,7 @@ impl<T: FromStr> Param<T> {
     }
 }
 
+/// `Deserialize` is required for parsing `warp` query string parameter into `Param` type.
 impl<'de, T: FromStr> Deserialize<'de> for Param<T> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where

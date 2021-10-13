@@ -484,6 +484,9 @@ impl From<TransactionAuthenticator> for TransactionSignature {
     }
 }
 
+/// There are 2 types transaction ids from HTTP request inputs:
+/// 1. Transaction hash: hex-encoded string, e.g. "0x374eda71dce727c6cd2dd4a4fd47bfb85c16be2e3e95ab0df4948f39e1af9981"
+/// 2. Transaction version: u64 number string (as we encode u64 into string in JSON), e.g. "122"
 #[derive(Clone, Debug)]
 pub enum TransactionId {
     Hash(HashValue),
