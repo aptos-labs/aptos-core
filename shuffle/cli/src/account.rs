@@ -8,6 +8,7 @@ use diem_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     PrivateKey,
 };
+use diem_infallible::duration_since_epoch;
 use diem_sdk::{
     client::BlockingClient,
     transaction_builder::{Currency, TransactionFactory},
@@ -18,7 +19,7 @@ use diem_types::{
 };
 use generate_key::load_key;
 use shuffle_transaction_builder::framework::encode_create_parent_vasp_account_script_function;
-use std::{fs, fs::File, io::Write, path::Path};
+use std::{fs, fs::File, io, io::Write, path::Path};
 
 const NEW_KEY_FILE_CONTENT: &[u8] = include_bytes!("../new_account.key");
 
@@ -30,7 +31,6 @@ pub fn handle() -> Result<()> {
             "A node hasn't been created yet! Run shuffle node first"
         ));
     }
-    println!("{:?}", &shuffle_dir);
     let config_path = &shuffle_dir.join("nodeconfig/0").join("node.yaml");
     let config = NodeConfig::load(&config_path)
         .with_context(|| format!("Failed to load NodeConfig from file: {:?}", config_path))?;
@@ -57,6 +57,47 @@ pub fn handle() -> Result<()> {
     create_account_onchain(&mut root_account, &new_account, &factory, &client)
 }
 
+pub fn confirm_user_decision(latest_dir: &Path) -> Result<String> {
+    let key_path = latest_dir.join("dev.key");
+    let prev_key = generate_key::load_key(&key_path);
+    println!(
+        "Private Key already exists: {}",
+        ::hex::encode(prev_key.to_bytes())
+    );
+    println!("Are you sure you want to generate a new key? [y/n]");
+
+    let mut user_response = String::new();
+    io::stdin()
+        .read_line(&mut user_response)
+        .expect("Failed to read line");
+    let mut user_response = user_response.trim().to_owned();
+
+    while user_response != "y" && user_response != "n" {
+        println!("Please enter y or n");
+        user_response = String::new();
+        io::stdin()
+            .read_line(&mut user_response)
+            .expect("Failed to read line");
+        user_response = user_response.trim().to_owned();
+    }
+
+    Ok(user_response)
+}
+
+pub fn save_old_key(accounts_dir: &Path, saved_key_path: &Path) -> Result<()> {
+    let old_key_path = accounts_dir.join("latest").join("dev.key");
+    let saved_key_path = saved_key_path.join("dev.key");
+    fs::copy(old_key_path, saved_key_path)?;
+    Ok(())
+}
+
+pub fn save_old_address(accounts_dir: &Path, saved_address_path: &Path) -> Result<()> {
+    let old_address_path = accounts_dir.join("latest").join("address");
+    let saved_address_path = saved_address_path.join("address");
+    fs::copy(old_address_path, saved_address_path)?;
+    Ok(())
+}
+
 pub fn generate_shuffle_accounts_dir(shuffle_dir: &Path) -> Result<()> {
     let account_dir = &shuffle_dir.join("accounts");
     if !account_dir.as_path().is_dir() {
@@ -74,7 +115,7 @@ pub fn generate_key_file(shuffle_dir: &Path) -> Result<Ed25519PrivateKey> {
     let latest_dir = &shuffle_dir.join("accounts").join("latest");
     let dev_key_filepath = &latest_dir.join("dev.key");
     fs::write(dev_key_filepath, NEW_KEY_FILE_CONTENT)?;
-    let private_key = generate_key::load_key(&dev_key_filepath);
+    let private_key = generate_key::generate_and_save_key(&dev_key_filepath);
     Ok(private_key)
 }
 
@@ -142,8 +183,12 @@ pub fn create_account_onchain(
 
 #[cfg(test)]
 mod test {
-    use crate::account::{generate_address_file, generate_key_file, generate_shuffle_accounts_dir};
+    use crate::account::{
+        generate_address_file, generate_key_file, generate_shuffle_accounts_dir, save_old_address,
+        save_old_key,
+    };
     use diem_crypto::PrivateKey;
+    use diem_infallible::duration_since_epoch;
     use generate_key::generate_key;
     use std::fs;
     use tempfile::tempdir;
@@ -198,5 +243,51 @@ mod test {
                 .exists(),
             true
         );
+    }
+
+    #[test]
+    fn test_save_old_key() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("accounts").join("latest"))
+            .expect("Directories weren't created");
+        let time = duration_since_epoch();
+        fs::create_dir_all(dir.path().join("accounts").join(time.as_secs().to_string()))
+            .expect("Directories weren't created");
+
+        generate_key_file(&dir.path().to_path_buf()).expect("Key file wasn't generated");
+
+        let accounts_dir = &dir.path().join("accounts");
+        let saved_dir = &dir.path().join("accounts").join(time.as_secs().to_string());
+        save_old_key(accounts_dir, &saved_dir).expect("Old key wasn't saved");
+        let saved_key = generate_key::load_key(saved_dir.join("dev.key"));
+
+        let old_key_path = &dir.path().join("accounts").join("latest").join("dev.key");
+        let old_private_key = generate_key::load_key(old_key_path);
+
+        assert_eq!(old_private_key, saved_key);
+    }
+
+    #[test]
+    fn test_save_old_address() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("accounts").join("latest"))
+            .expect("Directories weren't created");
+        let time = duration_since_epoch();
+        fs::create_dir_all(dir.path().join("accounts").join(time.as_secs().to_string()))
+            .expect("Directories weren't created");
+
+        let private_key = generate_key();
+        let public_key = private_key.public_key();
+        generate_address_file(dir.path(), &public_key).expect("Address file wasn't generated");
+
+        let accounts_dir = &dir.path().join("accounts");
+        let saved_dir = &dir.path().join("accounts").join(time.as_secs().to_string());
+        save_old_address(accounts_dir, &saved_dir).expect("Old address wasn't saved");
+        let saved_address = fs::read_to_string(saved_dir.join("address")).unwrap();
+
+        let old_address_path = &dir.path().join("accounts").join("latest").join("address");
+        let old_address = fs::read_to_string(old_address_path).unwrap();
+
+        assert_eq!(saved_address, old_address);
     }
 }

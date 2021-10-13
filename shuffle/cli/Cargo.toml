@@ -27,6 +27,7 @@ diem-config = { path = "../../config" }
 diem-crypto = { path = "../../crypto/crypto" }
 diem-framework-releases = { path = "../../language/diem-framework/DPN/releases" }
 diem-genesis-tool = { path = "../../config/management/genesis" }
+diem-infallible = { path = "../../common/infallible"}
 diem-json-rpc-types = { path = "../../json-rpc/types" }
 diem-node = { path = "../../diem-node" }
 diem-sdk = { path = "../../sdk" }
