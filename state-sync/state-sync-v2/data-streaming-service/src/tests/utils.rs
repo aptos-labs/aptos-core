@@ -17,6 +17,7 @@ use std::{collections::BTreeMap, thread, time::Duration};
 use storage_service_types::CompleteDataRange;
 
 /// Test constants for advertised data
+pub const MAX_RESPONSE_ID: u64 = 100000;
 pub const MIN_ADVERTISED_EPOCH: u64 = 100;
 pub const MAX_ADVERTISED_EPOCH: u64 = 1000;
 
@@ -123,7 +124,7 @@ impl DiemDataClient for MockDiemDataClient {
 
 /// Creates a data client response using a specified payload and random id
 pub fn create_data_client_response(response_payload: DataClientPayload) -> DataClientResponse {
-    let response_id = create_random_u64(10000);
+    let response_id = create_random_u64(MAX_RESPONSE_ID);
     DataClientResponse {
         response_id,
         response_payload,
@@ -137,6 +138,13 @@ pub fn create_ledger_info(epoch: Epoch) -> LedgerInfoWithSignatures {
         LedgerInfo::new(block_info, HashValue::zero()),
         BTreeMap::new(),
     )
+}
+
+/// Creates an epoch ending client response with a single ledger info
+pub fn create_epoch_ending_client_response(epoch: Epoch) -> DataClientResponse {
+    let response_payload =
+        DataClientPayload::EpochEndingLedgerInfos(vec![create_ledger_info(epoch)]);
+    create_data_client_response(response_payload)
 }
 
 /// Returns a random u64 with a value between 0 and `max_value` - 1 (inclusive).
