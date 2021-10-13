@@ -266,7 +266,7 @@ pub fn compile_script<'a>(
     script: Script,
     dependencies: impl IntoIterator<Item = &'a CompiledModule>,
 ) -> Result<(CompiledScript, SourceMap)> {
-    let mut context = Context::new(HashMap::new(), None)?;
+    let mut context = Context::new(script.loc, HashMap::new(), None)?;
     for dep in dependencies {
         context.add_compiled_dependency(dep)?;
     }
@@ -342,7 +342,7 @@ pub fn compile_module<'a>(
     dependencies: impl IntoIterator<Item = &'a CompiledModule>,
 ) -> Result<(CompiledModule, SourceMap)> {
     let current_module = module.identifier;
-    let mut context = Context::new(HashMap::new(), Some(current_module))?;
+    let mut context = Context::new(module.loc, HashMap::new(), Some(current_module))?;
     for dep in dependencies {
         context.add_compiled_dependency(dep)?;
     }
@@ -444,7 +444,11 @@ fn compile_explicit_dependency_declarations(
             functions,
         } = dependency;
         let current_module = outer_context.module_ident(&mname)?;
-        let mut context = Context::new(dependencies_acc, Some(*current_module))?;
+        let mut context = Context::new(
+            outer_context.decl_location(),
+            dependencies_acc,
+            Some(*current_module),
+        )?;
         compile_imports(&mut context, imports.clone())?;
         let self_module_handle_idx = context.module_handle_index(&mname)?;
         for struct_dep in structs {

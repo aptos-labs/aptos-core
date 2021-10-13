@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::syntax::ParseError;
+use move_command_line_common::files::FileHash;
 use move_ir_types::location::*;
-use move_symbol_pool::Symbol;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Tok {
@@ -131,7 +131,7 @@ impl Tok {
 
 pub struct Lexer<'input> {
     pub spec_mode: bool,
-    file: Symbol,
+    file_hash: FileHash,
     text: &'input str,
     prev_end: usize,
     cur_start: usize,
@@ -140,10 +140,10 @@ pub struct Lexer<'input> {
 }
 
 impl<'input> Lexer<'input> {
-    pub fn new(file: Symbol, s: &'input str) -> Lexer<'input> {
+    pub fn new(file_hash: FileHash, s: &'input str) -> Lexer<'input> {
         Lexer {
             spec_mode: false, // read tokens without trailing punctuation during specs.
-            file,
+            file_hash,
             text: s,
             prev_end: 0,
             cur_start: 0,
@@ -160,8 +160,8 @@ impl<'input> Lexer<'input> {
         &self.text[self.cur_start..self.cur_end]
     }
 
-    pub fn file_name(&self) -> Symbol {
-        self.file
+    pub fn file_hash(&self) -> FileHash {
+        self.file_hash
     }
 
     pub fn start_loc(&self) -> usize {
@@ -389,7 +389,7 @@ impl<'input> Lexer<'input> {
             ']' => (Tok::RSquare, 1), // for vector specs
             _ => {
                 let idx = start_offset as u32;
-                let location = Loc::new(self.file_name(), idx, idx);
+                let location = Loc::new(self.file_hash(), idx, idx);
                 return Err(ParseError::InvalidToken { location });
             }
         };

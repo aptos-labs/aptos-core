@@ -166,7 +166,7 @@ impl MovePackage {
                     AnnotatedCompiledUnit::Script(_) => eprintln!(
                         "Warning: Found a script in given dependencies. \
                             The script will be ignored: {}",
-                        unit.loc().file()
+                        unit.loc().file_hash()
                     ),
                 }
             }

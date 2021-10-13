@@ -16,7 +16,7 @@ use codespan_reporting::{
         Config,
     },
 };
-use move_command_line_common::env::read_env_var;
+use move_command_line_common::{env::read_env_var, files::FileHash};
 use move_ir_types::location::*;
 use move_symbol_pool::Symbol;
 use std::{
@@ -30,9 +30,10 @@ use std::{
 //**************************************************************************************************
 
 pub type FileId = usize;
+pub type FileName = Symbol;
 
-pub type FilesSourceText = HashMap<Symbol, String>;
-type FileMapping = HashMap<Symbol, FileId>;
+pub type FilesSourceText = HashMap<FileHash, (FileName, String)>;
+type FileMapping = HashMap<FileHash, FileId>;
 
 #[derive(PartialEq, Eq, Clone, Debug, Hash)]
 pub struct Diagnostic {
@@ -105,9 +106,9 @@ fn output_diagnostics<W: WriteColor>(
 ) {
     let mut files = SimpleFiles::new();
     let mut file_mapping = HashMap::new();
-    for (fname, source) in sources {
+    for (fhash, (fname, source)) in sources {
         let id = files.add(*fname, source.as_str());
-        file_mapping.insert(*fname, id);
+        file_mapping.insert(*fhash, id);
     }
     render_diagnostics(writer, &files, &file_mapping, diags);
 }
@@ -135,7 +136,7 @@ fn render_diagnostics(
 }
 
 fn convert_loc(file_mapping: &FileMapping, loc: Loc) -> (FileId, Range<usize>) {
-    let fname = loc.file();
+    let fname = loc.file_hash();
     let id = *file_mapping.get(&fname).unwrap();
     let range = loc.usize_range();
     (id, range)

@@ -124,8 +124,8 @@ impl TestRunner {
     ) -> Result<Self> {
         let source_files = tests
             .files
-            .keys()
-            .map(|filepath| filepath.to_string())
+            .values()
+            .map(|(filepath, _)| filepath.to_string())
             .collect();
         let modules = tests.module_info.values().map(|info| &info.module);
         let starting_storage_state = setup_test_storage(modules)?;

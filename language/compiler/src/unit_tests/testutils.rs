@@ -12,7 +12,6 @@ use move_binary_format::{
     errors::{Location, VMError},
     file_format::{CompiledModule, CompiledScript},
 };
-use move_symbol_pool::Symbol;
 
 #[allow(unused_macros)]
 macro_rules! instr_count {
@@ -30,7 +29,7 @@ fn compile_script_string_impl(
     code: &str,
     deps: Vec<CompiledModule>,
 ) -> Result<(CompiledScript, Option<VMError>)> {
-    let parsed_script = parse_script(Symbol::from("file_name"), code).unwrap();
+    let parsed_script = parse_script(code).unwrap();
     let script = compile_script(parsed_script, &deps)?.0;
 
     let mut serialized_script = Vec::<u8>::new();
@@ -80,7 +79,7 @@ fn compile_module_string_impl(
     code: &str,
     deps: Vec<CompiledModule>,
 ) -> Result<(CompiledModule, Option<VMError>)> {
-    let module = parse_module(Symbol::from("file_name"), code).unwrap();
+    let module = parse_module(code).unwrap();
     let compiled_module = compile_module(module, &deps)?.0;
 
     let mut serialized_module = Vec::<u8>::new();

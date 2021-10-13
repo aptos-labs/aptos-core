@@ -16,6 +16,7 @@ move-ir-types = { path = "../../../move-ir/types" }
 move-core-types = { path = "../../../move-core/types" }
 move-symbol-pool = { path = "../../../move-symbol-pool" }
 diem-workspace-hack = { path = "../../../../common/workspace-hack" }
+move-command-line-common = { path = "../../../move-command-line-common" }
 
 [features]
 default = []

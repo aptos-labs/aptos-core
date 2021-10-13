@@ -34,7 +34,7 @@ fn bad_module_address() {
     );
 
     // compile with account 1's address
-    let compiled_module = compile_module("file_name", &program).1;
+    let compiled_module = compile_module(&program).1;
     // send with account 2's address
     let txn = account2
         .account()
@@ -73,7 +73,7 @@ macro_rules! module_republish_test {
             executor.add_account_data(&account);
 
             let program1 = String::from($prog1).replace("##ADDRESS##", &account.address().to_hex());
-            let compiled_module1 = compile_module("file_name", &program1).1;
+            let compiled_module1 = compile_module(&program1).1;
 
             let txn1 = account
                 .account()
@@ -83,7 +83,7 @@ macro_rules! module_republish_test {
                 .sign();
 
             let program2 = String::from($prog2).replace("##ADDRESS##", &account.address().to_hex());
-            let compiled_module2 = compile_module("file_name", &program2).1;
+            let compiled_module2 = compile_module(&program2).1;
 
             let txn2 = account
                 .account()
@@ -282,7 +282,7 @@ pub fn test_publishing_no_modules_non_allowlist_script() {
         sender.address(),
     );
 
-    let random_module = compile_module("file_name", &program).1;
+    let random_module = compile_module(&program).1;
     let txn = sender
         .account()
         .transaction()
@@ -315,7 +315,7 @@ pub fn test_publishing_no_modules_non_allowlist_script_proper_sender() {
         ",
     );
 
-    let random_module = compile_module("file_name", &program).1;
+    let random_module = compile_module(&program).1;
     let txn = sender
         .transaction()
         .module(random_module)
@@ -344,7 +344,7 @@ pub fn test_publishing_no_modules_proper_sender() {
         ",
     );
 
-    let random_script = compile_module("file_name", &program).1;
+    let random_script = compile_module(&program).1;
     let txn = sender
         .transaction()
         .module(random_script)
@@ -373,7 +373,7 @@ pub fn test_publishing_no_modules_core_code_sender() {
         ",
     );
 
-    let random_script = compile_module("file_name", &program).1;
+    let random_script = compile_module(&program).1;
     let txn = sender
         .transaction()
         .module(random_script)
@@ -405,7 +405,7 @@ pub fn test_publishing_no_modules_invalid_sender() {
         sender.address(),
     );
 
-    let random_script = compile_module("file_name", &program).1;
+    let random_script = compile_module(&program).1;
     let txn = sender
         .account()
         .transaction()
@@ -437,7 +437,7 @@ pub fn test_publishing_allow_modules() {
         sender.address(),
     );
 
-    let random_script = compile_module("file_name", &program).1;
+    let random_script = compile_module(&program).1;
     let txn = sender
         .account()
         .transaction()

@@ -5,6 +5,7 @@ use anyhow::{anyhow, Context};
 use std::{collections::BTreeSet, fmt, str::FromStr};
 
 use crate::lexer::*;
+use move_command_line_common::files::FileHash;
 use move_core_types::account_address::AccountAddress;
 use move_ir_types::{ast::*, location::*, spec_language_ast::*};
 use move_symbol_pool::Symbol;
@@ -32,22 +33,22 @@ where
     }
 }
 
-fn make_loc(file: Symbol, start: usize, end: usize) -> Loc {
-    Loc::new(file, start as u32, end as u32)
+fn make_loc(file_hash: FileHash, start: usize, end: usize) -> Loc {
+    Loc::new(file_hash, start as u32, end as u32)
 }
 
 fn current_token_loc(tokens: &Lexer) -> Loc {
     let start_loc = tokens.start_loc();
     make_loc(
-        tokens.file_name(),
+        tokens.file_hash(),
         start_loc,
         start_loc + tokens.content().len(),
     )
 }
 
-fn spanned<T>(file: Symbol, start: usize, end: usize, value: T) -> Spanned<T> {
+fn spanned<T>(file_hash: FileHash, start: usize, end: usize, value: T) -> Spanned<T> {
     Spanned {
-        loc: make_loc(file, start, end),
+        loc: make_loc(file_hash, start, end),
         value,
     }
 }
@@ -202,7 +203,7 @@ fn parse_var(tokens: &mut Lexer) -> Result<Var, ParseError<Loc, anyhow::Error>> 
     let start_loc = tokens.start_loc();
     let var = parse_var_(tokens)?;
     let end_loc = tokens.previous_end_loc();
-    Ok(spanned(tokens.file_name(), start_loc, end_loc, var))
+    Ok(spanned(tokens.file_hash(), start_loc, end_loc, var))
 }
 
 // Field: Field = {
@@ -213,7 +214,7 @@ fn parse_field(tokens: &mut Lexer) -> Result<Field, ParseError<Loc, anyhow::Erro
     let start_loc = tokens.start_loc();
     let f = Field_(parse_name(tokens)?);
     let end_loc = tokens.previous_end_loc();
-    Ok(spanned(tokens.file_name(), start_loc, end_loc, f))
+    Ok(spanned(tokens.file_hash(), start_loc, end_loc, f))
 }
 
 /// field-ident: name-and-type-actuals '::' field
@@ -226,7 +227,7 @@ fn parse_field_ident(tokens: &mut Lexer) -> Result<FieldIdent, ParseError<Loc, a
     let field = parse_field(tokens)?;
     let end_loc = tokens.previous_end_loc();
     Ok(spanned(
-        tokens.file_name(),
+        tokens.file_hash(),
         start_loc,
         end_loc,
         FieldIdent_ {
@@ -303,7 +304,7 @@ fn parse_copyable_val(tokens: &mut Lexer) -> Result<CopyableVal, ParseError<Loc,
         }
     };
     let end_loc = tokens.previous_end_loc();
-    Ok(spanned(tokens.file_name(), start_loc, end_loc, val))
+    Ok(spanned(tokens.file_hash(), start_loc, end_loc, val))
 }
 
 // Get the precedence of a binary operator. The minimum precedence value
@@ -399,7 +400,7 @@ fn parse_rhs_of_binary_exp(
         let start_loc = result.loc.start();
         let end_loc = tokens.previous_end_loc();
         let e = Exp_::BinopExp(Box::new(result), op, Box::new(rhs));
-        result = spanned(tokens.file_name(), start_loc as usize, end_loc, e);
+        result = spanned(tokens.file_hash(), start_loc as usize, end_loc, e);
     }
 
     Ok(result)
@@ -453,7 +454,7 @@ fn parse_qualified_function_name(
         }
     };
     let end_loc = tokens.previous_end_loc();
-    Ok(spanned(tokens.file_name(), start_loc, end_loc, call))
+    Ok(spanned(tokens.file_hash(), start_loc, end_loc, call))
 }
 
 // UnaryExp : Exp = {
@@ -482,7 +483,7 @@ fn parse_borrow_field_(
         let end_loc = tokens.previous_end_loc();
         let type_actuals: Vec<Type> = vec![];
         spanned(
-            tokens.file_name(),
+            tokens.file_hash(),
             start_loc,
             end_loc,
             parse_pack_(tokens, name, type_actuals)?,
@@ -527,7 +528,7 @@ fn parse_unary_exp(tokens: &mut Lexer) -> Result<Exp, ParseError<Loc, anyhow::Er
     let start_loc = tokens.start_loc();
     let e = parse_unary_exp_(tokens)?;
     let end_loc = tokens.previous_end_loc();
-    Ok(spanned(tokens.file_name(), start_loc, end_loc, e))
+    Ok(spanned(tokens.file_hash(), start_loc, end_loc, e))
 }
 
 // Call: Exp = {
@@ -540,7 +541,7 @@ fn parse_call(tokens: &mut Lexer) -> Result<Exp, ParseError<Loc, anyhow::Error>>
     let exp = parse_call_or_term(tokens)?;
     let end_loc = tokens.previous_end_loc();
     Ok(spanned(
-        tokens.file_name(),
+        tokens.file_hash(),
         start_loc,
         end_loc,
         Exp_::FunctionCall(f, Box::new(exp)),
@@ -584,7 +585,7 @@ fn parse_call_or_term(tokens: &mut Lexer) -> Result<Exp, ParseError<Loc, anyhow:
     let start_loc = tokens.start_loc();
     let v = parse_call_or_term_(tokens)?;
     let end_loc = tokens.previous_end_loc();
-    Ok(spanned(tokens.file_name(), start_loc, end_loc, v))
+    Ok(spanned(tokens.file_hash(), start_loc, end_loc, v))
 }
 
 // FieldExp: (Field_, Exp_) = {
@@ -850,7 +851,7 @@ fn parse_lvalue(tokens: &mut Lexer) -> Result<LValue, ParseError<Loc, anyhow::Er
     let start_loc = tokens.start_loc();
     let lv = parse_lvalue_(tokens)?;
     let end_loc = tokens.previous_end_loc();
-    Ok(spanned(tokens.file_name(), start_loc, end_loc, lv))
+    Ok(spanned(tokens.file_hash(), start_loc, end_loc, lv))
 }
 
 // FieldBindings: (Field_, Var_) = {
@@ -950,7 +951,7 @@ fn parse_cmd_(tokens: &mut Lexer) -> Result<Cmd_, ParseError<Loc, anyhow::Error>
             let v = parse_comma_list(tokens, &[Tok::Semicolon], parse_exp, true)?;
             let end = tokens.start_loc();
             Ok(Cmd_::Return(Box::new(spanned(
-                tokens.file_name(),
+                tokens.file_hash(),
                 start,
                 end,
                 Exp_::ExprList(v),
@@ -989,7 +990,7 @@ fn parse_cmd_(tokens: &mut Lexer) -> Result<Cmd_, ParseError<Loc, anyhow::Error>
             consume_token(tokens, Tok::RParen)?;
             let end = tokens.start_loc();
             Ok(Cmd_::Exp(Box::new(spanned(
-                tokens.file_name(),
+                tokens.file_hash(),
                 start,
                 end,
                 Exp_::ExprList(v),
@@ -1041,7 +1042,7 @@ fn parse_statement(tokens: &mut Lexer) -> Result<Statement, ParseError<Loc, anyh
             let start_loc = tokens.start_loc();
             let c = parse_cmd_(tokens)?;
             let end_loc = tokens.previous_end_loc();
-            let cmd = spanned(tokens.file_name(), start_loc, end_loc, c);
+            let cmd = spanned(tokens.file_hash(), start_loc, end_loc, c);
             consume_token(tokens, Tok::Semicolon)?;
             Ok(Statement::CommandStatement(cmd))
         }
@@ -1118,7 +1119,7 @@ fn parse_block(tokens: &mut Lexer) -> Result<Block, ParseError<Loc, anyhow::Erro
     consume_token(tokens, Tok::RBrace)?;
     let end_loc = tokens.previous_end_loc();
     Ok(spanned(
-        tokens.file_name(),
+        tokens.file_hash(),
         start_loc,
         end_loc,
         Block_::new(stmts),
@@ -1275,7 +1276,7 @@ fn parse_type_var(tokens: &mut Lexer) -> Result<TypeVar, ParseError<Loc, anyhow:
     let start_loc = tokens.start_loc();
     let type_var = TypeVar_(parse_name(tokens)?);
     let end_loc = tokens.previous_end_loc();
-    Ok(spanned(tokens.file_name(), start_loc, end_loc, type_var))
+    Ok(spanned(tokens.file_hash(), start_loc, end_loc, type_var))
 }
 
 fn parse_type_parameter_with_phantom_decl(
@@ -1711,7 +1712,7 @@ fn parse_invariant(tokens: &mut Lexer) -> Result<Invariant, ParseError<Loc, anyh
     let result = parse_invariant_(tokens);
     tokens.spec_mode = false;
     Ok(spanned(
-        tokens.file_name(),
+        tokens.file_hash(),
         start,
         tokens.previous_end_loc(),
         result?,
@@ -1758,7 +1759,7 @@ fn parse_synthetic(
     let result = parse_synthetic_(tokens);
     tokens.spec_mode = false;
     Ok(spanned(
-        tokens.file_name(),
+        tokens.file_hash(),
         start,
         tokens.previous_end_loc(),
         result?,
@@ -1868,7 +1869,7 @@ fn parse_function_decl(
         let start_loc = tokens.start_loc();
         let cond = parse_spec_condition(tokens)?;
         let end_loc = tokens.previous_end_loc();
-        specifications.push(spanned(tokens.file_name(), start_loc, end_loc, cond));
+        specifications.push(spanned(tokens.file_hash(), start_loc, end_loc, cond));
     }
 
     let func_name = FunctionName(name);
@@ -1891,7 +1892,7 @@ fn parse_function_decl(
     let end_loc = tokens.previous_end_loc();
     Ok((
         func_name,
-        spanned(tokens.file_name(), start_loc, end_loc, func),
+        spanned(tokens.file_hash(), start_loc, end_loc, func),
     ))
 }
 
@@ -1912,11 +1913,12 @@ fn parse_field_decl(tokens: &mut Lexer) -> Result<(Field, Type), ParseError<Loc,
 // }
 
 fn parse_script(tokens: &mut Lexer) -> Result<Script, ParseError<Loc, anyhow::Error>> {
-    let start_loc = tokens.start_loc();
+    let script_start = tokens.start_loc();
     let mut imports: Vec<ImportDefinition> = vec![];
     while tokens.peek() == Tok::Import {
         imports.push(parse_import_decl(tokens)?);
     }
+    let fun_start = tokens.start_loc();
     consume_token(tokens, Tok::Main)?;
     let type_formals = if tokens.peek() == Tok::Less {
         consume_token(tokens, Tok::Less)?;
@@ -1940,8 +1942,9 @@ fn parse_script(tokens: &mut Lexer) -> Result<Script, ParseError<Loc, anyhow::Er
         vec![],
         FunctionBody::Move { locals, code: body },
     );
-    let main = spanned(tokens.file_name(), start_loc, end_loc, main);
-    Ok(Script::new(imports, vec![], vec![], main))
+    let main = spanned(tokens.file_hash(), fun_start, end_loc, main);
+    let loc = make_loc(tokens.file_hash(), script_start, end_loc);
+    Ok(Script::new(loc, imports, vec![], vec![], main))
 }
 
 // StructDecl: StructDefinition_ = {
@@ -1987,7 +1990,7 @@ fn parse_struct_decl(
         consume_token(tokens, Tok::Semicolon)?;
         let end_loc = tokens.previous_end_loc();
         return Ok(spanned(
-            tokens.file_name(),
+            tokens.file_hash(),
             start_loc,
             end_loc,
             StructDefinition_::native(abilities, name, type_parameters),
@@ -2009,7 +2012,7 @@ fn parse_struct_decl(
     consume_token(tokens, Tok::RBrace)?;
     let end_loc = tokens.previous_end_loc();
     Ok(spanned(
-        tokens.file_name(),
+        tokens.file_hash(),
         start_loc,
         end_loc,
         StructDefinition_::move_declared(abilities, name, type_parameters, fields, invariants),
@@ -2087,6 +2090,7 @@ fn is_struct_decl(tokens: &mut Lexer) -> Result<bool, ParseError<Loc, anyhow::Er
 }
 
 fn parse_module(tokens: &mut Lexer) -> Result<ModuleDefinition, ParseError<Loc, anyhow::Error>> {
+    let start_loc = tokens.start_loc();
     consume_token(tokens, Tok::Module)?;
     let identifier = parse_module_ident(tokens)?;
     consume_token(tokens, Tok::LBrace)?;
@@ -2116,8 +2120,11 @@ fn parse_module(tokens: &mut Lexer) -> Result<ModuleDefinition, ParseError<Loc, 
         functions.push(parse_function_decl(tokens)?);
     }
     tokens.advance()?; // consume the RBrace
+    let end_loc = tokens.previous_end_loc();
+    let loc = make_loc(tokens.file_hash(), start_loc, end_loc);
 
     Ok(ModuleDefinition::new(
+        loc,
         identifier,
         friends,
         imports,
@@ -2145,21 +2152,19 @@ fn parse_script_or_module(
 }
 
 pub fn parse_module_string(
-    file: Symbol,
     input: &str,
 ) -> Result<ModuleDefinition, ParseError<Loc, anyhow::Error>> {
-    let mut tokens = Lexer::new(file, input);
+    let file_hash = FileHash::new(input);
+    let mut tokens = Lexer::new(file_hash, input);
     tokens.advance()?;
     let unit = parse_module(&mut tokens)?;
     consume_token(&mut tokens, Tok::EOF)?;
     Ok(unit)
 }
 
-pub fn parse_script_string(
-    file: Symbol,
-    input: &str,
-) -> Result<Script, ParseError<Loc, anyhow::Error>> {
-    let mut tokens = Lexer::new(file, input);
+pub fn parse_script_string(input: &str) -> Result<Script, ParseError<Loc, anyhow::Error>> {
+    let file_hash = FileHash::new(input);
+    let mut tokens = Lexer::new(file_hash, input);
     tokens.advance()?;
     let unit = parse_script(&mut tokens)?;
     consume_token(&mut tokens, Tok::EOF)?;
@@ -2167,10 +2172,10 @@ pub fn parse_script_string(
 }
 
 pub fn parse_script_or_module_string(
-    file: Symbol,
     input: &str,
 ) -> Result<ScriptOrModule, ParseError<Loc, anyhow::Error>> {
-    let mut tokens = Lexer::new(file, input);
+    let file_hash = FileHash::new(input);
+    let mut tokens = Lexer::new(file_hash, input);
     tokens.advance()?;
     let unit = parse_script_or_module(&mut tokens)?;
     consume_token(&mut tokens, Tok::EOF)?;

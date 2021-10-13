@@ -408,7 +408,7 @@ fn compile_ir_module<'a>(
 ) -> Result<CompiledModule> {
     use compiler::Compiler as IRCompiler;
     let code = std::fs::read_to_string(file_name).unwrap();
-    IRCompiler::new(deps.collect()).into_compiled_module(file_name, &code)
+    IRCompiler::new(deps.collect()).into_compiled_module(&code)
 }
 
 fn compile_ir_script<'a>(
@@ -417,8 +417,7 @@ fn compile_ir_script<'a>(
 ) -> Result<CompiledScript> {
     use compiler::Compiler as IRCompiler;
     let code = std::fs::read_to_string(file_name).unwrap();
-    let (script, _) = IRCompiler::new(deps.collect())
-        .into_compiled_script_and_source_map(file_name.into(), &code)?;
+    let (script, _) = IRCompiler::new(deps.collect()).into_compiled_script_and_source_map(&code)?;
     Ok(script)
 }
 

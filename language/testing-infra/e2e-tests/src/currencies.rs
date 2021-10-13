@@ -21,7 +21,7 @@ pub fn add_currency_to_system(
                 return;
             }
             ";
-            compile::compile_script("file_name", script, vec![])
+            compile::compile_script(script, vec![])
         };
 
         let txn = dr_account
@@ -61,7 +61,7 @@ pub fn add_currency_to_system(
             currency_code_hex = hex::encode(currency_code_to_register),
         );
 
-        compile::compile_module("this_is_a_filename", &module)
+        compile::compile_module(&module)
     };
 
     let txn = dr_account
@@ -86,7 +86,7 @@ pub fn add_currency_to_system(
             "#,
                 currency_code = currency_code_to_register
             );
-            compile::compile_script("file_name", &script, vec![compiled_module])
+            compile::compile_script(&script, vec![compiled_module])
         };
 
         let write_set_payload = WriteSetPayload::Script {

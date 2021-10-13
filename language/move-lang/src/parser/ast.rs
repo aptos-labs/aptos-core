@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::shared::{ast_debug::*, Identifier, Name, NumericalAddress, TName};
+use move_command_line_common::files::FileHash;
 use move_ir_types::location::*;
 use move_symbol_pool::Symbol;
 use std::{fmt, hash::Hash};
@@ -702,11 +703,11 @@ impl LeadingNameAccess_ {
 }
 
 impl Definition {
-    pub fn file(&self) -> Symbol {
+    pub fn file_hash(&self) -> FileHash {
         match self {
-            Definition::Module(m) => m.loc.file(),
-            Definition::Address(a) => a.loc.file(),
-            Definition::Script(s) => s.loc.file(),
+            Definition::Module(m) => m.loc.file_hash(),
+            Definition::Address(a) => a.loc.file_hash(),
+            Definition::Script(s) => s.loc.file_hash(),
         }
     }
 }

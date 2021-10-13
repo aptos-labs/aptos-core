@@ -799,7 +799,7 @@ impl<'a> Disassembler<'a> {
             .identifier_at(function_handle.name);
         let function_code_coverage_map = self.get_function_coverage(function_name);
 
-        let decl_location = &function_source_map.decl_location;
+        let decl_location = &function_source_map.definition_location;
         let instrs: Vec<String> = code
             .code
             .iter()

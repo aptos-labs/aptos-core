@@ -5,7 +5,6 @@
 
 use codespan::ByteIndex;
 use codespan_reporting::diagnostic::{Diagnostic, Label, LabelStyle};
-use itertools::Itertools;
 #[allow(unused_imports)]
 use log::warn;
 use std::collections::{BTreeMap, BTreeSet};
@@ -110,9 +109,8 @@ pub fn run_model_builder_with_options_and_compilation_flags(
     let (comment_map, compiler) = match comments_and_compiler_res {
         Err(diags) => {
             // Add source files so that the env knows how to translate locations of parse errors
-            for fname in files.keys().sorted() {
-                let fsrc = &files[fname];
-                env.add_source(fname.as_str(), fsrc, /* is_dep */ false);
+            for (fhash, (fname, fsrc)) in &files {
+                env.add_source(*fhash, fname.as_str(), fsrc, /* is_dep */ false);
             }
             add_move_lang_diagnostics(&mut env, diags);
             return Ok(env);
@@ -124,16 +122,15 @@ pub fn run_model_builder_with_options_and_compilation_flags(
     let dep_files: BTreeSet<_> = parsed_prog
         .lib_definitions
         .iter()
-        .map(|def| def.file())
+        .map(|def| def.file_hash())
         .collect();
-    for fname in files.keys().sorted() {
-        let fsrc = &files[fname];
-        env.add_source(fname.as_str(), fsrc, dep_files.contains(fname));
+    for (fhash, (fname, fsrc)) in &files {
+        env.add_source(*fhash, fname.as_str(), fsrc, dep_files.contains(fhash));
     }
 
     // Add any documentation comments found by the Move compiler to the env.
-    for (fname, documentation) in comment_map {
-        let file_id = env.get_file_id(fname).expect("file name defined");
+    for (fhash, documentation) in comment_map {
+        let file_id = env.get_file_id(fhash).expect("file name defined");
         env.add_documentation(
             file_id,
             documentation
@@ -166,8 +163,8 @@ pub fn run_model_builder_with_options_and_compilation_flags(
     let mut visited_addresses = BTreeSet::new();
     let mut visited_modules = BTreeSet::new();
     for (_, mident, mdef) in &expansion_ast.modules {
-        let src_file = mdef.loc.file();
-        if !dep_files.contains(&src_file) {
+        let src_file_hash = mdef.loc.file_hash();
+        if !dep_files.contains(&src_file_hash) {
             collect_related_modules_recursive(
                 mident,
                 &expansion_ast.modules,
@@ -177,8 +174,8 @@ pub fn run_model_builder_with_options_and_compilation_flags(
         }
     }
     for sdef in expansion_ast.scripts.values() {
-        let src_file = sdef.loc.file();
-        if !dep_files.contains(&src_file) {
+        let src_file_hash = sdef.loc.file_hash();
+        if !dep_files.contains(&src_file_hash) {
             for (_, mident, _neighbor) in &sdef.immediate_neighbors {
                 collect_related_modules_recursive(
                     mident,

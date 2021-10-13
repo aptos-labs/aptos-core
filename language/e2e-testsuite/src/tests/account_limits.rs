@@ -44,9 +44,7 @@ fn encode_add_account_limits_admin_script(execute_as: AccountAddress) -> WriteSe
         let compiler = Compiler {
             deps: diem_framework_releases::current_modules().iter().collect(),
         };
-        compiler
-            .into_script_blob("file_name", code)
-            .expect("Failed to compile")
+        compiler.into_script_blob(code).expect("Failed to compile")
     };
 
     WriteSetPayload::Script {
@@ -89,9 +87,7 @@ fn encode_update_account_limit_definition_script(
         let compiler = Compiler {
             deps: diem_framework_releases::current_modules().iter().collect(),
         };
-        compiler
-            .into_script_blob("file_name", code)
-            .expect("Failed to compile")
+        compiler.into_script_blob(code).expect("Failed to compile")
     };
 
     Script::new(
@@ -134,9 +130,7 @@ fn encode_update_account_limit_window_info_script(
         let compiler = Compiler {
             deps: diem_framework_releases::current_modules().iter().collect(),
         };
-        compiler
-            .into_script_blob("file_name", code)
-            .expect("Failed to compile")
+        compiler.into_script_blob(code).expect("Failed to compile")
     };
 
     Script::new(

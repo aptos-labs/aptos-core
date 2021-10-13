@@ -5,8 +5,8 @@ use crate::{
     diag, diagnostics::Diagnostic, parser::syntax::make_loc, shared::CompilationEnv,
     FileCommentMap, MatchedFileCommentMap,
 };
+use move_command_line_common::files::FileHash;
 use move_ir_types::location::Loc;
-use move_symbol_pool::Symbol;
 use std::fmt;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -160,7 +160,7 @@ impl fmt::Display for Tok {
 
 pub struct Lexer<'input> {
     text: &'input str,
-    file: Symbol,
+    file_hash: FileHash,
     doc_comments: FileCommentMap,
     matched_doc_comments: MatchedFileCommentMap,
     prev_end: usize,
@@ -170,10 +170,10 @@ pub struct Lexer<'input> {
 }
 
 impl<'input> Lexer<'input> {
-    pub fn new(text: &'input str, file: Symbol) -> Lexer<'input> {
+    pub fn new(text: &'input str, file_hash: FileHash) -> Lexer<'input> {
         Lexer {
             text,
-            file,
+            file_hash,
             doc_comments: FileCommentMap::new(),
             matched_doc_comments: MatchedFileCommentMap::new(),
             prev_end: 0,
@@ -191,8 +191,8 @@ impl<'input> Lexer<'input> {
         &self.text[self.cur_start..self.cur_end]
     }
 
-    pub fn file_name(&self) -> Symbol {
-        self.file
+    pub fn file_hash(&self) -> FileHash {
+        self.file_hash
     }
 
     pub fn start_loc(&self) -> usize {
@@ -241,7 +241,7 @@ impl<'input> Lexer<'input> {
                         // Highlight the '/**' if it's a documentation comment, or the '/*'
                         // otherwise.
                         let location =
-                            make_loc(self.file, loc.0, loc.0 + if loc.1 { 3 } else { 2 });
+                            make_loc(self.file_hash, loc.0, loc.0 + if loc.1 { 3 } else { 2 });
                         return Err(diag!(
                             Syntax::InvalidDocComment,
                             (location, "Unclosed block comment"),
@@ -314,7 +314,7 @@ impl<'input> Lexer<'input> {
     pub fn lookahead(&mut self) -> Result<Tok, Diagnostic> {
         let text = self.trim_whitespace_and_comments(self.cur_end)?;
         let offset = self.text.len() - text.len();
-        let (tok, _) = find_token(self.file, text, offset)?;
+        let (tok, _) = find_token(self.file_hash, text, offset)?;
         Ok(tok)
     }
 
@@ -323,10 +323,10 @@ impl<'input> Lexer<'input> {
     pub fn lookahead2(&mut self) -> Result<(Tok, Tok), Diagnostic> {
         let text = self.trim_whitespace_and_comments(self.cur_end)?;
         let offset = self.text.len() - text.len();
-        let (first, length) = find_token(self.file, text, offset)?;
+        let (first, length) = find_token(self.file_hash, text, offset)?;
         let text2 = self.trim_whitespace_and_comments(offset + length)?;
         let offset2 = self.text.len() - text2.len();
-        let (second, _) = find_token(self.file, text2, offset2)?;
+        let (second, _) = find_token(self.file_hash, text2, offset2)?;
         Ok((first, second))
     }
 
@@ -369,7 +369,7 @@ impl<'input> Lexer<'input> {
             .doc_comments
             .iter()
             .map(|((start, end), _)| {
-                let loc = Loc::new(self.file, *start, *end);
+                let loc = Loc::new(self.file_hash, *start, *end);
                 diag!(Syntax::InvalidDocComment, (loc, msg))
             })
             .collect();
@@ -381,7 +381,7 @@ impl<'input> Lexer<'input> {
         self.prev_end = self.cur_end;
         let text = self.trim_whitespace_and_comments(self.cur_end)?;
         self.cur_start = self.text.len() - text.len();
-        let (token, len) = find_token(self.file, text, self.cur_start)?;
+        let (token, len) = find_token(self.file_hash, text, self.cur_start)?;
         self.cur_end = self.cur_start + len;
         self.token = token;
         Ok(())
@@ -397,7 +397,11 @@ impl<'input> Lexer<'input> {
 }
 
 // Find the next token and its length without changing the state of the lexer.
-fn find_token(file: Symbol, text: &str, start_offset: usize) -> Result<(Tok, usize), Diagnostic> {
+fn find_token(
+    file_hash: FileHash,
+    text: &str,
+    start_offset: usize,
+) -> Result<(Tok, usize), Diagnostic> {
     let c: char = match text.chars().next() {
         Some(next_char) => next_char,
         None => {
@@ -425,7 +429,7 @@ fn find_token(file: Symbol, text: &str, start_offset: usize) -> Result<(Tok, usi
                 match get_string_len(line) {
                     Some(last_quote) => (Tok::ByteStringValue, 2 + last_quote + 1),
                     None => {
-                        let loc = make_loc(file, start_offset, start_offset + line.len() + 2);
+                        let loc = make_loc(file_hash, start_offset, start_offset + line.len() + 2);
                         return Err(diag!(
                             if is_hex {
                                 Syntax::InvalidHexString
@@ -524,7 +528,7 @@ fn find_token(file: Symbol, text: &str, start_offset: usize) -> Result<(Tok, usi
         '#' => (Tok::NumSign, 1),
         '@' => (Tok::AtSign, 1),
         _ => {
-            let loc = make_loc(file, start_offset, start_offset);
+            let loc = make_loc(file_hash, start_offset, start_offset);
             return Err(diag!(
                 Syntax::InvalidCharacter,
                 (loc, format!("Invalid character: '{}'", c))

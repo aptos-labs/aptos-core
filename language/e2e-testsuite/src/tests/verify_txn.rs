@@ -804,7 +804,7 @@ pub fn test_publish_from_diem_root() {
         sender.address(),
     );
 
-    let random_module = compile_module("file_name", &module).1;
+    let random_module = compile_module(&module).1;
     let txn = sender
         .account()
         .transaction()
@@ -1004,7 +1004,7 @@ pub fn test_no_publishing_diem_root_sender() {
         ",
     );
 
-    let random_module = compile_module("file_name", &module).1;
+    let random_module = compile_module(&module).1;
     let txn = sender
         .transaction()
         .module(random_module)
@@ -1052,7 +1052,7 @@ pub fn test_open_publishing_invalid_address() {
         receiver.address(),
     );
 
-    let random_module = compile_module("file_name", &module).1;
+    let random_module = compile_module(&module).1;
     let txn = sender
         .account()
         .transaction()
@@ -1111,7 +1111,7 @@ pub fn test_open_publishing() {
         sender.address(),
     );
 
-    let random_module = compile_module("file_name", &program).1;
+    let random_module = compile_module(&program).1;
     let txn = sender
         .account()
         .transaction()
@@ -1144,7 +1144,7 @@ fn bad_module() -> (CompiledModule, Vec<u8>) {
     ";
     let compiler = Compiler { deps: vec![] };
     let module = compiler
-        .into_compiled_module("file_name", bad_module_code)
+        .into_compiled_module(bad_module_code)
         .expect("Failed to compile");
     let mut bytes = vec![];
     module.serialize(&mut bytes).unwrap();
@@ -1179,7 +1179,7 @@ fn good_module_uses_bad(
             .collect(),
     };
     let module = compiler
-        .into_compiled_module("file_name", good_module_code.as_str())
+        .into_compiled_module(good_module_code.as_str())
         .expect("Failed to compile");
     let mut bytes = vec![];
     module.serialize(&mut bytes).unwrap();
@@ -1212,9 +1212,7 @@ fn test_script_dependency_fails_verification() {
     let compiler = Compiler {
         deps: vec![&module],
     };
-    let script = compiler
-        .into_script_blob("file_name", code)
-        .expect("Failed to compile");
+    let script = compiler.into_script_blob(code).expect("Failed to compile");
     let txn = sender
         .account()
         .transaction()
@@ -1292,9 +1290,7 @@ fn test_type_tag_dependency_fails_verification() {
     let compiler = Compiler {
         deps: vec![&module],
     };
-    let script = compiler
-        .into_script_blob("file_name", code)
-        .expect("Failed to compile");
+    let script = compiler.into_script_blob(code).expect("Failed to compile");
     let txn = sender
         .account()
         .transaction()
@@ -1353,9 +1349,7 @@ fn test_script_transitive_dependency_fails_verification() {
     let compiler = Compiler {
         deps: vec![&good_module],
     };
-    let script = compiler
-        .into_script_blob("file_name", code)
-        .expect("Failed to compile");
+    let script = compiler.into_script_blob(code).expect("Failed to compile");
     let txn = sender
         .account()
         .transaction()
@@ -1411,7 +1405,7 @@ fn test_module_transitive_dependency_fails_verification() {
         };
         diem_types::transaction::Module::new(
             compiler
-                .into_module_blob("file_name", module_code.as_str())
+                .into_module_blob(module_code.as_str())
                 .expect("Module compilation failed"),
         )
     };
@@ -1462,9 +1456,7 @@ fn test_type_tag_transitive_dependency_fails_verification() {
     let compiler = Compiler {
         deps: vec![&good_module],
     };
-    let script = compiler
-        .into_script_blob("file_name", code)
-        .expect("Failed to compile");
+    let script = compiler.into_script_blob(code).expect("Failed to compile");
     let txn = sender
         .account()
         .transaction()
@@ -1556,7 +1548,7 @@ pub fn publish_and_register_new_currency() {
         }
     "#;
 
-    let (compiled_module, module) = compile_module("file_name", module);
+    let (compiled_module, module) = compile_module(module);
     let txn = sender
         .transaction()
         .module(module)
@@ -1581,9 +1573,7 @@ pub fn publish_and_register_new_currency() {
             let compiler = Compiler {
                 deps: vec![&compiled_module],
             };
-            compiler
-                .into_script_blob("file_name", code)
-                .expect("Failed to compile")
+            compiler.into_script_blob(code).expect("Failed to compile")
         };
         let txn = sender
             .transaction()

@@ -51,7 +51,7 @@ pub fn publish(
                     println!(
                         "Warning: Found script in specified files for publishing. But scripts \
                          cannot be published. Script found in: {}",
-                        c.loc().file()
+                        c.loc().file_hash()
                     )
                 }
             }

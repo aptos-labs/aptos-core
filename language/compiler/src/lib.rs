@@ -15,7 +15,6 @@ use ir_to_bytecode::{
     parser::{parse_module, parse_script},
 };
 use move_binary_format::file_format::{CompiledModule, CompiledScript};
-use move_symbol_pool::Symbol;
 
 /// An API for the compiler. Supports setting custom options.
 #[derive(Clone, Debug)]
@@ -32,16 +31,15 @@ impl<'a> Compiler<'a> {
     /// Compiles into a `CompiledScript` where the bytecode hasn't been serialized.
     pub fn into_compiled_script_and_source_map(
         self,
-        file_name: Symbol,
         code: &str,
     ) -> Result<(CompiledScript, SourceMap)> {
-        let (compiled_script, source_map) = self.compile_script(file_name, code)?;
+        let (compiled_script, source_map) = self.compile_script(code)?;
         Ok((compiled_script, source_map))
     }
 
     /// Compiles the script into a serialized form.
-    pub fn into_script_blob(self, file_name: &str, code: &str) -> Result<Vec<u8>> {
-        let compiled_script = self.compile_script(Symbol::from(file_name), code)?.0;
+    pub fn into_script_blob(self, code: &str) -> Result<Vec<u8>> {
+        let compiled_script = self.compile_script(code)?.0;
 
         let mut serialized_script = Vec::<u8>::new();
         compiled_script.serialize(&mut serialized_script)?;
@@ -49,28 +47,28 @@ impl<'a> Compiler<'a> {
     }
 
     /// Compiles the module.
-    pub fn into_compiled_module(self, file_name: &str, code: &str) -> Result<CompiledModule> {
-        Ok(self.compile_mod(Symbol::from(file_name), code)?.0)
+    pub fn into_compiled_module(self, code: &str) -> Result<CompiledModule> {
+        Ok(self.compile_mod(code)?.0)
     }
 
     /// Compiles the module into a serialized form.
-    pub fn into_module_blob(self, file_name: &str, code: &str) -> Result<Vec<u8>> {
-        let compiled_module = self.compile_mod(Symbol::from(file_name), code)?.0;
+    pub fn into_module_blob(self, code: &str) -> Result<Vec<u8>> {
+        let compiled_module = self.compile_mod(code)?.0;
 
         let mut serialized_module = Vec::<u8>::new();
         compiled_module.serialize(&mut serialized_module)?;
         Ok(serialized_module)
     }
 
-    fn compile_script(self, file_name: Symbol, code: &str) -> Result<(CompiledScript, SourceMap)> {
-        let parsed_script = parse_script(file_name, code)?;
+    fn compile_script(self, code: &str) -> Result<(CompiledScript, SourceMap)> {
+        let parsed_script = parse_script(code)?;
         let (compiled_script, source_map) =
             compile_script(parsed_script, self.deps.iter().map(|d| &**d))?;
         Ok((compiled_script, source_map))
     }
 
-    fn compile_mod(self, file_name: Symbol, code: &str) -> Result<(CompiledModule, SourceMap)> {
-        let parsed_module = parse_module(file_name, code)?;
+    fn compile_mod(self, code: &str) -> Result<(CompiledModule, SourceMap)> {
+        let parsed_module = parse_module(code)?;
         let (compiled_module, source_map) =
             compile_module(parsed_module, self.deps.iter().map(|d| &**d))?;
         Ok((compiled_module, source_map))

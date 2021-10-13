@@ -8,7 +8,7 @@ pub fn decode(loc: Loc, s: &str) -> Result<Vec<u8>, Diagnostic> {
     match hex::decode(s) {
         Ok(vec) => Ok(vec),
         Err(hex::FromHexError::InvalidHexCharacter { c, index }) => {
-            let filename = loc.file();
+            let filename = loc.file_hash();
             let start_offset = loc.start() as usize;
             let offset = start_offset + 2 + index;
             let loc = make_loc(filename, offset, offset);

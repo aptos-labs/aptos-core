@@ -2,7 +2,39 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{anyhow, bail};
-use std::path::Path;
+use serde::{Deserialize, Serialize};
+use sha2::Digest;
+use std::{convert::TryInto, path::Path};
+
+/// Result of sha256 hash of a file's contents.
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
+pub struct FileHash(pub [u8; 32]);
+
+impl FileHash {
+    pub fn new(file_contents: &str) -> Self {
+        Self(
+            sha2::Sha256::digest(file_contents.as_bytes())
+                .try_into()
+                .expect("Length of sha256 digest must always be 32 bytes"),
+        )
+    }
+
+    pub const fn empty() -> Self {
+        Self([0; 32])
+    }
+}
+
+impl std::fmt::Display for FileHash {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        hex::encode(self.0).fmt(f)
+    }
+}
+
+impl std::fmt::Debug for FileHash {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        hex::encode(self.0).fmt(f)
+    }
+}
 
 /// Extension for Move source language files
 pub const MOVE_EXTENSION: &str = "move";

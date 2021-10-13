@@ -40,9 +40,7 @@ main(dr_account: signer, account: signer, auth_key_prefix: vector<u8>) {
         let compiler = Compiler {
             deps: diem_framework_releases::current_modules().iter().collect(),
         };
-        compiler
-            .into_script_blob("file_name", code)
-            .expect("Failed to compile")
+        compiler.into_script_blob(code).expect("Failed to compile")
     };
     let account = Account::new_diem_root();
     let txn = account
@@ -104,9 +102,7 @@ main(dr_account: signer, account: signer, auth_key_prefix: vector<u8>) {
         let compiler = Compiler {
             deps: diem_framework_releases::current_modules().iter().collect(),
         };
-        compiler
-            .into_script_blob("file_name", code)
-            .expect("Failed to compile")
+        compiler.into_script_blob(code).expect("Failed to compile")
     };
     let account = Account::new_diem_root();
     let txn = account
@@ -166,9 +162,7 @@ main(account: signer, auth_key_prefix: vector<u8>) {
         let compiler = Compiler {
             deps: diem_framework_releases::current_modules().iter().collect(),
         };
-        compiler
-            .into_script_blob("file_name", code)
-            .expect("Failed to compile")
+        compiler.into_script_blob(code).expect("Failed to compile")
     };
     let account = Account::new_diem_root();
     let txn = account

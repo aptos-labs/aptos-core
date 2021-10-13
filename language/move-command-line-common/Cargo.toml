@@ -13,5 +13,8 @@ edition = "2018"
 anyhow = "1.0.38"
 difference = "2.0.0"
 walkdir = "2.3.1"
+sha2 = "0.9.3"
+hex = "0.4.3"
+serde = { version = "1.0.124", features = ["derive"] }
 
 diem-workspace-hack = { path = "../../common/workspace-hack" }

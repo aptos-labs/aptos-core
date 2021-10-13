@@ -10,17 +10,17 @@ use move_binary_format::CompiledModule;
 
 /// Compile the provided Move code into a blob which can be used as the code to be published
 /// (a Module).
-pub fn compile_module(file_name: &str, code: &str) -> (CompiledModule, Module) {
+pub fn compile_module(code: &str) -> (CompiledModule, Module) {
     let compiled_module = Compiler {
         deps: diem_framework_releases::current_modules().iter().collect(),
     }
-    .into_compiled_module(file_name, code)
+    .into_compiled_module(code)
     .expect("Module compilation failed");
     let module = Module::new(
         Compiler {
             deps: diem_framework_releases::current_modules().iter().collect(),
         }
-        .into_module_blob(file_name, code)
+        .into_module_blob(code)
         .expect("Module compilation failed"),
     );
     (compiled_module, module)
@@ -28,7 +28,7 @@ pub fn compile_module(file_name: &str, code: &str) -> (CompiledModule, Module) {
 
 /// Compile the provided Move code into a blob which can be used as the code to be executed
 /// (a Script).
-pub fn compile_script(file_name: &str, code: &str, extra_deps: Vec<CompiledModule>) -> Script {
+pub fn compile_script(code: &str, extra_deps: Vec<CompiledModule>) -> Script {
     let compiler = Compiler {
         deps: diem_framework_releases::current_modules()
             .iter()
@@ -37,7 +37,7 @@ pub fn compile_script(file_name: &str, code: &str, extra_deps: Vec<CompiledModul
     };
     Script::new(
         compiler
-            .into_script_blob(file_name, code)
+            .into_script_blob(code)
             .expect("Script compilation failed"),
         vec![],
         vec![],

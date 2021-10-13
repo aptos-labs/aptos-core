@@ -210,6 +210,7 @@ fn module(
         }
     ) = ident;
     let ir_module = IR::ModuleDefinition {
+        loc: ident_loc,
         identifier: IR::ModuleIdent {
             address: MoveAddress::new(addr_bytes.into_bytes()),
             name: IR::ModuleName(module_name.0.value),
@@ -281,6 +282,7 @@ fn script(
         function_declarations,
     );
     let ir_script = IR::Script {
+        loc,
         imports,
         explicit_dependency_declarations,
         constants,

@@ -303,9 +303,7 @@ fn test_change_publishing_option_to_custom() {
         let compiler = Compiler {
             deps: diem_framework_releases::current_modules().iter().collect(),
         };
-        compiler
-            .into_script_blob("file_name", code)
-            .expect("Failed to compile")
+        compiler.into_script_blob(code).expect("Failed to compile")
     };
     let txn5 = get_test_signed_transaction(
         genesis_account,

@@ -43,7 +43,7 @@ pub fn verify(
         if let Some(prev) = decl_locs.insert(mident_, compiled_mident) {
             let cur = &decl_locs[&mident_];
             let (orig, duplicate) =
-                if cur.0.file() == prev.0.file() && cur.0.start() > prev.0.start() {
+                if cur.0.file_hash() == prev.0.file_hash() && cur.0.start() > prev.0.start() {
                     (&prev, cur)
                 } else {
                     (cur, &prev)

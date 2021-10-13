@@ -65,7 +65,7 @@ impl LocalStates {
     pub fn get_state(&self, local: &Var) -> &LocalState {
         self.local_states
             .get(local)
-            .unwrap_or_else(|| panic!("{:#?}{:#?}", local.loc(), local))
+            .unwrap_or_else(|| panic!("ICE: Unable to get state for local {:#?}", local))
     }
 
     pub fn set_state(&mut self, local: Var, state: LocalState) {

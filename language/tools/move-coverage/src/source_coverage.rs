@@ -29,8 +29,9 @@ pub struct FunctionSourceCoverage {
 }
 
 #[derive(Debug, Serialize)]
-pub struct SourceCoverageBuilder {
+pub struct SourceCoverageBuilder<'a> {
     uncovered_locations: BTreeMap<Identifier, FunctionSourceCoverage>,
+    source_map: &'a SourceMap,
 }
 
 #[derive(Debug, Serialize, Eq, PartialEq, Ord, PartialOrd)]
@@ -53,11 +54,11 @@ pub struct SourceCoverage {
     pub annotated_lines: Vec<AnnotatedLine>,
 }
 
-impl SourceCoverageBuilder {
+impl<'a> SourceCoverageBuilder<'a> {
     pub fn new(
         module: &CompiledModule,
         coverage_map: &CoverageMap,
-        source_map: &SourceMap,
+        source_map: &'a SourceMap,
     ) -> Self {
         let module_name = module.self_id();
         let unified_exec_map = coverage_map.to_unified_exec_map();
@@ -86,7 +87,8 @@ impl SourceCoverageBuilder {
                                 let function_map = source_map
                                     .get_function_source_map(function_def_idx)
                                     .unwrap();
-                                let mut uncovered_locations = vec![function_map.decl_location];
+                                let mut uncovered_locations =
+                                    vec![function_map.definition_location];
                                 uncovered_locations.extend(function_map.code_map.values());
 
                                 FunctionSourceCoverage {
@@ -126,11 +128,16 @@ impl SourceCoverageBuilder {
 
         Self {
             uncovered_locations,
+            source_map,
         }
     }
 
     pub fn compute_source_coverage(&self, file_path: &Path) -> SourceCoverage {
         let file_contents = fs::read_to_string(file_path).unwrap();
+        assert!(
+            self.source_map.check(&file_contents),
+            "File contents out of sync with source map"
+        );
         let mut files = Files::new();
         let file_id = files.add(file_path.as_os_str().to_os_string(), file_contents.clone());
 

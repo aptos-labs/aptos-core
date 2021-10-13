@@ -2,19 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{diag, diagnostics::Diagnostics, parser::syntax::make_loc};
+use move_command_line_common::files::FileHash;
 use move_ir_types::location::*;
-use move_symbol_pool::Symbol;
 
 struct Context {
-    filename: Symbol,
+    file_hash: FileHash,
     start_offset: usize,
     diags: Diagnostics,
 }
 
 impl Context {
-    fn new(filename: Symbol, start_offset: usize) -> Self {
+    fn new(file_hash: FileHash, start_offset: usize) -> Self {
         Self {
-            filename,
+            file_hash,
             start_offset,
             diags: Diagnostics::new(),
         }
@@ -22,7 +22,7 @@ impl Context {
 
     fn error(&mut self, start: usize, end: usize, err_text: String) {
         let loc = make_loc(
-            self.filename,
+            self.file_hash,
             self.start_offset + 2 + start, // add 2 for the beginning of the string
             self.start_offset + 2 + end,
         );
@@ -40,9 +40,9 @@ impl Context {
 }
 
 pub fn decode(loc: Loc, text: &str) -> Result<Vec<u8>, Diagnostics> {
-    let filename = loc.file();
+    let file_hash = loc.file_hash();
     let start_offset = loc.start() as usize;
-    let mut context = Context::new(filename, start_offset);
+    let mut context = Context::new(file_hash, start_offset);
     let mut buffer = vec![];
     let chars: Vec<_> = text.chars().collect();
     decode_(&mut context, &mut buffer, chars);

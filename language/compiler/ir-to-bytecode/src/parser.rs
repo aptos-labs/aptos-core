@@ -14,7 +14,6 @@ use codespan_reporting::{
 use ir_to_bytecode_syntax::syntax::{self, ParseError};
 use move_command_line_common::character_sets::is_permitted_char;
 use move_ir_types::{ast, location::*};
-use move_symbol_pool::Symbol;
 
 // We restrict strings to only ascii visual characters (0x20 <= c <= 0x7E) or a permitted newline
 // character--\n--or a tab--\t. Checking each character in the input string is more fool-proof
@@ -36,23 +35,23 @@ fn verify_string(string: &str) -> Result<()> {
 
 /// Given the raw input of a file, creates a `ScriptOrModule` enum
 /// Fails with `Err(_)` if the text cannot be parsed`
-pub fn parse_script_or_module(file_name: Symbol, s: &str) -> Result<ast::ScriptOrModule> {
+pub fn parse_script_or_module(s: &str) -> Result<ast::ScriptOrModule> {
     verify_string(s)?;
-    syntax::parse_script_or_module_string(file_name, s).or_else(|e| handle_error(e, s))
+    syntax::parse_script_or_module_string(s).or_else(|e| handle_error(e, s))
 }
 
 /// Given the raw input of a file, creates a `Script` struct
 /// Fails with `Err(_)` if the text cannot be parsed
-pub fn parse_script(file_name: Symbol, script_str: &str) -> Result<ast::Script> {
+pub fn parse_script(script_str: &str) -> Result<ast::Script> {
     verify_string(script_str)?;
-    syntax::parse_script_string(file_name, script_str).or_else(|e| handle_error(e, script_str))
+    syntax::parse_script_string(script_str).or_else(|e| handle_error(e, script_str))
 }
 
 /// Given the raw input of a file, creates a single `ModuleDefinition` struct
 /// Fails with `Err(_)` if the text cannot be parsed
-pub fn parse_module(file_name: Symbol, modules_str: &str) -> Result<ast::ModuleDefinition> {
+pub fn parse_module(modules_str: &str) -> Result<ast::ModuleDefinition> {
     verify_string(modules_str)?;
-    syntax::parse_module_string(file_name, modules_str).or_else(|e| handle_error(e, modules_str))
+    syntax::parse_module_string(modules_str).or_else(|e| handle_error(e, modules_str))
 }
 
 fn handle_error<T>(e: syntax::ParseError<Loc, anyhow::Error>, code_str: &str) -> Result<T> {
@@ -61,7 +60,7 @@ fn handle_error<T>(e: syntax::ParseError<Loc, anyhow::Error>, code_str: &str) ->
         ParseError::User { location, .. } => location,
     };
     let mut files = SimpleFiles::new();
-    let id = files.add(location.file(), code_str.to_string());
+    let id = files.add(location.file_hash(), code_str.to_string());
     let lbl = match &e {
         ParseError::InvalidToken { .. } => {
             Label::primary(id, location.usize_range()).with_message("Invalid Token")

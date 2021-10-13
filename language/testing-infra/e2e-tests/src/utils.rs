@@ -24,7 +24,7 @@ pub fn close_module_publishing(
             return;
         }
         ";
-        compile::compile_script("file_name", script, vec![])
+        compile::compile_script(script, vec![])
     };
 
     let txn = dr_account

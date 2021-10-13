@@ -410,7 +410,7 @@ fn type_name(_context: &Context, sp!(loc, ntn_): N::TypeName) -> H::TypeName {
     let tn_ = match ntn_ {
         NT::Multiple(_) => panic!(
             "ICE type constraints failed {}:{}-{}",
-            loc.file(),
+            loc.file_hash(),
             loc.start(),
             loc.end()
         ),
@@ -433,7 +433,7 @@ fn base_type(context: &Context, sp!(loc, nb_): N::Type) -> H::BaseType {
     let b_ = match nb_ {
         NT::Var(_) => panic!(
             "ICE tvar not expanded: {}:{}-{}",
-            loc.file(),
+            loc.file_hash(),
             loc.start(),
             loc.end()
         ),
@@ -448,7 +448,7 @@ fn base_type(context: &Context, sp!(loc, nb_): N::Type) -> H::BaseType {
         NT::Ref(_, _) | NT::Unit => {
             panic!(
                 "ICE type constraints failed {}:{}-{}",
-                loc.file(),
+                loc.file_hash(),
                 loc.start(),
                 loc.end()
             )

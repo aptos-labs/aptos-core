@@ -31,7 +31,7 @@ fn prepare_module(executor: &mut FakeExecutor, account: &Account, seq_num: u64) 
         ",
         account.address(),
     );
-    let compiled_module = compile_module("file_name", &program).1;
+    let compiled_module = compile_module(&program).1;
 
     let txn = account
         .transaction()

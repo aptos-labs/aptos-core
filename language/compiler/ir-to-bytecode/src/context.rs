@@ -19,9 +19,12 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
 };
-use move_ir_types::ast::{
-    BlockLabel, ConstantName, Field_, FunctionName, ModuleIdent, ModuleName, QualifiedStructIdent,
-    StructName,
+use move_ir_types::{
+    ast::{
+        BlockLabel, ConstantName, Field_, FunctionName, ModuleIdent, ModuleName,
+        QualifiedStructIdent, StructName,
+    },
+    location::Loc,
 };
 use std::{clone::Clone, collections::HashMap, hash::Hash};
 
@@ -274,6 +277,7 @@ impl<'a> Context<'a> {
     /// The current module is a dummy `Self` for CompiledScript.
     /// It initializes an "import" of `Self` as the alias for the current_module.
     pub fn new(
+        decl_location: Loc,
         dependencies: CompiledDependencies<'a>,
         current_module_opt: Option<ModuleIdent>,
     ) -> Result<Self> {
@@ -299,7 +303,7 @@ impl<'a> Context<'a> {
             address_identifiers: HashMap::new(),
             constant_pool: HashMap::new(),
             current_function_index: FunctionDefinitionIndex::new(0),
-            source_map: SourceMap::new(current_module_opt),
+            source_map: SourceMap::new(decl_location, current_module_opt),
         };
 
         Ok(context)
@@ -865,5 +869,9 @@ impl<'a> Context<'a> {
     ) -> Result<&(FunctionHandle, FunctionHandleIndex)> {
         self.ensure_function_declared(m, f.clone())?;
         Ok(self.function_handles.get(&(m, f)).unwrap())
+    }
+
+    pub fn decl_location(&self) -> Loc {
+        self.source_map.definition_location
     }
 }

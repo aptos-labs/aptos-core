@@ -239,9 +239,7 @@ pub(crate) fn enable_custom_script(
         let compiler = Compiler {
             deps: diem_framework_releases::current_modules().iter().collect(),
         };
-        compiler
-            .into_script_blob("file_name", code)
-            .expect("Failed to compile")
+        compiler.into_script_blob(code).expect("Failed to compile")
     };
 
     let txn = root_account.sign_with_transaction_builder(transaction_factory.payload(

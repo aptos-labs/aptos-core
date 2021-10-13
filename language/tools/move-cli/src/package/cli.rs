@@ -13,6 +13,7 @@ use std::{
 use anyhow::Result;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 
+use move_command_line_common::files::FileHash;
 use move_lang::{
     compiled_unit::CompiledUnit,
     diagnostics::{self, codes::Severity},
@@ -188,7 +189,11 @@ pub fn handle_package_commands(
                     rpkg.get_sources(&resolution_graph.build_options)
                         .unwrap()
                         .iter()
-                        .map(|fname| (*fname, read_to_string(Path::new(fname.as_str())).unwrap()))
+                        .map(|fname| {
+                            let contents = read_to_string(Path::new(fname.as_str())).unwrap();
+                            let fhash = FileHash::new(&contents);
+                            (fhash, (*fname, contents))
+                        })
                         .collect::<HashMap<_, _>>()
                 })
                 .collect();

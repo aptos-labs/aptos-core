@@ -627,9 +627,7 @@ impl ClientProxy {
             let compiler = Compiler {
                 deps: diem_framework_releases::current_modules().iter().collect(),
             };
-            compiler
-                .into_script_blob("file_name", &code)
-                .expect("Failed to compile")
+            compiler.into_script_blob(&code).expect("Failed to compile")
         };
         match self.diem_root_account {
             Some(_) => self.association_transaction_with_local_diem_root_account(

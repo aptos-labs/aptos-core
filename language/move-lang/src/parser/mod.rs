@@ -17,7 +17,7 @@ use crate::{
 };
 use anyhow::anyhow;
 use comments::*;
-use move_command_line_common::files::find_move_filenames;
+use move_command_line_common::files::{find_move_filenames, FileHash};
 use move_symbol_pool::Symbol;
 use std::{
     collections::{BTreeSet, HashMap},
@@ -49,14 +49,14 @@ pub(crate) fn parse_program(
     let mut diags: Diagnostics = Diagnostics::new();
 
     for fname in targets {
-        let (defs, comments, ds) = parse_file(compilation_env, &mut files, fname)?;
+        let (defs, comments, ds, file_hash) = parse_file(compilation_env, &mut files, fname)?;
         source_definitions.extend(defs);
-        source_comments.insert(fname, comments);
+        source_comments.insert(file_hash, comments);
         diags.extend(ds);
     }
 
     for fname in deps {
-        let (defs, _, ds) = parse_file(compilation_env, &mut files, fname)?;
+        let (defs, _, ds, _) = parse_file(compilation_env, &mut files, fname)?;
         lib_definitions.extend(defs);
         diags.extend(ds);
     }
@@ -127,27 +127,29 @@ fn parse_file(
     Vec<parser::ast::Definition>,
     MatchedFileCommentMap,
     Diagnostics,
+    FileHash,
 )> {
     let mut diags = Diagnostics::new();
     let mut f = File::open(fname.as_str())
         .map_err(|err| std::io::Error::new(err.kind(), format!("{}: {}", err, fname)))?;
     let mut source_buffer = String::new();
     f.read_to_string(&mut source_buffer)?;
-    let buffer = match verify_string(fname, &source_buffer) {
+    let file_hash = FileHash::new(&source_buffer);
+    let buffer = match verify_string(file_hash, &source_buffer) {
         Err(ds) => {
             diags.extend(ds);
-            files.insert(fname, source_buffer);
-            return Ok((vec![], MatchedFileCommentMap::new(), diags));
+            files.insert(file_hash, (fname, source_buffer));
+            return Ok((vec![], MatchedFileCommentMap::new(), diags, file_hash));
         }
         Ok(()) => &source_buffer,
     };
-    let (defs, comments) = match parse_file_string(compilation_env, fname, buffer) {
+    let (defs, comments) = match parse_file_string(compilation_env, file_hash, buffer) {
         Ok(defs_and_comments) => defs_and_comments,
         Err(ds) => {
             diags.extend(ds);
             (vec![], MatchedFileCommentMap::new())
         }
     };
-    files.insert(fname, source_buffer);
-    Ok((defs, comments, diags))
+    files.insert(file_hash, (fname, source_buffer));
+    Ok((defs, comments, diags, file_hash))
 }

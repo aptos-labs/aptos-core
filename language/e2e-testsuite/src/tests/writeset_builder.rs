@@ -30,7 +30,7 @@ fn build_upgrade_writeset() {
         ",
     );
 
-    let module = compile_module("file_name", &program).0;
+    let module = compile_module(&program).0;
     let module_bytes = {
         let mut v = vec![];
         module.serialize(&mut v).unwrap();
@@ -83,9 +83,7 @@ main(lr_account: signer) {
         let compiler = Compiler {
             deps: vec![&module],
         };
-        compiler
-            .into_script_blob("file_name", code)
-            .expect("Failed to compile")
+        compiler.into_script_blob(code).expect("Failed to compile")
     };
 
     let txn = genesis_account

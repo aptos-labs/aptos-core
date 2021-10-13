@@ -9,6 +9,7 @@ use move_binary_format::{
         MemberCount, ModuleHandleIndex, StructDefinition, StructDefinitionIndex, TableIndex,
     },
 };
+use move_command_line_common::files::FileHash;
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 use move_ir_types::{
     ast::{ConstantName, ModuleIdent, ModuleName, NopLabel},
@@ -27,7 +28,7 @@ pub type SourceName = (String, Loc);
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct StructSourceMap {
     /// The source declaration location of the struct
-    pub decl_location: Loc,
+    pub definition_location: Loc,
 
     /// Important: type parameters need to be added in the order of their declaration
     pub type_parameters: Vec<SourceName>,
@@ -42,7 +43,7 @@ pub struct FunctionSourceMap {
     /// The source location for the definition of this entire function. Note that in certain
     /// instances this will have no valid source location e.g. the "main" function for modules that
     /// are treated as programs are synthesized and therefore have no valid source location.
-    pub decl_location: Loc,
+    pub definition_location: Loc,
 
     /// Note that type parameters need to be added in the order of their declaration
     pub type_parameters: Vec<SourceName>,
@@ -66,6 +67,9 @@ pub struct FunctionSourceMap {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SourceMap {
+    /// The source location for the definition of the module or script that this source map is for.
+    pub definition_location: Loc,
+
     /// The name <address.module_name> for module that this source map is for
     /// None if it is a script
     pub module_name_opt: Option<(AccountAddress, Identifier)>,
@@ -81,9 +85,9 @@ pub struct SourceMap {
 }
 
 impl StructSourceMap {
-    pub fn new(decl_location: Loc) -> Self {
+    pub fn new(definition_location: Loc) -> Self {
         Self {
-            decl_location,
+            definition_location,
             type_parameters: Vec::new(),
             fields: Vec::new(),
         }
@@ -128,9 +132,9 @@ impl StructSourceMap {
 }
 
 impl FunctionSourceMap {
-    pub fn new(decl_location: Loc, is_native: bool) -> Self {
+    pub fn new(definition_location: Loc, is_native: bool) -> Self {
         Self {
-            decl_location,
+            definition_location,
             type_parameters: Vec::new(),
             parameters: Vec::new(),
             locals: Vec::new(),
@@ -188,7 +192,7 @@ impl FunctionSourceMap {
         // `None`.
         if self.is_native {
             if code_offset == 0 {
-                Some(self.decl_location)
+                Some(self.definition_location)
             } else {
                 None
             }
@@ -256,17 +260,23 @@ impl FunctionSourceMap {
 }
 
 impl SourceMap {
-    pub fn new(module_name_opt: Option<ModuleIdent>) -> Self {
+    pub fn new(definition_location: Loc, module_name_opt: Option<ModuleIdent>) -> Self {
         let module_name_opt = module_name_opt.map(|module_name| {
             let ident = Identifier::new(module_name.name.0.as_str()).unwrap();
             (module_name.address, ident)
         });
         Self {
+            definition_location,
             module_name_opt,
             struct_map: BTreeMap::new(),
             function_map: BTreeMap::new(),
             constant_map: BTreeMap::new(),
         }
+    }
+
+    pub fn check(&self, file_contents: &str) -> bool {
+        let file_hash = FileHash::new(file_contents);
+        self.definition_location.file_hash() == file_hash
     }
 
     pub fn add_top_level_function_mapping(
@@ -486,7 +496,7 @@ impl SourceMap {
                 Some(ModuleIdent::new(module_name, address))
             }
         };
-        let mut empty_source_map = Self::new(module_ident);
+        let mut empty_source_map = Self::new(default_loc, module_ident);
 
         for (function_idx, function_def) in view.function_defs().into_iter().flatten().enumerate() {
             empty_source_map.add_top_level_function_mapping(

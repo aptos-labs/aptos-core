@@ -237,7 +237,7 @@ impl TestFailure {
                         Some(Diagnostic::new(
                             diagnostics::codes::Tests::TestFailed,
                             (loc, base_message.clone()),
-                            vec![(function_source_map.decl_location, msg)],
+                            vec![(function_source_map.definition_location, msg)],
                         ))
                     })
                     .collect();

@@ -242,7 +242,7 @@ fn add_module_txn(sender: &AccountData, seq_num: u64) -> (CompiledModule, Signed
         deps: diem_framework_releases::current_modules().iter().collect(),
     };
     let module = compiler
-        .into_compiled_module("file_name", module_code.as_str())
+        .into_compiled_module(module_code.as_str())
         .expect("Module compilation failed");
     let mut module_blob = vec![];
     module
@@ -277,7 +277,7 @@ fn add_resource_txn(
         sender.address(),
     );
 
-    let module = compile_script("file_name", &program, extra_deps);
+    let module = compile_script(&program, extra_deps);
     sender
         .account()
         .transaction()
@@ -303,7 +303,7 @@ fn remove_resource_txn(
         sender.address(),
     );
 
-    let module = compile_script("file_name", &program, extra_deps);
+    let module = compile_script(&program, extra_deps);
     sender
         .account()
         .transaction()
@@ -329,7 +329,7 @@ fn borrow_resource_txn(
         sender.address(),
     );
 
-    let module = compile_script("file_name", &program, extra_deps);
+    let module = compile_script(&program, extra_deps);
     sender
         .account()
         .transaction()
@@ -355,7 +355,7 @@ fn change_resource_txn(
         sender.address(),
     );
 
-    let module = compile_script("file_name", &program, extra_deps);
+    let module = compile_script(&program, extra_deps);
     sender
         .account()
         .transaction()

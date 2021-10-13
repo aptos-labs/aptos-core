@@ -51,9 +51,7 @@ pub static CREATE_ACCOUNT_SCRIPT: Lazy<Vec<u8>> = Lazy::new(|| {
     let compiler = Compiler {
         deps: diem_framework_releases::current_modules().iter().collect(),
     };
-    compiler
-        .into_script_blob("file_name", code)
-        .expect("Failed to compile")
+    compiler.into_script_blob(code).expect("Failed to compile")
 });
 
 pub static EMPTY_SCRIPT: Lazy<Vec<u8>> = Lazy::new(|| {
@@ -66,9 +64,7 @@ pub static EMPTY_SCRIPT: Lazy<Vec<u8>> = Lazy::new(|| {
     let compiler = Compiler {
         deps: diem_framework_releases::current_modules().iter().collect(),
     };
-    compiler
-        .into_script_blob("file_name", code)
-        .expect("Failed to compile")
+    compiler.into_script_blob(code).expect("Failed to compile")
 });
 
 pub static MULTI_AGENT_SWAP_SCRIPT: Lazy<Vec<u8>> = Lazy::new(|| {
@@ -107,9 +103,7 @@ pub static MULTI_AGENT_SWAP_SCRIPT: Lazy<Vec<u8>> = Lazy::new(|| {
     let compiler = Compiler {
         deps: diem_framework_releases::current_modules().iter().collect(),
     };
-    compiler
-        .into_script_blob("file_name", code)
-        .expect("Failed to compile")
+    compiler.into_script_blob(code).expect("Failed to compile")
 });
 
 pub static MULTI_AGENT_MINT_SCRIPT: Lazy<Vec<u8>> = Lazy::new(|| {
@@ -151,9 +145,7 @@ pub static MULTI_AGENT_MINT_SCRIPT: Lazy<Vec<u8>> = Lazy::new(|| {
     let compiler = Compiler {
         deps: diem_framework_releases::current_modules().iter().collect(),
     };
-    compiler
-        .into_script_blob("file_name", code)
-        .expect("Failed to compile")
+    compiler.into_script_blob(code).expect("Failed to compile")
 });
 
 pub fn empty_txn(
