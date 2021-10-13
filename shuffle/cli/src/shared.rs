@@ -122,6 +122,10 @@ mod test {
     }
 
     #[test]
+    #[ignore]
+    // Tests if the generated typesript libraries can actually be run by deno runtime.
+    // `ignore`d tests are still run on CI via codegen-unit-test, but help keep
+    // the local testsuite fast for devs.
     fn test_generate_typescript_libraries() {
         let tmpdir = tempdir().unwrap();
         let dir_path = tmpdir.path();
