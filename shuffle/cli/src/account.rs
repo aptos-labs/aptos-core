@@ -1,13 +1,11 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::shared::{ get_shuffle_dir, send};
+use crate::shared::{get_home_dir, send, Home};
 use anyhow::{anyhow, Context, Result};
 use diem_config::config::NodeConfig;
-use diem_crypto::{
-    ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
-    PrivateKey,
-};
+use diem_crypto::PrivateKey;
+
 use diem_infallible::duration_since_epoch;
 use diem_sdk::{
     client::BlockingClient,
@@ -19,39 +17,39 @@ use diem_types::{
 };
 use generate_key::load_key;
 use shuffle_transaction_builder::framework::encode_create_parent_vasp_account_script_function;
-use std::{fs, fs::File, io, io::Write, path::Path};
-
-const NEW_KEY_FILE_CONTENT: &[u8] = include_bytes!("../new_account.key");
+use std::path::Path;
+use diem_crypto::ed25519::{Ed25519PublicKey, Ed25519PrivateKey};
+use std::{fs, io};
+use std::fs::File;
+use std::io::Write;
 
 // Creates new account from randomly generated private/public key pair.
 pub fn handle() -> Result<()> {
-    let shuffle_dir = get_shuffle_dir();
-    if !Path::new(shuffle_dir.as_path()).is_dir() {
+    let mut home = Home::new(get_home_dir().as_path())?;
+    let shuffle_dir = home.shuffle_path.as_path();
+    if !shuffle_dir.is_dir() {
         return Err(anyhow!(
             "A node hasn't been created yet! Run shuffle node first"
         ));
     }
 
-
-    let accounts_dir = shuffle_dir.join("accounts");
-    let latest_dir = accounts_dir.join("latest");
+    let latest_dir = home.latest_dir_path.as_path();
     if latest_dir.exists() {
-        let wants_another_key = confirm_user_decision(&latest_dir).unwrap();
-        if wants_another_key == "y" {
+        let wants_another_key = home.confirm_user_decision()?;
+        if wants_another_key {
             let time = duration_since_epoch();
-            let saved_dir = accounts_dir.join(time.as_secs().to_string());
-            fs::create_dir(&saved_dir)?;
-            save_old_key(&accounts_dir, &saved_dir)?;
-            save_old_address(&accounts_dir, &saved_dir)?;
+            let archive_dir = home.create_archive_dir(time)?;
+            home.archive_old_key(&archive_dir)?;
+            home.archive_old_address(&archive_dir)?;
         } else {
             return Ok(());
         }
     }
 
-    let config = NodeConfig::load(get_nodeconfig_path()).with_context(|| {
+    let config = NodeConfig::load(home.node_config_path.as_path()).with_context(|| {
         format!(
             "Failed to load NodeConfig from file: {:?}",
-            get_nodeconfig_path()
+            home.node_config_path.as_path()
         )
     })?;
     let json_rpc_url = format!("http://0.0.0.0:{}", config.json_rpc.address.port());
@@ -61,16 +59,31 @@ pub fn handle() -> Result<()> {
 
     let mut root_account = get_root_account(&client, &shuffle_dir);
 
-    generate_shuffle_accounts_dir(&shuffle_dir)?;
-    let new_account_key = generate_key_file(&shuffle_dir).unwrap();
-    let public_key = new_account_key.public_key();
-    generate_address_file(&shuffle_dir, &public_key)?;
+    home.generate_shuffle_accounts_dir()?;
+    home.generate_shuffle_latest_dir()?;
 
+    let new_account_key = home.generate_key_file()?;
+    let public_key = new_account_key.public_key();
+    home.generate_address_file(&public_key)?;
     let new_account = LocalAccount::new(
         AuthenticationKey::ed25519(&public_key).derived_address(),
         new_account_key,
         0,
     );
+
+    if client
+        .get_account(new_account.address())?
+        .into_inner()
+        .is_some()
+    {
+        println!("Account already exists: {}", new_account.address());
+        println!(
+            "Private key: {}",
+            ::hex::encode(new_account.private_key().to_bytes())
+        );
+        println!("Public key: {}", new_account.public_key());
+        return Ok(());
+    }
 
     // Create a new account.
     create_account_onchain(&mut root_account, &new_account, &factory, &client)

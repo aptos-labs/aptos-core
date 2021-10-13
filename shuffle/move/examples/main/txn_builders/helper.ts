@@ -42,7 +42,7 @@ function newRawTransactionAndSigningMsg(
   // new Helper(Shuffle) that is set at top level that does this for you, so
   // you don't need to pass it in per call.
   const rawTxn = setMessageRawTransaction(
-      senderAddress,
+    senderAddress,
     message,
     sequenceNumber
   );
