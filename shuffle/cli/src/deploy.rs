@@ -72,10 +72,9 @@ fn publish_packages_as_transaction(
 
     // ================= Send a module transaction ========================
     let seq_number = client
-        .get_account(derived_address)
-        .unwrap()
+        .get_account(derived_address)?
         .into_inner()
-        .unwrap()
+        .ok_or_else(|| anyhow::anyhow!("missing AccountView"))?
         .sequence_number;
     let mut new_account = LocalAccount::new(derived_address, new_account_key, seq_number);
     let compiled_units = compiled_package.compiled_units;
@@ -109,8 +108,7 @@ fn publish_packages_as_transaction(
 
     let account_state_blob: AccountStateBlob = {
         let blob = client
-            .get_account_state_with_proof(new_account.address(), None, None)
-            .unwrap()
+            .get_account_state_with_proof(new_account.address(), None, None)?
             .into_inner()
             .blob
             .ok_or_else(|| anyhow::anyhow!("missing account state blob"))?;
