@@ -118,28 +118,26 @@ instead of an n-dimensional Boogie array.
 
 \Paragraph{Discussion and Related Work}
 
-Many approaches have been applied to the verification of smart contracts
-\cite{liu2019survey,miller2018smart,solcverify,DBLP:conf/esop/HajduJ20,verisol}.
-A recent survey~\cite{CONTRACT_VERIFICATION} distinguishes between
-\emph{contract} and \emph{program} level approaches. Our approach has aspects of
-both: we address program level properties via pre/post conditions, and contract
-(``blockchain state'') level properties via global invariants. In both cases, we
-use traditional predicate logic to write these properties, characterized as
-Hoare logic by the paper.
-
-While~\cite{CONTRACT_VERIFICATION} refers to at least two dozen systems for
-smart contract verification, to the best of our knowledge, the Move ecosystem is
-the first one where contract programming and specification language are fully
-integrated, and the language is designed from first principles influenced by
-verification. Methodologically, Move and the Move prover are therefore closer to
-systems like Dafny~\cite{DAFNY}, or the older Spec\# system~\cite{SPECSHARP},
-where instead of adding a specification approach posterior to an existing
-language, it is part from the beginning. This allows us not only to deliver a
-more consistent user experience, but also to make verification technically
-easier by curating the programming language, as reflected in Move's absence of
-dynamic dispatching and the notorious re-entrance problem~\cite{REENTRANCE}, as
-well as the borrow semantics which enables optimizations like reference
-elimination (Sec.~\ref{sec:RefElim}).
+Many approaches have been applied to the verification of smart contracts; see
+e.g. the
+surveys~\cite{liu2019survey,CONTRACT_VERIFICATION}. \cite{CONTRACT_VERIFICATION}
+refers to at least two dozen systems for smart contract verification. It
+distinguishes between \emph{contract} and \emph{program} level approaches. Our
+approach has aspects of both: we address program level properties via pre/post
+conditions, and contract (``blockchain state'') level properties via global
+invariants. To the best of our knowledge, among the existing approaches, the
+Move ecosystem is the first one where contract programming and specification
+language are fully integrated, and the language is designed from first
+principles influenced by verification. Methodologically, Move and the Move
+prover are thereby closer to systems like Dafny~\cite{DAFNY}, or the older
+Spec\# system~\cite{SPECSHARP}, where instead of adding a specification approach
+posterior to an existing language, it is part from the beginning. This allows us
+not only to deliver a more consistent user experience, but also to make
+verification technically easier by curating the programming language.
+% as reflected in Move's absence of
+% dynamic dispatching and the notorious re-entrance problem~\cite{REENTRANCE}, as
+% well as the borrow semantics which enables optimizations like reference
+% elimination (Sec.~\ref{sec:RefElim}).
 
 % Other related works on the
 % \solidity smart contract verification employ the theoretical foundations
@@ -154,28 +152,37 @@ approach for smart contracts based on inductive Hoare logic has similar
 expressiveness. We support universal quantification over arbitrary memory
 content, a suspension mechanism of invariants to allow non-atomic construction
 of memory content, and generic invariants.  For comparison, the SMT Checker
-build into \solidity \cite{solidity} does not support quantifiers, because it
-interprets programming language constructs (requires and assert statements) as
-specifications and has no dedicated specification language. While in Solidity
-one can simulate aspects of global invariants using modifiers by attaching
-pre/post conditions, this is not the same as our invariants, which are
-guaranteed to hold independent of whether a user may or (accidentally) may not
-attach a modifier, and which are optimized to be only evaluated as needed.
+build into \solidity \cite{solidity,solcverify,DBLP:conf/esop/HajduJ20}
+does not support quantifiers, because it interprets programming language
+constructs (requires and assert statements) as specifications and has no
+dedicated specification language. While in Solidity one can simulate aspects of
+global invariants using modifiers by attaching pre/post conditions, this is not
+the same as our invariants, which are guaranteed to hold independent of whether
+a user may or (accidentally) may not attach a modifier, and which are optimized
+to be only evaluated as needed.
 
 While the expressiveness of Move specifications comes with the price of
-undecidability and the dependency of heuristics in SMT solvers, \MVP deals with
-this by its elaborated translation to SMT logic, as
-partially described in this paper. The result is a practical verification system
-that is fully integrated into the Diem blockchain production process, which (to
-the best of our knowledge) is novel by itself.
+undecidability and the dependency from heuristics in SMT solvers, \MVP deals
+with this by its elaborated translation to SMT logic, as described in this
+paper. The result is a practical verification system that is fully integrated
+into the Diem blockchain production process, running in continuous integration,
+which is (to the best of our knowledge) a first in the industry.
 
-Because of the similarity of Move and Rust~\cite{rust} in the use of borrow
-semantics, some of the techniques described here may also be applicable to the
-verification of Rust~\cite{rust}.  We expect reference elimination to apply for
+The invididual techniques we described are novel each by
+themselves. \emph{Reference elimination} relies on borrow semantics, similar as
+in the Rust~\cite{rust} language.  We expect reference elimination to apply for
 the safe subset of Rust, though some extra work would be needed to deal with
-embedded references.  To the best of our knowledge, something similar has not
-yet been attempted in existing Rust verification work
-\cite{prusti,smack,nopanic,crust}.
+references aggregated by structs.  However, we are not aware of that something
+similar has been attempted in existing Rust verification work
+\cite{prusti,smack,nopanic,crust}. \emph{Global invariant injection} and the
+approach to minimize the number of assumptions and assertions is not applied in
+any existing verification approach we know of; however, we co-authored a while
+ago a similar line of work for \emph{runtime checking} of invariants in
+Spec\#~\cite{StateConstraintsPatent}, yet that work never left the conceptual
+state. \emph{Monomorphization} is well known as a technique for compiling
+languages like C++ or Rust, where it is called specialization; however, we are
+not aware of it being generalized for modular verification of generic code where
+full type erasure is not possible, as it is the case in Move.
 
 
 \Paragraph{Future Work}

@@ -501,7 +501,7 @@ a multi-sorted representation in the SMT logic.
 \end{Figure}
 
 To verify a generic function for all possible instantiations, monomorphization
-skolemizes the type parameter, i.e.~ the function is verified for a new type
+skolemizes the type parameter, i.e.~the function is verified for a new type
 with no special properties that represents an arbitrary type.  It then
 specializes all called functions and used data types with this new type and any
 other concrete types they may use.  Fig.~\ref{fig:Mono} sketches this approach.
@@ -549,7 +549,7 @@ specifications injected and inlined function calls expanded.
 \end{itemize}
 
 \noindent To understand the correctness of this procedure, consider the
-following arguments:
+following arguments (a full formal proof is outstanding):
 
 \begin{itemize}
 \item \emph{Direct interaction} Whenever a modified memory |M<t>| can influence
