@@ -1,8 +1,11 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::dynamic_analysis::{concretize, ConcretizedSecondaryIndexes};
+use crate::dynamic_analysis::{
+    bind_formals, concretize, ConcretizedFormals, ConcretizedSecondaryIndexes,
+};
 use anyhow::{anyhow, bail, Result};
+use move_binary_format::layout::ModuleCache;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
@@ -136,6 +139,34 @@ impl NormalizedReadWriteSetAnalysis {
 
     pub fn get_canonical_summary(&self, module: &ModuleId, fun: &IdentStr) -> Option<ReadWriteSet> {
         self.get_summary(module, fun).cloned()
+    }
+
+    /// Returns an overapproximation of the access paths in global storage that will be read/written
+    /// by `module::fun` if called with arguments `signers`, `actuals`, `type_actuals`.
+    ///
+    /// Secondary indices will not be resolved and it's up to caller to decide whether it needs to
+    /// be resolved or not.
+    pub fn get_binded_summary<R: MoveResolver>(
+        &self,
+        module: &ModuleId,
+        fun: &IdentStr,
+        signers: &[AccountAddress],
+        actuals: &[Vec<u8>],
+        type_actuals: &[TypeTag],
+        module_cache: &ModuleCache<R>,
+    ) -> Result<ConcretizedFormals> {
+        let state = self
+            .get_summary(module, fun)
+            .ok_or_else(|| anyhow!("Function {}::{} to found", module, fun))?;
+        bind_formals(
+            state,
+            module,
+            fun,
+            signers,
+            actuals,
+            type_actuals,
+            module_cache,
+        )
     }
 
     /// Return `true` if `module`::`fun` may read an address from the blockchain state and

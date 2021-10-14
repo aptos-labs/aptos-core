@@ -4,5 +4,5 @@
 mod dynamic_analysis;
 mod normalize;
 
-pub use dynamic_analysis::ConcretizedSecondaryIndexes;
+pub use dynamic_analysis::{ConcretizedSecondaryIndexes, ConcretizedFormals};
 pub use normalize::NormalizedReadWriteSetAnalysis;

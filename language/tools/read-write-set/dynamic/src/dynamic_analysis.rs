@@ -3,9 +3,8 @@
 
 use anyhow::{anyhow, bail, Result};
 use move_binary_format::{
-    layout::{ModuleCache, TypeLayoutBuilder},
+    layout::{GetModule, ModuleCache, TypeLayoutBuilder},
     normalized::{Function, Type},
-    CompiledModule,
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -45,7 +44,7 @@ impl ConcretizedFormals {
     /// example: if `self` is 0x7/0x1::AModule::AResource/addr_field/0x2::M2::R/f -> Write and the
     /// value of 0x7/0x1::AModule::AResource/addr_field is 0xA in `blockchain_view`, this will
     /// return { 0x7/0x1::AModule::AResource/addr_field -> Read, 0xA/0x2::M2::R/f -> Write }
-    fn concretize_secondary_indexes<R: MoveResolver>(
+    pub fn concretize_secondary_indexes<R: MoveResolver>(
         self,
         blockchain_view: &R,
     ) -> Option<ConcretizedSecondaryIndexes> {
@@ -239,27 +238,24 @@ impl ConcretizedFormals {
 
 /// Bind all formals and type variables in `accesses` using `signers`, `actuals`, and
 /// `type_actuals`.
-pub fn bind_formals(
+pub fn bind_formals<R: MoveResolver>(
     accesses: &ReadWriteSet,
     module: &ModuleId,
     fun: &IdentStr,
     signers: &[AccountAddress],
     actuals: &[Vec<u8>],
     type_actuals: &[TypeTag],
-    blockchain_view: &impl MoveResolver,
+    module_cache: &ModuleCache<R>,
 ) -> Result<ConcretizedFormals> {
     let subst_map = type_actuals
         .iter()
         .map(|ty| Type::from(ty.clone()))
         .collect::<Vec<_>>();
 
-    let compiled_module = CompiledModule::deserialize(
-        &blockchain_view
-            .get_module(module)
-            .map_err(|_| anyhow!("Failed to get module from storage"))?
-            .ok_or_else(|| anyhow!("Failed to get module"))?,
-    )
-    .map_err(|_| anyhow!("Failed to deserialize module"))?;
+    let compiled_module = module_cache
+        .get_module_by_id(module)
+        .map_err(|_| anyhow!("Failed to get module from storage"))?
+        .ok_or_else(|| anyhow!("Failed to get module"))?;
 
     let func_type = Function::new_from_name(&compiled_module, fun)
         .ok_or_else(|| anyhow!("Failed to find function"))?
@@ -289,6 +285,7 @@ pub fn concretize(
     type_actuals: &[TypeTag],
     blockchain_view: &impl MoveResolver,
 ) -> Result<ConcretizedSecondaryIndexes> {
+    let module_cache = ModuleCache::new(blockchain_view);
     bind_formals(
         accesses,
         module,
@@ -296,7 +293,7 @@ pub fn concretize(
         signers,
         actuals,
         type_actuals,
-        blockchain_view,
+        &module_cache,
     )?
     .concretize_secondary_indexes(blockchain_view)
     .ok_or_else(|| anyhow!("Failed to concretize secondary index"))
