@@ -15,7 +15,7 @@ Shuffle.test("Test Assert", () => {
 
 Shuffle.test("Ability to set message", async () => {
   const sender = Shuffle.senderAddress;
-  console.log("===================sender address: " + sender);
+  console.log("Test sender address: " + sender);
   await main.setMessage("hello blockchain", (await Shuffle.sequenceNumber())!.valueOf());
 
   for (let i = 0; i < 10; i++) {

@@ -31,23 +31,36 @@ pub fn handle(project_path: &Path) -> Result<()> {
     let client = BlockingClient::new(json_rpc_url);
     let factory = TransactionFactory::new(ChainId::test());
 
-    let mut root_account = account::get_root_account(&client, shuffle_dir);
+    let mut new_account = create_test_account(&client, shuffle_dir, &factory)?;
+    send_module_transaction(&client, &mut new_account, project_path, &factory)?;
+    run_deno_test(project_path, &config)
+}
 
+// Set up a new test account
+fn create_test_account(
+    client: &BlockingClient,
+    shuffle_dir: &Path,
+    factory: &TransactionFactory,
+) -> Result<LocalAccount> {
+    let mut root_account = account::get_root_account(client, shuffle_dir);
     let latest_dir = &shuffle_dir.join("accounts").join("latest");
     let dev_key_filepath = &latest_dir.join("dev.key");
-
-    // ================= Set up account ========================
-
     // TODO: generate random key by using let new_account_key = generate_key::generate_key();
     let new_account_key = generate_key::load_key(&dev_key_filepath);
     let public_key = new_account_key.public_key();
     let derived_address = AuthenticationKey::ed25519(&public_key).derived_address();
-    let mut new_account = LocalAccount::new(derived_address, new_account_key, 0);
+    let new_account = LocalAccount::new(derived_address, new_account_key, 0);
+    account::create_account_onchain(&mut root_account, &new_account, factory, client)?;
+    Ok(new_account)
+}
 
-    account::create_account_onchain(&mut root_account, &new_account, &factory, &client)?;
-
-    // ================= Send a module transaction ========================
-
+// Publish user made module onchain
+fn send_module_transaction(
+    client: &BlockingClient,
+    new_account: &mut LocalAccount,
+    project_path: &Path,
+    factory: &TransactionFactory,
+) -> Result<()> {
     let account_seq_num = client
         .get_account(new_account.address())?
         .into_inner()
@@ -60,11 +73,12 @@ pub fn handle(project_path: &Path) -> Result<()> {
     );
 
     let compiled_package = deploy::build_move_packages(project_path)?;
-    deploy::send_module_transaction(&compiled_package, &client, &mut new_account, &factory)?;
-    deploy::check_module_exists(&client, &new_account)?;
+    deploy::send_module_transaction(&compiled_package, client, new_account, factory)?;
+    deploy::check_module_exists(client, new_account)
+}
 
-    // ================= Run shuffle test ========================
-
+// Run shuffle test using deno
+fn run_deno_test(project_path: &Path, config: &NodeConfig) -> Result<()> {
     let tests_path_string = project_path
         .join("e2e")
         .as_path()

@@ -70,7 +70,7 @@ fn publish_packages_as_transaction(
         derived_address.to_hex_literal()
     );
 
-    // ================= Send a module transaction ========================
+    // Send a module transaction
     let seq_number = client
         .get_account(derived_address)?
         .into_inner()
@@ -78,10 +78,6 @@ fn publish_packages_as_transaction(
         .sequence_number;
     let mut new_account = LocalAccount::new(derived_address, new_account_key, seq_number);
     send_module_transaction(&compiled_package, &client, &mut new_account, &factory)?;
-
-    // ================= Get modules in the account  ========================
-    // Assumes we've deployed to the shuffle developer's address.
-
     check_module_exists(&client, &new_account)
 }
 
@@ -122,7 +118,7 @@ pub fn send_module_transaction(
 pub fn check_module_exists(client: &BlockingClient, account: &LocalAccount) -> Result<()> {
     let account_state_blob: AccountStateBlob = {
         let blob = client
-            .get_account_state_with_proof(new_account.address(), None, None)?
+            .get_account_state_with_proof(account.address(), None, None)?
             .into_inner()
             .blob
             .ok_or_else(|| anyhow::anyhow!("missing account state blob"))?;
