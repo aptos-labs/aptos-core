@@ -226,6 +226,12 @@ impl Home {
         file.write_all(address.to_string().as_ref())?;
         Ok(())
     }
+
+    pub fn save_root_key(&self, root_key_path: &Path) -> Result<()> {
+        let new_root_key = generate_key::load_key(root_key_path);
+        generate_key::save_key(new_root_key, self.latest_key_path.as_path());
+        Ok(())
+    }
 }
 
 /// Generates the typescript bindings for the main Move package based on the embedded
@@ -294,14 +300,15 @@ fn generate_transaction_builders(pkg_path: &Path, target_dir: &Path) -> Result<(
 
 #[cfg(test)]
 mod test {
-    use crate::{new, shared::Home};
+    use super::{generate_typescript_libraries, get_shuffle_project_path};
+    use crate::{
+        new,
+        shared::{Config, Home},
+    };
     use diem_crypto::PrivateKey;
     use diem_infallible::duration_since_epoch;
     use std::fs;
     use tempfile::tempdir;
-
-    use super::{generate_typescript_libraries, get_shuffle_project_path};
-    use crate::shared::Config;
 
     #[test]
     fn test_get_shuffle_project_path() {
@@ -495,5 +502,19 @@ mod test {
             Option::Some(String::from("127.0.0.1:8081")),
         );
         assert_eq!(temp_config.get_network(), "127.0.0.1:8081");
+    }
+
+    #[test]
+    fn test_save_root_key() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join(".shuffle/accounts/latest")).unwrap();
+        let user_root_key_path = dir.path().join("root.key");
+        let user_root_key = generate_key::generate_and_save_key(&user_root_key_path);
+
+        let home = Home::new(dir.path()).unwrap();
+        home.save_root_key(&user_root_key_path).unwrap();
+        let new_root_key = generate_key::load_key(home.latest_key_path);
+
+        assert_eq!(new_root_key, user_root_key);
     }
 }

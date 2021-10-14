@@ -17,10 +17,13 @@ use diem_types::{
 };
 use generate_key::load_key;
 use shuffle_transaction_builder::framework::encode_create_parent_vasp_account_script_function;
-use std::{io, path::Path};
+use std::{
+    io,
+    path::{Path, PathBuf},
+};
 
 // Creates new account from randomly generated private/public key pair.
-pub fn handle() -> Result<()> {
+pub fn handle(root: Option<PathBuf>) -> Result<()> {
     let home = Home::new(get_home_path().as_path())?;
     if !home.get_shuffle_path().is_dir() {
         return Err(anyhow!(
@@ -51,6 +54,12 @@ pub fn handle() -> Result<()> {
     let client = BlockingClient::new(json_rpc_url);
     let factory = TransactionFactory::new(ChainId::test());
 
+    if root.is_some() {
+        home.save_root_key(
+            root.ok_or_else(|| anyhow::anyhow!("Invalid root key path"))?
+                .as_path(),
+        )?;
+    }
     let mut root_account = get_root_account(&client, home.get_root_key_path());
 
     home.generate_shuffle_accounts_path()?;

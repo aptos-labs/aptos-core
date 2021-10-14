@@ -17,7 +17,6 @@ mod test;
 pub fn main() -> Result<()> {
     let subcommand = Subcommand::from_args();
     match subcommand {
-        Subcommand::Account {} => account::handle(),
         Subcommand::New { blockchain, path } => new::handle(blockchain, path),
         Subcommand::Node {} => node::handle(),
         Subcommand::Build { project_path } => {
@@ -26,6 +25,7 @@ pub fn main() -> Result<()> {
         Subcommand::Deploy { project_path } => {
             deploy::handle(&normalized_project_path(project_path)?)
         }
+        Subcommand::Account { root } => account::handle(root),
         Subcommand::Test { project_path } => test::handle(&normalized_project_path(project_path)?),
         Subcommand::Console {
             project_path,
@@ -37,8 +37,6 @@ pub fn main() -> Result<()> {
 #[derive(Debug, StructOpt)]
 #[structopt(name = "shuffle", about = "CLI frontend for Shuffle toolset")]
 pub enum Subcommand {
-    #[structopt(about = "Creates new account with randomly generated private/public key")]
-    Account {},
     #[structopt(about = "Creates a new shuffle project for Move development")]
     New {
         #[structopt(short, long, default_value = new::DEFAULT_BLOCKCHAIN)]
@@ -59,6 +57,10 @@ pub enum Subcommand {
     Deploy {
         #[structopt(short, long)]
         project_path: Option<PathBuf>,
+    },
+    Account {
+        #[structopt(short, long, help = "Creates account from mint.key passed in by user")]
+        root: Option<PathBuf>,
     },
     #[structopt(about = "Starts a REPL for onchain inspection")]
     Console {
