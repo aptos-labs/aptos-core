@@ -225,6 +225,7 @@ pub struct UserTransactionRequest {
     pub gas_currency_code: String,
     pub expiration_timestamp_secs: U64,
     pub payload: TransactionPayload,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub signature: Option<TransactionSignature>,
 }
 
