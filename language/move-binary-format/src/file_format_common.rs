@@ -374,6 +374,9 @@ pub const VERSION_3: u32 = 3;
 // Mark which version is the latest version
 pub const VERSION_MAX: u32 = VERSION_3;
 
+// Mark the number for the next file format version
+pub const VERSION_NEXT: u32 = VERSION_MAX + 1;
+
 pub(crate) mod versioned_data {
     use crate::{errors::*, file_format_common::*};
     use move_core_types::vm_status::StatusCode;
@@ -408,7 +411,7 @@ pub(crate) mod versioned_data {
                         .with_message("Bad binary header".to_string()));
                 }
             };
-            if version == 0 || version > VERSION_MAX {
+            if version == 0 || version > VERSION_NEXT {
                 return Err(PartialVMError::new(StatusCode::UNKNOWN_VERSION));
             }
             Ok((Self { version, binary }, cursor))
