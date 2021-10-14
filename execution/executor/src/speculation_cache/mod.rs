@@ -257,14 +257,24 @@ impl SpeculationCache {
     }
 
     pub fn prune(&mut self, committed_ledger_info: &LedgerInfo) -> Result<(), Error> {
-        let arc_latest_committed_block =
-            self.get_block(&committed_ledger_info.consensus_block_id())?;
-        let latest_committed_block = arc_latest_committed_block.lock();
-        self.heads = latest_committed_block.children.clone();
-        self.update_block_tree_root(
-            latest_committed_block.output().executed_trees().clone(),
-            committed_ledger_info,
-        );
+        let (heads, executed_trees) = {
+            let latest_committed_block =
+                self.get_block(&committed_ledger_info.consensus_block_id())?;
+            let locked = latest_committed_block.lock();
+
+            (
+                locked.children.clone(),
+                locked.output().executed_trees().clone(),
+            )
+        };
+
+        // being defensive here: a leaked block ref being dropped out of the lock can cause
+        // weakly reffed SMT nodes go away out of the lock unexpectedly.
+        if !self.heads.iter().all(|h| Arc::strong_count(h) == 1) {
+            panic!("Block ref leaked: there are still references out there of blocks to be pruned.")
+        }
+        self.heads = heads;
+        self.update_block_tree_root(executed_trees, committed_ledger_info);
         Ok(())
     }
 
