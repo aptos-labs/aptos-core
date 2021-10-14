@@ -238,9 +238,8 @@ impl ConcretizedFormals {
 }
 
 /// Bind all formals and type variables in `accesses` using `signers`, `actuals`, and
-/// `type_actuals`. In addition, concretize all secondary indexes in `accesses` against the state in
-/// `blockchain_view`.
-pub fn concretize(
+/// `type_actuals`.
+pub fn bind_formals(
     accesses: &ReadWriteSet,
     module: &ModuleId,
     fun: &IdentStr,
@@ -248,7 +247,7 @@ pub fn concretize(
     actuals: &[Vec<u8>],
     type_actuals: &[TypeTag],
     blockchain_view: &impl MoveResolver,
-) -> Result<ConcretizedSecondaryIndexes> {
+) -> Result<ConcretizedFormals> {
     let subst_map = type_actuals
         .iter()
         .map(|ty| Type::from(ty.clone()))
@@ -269,17 +268,38 @@ pub fn concretize(
         .map(|ty| ty.subst(&subst_map).into_type_tag())
         .collect::<Option<Vec<_>>>()
         .ok_or_else(|| anyhow!("Failed to substitute types"))?;
-    let concretized_formals = ConcretizedFormals::from_args(
+    ConcretizedFormals::from_args(
         accesses,
         signers,
         actuals,
         func_type.as_slice(),
         type_actuals,
-    )?;
+    )
+}
 
-    concretized_formals
-        .concretize_secondary_indexes(blockchain_view)
-        .ok_or_else(|| anyhow!("Failed to concretize secondary index"))
+/// Bind all formals and type variables in `accesses` using `signers`, `actuals`, and
+/// `type_actuals`. In addition, concretize all secondary indexes in `accesses` against the state in
+/// `blockchain_view`.
+pub fn concretize(
+    accesses: &ReadWriteSet,
+    module: &ModuleId,
+    fun: &IdentStr,
+    signers: &[AccountAddress],
+    actuals: &[Vec<u8>],
+    type_actuals: &[TypeTag],
+    blockchain_view: &impl MoveResolver,
+) -> Result<ConcretizedSecondaryIndexes> {
+    bind_formals(
+        accesses,
+        module,
+        fun,
+        signers,
+        actuals,
+        type_actuals,
+        blockchain_view,
+    )?
+    .concretize_secondary_indexes(blockchain_view)
+    .ok_or_else(|| anyhow!("Failed to concretize secondary index"))
 }
 
 impl Deref for ConcretizedFormals {
