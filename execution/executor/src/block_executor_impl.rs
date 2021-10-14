@@ -27,7 +27,7 @@ use crate::{
     types::ProcessedVMOutput,
     Executor,
 };
-use diem_types::protocol_spec::ProtocolSpec;
+use diem_types::{proof::definition::LeafCount, protocol_spec::ProtocolSpec};
 
 impl<PS, V> BlockExecutor for Executor<PS, V>
 where
@@ -161,18 +161,43 @@ where
     ) -> anyhow::Result<(), Error> {
         let _timer = DIEM_EXECUTOR_COMMIT_BLOCKS_SECONDS.start_timer();
         let block_id_to_commit = ledger_info_with_sigs.ledger_info().consensus_block_id();
-        let read_lock = self.cache.read();
-
         info!(
             LogSchema::new(LogEntry::BlockExecutor).block_id(block_id_to_commit),
             "commit_block"
         );
-
         let version = ledger_info_with_sigs.ledger_info().version();
-
         let num_txns_in_li = version
             .checked_add(1)
             .ok_or_else(|| format_err!("version + 1 overflows"))?;
+
+        if let Some((num_persistent_txns, txns_to_keep)) =
+            self.lock_and_get_txns_to_keep(block_ids, version, num_txns_in_li)?
+        {
+            self.save_to_db(
+                &ledger_info_with_sigs,
+                num_txns_in_li,
+                num_persistent_txns,
+                &txns_to_keep,
+            )?;
+
+            self.cache
+                .write()
+                .prune(ledger_info_with_sigs.ledger_info())?;
+        }
+
+        // Now that the blocks are persisted successfully, we can reply to consensus
+        Ok(())
+    }
+}
+
+impl<PS, V> Executor<PS, V> {
+    fn lock_and_get_txns_to_keep(
+        &self,
+        block_ids: Vec<HashValue>,
+        version: Version,
+        num_txns_in_li: u64,
+    ) -> anyhow::Result<Option<(LeafCount, Vec<TransactionToCommit>)>, Error> {
+        let read_lock = self.cache.read();
         let num_persistent_txns = read_lock.synced_trees().txn_accumulator().num_leaves();
 
         if num_txns_in_li < num_persistent_txns {
@@ -185,7 +210,7 @@ where
         }
 
         if num_txns_in_li == num_persistent_txns {
-            return Ok(());
+            return Ok(None);
         }
 
         // All transactions that need to go to storage. In the above example, this means all the
@@ -230,9 +255,16 @@ where
              in accumulator ({}).",
             num_txns_in_li, num_txns_in_speculative_accumulator,
         );
-        drop(blocks);
-        drop(read_lock);
+        Ok(Some((num_persistent_txns, txns_to_keep)))
+    }
 
+    fn save_to_db(
+        &self,
+        ledger_info_with_sigs: &LedgerInfoWithSignatures,
+        num_txns_in_li: u64,
+        num_persistent_txns: u64,
+        txns_to_keep: &[TransactionToCommit],
+    ) -> anyhow::Result<(), Error> {
         let num_txns_to_keep = txns_to_keep.len() as u64;
 
         // Skip txns that are already committed to allow failures in state sync process.
@@ -246,7 +278,6 @@ where
 
         let num_txns_to_skip = num_persistent_txns - first_version_to_keep;
         let first_version_to_commit = first_version_to_keep + num_txns_to_skip;
-
         if num_txns_to_skip != 0 {
             debug!(
                 LogSchema::new(LogEntry::BlockExecutor)
@@ -275,15 +306,9 @@ where
             self.db.writer.save_transactions(
                 txns_to_commit,
                 first_version_to_commit,
-                Some(&ledger_info_with_sigs),
+                Some(ledger_info_with_sigs),
             )?;
         }
-
-        self.cache
-            .write()
-            .prune(ledger_info_with_sigs.ledger_info())?;
-
-        // Now that the blocks are persisted successfully, we can reply to consensus
         Ok(())
     }
 }
