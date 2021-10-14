@@ -170,10 +170,6 @@ impl MempoolNetworkInterface {
                 counters::active_upstream_peers(&peer.network_id()).inc();
                 sync_states.insert(peer, PeerSyncState::new(metadata));
             } else if let Some(peer_state) = sync_states.get_mut(&peer) {
-                if !peer_state.is_alive {
-                    counters::active_upstream_peers(&peer.network_id()).inc();
-                }
-                peer_state.is_alive = true;
                 peer_state.metadata = metadata;
             }
         }
@@ -203,7 +199,7 @@ impl MempoolNetworkInterface {
 
         // Retrieve just what's needed for the peer ordering
         let peers: Vec<_> = {
-            let peer_states = self.sync_states.read_filtered(|(_, state)| state.is_alive);
+            let peer_states = self.sync_states.read_all();
             peer_states
                 .iter()
                 .map(|(peer, state)| (*peer, state.metadata.role))
@@ -334,11 +330,6 @@ impl MempoolNetworkInterface {
             // If we don't have any info about the node, we shouldn't broadcast to it
             return;
         };
-
-        // Only broadcast to peers that are alive.
-        if !state.is_alive {
-            return;
-        }
 
         // When not a validator, only broadcast to `default_failovers`
         if !self.role.is_validator() {

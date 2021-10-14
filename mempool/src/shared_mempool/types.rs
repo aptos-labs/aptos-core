@@ -226,7 +226,6 @@ pub type MempoolEventsReceiver = mpsc::Receiver<MempoolClientRequest>;
 #[derive(Clone, Debug)]
 pub(crate) struct PeerSyncState {
     pub timeline_id: u64,
-    pub is_alive: bool,
     pub broadcast_info: BroadcastInfo,
     pub metadata: ConnectionMetadata,
 }
@@ -235,7 +234,6 @@ impl PeerSyncState {
     pub fn new(metadata: ConnectionMetadata) -> Self {
         PeerSyncState {
             timeline_id: 0,
-            is_alive: true,
             broadcast_info: BroadcastInfo::new(),
             metadata,
         }
