@@ -38,7 +38,7 @@ pub fn handle(project_path: &Path) -> Result<()> {
 }
 
 /// Builds the packages in the shuffle project using the move package system.
-fn build_move_packages(project_path: &Path) -> Result<CompiledPackage> {
+pub fn build_move_packages(project_path: &Path) -> Result<CompiledPackage> {
     println!("Building Examples...");
     let pkgdir = project_path.join(MAIN_PKG_PATH);
     let config = move_package::BuildConfig {

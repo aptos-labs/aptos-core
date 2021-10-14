@@ -1,6 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::deploy;
 use anyhow::Result;
 use diem_sdk::client::BlockingClient;
 use directories::BaseDirs;
@@ -24,8 +25,7 @@ pub struct Config {
 }
 
 pub fn read_config(project_path: &Path) -> Result<Config> {
-    let config_string =
-        fs::read_to_string(project_path.join("Shuffle").with_extension("toml")).unwrap();
+    let config_string = fs::read_to_string(project_path.join("Shuffle").with_extension("toml"))?;
     let read_config: Config = toml::from_str(config_string.as_str())?;
     Ok(read_config)
 }
@@ -54,6 +54,8 @@ pub fn get_shuffle_dir() -> PathBuf {
 /// diem types and Move stdlib. Mimics much of the transaction_builder_generator's CLI
 /// except with typescript defaults and embedded content, as opposed to repo directory paths.
 pub fn generate_typescript_libraries(project_path: &Path) -> Result<()> {
+    let _compiled_package = deploy::build_move_packages(project_path)?;
+
     let pkg_path = project_path.join(MAIN_PKG_PATH);
     let target_dir = pkg_path.join("generated");
     let installer = serdegen::typescript::Installer::new(target_dir.clone());
@@ -65,10 +67,10 @@ pub fn generate_typescript_libraries(project_path: &Path) -> Result<()> {
 fn generate_runtime(installer: &serdegen::typescript::Installer) -> Result<()> {
     installer
         .install_serde_runtime()
-        .expect("unable to install Serde runtime");
+        .map_err(|e| anyhow::anyhow!("unable to install Serde runtime: {:?}", e))?;
     installer
         .install_bcs_runtime()
-        .expect("unable to install BCS runtime");
+        .map_err(|e| anyhow::anyhow!("unable to install BCS runtime: {:?}", e))?;
 
     // diem types
     let diem_types_content = String::from_utf8_lossy(include_bytes!(
@@ -81,21 +83,20 @@ fn generate_runtime(installer: &serdegen::typescript::Installer) -> Result<()> {
         .with_encodings(vec![serdegen::Encoding::Bcs]);
     installer
         .install_module(&config, &registry)
-        .expect("unable to install typescript diem types");
+        .map_err(|e| anyhow::anyhow!("unable to install typescript diem types: {:?}", e))?;
     Ok(())
 }
 
 fn generate_transaction_builders(pkg_path: &Path, target_dir: &Path) -> Result<()> {
     let module_name = "diemStdlib";
     let abi_directory = pkg_path;
-    let abis =
-        buildgen::read_abis(&[abi_directory]).expect("failed to read ABI from Move package main");
+    let abis = buildgen::read_abis(&[abi_directory])?;
 
     let installer: buildgen::typescript::Installer =
         buildgen::typescript::Installer::new(PathBuf::from(target_dir));
     installer
         .install_transaction_builders(module_name, abis.as_slice())
-        .expect("unable to install transaction builders for package");
+        .map_err(|e| anyhow::anyhow!("unable to install transaction builders: {:?}", e))?;
     Ok(())
 }
 
@@ -132,16 +133,15 @@ mod test {
         new::write_example_move_packages(dir_path).expect("unable to create move main pkg");
         generate_typescript_libraries(dir_path).expect("unable to generate TS libraries");
 
+        let script_path = dir_path.join("main/generated/diemStdlib/mod.ts");
         let output = std::process::Command::new("deno")
-            .args([
-                "run",
-                dir_path
-                    .join("main/generated/diemStdlib/mod.ts")
-                    .to_string_lossy()
-                    .as_ref(),
-            ])
+            .args(["run", script_path.to_string_lossy().as_ref()])
             .output()
             .unwrap();
         assert!(output.status.success());
+
+        let script_contents = std::fs::read(script_path.to_string_lossy().as_ref()).unwrap();
+        assert!(String::from_utf8_lossy(script_contents.as_ref())
+            .contains("static encodeSetMessageScript(message: Uint8Array): DiemTypes.Script"));
     }
 }
