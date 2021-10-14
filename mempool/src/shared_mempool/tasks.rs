@@ -53,7 +53,13 @@ pub(crate) fn execute_broadcast<V>(
     V: TransactionValidation,
 {
     let network_interface = &smp.network_interface.clone();
-    network_interface.execute_broadcast(peer, backoff, smp);
+    // If there's no connection, don't bother to broadcast
+    if network_interface.app_data().read(&peer).is_some() {
+        network_interface.execute_broadcast(peer, backoff, smp);
+    } else {
+        // Drop the scheduled broadcast, we're not connected anymore
+        return;
+    }
     let schedule_backoff = network_interface.is_backoff_mode(&peer);
 
     let interval_ms = if schedule_backoff {

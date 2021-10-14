@@ -565,8 +565,8 @@ fn test_interruption_in_sync() {
     // B reconnects to A
     harness.connect(v_b, v_a);
 
-    // B should receive the remaining txns
-    for seq_num in 1..3 {
+    // B starts over from the beginning, and receives 0..3
+    for seq_num in 0..3 {
         harness.broadcast_txns_and_validate(v_a, v_b, seq_num);
     }
 }

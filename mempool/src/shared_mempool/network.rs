@@ -186,20 +186,9 @@ impl MempoolNetworkInterface {
 
     /// Disables a peer if it can be restarted, otherwise removes it
     pub fn disable_peer(&self, peer: PeerNetworkId) {
-        // Validators can be restarted ata  later time
-        // TODO: Determine why there's this optimization
-        // TODO: What about garbage collection of validators
-        if peer.network_id().is_validator_network() {
-            if let Some(state) = self.sync_states.write_lock().get_mut(&peer) {
-                counters::active_upstream_peers(&peer.network_id()).dec();
-                state.is_alive = false;
-            }
-        } else {
-            // All other nodes have their state immediately restarted anyways, so let's free them
-            // TODO: Why is the Validator optimization not applied here
-            if self.sync_states.write_lock().remove(&peer).is_some() {
-                counters::active_upstream_peers(&peer.network_id()).dec();
-            }
+        // All other nodes have their state immediately restarted anyways, so let's free them
+        if self.sync_states.write_lock().remove(&peer).is_some() {
+            counters::active_upstream_peers(&peer.network_id()).dec();
         }
 
         // Always update prioritized peers to be in line with peer states
