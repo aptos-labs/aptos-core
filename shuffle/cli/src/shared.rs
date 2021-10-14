@@ -14,7 +14,6 @@ use serde_reflection::Registry;
 use std::{
     fs,
     fs::File,
-    io,
     io::Write,
     path::{Path, PathBuf},
     time::Duration,
@@ -23,6 +22,7 @@ use transaction_builder_generator as buildgen;
 use transaction_builder_generator::SourceInstaller as BuildgenSourceInstaller;
 
 pub const MAIN_PKG_PATH: &str = "main";
+const NEW_KEY_FILE_CONTENT: &[u8] = include_bytes!("../new_account.key");
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "kebab-case")]
@@ -30,8 +30,11 @@ pub struct Config {
     pub(crate) blockchain: String,
 }
 
-pub fn get_home_dir() -> PathBuf {
-    BaseDirs::new().unwrap().home_dir().to_path_buf()
+pub fn get_home_path() -> PathBuf {
+    BaseDirs::new()
+        .expect("Unable to deduce base directory for OS")
+        .home_dir()
+        .to_path_buf()
 }
 
 pub fn read_config(project_path: &Path) -> Result<Config> {
@@ -84,99 +87,95 @@ pub fn get_shuffle_dir() -> PathBuf {
 
 // Contains all the commonly used paths in shuffle/cli
 pub struct Home {
-    pub shuffle_path: PathBuf,
-    pub root_key_path: PathBuf,
-    pub node_config_path: PathBuf,
-    pub account_dir_path: PathBuf,
-    pub latest_dir_path: PathBuf,
-    pub latest_key_path: PathBuf,
-    pub latest_address_path: PathBuf,
+    shuffle_path: PathBuf,
+    root_key_path: PathBuf,
+    node_config_path: PathBuf,
+    account_path: PathBuf,
+    latest_path: PathBuf,
+    latest_key_path: PathBuf,
+    latest_address_path: PathBuf,
 }
 
 impl Home {
-    pub fn new(home_dir: &Path) -> Result<Self> {
+    pub fn new(home_path: &Path) -> Result<Self> {
         Ok(Self {
-            shuffle_path: home_dir.join(".shuffle"),
-            root_key_path: home_dir.join(".shuffle/nodeconfig/mint.key"),
-            node_config_path: home_dir.join(".shuffle/nodeconfig/0/node.yaml"),
-            account_dir_path: home_dir.join(".shuffle/accounts"),
-            latest_dir_path: home_dir.join(".shuffle/accounts/latest"),
-            latest_key_path: home_dir.join(".shuffle/accounts/latest/dev.key"),
-            latest_address_path: home_dir.join(".shuffle/accounts/latest/address"),
+            shuffle_path: home_path.join(".shuffle"),
+            root_key_path: home_path.join(".shuffle/nodeconfig/mint.key"),
+            node_config_path: home_path.join(".shuffle/nodeconfig/0/node.yaml"),
+            account_path: home_path.join(".shuffle/accounts"),
+            latest_path: home_path.join(".shuffle/accounts/latest"),
+            latest_key_path: home_path.join(".shuffle/accounts/latest/dev.key"),
+            latest_address_path: home_path.join(".shuffle/accounts/latest/address"),
         })
     }
 
-    pub fn create_archive_dir(&mut self, time: Duration) -> Result<PathBuf> {
-        let archived_dir = self.account_dir_path.join(time.as_secs().to_string());
+    pub fn get_shuffle_path(&self) -> &Path {
+        &self.shuffle_path
+    }
+
+    pub fn get_root_key_path(&self) -> &Path {
+        &self.root_key_path
+    }
+
+    pub fn get_node_config_path(&self) -> &Path {
+        &self.node_config_path
+    }
+
+    pub fn get_latest_path(&self) -> &Path {
+        &self.latest_path
+    }
+
+    pub fn get_latest_key_path(&self) -> &Path {
+        &self.latest_key_path
+    }
+
+    pub fn create_archive_dir(&self, time: Duration) -> Result<PathBuf> {
+        let archived_dir = self.account_path.join(time.as_secs().to_string());
         fs::create_dir(&archived_dir)?;
         Ok(archived_dir)
     }
 
-    pub fn archive_old_key(&mut self, archived_dir: &Path) -> Result<()> {
+    pub fn archive_old_key(&self, archived_dir: &Path) -> Result<()> {
         let old_key_path = self.latest_key_path.as_path();
         let archived_key_path = archived_dir.join("dev.key");
         fs::copy(old_key_path, archived_key_path)?;
         Ok(())
     }
 
-    pub fn archive_old_address(&mut self, archived_dir: &Path) -> Result<()> {
+    pub fn archive_old_address(&self, archived_dir: &Path) -> Result<()> {
         let old_address_path = self.latest_address_path.as_path();
         let archived_address_path = archived_dir.join("address");
         fs::copy(old_address_path, archived_address_path)?;
         Ok(())
     }
 
-    pub fn generate_shuffle_accounts_dir(&mut self) -> Result<()> {
-        if !self.account_dir_path.is_dir() {
-            fs::create_dir(self.account_dir_path.as_path())?;
+    pub fn generate_shuffle_accounts_path(&self) -> Result<()> {
+        if !self.account_path.is_dir() {
+            fs::create_dir(self.account_path.as_path())?;
         }
         Ok(())
     }
 
-    pub fn generate_shuffle_latest_dir(&mut self) -> Result<()> {
-        if !self.latest_dir_path.is_dir() {
-            fs::create_dir(self.latest_dir_path.as_path())?;
+    pub fn generate_shuffle_latest_path(&self) -> Result<()> {
+        if !self.latest_path.is_dir() {
+            fs::create_dir(self.latest_path.as_path())?;
         }
         Ok(())
     }
 
-    pub fn generate_key_file(&mut self) -> Result<Ed25519PrivateKey> {
-        Ok(generate_key::generate_and_save_key(
-            self.latest_key_path.as_path(),
-        ))
+    pub fn generate_key_file(&self) -> Result<Ed25519PrivateKey> {
+        // Using NEW_KEY_FILE for now due to hard coded address in
+        // /diem/shuffle/move/examples/main/sources/move.toml
+        fs::write(self.latest_key_path.as_path(), NEW_KEY_FILE_CONTENT)?;
+        Ok(generate_key::load_key(self.latest_key_path.as_path()))
     }
 
-    pub fn generate_address_file(&mut self, public_key: &Ed25519PublicKey) -> Result<()> {
+    pub fn generate_address_file(&self, public_key: &Ed25519PublicKey) -> Result<()> {
         let address = AuthenticationKey::ed25519(public_key).derived_address();
         let address_filepath = self.latest_address_path.as_path();
         let mut file = File::create(address_filepath)?;
         file.write_all(address.to_string().as_ref())?;
         Ok(())
-    }
-
-    pub fn confirm_user_decision(&mut self) -> Result<bool> {
-        let key_path = self.latest_key_path.as_path();
-        let prev_key = generate_key::load_key(&key_path);
-        println!(
-            "Private Key already exists: {}",
-            ::hex::encode(prev_key.to_bytes())
-        );
-        println!("Are you sure you want to generate a new key? [y/n]");
-
-        let mut user_response = String::new();
-        io::stdin()
-            .read_line(&mut user_response)
-            .expect("Failed to read line");
-        let user_response = user_response.trim().to_owned();
-
-        if user_response != "y" && user_response != "n" {
-            println!("Please restart and enter either y or n");
-            return Ok(false);
-        } else if user_response == "n" {
-            return Ok(false);
-        }
-
-        Ok(true)
     }
 }
 
@@ -258,7 +257,7 @@ mod test {
         let dir = tempdir().unwrap();
         fs::create_dir_all(dir.path().join(".shuffle/accounts")).unwrap();
 
-        let mut home = Home::new(dir.path()).unwrap();
+        let home = Home::new(dir.path()).unwrap();
         let time = duration_since_epoch();
         home.create_archive_dir(time).unwrap();
         let test_archive_dir = dir
@@ -273,7 +272,7 @@ mod test {
         let dir = tempdir().unwrap();
         fs::create_dir_all(dir.path().join(".shuffle/accounts/latest")).unwrap();
 
-        let mut home = Home::new(dir.path()).unwrap();
+        let home = Home::new(dir.path()).unwrap();
         let private_key = home.generate_key_file().unwrap();
 
         let time = duration_since_epoch();
@@ -294,7 +293,7 @@ mod test {
         let dir = tempdir().unwrap();
         fs::create_dir_all(dir.path().join(".shuffle/accounts/latest")).unwrap();
 
-        let mut home = Home::new(dir.path()).unwrap();
+        let home = Home::new(dir.path()).unwrap();
         let private_key = home.generate_key_file().unwrap();
         home.generate_address_file(&private_key.public_key())
             .unwrap();
@@ -316,31 +315,31 @@ mod test {
     }
 
     #[test]
-    fn test_generate_shuffle_accounts_dir() {
+    fn test_home_generate_shuffle_accounts_path() {
         let dir = tempdir().unwrap();
         fs::create_dir_all(dir.path().join(".shuffle")).unwrap();
 
-        let mut home = Home::new(dir.path()).unwrap();
-        home.generate_shuffle_accounts_dir().unwrap();
+        let home = Home::new(dir.path()).unwrap();
+        home.generate_shuffle_accounts_path().unwrap();
         assert_eq!(dir.path().join(".shuffle/accounts").is_dir(), true);
     }
 
     #[test]
-    fn test_generate_shuffle_latest_dir() {
+    fn test_home_generate_shuffle_latest_path() {
         let dir = tempdir().unwrap();
         fs::create_dir_all(dir.path().join(".shuffle/accounts")).unwrap();
 
-        let mut home = Home::new(dir.path()).unwrap();
-        home.generate_shuffle_latest_dir().unwrap();
+        let home = Home::new(dir.path()).unwrap();
+        home.generate_shuffle_latest_path().unwrap();
         assert_eq!(dir.path().join(".shuffle/accounts/latest").is_dir(), true);
     }
 
     #[test]
-    fn test_generate_key_file() {
+    fn test_home_generate_key_file() {
         let dir = tempdir().unwrap();
         fs::create_dir_all(dir.path().join(".shuffle/accounts/latest")).unwrap();
 
-        let mut home = Home::new(dir.path()).unwrap();
+        let home = Home::new(dir.path()).unwrap();
         home.generate_key_file().unwrap();
         assert_eq!(
             dir.path().join(".shuffle/accounts/latest/dev.key").exists(),
@@ -349,11 +348,11 @@ mod test {
     }
 
     #[test]
-    fn test_generate_address_file() {
+    fn test_home_generate_address_file() {
         let dir = tempdir().unwrap();
         fs::create_dir_all(dir.path().join(".shuffle/accounts/latest")).unwrap();
 
-        let mut home = Home::new(dir.path()).unwrap();
+        let home = Home::new(dir.path()).unwrap();
         let public_key = home.generate_key_file().unwrap().public_key();
         home.generate_address_file(&public_key).unwrap();
         assert_eq!(
@@ -363,11 +362,11 @@ mod test {
     }
 
     #[test]
-    fn test_home_get_shuffle_dir() {
+    fn test_home_get_shuffle_path() {
         let dir = tempdir().unwrap();
         let home = Home::new(dir.path()).unwrap();
         let correct_dir = dir.path().join(".shuffle");
-        assert_eq!(correct_dir, home.shuffle_path);
+        assert_eq!(correct_dir, home.get_shuffle_path());
     }
 
     #[test]
@@ -394,19 +393,11 @@ mod test {
     }
 
     #[test]
-    fn test_home_get_accounts_dir() {
-        let dir = tempdir().unwrap();
-        let home = Home::new(dir.path()).unwrap();
-        let correct_dir = dir.path().join(".shuffle/accounts");
-        assert_eq!(correct_dir, home.account_dir_path);
-    }
-
-    #[test]
-    fn test_home_get_latest_dir() {
+    fn test_home_get_latest_path() {
         let dir = tempdir().unwrap();
         let home = Home::new(dir.path()).unwrap();
         let correct_dir = dir.path().join(".shuffle/accounts/latest");
-        assert_eq!(correct_dir, home.latest_dir_path);
+        assert_eq!(correct_dir, home.get_latest_path());
     }
 
     #[test]
@@ -414,7 +405,7 @@ mod test {
         let dir = tempdir().unwrap();
         let home = Home::new(dir.path()).unwrap();
         let correct_dir = dir.path().join(".shuffle/nodeconfig/0/node.yaml");
-        assert_eq!(correct_dir, home.node_config_path);
+        assert_eq!(correct_dir, home.get_node_config_path());
     }
 
     #[test]
@@ -422,7 +413,7 @@ mod test {
         let dir = tempdir().unwrap();
         let home = Home::new(dir.path()).unwrap();
         let correct_dir = dir.path().join(".shuffle/nodeconfig/mint.key");
-        assert_eq!(correct_dir, home.root_key_path);
+        assert_eq!(correct_dir, home.get_root_key_path());
     }
 
     #[test]
@@ -430,14 +421,6 @@ mod test {
         let dir = tempdir().unwrap();
         let home = Home::new(dir.path()).unwrap();
         let correct_dir = dir.path().join(".shuffle/accounts/latest/dev.key");
-        assert_eq!(correct_dir, home.latest_key_path);
-    }
-
-    #[test]
-    fn test_home_get_latest_address_path() {
-        let dir = tempdir().unwrap();
-        let home = Home::new(dir.path()).unwrap();
-        let correct_dir = dir.path().join(".shuffle/accounts/latest/address");
-        assert_eq!(correct_dir, home.latest_address_path);
+        assert_eq!(correct_dir, home.get_latest_key_path());
     }
 }
