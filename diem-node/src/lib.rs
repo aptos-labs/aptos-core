@@ -455,6 +455,7 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
         consensus_requests,
         mempool_listener,
         mempool_reconfig_subscription,
+        peer_metadata_storage.clone(),
     );
     debug!("Mempool started in {} ms", instant.elapsed().as_millis());
 

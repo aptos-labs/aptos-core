@@ -25,6 +25,7 @@ use event_notifications::EventSubscriptionService;
 use futures::channel::mpsc;
 use mempool_notifications::{self, MempoolNotifier};
 use network::{
+    application::storage::PeerMetadataStorage,
     peer_manager::{conn_notifs_channel, ConnectionRequestSender, PeerManagerRequestSender},
     protocols::network::{NewNetworkEvents, NewNetworkSender},
 };
@@ -122,6 +123,7 @@ impl MockSharedMempool {
         );
         let reconfig_event_subscriber = event_subscriber.subscribe_to_reconfigurations().unwrap();
         let network_handles = vec![(NetworkId::Validator, network_sender, network_events)];
+        let peer_metadata_storage = PeerMetadataStorage::new(&[NetworkId::Validator]);
 
         start_shared_mempool(
             handle,
@@ -135,6 +137,7 @@ impl MockSharedMempool {
             db.reader.clone(),
             Arc::new(RwLock::new(validator)),
             vec![],
+            peer_metadata_storage,
         );
 
         (ac_client, mempool, consensus_sender, mempool_notifier)

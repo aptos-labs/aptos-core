@@ -5,9 +5,10 @@ use crate::{
     core_mempool::{CoreMempool, TimelineState},
     shared_mempool::{tasks, types::SharedMempool},
 };
-use diem_config::config::NodeConfig;
+use diem_config::{config::NodeConfig, network_id::NetworkId};
 use diem_infallible::{Mutex, RwLock};
 use diem_types::transaction::SignedTransaction;
+use network::application::storage::PeerMetadataStorage;
 use proptest::{
     arbitrary::any,
     prelude::*,
@@ -43,6 +44,7 @@ pub fn test_mempool_process_incoming_transactions_impl(
         vm_validator,
         vec![],
         config.base.role,
+        PeerMetadataStorage::new(&[NetworkId::Validator]),
     );
 
     let _ = tasks::process_incoming_transactions(&smp, txns, timeline_state);

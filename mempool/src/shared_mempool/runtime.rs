@@ -16,6 +16,7 @@ use diem_types::protocol_spec::DpnProto;
 use event_notifications::ReconfigNotificationListener;
 use futures::channel::mpsc::{self, Receiver, UnboundedSender};
 use mempool_notifications::MempoolNotificationListener;
+use network::application::storage::PeerMetadataStorage;
 use std::{collections::HashMap, sync::Arc};
 use storage_interface::DbReader;
 use tokio::runtime::{Builder, Handle, Runtime};
@@ -40,6 +41,7 @@ pub(crate) fn start_shared_mempool<V>(
     db: Arc<dyn DbReader<DpnProto>>,
     validator: Arc<RwLock<V>>,
     subscribers: Vec<UnboundedSender<SharedMempoolNotification>>,
+    peer_metadata_storage: Arc<PeerMetadataStorage>,
 ) where
     V: TransactionValidation + 'static,
 {
@@ -58,6 +60,7 @@ pub(crate) fn start_shared_mempool<V>(
         validator,
         subscribers,
         config.base.role,
+        peer_metadata_storage,
     );
 
     executor.spawn(coordinator(
@@ -91,6 +94,7 @@ pub fn bootstrap(
     consensus_requests: Receiver<ConsensusRequest>,
     mempool_listener: MempoolNotificationListener,
     mempool_reconfig_events: ReconfigNotificationListener,
+    peer_metadata_storage: Arc<PeerMetadataStorage>,
 ) -> Runtime {
     let runtime = Builder::new_multi_thread()
         .thread_name("shared-mem")
@@ -111,6 +115,7 @@ pub fn bootstrap(
         db,
         vm_validator,
         vec![],
+        peer_metadata_storage,
     );
     runtime
 }

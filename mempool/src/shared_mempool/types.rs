@@ -59,9 +59,10 @@ impl<V: TransactionValidation + 'static> SharedMempool<V> {
         validator: Arc<RwLock<V>>,
         subscribers: Vec<UnboundedSender<SharedMempoolNotification>>,
         role: RoleType,
+        peer_metadata_storage: Arc<PeerMetadataStorage>,
     ) -> Self {
         let network_interface = MempoolNetworkInterface::new(
-            PeerMetadataStorage::new(&[NetworkId::Public, NetworkId::Validator, NetworkId::Vfn]),
+            peer_metadata_storage,
             network_senders,
             role,
             config.clone(),
