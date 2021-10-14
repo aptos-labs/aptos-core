@@ -70,7 +70,7 @@ function update_path_and_profile {
   DOTNET_ROOT="$HOME/.dotnet"
   BIN_DIR="$HOME/bin"
   C_HOME="${HOME}/.cargo"
-  if [[ -n "$OPT_DIR" ]]; then
+  if [[ "$OPT_DIR" == "true" ]]; then
     DOTNET_ROOT="/opt/dotnet"
     BIN_DIR="/opt/bin"
     C_HOME="/opt/cargo"
