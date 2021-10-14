@@ -308,7 +308,7 @@ where
                     .collect(),
                 &proof_reader,
             )
-            .expect("Failed to update state tree.");
+            .map_err(|e| format_err!("Failed to update state tree. err: {:?}", e))?;
 
         for ((vm_output, txn), ((state_tree_hash, new_node_hashes), blobs)) in itertools::zip_eq(
             itertools::zip_eq(vm_outputs.into_iter(), transactions.iter()).take(transaction_count),
