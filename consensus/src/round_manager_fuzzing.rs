@@ -165,7 +165,6 @@ fn create_node_for_fuzzing() -> RoundManager {
             storage.clone(),
         ))),
         network,
-        Arc::new(MockTransactionManager::new(None)),
         storage,
         false,
         OnChainConsensusConfig::default(),

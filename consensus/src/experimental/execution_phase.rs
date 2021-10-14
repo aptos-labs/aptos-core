@@ -56,17 +56,25 @@ impl StatelessPipeline for ExecutionPhase {
     async fn process(&self, req: ExecutionRequest) -> ExecutionResponse {
         let ExecutionRequest { ordered_blocks } = req;
         let block_id = ordered_blocks.last().unwrap().id();
+        let mut result = vec![];
 
-        // execute the blocks with execution_correctness_client
-        let inner = ordered_blocks
-            .iter()
-            .map(|b| {
-                let state_compute_result =
-                    self.execution_proxy.compute(b.block(), b.parent_id())?;
-                Ok(ExecutedBlock::new(b.block().clone(), state_compute_result))
-            })
-            .collect::<Result<Vec<ExecutedBlock>, ExecutionError>>();
+        for b in ordered_blocks {
+            match self.execution_proxy.compute(b.block(), b.parent_id()).await {
+                Ok(compute_result) => {
+                    result.push(ExecutedBlock::new(b.block().clone(), compute_result));
+                }
+                Err(e) => {
+                    return ExecutionResponse {
+                        block_id,
+                        inner: Err(e),
+                    }
+                }
+            }
+        }
 
-        ExecutionResponse { block_id, inner }
+        ExecutionResponse {
+            block_id,
+            inner: Ok(result),
+        }
     }
 }

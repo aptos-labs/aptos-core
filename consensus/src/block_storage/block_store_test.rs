@@ -4,7 +4,9 @@
 use crate::{
     block_storage::{block_store::sync_manager::NeedFetchResult, BlockReader},
     pending_votes::{PendingVotes, VoteReceptionResult},
-    test_utils::{build_empty_tree, build_simple_tree, TreeInserter},
+    test_utils::{
+        build_empty_tree, build_simple_tree, consensus_runtime, timed_block_on, TreeInserter,
+    },
 };
 use consensus_types::{
     block::{
@@ -25,8 +27,8 @@ use diem_types::{
 use proptest::prelude::*;
 use std::{cmp::min, collections::HashSet};
 
-#[test]
-fn test_highest_block_and_quorum_cert() {
+#[tokio::test]
+async fn test_highest_block_and_quorum_cert() {
     let mut inserter = TreeInserter::default();
     let block_store = inserter.block_store();
     assert_eq!(
@@ -41,7 +43,9 @@ fn test_highest_block_and_quorum_cert() {
     let genesis = block_store.ordered_root();
 
     // Genesis block and quorum certificate is still the highest
-    let block_round_1 = inserter.insert_block_with_qc(certificate_for_genesis(), &genesis, 1);
+    let block_round_1 = inserter
+        .insert_block_with_qc(certificate_for_genesis(), &genesis, 1)
+        .await;
     assert_eq!(
         block_store.highest_certified_block().block(),
         &Block::make_genesis_block()
@@ -52,7 +56,7 @@ fn test_highest_block_and_quorum_cert() {
     );
 
     // block_round_1 block and quorum certificate is now the highest
-    let block_round_3 = inserter.insert_block(&block_round_1, 3, None);
+    let block_round_3 = inserter.insert_block(&block_round_1, 3, None).await;
     assert_eq!(block_store.highest_certified_block(), block_round_1);
     assert_eq!(
         block_store.highest_quorum_cert().as_ref(),
@@ -64,7 +68,7 @@ fn test_highest_block_and_quorum_cert() {
 
     // block_round_1 block and quorum certificate is still the highest, since block_round_4
     // also builds on block_round_1
-    let block_round_4 = inserter.insert_block(&block_round_1, 4, None);
+    let block_round_4 = inserter.insert_block(&block_round_1, 4, None).await;
     assert_eq!(block_store.highest_certified_block(), block_round_1);
     assert_eq!(
         block_store.highest_quorum_cert().as_ref(),
@@ -75,13 +79,15 @@ fn test_highest_block_and_quorum_cert() {
     );
 }
 
-#[test]
-fn test_qc_ancestry() {
+#[tokio::test]
+async fn test_qc_ancestry() {
     let mut inserter = TreeInserter::default();
     let block_store = inserter.block_store();
     let genesis = block_store.ordered_root();
-    let block_a_1 = inserter.insert_block_with_qc(certificate_for_genesis(), &genesis, 1);
-    let block_a_2 = inserter.insert_block(&block_a_1, 2, None);
+    let block_a_1 = inserter
+        .insert_block_with_qc(certificate_for_genesis(), &genesis, 1)
+        .await;
+    let block_a_2 = inserter.insert_block(&block_a_1, 2, None).await;
 
     assert_eq!(
         block_store.get_block(genesis.quorum_cert().certified_block().id()),
@@ -110,13 +116,14 @@ proptest! {
             50)
     ){
         let authors: HashSet<Author> = private_keys.iter().map(|private_key| diem_types::account_address::from_public_key(&private_key.public_key())).collect();
+        let mut runtime = consensus_runtime();
         let block_store = build_empty_tree();
         for block in blocks {
             if block.round() > 0 && authors.contains(&block.author().unwrap()) {
                 let known_parent = block_store.block_exists(block.parent_id());
                 let certified_parent = block.quorum_cert().certified_block().id() == block.parent_id();
                 let verify_res = block.verify_well_formed();
-                let res = block_store.execute_and_insert_block(block.clone());
+                let res = timed_block_on(&mut runtime, block_store.execute_and_insert_block(block.clone()));
                 if !certified_parent {
                     prop_assert!(verify_res.is_err());
                 } else if !known_parent {
@@ -141,55 +148,55 @@ proptest! {
     }
 }
 
-#[test]
-fn test_block_store_prune() {
-    let (blocks, block_store) = build_simple_tree();
+#[tokio::test]
+async fn test_block_store_prune() {
+    let (blocks, block_store) = build_simple_tree().await;
     // Attempt to prune genesis block (should be no-op)
     assert_eq!(block_store.prune_tree(blocks[0].id()).len(), 0);
     assert_eq!(block_store.len(), 7);
     assert_eq!(block_store.child_links(), block_store.len() - 1);
     assert_eq!(block_store.pruned_blocks_in_mem(), 0);
 
-    let (blocks, block_store) = build_simple_tree();
+    let (blocks, block_store) = build_simple_tree().await;
     // Prune up to block A1
     assert_eq!(block_store.prune_tree(blocks[1].id()).len(), 4);
     assert_eq!(block_store.len(), 3);
     assert_eq!(block_store.child_links(), block_store.len() - 1);
     assert_eq!(block_store.pruned_blocks_in_mem(), 4);
 
-    let (blocks, block_store) = build_simple_tree();
+    let (blocks, block_store) = build_simple_tree().await;
     // Prune up to block A2
     assert_eq!(block_store.prune_tree(blocks[2].id()).len(), 5);
     assert_eq!(block_store.len(), 2);
     assert_eq!(block_store.child_links(), block_store.len() - 1);
     assert_eq!(block_store.pruned_blocks_in_mem(), 5);
 
-    let (blocks, block_store) = build_simple_tree();
+    let (blocks, block_store) = build_simple_tree().await;
     // Prune up to block A3
     assert_eq!(block_store.prune_tree(blocks[3].id()).len(), 6);
     assert_eq!(block_store.len(), 1);
     assert_eq!(block_store.child_links(), block_store.len() - 1);
 
-    let (blocks, block_store) = build_simple_tree();
+    let (blocks, block_store) = build_simple_tree().await;
     // Prune up to block B1
     assert_eq!(block_store.prune_tree(blocks[4].id()).len(), 4);
     assert_eq!(block_store.len(), 3);
     assert_eq!(block_store.child_links(), block_store.len() - 1);
 
-    let (blocks, block_store) = build_simple_tree();
+    let (blocks, block_store) = build_simple_tree().await;
     // Prune up to block B2
     assert_eq!(block_store.prune_tree(blocks[5].id()).len(), 6);
     assert_eq!(block_store.len(), 1);
     assert_eq!(block_store.child_links(), block_store.len() - 1);
 
-    let (blocks, block_store) = build_simple_tree();
+    let (blocks, block_store) = build_simple_tree().await;
     // Prune up to block C1
     assert_eq!(block_store.prune_tree(blocks[6].id()).len(), 6);
     assert_eq!(block_store.len(), 1);
     assert_eq!(block_store.child_links(), block_store.len() - 1);
 
     // Prune the chain of Genesis -> B1 -> B2
-    let (blocks, block_store) = build_simple_tree();
+    let (blocks, block_store) = build_simple_tree().await;
     // Prune up to block B1
     assert_eq!(block_store.prune_tree(blocks[4].id()).len(), 4);
     assert_eq!(block_store.len(), 3);
@@ -200,8 +207,8 @@ fn test_block_store_prune() {
     assert_eq!(block_store.child_links(), block_store.len() - 1);
 }
 
-#[test]
-fn test_block_tree_gc() {
+#[tokio::test]
+async fn test_block_tree_gc() {
     // build a tree with 100 nodes, max_pruned_nodes_in_mem = 10
     let mut inserter = TreeInserter::default();
     let block_store = inserter.block_store();
@@ -211,9 +218,11 @@ fn test_block_tree_gc() {
 
     for round in 1..100 {
         if round == 1 {
-            cur_node = inserter.insert_block_with_qc(certificate_for_genesis(), &cur_node, round);
+            cur_node = inserter
+                .insert_block_with_qc(certificate_for_genesis(), &cur_node, round)
+                .await;
         } else {
-            cur_node = inserter.insert_block(&cur_node, round, None);
+            cur_node = inserter.insert_block(&cur_node, round, None).await;
         }
         added_blocks.push(cur_node.clone());
     }
@@ -225,16 +234,18 @@ fn test_block_tree_gc() {
     }
 }
 
-#[test]
-fn test_path_from_root() {
+#[tokio::test]
+async fn test_path_from_root() {
     let mut inserter = TreeInserter::default();
     let block_store = inserter.block_store();
     let genesis = block_store
         .get_block(block_store.ordered_root().id())
         .unwrap();
-    let b1 = inserter.insert_block_with_qc(certificate_for_genesis(), &genesis, 1);
-    let b2 = inserter.insert_block(&b1, 2, None);
-    let b3 = inserter.insert_block(&b2, 3, None);
+    let b1 = inserter
+        .insert_block_with_qc(certificate_for_genesis(), &genesis, 1)
+        .await;
+    let b2 = inserter.insert_block(&b1, 2, None).await;
+    let b3 = inserter.insert_block(&b2, 3, None).await;
 
     assert_eq!(
         block_store.path_from_ordered_root(b3.id()),
@@ -254,8 +265,8 @@ fn test_path_from_root() {
     assert_eq!(block_store.path_from_ordered_root(genesis.id()), None);
 }
 
-#[test]
-fn test_insert_vote() {
+#[tokio::test]
+async fn test_insert_vote() {
     ::diem_logger::Logger::init_for_testing();
     // Set up enough different authors to support different votes for the same block.
     let (signers, validator_verifier) = random_validator_verifier(11, Some(10), false);
@@ -263,7 +274,9 @@ fn test_insert_vote() {
     let mut inserter = TreeInserter::new(my_signer);
     let block_store = inserter.block_store();
     let genesis = block_store.ordered_root();
-    let block = inserter.insert_block_with_qc(certificate_for_genesis(), &genesis, 1);
+    let block = inserter
+        .insert_block_with_qc(certificate_for_genesis(), &genesis, 1)
+        .await;
     let mut pending_votes = PendingVotes::new();
 
     assert!(block_store.get_quorum_cert_for_block(block.id()).is_none());
@@ -325,8 +338,8 @@ fn test_insert_vote() {
     assert_eq!(block_qc.certified_block().id(), block.id());
 }
 
-#[test]
-fn test_illegal_timestamp() {
+#[tokio::test]
+async fn test_illegal_timestamp() {
     let signer = ValidatorSigner::random(None);
     let block_store = build_empty_tree();
     let genesis = block_store.ordered_root();
@@ -338,37 +351,43 @@ fn test_illegal_timestamp() {
         certificate_for_genesis(),
         &signer,
     );
-    let result = block_store.execute_and_insert_block(block_with_illegal_timestamp);
+    let result = block_store
+        .execute_and_insert_block(block_with_illegal_timestamp)
+        .await;
     assert!(result.is_err());
 }
 
-#[test]
-fn test_highest_qc() {
+#[tokio::test]
+async fn test_highest_qc() {
     let mut inserter = TreeInserter::default();
     let block_store = inserter.block_store();
 
     // build a tree of the following form
     // genesis <- a1 <- a2 <- a3
     let genesis = block_store.ordered_root();
-    let a1 = inserter.insert_block_with_qc(certificate_for_genesis(), &genesis, 1);
+    let a1 = inserter
+        .insert_block_with_qc(certificate_for_genesis(), &genesis, 1)
+        .await;
     assert_eq!(block_store.highest_certified_block(), genesis);
-    let a2 = inserter.insert_block(&a1, 2, None);
+    let a2 = inserter.insert_block(&a1, 2, None).await;
     assert_eq!(block_store.highest_certified_block(), a1);
-    let _a3 = inserter.insert_block(&a2, 3, None);
+    let _a3 = inserter.insert_block(&a2, 3, None).await;
     assert_eq!(block_store.highest_certified_block(), a2);
 }
 
-#[test]
-fn test_need_fetch_for_qc() {
+#[tokio::test]
+async fn test_need_fetch_for_qc() {
     let mut inserter = TreeInserter::default();
     let block_store = inserter.block_store();
 
     // build a tree of the following form
     // genesis <- a1 <- a2 <- a3
     let genesis = block_store.ordered_root();
-    let a1 = inserter.insert_block_with_qc(certificate_for_genesis(), &genesis, 1);
-    let a2 = inserter.insert_block(&a1, 2, None);
-    let a3 = inserter.insert_block(&a2, 3, None);
+    let a1 = inserter
+        .insert_block_with_qc(certificate_for_genesis(), &genesis, 1)
+        .await;
+    let a2 = inserter.insert_block(&a1, 2, None).await;
+    let a3 = inserter.insert_block(&a2, 3, None).await;
     block_store.prune_tree(a2.id());
     let need_fetch_qc = placeholder_certificate_for_block(
         vec![inserter.signer()],

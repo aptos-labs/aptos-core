@@ -41,7 +41,7 @@ impl MockStateComputer {
 
 #[async_trait::async_trait]
 impl StateComputer for MockStateComputer {
-    fn compute(
+    async fn compute(
         &self,
         block: &Block,
         _parent_block_id: HashValue,
@@ -102,7 +102,7 @@ pub struct EmptyStateComputer;
 
 #[async_trait::async_trait]
 impl StateComputer for EmptyStateComputer {
-    fn compute(
+    async fn compute(
         &self,
         _block: &Block,
         _parent_block_id: HashValue,
@@ -142,7 +142,7 @@ impl RandomComputeResultStateComputer {
 
 #[async_trait::async_trait]
 impl StateComputer for RandomComputeResultStateComputer {
-    fn compute(
+    async fn compute(
         &self,
         _block: &Block,
         _parent_block_id: HashValue,

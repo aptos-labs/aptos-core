@@ -119,7 +119,7 @@ impl BlockStore {
         let highest_tc = initial_data.highest_timeout_certificate();
         let highest_2chain_tc = initial_data.highest_2chain_timeout_certificate();
         let (root, root_metadata, blocks, quorum_certs) = initial_data.take();
-        let block_store = Self::build(
+        let block_store = block_on(Self::build(
             root,
             root_metadata,
             blocks,
@@ -131,7 +131,7 @@ impl BlockStore {
             max_pruned_blocks_in_mem,
             time_service,
             back_pressure_limit,
-        );
+        ));
         block_on(block_store.try_commit());
         block_store
     }
@@ -157,7 +157,7 @@ impl BlockStore {
         }
     }
 
-    fn build(
+    async fn build(
         root: RootInfo,
         root_metadata: RootMetadata,
         blocks: Vec<Block>,
@@ -228,6 +228,7 @@ impl BlockStore {
         for block in blocks {
             block_store
                 .execute_and_insert_block(block)
+                .await
                 .unwrap_or_else(|e| {
                     panic!("[BlockStore] failed to insert block during build {:?}", e)
                 });
@@ -317,7 +318,8 @@ impl BlockStore {
             max_pruned_blocks_in_mem,
             Arc::clone(&self.time_service),
             self.back_pressure_limit,
-        );
+        )
+        .await;
 
         let to_remove = self.inner.read().get_all_block_id();
         if let Err(e) = self.storage.prune_tree(to_remove) {
@@ -339,7 +341,10 @@ impl BlockStore {
     /// Duplicate inserts will return the previously inserted block (
     /// note that it is considered a valid non-error case, for example, it can happen if a validator
     /// receives a certificate for a block that is currently being added).
-    pub fn execute_and_insert_block(&self, block: Block) -> anyhow::Result<Arc<ExecutedBlock>> {
+    pub async fn execute_and_insert_block(
+        &self,
+        block: Block,
+    ) -> anyhow::Result<Arc<ExecutedBlock>> {
         if let Some(existing_block) = self.get_block(block.id()) {
             return Ok(existing_block);
         }
@@ -348,7 +353,7 @@ impl BlockStore {
             "Block with old round"
         );
 
-        let executed_block = match self.execute_block(block.clone()) {
+        let executed_block = match self.execute_block(block.clone()).await {
             Ok(res) => Ok(res),
             Err(Error::BlockNotFound(parent_block_id)) => {
                 // recover the block tree in executor
@@ -357,9 +362,9 @@ impl BlockStore {
                     .unwrap_or_else(Vec::new);
 
                 for block in blocks_to_reexecute {
-                    self.execute_block(block.block().clone())?;
+                    self.execute_block(block.block().clone()).await?;
                 }
-                self.execute_block(block)
+                self.execute_block(block).await
             }
             err => err,
         }?;
@@ -373,10 +378,13 @@ impl BlockStore {
         self.inner.write().insert_block(executed_block)
     }
 
-    fn execute_block(&self, block: Block) -> anyhow::Result<ExecutedBlock, Error> {
+    async fn execute_block(&self, block: Block) -> anyhow::Result<ExecutedBlock, Error> {
         // Although NIL blocks don't have a payload, we still send a T::default() to compute
         // because we may inject a block prologue transaction.
-        let state_compute_result = self.state_computer.compute(&block, block.parent_id())?;
+        let state_compute_result = self
+            .state_computer
+            .compute(&block, block.parent_id())
+            .await?;
         observe_block(block.timestamp_usecs(), BlockStage::EXECUTED);
 
         Ok(ExecutedBlock::new(block, state_compute_result))
@@ -566,8 +574,8 @@ impl BlockStore {
     }
 
     /// Helper function to insert the block with the qc together
-    pub fn insert_block_with_qc(&self, block: Block) -> anyhow::Result<Arc<ExecutedBlock>> {
+    pub async fn insert_block_with_qc(&self, block: Block) -> anyhow::Result<Arc<ExecutedBlock>> {
         self.insert_single_quorum_cert(block.quorum_cert().clone())?;
-        self.execute_and_insert_block(block)
+        self.execute_and_insert_block(block).await
     }
 }

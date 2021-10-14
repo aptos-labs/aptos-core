@@ -3,7 +3,7 @@
 
 use crate::{
     error::StateSyncError,
-    state_replication::{StateComputer, StateComputerCommitCallBackType},
+    state_replication::{StateComputer, StateComputerCommitCallBackType, TxnManager},
 };
 use anyhow::Result;
 use consensus_notifications::ConsensusNotificationSender;
@@ -21,16 +21,19 @@ use std::{boxed::Box, sync::Arc};
 /// implements StateComputer traits.
 pub struct ExecutionProxy {
     execution_correctness_client: Box<dyn ExecutionCorrectness + Send + Sync>,
+    mempool_notifier: Arc<dyn TxnManager>,
     state_sync_notifier: Box<dyn ConsensusNotificationSender>,
 }
 
 impl ExecutionProxy {
     pub fn new(
         execution_correctness_client: Box<dyn ExecutionCorrectness + Send + Sync>,
+        mempool_notifier: Arc<dyn TxnManager>,
         state_sync_notifier: Box<dyn ConsensusNotificationSender>,
     ) -> Self {
         Self {
             execution_correctness_client,
+            mempool_notifier,
             state_sync_notifier,
         }
     }
@@ -38,7 +41,7 @@ impl ExecutionProxy {
 
 #[async_trait::async_trait]
 impl StateComputer for ExecutionProxy {
-    fn compute(
+    async fn compute(
         &self,
         // The block to be executed.
         block: &Block,
@@ -57,11 +60,23 @@ impl StateComputer for ExecutionProxy {
         );
 
         // TODO: figure out error handling for the prologue txn
-        monitor!(
+        let compute_result = monitor!(
             "execute_block",
             self.execution_correctness_client
                 .execute_block(block.clone(), parent_block_id)
-        )
+        )?;
+
+        // notify mempool about failed transaction
+        if let Err(e) = self
+            .mempool_notifier
+            .notify_failed_txn(block, &compute_result)
+            .await
+        {
+            error!(
+                error = ?e, "Failed to notify mempool of rejected txns",
+            );
+        }
+        Ok(compute_result)
     }
 
     /// Send a successful commit. A future is fulfilled when the state is finalized.

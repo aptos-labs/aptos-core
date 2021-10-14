@@ -59,7 +59,7 @@ impl TxnManager for MockTransactionManager {
         Ok(random_payload(10))
     }
 
-    async fn notify(
+    async fn notify_failed_txn(
         &self,
         block: &Block,
         compute_results: &StateComputeResult,
@@ -80,7 +80,7 @@ impl TxnManager for MockTransactionManager {
                 .mempool_proxy
                 .as_ref()
                 .unwrap()
-                .notify(block, &mock_compute_result)
+                .notify_failed_txn(block, &mock_compute_result)
                 .await
                 .is_ok());
         }

@@ -221,7 +221,6 @@ impl NodeSetup {
             proposal_generator,
             Arc::new(Mutex::new(safety_rules)),
             network,
-            Arc::new(MockTransactionManager::new(None)),
             storage.clone(),
             false,
             OnChainConsensusConfig::default(),
@@ -791,9 +790,8 @@ fn sync_info_sent_on_stale_sync_info() {
     let mut behind_node = nodes.pop().unwrap();
     let mut ahead_node = nodes.pop().unwrap();
     // ahead node has one more block
-    ahead_node
-        .block_store
-        .execute_and_insert_block(block_0)
+    runtime
+        .block_on(ahead_node.block_store.execute_and_insert_block(block_0))
         .unwrap();
     ahead_node
         .block_store

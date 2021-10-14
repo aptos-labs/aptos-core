@@ -28,9 +28,9 @@ pub trait TxnManager: Send + Sync {
         exclude: Vec<&Payload>,
     ) -> Result<Payload, MempoolError>;
 
-    /// Notifies TxnManager about the executed result of the block,
-    /// which includes the specifics of what transactions succeeded and failed.
-    async fn notify(
+    /// Notifies TxnManager about the txns which failed execution. (Committed txns is notified by
+    /// state sync.)
+    async fn notify_failed_txn(
         &self,
         block: &Block,
         compute_result: &StateComputeResult,
@@ -48,7 +48,7 @@ pub trait StateComputer: Send + Sync {
     /// How to execute a sequence of transactions and obtain the next state. While some of the
     /// transactions succeed, some of them can fail.
     /// In case all the transactions are failed, new_state_id is equal to the previous state id.
-    fn compute(
+    async fn compute(
         &self,
         // The block that will be computed.
         block: &Block,

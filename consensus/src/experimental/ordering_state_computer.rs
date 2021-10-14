@@ -49,7 +49,7 @@ impl OrderingStateComputer {
 
 #[async_trait::async_trait]
 impl StateComputer for OrderingStateComputer {
-    fn compute(
+    async fn compute(
         &self,
         // The block to be executed.
         _block: &Block,

@@ -48,8 +48,12 @@ async fn test_proposal_generation_parent() {
         1,
     );
     let genesis = block_store.ordered_root();
-    let a1 = inserter.insert_block_with_qc(certificate_for_genesis(), &genesis, 1);
-    let b1 = inserter.insert_block_with_qc(certificate_for_genesis(), &genesis, 2);
+    let a1 = inserter
+        .insert_block_with_qc(certificate_for_genesis(), &genesis, 1)
+        .await;
+    let b1 = inserter
+        .insert_block_with_qc(certificate_for_genesis(), &genesis, 2)
+        .await;
 
     // With no certifications the parent is genesis
     // generate proposals for an empty tree.
@@ -89,7 +93,9 @@ async fn test_old_proposal_generation() {
         1,
     );
     let genesis = block_store.ordered_root();
-    let a1 = inserter.insert_block_with_qc(certificate_for_genesis(), &genesis, 1);
+    let a1 = inserter
+        .insert_block_with_qc(certificate_for_genesis(), &genesis, 1)
+        .await;
     inserter.insert_qc_for_block(a1.as_ref(), None);
 
     let proposal_err = proposal_generator.generate_proposal(1).await.err();

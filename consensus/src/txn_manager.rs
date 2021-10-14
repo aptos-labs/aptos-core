@@ -119,8 +119,7 @@ impl TxnManager for MempoolProxy {
         Ok(txns)
     }
 
-    // Consensus notifies mempool of executed transactions
-    async fn notify(
+    async fn notify_failed_txn(
         &self,
         block: &Block,
         compute_results: &StateComputeResult,

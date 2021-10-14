@@ -51,6 +51,7 @@ pub fn start_consensus(
 
     let state_computer = Arc::new(ExecutionProxy::new(
         execution_correctness_manager.client(),
+        txn_manager.clone(),
         state_sync_notifier,
     ));
 

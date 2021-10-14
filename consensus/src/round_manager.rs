@@ -19,7 +19,7 @@ use crate::{
     network_interface::ConsensusMsg,
     pending_votes::VoteReceptionResult,
     persistent_liveness_storage::{PersistentLivenessStorage, RecoveryData},
-    state_replication::{StateComputer, TxnManager},
+    state_replication::StateComputer,
 };
 use anyhow::{bail, ensure, Context, Result};
 use consensus_types::{
@@ -217,7 +217,6 @@ pub struct RoundManager {
     proposal_generator: ProposalGenerator,
     safety_rules: Arc<Mutex<MetricsSafetyRules>>,
     network: NetworkSender,
-    txn_manager: Arc<dyn TxnManager>,
     storage: Arc<dyn PersistentLivenessStorage>,
     sync_only: bool,
     decoupled_execution: bool,
@@ -234,7 +233,6 @@ impl RoundManager {
         proposal_generator: ProposalGenerator,
         safety_rules: Arc<Mutex<MetricsSafetyRules>>,
         network: NetworkSender,
-        txn_manager: Arc<dyn TxnManager>,
         storage: Arc<dyn PersistentLivenessStorage>,
         sync_only: bool,
         onchain_config: OnChainConsensusConfig,
@@ -255,7 +253,6 @@ impl RoundManager {
             proposal_generator,
             safety_rules,
             network,
-            txn_manager,
             storage,
             sync_only,
             decoupled_execution: false,
@@ -272,7 +269,6 @@ impl RoundManager {
         proposal_generator: ProposalGenerator,
         safety_rules: Arc<Mutex<MetricsSafetyRules>>,
         network: NetworkSender,
-        txn_manager: Arc<dyn TxnManager>,
         storage: Arc<dyn PersistentLivenessStorage>,
         sync_only: bool,
         back_pressure_limit: u64,
@@ -286,7 +282,6 @@ impl RoundManager {
             proposal_generator,
             safety_rules,
             network,
-            txn_manager,
             storage,
             sync_only,
             decoupled_execution: true,
@@ -673,21 +668,8 @@ impl RoundManager {
         let executed_block = self
             .block_store
             .execute_and_insert_block(proposed_block)
+            .await
             .context("[RoundManager] Failed to execute_and_insert the block")?;
-
-        if !self.decoupled_execution {
-            // notify mempool about failed txn
-            let compute_result = executed_block.compute_result();
-            if let Err(e) = self
-                .txn_manager
-                .notify(executed_block.block(), compute_result)
-                .await
-            {
-                error!(
-                    error = ?e, "[RoundManager] Failed to notify mempool of rejected txns",
-                );
-            }
-        }
 
         // Short circuit if already voted.
         ensure!(

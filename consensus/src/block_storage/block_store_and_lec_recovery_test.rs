@@ -5,7 +5,7 @@ use crate::{
     block_storage::{block_store::BlockStore, BlockReader},
     persistent_liveness_storage::{LedgerRecoveryData, RecoveryData, RootMetadata},
     state_computer::ExecutionProxy,
-    test_utils::{EmptyStorage, TreeInserter},
+    test_utils::{EmptyStorage, MockTransactionManager, TreeInserter},
     util::mock_time_service::SimulatedTimeService,
 };
 use consensus_types::{block::Block, quorum_cert::QuorumCert};
@@ -68,6 +68,7 @@ fn build_inserter(
 
     let state_computer = Arc::new(ExecutionProxy::new(
         lec_client,
+        Arc::new(MockTransactionManager::new(None)),
         Box::new(consensus_notifier),
     ));
 
@@ -87,8 +88,8 @@ fn build_inserter(
     )
 }
 
-#[test]
-fn test_executor_restart() {
+#[tokio::test]
+async fn test_executor_restart() {
     // Start storage service
     let (config, _handle, db) = start_storage_service();
     let execution_correctness_manager = ExecutionCorrectnessManager::new(&config);
@@ -110,9 +111,11 @@ fn test_executor_restart() {
 
     //       ╭--> A1--> A2
     // Genesis--> B1
-    let a1 = inserter.insert_block_with_qc(qc.clone(), &genesis_block, 1);
-    let a2 = inserter.insert_block(&a1, 2, None);
-    let b1 = inserter.insert_block_with_qc(qc, &genesis_block, 4);
+    let a1 = inserter
+        .insert_block_with_qc(qc.clone(), &genesis_block, 1)
+        .await;
+    let a2 = inserter.insert_block(&a1, 2, None).await;
+    let b1 = inserter.insert_block_with_qc(qc, &genesis_block, 4).await;
 
     // Crash LEC.
     drop(execution_correctness_manager);
@@ -123,13 +126,15 @@ fn test_executor_restart() {
     //       ╭--> A1--> A2--> A3
     // Genesis--> B1--> B2
     //             ╰--> C1
-    let _a3 = inserter.insert_block(&a2, 3, Some(genesis.block_info()));
-    let _b2 = inserter.insert_block(&b1, 5, None);
-    let _c1 = inserter.insert_block(&b1, 6, None);
+    let _a3 = inserter
+        .insert_block(&a2, 3, Some(genesis.block_info()))
+        .await;
+    let _b2 = inserter.insert_block(&b1, 5, None).await;
+    let _c1 = inserter.insert_block(&b1, 6, None).await;
 }
 
-#[test]
-fn test_block_store_restart() {
+#[tokio::test]
+async fn test_block_store_restart() {
     // Start storage service
     let (config, _handle, db) = start_storage_service();
 
@@ -152,9 +157,11 @@ fn test_block_store_restart() {
 
         //       ╭--> A1--> A2
         // Genesis--> B1
-        let a1 = inserter.insert_block_with_qc(qc.clone(), &genesis_block, 1);
-        let _a2 = inserter.insert_block(&a1, 2, None);
-        let _b1 = inserter.insert_block_with_qc(qc, &genesis_block, 4);
+        let a1 = inserter
+            .insert_block_with_qc(qc.clone(), &genesis_block, 1)
+            .await;
+        let _a2 = inserter.insert_block(&a1, 2, None).await;
+        let _b1 = inserter.insert_block_with_qc(qc, &genesis_block, 4).await;
     }
 
     // Restart block_store
@@ -174,15 +181,19 @@ fn test_block_store_restart() {
 
         //       ╭--> A1--> A2
         // Genesis--> B1
-        let a1 = inserter.insert_block_with_qc(qc.clone(), &genesis_block, 1);
-        let a2 = inserter.insert_block(&a1, 2, None);
-        let b1 = inserter.insert_block_with_qc(qc, &genesis_block, 4);
+        let a1 = inserter
+            .insert_block_with_qc(qc.clone(), &genesis_block, 1)
+            .await;
+        let a2 = inserter.insert_block(&a1, 2, None).await;
+        let b1 = inserter.insert_block_with_qc(qc, &genesis_block, 4).await;
 
         //       ╭--> A1--> A2--> A3
         // Genesis--> B1--> B2
         //             ╰--> C1
-        let _a3 = inserter.insert_block(&a2, 3, Some(genesis.block_info()));
-        let _b2 = inserter.insert_block(&b1, 5, None);
-        let _c1 = inserter.insert_block(&b1, 6, None);
+        let _a3 = inserter
+            .insert_block(&a2, 3, Some(genesis.block_info()))
+            .await;
+        let _b2 = inserter.insert_block(&b1, 5, None).await;
+        let _c1 = inserter.insert_block(&b1, 6, None).await;
     }
 }
