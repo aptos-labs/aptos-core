@@ -45,6 +45,28 @@ pub fn send(client: &BlockingClient, tx: diem_types::transaction::SignedTransact
     Ok(())
 }
 
+/// Checks the current directory, and then parent directories for a Shuffle.toml
+/// file to indicate the base project directory.
+pub fn get_shuffle_project_path(cwd: &Path) -> Result<PathBuf> {
+    let mut path: PathBuf = PathBuf::from(cwd);
+    let project_file = Path::new("Shuffle.toml");
+
+    loop {
+        path.push(project_file);
+
+        if path.is_file() {
+            path.pop();
+            return Ok(path);
+        }
+
+        if !(path.pop() && path.pop()) {
+            return Err(anyhow::anyhow!(
+                "unable to find Shuffle.toml; are you in a Shuffle project?"
+            ));
+        }
+    }
+}
+
 // returns ~/.shuffle
 pub fn get_shuffle_dir() -> PathBuf {
     BaseDirs::new().unwrap().home_dir().join(".shuffle")
@@ -107,7 +129,20 @@ mod test {
     use std::path::PathBuf;
     use tempfile::tempdir;
 
-    use super::generate_typescript_libraries;
+    use super::{generate_typescript_libraries, get_shuffle_project_path};
+
+    #[test]
+    fn test_get_shuffle_project_path() {
+        let tmpdir = tempdir().unwrap();
+        let dir_path = tmpdir.path();
+
+        std::fs::create_dir_all(dir_path.join("nested")).unwrap();
+        std::fs::write(dir_path.join("Shuffle.toml"), "goodday").unwrap();
+
+        let actual = get_shuffle_project_path(dir_path.join("nested").as_path()).unwrap();
+        let expectation = dir_path;
+        assert_eq!(&actual, expectation);
+    }
 
     #[test]
     fn test_get_shuffle_dir() {
