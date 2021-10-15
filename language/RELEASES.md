@@ -1,3 +1,169 @@
+# Move Version 1.5
+
+Version 1.5 of Move (released along with Diem Core version 1.5) includes a new package
+system, a number of bug fixes,
+and other improvements.
+
+## Highlights
+
+* Packages: The Move package system is a new feature to allow Move programmers to
+more easily re-use code and share it across projects.
+More details are available in the package [change description](changes/7-packages.md).
+* The Move Prover has extensive changes related to global invariants and specification
+variables, along with many other enhancements and bug fixes.
+
+## Move Language
+
+[Named address](changes/5-named-addresses.md)
+values are now expected to be specified in packages rather than
+in the source code. The address values are then passed on the command line to the
+compiler, with the expectation that developers will no longer invoke the compiler
+directly but will instead build via the package system. Thus, named address
+declarations in Move can no longer specify the address values
+([#8880](https://github.com/diem/diem/pull/8880)).
+
+## Compiler
+
+* The Move compiler now makes a distinction between errors and non-fatal warnings,
+so that it can report warning messages without causing a compilation to fail
+([#8881](https://github.com/diem/diem/pull/8881)).
+The parser is also a little bit better about continuing after certain kinds of errors
+([#9175](https://github.com/diem/diem/pull/9175)).
+* Performance: Removed an unnecessary copy
+of the source code in memory to speed up build times by about 5%
+([#8893](https://github.com/diem/diem/pull/8893))
+and used string interning in the compiler to further reduce both build times
+and memory use by another 30%
+([#8874](https://github.com/diem/diem/pull/8874)).
+* Checking for phantom types: the compiler now reports warnings for non-phantom
+parameters that are either unused or used in a phantom position
+([#8740](https://github.com/diem/diem/pull/8740)).
+* Attributes: The compiler now reports better error messages for attributes, especially
+for "known" attributes that are expected to be used in certain ways
+([#9249](https://github.com/diem/diem/pull/9249)).
+
+## Prover
+
+* Global invariants: This release of the Move Prover includes extensive changes
+related to global invariants. In previous releases, verification may have been
+skipped for global invariants quantified over a generic memory and then evaluated
+in a generic Move function. The solution provides more holistic support for type parameters
+in the Move Prover. In particular, specifications for generic global invariants
+previously written as `invariant forall t: type: ...` should now be written as
+`invariant<T> ...` to express that the invariant applies to a generic type `T`.
+Another important change is the addition of an invariant suspension scheme which
+allows the verification of a global invariant to be deferred to a different
+location (instead of right after the relevant bytecode). These schemas include
+`disable_invariants_in_body` which postpones the evaluation to the end of the
+function and `delegate_invariants_to_caller` which lifts the evaluation to the
+caller side. This feature allows verification of more (or stronger) global
+invariants as the caller side has more context to evaluate the
+invariant. Internally, the bytecode transformation pipeline is updated such
+that all global invariants related to a function are instrumented at
+the appropriate locations. The monomorphization pass is updated to
+instantiate type parameters on both the global invariant side and function
+side.
+* Specification variables (a.k.a., ghost variables): Specification variable
+declarations can now optionally include an
+initializer: for example, `global spec_var: num = 1`.
+Specification variables can also now be updated in
+a function spec block, for example: `update spec_var = spec_var + 1`.
+The new implementation of specification variables maps them to
+regular global "ghost" memory. Access to specification variables is mapped to
+accessing this memory (at address `@0`), so that memory usage and global
+invariant analysis can be applied uniformly to specification variables.
+* Added new `--unconditional-abort-as-inconsistency` flag to treat
+functions that do not return (i.e., abort unconditionally) as inconsistency violations
+([#8861](https://github.com/diem/diem/pull/8861)).
+* Added new `--ignore-pragma-opaque-when-possible` flag to ignore the `opaque` pragma
+when possible
+([#8843](https://github.com/diem/diem/pull/8843))
+and a related `--ignore-pragma-opaque-internal-only` flag that only applies to internal
+functions
+([#8862](https://github.com/diem/diem/pull/8862)).
+* Added the `is_signer` native specification function to the Signer module
+in the standard library, along with support for that function in the Prover
+([#8868](https://github.com/diem/diem/pull/8868)).
+* Loop invariants: Added new `invariant` syntax which can be used in loop
+headers to specify invariant conditions for those loops
+([#8890](https://github.com/diem/diem/pull/8890) and
+ [#8945](https://github.com/diem/diem/pull/8945)).
+* The `--dump-bytecode` command line option now emits the bytecode dumps
+in the parent directory of the output and uses a new naming convention for
+the output files
+([#9052](https://github.com/diem/diem/pull/9052)).
+* The documentation generator has been extended to show the backward call graph
+in addition to the forward call graph
+([#9239](https://github.com/diem/diem/pull/9239)).
+* The `spec_address_of` native specification function has been replaced by the
+`address_of` Move function, which can also be used in specifications
+([#9261](https://github.com/diem/diem/pull/9261)).
+
+**Fixed bugs:**
+
+* Crash in `move_model::ty::Type::replace`
+([#9155](https://github.com/diem/diem/issues/9155)).
+* The `choose` operator was handled incorrectly
+([#8865](https://github.com/diem/diem/pull/8865)).
+* Variable scope issue with shadowing of let-bound names in schemas
+([#8854](https://github.com/diem/diem/issues/8854)).
+* Uninterpreted functions should not have an `inline` attribute
+([#8995](https://github.com/diem/diem/issues/8995)).
+* The `--generate-only` flag was ignored
+([#9092](https://github.com/diem/diem/pull/9092)).
+* Boogie name resolution error: "use of undeclared function"
+([#9156](https://github.com/diem/diem/issues/9156)).
+
+## Standard Library
+
+An experimental module for capability-based access control has been added
+to the "nursery" area of the standard library
+([#9305](https://github.com/diem/diem/pull/9305)).
+
+## Documentation
+
+The Move language documentation has been updated for both named addresses
+([#9195](https://github.com/diem/diem/pull/9195))
+and phantom types
+([#9263](https://github.com/diem/diem/pull/9263)) and
+ [#9339](https://github.com/diem/diem/pull/9339)),
+as well as for the new Move packages
+([#9241](https://github.com/diem/diem/pull/9241)).
+
+## Miscellaneous
+
+* For internal testing within the Move project, this release introduces a new
+"transactional-tests" infrastructure (see the
+`testing-infra/transactional-test-runner` directory). Many existing tests have
+been migrated to use this and we will continue that migration over time.
+Note that this testing framework is intended for internal use:
+most testing of Move code should continue to use Move unit tests.
+* The Move IR compiler, which is now only intended for internal testing purposes,
+has some significant updates in this release. This tool is not intended for
+external use so there is no documentation of the new IR syntax.
+* The `MoveStorage` trait has been renamed to `MoveResolver` and moved to the
+`move-core-types` crate so that it can be used without pulling in the VM as a
+dependency
+([#8886](https://github.com/diem/diem/pull/8886)).
+* The `MoveStruct` type in `move-core-types` has been generalized to an enum that
+can also specify the field names
+([#8901](https://github.com/diem/diem/pull/8901)).
+* The compiler's `AddressBytes` struct has been renamed to `NumericalAddress`
+and changed into a wrapper around `AccountAddress`
+([#9282](https://github.com/diem/diem/pull/9282)).
+* Added a "generate struct-layouts" sandbox command to the Move CLI to dump
+struct layouts in YAML format
+([#9073](https://github.com/diem/diem/pull/9073)).
+
+**Fixed bugs:**
+
+* Fixed disassembler crash for scripts without source mappings
+([#9005](https://github.com/diem/diem/pull/9005)).
+* Fixed a problem with unit tests where an abort from native function
+was not reported as an error
+([#9143](https://github.com/diem/diem/pull/9143)).
+
+
 # Move Version 1.4
 
 Version 1.4 of Move (released along with Diem Core version 1.4) includes named addresses,
