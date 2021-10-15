@@ -23,7 +23,7 @@
     "keywords": [
         "move"
     ],
-    "main": "./out/src/extension.js",
+    "main": "./out/src/main.js",
     "activationEvents": [
         "onLanguage:move"
     ],
@@ -84,6 +84,9 @@
         "vscode:prepublish": "npm run pretest",
         "package": "vsce package -o move-analyzer.vsix",
         "publish": "npm run pretest && npm run test && vsce publish"
+    },
+    "dependencies": {
+        "vscode-languageclient": "6.1.4"
     },
     "devDependencies": {
         "@types/glob": "^7.1.4",

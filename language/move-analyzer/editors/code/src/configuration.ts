@@ -17,6 +17,11 @@ export class Configuration {
         this.configuration = vscode.workspace.getConfiguration('move-analyzer');
     }
 
+    /** A string representation of the configured values, for logging purposes. */
+    toString(): string {
+        return JSON.stringify(this.configuration);
+    }
+
     /** The path to the move-analyzer executable. */
     get serverPath(): string {
         const path = this.configuration.get<string>('server.path', 'move-analyzer');

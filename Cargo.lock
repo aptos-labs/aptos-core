@@ -2836,6 +2836,7 @@ dependencies = [
  "toml",
  "tracing",
  "tracing-core",
+ "url",
  "warp",
  "zeroize",
 ]
@@ -4684,6 +4685,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "lsp-server"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c351c75989da23b355226dc188dc2b52538a7f4f218d70fd7393c6b62b110444"
+dependencies = [
+ "crossbeam-channel",
+ "log",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "lsp-types"
+version = "0.90.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6f3734ab1d7d157fc0c45110e06b587c31cd82bea2ccfd6b563cbff0aaeeb1d3"
+dependencies = [
+ "bitflags",
+ "serde",
+ "serde_json",
+ "serde_repr",
+ "url",
+]
+
+[[package]]
 name = "many-keys-stress-test"
 version = "0.1.0"
 dependencies = [
@@ -4853,6 +4879,9 @@ name = "move-analyzer"
 version = "0.0.0"
 dependencies = [
  "diem-workspace-hack",
+ "lsp-server",
+ "lsp-types",
+ "serde_json",
  "structopt 0.3.21",
 ]
 
@@ -8863,7 +8892,7 @@ version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f559b464de2e2bdabcac6a210d12e9b5a5973c251e102c44c585c71d51bd78e"
 dependencies = [
- "cfg-if 1.0.0",
+ "cfg-if 0.1.10",
  "static_assertions",
 ]
 
@@ -9035,6 +9064,7 @@ dependencies = [
  "idna",
  "matches",
  "percent-encoding",
+ "serde",
 ]
 
 [[package]]

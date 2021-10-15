@@ -4,22 +4,24 @@
 import type { Configuration } from './configuration';
 import * as fs from 'fs';
 import * as vscode from 'vscode';
+import * as lc from 'vscode-languageclient';
+import { log } from './log';
 
 /** Information passed along to each VS Code command defined by this extension. */
 export class Context {
     private constructor(
-        private readonly extension: Readonly<vscode.ExtensionContext>,
+        private readonly extensionContext: Readonly<vscode.ExtensionContext>,
         readonly configuration: Readonly<Configuration>,
     ) { }
 
     static create(
-        extension: Readonly<vscode.ExtensionContext>,
+        extensionContext: Readonly<vscode.ExtensionContext>,
         configuration: Readonly<Configuration>,
     ): Context | Error {
         if (!fs.existsSync(configuration.serverPath)) {
             return new Error(`command '${configuration.serverPath}' could not be found.`);
         }
-        return new Context(extension, configuration);
+        return new Context(extensionContext, configuration);
     }
 
     /**
@@ -36,6 +38,40 @@ export class Context {
         const disposable = vscode.commands.registerCommand(`move-analyzer.${name}`, async () => {
             return command(this);
         });
-        this.extension.subscriptions.push(disposable);
+        this.extensionContext.subscriptions.push(disposable);
+    }
+
+    /**
+     * Configures and starts the client that interacts with the language server.
+     *
+     * The "client" is an object that sends messages to the language server, which in Move's case is
+     * the `move-analyzer` executable. Unlike registered extension commands such as
+     * `move-analyzer.serverVersion`, which are manually executed by a VS Code user via the command
+     * palette or menu, this client sends many of its messages on its own (for example, when it
+     * starts, it sends the "initialize" request).
+     *
+     * To read more about the messages sent and responses received by this client, such as
+     * "initialize," read [the Language Server Protocol specification](https://microsoft.github.io/language-server-protocol/specifications/specification-current/#initialize).
+     **/
+    startClient(): void {
+        const executable: lc.Executable = {
+            command: this.configuration.serverPath,
+        };
+        const serverOptions: lc.ServerOptions = {
+            run: executable,
+            debug: executable,
+        };
+        const clientOptions: lc.LanguageClientOptions = {
+            documentSelector: [{ scheme: 'file', language: 'move' }],
+        };
+        const client = new lc.LanguageClient(
+            'move-analyzer',
+            'Move Language Server',
+            serverOptions,
+            clientOptions,
+        );
+        log.info('Starting client...');
+        const disposable = client.start();
+        this.extensionContext.subscriptions.push(disposable);
     }
 }
