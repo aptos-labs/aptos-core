@@ -50,8 +50,12 @@ pub struct FlattenOptions {
     pub pipeline: Vec<SimplificationPass>,
 
     /// Dump stepwise result
-    #[structopt(long)]
-    pub dump: bool,
+    #[structopt(long = "dump-stepwise")]
+    pub dump_stepwise: bool,
+
+    /// Dump stepwise result in raw exp printing format
+    #[structopt(long = "dump-stepwise-raw", requires = "dump-stepwise")]
+    pub dump_stepwise_raw: bool,
 }
 
 //**************************************************************************************************
@@ -106,7 +110,7 @@ pub fn run(options: &FlattenOptions) -> Result<()> {
         // prepare for stepwise result printing
         let fun_scope = SpecBlockTarget::Function(fun_id.module_id, fun_id.id);
         let printer = SpecPrinter::new(&env, &fun_scope);
-        if options.dump {
+        if options.dump_stepwise {
             println!(
                 "================ fun {} ================",
                 fun_env.get_full_name_str()
@@ -127,10 +131,14 @@ pub fn run(options: &FlattenOptions) -> Result<()> {
             }?;
 
             // dump stepwise results if requested
-            if options.dump {
+            if options.dump_stepwise {
                 println!("step {} - {:?} {{", i, pass);
                 for cond in &new_spec.conditions {
-                    println!("\t{}", SpecPrinter::convert(printer.print_condition(cond)));
+                    if options.dump_stepwise_raw {
+                        println!("\t{:?} {}", cond.kind, cond.exp.display(&env));
+                    } else {
+                        println!("\t{}", SpecPrinter::convert(printer.print_condition(cond)));
+                    }
                 }
                 println!("}}");
             }
