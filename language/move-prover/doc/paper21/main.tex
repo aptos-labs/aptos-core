@@ -23,20 +23,18 @@
 
 \maketitle
 \begin{abstract}
-  The Move Prover (\MVP) is a formal verifier for smart contracts
-  written in the Move programming language. \MVP has an expressive
-  specification language, and is fast and reliable enough that it can
-  be run routinely by developers and in integration testing in a few
-  minutes. Besides the simplicity of smart contracts and the Move
-  language, three transformations are responsible for the practicality
-  of \MVP: (1) an alias-free memory model, (2) fine-grained invariant
-  checking, and (3) monomorphization.  The entirety of the Move code for
-  the Diem blockchain has been extensively specified and can be
-  completely verified by \MVP in a few minutes. Changes in the Diem
-  framework must be successfully verified before being integrated into
-  the open source repository on GitHub.
-  \keywords{Smart contracts \and
-    formal verification \and Move language \and Diem blockchain}
+  The Move Prover (\MVP) is a formal verifier for smart contracts written in the
+  Move programming language. \MVP has an expressive specification language, and
+  is fast and reliable enough that it can be run routinely by developers and in
+  integration testing.  Besides the simplicity of smart contracts and the Move
+  language, three implementation approaches are responsible for the practicality
+  of \MVP: (1) an alias-free memory model, (2) fine-grained invariant checking,
+  and (3) monomorphization.  The entirety of the Move code for the Diem
+  blockchain has been extensively specified and can be completely verified by
+  \MVP in a few minutes. Changes in the Diem framework must be successfully
+  verified before being integrated into the open source repository on GitHub.
+  \keywords{Smart contracts \and formal verification \and Move language \and
+    Diem blockchain}
 \end{abstract}
 
 
@@ -46,13 +44,14 @@
 \input{analysis.tex}
 \input{conclusion.tex}
 
-%\vspace{-0.9ex}
+%\vspace{-0.5ex}
 \Paragraph{Acknowledgements}
 
 This work would not have been possible without the many contributions of the
 Move platform team and collaborators.  We specifically like to thank Bob Wilson,
-Clark Barrett, Dario Russi, Jack Moffitt, Mathieu Baudet, Runtian Zhou, Sam
-Blackshear, Tim Zakian, Todd Nowacki, Victor Gao, and Kevin Cheang.
+Clark Barrett, Dario Russi, Jack Moffitt, Jake Silverman, Mathieu Baudet,
+Runtian Zhou, Sam Blackshear, Tim Zakian, Todd Nowacki, Victor Gao, and Kevin
+Cheang.
 
 \newpage
 \bibliographystyle{splncs04}
