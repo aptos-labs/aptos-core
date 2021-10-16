@@ -1,4 +1,4 @@
-module MessageAddress::Message {
+module Sender::Message {
     use Std::Signer;
     use Std::Event;
 
