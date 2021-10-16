@@ -72,7 +72,7 @@ fn send_module_transaction(
         project_path.to_string_lossy().to_string()
     );
 
-    let compiled_package = deploy::build_move_packages(project_path)?;
+    let compiled_package = shared::build_move_packages(project_path)?;
     deploy::send_module_transaction(&compiled_package, client, new_account, factory)?;
     deploy::check_module_exists(client, new_account)
 }

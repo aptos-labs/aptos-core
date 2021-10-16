@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use structopt::StructOpt;
 
 mod account;
+mod build;
 mod console;
 mod deploy;
 mod new;
@@ -19,6 +20,9 @@ pub fn main() -> Result<()> {
         Subcommand::Account {} => account::handle(),
         Subcommand::New { blockchain, path } => new::handle(blockchain, path),
         Subcommand::Node {} => node::handle(),
+        Subcommand::Build { project_path } => {
+            build::handle(&normalized_project_path(project_path)?)
+        }
         Subcommand::Deploy { project_path } => {
             deploy::handle(&normalized_project_path(project_path)?)
         }
@@ -45,6 +49,11 @@ pub enum Subcommand {
     },
     #[structopt(about = "Runs a local devnet with prefunded accounts")]
     Node {},
+    #[structopt(about = "Compiles the Move package and generates typescript files")]
+    Build {
+        #[structopt(short, long)]
+        project_path: Option<PathBuf>,
+    },
     #[structopt(about = "Publishes the main move package using the account as publisher")]
     Deploy {
         #[structopt(short, long)]

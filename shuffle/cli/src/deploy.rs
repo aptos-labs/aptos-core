@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::shared::{get_shuffle_dir, send, MAIN_PKG_PATH};
+use crate::shared::{build_move_packages, get_shuffle_dir, send};
 use anyhow::{anyhow, Result};
 use diem_crypto::PrivateKey;
 use diem_sdk::{
@@ -35,20 +35,6 @@ pub fn handle(project_path: &Path) -> Result<()> {
     }
     let compiled_package = build_move_packages(project_path)?;
     publish_packages_as_transaction(&account_key_path, compiled_package)
-}
-
-/// Builds the packages in the shuffle project using the move package system.
-pub fn build_move_packages(project_path: &Path) -> Result<CompiledPackage> {
-    println!("Building Examples...");
-    let pkgdir = project_path.join(MAIN_PKG_PATH);
-    let config = move_package::BuildConfig {
-        dev_mode: true,
-        test_mode: false,
-        generate_docs: false,
-        generate_abis: true,
-    };
-
-    config.compile_package(pkgdir.as_path(), &mut std::io::stdout())
 }
 
 fn publish_packages_as_transaction(

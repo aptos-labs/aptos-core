@@ -1,12 +1,12 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::deploy;
 use anyhow::Result;
 use diem_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 use diem_sdk::client::BlockingClient;
 use diem_types::transaction::authenticator::AuthenticationKey;
 use directories::BaseDirs;
+use move_package::compilation::compiled_package::CompiledPackage;
 use serde::{Deserialize, Serialize};
 use serde_generate as serdegen;
 use serde_generate::SourceInstaller;
@@ -183,7 +183,7 @@ impl Home {
 /// diem types and Move stdlib. Mimics much of the transaction_builder_generator's CLI
 /// except with typescript defaults and embedded content, as opposed to repo directory paths.
 pub fn generate_typescript_libraries(project_path: &Path) -> Result<()> {
-    let _compiled_package = deploy::build_move_packages(project_path)?;
+    let _compiled_package = build_move_packages(project_path)?;
 
     let pkg_path = project_path.join(MAIN_PKG_PATH);
     let target_dir = pkg_path.join("generated");
@@ -214,6 +214,20 @@ fn generate_runtime(installer: &serdegen::typescript::Installer) -> Result<()> {
         .install_module(&config, &registry)
         .map_err(|e| anyhow::anyhow!("unable to install typescript diem types: {:?}", e))?;
     Ok(())
+}
+
+/// Builds the packages in the shuffle project using the move package system.
+pub fn build_move_packages(project_path: &Path) -> Result<CompiledPackage> {
+    println!("Building Examples...");
+    let pkgdir = project_path.join(MAIN_PKG_PATH);
+    let config = move_package::BuildConfig {
+        dev_mode: true,
+        test_mode: false,
+        generate_docs: false,
+        generate_abis: true,
+    };
+
+    config.compile_package(pkgdir.as_path(), &mut std::io::stdout())
 }
 
 fn generate_transaction_builders(pkg_path: &Path, target_dir: &Path) -> Result<()> {
