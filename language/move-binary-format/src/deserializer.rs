@@ -1207,7 +1207,7 @@ fn load_function_def(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Functio
             Visibility::Private
         };
         (vis, flags)
-    } else if cursor.version() <= VERSION_MAX {
+    } else {
         let vis = flags.try_into().map_err(|_| {
             PartialVMError::new(StatusCode::MALFORMED)
                 .with_message("Invalid visibility byte".to_string())
@@ -1216,9 +1216,6 @@ fn load_function_def(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Functio
             PartialVMError::new(StatusCode::MALFORMED).with_message("Unexpected EOF".to_string())
         })?;
         (vis, extra_flags)
-    } else {
-        return Err(PartialVMError::new(StatusCode::UNREACHABLE)
-            .with_message(String::from("Invalid bytecode version")));
     };
 
     let acquires_global_resources = load_struct_definition_indices(cursor)?;
