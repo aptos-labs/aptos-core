@@ -6,10 +6,36 @@ import * as ed from "https://deno.land/x/ed25519@1.0.1/mod.ts";
 import { BcsSerializer } from "./generated/bcs/mod.ts";
 import { ListTuple, uint8 } from "./generated/serde/types.ts";
 import { createHash } from "https://deno.land/std@0.77.0/hash/mod.ts";
+import { createRemote } from "https://deno.land/x/gentle_rpc@v3.0/mod.ts";
+
+export async function buildAndSubmitTransaction(
+  addressStr: string,
+  sequenceNumber: number,
+  privateKeyBytes: Uint8Array,
+  payload: DiemTypes.TransactionPayload,
+) {
+  if (sequenceNumber == undefined) {
+    throw "Must pass in parameters: message, sequenceNumber. Try Shuffle.sequenceNumber()";
+  }
+
+  const rawTxn = newRawTransaction(
+    addressStr,
+    payload,
+    sequenceNumber,
+  );
+  const signingMsg = generateSigningMessage(rawTxn);
+  const signedTxnHex = await newSignedTransaction(
+    normalizePrivateKey(privateKeyBytes),
+    rawTxn,
+    signingMsg
+  );
+  const remote = createRemote("http://127.0.0.1:8080/v1");
+  return await remote.call("submit", [signedTxnHex]);
+}
 
 export function newRawTransaction(
   addressStr: string,
-  payload: DiemTypes.TransactionPayloadVariantScript,
+  payload: DiemTypes.TransactionPayload,
   sequenceNumber: number,
 ): DiemTypes.RawTransaction {
   return new DiemTypes.RawTransaction(
@@ -103,4 +129,12 @@ export function hexToAscii(hexx: string) {
     str += String.fromCharCode(parseInt(hex.substr(i, 2), 16));
   }
   return str;
+}
+
+function normalizePrivateKey(privateKeyBytes: Uint8Array): Uint8Array {
+  if (privateKeyBytes.length == 33) {
+    // slice off first BIP type byte, rest of 32 bytes is private key
+    privateKeyBytes = privateKeyBytes.slice(1);
+  }
+  return privateKeyBytes;
 }

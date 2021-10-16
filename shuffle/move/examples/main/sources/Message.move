@@ -14,7 +14,7 @@ module MessageAddress::Message {
     /// There is no message present
     const ENO_MESSAGE: u64 = 0;
 
-    public fun set_message(account: signer, message: vector<u8>)
+    public(script) fun set_message(account: signer, message: vector<u8>)
     acquires MessageHolder {
         let account_addr = Signer::address_of(&account);
         if (!exists<MessageHolder>(account_addr)) {

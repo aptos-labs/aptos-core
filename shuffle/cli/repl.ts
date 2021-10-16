@@ -28,7 +28,7 @@ export const privateKeyPath = path.join(shuffleDir,"accounts/latest/dev.key");
 console.log(`Loading Project ${highlight(projectPath)}`);
 console.log(`Connected to Node ${highlight(nodeUrl)}`);
 console.log(`Sender Account Address ${highlight(fullSenderAddress)}`);
-console.log(`"Shuffle", "main", "DiemHelpers" top level objects available`);
+console.log(`"Shuffle", "main", "codegen", "DiemHelpers" top level objects available`);
 console.log(await ledgerInfo());
 console.log();
 

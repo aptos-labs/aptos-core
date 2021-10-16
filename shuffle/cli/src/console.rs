@@ -16,11 +16,16 @@ pub fn handle(project_path: &Path) -> Result<()> {
     let deno_bootstrap = format!(
         r#"import * as Shuffle from "{shuffle}";
         import * as main from "{main}";
+        import * as codegen from "{codegen}";
         import * as DiemHelpers from "{helpers}";"#,
         shuffle = project_path.join("repl.ts").to_string_lossy(),
         main = project_path
             .join(shared::MAIN_PKG_PATH)
             .join("mod.ts")
+            .to_string_lossy(),
+        codegen = project_path
+            .join(shared::MAIN_PKG_PATH)
+            .join("generated/diemTypes/mod.ts")
             .to_string_lossy(),
         helpers = project_path
             .join(shared::MAIN_PKG_PATH)
