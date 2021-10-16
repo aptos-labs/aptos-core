@@ -91,5 +91,13 @@ mod test {
         let actual_example_content =
             fs::read_to_string(dir.path().join("main/sources/Message.move")).unwrap();
         assert_eq!(expected_example_content, actual_example_content);
+
+        // spot check stdlib
+        let expected_example_content = String::from_utf8_lossy(include_bytes!(
+            "../../move/examples/stdlib/sources/GUID.move"
+        ));
+        let actual_example_content =
+            fs::read_to_string(dir.path().join("stdlib/sources/GUID.move")).unwrap();
+        assert_eq!(expected_example_content, actual_example_content);
     }
 }
