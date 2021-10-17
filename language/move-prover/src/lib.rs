@@ -24,10 +24,12 @@ use errmapgen::ErrmapGen;
 #[allow(unused_imports)]
 use log::{debug, info, warn};
 use move_model::{
-    code_writer::CodeWriter, model::GlobalEnv, parse_addresses_from_options,
-    run_model_builder_with_options,
+    code_writer::CodeWriter,
+    model::{FunctionVisibility, GlobalEnv},
+    parse_addresses_from_options, run_model_builder_with_options,
 };
 use std::{
+    collections::BTreeSet,
     fs,
     path::{Path, PathBuf},
     time::Instant,
@@ -111,6 +113,11 @@ pub fn run_move_prover_with_model<W: WriteColor>(
 
     // Check correct backend versions.
     options.backend.check_tool_versions()?;
+
+    // Print functions that are reachable from the script function if the flag is set
+    if options.script_reach {
+        print_script_reach(env);
+    }
 
     // Create and process bytecode
     let now = Instant::now();
@@ -259,6 +266,34 @@ pub fn create_and_process_bytecode(options: &Options, env: &GlobalEnv) -> Functi
 
 // TODO: make those tools independent. Need to first address the todo to
 // move the model builder into the move-model crate.
+
+// Print functions that are reachable from script functions available in the `GlobalEnv`
+fn print_script_reach(env: &GlobalEnv) {
+    let target_modules = env.get_target_modules();
+    let mut func_ids = BTreeSet::new();
+
+    for m in &target_modules {
+        for f in m.get_functions() {
+            if matches!(f.visibility(), FunctionVisibility::Script) {
+                let qualified_id = f.get_qualified_id();
+                func_ids.insert(qualified_id);
+                let trans_funcs = f.get_transitive_closure_of_called_functions();
+                for trans_func in trans_funcs {
+                    func_ids.insert(trans_func);
+                }
+            }
+        }
+    }
+
+    if func_ids.is_empty() {
+        println!("no function is reached from the script functions in the target module");
+    } else {
+        for func_id in func_ids {
+            let func_env = env.get_function(func_id);
+            println!("{}", func_env.get_full_name_str());
+        }
+    }
+}
 
 fn run_docgen<W: WriteColor>(
     env: &GlobalEnv,

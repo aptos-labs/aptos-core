@@ -81,6 +81,8 @@ pub struct Options {
     /// TODO: this currently create errors during deserialization, so skip them for this.
     #[serde(skip_serializing)]
     pub errmapgen: ErrmapOptions,
+    /// Options for printing out modules and functions reachable by script functions
+    pub script_reach: bool,
 }
 
 impl Default for Options {
@@ -111,6 +113,7 @@ impl Default for Options {
             abigen: AbigenOptions::default(),
             errmapgen: ErrmapOptions::default(),
             experimental_pipeline: false,
+            script_reach: false,
         }
     }
 }
@@ -516,6 +519,12 @@ impl Options {
                     and generate a z3 trace file for analysis. The file will be stored \
                     at FUNCTION_NAME.z3log.")
             )
+            .arg(
+                Arg::with_name("script-reach")
+                    .long("script-reach")
+                    .help("For each script function which is verification target, \
+                    print out the names of all called functions, directly or indirectly.")
+            )
             .after_help("More options available via `--config file` or `--config-str str`. \
             Use `--print-config` to see format and current values. \
             See `move-prover/src/cli.rs::Option` for documentation.");
@@ -743,6 +752,10 @@ impl Options {
                 fun_name = &fun_name[i + 2..];
             }
             options.backend.z3_trace_file = Some(format!("{}.z3log", fun_name));
+        }
+
+        if matches.is_present("script-reach") {
+            options.script_reach = true;
         }
 
         options.backend.derive_options();
