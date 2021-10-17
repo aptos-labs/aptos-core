@@ -55,6 +55,15 @@ impl StatelessPipeline for ExecutionPhase {
     type Response = ExecutionResponse;
     async fn process(&self, req: ExecutionRequest) -> ExecutionResponse {
         let ExecutionRequest { ordered_blocks } = req;
+
+        if ordered_blocks.is_empty() {
+            // return err when the blocks are empty
+            return ExecutionResponse {
+                block_id: HashValue::zero(),
+                inner: Err(ExecutionError::EmptyBlocks),
+            };
+        }
+
         let block_id = ordered_blocks.last().unwrap().id();
         let mut result = vec![];
 

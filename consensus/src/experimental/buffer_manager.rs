@@ -103,7 +103,7 @@ impl BufferManager {
         commit_msg_rx: channel::diem_channel::Receiver<AccountAddress, VerifiedEvent>,
         persisting_phase_tx: Sender<PersistingRequest>,
         block_rx: UnboundedReceiver<OrderedBlocks>,
-        sync_rx: UnboundedReceiver<ResetRequest>,
+        reset_rx: UnboundedReceiver<ResetRequest>,
         verifier: ValidatorVerifier,
     ) -> Self {
         let buffer = Buffer::<BufferItem>::new();
@@ -127,7 +127,7 @@ impl BufferManager {
             persisting_phase_tx,
 
             block_rx,
-            reset_rx: sync_rx,
+            reset_rx,
             stop: false,
 
             verifier,

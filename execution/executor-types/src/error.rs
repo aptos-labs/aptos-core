@@ -16,6 +16,9 @@ pub enum Error {
 
     #[error("Serialization error: {0}")]
     SerializationError(String),
+
+    #[error("Received Empty Blocks")]
+    EmptyBlocks,
 }
 
 impl From<anyhow::Error> for Error {
