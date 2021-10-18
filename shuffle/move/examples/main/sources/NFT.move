@@ -37,13 +37,15 @@ module Sender::NFT { // TODO: Swap {Sender,TroveFramework}
         mint_events: Event::EventHandle<MintEvent<Type>>,
     }
 
-    const ADMIN: address = @0xa550c18;
+    // Not relevant in shuffle console development as it moves away from hardcoded
+    // addresses.
+    /* const ADMIN: address = @0xa550c18; */
 
     // Error codes
-    const ENOT_ADMIN: u64 = 0;
+    /* const ENOT_ADMIN: u64 = 0; */
 
     public(script) fun initialize<Type: store + drop>(account: &signer) {
-        assert(Signer::address_of(account) == ADMIN, ENOT_ADMIN);
+        /* assert(Signer::address_of(account) == ADMIN, ENOT_ADMIN); */
         move_to(account, Admin { mint_events: Event::new_event_handle<MintEvent<Type>>(account) })
     }
 
@@ -54,7 +56,7 @@ module Sender::NFT { // TODO: Swap {Sender,TroveFramework}
         let creator = Signer::address_of(account);
         let token_id = GUID::create(account);
         Event::emit_event(
-            &mut borrow_global_mut<Admin<Type>>(ADMIN).mint_events,
+            &mut borrow_global_mut<Admin<Type>>(Signer::address_of(account)).mint_events, // updated from ADMIN
             MintEvent {
                 id: GUID::id(&token_id),
                 creator,
