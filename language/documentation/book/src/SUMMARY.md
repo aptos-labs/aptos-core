@@ -31,6 +31,7 @@
 - [Type Abilities](abilities.md)
 - [Uses and Aliases](uses.md)
 - [Friends](friends.md)
+- [Packages](packages.md)
 
 ## Global Storage
 
