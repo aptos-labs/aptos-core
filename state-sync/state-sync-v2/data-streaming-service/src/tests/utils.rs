@@ -161,16 +161,16 @@ impl DiemDataClient for MockDiemDataClient {
     ) -> Result<DataClientResponse, diem_data_client::Error> {
         self.emulate_network_latencies();
 
-        // Create the requested transaction outputs
-        let mut transaction_outputs = vec![];
+        // Create the requested transactions and transaction outputs
+        let mut transactions_and_outputs = vec![];
         for _ in start_version..=end_version {
-            transaction_outputs.push(create_transaction_output());
+            transactions_and_outputs.push((create_transaction(), create_transaction_output()));
         }
 
         // Create a transaction output list with an empty proof
         let mut output_list_with_proof = TransactionOutputListWithProof::new_empty();
         output_list_with_proof.first_transaction_output_version = Some(start_version);
-        output_list_with_proof.transaction_outputs = transaction_outputs;
+        output_list_with_proof.transactions_and_outputs = transactions_and_outputs;
         let response_payload =
             DataClientPayload::TransactionOutputsWithProof(output_list_with_proof);
 
