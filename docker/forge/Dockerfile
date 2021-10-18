@@ -31,6 +31,8 @@ COPY scripts/dev_setup.sh /diem/scripts/dev_setup.sh
 RUN /diem/scripts/dev_setup.sh -b -p -i kubectl -i helm -i git -i unzip -i awscli -i vault
 ENV PATH "$PATH:/root/bin"
 
+RUN helm plugin install https://github.com/hypnoglow/helm-s3.git --version 0.10.0
+
 RUN mkdir /etc/forge
 WORKDIR /etc/forge
 COPY --from=builder /diem/target/release/forge /usr/local/bin/forge
