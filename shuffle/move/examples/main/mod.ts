@@ -51,6 +51,33 @@ export async function setMessageScript(
   );
 }
 
+// Script example; initializes TestNFT utilizing the NFT<Type>
+// generic methods. See main/sources/NFT.move
+export async function initializeTestNFT(sequenceNumber: number) {
+  const privateKeyBytes = await Deno.readFile(privateKeyPath);
+  const nftAddress = DiemHelpers.hexToAccountAddress(senderAddress);
+
+  // Create the type tag representing TestNFT to pass to the generic
+  // script `initialize_nft`
+  const testNftType = new DiemTypes.TypeTagVariantStruct(
+    new DiemTypes.StructTag(
+      nftAddress,
+      new DiemTypes.Identifier("TestNFT"),
+      new DiemTypes.Identifier("TestNFT"),
+      [],
+    ),
+  );
+
+  const script = codegen.Stdlib.encodeInitializeNftScript(testNftType);
+  const payload = new DiemTypes.TransactionPayloadVariantScript(script);
+  return await DiemHelpers.buildAndSubmitTransaction(
+    fullSenderAddress,
+    sequenceNumber,
+    privateKeyBytes,
+    payload,
+  );
+}
+
 export function messagesFrom(resources: any[]) {
   return resources
     .filter(

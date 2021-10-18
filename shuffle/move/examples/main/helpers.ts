@@ -15,7 +15,7 @@ export async function buildAndSubmitTransaction(
   payload: DiemTypes.TransactionPayload,
 ) {
   if (sequenceNumber == undefined) {
-    throw "Must pass in parameters: message, sequenceNumber. Try Shuffle.sequenceNumber()";
+    throw "Must pass in parameter sequenceNumber. Try Shuffle.sequenceNumber()";
   }
 
   const rawTxn = newRawTransaction(
