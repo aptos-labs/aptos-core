@@ -10,7 +10,6 @@ mod tests;
 
 use crate::network::StorageServiceNetworkEvents;
 use bounded_executor::BoundedExecutor;
-use diem_crypto::HashValue;
 use diem_types::{
     account_state_blob::AccountStatesChunkWithProof,
     epoch_change::EpochChangeProof,
@@ -140,7 +139,7 @@ impl<T: StorageReaderInterface> Handler<T> {
     ) -> Result<StorageServiceResponse, Error> {
         let account_states_chunk_with_proof = self.storage.get_account_states_chunk_with_proof(
             request.version,
-            request.start_account_key,
+            request.start_account_index,
             request.expected_num_account_states,
         )?;
 
@@ -275,7 +274,7 @@ pub trait StorageReaderInterface: Clone + Send + 'static {
     fn get_account_states_chunk_with_proof(
         &self,
         version: u64,
-        start_account_key: HashValue,
+        start_account_index: u64,
         expected_num_account_states: u64,
     ) -> Result<AccountStatesChunkWithProof, Error>;
 }
@@ -364,7 +363,7 @@ impl StorageReaderInterface for StorageReader {
     fn get_account_states_chunk_with_proof(
         &self,
         _version: u64,
-        _start_account_key: HashValue,
+        _start_account_index: u64,
         _expected_num_account_states: u64,
     ) -> Result<AccountStatesChunkWithProof, Error> {
         // TODO(joshlind): implement this once DbReaderWriter supports these calls.
