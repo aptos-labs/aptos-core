@@ -18,9 +18,8 @@ use diem_types::{
 };
 use generate_key::load_key;
 use move_binary_format::{file_format::CompiledModule, normalized};
-use move_lang::compiled_unit::{CompiledUnit, NamedCompiledModule};
 use move_package::compilation::compiled_package::CompiledPackage;
-use std::{collections::HashSet, convert::TryFrom, path::Path};
+use std::{convert::TryFrom, path::Path};
 
 /// Deploys shuffle's main Move Package to the sender's address.
 pub fn handle(project_path: &Path) -> Result<()> {
@@ -73,28 +72,23 @@ pub fn send_module_transaction(
     account: &mut LocalAccount,
     factory: &TransactionFactory,
 ) -> Result<()> {
-    let compiled_units = compiled_package.clone().compiled_units;
-    let mut uniq_modules: HashSet<String> = HashSet::new(); // Apparently modules can appear twice in compiled units, ensure uniq
-    for unit in compiled_units {
-        match unit {
-            CompiledUnit::Module(NamedCompiledModule { name, module, .. }) => {
-                let namecpy = name.to_string();
-                if uniq_modules.contains(&namecpy) {
-                    continue;
-                }
-                println!("Deploying Module: {}", namecpy);
-                uniq_modules.insert(namecpy);
-                let mut binary = vec![];
-                module.serialize(&mut binary)?;
-                let publish_txn = account.sign_with_transaction_builder(
-                    factory.payload(TransactionPayload::Module(Module::new(binary))),
-                );
+    for module in compiled_package
+        .transitive_compiled_modules()
+        .compute_dependency_graph()
+        .compute_topological_order()?
+    {
+        let module_id = module.self_id();
+        if module_id.address() == &account.address() {
+            println!("Deploying Module: {}", module_id);
+            let mut binary = vec![];
+            module.serialize(&mut binary)?;
+            let publish_txn = account.sign_with_transaction_builder(
+                factory.payload(TransactionPayload::Module(Module::new(binary))),
+            );
 
-                send(client, publish_txn)?;
-            }
-            _ => {
-                continue;
-            }
+            send(client, publish_txn)?;
+        } else {
+            println!("Skipping Module: {}", module_id);
         }
     }
     println!("Success!");

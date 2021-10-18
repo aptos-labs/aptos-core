@@ -16,6 +16,7 @@ use bytecode_source_map::utils::source_map_from_file;
 use colored::Colorize;
 use docgen::{Docgen, DocgenOptions};
 use move_binary_format::file_format::{CompiledModule, CompiledScript};
+use move_bytecode_utils::Modules;
 use move_command_line_common::files::{
     extension_equals, find_filenames, find_move_filenames, MOVE_COMPILED_EXTENSION,
     SOURCE_MAP_EXTENSION,
@@ -67,7 +68,7 @@ pub struct CompiledPackage {
     pub sources: Vec<String>,
     /// The output compiled bytecode (both module, and scripts)
     pub compiled_units: Vec<CompiledUnit>,
-    /// Packages that this package depends on. Non-transitive dependencies.
+    /// Packages that this package depends on.
     pub dependencies: Vec<CompiledPackage>,
 
     // Optional artifacts from compilation
@@ -127,8 +128,23 @@ impl OnDiskCompiledPackage {
             .map(|(bytecode_path, source_map_path)| {
                 let bytecode_bytes = std::fs::read(bytecode_path.as_str())?;
                 let source_map = source_map_from_file(Path::new(source_map_path))?;
-                match CompiledModule::deserialize(&bytecode_bytes) {
-                    Ok(module) => {
+                match CompiledScript::deserialize(&bytecode_bytes) {
+                    Ok(script) => {
+                        let name = FileName::from(
+                            Path::new(bytecode_path.as_str())
+                                .file_stem()
+                                .unwrap()
+                                .to_string_lossy()
+                                .to_string(),
+                        );
+                        Ok(CompiledUnit::Script(NamedCompiledScript {
+                            name,
+                            script,
+                            source_map,
+                        }))
+                    }
+                    Err(_) => {
+                        let module = CompiledModule::deserialize(&bytecode_bytes)?;
                         let (address_bytes, module_name) = {
                             let id = module.self_id();
                             let parsed_addr = NumericalAddress::new(
@@ -142,21 +158,6 @@ impl OnDiskCompiledPackage {
                             address: address_bytes,
                             name: module_name,
                             module,
-                            source_map,
-                        }))
-                    }
-                    Err(_) => {
-                        let script = CompiledScript::deserialize(&bytecode_bytes)?;
-                        let name = FileName::from(
-                            Path::new(bytecode_path.as_str())
-                                .file_stem()
-                                .unwrap()
-                                .to_string_lossy()
-                                .to_string(),
-                        );
-                        Ok(CompiledUnit::Script(NamedCompiledScript {
-                            name,
-                            script,
                             source_map,
                         }))
                     }
@@ -274,24 +275,33 @@ impl OnDiskCompiledPackage {
 }
 
 impl CompiledPackage {
-    /// Returns all compiled modules for this package in transitive dependencies
-    pub fn transitive_compiled_modules(&self) -> Vec<CompiledUnit> {
+    /// Returns all compiled units for this package in transitive dependencies. Order is not
+    /// guaranteed.
+    pub fn transitive_compiled_units(&self) -> Vec<CompiledUnit> {
         self.transitive_dependencies()
-            .into_iter()
+            .iter()
             .flat_map(|compiled_package| compiled_package.compiled_units.clone())
             .collect()
     }
 
-    /// Returns `CompiledPackage`s in dependency order
-    pub fn transitive_dependencies(&self) -> Vec<&CompiledPackage> {
-        self.dependencies
-            .iter()
-            .flat_map(|dep| {
-                let mut dep_deps = dep.transitive_dependencies();
-                dep_deps.push(dep);
-                dep_deps
-            })
-            .collect()
+    /// Returns compiled modules for this package and its transitive dependencies in dependency
+    /// order.
+    pub fn transitive_compiled_modules(&self) -> Modules {
+        Modules::new(
+            self.transitive_dependencies()
+                .iter()
+                .flat_map(|compiled_package| &compiled_package.compiled_units)
+                .chain(self.compiled_units.iter())
+                .filter_map(|unit| match unit {
+                    CompiledUnit::Module(NamedCompiledModule { module, .. }) => Some(module),
+                    CompiledUnit::Script(_) => None,
+                }),
+        )
+    }
+
+    /// Returns `CompiledPackage`s in dependency order and deduped
+    pub fn transitive_dependencies(&self) -> &[CompiledPackage] {
+        &self.dependencies
     }
 
     pub(crate) fn build<W: Write>(

@@ -33,6 +33,7 @@ move-core-types = { path = "../../move-core/types" }
 move-symbol-pool = { path = "../../move-symbol-pool" }
 move-command-line-common = { path = "../../move-command-line-common" }
 move-model = { path = "../../move-model" }
+move-bytecode-utils = { path = "../move-bytecode-utils" }
 
 [dev-dependencies]
 datatest-stable = "0.1.1"
