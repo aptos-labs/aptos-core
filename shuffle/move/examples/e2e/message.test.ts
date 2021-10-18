@@ -20,6 +20,8 @@ Shuffle.test("Test Assert", () => {
 Shuffle.test("Ability to set message", async () => {
   const sender = Shuffle.senderAddress;
   console.log("Test sender address: " + sender);
+  const receiver = Shuffle.receiverAddress;
+  console.log("Test receiver address: " + receiver);
   await main.setMessageScriptFunction(
     "hello blockchain",
     (await Shuffle.sequenceNumber())!.valueOf(),
@@ -29,9 +31,8 @@ Shuffle.test("Ability to set message", async () => {
     const resources = await Shuffle.resources(sender);
     const messageResource = main.resourcesWithName(resources, "MessageHolder")[0];
     if (messageResource !== undefined) {
-      const result =
-        DiemHelpers.hexToAscii(messageResource["value"]["message"])
-          .toString() === "\x00hello blockchain";
+      const result = DiemHelpers.hexToAscii(messageResource["value"]["message"])
+        .toString() === "\x00hello blockchain";
       if (result) {
         return;
       }

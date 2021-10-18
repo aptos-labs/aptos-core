@@ -24,6 +24,9 @@ export const senderAddress = await Deno.readTextFile(senderAddressPath);
 export const fullSenderAddress = "0x" + senderAddress;
 export const privateKeyPath = path.join(shuffleDir,"accounts/latest/dev.key");
 
+export const receiverPrivateKeyPath = path.join(shuffleDir, "accounts/testkeys/receiver.key");
+export const receiverAddressPath = path.join(shuffleDir, "accounts/testkeys/address");
+export const receiverAddress = await Deno.readTextFile(receiverAddressPath);
 
 console.log(`Loading Project ${highlight(projectPath)}`);
 console.log(`Connected to Node ${highlight(nodeUrl)}`);

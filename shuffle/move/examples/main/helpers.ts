@@ -27,7 +27,7 @@ export async function buildAndSubmitTransaction(
   const signedTxnHex = await newSignedTransaction(
     normalizePrivateKey(privateKeyBytes),
     rawTxn,
-    signingMsg
+    signingMsg,
   );
   const remote = createRemote("http://127.0.0.1:8080/v1");
   return await remote.call("submit", [signedTxnHex]);
