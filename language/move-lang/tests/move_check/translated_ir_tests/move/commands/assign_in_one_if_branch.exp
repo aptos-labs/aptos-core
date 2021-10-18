@@ -2,17 +2,17 @@ error[E06002]: use of unassigned variable
   ┌─ tests/move_check/translated_ir_tests/move/commands/assign_in_one_if_branch.move:7:5
   │
 3 │     let x;
-  │         - The variable might not have a value due to this position. The variable must be assigned a value before being used
+  │         - The variable 'x' might not have a value. The variable must be assigned a value before being used.
   ·
 7 │     x == y;
-  │     ^ Invalid usage of variable 'x'
+  │     ^ Invalid usage of unassigned variable 'x'
 
 error[E06002]: use of unassigned variable
   ┌─ tests/move_check/translated_ir_tests/move/commands/assign_in_one_if_branch.move:7:10
   │
 4 │     let y;
-  │         - The variable might not have a value due to this position. The variable must be assigned a value before being used
+  │         - The variable 'y' might not have a value. The variable must be assigned a value before being used.
   ·
 7 │     x == y;
-  │          ^ Invalid usage of variable 'y'
+  │          ^ Invalid usage of unassigned variable 'y'
 

@@ -104,7 +104,10 @@ error[E06002]: use of unassigned variable
    ┌─ tests/move_check/locals/assign_partial_resource.move:32:13
    │
 31 │         if (cond) { x = y };
-   │                         - The variable might not have a value due to this position. The variable must be assigned a value before being used
+   │                         -
+   │                         │
+   │                         The value of 'y' might have been previously moved here.
+   │                         Suggestion: use 'copy y' to avoid the move.
 32 │         (x, y)
-   │             ^ Invalid usage of variable 'y'
+   │             ^ Invalid usage of previously moved variable 'y'.
 

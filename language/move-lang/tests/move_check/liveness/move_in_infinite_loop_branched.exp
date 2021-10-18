@@ -4,8 +4,9 @@ error[E06002]: use of unassigned variable
 5 │             loop { let y = move x; y / y; }
   │                            ^^^^^^
   │                            │
-  │                            Invalid usage of variable 'x'
-  │                            The variable might not have a value due to this position. The variable must be assigned a value before being used
+  │                            Invalid usage of previously moved variable 'x'.
+  │                            Suggestion: use 'copy x' to avoid the move.
+  │                            In a loop, this typically means it was moved in the first iteration, and is not available by the second iteration.
 
 error[E06002]: use of unassigned variable
   ┌─ tests/move_check/liveness/move_in_infinite_loop_branched.move:7:28
@@ -13,6 +14,7 @@ error[E06002]: use of unassigned variable
 7 │             loop { let y = move x; y % y; }
   │                            ^^^^^^
   │                            │
-  │                            Invalid usage of variable 'x'
-  │                            The variable might not have a value due to this position. The variable must be assigned a value before being used
+  │                            Invalid usage of previously moved variable 'x'.
+  │                            Suggestion: use 'copy x' to avoid the move.
+  │                            In a loop, this typically means it was moved in the first iteration, and is not available by the second iteration.
 

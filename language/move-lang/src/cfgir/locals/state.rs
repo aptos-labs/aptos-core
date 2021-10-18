@@ -12,26 +12,36 @@ use move_ir_types::location::*;
 // Abstract state
 //**************************************************************************************************
 
-#[derive(Clone)]
+#[derive(Debug, Clone, Copy)]
+pub enum UnavailableReason {
+    Unassigned,
+    Moved,
+}
+
+#[derive(Clone, Debug)]
 pub enum LocalState {
     // Local does not have a value
-    Unavailable(Loc),
+    Unavailable(Loc, UnavailableReason),
     // Local has a value
     Available(Loc),
     // Available in some branches but not all. If it is a resource, cannot be assigned
-    MaybeUnavailable { available: Loc, unavailable: Loc },
+    MaybeUnavailable {
+        available: Loc,
+        unavailable: Loc,
+        unavailable_reason: UnavailableReason,
+    },
 }
 
 impl LocalState {
     pub fn is_available(&self) -> bool {
         match self {
             LocalState::Available(_) => true,
-            LocalState::Unavailable(_) | LocalState::MaybeUnavailable { .. } => false,
+            LocalState::Unavailable(_, _) | LocalState::MaybeUnavailable { .. } => false,
         }
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct LocalStates {
     local_states: UniqueMap<Var, LocalState>,
 }
@@ -42,7 +52,7 @@ impl LocalStates {
             local_states: UniqueMap::new(),
         };
         for (var, _) in local_types.key_cloned_iter() {
-            let local_state = LocalState::Unavailable(var.loc());
+            let local_state = LocalState::Unavailable(var.loc(), UnavailableReason::Unassigned);
             states.set_state(var, local_state)
         }
         for (var, _) in function_arguments {
@@ -73,7 +83,7 @@ impl LocalStates {
         for (var, state) in self.iter() {
             print!("{}: ", var);
             match state {
-                L::Unavailable(_) => println!("Unavailable"),
+                L::Unavailable(_, _) => println!("Unavailable"),
                 L::Available(_) => println!("Available"),
                 L::MaybeUnavailable { .. } => println!("MaybeUnavailable"),
             }
@@ -88,7 +98,7 @@ impl AbstractDomain for LocalStates {
         for (local, other_state) in other.local_states.key_cloned_iter() {
             match (self.get_state(&local), other_state) {
                 // equal so nothing to do
-                (L::Unavailable(_), L::Unavailable(_))
+                (L::Unavailable(_, _), L::Unavailable(_, _))
                 | (L::Available(_), L::Available(_))
                 | (L::MaybeUnavailable { .. }, L::MaybeUnavailable { .. }) => (),
                 // if its partially assigned, stays partially assigned
@@ -102,14 +112,15 @@ impl AbstractDomain for LocalStates {
                 }
 
                 // Available in one but not the other, so maybe unavailable
-                (L::Available(available), L::Unavailable(unavailable))
-                | (L::Unavailable(unavailable), L::Available(available)) => {
+                (L::Available(available), L::Unavailable(unavailable, reason))
+                | (L::Unavailable(unavailable, reason), L::Available(available)) => {
                     result = JoinResult::Changed;
                     let available = *available;
                     let unavailable = *unavailable;
                     let state = L::MaybeUnavailable {
                         available,
                         unavailable,
+                        unavailable_reason: *reason,
                     };
 
                     self.set_state(local, state)

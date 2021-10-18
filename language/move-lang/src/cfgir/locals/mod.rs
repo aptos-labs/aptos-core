@@ -146,14 +146,14 @@ fn command(context: &mut Context, sp!(loc, cmd_): &Command) {
             let mut diags = Diagnostics::new();
             for (local, state) in context.local_states.iter() {
                 match state {
-                    LocalState::Unavailable(_) => (),
+                    LocalState::Unavailable(_, _) => (),
                     LocalState::Available(available)
                     | LocalState::MaybeUnavailable { available, .. } => {
                         let ty = context.local_type(&local);
                         let abilities = ty.value.abilities(ty.loc);
                         if !abilities.has_ability_(Ability_::Drop) {
                             let verb = match state {
-                                LocalState::Unavailable(_) => unreachable!(),
+                                LocalState::Unavailable(_, _) => unreachable!(),
                                 LocalState::Available(_) => "still contains",
                                 LocalState::MaybeUnavailable { .. } => "might still contain",
                             };
@@ -206,11 +206,11 @@ fn lvalue(context: &mut Context, sp!(loc, l_): &LValue) {
             if !abilities.has_ability_(Ability_::Drop) {
                 let old_state = context.get_state(v);
                 match old_state {
-                    LocalState::Unavailable(_) => (),
+                    LocalState::Unavailable(_, _) => (),
                     LocalState::Available(available)
                     | LocalState::MaybeUnavailable { available, .. } => {
                         let verb = match old_state {
-                            LocalState::Unavailable(_) => unreachable!(),
+                            LocalState::Unavailable(_, _) => unreachable!(),
                             LocalState::Available(_) => "contains",
                             LocalState::MaybeUnavailable { .. } => "might contain",
                         };
@@ -252,7 +252,10 @@ fn exp(context: &mut Context, parent_e: &Exp) {
 
         E::Move { var, .. } => {
             use_local(context, eloc, var);
-            context.set_state(*var, LocalState::Unavailable(*eloc))
+            context.set_state(
+                *var,
+                LocalState::Unavailable(*eloc, UnavailableReason::Moved),
+            )
         }
 
         E::ModuleCall(mcall) => exp(context, &mcall.arguments),
@@ -287,27 +290,61 @@ fn use_local(context: &mut Context, loc: &Loc, local: &Var) {
     let state = context.get_state(local);
     match state {
         L::Available(_) => (),
-        L::Unavailable(unavailable) | L::MaybeUnavailable { unavailable, .. } => {
-            let verb = match state {
-                LocalState::Available(_) => unreachable!(),
-                LocalState::Unavailable(_) => "does",
-                LocalState::MaybeUnavailable { .. } => "might",
-            };
+        L::Unavailable(unavailable, unavailable_reason)
+        | L::MaybeUnavailable {
+            unavailable,
+            unavailable_reason,
+            ..
+        } => {
             let unavailable = *unavailable;
             let vstr = match display_var(local.value()) {
                 DisplayVar::Tmp => panic!("ICE invalid use tmp local {}", local.value()),
                 DisplayVar::Orig(s) => s,
             };
-            let msg = format!(
-                "The variable {} not have a value due to this position. The variable must be \
-                 assigned a value before being used",
-                verb
-            );
-            context.add_diag(diag!(
-                MoveSafety::UnassignedVariable,
-                (*loc, format!("Invalid usage of variable '{}'", vstr)),
-                (unavailable, msg),
-            ))
+            match unavailable_reason {
+                UnavailableReason::Unassigned => {
+                    let msg = format!(
+                        "The variable '{}' {} not have a value. The variable must be \
+                         assigned a value before being used.",
+                        vstr,
+                        match state {
+                            LocalState::Available(_) => unreachable!(),
+                            LocalState::Unavailable(_, _) => "does",
+                            LocalState::MaybeUnavailable { .. } => "might",
+                        }
+                    );
+                    context.add_diag(diag!(
+                        MoveSafety::UnassignedVariable,
+                        (
+                            *loc,
+                            format!("Invalid usage of unassigned variable '{}'", vstr)
+                        ),
+                        (unavailable, msg),
+                    ));
+                }
+                UnavailableReason::Moved => {
+                    let verb = match state {
+                        LocalState::Available(_) => unreachable!(),
+                        LocalState::Unavailable(_, _) => "was",
+                        LocalState::MaybeUnavailable { .. } => "might have been",
+                    };
+                    let suggestion = format!("Suggestion: use 'copy {}' to avoid the move.", vstr);
+                    let reason = if *loc == unavailable {
+                        "In a loop, this typically means it was moved in the first iteration, and is not available by the second iteration.".to_string()
+                    } else {
+                        format!("The value of '{}' {} previously moved here.", vstr, verb)
+                    };
+                    context.add_diag(diag!(
+                        MoveSafety::UnassignedVariable,
+                        (
+                            *loc,
+                            format!("Invalid usage of previously moved variable '{}'.", vstr)
+                        ),
+                        (unavailable, reason),
+                        (unavailable, suggestion),
+                    ));
+                }
+            };
         }
     }
 }

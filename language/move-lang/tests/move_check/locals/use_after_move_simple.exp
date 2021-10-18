@@ -2,47 +2,65 @@ error[E06002]: use of unassigned variable
   ┌─ tests/move_check/locals/use_after_move_simple.move:7:17
   │
 6 │         move x;
-  │         ------ The variable does not have a value due to this position. The variable must be assigned a value before being used
+  │         ------
+  │         │
+  │         The value of 'x' was previously moved here.
+  │         Suggestion: use 'copy x' to avoid the move.
 7 │         let _ = move x + 1;
-  │                 ^^^^^^ Invalid usage of variable 'x'
+  │                 ^^^^^^ Invalid usage of previously moved variable 'x'.
 
 error[E06002]: use of unassigned variable
    ┌─ tests/move_check/locals/use_after_move_simple.move:11:19
    │
 10 │         let _s2 = s;
-   │                   - The variable does not have a value due to this position. The variable must be assigned a value before being used
+   │                   -
+   │                   │
+   │                   The value of 's' was previously moved here.
+   │                   Suggestion: use 'copy s' to avoid the move.
 11 │         let _s3 = s;
-   │                   ^ Invalid usage of variable 's'
+   │                   ^ Invalid usage of previously moved variable 's'.
 
 error[E06002]: use of unassigned variable
    ┌─ tests/move_check/locals/use_after_move_simple.move:17:17
    │
 16 │         move x;
-   │         ------ The variable does not have a value due to this position. The variable must be assigned a value before being used
+   │         ------
+   │         │
+   │         The value of 'x' was previously moved here.
+   │         Suggestion: use 'copy x' to avoid the move.
 17 │         let _ = x + 1;
-   │                 ^ Invalid usage of variable 'x'
+   │                 ^ Invalid usage of previously moved variable 'x'.
 
 error[E06002]: use of unassigned variable
    ┌─ tests/move_check/locals/use_after_move_simple.move:21:19
    │
 20 │         let _s2 = s;
-   │                   - The variable does not have a value due to this position. The variable must be assigned a value before being used
+   │                   -
+   │                   │
+   │                   The value of 's' was previously moved here.
+   │                   Suggestion: use 'copy s' to avoid the move.
 21 │         let _s3 = copy s;
-   │                   ^^^^^^ Invalid usage of variable 's'
+   │                   ^^^^^^ Invalid usage of previously moved variable 's'.
 
 error[E06002]: use of unassigned variable
    ┌─ tests/move_check/locals/use_after_move_simple.move:27:17
    │
 26 │         move x;
-   │         ------ The variable does not have a value due to this position. The variable must be assigned a value before being used
+   │         ------
+   │         │
+   │         The value of 'x' was previously moved here.
+   │         Suggestion: use 'copy x' to avoid the move.
 27 │         let _ = &x;
-   │                 ^^ Invalid usage of variable 'x'
+   │                 ^^ Invalid usage of previously moved variable 'x'.
 
 error[E06002]: use of unassigned variable
    ┌─ tests/move_check/locals/use_after_move_simple.move:31:19
    │
 30 │         let _s2 = s;
-   │                   - The variable does not have a value due to this position. The variable must be assigned a value before being used
+   │                   -
+   │                   │
+   │                   The value of 's' was previously moved here.
+   │                   Suggestion: use 'copy s' to avoid the move.
 31 │         let _s3 = &s;
-   │                   ^^ Invalid usage of variable 's'
+   │                   ^^ Invalid usage of previously moved variable 's'.
 
