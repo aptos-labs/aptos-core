@@ -65,6 +65,21 @@ module DiemFramework::XUS {
         invariant [suspendable] forall addr: address where exists<AccountLimits::LimitsDefinition<XUS>>(addr):
             addr == @DiemRoot;
 
+        /// After genesis, XUS is always a non-synthetic currency.
+        invariant [suspendable] DiemTimestamp::is_operating()
+            ==> !Diem::is_synthetic_currency<XUS>();
+
+        /// After genesis, the scaling factor for XUS is always equal to 1,000,000.
+        invariant [suspendable] DiemTimestamp::is_operating()
+            ==> Diem::spec_currency_info<XUS>().scaling_factor == 1000000;
+
+        /// After genesis, the fractional part for XUS is always equal to 100.
+        invariant [suspendable] DiemTimestamp::is_operating()
+            ==> Diem::spec_currency_info<XUS>().fractional_part == 100;
+
+        /// After genesis, the currency code for XUS is always "XUS".
+        invariant [suspendable] DiemTimestamp::is_operating()
+            ==> Diem::spec_currency_code<XUS>() == b"XUS";
     }
 
     /// # Access Control
@@ -73,7 +88,7 @@ module DiemFramework::XUS {
 
     spec module {
         /// Only TreasuryCompliance can have MintCapability<XUS> [[H1]][PERMISSION].
-        /// If an account has BurnCapability<XUS>, it is a TreasuryCompliance account.
+        /// If an account has MintCapability<XUS>, it is a TreasuryCompliance account.
         invariant
             forall a: address:
                 Diem::spec_has_mint_capability<XUS>(a) ==>

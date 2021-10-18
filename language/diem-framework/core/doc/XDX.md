@@ -318,6 +318,46 @@ After genesis, XDX is registered.
 </code></pre>
 
 
+After genesis, the exchange rate to XDX is always equal to 1.0.
+
+
+<pre><code><b>invariant</b> [suspendable] <a href="DiemTimestamp.md#0x1_DiemTimestamp_is_operating">DiemTimestamp::is_operating</a>()
+     ==&gt; <a href="Diem.md#0x1_Diem_spec_xdx_exchange_rate">Diem::spec_xdx_exchange_rate</a>&lt;<a href="XDX.md#0x1_XDX">XDX</a>&gt;() == <a href="../../../../../../../move-stdlib/docs/FixedPoint32.md#0x1_FixedPoint32_spec_create_from_rational">FixedPoint32::spec_create_from_rational</a>(1, 1);
+</code></pre>
+
+
+After genesis, XDX is always a synthetic currency.
+
+
+<pre><code><b>invariant</b> [suspendable] <a href="DiemTimestamp.md#0x1_DiemTimestamp_is_operating">DiemTimestamp::is_operating</a>()
+    ==&gt; <a href="Diem.md#0x1_Diem_is_synthetic_currency">Diem::is_synthetic_currency</a>&lt;<a href="XDX.md#0x1_XDX">XDX</a>&gt;();
+</code></pre>
+
+
+After genesis, the scaling factor for XDX is always equal to 1,000,000.
+
+
+<pre><code><b>invariant</b> [suspendable] <a href="DiemTimestamp.md#0x1_DiemTimestamp_is_operating">DiemTimestamp::is_operating</a>()
+    ==&gt; <a href="Diem.md#0x1_Diem_spec_currency_info">Diem::spec_currency_info</a>&lt;<a href="XDX.md#0x1_XDX">XDX</a>&gt;().scaling_factor == 1000000;
+</code></pre>
+
+
+After genesis, the fractional part for XDX is always equal to 1,000.
+
+
+<pre><code><b>invariant</b> [suspendable] <a href="DiemTimestamp.md#0x1_DiemTimestamp_is_operating">DiemTimestamp::is_operating</a>()
+    ==&gt; <a href="Diem.md#0x1_Diem_spec_currency_info">Diem::spec_currency_info</a>&lt;<a href="XDX.md#0x1_XDX">XDX</a>&gt;().fractional_part == 1000;
+</code></pre>
+
+
+After genesis, the currency code for XDX is always "XDX".
+
+
+<pre><code><b>invariant</b> [suspendable] <a href="DiemTimestamp.md#0x1_DiemTimestamp_is_operating">DiemTimestamp::is_operating</a>()
+    ==&gt; <a href="Diem.md#0x1_Diem_spec_currency_code">Diem::spec_currency_code</a>&lt;<a href="XDX.md#0x1_XDX">XDX</a>&gt;() == b"<a href="XDX.md#0x1_XDX">XDX</a>";
+</code></pre>
+
+
 
 <a name="@Helper_Functions_3"></a>
 
@@ -331,7 +371,7 @@ Checks whether the Reserve resource exists.
 
 
 <pre><code><b>fun</b> <a href="XDX.md#0x1_XDX_reserve_exists">reserve_exists</a>(): bool {
-   <b>exists</b>&lt;<a href="XDX.md#0x1_XDX_Reserve">Reserve</a>&gt;(@CurrencyInfo)
+   <b>exists</b>&lt;<a href="XDX.md#0x1_XDX_Reserve">Reserve</a>&gt;(<a href="XDX.md#0x1_XDX_reserve_address">reserve_address</a>())
 }
 </code></pre>
 
@@ -357,8 +397,8 @@ it does not hold for all types (but does hold for XDX).
 <code><a href="XDX.md#0x1_XDX_Reserve">Reserve</a></code> is persistent
 
 
-<pre><code><b>invariant</b> <b>update</b> <b>old</b>(<b>exists</b>&lt;<a href="XDX.md#0x1_XDX_Reserve">Reserve</a>&gt;(<a href="XDX.md#0x1_XDX_reserve_address">reserve_address</a>()))
-    ==&gt; <b>exists</b>&lt;<a href="XDX.md#0x1_XDX_Reserve">Reserve</a>&gt;(<a href="XDX.md#0x1_XDX_reserve_address">reserve_address</a>());
+<pre><code><b>invariant</b> <b>update</b> <b>old</b>(<a href="XDX.md#0x1_XDX_reserve_exists">reserve_exists</a>())
+    ==&gt; <a href="XDX.md#0x1_XDX_reserve_exists">reserve_exists</a>();
 </code></pre>
 
 

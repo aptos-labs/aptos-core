@@ -125,13 +125,33 @@ module DiemFramework::XDX {
 
         /// After genesis, XDX is registered.
         invariant [suspendable] DiemTimestamp::is_operating() ==> Diem::is_currency<XDX>();
+
+        /// After genesis, the exchange rate to XDX is always equal to 1.0.
+        invariant [suspendable] DiemTimestamp::is_operating()
+             ==> Diem::spec_xdx_exchange_rate<XDX>() == FixedPoint32::spec_create_from_rational(1, 1);
+
+        /// After genesis, XDX is always a synthetic currency.
+        invariant [suspendable] DiemTimestamp::is_operating()
+            ==> Diem::is_synthetic_currency<XDX>();
+
+        /// After genesis, the scaling factor for XDX is always equal to 1,000,000.
+        invariant [suspendable] DiemTimestamp::is_operating()
+            ==> Diem::spec_currency_info<XDX>().scaling_factor == 1000000;
+
+        /// After genesis, the fractional part for XDX is always equal to 1,000.
+        invariant [suspendable] DiemTimestamp::is_operating()
+            ==> Diem::spec_currency_info<XDX>().fractional_part == 1000;
+
+        /// After genesis, the currency code for XDX is always "XDX".
+        invariant [suspendable] DiemTimestamp::is_operating()
+            ==> Diem::spec_currency_code<XDX>() == b"XDX";
     }
 
     /// # Helper Functions
     spec module {
         /// Checks whether the Reserve resource exists.
         fun reserve_exists(): bool {
-           exists<Reserve>(@CurrencyInfo)
+           exists<Reserve>(reserve_address())
         }
 
         /// After genesis, `LimitsDefinition<XDX>` is published at Diem root. It's published by
@@ -145,8 +165,8 @@ module DiemFramework::XDX {
             addr == @DiemRoot;
 
         /// `Reserve` is persistent
-        invariant update old(exists<Reserve>(reserve_address()))
-            ==> exists<Reserve>(reserve_address());
+        invariant update old(reserve_exists())
+            ==> reserve_exists();
     }
 
 }

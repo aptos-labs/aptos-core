@@ -3507,6 +3507,8 @@ Updates the <code>to_xdx_exchange_rate</code> held in the <code><a href="Diem.md
 ) <b>acquires</b> <a href="Diem.md#0x1_Diem_CurrencyInfo">CurrencyInfo</a> {
     <a href="Roles.md#0x1_Roles_assert_treasury_compliance">Roles::assert_treasury_compliance</a>(tc_account);
     <a href="Diem.md#0x1_Diem_assert_is_currency">assert_is_currency</a>&lt;FromCoinType&gt;();
+    // <a href="XDX.md#0x1_XDX">XDX</a> is not allowed <b>to</b> <b>update</b> the exchange rate.
+    <b>assert</b>(<a href="Diem.md#0x1_Diem_currency_code">currency_code</a>&lt;FromCoinType&gt;() != b"<a href="XDX.md#0x1_XDX">XDX</a>", <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="Diem.md#0x1_Diem_ECOIN">ECOIN</a>));
     <b>let</b> currency_info = borrow_global_mut&lt;<a href="Diem.md#0x1_Diem_CurrencyInfo">CurrencyInfo</a>&lt;FromCoinType&gt;&gt;(@<a href="Diem.md#0x1_Diem_CurrencyInfo">CurrencyInfo</a>);
     currency_info.to_xdx_exchange_rate = xdx_exchange_rate;
     <a href="../../../../../../../move-stdlib/docs/Event.md#0x1_Event_emit_event">Event::emit_event</a>(
@@ -3551,6 +3553,7 @@ Must abort if the account does not have the TreasuryCompliance Role [[H5]][PERMI
 <pre><code><b>schema</b> <a href="Diem.md#0x1_Diem_UpdateXDXExchangeRateAbortsIf">UpdateXDXExchangeRateAbortsIf</a>&lt;FromCoinType&gt; {
     <b>include</b> <a href="Roles.md#0x1_Roles_AbortsIfNotTreasuryCompliance">Roles::AbortsIfNotTreasuryCompliance</a>{account: tc_account};
     <b>include</b> <a href="Diem.md#0x1_Diem_AbortsIfNoCurrency">AbortsIfNoCurrency</a>&lt;FromCoinType&gt;;
+    <b>aborts_if</b> <a href="Diem.md#0x1_Diem_spec_currency_code">spec_currency_code</a>&lt;FromCoinType&gt;() == b"<a href="XDX.md#0x1_XDX">XDX</a>" <b>with</b> <a href="../../../../../../../move-stdlib/docs/Errors.md#0x1_Errors_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>;
 }
 </code></pre>
 

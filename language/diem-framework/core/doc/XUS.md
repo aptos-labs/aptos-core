@@ -168,6 +168,38 @@ it does not hold for all types (but does hold for XUS).
 </code></pre>
 
 
+After genesis, XUS is always a non-synthetic currency.
+
+
+<pre><code><b>invariant</b> [suspendable] <a href="DiemTimestamp.md#0x1_DiemTimestamp_is_operating">DiemTimestamp::is_operating</a>()
+    ==&gt; !<a href="Diem.md#0x1_Diem_is_synthetic_currency">Diem::is_synthetic_currency</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;();
+</code></pre>
+
+
+After genesis, the scaling factor for XUS is always equal to 1,000,000.
+
+
+<pre><code><b>invariant</b> [suspendable] <a href="DiemTimestamp.md#0x1_DiemTimestamp_is_operating">DiemTimestamp::is_operating</a>()
+    ==&gt; <a href="Diem.md#0x1_Diem_spec_currency_info">Diem::spec_currency_info</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;().scaling_factor == 1000000;
+</code></pre>
+
+
+After genesis, the fractional part for XUS is always equal to 100.
+
+
+<pre><code><b>invariant</b> [suspendable] <a href="DiemTimestamp.md#0x1_DiemTimestamp_is_operating">DiemTimestamp::is_operating</a>()
+    ==&gt; <a href="Diem.md#0x1_Diem_spec_currency_info">Diem::spec_currency_info</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;().fractional_part == 100;
+</code></pre>
+
+
+After genesis, the currency code for XUS is always "XUS".
+
+
+<pre><code><b>invariant</b> [suspendable] <a href="DiemTimestamp.md#0x1_DiemTimestamp_is_operating">DiemTimestamp::is_operating</a>()
+    ==&gt; <a href="Diem.md#0x1_Diem_spec_currency_code">Diem::spec_currency_code</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;() == b"<a href="XUS.md#0x1_XUS">XUS</a>";
+</code></pre>
+
+
 
 <a name="@Access_Control_2"></a>
 
@@ -180,7 +212,7 @@ it does not hold for all types (but does hold for XUS).
 
 
 Only TreasuryCompliance can have MintCapability<XUS> [[H1]][PERMISSION].
-If an account has BurnCapability<XUS>, it is a TreasuryCompliance account.
+If an account has MintCapability<XUS>, it is a TreasuryCompliance account.
 
 
 <pre><code><b>invariant</b>

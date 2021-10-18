@@ -1474,6 +1474,8 @@ module DiemFramework::Diem {
     ) acquires CurrencyInfo {
         Roles::assert_treasury_compliance(tc_account);
         assert_is_currency<FromCoinType>();
+        // XDX is not allowed to update the exchange rate.
+        assert(currency_code<FromCoinType>() != b"XDX", Errors::invalid_argument(ECOIN));
         let currency_info = borrow_global_mut<CurrencyInfo<FromCoinType>>(@CurrencyInfo);
         currency_info.to_xdx_exchange_rate = xdx_exchange_rate;
         Event::emit_event(
@@ -1496,6 +1498,7 @@ module DiemFramework::Diem {
         include Roles::AbortsIfNotTreasuryCompliance{account: tc_account};
 
         include AbortsIfNoCurrency<FromCoinType>;
+        aborts_if spec_currency_code<FromCoinType>() == b"XDX" with Errors::INVALID_ARGUMENT;
     }
     spec schema UpdateXDXExchangeRateEnsures<FromCoinType> {
         xdx_exchange_rate: FixedPoint32;
