@@ -52,7 +52,9 @@ export async function setMessageScript(
 }
 
 // Script example; initializes TestNFT utilizing the NFT<Type>
-// generic methods. See main/sources/NFT.move
+// generic methods. This example replaces the genesis initialize functionality
+// but with a different address. See main/sources/NFT.move
+// This is optional, as createTestNFTScriptFunction handles init.
 export async function initializeTestNFT(sequenceNumber: number) {
   const privateKeyBytes = await Deno.readFile(privateKeyPath);
   const nftAddress = DiemHelpers.hexToAccountAddress(senderAddress);
@@ -70,6 +72,24 @@ export async function initializeTestNFT(sequenceNumber: number) {
 
   const script = codegen.Stdlib.encodeInitializeNftScript(testNftType);
   const payload = new DiemTypes.TransactionPayloadVariantScript(script);
+  return await DiemHelpers.buildAndSubmitTransaction(
+    fullSenderAddress,
+    sequenceNumber,
+    privateKeyBytes,
+    payload,
+  );
+}
+
+// ScriptFunction example; creation of NFT. Can only create one per account atm.
+// See main/source/TestNFT.move
+export async function createTestNFTScriptFunction(
+  contentUri: string,
+  sequenceNumber: number,
+) {
+  const privateKeyBytes = await Deno.readFile(privateKeyPath);
+  const payload = codegen.Stdlib.encodeCreateNftScriptFunction(
+    textEncoder.encode(contentUri),
+  );
   return await DiemHelpers.buildAndSubmitTransaction(
     fullSenderAddress,
     sequenceNumber,
