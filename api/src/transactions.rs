@@ -1,11 +1,15 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{context::Context, page::Page, param::TransactionIdParam};
+use crate::{
+    context::Context,
+    page::Page,
+    param::{AddressParam, TransactionIdParam},
+};
 
 use diem_api_types::{
     mime_types, Error, LedgerInfo, Response, Transaction, TransactionData, TransactionId,
-    TransactionSigningMessage, UserTransactionRequest,
+    TransactionOnChainData, TransactionSigningMessage, UserTransactionRequest,
 };
 use diem_types::{
     mempool_status::MempoolStatusCode,
@@ -21,6 +25,7 @@ use warp::{
 pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
     get_transaction(context.clone())
         .or(get_transactions(context.clone()))
+        .or(get_account_transactions(context.clone()))
         .or(post_transactions(context.clone()))
         .or(post_signing_message(context))
 }
@@ -57,6 +62,25 @@ pub fn get_transactions(
 
 async fn handle_get_transactions(page: Page, context: Context) -> Result<impl Reply, Rejection> {
     Ok(Transactions::new(context)?.list(page)?)
+}
+
+// GET /accounts/{address}/transactions?start={u64}&limit={u16}
+pub fn get_account_transactions(
+    context: Context,
+) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+    warp::path!("accounts" / AddressParam / "transactions")
+        .and(warp::get())
+        .and(warp::query::<Page>())
+        .and(context.filter())
+        .and_then(handle_get_account_transactions)
+}
+
+async fn handle_get_account_transactions(
+    address: AddressParam,
+    page: Page,
+    context: Context,
+) -> Result<impl Reply, Rejection> {
+    Ok(Transactions::new(context)?.list_by_account(address, page)?)
 }
 
 // POST /transactions
@@ -170,15 +194,31 @@ impl Transactions {
 
     pub fn list(self, page: Page) -> Result<impl Reply, Error> {
         let ledger_version = self.ledger_info.version();
-        let start_version = page.start(ledger_version)?;
+        let start_version = page.start(ledger_version, ledger_version)?;
         let limit = page.limit()?;
 
         let data = self
             .context
             .get_transactions(start_version, limit, ledger_version)?;
 
-        let converter = self.context.move_converter();
+        self.render_transactions(data)
+    }
 
+    pub fn list_by_account(self, address: AddressParam, page: Page) -> Result<impl Reply, Error> {
+        let data = self.context.get_account_transactions(
+            address.parse("account address")?.into(),
+            page.start(0, u64::MAX)?,
+            page.limit()?,
+            self.ledger_info.version(),
+        )?;
+        self.render_transactions(data)
+    }
+
+    fn render_transactions(
+        self,
+        data: Vec<TransactionOnChainData<TransactionInfo>>,
+    ) -> Result<impl Reply, Error> {
+        let converter = self.context.move_converter();
         let txns: Vec<Transaction> = data
             .into_iter()
             .map(|t| converter.try_into_onchain_transaction(t))

@@ -141,6 +141,23 @@ impl Context {
             .collect())
     }
 
+    pub fn get_account_transactions(
+        &self,
+        address: AccountAddress,
+        start_seq_number: u64,
+        limit: u16,
+        ledger_version: u64,
+    ) -> Result<Vec<TransactionOnChainData<TransactionInfo>>> {
+        let txns = self.db.get_account_transactions(
+            address,
+            start_seq_number,
+            limit as u64,
+            true,
+            ledger_version,
+        )?;
+        Ok(txns.into_inner().into_iter().map(|t| t.into()).collect())
+    }
+
     pub fn get_transaction_by_hash(
         &self,
         hash: HashValue,

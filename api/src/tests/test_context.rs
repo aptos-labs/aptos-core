@@ -129,15 +129,23 @@ impl TestContext {
     }
 
     pub fn create_parent_vasp(&self, account: &LocalAccount) -> SignedTransaction {
+        let mut tc = self.tc_account();
+        self.create_parent_vasp_by_account(&mut tc, account)
+    }
+
+    pub fn create_parent_vasp_by_account(
+        &self,
+        creator: &mut LocalAccount,
+        account: &LocalAccount,
+    ) -> SignedTransaction {
         let factory = self.transaction_factory();
-        self.tc_account()
-            .sign_with_transaction_builder(factory.create_parent_vasp_account(
-                Currency::XUS,
-                0,
-                account.authentication_key(),
-                "vasp",
-                true,
-            ))
+        creator.sign_with_transaction_builder(factory.create_parent_vasp_account(
+            Currency::XUS,
+            0,
+            account.authentication_key(),
+            "vasp",
+            true,
+        ))
     }
 
     pub fn create_invalid_signature_transaction(&mut self) -> SignedTransaction {

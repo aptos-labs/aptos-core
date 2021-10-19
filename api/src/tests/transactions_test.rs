@@ -1149,3 +1149,89 @@ async fn test_signing_message_with_payload(
     let ledger = context.get("/").await;
     assert_eq!(ledger["ledger_version"].as_str().unwrap(), "2"); // one metadata + one txn
 }
+
+#[tokio::test]
+async fn test_get_account_transactions() {
+    let mut context = new_test_context();
+    let account = context.gen_account();
+    let txn = context.create_parent_vasp(&account);
+    context.commit_block(&vec![txn]);
+
+    let txns = context
+        .get(format!("/accounts/{}/transactions", context.tc_account().address()).as_str())
+        .await;
+    assert_eq!(1, txns.as_array().unwrap().len());
+    let expected_txns = context.get("/transactions?start=2&limit=1").await;
+    assert_json(txns, expected_txns);
+}
+
+#[tokio::test]
+async fn test_get_account_transactions_filter_transactions_by_start_sequence_number() {
+    let mut context = new_test_context();
+    let account = context.gen_account();
+    let txn = context.create_parent_vasp(&account);
+    context.commit_block(&vec![txn]);
+
+    let txns = context
+        .get(
+            format!(
+                "/accounts/{}/transactions?start=1",
+                context.tc_account().address()
+            )
+            .as_str(),
+        )
+        .await;
+    assert_json(txns, json!([]));
+}
+
+#[tokio::test]
+async fn test_get_account_transactions_filter_transactions_by_start_sequence_number_is_too_large() {
+    let mut context = new_test_context();
+    let account = context.gen_account();
+    let txn = context.create_parent_vasp(&account);
+    context.commit_block(&vec![txn]);
+
+    let txns = context
+        .get(
+            format!(
+                "/accounts/{}/transactions?start=1000",
+                context.tc_account().address()
+            )
+            .as_str(),
+        )
+        .await;
+    assert_json(txns, json!([]));
+}
+
+#[tokio::test]
+async fn test_get_account_transactions_filter_transactions_by_limit() {
+    let mut context = new_test_context();
+    let mut tc_account = context.tc_account();
+    let account1 = context.gen_account();
+    let txn1 = context.create_parent_vasp_by_account(&mut tc_account, &account1);
+    let account2 = context.gen_account();
+    let txn2 = context.create_parent_vasp_by_account(&mut tc_account, &account2);
+    context.commit_block(&vec![txn1, txn2]);
+
+    let txns = context
+        .get(
+            format!(
+                "/accounts/{}/transactions?start=0&limit=1",
+                context.tc_account().address()
+            )
+            .as_str(),
+        )
+        .await;
+    assert_eq!(txns.as_array().unwrap().len(), 1);
+
+    let txns = context
+        .get(
+            format!(
+                "/accounts/{}/transactions?start=0&limit=2",
+                context.tc_account().address()
+            )
+            .as_str(),
+        )
+        .await;
+    assert_eq!(txns.as_array().unwrap().len(), 2);
+}

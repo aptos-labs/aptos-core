@@ -19,17 +19,17 @@ pub(crate) struct Page {
 }
 
 impl Page {
-    pub fn start(&self, latest_ledger_version: u64) -> Result<u64, Error> {
+    pub fn start(&self, default: u64, max: u64) -> Result<u64, Error> {
         let version = self
             .start
             .clone()
             .map(|v| v.parse("start"))
-            .unwrap_or_else(|| Ok(latest_ledger_version))?;
-        if version > latest_ledger_version {
+            .unwrap_or_else(|| Ok(default))?;
+        if version > max {
             return Err(Error::not_found(
                 "transaction",
                 TransactionId::Version(version),
-                latest_ledger_version,
+                max,
             ));
         }
         Ok(version)
