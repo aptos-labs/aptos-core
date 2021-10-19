@@ -62,15 +62,17 @@ pub struct EmitJobRequest {
     pub accounts_per_client: usize,
     pub workers_per_endpoint: Option<usize>,
     pub thread_params: EmitThreadParams,
+    pub gas_price: u64,
 }
 
 impl EmitJobRequest {
-    pub fn default(json_rpc_clients: Vec<JsonRpcClient>) -> Self {
+    pub fn default(json_rpc_clients: Vec<JsonRpcClient>, gas_price: u64) -> Self {
         Self {
             json_rpc_clients,
             accounts_per_client: 15,
             workers_per_endpoint: None,
             thread_params: EmitThreadParams::default(),
+            gas_price,
         }
     }
 }
@@ -125,10 +127,10 @@ struct SubmissionWorker {
 
 impl SubmissionWorker {
     #[allow(clippy::collapsible_if)]
-    async fn run(mut self) -> Vec<LocalAccount> {
+    async fn run(mut self, gas_price: u64) -> Vec<LocalAccount> {
         let wait_duration = Duration::from_millis(self.params.wait_millis);
         while !self.stop.load(Ordering::Relaxed) {
-            let requests = self.gen_requests();
+            let requests = self.gen_requests(gas_price);
             let num_requests = requests.len();
             let start_time = Instant::now();
             let wait_until = start_time + wait_duration;
@@ -193,7 +195,7 @@ impl SubmissionWorker {
         self.accounts
     }
 
-    fn gen_requests(&mut self) -> Vec<SignedTransaction> {
+    fn gen_requests(&mut self, gas_price: u64) -> Vec<SignedTransaction> {
         let batch_size = max(MAX_TXN_BATCH_SIZE, self.accounts.len());
         let accounts = self
             .accounts
@@ -205,8 +207,13 @@ impl SubmissionWorker {
                 .all_addresses
                 .choose(&mut self.rng)
                 .expect("all_addresses can't be empty");
-            let request =
-                gen_transfer_txn_request(sender, receiver, SEND_AMOUNT, &self.txn_factory);
+            let request = gen_transfer_txn_request(
+                sender,
+                receiver,
+                SEND_AMOUNT,
+                &self.txn_factory,
+                gas_price,
+            );
             requests.push(request);
         }
         requests
@@ -252,6 +259,7 @@ impl<'t> TxnEmitter<'t> {
             &faucet_account.address(),
             coins_total,
             &self.txn_factory,
+            0,
         );
         execute_and_wait_transactions(&client, &mut faucet_account, vec![mint_txn])
             .await
@@ -434,7 +442,7 @@ impl<'t> TxnEmitter<'t> {
                     txn_factory: self.txn_factory.clone(),
                     rng: self.from_rng(),
                 };
-                let join_handle = tokio_handle.spawn(worker.run().boxed());
+                let join_handle = tokio_handle.spawn(worker.run(req.gas_price).boxed());
                 workers.push(Worker { join_handle });
             }
         }
@@ -734,6 +742,7 @@ where
                     &account.address(),
                     diem_per_new_account,
                     txn_factory,
+                    0,
                 )
             })
             .collect();
@@ -772,12 +781,13 @@ pub fn gen_transfer_txn_request(
     receiver: &AccountAddress,
     num_coins: u64,
     txn_factory: &TransactionFactory,
+    gas_price: u64,
 ) -> SignedTransaction {
-    sender.sign_with_transaction_builder(txn_factory.peer_to_peer(
-        Currency::XUS,
-        *receiver,
-        num_coins,
-    ))
+    sender.sign_with_transaction_builder(
+        txn_factory
+            .peer_to_peer(Currency::XUS, *receiver, num_coins)
+            .gas_unit_price(gas_price),
+    )
 }
 
 impl StatsAccumulator {
