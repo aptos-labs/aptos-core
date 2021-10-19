@@ -98,14 +98,19 @@ export async function createTestNFTScriptFunction(
   );
 }
 
-export function messagesFrom(resources: any[]) {
+export function resourcesWithName(resources: any[], resourceName: string) {
   return resources
     .filter(
-      (entry) => entry["type"]["name"] == "MessageHolder",
+      (entry) => entry["type"]["name"] == resourceName,
     );
 }
 
 export function decodedMessages(resources: any[]) {
-  return messagesFrom(resources)
+  return resourcesWithName(resources, "MessageHolder")
     .map((entry) => DiemHelpers.hexToAscii(entry.value.message));
+}
+
+export function decodedNFTs(resources: any[]) {
+  return resourcesWithName(resources, "NFT")
+    .map((entry) => DiemHelpers.hexToAscii(entry.value.content_uri));
 }

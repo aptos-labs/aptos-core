@@ -27,7 +27,7 @@ Shuffle.test("Ability to set message", async () => {
 
   for (let i = 0; i < 10; i++) {
     const resources = await Shuffle.resources(sender);
-    const messageResource = main.messagesFrom(resources)[0];
+    const messageResource = main.resourcesWithName(resources, "MessageHolder")[0];
     if (messageResource !== undefined) {
       const result =
         DiemHelpers.hexToAscii(messageResource["value"]["message"])
