@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::test_utils::new_test_context;
+use crate::tests::new_test_context;
 use serde_json::json;
 
 #[tokio::test]

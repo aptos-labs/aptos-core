@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::test_utils::{assert_json, find_value, new_test_context, TestContext};
+use crate::tests::{assert_json, find_value, new_test_context, TestContext};
 
 use diem_api_types::HexEncodedBytes;
 use diem_crypto::{

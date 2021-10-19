@@ -11,7 +11,4 @@ pub mod runtime;
 mod transactions;
 
 #[cfg(any(test))]
-pub(crate) mod test_utils;
-
-#[cfg(any(test))]
 pub(crate) mod tests;

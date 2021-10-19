@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{context::Context, index};
+use crate::{context::Context, index, tests::pretty};
 use diem_api_types::{
     mime_types, TransactionOnChainData, X_DIEM_CHAIN_ID, X_DIEM_LEDGER_TIMESTAMP,
     X_DIEM_LEDGER_VERSION,
@@ -303,36 +303,4 @@ impl TestContext {
         );
         LedgerInfoWithSignatures::new(info, BTreeMap::new())
     }
-}
-
-pub fn find_value(val: &Value, filter: for<'r> fn(&'r &Value) -> bool) -> Value {
-    let resources = val
-        .as_array()
-        .expect(format!("expect array, but got: {}", val).as_str());
-    let mut balances = resources.iter().filter(filter);
-    match balances.next() {
-        Some(resource) => {
-            let more = balances.next();
-            if let Some(val) = more {
-                panic!("found multiple items by the filter: {}", pretty(val));
-            }
-            resource.clone()
-        }
-        None => {
-            panic!("\ncould not find item in {}", pretty(val))
-        }
-    }
-}
-
-pub fn assert_json(ret: Value, expected: Value) {
-    assert!(
-        ret == expected,
-        "\nexpected: {}, \nbut got: {}",
-        pretty(&expected),
-        pretty(&ret)
-    )
-}
-
-pub fn pretty(val: &Value) -> String {
-    serde_json::to_string_pretty(val).unwrap()
 }
