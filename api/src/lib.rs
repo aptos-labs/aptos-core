@@ -3,6 +3,7 @@
 
 mod accounts;
 mod context;
+mod events;
 mod index;
 pub(crate) mod log;
 mod page;

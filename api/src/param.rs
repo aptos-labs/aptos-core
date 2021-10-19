@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_api_types::{Address, Error, TransactionId};
+use diem_api_types::{Address, Error, EventKey, TransactionId};
 use serde::{Deserialize, Deserializer};
 
 use std::{convert::Infallible, str::FromStr};
@@ -10,6 +10,7 @@ pub type AddressParam = Param<Address>;
 pub type TransactionIdParam = Param<TransactionId>;
 pub type TransactionVersionParam = Param<u64>;
 pub type LedgerVersionParam = Param<u64>;
+pub type EventKeyParam = Param<EventKey>;
 
 /// `Param` is designed for parsing `warp` path parameter or query string
 /// into a type specified by the generic type parameter of `Param`.

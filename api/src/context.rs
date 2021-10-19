@@ -9,11 +9,13 @@ use diem_types::{
     account_state::AccountState,
     account_state_blob::AccountStateBlob,
     chain_id::ChainId,
+    contract_event::ContractEvent,
+    event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
     protocol_spec::DpnProto,
     transaction::{SignedTransaction, TransactionInfo},
 };
-use storage_interface::MoveDbReader;
+use storage_interface::{MoveDbReader, Order};
 
 use anyhow::{ensure, format_err, Result};
 use futures::{channel::oneshot, SinkExt};
@@ -193,5 +195,22 @@ impl Context {
             .db
             .get_transaction_by_version(version, ledger_version, true)?
             .into())
+    }
+
+    pub fn get_events(
+        &self,
+        event_key: &EventKey,
+        start: u64,
+        limit: u16,
+        ledger_version: u64,
+    ) -> Result<Vec<ContractEvent>> {
+        let events = self
+            .db
+            .get_events(event_key, start, Order::Ascending, limit as u64)?;
+        Ok(events
+            .into_iter()
+            .filter(|(version, _event)| version <= &ledger_version)
+            .map(|(_, event)| event)
+            .collect::<Vec<_>>())
     }
 }

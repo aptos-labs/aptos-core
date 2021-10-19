@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod accounts_test;
+mod events_test;
 mod index_test;
 mod test_context;
 mod transactions_test;
