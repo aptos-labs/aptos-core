@@ -27,8 +27,8 @@ pub use move_types::{
 };
 pub use response::{Response, X_DIEM_CHAIN_ID, X_DIEM_LEDGER_TIMESTAMP, X_DIEM_LEDGER_VERSION};
 pub use transaction::{
-    BlockMetadataTransaction, Event, GenesisTransaction, PendingTransaction, ScriptFunctionPayload,
-    ScriptPayload, Transaction, TransactionData, TransactionId, TransactionOnChainData,
-    TransactionPayload, TransactionSigningMessage, UserTransaction, UserTransactionRequest,
-    WriteSetChange, WriteSetPayload,
+    BlockMetadataTransaction, DirectWriteSet, Event, GenesisTransaction, PendingTransaction,
+    ScriptFunctionPayload, ScriptPayload, ScriptWriteSet, Transaction, TransactionData,
+    TransactionId, TransactionOnChainData, TransactionPayload, TransactionSigningMessage,
+    UserTransaction, UserTransactionRequest, WriteSet, WriteSetChange, WriteSetPayload,
 };

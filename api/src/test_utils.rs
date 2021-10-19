@@ -306,7 +306,9 @@ impl TestContext {
 }
 
 pub fn find_value(val: &Value, filter: for<'r> fn(&'r &Value) -> bool) -> Value {
-    let resources = val.as_array().expect("array");
+    let resources = val
+        .as_array()
+        .expect(format!("expect array, but got: {}", val).as_str());
     let mut balances = resources.iter().filter(filter);
     match balances.next() {
         Some(resource) => {

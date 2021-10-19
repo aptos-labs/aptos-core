@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    Bytecode, Event, HexEncodedBytes, MoveFunction, MoveModuleBytecode, MoveResource, MoveType,
-    MoveValue, ScriptFunctionPayload, ScriptPayload, Transaction, TransactionData,
-    TransactionOnChainData, TransactionPayload, UserTransactionRequest, WriteSetChange,
-    WriteSetPayload,
+    Bytecode, DirectWriteSet, Event, HexEncodedBytes, MoveFunction, MoveModuleBytecode,
+    MoveResource, MoveType, MoveValue, ScriptFunctionPayload, ScriptPayload, ScriptWriteSet,
+    Transaction, TransactionData, TransactionOnChainData, TransactionPayload,
+    UserTransactionRequest, WriteSet, WriteSetChange, WriteSetPayload,
 };
 use diem_types::{
     access_path::{AccessPath, Path},
@@ -119,18 +119,24 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
     ) -> Result<WriteSetPayload> {
         use diem_types::transaction::WriteSetPayload::*;
         let ret = match payload {
-            Script { execute_as, script } => WriteSetPayload::ScriptWriteSet {
-                execute_as: execute_as.into(),
-                script: script.try_into()?,
+            Script { execute_as, script } => WriteSetPayload {
+                write_set: WriteSet::ScriptWriteSet(ScriptWriteSet {
+                    execute_as: execute_as.into(),
+                    script: script.try_into()?,
+                }),
             },
             Direct(d) => {
                 let (write_set, events) = d.into_inner();
-                WriteSetPayload::DirectWriteSet {
-                    changes: write_set
-                        .into_iter()
-                        .map(|(access_path, op)| self.try_into_write_set_change(access_path, op))
-                        .collect::<Result<_>>()?,
-                    events: self.try_into_events(&events)?,
+                WriteSetPayload {
+                    write_set: WriteSet::DirectWriteSet(DirectWriteSet {
+                        changes: write_set
+                            .into_iter()
+                            .map(|(access_path, op)| {
+                                self.try_into_write_set_change(access_path, op)
+                            })
+                            .collect::<Result<_>>()?,
+                        events: self.try_into_events(&events)?,
+                    }),
                 }
             }
         };

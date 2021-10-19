@@ -316,16 +316,27 @@ impl TryFrom<Script> for ScriptPayload {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "write_set_type", rename_all = "snake_case")]
-pub enum WriteSetPayload {
-    ScriptWriteSet {
-        execute_as: Address,
-        script: ScriptPayload,
-    },
-    DirectWriteSet {
-        changes: Vec<WriteSetChange>,
-        events: Vec<Event>,
-    },
+pub struct WriteSetPayload {
+    pub write_set: WriteSet,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum WriteSet {
+    ScriptWriteSet(ScriptWriteSet),
+    DirectWriteSet(DirectWriteSet),
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ScriptWriteSet {
+    pub execute_as: Address,
+    pub script: ScriptPayload,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct DirectWriteSet {
+    pub changes: Vec<WriteSetChange>,
+    pub events: Vec<Event>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

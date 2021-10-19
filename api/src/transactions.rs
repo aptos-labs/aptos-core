@@ -302,8 +302,7 @@ mod tests {
             txn["event_root_hash"],
             info.event_root_hash().to_hex_literal()
         );
-
-        let chain_id = find_value(&txn["payload"]["changes"], |val| {
+        let chain_id = find_value(&txn["payload"]["write_set"]["changes"], |val| {
             val["type"] == "write_module" && val["data"]["abi"]["name"] == "ChainId"
         });
         let bytecode = chain_id["data"]["bytecode"].clone();
@@ -373,7 +372,7 @@ mod tests {
             }),
         );
 
-        let chain_id = find_value(&txn["payload"]["changes"], |val| {
+        let chain_id = find_value(&txn["payload"]["write_set"]["changes"], |val| {
             val["type"] == "write_resource"
                 && val["address"] == "0xdd"
                 && val["data"]["type"]["name"] == "RoleId"
@@ -400,7 +399,7 @@ mod tests {
 
         let first_event = txn["events"][0].clone();
         // transaction events are same with events from payload
-        assert_json(first_event.clone(), txn["payload"]["events"][0].clone());
+        assert_json(first_event.clone(), txn["payload"]["write_set"]["events"][0].clone());
         assert_json(
             first_event,
             json!({
@@ -768,29 +767,31 @@ mod tests {
             txns[0]["payload"].clone(),
             json!({
                 "type": "write_set_payload",
-                "write_set_type": "direct_write_set",
-                "changes": [
-                    {
-                        "type": "delete_module",
-                        "address": "0x1",
-                        "module": {
+                "write_set": {
+                    "type": "direct_write_set",
+                    "changes": [
+                        {
+                            "type": "delete_module",
                             "address": "0x1",
-                            "name": "AccountAdministrationScripts"
+                            "module": {
+                                "address": "0x1",
+                                "name": "AccountAdministrationScripts"
+                            }
+                        },
+                        {
+                            "type": "delete_resource",
+                            "address": "0xb1e55ed",
+                            "resource": {
+                                "type": "struct",
+                                "address": "0x1",
+                                "module": "AccountFreezing",
+                                "name": "FreezingBit",
+                                "generic_type_params": []
+                            }
                         }
-                    },
-                    {
-                        "type": "delete_resource",
-                        "address": "0xb1e55ed",
-                        "resource": {
-                            "type": "struct",
-                            "address": "0x1",
-                            "module": "AccountFreezing",
-                            "name": "FreezingBit",
-                            "generic_type_params": []
-                        }
-                    }
-                ],
-                "events": []
+                    ],
+                    "events": []
+                }
             }),
         )
     }
@@ -1292,29 +1293,31 @@ mod tests {
         );
         let payload = json!({
             "type": "write_set_payload",
-            "write_set_type": "direct_write_set",
-            "changes": [
-                {
-                    "type": "delete_module",
-                    "address": "0x1",
-                    "module": {
+            "write_set": {
+                "type": "direct_write_set",
+                "changes": [
+                    {
+                        "type": "delete_module",
                         "address": "0x1",
-                        "name": "AccountAdministrationScripts"
+                        "module": {
+                            "address": "0x1",
+                            "name": "AccountAdministrationScripts"
+                        }
+                    },
+                    {
+                        "type": "delete_resource",
+                        "address": "0xb1e55ed",
+                        "resource": {
+                            "type": "struct",
+                            "address": "0x1",
+                            "module": "AccountFreezing",
+                            "name": "FreezingBit",
+                            "generic_type_params": []
+                        }
                     }
-                },
-                {
-                    "type": "delete_resource",
-                    "address": "0xb1e55ed",
-                    "resource": {
-                        "type": "struct",
-                        "address": "0x1",
-                        "module": "AccountFreezing",
-                        "name": "FreezingBit",
-                        "generic_type_params": []
-                    }
-                }
-            ],
-            "events": []
+                ],
+                "events": []
+            }
         });
 
         let sender = context.tc_account();
