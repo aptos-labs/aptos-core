@@ -66,7 +66,19 @@ pub fn handle() -> Result<()> {
     );
 
     // Create a new account.
-    create_account_onchain(&mut root_account, &new_account, &factory, &client)
+    create_account_onchain(&mut root_account, &new_account, &factory, &client)?;
+
+    home.generate_shuffle_test_path()?;
+    let test_key = home.generate_testkey_file()?;
+    let public_test_key = test_key.public_key();
+    home.generate_testkey_address_file(&test_key.public_key())?;
+    let test_account = LocalAccount::new(
+        AuthenticationKey::ed25519(&public_test_key).derived_address(),
+        test_key,
+        0,
+    );
+
+    create_account_onchain(&mut root_account, &test_account, &factory, &client)
 }
 
 pub fn confirm_user_decision(home: &Home) -> bool {

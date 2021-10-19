@@ -94,6 +94,9 @@ pub struct Home {
     latest_path: PathBuf,
     latest_key_path: PathBuf,
     latest_address_path: PathBuf,
+    test_path: PathBuf,
+    test_key_path: PathBuf,
+    test_key_address_path: PathBuf,
 }
 
 impl Home {
@@ -106,6 +109,9 @@ impl Home {
             latest_path: home_path.join(".shuffle/accounts/latest"),
             latest_key_path: home_path.join(".shuffle/accounts/latest/dev.key"),
             latest_address_path: home_path.join(".shuffle/accounts/latest/address"),
+            test_path: home_path.join(".shuffle/accounts/test"),
+            test_key_path: home_path.join(".shuffle/accounts/test/dev.key"),
+            test_key_address_path: home_path.join(".shuffle/accounts/test/address"),
         })
     }
 
@@ -127,6 +133,10 @@ impl Home {
 
     pub fn get_latest_key_path(&self) -> &Path {
         &self.latest_key_path
+    }
+
+    pub fn get_test_key_path(&self) -> &Path {
+        &self.test_key_path
     }
 
     pub fn create_archive_dir(&self, time: Duration) -> Result<PathBuf> {
@@ -173,6 +183,30 @@ impl Home {
     pub fn generate_address_file(&self, public_key: &Ed25519PublicKey) -> Result<()> {
         let address = AuthenticationKey::ed25519(public_key).derived_address();
         let address_filepath = self.latest_address_path.as_path();
+        let mut file = File::create(address_filepath)?;
+        file.write_all(address.to_string().as_ref())?;
+        Ok(())
+    }
+
+    pub fn generate_shuffle_test_path(&self) -> Result<()> {
+        if !self.test_path.is_dir() {
+            fs::create_dir(self.test_path.as_path())?;
+        }
+        Ok(())
+    }
+
+    pub fn generate_testkey_file(&self) -> Result<Ed25519PrivateKey> {
+        Ok(generate_key::generate_and_save_key(
+            self.test_key_path.as_path(),
+        ))
+        // const NEW_KEY_FILE_CONTENT: &[u8] = include_bytes!("../new_account.key");
+        // fs::write(self.testkey_path.as_path(), NEW_KEY_FILE_CONTENT)?;
+        // Ok(generate_key::load_key(self.test_key_path.as_path()))
+    }
+
+    pub fn generate_testkey_address_file(&self, public_key: &Ed25519PublicKey) -> Result<()> {
+        let address = AuthenticationKey::ed25519(public_key).derived_address();
+        let address_filepath = self.test_key_address_path.as_path();
         let mut file = File::create(address_filepath)?;
         file.write_all(address.to_string().as_ref())?;
         Ok(())

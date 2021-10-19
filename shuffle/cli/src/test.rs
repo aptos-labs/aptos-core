@@ -10,7 +10,7 @@ use diem_sdk::{
 };
 use diem_types::{chain_id::ChainId, transaction::authenticator::AuthenticationKey};
 use shared::Home;
-use std::{collections::HashMap, fs::File, io::Write, path::Path, process::Command};
+use std::{collections::HashMap, path::Path, process::Command};
 
 pub fn handle(project_path: &Path) -> Result<()> {
     let _config = shared::read_config(project_path)?;
@@ -57,15 +57,9 @@ fn create_receiver_account(
     factory: &TransactionFactory,
 ) -> Result<LocalAccount> {
     let mut root_account = account::get_root_account(client, home.get_root_key_path());
-
-    let testkey_dir = home.get_shuffle_path().join("accounts").join("testkeys");
-    let dev_key_filepath = &testkey_dir.join("receiver.key");
-    let receiver_account_key = generate_key::generate_and_save_key(dev_key_filepath);
+    let receiver_account_key = generate_key::load_key(home.get_test_key_path());
     let public_key = receiver_account_key.public_key();
     let address = AuthenticationKey::ed25519(&public_key).derived_address();
-    let test_account_filepath = &testkey_dir.join("address");
-    let mut file = File::create(test_account_filepath)?;
-    file.write_all(address.to_string().as_ref())?;
     let receiver_account = LocalAccount::new(address, receiver_account_key, 0);
     account::create_account_onchain(&mut root_account, &receiver_account, factory, client)?;
 
