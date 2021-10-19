@@ -32,7 +32,7 @@ impl NetworkTest for PartialNodesDown {
         thread::sleep(Duration::from_secs(5));
 
         // Generate some traffic
-        let txn_stat = generate_traffic(ctx, &up_nodes, duration, 0)?;
+        let txn_stat = generate_traffic(ctx, &up_nodes, duration, 0, None)?;
         ctx.report
             .report_txn_stats(self.name().to_string(), txn_stat, duration);
         for n in &down_nodes {

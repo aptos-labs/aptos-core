@@ -64,7 +64,7 @@ impl NetworkTest for SimpleValidatorUpgrade {
         batch_update(ctx, &validators_to_downgrade, &old_version)?;
 
         // Generate some traffic
-        generate_traffic(ctx, &all_validators, duration, 0)?;
+        generate_traffic(ctx, &all_validators, duration, 0, None)?;
 
         // Update the first Validator
         let msg = format!(
@@ -74,7 +74,7 @@ impl NetworkTest for SimpleValidatorUpgrade {
         println!("{}", msg);
         ctx.report.report_text(msg);
         batch_update(ctx, &[first_node], &new_version)?;
-        generate_traffic(ctx, &[first_node], duration, 0)?;
+        generate_traffic(ctx, &[first_node], duration, 0, None)?;
 
         // Update the rest of the first batch
         let msg = format!(
@@ -84,7 +84,7 @@ impl NetworkTest for SimpleValidatorUpgrade {
         println!("{}", msg);
         ctx.report.report_text(msg);
         batch_update(ctx, &first_batch, &new_version)?;
-        generate_traffic(ctx, &first_batch, duration, 0)?;
+        generate_traffic(ctx, &first_batch, duration, 0, None)?;
 
         ctx.swarm().fork_check()?;
 
@@ -93,7 +93,7 @@ impl NetworkTest for SimpleValidatorUpgrade {
         println!("{}", msg);
         ctx.report.report_text(msg);
         batch_update(ctx, &second_batch, &new_version)?;
-        generate_traffic(ctx, &second_batch, duration, 0)?;
+        generate_traffic(ctx, &second_batch, duration, 0, None)?;
 
         let msg = "5. check swarm health".to_string();
         println!("{}", msg);

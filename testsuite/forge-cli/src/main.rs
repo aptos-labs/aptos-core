@@ -434,7 +434,7 @@ impl NetworkTest for EmitTransaction {
             .validators()
             .map(|v| v.peer_id())
             .collect::<Vec<_>>();
-        let stats = generate_traffic(ctx, &all_validators, duration, 0).unwrap();
+        let stats = generate_traffic(ctx, &all_validators, duration, 0, None).unwrap();
         ctx.report
             .report_txn_stats(self.name().to_string(), stats, duration);
 

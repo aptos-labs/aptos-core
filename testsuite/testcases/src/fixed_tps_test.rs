@@ -5,15 +5,15 @@ use crate::generate_traffic;
 use forge::{NetworkContext, NetworkTest, Result, Test};
 use tokio::time::Duration;
 
-pub struct NonZeroGasPrice;
+pub struct FixedTpsTest;
 
-impl Test for NonZeroGasPrice {
+impl Test for FixedTpsTest {
     fn name(&self) -> &'static str {
-        "gas-price-unit-1"
+        "fixed-tps-test"
     }
 }
 
-impl NetworkTest for NonZeroGasPrice {
+impl NetworkTest for FixedTpsTest {
     fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
         let duration = Duration::from_secs(240);
         let all_validators = ctx
@@ -22,8 +22,8 @@ impl NetworkTest for NonZeroGasPrice {
             .map(|v| v.peer_id())
             .collect::<Vec<_>>();
 
-        // Generate some traffic
-        let txn_stat = generate_traffic(ctx, &all_validators, duration, 1, None)?;
+        // Generate some traffic with fixed tps 10
+        let txn_stat = generate_traffic(ctx, &all_validators, duration, 0, Some(10))?;
         ctx.report
             .report_txn_stats(self.name().to_string(), txn_stat, duration);
 

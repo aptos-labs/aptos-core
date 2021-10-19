@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod compatibility_test;
+pub mod fixed_tps_test;
 pub mod gas_price_test;
 pub mod partial_nodes_down_test;
 pub mod performance_test;
@@ -38,6 +39,7 @@ pub fn generate_traffic<'t>(
     validators: &[PeerId],
     duration: Duration,
     gas_price: u64,
+    fixed_tps: Option<u64>,
 ) -> Result<TxnStats> {
     let rt = Runtime::new()?;
     let rng = SeedableRng::from_rng(ctx.core().rng())?;
@@ -48,10 +50,11 @@ pub fn generate_traffic<'t>(
         .map(|n| n.async_json_rpc_client())
         .collect::<Vec<_>>();
     let mut emitter = TxnEmitter::new(ctx.swarm().chain_info(), rng);
-    let stats = rt.block_on(emitter.emit_txn_for(
-        duration,
-        EmitJobRequest::default(validator_clients, gas_price),
-    ))?;
+    let emit_job_request = match fixed_tps {
+        Some(tps) => EmitJobRequest::fixed_tps(validator_clients, tps, gas_price),
+        None => EmitJobRequest::default(validator_clients, gas_price),
+    };
+    let stats = rt.block_on(emitter.emit_txn_for(duration, emit_job_request))?;
 
     Ok(stats)
 }

@@ -75,6 +75,30 @@ impl EmitJobRequest {
             gas_price,
         }
     }
+
+    pub fn fixed_tps_params(clients_count: usize, tps: u64) -> (usize, u64) {
+        if tps < 1 {
+            panic!("Target tps {} can not less than 1", tps)
+        }
+        let num_workers = tps as usize / clients_count + 1;
+        let wait_time = (clients_count * num_workers * 1000_usize / tps as usize) as u64;
+        (num_workers, wait_time)
+    }
+
+    pub fn fixed_tps(json_rpc_clients: Vec<JsonRpcClient>, tps: u64, gas_price: u64) -> Self {
+        let (num_workers, wait_time) =
+            EmitJobRequest::fixed_tps_params(json_rpc_clients.len(), tps);
+        Self {
+            json_rpc_clients,
+            accounts_per_client: 1,
+            workers_per_endpoint: Some(num_workers),
+            thread_params: EmitThreadParams {
+                wait_millis: wait_time,
+                wait_committed: true,
+            },
+            gas_price,
+        }
+    }
 }
 
 #[derive(Debug, Default)]
