@@ -472,6 +472,22 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_get_transactions_with_zero_limit() {
+        let context = new_test_context();
+        let resp = context
+            .expect_status_code(400)
+            .get("/transactions?limit=0")
+            .await;
+        assert_json(
+            resp,
+            json!({
+              "code": 400,
+              "message": "invalid parameter limit: 0"
+            }),
+        );
+    }
+
+    #[tokio::test]
     async fn test_get_transactions_param_limit_exceeds_limit() {
         let context = new_test_context();
         let resp = context
