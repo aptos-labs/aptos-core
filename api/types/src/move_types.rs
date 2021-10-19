@@ -248,6 +248,14 @@ impl<'de> Deserialize<'de> for MoveStructValue {
     }
 }
 
+// MoveValue is used for:
+// 1. Serialize Move value into JSON blob,
+// 2. Deserialize the Move value JSON blob back as Json variant for holding the data
+//    while deserializing a JSON request body.
+// 3. Serialize typed Move value (non-Json variant) into BCS bytes for creating valid
+//    `TransactionPayload`, e.g. script function payload has BCS serialized arguments.
+//    This is also the reason you will see some types defined in this package can be
+//    serialized into binary/BCS format.
 #[derive(Clone, Debug, PartialEq)]
 pub enum MoveValue {
     U8(u8),
@@ -258,6 +266,21 @@ pub enum MoveValue {
     Vector(Vec<MoveValue>),
     Bytes(HexEncodedBytes),
     Struct(MoveStructValue),
+    // Json value is used for deserializing MoveValue JSON blob.
+    // Because when we serialize MoveValue into JSON, the type information
+    // will be lost (e.g. we serialize `Address` as hex-encoded string, we can't
+    // deserialize the hex-encoded string as `Address` unless we know its type
+    // is `Address`).
+    // So we deserialize MoveValue into Json variant first, then we look up
+    // the type information from DB and convert the Json variant into
+    // typed variant values.
+    // For example, a script function JSON blob contains arguments, which
+    // is `MoveValue` JSON blob, we don't know the arguments' types until
+    // we look up the script function Move type definition from DB by the
+    // script function module and name.
+    // We add this variant here instead of a different type, because this can
+    // avoid replicating all the types that uses `MoveValue` to use a different
+    // type.
     Json(serde_json::Value),
 }
 
