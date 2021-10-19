@@ -7,6 +7,8 @@ import { BcsSerializer } from "./generated/bcs/mod.ts";
 import { ListTuple, uint8, Seq, bytes } from "./generated/serde/types.ts";
 import { createHash } from "https://deno.land/std@0.77.0/hash/mod.ts";
 import { createRemote } from "https://deno.land/x/gentle_rpc@v3.0/mod.ts";
+import * as path from "https://deno.land/std@0.110.0/path/mod.ts";
+import * as util from "https://deno.land/std@0.85.0/node/util.ts";
 
 export async function buildAndSubmitTransaction(
   addressStr: string,
@@ -47,18 +49,26 @@ export function buildScriptFunctionTransaction(
   return new DiemTypes.ScriptFunction(module_id, new DiemTypes.Identifier(functionName), tyArgs, args);
 }
 
+// Example Usage:
+// await DiemHelpers.buildAndSubmitScriptFunctionTransaction("0xE73FFAAB476ED3F57E1A6877F3EE3891", "Foo", "Bar", [], [], 0)
 export async function buildAndSubmitScriptFunctionTransaction(
   moduleAddress: string,
   moduleName: string,
   functionName: string,
   tyArgs: Seq<DiemTypes.TypeTag>,
   args: Seq<bytes>,
-  addressStr: string,
   sequenceNumber: number,
-  privateKeyBytes: Uint8Array,
 ) {
   let payload: DiemTypes.TransactionPayload = buildScriptFunctionTransaction(moduleAddress, moduleName, functionName, tyArgs, args);
-  return await buildAndSubmitTransaction(addressStr, sequenceNumber, privateKeyBytes, payload);
+
+  // TODO(dimroc) : Help clean this up
+  const shuffleDir = Deno.env.get("SHUFFLE_HOME") || "unknown";
+  const privateKeyPath = path.join(shuffleDir, "accounts/latest/dev.key");
+  const senderAddressPath = path.join(shuffleDir, "accounts/latest/address");
+  const senderAddress = await Deno.readTextFile(senderAddressPath);
+  const fullSenderAddress = "0x" + senderAddress;
+  const privateKeyBytes = await Deno.readFile(privateKeyPath);
+  return await buildAndSubmitTransaction(fullSenderAddress, sequenceNumber, privateKeyBytes, payload);
 }
 
 export function newRawTransaction(
