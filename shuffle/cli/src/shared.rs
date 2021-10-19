@@ -199,9 +199,6 @@ impl Home {
         Ok(generate_key::generate_and_save_key(
             self.test_key_path.as_path(),
         ))
-        // const NEW_KEY_FILE_CONTENT: &[u8] = include_bytes!("../new_account.key");
-        // fs::write(self.testkey_path.as_path(), NEW_KEY_FILE_CONTENT)?;
-        // Ok(generate_key::load_key(self.test_key_path.as_path()))
     }
 
     pub fn generate_testkey_address_file(&self, public_key: &Ed25519PublicKey) -> Result<()> {
