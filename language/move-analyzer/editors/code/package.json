@@ -43,6 +43,22 @@
                     "type": "string",
                     "default": "move-analyzer",
                     "markdownDescription": "Path and filename of the move-analyzer executable, e.g. `/usr/bin/move-analyzer`."
+                },
+                "move-analyzer.trace.server": {
+                    "type": "string",
+                    "scope": "window",
+                    "enum": [
+                        "off",
+                        "messages",
+                        "verbose"
+                    ],
+                    "enumDescriptions": [
+                        "Do not log any messages.",
+                        "Log short summaries of each message.",
+                        "Log each message and its contents."
+                    ],
+                    "default": "off",
+                    "description": "Traces the communication between the move-analyzer language server and Visual Studio Code. Note that this log can be very verbose, and so not recommended for anyone besides people working on or debugging move-analyzer itself."
                 }
             }
         },
