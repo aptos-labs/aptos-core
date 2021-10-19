@@ -4,7 +4,7 @@
 import * as DiemTypes from "./generated/diemTypes/mod.ts";
 import * as ed from "https://deno.land/x/ed25519@1.0.1/mod.ts";
 import { BcsSerializer } from "./generated/bcs/mod.ts";
-import { ListTuple, uint8 } from "./generated/serde/types.ts";
+import { ListTuple, uint8, Seq, bytes } from "./generated/serde/types.ts";
 import { createHash } from "https://deno.land/std@0.77.0/hash/mod.ts";
 import { createRemote } from "https://deno.land/x/gentle_rpc@v3.0/mod.ts";
 
@@ -31,6 +31,34 @@ export async function buildAndSubmitTransaction(
   );
   const remote = createRemote("http://127.0.0.1:8080/v1");
   return await remote.call("submit", [signedTxnHex]);
+}
+
+export function buildScriptFunctionTransaction(
+  moduleAddress: string,
+  moduleName: string,
+  functionName: string,
+  tyArgs: Seq<DiemTypes.TypeTag>, //[0,9,8]
+  args: Seq<bytes> // new Uint8Array(9,0,9)
+): DiemTypes.TransactionPayload {
+  const module_id: DiemTypes.ModuleId = new DiemTypes.ModuleId(
+    hexToAccountAddress(moduleAddress),
+    new DiemTypes.Identifier(moduleName)
+  );
+  return new DiemTypes.ScriptFunction(module_id, new DiemTypes.Identifier(functionName), tyArgs, args);
+}
+
+export async function buildAndSubmitScriptFunctionTransaction(
+  moduleAddress: string,
+  moduleName: string,
+  functionName: string,
+  tyArgs: Seq<DiemTypes.TypeTag>,
+  args: Seq<bytes>,
+  addressStr: string,
+  sequenceNumber: number,
+  privateKeyBytes: Uint8Array,
+) {
+  let payload: DiemTypes.TransactionPayload = buildScriptFunctionTransaction(moduleAddress, moduleName, functionName, tyArgs, args);
+  return await buildAndSubmitTransaction(addressStr, sequenceNumber, privateKeyBytes, payload);
 }
 
 export function newRawTransaction(
