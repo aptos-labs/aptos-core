@@ -536,7 +536,7 @@ fn verify_committed_transactions(
         txn_output_list_with_proof
             .verify(ledger_info, Some(cur_ver))
             .unwrap();
-        assert_eq!(txn_output_list_with_proof.transaction_outputs.len(), 1);
+        assert_eq!(txn_output_list_with_proof.transactions_and_outputs.len(), 1);
 
         // Fetch and verify account states.
         for (addr, expected_blob) in txn_to_commit.account_states() {

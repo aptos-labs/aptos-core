@@ -1192,19 +1192,19 @@ impl<T: TransactionInfoTrait> TransactionListWithProof<T> {
 /// resulting state matches the expected state in the proof (for each version).
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 pub struct TransactionOutputListWithProof<T> {
-    pub transaction_outputs: Vec<TransactionOutput>,
+    pub transactions_and_outputs: Vec<(Transaction, TransactionOutput)>,
     pub first_transaction_output_version: Option<Version>,
     pub proof: TransactionInfoListWithProof<T>,
 }
 
 impl<T: TransactionInfoTrait> TransactionOutputListWithProof<T> {
     pub fn new(
-        transaction_outputs: Vec<TransactionOutput>,
+        transactions_and_outputs: Vec<(Transaction, TransactionOutput)>,
         first_transaction_output_version: Option<Version>,
         proof: TransactionInfoListWithProof<T>,
     ) -> Self {
         Self {
-            transaction_outputs,
+            transactions_and_outputs,
             first_transaction_output_version,
             proof,
         }
@@ -1220,7 +1220,9 @@ impl<T: TransactionInfoTrait> TransactionOutputListWithProof<T> {
     /// 1. All transaction infos exist on the given `ledger_info`.
     /// 2. If `first_transaction_output_version` is None, the transaction output list is empty.
     ///    Otherwise, the list starts at `first_transaction_output_version`.
-    /// 3. Events in each transaction output match the expected event root hashes in the proof.
+    /// 3. Events, gas, status in each transaction output match the expected event root hashes,
+    ///    the gas used and the transaction execution status in the proof, respectively.
+    /// 4. The transaction hashes match those of the transaction infos.
     ///
     /// Note: the proof cannot verify the TransactionOutputs themselves. This
     /// requires speculative execution of each TransactionOutput to verify that the
@@ -1230,24 +1232,66 @@ impl<T: TransactionInfoTrait> TransactionOutputListWithProof<T> {
         ledger_info: &LedgerInfo,
         first_transaction_output_version: Option<Version>,
     ) -> Result<()> {
-        // Verify the first transaction output versions match
+        // Verify the first transaction/output versions match
         ensure!(
             self.first_transaction_output_version == first_transaction_output_version,
-            "First transaction output version ({:?}) doesn't match given version ({:?}).",
+            "First transaction and output version ({:?}) doesn't match given version ({:?}).",
             self.first_transaction_output_version,
             first_transaction_output_version,
         );
 
+        // Verify the lengths of the transaction(output)s and transaction infos match
+        ensure!(
+            self.proof.transaction_infos.len() == self.transactions_and_outputs.len(),
+            "The number of TransactionInfo objects ({}) does not match the number of \
+             transactions and outputs ({}).",
+            self.proof.transaction_infos.len(),
+            self.transactions_and_outputs.len(),
+        );
+
+        // Verify the events, status, gas used and transaction hashes.
+        itertools::zip_eq(
+            &self.transactions_and_outputs,
+            &self.proof.transaction_infos,
+        )
+        .map(|((txn, txn_output), txn_info)| {
+            // Check the events against the expected events root hash
+            verify_events_against_root_hash(&txn_output.events, txn_info)?;
+
+            // Verify the gas matches for both the transaction info and output
+            ensure!(
+                txn_output.gas_used() == txn_info.gas_used(),
+                "The gas used in transaction output does not match the transaction info \
+                     in proof. Gas used in transaction output: {}. Gas used in txn_info: {}.",
+                txn_output.gas_used(),
+                txn_info.gas_used(),
+            );
+
+            // Verify the execution status matches for both the transaction info and output.
+            ensure!(
+                *txn_output.status() == TransactionStatus::Keep(txn_info.status().clone()),
+                "The execution status of transaction output does not match the transaction \
+                     info in proof. Status in transaction output: {:?}. Status in txn_info: {:?}.",
+                txn_output.status(),
+                txn_info.status(),
+            );
+
+            // Verify the transaction hashes match those of the transaction infos
+            let txn_hash = txn.hash();
+            ensure!(
+                txn_hash == txn_info.transaction_hash(),
+                "The transaction hash does not match the hash in transaction info. \
+                     Transaction hash: {:x}. Transaction hash in txn_info: {:x}.",
+                txn_hash,
+                txn_info.transaction_hash(),
+            );
+            Ok(())
+        })
+        .collect::<Result<Vec<_>>>()?;
+
         // Verify the transaction infos are proven by the ledger info.
         self.proof
             .verify(ledger_info, self.first_transaction_output_version)?;
-
-        // Verify the events
-        itertools::zip_eq(&self.transaction_outputs, &self.proof.transaction_infos)
-            .map(|(txn_output, txn_info)| {
-                verify_events_against_root_hash(&txn_output.events, txn_info)
-            })
-            .collect::<Result<Vec<_>>>()?;
 
         Ok(())
     }

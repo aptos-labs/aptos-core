@@ -812,18 +812,19 @@ impl DbReader<DpnProto> for DiemDB {
 
             let limit = std::cmp::min(limit, ledger_version - start_version + 1);
 
-            let (txn_infos, txn_outputs) = (start_version..start_version + limit)
+            let (txn_infos, txns_and_outputs) = (start_version..start_version + limit)
                 .map(|version| {
                     let txn_info = self.ledger_store.get_transaction_info(version)?;
                     let events = self.event_store.get_events_by_version(version)?;
                     let write_set = self.transaction_store.get_write_set(version)?;
+                    let txn = self.transaction_store.get_transaction(version)?;
                     let txn_output = TransactionOutput::new(
                         write_set,
                         events,
                         txn_info.gas_used(),
                         txn_info.status().clone().into(),
                     );
-                    Ok((txn_info, txn_output))
+                    Ok((txn_info, (txn, txn_output)))
                 })
                 .collect::<Result<Vec<_>>>()?
                 .into_iter()
@@ -838,7 +839,7 @@ impl DbReader<DpnProto> for DiemDB {
             );
 
             Ok(TransactionOutputListWithProof::new(
-                txn_outputs,
+                txns_and_outputs,
                 Some(start_version),
                 proof,
             ))

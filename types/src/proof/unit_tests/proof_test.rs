@@ -619,20 +619,28 @@ fn test_transaction_list_with_proof() {
 }
 
 #[test]
-fn test_transaction_output_list_with_proof() {
-    // Create test event and transaction output
+fn test_transaction_and_output_list_with_proof() {
+    // Create test transaction, event and transaction output
+    let transaction = Transaction::BlockMetadata(BlockMetadata::new(
+        HashValue::random(),
+        0,
+        0,
+        vec![],
+        AccountAddress::random(),
+    ));
     let event = create_event();
     let transaction_output = TransactionOutput::new(
         WriteSet::default(),
         vec![event.clone()],
         0,
-        TransactionStatus::Retry,
+        TransactionStatus::Keep(KeptVMStatus::MiscellaneousError),
     );
 
     // Create transaction output list with proof
-    let transaction_info_list_proof = create_single_transaction_info_proof(None, None);
+    let transaction_info_list_proof =
+        create_single_transaction_info_proof(Some(transaction.hash()), None);
     let transaction_output_list_proof = TransactionOutputListWithProof::new(
-        vec![transaction_output.clone()],
+        vec![(transaction.clone(), transaction_output.clone())],
         Some(1),
         transaction_info_list_proof.clone(),
     );
@@ -653,10 +661,10 @@ fn test_transaction_output_list_with_proof() {
 
     // Construct a new transaction output list proof where the transaction info and event hashes match
     let transaction_info_list_proof =
-        create_single_transaction_info_proof(None, Some(event.hash()));
+        create_single_transaction_info_proof(Some(transaction.hash()), Some(event.hash()));
     let expected_info_hash = transaction_info_list_proof.transaction_infos[0].hash();
-    let transaction_output_list_proof = TransactionOutputListWithProof::new(
-        vec![transaction_output],
+    let transaction_and_output_list_proof = TransactionOutputListWithProof::new(
+        vec![(transaction, transaction_output)],
         Some(1),
         transaction_info_list_proof,
     );
@@ -664,7 +672,7 @@ fn test_transaction_output_list_with_proof() {
     // Ensure ledger verification now passes
     let block_info = BlockInfo::new(0, 0, HashValue::random(), expected_info_hash, 0, 0, None);
     let ledger_info = LedgerInfo::new(block_info, HashValue::zero());
-    transaction_output_list_proof
+    transaction_and_output_list_proof
         .verify(&ledger_info, Some(1))
         .unwrap();
 }
