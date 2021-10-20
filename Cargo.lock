@@ -6429,6 +6429,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "public-script-helper"
+version = "0.1.0"
+dependencies = [
+ "abigen",
+ "anyhow",
+ "bcs",
+ "diem-config",
+ "diem-crypto",
+ "diem-genesis-tool",
+ "diem-json-rpc-types",
+ "diem-node",
+ "diem-sdk",
+ "diem-temppath",
+ "diem-types",
+ "diem-workspace-hack",
+ "diemdb",
+ "generate-key",
+ "log",
+ "move-core-types",
+ "move-prover",
+ "rand 0.8.4",
+ "shuffle-transaction-builder",
+ "structopt 0.3.21",
+ "transaction-builder-generator",
+ "walkdir",
+]
+
+[[package]]
 name = "qstring"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
