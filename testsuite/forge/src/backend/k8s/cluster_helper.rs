@@ -35,6 +35,9 @@ const HELM_BIN: &str = "helm";
 const KUBECTL_BIN: &str = "kubectl";
 const MAX_NUM_VALIDATORS: usize = 30;
 const HEALTH_CHECK_URL: &str = "http://127.0.0.1:8001";
+const VALIDATOR_SCALING_FACTOR: i64 = 3;
+const UTILITIES_SCALING_FACTOR: i64 = 3;
+const TRUSTED_SCALING_FACTOR: i64 = 1;
 
 async fn wait_genesis_job(kube_client: &K8sClient, era: &str) -> Result<()> {
     diem_retrier::retry_async(k8s_retry_strategy(), || {
@@ -51,6 +54,38 @@ async fn wait_genesis_job(kube_client: &K8sClient, era: &str) -> Result<()> {
                     Ok(())
                 }
                 _ => bail!("Genesis job not completed"),
+            }
+        })
+    })
+    .await
+}
+
+async fn nodegroup_state_check(desire_size: i64) -> Result<()> {
+    // we do not check node state for scaling down
+    if desire_size == 0 {
+        return Ok(());
+    }
+
+    diem_retrier::retry_async(k8s_retry_strategy(), || {
+        Box::pin(async move {
+            let status_args = ["get", "nodes"];
+            let raw_nodegroup_values = Command::new(KUBECTL_BIN)
+                .args(&status_args)
+                .output()
+                .unwrap_or_else(|_| panic!("failed to nodegroup status"));
+
+            let nodegroup_states = String::from_utf8(raw_nodegroup_values.stdout).unwrap();
+            let v: Vec<_> = nodegroup_states.match_indices("Ready").collect();
+            println!(
+                "Desire size of nodegroup is {}, currently {} nodes are ready to schedule",
+                desire_size,
+                v.len()
+            );
+            if v.len() < desire_size as usize {
+                bail!("nodegroup is not healthy");
+            } else {
+                println!("All nodes are ready");
+                Ok(())
             }
         })
     })
@@ -298,8 +333,12 @@ pub fn clean_k8s_cluster(
 
     // healthcheck on each of the validators wait until they all healthy
     if require_validator_healthcheck {
-        return nodes_healthcheck(all_nodes);
+        let unhealthy_nodes = nodes_healthcheck(all_nodes).unwrap();
+        if !unhealthy_nodes.is_empty() {
+            bail!("Unhealthy validators after cleanup: {:?}", unhealthy_nodes);
+        }
     }
+
     Ok(())
 }
 
@@ -418,24 +457,47 @@ pub fn set_eks_nodegroup_size(
     let max_surge = 2; // multiplier for max size
     let num_validators: i64 = num_validators as i64;
     let idle_utilities_size = 5; // keep extra utilities nodes around for forge pods and monitoring
+                                 // make minimum of 5 extra buffer nodes on cluster when we do scaling up
+    let buffer_node = if num_validators != 0 {
+        cmp::max(5, num_validators / 5)
+    } else {
+        0
+    };
     let validator_scaling = NodegroupScalingConfig {
-        desired_size: Some(cmp::max(num_validators * 3, 1)),
-        max_size: Some(cmp::max((num_validators * 3 + 1) * max_surge, 1)),
-        min_size: Some(cmp::max(num_validators * 3, 1)),
+        desired_size: Some(cmp::max(
+            num_validators * VALIDATOR_SCALING_FACTOR + buffer_node,
+            1,
+        )),
+        max_size: Some(cmp::max(
+            (num_validators * VALIDATOR_SCALING_FACTOR + 1) * max_surge,
+            1,
+        )),
+        min_size: Some(cmp::max(num_validators * VALIDATOR_SCALING_FACTOR, 1)),
     };
     let utilities_scaling = NodegroupScalingConfig {
-        desired_size: Some(cmp::max(num_validators * 3, idle_utilities_size)),
-        max_size: Some(cmp::max(
-            num_validators * 3 * max_surge,
+        desired_size: Some(cmp::max(
+            num_validators * UTILITIES_SCALING_FACTOR + buffer_node,
             idle_utilities_size,
         )),
-        min_size: Some(cmp::max(num_validators * 3, idle_utilities_size)),
+        max_size: Some(cmp::max(
+            num_validators * UTILITIES_SCALING_FACTOR * max_surge,
+            idle_utilities_size,
+        )),
+        min_size: Some(cmp::max(
+            num_validators * UTILITIES_SCALING_FACTOR,
+            idle_utilities_size,
+        )),
     };
     let trusted_scaling = NodegroupScalingConfig {
-        desired_size: Some(num_validators),
-        max_size: Some(cmp::max(num_validators * max_surge, 1)),
-        min_size: Some(num_validators),
+        desired_size: Some(num_validators * TRUSTED_SCALING_FACTOR + buffer_node),
+        max_size: Some(cmp::max(
+            num_validators * max_surge * TRUSTED_SCALING_FACTOR,
+            1,
+        )),
+        min_size: Some(num_validators * TRUSTED_SCALING_FACTOR),
     };
+    let desire_nodegroup_size = num_validators
+        * (VALIDATOR_SCALING_FACTOR + UTILITIES_SCALING_FACTOR + TRUSTED_SCALING_FACTOR);
 
     // submit the scaling requests
     let rt = Runtime::new()?;
@@ -510,6 +572,9 @@ pub fn set_eks_nodegroup_size(
             })
             .unwrap();
         });
+
+    rt.block_on(async { nodegroup_state_check(desire_nodegroup_size).await })
+        .unwrap();
 
     Ok(())
 }

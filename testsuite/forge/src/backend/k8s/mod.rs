@@ -110,7 +110,7 @@ impl Factory for K8sFactory {
             node_num.get(),
             format!("{}", init_version),
             format!("{}", init_version),
-            true,
+            false,
         )?;
         let rt = Runtime::new().unwrap();
         let swarm = rt

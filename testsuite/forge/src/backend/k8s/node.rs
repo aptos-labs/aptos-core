@@ -4,13 +4,15 @@
 use crate::{scale_sts_replica, FullNode, HealthCheckError, Node, Result, Validator, Version};
 use anyhow::format_err;
 use diem_config::config::NodeConfig;
-use diem_sdk::{client::Client as JsonRpcClient, types::PeerId};
+use diem_sdk::{
+    client::{BlockingClient, Client as JsonRpcClient},
+    types::PeerId,
+};
 use reqwest::Url;
 use std::{
     fmt::{Debug, Formatter},
     str::FromStr,
 };
-use tokio::runtime::Runtime;
 
 pub struct K8sNode {
     pub(crate) name: String,
@@ -21,7 +23,6 @@ pub struct K8sNode {
     pub(crate) ip: String,
     pub(crate) port: u32,
     pub(crate) rest_api_port: u32,
-    pub(crate) runtime: Runtime,
     pub version: Version,
 }
 
@@ -101,10 +102,8 @@ impl Node for K8sNode {
     }
 
     fn health_check(&mut self) -> Result<(), HealthCheckError> {
-        let results = match self
-            .runtime
-            .block_on(self.json_rpc_client().batch(Vec::new()))
-        {
+        let client = BlockingClient::new(self.json_rpc_endpoint());
+        let results = match client.batch(Vec::new()) {
             Ok(x) => x,
             Err(x) => return Err(HealthCheckError::RpcFailure(format_err!(x))),
         };

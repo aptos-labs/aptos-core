@@ -21,7 +21,7 @@ use kube::{
     client::Client as K8sClient,
 };
 use std::{collections::HashMap, convert::TryFrom, env, process::Command, str, sync::Arc, thread};
-use tokio::{runtime::Runtime, time::Duration};
+use tokio::time::Duration;
 
 const JSON_RPC_PORT: u32 = 80;
 const REST_API_PORT: u32 = 8081;
@@ -143,11 +143,17 @@ impl K8sSwarm {
 
 impl Swarm for K8sSwarm {
     fn health_check(&mut self) -> Result<()> {
-        nodes_healthcheck(Box::new(
+        let unhealthy_nodes = nodes_healthcheck(Box::new(
             self.validators
                 .values_mut()
                 .map(|v| v as &mut dyn Validator),
         ))
+        .unwrap();
+        if !unhealthy_nodes.is_empty() {
+            bail!("Unhealthy nodes: {:?}", unhealthy_nodes)
+        }
+
+        Ok(())
     }
 
     fn validators<'a>(&'a self) -> Box<dyn Iterator<Item = &'a dyn Validator> + 'a> {
@@ -257,7 +263,7 @@ impl Swarm for K8sSwarm {
 }
 
 pub(crate) fn k8s_retry_strategy() -> impl Iterator<Item = Duration> {
-    diem_retrier::exp_retry_strategy(1000, 10000, 30)
+    diem_retrier::exp_retry_strategy(1000, 10000, 50)
 }
 
 #[derive(Clone, Debug)]
@@ -294,7 +300,7 @@ pub(crate) async fn get_validators(
     image_tag: &str,
 ) -> Result<HashMap<PeerId, K8sNode>> {
     let services = list_services(client).await?;
-    services
+    let mut validators = services
         .into_iter()
         .filter(|s| s.name.contains(VALIDATOR_LB))
         .map(|s| {
@@ -310,11 +316,20 @@ pub(crate) async fn get_validators(
                 rest_api_port: REST_API_PORT,
                 dns: s.name,
                 version: Version::new(0, image_tag.to_string()),
-                runtime: Runtime::new().unwrap(),
             };
-            Ok((node.peer_id(), node))
+            (node.peer_id(), node)
         })
-        .collect::<Result<HashMap<_, _>>>()
+        .collect::<HashMap<_, _>>();
+    let all_nodes = Box::new(validators.values_mut().map(|v| v as &mut dyn Validator));
+    let unhealthy_nodes = nodes_healthcheck(all_nodes).unwrap();
+    let mut health_nodes = HashMap::new();
+    for node in validators {
+        if !unhealthy_nodes.contains(&node.1.name) {
+            health_nodes.insert(node.0, node.1);
+        }
+    }
+
+    Ok(health_nodes)
 }
 
 fn parse_node_id(s: &str) -> Result<usize> {
@@ -336,7 +351,7 @@ fn load_tc_key(tc_key_bytes: &[u8]) -> Ed25519PrivateKey {
 
 pub fn nodes_healthcheck<'a>(
     nodes: Box<dyn Iterator<Item = &'a mut dyn Validator> + 'a>,
-) -> Result<()> {
+) -> Result<Vec<String>> {
     let unhealthy_nodes = nodes
         .filter_map(|node| {
             let node_name = node.name().to_string();
@@ -359,11 +374,10 @@ pub fn nodes_healthcheck<'a>(
         })
         .collect::<Vec<_>>();
     if !unhealthy_nodes.is_empty() {
-        bail!("Unhealthy validators after cleanup: {:?}", unhealthy_nodes);
+        debug!("Unhealthy validators after cleanup: {:?}", unhealthy_nodes);
     }
-    println!("All validators healthy after cleanup!");
     println!("Wait for the instance to sync up with peers");
     thread::sleep(Duration::from_secs(20));
 
-    Ok(())
+    Ok(unhealthy_nodes)
 }
