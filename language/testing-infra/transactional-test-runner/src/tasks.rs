@@ -20,7 +20,7 @@ use tempfile::NamedTempFile;
 #[derive(Debug)]
 pub enum RawAddress {
     Named(Identifier),
-    Literal(AccountAddress),
+    Anonymous(AccountAddress),
 }
 
 fn parse_address_literal(s: &str) -> Result<AccountAddress> {
@@ -33,7 +33,7 @@ fn parse_address_literal(s: &str) -> Result<AccountAddress> {
 impl RawAddress {
     pub fn parse(s: &str) -> Result<Self> {
         if let Ok(addr) = parse_address_literal(s) {
-            return Ok(Self::Literal(addr));
+            return Ok(Self::Anonymous(addr));
         }
         let name =
             Identifier::new(s).map_err(|_| anyhow!("Failed to parse \"{}\" as address.", s))?;

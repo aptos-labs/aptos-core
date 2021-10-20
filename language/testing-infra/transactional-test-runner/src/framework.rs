@@ -59,7 +59,7 @@ impl<'a> CompiledState<'a> {
     pub fn resolve_address(&self, addr: &RawAddress) -> AccountAddress {
         match addr {
             RawAddress::Named(named_addr) => self.resolve_named_address(named_addr.as_str()),
-            RawAddress::Literal(addr) => *addr,
+            RawAddress::Anonymous(addr) => *addr,
         }
     }
 }

@@ -25,8 +25,10 @@ move-binary-format = { path = "../../move-binary-format" }
 move-core-types = { path = "../../move-core/types" }
 diem-vm =  { path = "../../diem-vm" }
 diem-types = { path = "../../../types", features = ["fuzzing"] }
+diem-transaction-builder = { path = "../../../sdk/transaction-builder" }
 diem-crypto = { path = "../../../crypto/crypto" }
 diem-framework = { path = "../../diem-framework" }
+diem-keygen = { path = "../../../diem-move/diem-keygen" }
 diem-state-view = { path = "../../../storage/state-view" }
 diem-workspace-hack = { path = "../../../common/workspace-hack" }
 move-command-line-common = { path = "../../move-command-line-common" }

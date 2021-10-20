@@ -6,6 +6,7 @@ use diem_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     ValidCryptoMaterialStringExt,
 };
+use diem_keygen::KeyGen;
 use diem_state_view::StateView;
 use diem_types::{
     access_path::AccessPath,
@@ -32,7 +33,10 @@ use move_core_types::{
     move_resource::MoveStructType,
     transaction_argument::{convert_txn_args, TransactionArgument},
 };
-use move_lang::{shared::verify_and_create_named_address_mapping, FullyCompiledProgram};
+use move_lang::{
+    shared::{verify_and_create_named_address_mapping, NumberFormat, NumericalAddress},
+    FullyCompiledProgram,
+};
 use move_transactional_test_runner::{
     framework::{run_test_impl, CompiledState, MoveTestAdapter},
     tasks::{EmptyCommand, InitCommand, RawAddress, SyntaxChoice, TaskInput},
@@ -90,13 +94,20 @@ struct DiemRunArgs {
 struct DiemInitArgs {
     #[structopt(long = "private-keys", parse(try_from_str = parse_named_private_key))]
     private_keys: Option<Vec<(Identifier, Ed25519PrivateKey)>>,
+
+    #[structopt(long = "validators", parse(try_from_str = parse_identifier))]
+    validators: Option<Vec<Identifier>>,
 }
 
 /// A raw private key -- either a literal or an unresolved name.
 #[derive(Debug)]
 enum RawPrivateKey {
     Named(Identifier),
-    Literal(Ed25519PrivateKey),
+    Anonymous(Ed25519PrivateKey),
+}
+
+fn parse_identifier(s: &str) -> Result<Identifier> {
+    Identifier::new(s).map_err(|_| format_err!("Failed to parse identifier"))
 }
 
 fn parse_ed25519_private_key(s: &str) -> Result<Ed25519PrivateKey> {
@@ -106,7 +117,7 @@ fn parse_ed25519_private_key(s: &str) -> Result<Ed25519PrivateKey> {
 impl RawPrivateKey {
     fn parse(s: &str) -> Result<Self> {
         if let Ok(private_key) = parse_ed25519_private_key(s) {
-            return Ok(Self::Literal(private_key));
+            return Ok(Self::Anonymous(private_key));
         }
         let name = Identifier::new(s)
             .map_err(|_| format_err!("Failed to parse '{}' as private key.", s))?;
@@ -149,7 +160,7 @@ impl<'a> DiemTestAdapter<'a> {
     /// Resolve a raw private key into a numeric one.
     fn resolve_private_key(&self, private_key: &RawPrivateKey) -> Ed25519PrivateKey {
         match private_key {
-            RawPrivateKey::Literal(private_key) => private_key.clone(),
+            RawPrivateKey::Anonymous(private_key) => private_key.clone(),
             RawPrivateKey::Named(name) => self.resolve_named_private_key(name),
         }
     }
@@ -266,6 +277,41 @@ impl<'a> DiemTestAdapter<'a> {
 
         Ok(())
     }
+
+    /// Create a validator account with random address and private key, and bind the generated address
+    /// and private key to the name.
+    fn create_validator_account(
+        &mut self,
+        validator_name: Identifier,
+        auth_key_prefix: Vec<u8>,
+        account_addr: AccountAddress,
+    ) {
+        let parameters = self
+            .fetch_default_transaction_parameters(&diem_root_address())
+            .unwrap();
+
+        let txn = RawTransaction::new(
+            diem_root_address(),
+            parameters.sequence_number,
+            diem_transaction_builder::stdlib::encode_create_validator_account_script_function(
+                0,
+                account_addr,
+                auth_key_prefix,
+                validator_name.as_bytes().into(),
+            ),
+            parameters.max_gas_amount,
+            parameters.gas_unit_price,
+            parameters.gas_currency_code,
+            parameters.expiration_timestamp_secs,
+            ChainId::test(),
+        )
+        .sign(&GENESIS_KEYPAIR.0, GENESIS_KEYPAIR.1.clone())
+        .unwrap()
+        .into_inner();
+
+        self.run_transaction(txn)
+            .expect("Failed to create account. This should not happen.")
+    }
 }
 
 fn panic_missing_private_key_named(cmd_name: &str, name: &IdentStr) -> ! {
@@ -304,6 +350,7 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
         pre_compiled_deps: Option<&'a FullyCompiledProgram>,
         task_opt: Option<TaskInput<(InitCommand, Self::ExtraInitArgs)>>,
     ) -> Self {
+        // Named address mapping
         let additional_named_address_mapping = match task_opt.as_ref().map(|t| &t.command) {
             Some((InitCommand { named_addresses }, _)) => {
                 verify_and_create_named_address_mapping(named_addresses.clone()).unwrap()
@@ -319,43 +366,84 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
             named_address_mapping.insert(name, addr);
         }
 
+        // Genesis modules
         // TODO: rework vm-genesis and try not to compile the genesis modules twice.
         let mut storage = FakeDataStore::new(HashMap::new());
         storage.add_write_set(GENESIS_CHANGE_SET_FRESH.write_set());
 
+        // Builtin private key mapping
         let mut private_key_mapping = BTreeMap::new();
         for (name, private_key) in diem_framework_private_key_mapping() {
             private_key_mapping.insert(Identifier::new(name).unwrap(), private_key);
         }
+
+        // Handle extra init args
+        let mut keygen = KeyGen::from_seed([0; 32]);
+        let mut validators_to_create = vec![];
+
         if let Some(TaskInput {
-            command:
-                (
-                    _,
-                    DiemInitArgs {
-                        private_keys: Some(additional_private_key_mapping),
-                        ..
-                    },
-                ),
+            command: (_, init_args),
             ..
         }) = task_opt
         {
-            for (name, private_key) in additional_private_key_mapping {
-                if private_key_mapping.contains_key(&name) {
-                    panic!(
-                        "Invalid init. The named private key '{}' already exists",
-                        name
-                    )
+            // Private key mapping
+            if let Some(additional_private_key_mapping) = init_args.private_keys {
+                for (name, private_key) in additional_private_key_mapping {
+                    if private_key_mapping.contains_key(&name) {
+                        panic!(
+                            "Invalid init. The named private key '{}' already exists.",
+                            name
+                        )
+                    }
+                    private_key_mapping.insert(name, private_key);
                 }
-                private_key_mapping.insert(name, private_key);
+            }
+
+            // Validators
+            if let Some(validators) = init_args.validators {
+                for validator_name in validators {
+                    if named_address_mapping.contains_key(validator_name.as_str()) {
+                        panic!(
+                            "Invalid validator name {} -- named address already exists.",
+                            validator_name
+                        )
+                    }
+                    if private_key_mapping.contains_key(&validator_name) {
+                        panic!(
+                            "Invalid validator name {} -- named private key already exists.",
+                            validator_name
+                        )
+                    }
+
+                    let (private_key, auth_key_prefix, account_addr) =
+                        keygen.generate_credentials_for_account_creation();
+                    named_address_mapping.insert(
+                        validator_name.to_string(),
+                        NumericalAddress::new(account_addr.into_bytes(), NumberFormat::Hex),
+                    );
+                    private_key_mapping.insert(validator_name.clone(), private_key);
+
+                    // Note: validator accounts are created at a later time.
+                    // This is because we need to fetch the sequence number of DiemRoot, which is
+                    // only available after the DiemTestAdapter has been fully initialized.
+                    validators_to_create.push((validator_name, auth_key_prefix, account_addr));
+                }
             }
         }
 
-        Self {
+        let mut adapter = Self {
             compiled_state: CompiledState::new(named_address_mapping, pre_compiled_deps),
             default_syntax,
             storage,
             private_key_mapping,
+        };
+
+        // Create validator accounts
+        for (validator_name, auth_key_prefix, account_addr) in validators_to_create {
+            adapter.create_validator_account(validator_name, auth_key_prefix, account_addr);
         }
+
+        adapter
     }
 
     fn publish_module(
@@ -408,8 +496,6 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
         gas_budget: Option<u64>,
         extra_args: Self::ExtraRunArgs,
     ) -> Result<()> {
-        assert!(!signers.is_empty());
-
         if !extra_args.admin_script {
             panic!(
                 "Transactions scripts are not currently allowed on Diem. \
@@ -482,7 +568,7 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
                 Some(private_key) => private_key.clone(),
                 None => panic_missing_private_key_named("run", named_addr),
             },
-            (None, RawAddress::Literal(_)) => panic_missing_private_key("run"),
+            (None, RawAddress::Anonymous(_)) => panic_missing_private_key("run"),
         };
 
         let params = self.fetch_default_transaction_parameters(&signer)?;

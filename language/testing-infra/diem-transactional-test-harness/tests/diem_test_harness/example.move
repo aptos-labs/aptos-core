@@ -35,6 +35,14 @@ module A::N {
 
 
 
+// You can also specify the private key in its literal (anonymous) form, but this is not recommended.
+//
+//# publish --private-key 56a26140eb233750cd14fb168c3eb4bd0782b099cde626ec8aff7f3cceb6364f
+module A::O {
+    public(script) fun baz() {}
+}
+
+
 // In order to get authenticated and run a transaction script successfully, you *must* provide
 // the correct private key that corresponds to the address and auth key prefix used to create
 // the account, as an additional argument to the run command.
@@ -53,6 +61,15 @@ module A::N {
 // private key mapping set by the init command.
 //
 //# run --signers A
+//#     -- 0x4777eb94491650dd3f095ce6f778acb6::M::foo
+
+
+
+// Literal signer addresses and private keys can be used, but again, this is often repetitive and
+// not recommended.
+//
+//# run --signers 0x4777eb94491650dd3f095ce6f778acb6
+//#     --private-key 56a26140eb233750cd14fb168c3eb4bd0782b099cde626ec8aff7f3cceb6364f
 //#     -- 0x4777eb94491650dd3f095ce6f778acb6::M::foo
 
 
