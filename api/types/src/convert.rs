@@ -16,7 +16,9 @@ use diem_types::{
     },
     write_set::WriteOp,
 };
-use move_core_types::{language_storage::StructTag, resolver::MoveResolver};
+use move_core_types::{
+    identifier::Identifier, language_storage::StructTag, resolver::MoveResolver,
+};
 use resource_viewer::MoveValueAnnotator;
 
 use anyhow::{ensure, format_err, Result};
@@ -47,6 +49,14 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
 
     pub fn try_into_resource<'b>(&self, typ: &StructTag, bytes: &'b [u8]) -> Result<MoveResource> {
         self.inner.view_resource(typ, bytes)?.try_into()
+    }
+
+    pub fn move_struct_fields<'b>(
+        &self,
+        typ: &StructTag,
+        bytes: &'b [u8],
+    ) -> Result<Vec<(Identifier, move_core_types::value::MoveValue)>> {
+        self.inner.move_struct_fields(typ, bytes)
     }
 
     pub fn try_into_pending_transaction(&self, txn: SignedTransaction) -> Result<Transaction> {

@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{Address, Bytecode};
-use diem_types::transaction::Module;
+use anyhow::format_err;
+use diem_types::{event::EventKey, transaction::Module};
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{
@@ -211,6 +212,13 @@ impl From<HexEncodedBytes> for move_core_types::value::MoveValue {
     }
 }
 
+impl TryFrom<HexEncodedBytes> for EventKey {
+    type Error = anyhow::Error;
+    fn try_from(bytes: HexEncodedBytes) -> anyhow::Result<Self> {
+        Ok(EventKey::from_bytes(bytes.0)?)
+    }
+}
+
 impl HexEncodedBytes {
     pub fn inner(&self) -> &[u8] {
         &self.0
@@ -304,6 +312,41 @@ pub struct MoveStructTag {
     pub module: Identifier,
     pub name: Identifier,
     pub generic_type_params: Vec<MoveType>,
+}
+
+impl MoveStructTag {
+    pub fn new(
+        address: Address,
+        module: Identifier,
+        name: Identifier,
+        generic_type_params: Vec<MoveType>,
+    ) -> Self {
+        Self {
+            address,
+            module,
+            name,
+            generic_type_params,
+        }
+    }
+}
+
+impl FromStr for MoveStructTag {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> anyhow::Result<Self, anyhow::Error> {
+        let parts = s.split("::").collect::<Vec<_>>();
+
+        if parts.len() == 3 {
+            Ok(Self::new(
+                parts[0].parse()?,
+                Identifier::new(parts[1].to_owned())?,
+                Identifier::new(parts[2].to_owned())?,
+                vec![],
+            ))
+        } else {
+            Err(format_err!("invalid Move struct tag string: {}", s))
+        }
+    }
 }
 
 impl From<StructTag> for MoveStructTag {

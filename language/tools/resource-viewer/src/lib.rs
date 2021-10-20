@@ -120,6 +120,24 @@ impl<'a, T: MoveResolver + ?Sized> MoveValueAnnotator<'a, T> {
         self.annotate_struct(&move_struct, &ty)
     }
 
+    pub fn move_struct_fields(
+        &self,
+        tag: &StructTag,
+        blob: &[u8],
+    ) -> Result<Vec<(Identifier, MoveValue)>> {
+        let ty = self.cache.resolve_struct(tag)?;
+        let struct_def = (&ty).try_into().map_err(into_vm_status)?;
+        Ok(match MoveStruct::simple_deserialize(blob, &struct_def)? {
+            MoveStruct::Runtime(runtime) => self
+                .cache
+                .get_field_names(&ty)?
+                .into_iter()
+                .zip(runtime.into_iter())
+                .collect(),
+            MoveStruct::WithFields(fields) => fields,
+        })
+    }
+
     pub fn view_value(&self, ty_tag: &TypeTag, blob: &[u8]) -> Result<AnnotatedMoveValue> {
         let ty = self.cache.resolve_type(ty_tag)?;
         self.view_value_by_fat_type(&ty, blob)

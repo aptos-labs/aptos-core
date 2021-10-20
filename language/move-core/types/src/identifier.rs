@@ -31,7 +31,7 @@ use anyhow::{bail, Result};
 use proptest::prelude::*;
 use ref_cast::RefCast;
 use serde::{Deserialize, Serialize};
-use std::{borrow::Borrow, fmt, ops::Deref};
+use std::{borrow::Borrow, fmt, ops::Deref, str::FromStr};
 
 /// Return true if this character can appear in a Move identifier.
 ///
@@ -135,6 +135,14 @@ impl Identifier {
     /// Converts this `Identifier` into a UTF-8-encoded byte sequence.
     pub fn into_bytes(self) -> Vec<u8> {
         self.into_string().into_bytes()
+    }
+}
+
+impl FromStr for Identifier {
+    type Err = anyhow::Error;
+
+    fn from_str(data: &str) -> Result<Self> {
+        Self::new(data)
     }
 }
 
