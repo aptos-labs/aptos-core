@@ -3,7 +3,10 @@
 
 //! This module translates specification conditions to Boogie code.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::{
+    collections::{BTreeMap, BTreeSet, HashMap},
+    rc::Rc,
+};
 
 use itertools::Itertools;
 #[allow(unused_imports)]
@@ -52,7 +55,7 @@ pub struct SpecTranslator<'env> {
     /// function. If an expression is duplicated and then later specialized by a type
     /// instantiation, it will have a different node id, but again the same instantiations
     /// map to the same node id, which is the desired semantics.
-    lifted_choice_infos: RefCell<BTreeMap<NodeId, LiftedChoiceInfo>>,
+    lifted_choice_infos: Rc<RefCell<BTreeMap<NodeId, LiftedChoiceInfo>>>,
 }
 
 /// A struct which contains information about a lifted choice expression (like `some x:int: p(x)`).
@@ -210,11 +213,11 @@ impl<'env> SpecTranslator<'env> {
                 if type_inst.is_empty() {
                     self.translate_spec_fun(module_env, *id, fun);
                 } else {
-                    SpecTranslator {
+                    let new_spec_trans = SpecTranslator {
                         type_inst,
                         ..self.clone()
-                    }
-                    .translate_spec_fun(module_env, *id, fun);
+                    };
+                    new_spec_trans.translate_spec_fun(module_env, *id, fun);
                 }
             }
         }
