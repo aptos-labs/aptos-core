@@ -51,13 +51,18 @@ To create easy to use API, the following principles are valued
 
 ### Models
 
-Models or types are defined in the `diem-api-types` module (in the directory `/api/types`).
+Models or types are defined in the `diem-api-types` package (in the directory `/api/types`).
 
-API response data structures are optimized for usability across all different languages that may be used by client applications.
+These types handle the JSON serialization and deserialization between internal data types and API response JSON types.
 
 `From` / `TryFrom` traits are implemented for converting between API data type and Diem core data types instead of special constructors.
 
 Move data are converted by procedures defined in the `convert.rs`, because Move data type definitions are defined by the Move module stored in the Diem DB. We first retrieve Move data types from the database, then convert them into API data types.
+
+When we convert internal Move struct values into JSON, the data type information will be lost, thus we can't direct convert move struct value JSON data back to any internal data structure while deserializing HTTP request data.
+For this reason:
+1. `diem_api_types::MoveValue` is only used internally for converting move values into JSON before we create external facing API types (e.g. `TransactionPayload`).
+2. When deserializing API request JSON data, we first convert them into external facing API types with Move values as JSON value, then convert Move JSON values into internal move value type `move_core_types::value::MoveValue` when we need.
 
 ### Error Handling
 

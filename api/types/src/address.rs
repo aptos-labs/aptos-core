@@ -52,13 +52,15 @@ impl From<&Address> for AccountAddress {
     }
 }
 
+impl From<Address> for move_core_types::value::MoveValue {
+    fn from(d: Address) -> Self {
+        move_core_types::value::MoveValue::Address(d.0)
+    }
+}
+
 impl Serialize for Address {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        if serializer.is_human_readable() {
-            self.to_string().serialize(serializer)
-        } else {
-            self.0.serialize(serializer)
-        }
+        self.to_string().serialize(serializer)
     }
 }
 
@@ -67,12 +69,8 @@ impl<'de> Deserialize<'de> for Address {
     where
         D: Deserializer<'de>,
     {
-        if deserializer.is_human_readable() {
-            let address = <String>::deserialize(deserializer)?;
-            address.parse().map_err(D::Error::custom)
-        } else {
-            Ok(Self(<AccountAddress>::deserialize(deserializer)?))
-        }
+        let address = <String>::deserialize(deserializer)?;
+        address.parse().map_err(D::Error::custom)
     }
 }
 
@@ -107,19 +105,6 @@ mod tests {
 
         let val: Value = serde_json::to_value(address).unwrap();
         assert_eq!(val, json!("0x1"));
-    }
-
-    #[test]
-    fn test_from_and_to_bcs_should_be_same_with_account_address() {
-        let address: Address = "0x1".parse().unwrap();
-        let account_address: AccountAddress = address.into();
-
-        let deserialized: Address =
-            bcs::from_bytes(&bcs::to_bytes(&account_address).unwrap()).unwrap();
-        assert_eq!(deserialized, address);
-
-        let deserialized: Address = bcs::from_bytes(&bcs::to_bytes(&address).unwrap()).unwrap();
-        assert_eq!(deserialized, address);
     }
 
     #[test]

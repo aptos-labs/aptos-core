@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    Address, Bytecode, Event, HexEncodedBytes, MoveFunction, MoveModuleBytecode, MoveResource,
-    MoveType, MoveValue, ScriptFunctionPayload, ScriptPayload, Transaction, TransactionData,
+    Bytecode, Event, HexEncodedBytes, MoveFunction, MoveModuleBytecode, MoveResource, MoveType,
+    MoveValue, ScriptFunctionPayload, ScriptPayload, Transaction, TransactionData,
     TransactionOnChainData, TransactionPayload, UserTransactionRequest, WriteSetChange,
-    WriteSetPayload, U128, U64,
+    WriteSetPayload,
 };
 use diem_types::{
     access_path::{AccessPath, Path},
@@ -46,7 +46,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
     }
 
     pub fn try_into_resource<'b>(&self, typ: &StructTag, bytes: &'b [u8]) -> Result<MoveResource> {
-        Ok(self.inner.view_resource(typ, bytes)?.try_into()?)
+        self.inner.view_resource(typ, bytes)?.try_into()
     }
 
     pub fn try_into_pending_transaction(&self, txn: SignedTransaction) -> Result<Transaction> {
@@ -290,7 +290,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
         &self,
         func: MoveFunction,
         args: Vec<serde_json::Value>,
-    ) -> Result<Vec<MoveValue>> {
+    ) -> Result<Vec<move_core_types::value::MoveValue>> {
         let arg_types = func
             .params
             .into_iter()
@@ -310,31 +310,27 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                 self.try_into_move_value(&arg_type, arg)
                     .map_err(|e| format_err!("parse #{} argument failed: {:?}", i + 1, e))
             })
-            .collect::<Result<Vec<MoveValue>>>()
+            .collect::<Result<_>>()
     }
 
-    pub fn try_into_move_value(&self, typ: &MoveType, val: Value) -> Result<MoveValue> {
+    pub fn try_into_move_value(
+        &self,
+        typ: &MoveType,
+        val: Value,
+    ) -> Result<move_core_types::value::MoveValue> {
+        use move_core_types::value::MoveValue::*;
+
         Ok(match typ {
-            MoveType::Bool => MoveValue::Bool(serde_json::from_value::<bool>(val)?),
-            MoveType::U8 => MoveValue::U8(serde_json::from_value::<u8>(val)?),
-            MoveType::U64 => MoveValue::U64(serde_json::from_value::<U64>(val)?),
-            MoveType::U128 => MoveValue::U128(serde_json::from_value::<U128>(val)?),
-            MoveType::Address => MoveValue::Address(serde_json::from_value::<Address>(val)?),
-            MoveType::Vector { items } => match **items {
-                MoveType::U8 => MoveValue::Bytes(serde_json::from_value::<HexEncodedBytes>(val)?),
-                _ => {
-                    if let Value::Array(list) = val {
-                        MoveValue::Vector(
-                            list.into_iter()
-                                .map(|v| self.try_into_move_value(&*items, v))
-                                .collect::<Result<Vec<MoveValue>>>()?,
-                        )
-                    } else {
-                        return Err(format_err!("expected array, but got: {:?}", &val));
-                    }
-                }
-            },
-            _ => {
+            MoveType::Bool => Bool(serde_json::from_value::<bool>(val)?),
+            MoveType::U8 => U8(serde_json::from_value::<u8>(val)?),
+            MoveType::U64 => serde_json::from_value::<crate::U64>(val)?.into(),
+            MoveType::U128 => serde_json::from_value::<crate::U128>(val)?.into(),
+            MoveType::Address => serde_json::from_value::<crate::Address>(val)?.into(),
+            MoveType::Vector { items } => self.try_into_move_value_vector(&*items, val)?,
+            MoveType::Signer
+            | MoveType::Struct(_)
+            | MoveType::GenericTypeParam { index: _ }
+            | MoveType::Reference { mutable: _, to: _ } => {
                 return Err(format_err!(
                     "unexpected move type {:?} for value {:?}",
                     &typ,
@@ -342,5 +338,28 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                 ))
             }
         })
+    }
+
+    pub fn try_into_move_value_vector(
+        &self,
+        typ: &MoveType,
+        val: Value,
+    ) -> Result<move_core_types::value::MoveValue> {
+        if matches!(typ, MoveType::U8) {
+            Ok(serde_json::from_value::<HexEncodedBytes>(val)?.into())
+        } else if let Value::Array(list) = val {
+            let vals = list
+                .into_iter()
+                .map(|v| self.try_into_move_value(typ, v))
+                .collect::<Result<_>>()?;
+
+            Ok(move_core_types::value::MoveValue::Vector(vals))
+        } else {
+            Err(format_err!(
+                "expected vector<{:?}>, but got: {:?}",
+                typ,
+                &val
+            ))
+        }
     }
 }
