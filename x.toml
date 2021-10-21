@@ -224,6 +224,7 @@ members = [
     "move-vm-transactional-tests",
     "mvhashmap", # Will be removed once mvhashmap is used in production.
     "offchain",
+    "public-script-helper",
     "scratchpad-benchmark",
     "sdk-compatibility",
     "serializer-tests",

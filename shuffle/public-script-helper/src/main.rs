@@ -11,10 +11,12 @@ use diem_sdk::{
 };
 use diem_types::{
     account_address::AccountAddress,
-    transaction::{Script, ScriptFunction, TransactionArgument, TransactionPayload, VecBytes},
-};
-use diem_types::{
-    account_config, chain_id::ChainId, transaction::authenticator::AuthenticationKey,
+    account_config,
+    chain_id::ChainId,
+    transaction::{
+        authenticator::AuthenticationKey, Script, ScriptFunction, TransactionArgument,
+        TransactionPayload, VecBytes,
+    },
 };
 use generate_key::load_key;
 use move_core_types::{
