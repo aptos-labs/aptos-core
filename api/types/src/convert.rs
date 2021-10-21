@@ -21,7 +21,10 @@ use resource_viewer::MoveValueAnnotator;
 
 use anyhow::{ensure, format_err, Result};
 use serde_json::Value;
-use std::{convert::TryInto, rc::Rc};
+use std::{
+    convert::{TryFrom, TryInto},
+    rc::Rc,
+};
 
 pub struct MoveConverter<'a, R: ?Sized> {
     inner: MoveValueAnnotator<'a, R>,
@@ -43,7 +46,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
     }
 
     pub fn try_into_resource<'b>(&self, typ: &StructTag, bytes: &'b [u8]) -> Result<MoveResource> {
-        Ok(self.inner.view_resource(typ, bytes)?.into())
+        Ok(self.inner.view_resource(typ, bytes)?.try_into()?)
     }
 
     pub fn try_into_pending_transaction(&self, txn: SignedTransaction) -> Result<Transaction> {
@@ -99,8 +102,8 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                         .inner
                         .view_function_arguments(&module, &function, &args)?
                         .into_iter()
-                        .map(|v| v.into())
-                        .collect(),
+                        .map(|v| MoveValue::try_from(v)?.json())
+                        .collect::<Result<_>>()?,
                     module: module.into(),
                     function,
                     type_arguments: ty_args.into_iter().map(|arg| arg.into()).collect(),
@@ -170,7 +173,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
             let data = self
                 .inner
                 .view_value(event.type_tag(), event.event_data())?;
-            ret.push((event, data).into());
+            ret.push((event, MoveValue::try_from(data)?.json()?).into());
         }
         Ok(ret)
     }
@@ -286,7 +289,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
     pub fn try_into_move_values(
         &self,
         func: MoveFunction,
-        args: Vec<MoveValue>,
+        args: Vec<serde_json::Value>,
     ) -> Result<Vec<MoveValue>> {
         let arg_types = func
             .params
@@ -304,17 +307,10 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
             .zip(args.into_iter())
             .enumerate()
             .map(|(i, (arg_type, arg))| {
-                self.deserialize_json_value(&arg_type, arg)
+                self.try_into_move_value(&arg_type, arg)
                     .map_err(|e| format_err!("parse #{} argument failed: {:?}", i + 1, e))
             })
             .collect::<Result<Vec<MoveValue>>>()
-    }
-
-    pub fn deserialize_json_value(&self, typ: &MoveType, val: MoveValue) -> Result<MoveValue> {
-        Ok(match val {
-            MoveValue::Json(v) => self.try_into_move_value(typ, v)?,
-            _ => val,
-        })
     }
 
     pub fn try_into_move_value(&self, typ: &MoveType, val: Value) -> Result<MoveValue> {

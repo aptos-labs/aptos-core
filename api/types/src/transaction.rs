@@ -22,7 +22,6 @@ use diem_types::{
     },
 };
 use move_core_types::identifier::Identifier;
-use resource_viewer::AnnotatedMoveValue;
 
 use serde::{Deserialize, Serialize};
 use std::{
@@ -254,17 +253,17 @@ pub struct Event {
     pub sequence_number: U64,
     #[serde(rename = "type")]
     pub typ: MoveType,
-    pub data: MoveValue,
+    pub data: serde_json::Value,
 }
 
-impl From<(&ContractEvent, AnnotatedMoveValue)> for Event {
-    fn from((event, data): (&ContractEvent, AnnotatedMoveValue)) -> Self {
+impl From<(&ContractEvent, serde_json::Value)> for Event {
+    fn from((event, data): (&ContractEvent, serde_json::Value)) -> Self {
         match event {
             ContractEvent::V0(v0) => Self {
                 key: (*v0.key()).into(),
                 sequence_number: v0.sequence_number().into(),
                 typ: v0.type_tag().clone().into(),
-                data: data.into(),
+                data,
             },
         }
     }
@@ -290,14 +289,14 @@ pub struct ScriptFunctionPayload {
     pub module: MoveModuleId,
     pub function: Identifier,
     pub type_arguments: Vec<MoveType>,
-    pub arguments: Vec<MoveValue>,
+    pub arguments: Vec<serde_json::Value>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ScriptPayload {
     pub code: MoveScriptBytecode,
     pub type_arguments: Vec<MoveType>,
-    pub arguments: Vec<MoveValue>,
+    pub arguments: Vec<serde_json::Value>,
 }
 
 impl TryFrom<Script> for ScriptPayload {
@@ -308,7 +307,10 @@ impl TryFrom<Script> for ScriptPayload {
         Ok(Self {
             code: MoveScriptBytecode::new(code).ensure_abi()?,
             type_arguments: ty_args.into_iter().map(|arg| arg.into()).collect(),
-            arguments: args.into_iter().map(|arg| arg.into()).collect(),
+            arguments: args
+                .into_iter()
+                .map(|arg| MoveValue::from(arg).json())
+                .collect::<anyhow::Result<_>>()?,
         })
     }
 }

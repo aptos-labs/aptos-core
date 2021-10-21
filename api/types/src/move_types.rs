@@ -34,12 +34,14 @@ pub struct MoveResource {
     pub value: MoveStructValue,
 }
 
-impl From<AnnotatedMoveStruct> for MoveResource {
-    fn from(s: AnnotatedMoveStruct) -> Self {
-        Self {
+impl TryFrom<AnnotatedMoveStruct> for MoveResource {
+    type Error = anyhow::Error;
+
+    fn try_from(s: AnnotatedMoveStruct) -> anyhow::Result<Self> {
+        Ok(Self {
             typ: MoveResourceType::Struct(s.type_.clone().into()),
-            value: s.into(),
-        }
+            value: s.try_into()?,
+        })
     }
 }
 
@@ -218,44 +220,20 @@ impl HexEncodedBytes {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct MoveStructValue(BTreeMap<Identifier, MoveValue>);
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct MoveStructValue(BTreeMap<Identifier, serde_json::Value>);
 
-impl From<AnnotatedMoveStruct> for MoveStructValue {
-    fn from(s: AnnotatedMoveStruct) -> Self {
+impl TryFrom<AnnotatedMoveStruct> for MoveStructValue {
+    type Error = anyhow::Error;
+    fn try_from(s: AnnotatedMoveStruct) -> anyhow::Result<Self> {
         let mut map = BTreeMap::new();
         for (id, val) in s.value {
-            map.insert(id, MoveValue::from(val));
+            map.insert(id, MoveValue::try_from(val)?.json()?);
         }
-        Self(map)
+        Ok(Self(map))
     }
 }
 
-impl Serialize for MoveStructValue {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        self.0.serialize(serializer)
-    }
-}
-
-impl<'de> Deserialize<'de> for MoveStructValue {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        Ok(Self(<BTreeMap<Identifier, MoveValue>>::deserialize(
-            deserializer,
-        )?))
-    }
-}
-
-// MoveValue is used for:
-// 1. Serialize Move value into JSON blob,
-// 2. Deserialize the Move value JSON blob back as Json variant for holding the data
-//    while deserializing a JSON request body.
-// 3. Serialize typed Move value (non-Json variant) into BCS bytes for creating valid
-//    `TransactionPayload`, e.g. script function payload has BCS serialized arguments.
-//    This is also the reason you will see some types defined in this package can be
-//    serialized into binary/BCS format.
 #[derive(Clone, Debug, PartialEq)]
 pub enum MoveValue {
     U8(u8),
@@ -266,38 +244,32 @@ pub enum MoveValue {
     Vector(Vec<MoveValue>),
     Bytes(HexEncodedBytes),
     Struct(MoveStructValue),
-    // Json value is used for deserializing MoveValue JSON blob.
-    // Because when we serialize MoveValue into JSON, the type information
-    // will be lost (e.g. we serialize `Address` as hex-encoded string, we can't
-    // deserialize the hex-encoded string as `Address` unless we know its type
-    // is `Address`).
-    // So we deserialize MoveValue into Json variant first, then we look up
-    // the type information from DB and convert the Json variant into
-    // typed variant values.
-    // For example, a script function JSON blob contains arguments, which
-    // is `MoveValue` JSON blob, we don't know the arguments' types until
-    // we look up the script function Move type definition from DB by the
-    // script function module and name.
-    // We add this variant here instead of a different type, because this can
-    // avoid replicating all the types that uses `MoveValue` to use a different
-    // type.
-    Json(serde_json::Value),
 }
 
-impl From<AnnotatedMoveValue> for MoveValue {
-    fn from(val: AnnotatedMoveValue) -> Self {
-        match val {
+impl MoveValue {
+    pub fn json(&self) -> anyhow::Result<serde_json::Value> {
+        Ok(serde_json::to_value(self)?)
+    }
+}
+
+impl TryFrom<AnnotatedMoveValue> for MoveValue {
+    type Error = anyhow::Error;
+
+    fn try_from(val: AnnotatedMoveValue) -> anyhow::Result<Self> {
+        Ok(match val {
             AnnotatedMoveValue::U8(v) => MoveValue::U8(v),
             AnnotatedMoveValue::U64(v) => MoveValue::U64(U64(v)),
             AnnotatedMoveValue::U128(v) => MoveValue::U128(U128(v)),
             AnnotatedMoveValue::Bool(v) => MoveValue::Bool(v),
             AnnotatedMoveValue::Address(v) => MoveValue::Address(v.into()),
-            AnnotatedMoveValue::Vector(_, vals) => {
-                MoveValue::Vector(vals.into_iter().map(MoveValue::from).collect())
-            }
+            AnnotatedMoveValue::Vector(_, vals) => MoveValue::Vector(
+                vals.into_iter()
+                    .map(MoveValue::try_from)
+                    .collect::<anyhow::Result<_>>()?,
+            ),
             AnnotatedMoveValue::Bytes(v) => MoveValue::Bytes(HexEncodedBytes(v)),
-            AnnotatedMoveValue::Struct(v) => MoveValue::Struct(v.into()),
-        }
+            AnnotatedMoveValue::Struct(v) => MoveValue::Struct(v.try_into()?),
+        })
     }
 }
 
@@ -346,23 +318,6 @@ impl Serialize for MoveValue {
             MoveValue::Vector(v) => v.serialize(serializer),
             MoveValue::Bytes(v) => v.serialize(serializer),
             MoveValue::Struct(v) => v.serialize(serializer),
-            MoveValue::Json(v) => v.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> Deserialize<'de> for MoveValue {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        if deserializer.is_human_readable() {
-            let value = serde_json::Value::deserialize(deserializer).map_err(D::Error::custom)?;
-            Ok(MoveValue::Json(value))
-        } else {
-            Err(D::Error::custom(
-                "can't deserialize MoveValue from binary format",
-            ))
         }
     }
 }
@@ -774,7 +729,7 @@ mod tests {
 
     use serde::{de::DeserializeOwned, Serialize};
     use serde_json::{json, to_value, Value};
-    use std::{boxed::Box, fmt::Debug};
+    use std::{boxed::Box, convert::TryFrom, fmt::Debug};
 
     #[test]
     fn test_serialize_move_type_tag() {
@@ -849,7 +804,7 @@ mod tests {
     fn test_serialize_move_resource() {
         use AnnotatedMoveValue::*;
 
-        let res = MoveResource::from(annotated_move_struct(
+        let res = MoveResource::try_from(annotated_move_struct(
             "Values",
             vec![
                 (identifier("field_u8"), U8(7)),
@@ -882,7 +837,8 @@ mod tests {
                     )),
                 ),
             ],
-        ));
+        ))
+        .unwrap();
         let value = to_value(&res).unwrap();
         assert_json(
             value,
@@ -912,13 +868,14 @@ mod tests {
 
     #[test]
     fn test_serialize_move_resource_with_address_0x0() {
-        let res = MoveResource::from(annotated_move_struct(
+        let res = MoveResource::try_from(annotated_move_struct(
             "Values",
             vec![(
                 identifier("address_0x0"),
                 AnnotatedMoveValue::Address(address("0x0")),
             )],
-        ));
+        ))
+        .unwrap();
         let value = to_value(&res).unwrap();
         assert_json(
             value,
