@@ -60,35 +60,46 @@ impl<'a, R: MoveResolver> ReadWriteSetAnalysis<'a, R> {
 
     /// Returns an overapproximation of the `ResourceKey`'s in global storage that will be written
     /// by `tx`
-    /// Note: this will return both writes performed by the transaction prologue/epilogue and by its
-    /// embedded payload.
-    ///
-    /// If `concretize` is true the analyzer will concretize the secondary indices in the analysis
-    /// with the state state `self.blockchain_view`.
-    pub fn get_keys_written(
-        &self,
-        tx: &SignedTransaction,
-        concretize: bool,
-    ) -> Result<Vec<ResourceKey>> {
-        Ok(self.get_keys_user_transaction(tx, concretize)?.1)
+    pub fn get_keys_written(&self, tx: &SignedTransaction) -> Result<Vec<ResourceKey>> {
+        Ok(self.get_keys_user_transaction(tx)?.1)
     }
 
     /// Returns an overapproximation of the `ResourceKey`'s in global storage that will be read
     /// by `tx`
-    /// Note: this will return both writes performed by the transaction prologue/epilogue and by its
-    /// embedded payload.
-    ///
-    /// If `concretize` is true the analyzer will concretize the secondary indices in the analysis
-    /// with the state state `self.blockchain_view`.
-    pub fn get_keys_read(
-        &self,
-        tx: &SignedTransaction,
-        concretize: bool,
-    ) -> Result<Vec<ResourceKey>> {
-        Ok(self.get_keys_user_transaction(tx, concretize)?.0)
+    pub fn get_keys_read(&self, tx: &SignedTransaction) -> Result<Vec<ResourceKey>> {
+        Ok(self.get_keys_user_transaction(tx)?.0)
     }
 
+    /// Returns an overapproximation of the `ResourceKey`'s in global storage that will be read
+    /// by `tx`. Secondary indexes will be fully resolved by using the global state at
+    /// `self.blockchain_view`.
+    ///
+    /// Return value will be a tuple where the first item is the read set and the second
+    /// item is the write set of this transaction.
+    ///
+    /// Note: this will return both writes performed by the transaction prologue/epilogue and by its
+    /// embedded payload.
     pub fn get_keys_user_transaction(
+        &self,
+        tx: &SignedTransaction,
+    ) -> Result<(Vec<ResourceKey>, Vec<ResourceKey>)> {
+        self.get_keys_user_transaction_impl(tx, true)
+    }
+
+    /// Returns an overapproximation of the `ResourceKey`'s in global storage that will be read
+    /// by `tx`. Only formals and type arguments will be binded and secondary indexes will remain to
+    /// be unresolved for better speed performance.
+    ///
+    /// Note: this will return both writes performed by the transaction prologue/epilogue and by its
+    /// embedded payload.
+    pub fn get_partial_keys_user_transaction(
+        &self,
+        tx: &SignedTransaction,
+    ) -> Result<(Vec<ResourceKey>, Vec<ResourceKey>)> {
+        self.get_keys_user_transaction_impl(tx, false)
+    }
+
+    fn get_keys_user_transaction_impl(
         &self,
         tx: &SignedTransaction,
         concretize: bool,
@@ -124,7 +135,7 @@ impl<'a, R: MoveResolver> ReadWriteSetAnalysis<'a, R> {
         }
     }
 
-    fn concretize_binded_accesses(
+    fn concretize_secondary_indexes(
         &self,
         binded_result: ConcretizedFormals,
         concretize: bool,
@@ -153,14 +164,16 @@ impl<'a, R: MoveResolver> ReadWriteSetAnalysis<'a, R> {
         }
     }
 
-    pub fn get_keys_transaction(
+    #[allow(dead_code)]
+    /// Internal API to get the read/write set of `PreprocessedTransaction`.
+    pub(crate) fn get_keys_transaction(
         &self,
         tx: &PreprocessedTransaction,
         concretize: bool,
     ) -> Result<(Vec<ResourceKey>, Vec<ResourceKey>)> {
         match tx {
             PreprocessedTransaction::UserTransaction(tx) => {
-                self.get_keys_user_transaction(tx, concretize)
+                self.get_keys_user_transaction_impl(tx, concretize)
             }
             PreprocessedTransaction::BlockMetadata(block_metadata) => {
                 let (round, timestamp, previous_vote, proposer) =
@@ -172,7 +185,7 @@ impl<'a, R: MoveResolver> ReadWriteSetAnalysis<'a, R> {
                     MoveValue::Vector(previous_vote.into_iter().map(MoveValue::Address).collect()),
                     MoveValue::Address(proposer),
                 ]);
-                let metadata_access = self.get_binded_summary(
+                let metadata_access = self.get_partially_concretized_summary(
                     &DIEM_BLOCK_MODULE,
                     BLOCK_PROLOGUE,
                     &[],
@@ -180,7 +193,7 @@ impl<'a, R: MoveResolver> ReadWriteSetAnalysis<'a, R> {
                     &[],
                     &self.module_cache,
                 )?;
-                self.concretize_binded_accesses(metadata_access, concretize)
+                self.concretize_secondary_indexes(metadata_access, concretize)
             }
             PreprocessedTransaction::InvalidSignature => Ok((vec![], vec![])),
             PreprocessedTransaction::WriteSet(_) | PreprocessedTransaction::WaypointWriteSet(_) => {
@@ -202,7 +215,7 @@ impl<'a, R: MoveResolver> ReadWriteSetAnalysis<'a, R> {
         let gas_currency = account_config::type_tag_for_currency_code(
             account_config::from_currency_code_string(tx.gas_currency_code())?,
         );
-        let prologue_accesses = self.get_binded_summary(
+        let prologue_accesses = self.get_partially_concretized_summary(
             &account_config::constants::ACCOUNT_MODULE,
             SCRIPT_PROLOGUE_NAME,
             &signers,
@@ -219,7 +232,7 @@ impl<'a, R: MoveResolver> ReadWriteSetAnalysis<'a, R> {
             &self.module_cache,
         )?;
 
-        let epilogue_accesses = self.get_binded_summary(
+        let epilogue_accesses = self.get_partially_concretized_summary(
             &account_config::constants::ACCOUNT_MODULE,
             USER_EPILOGUE_NAME,
             &signers,
@@ -232,7 +245,7 @@ impl<'a, R: MoveResolver> ReadWriteSetAnalysis<'a, R> {
             &[gas_currency.clone()],
             &self.module_cache,
         )?;
-        let script_accesses = self.get_binded_summary(
+        let script_accesses = self.get_partially_concretized_summary(
             module_name,
             script_name,
             &signers,
@@ -245,7 +258,7 @@ impl<'a, R: MoveResolver> ReadWriteSetAnalysis<'a, R> {
         let mut keys_written = vec![];
 
         for accesses in vec![prologue_accesses, script_accesses, epilogue_accesses] {
-            let (reads, writes) = self.concretize_binded_accesses(accesses, concretize)?;
+            let (reads, writes) = self.concretize_secondary_indexes(accesses, concretize)?;
             keys_read.extend(reads);
             keys_written.extend(writes);
         }

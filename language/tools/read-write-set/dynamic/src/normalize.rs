@@ -141,12 +141,12 @@ impl NormalizedReadWriteSetAnalysis {
         self.get_summary(module, fun).cloned()
     }
 
-    /// Returns an overapproximation of the access paths in global storage that will be read/written
+    /// Returns the access paths in global storage that will be read/written by `module::fun` if called with arguments `signers`, `actuals`, `type_actuals`. This will be an overapproximation if `module::fun` contains no secondary indexes; otherwise it is neither an overapproximation nor an underapproximation
     /// by `module::fun` if called with arguments `signers`, `actuals`, `type_actuals`.
     ///
-    /// Secondary indices will not be resolved and it's up to caller to decide whether it needs to
+    /// We say "partially concretized" because the summary may contain secondary indexes that require reads from the current blockchain state to be concretized. If desired, the caller can concretized them using <add API for this>
     /// be resolved or not.
-    pub fn get_binded_summary<R: MoveResolver>(
+    pub fn get_partially_concretized_summary<R: MoveResolver>(
         &self,
         module: &ModuleId,
         fun: &IdentStr,
@@ -157,7 +157,7 @@ impl NormalizedReadWriteSetAnalysis {
     ) -> Result<ConcretizedFormals> {
         let state = self
             .get_summary(module, fun)
-            .ok_or_else(|| anyhow!("Function {}::{} to found", module, fun))?;
+            .ok_or_else(|| anyhow!("Function {}::{} not found", module, fun))?;
         bind_formals(
             state,
             module,
