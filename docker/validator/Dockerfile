@@ -37,6 +37,8 @@ COPY --from=builder /diem/target/release/db-restore /opt/diem/bin
 
 # Admission control
 EXPOSE 8000
+# REST API
+EXPOSE 8081
 # Validator network
 EXPOSE 6180
 # Metrics
