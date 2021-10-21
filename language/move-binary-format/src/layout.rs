@@ -13,11 +13,7 @@ use move_core_types::{
     resolver::ModuleResolver,
     value::{MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
 };
-use std::{
-    cell::RefCell,
-    collections::{btree_map::Entry, BTreeMap},
-    fmt::Debug,
-};
+use std::{collections::BTreeMap, fmt::Debug, sync::RwLock};
 
 /// A persistent storage that can fetch the bytecode for a given module id
 /// TODO: do we want to implement this in a way that allows clients to cache struct layouts?
@@ -29,20 +25,20 @@ pub trait GetModule {
 
 /// Simple in-memory module cache
 pub struct ModuleCache<R: ModuleResolver> {
-    cache: RefCell<BTreeMap<ModuleId, CompiledModule>>,
+    cache: RwLock<BTreeMap<ModuleId, CompiledModule>>,
     resolver: R,
 }
 
 impl<R: ModuleResolver> ModuleCache<R> {
     pub fn new(resolver: R) -> Self {
         ModuleCache {
-            cache: RefCell::new(BTreeMap::new()),
+            cache: RwLock::new(BTreeMap::new()),
             resolver,
         }
     }
 
     pub fn add(&self, id: ModuleId, m: CompiledModule) {
-        self.cache.borrow_mut().insert(id, m);
+        self.cache.write().unwrap().insert(id, m);
     }
 }
 
@@ -50,20 +46,26 @@ impl<R: ModuleResolver> GetModule for ModuleCache<R> {
     type Error = anyhow::Error;
 
     fn get_module_by_id(&self, id: &ModuleId) -> Result<Option<CompiledModule>, Self::Error> {
-        Ok(Some(match self.cache.borrow_mut().entry(id.clone()) {
-            Entry::Vacant(entry) => {
-                let module_bytes = self
-                    .resolver
-                    .get_module(id)
-                    .map_err(|_| anyhow!("Failed to get module {:?}", id))?
-                    .ok_or_else(|| anyhow!("Module {:?} doesn't exist", id))?;
-                let module = CompiledModule::deserialize(&module_bytes)
-                    .map_err(|_| anyhow!("Failure deserializing module {:?}", id))?;
-                entry.insert(module.clone());
-                module
-            }
-            Entry::Occupied(entry) => entry.get().clone(),
-        }))
+        if let Some(compiled_module) = self.cache.read().unwrap().get(id) {
+            return Ok(Some(compiled_module.clone()));
+        }
+
+        if let Some(module_bytes) = self
+            .resolver
+            .get_module(id)
+            .map_err(|_| anyhow!("Failed to get module {:?}", id))?
+        {
+            let module = CompiledModule::deserialize(&module_bytes)
+                .map_err(|_| anyhow!("Failure deserializing module {:?}", id))?;
+
+            self.cache
+                .write()
+                .unwrap()
+                .insert(id.clone(), module.clone());
+            Ok(Some(module))
+        } else {
+            Ok(None)
+        }
     }
 }
 
