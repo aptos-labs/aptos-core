@@ -4,11 +4,10 @@
 import * as DiemTypes from "./generated/diemTypes/mod.ts";
 import * as ed from "https://deno.land/x/ed25519@1.0.1/mod.ts";
 import { BcsSerializer } from "./generated/bcs/mod.ts";
-import { ListTuple, uint8, Seq, bytes } from "./generated/serde/types.ts";
+import { bytes, ListTuple, Seq, uint8 } from "./generated/serde/types.ts";
 import { createHash } from "https://deno.land/std@0.77.0/hash/mod.ts";
-import { createRemote } from "https://deno.land/x/gentle_rpc@v3.0/mod.ts";
 import * as path from "https://deno.land/std@0.110.0/path/mod.ts";
-import * as util from "https://deno.land/std@0.85.0/node/util.ts";
+import { nodeUrl } from "../repl.ts";
 
 export async function buildAndSubmitTransaction(
   addressStr: string,
@@ -26,13 +25,21 @@ export async function buildAndSubmitTransaction(
     sequenceNumber,
   );
   const signingMsg = generateSigningMessage(rawTxn);
-  const signedTxnHex = await newSignedTransaction(
+  const signedTxnBytes = await newSignedTransaction(
     normalizePrivateKey(privateKeyBytes),
     rawTxn,
     signingMsg,
   );
-  const remote = createRemote("http://127.0.0.1:8080/v1");
-  return await remote.call("submit", [signedTxnHex]);
+
+  const settings = {
+    method: "POST",
+    body: signedTxnBytes,
+    headers: {
+      "Content-Type": "application/vnd.bcs+signed_transaction",
+    },
+  };
+  const res = await fetch(relativeUrl("/transactions"), settings);
+  return await res.json();
 }
 
 export function buildScriptFunctionTransaction(
@@ -40,13 +47,18 @@ export function buildScriptFunctionTransaction(
   moduleName: string,
   functionName: string,
   tyArgs: Seq<DiemTypes.TypeTag>, //[0,9,8]
-  args: Seq<bytes> // new Uint8Array(9,0,9)
+  args: Seq<bytes>, // new Uint8Array(9,0,9)
 ): DiemTypes.TransactionPayload {
   const module_id: DiemTypes.ModuleId = new DiemTypes.ModuleId(
     hexToAccountAddress(moduleAddress),
-    new DiemTypes.Identifier(moduleName)
+    new DiemTypes.Identifier(moduleName),
   );
-  return new DiemTypes.ScriptFunction(module_id, new DiemTypes.Identifier(functionName), tyArgs, args);
+  return new DiemTypes.ScriptFunction(
+    module_id,
+    new DiemTypes.Identifier(functionName),
+    tyArgs,
+    args,
+  );
 }
 
 // Example Usage:
@@ -59,7 +71,13 @@ export async function buildAndSubmitScriptFunctionTransaction(
   args: Seq<bytes>,
   sequenceNumber: number,
 ) {
-  let payload: DiemTypes.TransactionPayload = buildScriptFunctionTransaction(moduleAddress, moduleName, functionName, tyArgs, args);
+  let payload: DiemTypes.TransactionPayload = buildScriptFunctionTransaction(
+    moduleAddress,
+    moduleName,
+    functionName,
+    tyArgs,
+    args,
+  );
 
   // TODO(dimroc) : Help clean this up
   const shuffleDir = Deno.env.get("SHUFFLE_HOME") || "unknown";
@@ -68,7 +86,12 @@ export async function buildAndSubmitScriptFunctionTransaction(
   const senderAddress = await Deno.readTextFile(senderAddressPath);
   const fullSenderAddress = "0x" + senderAddress;
   const privateKeyBytes = await Deno.readFile(privateKeyPath);
-  return await buildAndSubmitTransaction(fullSenderAddress, sequenceNumber, privateKeyBytes, payload);
+  return await buildAndSubmitTransaction(
+    fullSenderAddress,
+    sequenceNumber,
+    privateKeyBytes,
+    payload,
+  );
 }
 
 export function newRawTransaction(
@@ -110,7 +133,7 @@ export async function newSignedTransaction(
   privateKeyBytes: Uint8Array,
   rawTxn: DiemTypes.RawTransaction,
   signingMsg: Uint8Array,
-): Promise<string> {
+): Promise<Uint8Array> {
   const publicKey = await ed.getPublicKey(privateKeyBytes);
 
   const signatureTmp = await ed.sign(signingMsg, privateKeyBytes);
@@ -124,7 +147,7 @@ export async function newSignedTransaction(
   const signedTxn = new DiemTypes.SignedTransaction(rawTxn, txnAuthenticator);
   const signedTxnSerializer = new BcsSerializer();
   signedTxn.serialize(signedTxnSerializer);
-  return bufferToHex(signedTxnSerializer.getBytes());
+  return signedTxnSerializer.getBytes();
 }
 
 export function hexToAccountAddress(hex: string): DiemTypes.AccountAddress {
@@ -175,4 +198,8 @@ function normalizePrivateKey(privateKeyBytes: Uint8Array): Uint8Array {
     privateKeyBytes = privateKeyBytes.slice(1);
   }
   return privateKeyBytes;
+}
+
+function relativeUrl(tail: string) {
+  return new URL(tail, nodeUrl).href;
 }
