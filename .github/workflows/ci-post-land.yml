@@ -164,6 +164,33 @@ jobs:
         env:
           DOCKER_CONTENT_TRUST_REPOSITORY_PASSPHRASE: ${{ secrets.ENV_DOCKERHUB_KEY_PASSWORD }}
 
+  build_ci_base_docker_image_github:
+    needs: prepare
+    runs-on: ubuntu-latest-xl
+    if: ${{ needs.prepare.outputs.base-image-changes == 'true' || github.event_name == 'create' }}
+    env:
+      REGISTRY: ghcr.io
+      IMAGE_NAME: ${{ github.repository }}_build_environment
+      IMAGE_TAG: ${{ needs.prepare.outputs.changes-target-branch }}
+    steps:
+      - uses: actions/checkout@v2.3.4
+        with:
+          # This ensures that the tip of the PR is checked out instead of the merge between the base ref and the tip
+          # On `push` this value will be empty and will "do-the-right-thing"
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0 #get all the history!!!
+      - name: Log in to the Container registry
+        uses: docker/login-action@v1
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: build image
+        run: docker build -f docker/ci/github/Dockerfile -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} .
+      - name: Push to ghcr
+        run: |
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+
   run-cluster-test-pre-release-suite:
     needs: prepare
     name: Run the pre-release suite of Cluster Test
