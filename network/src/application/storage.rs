@@ -41,6 +41,10 @@ impl PeerMetadataStorage {
         Arc::new(peer_metadata_storage)
     }
 
+    pub fn networks(&self) -> impl Iterator<Item = NetworkId> + '_ {
+        self.storage.keys().copied()
+    }
+
     /// Handle common logic of getting a network
     fn get_network(&self, network_id: NetworkId) -> &LockingHashMap<AccountAddress, PeerInfo> {
         self.storage

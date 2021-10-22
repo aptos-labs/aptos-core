@@ -23,6 +23,10 @@ impl PeerInfo {
             active_connection: connection_metadata,
         }
     }
+
+    pub fn is_connected(&self) -> bool {
+        self.status == PeerState::Connected
+    }
 }
 
 /// The current state of a `Peer` at any one time

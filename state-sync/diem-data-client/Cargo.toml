@@ -12,10 +12,14 @@ edition = "2018"
 [dependencies]
 async-trait = "0.1.42"
 futures = "0.3.12"
+rand = "0.8.3"
 serde = { version = "1.0.124", default-features = false }
 thiserror = "1.0.24"
 
+diem-config = { path = "../../config" }
 diem-crypto = { path = "../../crypto/crypto" }
 diem-types = { path = "../../types" }
 diem-workspace-hack = { path = "../../common/workspace-hack" }
+network = { path = "../../network" }
+storage-service-client = { path = "../storage-service/client" }
 storage-service-types = { path = "../storage-service/types" }

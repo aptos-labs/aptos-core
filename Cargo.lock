@@ -1756,11 +1756,15 @@ name = "diem-data-client"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "diem-config",
  "diem-crypto",
  "diem-types",
  "diem-workspace-hack",
  "futures",
+ "network",
+ "rand 0.8.4",
  "serde",
+ "storage-service-client",
  "storage-service-types",
  "thiserror",
 ]

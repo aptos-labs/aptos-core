@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
+
+use std::convert::TryFrom;
+
 use async_trait::async_trait;
 use diem_types::{
     account_state_blob::AccountStatesChunkWithProof,
@@ -12,18 +15,30 @@ use diem_types::{
     },
 };
 use serde::{Deserialize, Serialize};
-use storage_service_types::{CompleteDataRange, Epoch};
+use storage_service_types::{CompleteDataRange, Epoch, StorageServiceResponse};
 use thiserror::Error;
 
+pub mod diemnet;
+
+// TODO(philiphayes): a Error { kind: ErrorKind, inner: BoxError } would be more convenient
 /// An error returned by the Diem Data Client for failed API calls.
 #[derive(Clone, Debug, Deserialize, Error, PartialEq, Serialize)]
 pub enum Error {
     #[error("The requested data is unavailable and cannot be found! Error: {0}")]
     DataIsUnavailable(String),
+
     #[error("The requested data is too large: {0}")]
     DataIsTooLarge(String),
+
+    #[error("Invalid request: {0}")]
+    InvalidRequest(String),
+
+    #[error("Invalid response: {0}")]
+    InvalidResponse(String),
+
     #[error("Timed out waiting for a response: {0}")]
     TimeoutWaitingForResponse(String),
+
     #[error("Unexpected error encountered: {0}")]
     UnexpectedErrorEncountered(String),
 }
@@ -129,6 +144,22 @@ pub enum DataClientPayload {
     NumberOfAccountStates(u64),
     TransactionOutputsWithProof(TransactionOutputListWithProof),
     TransactionsWithProof(TransactionListWithProof),
+}
+
+impl TryFrom<StorageServiceResponse> for DataClientPayload {
+    type Error = Error;
+
+    fn try_from(response: StorageServiceResponse) -> Result<Self, Self::Error> {
+        match response {
+            StorageServiceResponse::EpochEndingLedgerInfos(epochs) => Ok(
+                DataClientPayload::EpochEndingLedgerInfos(epochs.ledger_info_with_sigs),
+            ),
+            StorageServiceResponse::TransactionsWithProof(txns) => {
+                Ok(DataClientPayload::TransactionsWithProof(txns))
+            }
+            _ => Err(Error::UnexpectedErrorEncountered(format!(""))),
+        }
+    }
 }
 
 /// A snapshot of the global state of data available in the Diem network.
