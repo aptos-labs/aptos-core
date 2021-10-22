@@ -48,7 +48,7 @@ export async function transactions() {
 }
 
 export async function accountTransactions() {
-  const remote = createRemote(path.join(nodeUrl,"v1"));
+  const remote = createRemote("http://127.0.0.1:8080/v1");
   return await remote.call(
       "get_account_transactions",
       [senderAddress, 0, 10, true]
