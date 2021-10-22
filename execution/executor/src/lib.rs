@@ -37,7 +37,7 @@ use diem_types::{
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use diem_vm::VMExecutor;
-use executor_types::{Error, ExecutedTrees, ProofReader};
+use executor_types::{Error, ExecutedTrees, ProcessedVMOutput, ProofReader, TransactionData};
 use storage_interface::{
     default_protocol::DbReaderWriter, state_view::VerifiedStateView, TreeState,
 };
@@ -46,7 +46,6 @@ use crate::{
     logging::{LogEntry, LogSchema},
     metrics::DIEM_EXECUTOR_ERRORS,
     speculation_cache::SpeculationCache,
-    types::{ProcessedVMOutput, TransactionData},
 };
 
 #[cfg(test)]
@@ -58,7 +57,6 @@ pub mod metrics;
 #[cfg(test)]
 mod mock_vm;
 mod speculation_cache;
-mod types;
 
 mod block_executor_impl;
 mod chunk_executor_impl;

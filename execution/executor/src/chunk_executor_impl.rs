@@ -10,35 +10,31 @@ use diem_types::{
     transaction::default_protocol::TransactionListWithProof,
 };
 use diem_vm::VMExecutor;
-use executor_types::ChunkExecutor;
+use executor_types::{ChunkExecutor, ProcessedVMOutput};
 use fail::fail_point;
 
 use crate::{metrics::DIEM_EXECUTOR_EXECUTE_AND_COMMIT_CHUNK_SECONDS, Executor};
+use diem_types::transaction::TransactionToCommit;
 
 impl<V: VMExecutor> ChunkExecutor for Executor<DpnProto, V> {
-    fn execute_and_commit_chunk(
+    fn execute_chunk(
         &self,
         txn_list_with_proof: TransactionListWithProof,
         // Target LI that has been verified independently: the proofs are relative to this version.
         verified_target_li: LedgerInfoWithSignatures,
-        // An optional end of epoch LedgerInfo. We do not allow chunks that end epoch without
-        // carrying any epoch change LI.
-        epoch_change_li: Option<LedgerInfoWithSignatures>,
-    ) -> anyhow::Result<Vec<ContractEvent>> {
+    ) -> anyhow::Result<(
+        ProcessedVMOutput,
+        Vec<TransactionToCommit>,
+        Vec<ContractEvent>,
+    )> {
         let _timer = DIEM_EXECUTOR_EXECUTE_AND_COMMIT_CHUNK_SECONDS.start_timer();
         // 1. Update the cache in executor to be consistent with latest synced state.
         self.reset_cache()?;
         let read_lock = self.cache.read();
 
-        info!(
-            LogSchema::new(LogEntry::ChunkExecutor)
-                .local_synced_version(read_lock.synced_trees().txn_accumulator().num_leaves() - 1)
-                .first_version_in_request(txn_list_with_proof.first_transaction_version)
-                .num_txns_in_request(txn_list_with_proof.transactions.len()),
-            "sync_request_received",
-        );
-
         // 2. Verify input transaction list.
+        let num_txn = txn_list_with_proof.transactions.len();
+        let first_version_in_request = txn_list_with_proof.first_transaction_version;
         let (transactions, transaction_infos) =
             self.verify_chunk(txn_list_with_proof, &verified_target_li)?;
 
@@ -48,7 +44,31 @@ impl<V: VMExecutor> ChunkExecutor for Executor<DpnProto, V> {
         let (output, txns_to_commit, events) =
             self.execute_chunk(first_version, transactions, transaction_infos)?;
 
+        info!(
+            LogSchema::new(LogEntry::ChunkExecutor)
+                .local_synced_version(first_version.saturating_sub(1))
+                .first_version_in_request(first_version_in_request)
+                .num_txns_in_request(num_txn),
+            "sync_request_executed",
+        );
+        Ok((output, txns_to_commit, events))
+    }
+
+    fn commit_chunk(
+        &self,
+        verified_target_li: LedgerInfoWithSignatures,
+        epoch_change_li: Option<LedgerInfoWithSignatures>,
+        output: ProcessedVMOutput,
+        txns_to_commit: Vec<TransactionToCommit>,
+        events: Vec<ContractEvent>,
+    ) -> anyhow::Result<Vec<ContractEvent>> {
         // 4. Commit to DB.
+        let first_version = self
+            .cache
+            .read()
+            .synced_trees()
+            .txn_accumulator()
+            .num_leaves();
         let ledger_info_to_commit =
             Self::find_chunk_li(verified_target_li, epoch_change_li, &output)?;
         if ledger_info_to_commit.is_none() && txns_to_commit.is_empty() {
@@ -82,7 +102,7 @@ impl<V: VMExecutor> ChunkExecutor for Executor<DpnProto, V> {
                         .expect("version must exist")
                 )
                 .committed_with_ledger_info(ledger_info_to_commit.is_some()),
-            "sync_finished",
+            "sync_request_committed",
         );
 
         Ok(events)

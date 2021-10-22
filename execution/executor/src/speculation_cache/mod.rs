@@ -17,17 +17,14 @@
 #[cfg(test)]
 mod test;
 
-use crate::{
-    logging::{LogEntry, LogSchema},
-    types::ProcessedVMOutput,
-};
+use crate::logging::{LogEntry, LogSchema};
 use anyhow::{format_err, Result};
 use consensus_types::block::Block;
 use diem_crypto::{hash::PRE_GENESIS_BLOCK_ID, HashValue};
 use diem_infallible::Mutex;
 use diem_logger::prelude::*;
 use diem_types::{ledger_info::LedgerInfo, transaction::Transaction};
-use executor_types::{Error, ExecutedTrees};
+use executor_types::{Error, ExecutedTrees, ProcessedVMOutput};
 use std::{
     collections::HashMap,
     sync::{Arc, Weak},

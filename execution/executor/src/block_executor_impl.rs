@@ -15,7 +15,7 @@ use diem_types::{
     },
 };
 use diem_vm::VMExecutor;
-use executor_types::{BlockExecutor, Error, StateComputeResult};
+use executor_types::{BlockExecutor, Error, ProcessedVMOutput, StateComputeResult};
 use fail::fail_point;
 
 use crate::{
@@ -24,7 +24,6 @@ use crate::{
         DIEM_EXECUTOR_SAVE_TRANSACTIONS_SECONDS, DIEM_EXECUTOR_TRANSACTIONS_SAVED,
         DIEM_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
     },
-    types::ProcessedVMOutput,
     Executor,
 };
 use diem_types::{proof::definition::LeafCount, protocol_spec::ProtocolSpec};
