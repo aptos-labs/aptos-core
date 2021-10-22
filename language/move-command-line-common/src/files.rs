@@ -37,6 +37,7 @@ pub fn find_filenames<Predicate: FnMut(&Path) -> bool>(
             continue;
         }
         for entry in walkdir::WalkDir::new(path)
+            .follow_links(true)
             .into_iter()
             .filter_map(|e| e.ok())
         {

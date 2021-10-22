@@ -1060,7 +1060,7 @@ pub fn replay<P: AsRef<Path>>(
     flags: &ReplayFlags,
 ) -> Result<()> {
     let root = root.as_ref();
-    for entry in WalkDir::new(root).into_iter() {
+    for entry in WalkDir::new(root).follow_links(true).into_iter() {
         let entry = entry?;
         if entry.file_name() == TRACE_FILE_NAME {
             let wks = entry

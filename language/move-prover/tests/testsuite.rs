@@ -255,7 +255,12 @@ fn get_flags_and_baseline(
 fn collect_enabled_tests(reqs: &mut Vec<Requirements>, group: &str, feature: &Feature, path: &str) {
     let mut p = PathBuf::new();
     p.push(path);
-    for entry in WalkDir::new(p.clone()).min_depth(1).into_iter().flatten() {
+    for entry in WalkDir::new(p.clone())
+        .follow_links(true)
+        .min_depth(1)
+        .into_iter()
+        .flatten()
+    {
         if !entry.file_name().to_string_lossy().ends_with(".move") {
             continue;
         }

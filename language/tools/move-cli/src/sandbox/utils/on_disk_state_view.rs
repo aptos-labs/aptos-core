@@ -499,6 +499,7 @@ impl OnDiskStateView {
         F: FnOnce(&Path) -> bool + Copy,
     {
         walkdir::WalkDir::new(&self.storage_dir)
+            .follow_links(true)
             .into_iter()
             .filter_map(|e| e.ok())
             .map(|e| e.path().to_path_buf())
