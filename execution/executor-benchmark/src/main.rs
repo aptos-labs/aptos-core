@@ -41,6 +41,12 @@ enum Command {
 
         #[structopt(long, parse(from_os_str))]
         checkpoint_dir: PathBuf,
+
+        #[structopt(
+            long,
+            about = "Verify sequence number of all the accounts after execution finishes"
+        )]
+        verify: bool,
     },
 }
 
@@ -71,9 +77,16 @@ fn main() {
             blocks,
             data_dir,
             checkpoint_dir,
+            verify,
         } => {
             diem_logger::Logger::new().init();
-            executor_benchmark::run_benchmark(opt.block_size, blocks, data_dir, checkpoint_dir);
+            executor_benchmark::run_benchmark(
+                opt.block_size,
+                blocks,
+                data_dir,
+                checkpoint_dir,
+                verify,
+            );
         }
     }
 }
