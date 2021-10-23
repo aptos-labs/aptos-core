@@ -7,7 +7,7 @@ use crate::{
     language_storage::{StructTag, TypeTag},
     transaction_argument::TransactionArgument,
 };
-use anyhow::{bail, Result};
+use anyhow::{bail, format_err, Result};
 use std::iter::Peekable;
 
 #[derive(Eq, PartialEq, Debug)]
@@ -364,101 +364,156 @@ pub fn parse_transaction_argument(s: &str) -> Result<TransactionArgument> {
     parse(s, |parser| parser.parse_transaction_argument())
 }
 
-#[allow(clippy::unreadable_literal)]
-#[test]
-fn tests_parse_transaction_argument_positive() {
-    use TransactionArgument as T;
-
-    for (s, expected) in &[
-        ("  0u8", T::U8(0)),
-        ("0u8", T::U8(0)),
-        ("255u8", T::U8(255)),
-        ("0", T::U64(0)),
-        ("0123", T::U64(123)),
-        ("0u64", T::U64(0)),
-        ("18446744073709551615", T::U64(18446744073709551615)),
-        ("18446744073709551615u64", T::U64(18446744073709551615)),
-        ("0u128", T::U128(0)),
-        (
-            "340282366920938463463374607431768211455u128",
-            T::U128(340282366920938463463374607431768211455),
-        ),
-        ("true", T::Bool(true)),
-        ("false", T::Bool(false)),
-        (
-            "0x0",
-            T::Address(AccountAddress::from_hex_literal("0x0").unwrap()),
-        ),
-        (
-            "0x54afa3526",
-            T::Address(AccountAddress::from_hex_literal("0x54afa3526").unwrap()),
-        ),
-        (
-            "0X54afa3526",
-            T::Address(AccountAddress::from_hex_literal("0x54afa3526").unwrap()),
-        ),
-        ("x\"7fff\"", T::U8Vector(vec![0x7f, 0xff])),
-        ("x\"\"", T::U8Vector(vec![])),
-        ("x\"00\"", T::U8Vector(vec![0x00])),
-        ("x\"deadbeef\"", T::U8Vector(vec![0xde, 0xad, 0xbe, 0xef])),
-    ] {
-        assert_eq!(&parse_transaction_argument(s).unwrap(), expected)
+pub fn parse_struct_tag(s: &str) -> Result<StructTag> {
+    let type_tag = parse(s, |parser| parser.parse_type_tag())
+        .map_err(|e| format_err!("invalid struct tag: {}, {}", s, e))?;
+    if let TypeTag::Struct(struct_tag) = type_tag {
+        Ok(struct_tag)
+    } else {
+        bail!("invalid struct tag: {}", s)
     }
 }
 
-#[test]
-fn tests_parse_transaction_argument_negative() {
-    for s in &[
-        "-3",
-        "0u42",
-        "0u645",
-        "0u64x",
-        "0u6 4",
-        "0u",
-        "256u8",
-        "18446744073709551616",
-        "18446744073709551616u64",
-        "340282366920938463463374607431768211456u128",
-        "0xg",
-        "0x00g0",
-        "0x",
-        "0x_",
-        "",
-        "x\"ffff",
-        "x\"a \"",
-        "x\" \"",
-        "x\"0g\"",
-        "x\"0\"",
-        "garbage",
-        "true3",
-        "3false",
-        "3 false",
-        "",
-    ] {
-        assert!(parse_transaction_argument(s).is_err())
-    }
-}
+#[cfg(test)]
+mod tests {
+    use crate::{
+        account_address::AccountAddress,
+        parser::{parse_struct_tag, parse_transaction_argument, parse_type_tag},
+        transaction_argument::TransactionArgument,
+    };
 
-#[test]
-fn test_type_tag() {
-    for s in &[
-        "u64",
-        "bool",
-        "vector<u8>",
-        "vector<vector<u64>>",
-        "signer",
-        "0x1::M::S",
-        "0x2::M::S_",
-        "0x3::M_::S",
-        "0x4::M_::S_",
-        "0x00000000004::M::S",
-        "0x1::M::S<u64>",
-        "0x1::M::S<0x2::P::Q>",
-        "vector<0x1::M::S>",
-        "vector<0x1::M_::S_>",
-        "vector<vector<0x1::M_::S_>>",
-        "0x1::M::S<vector<u8>>",
-    ] {
-        assert!(parse_type_tag(s).is_ok(), "Failed to parse tag {}", s);
+    #[allow(clippy::unreadable_literal)]
+    #[test]
+    fn tests_parse_transaction_argument_positive() {
+        use TransactionArgument as T;
+
+        for (s, expected) in &[
+            ("  0u8", T::U8(0)),
+            ("0u8", T::U8(0)),
+            ("255u8", T::U8(255)),
+            ("0", T::U64(0)),
+            ("0123", T::U64(123)),
+            ("0u64", T::U64(0)),
+            ("18446744073709551615", T::U64(18446744073709551615)),
+            ("18446744073709551615u64", T::U64(18446744073709551615)),
+            ("0u128", T::U128(0)),
+            (
+                "340282366920938463463374607431768211455u128",
+                T::U128(340282366920938463463374607431768211455),
+            ),
+            ("true", T::Bool(true)),
+            ("false", T::Bool(false)),
+            (
+                "0x0",
+                T::Address(AccountAddress::from_hex_literal("0x0").unwrap()),
+            ),
+            (
+                "0x54afa3526",
+                T::Address(AccountAddress::from_hex_literal("0x54afa3526").unwrap()),
+            ),
+            (
+                "0X54afa3526",
+                T::Address(AccountAddress::from_hex_literal("0x54afa3526").unwrap()),
+            ),
+            ("x\"7fff\"", T::U8Vector(vec![0x7f, 0xff])),
+            ("x\"\"", T::U8Vector(vec![])),
+            ("x\"00\"", T::U8Vector(vec![0x00])),
+            ("x\"deadbeef\"", T::U8Vector(vec![0xde, 0xad, 0xbe, 0xef])),
+        ] {
+            assert_eq!(&parse_transaction_argument(s).unwrap(), expected)
+        }
+    }
+
+    #[test]
+    fn tests_parse_transaction_argument_negative() {
+        for s in &[
+            "-3",
+            "0u42",
+            "0u645",
+            "0u64x",
+            "0u6 4",
+            "0u",
+            "256u8",
+            "18446744073709551616",
+            "18446744073709551616u64",
+            "340282366920938463463374607431768211456u128",
+            "0xg",
+            "0x00g0",
+            "0x",
+            "0x_",
+            "",
+            "x\"ffff",
+            "x\"a \"",
+            "x\" \"",
+            "x\"0g\"",
+            "x\"0\"",
+            "garbage",
+            "true3",
+            "3false",
+            "3 false",
+            "",
+        ] {
+            assert!(parse_transaction_argument(s).is_err())
+        }
+    }
+
+    #[test]
+    fn test_type_tag() {
+        for s in &[
+            "u64",
+            "bool",
+            "vector<u8>",
+            "vector<vector<u64>>",
+            "signer",
+            "0x1::M::S",
+            "0x2::M::S_",
+            "0x3::M_::S",
+            "0x4::M_::S_",
+            "0x00000000004::M::S",
+            "0x1::M::S<u64>",
+            "0x1::M::S<0x2::P::Q>",
+            "vector<0x1::M::S>",
+            "vector<0x1::M_::S_>",
+            "vector<vector<0x1::M_::S_>>",
+            "0x1::M::S<vector<u8>>",
+        ] {
+            assert!(parse_type_tag(s).is_ok(), "Failed to parse tag {}", s);
+        }
+    }
+
+    #[test]
+    fn test_parse_valid_struct_tag() {
+        let valid = vec![
+            "0x1::Diem::Diem",
+            "0x1::Diem_Type::Diem",
+            "0x1::Diem_::Diem",
+            "0x1::X_123::X32_",
+            "0x1::Diem::Diem_Type",
+            "0x1::Diem::Diem<0x1::XDX::XDX>",
+            "0x1::Diem::Diem<0x1::XDX::XDX_Type>",
+            "0x1::Diem::Diem<u8>",
+            "0x1::Diem::Diem<u64>",
+            "0x1::Diem::Diem<u128>",
+            "0x1::Diem::Diem<bool>",
+            "0x1::Diem::Diem<address>",
+            "0x1::Diem::Diem<signer>",
+            "0x1::Diem::Diem<vector<0x1::XDX::XDX>>",
+            "0x1::Diem::Diem<u8,bool>",
+            "0x1::Diem::Diem<u8,   bool>",
+            "0x1::Diem::Diem<u8  ,bool>",
+            "0x1::Diem::Diem<u8 , bool  ,    vector<u8>,address,signer>",
+            "0x1::Diem::Diem<vector<0x1::Diem::Struct<0x1::XUS::XUS>>>",
+            "0x1::Diem::Diem<0x1::Diem::Struct<vector<0x1::XUS::XUS>, 0x1::Diem::Diem<vector<0x1::Diem::Struct<0x1::XUS::XUS>>>>>",
+        ];
+        for text in valid {
+            let st = parse_struct_tag(text).expect("valid StructTag");
+            assert_eq!(
+                st.to_string().replace(" ", ""),
+                text.replace(" ", ""),
+                "text: {:?}, StructTag: {:?}",
+                text,
+                st
+            );
+        }
     }
 }

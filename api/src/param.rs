@@ -3,6 +3,7 @@
 
 use diem_api_types::{Address, Error, EventKey, MoveStructTag, TransactionId};
 use move_core_types::identifier::Identifier;
+use percent_encoding::percent_decode_str;
 use serde::{Deserialize, Deserializer};
 
 use std::{convert::Infallible, str::FromStr};
@@ -37,9 +38,13 @@ impl<T: FromStr> FromStr for Param<T> {
 
 impl<T: FromStr> Param<T> {
     pub fn parse(self, name: &str) -> Result<T, Error> {
-        self.data
+        let decoded = percent_decode_str(&self.data)
+            .decode_utf8()
+            .map_err(|_| Error::invalid_param(name, &self.data))?;
+
+        decoded
             .parse()
-            .map_err(|_| Error::invalid_param(name, &self.data))
+            .map_err(|_| Error::invalid_param(name, &decoded))
     }
 }
 
@@ -51,5 +56,28 @@ impl<'de, T: FromStr> Deserialize<'de> for Param<T> {
     {
         let data = <String>::deserialize(deserializer)?;
         Ok(Self { data, _value: None })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::MoveIdentifierParam;
+    use std::str::FromStr;
+
+    #[test]
+    fn test_parse_percent_encoded_path_parameter() {
+        let param = MoveIdentifierParam::from_str("abcd%5F").unwrap();
+        assert!(param.parse("param_name").is_ok())
+    }
+
+    #[test]
+    fn test_parse_percent_encoded_path_parameter_failed() {
+        let param = MoveIdentifierParam::from_str("%3Aabcd").unwrap();
+        let ret = param.parse("param_name");
+        assert!(ret.is_err());
+        assert_eq!(
+            "400 Bad Request: invalid parameter param_name: :abcd",
+            ret.err().unwrap().to_string()
+        );
     }
 }

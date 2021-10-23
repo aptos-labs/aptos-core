@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::tests::{assert_json, new_test_context};
+use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use serde_json::json;
 
 #[tokio::test]
@@ -194,16 +195,40 @@ async fn test_get_events_by_invalid_account_event_handle_field_name() {
 #[tokio::test]
 async fn test_get_events_by_invalid_account_event_handle_field_type() {
     let context = new_test_context();
+
     let resp = context
         .expect_status_code(400)
         .get("/accounts/0xa550c18/events/0x1::DiemAccount::AccountOperationsCapability/limits_cap")
         .await;
-
     assert_json(
         resp,
         json!({
           "code": 400,
           "message": "field(limits_cap) type is not EventHandle struct, deserialize error: unexpected end of input"
+        }),
+    );
+}
+
+#[tokio::test]
+async fn test_get_events_by_struct_type_has_generic_type_parameter() {
+    let context = new_test_context();
+
+    // This test is for making sure we can look up right struct with generic
+    // type specified in the URL path.
+    // Instead of creating the example, we just look up an event handle that does not exist.
+    let path = format!(
+        "/accounts/0x1/events/{}/coin",
+        utf8_percent_encode("0x1::DiemAccount::Balance<0x1::ABC::ABC>", NON_ALPHANUMERIC)
+            .to_string()
+    );
+    let resp = context.expect_status_code(404).get(path.as_str()).await;
+
+    assert_json(
+        resp,
+        json!({
+          "code": 404,
+          "message": "resource not found by address(0x1), struct tag(0x1::DiemAccount::Balance<0x1::ABC::ABC>) and ledger version(0)",
+          "diem_ledger_version": "0"
         }),
     );
 }

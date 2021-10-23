@@ -23,17 +23,17 @@ Failures in 0x1::Module:
 │ 
 │ ────── Storage state at point of failure ──────
 │ 0x1:
-│ 	=> key 0x1::Module::B<U64> {
+│ 	=> key 0x1::Module::B<u64> {
 │ 	    t: 5
 │ 	}
 │ 0x2:
-│ 	=> key 0x1::Module::B<Bool> {
+│ 	=> key 0x1::Module::B<bool> {
 │ 	    t: 6
 │ 	}
-│ 	=> key 0x1::Module::B<U64> {
+│ 	=> key 0x1::Module::B<u64> {
 │ 	    t: 5
 │ 	}
-│ 	=> key 0x1::Module::B<0x1::Module::C<U64>> {
+│ 	=> key 0x1::Module::B<0x1::Module::C<u64>> {
 │ 	    t: 5
 │ 	}
 │ 

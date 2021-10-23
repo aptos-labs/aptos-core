@@ -1591,6 +1591,7 @@ dependencies = [
  "hex",
  "hyper",
  "move-core-types",
+ "percent-encoding",
  "rand 0.8.4",
  "resource-viewer",
  "serde",

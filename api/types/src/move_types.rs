@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{Address, Bytecode};
-use anyhow::format_err;
+
 use diem_types::{event::EventKey, transaction::Module};
 use move_binary_format::{
     access::ModuleAccess,
@@ -14,6 +14,7 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
+    parser::parse_struct_tag,
     transaction_argument::TransactionArgument,
 };
 use resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue};
@@ -334,18 +335,7 @@ impl FromStr for MoveStructTag {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> anyhow::Result<Self, anyhow::Error> {
-        let parts = s.split("::").collect::<Vec<_>>();
-
-        if parts.len() == 3 {
-            Ok(Self::new(
-                parts[0].parse()?,
-                Identifier::new(parts[1].to_owned())?,
-                Identifier::new(parts[2].to_owned())?,
-                vec![],
-            ))
-        } else {
-            Err(format_err!("invalid Move struct tag string: {}", s))
-        }
+        Ok(parse_struct_tag(s)?.into())
     }
 }
 
