@@ -1,8 +1,6 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use move_binary_format::errors::PartialVMError;
-
 use serde::{Deserialize, Serialize};
 use std::{
     convert::From,
@@ -89,12 +87,6 @@ impl From<anyhow::Error> for Error {
 impl From<serde_json::error::Error> for Error {
     fn from(err: serde_json::error::Error) -> Self {
         Self::internal(err.into())
-    }
-}
-
-impl From<PartialVMError> for Error {
-    fn from(err: PartialVMError) -> Self {
-        Self::internal(anyhow::format_err!(err.to_string()))
     }
 }
 

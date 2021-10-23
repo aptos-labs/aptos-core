@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::tests::{assert_json, find_value, new_test_context, TestContext};
+use crate::tests::{assert_json, find_value, new_test_context, pretty, TestContext};
 
 use diem_api_types::HexEncodedBytes;
 use diem_crypto::{
@@ -9,20 +9,21 @@ use diem_crypto::{
     multi_ed25519::{MultiEd25519PrivateKey, MultiEd25519PublicKey},
     SigningKey, Uniform,
 };
-use diem_sdk::{client::SignedTransaction, transaction_builder::Currency};
+use diem_sdk::{client::SignedTransaction, transaction_builder::Currency, types::LocalAccount};
 use diem_types::{
     access_path::{AccessPath, Path},
     account_address::AccountAddress,
+    account_config::{from_currency_code_string, xus_tag, XUS_NAME},
     transaction::{
         authenticator::{AuthenticationKey, TransactionAuthenticator},
-        ChangeSet, Transaction, TransactionInfoTrait,
+        ChangeSet, Script, ScriptFunction, Transaction, TransactionInfoTrait,
     },
     write_set::{WriteOp, WriteSetMut},
 };
 
 use move_core_types::{
     identifier::Identifier,
-    language_storage::{ModuleId, StructTag},
+    language_storage::{ModuleId, StructTag, TypeTag, CORE_CODE_ADDRESS},
 };
 use serde_json::json;
 
@@ -284,6 +285,7 @@ async fn test_get_transactions_output_user_transaction_with_script_function_payl
             "event_root_hash": metadata.event_root_hash().to_hex_literal(),
             "gas_used": metadata.gas_used().to_string(),
             "success": true,
+            "vm_status": "Executed successfully",
             "id": metadata_txn.id().to_hex_literal(),
             "round": "1",
             "previous_block_votes": [],
@@ -313,6 +315,7 @@ async fn test_get_transactions_output_user_transaction_with_script_function_payl
             "event_root_hash": user_txn_info.event_root_hash().to_hex_literal(),
             "gas_used": user_txn_info.gas_used().to_string(),
             "success": true,
+            "vm_status": "Executed successfully",
             "sender": "0xb1e55ed",
             "sequence_number": "0",
             "max_gas_amount": "1000000",
@@ -1234,4 +1237,335 @@ async fn test_get_account_transactions_filter_transactions_by_limit() {
         )
         .await;
     assert_eq!(txns.as_array().unwrap().len(), 2);
+}
+
+const MISC_ERROR: &str = "Move bytecode deserialization / verification failed, including script function not found or invalid arguments";
+
+#[tokio::test]
+async fn test_get_txn_execute_failed_by_invalid_module_payload_bytecode() {
+    let context = new_test_context();
+    let invalid_bytecode = hex::decode("a11ceb0b030000").unwrap();
+    let mut tc_account = context.tc_account();
+    let txn = tc_account
+        .sign_with_transaction_builder(context.transaction_factory().module(invalid_bytecode));
+    test_transaction_vm_status(context, txn, false, MISC_ERROR).await
+}
+
+#[tokio::test]
+async fn test_get_txn_execute_failed_by_invalid_script_payload_bytecode() {
+    let context = new_test_context();
+    let mut tc_account = context.tc_account();
+    let invalid_bytecode = hex::decode("a11ceb0b030000").unwrap();
+    let txn = tc_account.sign_with_transaction_builder(
+        context
+            .transaction_factory()
+            .script(Script::new(invalid_bytecode, vec![], vec![])),
+    );
+    test_transaction_vm_status(context, txn, false, MISC_ERROR).await
+}
+
+#[tokio::test]
+async fn test_get_txn_execute_failed_by_invalid_write_set_payload() {
+    let context = new_test_context();
+
+    let invalid_bytecode = hex::decode("a11ceb0b030000").unwrap();
+    let mut root_account = context.root_account();
+    let code_address = AccountAddress::from_hex_literal("0x1").unwrap();
+    let txn = root_account.sign_with_transaction_builder(
+        context.transaction_factory().change_set(ChangeSet::new(
+            WriteSetMut::new(vec![(
+                AccessPath::new(
+                    code_address,
+                    bcs::to_bytes(&Path::Code(ModuleId::new(
+                        code_address,
+                        Identifier::new("AccountAdministrationScripts").unwrap(),
+                    )))
+                    .unwrap(),
+                ),
+                WriteOp::Value(invalid_bytecode),
+            )])
+            .freeze()
+            .unwrap(),
+            vec![],
+        )),
+    );
+
+    // should fail, but VM executed successfully, need investigate, but out of API scope
+    test_transaction_vm_status(context, txn, true, "Executed successfully").await
+}
+
+#[tokio::test]
+async fn test_get_txn_execute_failed_by_invalid_script_function_address() {
+    let context = new_test_context();
+    let account = context.dd_account();
+    test_get_txn_execute_failed_by_invalid_script_function(
+        context,
+        account,
+        "0x1222",
+        "PaymentScripts",
+        "peer_to_peer_with_metadata",
+        vec![xus_tag()],
+        vec![
+            bcs::to_bytes(&AccountAddress::from_hex_literal("0xdd").unwrap()).unwrap(),
+            bcs::to_bytes(&1u64).unwrap(),
+            bcs::to_bytes(&Vec::<u8>::new()).unwrap(),
+            bcs::to_bytes(&Vec::<u8>::new()).unwrap(),
+        ],
+        MISC_ERROR,
+    )
+    .await
+}
+
+#[tokio::test]
+async fn test_get_txn_execute_failed_by_invalid_script_function_module_name() {
+    let context = new_test_context();
+    let account = context.dd_account();
+    test_get_txn_execute_failed_by_invalid_script_function(
+        context,
+        account,
+        "0x1",
+        "PaymentScriptsInvalid",
+        "peer_to_peer_with_metadata",
+        vec![xus_tag()],
+        vec![
+            bcs::to_bytes(&AccountAddress::from_hex_literal("0xdd").unwrap()).unwrap(),
+            bcs::to_bytes(&1u64).unwrap(),
+            bcs::to_bytes(&Vec::<u8>::new()).unwrap(),
+            bcs::to_bytes(&Vec::<u8>::new()).unwrap(),
+        ],
+        MISC_ERROR,
+    )
+    .await
+}
+
+#[tokio::test]
+async fn test_get_txn_execute_failed_by_invalid_script_function_name() {
+    let context = new_test_context();
+    let account = context.dd_account();
+    test_get_txn_execute_failed_by_invalid_script_function(
+        context,
+        account,
+        "0x1",
+        "PaymentScripts",
+        "peer_to_peer_with_metadata_invalid",
+        vec![xus_tag()],
+        vec![
+            bcs::to_bytes(&AccountAddress::from_hex_literal("0xdd").unwrap()).unwrap(),
+            bcs::to_bytes(&1u64).unwrap(),
+            bcs::to_bytes(&Vec::<u8>::new()).unwrap(),
+            bcs::to_bytes(&Vec::<u8>::new()).unwrap(),
+        ],
+        MISC_ERROR,
+    )
+    .await
+}
+
+#[tokio::test]
+async fn test_get_txn_execute_failed_by_invalid_script_function_type_arguments() {
+    let context = new_test_context();
+    let account = context.dd_account();
+    test_get_txn_execute_failed_by_invalid_script_function(
+        context,
+        account,
+        "0x1",
+        "PaymentScripts",
+        "peer_to_peer_with_metadata_invalid",
+        vec![TypeTag::Struct(StructTag {
+            address: CORE_CODE_ADDRESS,
+            module: from_currency_code_string(XUS_NAME).unwrap(),
+            name: Identifier::new("invalid").unwrap(),
+            type_params: vec![],
+        })],
+        vec![
+            bcs::to_bytes(&AccountAddress::from_hex_literal("0xdd").unwrap()).unwrap(),
+            bcs::to_bytes(&1u64).unwrap(),
+            bcs::to_bytes(&Vec::<u8>::new()).unwrap(),
+            bcs::to_bytes(&Vec::<u8>::new()).unwrap(),
+        ],
+        MISC_ERROR,
+    )
+    .await
+}
+
+#[tokio::test]
+async fn test_get_txn_execute_failed_by_invalid_script_function_arguments() {
+    let context = new_test_context();
+    let account = context.dd_account();
+    test_get_txn_execute_failed_by_invalid_script_function(
+        context,
+        account,
+        "0x1",
+        "PaymentScripts",
+        "peer_to_peer_with_metadata",
+        vec![xus_tag()],
+        vec![
+            bcs::to_bytes(&AccountAddress::from_hex_literal("0xdd").unwrap()).unwrap(),
+            bcs::to_bytes(&1u8).unwrap(), // invalid type
+            bcs::to_bytes(&Vec::<u8>::new()).unwrap(),
+            bcs::to_bytes(&Vec::<u8>::new()).unwrap(),
+        ],
+        MISC_ERROR,
+    )
+    .await
+}
+
+#[tokio::test]
+async fn test_get_txn_execute_failed_by_missing_script_function_arguments() {
+    let context = new_test_context();
+    let account = context.dd_account();
+    test_get_txn_execute_failed_by_invalid_script_function(
+        context,
+        account,
+        "0x1",
+        "PaymentScripts",
+        "peer_to_peer_with_metadata",
+        vec![xus_tag()],
+        vec![
+            bcs::to_bytes(&AccountAddress::from_hex_literal("0xdd").unwrap()).unwrap(),
+            // missing 3 arguments
+        ],
+        MISC_ERROR,
+    )
+    .await
+}
+
+#[tokio::test]
+async fn test_get_txn_execute_failed_by_script_function_validation() {
+    let mut context = new_test_context();
+    let account = context.gen_account();
+    context.commit_block(&vec![context.create_parent_vasp(&account)]);
+
+    test_get_txn_execute_failed_by_invalid_script_function(
+        context,
+        account,
+        "0x1",
+        "PaymentScripts",
+        "peer_to_peer_with_metadata",
+        vec![xus_tag()],
+        vec![
+            bcs::to_bytes(&AccountAddress::from_hex_literal("0xdd").unwrap()).unwrap(),
+            bcs::to_bytes(&123u64).unwrap(), // exceed limit, account balance is 0.
+            bcs::to_bytes(&Vec::<u8>::new()).unwrap(),
+            bcs::to_bytes(&Vec::<u8>::new()).unwrap(),
+        ],
+        r#"Move abort by LIMIT_EXCEEDED - EINSUFFICIENT_BALANCE
+ A limit on an amount, e.g. a currency, is exceeded. Example: withdrawal of money after account limits window
+ is exhausted.
+ The account does not hold a large enough balance in the specified currency"#,
+    )
+    .await
+}
+
+#[tokio::test]
+async fn test_get_txn_execute_failed_by_script_function_execution_failure() {
+    let context = new_test_context();
+
+    // address 0xA550C18 {
+    //     module Hello {
+    //         fun world() {
+    //             1/0;
+    //         }
+    //         public(script) fun hello() {
+    //             world();
+    //         }
+    //     }
+    // }
+    let hello_script_fun = hex::decode("a11ceb0b030000000601000203020a050c01070d12081f100c2f24000000010000000002000000000548656c6c6f0568656c6c6f05776f726c640000000000000000000000000a550c180002000000021101020100000000050601000000000000000600000000000000001a010200").unwrap();
+    let mut root_account = context.root_account();
+    let module_txn = root_account
+        .sign_with_transaction_builder(context.transaction_factory().module(hello_script_fun));
+
+    context.commit_block(&vec![module_txn]);
+
+    test_get_txn_execute_failed_by_invalid_script_function(
+        context,
+        root_account,
+        "0xA550C18",
+        "Hello",
+        "hello",
+        vec![],
+        vec![],
+        "Execution failed in 0000000000000000000000000A550C18::Hello::world at code offset 2",
+    )
+    .await
+}
+
+#[tokio::test]
+async fn test_get_txn_execute_failed_by_script_execution_failure() {
+    let context = new_test_context();
+
+    // script {
+    //     fun main() {
+    //         1/0;
+    //     }
+    // }
+    let script =
+        hex::decode("a11ceb0b030000000105000100000000050601000000000000000600000000000000001a0102")
+            .unwrap();
+    let mut root_account = context.root_account();
+    let txn = root_account.sign_with_transaction_builder(
+        context
+            .transaction_factory()
+            .script(Script::new(script, vec![], vec![])),
+    );
+
+    test_transaction_vm_status(
+        context,
+        txn,
+        false,
+        "Execution failed in script at code offset 2",
+    )
+    .await
+}
+
+async fn test_get_txn_execute_failed_by_invalid_script_function(
+    context: TestContext,
+    mut account: LocalAccount,
+    address: &str,
+    module_id: &str,
+    func: &str,
+    ty_args: Vec<TypeTag>,
+    args: Vec<Vec<u8>>,
+    vm_status: &str,
+) {
+    let txn = account.sign_with_transaction_builder(context.transaction_factory().script_function(
+        ScriptFunction::new(
+            ModuleId::new(
+                AccountAddress::from_hex_literal(address).unwrap(),
+                Identifier::new(module_id).unwrap(),
+            ),
+            Identifier::new(func).unwrap(),
+            ty_args,
+            args,
+        ),
+    ));
+
+    test_transaction_vm_status(context, txn, false, vm_status).await
+}
+
+async fn test_transaction_vm_status(
+    context: TestContext,
+    txn: SignedTransaction,
+    success: bool,
+    vm_status: &str,
+) {
+    let body = bcs::to_bytes(&txn).unwrap();
+    // we don't validate transaction payload when submit txn into mempool.
+    context
+        .expect_status_code(202)
+        .post_bcs_txn("/transactions", body)
+        .await;
+
+    context.commit_mempool_txns(1);
+
+    let resp = context
+        .get(format!("/transactions/{}", txn.committed_hash().to_hex_literal()).as_str())
+        .await;
+    assert_eq!(
+        resp["success"].as_bool().unwrap(),
+        success,
+        "{}",
+        pretty(&resp)
+    );
+    assert_eq!(resp["vm_status"].as_str().unwrap(), vm_status);
 }

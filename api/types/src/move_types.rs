@@ -163,6 +163,12 @@ impl<'de> Deserialize<'de> for U128 {
 #[derive(Clone, Debug, PartialEq)]
 pub struct HexEncodedBytes(Vec<u8>);
 
+impl HexEncodedBytes {
+    pub fn json(&self) -> anyhow::Result<serde_json::Value> {
+        Ok(serde_json::to_value(self)?)
+    }
+}
+
 impl FromStr for HexEncodedBytes {
     type Err = anyhow::Error;
 
@@ -678,16 +684,16 @@ impl MoveModuleBytecode {
         }
     }
 
-    pub fn ensure_abi(mut self) -> anyhow::Result<Self> {
+    pub fn try_parse_abi(mut self) -> anyhow::Result<Self> {
         if self.abi.is_none() {
-            let module = CompiledModule::deserialize(self.bytecode.inner())?.try_into()?;
-            self.abi = Some(module);
+            // Ignore error, because it is possible a transaction module payload contains
+            // invalid bytecode.
+            // So we ignore the error and output bytecode without abi.
+            if let Ok(module) = CompiledModule::deserialize(self.bytecode.inner()) {
+                self.abi = Some(module.try_into()?);
+            }
         }
         Ok(self)
-    }
-
-    pub fn into_abi(self) -> anyhow::Result<MoveModule> {
-        Ok(self.ensure_abi()?.abi.unwrap())
     }
 }
 
@@ -711,16 +717,16 @@ impl MoveScriptBytecode {
         }
     }
 
-    pub fn ensure_abi(mut self) -> anyhow::Result<Self> {
+    pub fn try_parse_abi(mut self) -> Self {
         if self.abi.is_none() {
-            let func = (&CompiledScript::deserialize(self.bytecode.inner())?).into();
-            self.abi = Some(func);
+            // ignore error, because it is possible a transaction script payload contains
+            // invalid bytecode.
+            // So we ignore the error and output bytecode without abi.
+            if let Ok(script) = CompiledScript::deserialize(self.bytecode.inner()) {
+                self.abi = Some((&script).into());
+            }
         }
-        Ok(self)
-    }
-
-    pub fn into_abi(self) -> anyhow::Result<MoveFunction> {
-        Ok(self.ensure_abi()?.abi.unwrap())
+        self
     }
 }
 

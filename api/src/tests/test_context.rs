@@ -22,6 +22,7 @@ use diem_secure_storage::KVStorage;
 use diem_temppath::TempPath;
 use diem_types::{
     account_address::AccountAddress,
+    account_config::testnet_dd_account_address,
     block_info::BlockInfo,
     block_metadata::BlockMetadata,
     chain_id::ChainId,
@@ -115,6 +116,14 @@ impl TestContext {
     pub fn tc_account(&self) -> LocalAccount {
         LocalAccount::new(
             treasury_compliance_account_address(),
+            self.root_keys.root_key.clone(),
+            0,
+        )
+    }
+
+    pub fn dd_account(&self) -> LocalAccount {
+        LocalAccount::new(
+            testnet_dd_account_address(),
             self.root_keys.root_key.clone(),
             0,
         )

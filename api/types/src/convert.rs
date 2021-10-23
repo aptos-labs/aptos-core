@@ -3,10 +3,11 @@
 
 use crate::{
     Bytecode, DirectWriteSet, Event, HexEncodedBytes, MoveFunction, MoveModuleBytecode,
-    MoveResource, MoveType, MoveValue, ScriptFunctionPayload, ScriptPayload, ScriptWriteSet,
-    Transaction, TransactionData, TransactionOnChainData, TransactionPayload,
-    UserTransactionRequest, WriteSet, WriteSetChange, WriteSetPayload,
+    MoveResource, MoveScriptBytecode, MoveType, MoveValue, ScriptFunctionPayload, ScriptPayload,
+    ScriptWriteSet, Transaction, TransactionData, TransactionInfo, TransactionOnChainData,
+    TransactionPayload, UserTransactionRequest, WriteSet, WriteSetChange, WriteSetPayload,
 };
+use diem_transaction_builder::error_explain;
 use diem_types::{
     access_path::{AccessPath, Path},
     chain_id::ChainId,
@@ -14,10 +15,14 @@ use diem_types::{
     transaction::{
         Module, RawTransaction, Script, ScriptFunction, SignedTransaction, TransactionInfoTrait,
     },
+    vm_status::{AbortLocation, KeptVMStatus},
     write_set::WriteOp,
 };
+use move_binary_format::file_format::FunctionHandleIndex;
 use move_core_types::{
-    identifier::Identifier, language_storage::StructTag, resolver::MoveResolver,
+    identifier::Identifier,
+    language_storage::{ModuleId, StructTag},
+    resolver::MoveResolver,
 };
 use resource_viewer::MoveValueAnnotator;
 
@@ -79,19 +84,35 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
         data: TransactionOnChainData<T>,
     ) -> Result<Transaction> {
         use diem_types::transaction::Transaction::*;
+        let info = self.into_transaction_info(data.version, &data.info);
         let events = self.try_into_events(&data.events)?;
-        let ret = match data.transaction {
+        Ok(match data.transaction {
             UserTransaction(txn) => {
                 let payload = self.try_into_transaction_payload(txn.payload().clone())?;
-                (data.version, &txn, &data.info, payload, events).into()
+                (&txn, info, payload, events).into()
             }
             GenesisTransaction(write_set) => {
                 let payload = self.try_into_write_set_payload(write_set)?;
-                (data.version, &data.info, payload, events).into()
+                (info, payload, events).into()
             }
-            BlockMetadata(txn) => (data.version, &txn, &data.info).into(),
-        };
-        Ok(ret)
+            BlockMetadata(txn) => (&txn, info).into(),
+        })
+    }
+
+    pub fn into_transaction_info<T: TransactionInfoTrait>(
+        &self,
+        version: u64,
+        info: &T,
+    ) -> TransactionInfo {
+        TransactionInfo {
+            version: version.into(),
+            hash: info.transaction_hash().into(),
+            state_root_hash: info.state_root_hash().into(),
+            event_root_hash: info.event_root_hash().into(),
+            gas_used: info.gas_used().into(),
+            success: info.status().is_success(),
+            vm_status: self.explain_vm_status(info.status()),
+        }
     }
 
     pub fn try_into_transaction_payload(
@@ -103,17 +124,27 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
             WriteSet(v) => TransactionPayload::WriteSetPayload(self.try_into_write_set_payload(v)?),
             Script(s) => TransactionPayload::ScriptPayload(s.try_into()?),
             Module(m) => {
-                TransactionPayload::ModulePayload(MoveModuleBytecode::from(m).ensure_abi()?)
+                let code = MoveModuleBytecode::from(m);
+                TransactionPayload::ModulePayload(code.try_parse_abi()?)
             }
             ScriptFunction(fun) => {
                 let (module, function, ty_args, args) = fun.into_inner();
-                TransactionPayload::ScriptFunctionPayload(ScriptFunctionPayload {
-                    arguments: self
-                        .inner
-                        .view_function_arguments(&module, &function, &args)?
+                let func_args = self
+                    .inner
+                    .view_function_arguments(&module, &function, &args);
+                let json_args = match func_args {
+                    Ok(values) => values
                         .into_iter()
                         .map(|v| MoveValue::try_from(v)?.json())
                         .collect::<Result<_>>()?,
+                    Err(_e) => args
+                        .into_iter()
+                        .map(|arg| HexEncodedBytes::from(arg).json())
+                        .collect::<Result<_>>()?,
+                };
+
+                TransactionPayload::ScriptFunctionPayload(ScriptFunctionPayload {
+                    arguments: json_args,
                     module: module.into(),
                     function,
                     type_arguments: ty_args.into_iter().map(|arg| arg.into()).collect(),
@@ -172,7 +203,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
             WriteOp::Value(val) => match access_path.get_path() {
                 Path::Code(_) => WriteSetChange::WriteModule {
                     address: access_path.address.into(),
-                    data: MoveModuleBytecode::new(val).ensure_abi()?,
+                    data: MoveModuleBytecode::new(val).try_parse_abi()?,
                 },
                 Path::Resource(typ) => WriteSetChange::WriteResource {
                     address: access_path.address.into(),
@@ -281,17 +312,23 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                     arguments,
                 } = script;
 
-                let args = self.try_into_move_values(code.clone().into_abi()?, arguments)?;
-                Target::Script(Script::new(
-                    code.bytecode.into(),
-                    type_arguments
-                        .into_iter()
-                        .map(|v| v.try_into())
-                        .collect::<Result<_>>()?,
-                    args.into_iter()
-                        .map(|arg| arg.try_into())
-                        .collect::<Result<_>>()?,
-                ))
+                let MoveScriptBytecode { bytecode, abi } = code.try_parse_abi();
+                match abi {
+                    Some(func) => {
+                        let args = self.try_into_move_values(func, arguments)?;
+                        Target::Script(Script::new(
+                            bytecode.into(),
+                            type_arguments
+                                .into_iter()
+                                .map(|v| v.try_into())
+                                .collect::<Result<_>>()?,
+                            args.into_iter()
+                                .map(|arg| arg.try_into())
+                                .collect::<Result<_>>()?,
+                        ))
+                    }
+                    None => return Err(anyhow::anyhow!("invalid transaction script bytecode")),
+                }
             }
             TransactionPayload::WriteSetPayload(_) => {
                 return Err(anyhow::anyhow!(
@@ -377,5 +414,59 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                 &val
             ))
         }
+    }
+
+    fn explain_vm_status(&self, status: &KeptVMStatus) -> String {
+        match status {
+            KeptVMStatus::MoveAbort(location, abort_code) => match &location {
+                AbortLocation::Module(module_id) => {
+                    let explanation = error_explain::get_explanation(module_id, *abort_code);
+                    explanation
+                        .map(|ec| {
+                            format!(
+                                "Move abort by {} - {}\n{}\n{}",
+                                ec.category.code_name,
+                                ec.reason.code_name,
+                                ec.category.code_description,
+                                ec.reason.code_description
+                            )
+                        })
+                        .unwrap_or_else(|| {
+                            format!("Move abort: code {} at {}", abort_code, location)
+                        })
+                }
+                AbortLocation::Script => format!("Move abort: code {}", abort_code),
+            },
+            KeptVMStatus::Executed => "Executed successfully".to_owned(),
+            KeptVMStatus::OutOfGas => "Out of gas".to_owned(),
+            KeptVMStatus::ExecutionFailure {
+                location,
+                function,
+                code_offset,
+            } => {
+                let func_name = match location {
+                    AbortLocation::Module(module_id) => self
+                        .explain_function_index(module_id, function)
+                        .map(|name| format!("{}::{}", location, name))
+                        .unwrap_or_else(|_| format!("{}::<#{} function>", location, function)),
+                    AbortLocation::Script => "script".to_owned(),
+                };
+                format!(
+                    "Execution failed in {} at code offset {}",
+                    func_name, code_offset
+                )
+            }
+            KeptVMStatus::MiscellaneousError => {
+                "Move bytecode deserialization / verification failed, including script function not found or invalid arguments"
+                    .to_owned()
+            }
+        }
+    }
+
+    fn explain_function_index(&self, module_id: &ModuleId, function: &u16) -> Result<String> {
+        let code = self.inner.get_module(&module_id.clone())? as Rc<dyn Bytecode>;
+        let func = code.function_handle_at(FunctionHandleIndex::new(*function));
+        let id = code.identifier_at(func.name);
+        Ok(format!("{}", id))
     }
 }

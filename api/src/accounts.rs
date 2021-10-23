@@ -135,7 +135,7 @@ impl Account {
             .account_state()?
             .into_modules()
             .map(MoveModuleBytecode::new)
-            .map(|m| m.ensure_abi())
+            .map(|m| m.try_parse_abi())
             .collect::<Result<Vec<MoveModuleBytecode>>>()?;
         Response::new(self.latest_ledger_info, &modules)
     }

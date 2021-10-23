@@ -113,40 +113,44 @@ impl From<(SignedTransaction, TransactionPayload)> for Transaction {
     }
 }
 
-impl<T: TransactionInfoTrait> From<(u64, &SignedTransaction, &T, TransactionPayload, Vec<Event>)>
-    for Transaction
+impl
+    From<(
+        &SignedTransaction,
+        TransactionInfo,
+        TransactionPayload,
+        Vec<Event>,
+    )> for Transaction
 {
     fn from(
-        (version, txn, info, payload, events): (
-            u64,
+        (txn, info, payload, events): (
             &SignedTransaction,
-            &T,
+            TransactionInfo,
             TransactionPayload,
             Vec<Event>,
         ),
     ) -> Self {
         Transaction::UserTransaction(Box::new(UserTransaction {
-            info: (version, info).into(),
+            info,
             request: (txn, payload).into(),
             events,
         }))
     }
 }
 
-impl<T: TransactionInfoTrait> From<(u64, &T, WriteSetPayload, Vec<Event>)> for Transaction {
-    fn from((version, info, payload, events): (u64, &T, WriteSetPayload, Vec<Event>)) -> Self {
+impl From<(TransactionInfo, WriteSetPayload, Vec<Event>)> for Transaction {
+    fn from((info, payload, events): (TransactionInfo, WriteSetPayload, Vec<Event>)) -> Self {
         Transaction::GenesisTransaction(GenesisTransaction {
-            info: (version, info).into(),
+            info,
             payload: GenesisPayload::WriteSetPayload(payload),
             events,
         })
     }
 }
 
-impl<T: TransactionInfoTrait> From<(u64, &BlockMetadata, &T)> for Transaction {
-    fn from((version, txn, info): (u64, &BlockMetadata, &T)) -> Self {
+impl From<(&BlockMetadata, TransactionInfo)> for Transaction {
+    fn from((txn, info): (&BlockMetadata, TransactionInfo)) -> Self {
         Transaction::BlockMetadataTransaction(BlockMetadataTransaction {
-            info: (version, info).into(),
+            info,
             id: txn.id().into(),
             round: txn.round().into(),
             previous_block_votes: txn
@@ -184,19 +188,7 @@ pub struct TransactionInfo {
     pub event_root_hash: HashValue,
     pub gas_used: U64,
     pub success: bool,
-}
-
-impl<T: TransactionInfoTrait> From<(u64, &T)> for TransactionInfo {
-    fn from((version, info): (u64, &T)) -> Self {
-        Self {
-            version: version.into(),
-            hash: info.transaction_hash().into(),
-            state_root_hash: info.state_root_hash().into(),
-            event_root_hash: info.event_root_hash().into(),
-            gas_used: info.gas_used().into(),
-            success: info.status().is_success(),
-        }
-    }
+    pub vm_status: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -305,7 +297,7 @@ impl TryFrom<Script> for ScriptPayload {
     fn try_from(script: Script) -> anyhow::Result<Self> {
         let (code, ty_args, args) = script.into_inner();
         Ok(Self {
-            code: MoveScriptBytecode::new(code).ensure_abi()?,
+            code: MoveScriptBytecode::new(code).try_parse_abi(),
             type_arguments: ty_args.into_iter().map(|arg| arg.into()).collect(),
             arguments: args
                 .into_iter()
