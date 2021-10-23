@@ -12,7 +12,10 @@ use crate::{
         },
     },
 };
-use diem_config::config::{NodeConfig, PeerRole};
+use diem_config::{
+    config::{NodeConfig, PeerRole},
+    network_id::{NetworkId, PeerNetworkId},
+};
 use diem_types::{transaction::SignedTransaction, PeerId};
 use netcore::transport::ConnectionOrigin;
 use network::{
@@ -50,8 +53,8 @@ impl MempoolOverrideConfig {
 #[derive(Default)]
 struct TestHarness {
     nodes: HashMap<NodeId, Node>,
-    /// A mapping of `PeerId` to `NodeId`.  Since network messages use `PeerId` this mapping is needed
-    peer_to_node_id: HashMap<PeerId, NodeId>,
+    /// A mapping of `PeerNetworkId` to `NodeId`.  Used for reverse mapping network requests.
+    peer_to_node_id: HashMap<PeerNetworkId, NodeId>,
 }
 
 impl TestHarness {
@@ -90,10 +93,11 @@ impl TestHarness {
         for idx in 0..validator_nodes_count {
             let node_id = harness.add_validator(&mut rng, idx, validator_mempool_config);
             peers.entry(PeerRole::Validator).or_default().push(node_id);
+            let validator_peer_id = harness.node(&node_id).peer_id(NetworkId::Validator);
 
             // Build up VFNs if we've determined we want those too
             if vfns_attached {
-                let node_id = harness.add_vfn(&mut rng, idx, vfn_mempool_config);
+                let node_id = harness.add_vfn(&mut rng, idx, vfn_mempool_config, validator_peer_id);
                 peers
                     .entry(PeerRole::ValidatorFullNode)
                     .or_default()
@@ -134,8 +138,9 @@ impl TestHarness {
         rng: &mut StdRng,
         idx: u32,
         mempool_config: Option<MempoolOverrideConfig>,
+        peer_id: PeerId,
     ) -> NodeId {
-        let (vfn, mut vfn_config) = vfn_config(rng, idx);
+        let (vfn, mut vfn_config) = vfn_config(rng, idx, peer_id);
         Self::update_config(&mut vfn_config, mempool_config);
 
         let node_id = NodeId::new(NodeType::ValidatorFullNode, idx);
@@ -189,11 +194,13 @@ impl TestHarness {
     }
 
     fn add_node(&mut self, node_id: NodeId, node_info: NodeInfo, node_config: NodeConfig) {
-        self.peer_to_node_id
-            .insert(node_info.primary_peer_id(), node_id);
-        if let Some(secondary_peer_id) = node_info.secondary_peer_id() {
-            self.peer_to_node_id.insert(secondary_peer_id, node_id);
+        for peer_network_id in node_info.peer_network_ids().into_iter() {
+            // VFN addresses aren't unique
+            if peer_network_id.network_id() != NetworkId::Vfn {
+                self.peer_to_node_id.insert(peer_network_id, node_id);
+            }
         }
+
         self.nodes
             .insert(node_id, Node::new(node_info, node_config));
     }
@@ -216,64 +223,65 @@ impl TestHarness {
         self.node(node_id).commit_txns(txns)
     }
 
-    /// Connect two nodes, Dialer -> Reciever, direction is important
-    fn connect(&mut self, dialer: &NodeId, receiver: &NodeId) {
-        self.connect_with_networks(dialer, true, receiver, true);
+    fn find_common_network(&self, node_a: &NodeId, node_b: &NodeId) -> NetworkId {
+        let node_a = self.node(node_a);
+        let node_b = self.node(node_b);
+        node_a.find_common_network(node_b)
     }
 
-    /// Connect two nodes on specific interfaces
-    fn connect_with_networks(
+    /// Connect two nodes, Dialer -> Reciever, direction is important
+    fn connect(&mut self, dialer_id: &NodeId, receiver_id: &NodeId) {
+        self.connect_with_network(
+            self.find_common_network(dialer_id, receiver_id),
+            dialer_id,
+            receiver_id,
+        )
+    }
+
+    fn connect_with_network(
         &mut self,
+        network_id: NetworkId,
         dialer_id: &NodeId,
-        dialer_is_primary: bool,
         receiver_id: &NodeId,
-        receiver_is_primary: bool,
     ) {
         // Tell receiver about dialer
         let dialer = self.node(dialer_id);
-        let dialer_peer_id = dialer.peer_id(dialer_is_primary);
+        let dialer_peer_network_id = dialer.peer_network_id(network_id);
         let dialer_role = dialer.peer_role();
         let receiver = self.mut_node(receiver_id);
 
         receiver.send_new_peer_event(
-            receiver_is_primary,
-            dialer_peer_id,
+            dialer_peer_network_id,
             dialer_role,
             ConnectionOrigin::Inbound,
         );
 
         // Tell dialer about receiver
         let receiver = self.node(receiver_id);
-        let receiver_peer_id = receiver.peer_id(receiver_is_primary);
+        let receiver_peer_network_id = receiver.peer_network_id(network_id);
         let receiver_role = receiver.peer_role();
         let dialer = self.mut_node(dialer_id);
         dialer.send_new_peer_event(
-            dialer_is_primary,
-            receiver_peer_id,
+            receiver_peer_network_id,
             receiver_role,
             ConnectionOrigin::Outbound,
         );
     }
 
     /// Disconnect two nodes
-    fn disconnect(
-        &mut self,
-        node_a_id: &NodeId,
-        is_primary_a: bool,
-        node_b_id: &NodeId,
-        is_primary_b: bool,
-    ) {
+    fn disconnect(&mut self, node_a_id: &NodeId, node_b_id: &NodeId) {
+        let network_id = self.find_common_network(node_a_id, node_b_id);
         // Tell B about A
         let node_a = self.node(node_a_id);
-        let id_a = node_a.peer_id(is_primary_a);
+        let id_a = node_a.peer_network_id(network_id);
         let node_b = self.mut_node(node_b_id);
-        node_b.send_lost_peer_event(is_primary_b, id_a);
+        node_b.send_lost_peer_event(id_a);
 
         // Tell A about B
         let node_b = self.node(node_b_id);
-        let id_b = node_b.peer_id(is_primary_b);
+        let id_b = node_b.peer_network_id(network_id);
         let node_a = self.mut_node(node_a_id);
-        node_a.send_lost_peer_event(is_primary_a, id_b);
+        node_a.send_lost_peer_event(id_b);
     }
 
     /// Blocks, expecting the next event to be the type provided
@@ -286,27 +294,27 @@ impl TestHarness {
     }
 
     /// Checks that a node has no pending messages to send.
-    fn assert_no_message_sent(&mut self, node_id: &NodeId, is_primary: bool) {
+    fn assert_no_message_sent(&mut self, node_id: &NodeId, network_id: NetworkId) {
         self.check_no_events(node_id);
         self.mut_node(node_id)
-            .check_no_network_messages_sent(is_primary);
+            .check_no_network_messages_sent(network_id);
     }
 
     /// Convenience function to get rid of the string of true falses
     fn broadcast_txns_successfully(
         &mut self,
         sender: &NodeId,
-        is_primary: bool,
+        network_id: NetworkId,
         num_messages: usize,
     ) -> (Vec<SignedTransaction>, PeerId) {
-        self.broadcast_txns(sender, is_primary, num_messages, true, true, false)
+        self.broadcast_txns(sender, network_id, num_messages, true, true, false)
     }
 
     /// Broadcast Transactions queued up in the local mempool of the sender
     fn broadcast_txns(
         &mut self,
         sender_id: &NodeId,
-        sender_is_primary: bool,
+        network_id: NetworkId,
         num_messages: usize,
         check_txns_in_mempool: bool, // Check whether all txns in this broadcast are accepted into recipient's mempool
         execute_send: bool, // If true, actually delivers msg to remote peer; else, drop the message (useful for testing unreliable msg delivery)
@@ -321,8 +329,8 @@ impl TestHarness {
 
         // Get the outgoing network request on the sender
         let sender = self.mut_node(sender_id);
-        let sender_peer_id = sender.peer_id(sender_is_primary);
-        let network_req = sender.get_next_network_req(sender_is_primary);
+        let sender_peer_id = sender.peer_id(network_id);
+        let network_req = sender.get_next_network_req(network_id);
 
         // Handle outgoing message
         match network_req {
@@ -339,13 +347,26 @@ impl TestHarness {
                         }
 
                         // Otherwise, let's forward it
-                        let receiver_id = *self.peer_to_node_id.get(&remote_peer_id).unwrap();
-
+                        let lookup_peer_network_id = match network_id {
+                            NetworkId::Vfn => {
+                                // If this is a validator broadcasting on Vfn we have a problem
+                                assert!(!sender
+                                    .supported_networks()
+                                    .contains(&NetworkId::Validator));
+                                // VFN should have same PeerId but different network from validator
+                                PeerNetworkId::new(
+                                    NetworkId::Validator,
+                                    sender.peer_id(NetworkId::Public),
+                                )
+                            }
+                            _ => PeerNetworkId::new(network_id, remote_peer_id),
+                        };
+                        let receiver_id =
+                            *self.peer_to_node_id.get(&lookup_peer_network_id).unwrap();
                         let receiver = self.mut_node(&receiver_id);
-                        let is_primary = receiver.primary_peer_id() == remote_peer_id;
 
                         receiver.send_network_req(
-                            is_primary,
+                            network_id,
                             ProtocolId::MempoolDirectSend,
                             PeerManagerNotification::RecvMessage(sender_peer_id, msg),
                         );
@@ -364,7 +385,7 @@ impl TestHarness {
 
                         // Sends an ACK response
                         if !drop_ack {
-                            self.deliver_response(&receiver_id, is_primary);
+                            self.deliver_response(&receiver_id, network_id);
                         }
                         (transactions, remote_peer_id)
                     }
@@ -390,18 +411,17 @@ impl TestHarness {
         receiver_id: &NodeId,
         seq_num: u64,
     ) {
-        self.broadcast_txns_and_validate_with_networks(sender_id, true, receiver_id, true, seq_num)
+        self.broadcast_txns_and_validate_with_networks(sender_id, receiver_id, seq_num)
     }
 
     fn broadcast_txns_and_validate_with_networks(
         &mut self,
         sender_id: &NodeId,
-        is_primary_sender: bool,
         receiver_id: &NodeId,
-        is_primary_receiver: bool,
         seq_num: u64,
     ) {
-        let (txns, rx_peer) = self.broadcast_txns_successfully(sender_id, is_primary_sender, 1);
+        let network_id = self.find_common_network(sender_id, receiver_id);
+        let (txns, rx_peer) = self.broadcast_txns_successfully(sender_id, network_id, 1);
         assert_eq!(1, txns.len(), "Expected only one transaction");
         let actual_seq_num = txns.get(0).unwrap().sequence_number();
         assert_eq!(
@@ -410,7 +430,7 @@ impl TestHarness {
             seq_num, actual_seq_num
         );
         let receiver = self.node(receiver_id);
-        let expected_peer_id = receiver.peer_id(is_primary_receiver);
+        let expected_peer_id = receiver.peer_id(network_id);
         assert_eq!(
             expected_peer_id, rx_peer,
             "Expected peer {} to receive message, but {} got it instead",
@@ -419,12 +439,12 @@ impl TestHarness {
     }
 
     /// Delivers broadcast ACK from `peer`.
-    fn deliver_response(&mut self, sender_id: &NodeId, sender_is_primary: bool) {
+    fn deliver_response(&mut self, sender_id: &NodeId, network_id: NetworkId) {
         // Wait for an ACK to come in on the events
         self.wait_for_event(sender_id, SharedMempoolNotification::ACK);
         let sender = self.mut_node(sender_id);
-        let sender_peer_id = sender.peer_id(sender_is_primary);
-        let network_req = sender.get_next_network_req(sender_is_primary);
+        let sender_peer_id = sender.peer_id(network_id);
+        let network_req = sender.get_next_network_req(network_id);
 
         match network_req {
             PeerManagerRequest::SendDirectSend(remote_peer_id, msg) => {
@@ -432,12 +452,23 @@ impl TestHarness {
                 match decoded_msg {
                     MempoolSyncMsg::BroadcastTransactionsResponse { .. } => {
                         // send it to peer
-                        let receiver_id = *self.peer_to_node_id.get(&remote_peer_id).unwrap();
-
+                        let lookup_peer_network_id = match network_id {
+                            NetworkId::Vfn => {
+                                // If this is a VFN responding to a validator we have a problem
+                                assert!(!sender.supported_networks().contains(&NetworkId::Public));
+                                // VFN should have same PeerId but different network from validator
+                                PeerNetworkId::new(
+                                    NetworkId::Public,
+                                    sender.peer_id(NetworkId::Validator),
+                                )
+                            }
+                            _ => PeerNetworkId::new(network_id, remote_peer_id),
+                        };
+                        let receiver_id =
+                            *self.peer_to_node_id.get(&lookup_peer_network_id).unwrap();
                         let receiver = self.mut_node(&receiver_id);
-                        let is_primary = receiver.primary_peer_id() == remote_peer_id;
                         receiver.send_network_req(
-                            is_primary,
+                            network_id,
                             ProtocolId::MempoolDirectSend,
                             PeerManagerNotification::RecvMessage(sender_peer_id, msg),
                         );
@@ -523,7 +554,7 @@ fn test_metric_cache_ignore_shared_txns() {
     // TODO: Why not use the information that comes back from the broadcast?
     for txn in txns.iter().take(3) {
         // Let peer_a share txns with peer_b
-        let _ = harness.broadcast_txns_successfully(v_a, true, 1);
+        let _ = harness.broadcast_txns_successfully(v_a, NetworkId::Validator, 1);
         // Check if txns's creation timestamp exist in peer_b's metrics_cache.
         assert_eq!(harness.exist_in_metrics_cache(v_b, txn), false);
     }
@@ -554,7 +585,7 @@ fn test_interruption_in_sync() {
     harness.broadcast_txns_and_validate(v_a, v_c, 0);
 
     // A loses connection to B
-    harness.disconnect(v_a, true, v_b, true);
+    harness.disconnect(v_a, v_b);
 
     // Only C receives the following transactions
     for seq_num in 1..3 {
@@ -601,13 +632,13 @@ fn test_broadcast_self_transactions() {
     harness.connect(v_b, v_a);
 
     // A sends txn to B
-    harness.broadcast_txns_successfully(v_a, true, 1);
+    harness.broadcast_txns_successfully(v_a, NetworkId::Validator, 1);
 
     // Add new txn to B
     harness.add_txns(v_b, vec![TestTransaction::new(2, 0, 1)]);
 
     // Verify that A will receive only second transaction from B
-    let (txn, _) = harness.broadcast_txns_successfully(v_b, true, 1);
+    let (txn, _) = harness.broadcast_txns_successfully(v_b, NetworkId::Validator, 1);
     assert_eq!(
         txn.get(0).unwrap().sender(),
         TestTransaction::get_address(2)
@@ -651,7 +682,7 @@ fn test_broadcast_updated_transaction() {
     harness.connect(v_b, v_a);
 
     // B receives 0
-    let (txn, _) = harness.broadcast_txns_successfully(v_a, true, 1);
+    let (txn, _) = harness.broadcast_txns_successfully(v_a, NetworkId::Validator, 1);
     assert_eq!(txn.get(0).unwrap().sequence_number(), 0);
     assert_eq!(txn.get(0).unwrap().gas_unit_price(), 1);
 
@@ -659,7 +690,7 @@ fn test_broadcast_updated_transaction() {
     harness.add_txns(v_a, vec![TestTransaction::new(1, 0, 5)]);
 
     // Trigger send from A to B and check B has updated gas price for sequence 0
-    let (txn, _) = harness.broadcast_txns_successfully(v_a, true, 1);
+    let (txn, _) = harness.broadcast_txns_successfully(v_a, NetworkId::Validator, 1);
     assert_eq!(txn.get(0).unwrap().sequence_number(), 0);
     assert_eq!(txn.get(0).unwrap().gas_unit_price(), 5);
 }
@@ -685,9 +716,9 @@ fn test_vfn_multi_network() {
 
     // Make a Chain PFN -> VFN A -> VFN B (-> upstream)
     // VFN A discovers pfn as Inbound
-    harness.connect_with_networks(pfn, true, vfn_a, false);
+    harness.connect(pfn, vfn_a);
     // VFN B discovers VFN A as Inbound
-    harness.connect_with_networks(vfn_a, false, vfn_b, false);
+    harness.connect(vfn_a, vfn_b);
 
     // Also add Validator chain PFN -> VFN A -> V A and VFN B -> VB
     harness.connect(vfn_a, v_a);
@@ -703,11 +734,11 @@ fn test_vfn_multi_network() {
     harness.broadcast_txns_and_validate(vfn_a, v_a, 0);
 
     // VFN A should additionally broadcast to failover upstream vfn in public network
-    harness.broadcast_txns_and_validate_with_networks(vfn_a, false, vfn_b, false, 0);
+    harness.broadcast_txns_and_validate_with_networks(vfn_a, vfn_b, 0);
 
     // Check no other mesages sent
-    harness.assert_no_message_sent(vfn_a, true);
-    harness.assert_no_message_sent(vfn_a, false);
+    harness.assert_no_message_sent(vfn_a, NetworkId::Vfn);
+    harness.assert_no_message_sent(vfn_a, NetworkId::Public);
 }
 
 #[test]
@@ -741,7 +772,7 @@ fn test_rebroadcast_mempool_is_full() {
     harness.connect(vfn, val);
 
     // We should get all three txns in a batch
-    let (txns, _) = harness.broadcast_txns_successfully(vfn, true, 1);
+    let (txns, _) = harness.broadcast_txns_successfully(vfn, NetworkId::Vfn, 1);
     let seq_nums = txns
         .iter()
         .map(|txn| txn.sequence_number())
@@ -750,7 +781,7 @@ fn test_rebroadcast_mempool_is_full() {
 
     // We continue getting broadcasts because we haven't committed the txns
     for _ in 0..2 {
-        let (txns, _) = harness.broadcast_txns(vfn, true, 1, false, true, false);
+        let (txns, _) = harness.broadcast_txns(vfn, NetworkId::Vfn, 1, false, true, false);
         let seq_nums = txns
             .iter()
             .map(|txn| txn.sequence_number())
@@ -763,10 +794,10 @@ fn test_rebroadcast_mempool_is_full() {
     harness.commit_txns(val, all_txns[..1].to_vec());
 
     // Send retry batch again, this time it should be processed
-    harness.broadcast_txns_successfully(vfn, true, 1);
+    harness.broadcast_txns_successfully(vfn, NetworkId::Vfn, 1);
 
     // Retry batch sent above should be processed successfully, and FN should move on to broadcasting later txns
-    let (txns, _) = harness.broadcast_txns(vfn, true, 1, false, true, false);
+    let (txns, _) = harness.broadcast_txns(vfn, NetworkId::Vfn, 1, false, true, false);
     let seq_nums = txns
         .iter()
         .map(|txn| txn.sequence_number())
@@ -787,23 +818,23 @@ fn test_rebroadcast_missing_ack() {
 
     // Test that txn broadcasts that don't receive an ACK, A rebroadcasts the unACK'ed batch of txns
     for _ in 0..3 {
-        let (txns, _) = harness.broadcast_txns(v_a, true, 1, true, false, false);
+        let (txns, _) = harness.broadcast_txns(v_a, NetworkId::Validator, 1, true, false, false);
         assert_eq!(0, txns.get(0).unwrap().sequence_number());
     }
 
     // Getting out of rebroadcasting mode scenario 1: B sends back ACK eventually
-    let (txns, _) = harness.broadcast_txns(v_a, true, 1, true, true, false);
+    let (txns, _) = harness.broadcast_txns(v_a, NetworkId::Validator, 1, true, true, false);
     assert_eq!(0, txns.get(0).unwrap().sequence_number());
 
     for _ in 0..3 {
-        let (txns, _) = harness.broadcast_txns(v_a, true, 1, true, false, false);
+        let (txns, _) = harness.broadcast_txns(v_a, NetworkId::Validator, 1, true, false, false);
         assert_eq!(1, txns.get(0).unwrap().sequence_number());
     }
 
     // Getting out of rebroadcasting mode scenario 2: txns in unACK'ed batch gets committed
     harness.commit_txns(v_a, vec![test_transaction(1)]);
 
-    let (txns, _) = harness.broadcast_txns(v_a, true, 1, true, false, false);
+    let (txns, _) = harness.broadcast_txns(v_a, NetworkId::Validator, 1, true, false, false);
     assert_eq!(2, txns.get(0).unwrap().sequence_number());
 }
 
@@ -825,29 +856,29 @@ fn test_max_broadcast_limit() {
     harness.connect(v_b, v_a);
 
     // Test that for mempool broadcasts txns up till max broadcast, even if they are not ACK'ed
-    let (txns, _) = harness.broadcast_txns(v_a, true, 1, true, true, true);
+    let (txns, _) = harness.broadcast_txns(v_a, NetworkId::Validator, 1, true, true, true);
     assert_eq!(0, txns.get(0).unwrap().sequence_number());
 
     for seq_num in 1..3 {
-        let (txns, _) = harness.broadcast_txns(v_a, true, 1, true, false, false);
+        let (txns, _) = harness.broadcast_txns(v_a, NetworkId::Validator, 1, true, false, false);
         assert_eq!(seq_num, txns.get(0).unwrap().sequence_number());
     }
 
     // Check that mempool doesn't broadcast more than max_broadcasts_per_peer, even
     // if there are more txns in mempool.
     for _ in 0..10 {
-        harness.assert_no_message_sent(v_a, true);
+        harness.assert_no_message_sent(v_a, NetworkId::Validator);
     }
 
     // Deliver ACK from B to A.
     // This should unblock A to send more broadcasts.
-    harness.deliver_response(v_b, true);
-    let (txns, _) = harness.broadcast_txns(v_a, true, 1, false, true, true);
+    harness.deliver_response(v_b, NetworkId::Validator);
+    let (txns, _) = harness.broadcast_txns(v_a, NetworkId::Validator, 1, false, true, true);
     assert_eq!(3, txns.get(0).unwrap().sequence_number());
 
     // Check that mempool doesn't broadcast more than max_broadcasts_per_peer, even
     // if there are more txns in mempool.
     for _ in 0..10 {
-        harness.assert_no_message_sent(v_a, true);
+        harness.assert_no_message_sent(v_a, NetworkId::Validator);
     }
 }
