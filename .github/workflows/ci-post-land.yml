@@ -61,7 +61,7 @@ jobs:
       name: Sccache
     runs-on: ubuntu-20.04-xl
     container:
-      image: diem/build_environment:${{ needs.prepare.outputs.changes-target-branch }}
+      image: ghcr.io/diem/diem_build_environment:${{ needs.prepare.outputs.changes-target-branch }}
       volumes:
         - "${{github.workspace}}:/opt/git/diem"
     steps:
@@ -95,7 +95,7 @@ jobs:
     environment:
       name: Sccache
     container:
-      image: diem/build_environment:main
+      image: ghcr.io/diem/diem_build_environment:main
       volumes:
         - "${{github.workspace}}:/opt/git/diem"
     steps:
@@ -359,7 +359,7 @@ jobs:
     if: ${{ needs.prepare.outputs.changes-target-branch == 'main' && needs.prepare.outputs.rust-changes == 'true'}}
     runs-on: ubuntu-20.04
     container:
-      image: diem/build_environment:${{ needs.prepare.outputs.changes-target-branch }}
+      image: ghcr.io/diem/diem_build_environment:${{ needs.prepare.outputs.changes-target-branch }}
       volumes:
         - "${{github.workspace}}:/opt/git/diem"
     steps:

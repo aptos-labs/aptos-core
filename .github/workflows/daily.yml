@@ -11,7 +11,7 @@ jobs:
   audit:
     runs-on: ubuntu-20.04
     container:
-      image: diem/build_environment:main
+      image: ghcr.io/diem/diem_build_environment:main
       volumes:
         - "${{github.workspace}}:/opt/git/diem"
     strategy:
@@ -58,7 +58,7 @@ jobs:
   coverage:
     runs-on: ubuntu-20.04-xl
     container:
-      image: diem/build_environment:main
+      image: ghcr.io/diem/diem_build_environment:main
       volumes:
         - "${{github.workspace}}:/opt/git/diem"
     environment:
@@ -106,7 +106,7 @@ jobs:
     # json-rpc interface.
     runs-on: ubuntu-20.04-xl
     container:
-      image: diem/build_environment:main
+      image: ghcr.io/diem/diem_build_environment:main
       volumes:
         - "${{github.workspace}}:/opt/git/diem"
     env:
@@ -139,7 +139,7 @@ jobs:
   prover-inconsistency-test:
     runs-on: ubuntu-20.04-xl
     container:
-      image: diem/build_environment:${{ matrix.target-branch }}
+      image: ghcr.io/diem/diem_build_environment:${{ matrix.target-branch }}
       volumes:
         - "${{github.workspace}}:/opt/git/diem"
     env:

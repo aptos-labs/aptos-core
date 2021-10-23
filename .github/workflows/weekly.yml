@@ -9,7 +9,7 @@ jobs:
   dep-report:
     runs-on: ubuntu-latest
     container:
-      image: diem/build_environment:main
+      image: ghcr.io/diem/diem_build_environment:main
     env:
       MESSAGE_PAYLOAD_FILE: /tmp/message
     steps:
@@ -29,7 +29,7 @@ jobs:
   transaction-replay:
     runs-on: ubuntu-latest-xl
     container:
-      image: diem/build_environment:main
+      image: ghcr.io/diem/diem_build_environment:main
       volumes:
         - "${{github.workspace}}:/opt/git/diem"
     env:
