@@ -24,6 +24,7 @@ use diem_types::{
     proof::{SparseMerkleInternalNode, SparseMerkleLeafNode},
     transaction::Version,
 };
+use itertools::Itertools;
 use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::cast::FromPrimitive;
 #[cfg(any(test, feature = "fuzzing"))]
@@ -339,6 +340,10 @@ impl InternalNode {
             16, /* the number of leaves in the subtree of which we want the hash of root */
             self.generate_bitmaps(),
         )
+    }
+
+    pub fn children_sorted(&self) -> impl Iterator<Item = (&Nibble, &Child)> {
+        self.children.iter().sorted_by_key(|(nibble, _)| **nibble)
     }
 
     pub fn serialize(&self, binary: &mut Vec<u8>, persist_leaf_counts: bool) -> Result<()> {

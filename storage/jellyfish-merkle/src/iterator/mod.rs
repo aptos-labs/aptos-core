@@ -10,13 +10,13 @@
 mod iterator_test;
 
 use crate::{
-    node_type::{InternalNode, Node, NodeKey},
+    node_type::{Child, InternalNode, Node, NodeKey},
     TreeReader,
 };
-use anyhow::{format_err, Result};
+use anyhow::{bail, ensure, format_err, Result};
 use diem_crypto::HashValue;
 use diem_types::{
-    nibble::{nibble_path::NibblePath, Nibble},
+    nibble::{nibble_path::NibblePath, Nibble, ROOT_NIBBLE_HEIGHT},
     transaction::Version,
 };
 use std::{marker::PhantomData, sync::Arc};
@@ -198,6 +198,81 @@ where
                 break;
             }
         }
+    }
+
+    /// Constructs a new iterator. This puts the internal state in the correct position, so the
+    /// following `next` call will yield the leaf at `start_idx`.
+    pub fn new_by_index(reader: Arc<R>, version: Version, start_idx: usize) -> Result<Self> {
+        let mut parent_stack = vec![];
+
+        let mut current_node_key = NodeKey::new_empty_path(version);
+        let mut current_node = reader.get_node(&current_node_key)?;
+        let total_leaves = current_node
+            .leaf_count()
+            .ok_or_else(|| format_err!("Leaf counts not available."))?;
+        if start_idx >= total_leaves {
+            return Ok(Self {
+                reader,
+                version,
+                parent_stack,
+                done: true,
+                phantom_value: PhantomData,
+            });
+        }
+
+        let mut leaves_skipped = 0;
+        for _ in 0..=ROOT_NIBBLE_HEIGHT {
+            match current_node {
+                Node::Null => {
+                    unreachable!("The Node::Null case has already been covered before loop.")
+                }
+                Node::Leaf(_) => {
+                    ensure!(
+                        leaves_skipped == start_idx,
+                        "Bug: The leaf should be the exact one we are looking for.",
+                    );
+                    return Ok(Self {
+                        reader,
+                        version,
+                        parent_stack,
+                        done: false,
+                        phantom_value: PhantomData,
+                    });
+                }
+                Node::Internal(internal_node) => {
+                    let (nibble, child) =
+                        Self::skip_leaves(&internal_node, &mut leaves_skipped, start_idx)?;
+                    let next_node_key = current_node_key.gen_child_node_key(child.version, nibble);
+                    parent_stack.push(NodeVisitInfo::new_next_child_to_visit(
+                        current_node_key,
+                        internal_node,
+                        nibble,
+                    ));
+                    current_node_key = next_node_key;
+                }
+            };
+            current_node = reader.get_node(&current_node_key)?;
+        }
+
+        bail!("Bug: potential infinite loop.");
+    }
+
+    fn skip_leaves<'a>(
+        internal_node: &'a InternalNode,
+        leaves_skipped: &mut usize,
+        target_leaf_idx: usize,
+    ) -> Result<(Nibble, &'a Child)> {
+        for (nibble, child) in internal_node.children_sorted() {
+            let child_leaf_count = child.leaf_count().expect("Leaf count available.");
+            // n.b. The index is 0-based, so to reach leaf at N, N previous ones need to be skipped.
+            if *leaves_skipped + child_leaf_count <= target_leaf_idx {
+                *leaves_skipped += child_leaf_count;
+            } else {
+                return Ok((*nibble, child));
+            }
+        }
+
+        bail!("Bug: Internal node has less leaves than expected.");
     }
 }
 
