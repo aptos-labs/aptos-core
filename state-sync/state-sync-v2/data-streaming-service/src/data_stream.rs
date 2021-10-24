@@ -138,10 +138,6 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStream<T> {
                 // Enqueue the pending response
                 self.get_sent_data_requests()
                     .push_back(pending_client_response);
-
-                // Update the stream progress tracker
-                self.stream_progress_tracker
-                    .update_request_tracking(&client_request)?;
             }
         }
         Ok(())
