@@ -310,8 +310,7 @@ where
         });
 
         let app = app.subcommand(ViewCommand::clap().name("view"));
-
-        app
+        SubCommands::augment_clap(app)
     }
 
     fn from_clap(matches: &clap::ArgMatches<'_>) -> Self {
@@ -326,12 +325,7 @@ where
                 TaskCommand::Run(StructOpt::from_clap(matches), StructOpt::from_clap(matches))
             }
             ("view", Some(matches)) => TaskCommand::View(StructOpt::from_clap(matches)),
-            _ => {
-                panic!(
-                    "Failed to construct command from structopt matches. \
-                        There is likely something wrong with your clap::App definition."
-                )
-            }
+            _ => TaskCommand::Subcommand(SubCommands::from_clap(matches)),
         }
     }
 }
