@@ -16,6 +16,7 @@ members = [
     "common/debug-interface",
     "common/diemdoc",
     "common/fallible",
+    "common/id-generator",
     "common/infallible",
     "common/logger",
     "common/logger/derive",

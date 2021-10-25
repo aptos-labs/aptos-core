@@ -188,6 +188,7 @@ members = [
     "diem-e2e-tests-replay",
     "diem-fuzz",
     "diem-fuzzer",
+    "diem-id-generator",
     "diem-json-rpc-client",
     "diem-keygen",
     "diem-parallel-executor", # Will be removed once parallel execution is used in production.

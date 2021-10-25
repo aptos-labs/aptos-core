@@ -2009,6 +2009,13 @@ name = "diem-global-constants"
 version = "0.1.0"
 
 [[package]]
+name = "diem-id-generator"
+version = "0.1.0"
+dependencies = [
+ "diem-workspace-hack",
+]
+
+[[package]]
 name = "diem-infallible"
 version = "0.1.0"
 dependencies = [
