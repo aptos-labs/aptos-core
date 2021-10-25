@@ -22,7 +22,7 @@ use diem_types::{
     },
     write_set::WriteSet,
 };
-use rand::{rngs::OsRng, RngCore};
+use rand::{rngs::OsRng, Rng};
 use std::{collections::BTreeMap, thread, time::Duration};
 use storage_service_types::CompleteDataRange;
 
@@ -49,11 +49,8 @@ pub struct MockDiemDataClient {}
 
 impl MockDiemDataClient {
     fn emulate_network_latencies(&self) {
-        // Sleep for 100 ms
-        thread::sleep(Duration::from_millis(100));
-
-        // Sleep an additional amount of time (< 0.4 second) to emulate variance
-        thread::sleep(Duration::from_millis(create_random_u64(400)));
+        // Sleep for 100 - 500 ms to emulate variance
+        thread::sleep(Duration::from_millis(create_range_random_u64(100, 500)));
     }
 }
 
@@ -264,11 +261,16 @@ fn create_transaction_output() -> TransactionOutput {
 
 /// Returns a random u64 with a value between 0 and `max_value` - 1 (inclusive).
 fn create_random_u64(max_value: u64) -> u64 {
-    let mut rng = OsRng;
-    rng.next_u64() % max_value
+    create_range_random_u64(0, max_value)
 }
 
 /// Returns a random (but non-zero) u64 with a value between 1 and `max_value` - 1 (inclusive).
 fn create_non_zero_random_u64(max_value: u64) -> u64 {
-    create_random_u64(max_value - 1) + 1
+    create_range_random_u64(1, max_value)
+}
+
+/// Returns a random u64 within the range, [min, max)
+fn create_range_random_u64(min_value: u64, max_value: u64) -> u64 {
+    let mut rng = OsRng;
+    rng.gen_range(min_value..max_value)
 }
