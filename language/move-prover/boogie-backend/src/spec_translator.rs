@@ -579,7 +579,7 @@ impl<'env> SpecTranslator<'env> {
             }
             ExpData::Block(node_id, vars, scope) => {
                 self.set_writer_location(*node_id);
-                self.translate_block(*node_id, vars, scope)
+                self.translate_block(vars, scope)
             }
             ExpData::IfElse(node_id, cond, on_true, on_false) => {
                 self.set_writer_location(*node_id);
@@ -625,20 +625,21 @@ impl<'env> SpecTranslator<'env> {
         }
     }
 
-    fn translate_block(&self, node_id: NodeId, vars: &[LocalVarDecl], exp: &Exp) {
+    fn translate_block(&self, vars: &[LocalVarDecl], exp: &Exp) {
         if vars.is_empty() {
             return self.translate_exp(exp);
         }
-        let loc = self.env.get_node_loc(node_id);
-        if let [var] = vars {
+        let mut bracket_num = 0;
+        for var in vars {
             let name_str = self.env.symbol_pool().string(var.name);
             emit!(self.writer, "(var {} := ", name_str);
             self.translate_exp(var.binding.as_ref().expect("binding"));
             emit!(self.writer, "; ");
-            self.translate_exp(exp);
+            bracket_num += 1;
+        }
+        self.translate_exp(exp);
+        for _n in 0..bracket_num {
             emit!(self.writer, ")");
-        } else {
-            self.error(&loc, "currently only single variable binding supported");
         }
     }
 
