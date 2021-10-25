@@ -7,15 +7,9 @@ use crate::{
     streaming_client::{StreamRequestMessage, StreamingServiceListener},
 };
 use diem_data_client::{DataClientPayload, DiemDataClient, GlobalDataSummary, OptimalChunkSizes};
+use diem_id_generator::{IdGenerator, U64IdGenerator};
 use futures::StreamExt;
-use std::{
-    collections::HashMap,
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc,
-    },
-    time::Duration,
-};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::time::interval;
 use tokio_stream::wrappers::IntervalStream;
 
@@ -38,8 +32,8 @@ pub struct DataStreamingService<T> {
     stream_requests: StreamingServiceListener,
 
     // Unique ID generators to maintain unique IDs across streams
-    stream_id_generator: AtomicU64,
-    notification_id_generator: Arc<AtomicU64>,
+    stream_id_generator: U64IdGenerator,
+    notification_id_generator: Arc<U64IdGenerator>,
 }
 
 impl<T: DiemDataClient + Send + Clone + 'static> DataStreamingService<T> {
@@ -49,8 +43,8 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStreamingService<T> {
             global_data_summary: GlobalDataSummary::empty(),
             data_streams: HashMap::new(),
             stream_requests,
-            stream_id_generator: AtomicU64::new(0),
-            notification_id_generator: Arc::new(AtomicU64::new(0)),
+            stream_id_generator: U64IdGenerator::new(),
+            notification_id_generator: Arc::new(U64IdGenerator::new()),
         }
     }
 
@@ -108,7 +102,7 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStreamingService<T> {
         data_stream.ensure_data_is_available(&self.global_data_summary.advertised_data)?;
 
         // Store the data stream internally
-        let stream_id = self.stream_id_generator.fetch_add(1, Ordering::Relaxed);
+        let stream_id = self.stream_id_generator.next();
         if self.data_streams.insert(stream_id, data_stream).is_some() {
             panic!(
                 "Duplicate data stream found! This should not occur! ID: {:?}",

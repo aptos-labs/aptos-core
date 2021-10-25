@@ -61,6 +61,7 @@ use anyhow::anyhow;
 use bytes::Bytes;
 use channel::diem_channel;
 use diem_config::network_id::NetworkContext;
+use diem_id_generator::{IdGenerator, U32IdGenerator};
 use diem_logger::prelude::*;
 use diem_time_service::{timeout, TimeService, TimeServiceTrait};
 use diem_types::PeerId;
@@ -149,24 +150,6 @@ impl SerializedRequest for OutboundRpcRequest {
 
     fn data(&self) -> &Bytes {
         &self.data
-    }
-}
-
-// Wraps the task of request id generation. Request ids start at 0 and increment till they hit
-// RequestId::MAX. After that, they wrap around to 0.
-struct RequestIdGenerator {
-    next_id: RequestId,
-}
-
-impl RequestIdGenerator {
-    pub fn new() -> Self {
-        Self { next_id: 0 }
-    }
-
-    pub fn next(&mut self) -> RequestId {
-        let request_id = self.next_id;
-        self.next_id = self.next_id.wrapping_add(1);
-        request_id
     }
 }
 
@@ -359,7 +342,7 @@ pub struct OutboundRpcs {
     remote_peer_id: PeerId,
     /// Generates the next RequestId to use for the next outbound RPC. Note that
     /// request ids are local to each connection.
-    request_id_gen: RequestIdGenerator,
+    request_id_gen: U32IdGenerator,
     /// A completion queue of pending outbound rpc tasks. Each task waits for
     /// either a successful `RpcResponse` message, handed to it via the channel
     /// in `pending_outbound_rpcs`, or waits for a timeout or cancellation
@@ -388,7 +371,7 @@ impl OutboundRpcs {
             network_context,
             time_service,
             remote_peer_id,
-            request_id_gen: RequestIdGenerator::new(),
+            request_id_gen: U32IdGenerator::new(),
             outbound_rpc_tasks: FuturesUnordered::new(),
             pending_outbound_rpcs: HashMap::new(),
             max_concurrent_outbound_rpcs,

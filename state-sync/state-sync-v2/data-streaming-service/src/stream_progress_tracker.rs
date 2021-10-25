@@ -20,16 +20,11 @@ use diem_data_client::{
     AdvertisedData, DataClientPayload, DataClientPayload::NumberOfAccountStates,
     DataClientResponse, GlobalDataSummary,
 };
+use diem_id_generator::{IdGenerator, U64IdGenerator};
 use diem_types::{ledger_info::LedgerInfoWithSignatures, transaction::Version};
 use enum_dispatch::enum_dispatch;
 use itertools::Itertools;
-use std::{
-    cmp,
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc,
-    },
-};
+use std::{cmp, sync::Arc};
 
 macro_rules! invalid_client_request {
     ($client_request:expr, $stream_tracker:expr) => {
@@ -81,7 +76,7 @@ pub trait DataStreamTracker {
         &mut self,
         client_request: &DataClientRequest,
         client_response: &DataClientResponse,
-        notification_id_generator: Arc<AtomicU64>,
+        notification_id_generator: Arc<U64IdGenerator>,
     ) -> Result<Option<DataNotification>, Error>;
 }
 
@@ -228,7 +223,7 @@ impl DataStreamTracker for AccountsStreamTracker {
         &mut self,
         client_request: &DataClientRequest,
         client_response: &DataClientResponse,
-        notification_id_generator: Arc<AtomicU64>,
+        notification_id_generator: Arc<U64IdGenerator>,
     ) -> Result<Option<DataNotification>, Error> {
         match client_request {
             AccountsWithProof(request) => {
@@ -341,7 +336,7 @@ impl ContinuousTransactionStreamTracker {
         &mut self,
         request_end_version: Version,
         client_response: &DataClientResponse,
-        notification_id_generator: Arc<AtomicU64>,
+        notification_id_generator: Arc<U64IdGenerator>,
     ) -> Result<DataNotification, Error> {
         // Create a new data notification
         let data_notification = create_data_notification(
@@ -525,7 +520,7 @@ impl DataStreamTracker for ContinuousTransactionStreamTracker {
         &mut self,
         client_request: &DataClientRequest,
         client_response: &DataClientResponse,
-        notification_id_generator: Arc<AtomicU64>,
+        notification_id_generator: Arc<U64IdGenerator>,
     ) -> Result<Option<DataNotification>, Error> {
         match client_request {
             EpochEndingLedgerInfos(_) => {
@@ -688,7 +683,7 @@ impl DataStreamTracker for EpochEndingStreamTracker {
         &mut self,
         client_request: &DataClientRequest,
         client_response: &DataClientResponse,
-        notification_id_generator: Arc<AtomicU64>,
+        notification_id_generator: Arc<U64IdGenerator>,
     ) -> Result<Option<DataNotification>, Error> {
         match client_request {
             EpochEndingLedgerInfos(request) => {
@@ -860,7 +855,7 @@ impl DataStreamTracker for TransactionStreamTracker {
         &mut self,
         client_request: &DataClientRequest,
         client_response: &DataClientResponse,
-        notification_id_generator: Arc<AtomicU64>,
+        notification_id_generator: Arc<U64IdGenerator>,
     ) -> Result<Option<DataNotification>, Error> {
         match &self.request {
             StreamRequest::GetAllTransactions(_) => match client_request {
@@ -1075,11 +1070,11 @@ fn highest_synced_ledger_info(
 
 /// Creates a new data notification for the given client response.
 fn create_data_notification(
-    notification_id_generator: Arc<AtomicU64>,
+    notification_id_generator: Arc<U64IdGenerator>,
     client_response: &DataClientResponse,
     stream_progress_tracker: StreamProgressTracker,
 ) -> DataNotification {
-    let notification_id = notification_id_generator.fetch_add(1, Ordering::Relaxed);
+    let notification_id = notification_id_generator.next();
 
     let data_payload = match &client_response.response_payload {
         DataClientPayload::AccountStatesWithProof(accounts_chunk) => {

@@ -9,14 +9,9 @@ use crate::stream_rpc::{
 use diem_infallible::RwLock;
 use diem_logger::debug;
 use futures::StreamExt;
-use std::{
-    collections::HashMap,
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc,
-    },
-};
+use std::{collections::HashMap, sync::Arc};
 
+use diem_id_generator::{IdGenerator, U64IdGenerator};
 use diem_types::protocol_spec::DpnProto;
 use storage_interface::MoveDbReader;
 
@@ -26,7 +21,7 @@ pub struct ConnectionManager {
     pub diem_db: Arc<dyn MoveDbReader<DpnProto>>,
     pub config: Arc<SubscriptionConfig>,
     /// Our unique user id counter.
-    next_user_id: Arc<AtomicU64>,
+    user_id_generator: Arc<U64IdGenerator>,
 }
 
 impl ConnectionManager {
@@ -35,7 +30,7 @@ impl ConnectionManager {
             clients: Arc::new(RwLock::new(HashMap::new())),
             diem_db,
             config,
-            next_user_id: Arc::new(AtomicU64::new(0)),
+            user_id_generator: Arc::new(U64IdGenerator::new()),
         }
     }
 
@@ -59,7 +54,7 @@ impl ConnectionManager {
     pub fn next_user_id(&self) -> u64 {
         // Ensure that if the node is up long enough, and we have enough connections to wrap around, we don't accidentally clobber an existing client
         loop {
-            let next_id = self.next_user_id.fetch_add(1, Ordering::Relaxed);
+            let next_id = self.user_id_generator.next();
             if !self.has_client(next_id) {
                 return next_id;
             }

@@ -4,6 +4,7 @@
 #![forbid(unsafe_code)]
 
 use channel::{diem_channel, message_queues::QueueStyle};
+use diem_id_generator::{IdGenerator, U64IdGenerator};
 use diem_infallible::RwLock;
 use diem_types::{
     account_state::AccountState,
@@ -22,10 +23,7 @@ use std::{
     iter::FromIterator,
     ops::Deref,
     pin::Pin,
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc,
-    },
+    sync::Arc,
     task::{Context, Poll},
 };
 use storage_interface::default_protocol::DbReaderWriter;
@@ -88,7 +86,7 @@ pub struct EventSubscriptionService {
     config_registry: Vec<ConfigID>,
 
     // Internal subscription ID generator
-    next_subscription_id: AtomicU64,
+    subscription_id_generator: U64IdGenerator,
 }
 
 impl EventSubscriptionService {
@@ -99,7 +97,7 @@ impl EventSubscriptionService {
             reconfig_subscriptions: HashMap::new(),
             config_registry: config_registry.to_vec(),
             storage,
-            next_subscription_id: AtomicU64::new(0),
+            subscription_id_generator: U64IdGenerator::new(),
         }
     }
 
@@ -189,7 +187,7 @@ impl EventSubscriptionService {
     }
 
     fn get_new_subscription_id(&mut self) -> u64 {
-        self.next_subscription_id.fetch_add(1, Ordering::Relaxed)
+        self.subscription_id_generator.next()
     }
 
     /// This notifies all the event subscribers of the new events found at the

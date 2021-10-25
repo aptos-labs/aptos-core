@@ -16,13 +16,11 @@ use claim::{assert_ge, assert_none};
 use diem_data_client::{
     AdvertisedData, DataClientPayload, DataClientResponse, GlobalDataSummary, OptimalChunkSizes,
 };
+use diem_id_generator::U64IdGenerator;
 use diem_infallible::Mutex;
 use diem_types::ledger_info::LedgerInfoWithSignatures;
 use futures::{FutureExt, StreamExt};
-use std::{
-    sync::{atomic::AtomicU64, Arc},
-    time::Duration,
-};
+use std::{sync::Arc, time::Duration};
 use storage_service_types::CompleteDataRange;
 use tokio::time::timeout;
 
@@ -202,7 +200,7 @@ fn create_epoch_ending_stream(
 
     // Create a diem data client mock and notification generator
     let diem_data_client = MockDiemDataClient::new();
-    let notification_generator = Arc::new(AtomicU64::new(0));
+    let notification_generator = Arc::new(U64IdGenerator::new());
 
     // Return the data stream and listener pair
     DataStream::new(

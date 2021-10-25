@@ -78,7 +78,7 @@ pub enum NotSupportedType {
     DirectSendMsg(ProtocolId),
 }
 
-/// Create alias RequestId for u32.
+/// Create alias RequestId for `u32`.
 pub type RequestId = u32;
 
 /// Create alias Priority for u8.

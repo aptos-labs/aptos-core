@@ -11,10 +11,8 @@ use claim::{assert_matches, assert_ok};
 use diem_data_client::{
     DataClientPayload, DataClientResponse, GlobalDataSummary, OptimalChunkSizes,
 };
-use std::{
-    cmp,
-    sync::{atomic::AtomicU64, Arc},
-};
+use diem_id_generator::U64IdGenerator;
+use std::{cmp, sync::Arc};
 use storage_service_types::CompleteDataRange;
 
 #[test]
@@ -280,8 +278,8 @@ fn create_epoch_ending_chunk_sizes(epoch_chunk_size: u64) -> GlobalDataSummary {
     global_data_summary
 }
 
-fn create_notification_id_generator() -> Arc<AtomicU64> {
-    Arc::new(AtomicU64::new(0))
+fn create_notification_id_generator() -> Arc<U64IdGenerator> {
+    Arc::new(U64IdGenerator::new())
 }
 
 fn create_empty_client_response() -> DataClientResponse {

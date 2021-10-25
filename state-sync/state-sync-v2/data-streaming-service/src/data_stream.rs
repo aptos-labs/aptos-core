@@ -15,12 +15,13 @@ use diem_data_client::{
     AdvertisedData, DataClientPayload, DataClientResponse, DiemDataClient, GlobalDataSummary,
     ResponseError,
 };
+use diem_id_generator::U64IdGenerator;
 use diem_infallible::Mutex;
 use futures::{stream::FusedStream, Stream};
 use std::{
     collections::{HashMap, VecDeque},
     pin::Pin,
-    sync::{atomic::AtomicU64, Arc},
+    sync::Arc,
     task::{Context, Poll},
 };
 
@@ -66,14 +67,14 @@ pub struct DataStream<T> {
     notification_sender: channel::diem_channel::Sender<(), DataNotification>,
 
     // A unique notification ID generator
-    notification_id_generator: Arc<AtomicU64>,
+    notification_id_generator: Arc<U64IdGenerator>,
 }
 
 impl<T: DiemDataClient + Send + Clone + 'static> DataStream<T> {
     pub fn new(
         stream_request: &StreamRequest,
         diem_data_client: T,
-        notification_id_generator: Arc<AtomicU64>,
+        notification_id_generator: Arc<U64IdGenerator>,
         advertised_data: &AdvertisedData,
     ) -> Result<(Self, DataStreamListener), Error> {
         // Create a new data stream listener

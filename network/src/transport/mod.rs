@@ -14,6 +14,7 @@ use diem_config::{
     network_id::{NetworkContext, NetworkId},
 };
 use diem_crypto::x25519;
+use diem_id_generator::{IdGenerator, U32IdGenerator};
 use diem_logger::prelude::*;
 use diem_time_service::{timeout, TimeService, TimeServiceTrait};
 use diem_types::{
@@ -29,17 +30,7 @@ use futures::{
 use netcore::transport::{proxy_protocol, tcp, ConnectionOrigin, Transport};
 use serde::Serialize;
 use short_hex_str::AsShortHexStr;
-use std::{
-    collections::BTreeMap,
-    convert::TryFrom,
-    fmt, io,
-    pin::Pin,
-    sync::{
-        atomic::{AtomicU32, Ordering},
-        Arc,
-    },
-    time::Duration,
-};
+use std::{collections::BTreeMap, convert::TryFrom, fmt, io, pin::Pin, sync::Arc, time::Duration};
 
 #[cfg(test)]
 mod test;
@@ -79,19 +70,18 @@ impl From<u32> for ConnectionId {
 
 /// Generator of unique ConnectionId's.
 struct ConnectionIdGenerator {
-    ctr: AtomicU32,
+    id_generator: U32IdGenerator,
 }
 
 impl ConnectionIdGenerator {
     const fn new() -> ConnectionIdGenerator {
         Self {
-            ctr: AtomicU32::new(0),
+            id_generator: U32IdGenerator::new(),
         }
     }
 
     fn next(&self) -> ConnectionId {
-        let next = self.ctr.fetch_add(1, Ordering::Relaxed);
-        ConnectionId::from(next)
+        ConnectionId::from(self.id_generator.next())
     }
 }
 
