@@ -20,7 +20,7 @@ use consensus_types::{
     timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
     vote::Vote,
     vote_data::VoteData,
-    vote_proposal::{MaybeSignedVoteProposal, VoteProposal},
+    vote_proposal::MaybeSignedVoteProposal,
 };
 use diem_crypto::{
     ed25519::{Ed25519PublicKey, Ed25519Signature},
@@ -49,7 +49,6 @@ pub struct SafetyRules {
     pub(crate) export_consensus_key: bool,
     pub(crate) validator_signer: Option<ConfigurableValidatorSigner>,
     pub(crate) epoch_state: Option<EpochState>,
-    pub(crate) decoupled_execution: bool,
 }
 
 impl SafetyRules {
@@ -59,9 +58,8 @@ impl SafetyRules {
         persistent_storage: PersistentSafetyStorage,
         verify_vote_proposal_signature: bool,
         export_consensus_key: bool,
-        decoupled_execution: bool,
     ) -> Self {
-        let execution_public_key = if verify_vote_proposal_signature && !decoupled_execution {
+        let execution_public_key = if verify_vote_proposal_signature {
             Some(
                 persistent_storage
                     .execution_public_key()
@@ -76,7 +74,6 @@ impl SafetyRules {
             export_consensus_key,
             validator_signer: None,
             epoch_state: None,
-            decoupled_execution,
         }
     }
 
@@ -108,11 +105,9 @@ impl SafetyRules {
             .verify_well_formed()
             .map_err(|error| Error::InvalidProposal(error.to_string()))?;
 
-        if self.decoupled_execution {
-            Ok(vote_proposal.vote_data_ordering_only())
-        } else {
-            self.extension_check(vote_proposal)
-        }
+        vote_proposal
+            .gen_vote_data()
+            .map_err(|error| Error::InvalidAccumulatorExtension(error.to_string()))
     }
 
     pub(crate) fn sign<T: Serialize + CryptoHash>(
@@ -156,21 +151,6 @@ impl SafetyRules {
             updated = true;
         }
         updated
-    }
-
-    /// Check if the executed result extends the parent result.
-    fn extension_check(&self, vote_proposal: &VoteProposal) -> Result<VoteData, Error> {
-        let proposed_block = vote_proposal.block();
-        let new_tree = vote_proposal
-            .accumulator_extension_proof()
-            .verify(
-                proposed_block
-                    .quorum_cert()
-                    .certified_block()
-                    .executed_state_id(),
-            )
-            .map_err(|e| Error::InvalidAccumulatorExtension(e.to_string()))?;
-        Ok(vote_proposal.vote_data_with_extension_proof(&new_tree))
     }
 
     /// Produces a LedgerInfo that either commits a block based upon the 3-chain

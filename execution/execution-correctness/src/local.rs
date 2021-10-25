@@ -59,6 +59,7 @@ impl ExecutionCorrectness for LocalClient {
                 result.extension_proof(),
                 block,
                 result.epoch_state().clone(),
+                false,
             );
             let signature = prikey.sign(&vote_proposal);
             result.set_signature(signature);

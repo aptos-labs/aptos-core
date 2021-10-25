@@ -51,6 +51,7 @@ impl SerializerService {
                                 result.extension_proof(),
                                 block_with_parent_id.0.clone(),
                                 result.epoch_state().clone(),
+                                false,
                             );
                             let signature = prikey.sign(&vote_proposal);
                             result.set_signature(signature);

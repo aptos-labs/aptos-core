@@ -126,8 +126,7 @@ impl NodeSetup {
                 waypoint,
                 true,
             );
-            let safety_rules_manager =
-                SafetyRulesManager::new_local(safety_storage, false, false, false);
+            let safety_rules_manager = SafetyRulesManager::new_local(safety_storage, false, false);
 
             nodes.push(Self::new(
                 playground,
@@ -899,8 +898,7 @@ fn safety_rules_crash() {
             true,
         );
 
-        node.safety_rules_manager =
-            SafetyRulesManager::new_local(safety_storage, false, false, false);
+        node.safety_rules_manager = SafetyRulesManager::new_local(safety_storage, false, false);
         let safety_rules =
             MetricsSafetyRules::new(node.safety_rules_manager.client(), node.storage.clone());
         let safety_rules_container = Arc::new(Mutex::new(safety_rules));

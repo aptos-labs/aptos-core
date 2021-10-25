@@ -29,6 +29,8 @@ pub struct VoteProposal {
     block: Block,
     /// An optional field containing the next epoch info.
     next_epoch_state: Option<EpochState>,
+    /// Represents whether the executed state id is dummy or not.
+    decoupled_execution: bool,
 }
 
 impl VoteProposal {
@@ -36,11 +38,13 @@ impl VoteProposal {
         accumulator_extension_proof: AccumulatorExtensionProof<TransactionAccumulatorHasher>,
         block: Block,
         next_epoch_state: Option<EpochState>,
+        decoupled_execution: bool,
     ) -> Self {
         Self {
             accumulator_extension_proof,
             block,
             next_epoch_state,
+            decoupled_execution,
         }
     }
 
@@ -59,7 +63,7 @@ impl VoteProposal {
     }
 
     /// This function returns the vote data with a dummy executed_state_id and version
-    pub fn vote_data_ordering_only(&self) -> VoteData {
+    fn vote_data_ordering_only(&self) -> VoteData {
         VoteData::new(
             self.block().gen_block_info(
                 *ACCUMULATOR_PLACEHOLDER_HASH,
@@ -72,7 +76,7 @@ impl VoteProposal {
 
     /// This function returns the vote data with a extension proof.
     /// Attention: this function itself does not verify the proof.
-    pub fn vote_data_with_extension_proof(
+    fn vote_data_with_extension_proof(
         &self,
         new_tree: &InMemoryAccumulator<TransactionAccumulatorHasher>,
     ) -> VoteData {
@@ -84,6 +88,22 @@ impl VoteProposal {
             ),
             self.block().quorum_cert().certified_block().clone(),
         )
+    }
+
+    /// Generate vote data depends on the config.
+    pub fn gen_vote_data(&self) -> anyhow::Result<VoteData> {
+        if self.decoupled_execution {
+            Ok(self.vote_data_ordering_only())
+        } else {
+            let proposed_block = self.block();
+            let new_tree = self.accumulator_extension_proof().verify(
+                proposed_block
+                    .quorum_cert()
+                    .certified_block()
+                    .executed_state_id(),
+            )?;
+            Ok(self.vote_data_with_extension_proof(&new_tree))
+        }
     }
 }
 

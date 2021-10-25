@@ -683,7 +683,8 @@ impl RoundManager {
             "[RoundManager] sync_only flag is set, stop voting"
         );
 
-        let maybe_signed_vote_proposal = executed_block.maybe_signed_vote_proposal();
+        let maybe_signed_vote_proposal =
+            executed_block.maybe_signed_vote_proposal(self.decoupled_execution);
         let vote_result = if self.two_chain() {
             self.safety_rules.lock().construct_and_sign_vote_two_chain(
                 &maybe_signed_vote_proposal,

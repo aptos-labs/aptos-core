@@ -23,7 +23,8 @@ use diem_types::{
 };
 use executor_types::StateComputeResult;
 use safety_rules::{
-    test_utils::make_proposal_with_parent, PersistentSafetyStorage, SafetyRulesManager,
+    test_utils::{make_proposal_with_parent, make_proposal_with_qc},
+    PersistentSafetyStorage, SafetyRulesManager,
 };
 use std::{collections::BTreeMap, sync::Arc};
 
@@ -48,7 +49,7 @@ pub fn prepare_safety_rules() -> (Arc<Mutex<MetricsSafetyRules>>, Vec<ValidatorS
     );
     let (_, storage) = MockStorage::start_for_testing((&validators).into());
 
-    let safety_rules_manager = SafetyRulesManager::new_local(safety_storage, false, false, true);
+    let safety_rules_manager = SafetyRulesManager::new_local(safety_storage, false, false);
     let mut safety_rules = MetricsSafetyRules::new(safety_rules_manager.client(), storage);
     safety_rules.perform_initialize().unwrap();
 
@@ -74,7 +75,7 @@ pub fn prepare_executed_blocks_with_ledger_info(
     let p1 = if let Some(parent) = some_parent {
         make_proposal_with_parent(vec![], init_round, &parent, None, signer, None)
     } else {
-        safety_rules::test_utils::make_proposal_with_qc(init_round, init_qc.unwrap(), signer, None)
+        make_proposal_with_qc(init_round, init_qc.unwrap(), signer, None)
     };
 
     let mut proposals: Vec<MaybeSignedVoteProposal> = vec![p1];

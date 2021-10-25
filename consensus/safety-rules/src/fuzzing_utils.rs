@@ -111,7 +111,7 @@ prop_compose! {
         next_epoch_state in arb_epoch_state(),
         include_signature in any::<bool>(),
     ) -> MaybeSignedVoteProposal {
-        let vote_proposal = VoteProposal::new(accumulator_extension_proof, block, next_epoch_state);
+        let vote_proposal = VoteProposal::new(accumulator_extension_proof, block, next_epoch_state, false);
         let signature = if include_signature {
             let mut rng = StdRng::from_seed(TEST_SEED);
             let private_key = Ed25519PrivateKey::generate(&mut rng);

@@ -71,6 +71,7 @@ pub fn make_proposal_with_qc_and_proof(
             validator_signer,
         ),
         None,
+        false,
     );
     let signature = exec_key.map(|key| key.sign(&vote_proposal));
     MaybeSignedVoteProposal {
@@ -242,7 +243,7 @@ pub fn test_safety_rules() -> SafetyRules {
     let storage = test_storage(&signer);
     let (epoch_change_proof, _) = make_genesis(&signer);
 
-    let mut safety_rules = SafetyRules::new(storage, true, false, false);
+    let mut safety_rules = SafetyRules::new(storage, true, false);
     safety_rules.initialize(&epoch_change_proof).unwrap();
     safety_rules
 }
@@ -251,7 +252,7 @@ pub fn test_safety_rules() -> SafetyRules {
 pub fn test_safety_rules_uninitialized() -> SafetyRules {
     let signer = ValidatorSigner::from_int(0);
     let storage = test_storage(&signer);
-    SafetyRules::new(storage, true, false, false)
+    SafetyRules::new(storage, true, false)
 }
 
 /// Returns a simple serializer for testing purposes.

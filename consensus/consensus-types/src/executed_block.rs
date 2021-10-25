@@ -93,12 +93,13 @@ impl ExecutedBlock {
         )
     }
 
-    pub fn maybe_signed_vote_proposal(&self) -> MaybeSignedVoteProposal {
+    pub fn maybe_signed_vote_proposal(&self, decoupled_execution: bool) -> MaybeSignedVoteProposal {
         MaybeSignedVoteProposal {
             vote_proposal: VoteProposal::new(
                 self.compute_result().extension_proof(),
                 self.block.clone(),
                 self.compute_result().epoch_state().clone(),
+                decoupled_execution,
             ),
             signature: self.compute_result().signature().clone(),
         }
