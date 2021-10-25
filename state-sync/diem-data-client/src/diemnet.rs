@@ -56,7 +56,8 @@ const DATA_SUMMARY_POLL_INTERVAL: Duration = Duration::from_millis(100);
 #[derive(Clone, Debug)]
 pub struct DiemNetDataClient {
     network_client: StorageServiceClient,
-    global_summary: Arc<RwLock<GlobalDataSummary>>,
+    peer_states: Arc<RwLock<PeerStates>>,
+    global_summary_cache: Arc<RwLock<GlobalDataSummary>>,
     next_response_id: Arc<AtomicU64>,
 }
 
@@ -65,23 +66,28 @@ impl DiemNetDataClient {
         time_service: TimeService,
         network_client: StorageServiceClient,
     ) -> (Self, DataSummaryPoller) {
-        let global_summary = Arc::new(RwLock::new(GlobalDataSummary::empty()));
         let client = Self {
             network_client,
-            global_summary: global_summary.clone(),
+            peer_states: Arc::new(RwLock::new(PeerStates::new())),
+            global_summary_cache: Arc::new(RwLock::new(GlobalDataSummary::empty())),
             next_response_id: Arc::new(AtomicU64::new(0)),
         };
-        let poller = DataSummaryPoller::new(
-            time_service,
-            client.clone(),
-            global_summary,
-            DATA_SUMMARY_POLL_INTERVAL,
-        );
+        let poller =
+            DataSummaryPoller::new(time_service, client.clone(), DATA_SUMMARY_POLL_INTERVAL);
         (client, poller)
     }
 
     fn next_response_id(&self) -> u64 {
         self.next_response_id.fetch_add(1, Ordering::Relaxed)
+    }
+
+    fn update_summary(&self, peer: PeerNetworkId, summary: StorageServerSummary) {
+        self.peer_states.write().update_summary(peer, summary)
+    }
+
+    fn update_global_summary_cache(&self) {
+        let aggregate = self.peer_states.read().aggregate_summary();
+        *self.global_summary_cache.write() = aggregate;
     }
 
     fn sample_peer(&self) -> Option<PeerNetworkId> {
@@ -98,10 +104,10 @@ impl DiemNetDataClient {
         all_connected.choose(&mut rand::thread_rng()).copied()
     }
 
-    // TODO(philiphayes): this should be generic in DiemDataClient
+    // TODO(philiphayes): this should be generic in DiemDataClient trait
     pub async fn send_request(
         &self,
-        // TODO(philiphayes): should be a separate DataClient type
+        // TODO(philiphayes): should be a separate DataClient type?
         request: StorageServiceRequest,
     ) -> Result<DataClientResponse, Error> {
         let peer = self
@@ -180,7 +186,7 @@ impl DiemDataClient for DiemNetDataClient {
         Ok(DataClientResponse {
             response_id: self.next_response_id(),
             response_payload: DataClientPayload::GlobalDataSummary(
-                self.global_summary.read().clone(),
+                self.global_summary_cache.read().clone(),
             ),
         })
     }
@@ -269,8 +275,6 @@ impl DiemDataClient for DiemNetDataClient {
 pub struct DataSummaryPoller {
     time_service: TimeService,
     data_client: DiemNetDataClient,
-    global_summary: Arc<RwLock<GlobalDataSummary>>,
-    peer_summaries: PeerDataSummaries,
     poll_interval: Duration,
 }
 
@@ -278,19 +282,16 @@ impl DataSummaryPoller {
     fn new(
         time_service: TimeService,
         data_client: DiemNetDataClient,
-        global_summary: Arc<RwLock<GlobalDataSummary>>,
         poll_interval: Duration,
     ) -> Self {
         Self {
             time_service,
             data_client,
-            global_summary,
-            peer_summaries: PeerDataSummaries::new(),
             poll_interval,
         }
     }
 
-    pub async fn start(mut self) {
+    pub async fn start(self) {
         let ticker = self.time_service.interval(self.poll_interval);
         futures::pin_mut!(ticker);
 
@@ -315,33 +316,38 @@ impl DataSummaryPoller {
                 }
             };
 
-            // compute the new aggregate and update the global summary cache
-            self.peer_summaries.update(peer, summary);
-            let new_global_summary = self.peer_summaries.aggregate();
-
-            *self.global_summary.write() = new_global_summary;
+            self.data_client.update_summary(peer, summary);
+            self.data_client.update_global_summary_cache();
         }
     }
+}
+
+#[derive(Debug, Default)]
+struct PeerState {
+    storage_summary: Option<StorageServerSummary>,
+    // TODO(philiphayes): imagine storing some scoring info here.
+    metadata: (),
 }
 
 /// Contains all of the unbanned peers' most recent [`StorageServerSummary`] data
-/// advertisements. Is aggregateable into a [`GlobalDataSummary`].
-struct PeerDataSummaries {
-    peer_summaries: HashMap<PeerNetworkId, StorageServerSummary>,
+/// advertisements and data-client internal metadata for scoring.
+#[derive(Debug)]
+struct PeerStates {
+    inner: HashMap<PeerNetworkId, PeerState>,
 }
 
-impl PeerDataSummaries {
+impl PeerStates {
     fn new() -> Self {
         Self {
-            peer_summaries: HashMap::new(),
+            inner: HashMap::new(),
         }
     }
 
-    fn update(&mut self, peer: PeerNetworkId, summary: StorageServerSummary) {
-        self.peer_summaries.insert(peer, summary);
+    fn update_summary(&mut self, peer: PeerNetworkId, summary: StorageServerSummary) {
+        self.inner.entry(peer).or_default().storage_summary = Some(summary);
     }
 
-    fn aggregate(&self) -> GlobalDataSummary {
+    fn aggregate_summary(&self) -> GlobalDataSummary {
         let mut aggregate_data = AdvertisedData::empty();
 
         let mut max_epoch_chunk_sizes = vec![];
@@ -349,8 +355,13 @@ impl PeerDataSummaries {
         let mut max_transaction_output_chunk_sizes = vec![];
         let mut max_account_states_chunk_sizes = vec![];
 
+        let summaries = self
+            .inner
+            .values()
+            .filter_map(|state| state.storage_summary.as_ref());
+
         // collect each peer's protocol and data advertisements
-        for summary in self.peer_summaries.values() {
+        for summary in summaries {
             // collect aggregate data advertisements
             aggregate_data
                 .account_states
