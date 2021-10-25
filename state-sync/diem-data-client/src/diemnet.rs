@@ -1,12 +1,19 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{DataClientResponse, DiemDataClient, Error, ResponseError};
+use crate::{
+    AdvertisedData, DataClientPayload, DataClientResponse, DiemDataClient, Error,
+    GlobalDataSummary, OptimalChunkSizes, ResponseError,
+};
 use async_trait::async_trait;
 use diem_config::network_id::PeerNetworkId;
+use diem_infallible::RwLock;
+use diem_time_service::{TimeService, TimeServiceTrait};
+use futures::StreamExt;
 use network::{application::interface::NetworkInterface, protocols::rpc::error::RpcError};
 use rand::seq::SliceRandom;
 use std::{
+    collections::HashMap,
     convert::TryInto,
     sync::{
         atomic::{AtomicU64, Ordering},
@@ -16,8 +23,9 @@ use std::{
 };
 use storage_service_client::StorageServiceClient;
 use storage_service_types::{
-    AccountStatesChunkWithProofRequest, EpochEndingLedgerInfoRequest, StorageServiceRequest,
-    TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
+    AccountStatesChunkWithProofRequest, EpochEndingLedgerInfoRequest, StorageServerSummary,
+    StorageServiceRequest, StorageServiceResponse, TransactionOutputsWithProofRequest,
+    TransactionsWithProofRequest,
 };
 
 // TODO(philiphayes): does this belong in a different crate? I feel like we're
@@ -25,6 +33,7 @@ use storage_service_types::{
 
 // TODO(philiphayes): configuration / pass as argument?
 const DEFAULT_TIMEOUT: Duration = Duration::from_millis(10_000);
+const DATA_SUMMARY_POLL_INTERVAL: Duration = Duration::from_millis(100);
 
 /// A [`DiemDataClient`] that fulfills requests from remote peers' Storage Service
 /// over DiemNet.
@@ -46,21 +55,38 @@ const DEFAULT_TIMEOUT: Duration = Duration::from_millis(10_000);
 /// and/or threads.
 #[derive(Clone, Debug)]
 pub struct DiemNetDataClient {
-    network: StorageServiceClient,
+    network_client: StorageServiceClient,
+    global_summary: Arc<RwLock<GlobalDataSummary>>,
     next_response_id: Arc<AtomicU64>,
 }
 
 impl DiemNetDataClient {
-    pub fn new(network: StorageServiceClient) -> Self {
-        Self {
-            network,
+    pub fn new(
+        time_service: TimeService,
+        network_client: StorageServiceClient,
+    ) -> (Self, DataSummaryPoller) {
+        let global_summary = Arc::new(RwLock::new(GlobalDataSummary::empty()));
+        let client = Self {
+            network_client,
+            global_summary: global_summary.clone(),
             next_response_id: Arc::new(AtomicU64::new(0)),
-        }
+        };
+        let poller = DataSummaryPoller::new(
+            time_service,
+            client.clone(),
+            global_summary,
+            DATA_SUMMARY_POLL_INTERVAL,
+        );
+        (client, poller)
+    }
+
+    fn next_response_id(&self) -> u64 {
+        self.next_response_id.fetch_add(1, Ordering::Relaxed)
     }
 
     fn sample_peer(&self) -> Option<PeerNetworkId> {
         // very dumb. just get this working e2e
-        let peer_infos = self.network.peer_metadata_storage();
+        let peer_infos = self.network_client.peer_metadata_storage();
         let all_connected = peer_infos
             .networks()
             .flat_map(|network_id| {
@@ -81,17 +107,32 @@ impl DiemNetDataClient {
         let peer = self
             .sample_peer()
             .ok_or_else(|| Error::DataIsUnavailable("no connected diemnet peers".to_owned()))?;
+        self.send_request_to_peer(peer, request).await
+    }
 
+    async fn send_request_to_peer(
+        &self,
+        peer: PeerNetworkId,
+        request: StorageServiceRequest,
+    ) -> Result<DataClientResponse, Error> {
+        let response = self.send_request_to_peer_inner(peer, request).await?;
+        Ok(DataClientResponse {
+            response_id: self.next_response_id(),
+            response_payload: response.try_into()?,
+        })
+    }
+
+    async fn send_request_to_peer_inner(
+        &self,
+        peer: PeerNetworkId,
+        request: StorageServiceRequest,
+    ) -> Result<StorageServiceResponse, Error> {
         let result = self
-            .network
+            .network_client
             .send_request(peer, request, DEFAULT_TIMEOUT)
             .await;
-
         match result {
-            Ok(response) => Ok(DataClientResponse {
-                response_id: self.next_response_id.fetch_add(1, Ordering::Relaxed),
-                response_payload: response.try_into()?,
-            }),
+            Ok(response) => Ok(response),
             Err(storage_service_client::Error::RpcError(err)) => match err {
                 RpcError::NotConnected(_) => Err(Error::DataIsUnavailable(err.to_string())),
                 RpcError::TimedOut => Err(Error::TimeoutWaitingForResponse(err.to_string())),
@@ -101,8 +142,20 @@ impl DiemNetDataClient {
                 Err(Error::UnexpectedErrorEncountered(err.to_string()))
             }
         }
-
         // TODO(philiphayes): update peer scores on error
+    }
+
+    async fn send_data_summary_request(
+        &self,
+        peer: PeerNetworkId,
+    ) -> Result<StorageServerSummary, Error> {
+        let response = self
+            .send_request_to_peer_inner(peer, StorageServiceRequest::GetStorageServerSummary)
+            .await?;
+        match response {
+            StorageServiceResponse::StorageServerSummary(summary) => Ok(summary),
+            _ => Err(Error::InvalidResponse("unexpected response".to_owned())),
+        }
     }
 }
 
@@ -120,6 +173,18 @@ fn range_len(start: u64, end: u64) -> Result<u64, Error> {
 
 #[async_trait]
 impl DiemDataClient for DiemNetDataClient {
+    fn get_global_data_summary(&self) -> Result<DataClientResponse, Error> {
+        // TODO(philiphayes): feels awkward to create a DataClientResponse here
+        // rather than just return the type directly. what does the response id
+        // mean here?
+        Ok(DataClientResponse {
+            response_id: self.next_response_id(),
+            response_payload: DataClientPayload::GlobalDataSummary(
+                self.global_summary.read().clone(),
+            ),
+        })
+    }
+
     async fn get_account_states_with_proof(
         &self,
         version: u64,
@@ -148,10 +213,6 @@ impl DiemDataClient for DiemNetDataClient {
             },
         ))
         .await
-    }
-
-    fn get_global_data_summary(&self) -> Result<DataClientResponse, Error> {
-        todo!()
     }
 
     async fn get_number_of_account_states(
@@ -203,4 +264,143 @@ impl DiemDataClient for DiemNetDataClient {
     ) -> Result<(), Error> {
         todo!()
     }
+}
+
+pub struct DataSummaryPoller {
+    time_service: TimeService,
+    data_client: DiemNetDataClient,
+    global_summary: Arc<RwLock<GlobalDataSummary>>,
+    peer_summaries: PeerDataSummaries,
+    poll_interval: Duration,
+}
+
+impl DataSummaryPoller {
+    fn new(
+        time_service: TimeService,
+        data_client: DiemNetDataClient,
+        global_summary: Arc<RwLock<GlobalDataSummary>>,
+        poll_interval: Duration,
+    ) -> Self {
+        Self {
+            time_service,
+            data_client,
+            global_summary,
+            peer_summaries: PeerDataSummaries::new(),
+            poll_interval,
+        }
+    }
+
+    pub async fn start(mut self) {
+        let ticker = self.time_service.interval(self.poll_interval);
+        futures::pin_mut!(ticker);
+
+        // TODO(philiphayes): rather than polling one at a time, maybe do
+        // round-robin with a few concurrent polls.
+        loop {
+            // wait for next round to poll
+            ticker.next().await;
+
+            // just sample a random peer for now. do something smarter here in
+            // the future.
+            let peer = match self.data_client.sample_peer() {
+                Some(peer) => peer,
+                None => continue,
+            };
+
+            let summary = match self.data_client.send_data_summary_request(peer).await {
+                Ok(summary) => summary,
+                Err(_err) => {
+                    // TODO(philiphayes): log
+                    continue;
+                }
+            };
+
+            // compute the new aggregate and update the global summary cache
+            self.peer_summaries.update(peer, summary);
+            let new_global_summary = self.peer_summaries.aggregate();
+
+            *self.global_summary.write() = new_global_summary;
+        }
+    }
+}
+
+/// Contains all of the unbanned peers' most recent [`StorageServerSummary`] data
+/// advertisements. Is aggregateable into a [`GlobalDataSummary`].
+struct PeerDataSummaries {
+    peer_summaries: HashMap<PeerNetworkId, StorageServerSummary>,
+}
+
+impl PeerDataSummaries {
+    fn new() -> Self {
+        Self {
+            peer_summaries: HashMap::new(),
+        }
+    }
+
+    fn update(&mut self, peer: PeerNetworkId, summary: StorageServerSummary) {
+        self.peer_summaries.insert(peer, summary);
+    }
+
+    fn aggregate(&self) -> GlobalDataSummary {
+        let mut aggregate_data = AdvertisedData::empty();
+
+        let mut max_epoch_chunk_sizes = vec![];
+        let mut max_transaction_chunk_sizes = vec![];
+        let mut max_transaction_output_chunk_sizes = vec![];
+        let mut max_account_states_chunk_sizes = vec![];
+
+        // collect each peer's protocol and data advertisements
+        for summary in self.peer_summaries.values() {
+            // collect aggregate data advertisements
+            aggregate_data
+                .account_states
+                .push(summary.data_summary.account_states);
+            aggregate_data
+                .epoch_ending_ledger_infos
+                .push(summary.data_summary.epoch_ending_ledger_infos);
+            aggregate_data
+                .synced_ledger_infos
+                .push(summary.data_summary.synced_ledger_info.clone());
+            aggregate_data
+                .transactions
+                .push(summary.data_summary.transactions);
+            aggregate_data
+                .transaction_outputs
+                .push(summary.data_summary.transaction_outputs);
+
+            // collect preferred max chunk sizes
+            max_epoch_chunk_sizes.push(summary.protocol_metadata.max_epoch_chunk_size);
+            max_transaction_chunk_sizes.push(summary.protocol_metadata.max_transaction_chunk_size);
+            max_transaction_output_chunk_sizes
+                .push(summary.protocol_metadata.max_transaction_output_chunk_size);
+            max_account_states_chunk_sizes
+                .push(summary.protocol_metadata.max_account_states_chunk_size);
+        }
+
+        // take the median for each max chunk size parameter.
+        // this works well when we have an honest majority that mostly agrees on
+        // the same chunk sizes.
+        // TODO(philiphayes): move these constants somewhere?
+        let aggregate_chunk_sizes = OptimalChunkSizes {
+            account_states_chunk_size: median(&mut max_account_states_chunk_sizes)
+                .unwrap_or(storage_service_server::MAX_ACCOUNT_STATES_CHUNK_SIZE),
+            epoch_chunk_size: median(&mut max_epoch_chunk_sizes)
+                .unwrap_or(storage_service_server::MAX_EPOCH_CHUNK_SIZE),
+            transaction_chunk_size: median(&mut max_transaction_chunk_sizes)
+                .unwrap_or(storage_service_server::MAX_TRANSACTION_CHUNK_SIZE),
+            transaction_output_chunk_size: median(&mut max_transaction_output_chunk_sizes)
+                .unwrap_or(storage_service_server::MAX_TRANSACTION_OUTPUT_CHUNK_SIZE),
+        };
+
+        GlobalDataSummary {
+            advertised_data: aggregate_data,
+            optimal_chunk_sizes: aggregate_chunk_sizes,
+        }
+    }
+}
+
+fn median<T: Ord + Copy>(values: &mut [T]) -> Option<T> {
+    values.sort_unstable();
+    let idx = values.len() / 2;
+    values.get(idx).copied()
 }

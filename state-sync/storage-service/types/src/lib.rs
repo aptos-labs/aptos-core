@@ -152,7 +152,7 @@ pub struct DataSummary {
 /// is complete (i.e. there are no missing pieces of data).
 /// This is used to provide a summary of the data currently held in storage, e.g.
 /// a CompleteDataRange<Version> of (A,B) means all versions A->B (inclusive).
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Copy, Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct CompleteDataRange<T> {
     pub lowest: T,
     pub highest: T,
@@ -166,5 +166,10 @@ impl<T: Ord> CompleteDataRange<T> {
     /// Returns true iff the given data item is within this range
     pub fn contains(&self, data_item: T) -> bool {
         data_item >= self.lowest && data_item <= self.highest
+    }
+
+    /// Returns true iff the range contains no items.
+    pub fn is_empty(&self) -> bool {
+        self.highest <= self.lowest
     }
 }

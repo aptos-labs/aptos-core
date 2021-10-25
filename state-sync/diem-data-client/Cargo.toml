@@ -18,8 +18,11 @@ thiserror = "1.0.24"
 
 diem-config = { path = "../../config" }
 diem-crypto = { path = "../../crypto/crypto" }
+diem-infallible = { path = "../../common/infallible" }
+diem-time-service = { path = "../../common/time-service", features = ["async"] }
 diem-types = { path = "../../types" }
 diem-workspace-hack = { path = "../../common/workspace-hack" }
 network = { path = "../../network" }
 storage-service-client = { path = "../storage-service/client" }
 storage-service-types = { path = "../storage-service/types" }
+storage-service-server = { path = "../storage-service/server" }
