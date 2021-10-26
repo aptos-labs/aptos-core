@@ -215,7 +215,7 @@ impl TimelineIndex {
 
     /// Read all transactions from the timeline since <timeline_id>.
     pub(crate) fn read_timeline(
-        &mut self,
+        &self,
         timeline_id: u64,
         count: usize,
     ) -> Vec<(AccountAddress, u64)> {
@@ -233,11 +233,7 @@ impl TimelineIndex {
     }
 
     /// Read transactions from the timeline from `start_id` (exclusive) to `end_id` (inclusive).
-    pub(crate) fn timeline_range(
-        &mut self,
-        start_id: u64,
-        end_id: u64,
-    ) -> Vec<(AccountAddress, u64)> {
+    pub(crate) fn timeline_range(&self, start_id: u64, end_id: u64) -> Vec<(AccountAddress, u64)> {
         self.timeline
             .range((Bound::Excluded(start_id), Bound::Included(end_id)))
             .map(|(_idx, txn)| txn)
@@ -349,7 +345,7 @@ impl ParkingLotIndex {
     }
 
     /// Returns a random "non-ready" transaction (with highest sequence number for that account).
-    pub(crate) fn get_poppable(&mut self) -> Option<TxnPointer> {
+    pub(crate) fn get_poppable(&self) -> Option<TxnPointer> {
         let mut rng = rand::thread_rng();
         self.data
             .choose(&mut rng)

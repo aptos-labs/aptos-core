@@ -438,7 +438,7 @@ impl TransactionStore {
         (batch, last_timeline_id)
     }
 
-    pub(crate) fn timeline_range(&mut self, start_id: u64, end_id: u64) -> Vec<SignedTransaction> {
+    pub(crate) fn timeline_range(&self, start_id: u64, end_id: u64) -> Vec<SignedTransaction> {
         self.timeline_index
             .timeline_range(start_id, end_id)
             .iter()
