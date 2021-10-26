@@ -41,3 +41,24 @@ async fn test_return_bad_request_if_method_not_allowed() {
 
     assert_eq!(expected, resp);
 }
+
+#[tokio::test]
+async fn test_health_check() {
+    let context = new_test_context();
+    let resp = context
+        .reply(warp::test::request().method("GET").path("/-/healthy"))
+        .await;
+    assert_eq!(resp.status(), 200)
+}
+
+#[tokio::test]
+async fn test_enable_jsonrpc_api() {
+    let context = new_test_context();
+    let resp = context
+        .post(
+            "/",
+            json!({"jsonrpc": "2.0", "method": "get_metadata", "id": 1}),
+        )
+        .await;
+    assert_eq!(resp["result"]["version"].as_u64().unwrap(), 0)
+}

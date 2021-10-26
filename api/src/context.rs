@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use diem_api_types::{Error, LedgerInfo, MoveConverter, TransactionOnChainData};
+use diem_config::config::{JsonRpcConfig, RoleType};
 use diem_crypto::HashValue;
 use diem_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
 use diem_types::{
@@ -24,7 +25,7 @@ use std::{
     convert::{Infallible, TryFrom},
     sync::Arc,
 };
-use warp::Filter;
+use warp::{Filter, Rejection, Reply};
 
 // Context holds application scope context
 #[derive(Clone)]
@@ -32,6 +33,8 @@ pub struct Context {
     chain_id: ChainId,
     db: Arc<dyn MoveDbReader<DpnProto>>,
     mp_sender: MempoolClientSender,
+    role: RoleType,
+    jsonrpc_config: JsonRpcConfig,
 }
 
 impl Context {
@@ -39,11 +42,15 @@ impl Context {
         chain_id: ChainId,
         db: Arc<dyn MoveDbReader<DpnProto>>,
         mp_sender: MempoolClientSender,
+        role: RoleType,
+        jsonrpc_config: JsonRpcConfig,
     ) -> Self {
         Self {
             chain_id,
             db,
             mp_sender,
+            role,
+            jsonrpc_config,
         }
     }
 
@@ -212,5 +219,21 @@ impl Context {
             .filter(|(version, _event)| version <= &ledger_version)
             .map(|(_, event)| event)
             .collect::<Vec<_>>())
+    }
+
+    pub fn health_check_route(
+        &self,
+    ) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+        diem_json_rpc::runtime::health_check_route(self.db.clone())
+    }
+
+    pub fn jsonrpc_routes(&self) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+        diem_json_rpc::runtime::jsonrpc_routes(
+            self.db.clone(),
+            self.mp_sender.clone(),
+            self.role,
+            self.chain_id,
+            &self.jsonrpc_config,
+        )
     }
 }

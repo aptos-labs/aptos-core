@@ -11,7 +11,11 @@ pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Inf
     index(context.clone())
         .or(accounts::routes(context.clone()))
         .or(transactions::routes(context.clone()))
-        .or(events::routes(context))
+        .or(events::routes(context.clone()))
+        .or(context.health_check_route())
+        // jsonrpc routes must before `recover` and after `index`
+        // so that POST '/' can be handled by jsonrpc routes instead of `index` route
+        .or(context.jsonrpc_routes())
         .recover(handle_rejection)
         .with(log::logger())
 }

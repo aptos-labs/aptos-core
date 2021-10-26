@@ -55,8 +55,7 @@ const INTRA_NODE_CHANNEL_BUFFER_SIZE: usize = 1;
 const MEMPOOL_NETWORK_CHANNEL_BUFFER_SIZE: usize = 1_024;
 
 pub struct DiemHandle {
-    _api: Option<Runtime>,
-    _rpc: Runtime,
+    _api: Runtime,
     _mempool: Runtime,
     _state_sync_bootstrapper: StateSyncBootstrapper,
     _network_runtimes: Vec<Runtime>,
@@ -437,20 +436,11 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
     );
     let (mp_client_sender, mp_client_events) = channel(AC_SMP_CHANNEL_BUFFER_SIZE);
 
-    let rpc_runtime = bootstrap_rpc(
-        node_config,
-        chain_id,
-        diem_db.clone(),
-        mp_client_sender.clone(),
-    );
-    let api_runtime = match node_config.api.enabled {
-        true => Some(bootstrap_api(
-            chain_id,
-            diem_db.clone(),
-            &node_config.api,
-            mp_client_sender,
-        )),
-        false => None,
+    let api_runtime = if node_config.api.enabled {
+        // bootstrap_api bootstraps a web-server serves for both REST and JSON-RPC API
+        bootstrap_api(node_config, chain_id, diem_db.clone(), mp_client_sender).unwrap()
+    } else {
+        bootstrap_rpc(node_config, chain_id, diem_db.clone(), mp_client_sender)
     };
 
     let mut consensus_runtime = None;
@@ -507,7 +497,6 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
 
     DiemHandle {
         _network_runtimes: network_runtimes,
-        _rpc: rpc_runtime,
         _mempool: mempool,
         _state_sync_bootstrapper: state_sync_bootstrapper,
         _consensus_runtime: consensus_runtime,

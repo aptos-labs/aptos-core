@@ -3,12 +3,7 @@
 
 use anyhow::{format_err, Error, Result};
 use diem_config::{
-    config::{
-        RoleType, StreamConfig, DEFAULT_BATCH_SIZE_LIMIT, DEFAULT_CONTENT_LENGTH_LIMIT,
-        DEFAULT_PAGE_SIZE_LIMIT, DEFAULT_STREAM_RPC_MAX_POLL_INTERVAL_MS,
-        DEFAULT_STREAM_RPC_POLL_INTERVAL_MS, DEFAULT_STREAM_RPC_SEND_QUEUE_SIZE,
-        DEFAULT_STREAM_RPC_SUBSCRIPTION_FETCH_SIZE,
-    },
+    config::{JsonRpcConfig, RoleType, StreamConfig},
     utils,
 };
 use diem_crypto::HashValue;
@@ -73,25 +68,21 @@ pub fn test_bootstrap(
     diem_db: Arc<dyn MoveDbReader<DpnProto>>,
     mp_sender: MempoolClientSender,
 ) -> Runtime {
-    let mut stream_config: StreamConfig = StreamConfig {
+    let stream_rpc = StreamConfig {
         enabled: true,
-        subscription_fetch_size: DEFAULT_STREAM_RPC_SUBSCRIPTION_FETCH_SIZE,
-        send_queue_size: DEFAULT_STREAM_RPC_SEND_QUEUE_SIZE,
-        poll_interval_ms: DEFAULT_STREAM_RPC_POLL_INTERVAL_MS,
-        max_poll_interval_ms: DEFAULT_STREAM_RPC_MAX_POLL_INTERVAL_MS,
+        ..Default::default()
+    };
+    let cfg = JsonRpcConfig {
+        address,
+        stream_rpc,
+        ..Default::default()
     };
     crate::bootstrap(
-        address,
-        DEFAULT_BATCH_SIZE_LIMIT,
-        DEFAULT_PAGE_SIZE_LIMIT,
-        DEFAULT_CONTENT_LENGTH_LIMIT,
-        &None,
-        &None,
+        &cfg,
         diem_db,
         mp_sender,
         RoleType::Validator,
         ChainId::test(),
-        &stream_config,
     )
 }
 

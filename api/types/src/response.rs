@@ -9,7 +9,7 @@ use warp::http::header::{HeaderValue, CONTENT_TYPE};
 
 pub const X_DIEM_CHAIN_ID: &str = "X-Diem-Chain-Id";
 pub const X_DIEM_LEDGER_VERSION: &str = "X-Diem-Ledger-Version";
-pub const X_DIEM_LEDGER_TIMESTAMP: &str = "X-Diem-Ledger-Timestamp";
+pub const X_DIEM_LEDGER_TIMESTAMP: &str = "X-Diem-Ledger-TimestampUsec";
 
 pub struct Response {
     pub ledger_info: LedgerInfo,

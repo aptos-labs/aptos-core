@@ -2,10 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{context::Context, index, tests::pretty};
+use bytes::Bytes;
 use diem_api_types::{
     mime_types, TransactionOnChainData, X_DIEM_CHAIN_ID, X_DIEM_LEDGER_TIMESTAMP,
     X_DIEM_LEDGER_VERSION,
 };
+use diem_config::config::{JsonRpcConfig, RoleType};
 use diem_crypto::hash::HashValue;
 use diem_genesis_tool::validator_builder::{RootKeys, ValidatorBuilder};
 use diem_global_constants::OWNER_ACCOUNT;
@@ -35,6 +37,7 @@ use diem_vm::DiemVM;
 use diemdb::DiemDB;
 use executor::{db_bootstrapper, Executor};
 use executor_types::BlockExecutor;
+use hyper::Response;
 use storage_interface::DbReaderWriter;
 use vm_validator::vm_validator::VMValidator;
 
@@ -65,12 +68,19 @@ pub fn new_test_context() -> TestContext {
     let mempool = MockSharedMempool::new_in_runtime(&db_rw, VMValidator::new(db.clone()));
 
     TestContext::new(
-        Context::new(ChainId::test(), db, mempool.ac_client.clone()),
+        Context::new(
+            ChainId::test(),
+            db.clone(),
+            mempool.ac_client.clone(),
+            RoleType::Validator,
+            JsonRpcConfig::default(),
+        ),
         rng,
         root_keys,
         validator_owner,
         Box::new(Executor::<DpnProto, DiemVM>::new(db_rw)),
         mempool,
+        db,
     )
 }
 
@@ -78,10 +88,11 @@ pub fn new_test_context() -> TestContext {
 pub struct TestContext {
     pub context: Context,
     pub validator_owner: AccountAddress,
+    pub mempool: Arc<MockSharedMempool>,
+    pub db: Arc<DiemDB>,
     rng: rand::rngs::StdRng,
     root_keys: Arc<RootKeys>,
     executor: Arc<Box<dyn BlockExecutor>>,
-    mempool: Arc<MockSharedMempool>,
     expect_status_code: u16,
 }
 
@@ -93,6 +104,7 @@ impl TestContext {
         validator_owner: AccountAddress,
         executor: Box<dyn BlockExecutor>,
         mempool: MockSharedMempool,
+        db: Arc<DiemDB>,
     ) -> Self {
         Self {
             context,
@@ -102,6 +114,7 @@ impl TestContext {
             executor: Arc::new(executor),
             mempool: Arc::new(mempool),
             expect_status_code: 200,
+            db,
         }
     }
 
@@ -253,9 +266,12 @@ impl TestContext {
         .await
     }
 
+    pub async fn reply(&self, req: warp::test::RequestBuilder) -> Response<Bytes> {
+        req.reply(&index::routes(self.context.clone())).await
+    }
+
     pub async fn execute(&self, req: warp::test::RequestBuilder) -> Value {
-        let routes = index::routes(self.context.clone());
-        let resp = req.reply(&routes).await;
+        let resp = self.reply(req).await;
 
         let headers = resp.headers();
         assert_eq!(headers[CONTENT_TYPE], mime_types::JSON);
