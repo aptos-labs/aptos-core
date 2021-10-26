@@ -1,8 +1,8 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::Result;
-use std::path::PathBuf;
+use anyhow::{anyhow, Result};
+use std::{fs, path::PathBuf};
 use structopt::StructOpt;
 
 mod account;
@@ -30,7 +30,14 @@ pub fn main() -> Result<()> {
         Subcommand::Console {
             project_path,
             network,
-        } => console::handle(&normalized_project_path(project_path)?, network),
+            key_path,
+            address,
+        } => console::handle(
+            &normalized_project_path(project_path)?,
+            network,
+            &normalized_key_path(key_path)?,
+            &normalized_address(address)?,
+        ),
     }
 }
 
@@ -69,6 +76,12 @@ pub enum Subcommand {
 
         #[structopt(short, long)]
         network: Option<String>,
+
+        #[structopt(short, long, requires("address"))]
+        key_path: Option<PathBuf>,
+
+        #[structopt(short, long, requires("key-path"))]
+        address: Option<String>,
     },
     #[structopt(about = "Runs end to end .ts tests")]
     Test {
@@ -81,5 +94,42 @@ fn normalized_project_path(project_path: Option<PathBuf>) -> Result<PathBuf> {
     match project_path {
         Some(path) => Ok(path),
         None => shared::get_shuffle_project_path(&std::env::current_dir()?),
+    }
+}
+
+fn normalized_address(account_address: Option<String>) -> Result<String> {
+    let home = shared::Home::new(shared::get_home_path().as_path())?;
+    match account_address {
+        Some(address) => {
+            if &address[0..2] != "0x" {
+                Ok("0x".to_owned() + &address)
+            } else {
+                Ok(address)
+            }
+        }
+        None => {
+            if !home.get_account_path().is_dir() {
+                return Err(anyhow!(
+                    "An account hasn't been created yet! Run shuffle account first"
+                ));
+            }
+            let address = fs::read_to_string(home.get_latest_address_path())?;
+            Ok("0x".to_owned() + &address)
+        }
+    }
+}
+
+fn normalized_key_path(diem_root_key_path: Option<PathBuf>) -> Result<PathBuf> {
+    let home = shared::Home::new(shared::get_home_path().as_path())?;
+    match diem_root_key_path {
+        Some(key_path) => Ok(key_path),
+        None => {
+            if !home.get_account_path().is_dir() {
+                return Err(anyhow!(
+                    "An account hasn't been created yet! Run shuffle account first"
+                ));
+            }
+            Ok(PathBuf::from(home.get_latest_key_path()))
+        }
     }
 }

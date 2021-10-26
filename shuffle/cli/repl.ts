@@ -18,13 +18,11 @@ function highlight(content: string) {
   return green(content);
 }
 
-export const shuffleDir = Deno.env.get("SHUFFLE_HOME") || "unknown";
-export const projectPath = Deno.env.get("PROJECT_PATH") || "unknown";
-export const nodeUrl = getNetworkEndpoint(Deno.env.get("SHUFFLE_NETWORK") || "unknown");
-export const senderAddressPath = path.join(shuffleDir,"accounts/latest/address");
-export const senderAddress = await Deno.readTextFile(senderAddressPath);
-export const fullSenderAddress = "0x" + senderAddress;
-export const privateKeyPath = path.join(shuffleDir,"accounts/latest/dev.key");
+export const shuffleDir = String(Deno.env.get("SHUFFLE_HOME"));
+export const projectPath = String(Deno.env.get("PROJECT_PATH"));
+export const nodeUrl = getNetworkEndpoint(String(Deno.env.get("SHUFFLE_NETWORK")));
+export const senderAddress = String(Deno.env.get("SENDER_ADDRESS"));
+export const privateKeyPath = String(Deno.env.get("PRIVATE_KEY_PATH"));
 
 export const receiverPrivateKeyPath = path.join(shuffleDir, "accounts/test/dev.key");
 export const receiverAddressPath = path.join(shuffleDir, "accounts/test/address");
@@ -32,7 +30,7 @@ export const receiverAddress = await Deno.readTextFile(receiverAddressPath);
 
 console.log(`Loading Project ${highlight(projectPath)}`);
 console.log(`Connected to Node ${highlight(nodeUrl)}`);
-console.log(`Sender Account Address ${highlight(fullSenderAddress)}`);
+console.log(`Sender Account Address ${highlight(senderAddress)}`);
 console.log(`"Shuffle", "main", "codegen", "DiemHelpers" top level objects available`);
 console.log(await ledgerInfo());
 console.log();
@@ -51,13 +49,13 @@ export async function accountTransactions() {
   const remote = createRemote("http://127.0.0.1:8080/v1");
   return await remote.call(
       "get_account_transactions",
-      [senderAddress, 0, 10, true]
+      [senderAddress.substring(2), 0, 10, true]
   );
 }
 
 export async function resources(addr: string | undefined) {
   if(addr === undefined) {
-    addr = fullSenderAddress;
+    addr = senderAddress;
   }
   const res = await fetch(relativeUrl(`/accounts/${addr}/resources`));
   return await res.json();
@@ -65,7 +63,7 @@ export async function resources(addr: string | undefined) {
 
 export async function modules(addr: string | undefined) {
   if(addr === undefined) {
-    addr = fullSenderAddress;
+    addr = senderAddress;
   }
   const res = await fetch(relativeUrl(`/accounts/${addr}/modules`));
   return await res.json();
@@ -84,7 +82,7 @@ export async function modules(addr: string | undefined) {
 //   "value": {
 //     "sequence_number": "2",
 export async function account() {
-  const res = await resources(fullSenderAddress);
+  const res = await resources(senderAddress);
   return res.
   find(
       (entry: any) => entry["type"]["name"] == "DiemAccount"
