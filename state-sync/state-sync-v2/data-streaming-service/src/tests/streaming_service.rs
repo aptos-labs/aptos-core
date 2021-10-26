@@ -78,6 +78,72 @@ async fn test_notifications_accounts() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn test_notifications_continuous_outputs() {
+    // Create a new streaming client and service
+    let (streaming_client, streaming_service) = create_new_streaming_client_and_service();
+    tokio::spawn(streaming_service.start_service());
+
+    // Request a continuous output stream and get a data stream listener
+    let mut stream_listener = streaming_client
+        .continuously_stream_transaction_outputs(
+            MIN_ADVERTISED_TRANSACTION_OUTPUT,
+            MIN_ADVERTISED_EPOCH,
+        )
+        .await
+        .unwrap();
+
+    // Read the data notifications from the stream and verify the payloads
+    let mut next_expected_epoch = MIN_ADVERTISED_EPOCH;
+    let mut next_expected_version = MIN_ADVERTISED_TRANSACTION_OUTPUT;
+    loop {
+        if let Ok(data_notification) = timeout(
+            Duration::from_secs(MAX_NOTIFICATION_TIMEOUT_SECS),
+            stream_listener.select_next_some(),
+        )
+        .await
+        {
+            if let DataPayload::ContinuousTransactionOutputsWithProof(
+                ledger_info_with_sigs,
+                outputs_with_proofs,
+            ) = data_notification.data_payload
+            {
+                let ledger_info = ledger_info_with_sigs.ledger_info();
+                // Verify the epoch of the ledger info
+                assert_eq!(ledger_info.epoch(), next_expected_epoch);
+
+                // Verify the output start version matches the expected version
+                let first_output_version = outputs_with_proofs.first_transaction_output_version;
+                assert_eq!(Some(next_expected_version), first_output_version);
+
+                let num_outputs = outputs_with_proofs.transactions_and_outputs.len() as u64;
+                next_expected_version += num_outputs;
+
+                // Update epochs if we've hit the epoch end
+                let last_output_version = first_output_version.unwrap() + num_outputs - 1;
+                if ledger_info.version() == last_output_version && ledger_info.ends_epoch() {
+                    next_expected_epoch += 1;
+                }
+            } else {
+                panic!(
+                    "Expected a continuous output payload, but got: {:?}",
+                    data_notification
+                );
+            }
+        } else {
+            if next_expected_epoch == MAX_ADVERTISED_EPOCH
+                && next_expected_version == MAX_ADVERTISED_TRANSACTION_OUTPUT + 1
+            {
+                return; // We hit the end of the stream!
+            }
+            panic!(
+                "Timed out waiting for a data notification! Next expected output: {:?}",
+                next_expected_version
+            );
+        }
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_notifications_continuous_transactions() {
     // Create a new streaming client and service
     let (streaming_client, streaming_service) = create_new_streaming_client_and_service();
@@ -327,6 +393,40 @@ async fn test_stream_accounts() {
 }
 
 #[tokio::test]
+async fn test_stream_continuous_outputs() {
+    // Create a new streaming client and service
+    let (streaming_client, streaming_service) = create_new_streaming_client_and_service();
+    tokio::spawn(streaming_service.start_service());
+
+    // Request a continuous output stream and verify we get a data stream listener
+    let result = streaming_client
+        .continuously_stream_transaction_outputs(
+            MIN_ADVERTISED_TRANSACTION_OUTPUT,
+            MIN_ADVERTISED_EPOCH,
+        )
+        .await;
+    assert_ok!(result);
+
+    // Request a stream where data is missing (we are lower than advertised)
+    let result = streaming_client
+        .continuously_stream_transaction_outputs(
+            MIN_ADVERTISED_TRANSACTION_OUTPUT - 1,
+            MIN_ADVERTISED_EPOCH,
+        )
+        .await;
+    assert_matches!(result, Err(Error::DataIsUnavailable(_)));
+
+    // Request a stream where data is missing (we are higher than advertised)
+    let result = streaming_client
+        .continuously_stream_transaction_outputs(
+            MAX_ADVERTISED_TRANSACTION_OUTPUT + 1,
+            MIN_ADVERTISED_EPOCH,
+        )
+        .await;
+    assert_matches!(result, Err(Error::DataIsUnavailable(_)));
+}
+
+#[tokio::test]
 async fn test_stream_continuous_transactions() {
     // Create a new streaming client and service
     let (streaming_client, streaming_service) = create_new_streaming_client_and_service();
@@ -466,12 +566,6 @@ async fn test_stream_unsupported() {
     // Create a new streaming client and service
     let (streaming_client, streaming_service) = create_new_streaming_client_and_service();
     tokio::spawn(streaming_service.start_service());
-
-    // Request a continuous transaction output stream and verify it's unsupported
-    let result = streaming_client
-        .continuously_stream_transaction_outputs(0, 0)
-        .await;
-    assert_matches!(result, Err(Error::UnsupportedRequestEncountered(_)));
 
     // Request a refetch notification payload stream and verify it's unsupported
     let result = streaming_client

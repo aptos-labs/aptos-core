@@ -28,6 +28,7 @@ pub struct DataNotification {
 #[derive(Clone, Debug)]
 pub enum DataPayload {
     AccountStatesWithProof(AccountStatesChunkWithProof),
+    ContinuousTransactionOutputsWithProof(LedgerInfoWithSignatures, TransactionOutputListWithProof),
     ContinuousTransactionsWithProof(LedgerInfoWithSignatures, TransactionListWithProof),
     EpochEndingLedgerInfos(Vec<LedgerInfoWithSignatures>),
     TransactionOutputsWithProof(TransactionOutputListWithProof),
