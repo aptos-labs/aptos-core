@@ -2,7 +2,7 @@
 
 This module provides REST API for client applications to query the Diem blockchain.
 
-The [API specification](blueprint.apib) is documented in [API Blueprint](https://apiblueprint.org) format.
+The [API specification](spec.yaml) is documented in [OpenAPI](https://www.openapis.org/) 3.0.3.
 
 ## Overview
 
