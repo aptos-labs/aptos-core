@@ -157,7 +157,10 @@ impl TryFrom<StorageServiceResponse> for DataClientPayload {
             StorageServiceResponse::TransactionsWithProof(txns) => {
                 Ok(DataClientPayload::TransactionsWithProof(txns))
             }
-            _ => Err(Error::UnexpectedErrorEncountered(format!(""))),
+            _ => Err(Error::InvalidResponse(format!(
+                "unrecognized storage service response variant: {:?}",
+                response
+            ))),
         }
     }
 }

@@ -172,6 +172,11 @@ impl ProtocolIdSet {
     pub fn contains(&self, protocol: ProtocolId) -> bool {
         self.0.is_set(protocol as u8)
     }
+
+    /// Insert a new protocol into the set.
+    pub fn insert(&mut self, protocol: ProtocolId) {
+        self.0.set(protocol as u8)
+    }
 }
 
 impl FromIterator<ProtocolId> for ProtocolIdSet {

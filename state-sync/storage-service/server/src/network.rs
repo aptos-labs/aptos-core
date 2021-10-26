@@ -31,7 +31,7 @@ pub fn network_endpoint_config() -> AppConfig {
     )
 }
 
-type NetworkRequest = (PeerId, ProtocolId, StorageServiceRequest, ResponseSender);
+pub type NetworkRequest = (PeerId, ProtocolId, StorageServiceRequest, ResponseSender);
 
 /// A stream of requests from network. Each request also comes with a callback to
 /// send the response.

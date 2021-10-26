@@ -1756,13 +1756,18 @@ name = "diem-data-client"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "bcs",
+ "channel",
+ "claim",
  "diem-config",
  "diem-crypto",
  "diem-infallible",
+ "diem-logger",
  "diem-time-service",
  "diem-types",
  "diem-workspace-hack",
  "futures",
+ "maplit",
  "network",
  "rand 0.8.4",
  "serde",
@@ -1770,6 +1775,7 @@ dependencies = [
  "storage-service-server",
  "storage-service-types",
  "thiserror",
+ "tokio",
 ]
 
 [[package]]

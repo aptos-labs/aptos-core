@@ -8,9 +8,13 @@ use crate::{
 use async_trait::async_trait;
 use diem_config::network_id::PeerNetworkId;
 use diem_infallible::RwLock;
+use diem_logger::trace;
 use diem_time_service::{TimeService, TimeServiceTrait};
 use futures::StreamExt;
-use network::{application::interface::NetworkInterface, protocols::rpc::error::RpcError};
+use network::{
+    application::interface::NetworkInterface,
+    protocols::{rpc::error::RpcError, wire::handshake::v1::ProtocolId},
+};
 use rand::seq::SliceRandom;
 use std::{
     collections::HashMap,
@@ -33,7 +37,7 @@ use storage_service_types::{
 
 // TODO(philiphayes): configuration / pass as argument?
 const DEFAULT_TIMEOUT: Duration = Duration::from_millis(10_000);
-const DATA_SUMMARY_POLL_INTERVAL: Duration = Duration::from_millis(100);
+pub const DATA_SUMMARY_POLL_INTERVAL: Duration = Duration::from_millis(100);
 
 /// A [`DiemDataClient`] that fulfills requests from remote peers' Storage Service
 /// over DiemNet.
@@ -90,18 +94,45 @@ impl DiemNetDataClient {
         *self.global_summary_cache.write() = aggregate;
     }
 
-    fn sample_peer(&self) -> Option<PeerNetworkId> {
-        // very dumb. just get this working e2e
-        let peer_infos = self.network_client.peer_metadata_storage();
-        let all_connected = peer_infos
-            .networks()
-            .flat_map(|network_id| {
-                peer_infos
-                    .read_filtered(network_id, |(_, peer_info)| peer_info.is_connected())
-                    .into_keys()
-            })
+    /// Choose a connected peer that can service the given request. Returns an
+    /// error if no such peer can be found.
+    fn choose_peer(&self, request: &StorageServiceRequest) -> Result<PeerNetworkId, Error> {
+        let all_connected = {
+            let network_peer_metadata = self.network_client.peer_metadata_storage();
+            network_peer_metadata
+                .networks()
+                .flat_map(|network_id| {
+                    network_peer_metadata
+                        .read_filtered(network_id, |(_, peer_metadata)| {
+                            peer_metadata.is_connected()
+                                && peer_metadata.supports_protocol(ProtocolId::StorageServiceRpc)
+                        })
+                        .into_keys()
+                })
+                .collect::<Vec<_>>()
+        };
+
+        if all_connected.is_empty() {
+            return Err(Error::DataIsUnavailable(
+                "no connected diemnet peers".to_owned(),
+            ));
+        }
+
+        let internal_peer_states = self.peer_states.read();
+        let all_serviceable = all_connected
+            .into_iter()
+            .filter(|peer| internal_peer_states.can_service_request(peer, request))
             .collect::<Vec<_>>();
-        all_connected.choose(&mut rand::thread_rng()).copied()
+
+        all_serviceable
+            .choose(&mut rand::thread_rng())
+            .copied()
+            .ok_or_else(|| {
+                Error::DataIsUnavailable(
+                    "no connected peers are advertising that they can serve this data range"
+                        .to_owned(),
+                )
+            })
     }
 
     // TODO(philiphayes): this should be generic in DiemDataClient trait
@@ -110,9 +141,7 @@ impl DiemNetDataClient {
         // TODO(philiphayes): should be a separate DataClient type?
         request: StorageServiceRequest,
     ) -> Result<DataClientResponse, Error> {
-        let peer = self
-            .sample_peer()
-            .ok_or_else(|| Error::DataIsUnavailable("no connected diemnet peers".to_owned()))?;
+        let peer = self.choose_peer(&request)?;
         self.send_request_to_peer(peer, request).await
     }
 
@@ -121,10 +150,11 @@ impl DiemNetDataClient {
         peer: PeerNetworkId,
         request: StorageServiceRequest,
     ) -> Result<DataClientResponse, Error> {
-        let response = self.send_request_to_peer_inner(peer, request).await?;
+        let response_id = self.next_response_id();
+        let response = self.send_request_to_peer_inner(peer, request).await;
         Ok(DataClientResponse {
-            response_id: self.next_response_id(),
-            response_payload: response.try_into()?,
+            response_id,
+            response_payload: response?.try_into()?,
         })
     }
 
@@ -252,6 +282,12 @@ impl DiemDataClient for DiemNetDataClient {
         end_version: u64,
         include_events: bool,
     ) -> Result<DataClientResponse, Error> {
+        if proof_version < end_version {
+            return Err(Error::InvalidRequest(format!(
+                "proof_version ({}) must be >= end_version ({})",
+                proof_version, end_version
+            )));
+        }
         self.send_request(StorageServiceRequest::GetTransactionsWithProof(
             TransactionsWithProofRequest {
                 proof_version,
@@ -272,6 +308,14 @@ impl DiemDataClient for DiemNetDataClient {
     }
 }
 
+// TODO(philiphayes):
+// + ownership b/w poller and data client a bit murky
+// + how to stop poller loop? ideally all data client refs get dropped and it
+//   just works.
+// + would need to make data client contain weak refs somehow when in poller...
+// + or maybe poller needs to not depend on data client?
+// + an explicit close method seems unsafe / easy to forget...
+// + ofc, in prod we will never cancel lol
 pub struct DataSummaryPoller {
     time_service: TimeService,
     data_client: DiemNetDataClient,
@@ -292,6 +336,8 @@ impl DataSummaryPoller {
     }
 
     pub async fn start(self) {
+        trace!("DataSummaryPoller: start");
+
         let ticker = self.time_service.interval(self.poll_interval);
         futures::pin_mut!(ticker);
 
@@ -301,11 +347,19 @@ impl DataSummaryPoller {
             // wait for next round to poll
             ticker.next().await;
 
+            trace!("DataSummaryPoller: polling next peer");
+
             // just sample a random peer for now. do something smarter here in
             // the future.
-            let peer = match self.data_client.sample_peer() {
-                Some(peer) => peer,
-                None => continue,
+            let maybe_peer = self
+                .data_client
+                .choose_peer(&StorageServiceRequest::GetStorageServerSummary);
+
+            trace!("DataSummaryPoller: maybe polling peer {:?}", maybe_peer);
+
+            let peer = match maybe_peer {
+                Ok(peer) => peer,
+                Err(_) => continue,
             };
 
             let summary = match self.data_client.send_data_summary_request(peer).await {
@@ -341,6 +395,23 @@ impl PeerStates {
         Self {
             inner: HashMap::new(),
         }
+    }
+
+    /// Returns true if a connected storage service peer can actually fulfill a
+    /// request, given our current view of their advertised data summary.
+    fn can_service_request(&self, peer: &PeerNetworkId, request: &StorageServiceRequest) -> bool {
+        // Storage services can always respond to data advertisement requests.
+        // We need this outer check, since we need to be able to send data summary
+        // requests to new peers (who don't have a peer state yet).
+        if request.is_get_storage_server_summary() {
+            return true;
+        }
+
+        self.inner
+            .get(peer)
+            .and_then(|peer_state| peer_state.storage_summary.as_ref())
+            .map(|summary| summary.can_service(request))
+            .unwrap_or(false)
     }
 
     fn update_summary(&mut self, peer: PeerNetworkId, summary: StorageServerSummary) {

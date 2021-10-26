@@ -49,6 +49,12 @@ pub enum StorageServiceRequest {
     GetTransactionsWithProof(TransactionsWithProofRequest), // Fetches a list of transactions with a proof
 }
 
+impl StorageServiceRequest {
+    pub fn is_get_storage_server_summary(&self) -> bool {
+        matches!(self, &Self::GetStorageServerSummary)
+    }
+}
+
 /// A storage service response.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum StorageServiceResponse {
@@ -112,6 +118,12 @@ pub struct StorageServerSummary {
     pub data_summary: DataSummary,
 }
 
+impl StorageServerSummary {
+    pub fn can_service(&self, request: &StorageServiceRequest) -> bool {
+        self.protocol_metadata.can_service(request) && self.data_summary.can_service(request)
+    }
+}
+
 /// A summary of the protocol metadata for the storage service instance, such as
 /// the maximum chunk sizes supported for different requests.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -120,6 +132,13 @@ pub struct ProtocolMetadata {
     pub max_transaction_chunk_size: u64, // The max number of transactions the server can return in a single chunk
     pub max_transaction_output_chunk_size: u64, // The max number of transaction outputs the server can return in a single chunk
     pub max_account_states_chunk_size: u64, // The max number of account states the server can return in a single chunk
+}
+
+impl ProtocolMetadata {
+    pub fn can_service(&self, _request: &StorageServiceRequest) -> bool {
+        // TODO(philiphayes): fill out
+        true
+    }
 }
 
 /// A type alias for different epochs.
@@ -146,6 +165,13 @@ pub struct DataSummary {
     /// [(X,Y)], it means all account states are held for every version X->Y
     /// (inclusive).
     pub account_states: CompleteDataRange<Version>,
+}
+
+impl DataSummary {
+    pub fn can_service(&self, _request: &StorageServiceRequest) -> bool {
+        // TODO(philiphayes): fill out
+        true
+    }
 }
 
 /// A struct representing a data range (lowest to highest, inclusive) where data
