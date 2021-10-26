@@ -14,8 +14,7 @@ use crate::{
     error::Error,
     streaming_client::{
         ContinuouslyStreamTransactionsRequest, Epoch, GetAllAccountsRequest,
-        GetAllEpochEndingLedgerInfosRequest, GetAllTransactionOutputsRequest,
-        GetAllTransactionsRequest, StreamRequest,
+        GetAllEpochEndingLedgerInfosRequest, StreamRequest,
     },
 };
 use diem_data_client::{
@@ -32,6 +31,15 @@ use std::{
         Arc,
     },
 };
+
+macro_rules! invalid_stream_request {
+    ($stream_request:expr) => {
+        panic!(
+            "Invalid stream request found {:?}",
+            format!("{:?}", $stream_request)
+        );
+    };
+}
 
 /// The interface offered by each stream tracker.
 #[enum_dispatch]
@@ -69,7 +77,6 @@ pub enum StreamProgressTracker {
     AccountsStreamTracker,
     ContinuousTransactionStreamTracker,
     EpochEndingStreamTracker,
-    TransactionOutputStreamTracker,
     TransactionStreamTracker,
 }
 
@@ -88,11 +95,11 @@ impl StreamProgressTracker {
             StreamRequest::GetAllEpochEndingLedgerInfos(request) => {
                 Ok(EpochEndingStreamTracker::new(request, advertised_data)?.into())
             }
-            StreamRequest::GetAllTransactionOutputs(request) => {
-                Ok(TransactionOutputStreamTracker::new(request)?.into())
+            StreamRequest::GetAllTransactionOutputs(_) => {
+                Ok(TransactionStreamTracker::new(stream_request)?.into())
             }
-            StreamRequest::GetAllTransactions(request) => {
-                Ok(TransactionStreamTracker::new(request)?.into())
+            StreamRequest::GetAllTransactions(_) => {
+                Ok(TransactionStreamTracker::new(stream_request)?.into())
             }
             _ => Err(Error::UnsupportedRequestEncountered(format!(
                 "Stream request not currently supported: {:?}",
@@ -611,157 +618,78 @@ impl DataStreamTracker for EpochEndingStreamTracker {
 }
 
 #[derive(Clone, Debug)]
-pub struct TransactionOutputStreamTracker {
-    // The original transaction output request made by the client
-    pub request: GetAllTransactionOutputsRequest,
-
-    // The next transaction output version that we're waiting to send to the
-    // client along the stream. All outputs before this have been sent.
-    pub next_stream_version: Version,
-
-    // The next transaction output version that we're waiting to request from
-    // the network. All outputs before this have already been requested.
-    pub next_request_version: Epoch,
-}
-
-impl TransactionOutputStreamTracker {
-    fn new(request: &GetAllTransactionOutputsRequest) -> Result<Self, Error> {
-        Ok(TransactionOutputStreamTracker {
-            request: request.clone(),
-            next_stream_version: request.start_version,
-            next_request_version: request.start_version,
-        })
-    }
-
-    fn update_request_tracking(
-        &mut self,
-        client_requests: &[DataClientRequest],
-    ) -> Result<(), Error> {
-        for client_request in client_requests.iter() {
-            match client_request {
-                TransactionOutputsWithProof(request) => {
-                    self.next_request_version =
-                        request.end_version.checked_add(1).ok_or_else(|| {
-                            Error::IntegerOverflow("Next request version has overflown!".into())
-                        })?;
-                }
-                client_request => {
-                    invalid_client_request(client_request, self.clone().into());
-                }
-            }
-        }
-
-        Ok(())
-    }
-}
-
-impl DataStreamTracker for TransactionOutputStreamTracker {
-    fn create_data_client_requests(
-        &mut self,
-        max_number_of_requests: u64,
-        global_data_summary: &GlobalDataSummary,
-    ) -> Result<Vec<DataClientRequest>, Error> {
-        // Create the client requests
-        let client_requests = create_data_client_requests(
-            self.next_request_version,
-            self.request.end_version,
-            max_number_of_requests,
-            global_data_summary
-                .optimal_chunk_sizes
-                .transaction_output_chunk_size,
-            self.clone().into(),
-        )?;
-        self.update_request_tracking(&client_requests)?;
-
-        Ok(client_requests)
-    }
-
-    fn is_remaining_data_available(&self, advertised_data: &AdvertisedData) -> bool {
-        let start_version = self.next_stream_version;
-        let end_version = self.request.end_version;
-        AdvertisedData::contains_range(
-            start_version,
-            end_version,
-            &advertised_data.transaction_outputs,
-        )
-    }
-
-    fn transform_client_response_into_notification(
-        &mut self,
-        client_request: &DataClientRequest,
-        client_response: &DataClientResponse,
-        notification_id_generator: Arc<AtomicU64>,
-    ) -> Result<Option<DataNotification>, Error> {
-        match client_request {
-            TransactionOutputsWithProof(request) => {
-                verify_client_request_indices(
-                    self.next_stream_version,
-                    request.start_version,
-                    request.end_version,
-                );
-
-                // Update the local stream notification tracker
-                self.next_stream_version = request.end_version.checked_add(1).ok_or_else(|| {
-                    Error::IntegerOverflow("Next stream version has overflown!".into())
-                })?;
-
-                // Create a new data notification
-                let data_notification = create_data_notification(
-                    notification_id_generator,
-                    client_response,
-                    self.clone().into(),
-                );
-                return Ok(Some(data_notification));
-            }
-            client_request => {
-                invalid_client_request(client_request, self.clone().into());
-            }
-        }
-        Ok(None)
-    }
-}
-
-#[derive(Clone, Debug)]
 pub struct TransactionStreamTracker {
-    // The original transaction request made by the client
-    pub request: GetAllTransactionsRequest,
+    // The original stream request made by the client (i.e., a transaction or
+    // transaction output stream request).
+    pub request: StreamRequest,
 
-    // The next transaction version that we're waiting to send to the client
-    // along the stream. All transactions before this have been sent.
+    // The next version that we're waiting to send to the client
+    // along the stream. All versions before this have been sent.
     pub next_stream_version: Version,
 
-    // The next transaction version that we're waiting to request from the
-    // network. All transactions before this have already been requested.
+    // The next version that we're waiting to request from the
+    // network. All versions before this have already been requested.
     pub next_request_version: Epoch,
 }
 
 impl TransactionStreamTracker {
-    fn new(request: &GetAllTransactionsRequest) -> Result<Self, Error> {
-        Ok(TransactionStreamTracker {
-            request: request.clone(),
-            next_stream_version: request.start_version,
-            next_request_version: request.start_version,
-        })
+    fn new(stream_request: &StreamRequest) -> Result<Self, Error> {
+        match stream_request {
+            StreamRequest::GetAllTransactions(request) => Ok(TransactionStreamTracker {
+                request: stream_request.clone(),
+                next_stream_version: request.start_version,
+                next_request_version: request.start_version,
+            }),
+            StreamRequest::GetAllTransactionOutputs(request) => Ok(TransactionStreamTracker {
+                request: stream_request.clone(),
+                next_stream_version: request.start_version,
+                next_request_version: request.start_version,
+            }),
+            request => invalid_stream_request!(request),
+        }
     }
 
     fn update_request_tracking(
         &mut self,
         client_requests: &[DataClientRequest],
     ) -> Result<(), Error> {
-        for client_request in client_requests.iter() {
-            match client_request {
-                TransactionsWithProof(request) => {
-                    self.next_request_version =
-                        request.end_version.checked_add(1).ok_or_else(|| {
-                            Error::IntegerOverflow("Next request version has overflown!".into())
-                        })?;
-                }
-                client_request => {
-                    invalid_client_request(client_request, self.clone().into());
+        match &self.request {
+            StreamRequest::GetAllTransactions(_) => {
+                for client_request in client_requests.iter() {
+                    match client_request {
+                        TransactionsWithProof(request) => {
+                            self.next_request_version =
+                                request.end_version.checked_add(1).ok_or_else(|| {
+                                    Error::IntegerOverflow(
+                                        "Next request version has overflown!".into(),
+                                    )
+                                })?;
+                        }
+                        client_request => {
+                            invalid_client_request(client_request, self.clone().into());
+                        }
+                    }
                 }
             }
+            StreamRequest::GetAllTransactionOutputs(_) => {
+                for client_request in client_requests.iter() {
+                    match client_request {
+                        TransactionOutputsWithProof(request) => {
+                            self.next_request_version =
+                                request.end_version.checked_add(1).ok_or_else(|| {
+                                    Error::IntegerOverflow(
+                                        "Next request version has overflown!".into(),
+                                    )
+                                })?;
+                        }
+                        client_request => {
+                            invalid_client_request(client_request, self.clone().into());
+                        }
+                    }
+                }
+            }
+            request => invalid_stream_request!(request),
         }
-
         Ok(())
     }
 }
@@ -773,15 +701,27 @@ impl DataStreamTracker for TransactionStreamTracker {
         global_data_summary: &GlobalDataSummary,
     ) -> Result<Vec<DataClientRequest>, Error> {
         // Create the client requests
-        let client_requests = create_data_client_requests(
-            self.next_request_version,
-            self.request.end_version,
-            max_number_of_requests,
-            global_data_summary
-                .optimal_chunk_sizes
-                .transaction_chunk_size,
-            self.clone().into(),
-        )?;
+        let client_requests = match &self.request {
+            StreamRequest::GetAllTransactions(request) => create_data_client_requests(
+                self.next_request_version,
+                request.end_version,
+                max_number_of_requests,
+                global_data_summary
+                    .optimal_chunk_sizes
+                    .transaction_chunk_size,
+                self.clone().into(),
+            )?,
+            StreamRequest::GetAllTransactionOutputs(request) => create_data_client_requests(
+                self.next_request_version,
+                request.end_version,
+                max_number_of_requests,
+                global_data_summary
+                    .optimal_chunk_sizes
+                    .transaction_output_chunk_size,
+                self.clone().into(),
+            )?,
+            request => invalid_stream_request!(request),
+        };
         self.update_request_tracking(&client_requests)?;
 
         Ok(client_requests)
@@ -789,8 +729,19 @@ impl DataStreamTracker for TransactionStreamTracker {
 
     fn is_remaining_data_available(&self, advertised_data: &AdvertisedData) -> bool {
         let start_version = self.next_stream_version;
-        let end_version = self.request.end_version;
-        AdvertisedData::contains_range(start_version, end_version, &advertised_data.transactions)
+        match &self.request {
+            StreamRequest::GetAllTransactions(request) => AdvertisedData::contains_range(
+                start_version,
+                request.end_version,
+                &advertised_data.transactions,
+            ),
+            StreamRequest::GetAllTransactionOutputs(request) => AdvertisedData::contains_range(
+                start_version,
+                request.end_version,
+                &advertised_data.transaction_outputs,
+            ),
+            request => invalid_stream_request!(request),
+        }
     }
 
     fn transform_client_response_into_notification(
@@ -799,32 +750,55 @@ impl DataStreamTracker for TransactionStreamTracker {
         client_response: &DataClientResponse,
         notification_id_generator: Arc<AtomicU64>,
     ) -> Result<Option<DataNotification>, Error> {
-        match client_request {
-            TransactionsWithProof(request) => {
-                verify_client_request_indices(
-                    self.next_stream_version,
-                    request.start_version,
-                    request.end_version,
-                );
-
-                // Update the local stream notification tracker
-                self.next_stream_version = request.end_version.checked_add(1).ok_or_else(|| {
-                    Error::IntegerOverflow("Next stream version has overflown!".into())
-                })?;
-
-                // Create a new data notification
-                let data_notification = create_data_notification(
-                    notification_id_generator,
-                    client_response,
-                    self.clone().into(),
-                );
-                return Ok(Some(data_notification));
+        match &self.request {
+            StreamRequest::GetAllTransactions(_) => {
+                match client_request {
+                    TransactionsWithProof(request) => {
+                        verify_client_request_indices(
+                            self.next_stream_version,
+                            request.start_version,
+                            request.end_version,
+                        );
+                        // Update the local stream notification tracker
+                        self.next_stream_version =
+                            request.end_version.checked_add(1).ok_or_else(|| {
+                                Error::IntegerOverflow("Next stream version has overflown!".into())
+                            })?;
+                    }
+                    request => {
+                        invalid_client_request(request, self.clone().into());
+                    }
+                }
             }
-            client_request => {
-                invalid_client_request(client_request, self.clone().into());
+            StreamRequest::GetAllTransactionOutputs(_) => {
+                match client_request {
+                    TransactionOutputsWithProof(request) => {
+                        verify_client_request_indices(
+                            self.next_stream_version,
+                            request.start_version,
+                            request.end_version,
+                        );
+                        // Update the local stream notification tracker
+                        self.next_stream_version =
+                            request.end_version.checked_add(1).ok_or_else(|| {
+                                Error::IntegerOverflow("Next stream version has overflown!".into())
+                            })?;
+                    }
+                    request => {
+                        invalid_client_request(request, self.clone().into());
+                    }
+                }
             }
+            request => invalid_stream_request!(request),
         }
-        Ok(None)
+
+        // Create a new data notification
+        let data_notification = create_data_notification(
+            notification_id_generator,
+            client_response,
+            self.clone().into(),
+        );
+        Ok(Some(data_notification))
     }
 }
 
@@ -944,20 +918,27 @@ fn create_data_client_request(
                 end_epoch: end_index,
             })
         }
-        StreamProgressTracker::TransactionOutputStreamTracker(stream_tracker) => {
-            DataClientRequest::TransactionOutputsWithProof(TransactionOutputsWithProofRequest {
-                start_version: start_index,
-                end_version: end_index,
-                max_proof_version: stream_tracker.request.max_proof_version,
-            })
-        }
         StreamProgressTracker::TransactionStreamTracker(stream_tracker) => {
-            DataClientRequest::TransactionsWithProof(TransactionsWithProofRequest {
-                start_version: start_index,
-                end_version: end_index,
-                max_proof_version: stream_tracker.request.max_proof_version,
-                include_events: stream_tracker.request.include_events,
-            })
+            match &stream_tracker.request {
+                StreamRequest::GetAllTransactions(request) => {
+                    DataClientRequest::TransactionsWithProof(TransactionsWithProofRequest {
+                        start_version: start_index,
+                        end_version: end_index,
+                        max_proof_version: request.max_proof_version,
+                        include_events: request.include_events,
+                    })
+                }
+                StreamRequest::GetAllTransactionOutputs(request) => {
+                    DataClientRequest::TransactionOutputsWithProof(
+                        TransactionOutputsWithProofRequest {
+                            start_version: start_index,
+                            end_version: end_index,
+                            max_proof_version: request.max_proof_version,
+                        },
+                    )
+                }
+                request => invalid_stream_request!(request),
+            }
         }
     }
 }
