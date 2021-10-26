@@ -5,7 +5,8 @@ runs:
   using: "composite"
   steps:
     - name: Check for changed and untracked files
-      run: ./scripts/changed-files.sh
+      run: |
+        ./scripts/changed-files.sh
       shell: bash
     - name: Clean target directory
       run: |

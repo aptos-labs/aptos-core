@@ -531,15 +531,11 @@ function install_cvc4 {
 function install_golang {
     if [[ $(go version | grep -c "go1.14" || true) == "0" ]]; then
       if [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
-        if ! grep -q 'buster-backports main' /etc/apt/sources.list; then
-          (
-            echo "deb http://http.us.debian.org/debian/ buster-backports main"
-            echo "deb-src http://http.us.debian.org/debian/ buster-backports main"
-          ) | "${PRE_COMMAND[@]}" tee -a /etc/apt/sources.list
-          "${PRE_COMMAND[@]}" apt-get update
-        fi
-        "${PRE_COMMAND[@]}" apt-get install -y golang-1.14-go/buster-backports
-        "${PRE_COMMAND[@]}" ln -sf /usr/lib/go-1.14 /usr/lib/golang
+        curl -LO https://golang.org/dl/go1.14.15.linux-amd64.tar.gz
+        "${PRE_COMMAND[@]}" rm -rf /usr/local/go
+        "${PRE_COMMAND[@]}" tar -C /usr/local -xzf go1.14.15.linux-amd64.tar.gz
+        "${PRE_COMMAND[@]}" ln -sf /usr/local/go /usr/lib/golang
+        rm go1.14.15.linux-amd64.tar.gz
       elif [[ "$PACKAGE_MANAGER" == "apk" ]]; then
         apk --update add --no-cache git make musl-dev go
       elif [[ "$PACKAGE_MANAGER" == "brew" ]]; then
@@ -576,7 +572,7 @@ function install_allure {
         "${PRE_COMMAND[@]}" apt-get install default-jre -y --no-install-recommends
         export ALLURE=${HOME}/allure_"${ALLURE_VERSION}"-1_all.deb
         curl -sL -o "$ALLURE" "https://github.com/diem/allure2/releases/download/${ALLURE_VERSION}/allure_${ALLURE_VERSION}-1_all.deb"
-        dpkg -i "$ALLURE"
+        "${PRE_COMMAND[@]}" dpkg -i "$ALLURE"
         rm "$ALLURE"
       elif [[ "$PACKAGE_MANAGER" == "apk" ]]; then
         apk --update add --no-cache  -X http://dl-cdn.alpinelinux.org/alpine/edge/community openjdk11
