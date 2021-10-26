@@ -25,7 +25,6 @@ use diem_types::{
     ledger_info::LedgerInfoWithSignatures,
 };
 
-use mirai_annotations::checked_precondition;
 use rand::{prelude::*, Rng};
 use std::{clone::Clone, cmp::min, sync::Arc, time::Duration};
 
@@ -40,24 +39,9 @@ pub enum NeedFetchResult {
 
 impl BlockStore {
     /// Check if we're far away from this ledger info and need to sync.
-    /// Returns false if we have this block in the tree or the root's round is higher than the
-    /// block.
-    pub fn need_sync_for_quorum_cert(
-        &self,
-        qc: &QuorumCert,
-        li: &LedgerInfoWithSignatures,
-    ) -> bool {
-        // This precondition ensures that the check in the following lines
-        // does not result in an addition overflow.
-        checked_precondition!(self.commit_root().round() < std::u64::MAX - 1);
-
-        // If we have the block locally, we're not far from this QC thus don't need to sync.
-        // In case root().round() is greater than that the committed
-        // block carried by LI is older than my current commit.
-        self.commit_root().round() < li.commit_info().round()
-            && (!self.block_exists(qc.commit_info().id())
-                // even if we have the block, but the gap is too large, we need sync
-                || self.ordered_root().round() - self.commit_root().round() > self.back_pressure_limit)
+    /// This ensures that the block referred by the ledger info is not in buffer manager.
+    pub fn need_sync_for_ledger_info(&self, li: &LedgerInfoWithSignatures) -> bool {
+        self.ordered_root().round() + self.back_pressure_limit < li.commit_info().round()
     }
 
     /// Checks if quorum certificate can be inserted in block store without RPC
@@ -183,7 +167,7 @@ impl BlockStore {
         highest_ledger_info: LedgerInfoWithSignatures,
         retriever: &mut BlockRetriever,
     ) -> anyhow::Result<()> {
-        if !self.need_sync_for_quorum_cert(&highest_ordered_cert, &highest_ledger_info) {
+        if !self.need_sync_for_ledger_info(&highest_ledger_info) {
             return Ok(());
         }
         let (root, root_metadata, blocks, quorum_certs) = Self::fast_forward_sync(
