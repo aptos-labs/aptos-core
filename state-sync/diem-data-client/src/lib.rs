@@ -136,7 +136,7 @@ pub struct DataClientResponse {
 }
 
 /// The payload returned in a Data Client response.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DataClientPayload {
     AccountStatesWithProof(AccountStatesChunkWithProof),
     EpochEndingLedgerInfos(Vec<LedgerInfoWithSignatures>),
@@ -166,7 +166,7 @@ impl TryFrom<StorageServiceResponse> for DataClientPayload {
 }
 
 /// A snapshot of the global state of data available in the Diem network.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct GlobalDataSummary {
     pub advertised_data: AdvertisedData,
     pub optimal_chunk_sizes: OptimalChunkSizes,
@@ -185,7 +185,7 @@ impl GlobalDataSummary {
 
 /// Holds the optimal chunk sizes that clients should use when
 /// requesting data. This makes the request *more likely* to succeed.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OptimalChunkSizes {
     pub account_states_chunk_size: u64,
     pub epoch_chunk_size: u64,
@@ -205,7 +205,7 @@ impl OptimalChunkSizes {
 }
 
 /// A summary of all data that is currently advertised in the network.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AdvertisedData {
     /// The ranges of account states advertised, e.g., if a range is
     /// (X,Y), it means all account states are held for every version X->Y

@@ -32,6 +32,9 @@ use storage_service_types::{
     TransactionsWithProofRequest,
 };
 
+#[cfg(test)]
+mod tests;
+
 // TODO(philiphayes): does this belong in a different crate? I feel like we're
 // accumulating a lot of tiny crates though...
 
@@ -59,9 +62,13 @@ pub const DATA_SUMMARY_POLL_INTERVAL: Duration = Duration::from_millis(100);
 /// and/or threads.
 #[derive(Clone, Debug)]
 pub struct DiemNetDataClient {
+    /// The underlying DiemNet storage service client.
     network_client: StorageServiceClient,
+    /// All of the data-client specific data we have on each network peer.
     peer_states: Arc<RwLock<PeerStates>>,
+    /// A cached, aggregate data summary of all unbanned peers' data summaries.
     global_summary_cache: Arc<RwLock<GlobalDataSummary>>,
+    /// Used for generating the next request/response id.
     next_response_id: Arc<AtomicU64>,
 }
 
@@ -85,10 +92,12 @@ impl DiemNetDataClient {
         self.next_response_id.fetch_add(1, Ordering::Relaxed)
     }
 
+    /// Update a peer's data summary.
     fn update_summary(&self, peer: PeerNetworkId, summary: StorageServerSummary) {
         self.peer_states.write().update_summary(peer, summary)
     }
 
+    /// Recompute and update the global data summary cache.
     fn update_global_summary_cache(&self) {
         let aggregate = self.peer_states.read().aggregate_summary();
         *self.global_summary_cache.write() = aggregate;
@@ -355,19 +364,20 @@ impl DataSummaryPoller {
                 .data_client
                 .choose_peer(&StorageServiceRequest::GetStorageServerSummary);
 
-            trace!("DataSummaryPoller: maybe polling peer {:?}", maybe_peer);
+            trace!("DataSummaryPoller: maybe polling peer: {:?}", maybe_peer);
 
             let peer = match maybe_peer {
                 Ok(peer) => peer,
                 Err(_) => continue,
             };
 
-            let summary = match self.data_client.send_data_summary_request(peer).await {
+            let result = self.data_client.send_data_summary_request(peer).await;
+
+            trace!("DataSummaryPoller: maybe received response: {:?}", result);
+
+            let summary = match result {
                 Ok(summary) => summary,
-                Err(_err) => {
-                    // TODO(philiphayes): log
-                    continue;
-                }
+                Err(_err) => continue,
             };
 
             self.data_client.update_summary(peer, summary);
