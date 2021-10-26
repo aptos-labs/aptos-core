@@ -20,81 +20,11 @@ use diem_infallible::Mutex;
 use diem_types::ledger_info::LedgerInfoWithSignatures;
 use futures::{FutureExt, StreamExt};
 use std::{
-    cmp::min,
     sync::{atomic::AtomicU64, Arc},
     time::Duration,
 };
 use storage_service_types::CompleteDataRange;
 use tokio::time::timeout;
-
-#[tokio::test]
-async fn test_epoch_ending_requests() {
-    // Create an epoch ending data stream
-    let (mut data_stream, _) = create_epoch_ending_stream(MIN_ADVERTISED_EPOCH);
-
-    // Initialize the data stream
-    let epoch_chunk_size = 15;
-    data_stream
-        .initialize_data_requests(create_global_data_summary(epoch_chunk_size))
-        .unwrap();
-
-    // Verify valid client requests have been created
-    let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
-    for i in 0..sent_requests.as_ref().unwrap().len() {
-        let sent_request = sent_requests.as_ref().unwrap().get(i).unwrap();
-        let i = i as u64;
-
-        // Verify the start and end epochs of the request
-        assert_eq!(
-            sent_request.lock().client_request,
-            DataClientRequest::EpochEndingLedgerInfos(EpochEndingLedgerInfosRequest {
-                start_epoch: MIN_ADVERTISED_EPOCH + (i * epoch_chunk_size),
-                end_epoch: min(
-                    MAX_ADVERTISED_EPOCH - 1,
-                    MIN_ADVERTISED_EPOCH + ((i + 1) * epoch_chunk_size) - 1
-                ),
-            })
-        );
-    }
-}
-
-#[tokio::test]
-async fn test_epoch_ending_notifications() {
-    // Create an epoch ending data stream
-    let (mut data_stream, mut stream_listener) = create_epoch_ending_stream(MIN_ADVERTISED_EPOCH);
-
-    // Initialize the data stream
-    let epoch_chunk_size = 100;
-    data_stream
-        .initialize_data_requests(create_global_data_summary(epoch_chunk_size))
-        .unwrap();
-
-    // Clear the pending queue and insert a response
-    let pending_response = PendingClientResponse {
-        client_request: DataClientRequest::EpochEndingLedgerInfos(EpochEndingLedgerInfosRequest {
-            start_epoch: MIN_ADVERTISED_EPOCH,
-            end_epoch: MIN_ADVERTISED_EPOCH + 1,
-        }),
-        client_response: Some(Ok(create_data_client_response(
-            DataClientPayload::EpochEndingLedgerInfos(vec![create_ledger_info(
-                0,
-                MIN_ADVERTISED_EPOCH,
-                true,
-            )]),
-        ))),
-    };
-    insert_response_into_pending_queue(&mut data_stream, pending_response);
-
-    // Process the response and verify a notification is sent to the client
-    data_stream
-        .process_data_responses(create_global_data_summary(epoch_chunk_size))
-        .unwrap();
-    verify_epoch_ending_notification(
-        &mut stream_listener,
-        create_ledger_info(0, MIN_ADVERTISED_EPOCH, true),
-    )
-    .await;
-}
 
 #[tokio::test]
 async fn test_stream_initialization() {
