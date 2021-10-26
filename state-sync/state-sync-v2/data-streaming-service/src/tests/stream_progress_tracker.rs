@@ -147,9 +147,9 @@ fn test_epoch_ending_stream_tracker() {
     global_data_summary
         .advertised_data
         .epoch_ending_ledger_infos = vec![
-        CompleteDataRange::new(0, 0),
-        CompleteDataRange::new(0, 0),
-        CompleteDataRange::new(0, 1),
+        CompleteDataRange::new(0, 0).unwrap(),
+        CompleteDataRange::new(0, 0).unwrap(),
+        CompleteDataRange::new(0, 1).unwrap(),
     ];
 
     // Try to create a progress stream tracker where the highest epoch is zero
@@ -162,10 +162,10 @@ fn test_epoch_ending_stream_tracker() {
     global_data_summary
         .advertised_data
         .epoch_ending_ledger_infos = vec![
-        CompleteDataRange::new(0, 1),
-        CompleteDataRange::new(0, 100),
-        CompleteDataRange::new(0, 99999999),
-        CompleteDataRange::new(0, 100),
+        CompleteDataRange::new(0, 1).unwrap(),
+        CompleteDataRange::new(0, 100).unwrap(),
+        CompleteDataRange::new(0, 99999999).unwrap(),
+        CompleteDataRange::new(0, 100).unwrap(),
     ];
 
     // Create a new data stream progress tracker and verify the most common highest
@@ -255,7 +255,7 @@ fn create_epoch_ending_progress_tracker(
     global_data_summary
         .advertised_data
         .epoch_ending_ledger_infos =
-        vec![CompleteDataRange::new(start_epoch, max_advertised_epoch)];
+        vec![CompleteDataRange::new(start_epoch, max_advertised_epoch).unwrap()];
 
     // Create a new epoch ending stream progress tracker
     match StreamProgressTracker::new(&stream_request, &global_data_summary.advertised_data).unwrap()

@@ -193,7 +193,8 @@ fn create_epoch_ending_stream(
         epoch_ending_ledger_infos: vec![CompleteDataRange::new(
             MIN_ADVERTISED_EPOCH,
             MAX_ADVERTISED_EPOCH,
-        )],
+        )
+        .unwrap()],
         synced_ledger_infos: vec![],
         transactions: vec![],
         transaction_outputs: vec![],

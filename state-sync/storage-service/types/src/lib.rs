@@ -12,7 +12,8 @@ use diem_types::{
         Version,
     },
 };
-use serde::{Deserialize, Serialize};
+use num_traits::identities::Zero;
+use serde::{de, Deserialize, Serialize};
 use thiserror::Error;
 
 pub type Result<T, E = StorageServiceError> = ::std::result::Result<T, E>;
@@ -57,6 +58,8 @@ impl StorageServiceRequest {
 
 /// A storage service response.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+// TODO(philiphayes): do something about this without making it ugly :(
+#[allow(clippy::large_enum_variant)]
 pub enum StorageServiceResponse {
     AccountStatesChunkWithProof(AccountStatesChunkWithProof),
     EpochEndingLedgerInfos(EpochChangeProof),
@@ -149,22 +152,22 @@ pub type Epoch = u64;
 pub struct DataSummary {
     /// The ledger info corresponding to the highest synced version in storage.
     /// This indicates the highest version and epoch that storage can prove.
-    pub synced_ledger_info: LedgerInfoWithSignatures,
+    pub synced_ledger_info: Option<LedgerInfoWithSignatures>,
     /// The range of epoch ending ledger infos in storage, e.g., if the range
     /// is [(X,Y)], it means all epoch ending ledger infos for epochs X->Y
     /// (inclusive) are held.
-    pub epoch_ending_ledger_infos: CompleteDataRange<Epoch>,
+    pub epoch_ending_ledger_infos: Option<CompleteDataRange<Epoch>>,
     /// The range of transactions held in storage, e.g., if the range is
     /// [(X,Y)], it means all transactions for versions X->Y (inclusive) are held.
-    pub transactions: CompleteDataRange<Version>,
+    pub transactions: Option<CompleteDataRange<Version>>,
     /// The range of transaction outputs held in storage, e.g., if the range
     /// is [(X,Y)], it means all transaction outputs for versions X->Y
     /// (inclusive) are held.
-    pub transaction_outputs: CompleteDataRange<Version>,
+    pub transaction_outputs: Option<CompleteDataRange<Version>>,
     /// The range of account states held in storage, e.g., if the range is
     /// [(X,Y)], it means all account states are held for every version X->Y
     /// (inclusive).
-    pub account_states: CompleteDataRange<Version>,
+    pub account_states: Option<CompleteDataRange<Version>>,
 }
 
 impl DataSummary {
@@ -174,28 +177,76 @@ impl DataSummary {
     }
 }
 
-/// A struct representing a data range (lowest to highest, inclusive) where data
-/// is complete (i.e. there are no missing pieces of data).
+#[derive(Clone, Debug, Error)]
+#[error("data range cannot be degenerate (lowest > highest)")]
+pub struct DegenerateRangeError;
+
+/// A struct representing a contiguous, non-empty data range (lowest to highest,
+/// inclusive) where data is complete (i.e. there are no missing pieces of data).
+///
 /// This is used to provide a summary of the data currently held in storage, e.g.
 /// a CompleteDataRange<Version> of (A,B) means all versions A->B (inclusive).
-#[derive(Copy, Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+///
+/// Note: CompleteDataRanges are never degenerate (lowest > highest). Constructing
+/// a degenerate range via `new` will return an `Err`.
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct CompleteDataRange<T> {
-    pub lowest: T,
-    pub highest: T,
+    lowest: T,
+    highest: T,
 }
 
-impl<T: Ord> CompleteDataRange<T> {
-    pub fn new(lowest: T, highest: T) -> Self {
-        Self { lowest, highest }
+impl<T: Copy + Ord> CompleteDataRange<T> {
+    pub fn new(lowest: T, highest: T) -> Result<Self, DegenerateRangeError> {
+        if lowest <= highest {
+            Ok(Self { lowest, highest })
+        } else {
+            Err(DegenerateRangeError)
+        }
+    }
+
+    #[inline]
+    pub fn lowest(&self) -> T {
+        self.lowest
+    }
+
+    #[inline]
+    pub fn highest(&self) -> T {
+        self.highest
     }
 
     /// Returns true iff the given data item is within this range
     pub fn contains(&self, data_item: T) -> bool {
         data_item >= self.lowest && data_item <= self.highest
     }
+}
 
-    /// Returns true iff the range contains no items.
-    pub fn is_empty(&self) -> bool {
-        self.highest <= self.lowest
+impl<T: Zero> CompleteDataRange<T> {
+    pub fn from_genesis(highest: T) -> Self {
+        Self {
+            lowest: T::zero(),
+            highest,
+        }
+    }
+}
+
+impl<'de, T> de::Deserialize<'de> for CompleteDataRange<T>
+where
+    T: Copy + Ord + de::Deserialize<'de>,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        use serde::de::Error;
+
+        #[derive(Deserialize)]
+        #[serde(rename = "CompleteDataRange")]
+        struct Value<U> {
+            lowest: U,
+            highest: U,
+        }
+
+        let value = Value::<T>::deserialize(deserializer)?;
+        Self::new(value.lowest, value.highest).map_err(D::Error::custom)
     }
 }

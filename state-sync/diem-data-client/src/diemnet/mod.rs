@@ -434,21 +434,26 @@ impl PeerStates {
         // collect each peer's protocol and data advertisements
         for summary in summaries {
             // collect aggregate data advertisements
-            aggregate_data
-                .account_states
-                .push(summary.data_summary.account_states);
-            aggregate_data
-                .epoch_ending_ledger_infos
-                .push(summary.data_summary.epoch_ending_ledger_infos);
-            aggregate_data
-                .synced_ledger_infos
-                .push(summary.data_summary.synced_ledger_info.clone());
-            aggregate_data
-                .transactions
-                .push(summary.data_summary.transactions);
-            aggregate_data
-                .transaction_outputs
-                .push(summary.data_summary.transaction_outputs);
+            if let Some(account_states) = summary.data_summary.account_states {
+                aggregate_data.account_states.push(account_states);
+            }
+            if let Some(epoch_ending_ledger_infos) = summary.data_summary.epoch_ending_ledger_infos
+            {
+                aggregate_data
+                    .epoch_ending_ledger_infos
+                    .push(epoch_ending_ledger_infos);
+            }
+            if let Some(synced_ledger_info) = summary.data_summary.synced_ledger_info.as_ref() {
+                aggregate_data
+                    .synced_ledger_infos
+                    .push(synced_ledger_info.clone());
+            }
+            if let Some(transactions) = summary.data_summary.transactions {
+                aggregate_data.transactions.push(transactions);
+            }
+            if let Some(transaction_outputs) = summary.data_summary.transaction_outputs {
+                aggregate_data.transaction_outputs.push(transaction_outputs);
+            }
 
             // collect preferred max chunk sizes
             max_epoch_chunk_sizes.push(summary.protocol_metadata.max_epoch_chunk_size);

@@ -123,11 +123,14 @@ async fn test_get_storage_server_summary() {
             max_account_states_chunk_size: 1000,
         },
         data_summary: DataSummary {
-            synced_ledger_info: create_test_ledger_info_with_sigs(highest_epoch, highest_version),
-            epoch_ending_ledger_infos: CompleteDataRange::new(0, highest_epoch - 1),
-            transactions: CompleteDataRange::new(0, highest_version),
-            transaction_outputs: CompleteDataRange::new(0, highest_version),
-            account_states: CompleteDataRange::new(0, highest_version),
+            synced_ledger_info: Some(create_test_ledger_info_with_sigs(
+                highest_epoch,
+                highest_version,
+            )),
+            epoch_ending_ledger_infos: Some(CompleteDataRange::from_genesis(highest_epoch - 1)),
+            transactions: Some(CompleteDataRange::from_genesis(highest_version)),
+            transaction_outputs: Some(CompleteDataRange::from_genesis(highest_version)),
+            account_states: Some(CompleteDataRange::from_genesis(highest_version)),
         },
     };
     assert_eq!(

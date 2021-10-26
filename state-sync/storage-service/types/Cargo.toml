@@ -10,6 +10,7 @@ publish = false
 edition = "2018"
 
 [dependencies]
+num-traits = { version = "0.2.14", default-features = false }
 serde = { version = "1.0.124", default-features = false }
 thiserror = "1.0.24"
 

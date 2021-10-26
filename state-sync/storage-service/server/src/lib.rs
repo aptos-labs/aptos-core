@@ -307,11 +307,11 @@ impl StorageReaderInterface for StorageReader {
         // For now we assume everything (since genesis) is held.
         // Return the relevant data summary
         let data_summary = DataSummary {
-            synced_ledger_info: latest_ledger_info_with_sigs,
-            epoch_ending_ledger_infos: CompleteDataRange::new(0, latest_epoch - 1),
-            transactions: CompleteDataRange::new(0, latest_version),
-            transaction_outputs: CompleteDataRange::new(0, latest_version),
-            account_states: CompleteDataRange::new(0, latest_version),
+            synced_ledger_info: Some(latest_ledger_info_with_sigs),
+            epoch_ending_ledger_infos: Some(CompleteDataRange::from_genesis(latest_epoch - 1)),
+            transactions: Some(CompleteDataRange::from_genesis(latest_version)),
+            transaction_outputs: Some(CompleteDataRange::from_genesis(latest_version)),
+            account_states: Some(CompleteDataRange::from_genesis(latest_version)),
         };
 
         Ok(data_summary)

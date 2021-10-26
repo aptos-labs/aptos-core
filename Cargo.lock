@@ -8185,6 +8185,7 @@ dependencies = [
  "diem-crypto",
  "diem-types",
  "diem-workspace-hack",
+ "num-traits",
  "serde",
  "thiserror",
 ]

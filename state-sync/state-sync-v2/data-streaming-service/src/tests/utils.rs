@@ -136,20 +136,24 @@ impl DiemDataClient for MockDiemDataClient {
             account_states: vec![CompleteDataRange::new(
                 MIN_ADVERTISED_ACCOUNTS,
                 MAX_ADVERTISED_ACCOUNTS,
-            )],
+            )
+            .unwrap()],
             epoch_ending_ledger_infos: vec![CompleteDataRange::new(
                 MIN_ADVERTISED_EPOCH,
                 MAX_ADVERTISED_EPOCH,
-            )],
+            )
+            .unwrap()],
             synced_ledger_infos: self.synced_ledger_infos.clone(),
             transactions: vec![CompleteDataRange::new(
                 MIN_ADVERTISED_TRANSACTION,
                 MAX_ADVERTISED_TRANSACTION,
-            )],
+            )
+            .unwrap()],
             transaction_outputs: vec![CompleteDataRange::new(
                 MIN_ADVERTISED_TRANSACTION_OUTPUT,
                 MAX_ADVERTISED_TRANSACTION_OUTPUT,
-            )],
+            )
+            .unwrap()],
         };
         let response_payload = DataClientPayload::GlobalDataSummary(GlobalDataSummary {
             advertised_data,

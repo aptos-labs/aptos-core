@@ -1042,7 +1042,7 @@ fn most_common_highest_epoch(advertised_data: &AdvertisedData) -> Option<Epoch> 
     let highest_epoch_frequencies = advertised_data
         .epoch_ending_ledger_infos
         .iter()
-        .map(|epoch_range| epoch_range.highest)
+        .map(|epoch_range| epoch_range.highest())
         .clone()
         .counts();
 
