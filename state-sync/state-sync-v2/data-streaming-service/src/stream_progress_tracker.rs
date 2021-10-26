@@ -32,6 +32,24 @@ use std::{
     },
 };
 
+macro_rules! invalid_client_request {
+    ($client_request:expr, $stream_tracker:expr) => {
+        panic!(
+            "Invalid client request {:?} found for the data stream tracker {:?}",
+            $client_request, $stream_tracker
+        );
+    };
+}
+
+macro_rules! invalid_response_type {
+    ($client_response:expr) => {
+        panic!(
+            "The client response is type mismatched: {:?}",
+            $client_response
+        );
+    };
+}
+
 macro_rules! invalid_stream_request {
     ($stream_request:expr) => {
         panic!(
@@ -152,8 +170,8 @@ impl AccountsStreamTracker {
                             Error::IntegerOverflow("Next request index has overflown!".into())
                         })?;
                 }
-                client_request => {
-                    invalid_client_request(client_request, self.clone().into());
+                request => {
+                    invalid_client_request!(request, self);
                 }
             }
         }
@@ -239,9 +257,7 @@ impl DataStreamTracker for AccountsStreamTracker {
                     self.account_num_requested = false;
                 }
             }
-            client_request => {
-                invalid_client_request(client_request, self.clone().into());
-            }
+            request => invalid_client_request!(request, self),
         }
         Ok(None)
     }
@@ -330,9 +346,7 @@ impl ContinuousTransactionStreamTracker {
                     self.next_request_version_and_epoch =
                         (next_request_version, next_request_epoch);
                 }
-                client_request => {
-                    invalid_client_request(client_request, self.clone().into());
-                }
+                request => invalid_client_request!(request, self),
             }
         }
 
@@ -466,9 +480,7 @@ impl DataStreamTracker for ContinuousTransactionStreamTracker {
                 }
                 self.end_of_epoch_requested = false;
             }
-            client_request => {
-                invalid_client_request(client_request, self.clone().into());
-            }
+            request => invalid_client_request!(request, self),
         }
         Ok(None)
     }
@@ -543,9 +555,7 @@ impl EpochEndingStreamTracker {
                             Error::IntegerOverflow("Next request epoch has overflown!".into())
                         })?;
                 }
-                client_request => {
-                    invalid_client_request(client_request, self.clone().into());
-                }
+                request => invalid_client_request!(request, self),
             }
         }
 
@@ -607,13 +617,10 @@ impl DataStreamTracker for EpochEndingStreamTracker {
                     client_response,
                     self.clone().into(),
                 );
-                return Ok(Some(data_notification));
+                Ok(Some(data_notification))
             }
-            client_request => {
-                invalid_client_request(client_request, self.clone().into());
-            }
+            request => invalid_client_request!(request, self),
         }
-        Ok(None)
     }
 }
 
@@ -665,9 +672,7 @@ impl TransactionStreamTracker {
                                     )
                                 })?;
                         }
-                        client_request => {
-                            invalid_client_request(client_request, self.clone().into());
-                        }
+                        request => invalid_client_request!(request, self),
                     }
                 }
             }
@@ -682,9 +687,7 @@ impl TransactionStreamTracker {
                                     )
                                 })?;
                         }
-                        client_request => {
-                            invalid_client_request(client_request, self.clone().into());
-                        }
+                        request => invalid_client_request!(request, self),
                     }
                 }
             }
@@ -765,9 +768,7 @@ impl DataStreamTracker for TransactionStreamTracker {
                                 Error::IntegerOverflow("Next stream version has overflown!".into())
                             })?;
                     }
-                    request => {
-                        invalid_client_request(request, self.clone().into());
-                    }
+                    request => invalid_client_request!(request, self),
                 }
             }
             StreamRequest::GetAllTransactionOutputs(_) => {
@@ -784,9 +785,7 @@ impl DataStreamTracker for TransactionStreamTracker {
                                 Error::IntegerOverflow("Next stream version has overflown!".into())
                             })?;
                     }
-                    request => {
-                        invalid_client_request(request, self.clone().into());
-                    }
+                    request => invalid_client_request!(request, self),
                 }
             }
             request => invalid_stream_request!(request),
@@ -817,16 +816,6 @@ fn verify_client_request_indices(expected_next_index: u64, start_index: u64, end
             end_index, expected_next_index
         );
     }
-}
-
-fn invalid_client_request(
-    client_request: &DataClientRequest,
-    stream_progress_tracker: StreamProgressTracker,
-) {
-    panic!(
-        "Invalid client request {:?} found for the data stream tracker {:?}",
-        client_request, stream_progress_tracker
-    );
 }
 
 /// Creates a batch of data client requests for the given stream progress tracker
@@ -1008,23 +997,13 @@ fn create_data_notification(
                 StreamProgressTracker::TransactionStreamTracker(_) => {
                     DataPayload::TransactionsWithProof(transactions_chunk.clone())
                 }
-                _ => {
-                    panic!(
-                        "The client response is type mismatched: {:?}",
-                        client_response
-                    );
-                }
+                _ => invalid_response_type!(client_response),
             }
         }
         DataClientPayload::TransactionOutputsWithProof(transactions_output_chunk) => {
             DataPayload::TransactionOutputsWithProof(transactions_output_chunk.clone())
         }
-        _ => {
-            panic!(
-                "The client response is type mismatched: {:?}",
-                client_response
-            );
-        }
+        _ => invalid_response_type!(client_response),
     };
 
     DataNotification {
