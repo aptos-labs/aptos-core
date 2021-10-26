@@ -19,7 +19,8 @@ pub fn handle(
         r#"import * as Shuffle from "{shuffle}";
         import * as main from "{main}";
         import * as codegen from "{codegen}";
-        import * as DiemHelpers from "{helpers}";"#,
+        import * as DiemHelpers from "{helpers}";
+        import * as help from "{repl_help}";"#,
         shuffle = project_path.join("repl.ts").to_string_lossy(),
         main = project_path
             .join(shared::MAIN_PKG_PATH)
@@ -33,6 +34,10 @@ pub fn handle(
             .join(shared::MAIN_PKG_PATH)
             .join("helpers.ts")
             .to_string_lossy(),
+        repl_help = project_path
+            .join(shared::MAIN_PKG_PATH)
+            .join("repl_help.ts")
+            .to_string_lossy()
     );
 
     let mut filtered_envs: HashMap<String, String> = HashMap::new();

@@ -31,7 +31,8 @@ export const receiverAddress = await Deno.readTextFile(receiverAddressPath);
 console.log(`Loading Project ${highlight(projectPath)}`);
 console.log(`Connected to Node ${highlight(nodeUrl)}`);
 console.log(`Sender Account Address ${highlight(senderAddress)}`);
-console.log(`"Shuffle", "main", "codegen", "DiemHelpers" top level objects available`);
+console.log(`"Shuffle", "main", "codegen", "DiemHelpers", "help" top level objects available`);
+console.log(`Run "help" for more information on top level objects`);
 console.log(await ledgerInfo());
 console.log();
 
