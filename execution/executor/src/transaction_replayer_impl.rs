@@ -32,7 +32,7 @@ impl<V: VMExecutor> TransactionReplayer for Executor<DpnProto, V> {
             let num_txns = txns.len();
 
             let (output, txns_to_commit, _, txns_to_retry, txn_infos_to_retry) =
-                self.replay_transactions_impl(first_version, txns, txn_infos)?;
+                self.replay_transactions_impl(first_version, txns, None, txn_infos)?;
             assert!(txns_to_retry.len() < num_txns);
 
             self.db

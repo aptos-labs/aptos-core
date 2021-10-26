@@ -14,6 +14,16 @@ pub static DIEM_EXECUTOR_EXECUTE_AND_COMMIT_CHUNK_SECONDS: Lazy<Histogram> = Laz
     .unwrap()
 });
 
+pub static DIEM_EXECUTOR_APPLY_CHUNK_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "diem_executor_apply_chunk_seconds",
+        // metric description
+        "The time spent in seconds of applying txn output chunk in Diem executor"
+    )
+    .unwrap()
+});
+
 pub static DIEM_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         // metric name

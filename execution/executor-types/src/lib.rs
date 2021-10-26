@@ -25,8 +25,8 @@ use diem_types::{
     on_chain_config,
     proof::{accumulator::InMemoryAccumulator, AccumulatorExtensionProof},
     transaction::{
-        default_protocol::TransactionListWithProof, Transaction, TransactionInfo,
-        TransactionStatus, TransactionToCommit, Version,
+        default_protocol::{TransactionListWithProof, TransactionOutputListWithProof},
+        Transaction, TransactionInfo, TransactionStatus, TransactionToCommit, Version,
     },
     write_set::WriteSet,
 };
@@ -47,6 +47,19 @@ pub trait ChunkExecutor: Send + Sync {
         // Target LI that has been verified independently: the proofs are relative to this version.
         verified_target_li: LedgerInfoWithSignatures,
     ) -> Result<(
+        ProcessedVMOutput,
+        Vec<TransactionToCommit>,
+        Vec<ContractEvent>,
+    )>;
+
+    /// Similar to `execute_chunk`, but instead of executing transactions, apply the transaction
+    /// outputs directly to get the executed result.
+    fn apply_chunk(
+        &self,
+        txn_output_list_with_proof: TransactionOutputListWithProof,
+        // Target LI that has been verified independently: the proofs are relative to this version.
+        verified_target_li: LedgerInfoWithSignatures,
+    ) -> anyhow::Result<(
         ProcessedVMOutput,
         Vec<TransactionToCommit>,
         Vec<ContractEvent>,
