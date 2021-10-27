@@ -164,7 +164,7 @@ impl MockSharedMempool {
     }
 
     pub fn get_txns(&self, size: u64) -> Vec<SignedTransaction> {
-        let mut pool = self.mempool.lock();
+        let pool = self.mempool.lock();
         pool.get_block(size, HashSet::new())
     }
 
@@ -175,7 +175,7 @@ impl MockSharedMempool {
 
     /// True if all the given txns are in mempool, else false.
     pub fn read_timeline(&self, timeline_id: u64, count: usize) -> Vec<SignedTransaction> {
-        let mut pool = self.mempool.lock();
+        let pool = self.mempool.lock();
         pool.read_timeline(timeline_id, count)
             .0
             .into_iter()

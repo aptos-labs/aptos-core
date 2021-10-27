@@ -109,7 +109,7 @@ impl Mempool {
         }
     }
 
-    fn log_latency(&mut self, account: AccountAddress, sequence_number: u64, metric: &str) {
+    fn log_latency(&self, account: AccountAddress, sequence_number: u64, metric: &str) {
         if let Some(&creation_time) = self.metrics_cache.get(&(account, sequence_number)) {
             if let Ok(time_delta) = SystemTime::now().duration_since(creation_time) {
                 counters::CORE_MEMPOOL_TXN_COMMIT_LATENCY
@@ -185,7 +185,7 @@ impl Mempool {
     ///  mempool should filter out such transactions.
     #[allow(clippy::explicit_counter_loop)]
     pub(crate) fn get_block(
-        &mut self,
+        &self,
         batch_size: u64,
         mut seen: HashSet<TxnPointer>,
     ) -> Vec<SignedTransaction> {
@@ -286,7 +286,7 @@ impl Mempool {
     /// Read `count` transactions from timeline since `timeline_id`.
     /// Returns block of transactions and new last_timeline_id.
     pub(crate) fn read_timeline(
-        &mut self,
+        &self,
         timeline_id: u64,
         count: usize,
     ) -> (Vec<SignedTransaction>, u64) {
@@ -294,7 +294,7 @@ impl Mempool {
     }
 
     /// Read transactions from timeline from `start_id` (exclusive) to `end_id` (inclusive).
-    pub(crate) fn timeline_range(&mut self, start_id: u64, end_id: u64) -> Vec<SignedTransaction> {
+    pub(crate) fn timeline_range(&self, start_id: u64, end_id: u64) -> Vec<SignedTransaction> {
         self.transactions.timeline_range(start_id, end_id)
     }
 

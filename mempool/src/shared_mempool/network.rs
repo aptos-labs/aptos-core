@@ -355,7 +355,7 @@ impl MempoolNetworkInterface {
         let transactions: Vec<SignedTransaction>;
         let mut metric_label = None;
         {
-            let mut mempool = smp.mempool.lock();
+            let mempool = smp.mempool.lock();
 
             // Sync peer's pending broadcasts with latest mempool state.
             // A pending broadcast might become empty if the corresponding txns were committed through

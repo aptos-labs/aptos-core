@@ -46,7 +46,7 @@ fn test_consensus_events_rejected_txns() {
         assert!(callback_rcv.await.is_ok());
     });
 
-    let mut pool = smp.mempool.lock();
+    let pool = smp.mempool.lock();
     let (timeline, _) = pool.read_timeline(0, 10);
     assert_eq!(timeline.len(), 1);
     assert_eq!(timeline.get(0).unwrap(), &kept_txn);
@@ -88,7 +88,7 @@ fn test_mempool_notify_committed_txns() {
             .is_ok());
     });
 
-    let mut pool = smp.mempool.lock();
+    let pool = smp.mempool.lock();
     let (timeline, _) = pool.read_timeline(0, 10);
     assert_eq!(timeline.len(), 1);
     assert_eq!(timeline.get(0).unwrap(), &kept_txn);
