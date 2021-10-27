@@ -49,12 +49,12 @@ export function buildScriptFunctionTransaction(
   tyArgs: Seq<DiemTypes.TypeTag>, //[0,9,8]
   args: Seq<bytes>, // new Uint8Array(9,0,9)
 ): DiemTypes.TransactionPayload {
-  const module_id: DiemTypes.ModuleId = new DiemTypes.ModuleId(
+  const moduleId: DiemTypes.ModuleId = new DiemTypes.ModuleId(
     hexToAccountAddress(moduleAddress),
     new DiemTypes.Identifier(moduleName),
   );
   return new DiemTypes.ScriptFunction(
-    module_id,
+    moduleId,
     new DiemTypes.Identifier(functionName),
     tyArgs,
     args,
@@ -71,7 +71,7 @@ export async function buildAndSubmitScriptFunctionTransaction(
   args: Seq<bytes>,
   sequenceNumber: number,
 ) {
-  let payload: DiemTypes.TransactionPayload = buildScriptFunctionTransaction(
+  const payload: DiemTypes.TransactionPayload = buildScriptFunctionTransaction(
     moduleAddress,
     moduleName,
     functionName,

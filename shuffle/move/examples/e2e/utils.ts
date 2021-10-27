@@ -5,6 +5,6 @@ export function deployMessageModule() {
   return true;
 }
 
-export function setMessage(_address: any, _message: any) {
+export function setMessage(_address: undefined, _message: undefined) {
   return true;
 }

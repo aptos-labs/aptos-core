@@ -108,15 +108,15 @@ function relativeUrl(tail: string) {
   return new URL(tail, nodeUrl).href;
 }
 
-function getNetworkEndpoint(input_network : string) {
-  if (input_network == "unknown") {
+function getNetworkEndpoint(inputNetwork : string) {
+  if (inputNetwork == "unknown") {
     throw new Error("Invalid network.")
   }
   let network = "";
-  if (isURL(input_network)) {
-    network = input_network;
+  if (isURL(inputNetwork)) {
+    network = inputNetwork;
   } else {
-    network = urlcat("http://",input_network);
+    network = urlcat("http://",inputNetwork);
   }
   return network;
 }

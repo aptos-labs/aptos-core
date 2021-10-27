@@ -98,6 +98,7 @@ export async function createTestNFTScriptFunction(
   );
 }
 
+// deno-lint-ignore no-explicit-any
 export function resourcesWithName(resources: any[], resourceName: string) {
   return resources
     .filter(
@@ -105,11 +106,13 @@ export function resourcesWithName(resources: any[], resourceName: string) {
     );
 }
 
+// deno-lint-ignore no-explicit-any
 export function decodedMessages(resources: any[]) {
   return resourcesWithName(resources, "MessageHolder")
     .map((entry) => DiemHelpers.hexToAscii(entry.value.message));
 }
 
+// deno-lint-ignore no-explicit-any
 export function decodedNFTs(resources: any[]) {
   return resourcesWithName(resources, "NFT")
     .map((entry) => DiemHelpers.hexToAscii(entry.value.content_uri));

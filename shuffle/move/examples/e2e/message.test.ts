@@ -3,10 +3,8 @@
 //
 // This file is generated on new project creation.
 
-// deno-lint-ignore-file no-explicit-any
 import {
   assert,
-  assertEquals,
   fail,
 } from "https://deno.land/std@0.85.0/testing/asserts.ts";
 import * as DiemHelpers from "../main/helpers.ts";
