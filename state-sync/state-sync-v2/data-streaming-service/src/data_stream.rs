@@ -8,6 +8,7 @@ use crate::{
         SentDataNotification,
     },
     error::Error,
+    logging::{LogEntry, LogEvent, LogSchema},
     stream_progress_tracker::{DataStreamTracker, StreamProgressTracker},
     streaming_client::StreamRequest,
 };
@@ -17,6 +18,7 @@ use diem_data_client::{
 };
 use diem_id_generator::{IdGenerator, U64IdGenerator};
 use diem_infallible::Mutex;
+use diem_logger::prelude::*;
 use futures::{stream::FusedStream, Stream};
 use std::{
     collections::{HashMap, VecDeque},
@@ -49,6 +51,9 @@ pub type PendingClientResponse = Arc<Mutex<Box<data_notification::PendingClientR
 /// proofs must be sent with monotonically increasing versions).
 #[derive(Debug)]
 pub struct DataStream<T> {
+    // The unique ID for this data stream. This is useful for logging.
+    data_stream_id: DataStreamId,
+
     // The data client through which to fetch data from the Diem network
     diem_data_client: T,
 
@@ -75,6 +80,7 @@ pub struct DataStream<T> {
 
 impl<T: DiemDataClient + Send + Clone + 'static> DataStream<T> {
     pub fn new(
+        data_stream_id: DataStreamId,
         stream_request: &StreamRequest,
         diem_data_client: T,
         notification_id_generator: Arc<U64IdGenerator>,
@@ -90,6 +96,7 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStream<T> {
 
         // Create a new data stream
         let data_stream = Self {
+            data_stream_id,
             diem_data_client,
             stream_progress_tracker,
             sent_data_requests: None,
@@ -144,6 +151,15 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStream<T> {
                 self.get_sent_data_requests()
                     .push_back(pending_client_response);
             }
+            debug!(
+                (LogSchema::new(LogEntry::SendDataRequests)
+                    .stream_id(self.data_stream_id)
+                    .event(LogEvent::Success)
+                    .message(&format!(
+                        "Sent {:?} data requests to the network",
+                        max_num_requests_to_send
+                    )))
+            );
         }
         Ok(())
     }
@@ -246,6 +262,12 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStream<T> {
         };
 
         // Send the data notification
+        info!(
+            (LogSchema::new(LogEntry::EndOfStreamNotification)
+                .stream_id(self.data_stream_id)
+                .event(LogEvent::Pending)
+                .message("Sent the end of stream notification"))
+        );
         self.stream_end_notification_id = Some(notification_id);
         self.send_data_notification(data_notification)
     }
@@ -324,8 +346,13 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStream<T> {
     fn handle_data_client_error(
         &mut self,
         data_client_request: &DataClientRequest,
-        _data_client_error: &diem_data_client::Error,
+        data_client_error: &diem_data_client::Error,
     ) -> Result<(), Error> {
+        error!(LogSchema::new(LogEntry::ReceivedDataResponse)
+            .stream_id(self.data_stream_id)
+            .event(LogEvent::Error)
+            .error(&data_client_error.clone().into()));
+
         // TODO(joshlind): don't just resend the request. Identify the best
         // way to react based on the error.
         self.resend_data_client_request(data_client_request)
@@ -349,10 +376,19 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStream<T> {
 
     /// Notifies the Diem data client of a bad client response
     fn notify_bad_response(&self, data_client_response: &DataClientResponse) {
-        self.diem_data_client.notify_bad_response(
-            data_client_response.id,
-            ResponseError::InvalidPayloadDataType,
-        );
+        let response_id = data_client_response.id;
+        let response_error = ResponseError::InvalidPayloadDataType;
+
+        info!(LogSchema::new(LogEntry::ReceivedDataResponse)
+            .stream_id(self.data_stream_id)
+            .event(LogEvent::Error)
+            .message(&format!(
+                "Notifying the data client of a bad response. Response id: {:?}, error: {:?}",
+                response_id, response_error
+            )));
+
+        self.diem_data_client
+            .notify_bad_response(response_id, response_error);
     }
 
     /// Sends a data notification to the client along the stream
@@ -386,6 +422,12 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStream<T> {
             }
 
             // Send the notification along the stream
+            debug!(
+                (LogSchema::new(LogEntry::StreamNotification)
+                    .stream_id(self.data_stream_id)
+                    .event(LogEvent::Success)
+                    .message("Sent a single stream notification!"))
+            );
             self.send_data_notification(data_notification)?;
         }
 

@@ -1467,6 +1467,7 @@ dependencies = [
  "diem-data-client",
  "diem-id-generator",
  "diem-infallible",
+ "diem-logger",
  "diem-types",
  "diem-workspace-hack",
  "enum_dispatch",

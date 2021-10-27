@@ -24,6 +24,7 @@ diem-crypto = { path = "../../../crypto/crypto" }
 diem-data-client = { path = "../../diem-data-client" }
 diem-id-generator = { path = "../../../common/id-generator" }
 diem-infallible = { path = "../../../common/infallible" }
+diem-logger = { path = "../../../common/logger" }
 diem-types = { path = "../../../types" }
 diem-workspace-hack = { path = "../../../common/workspace-hack" }
 
