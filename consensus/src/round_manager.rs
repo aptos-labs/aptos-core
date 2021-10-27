@@ -219,8 +219,6 @@ pub struct RoundManager {
     network: NetworkSender,
     storage: Arc<dyn PersistentLivenessStorage>,
     sync_only: bool,
-    decoupled_execution: bool,
-    back_pressure_limit: u64,
     onchain_config: OnChainConsensusConfig,
 }
 
@@ -245,6 +243,9 @@ impl RoundManager {
         counters::OP_COUNTERS
             .gauge("two_chain")
             .set(onchain_config.two_chain() as i64);
+        counters::OP_COUNTERS
+            .gauge("decoupled_execution")
+            .set(onchain_config.decoupled_execution() as i64);
         Self {
             epoch_state,
             block_store,
@@ -255,43 +256,20 @@ impl RoundManager {
             network,
             storage,
             sync_only,
-            decoupled_execution: false,
-            back_pressure_limit: 1, // arbitrary dummy value
-            onchain_config,
-        }
-    }
-
-    pub fn new_with_decoupled_execution(
-        epoch_state: EpochState,
-        block_store: Arc<BlockStore>,
-        round_state: RoundState,
-        proposer_election: Box<dyn ProposerElection + Send + Sync>,
-        proposal_generator: ProposalGenerator,
-        safety_rules: Arc<Mutex<MetricsSafetyRules>>,
-        network: NetworkSender,
-        storage: Arc<dyn PersistentLivenessStorage>,
-        sync_only: bool,
-        back_pressure_limit: u64,
-        onchain_config: OnChainConsensusConfig,
-    ) -> Self {
-        Self {
-            epoch_state,
-            block_store,
-            round_state,
-            proposer_election,
-            proposal_generator,
-            safety_rules,
-            network,
-            storage,
-            sync_only,
-            decoupled_execution: true,
-            back_pressure_limit,
             onchain_config,
         }
     }
 
     fn two_chain(&self) -> bool {
         self.onchain_config.two_chain()
+    }
+
+    fn decoupled_execution(&self) -> bool {
+        self.onchain_config.decoupled_execution()
+    }
+
+    fn back_pressure_limit(&self) -> u64 {
+        self.onchain_config.back_pressure_limit()
     }
 
     fn create_block_retriever(&self, author: Author) -> BlockRetriever {
@@ -500,11 +478,11 @@ impl RoundManager {
     }
 
     fn sync_only(&self) -> bool {
-        if self.decoupled_execution {
+        if self.decoupled_execution() {
             let commit_round = self.block_store.commit_root().round();
             let ordered_round = self.block_store.ordered_root().round();
             let sync_or_not =
-                self.sync_only || ordered_round > self.back_pressure_limit + commit_round;
+                self.sync_only || ordered_round > self.back_pressure_limit() + commit_round;
 
             counters::OP_COUNTERS
                 .gauge("sync_only")
@@ -684,7 +662,7 @@ impl RoundManager {
         );
 
         let maybe_signed_vote_proposal =
-            executed_block.maybe_signed_vote_proposal(self.decoupled_execution);
+            executed_block.maybe_signed_vote_proposal(self.decoupled_execution());
         let vote_result = if self.two_chain() {
             self.safety_rules.lock().construct_and_sign_vote_two_chain(
                 &maybe_signed_vote_proposal,

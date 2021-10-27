@@ -409,81 +409,48 @@ impl EpochManager {
 
         let safety_rules_container = Arc::new(Mutex::new(safety_rules));
 
-        let mut processor = if self.config.decoupled_execution {
-            let ordering_state_computer = Arc::new(self.spawn_decoupled_execution(
+        let state_computer = if onchain_config.decoupled_execution() {
+            Arc::new(self.spawn_decoupled_execution(
                 safety_rules_container.clone(),
                 epoch_state.verifier.clone(),
-            ));
-
-            info!(epoch = epoch, "Create BlockStore");
-            let block_store = Arc::new(BlockStore::new(
-                Arc::clone(&self.storage),
-                recovery_data,
-                ordering_state_computer,
-                self.config.max_pruned_blocks_in_mem,
-                Arc::clone(&self.time_service),
-                self.config.back_pressure_limit,
-            ));
-
-            info!(epoch = epoch, "Create ProposalGenerator");
-            // txn manager is required both by proposal generator (to pull the proposers)
-            // and by event processor (to update their status).
-            let proposal_generator = ProposalGenerator::new(
-                self.author,
-                block_store.clone(),
-                self.txn_manager.clone(),
-                self.time_service.clone(),
-                self.config.max_block_size,
-            );
-
-            RoundManager::new_with_decoupled_execution(
-                epoch_state,
-                block_store,
-                round_state,
-                proposer_election,
-                proposal_generator,
-                safety_rules_container,
-                network_sender,
-                self.storage.clone(),
-                self.config.sync_only,
-                self.config.back_pressure_limit,
-                onchain_config,
-            )
+            ))
         } else {
-            info!(epoch = epoch, "Create BlockStore");
-            let block_store = Arc::new(BlockStore::new(
-                Arc::clone(&self.storage),
-                recovery_data,
-                self.commit_state_computer.clone(),
-                self.config.max_pruned_blocks_in_mem,
-                Arc::clone(&self.time_service),
-                self.config.back_pressure_limit,
-            ));
-
-            info!(epoch = epoch, "Create ProposalGenerator");
-            // txn manager is required both by proposal generator (to pull the proposers)
-            // and by event processor (to update their status).
-            let proposal_generator = ProposalGenerator::new(
-                self.author,
-                block_store.clone(),
-                self.txn_manager.clone(),
-                self.time_service.clone(),
-                self.config.max_block_size,
-            );
-
-            RoundManager::new(
-                epoch_state,
-                block_store,
-                round_state,
-                proposer_election,
-                proposal_generator,
-                safety_rules_container,
-                network_sender,
-                self.storage.clone(),
-                self.config.sync_only,
-                onchain_config,
-            )
+            self.commit_state_computer.clone()
         };
+
+        info!(epoch = epoch, "Create BlockStore");
+        let block_store = Arc::new(BlockStore::new(
+            Arc::clone(&self.storage),
+            recovery_data,
+            state_computer,
+            self.config.max_pruned_blocks_in_mem,
+            Arc::clone(&self.time_service),
+            onchain_config.back_pressure_limit(),
+        ));
+
+        info!(epoch = epoch, "Create ProposalGenerator");
+        // txn manager is required both by proposal generator (to pull the proposers)
+        // and by event processor (to update their status).
+        let proposal_generator = ProposalGenerator::new(
+            self.author,
+            block_store.clone(),
+            self.txn_manager.clone(),
+            self.time_service.clone(),
+            self.config.max_block_size,
+        );
+
+        let mut processor = RoundManager::new(
+            epoch_state,
+            block_store,
+            round_state,
+            proposer_election,
+            proposal_generator,
+            safety_rules_container,
+            network_sender,
+            self.storage.clone(),
+            self.config.sync_only,
+            onchain_config,
+        );
 
         processor.start(last_vote).await;
         self.processor = Some(RoundProcessor::Normal(processor));
