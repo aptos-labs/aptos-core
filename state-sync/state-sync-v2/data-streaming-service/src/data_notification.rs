@@ -26,7 +26,7 @@ pub struct DataNotification {
     pub data_payload: DataPayload,
 }
 
-/// A single payload (e.g. chunk) of requested data.
+/// A single payload (e.g. chunk) of data delivered to a data listener.
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug)]
 pub enum DataPayload {
@@ -34,6 +34,7 @@ pub enum DataPayload {
     ContinuousTransactionOutputsWithProof(LedgerInfoWithSignatures, TransactionOutputListWithProof),
     ContinuousTransactionsWithProof(LedgerInfoWithSignatures, TransactionListWithProof),
     EpochEndingLedgerInfos(Vec<LedgerInfoWithSignatures>),
+    EndOfStream,
     TransactionOutputsWithProof(TransactionOutputListWithProof),
     TransactionsWithProof(TransactionListWithProof),
 }

@@ -4,7 +4,7 @@
 use crate::{
     data_notification,
     data_notification::{
-        DataClientRequest, DataClientResponse, DataNotification, NotificationId,
+        DataClientRequest, DataClientResponse, DataNotification, DataPayload, NotificationId,
         SentDataNotification,
     },
     error::Error,
@@ -15,7 +15,7 @@ use channel::{diem_channel, message_queues::QueueStyle};
 use diem_data_client::{
     AdvertisedData, DiemDataClient, GlobalDataSummary, ResponseError, ResponsePayload,
 };
-use diem_id_generator::U64IdGenerator;
+use diem_id_generator::{IdGenerator, U64IdGenerator};
 use diem_infallible::Mutex;
 use futures::{stream::FusedStream, Stream};
 use std::{
@@ -68,6 +68,9 @@ pub struct DataStream<T> {
 
     // A unique notification ID generator
     notification_id_generator: Arc<U64IdGenerator>,
+
+    // Notification ID of the end of stream notification (when it has been sent)
+    stream_end_notification_id: Option<NotificationId>,
 }
 
 impl<T: DiemDataClient + Send + Clone + 'static> DataStream<T> {
@@ -93,6 +96,7 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStream<T> {
             sent_notifications: HashMap::new(),
             notification_sender,
             notification_id_generator,
+            stream_end_notification_id: None,
         };
 
         Ok((data_stream, data_stream_listener))
@@ -227,12 +231,38 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStream<T> {
         pending_client_response
     }
 
+    fn send_data_notification(&self, data_notification: DataNotification) -> Result<(), Error> {
+        self.notification_sender
+            .push((), data_notification)
+            .map_err(|error| Error::UnexpectedErrorEncountered(error.to_string()))
+    }
+
+    fn send_end_of_stream_notification(&mut self) -> Result<(), Error> {
+        // Create end of stream notification
+        let notification_id = self.notification_id_generator.next();
+        let data_notification = DataNotification {
+            notification_id,
+            data_payload: DataPayload::EndOfStream,
+        };
+
+        // Send the data notification
+        self.stream_end_notification_id = Some(notification_id);
+        self.send_data_notification(data_notification)
+    }
+
     /// Processes any data client responses that have been received. Note: the
     /// responses must be processed in FIFO order.
     pub fn process_data_responses(
         &mut self,
         global_data_summary: GlobalDataSummary,
     ) -> Result<(), Error> {
+        // Check if the stream is complete
+        if self.stream_progress_tracker.is_stream_complete()
+            && self.stream_end_notification_id.is_none()
+        {
+            return self.send_end_of_stream_notification();
+        }
+
         // Process any ready data responses
         for _ in 0..MAX_CONCURRENT_REQUESTS {
             if let Some(pending_response) = self.pop_pending_response_queue() {
@@ -356,9 +386,7 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStream<T> {
             }
 
             // Send the notification along the stream
-            self.notification_sender
-                .push((), data_notification)
-                .map_err(|error| Error::UnexpectedErrorEncountered(error.to_string()))?;
+            self.send_data_notification(data_notification)?;
         }
 
         Ok(())
