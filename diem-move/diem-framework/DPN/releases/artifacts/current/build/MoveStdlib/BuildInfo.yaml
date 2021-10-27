@@ -5,6 +5,9 @@ compiled_package_info:
     Std: "00000000000000000000000000000001"
   module_resolution_metadata:
     ? address: "00000000000000000000000000000001"
+      name: ASCII
+    : Std
+    ? address: "00000000000000000000000000000001"
       name: BCS
     : Std
     ? address: "00000000000000000000000000000001"
@@ -37,7 +40,7 @@ compiled_package_info:
     ? address: "00000000000000000000000000000001"
       name: Vector
     : Std
-  source_digest: D5030F77F89237C1383646FF00CEDF0B00AB2B9F1B39B6AB91966E1C0E3A7CD1
+  source_digest: DDC7BB5B39FEB0C14AB804D447ED4B69AB0964328316AE7A5196FFF70F7948B3
   build_flags:
     dev_mode: false
     test_mode: false

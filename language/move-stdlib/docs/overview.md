@@ -12,6 +12,7 @@ This is the root document for the Move stdlib module documentation. The Move std
 ## Index
 
 
+-  [`0x1::ASCII`](ASCII.md#0x1_ASCII)
 -  [`0x1::BCS`](BCS.md#0x1_BCS)
 -  [`0x1::BitVector`](BitVector.md#0x1_BitVector)
 -  [`0x1::Capability`](Capability.md#0x1_Capability)
