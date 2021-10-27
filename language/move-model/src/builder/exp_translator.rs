@@ -1468,6 +1468,25 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     expected_type,
                     "in expression",
                 );
+                // calls to built-in functions might have additional requirements on the types
+                match cand.oper {
+                    Operation::Exists(_) | Operation::Global(_) => {
+                        let ty_inst = &instantiation[0];
+                        if !matches!(ty_inst, Type::Struct(..)) {
+                            self.error(
+                                loc,
+                                &format!(
+                                    "Expect a struct type as the type instantiation for an \
+                                    operation on the global state, found: {}",
+                                    ty_inst.display(&self.type_display_context())
+                                ),
+                            );
+                            return self.new_error_exp();
+                        }
+                    }
+                    _ => (),
+                };
+
                 // Construct result.
                 let id = self.new_node_id_with_type_loc(&ty, loc);
                 self.set_node_instantiation(id, instantiation);
