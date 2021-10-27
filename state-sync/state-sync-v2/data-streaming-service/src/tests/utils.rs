@@ -209,7 +209,7 @@ impl DiemDataClient for MockDiemDataClient {
     }
 
     fn notify_bad_response(&self, _response_id: u64, _response_error: ResponseError) {
-        // TODO(joshlind): implement this
+        // TODO(joshlind): update me to handle some score emulation!
     }
 }
 

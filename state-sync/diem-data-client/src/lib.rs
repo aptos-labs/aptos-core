@@ -17,6 +17,8 @@ use storage_service::UnexpectedResponseError;
 use storage_service_types::{self as storage_service, CompleteDataRange, Epoch};
 use thiserror::Error;
 
+pub type ResponseId = u64;
+
 pub mod diemnet;
 
 pub type Result<T, E = Error> = ::std::result::Result<T, E>;
@@ -55,8 +57,8 @@ impl From<UnexpectedResponseError> for Error {
 /// the Data Client about invalid or malformed responses.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub enum ResponseError {
+    InvalidData,
     InvalidPayloadDataType,
-    MissingData,
     ProofVerificationError,
 }
 
@@ -139,7 +141,7 @@ pub trait DiemDataClient {
 /// `notify_bad_response()` API call above.
 #[derive(Clone, Debug)]
 pub struct Response<T> {
-    pub id: u64,
+    pub id: ResponseId,
     pub payload: T,
 }
 
@@ -152,7 +154,7 @@ impl<T> Response<T> {
         self.payload
     }
 
-    pub fn into_parts(self) -> (u64, T) {
+    pub fn into_parts(self) -> (ResponseId, T) {
         (self.id, self.payload)
     }
 
