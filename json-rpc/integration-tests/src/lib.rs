@@ -635,10 +635,6 @@ impl PublicUsageTest for PeerToPeerWithEvents {
                     "gas_unit_price": 0,
                     "max_gas_amount": 1000000,
                     "public_key": sender.public_key().to_string(),
-                    "secondary_signers": [],
-                    "secondary_signature_schemes": [],
-                    "secondary_signatures": [],
-                    "secondary_public_keys": [],
                     "script": {
                         "type": "peer_to_peer_with_metadata",
                         "type_arguments": [

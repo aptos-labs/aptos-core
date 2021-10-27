@@ -1131,28 +1131,44 @@ impl From<Transaction> for TransactionDataView {
                     signature_scheme: t.authenticator().sender().scheme().to_string(),
                     signature: t.authenticator().sender().signature_bytes().into(),
                     public_key: t.authenticator().sender().public_key_bytes().into(),
-                    secondary_signers: Some(t.authenticator().secondary_signer_addreses()),
-                    secondary_signature_schemes: Some(
-                        t.authenticator()
-                            .secondary_signers()
-                            .iter()
-                            .map(|account_auth| account_auth.scheme().to_string())
-                            .collect(),
-                    ),
-                    secondary_signatures: Some(
-                        t.authenticator()
-                            .secondary_signers()
-                            .iter()
-                            .map(|account_auth| account_auth.signature_bytes().into())
-                            .collect(),
-                    ),
-                    secondary_public_keys: Some(
-                        t.authenticator()
-                            .secondary_signers()
-                            .iter()
-                            .map(|account_auth| account_auth.public_key_bytes().into())
-                            .collect(),
-                    ),
+                    secondary_signers: if t.is_multi_agent() {
+                        Some(t.authenticator().secondary_signer_addreses())
+                    } else {
+                        None
+                    },
+                    secondary_signature_schemes: if t.is_multi_agent() {
+                        Some(
+                            t.authenticator()
+                                .secondary_signers()
+                                .iter()
+                                .map(|account_auth| account_auth.scheme().to_string())
+                                .collect(),
+                        )
+                    } else {
+                        None
+                    },
+                    secondary_signatures: if t.is_multi_agent() {
+                        Some(
+                            t.authenticator()
+                                .secondary_signers()
+                                .iter()
+                                .map(|account_auth| account_auth.signature_bytes().into())
+                                .collect(),
+                        )
+                    } else {
+                        None
+                    },
+                    secondary_public_keys: if t.is_multi_agent() {
+                        Some(
+                            t.authenticator()
+                                .secondary_signers()
+                                .iter()
+                                .map(|account_auth| account_auth.public_key_bytes().into())
+                                .collect(),
+                        )
+                    } else {
+                        None
+                    },
                     sequence_number: t.sequence_number(),
                     chain_id: t.chain_id().id(),
                     max_gas_amount: t.max_gas_amount(),
