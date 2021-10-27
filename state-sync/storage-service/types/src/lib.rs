@@ -3,6 +3,8 @@
 
 #![forbid(unsafe_code)]
 
+use std::convert::TryFrom;
+
 use diem_types::{
     account_state_blob::AccountStatesChunkWithProof,
     epoch_change::EpochChangeProof,
@@ -68,6 +70,119 @@ pub enum StorageServiceResponse {
     StorageServerSummary(StorageServerSummary),
     TransactionOutputsWithProof(TransactionOutputListWithProof),
     TransactionsWithProof(TransactionListWithProof),
+}
+
+// TODO(philiphayes): is there a proc-macro for this?
+impl StorageServiceResponse {
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::AccountStatesChunkWithProof(_) => "AccountStatesChunkWithProof",
+            Self::EpochEndingLedgerInfos(_) => "EpochEndingLedgerInfos",
+            Self::NumberOfAccountsAtVersion(_) => "NumberOfAccountsAtVersion",
+            Self::ServerProtocolVersion(_) => "ServerProtocolVersion",
+            Self::StorageServerSummary(_) => "StorageServerSummary",
+            Self::TransactionOutputsWithProof(_) => "TransactionOutputsWithProof",
+            Self::TransactionsWithProof(_) => "TransactionsWithProof",
+        }
+    }
+}
+
+#[derive(Clone, Debug, Error)]
+#[error("unexpected response variant: {0}")]
+pub struct UnexpectedResponseError(pub String);
+
+// Conversions from the outer StorageServiceResponse enum to the inner types.
+// TODO(philiphayes): is there a proc-macro for this?
+
+impl TryFrom<StorageServiceResponse> for AccountStatesChunkWithProof {
+    type Error = UnexpectedResponseError;
+    fn try_from(response: StorageServiceResponse) -> Result<Self, Self::Error> {
+        match response {
+            StorageServiceResponse::AccountStatesChunkWithProof(inner) => Ok(inner),
+            _ => Err(UnexpectedResponseError(format!(
+                "expected AccountStatesChunkWithProof found {}",
+                response.name()
+            ))),
+        }
+    }
+}
+
+impl TryFrom<StorageServiceResponse> for EpochChangeProof {
+    type Error = UnexpectedResponseError;
+    fn try_from(response: StorageServiceResponse) -> Result<Self, Self::Error> {
+        match response {
+            StorageServiceResponse::EpochEndingLedgerInfos(inner) => Ok(inner),
+            _ => Err(UnexpectedResponseError(format!(
+                "expected EpochEndingLedgerInfos found {}",
+                response.name()
+            ))),
+        }
+    }
+}
+
+impl TryFrom<StorageServiceResponse> for u64 {
+    type Error = UnexpectedResponseError;
+    fn try_from(response: StorageServiceResponse) -> Result<Self, Self::Error> {
+        match response {
+            StorageServiceResponse::NumberOfAccountsAtVersion(inner) => Ok(inner),
+            _ => Err(UnexpectedResponseError(format!(
+                "expected NumberOfAccountsAtVersion found {}",
+                response.name()
+            ))),
+        }
+    }
+}
+
+impl TryFrom<StorageServiceResponse> for ServerProtocolVersion {
+    type Error = UnexpectedResponseError;
+    fn try_from(response: StorageServiceResponse) -> Result<Self, Self::Error> {
+        match response {
+            StorageServiceResponse::ServerProtocolVersion(inner) => Ok(inner),
+            _ => Err(UnexpectedResponseError(format!(
+                "expected ServerProtocolVersion found {}",
+                response.name()
+            ))),
+        }
+    }
+}
+
+impl TryFrom<StorageServiceResponse> for StorageServerSummary {
+    type Error = UnexpectedResponseError;
+    fn try_from(response: StorageServiceResponse) -> Result<Self, Self::Error> {
+        match response {
+            StorageServiceResponse::StorageServerSummary(inner) => Ok(inner),
+            _ => Err(UnexpectedResponseError(format!(
+                "expected StorageServerSummary found {}",
+                response.name()
+            ))),
+        }
+    }
+}
+
+impl TryFrom<StorageServiceResponse> for TransactionOutputListWithProof {
+    type Error = UnexpectedResponseError;
+    fn try_from(response: StorageServiceResponse) -> Result<Self, Self::Error> {
+        match response {
+            StorageServiceResponse::TransactionOutputsWithProof(inner) => Ok(inner),
+            _ => Err(UnexpectedResponseError(format!(
+                "expected TransactionOutputsWithProof found {}",
+                response.name()
+            ))),
+        }
+    }
+}
+
+impl TryFrom<StorageServiceResponse> for TransactionListWithProof {
+    type Error = UnexpectedResponseError;
+    fn try_from(response: StorageServiceResponse) -> Result<Self, Self::Error> {
+        match response {
+            StorageServiceResponse::TransactionsWithProof(inner) => Ok(inner),
+            _ => Err(UnexpectedResponseError(format!(
+                "expected TransactionsWithProof found {}",
+                response.name()
+            ))),
+        }
+    }
 }
 
 /// A storage service request for fetching a list of account states at a

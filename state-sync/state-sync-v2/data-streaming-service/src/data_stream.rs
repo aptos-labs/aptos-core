@@ -4,7 +4,8 @@
 use crate::{
     data_notification,
     data_notification::{
-        DataClientRequest, DataNotification, NotificationId, SentDataNotification,
+        DataClientRequest, DataClientResponse, DataNotification, NotificationId,
+        SentDataNotification,
     },
     error::Error,
     stream_progress_tracker::{DataStreamTracker, StreamProgressTracker},
@@ -12,8 +13,7 @@ use crate::{
 };
 use channel::{diem_channel, message_queues::QueueStyle};
 use diem_data_client::{
-    AdvertisedData, DataClientPayload, DataClientResponse, DiemDataClient, GlobalDataSummary,
-    ResponseError,
+    AdvertisedData, DiemDataClient, GlobalDataSummary, ResponseError, ResponsePayload,
 };
 use diem_id_generator::U64IdGenerator;
 use diem_infallible::Mutex;
@@ -169,7 +169,9 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStream<T> {
                         request.start_index,
                         request.end_index,
                     );
-                    let client_response = client_response.await;
+                    let client_response = client_response
+                        .await
+                        .map(|response| response.map(ResponsePayload::from));
                     pending_response.lock().client_response = Some(client_response);
                 });
             }
@@ -177,7 +179,9 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStream<T> {
                 tokio::spawn(async move {
                     let client_response = diem_data_client
                         .get_epoch_ending_ledger_infos(request.start_epoch, request.end_epoch);
-                    let client_response = client_response.await;
+                    let client_response = client_response
+                        .await
+                        .map(|response| response.map(ResponsePayload::from));
                     pending_response.lock().client_response = Some(client_response);
                 });
             }
@@ -185,7 +189,9 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStream<T> {
                 tokio::spawn(async move {
                     let client_response =
                         diem_data_client.get_number_of_account_states(request.version);
-                    let client_response = client_response.await;
+                    let client_response = client_response
+                        .await
+                        .map(|response| response.map(ResponsePayload::from));
                     pending_response.lock().client_response = Some(client_response);
                 });
             }
@@ -196,7 +202,9 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStream<T> {
                         request.start_version,
                         request.end_version,
                     );
-                    let client_response = client_response.await;
+                    let client_response = client_response
+                        .await
+                        .map(|response| response.map(ResponsePayload::from));
                     pending_response.lock().client_response = Some(client_response);
                 });
             }
@@ -208,7 +216,9 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStream<T> {
                         request.end_version,
                         request.include_events,
                     );
-                    let client_response = client_response.await;
+                    let client_response = client_response
+                        .await
+                        .map(|response| response.map(ResponsePayload::from));
                     pending_response.lock().client_response = Some(client_response);
                 });
             }
@@ -309,15 +319,10 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStream<T> {
 
     /// Notifies the Diem data client of a bad client response
     fn notify_bad_response(&self, data_client_response: &DataClientResponse) {
-        let response_id = data_client_response.response_id;
-        let response_error = ResponseError::InvalidPayloadDataType;
-        let diem_data_client = self.diem_data_client.clone();
-
-        tokio::spawn(async move {
-            let client_response = diem_data_client.notify_bad_response(response_id, response_error);
-            let _ = client_response.await;
-            // TODO(joshlind): log the response if it's an error?
-        });
+        self.diem_data_client.notify_bad_response(
+            data_client_response.id,
+            ResponseError::InvalidPayloadDataType,
+        );
     }
 
     /// Sends a data notification to the client along the stream
@@ -436,32 +441,32 @@ fn sanity_check_client_response(
     match data_client_request {
         DataClientRequest::AccountsWithProof(_) => {
             matches!(
-                data_client_response.response_payload,
-                DataClientPayload::AccountStatesWithProof(_)
+                data_client_response.payload,
+                ResponsePayload::AccountStatesWithProof(_)
             )
         }
         DataClientRequest::EpochEndingLedgerInfos(_) => {
             matches!(
-                data_client_response.response_payload,
-                DataClientPayload::EpochEndingLedgerInfos(_)
+                data_client_response.payload,
+                ResponsePayload::EpochEndingLedgerInfos(_)
             )
         }
         DataClientRequest::NumberOfAccounts(_) => {
             matches!(
-                data_client_response.response_payload,
-                DataClientPayload::NumberOfAccountStates(_)
+                data_client_response.payload,
+                ResponsePayload::NumberOfAccountStates(_)
             )
         }
         DataClientRequest::TransactionsWithProof(_) => {
             matches!(
-                data_client_response.response_payload,
-                DataClientPayload::TransactionsWithProof(_)
+                data_client_response.payload,
+                ResponsePayload::TransactionsWithProof(_)
             )
         }
         DataClientRequest::TransactionOutputsWithProof(_) => {
             matches!(
-                data_client_response.response_payload,
-                DataClientPayload::TransactionOutputsWithProof(_)
+                data_client_response.payload,
+                ResponsePayload::TransactionOutputsWithProof(_)
             )
         }
     }

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::streaming_client::Epoch;
-use diem_data_client::DataClientResponse;
+use diem_data_client::{Response, ResponsePayload};
 use diem_types::{
     account_state_blob::AccountStatesChunkWithProof,
     ledger_info::LedgerInfoWithSignatures,
@@ -15,6 +15,9 @@ use std::fmt::{Debug, Formatter};
 
 /// A unique ID used to identify each notification.
 pub type NotificationId = u64;
+
+/// A generic data client response enum.
+pub type DataClientResponse = Response<ResponsePayload>;
 
 /// A single data notification with an ID and data payload.
 #[derive(Clone, Debug)]

@@ -6,7 +6,7 @@ use crate::{
     error::Error,
     streaming_client::{StreamRequestMessage, StreamingServiceListener},
 };
-use diem_data_client::{DataClientPayload, DiemDataClient, GlobalDataSummary, OptimalChunkSizes};
+use diem_data_client::{DiemDataClient, GlobalDataSummary, OptimalChunkSizes};
 use diem_id_generator::{IdGenerator, U64IdGenerator};
 use futures::StreamExt;
 use std::{collections::HashMap, sync::Arc, time::Duration};
@@ -116,29 +116,10 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStreamingService<T> {
 
     /// Refreshes the global data summary by communicating with the Diem data client
     fn refresh_global_data_summary(&mut self) -> Result<(), Error> {
-        match self.diem_data_client.get_global_data_summary() {
-            Ok(data_client_response) => {
-                match data_client_response.response_payload {
-                    DataClientPayload::GlobalDataSummary(global_data_summary) => {
-                        verify_optimal_chunk_sizes(&global_data_summary.optimal_chunk_sizes)?;
-                        self.global_data_summary = global_data_summary;
-                        Ok(())
-                    },
-                    result => {
-                        Err(Error::DiemDataClientResponseIsInvalid(format!(
-                            "Response payload type is incorrect! Expected a global data summary, but got: {:?}",
-                            result
-                        )))
-                    }
-                }
-            }
-            Err(error) => {
-                Err(Error::DiemDataClientResponseIsInvalid(format!(
-                    "Failed to fetch global data summary! Error: {:?}",
-                    error
-                )))
-            }
-        }
+        let global_data_summary = self.diem_data_client.get_global_data_summary();
+        verify_optimal_chunk_sizes(&global_data_summary.optimal_chunk_sizes)?;
+        self.global_data_summary = global_data_summary;
+        Ok(())
     }
 
     /// Ensures that all existing data streams are making progress

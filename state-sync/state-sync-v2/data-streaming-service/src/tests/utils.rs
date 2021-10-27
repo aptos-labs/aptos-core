@@ -1,12 +1,10 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::streaming_client::Epoch;
 use async_trait::async_trait;
 use diem_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use diem_data_client::{
-    AdvertisedData, DataClientPayload, DataClientResponse, DiemDataClient, GlobalDataSummary,
-    OptimalChunkSizes, ResponseError,
+    AdvertisedData, DiemDataClient, GlobalDataSummary, OptimalChunkSizes, Response, ResponseError,
 };
 use diem_types::{
     account_address::AccountAddress,
@@ -17,8 +15,8 @@ use diem_types::{
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     proof::SparseMerkleRangeProof,
     transaction::{
-        default_protocol::TransactionOutputListWithProof, RawTransaction, Script,
-        SignedTransaction, Transaction, TransactionListWithProof, TransactionOutput,
+        default_protocol::{TransactionListWithProof, TransactionOutputListWithProof},
+        RawTransaction, Script, SignedTransaction, Transaction, TransactionOutput,
         TransactionPayload, TransactionStatus, Version,
     },
     write_set::WriteSet,
@@ -29,7 +27,7 @@ use std::{
     thread,
     time::Duration,
 };
-use storage_service_types::CompleteDataRange;
+use storage_service_types::{CompleteDataRange, Epoch};
 
 /// The number of accounts held at any version
 pub const TOTAL_NUM_ACCOUNTS: u64 = 2000;
@@ -76,10 +74,10 @@ impl MockDiemDataClient {
 impl DiemDataClient for MockDiemDataClient {
     async fn get_account_states_with_proof(
         &self,
-        _version: u64,
+        _version: Version,
         start_index: u64,
         end_index: u64,
-    ) -> Result<DataClientResponse, diem_data_client::Error> {
+    ) -> Result<Response<AccountStatesChunkWithProof>, diem_data_client::Error> {
         self.emulate_network_latencies();
 
         // Create epoch ending ledger infos according to the requested epochs
@@ -89,7 +87,7 @@ impl DiemDataClient for MockDiemDataClient {
         }
 
         // Create an account states chunk with proof
-        let accounts_with_proofs = AccountStatesChunkWithProof {
+        let account_states = AccountStatesChunkWithProof {
             first_index: start_index,
             last_index: end_index,
             first_key: HashValue::random(),
@@ -97,17 +95,14 @@ impl DiemDataClient for MockDiemDataClient {
             account_blobs,
             proof: SparseMerkleRangeProof::new(vec![]),
         };
-        let response_payload = DataClientPayload::AccountStatesWithProof(accounts_with_proofs);
-
-        // Return the chunk
-        Ok(create_data_client_response(response_payload))
+        Ok(create_data_client_response(account_states))
     }
 
     async fn get_epoch_ending_ledger_infos(
         &self,
-        start_epoch: u64,
-        end_epoch: u64,
-    ) -> Result<DataClientResponse, diem_data_client::Error> {
+        start_epoch: Epoch,
+        end_epoch: Epoch,
+    ) -> Result<Response<Vec<LedgerInfoWithSignatures>>, diem_data_client::Error> {
         self.emulate_network_latencies();
 
         // Fetch the epoch ending ledger infos according to the requested epochs
@@ -116,13 +111,10 @@ impl DiemDataClient for MockDiemDataClient {
             let ledger_info = self.epoch_ending_ledger_infos.get(&epoch).unwrap();
             epoch_ending_ledger_infos.push(ledger_info.clone());
         }
-        let response_payload = DataClientPayload::EpochEndingLedgerInfos(epoch_ending_ledger_infos);
-
-        // Return the ledger infos
-        Ok(create_data_client_response(response_payload))
+        Ok(create_data_client_response(epoch_ending_ledger_infos))
     }
 
-    fn get_global_data_summary(&self) -> Result<DataClientResponse, diem_data_client::Error> {
+    fn get_global_data_summary(&self) -> GlobalDataSummary {
         // Create a random set of optimal chunk sizes to emulate changing environments
         let optimal_chunk_sizes = OptimalChunkSizes {
             account_states_chunk_size: create_non_zero_random_u64(100),
@@ -155,30 +147,25 @@ impl DiemDataClient for MockDiemDataClient {
             )
             .unwrap()],
         };
-        let response_payload = DataClientPayload::GlobalDataSummary(GlobalDataSummary {
+        GlobalDataSummary {
             advertised_data,
             optimal_chunk_sizes,
-        });
-
-        // Return the global data summary
-        Ok(create_data_client_response(response_payload))
+        }
     }
 
     async fn get_number_of_account_states(
         &self,
-        _version: u64,
-    ) -> Result<DataClientResponse, diem_data_client::Error> {
-        Ok(create_data_client_response(
-            DataClientPayload::NumberOfAccountStates(TOTAL_NUM_ACCOUNTS),
-        ))
+        _version: Version,
+    ) -> Result<Response<u64>, diem_data_client::Error> {
+        Ok(create_data_client_response(TOTAL_NUM_ACCOUNTS))
     }
 
     async fn get_transaction_outputs_with_proof(
         &self,
-        _proof_version: u64,
-        start_version: u64,
-        end_version: u64,
-    ) -> Result<DataClientResponse, diem_data_client::Error> {
+        _proof_version: Version,
+        start_version: Version,
+        end_version: Version,
+    ) -> Result<Response<TransactionOutputListWithProof>, diem_data_client::Error> {
         self.emulate_network_latencies();
 
         // Create the requested transactions and transaction outputs
@@ -191,20 +178,16 @@ impl DiemDataClient for MockDiemDataClient {
         let mut output_list_with_proof = TransactionOutputListWithProof::new_empty();
         output_list_with_proof.first_transaction_output_version = Some(start_version);
         output_list_with_proof.transactions_and_outputs = transactions_and_outputs;
-        let response_payload =
-            DataClientPayload::TransactionOutputsWithProof(output_list_with_proof);
-
-        // Return the transaction output list with proofs
-        Ok(create_data_client_response(response_payload))
+        Ok(create_data_client_response(output_list_with_proof))
     }
 
     async fn get_transactions_with_proof(
         &self,
-        _proof_version: u64,
-        start_version: u64,
-        end_version: u64,
+        _proof_version: Version,
+        start_version: Version,
+        end_version: Version,
         include_events: bool,
-    ) -> Result<DataClientResponse, diem_data_client::Error> {
+    ) -> Result<Response<TransactionListWithProof>, diem_data_client::Error> {
         self.emulate_network_latencies();
 
         // Include events if required
@@ -221,29 +204,18 @@ impl DiemDataClient for MockDiemDataClient {
         transaction_list_with_proof.first_transaction_version = Some(start_version);
         transaction_list_with_proof.events = events;
         transaction_list_with_proof.transactions = transactions;
-        let response_payload =
-            DataClientPayload::TransactionsWithProof(transaction_list_with_proof);
-
-        // Return the transaction list with proofs
-        Ok(create_data_client_response(response_payload))
+        Ok(create_data_client_response(transaction_list_with_proof))
     }
 
-    async fn notify_bad_response(
-        &self,
-        _response_id: u64,
-        _response_error: ResponseError,
-    ) -> Result<(), diem_data_client::Error> {
-        unimplemented!();
+    fn notify_bad_response(&self, _response_id: u64, _response_error: ResponseError) {
+        // TODO(joshlind): implement this
     }
 }
 
 /// Creates a data client response using a specified payload and random id
-pub fn create_data_client_response(response_payload: DataClientPayload) -> DataClientResponse {
+pub fn create_data_client_response<T>(response_payload: T) -> Response<T> {
     let response_id = create_random_u64(MAX_RESPONSE_ID);
-    DataClientResponse {
-        response_id,
-        response_payload,
-    }
+    Response::new(response_id, response_payload)
 }
 
 /// Creates a ledger info with the given version and epoch. If `epoch_ending`

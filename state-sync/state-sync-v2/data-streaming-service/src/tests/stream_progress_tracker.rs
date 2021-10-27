@@ -2,15 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    data_notification::{DataClientRequest, EpochEndingLedgerInfosRequest},
+    data_notification::{DataClientRequest, DataClientResponse, EpochEndingLedgerInfosRequest},
     error::Error,
     stream_progress_tracker::{DataStreamTracker, EpochEndingStreamTracker, StreamProgressTracker},
     streaming_client::{GetAllEpochEndingLedgerInfosRequest, StreamRequest},
 };
 use claim::{assert_matches, assert_ok};
-use diem_data_client::{
-    DataClientPayload, DataClientResponse, GlobalDataSummary, OptimalChunkSizes,
-};
+use diem_data_client::{GlobalDataSummary, OptimalChunkSizes, Response, ResponsePayload};
 use diem_id_generator::U64IdGenerator;
 use std::{cmp, sync::Arc};
 use storage_service_types::CompleteDataRange;
@@ -283,8 +281,5 @@ fn create_notification_id_generator() -> Arc<U64IdGenerator> {
 }
 
 fn create_empty_client_response() -> DataClientResponse {
-    DataClientResponse {
-        response_id: 0,
-        response_payload: DataClientPayload::EpochEndingLedgerInfos(vec![]),
-    }
+    Response::new(0, ResponsePayload::EpochEndingLedgerInfos(vec![]))
 }

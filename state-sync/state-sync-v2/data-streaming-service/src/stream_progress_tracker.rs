@@ -8,18 +8,15 @@ use crate::{
             AccountsWithProof, EpochEndingLedgerInfos, NumberOfAccounts,
             TransactionOutputsWithProof, TransactionsWithProof,
         },
-        DataNotification, DataPayload, EpochEndingLedgerInfosRequest, NumberOfAccountsRequest,
-        TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
+        DataClientResponse, DataNotification, DataPayload, EpochEndingLedgerInfosRequest,
+        NumberOfAccountsRequest, TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
     },
     error::Error,
     streaming_client::{
         Epoch, GetAllAccountsRequest, GetAllEpochEndingLedgerInfosRequest, StreamRequest,
     },
 };
-use diem_data_client::{
-    AdvertisedData, DataClientPayload, DataClientPayload::NumberOfAccountStates,
-    DataClientResponse, GlobalDataSummary,
-};
+use diem_data_client::{AdvertisedData, GlobalDataSummary, ResponsePayload};
 use diem_id_generator::{IdGenerator, U64IdGenerator};
 use diem_types::{ledger_info::LedgerInfoWithSignatures, transaction::Version};
 use enum_dispatch::enum_dispatch;
@@ -247,7 +244,8 @@ impl DataStreamTracker for AccountsStreamTracker {
                 return Ok(Some(data_notification));
             }
             NumberOfAccounts(_) => {
-                if let NumberOfAccountStates(number_of_accounts) = client_response.response_payload
+                if let ResponsePayload::NumberOfAccountStates(number_of_accounts) =
+                    client_response.payload
                 {
                     // We got a response. Save the number of accounts.
                     self.number_of_accounts = Some(number_of_accounts);
@@ -524,8 +522,8 @@ impl DataStreamTracker for ContinuousTransactionStreamTracker {
     ) -> Result<Option<DataNotification>, Error> {
         match client_request {
             EpochEndingLedgerInfos(_) => {
-                if let DataClientPayload::EpochEndingLedgerInfos(epoch_ending_ledger_infos) =
-                    &client_response.response_payload
+                if let ResponsePayload::EpochEndingLedgerInfos(epoch_ending_ledger_infos) =
+                    &client_response.payload
                 {
                     if let [target_ledger_info] = &epoch_ending_ledger_infos[..] {
                         self.target_ledger_info = Some(target_ledger_info.clone());
@@ -1076,28 +1074,27 @@ fn create_data_notification(
 ) -> DataNotification {
     let notification_id = notification_id_generator.next();
 
-    let data_payload = match &client_response.response_payload {
-        DataClientPayload::AccountStatesWithProof(accounts_chunk) => {
+    let data_payload = match &client_response.payload {
+        ResponsePayload::AccountStatesWithProof(accounts_chunk) => {
             DataPayload::AccountStatesWithProof(accounts_chunk.clone())
         }
-        DataClientPayload::EpochEndingLedgerInfos(ledger_infos) => {
+        ResponsePayload::EpochEndingLedgerInfos(ledger_infos) => {
             DataPayload::EpochEndingLedgerInfos(ledger_infos.clone())
         }
-        DataClientPayload::TransactionsWithProof(transactions_chunk) => {
-            match stream_progress_tracker {
-                StreamProgressTracker::ContinuousTransactionStreamTracker(stream_tracker) => {
-                    DataPayload::ContinuousTransactionsWithProof(
-                        stream_tracker.get_target_ledger_info().clone(),
-                        transactions_chunk.clone(),
-                    )
-                }
-                StreamProgressTracker::TransactionStreamTracker(_) => {
-                    DataPayload::TransactionsWithProof(transactions_chunk.clone())
-                }
-                _ => invalid_response_type!(client_response),
+        ResponsePayload::TransactionsWithProof(transactions_chunk) => match stream_progress_tracker
+        {
+            StreamProgressTracker::ContinuousTransactionStreamTracker(stream_tracker) => {
+                DataPayload::ContinuousTransactionsWithProof(
+                    stream_tracker.get_target_ledger_info().clone(),
+                    transactions_chunk.clone(),
+                )
             }
-        }
-        DataClientPayload::TransactionOutputsWithProof(transactions_output_chunk) => {
+            StreamProgressTracker::TransactionStreamTracker(_) => {
+                DataPayload::TransactionsWithProof(transactions_chunk.clone())
+            }
+            _ => invalid_response_type!(client_response),
+        },
+        ResponsePayload::TransactionOutputsWithProof(transactions_output_chunk) => {
             match stream_progress_tracker {
                 StreamProgressTracker::ContinuousTransactionStreamTracker(stream_tracker) => {
                     DataPayload::ContinuousTransactionOutputsWithProof(

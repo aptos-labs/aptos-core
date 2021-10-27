@@ -14,7 +14,7 @@ use crate::{
 };
 use claim::{assert_ge, assert_none};
 use diem_data_client::{
-    AdvertisedData, DataClientPayload, DataClientResponse, GlobalDataSummary, OptimalChunkSizes,
+    AdvertisedData, GlobalDataSummary, OptimalChunkSizes, Response, ResponsePayload,
 };
 use diem_id_generator::U64IdGenerator;
 use diem_infallible::Mutex;
@@ -95,10 +95,10 @@ async fn test_stream_invalid_response() {
     });
     let pending_response = PendingClientResponse {
         client_request: client_request.clone(),
-        client_response: Some(Ok(DataClientResponse {
-            response_id: 0,
-            response_payload: DataClientPayload::NumberOfAccountStates(10),
-        })),
+        client_response: Some(Ok(Response::new(
+            0,
+            ResponsePayload::NumberOfAccountStates(10),
+        ))),
     };
     insert_response_into_pending_queue(&mut data_stream, pending_response);
 
@@ -237,7 +237,7 @@ fn set_epoch_ending_response_in_queue(
     let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
     let pending_response = sent_requests.as_mut().unwrap().get_mut(index).unwrap();
     let client_response = Some(Ok(create_data_client_response(
-        DataClientPayload::EpochEndingLedgerInfos(vec![create_ledger_info(
+        ResponsePayload::EpochEndingLedgerInfos(vec![create_ledger_info(
             0,
             MIN_ADVERTISED_EPOCH,
             true,

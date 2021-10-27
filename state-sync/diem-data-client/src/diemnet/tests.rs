@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{
-    DataClientPayload, DataSummaryPoller, DiemDataClient, DiemNetDataClient, Error,
-    DATA_SUMMARY_POLL_INTERVAL,
+    DataSummaryPoller, DiemDataClient, DiemNetDataClient, Error, DATA_SUMMARY_POLL_INTERVAL,
 };
 use channel::{diem_channel, message_queues::QueueStyle};
 use claim::assert_matches;
@@ -177,8 +176,5 @@ async fn test_request_works_only_when_data_available() {
         .await
         .unwrap();
 
-    assert_eq!(
-        response.response_payload,
-        DataClientPayload::TransactionsWithProof(TransactionListWithProof::new_empty())
-    );
+    assert_eq!(response.payload, TransactionListWithProof::new_empty(),);
 }

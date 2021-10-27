@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    AdvertisedData, DataClientPayload, DataClientResponse, DiemDataClient, Error,
-    GlobalDataSummary, OptimalChunkSizes, ResponseError,
+    AdvertisedData, DiemDataClient, Error, GlobalDataSummary, OptimalChunkSizes, Response,
+    ResponseError, Result,
 };
 use async_trait::async_trait;
 use diem_config::network_id::PeerNetworkId;
@@ -11,16 +11,25 @@ use diem_id_generator::{IdGenerator, U64IdGenerator};
 use diem_infallible::RwLock;
 use diem_logger::trace;
 use diem_time_service::{TimeService, TimeServiceTrait};
+use diem_types::{
+    account_state_blob::AccountStatesChunkWithProof,
+    epoch_change::EpochChangeProof,
+    ledger_info::LedgerInfoWithSignatures,
+    transaction::{
+        default_protocol::{TransactionListWithProof, TransactionOutputListWithProof},
+        Version,
+    },
+};
 use futures::StreamExt;
 use network::{
     application::interface::NetworkInterface,
     protocols::{rpc::error::RpcError, wire::handshake::v1::ProtocolId},
 };
 use rand::seq::SliceRandom;
-use std::{collections::HashMap, convert::TryInto, sync::Arc, time::Duration};
+use std::{collections::HashMap, convert::TryFrom, sync::Arc, time::Duration};
 use storage_service_client::StorageServiceClient;
 use storage_service_types::{
-    AccountStatesChunkWithProofRequest, EpochEndingLedgerInfoRequest, StorageServerSummary,
+    AccountStatesChunkWithProofRequest, Epoch, EpochEndingLedgerInfoRequest, StorageServerSummary,
     StorageServiceRequest, StorageServiceResponse, TransactionOutputsWithProofRequest,
     TransactionsWithProofRequest,
 };
@@ -137,39 +146,53 @@ impl DiemNetDataClient {
             })
     }
 
-    // TODO(philiphayes): this should be generic in DiemDataClient trait
-    pub async fn send_request(
+    async fn send_request_and_decode<T, E>(
         &self,
-        // TODO(philiphayes): should be a separate DataClient type?
         request: StorageServiceRequest,
-    ) -> Result<DataClientResponse, Error> {
+    ) -> Result<Response<T>>
+    where
+        T: TryFrom<StorageServiceResponse, Error = E>,
+        E: Into<Error>,
+    {
         let peer = self.choose_peer(&request)?;
-        self.send_request_to_peer(peer, request).await
+        self.send_request_to_peer_and_decode(peer, request).await
+    }
+
+    async fn send_request_to_peer_and_decode<T, E>(
+        &self,
+        peer: PeerNetworkId,
+        request: StorageServiceRequest,
+    ) -> Result<Response<T>>
+    where
+        T: TryFrom<StorageServiceResponse, Error = E>,
+        E: Into<Error>,
+    {
+        let response = self.send_request_to_peer(peer, request).await?;
+
+        let id = response.id;
+
+        // try to convert the storage service enum into the exact variant we're expecting.
+        let result = response.and_then(T::try_from).map_err(Into::into);
+
+        // if the variant doesn't match what we're expecting, report the issue.
+        if result.is_err() {
+            self.notify_bad_response(id, ResponseError::InvalidPayloadDataType);
+        }
+
+        result
     }
 
     async fn send_request_to_peer(
         &self,
         peer: PeerNetworkId,
         request: StorageServiceRequest,
-    ) -> Result<DataClientResponse, Error> {
+    ) -> Result<Response<StorageServiceResponse>, Error> {
         let response_id = self.next_response_id();
-        let response = self.send_request_to_peer_inner(peer, request).await;
-        Ok(DataClientResponse {
-            response_id,
-            response_payload: response?.try_into()?,
-        })
-    }
-
-    async fn send_request_to_peer_inner(
-        &self,
-        peer: PeerNetworkId,
-        request: StorageServiceRequest,
-    ) -> Result<StorageServiceResponse, Error> {
         let result = self
             .network_client
             .send_request(peer, request, DEFAULT_TIMEOUT)
             .await;
-        match result {
+        let storage_response = match result {
             Ok(response) => Ok(response),
             Err(storage_service_client::Error::RpcError(err)) => match err {
                 RpcError::NotConnected(_) => Err(Error::DataIsUnavailable(err.to_string())),
@@ -179,25 +202,14 @@ impl DiemNetDataClient {
             Err(storage_service_client::Error::StorageServiceError(err)) => {
                 Err(Error::UnexpectedErrorEncountered(err.to_string()))
             }
-        }
+        }?;
         // TODO(philiphayes): update peer scores on error
-    }
-
-    async fn send_data_summary_request(
-        &self,
-        peer: PeerNetworkId,
-    ) -> Result<StorageServerSummary, Error> {
-        let response = self
-            .send_request_to_peer_inner(peer, StorageServiceRequest::GetStorageServerSummary)
-            .await?;
-        match response {
-            StorageServiceResponse::StorageServerSummary(summary) => Ok(summary),
-            _ => Err(Error::InvalidResponse("unexpected response".to_owned())),
-        }
+        Ok(Response::new(response_id, storage_response))
     }
 }
 
-/// (start..=end).len()
+/// Calculate `(start..=end).len()`. Returns an error if `end < start` or
+/// `end == u64::MAX`.
 fn range_len(start: u64, end: u64) -> Result<u64, Error> {
     // len = end - start + 1
     let len = end.checked_sub(start).ok_or_else(|| {
@@ -211,102 +223,80 @@ fn range_len(start: u64, end: u64) -> Result<u64, Error> {
 
 #[async_trait]
 impl DiemDataClient for DiemNetDataClient {
-    fn get_global_data_summary(&self) -> Result<DataClientResponse, Error> {
-        // TODO(philiphayes): feels awkward to create a DataClientResponse here
-        // rather than just return the type directly. what does the response id
-        // mean here?
-        Ok(DataClientResponse {
-            response_id: self.next_response_id(),
-            response_payload: DataClientPayload::GlobalDataSummary(
-                self.global_summary_cache.read().clone(),
-            ),
-        })
+    fn get_global_data_summary(&self) -> GlobalDataSummary {
+        self.global_summary_cache.read().clone()
+    }
+
+    fn notify_bad_response(&self, _response_id: u64, _response_error: ResponseError) {
+        todo!()
     }
 
     async fn get_account_states_with_proof(
         &self,
         version: u64,
-        start_index: u64,
-        end_index: u64,
-    ) -> Result<DataClientResponse, Error> {
-        self.send_request(StorageServiceRequest::GetAccountStatesChunkWithProof(
+        start_account_index: u64,
+        end_account_index: u64,
+    ) -> Result<Response<AccountStatesChunkWithProof>> {
+        let request = StorageServiceRequest::GetAccountStatesChunkWithProof(
             AccountStatesChunkWithProofRequest {
                 version,
-                start_account_index: start_index,
-                expected_num_account_states: range_len(start_index, end_index)?,
+                start_account_index,
+                expected_num_account_states: range_len(start_account_index, end_account_index)?,
             },
-        ))
-        .await
+        );
+        self.send_request_and_decode(request).await
     }
 
     async fn get_epoch_ending_ledger_infos(
         &self,
-        start_epoch: u64,
-        expected_end_epoch: u64,
-    ) -> Result<DataClientResponse, Error> {
-        self.send_request(StorageServiceRequest::GetEpochEndingLedgerInfos(
-            EpochEndingLedgerInfoRequest {
+        start_epoch: Epoch,
+        expected_end_epoch: Epoch,
+    ) -> Result<Response<Vec<LedgerInfoWithSignatures>>> {
+        let request =
+            StorageServiceRequest::GetEpochEndingLedgerInfos(EpochEndingLedgerInfoRequest {
                 start_epoch,
                 expected_end_epoch,
-            },
-        ))
-        .await
+            });
+        let response: Response<EpochChangeProof> = self.send_request_and_decode(request).await?;
+        Ok(response.map(|epoch_change| epoch_change.ledger_info_with_sigs))
     }
 
-    async fn get_number_of_account_states(
-        &self,
-        version: u64,
-    ) -> Result<DataClientResponse, Error> {
-        self.send_request(StorageServiceRequest::GetNumberOfAccountsAtVersion(version))
-            .await
+    async fn get_number_of_account_states(&self, version: Version) -> Result<Response<u64>> {
+        let request = StorageServiceRequest::GetNumberOfAccountsAtVersion(version);
+        self.send_request_and_decode(request).await
     }
 
     async fn get_transaction_outputs_with_proof(
         &self,
-        proof_version: u64,
-        start_version: u64,
-        end_version: u64,
-    ) -> Result<DataClientResponse, Error> {
-        self.send_request(StorageServiceRequest::GetTransactionOutputsWithProof(
+        proof_version: Version,
+        start_version: Version,
+        end_version: Version,
+    ) -> Result<Response<TransactionOutputListWithProof>> {
+        let request = StorageServiceRequest::GetTransactionOutputsWithProof(
             TransactionOutputsWithProofRequest {
                 proof_version,
                 start_version,
                 expected_num_outputs: range_len(start_version, end_version)?,
             },
-        ))
-        .await
+        );
+        self.send_request_and_decode(request).await
     }
 
     async fn get_transactions_with_proof(
         &self,
-        proof_version: u64,
-        start_version: u64,
-        end_version: u64,
+        proof_version: Version,
+        start_version: Version,
+        end_version: Version,
         include_events: bool,
-    ) -> Result<DataClientResponse, Error> {
-        if proof_version < end_version {
-            return Err(Error::InvalidRequest(format!(
-                "proof_version ({}) must be >= end_version ({})",
-                proof_version, end_version
-            )));
-        }
-        self.send_request(StorageServiceRequest::GetTransactionsWithProof(
-            TransactionsWithProofRequest {
+    ) -> Result<Response<TransactionListWithProof>> {
+        let request =
+            StorageServiceRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
                 proof_version,
                 start_version,
                 expected_num_transactions: range_len(start_version, end_version)?,
                 include_events,
-            },
-        ))
-        .await
-    }
-
-    async fn notify_bad_response(
-        &self,
-        _response_id: u64,
-        _response_error: ResponseError,
-    ) -> Result<(), Error> {
-        todo!()
+            });
+        self.send_request_and_decode(request).await
     }
 }
 
@@ -364,7 +354,14 @@ impl DataSummaryPoller {
                 Err(_) => continue,
             };
 
-            let result = self.data_client.send_data_summary_request(peer).await;
+            let result: Result<StorageServerSummary> = self
+                .data_client
+                .send_request_to_peer_and_decode(
+                    peer,
+                    StorageServiceRequest::GetStorageServerSummary,
+                )
+                .await
+                .map(Response::into_payload);
 
             trace!("DataSummaryPoller: maybe received response: {:?}", result);
 
