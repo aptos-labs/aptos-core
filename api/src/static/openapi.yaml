@@ -7,144 +7,196 @@ info:
     name: Apache 2.0
     url: http://www.apache.org/licenses/LICENSE-2.0.html
   version: 0.1.0
+tags:
+  - name: info
+    description: API for getting the latest ledger information.
+  - name: accounts
+    description: API for getting account resources, modules / events.
+  - name: transactions
+    description: API for getting, creating, and submit transactions.
 paths:
   /:
     get:
-      summary: get Diem blockchain the latest ledger information.
+      summary: Get the latest ledger information.
       operationId: get-ledger-info
+      tags:
+        - info
       responses:
-        200:
-          description: Returns the latest ledger information
+        "200":
+          description: Returns the latest ledger information.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/LedgerInfo'
-        500:
-          $ref: '#/components/responses/Error'
+        "500":
+          $ref: '#/components/responses/500'
   /accounts/{address}/resources:
     get:
-      summary: Query account resources by account address.
+      summary: Get account resources
       operationId: get-account-resources
+      tags:
+        - accounts
       parameters:
         - $ref: '#/components/parameters/AccountAddress'
       responses:
-        200:
-          description: Returns all account resources in the latest ledger version.
+        "200":
+          description: Returns the latest account resources.
           content:
             application/json:
               schema:
                 type: array
                 items:
                   $ref: '#/components/schemas/MoveResource'
-        400:
-          $ref: '#/components/responses/Error'
-        404:
-          $ref: '#/components/responses/Error'
-        500:
-          $ref: '#/components/responses/Error'
+        "400":
+          $ref: '#/components/responses/400'
+        "404":
+          $ref: '#/components/responses/404'
+        "500":
+          $ref: '#/components/responses/500'
   /accounts/{address}/modules:
     get:
-      summary: Query account modules / code by account address.
+      summary: Get account modules
       operationId: get-account-modules
+      tags:
+        - accounts
       parameters:
         - $ref: '#/components/parameters/AccountAddress'
       responses:
-        200:
-          description: Returns all account modules in the latest ledger version.
+        "200":
+          description: Returns the latest account modules.
           content:
             application/json:
               schema:
                 type: array
                 items:
                   $ref: '#/components/schemas/MoveModuleBytecode'
-        400:
-          $ref: '#/components/responses/Error'
-        404:
-          $ref: '#/components/responses/Error'
-        500:
-          $ref: '#/components/responses/Error'
+        "400":
+          $ref: '#/components/responses/400'
+        "404":
+          $ref: '#/components/responses/404'
+        "500":
+          $ref: '#/components/responses/500'
   /ledger/{ledger_version}/accounts/{address}/resources:
     get:
-      summary: Query account resources by account address.
+      summary: Get account resources by ledger version
       operationId: get-account-resources-by-version
+      description: >-
+        This API returns account resources for a specific ledger version (AKA transaction version).
+
+
+        Diem node prunes account state history data by a time window configured (link).
+
+
+        When the data is pruned, server responds 404.
+      tags:
+        - accounts
       parameters:
         - $ref: '#/components/parameters/AccountAddress'
         - $ref: '#/components/parameters/LedgerVersion'
       responses:
-        200:
+        "200":
           description: >-
-            Returns all account resources for the given ledger version.
-
-            Note: Diem node may prune account state history data depending on a configuration
-            (TODO: configuration document URL).
-            When the data is pruned, 404 is returned.
+            Returns the given ledger version account resources.
           content:
             application/json:
               schema:
                 type: array
                 items:
                   $ref: '#/components/schemas/MoveResource'
-        400:
-          $ref: '#/components/responses/Error'
-        404:
-          $ref: '#/components/responses/Error'
-        500:
-          $ref: '#/components/responses/Error'
+        "400":
+          $ref: '#/components/responses/400'
+        "404":
+          $ref: '#/components/responses/404'
+        "500":
+          $ref: '#/components/responses/500'
   /ledger/{ledger_version}/accounts/{address}/modules:
     get:
-      summary: Query account modules / code by account address.
+      summary: Get account modules by ledger version
+      description: >-
+        This API returns account modules for a specific ledger version (AKA transaction version).
+
+
+        Diem node prunes account state history data by a time window configured (link).
+
+
+        When the data is pruned, server responds 404.
       operationId: get-account-modules-by-version
+      tags:
+        - accounts
       parameters:
         - $ref: '#/components/parameters/AccountAddress'
         - $ref: '#/components/parameters/LedgerVersion'
       responses:
-        200:
+        "200":
           description: >-
-            Returns all account modules for the given ledger version.
-
-            Note: Diem node may prune account state history data depending on a configuration
-            (TODO: configuration document URL).
-            When the data is pruned, 404 is returned.
+            Returns the given ledger version account modules.
           content:
             application/json:
               schema:
                 type: array
                 items:
                   $ref: '#/components/schemas/MoveModuleBytecode'
-        400:
-          $ref: '#/components/responses/Error'
-        404:
-          $ref: '#/components/responses/Error'
-        500:
-          $ref: '#/components/responses/Error'
+        "400":
+          $ref: '#/components/responses/400'
+        "404":
+          $ref: '#/components/responses/404'
+        "500":
+          $ref: '#/components/responses/500'
   /transactions:
     get:
-      summary: Query all transactions on chain.
+      summary: Get transactions
       operationId: get-transactions
+      tags:
+        - transactions
       parameters:
         - $ref: '#/components/parameters/StartVersion'
         - $ref: '#/components/parameters/Limit'
       responses:
-        200:
-          description: Returns all transactions, paginated.
+        "200":
+          description: Returns on-chain transactions, paginated.
           content:
             application/json:
               schema:
                 type: array
                 items:
                   $ref: '#/components/schemas/OnChainTransaction'
-        500:
-          $ref: '#/components/responses/Error'
+        "400":
+          $ref: '#/components/responses/400'
+        "500":
+          $ref: '#/components/responses/500'
     post:
-      summary: Submit a transaction to mempool for execution.
+      summary: Submit transaction
       operationId: submit-transaction
+      description: >-
+        **Submit transaction using JSON without additional tools**
+
+          * Send [POST /transactions/signing_message](#operation/create-signing-message) to create transaction signing message.
+          * Sign the transaction signing message and create transaction signature.
+          * Submit the user transaction request with the transaction siganture. The request header "Content-Type" must set to "application/json".
+
+        **Submit transaction using signed transaction BCS bytes**
+
+          * Generate Diem core types and transaction script functions for the client application langauge
+            by [Tranaction Builder](https://github.com/diem/diem/tree/main/language/transaction-builder/generator)
+          * Create [RawTransaction](https://diem.github.io/diem/diem_types/transaction/struct.RawTransaction.html).
+          * Create transaction signing message: bytes("DIEM::RawTransaction") + BCS bytes of the RawTransaction.
+            See [Crypto Spec](https://github.com/diem/diem/blob/main/specifications/crypto/README.md) for more details.
+          * Sign the transaction signing message and create transaction signature.
+          * Create [SignedTransaction](https://diem.github.io/diem/diem_types/transaction/struct.SignedTransaction.html).
+          * Serialize [SignedTransaction](https://diem.github.io/diem/diem_types/transaction/struct.SignedTransaction.html)
+            into BCS bytes.
+          * Submit the [SignedTransaction](https://diem.github.io/diem/diem_types/transaction/struct.SignedTransaction.html)
+            BCS bytes (do not hex-encoded it). The request header "Content-Type" must set to "application/vnd.bcs+signed_transaction".
+      tags:
+        - transactions
       requestBody:
-        description: Transaction request
+        description: >-
+          User transaction request with transaction sender's signature.
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UserTransactionRequest'
+              $ref: '#/components/schemas/UserTransactionRequestWithSignature'
           application/vnd.bcs+signed_transaction:
             schema:
               type: string
@@ -152,20 +204,28 @@ paths:
               description: >-
                 BCS bytes of the [SignedTransaction](https://diem.github.io/diem/diem_types/transaction/struct.SignedTransaction.html).
       responses:
-        202:
+        "202":
           description: Transaction is accepted and submitted to mempool.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/PendingTransaction'
-        400:
-          $ref: '#/components/responses/Error'
-        500:
-          $ref: '#/components/responses/Error'
+        "400":
+          $ref: '#/components/responses/400'
+        "500":
+          $ref: '#/components/responses/500'
   /transactions/{txn_hash}:
     get:
-      summary: Query transaction by transaction hash
+      summary: Get transaction by hash
+      description: >-
+        Server first looks up on-chain transaction by hash; if no on-chain transaction found,
+        then look up transaction by hash in the mempool transactions.
+
+        It is possible transaction is commited on-chain, but server responses
+        404 not found due to various reasons, e.g. broken index.
       operationId: get-transaction
+      tags:
+        - transactions
       parameters:
         - name: txn_hash
           in: path
@@ -175,29 +235,32 @@ paths:
             type: string
             format: hex-encoded-bytes
       responses:
-        200:
+        "200":
           description: >-
-            First look up on-chain transaction by hash; if no on-chain transaction found,
-            then look up transaction by hash in the mempool transactions.
-
-            It is possible transaction is commited on-chain, but server responses
-            404 not found due to various reasons, e.g. broken index.
+            Returns transaction matches the given hash.
           content:
             application/json:
               schema:
                 oneOf:
                   - $ref: '#/components/schemas/OnChainTransaction'
                   - $ref: '#/components/schemas/PendingTransaction'
-        400:
-          $ref: '#/components/responses/Error'
-        404:
-          $ref: '#/components/responses/Error'
-        500:
-          $ref: '#/components/responses/Error'
+        "400":
+          $ref: '#/components/responses/400'
+        "404":
+          $ref: '#/components/responses/404'
+        "500":
+          $ref: '#/components/responses/500'
   /transactions/{txn_version}:
     get:
-      summary: Query transaction by transaction version
+      summary: Get transaction by version
+      description: >-
+        Looks up transaction on-chain by version.
+
+        Note: as pending transaction in the mempool does not have a version,
+              this API does not look for pending transaction in the mempool.
       operationId: get-transaction-by-version
+      tags:
+        - transactions
       parameters:
         - name: txn_version
           in: path
@@ -206,36 +269,48 @@ paths:
           schema:
             type: integer
       responses:
-        200:
+        "200":
           description: >-
             Returns on-chain transaction by the given version.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/OnChainTransaction'
-        400:
-          $ref: '#/components/responses/Error'
-        404:
-          $ref: '#/components/responses/Error'
-        500:
-          $ref: '#/components/responses/Error'
+        "400":
+          $ref: '#/components/responses/400'
+        "404":
+          $ref: '#/components/responses/404'
+        "500":
+          $ref: '#/components/responses/500'
   /transactions/signing_message:
     post:
-      summary: Construct transaction signing message for client.
+      summary: Create transaction signing message
+      description: >-
+        This API creates transaction signing message for client to create
+        transaction signature.
+
+
+        The success response contains hex-encoded signing message bytes.
+
+
+        **To sign the message**
+
+          1. Client first needs to HEX decode the `message` into bytes.
+          2. Then sign the bytes to create signature.
       operationId: create-signing-message
+      tags:
+        - transactions
       requestBody:
-        description: User transaction request without `signature` field specified.
+        description: User transaction request
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/UserTransactionRequest'
       responses:
-        200:
+        "200":
           description: >-
-            Returns transaction signing message bytes.
-            Client can use account private key to sign the message (after decoded into bytes), and then
-            construct `UserTransactionRequest` with `signature` field to submit transaction to mempool.
+            Returns hex-encoded transaction signing message bytes.
           content:
             application/json:
               schema:
@@ -246,12 +321,12 @@ paths:
                   message:
                     type: string
                     format: hex-encoded-bytes
-        400:
-          $ref: '#/components/responses/Error'
-        404:
-          $ref: '#/components/responses/Error'
-        500:
-          $ref: '#/components/responses/Error'
+        "400":
+          $ref: '#/components/responses/400'
+        "404":
+          $ref: '#/components/responses/404'
+        "500":
+          $ref: '#/components/responses/500'
 components:
   parameters:
     AccountAddress:
@@ -259,13 +334,13 @@ components:
       in: path
       required: true
       schema:
-        $ref: '#/components/schemas/Address'
+        $ref: '#/components/schemas/address'
     LedgerVersion:
       name: ledger_version
       in: path
       required: true
       description: >-
-        Ledger version is the version of the latest transaction in the ledger / latest block on-chain.
+        Ledger version is the version of the latest transaction in the ledger.
       schema:
         type: string
         format: uint64
@@ -286,32 +361,51 @@ components:
       schema:
         type: integer
   responses:
-    Error:
+    "400":
       description: >-
-        Error response data, use HTTP response code to distinguish client / server internal errors.
+        Bad request due to a client error: invalid request headers, parameters or body.
+        Client should not retry the request without modification.
       content:
         application/json:
           schema:
-            type: object
-            properties:
-              code:
-                type: integer
-              message:
-                type: string
-              diem_ledger_version:
-                type: string
-                format: uint64
-            required:
-              - code
-              - message
+            $ref: "#/components/schemas/Error"
+    "404":
+      description: >-
+        Resource or data not found.
+        Client may retry the request if it is waiting for transaction execution or ledger synchronization.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    "500":
+      description: >-
+        Server internal error, caused by unexpected issues.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
   schemas:
-    Address:
+    Error:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        diem_ledger_version:
+          type: string
+          format: uint64
+    address:
       type: string
       format: hex-encoded-bytes
       description: >-
         Hex-encoded 16 bytes Diem account address.
-        Prefixed with `0x`.
-        Leading zeros are trimmed.
+
+
+        Prefixed with `0x` and leading zeros are trimmed.
       example: "0xdd"
     LedgerInfo:
       type: object
@@ -330,13 +424,13 @@ components:
           format: uint64
           example: "52635485"
           description: >-
-            The version of the latest transaction in the ledger / latest block on-chain
+            The version of the latest transaction in the ledger.
         ledger_timestamp:
           type: string
           format: uint64
           example: "1632507671675208"
           description: >-
-            The timestamp of the ledger version in microseconds
+            The timestamp of the ledger version in microseconds.
     MoveResource:
       type: object
       required:
@@ -344,17 +438,94 @@ components:
         - value
       properties:
         type:
-          $ref: '#/components/schemas/MoveResourceType'
+          $ref: '#/components/schemas/MoveTypeStruct'
         value:
           type: "object"
           description: >-
             Account resource data value, deserialized from Move data, field name map to field value, use `type` field information to decode.
-    MoveResourceType:
+    MoveTypeBool:
       type: object
       description: >-
-        Move type struct, we need redefine it here because JSON schema does not support tree recursive structures.
-        The `generic_type_params` field `items` is ref to `#/components/schemas/MoveType` which is recursive
-        structure.
+        Move type `bool`
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum:
+            - bool
+    MoveTypeU8:
+      type: object
+      description: >-
+        Move type `u8`
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum:
+            - u8
+    MoveTypeU64:
+      type: object
+      description: >-
+        Move type `u64`
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum:
+            - u64
+    MoveTypeU128:
+      type: object
+      description: >-
+        Move type `u128`
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum:
+            - u128
+    MoveTypeAddress:
+      type: object
+      description: >-
+        Move type `address`
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum:
+            - address
+    MoveTypeSigner:
+      type: object
+      description: >-
+        Move type `signer`
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum:
+            - signer
+    MoveTypeVector:
+      type: object
+      description: Move type `vector`.
+      required:
+        - type
+        - items
+      properties:
+        type:
+          type: string
+          enum:
+            - vector
+          items:
+            $ref: '#/components/schemas/MoveType'
+    MoveTypeStruct:
+      type: object
+      description: >-
+        Move type `struct` referencing to an on-chain struct definition.
       required:
         - type
         - address
@@ -367,7 +538,7 @@ components:
           enum:
             - struct
         address:
-          $ref: '#/components/schemas/Address'
+          $ref: '#/components/schemas/address'
         module:
           type: string
           description: Module identifier / name, case sensitive.
@@ -380,129 +551,50 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MoveType'
+    MoveTypeGenericTypeParam:
+      type: object
+      description: >-
+        Move type generic type param, used for referencing to a generic type param defined
+        in the struct / function generaic type parameters.
+      required:
+        - type
+        - index
+      properties:
+        type:
+          type: string
+          enum:
+            - generic_type_param
+        index:
+          type: integer
+    MoveTypeReference:
+      type: object
+      description: >-
+        Move type reference, used for defining a reference type.
+      required:
+        - type
+        - mutable
+        - to
+      properties:
+        type:
+          type: string
+          enum:
+            - reference
+        mutable:
+          type: boolean
+        to:
+          $ref: '#/components/schemas/MoveType'
     MoveType:
       oneOf:
-        - type: object
-          description: Move type boolean
-          required:
-            - type
-          properties:
-            type:
-              type: string
-              enum:
-                - bool
-        - type: object
-          description: Move type unsigned int8
-          required:
-            - type
-          properties:
-            type:
-              type: string
-              enum:
-                - u8
-        - type: object
-          description: Move type unsigned int64
-          required:
-            - type
-          properties:
-            type:
-              type: string
-              enum:
-                - u64
-        - type: object
-          description: Move type unsigned int128
-          required:
-            - type
-          properties:
-            type:
-              type: string
-              enum:
-                - u128
-        - type: object
-          description: Move type address
-          required:
-            - type
-          properties:
-            type:
-              type: string
-              enum:
-                - address
-        - type: object
-          description: Move type signer
-          required:
-            - type
-          properties:
-            type:
-              type: string
-              enum:
-                - signer
-        - type: object
-          description: Move type vector
-          required:
-            - type
-            - items
-          properties:
-            type:
-              type: string
-              enum:
-                - vector
-            items:
-              $ref: '#/components/schemas/MoveType'
-        - type: object
-          description: Move type struct
-          required:
-            - type
-            - address
-            - module
-            - name
-            - generic_type_params
-          properties:
-            type:
-              type: string
-              enum:
-                - struct
-            address:
-              $ref: '#/components/schemas/Address'
-            module:
-              type: string
-              description: Module identifier / name
-            name:
-              type: string
-              description: struct name
-            generic_type_params:
-              type: array
-              items:
-                $ref: '#/components/schemas/MoveType'
-        - type: object
-          description: >-
-            Move type generic type param, used for referencing to a generic type param defined
-            in the struct / function generaic type parameters.
-          required:
-            - type
-            - index
-          properties:
-            type:
-              type: string
-              enum:
-                - generic_type_param
-            index:
-              type: integer
-        - type: object
-          description: >-
-            Move type reference, used for defining a reference type.
-          required:
-            - type
-            - mutable
-            - to
-          properties:
-            type:
-              type: string
-              enum:
-                - reference
-            mutable:
-              type: boolean
-            to:
-              $ref: '#/components/schemas/MoveType'
+        - $ref: '#/components/schemas/MoveTypeBool'
+        - $ref: '#/components/schemas/MoveTypeU8'
+        - $ref: '#/components/schemas/MoveTypeU64'
+        - $ref: '#/components/schemas/MoveTypeU128'
+        - $ref: '#/components/schemas/MoveTypeAddress'
+        - $ref: '#/components/schemas/MoveTypeSigner'
+        - $ref: '#/components/schemas/MoveTypeVector'
+        - $ref: '#/components/schemas/MoveTypeStruct'
+        - $ref: '#/components/schemas/MoveTypeGenericTypeParam'
+        - $ref: '#/components/schemas/MoveTypeReference'
     MoveModuleBytecode:
       type: object
       required:
@@ -524,7 +616,7 @@ components:
         - structs
       properties:
         address:
-          $ref: '#/components/schemas/Address'
+          $ref: '#/components/schemas/address'
         name:
           type: string
           example: "Diem"
@@ -637,7 +729,7 @@ components:
         - name
       properties:
         address:
-          $ref: '#/components/schemas/Address'
+          $ref: '#/components/schemas/address'
         name:
           type: string
           description: Module identifier / name
@@ -654,7 +746,36 @@ components:
         - payload
       properties:
         sender:
-          $ref: '#/components/schemas/Address'
+          $ref: '#/components/schemas/address'
+        sequence_number:
+          type: string
+          format: uint64
+        max_gas_amount:
+          type: string
+          format: uint64
+        gas_unit_price:
+          type: string
+          format: uint64
+        gas_currency_code:
+          type: string
+        expiration_timestamp_secs:
+          type: string
+          format: uint64
+        payload:
+          $ref: '#/components/schemas/TransactionPayload'
+    UserTransactionRequestWithSignature:
+      type: object
+      required:
+        - sender
+        - sequence_number
+        - max_gas_amount
+        - gas_unit_price
+        - gas_currency_code
+        - expiration_timestamp_secs
+        - payload
+      properties:
+        sender:
+          $ref: '#/components/schemas/address'
         sequence_number:
           type: string
           format: uint64
@@ -695,7 +816,7 @@ components:
           type: string
           format: hex-encoded-bytes
         sender:
-          $ref: '#/components/schemas/Address'
+          $ref: '#/components/schemas/address'
         sequence_number:
           type: string
           format: uint64
@@ -741,7 +862,7 @@ components:
         type:
           type: string
           enum:
-            - genesis_transaction
+            - user_transaction
         version:
           type: string
           format: uint64
@@ -759,8 +880,10 @@ components:
           format: hex-encoded-bytes
         success:
           type: boolean
+        vm_status:
+          type: string
         sender:
-          $ref: '#/components/schemas/Address'
+          $ref: '#/components/schemas/address'
         sequence_number:
           type: string
           format: uint64
@@ -798,7 +921,7 @@ components:
         type:
           type: string
           enum:
-            - genesis_transaction
+            - block_metadata_transaction
         version:
           type: string
           format: uint64
@@ -816,6 +939,8 @@ components:
           format: hex-encoded-bytes
         success:
           type: boolean
+        vm_status:
+          type: string
         id:
           type: string
           format: hex-encoded-bytes
@@ -825,9 +950,9 @@ components:
         previous_block_votes:
           type: array
           items:
-            $ref: '#/components/schemas/Address'
+            $ref: '#/components/schemas/address'
         proposer:
-          $ref: '#/components/schemas/Address'
+          $ref: '#/components/schemas/address'
         timestamp:
           type: string
           format: uint64
@@ -866,15 +991,10 @@ components:
           format: hex-encoded-bytes
         success:
           type: boolean
+        vm_status:
+          type: string
         payload:
-          type: object
-          properties:
-            type:
-              type: string
-              enum:
-                - genesis_payload
-            write_set:
-              $ref: '#/components/schemas/WriteSet'
+          $ref: '#/components/schemas/WriteSetPayload'
         events:
           type: array
           items:
@@ -979,7 +1099,7 @@ components:
           enum:
             - script_write_set
         execute_as:
-          $ref: '#/components/schemas/Address'
+          $ref: '#/components/schemas/address'
         script:
           $ref: '#/components/schemas/Script'
     DirectWriteSet:
@@ -1019,7 +1139,7 @@ components:
           enum:
             - delete_module
         address:
-          $ref: '#/components/schemas/Address'
+          $ref: '#/components/schemas/address'
         module:
           $ref: '#/components/schemas/MoveModuleId'
     DeleteResource:
@@ -1035,9 +1155,9 @@ components:
           enum:
             - delete_resource
         address:
-          $ref: '#/components/schemas/Address'
+          $ref: '#/components/schemas/address'
         resource:
-          $ref: '#/components/schemas/MoveResourceType'
+          $ref: '#/components/schemas/MoveTypeStruct'
     WriteModule:
       type: object
       description: Write move module
@@ -1051,7 +1171,7 @@ components:
           enum:
             - write_module
         address:
-          $ref: '#/components/schemas/Address'
+          $ref: '#/components/schemas/address'
         data:
           $ref: '#/components/schemas/MoveModuleBytecode'
     WriteResource:
@@ -1067,7 +1187,7 @@ components:
           enum:
             - write_resource
         address:
-          $ref: '#/components/schemas/Address'
+          $ref: '#/components/schemas/address'
         data:
           $ref: '#/components/schemas/MoveResource'
     Script:
@@ -1097,21 +1217,37 @@ components:
           format: hex-encoded-bytes
         abi:
           $ref: '#/components/schemas/MoveFunction'
+    bool:
+      type: boolean
+      description: Move `bool` type value
+    u8:
+      type: integer
+      description: Unsiged int8 type value
+    u64:
+      type: string
+      format: uint64
+      description: Unsiged int64 type value
+    u128:
+      type: string
+      format: uint128
+      description: Unsiged int128 type value
+    vector:
+      type: array
+      items:
+        $ref: '#/components/schemas/MoveValue'
+    struct:
+      type: object
+      description: Move struct value, object properties map to struct field name and value
+      additionalProperties: true
     MoveValue:
       oneOf:
-        - type: integer
-          description: Unsiged int8 type value
-        - type: string
-          description: >-
-            Could be `uint64`, `uint128`, `hex-encoded-bytes` or `#/components/schemas/Address` type value.
-            To correctly decode, need check `MoveType` of the value.
-        - type: boolean
-          description: boolean type value
-        - type: array
-          items:
-            $ref: '#/components/schemas/MoveValue'
-        - type: object
-          description: Move struct value, object properties map to struct field name and value
+        - $ref: '#/components/schemas/bool'
+        - $ref: '#/components/schemas/u8'
+        - $ref: '#/components/schemas/u64'
+        - $ref: '#/components/schemas/u128'
+        - $ref: '#/components/schemas/address'
+        - $ref: '#/components/schemas/vector'
+        - $ref: '#/components/schemas/struct'
     Event:
       type: object
       required:
@@ -1212,7 +1348,7 @@ components:
         secondary_signer_addresses:
           type: array
           items:
-            $ref: '#/components/schemas/Address'
+            $ref: '#/components/schemas/address'
         secondary_signers:
           type: array
           items:
