@@ -1,0 +1,8 @@
+warning: Failed to instantiate all type parameters in this global invariant
+   ┌─ tests/sources/functional/uninst_global_invariant.move:11:9
+   │
+ 7 │         move_to(&account, S1 {});
+   │         ------- When instrumenting the global invariant here
+   ·
+11 │         invariant<T> exists<S1>(@0x42) ==> exists<S2<T>>(@0x42);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
