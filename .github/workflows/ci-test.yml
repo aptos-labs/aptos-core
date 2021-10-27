@@ -492,6 +492,8 @@ jobs:
           shellcheck scripts/weekly-dep-report.sh
       - name: docker lints
         uses: ./.github/actions/docker-checks
+      - name: deno lints
+        run: deno lint ./shuffle && deno lint ./language/move-analyzer
 
   lint:
     runs-on: ubuntu-20.04-xl

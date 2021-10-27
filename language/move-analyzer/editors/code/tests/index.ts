@@ -12,8 +12,8 @@ import * as Mocha from 'mocha';
 import * as path from 'path';
 /* eslint-disable */
 // deno-lint-ignore require-await
-/* eslint-enable */
 export async function run(): Promise<void> {
+    /* eslint-disable */
     const suite = new Mocha({
         ui: 'tdd',
         color: true,
