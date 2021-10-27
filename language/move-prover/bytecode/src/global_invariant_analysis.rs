@@ -16,10 +16,11 @@ use crate::{
 use move_binary_format::file_format::CodeOffset;
 use move_model::{
     ast::ConditionKind,
-    model::{FunctionEnv, GlobalEnv, GlobalId, QualifiedInstId, StructId},
+    model::{FunctionEnv, GlobalEnv, GlobalId, Loc, QualifiedInstId, StructId},
     ty::{Type, TypeDisplayContext, TypeInstantiationDerivation, TypeUnificationAdapter, Variance},
 };
 
+use codespan_reporting::diagnostic::Severity;
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt,
@@ -285,9 +286,11 @@ impl PerFunctionRelevance {
             .collect();
         let entrypoint_assumptions = Self::calculate_invariant_relevance(
             env,
+            target.get_loc(),
             mem_analysis.accessed.all.iter(),
             &entrypoint_invariants,
             fun_type_params_arity,
+            /* allow_uninstantiated_invariant */ true,
         );
 
         // if this function defers invariant checking on return, filter out invariants that are
@@ -386,9 +389,11 @@ impl PerFunctionRelevance {
             // collect instantiation information
             let relevance = Self::calculate_invariant_relevance(
                 env,
+                target.get_bytecode_loc(bc.get_attr_id()),
                 mem_related.iter(),
                 inv_related,
                 fun_type_params_arity,
+                /* allow_uninstantiated_invariant */ false,
             );
 
             if is_return {
@@ -453,9 +458,11 @@ impl PerFunctionRelevance {
     /// it relevant.
     fn calculate_invariant_relevance<'a>(
         env: &GlobalEnv,
+        loc: Loc,
         mem_related: impl Iterator<Item = &'a QualifiedInstId<StructId>>,
         inv_related: &BTreeSet<GlobalId>,
         fun_type_params_arity: usize,
+        allow_uninstantiated_invariant: bool,
     ) -> BTreeMap<GlobalId, PerBytecodeRelevance> {
         let mut result = BTreeMap::new();
 
@@ -522,6 +529,27 @@ impl PerFunctionRelevance {
                             true,
                         );
 
+                        let mut wellformed_inv_inst = vec![];
+                        for inv_inst in inv_insts {
+                            if inv_inst.iter().any(|t| matches!(t, Type::Error)) {
+                                if !allow_uninstantiated_invariant {
+                                    env.diag_with_labels(
+                                        Severity::Warning,
+                                        &inv.loc,
+                                        "Failed to instantiate all type parameters in this \
+                                        global invariant",
+                                        vec![(
+                                            loc.clone(),
+                                            "When instrumenting the global invariant here"
+                                                .to_string(),
+                                        )],
+                                    );
+                                }
+                            } else {
+                                wellformed_inv_inst.push(inv_inst);
+                            }
+                        }
+
                         // record the relevance information
                         result
                             .entry(*inv_id)
@@ -529,7 +557,7 @@ impl PerFunctionRelevance {
                             .insts
                             .entry(rel_inst)
                             .or_insert_with(BTreeSet::new)
-                            .extend(inv_insts);
+                            .extend(wellformed_inv_inst);
                     }
                 }
             }

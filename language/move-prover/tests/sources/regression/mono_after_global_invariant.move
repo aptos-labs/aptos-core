@@ -9,6 +9,8 @@ module Base {
     public fun put_b(s: &signer) {
         move_to(s, B {});
         // the global invariants in 0x2::Test is instrumented here
+        // but this instrumentation causes a warning becaues we do
+        // not know how to instantiate the parameter T
     }
 
     spec module {
@@ -28,6 +30,8 @@ module Test {
     public fun put_r<T: store>(s: &signer, v: T) {
         Base::put_b(s);
         move_to(s, R { f: v });
+        // the global invariants in 0x2::Test is instrumented here
+        // as well, not causing a warning and not verified.
     }
 
     spec module {
