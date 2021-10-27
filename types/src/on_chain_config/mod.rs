@@ -25,7 +25,7 @@ mod vm_config;
 mod vm_publishing_option;
 
 pub use self::{
-    consensus_config::{ConsensusConfigV1, OnChainConsensusConfig},
+    consensus_config::{ConsensusConfigV1, ConsensusConfigV2, OnChainConsensusConfig},
     diem_version::{
         DiemVersion, DIEM_MAX_KNOWN_VERSION, DIEM_VERSION_2, DIEM_VERSION_3, DIEM_VERSION_4,
     },
