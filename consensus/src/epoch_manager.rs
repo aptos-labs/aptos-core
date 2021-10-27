@@ -168,6 +168,7 @@ impl EpochManager {
     fn create_proposer_election(
         &self,
         epoch_state: &EpochState,
+        onchain_config: &OnChainConsensusConfig,
     ) -> Box<dyn ProposerElection + Send + Sync> {
         let proposers = epoch_state
             .verifier
@@ -193,7 +194,12 @@ impl EpochManager {
                     heuristic_config.active_weights,
                     heuristic_config.inactive_weights,
                 ));
-                Box::new(LeaderReputation::new(proposers, backend, heuristic))
+                Box::new(LeaderReputation::new(
+                    proposers,
+                    backend,
+                    heuristic,
+                    onchain_config.leader_reputation_exclude_round(),
+                ))
             }
             ConsensusProposerType::RoundProposer(round_proposers) => {
                 // Hardcoded to the first proposer
@@ -393,7 +399,7 @@ impl EpochManager {
             self.create_round_state(self.time_service.clone(), self.timeout_sender.clone());
 
         info!(epoch = epoch, "Create ProposerElection");
-        let proposer_election = self.create_proposer_election(&epoch_state);
+        let proposer_election = self.create_proposer_election(&epoch_state, &onchain_config);
         let network_sender = NetworkSender::new(
             self.author,
             self.network_sender.clone(),

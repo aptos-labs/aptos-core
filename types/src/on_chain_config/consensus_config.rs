@@ -11,11 +11,19 @@ pub enum OnChainConsensusConfig {
     V1(ConsensusConfigV1),
 }
 
+/// The public interface that exposes all values with safe fallback.
 impl OnChainConsensusConfig {
+    /// 2-chain commit rule or 3-chain commit rule.
     pub fn two_chain(&self) -> bool {
         match &self {
             OnChainConsensusConfig::V1(config) => config.two_chain,
         }
+    }
+
+    /// The number of recent rounds that don't count into reputations.
+    pub fn leader_reputation_exclude_round(&self) -> u64 {
+        // default value used before onchain config
+        return 4;
     }
 }
 

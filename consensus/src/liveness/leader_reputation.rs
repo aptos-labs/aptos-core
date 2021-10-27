@@ -163,6 +163,7 @@ pub struct LeaderReputation {
     backend: Box<dyn MetadataBackend>,
     heuristic: Box<dyn ReputationHeuristic>,
     already_proposed: Mutex<(Round, HashMap<Author, HashValue>)>,
+    exclude_round: u64,
 }
 
 impl LeaderReputation {
@@ -170,20 +171,21 @@ impl LeaderReputation {
         proposers: Vec<Author>,
         backend: Box<dyn MetadataBackend>,
         heuristic: Box<dyn ReputationHeuristic>,
+        exclude_round: u64,
     ) -> Self {
         Self {
             proposers,
             backend,
             heuristic,
             already_proposed: Mutex::new((0, HashMap::new())),
+            exclude_round,
         }
     }
 }
 
 impl ProposerElection for LeaderReputation {
     fn get_valid_proposer(&self, round: Round) -> Author {
-        // TODO: configure the round gap
-        let target_round = round.saturating_sub(4);
+        let target_round = round.saturating_sub(self.exclude_round);
         let sliding_window = self.backend.get_block_metadata(target_round);
         let mut weights = self.heuristic.get_weights(&self.proposers, &sliding_window);
         assert_eq!(weights.len(), self.proposers.len());

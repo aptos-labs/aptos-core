@@ -99,6 +99,7 @@ fn test_api() {
             active_weight,
             inactive_weight,
         )),
+        4,
     );
     let round = 42u64;
     // first metadata is ignored because of window size 1
