@@ -62,3 +62,14 @@ async fn test_enable_jsonrpc_api() {
         .await;
     assert_eq!(resp["result"]["version"].as_u64().unwrap(), 0)
 }
+
+#[tokio::test]
+async fn test_openapi_spec() {
+    let context = new_test_context();
+    let paths = ["/openapi.yaml", "spec.html"];
+    for path in paths {
+        let req = warp::test::request().method("GET").path(path);
+        let resp = context.reply(req).await;
+        assert_eq!(resp.status(), 200);
+    }
+}

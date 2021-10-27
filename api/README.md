@@ -2,7 +2,10 @@
 
 This module provides REST API for client applications to query the Diem blockchain.
 
-The [API specification](spec.yaml) is documented in [OpenAPI](https://www.openapis.org/) 3.0.3.
+The [API specification](src/static/openapi.yaml) is documented in [OpenAPI](https://www.openapis.org/) 3.0.3.
+You can load the specification into a renderer (e.g. [redocly](https://redocly.github.io/redoc/?url=https://raw.githubusercontent.com/diem/diem/main/api/src/static/openapi.yaml)).
+
+For a Diem node enabled API, you can get the specification document at `/spec.html`.
 
 ## Overview
 

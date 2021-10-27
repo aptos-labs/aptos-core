@@ -9,6 +9,7 @@ use warp::{http::StatusCode, reject::MethodNotAllowed, reply, Filter, Rejection,
 
 pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Infallible> + Clone {
     index(context.clone())
+        .or(openapi_spec())
         .or(accounts::routes(context.clone()))
         .or(transactions::routes(context.clone()))
         .or(events::routes(context.clone()))
@@ -18,6 +19,24 @@ pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Inf
         .or(context.jsonrpc_routes())
         .recover(handle_rejection)
         .with(log::logger())
+}
+
+// GET /openapi.yaml
+// GET /spec.html
+// GET /redoc.standalone.js
+pub fn openapi_spec() -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+    let spec = warp::path!("openapi.yaml")
+        .and(warp::get())
+        .map(|| include_str!("static/openapi.yaml"));
+    let renderer = warp::path!("redoc.standalone.js").and(warp::get()).map(|| {
+        warp::http::Response::builder()
+            .header("Content-Type", "text/javascript")
+            .body(include_str!("static/redoc.standalone.js"))
+    });
+    let html = warp::path!("spec.html")
+        .and(warp::get())
+        .map(|| reply::html(include_str!("static/spec.html")));
+    spec.or(renderer).or(html)
 }
 
 // GET /
