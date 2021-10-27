@@ -29,7 +29,7 @@ async function main(): Promise<void> {
 
         // Download VS Code, unzip it, and run the "test suite" program.
         await runTests({ extensionDevelopmentPath, extensionTestsPath });
-    } catch (err: unknown) {
+    } catch (_err: unknown) {
         console.error('Failed to run tests');
         process.exit(1);
     }

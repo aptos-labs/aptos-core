@@ -10,7 +10,9 @@
 import * as glob from 'glob';
 import * as Mocha from 'mocha';
 import * as path from 'path';
-
+/* eslint-disable */
+// deno-lint-ignore require-await
+/* eslint-enable */
 export async function run(): Promise<void> {
     const suite = new Mocha({
         ui: 'tdd',

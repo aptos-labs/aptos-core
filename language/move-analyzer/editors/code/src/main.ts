@@ -5,7 +5,7 @@ import { Configuration } from './configuration';
 import { Context } from './context';
 import { Extension } from './extension';
 import { log } from './log';
-import * as child_process from 'child_process';
+import * as childProcess from 'child_process';
 import * as vscode from 'vscode';
 
 /**
@@ -13,7 +13,7 @@ import * as vscode from 'vscode';
  * interfaces with.
  */
 async function serverVersion(context: Readonly<Context>): Promise<void> {
-    const version = child_process.spawnSync(
+    const version = childProcess.spawnSync(
         context.configuration.serverPath, ['--version'], { encoding: 'utf8' },
     );
     if (version.stdout) {
