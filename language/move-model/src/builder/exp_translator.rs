@@ -1476,8 +1476,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                             self.error(
                                 loc,
                                 &format!(
-                                    "Expect a struct type as the type instantiation for an \
-                                    operation on the global state, found: {}",
+                                    "The type argument to `exists` and `global` must be a struct \
+                                    type but {} is not a struct type.",
                                     ty_inst.display(&self.type_display_context())
                                 ),
                             );
