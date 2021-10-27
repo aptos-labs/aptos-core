@@ -19,7 +19,7 @@ use diem_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
     ledger_info::LedgerInfoWithSignatures,
-    on_chain_config::{ConsensusConfigV1, OnChainConsensusConfig},
+    on_chain_config::{ConsensusConfigV2, OnChainConsensusConfig},
 };
 use std::{
     collections::HashSet,
@@ -162,34 +162,38 @@ impl Experiment for Reconfiguration {
         }
 
         {
-            info!("Switch from 2-chain and 3-chain repetitively.");
-            let two_chain_config =
-                OnChainConsensusConfig::V1(ConsensusConfigV1 { two_chain: true });
-            let three_chain_config = OnChainConsensusConfig::default();
+            info!("Switch decoupled-execution on and off repetitively.");
+            let upgrade_config = OnChainConsensusConfig::V2(ConsensusConfigV2 {
+                two_chain: true,
+                decoupled_execution: true,
+                back_pressure_limit: 10,
+                exclude_round: 20,
+            });
+            let downgrade_config = OnChainConsensusConfig::default();
             for i in 1..self.count / 2 {
-                let two_chain_txn = diem_root_account.sign_with_transaction_builder(
+                let upgrade_txn = diem_root_account.sign_with_transaction_builder(
                     tx_factory.update_diem_consensus_config(
                         allowed_nonce,
-                        bcs::to_bytes(&two_chain_config).unwrap(),
+                        bcs::to_bytes(&upgrade_config).unwrap(),
                     ),
                 );
                 execute_and_wait_transactions(
                     &mut full_node_client,
                     &mut diem_root_account,
-                    vec![two_chain_txn],
+                    vec![upgrade_txn],
                 )
                 .await?;
                 version = expect_epoch(&full_node_client, version, (i + 1) * 2).await?;
-                let three_chain_txn = diem_root_account.sign_with_transaction_builder(
+                let downgrade_txn = diem_root_account.sign_with_transaction_builder(
                     tx_factory.update_diem_consensus_config(
                         allowed_nonce,
-                        bcs::to_bytes(&three_chain_config).unwrap(),
+                        bcs::to_bytes(&downgrade_config).unwrap(),
                     ),
                 );
                 execute_and_wait_transactions(
                     &mut full_node_client,
                     &mut diem_root_account,
-                    vec![three_chain_txn],
+                    vec![downgrade_txn],
                 )
                 .await?;
                 version = expect_epoch(&full_node_client, version, (i + 1) * 2 + 1).await?;
