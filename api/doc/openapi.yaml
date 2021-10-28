@@ -32,6 +32,24 @@ paths:
                 $ref: '#/components/schemas/LedgerInfo'
         "500":
           $ref: '#/components/responses/500'
+  /spec.html:
+    get:
+      summary: API specification document.
+      operationId: get-spec-html
+      tags:
+        - info
+      responses:
+        "200":
+          description: Returns OpenAPI specification html document.
+  /openapi.yaml:
+    get:
+      summary: OpenAPI YAML specification.
+      operationId: get-spec-yaml
+      tags:
+        - info
+      responses:
+        "200":
+          description: Returns OpenAPI specification YAML document.
   /accounts/{address}/resources:
     get:
       summary: Get account resources
