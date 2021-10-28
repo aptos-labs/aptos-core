@@ -30,14 +30,17 @@
 //! ```
 //!
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use diem_logger::info;
 use diem_sdk::{
     client::{Client, SignedTransaction},
-    transaction_builder::TransactionFactory,
-    types::{chain_id::ChainId, LocalAccount},
+    transaction_builder::{Currency, TransactionFactory},
+    types::{chain_id::ChainId, transaction::authenticator::AuthenticationKey, LocalAccount},
 };
+use reqwest::StatusCode;
+use serde::Deserialize;
 use std::{
+    convert::Infallible,
     fmt,
     sync::{Arc, Mutex},
 };
@@ -74,10 +77,12 @@ pub fn routes(
     service: Arc<Service>,
 ) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
     let mint = mint::mint_routes(service.clone());
+    let create_account = create_account_route(service);
     let health = warp::path!("-" / "healthy").map(|| "diem-faucet:ok");
 
     health
         .or(mint)
+        .or(create_account)
         .with(warp::log::custom(|info| {
             info!(
                 "{} \"{} {} {:?}\" {} \"{}\" \"{}\" {:?}",
@@ -92,6 +97,85 @@ pub fn routes(
             )
         }))
         .with(warp::cors().allow_any_origin().allow_methods(vec!["POST"]))
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "kebab-case")]
+struct CreateAccountParams {
+    authentication_key: AuthenticationKey,
+}
+
+fn create_account_route(
+    service: Arc<Service>,
+) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+    warp::path::path("accounts")
+        .and(warp::post())
+        .and(warp::any().map(move || service.clone()))
+        .and(warp::query().map(move |params: CreateAccountParams| params))
+        .and_then(handle_create_account)
+}
+
+async fn handle_create_account(
+    service: Arc<Service>,
+    params: CreateAccountParams,
+) -> Result<Box<dyn warp::Reply>, Infallible> {
+    match create_account(service, params).await {
+        Ok(txn) => Ok(Box::new(hex::encode(bcs::to_bytes(&txn).unwrap()))),
+        Err(err) => Ok(Box::new(warp::reply::with_status(
+            err.to_string(),
+            StatusCode::INTERNAL_SERVER_ERROR,
+        ))),
+    }
+}
+
+async fn create_account(
+    service: Arc<Service>,
+    params: CreateAccountParams,
+) -> Result<SignedTransaction> {
+    // Check to ensure the account hasn't already been created
+    if service
+        .client
+        .get_account(params.authentication_key.derived_address())
+        .await?
+        .into_inner()
+        .is_some()
+    {
+        return Err(anyhow!("account already exists"));
+    }
+
+    // get TC account's sequence number
+    let tc_account_address = service
+        .treasury_compliance_account
+        .lock()
+        .unwrap()
+        .address();
+    let tc_sequence_number = service
+        .client
+        .get_account(tc_account_address)
+        .await?
+        .into_inner()
+        .ok_or_else(|| anyhow::format_err!("treasury compliance account not found"))?
+        .sequence_number;
+
+    let txn = {
+        let mut treasury_account = service.treasury_compliance_account.lock().unwrap();
+        if tc_sequence_number > treasury_account.sequence_number() {
+            *treasury_account.sequence_number_mut() = tc_sequence_number;
+        }
+
+        let builder = service.transaction_factory.create_parent_vasp_account(
+            Currency::XUS,
+            0, // sliding_nonce
+            params.authentication_key,
+            &format!("No. {}", treasury_account.sequence_number()),
+            false, // add all currencies
+        );
+
+        treasury_account.sign_with_transaction_builder(builder)
+    };
+
+    service.client.submit(&txn).await?;
+    Ok(txn)
 }
 
 //
