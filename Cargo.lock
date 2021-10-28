@@ -7524,9 +7524,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.67"
+version = "1.0.68"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a7f9e390c27c3c0ce8bc5d725f6e4d30a29d26659494aa4b17535f7522c5c950"
+checksum = "0f690853975602e1bfe1ccbf50504d67174e3bcf340f23b5ea9992e0587a52d8"
 dependencies = [
  "indexmap",
  "itoa",
@@ -7746,16 +7746,20 @@ dependencies = [
  "move-package",
  "once_cell",
  "rand 0.8.4",
+ "reqwest",
  "serde",
  "serde-generate",
  "serde-reflection",
+ "serde_json",
  "serde_yaml",
  "shuffle-custom-node",
  "shuffle-transaction-builder",
  "structopt 0.3.21",
  "tempfile",
+ "tokio",
  "toml",
  "transaction-builder-generator",
+ "url",
 ]
 
 [[package]]

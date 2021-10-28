@@ -4,6 +4,7 @@
 use anyhow::{anyhow, Result};
 use std::{fs, path::PathBuf};
 use structopt::StructOpt;
+use url::Url;
 
 mod account;
 mod build;
@@ -13,8 +14,10 @@ mod new;
 mod node;
 mod shared;
 mod test;
+mod transactions;
 
-pub fn main() -> Result<()> {
+#[tokio::main]
+pub async fn main() -> Result<()> {
     let subcommand = Subcommand::from_args();
     match subcommand {
         Subcommand::New { blockchain, path } => new::handle(blockchain, path),
@@ -38,6 +41,9 @@ pub fn main() -> Result<()> {
             &normalized_key_path(key_path)?,
             &normalized_address(address)?,
         ),
+        Subcommand::Transactions { network, tail } => {
+            transactions::handle(normalized_network(network.as_str())?, should_tail(tail)).await
+        }
     }
 }
 
@@ -88,6 +94,16 @@ pub enum Subcommand {
         #[structopt(short, long)]
         project_path: Option<PathBuf>,
     },
+    #[structopt(
+        about = "Captures last 10 transactions and continuously polls for new transactions"
+    )]
+    Transactions {
+        #[structopt(short, long)]
+        network: String,
+
+        #[structopt(short, help = "Blocks and streams future transactions as they happen")]
+        tail: Option<Option<bool>>,
+    },
 }
 
 fn normalized_project_path(project_path: Option<PathBuf>) -> Result<PathBuf> {
@@ -131,5 +147,20 @@ fn normalized_key_path(diem_root_key_path: Option<PathBuf>) -> Result<PathBuf> {
             }
             Ok(PathBuf::from(home.get_latest_key_path()))
         }
+    }
+}
+
+fn normalized_network(network: &str) -> Result<Url> {
+    match Url::parse(network) {
+        Ok(_res) => Ok(Url::parse(network)?),
+        Err(_e) => Ok(Url::parse(("http://".to_owned() + network).as_str())?),
+    }
+}
+
+fn should_tail(tail_flag: Option<Option<bool>>) -> bool {
+    match tail_flag {
+        Some(Some(val)) => val,
+        Some(_val) => true,
+        None => false,
     }
 }
