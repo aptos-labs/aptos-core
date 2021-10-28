@@ -9,7 +9,6 @@
         { "include": "#has-abilities" },
         { "include": "#type-address" },
         { "include": "#keyword" },
-        { "include": "#name-access-chain" },
         { "include": "#type" },
         { "include": "#function" },
         { "include": "#value" },
@@ -140,47 +139,6 @@
                 {
                     "name": "storage.modifier.move",
                     "match": "\\b(native|public|mut)\\b"
-                }
-            ]
-        },
-        "name-access-chain": {
-            "comment": "A name access chain. With regular expressions we can't distinguish between an ordinary identifier and a leading name access, so this pattern only matches chains with more than one element.",
-            "patterns": [
-                {
-                    "name": "meta.name-access-chain.three-elements.move",
-                    "comment": "A name access chain with a leading-name-access followed by two other names. The last element in the chain could be anything: a module, struct, constant, etc. Leave it to the `#identifier` matcher to classify.",
-                    "begin": "\\b((0x[a-fA-F0-9]+(?:u(?:8|64|128))?)|([0-9]+(?:u(?:8|64|128))?)|([_a-zA-Z][_a-zA-Z0-9]*))(::)([_a-zA-Z][_a-zA-Z0-9]*)(::)",
-                    "beginCaptures": {
-                        "1": { "name": "meta.leading-name-access.move" },
-                        "2": { "name": "meta.value.number.hexadecimal.move constant.numeric.move" },
-                        "3": { "name": "meta.value.number.move constant.numeric.move" },
-                        "4": { "name": "meta.identifier.move entity.name.namespace.move" },
-                        "5": { "name": "meta.punctuation.coloncolon.move" },
-                        "6": { "name": "meta.identifier.move variable.other.move" },
-                        "7": { "name": "meta.punctuation.coloncolon.move" }
-                    },
-                    "end": "(?![_a-zA-Z0-9])",
-                    "patterns": [
-                        { "include": "#function" },
-                        { "include": "#identifier" }
-                    ]
-                },
-                {
-                    "name": "meta.name-access-chain.two-elements.move",
-                    "comment": "A name access chain with a leading-name-access followed by one other name.",
-                    "begin": "\\b((0x[a-fA-F0-9]+(?:u(?:8|64|128))?)|([0-9]+(?:u(?:8|64|128))?)|([_a-zA-Z][_a-zA-Z0-9]*))(::)",
-                    "beginCaptures": {
-                        "1": { "name": "meta.leading-name-access.move" },
-                        "2": { "name": "meta.value.number.hexadecimal.move constant.numeric.move" },
-                        "3": { "name": "meta.value.number.move constant.numeric.move" },
-                        "4": { "name": "meta.identifier.move entity.name.namespace.move" },
-                        "5": { "name": "meta.punctuation.coloncolon.move" }
-                    },
-                    "end": "(?![_a-zA-Z0-9])",
-                    "patterns": [
-                        { "include": "#function" },
-                        { "include": "#identifier" }
-                    ]
                 }
             ]
         },

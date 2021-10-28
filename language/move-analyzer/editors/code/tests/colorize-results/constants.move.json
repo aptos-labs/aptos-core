@@ -23,7 +23,7 @@
 	},
 	{
 		"c": "0x1",
-		"t": "source.move meta.name-access-chain.two-elements.move meta.leading-name-access.move meta.value.number.hexadecimal.move constant.numeric.move",
+		"t": "source.move meta.value.number.hexadecimal.move constant.numeric.move",
 		"r": {
 			"dark_plus": "constant.numeric: #B5CEA8",
 			"light_plus": "constant.numeric: #098658",
@@ -34,7 +34,7 @@
 	},
 	{
 		"c": "::",
-		"t": "source.move meta.name-access-chain.two-elements.move meta.punctuation.coloncolon.move",
+		"t": "source.move meta.punctuation.colon-colon.move",
 		"r": {
 			"dark_plus": "default: #D4D4D4",
 			"light_plus": "default: #000000",
@@ -45,7 +45,7 @@
 	},
 	{
 		"c": "M",
-		"t": "source.move meta.name-access-chain.two-elements.move meta.identifier.camel-case.move entity.name.type.move",
+		"t": "source.move meta.identifier.camel-case.move entity.name.type.move",
 		"r": {
 			"dark_plus": "entity.name.type: #4EC9B0",
 			"light_plus": "entity.name.type: #267F99",
