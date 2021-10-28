@@ -1,12 +1,14 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_faucet::mint;
-use diem_logger::prelude::info;
-use diem_sdk::types::chain_id::ChainId;
-use std::fmt;
+use diem_logger::info;
+use diem_sdk::types::{
+    account_config::{testnet_dd_account_address, treasury_compliance_account_address},
+    chain_id::ChainId,
+    LocalAccount,
+};
+use std::sync::Arc;
 use structopt::StructOpt;
-use warp::Filter;
 
 #[derive(Debug, StructOpt)]
 #[structopt(
@@ -53,84 +55,36 @@ async fn main() {
         args.chain_id,
         args.server_url.as_str(),
     );
-    let service = std::sync::Arc::new(mint::Service::new(
+    let treasury_account = LocalAccount::new(
+        treasury_compliance_account_address(),
+        generate_key::load_key(&args.mint_key_file_path),
+        0,
+    );
+    let dd_account = LocalAccount::new(
+        testnet_dd_account_address(),
+        generate_key::load_key(&args.mint_key_file_path),
+        0,
+    );
+    let service = Arc::new(diem_faucet::Service::new(
         args.server_url,
         args.chain_id,
-        args.mint_key_file_path,
+        treasury_account,
+        dd_account,
     ));
 
     info!("[faucet]: running on: {}", address);
-    warp::serve(routes(service)).run(address).await;
+    warp::serve(diem_faucet::routes(service)).run(address).await;
 }
-
-fn routes(
-    service: std::sync::Arc<mint::Service>,
-) -> warp::filters::BoxedFilter<(impl warp::Reply,)> {
-    let mint = warp::any()
-        .and(warp::post())
-        .and(warp::any().map(move || std::sync::Arc::clone(&service)))
-        .and(warp::query().map(move |params: mint::MintParams| params))
-        .and_then(handle)
-        .with(warp::log::custom(|info| {
-            info!(
-                "{} \"{} {} {:?}\" {} \"{}\" \"{}\" {:?}",
-                OptFmt(info.remote_addr()),
-                info.method(),
-                info.path(),
-                info.version(),
-                info.status().as_u16(),
-                OptFmt(info.referer()),
-                OptFmt(info.user_agent()),
-                info.elapsed(),
-            )
-        }))
-        .with(warp::cors().allow_any_origin().allow_methods(vec!["POST"]));
-
-    // POST /?amount=25&auth_key=xxx&currency_code=XXX
-    let route_root = warp::path::end().and(mint.clone());
-    // POST /mint?amount=25&auth_key=xxx&currency_code=XXX
-    let route_mint = warp::path::path("mint").and(warp::path::end()).and(mint);
-
-    let health = warp::path!("-" / "healthy").map(|| "diem-faucet:ok");
-    health.or(route_mint.or(route_root)).boxed()
-}
-
-async fn handle(
-    service: std::sync::Arc<mint::Service>,
-    params: mint::MintParams,
-) -> Result<Box<dyn warp::Reply>, warp::Rejection> {
-    match service.process(params).await {
-        Ok(body) => Ok(Box::new(body.to_string())),
-        Err(err) => Err(warp::reject::custom(ServerInternalError(err.to_string()))),
-    }
-}
-
-struct OptFmt<T>(Option<T>);
-
-impl<T: fmt::Display> fmt::Display for OptFmt<T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if let Some(t) = &self.0 {
-            fmt::Display::fmt(t, f)
-        } else {
-            f.write_str("-")
-        }
-    }
-}
-
-#[derive(Debug)]
-struct ServerInternalError(String);
-
-impl warp::reject::Reject for ServerInternalError {}
 
 #[cfg(test)]
 mod tests {
-    use crate::routes;
-    use diem_faucet::mint;
+    use diem_faucet::{routes, Service};
     use diem_infallible::RwLock;
     use diem_sdk::{
         transaction_builder::stdlib::{ScriptCall, ScriptFunctionCall},
         types::{
             account_address::AccountAddress,
+            account_config::{testnet_dd_account_address, treasury_compliance_account_address},
             chain_id::ChainId,
             diem_id_identifier::DiemIdVaspDomainIdentifier,
             transaction::{
@@ -138,19 +92,25 @@ mod tests {
                 SignedTransaction, TransactionPayload,
                 TransactionPayload::{Script, ScriptFunction},
             },
+            LocalAccount,
         },
     };
     use std::{collections::HashMap, convert::TryFrom, sync::Arc};
     use warp::Filter;
 
-    fn setup(
-        accounts: Arc<RwLock<HashMap<AccountAddress, serde_json::Value>>>,
-    ) -> Arc<mint::Service> {
+    fn setup(accounts: Arc<RwLock<HashMap<AccountAddress, serde_json::Value>>>) -> Arc<Service> {
         let f = tempfile::NamedTempFile::new()
             .unwrap()
             .into_temp_path()
             .to_path_buf();
         generate_key::generate_and_save_key(&f);
+        let treasury_account = LocalAccount::new(
+            treasury_compliance_account_address(),
+            generate_key::load_key(&f),
+            0,
+        );
+        let dd_account =
+            LocalAccount::new(testnet_dd_account_address(), generate_key::load_key(&f), 0);
 
         let chain_id = ChainId::test();
 
@@ -164,10 +124,11 @@ mod tests {
         let future = warp::serve(stub).bind(([127, 0, 0, 1], port));
         tokio::task::spawn(async move { future.await });
 
-        let service = mint::Service::new(
+        let service = Service::new(
             format!("http://localhost:{}/v1", port),
             chain_id,
-            f.to_str().unwrap().to_owned(),
+            treasury_account,
+            dd_account,
         );
         Arc::new(service)
     }
@@ -327,10 +288,7 @@ mod tests {
             )
             .reply(&filter)
             .await;
-        assert_eq!(
-            resp.body(),
-            "Unhandled rejection: ServerInternalError(\"treasury compliance account not found\")"
-        );
+        assert_eq!(resp.body(), "treasury compliance account not found");
     }
 
     #[tokio::test]
