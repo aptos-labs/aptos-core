@@ -8,6 +8,8 @@ use serde_json::Value;
 use std::{cmp::max, fs, io, io::Write, str::FromStr, thread, time};
 use url::Url;
 
+const DIEM_ACCOUNT_TYPE: &str = "0x1::DiemAccount::DiemAccount";
+
 // Will list the last 10 transactions and has the ability to block and stream future transactions.
 pub async fn handle(network: Url, tail: bool) -> Result<()> {
     let home = Home::new(get_home_path().as_path())?;
@@ -106,8 +108,7 @@ async fn get_account_sequence_number(
     network: &Url,
     address: AccountAddress,
 ) -> Result<u64> {
-    let path =
-        network.join(format!("accounts/{}/resources/", address.to_hex_literal()).as_str())?;
+    let path = network.join(format!("accounts/{}/resources", address.to_hex_literal()).as_str())?;
     let resp = client.get(path.as_str()).send().await?;
     let json: Vec<Value> = serde_json::from_str(resp.text().await?.as_str())?;
     parse_json_for_account_seq_num(json)
@@ -123,7 +124,7 @@ fn parse_txn_for_seq_num(last_txn: &Value) -> Result<i64> {
 fn parse_json_for_account_seq_num(json_objects: Vec<Value>) -> Result<u64> {
     let mut seq_number_string = "";
     for object in &json_objects {
-        if object["type"]["name"] == "DiemAccount" {
+        if object["type"] == DIEM_ACCOUNT_TYPE {
             seq_number_string = object["value"]["sequence_number"]
                 .as_str()
                 .ok_or_else(|| anyhow!("Invalid sequence number string"))?;
@@ -186,21 +187,21 @@ mod test {
     #[test]
     fn test_parse_json_for_seq_num() {
         let value_obj = json!({
-            "type" : {
-                "type": "struct",
-                "address": "0x1",
-                "module": "DiemAccount",
-                "name": "DiemAccount",
-            },
+            "type":"0x1::DiemAccount::DiemAccount",
             "value": {
-                "authentication_key": "0x1",
-                "received_events" : {
+                "authentication_key": "0x88cae30f0fea7879708788df9e7c9b7524163afcc6e33b0a9473852e18327fa9",
+                "key_rotation_capability":{
+                    "vec":[{"account_address":"0x24163afcc6e33b0a9473852e18327fa9"}]
+                },
+                "received_events":{
                     "counter":"0",
-                    "guid": {}
+                    "guid":{}
                 },
                 "sent_events":{},
-                "sequence_number": "3",
-                "withdraw_capability":{}
+                "sequence_number":"3",
+                "withdraw_capability":{
+                    "vec":[{"account_address":"0x24163afcc6e33b0a9473852e18327fa9"}]
+                }
             }
         });
 
