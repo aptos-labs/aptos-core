@@ -155,8 +155,8 @@ impl AccountsStreamTracker {
             request: request.clone(),
             account_num_requested: false,
             number_of_accounts: None,
-            next_stream_index: 0,
-            next_request_index: 0,
+            next_stream_index: request.start_index,
+            next_request_index: request.start_index,
             stream_is_complete: false,
         })
     }
@@ -287,15 +287,24 @@ impl DataStreamTracker for AccountsStreamTracker {
                 if let ResponsePayload::NumberOfAccountStates(number_of_accounts) =
                     client_response.payload
                 {
-                    // We got a response. Save the number of accounts.
-                    self.number_of_accounts = Some(number_of_accounts);
-                    self.account_num_requested = false;
                     info!(
                         (LogSchema::new(LogEntry::ReceivedDataResponse)
                             .event(LogEvent::Success)
                             .message(&format!("Received number of accounts at version: {:?}. Total accounts: {:?}",
                                               request.version, number_of_accounts)))
                     );
+                    self.account_num_requested = false;
+
+                    // Sanity check the response before saving it.
+                    if number_of_accounts < self.next_request_index {
+                        return Err(Error::NoDataToFetch(format!(
+                            "The next account index to fetch is higher than the \
+                            total number of accounts. Next index: {:?}, total accounts: {:?}",
+                            self.next_request_index, number_of_accounts
+                        )));
+                    } else {
+                        self.number_of_accounts = Some(number_of_accounts);
+                    }
                 }
             }
             request => invalid_client_request!(request, self),
