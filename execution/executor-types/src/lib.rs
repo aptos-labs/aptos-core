@@ -26,7 +26,8 @@ use diem_types::{
     proof::{accumulator::InMemoryAccumulator, AccumulatorExtensionProof},
     transaction::{
         default_protocol::{TransactionListWithProof, TransactionOutputListWithProof},
-        Transaction, TransactionInfo, TransactionStatus, TransactionToCommit, Version,
+        Transaction, TransactionInfo, TransactionOutput, TransactionStatus, TransactionToCommit,
+        Version,
     },
     write_set::WriteSet,
 };
@@ -77,6 +78,18 @@ pub trait ChunkExecutor: Send + Sync {
         events: Vec<ContractEvent>,
     ) -> anyhow::Result<Vec<ContractEvent>>;
 
+    fn execute_or_apply_chunk(
+        &self,
+        first_version: u64,
+        transactions: Vec<Transaction>,
+        transaction_outputs: Option<Vec<TransactionOutput>>,
+        transaction_infos: Vec<TransactionInfo>,
+    ) -> Result<(
+        ProcessedVMOutput,
+        Vec<TransactionToCommit>,
+        Vec<ContractEvent>,
+    )>;
+
     fn execute_and_commit_chunk(
         &self,
         txn_list_with_proof: TransactionListWithProof,
@@ -85,6 +98,23 @@ pub trait ChunkExecutor: Send + Sync {
     ) -> Result<Vec<ContractEvent>> {
         let (output, txns_to_commit, events) =
             self.execute_chunk(txn_list_with_proof, verified_target_li.clone())?;
+        self.commit_chunk(
+            verified_target_li,
+            epoch_change_li,
+            output,
+            txns_to_commit,
+            events,
+        )
+    }
+
+    fn apply_and_commit_chunk(
+        &self,
+        txn_output_list_with_proof: TransactionOutputListWithProof,
+        verified_target_li: LedgerInfoWithSignatures,
+        epoch_change_li: Option<LedgerInfoWithSignatures>,
+    ) -> Result<Vec<ContractEvent>> {
+        let (output, txns_to_commit, events) =
+            self.apply_chunk(txn_output_list_with_proof, verified_target_li.clone())?;
         self.commit_chunk(
             verified_target_li,
             epoch_change_li,

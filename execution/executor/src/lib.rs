@@ -19,7 +19,7 @@ use diem_crypto::{
 };
 use diem_infallible::{RwLock, RwLockReadGuard};
 use diem_logger::prelude::*;
-use diem_state_view::StateViewId;
+use diem_state_view::{StateView, StateViewId};
 use diem_types::{
     account_address::{AccountAddress, HashAccountAddress},
     account_state::AccountState,
@@ -164,8 +164,8 @@ where
 
     /// Skip the already-persisted chunk and return transactions and optional outputs to be applied.
     /// Specifically:
-    ///  2. Verify that transactions to skip match what's already persisted (no fork).
-    ///  3. Return transactions, outputs and txn_infos to be applied.
+    ///  1. Verify that transactions to skip match what's already persisted (no fork).
+    ///  2. Return transactions, outputs and txn_infos to be applied.
     fn filter_chunk(
         &self,
         mut transactions: Vec<Transaction>,
@@ -511,6 +511,9 @@ where
                 transactions.len(),
                 outputs.len()
             );
+            for (access_path, _) in outputs.iter().map(|o| o.write_set()).flatten() {
+                state_view.get(access_path)?;
+            }
             outputs
         } else {
             V::execute_block(transactions.clone(), &state_view)?
@@ -593,40 +596,6 @@ where
             txns_to_retry,
             txn_infos_to_retry,
         ))
-    }
-
-    fn execute_or_apply_chunk(
-        &self,
-        first_version: u64,
-        transactions: Vec<Transaction>,
-        transaction_outputs: Option<Vec<TransactionOutput>>,
-        transaction_infos: Vec<PS::TransactionInfo>,
-    ) -> Result<(
-        ProcessedVMOutput,
-        Vec<TransactionToCommit>,
-        Vec<ContractEvent>,
-    )> {
-        let num_txns = transactions.len();
-
-        let (processed_vm_output, txns_to_commit, events, txns_to_retry, _txn_infos_to_retry) =
-            self.replay_transactions_impl(
-                first_version,
-                transactions,
-                transaction_outputs,
-                transaction_infos,
-            )?;
-
-        ensure!(
-            txns_to_retry.is_empty(),
-            "The transaction at version {} got the status of 'Retry'",
-            num_txns
-                .checked_sub(txns_to_retry.len())
-                .ok_or_else(|| format_err!("integer overflow occurred"))?
-                .checked_add(first_version as usize)
-                .ok_or_else(|| format_err!("integer overflow occurred"))?,
-        );
-
-        Ok((processed_vm_output, txns_to_commit, events))
     }
 }
 
