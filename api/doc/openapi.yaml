@@ -13,7 +13,9 @@ tags:
   - name: accounts
     description: API for getting account resources, modules / events.
   - name: transactions
-    description: API for getting, creating, and submit transactions.
+    description: API for getting, creating, and submitting transactions.
+  - name: events
+    description: API for getting events.
 paths:
   /:
     get:
@@ -91,8 +93,8 @@ paths:
       tags:
         - accounts
       parameters:
-        - $ref: '#/components/parameters/AccountAddress'
         - $ref: '#/components/parameters/LedgerVersion'
+        - $ref: '#/components/parameters/AccountAddress'
       responses:
         "200":
           description: >-
@@ -124,8 +126,8 @@ paths:
       tags:
         - accounts
       parameters:
-        - $ref: '#/components/parameters/AccountAddress'
         - $ref: '#/components/parameters/LedgerVersion'
+        - $ref: '#/components/parameters/AccountAddress'
       responses:
         "200":
           description: >-
@@ -232,8 +234,7 @@ paths:
           required: true
           description: hex-encoded transaction hash with `0x` prefix.
           schema:
-            type: string
-            format: hex-encoded-bytes
+            $ref: '#/components/schemas/HexEncodedBytes'
       responses:
         "200":
           description: >-
@@ -319,8 +320,81 @@ paths:
                   - message
                 properties:
                   message:
-                    type: string
-                    format: hex-encoded-bytes
+                    $ref: '#/components/schemas/HexEncodedBytes'
+        "400":
+          $ref: '#/components/responses/400'
+        "404":
+          $ref: '#/components/responses/404'
+        "500":
+          $ref: '#/components/responses/500'
+  /events/{event_key}:
+    get:
+      summary: Get events by event key
+      operationId: get-events
+      tags:
+        - events
+      parameters:
+        - name: event_key
+          in: path
+          required: true
+          description: >-
+            Event key for an event stream.
+            It is BCS serialized bytes of `guid` field in the Move struct `EventHandle`.
+          schema:
+            $ref: '#/components/schemas/HexEncodedBytes'
+      responses:
+        "200":
+          description: >-
+            Returns events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Event'
+        "400":
+          $ref: '#/components/responses/400'
+        "404":
+          $ref: '#/components/responses/404'
+        "500":
+          $ref: '#/components/responses/500'
+  /accounts/{address}/events/{event_handle_struct}/{field_name}:
+    get:
+      summary: Get events by event handle.
+      description: >-
+        This API extracts event key from the account resource identified
+        by the `event_handle_struct` and `field_name`, then returns
+        events identified by the event key.
+      operationId: get-events
+      tags:
+        - events
+        - accounts
+      parameters:
+        - $ref: '#/components/parameters/AccountAddress'
+        - name: event_handle_struct
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/MoveStructTagID'
+          example: 0x1::DiemAccount::DiemAccount
+        - name: field_name
+          in: path
+          required: true
+          description: >-
+            The field name of the `EventHandle` in the struct.
+          schema:
+            type: string
+          example: sent_events
+      responses:
+        "200":
+          description: >-
+            Returns events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Event'
         "400":
           $ref: '#/components/responses/400'
         "404":
@@ -339,11 +413,8 @@ components:
       name: ledger_version
       in: path
       required: true
-      description: >-
-        Ledger version is the version of the latest transaction in the ledger.
       schema:
-        type: string
-        format: uint64
+        $ref: '#/components/schemas/LedgerVersion'
     StartVersion:
       name: start
       in: query
@@ -396,17 +467,71 @@ components:
         message:
           type: string
         diem_ledger_version:
-          type: string
-          format: uint64
+          $ref: '#/components/schemas/LedgerVersion'
     address:
       type: string
-      format: hex-encoded-bytes
+      format: address
       description: >-
         Hex-encoded 16 bytes Diem account address.
 
 
         Prefixed with `0x` and leading zeros are trimmed.
+
+
+        See [doc](https://github.com/diem/diem/blob/main/language/documentation/book/src/address.md) for more details.
       example: "0xdd"
+    HexEncodedBytes:
+      type: string
+      format: hex
+      description: >-
+        All bytes data are represented as hex-encoded string prefixed with `0x` and fulfilled with
+        two hex digits per byte.
+
+
+        Different with `address` type, hex-encoded bytes should not trim any zeros.
+    TimestampSec:
+      type: string
+      format: uint64
+      description: >-
+        Timestamp in seconds, e.g. transaction expiration timestamp.
+      example: "1635447454"
+    TimestampUsec:
+      type: string
+      format: uint64
+      description: >-
+        Timestamp in microseconds, e.g. ledger / block creation timestamp.
+      example: "1632507671675208"
+    LedgerVersion:
+      type: string
+      format: uint64
+      example: "52635485"
+      description: >-
+        The version of the latest transaction in the ledger.
+    EventKey:
+      type: string
+      format: hex
+      description: >-
+        Event `key` is a global index for an event stream.
+
+
+        It is BCS serialized bytes of `EventHandle` `guid` field, which is
+        a combination of a `uint64` creation number and account `address`
+        (without trimming leading zeros) values.
+
+
+        For example, event key `0x00000000000000000000000000000000000000000a550c18`
+        is combined by the following 2 parts:
+          1. `0000000000000000`: `uint64` representation of `0`.
+          2. `0000000000000000000000000a550c18`: 16 bytes of account address.
+      example: "0x00000000000000000000000000000000000000000a550c18"
+    EventSequenceNumber:
+      type: string
+      format: uint64
+      description: >-
+        Event `sequence_number` is unique id of an event in an event stream.
+
+
+        Event `sequence_number` starts from 0 for each event key.
     LedgerInfo:
       type: object
       required:
@@ -420,17 +545,9 @@ components:
           description: >-
             The blockchain chain id.
         ledger_version:
-          type: string
-          format: uint64
-          example: "52635485"
-          description: >-
-            The version of the latest transaction in the ledger.
+          $ref: '#/components/schemas/LedgerVersion'
         ledger_timestamp:
-          type: string
-          format: uint64
-          example: "1632507671675208"
-          description: >-
-            The timestamp of the ledger version in microseconds.
+          $ref: '#/components/schemas/TimestampUsec'
     MoveResource:
       type: object
       required:
@@ -602,8 +719,7 @@ components:
         - abi
       properties:
         bytecode:
-          type: string
-          format: hex-encoded-bytes
+          $ref: '#/components/schemas/HexEncodedBytes'
         abi:
           $ref: '#/components/schemas/MoveModule'
     MoveModule:
@@ -632,6 +748,32 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MoveStruct'
+    MoveStructTagID:
+      type: string
+      format: struct_tag_id
+      description: >-
+        String representation of an on-chain Move struct.
+
+
+        It is a combination of:
+          1. `Move module address`, `module name` and `struct name` joined by `::`.
+          2. `struct generic type parameters` joined by `, `.
+
+
+        Examples:
+          * `0x1::Diem::Diem<0x1::XDX::XDX>`
+          * `0x1::Abc::Abc<vector<u8>, vector<u64>>`
+          * `0x1::DiemAccount::AccountOperationsCapability`
+
+
+        Note:
+          1. Empty chars should be ignored when comparing 2 struct tag ids.
+          2. When used in an URL path, should be encoded by url-encoding (AKA percent-encoding).
+
+
+        See [doc](https://github.com/diem/diem/blob/main/language/documentation/book/src/structs-and-resources.md) for more details.
+      example:
+        - "0x1::DiemAccount::DiemAccount"
     MoveStruct:
       type: object
       required:
@@ -748,19 +890,15 @@ components:
         sender:
           $ref: '#/components/schemas/address'
         sequence_number:
-          type: string
-          format: uint64
+          $ref: '#/components/schemas/u64'
         max_gas_amount:
-          type: string
-          format: uint64
+          $ref: '#/components/schemas/u64'
         gas_unit_price:
-          type: string
-          format: uint64
+          $ref: '#/components/schemas/u64'
         gas_currency_code:
           type: string
         expiration_timestamp_secs:
-          type: string
-          format: uint64
+          $ref: '#/components/schemas/TimestampSec'
         payload:
           $ref: '#/components/schemas/TransactionPayload'
     UserTransactionRequestWithSignature:
@@ -777,19 +915,15 @@ components:
         sender:
           $ref: '#/components/schemas/address'
         sequence_number:
-          type: string
-          format: uint64
+          $ref: '#/components/schemas/u64'
         max_gas_amount:
-          type: string
-          format: uint64
+          $ref: '#/components/schemas/u64'
         gas_unit_price:
-          type: string
-          format: uint64
+          $ref: '#/components/schemas/u64'
         gas_currency_code:
           type: string
         expiration_timestamp_secs:
-          type: string
-          format: uint64
+          $ref: '#/components/schemas/TimestampSec'
         payload:
           $ref: '#/components/schemas/TransactionPayload'
         signature:
@@ -813,24 +947,19 @@ components:
           enum:
             - pending_transaction
         hash:
-          type: string
-          format: hex-encoded-bytes
+          $ref: '#/components/schemas/HexEncodedBytes'
         sender:
           $ref: '#/components/schemas/address'
         sequence_number:
-          type: string
-          format: uint64
+          $ref: '#/components/schemas/u64'
         max_gas_amount:
-          type: string
-          format: uint64
+          $ref: '#/components/schemas/u64'
         gas_unit_price:
-          type: string
-          format: uint64
+          $ref: '#/components/schemas/u64'
         gas_currency_code:
           type: string
         expiration_timestamp_secs:
-          type: string
-          format: uint64
+          $ref: '#/components/schemas/TimestampSec'
         payload:
           $ref: '#/components/schemas/TransactionPayload'
         signature:
@@ -864,20 +993,15 @@ components:
           enum:
             - user_transaction
         version:
-          type: string
-          format: uint64
+          $ref: '#/components/schemas/u64'
         hash:
-          type: string
-          format: hex-encoded-bytes
+          $ref: '#/components/schemas/HexEncodedBytes'
         state_root_hash:
-          type: string
-          format: hex-encoded-bytes
+          $ref: '#/components/schemas/HexEncodedBytes'
         event_root_hash:
-          type: string
-          format: hex-encoded-bytes
+          $ref: '#/components/schemas/HexEncodedBytes'
         gas_used:
-          type: string
-          format: hex-encoded-bytes
+          $ref: '#/components/schemas/u64'
         success:
           type: boolean
         vm_status:
@@ -885,19 +1009,15 @@ components:
         sender:
           $ref: '#/components/schemas/address'
         sequence_number:
-          type: string
-          format: uint64
+          $ref: '#/components/schemas/u64'
         max_gas_amount:
-          type: string
-          format: uint64
+          $ref: '#/components/schemas/u64'
         gas_unit_price:
-          type: string
-          format: uint64
+          $ref: '#/components/schemas/u64'
         gas_currency_code:
           type: string
         expiration_timestamp_secs:
-          type: string
-          format: uint64
+          $ref: '#/components/schemas/TimestampSec'
         payload:
           $ref: '#/components/schemas/TransactionPayload'
         signature:
@@ -923,30 +1043,23 @@ components:
           enum:
             - block_metadata_transaction
         version:
-          type: string
-          format: uint64
+          $ref: '#/components/schemas/u64'
         hash:
-          type: string
-          format: hex-encoded-bytes
+          $ref: '#/components/schemas/HexEncodedBytes'
         state_root_hash:
-          type: string
-          format: hex-encoded-bytes
+          $ref: '#/components/schemas/HexEncodedBytes'
         event_root_hash:
-          type: string
-          format: hex-encoded-bytes
+          $ref: '#/components/schemas/HexEncodedBytes'
         gas_used:
-          type: string
-          format: hex-encoded-bytes
+          $ref: '#/components/schemas/u64'
         success:
           type: boolean
         vm_status:
           type: string
         id:
-          type: string
-          format: hex-encoded-bytes
+          $ref: '#/components/schemas/HexEncodedBytes'
         round:
-          type: string
-          format: uint64
+          $ref: '#/components/schemas/u64'
         previous_block_votes:
           type: array
           items:
@@ -954,9 +1067,7 @@ components:
         proposer:
           $ref: '#/components/schemas/address'
         timestamp:
-          type: string
-          format: uint64
-          description: Timestamp of the block created in microseconds.
+          $ref: '#/components/schemas/TimestampUsec'
     GenesisTransaction:
       type: object
       required:
@@ -975,20 +1086,15 @@ components:
           enum:
             - genesis_transaction
         version:
-          type: string
-          format: uint64
+          $ref: '#/components/schemas/u64'
         hash:
-          type: string
-          format: hex-encoded-bytes
+          $ref: '#/components/schemas/HexEncodedBytes'
         state_root_hash:
-          type: string
-          format: hex-encoded-bytes
+          $ref: '#/components/schemas/HexEncodedBytes'
         event_root_hash:
-          type: string
-          format: hex-encoded-bytes
+          $ref: '#/components/schemas/HexEncodedBytes'
         gas_used:
-          type: string
-          format: hex-encoded-bytes
+          $ref: '#/components/schemas/u64'
         success:
           type: boolean
         vm_status:
@@ -1067,8 +1173,7 @@ components:
           enum:
             - module_payload
         bytecode:
-          type: string
-          format: hex-encoded-bytes
+          $ref: '#/components/schemas/HexEncodedBytes'
         abi:
           $ref: '#/components/schemas/MoveModule'
     WriteSetPayload:
@@ -1213,8 +1318,7 @@ components:
         - bytecode
       properties:
         bytecode:
-          type: string
-          format: hex-encoded-bytes
+          $ref: '#/components/schemas/HexEncodedBytes'
         abi:
           $ref: '#/components/schemas/MoveFunction'
     bool:
@@ -1257,19 +1361,18 @@ components:
         - data
       description: >-
         Event `key` and `sequence_number` are global identifier of the event.
+
+
+        Event `sequence_number` starts from 0 for each event key.
+
+
         Event `type` is the type information of the event `data`, you can use the `type`
         to decode the `data` JSON.
       properties:
         key:
-          type: string
-          format: hex-encoded-bytes
-          description: >-
-            Hex-encoded event key bytes.
+          $ref: '#/components/schemas/EventKey'
         sequence_number:
-          type: string
-          format: uint64
-          description: >-
-            The sequence number of the event in the event stream by the event key.
+          $ref: '#/components/schemas/EventSequenceNumber'
         type:
           $ref: '#/components/schemas/MoveType'
         data:
@@ -1294,12 +1397,9 @@ components:
           enum:
             - ed25519_signature
         public_key:
-          type: string
-          format: hex-encoded-bytes
-          description: Public key of the signature
+          $ref: '#/components/schemas/HexEncodedBytes'
         signature:
-          type: string
-          format: hex-encoded-bytes
+          $ref: '#/components/schemas/HexEncodedBytes'
     MultiEd25519Signature:
       type: object
       description: >-
@@ -1317,23 +1417,19 @@ components:
             - multi_ed25519_signature
         public_keys:
           type: array
+          description: all public keys of the sender account
           items:
-            type: string
-            format: hex-encoded-bytes
-            description: all public keys of the sender account
+            $ref: '#/components/schemas/HexEncodedBytes'
         signatures:
           type: array
+          description: signatures created based on the `threshold`
           items:
-            type: string
-            format: hex-encoded-bytes
-            description: signatures created based on the `threshold`
+            $ref: '#/components/schemas/HexEncodedBytes'
         threshold:
           type: integer
           description: The threshold of the multi ed25519 account key.
         bitmap:
-          type: string
-          format: hex-encoded-bytes
-          description: The hex-encoded bitmap bytes, which is created after the signature.
+          $ref: '#/components/schemas/HexEncodedBytes'
     MultiAgentSignature:
       type: object
       description: >-

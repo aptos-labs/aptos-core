@@ -29,7 +29,7 @@ pub fn get_events(
         .and_then(handle_get_events)
 }
 
-// GET /accounts/<address>/events/<event_handle_resource>
+// GET /accounts/<address>/events/<event_handle_struct>/<field_name>
 pub fn get_account_events(
     context: Context,
 ) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
