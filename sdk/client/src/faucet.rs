@@ -3,6 +3,7 @@
 
 use crate::{BlockingClient, Error, Result};
 use diem_types::transaction::{authenticator::AuthenticationKey, SignedTransaction};
+use reqwest::Url;
 
 pub struct FaucetClient {
     url: String,
@@ -15,6 +16,31 @@ impl FaucetClient {
             url,
             json_rpc_client: BlockingClient::new(json_rpc_url),
         }
+    }
+
+    pub fn create_account(&self, authentication_key: AuthenticationKey) -> Result<()> {
+        let client = reqwest::blocking::Client::new();
+        let mut url = Url::parse(&self.url).map_err(Error::request)?;
+        url.set_path("accounts");
+        let query = format!("authentication-key={}", authentication_key);
+        url.set_query(Some(&query));
+
+        // Faucet returns the transaction that creates the account and needs to be waited on before
+        // returning.
+        let response = client.post(url).send().map_err(Error::request)?;
+        let status_code = response.status();
+        let body = response.text().map_err(Error::decode)?;
+        if !status_code.is_success() {
+            return Err(Error::status(status_code.as_u16()));
+        }
+        let bytes = hex::decode(body).map_err(Error::decode)?;
+        let txn: SignedTransaction = bcs::from_bytes(&bytes).map_err(Error::decode)?;
+
+        self.json_rpc_client
+            .wait_for_signed_transaction(&txn, None, None)
+            .map_err(Error::unknown)?;
+
+        Ok(())
     }
 
     pub fn fund(

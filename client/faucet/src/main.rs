@@ -81,6 +81,11 @@ mod tests {
     use diem_faucet::{routes, Service};
     use diem_infallible::RwLock;
     use diem_sdk::{
+        client::{
+            views::{BytesView, TransactionDataView, TransactionView, VMStatusView},
+            FaucetClient,
+        },
+        crypto::hash::CryptoHash,
         transaction_builder::stdlib::{ScriptCall, ScriptFunctionCall},
         types::{
             account_address::AccountAddress,
@@ -88,14 +93,20 @@ mod tests {
             chain_id::ChainId,
             diem_id_identifier::DiemIdVaspDomainIdentifier,
             transaction::{
+                authenticator::AuthenticationKey,
                 metadata::{CoinTradeMetadata, Metadata},
-                SignedTransaction, TransactionPayload,
+                SignedTransaction, Transaction, TransactionPayload,
                 TransactionPayload::{Script, ScriptFunction},
             },
             LocalAccount,
         },
     };
-    use std::{collections::HashMap, convert::TryFrom, sync::Arc};
+    use std::{
+        collections::HashMap,
+        convert::TryFrom,
+        str::FromStr,
+        sync::{Arc, Mutex},
+    };
     use warp::Filter;
 
     fn setup(accounts: Arc<RwLock<HashMap<AccountAddress, serde_json::Value>>>) -> Arc<Service> {
@@ -114,18 +125,18 @@ mod tests {
 
         let chain_id = ChainId::test();
 
+        let last_txn = Arc::new(Mutex::new(None));
         let stub = warp::any()
             .and(warp::body::json())
             .map(move |req: serde_json::Value| {
-                let resp = handle_request(req, chain_id, Arc::clone(&accounts));
+                let resp = handle_request(req, chain_id, Arc::clone(&accounts), last_txn.clone());
                 Ok(warp::reply::json(&resp))
             });
-        let port = diem_config::utils::get_available_port();
-        let future = warp::serve(stub).bind(([127, 0, 0, 1], port));
+        let (address, future) = warp::serve(stub).bind_ephemeral(([127, 0, 0, 1], 0));
         tokio::task::spawn(async move { future.await });
 
         let service = Service::new(
-            format!("http://localhost:{}/v1", port),
+            format!("http://localhost:{}/v1", address.port()),
             chain_id,
             treasury_account,
             dd_account,
@@ -381,17 +392,26 @@ mod tests {
         req: serde_json::Value,
         chain_id: ChainId,
         accounts: Arc<RwLock<HashMap<AccountAddress, serde_json::Value>>>,
+        last_txn: Arc<Mutex<Option<SignedTransaction>>>,
     ) -> serde_json::Value {
         if let serde_json::Value::Array(reqs) = req {
             return reqs
                 .iter()
-                .map(move |req| handle_request(req.clone(), chain_id, Arc::clone(&accounts)))
+                .map(move |req| {
+                    handle_request(
+                        req.clone(),
+                        chain_id,
+                        Arc::clone(&accounts),
+                        last_txn.clone(),
+                    )
+                })
                 .collect();
         }
         match req["method"].as_str() {
             Some("submit") => {
                 let raw: &str = req["params"][0].as_str().unwrap();
                 let txn: SignedTransaction = bcs::from_bytes(&hex::decode(raw).unwrap()).unwrap();
+                *last_txn.lock().unwrap() = Some(txn.clone());
                 assert_eq!(txn.chain_id(), chain_id);
                 if let Script(script) = txn.payload() {
                     match ScriptCall::decode(script) {
@@ -492,6 +512,21 @@ mod tests {
                     .ok()
                     .and_then(|address| reader.get(&address));
                 create_response(&req["id"], chain_id.id(), address_lookup)
+            }
+            Some("get_account_transaction") => {
+                let response = last_txn.lock().unwrap().take().map(|txn| {
+                    let view = TransactionView {
+                        version: 0,
+                        transaction: TransactionDataView::WriteSet {},
+                        hash: Transaction::UserTransaction(txn).hash(),
+                        bytes: BytesView::new([]),
+                        events: Vec::new(),
+                        vm_status: VMStatusView::Executed,
+                        gas_used: 0,
+                    };
+                    serde_json::to_value(&view).unwrap()
+                });
+                create_response(&req["id"], chain_id.id(), response.as_ref())
             }
             _ => panic!("unexpected method"),
         }
@@ -599,5 +634,24 @@ mod tests {
             "is_frozen": false,
             "sequence_number": 0
         })
+    }
+
+    #[tokio::test]
+    async fn create_account_with_client() {
+        let accounts = genesis_accounts();
+        let service = setup(accounts.clone());
+        let jsonrpc_endpoint = service.jsonrpc_endpoint().to_owned();
+        let (address, future) = warp::serve(routes(service)).bind_ephemeral(([127, 0, 0, 1], 0));
+        tokio::task::spawn(async move { future.await });
+
+        let faucet_client = FaucetClient::new(format!("http://{}", address), jsonrpc_endpoint);
+
+        let auth_key = AuthenticationKey::from_str(
+            "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d",
+        )
+        .unwrap();
+        tokio::task::spawn_blocking(move || faucet_client.create_account(auth_key).unwrap())
+            .await
+            .unwrap();
     }
 }

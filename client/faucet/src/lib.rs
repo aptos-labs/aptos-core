@@ -53,6 +53,7 @@ pub struct Service {
     designated_dealer_account: Mutex<LocalAccount>,
     transaction_factory: TransactionFactory,
     client: Client,
+    jsonrpc_endpoint: String,
 }
 
 impl Service {
@@ -62,14 +63,19 @@ impl Service {
         treasury_compliance_account: LocalAccount,
         designated_dealer_account: LocalAccount,
     ) -> Self {
-        let client = Client::new(jsonrpc_endpoint);
+        let client = Client::new(&jsonrpc_endpoint);
         Service {
             treasury_compliance_account: Mutex::new(treasury_compliance_account),
             designated_dealer_account: Mutex::new(designated_dealer_account),
             transaction_factory: TransactionFactory::new(chain_id)
                 .with_transaction_expiration_time(30),
             client,
+            jsonrpc_endpoint,
         }
+    }
+
+    pub fn jsonrpc_endpoint(&self) -> &str {
+        &self.jsonrpc_endpoint
     }
 }
 
