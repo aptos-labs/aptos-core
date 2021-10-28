@@ -438,9 +438,9 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
 
     let api_runtime = if node_config.api.enabled {
         // bootstrap_api bootstraps a web-server serves for both REST and JSON-RPC API
-        bootstrap_api(node_config, chain_id, diem_db.clone(), mp_client_sender).unwrap()
+        bootstrap_api(node_config, chain_id, diem_db, mp_client_sender).unwrap()
     } else {
-        bootstrap_rpc(node_config, chain_id, diem_db.clone(), mp_client_sender)
+        bootstrap_rpc(node_config, chain_id, diem_db, mp_client_sender)
     };
 
     let mut consensus_runtime = None;
@@ -481,7 +481,7 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
             consensus_network_events,
             Box::new(consensus_notifier),
             consensus_to_mempool_sender,
-            diem_db,
+            db_rw.clone(),
             consensus_reconfig_subscription
                 .expect("Consensus requires a reconfiguration subscription!"),
             peer_metadata_storage,

@@ -57,7 +57,7 @@ pub struct ExecutionCorrectnessManager {
 }
 
 impl ExecutionCorrectnessManager {
-    pub fn new(config: &NodeConfig) -> Self {
+    pub fn new(config: &NodeConfig, local_db: DbReaderWriter) -> Self {
         if let ExecutionCorrectnessService::Process(remote_service) = &config.execution.service {
             return Self::new_process(
                 remote_service.server_address,
@@ -69,9 +69,7 @@ impl ExecutionCorrectnessManager {
         let storage_address = config.storage.address;
         let timeout_ms = config.storage.timeout_ms;
         match &config.execution.service {
-            ExecutionCorrectnessService::Local => {
-                Self::new_local(storage_address, execution_prikey, timeout_ms)
-            }
+            ExecutionCorrectnessService::Local => Self::new_local(local_db, execution_prikey),
             ExecutionCorrectnessService::Serializer => {
                 Self::new_serializer(storage_address, execution_prikey, timeout_ms)
             }
@@ -85,14 +83,8 @@ impl ExecutionCorrectnessManager {
         }
     }
 
-    pub fn new_local(
-        storage_address: SocketAddr,
-        execution_prikey: Option<Ed25519PrivateKey>,
-        timeout: u64,
-    ) -> Self {
-        let block_executor = Box::new(Executor::<DpnProto, DiemVM>::new(DbReaderWriter::new(
-            StorageClient::new(&storage_address, timeout),
-        )));
+    pub fn new_local(db: DbReaderWriter, execution_prikey: Option<Ed25519PrivateKey>) -> Self {
+        let block_executor = Box::new(Executor::<DpnProto, DiemVM>::new(db));
         Self {
             internal_execution_correctness: ExecutionCorrectnessWrapper::Local(Arc::new(
                 LocalService::new(block_executor, execution_prikey),

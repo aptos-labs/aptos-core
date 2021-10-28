@@ -91,8 +91,9 @@ fn build_inserter(
 #[tokio::test]
 async fn test_executor_restart() {
     // Start storage service
-    let (config, _handle, db) = start_storage_service();
-    let execution_correctness_manager = ExecutionCorrectnessManager::new(&config);
+    let (config, _handle, db_rw) = start_storage_service();
+    let db = db_rw.reader.clone();
+    let execution_correctness_manager = ExecutionCorrectnessManager::new(&config, db_rw.clone());
 
     let (initial_data, qc) = get_initial_data_and_qc(&*db);
 
@@ -121,7 +122,7 @@ async fn test_executor_restart() {
     drop(execution_correctness_manager);
 
     // Restart LEC and make sure we can continue to append to the current tree.
-    let _execution_correctness_manager = ExecutionCorrectnessManager::new(&config);
+    let _execution_correctness_manager = ExecutionCorrectnessManager::new(&config, db_rw);
 
     //       ╭--> A1--> A2--> A3
     // Genesis--> B1--> B2
@@ -136,9 +137,10 @@ async fn test_executor_restart() {
 #[tokio::test]
 async fn test_block_store_restart() {
     // Start storage service
-    let (config, _handle, db) = start_storage_service();
+    let (config, _handle, db_rw) = start_storage_service();
+    let db = db_rw.reader.clone();
 
-    let execution_correctness_manager = ExecutionCorrectnessManager::new(&config);
+    let execution_correctness_manager = ExecutionCorrectnessManager::new(&config, db_rw);
 
     {
         let (initial_data, qc) = get_initial_data_and_qc(&*db);
