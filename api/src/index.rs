@@ -27,15 +27,15 @@ pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Inf
 pub fn openapi_spec() -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
     let spec = warp::path!("openapi.yaml")
         .and(warp::get())
-        .map(|| include_str!("static/openapi.yaml"));
+        .map(|| include_str!("../doc/openapi.yaml"));
     let renderer = warp::path!("redoc.standalone.js").and(warp::get()).map(|| {
         warp::http::Response::builder()
             .header("Content-Type", "text/javascript")
-            .body(include_str!("static/redoc.standalone.js"))
+            .body(include_str!("../doc/redoc.standalone.js"))
     });
     let html = warp::path!("spec.html")
         .and(warp::get())
-        .map(|| reply::html(include_str!("static/spec.html")));
+        .map(|| reply::html(include_str!("../doc/spec.html")));
     spec.or(renderer).or(html)
 }
 

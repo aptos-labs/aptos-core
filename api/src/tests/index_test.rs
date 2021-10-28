@@ -66,7 +66,7 @@ async fn test_enable_jsonrpc_api() {
 #[tokio::test]
 async fn test_openapi_spec() {
     let context = new_test_context();
-    let paths = ["/openapi.yaml", "spec.html"];
+    let paths = ["/openapi.yaml", "/spec.html"];
     for path in paths {
         let req = warp::test::request().method("GET").path(path);
         let resp = context.reply(req).await;
