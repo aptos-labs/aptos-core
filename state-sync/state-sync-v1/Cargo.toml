@@ -47,7 +47,7 @@ netcore = { path = "../../network/netcore" }
 network = { path = "../../network" }
 short-hex-str = { path = "../../common/short-hex-str" }
 storage-interface = { path = "../../storage/storage-interface" }
-vm-genesis = { path = "../../language/tools/vm-genesis", optional = true }
+vm-genesis = { path = "../../diem-move/vm-genesis", optional = true }
 
 [dev-dependencies]
 bytes = "1.0.1"
@@ -69,7 +69,7 @@ network-builder = { path  = "../../network/builder" }
 storage-service = { path = "../../storage/storage-service" }
 diem-transaction-builder = { path = "../../sdk/transaction-builder" }
 diem-time-service = { path = "../../common/time-service", features = ["testing"] }
-vm-genesis = { path = "../../language/tools/vm-genesis", features = ["fuzzing"] }
+vm-genesis = { path = "../../diem-move/vm-genesis", features = ["fuzzing"] }
 
 [features]
 default = []

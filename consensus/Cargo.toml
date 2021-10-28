@@ -65,7 +65,7 @@ diem-config = { path = "../config", features = ["fuzzing"] }
 diem-mempool = { path = "../mempool", features = ["fuzzing"] }
 network = { path = "../network", features = ["fuzzing"] }
 safety-rules = { path = "safety-rules", features = ["testing"] }
-vm-genesis = { path = "../language/tools/vm-genesis" }
+vm-genesis = { path = "../diem-move/vm-genesis" }
 vm-validator = { path = "../vm-validator" }
 
 [features]

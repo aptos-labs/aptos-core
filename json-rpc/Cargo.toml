@@ -52,7 +52,7 @@ resource-viewer = { path = "../language/tools/resource-viewer" }
 scratchpad = { path = "../storage/scratchpad", optional = true }
 storage-interface = { path = "../storage/storage-interface" }
 thiserror = "1.0.24"
-vm-genesis = { path = "../language/tools/vm-genesis", optional = true }
+vm-genesis = { path = "../diem-move/vm-genesis", optional = true }
 
 [dev-dependencies]
 proptest = "1.0.0"
@@ -69,7 +69,7 @@ diem-temppath = { path = "../common/temppath" }
 diem-types = { path = "../types", features = ["fuzzing"] }
 vm-validator = { path = "../vm-validator" }
 diem-framework-releases= { path = "../language/diem-framework/DPN/releases" }
-vm-genesis = { path = "../language/tools/vm-genesis" }
+vm-genesis = { path = "../diem-move/vm-genesis" }
 executor = { path = "../execution/executor" }
 executor-types = { path = "../execution/executor-types" }
 scratchpad = { path = "../storage/scratchpad" }

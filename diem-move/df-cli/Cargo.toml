@@ -14,11 +14,11 @@ anyhow = "1.0.38"
 bcs = "0.1.2"
 structopt = "0.3.21"
 
-diem-workspace-hack = { path = "../../../common/workspace-hack" }
-move-core-types = { path = "../../move-core/types" }
-move-cli = { path = "../../tools/move-cli" }
-diem-vm = { path = "../../diem-vm" }
-diem-framework-releases = { path = "../../diem-framework/DPN/releases" }
+diem-workspace-hack = { path = "../../common/workspace-hack" }
+move-core-types = { path = "../../language/move-core/types" }
+move-cli = { path = "../../language/tools/move-cli" }
+diem-vm = { path = "../../language/diem-vm" }
+diem-framework-releases = { path = "../../language/diem-framework/DPN/releases" }
 
 [dev-dependencies]
 datatest-stable = "0.1.1"

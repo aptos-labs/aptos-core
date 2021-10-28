@@ -27,4 +27,4 @@ diem-workspace-hack = { path = "../../common/workspace-hack" }
 storage-interface = { path = "../../storage/storage-interface" }
 storage-service = { path = "../../storage/storage-service" }
 diem-transaction-builder = { path = "../../sdk/transaction-builder" }
-vm-genesis = { path = "../../language/tools/vm-genesis" }
+vm-genesis = { path = "../../diem-move/vm-genesis" }

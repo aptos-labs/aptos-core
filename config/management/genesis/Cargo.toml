@@ -34,7 +34,7 @@ diem-temppath = { path = "../../../common/temppath" }
 diem-vm = { path = "../../../language/diem-vm" }
 diemdb = { path = "../../../storage/diemdb" }
 storage-interface = { path = "../../../storage/storage-interface" }
-vm-genesis = { path = "../../../language/tools/vm-genesis" }
+vm-genesis = { path = "../../../diem-move/vm-genesis" }
 
 [dev-dependencies]
 diem-config = { path = "../..", features = ["fuzzing"]}

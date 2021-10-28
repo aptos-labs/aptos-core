@@ -256,29 +256,18 @@ members = [
 # yelling at you, you should redesign your crate and properly remove that
 # dependency, instead of adding the crate to this list and silencing the lint.
 diem_crates_in_language = [
-    "diem-e2e-tests-replay",
     "diem-framework",
     "diem-framework-releases",
-    "diem-events-fetcher",
-    "diem-keygen",
-    "diem-validator-interface",
     "diem-transactional-test-harness",
-    "diem-transaction-replay",
     "diem-transaction-benchmarks",
-    "diem-writeset-generator",
     "diem-vm",
     "language-e2e-testsuite",
     "ir-testsuite",
     "language-e2e-tests",
-    "move-oncall-trainer",
     "functional-tests",
-    "genesis-viewer",
-    "vm-genesis",
     "transaction-builder",
     "transaction-builder-generator",
     "move-lang-functional-tests",
-    "diem-resource-viewer",
-    "df-cli",
 ]
 # A special set of diem crates Move crates are allowed to depend on.
 #

@@ -31,7 +31,7 @@ diem-vm = { path = "../language/diem-vm" }
 diemdb = { path = "../storage/diemdb", features = ["fuzzing"] }
 storage-service = { path = "../storage/storage-service" }
 diem-transaction-builder = { path = "../sdk/transaction-builder" }
-vm-genesis = { path = "../language/tools/vm-genesis" }
+vm-genesis = { path = "../diem-move/vm-genesis" }
 move-core-types = { path = "../language/move-core/types" }
 
 [features]

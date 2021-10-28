@@ -20,16 +20,16 @@ rand = "0.8.3"
 serde = { version = "1.0.124", default-features = false }
 diem-state-view = { path = "../../../storage/state-view" }
 diem-types = { path = "../../../types", features = ["fuzzing"] }
-diem-writeset-generator = { path = "../../diem-tools/writeset-transaction-generator" }
+diem-writeset-generator = { path = "../../../diem-move/writeset-transaction-generator" }
 move-core-types = { path = "../../move-core/types" }
 move-vm-runtime = { path = "../../move-vm/runtime" }
 move-vm-types = { path = "../../move-vm/types" }
 move-binary-format = { path = "../../move-binary-format" }
-vm-genesis = { path = "../../tools/vm-genesis" }
+vm-genesis = { path = "../../../diem-move/vm-genesis" }
 diem-vm = { path = "../../diem-vm" }
 proptest = "1.0.0"
 proptest-derive = "0.3.0"
-diem-keygen = { path = "../../diem-tools/diem-keygen" }
+diem-keygen = { path = "../../../diem-move/diem-keygen" }
 diem-proptest-helpers = { path = "../../../common/proptest-helpers" }
 diem-config = { path = "../../../config" }
 diem-framework-releases = { path = "../../diem-framework/DPN/releases" }

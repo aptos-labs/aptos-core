@@ -50,7 +50,7 @@ impl PublicUsageTest for ReplayTooling {
             .unwrap();
 
         let script_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../language/diem-tools/transaction-replay/examples/account_exists.move")
+            .join("../../diem-move/transaction-replay/examples/account_exists.move")
             .canonicalize()?;
 
         let bisect_result = json_debugger

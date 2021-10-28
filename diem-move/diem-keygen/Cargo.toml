@@ -14,6 +14,6 @@ rand = "0.8.3"
 sha3 = "0.9.1"
 hex = "0.4.3"
 
-diem-crypto = { path = "../../../crypto/crypto" }
-diem-types = { path = "../../../types" }
-diem-workspace-hack = { path = "../../../common/workspace-hack" }
+diem-crypto = { path = "../../crypto/crypto" }
+diem-types = { path = "../../types" }
+diem-workspace-hack = { path = "../../common/workspace-hack" }

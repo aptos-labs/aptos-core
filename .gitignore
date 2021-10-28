@@ -37,7 +37,7 @@ Temporary Items
 .apdisk
 
 # Generated VM config in vm-genesis
-language/tools/vm-genesis/genesis/vm_config.toml
+diem-move/vm-genesis/genesis/vm_config.toml
 
 # Terraform
 .terraform/

@@ -19,12 +19,12 @@ reqwest = { version = "0.11.2", features = ["json"] }
 
 compiler = { path = "../../language/compiler" }
 diem-config = { path = "../../config" }
-diem-events-fetcher = { path = "../../language/diem-tools/diem-events-fetcher" }
+diem-events-fetcher = { path = "../../diem-move/diem-events-fetcher" }
 diem-framework = { path = "../../language/diem-framework" }
 diem-framework-releases = { path = "../../language/diem-framework/DPN/releases" }
 diem-sdk = { path = "../../sdk" }
 diem-temppath = { path = "../../common/temppath" }
-diem-transaction-replay = { path = "../../language/diem-tools/transaction-replay" }
+diem-transaction-replay = { path = "../../diem-move/transaction-replay" }
 move-command-line-common = { path = "../../language/move-command-line-common" }
 move-stdlib = { path = "../../language/move-stdlib" }
 forge = { path = "../forge" }
@@ -56,9 +56,9 @@ diem-swarm = { path = "../diem-swarm"}
 diem-time-service = { path = "../../common/time-service", features = ["testing"] }
 diem-types = { path = "../../types" }
 diem-vault-client = { path = "../../secure/storage/vault", features = ["fuzzing"] }
-diem-validator-interface = { path = "../../language/diem-tools/diem-validator-interface" }
+diem-validator-interface = { path = "../../diem-move/diem-validator-interface" }
 diem-workspace-hack = { path = "../../common/workspace-hack" }
-diem-writeset-generator = { path = "../../language/diem-tools/writeset-transaction-generator" }
+diem-writeset-generator = { path = "../../diem-move/writeset-transaction-generator" }
 diem-transaction-builder = { path = "../../sdk/transaction-builder" }
 
 [[test]]

@@ -37,7 +37,7 @@ diem-metrics = { path = "../../common/metrics" }
 diem-types = { path = "../../types" }
 diem-temppath = { path = "../../common/temppath/" }
 diem-workspace-hack = { path = "../../common/workspace-hack" }
-diem-resource-viewer = { path = "../../language/tools/diem-resource-viewer" }
+diem-resource-viewer = { path = "../../diem-move/diem-resource-viewer" }
 diem-framework = { path = "../../language/diem-framework" }
 diem-framework-releases = { path = "../../language/diem-framework/DPN/releases" }
 diem-transaction-builder = { path = "../../sdk/transaction-builder" }
