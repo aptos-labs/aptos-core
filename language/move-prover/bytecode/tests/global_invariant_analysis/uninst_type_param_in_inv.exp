@@ -116,26 +116,3 @@ Demo::f1: [
 @0 => invariant<T1, T2>
             (exists<S1<T1>>(@0x2) && exists<S2<T2>>(@0x2))
                 ==> global<S1<T1>>(@0x2).v == 0;
-
-============ Diagnostics ================
-warning: Failed to instantiate all type parameters in this global invariant
-   ┌─ tests/global_invariant_analysis/uninst_type_param_in_inv.move:23:9
-   │
-14 │               *&mut borrow_global_mut<S1<bool>>(addr).v = 0;
-   │               --------------------------------------------- When instrumenting the global invariant here
-   ·
-23 │ ╭         invariant<T1, T2>
-24 │ │             (exists<S1<T1>>(@0x2) && exists<S2<T2>>(@0x2))
-25 │ │                 ==> global<S1<T1>>(@0x2).v == 0;
-   │ ╰────────────────────────────────────────────────^
-
-warning: Failed to instantiate all type parameters in this global invariant
-   ┌─ tests/global_invariant_analysis/uninst_type_param_in_inv.move:23:9
-   │
-18 │               *&mut borrow_global_mut<S1<u64>>(addr).v = 0;
-   │               -------------------------------------------- When instrumenting the global invariant here
-   ·
-23 │ ╭         invariant<T1, T2>
-24 │ │             (exists<S1<T1>>(@0x2) && exists<S2<T2>>(@0x2))
-25 │ │                 ==> global<S1<T1>>(@0x2).v == 0;
-   │ ╰────────────────────────────────────────────────^

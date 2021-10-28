@@ -1,14 +1,4 @@
 Move prover returns: exiting with boogie verification errors
-warning: Failed to instantiate all type parameters in this global invariant
-   ┌─ tests/sources/regression/mono_after_global_invariant.move:44:9
-   │
-10 │           move_to(s, B {});
-   │           ------- When instrumenting the global invariant here
-   ·
-44 │ ╭         invariant<T> update
-45 │ │             Base::has_b() ==> (has_r<T>() ==> old(has_r<T>()));
-   │ ╰───────────────────────────────────────────────────────────────^
-
 error: global memory invariant does not hold
    ┌─ tests/sources/regression/mono_after_global_invariant.move:44:9
    │

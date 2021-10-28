@@ -393,7 +393,7 @@ impl PerFunctionRelevance {
                 mem_related.iter(),
                 inv_related,
                 fun_type_params_arity,
-                /* allow_uninstantiated_invariant */ false,
+                /* allow_uninstantiated_invariant */ true,
             );
 
             if is_return {
