@@ -654,4 +654,28 @@ mod tests {
             .await
             .unwrap();
     }
+
+    #[tokio::test]
+    async fn fund_account_with_client() {
+        let accounts = genesis_accounts();
+        let service = setup(accounts.clone());
+        let jsonrpc_endpoint = service.jsonrpc_endpoint().to_owned();
+        let (address, future) = warp::serve(routes(service)).bind_ephemeral(([127, 0, 0, 1], 0));
+        tokio::task::spawn(async move { future.await });
+
+        let faucet_client = FaucetClient::new(format!("http://{}", address), jsonrpc_endpoint);
+
+        let auth_key = AuthenticationKey::from_str(
+            "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d",
+        )
+        .unwrap();
+        tokio::task::spawn_blocking(move || {
+            faucet_client.create_account(auth_key).unwrap();
+            faucet_client
+                .fund(auth_key.derived_address(), "XUS", 10)
+                .unwrap()
+        })
+        .await
+        .unwrap();
+    }
 }

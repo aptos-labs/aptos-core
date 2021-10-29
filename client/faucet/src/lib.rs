@@ -33,7 +33,7 @@
 use anyhow::{anyhow, Result};
 use diem_logger::info;
 use diem_sdk::{
-    client::{Client, SignedTransaction},
+    client::{AccountAddress, Client, SignedTransaction},
     transaction_builder::{Currency, TransactionFactory},
     types::{chain_id::ChainId, transaction::authenticator::AuthenticationKey, LocalAccount},
 };
@@ -83,12 +83,12 @@ pub fn routes(
     service: Arc<Service>,
 ) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
     let mint = mint::mint_routes(service.clone());
-    let create_account = create_account_route(service);
+    let accounts = accounts_routes(service);
     let health = warp::path!("-" / "healthy").map(|| "diem-faucet:ok");
 
     health
         .or(mint)
-        .or(create_account)
+        .or(accounts)
         .with(warp::log::custom(|info| {
             info!(
                 "{} \"{} {} {:?}\" {} \"{}\" \"{}\" {:?}",
@@ -103,6 +103,12 @@ pub fn routes(
             )
         }))
         .with(warp::cors().allow_any_origin().allow_methods(vec!["POST"]))
+}
+
+fn accounts_routes(
+    service: Arc<Service>,
+) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+    create_account_route(service.clone()).or(fund_account_route(service))
 }
 
 #[derive(Deserialize)]
@@ -178,6 +184,84 @@ async fn create_account(
         );
 
         treasury_account.sign_with_transaction_builder(builder)
+    };
+
+    service.client.submit(&txn).await?;
+    Ok(txn)
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "kebab-case")]
+struct FundAccountParams {
+    amount: u64,
+    currency: Currency,
+}
+
+fn fund_account_route(
+    service: Arc<Service>,
+) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+    warp::path!("accounts" / AccountAddress / "fund")
+        .and(warp::post())
+        .and(warp::any().map(move || service.clone()))
+        .and(warp::query().map(move |params: FundAccountParams| params))
+        .and_then(handle_fund_account)
+}
+
+async fn handle_fund_account(
+    address: AccountAddress,
+    service: Arc<Service>,
+    params: FundAccountParams,
+) -> Result<Box<dyn warp::Reply>, Infallible> {
+    match fund_account(service, address, params).await {
+        Ok(txn) => Ok(Box::new(hex::encode(bcs::to_bytes(&txn).unwrap()))),
+        Err(err) => Ok(Box::new(warp::reply::with_status(
+            err.to_string(),
+            StatusCode::INTERNAL_SERVER_ERROR,
+        ))),
+    }
+}
+
+async fn fund_account(
+    service: Arc<Service>,
+    address: AccountAddress,
+    params: FundAccountParams,
+) -> Result<SignedTransaction> {
+    // Check to ensure the account has already been created
+    if service
+        .client
+        .get_account(address)
+        .await?
+        .into_inner()
+        .is_none()
+    {
+        return Err(anyhow!("account doesn't exist"));
+    }
+
+    // get DD account's sequence number
+    let dd_account_address = service.designated_dealer_account.lock().unwrap().address();
+    let dd_sequence_number = service
+        .client
+        .get_account(dd_account_address)
+        .await?
+        .into_inner()
+        .ok_or_else(|| anyhow::format_err!("treasury compliance account not found"))?
+        .sequence_number;
+
+    let txn = {
+        let mut dd_account = service.designated_dealer_account.lock().unwrap();
+        if dd_sequence_number > dd_account.sequence_number() {
+            *dd_account.sequence_number_mut() = dd_sequence_number;
+        }
+
+        dd_account.sign_with_transaction_builder(
+            service.transaction_factory.peer_to_peer_with_metadata(
+                params.currency,
+                address,
+                params.amount,
+                vec![],
+                vec![],
+            ),
+        )
     };
 
     service.client.submit(&txn).await?;
