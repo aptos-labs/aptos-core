@@ -22,8 +22,7 @@ pub use hash::HashValue;
 pub use ledger_info::LedgerInfo;
 pub use move_types::{
     HexEncodedBytes, MoveFunction, MoveModule, MoveModuleBytecode, MoveModuleId, MoveResource,
-    MoveResourceType, MoveScriptBytecode, MoveStructTag, MoveStructValue, MoveType, MoveValue,
-    U128, U64,
+    MoveScriptBytecode, MoveStructTag, MoveStructValue, MoveType, MoveValue, U128, U64,
 };
 pub use response::{Response, X_DIEM_CHAIN_ID, X_DIEM_LEDGER_TIMESTAMP, X_DIEM_LEDGER_VERSION};
 pub use transaction::{

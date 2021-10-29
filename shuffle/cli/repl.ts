@@ -73,20 +73,14 @@ export async function modules(addr: string | undefined) {
 // Gets the sender address's account resource from the developer API.
 // Example payload below:
 // {
-//   "type": {
-//     "type": "struct",
-//     "address": "0x1",
-//     "module": "DiemAccount",
-//     "name": "DiemAccount",
-//     "generic_type_params": []
-//   },
+//   "type": "0x1::DiemAccount::DiemAccount",
 //   "value": {
 //     "sequence_number": "2",
 export async function account() {
   const res = await resources(senderAddress);
   return res.
   find(
-      (entry: any) => entry["type"]["name"] == "DiemAccount"
+      (entry: any) => entry["type"] == "0x1::DiemAccount::DiemAccount"
   );
 }
 

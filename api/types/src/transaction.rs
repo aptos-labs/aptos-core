@@ -3,7 +3,7 @@
 
 use crate::{
     Address, EventKey, HashValue, HexEncodedBytes, MoveModuleBytecode, MoveModuleId, MoveResource,
-    MoveResourceType, MoveScriptBytecode, MoveType, MoveValue, U64,
+    MoveScriptBytecode, MoveStructTag, MoveType, MoveValue, U64,
 };
 
 use diem_crypto::{
@@ -340,7 +340,7 @@ pub enum WriteSetChange {
     },
     DeleteResource {
         address: Address,
-        resource: MoveResourceType,
+        resource: MoveStructTag,
     },
     WriteModule {
         address: Address,

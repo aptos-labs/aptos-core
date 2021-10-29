@@ -14,7 +14,7 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
-    parser::parse_struct_tag,
+    parser::{parse_struct_tag, parse_type_tag},
     transaction_argument::TransactionArgument,
 };
 use resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue};
@@ -31,7 +31,7 @@ use std::{
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct MoveResource {
     #[serde(rename = "type")]
-    pub typ: MoveResourceType,
+    pub typ: MoveStructTag,
     pub value: MoveStructValue,
 }
 
@@ -40,21 +40,9 @@ impl TryFrom<AnnotatedMoveStruct> for MoveResource {
 
     fn try_from(s: AnnotatedMoveStruct) -> anyhow::Result<Self> {
         Ok(Self {
-            typ: MoveResourceType::Struct(s.type_.clone().into()),
+            typ: s.type_.clone().into(),
             value: s.try_into()?,
         })
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum MoveResourceType {
-    Struct(MoveStructTag),
-}
-
-impl From<StructTag> for MoveResourceType {
-    fn from(s: StructTag) -> Self {
-        MoveResourceType::Struct(s.into())
     }
 }
 
@@ -313,7 +301,7 @@ impl Serialize for MoveValue {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct MoveStructTag {
     pub address: Address,
     pub module: Identifier,
@@ -356,6 +344,37 @@ impl From<StructTag> for MoveStructTag {
     }
 }
 
+impl fmt::Display for MoveStructTag {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}::{}::{}", self.address, self.module, self.name)?;
+        if let Some(first_ty) = self.generic_type_params.first() {
+            write!(f, "<")?;
+            write!(f, "{}", first_ty)?;
+            for ty in self.generic_type_params.iter().skip(1) {
+                write!(f, ", {}", ty)?;
+            }
+            write!(f, ">")?;
+        }
+        Ok(())
+    }
+}
+
+impl Serialize for MoveStructTag {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.to_string().serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for MoveStructTag {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let data = <String>::deserialize(deserializer)?;
+        data.parse().map_err(D::Error::custom)
+    }
+}
+
 impl TryFrom<MoveStructTag> for StructTag {
     type Error = anyhow::Error;
     fn try_from(tag: MoveStructTag) -> anyhow::Result<Self> {
@@ -372,8 +391,7 @@ impl TryFrom<MoveStructTag> for StructTag {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
+#[derive(Clone, Debug, PartialEq)]
 pub enum MoveType {
     Bool,
     U8,
@@ -385,6 +403,53 @@ pub enum MoveType {
     Struct(MoveStructTag),
     GenericTypeParam { index: u16 },
     Reference { mutable: bool, to: Box<MoveType> },
+}
+
+impl fmt::Display for MoveType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            MoveType::U8 => write!(f, "u8"),
+            MoveType::U64 => write!(f, "u64"),
+            MoveType::U128 => write!(f, "u128"),
+            MoveType::Address => write!(f, "address"),
+            MoveType::Signer => write!(f, "signer"),
+            MoveType::Bool => write!(f, "bool"),
+            MoveType::Vector { items } => write!(f, "vector<{}>", items),
+            MoveType::Struct(s) => write!(f, "{}", s),
+            MoveType::GenericTypeParam { index } => write!(f, "T{}", index),
+            MoveType::Reference { mutable, to } => {
+                if *mutable {
+                    write!(f, "&mut {}", to)
+                } else {
+                    write!(f, "&{}", to)
+                }
+            }
+        }
+    }
+}
+
+impl FromStr for MoveType {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(parse_type_tag(s)?.into())
+    }
+}
+
+impl Serialize for MoveType {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.to_string().serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for MoveType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let data = <String>::deserialize(deserializer)?;
+        data.parse().map_err(D::Error::custom)
+    }
 }
 
 impl MoveType {
@@ -753,65 +818,18 @@ mod tests {
             let value = to_value(MoveType::from(t)).unwrap();
             assert_json(value, expected)
         }
-        assert_serialize(Bool, json!({"type": "bool"}));
-        assert_serialize(U8, json!({"type": "u8"}));
-        assert_serialize(U64, json!({"type": "u64"}));
-        assert_serialize(U128, json!({"type": "u128"}));
-        assert_serialize(Address, json!({"type": "address"}));
-        assert_serialize(Signer, json!({"type": "signer"}));
+        assert_serialize(Bool, json!("bool"));
+        assert_serialize(U8, json!("u8"));
+        assert_serialize(U64, json!("u64"));
+        assert_serialize(U128, json!("u128"));
+        assert_serialize(Address, json!("address"));
+        assert_serialize(Signer, json!("signer"));
 
-        assert_serialize(
-            Vector(Box::new(U8)),
-            json!({"type": "vector", "items": {"type": "u8"}}),
-        );
+        assert_serialize(Vector(Box::new(U8)), json!("vector<u8>"));
 
         assert_serialize(
             Struct(create_nested_struct()),
-            json!({
-                "type": "struct",
-                "address": "0x1",
-                "module": "Home",
-                "name": "ABC",
-                "generic_type_params": [
-                    {
-                        "type": "address"
-                    },
-                    {
-                        "type": "struct",
-                        "address": "0x1",
-                        "module": "Account",
-                        "name": "Base",
-                        "generic_type_params": [
-                            {
-                                "type": "u128"
-                            },
-                            {
-                                "type": "vector",
-                                "items": {
-                                    "type": "u64"
-                                }
-                            },
-                            {
-                                "type": "vector",
-                                "items": {
-                                    "type": "struct",
-                                    "address": "0x1",
-                                    "module": "Type",
-                                    "name": "String",
-                                    "generic_type_params": []
-                                }
-                            },
-                            {
-                                "type": "struct",
-                                "address": "0x1",
-                                "module": "Type",
-                                "name": "String",
-                                "generic_type_params": []
-                            }
-                        ]
-                    }
-                ]
-            }),
+            json!("0x1::Home::ABC<address, 0x1::Account::Base<u128, vector<u64>, vector<0x1::Type::String>, 0x1::Type::String>>"),
         );
     }
 
@@ -858,13 +876,7 @@ mod tests {
         assert_json(
             value,
             json!({
-                "type": {
-                    "type": "struct",
-                    "address": "0x1",
-                    "module": "Type",
-                    "name": "Values",
-                    "generic_type_params": []
-                },
+                "type": "0x1::Type::Values",
                 "value": {
                     "field_u8": 7,
                     "field_u64": "7",
@@ -895,13 +907,7 @@ mod tests {
         assert_json(
             value,
             json!({
-                "type": {
-                    "type": "struct",
-                    "address": "0x1",
-                    "module": "Type",
-                    "name": "Values",
-                    "generic_type_params": []
-                },
+                "type": "0x1::Type::Values",
                 "value": {
                     "address_0x0": "0x0",
                 }

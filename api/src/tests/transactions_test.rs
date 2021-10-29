@@ -74,27 +74,15 @@ async fn test_get_transactions_output_genesis_transaction() {
                             "visibility": "public",
                             "generic_type_params": [],
                             "params": [],
-                            "return": [
-                                {
-                                    "type": "u8"
-                                }
-                            ]
+                            "return": ["u8"]
                         },
                         {
                             "name": "initialize",
                             "visibility": "public",
                             "generic_type_params": [],
                             "params": [
-                                {
-                                    "type": "reference",
-                                    "mutable": false,
-                                    "to": {
-                                        "type": "signer"
-                                    }
-                                },
-                                {
-                                    "type": "u8"
-                                }
+                                "&signer",
+                                "u8"
                             ],
                             "return": []
                         }
@@ -110,9 +98,7 @@ async fn test_get_transactions_output_genesis_transaction() {
                             "fields": [
                                 {
                                     "name": "id",
-                                    "type": {
-                                        "type": "u8"
-                                    }
+                                    "type": "u8"
                                 }
                             ]
                         }
@@ -125,7 +111,7 @@ async fn test_get_transactions_output_genesis_transaction() {
     let chain_id = find_value(&txn["payload"]["write_set"]["changes"], |val| {
         val["type"] == "write_resource"
             && val["address"] == "0xdd"
-            && val["data"]["type"]["name"] == "RoleId"
+            && val["data"]["type"] == "0x1::Roles::RoleId"
     });
     assert_json(
         chain_id,
@@ -133,13 +119,7 @@ async fn test_get_transactions_output_genesis_transaction() {
             "type": "write_resource",
             "address": "0xdd",
             "data": {
-                "type": {
-                    "type": "struct",
-                    "address": "0x1",
-                    "module": "Roles",
-                    "name": "RoleId",
-                    "generic_type_params": []
-                },
+                "type": "0x1::Roles::RoleId",
                 "value": {
                     "role_id": "2"
                 }
@@ -158,13 +138,7 @@ async fn test_get_transactions_output_genesis_transaction() {
         json!({
             "key": "0x00000000000000000000000000000000000000000a550c18",
             "sequence_number": "0",
-            "type": {
-                "type": "struct",
-                "address": "0x1",
-                "module": "DiemAccount",
-                "name": "CreateAccountEvent",
-                "generic_type_params": []
-            },
+            "type": "0x1::DiemAccount::CreateAccountEvent",
             "data": {
                 "created": "0xa550c18",
                 "role_id": "0"
@@ -326,13 +300,7 @@ async fn test_get_transactions_output_user_transaction_with_script_function_payl
                 {
                     "key": "0x00000000000000000000000000000000000000000a550c18",
                     "sequence_number": "5",
-                    "type": {
-                        "type": "struct",
-                        "address": "0x1",
-                        "module": "DiemAccount",
-                        "name": "CreateAccountEvent",
-                        "generic_type_params": []
-                    },
+                    "type": "0x1::DiemAccount::CreateAccountEvent",
                     "data": {
                         "created": account.address().to_hex_literal(),
                         "role_id": "5"
@@ -347,13 +315,7 @@ async fn test_get_transactions_output_user_transaction_with_script_function_payl
                 },
                 "function": "create_parent_vasp_account",
                 "type_arguments": [
-                    {
-                        "type": "struct",
-                        "address": "0x1",
-                        "module": "XUS",
-                        "name": "XUS",
-                        "generic_type_params": []
-                    }
+                    "0x1::XUS::XUS"
                 ],
                 "arguments": [
                     "0",
@@ -404,19 +366,8 @@ async fn test_get_transactions_output_user_transaction_with_script_payload() {
                     "visibility": "script",
                     "generic_type_params": [],
                     "params": [
-                        {
-                            "type": "reference",
-                            "mutable": false,
-                            "to": {
-                                "type": "signer"
-                            }
-                        },
-                        {
-                            "type": "vector",
-                            "items": {
-                                "type": "u8"
-                            }
-                        }
+                        "&signer",
+                        "vector<u8>"
                     ],
                     "return": []
                 }
@@ -462,11 +413,7 @@ async fn test_get_transactions_output_user_transaction_with_module_payload() {
                         "visibility": "public",
                         "generic_type_params": [],
                         "params": [],
-                        "return": [
-                            {
-                                "type": "u8"
-                            }
-                        ]
+                        "return": ["u8"]
                     }
                 ],
                 "structs": []
@@ -536,13 +483,7 @@ async fn test_get_transactions_output_user_transaction_with_write_set_payload() 
                     {
                         "type": "delete_resource",
                         "address": "0xb1e55ed",
-                        "resource": {
-                            "type": "struct",
-                            "address": "0x1",
-                            "module": "AccountFreezing",
-                            "name": "FreezingBit",
-                            "generic_type_params": []
-                        }
+                        "resource": "0x1::AccountFreezing::FreezingBit"
                     }
                 ],
                 "events": []
@@ -592,13 +533,7 @@ async fn test_post_bcs_format_transaction() {
                 },
                 "function": "create_parent_vasp_account",
                 "type_arguments": [
-                    {
-                        "type": "struct",
-                        "address": "0x1",
-                        "module": "XUS",
-                        "name": "XUS",
-                        "generic_type_params": []
-                    }
+                    "0x1::XUS::XUS"
                 ],
                 "arguments": [
                     "0",
@@ -940,13 +875,7 @@ async fn test_signing_message_with_script_function_payload() {
         "module": { "address": "0x1", "name": "AccountCreationScripts"},
         "function": "create_parent_vasp_account",
         "type_arguments": [
-            {
-                "type": "struct",
-                "address": "0x1",
-                "module": "XUS",
-                "name": "XUS",
-                "generic_type_params": []
-            }
+            "0x1::XUS::XUS"
         ],
         "arguments": [
             "0",     // sliding_nonce
@@ -1062,13 +991,7 @@ async fn test_signing_message_with_write_set_payload() {
                 {
                     "type": "delete_resource",
                     "address": "0xb1e55ed",
-                    "resource": {
-                        "type": "struct",
-                        "address": "0x1",
-                        "module": "AccountFreezing",
-                        "name": "FreezingBit",
-                        "generic_type_params": []
-                    }
+                    "resource": "0x1::AccountFreezing::FreezingBit"
                 }
             ],
             "events": []

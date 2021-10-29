@@ -18,13 +18,7 @@ async fn test_get_events() {
         json!({
           "key": "0x00000000000000000000000000000000000000000a550c18",
           "sequence_number": "0",
-          "type": {
-            "type": "struct",
-            "address": "0x1",
-            "module": "DiemAccount",
-            "name": "CreateAccountEvent",
-            "generic_type_params": []
-          },
+          "type": "0x1::DiemAccount::CreateAccountEvent",
           "data": {
             "created": "0xa550c18",
             "role_id": "0"
@@ -46,13 +40,7 @@ async fn test_get_events_filter_by_start_sequence_number() {
         json!({
           "key": "0x00000000000000000000000000000000000000000a550c18",
           "sequence_number": "1",
-          "type": {
-            "type": "struct",
-            "address": "0x1",
-            "module": "DiemAccount",
-            "name": "CreateAccountEvent",
-            "generic_type_params": []
-          },
+          "type": "0x1::DiemAccount::CreateAccountEvent",
           "data": {
             "created": "0xb1e55ed",
             "role_id": "1"
@@ -103,13 +91,7 @@ async fn test_get_events_by_account_event_handle() {
         json!({
           "key": "0x00000000000000000000000000000000000000000a550c18",
           "sequence_number": "0",
-          "type": {
-            "type": "struct",
-            "address": "0x1",
-            "module": "DiemAccount",
-            "name": "CreateAccountEvent",
-            "generic_type_params": []
-          },
+          "type": "0x1::DiemAccount::CreateAccountEvent",
           "data": {
             "created": "0xa550c18",
             "role_id": "0"

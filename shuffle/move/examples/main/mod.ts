@@ -102,7 +102,7 @@ export async function createTestNFTScriptFunction(
 export function resourcesWithName(resources: any[], resourceName: string) {
   return resources
     .filter(
-      (entry) => entry["type"]["name"] == resourceName,
+      (entry) => entry["type"].split("::", 3)[2] == resourceName,
     );
 }
 

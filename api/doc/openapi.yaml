@@ -496,7 +496,7 @@ components:
         Prefixed with `0x` and leading zeros are trimmed.
 
 
-        See [doc](https://github.com/diem/diem/blob/main/language/documentation/book/src/address.md) for more details.
+        See [doc](https://diem.github.io/move/address.html) for more details.
       example: "0xdd"
     HexEncodedBytes:
       type: string
@@ -573,168 +573,138 @@ components:
         - value
       properties:
         type:
-          $ref: '#/components/schemas/MoveTypeStruct'
+          $ref: '#/components/schemas/MoveStructTagID'
         value:
           type: "object"
           description: >-
             Account resource data value, deserialized from Move data, field name map to field value, use `type` field information to decode.
-    MoveTypeBool:
-      type: object
-      description: >-
-        Move type `bool`
-      required:
-        - type
-      properties:
-        type:
-          type: string
-          enum:
-            - bool
-    MoveTypeU8:
-      type: object
-      description: >-
-        Move type `u8`
-      required:
-        - type
-      properties:
-        type:
-          type: string
-          enum:
-            - u8
-    MoveTypeU64:
-      type: object
-      description: >-
-        Move type `u64`
-      required:
-        - type
-      properties:
-        type:
-          type: string
-          enum:
-            - u64
-    MoveTypeU128:
-      type: object
-      description: >-
-        Move type `u128`
-      required:
-        - type
-      properties:
-        type:
-          type: string
-          enum:
-            - u128
-    MoveTypeAddress:
-      type: object
-      description: >-
-        Move type `address`
-      required:
-        - type
-      properties:
-        type:
-          type: string
-          enum:
-            - address
-    MoveTypeSigner:
-      type: object
-      description: >-
-        Move type `signer`
-      required:
-        - type
-      properties:
-        type:
-          type: string
-          enum:
-            - signer
-    MoveTypeVector:
-      type: object
-      description: Move type `vector`.
-      required:
-        - type
-        - items
-      properties:
-        type:
-          type: string
-          enum:
-            - vector
-          items:
-            $ref: '#/components/schemas/MoveType'
-    MoveTypeStruct:
-      type: object
-      description: >-
-        Move type `struct` referencing to an on-chain struct definition.
-      required:
-        - type
-        - address
-        - module
-        - name
-        - generic_type_params
-      properties:
-        type:
-          type: string
-          enum:
-            - struct
-        address:
-          $ref: '#/components/schemas/address'
-        module:
-          type: string
-          description: Module identifier / name, case sensitive.
-          example: "Diem"
-        name:
-          type: string
-          description: Struct name, case sensitive.
-          example: "Diem"
-        generic_type_params:
-          type: array
-          items:
-            $ref: '#/components/schemas/MoveType'
-    MoveTypeGenericTypeParam:
-      type: object
-      description: >-
-        Move type generic type param, used for referencing to a generic type param defined
-        in the struct / function generaic type parameters.
-      required:
-        - type
-        - index
-      properties:
-        type:
-          type: string
-          enum:
-            - generic_type_param
-        index:
-          type: integer
-    MoveTypeReference:
-      type: object
-      description: >-
-        Move type reference, used for defining a reference type.
-      required:
-        - type
-        - mutable
-        - to
-      properties:
-        type:
-          type: string
-          enum:
-            - reference
-        mutable:
-          type: boolean
-        to:
-          $ref: '#/components/schemas/MoveType'
-    MoveType:
+    MoveTypeTagID:
       oneOf:
-        - $ref: '#/components/schemas/MoveTypeBool'
-        - $ref: '#/components/schemas/MoveTypeU8'
-        - $ref: '#/components/schemas/MoveTypeU64'
-        - $ref: '#/components/schemas/MoveTypeU128'
-        - $ref: '#/components/schemas/MoveTypeAddress'
-        - $ref: '#/components/schemas/MoveTypeSigner'
-        - $ref: '#/components/schemas/MoveTypeVector'
-        - $ref: '#/components/schemas/MoveTypeStruct'
-        - $ref: '#/components/schemas/MoveTypeGenericTypeParam'
-        - $ref: '#/components/schemas/MoveTypeReference'
+        - $ref: '#/components/schemas/MovePrimitiveTypeID'
+        - $ref: '#/components/schemas/MoveVectorTypeID'
+        - $ref: '#/components/schemas/MoveStructTagID'
+    MoveTypeID:
+      oneOf:
+        - $ref: '#/components/schemas/MovePrimitiveTypeID'
+        - $ref: '#/components/schemas/MoveVectorTypeID'
+        - $ref: '#/components/schemas/MoveStructTagID'
+        - $ref: '#/components/schemas/MoveReferenceTypeID'
+        - $ref: '#/components/schemas/MoveGenericTypeID'
+    MovePrimitiveTypeID:
+      type: string
+      format: move_type
+      enum:
+        - bool
+        - u8
+        - u64
+        - u128
+        - address
+        - signer
+    MoveVectorTypeID:
+      type: string
+      format: move_type
+      pattern: '^vector<.+>$'
+      description: >-
+        String representation of an on-chain Move vector: `vector<{non-reference MoveTypeID}>`
+
+
+        Examples:
+          * `vector<u8>`
+          * `vector<vector<u64>>`
+          * `vector<0x1::DiemAccount::Balance<0x1::XDX::XDX>>`
+
+
+        See [doc](https://diem.github.io/move/vector.html) for more details.
+      example:
+        - "vector<u8>"
+    MoveStructTagID:
+      type: string
+      format: move_type
+      pattern: '^0x[0-9a-zA-Z:_<>]+$'
+      description: >-
+        String representation of an on-chain Move struct.
+
+
+        It is a combination of:
+          1. `Move module address`, `module name` and `struct name` joined by `::`.
+          2. `struct generic type parameters` joined by `, `.
+
+
+        Examples:
+          * `0x1::Diem::Diem<0x1::XDX::XDX>`
+          * `0x1::Abc::Abc<vector<u8>, vector<u64>>`
+          * `0x1::DiemAccount::AccountOperationsCapability`
+
+
+        Note:
+          1. Empty chars should be ignored when comparing 2 struct tag ids.
+          2. When used in an URL path, should be encoded by url-encoding (AKA percent-encoding).
+
+
+        See [doc](https://diem.github.io/move/structs-and-resources.html) for more details.
+      example:
+        - "0x1::DiemAccount::DiemAccount"
+    MoveReferenceTypeID:
+      type: string
+      format: move_type
+      pattern: '^&(mut )?.+$'
+      description: >-
+        A reference type string representation.
+
+
+        Move has two types of references: immutable `&` and mutable `&mut`.
+        For example:
+          * `&signer`
+          * `&mut address`
+          * `&mut vector<u8>`
+
+
+        See [doc](https://diem.github.io/move/references.html) for more details.
+      example: >-
+        &signer
+    MoveGenericTypeID:
+      type: string
+      format: move_type
+      pattern: '^T\d+$'
+      description: >-
+        A generic type parameter type string representation.
+
+
+        It is always start with `T` and following an index number, which
+        is the position of the generic type parameter in the `struct` or
+        `function` generic type parameters definition.
+
+
+        For example, the following is `0x1::TransactionFee::TransactionFee` JSON representation:
+
+            {
+                "name": "TransactionFee",
+                "is_native": false,
+                "abilities": ["key"],
+                "generic_type_params": [
+                    {"constraints": [], "is_phantom": true}
+                ],
+                "fields": [
+                    { "name": "balance", "type": "0x1::Diem::Diem<T0>" },
+                    { "name": "preburn", "type": "0x1::Diem::Preburn<T0>" }
+                ]
+            }
+
+        It's Move source code:
+
+            module DiemFramework::TransactionFee {
+                struct TransactionFee<phantom CoinType> has key {
+                    balance: Diem<CoinType>,
+                    preburn: Preburn<CoinType>,
+                }
+            }
+
+        The `T0` in the above JSON representation is the generic type place holder for
+        the `CoinType` in the Move source code.
     MoveModuleBytecode:
       type: object
       required:
         - bytecode
-        - abi
       properties:
         bytecode:
           $ref: '#/components/schemas/HexEncodedBytes'
@@ -766,32 +736,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MoveStruct'
-    MoveStructTagID:
-      type: string
-      format: struct_tag_id
-      description: >-
-        String representation of an on-chain Move struct.
-
-
-        It is a combination of:
-          1. `Move module address`, `module name` and `struct name` joined by `::`.
-          2. `struct generic type parameters` joined by `, `.
-
-
-        Examples:
-          * `0x1::Diem::Diem<0x1::XDX::XDX>`
-          * `0x1::Abc::Abc<vector<u8>, vector<u64>>`
-          * `0x1::DiemAccount::AccountOperationsCapability`
-
-
-        Note:
-          1. Empty chars should be ignored when comparing 2 struct tag ids.
-          2. When used in an URL path, should be encoded by url-encoding (AKA percent-encoding).
-
-
-        See [doc](https://github.com/diem/diem/blob/main/language/documentation/book/src/structs-and-resources.md) for more details.
-      example:
-        - "0x1::DiemAccount::DiemAccount"
     MoveStruct:
       type: object
       required:
@@ -836,7 +780,7 @@ components:
         name:
           type: string
         type:
-          $ref: '#/components/schemas/MoveType'
+          $ref: '#/components/schemas/MoveTypeID'
     MoveFunction:
       type: object
       required:
@@ -870,11 +814,11 @@ components:
         params:
           type: array
           items:
-            $ref: '#/components/schemas/MoveType'
+            $ref: '#/components/schemas/MoveTypeID'
         return:
           type: array
           items:
-            $ref: '#/components/schemas/MoveType'
+            $ref: '#/components/schemas/MoveTypeID'
     MoveAbility:
       type: string
       enum:
@@ -882,6 +826,11 @@ components:
         - drop
         - store
         - key
+      description: >-
+        Abilities are a typing feature in Move that control what actions are permissible for values of a given type.
+
+
+        See [doc](https://diem.github.io/move/abilities.html) for more details.
     MoveModuleId:
       type: object
       required:
@@ -1152,7 +1101,7 @@ components:
           type: array
           description: Generic type arguments required by the script function.
           items:
-            $ref: '#/components/schemas/MoveType'
+            $ref: '#/components/schemas/MoveTypeTagID'
         arguments:
           type: array
           description: The script function arguments.
@@ -1175,7 +1124,7 @@ components:
         type_arguments:
           type: array
           items:
-            $ref: '#/components/schemas/MoveType'
+            $ref: '#/components/schemas/MoveTypeTagID'
         arguments:
           type: array
           items:
@@ -1280,7 +1229,7 @@ components:
         address:
           $ref: '#/components/schemas/address'
         resource:
-          $ref: '#/components/schemas/MoveTypeStruct'
+          $ref: '#/components/schemas/MoveStructTagID'
     WriteModule:
       type: object
       description: Write move module
@@ -1325,7 +1274,7 @@ components:
         type_arguments:
           type: array
           items:
-            $ref: '#/components/schemas/MoveType'
+            $ref: '#/components/schemas/MoveTypeTagID'
         arguments:
           type: array
           items:
@@ -1392,7 +1341,7 @@ components:
         sequence_number:
           $ref: '#/components/schemas/EventSequenceNumber'
         type:
-          $ref: '#/components/schemas/MoveType'
+          $ref: '#/components/schemas/MoveTypeTagID'
         data:
           $ref: '#/components/schemas/MoveValue'
     TransactionSignature:

@@ -73,26 +73,12 @@ async fn test_account_resources_response() {
     let resp = context.get(&account_resources(address)).await;
 
     let res = find_value(&resp, |v| {
-        v["type"]["name"] == "Balance" && v["type"]["generic_type_params"][0]["name"] == "XDX"
+        v["type"] == "0x1::DiemAccount::Balance<0x1::XDX::XDX>"
     });
     assert_json(
         res,
         json!({
-            "type": {
-                "type": "struct",
-                "address": "0x1",
-                "module": "DiemAccount",
-                "name": "Balance",
-                "generic_type_params": [
-                    {
-                        "type": "struct",
-                        "address": "0x1",
-                        "module": "XDX",
-                        "name": "XDX",
-                        "generic_type_params": []
-                    }
-                ]
-            },
+            "type": "0x1::DiemAccount::Balance<0x1::XDX::XDX>",
             "value": {
                 "coin": {
                     "value": "0"
@@ -127,23 +113,9 @@ async fn test_account_modules() {
                         }
                     ],
                     "params": [
-                        {
-                            "type": "reference",
-                            "mutable": false,
-                            "to": {
-                                "type": "generic_type_param",
-                                "index": 0
-                            }
-                        }
+                        "&T0"
                     ],
-                    "return": [
-                        {
-                            "type": "vector",
-                            "items": {
-                                "type": "u8"
-                            }
-                        }
-                    ]
+                    "return": ["vector<u8>"]
                 }
             ],
             "structs": []
@@ -174,13 +146,10 @@ async fn test_get_module_with_script_functions() {
                         }
                     ],
                     "params": [
-                        {"type": "signer"},
-                        {"type": "signer"},
-                        {"type": "u64"},
-                        {
-                            "type": "vector",
-                            "items": {"type": "u8"}
-                        }
+                        "signer",
+                        "signer",
+                        "u64",
+                        "vector<u8>"
                     ],
                     "return": []
                 },
@@ -193,17 +162,11 @@ async fn test_get_module_with_script_functions() {
                         }
                     ],
                     "params": [
-                        {"type": "signer"},
-                        {"type": "address"},
-                        {"type": "u64"},
-                        {
-                            "type": "vector",
-                            "items": {"type": "u8"}
-                        },
-                        {
-                            "type": "vector",
-                            "items": {"type": "u8"}
-                        }
+                        "signer",
+                        "address",
+                        "u64",
+                        "vector<u8>",
+                        "vector<u8>"
                     ],
                     "return": []
                 }
@@ -266,10 +229,7 @@ async fn test_get_module_diem_config() {
                     ],
                     "params": [],
                     "return": [
-                        {
-                            "type": "generic_type_param",
-                            "index": 0
-                        }
+                        "T0"
                     ]
                 },
                 {
@@ -277,13 +237,7 @@ async fn test_get_module_diem_config() {
                     "visibility": "public",
                     "generic_type_params": [],
                     "params": [
-                        {
-                            "type": "reference",
-                            "mutable": false,
-                            "to": {
-                                "type": "signer"
-                            }
-                        }
+                        "&signer"
                     ],
                     "return": []
                 },
@@ -300,17 +254,8 @@ async fn test_get_module_diem_config() {
                         }
                     ],
                     "params": [
-                        {
-                            "type": "reference",
-                            "mutable": false,
-                            "to": {
-                                "type": "signer"
-                            }
-                        },
-                        {
-                            "type": "generic_type_param",
-                            "index": 0
-                        }
+                        "&signer",
+                        "T0"
                     ],
                     "return": []
                 },
@@ -327,31 +272,11 @@ async fn test_get_module_diem_config() {
                         }
                     ],
                     "params": [
-                        {
-                            "type": "reference",
-                            "mutable": false,
-                            "to": {
-                                "type": "signer"
-                            }
-                        },
-                        {
-                            "type": "generic_type_param",
-                            "index": 0
-                        }
+                        "&signer",
+                        "T0"
                     ],
                     "return": [
-                        {
-                            "type": "struct",
-                            "address": "0x1",
-                            "module": "DiemConfig",
-                            "name": "ModifyConfigCapability",
-                            "generic_type_params": [
-                                {
-                                    "type": "generic_type_param",
-                                    "index": 0
-                                }
-                            ]
-                        }
+                        "0x1::DiemConfig::ModifyConfigCapability<T0>"
                     ]
                 },
                 {
@@ -359,13 +284,7 @@ async fn test_get_module_diem_config() {
                     "visibility": "public",
                     "generic_type_params": [],
                     "params": [
-                        {
-                            "type": "reference",
-                            "mutable": false,
-                            "to": {
-                                "type": "signer"
-                            }
-                        }
+                        "&signer"
                     ],
                     "return": []
                 },
@@ -382,17 +301,8 @@ async fn test_get_module_diem_config() {
                         }
                     ],
                     "params": [
-                        {
-                            "type": "reference",
-                            "mutable": false,
-                            "to": {
-                                "type": "signer"
-                            }
-                        },
-                        {
-                            "type": "generic_type_param",
-                            "index": 0
-                        }
+                        "&signer",
+                        "T0"
                     ],
                     "return": []
                 },
@@ -409,26 +319,8 @@ async fn test_get_module_diem_config() {
                         }
                     ],
                     "params": [
-                        {
-                            "type": "reference",
-                            "mutable": false,
-                            "to": {
-                                "type": "struct",
-                                "address": "0x1",
-                                "module": "DiemConfig",
-                                "name": "ModifyConfigCapability",
-                                "generic_type_params": [
-                                    {
-                                        "type": "generic_type_param",
-                                        "index": 0
-                                    }
-                                ]
-                            }
-                        },
-                        {
-                            "type": "generic_type_param",
-                            "index": 0
-                        }
+                        "&0x1::DiemConfig::ModifyConfigCapability<T0>",
+                        "T0"
                     ],
                     "return": []
                 }
@@ -444,33 +336,15 @@ async fn test_get_module_diem_config() {
                     "fields": [
                         {
                             "name": "epoch",
-                            "type": {
-                                "type": "u64"
-                            }
+                            "type": "u64"
                         },
                         {
                             "name": "last_reconfiguration_time",
-                            "type": {
-                                "type": "u64"
-                            }
+                            "type": "u64"
                         },
                         {
                             "name": "events",
-                            "type": {
-                                "type": "struct",
-                                "address": "0x1",
-                                "module": "Event",
-                                "name": "EventHandle",
-                                "generic_type_params": [
-                                    {
-                                        "type": "struct",
-                                        "address": "0x1",
-                                        "module": "DiemConfig",
-                                        "name": "NewEpochEvent",
-                                        "generic_type_params": []
-                                    }
-                                ]
-                            }
+                            "type": "0x1::Event::EventHandle<0x1::DiemConfig::NewEpochEvent>"
                         }
                     ]
                 },
@@ -494,10 +368,7 @@ async fn test_get_module_diem_config() {
                     "fields": [
                         {
                             "name": "payload",
-                            "type": {
-                                "type": "generic_type_param",
-                                "index": 0
-                            }
+                            "type": "T0"
                         }
                     ]
                 },
@@ -511,9 +382,7 @@ async fn test_get_module_diem_config() {
                     "fields": [
                         {
                             "name": "dummy_field",
-                            "type": {
-                                "type": "bool"
-                            }
+                            "type": "bool"
                         }
                     ]
                 },
@@ -533,9 +402,7 @@ async fn test_get_module_diem_config() {
                     "fields": [
                         {
                             "name": "dummy_field",
-                            "type": {
-                                "type": "bool"
-                            }
+                            "type": "bool"
                         }
                     ]
                 },
@@ -550,9 +417,7 @@ async fn test_get_module_diem_config() {
                     "fields": [
                         {
                             "name": "epoch",
-                            "type": {
-                                "type": "u64"
-                            }
+                            "type": "u64"
                         }
                     ]
                 }
@@ -589,18 +454,7 @@ async fn test_account_modules_structs() {
             "fields": [
                 {
                     "name": "coin",
-                    "type": {
-                        "type": "struct",
-                        "address": "0x1",
-                        "module": "Diem",
-                        "name": "Diem",
-                        "generic_type_params": [
-                            {
-                                "type": "generic_type_param",
-                                "index": 0
-                            }
-                        ]
-                    }
+                    "type": "0x1::Diem::Diem<T0>"
                 }
             ]
         }),
@@ -625,9 +479,7 @@ async fn test_account_modules_structs() {
             "fields": [
                 {
                     "name": "value",
-                    "type": {
-                        "type": "u64"
-                    }
+                    "type": "u64"
                 }
             ]
         }),
@@ -647,7 +499,7 @@ async fn test_get_account_resources_by_ledger_version() {
         ))
         .await;
     let tc_account = find_value(&ledger_version_1_resources, |f| {
-        f["type"]["name"] == "DiemAccount"
+        f["type"] == "0x1::DiemAccount::DiemAccount"
     });
     assert_eq!(tc_account["value"]["sequence_number"], "1");
 
@@ -658,7 +510,7 @@ async fn test_get_account_resources_by_ledger_version() {
         ))
         .await;
     let tc_account = find_value(&ledger_version_0_resources, |f| {
-        f["type"]["name"] == "DiemAccount"
+        f["type"] == "0x1::DiemAccount::DiemAccount"
     });
     assert_eq!(tc_account["value"]["sequence_number"], "0");
 }
