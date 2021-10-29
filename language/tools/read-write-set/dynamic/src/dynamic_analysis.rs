@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{anyhow, bail, Result};
-use move_binary_format::{
-    layout::{GetModule, ModuleCache, TypeLayoutBuilder},
-    normalized::{Function, Type},
+use move_binary_format::normalized::{Function, Type};
+use move_bytecode_utils::{
+    layout::TypeLayoutBuilder,
+    module_cache::{GetModule, ModuleCache},
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -238,14 +239,14 @@ impl ConcretizedFormals {
 
 /// Bind all formals and type variables in `accesses` using `signers`, `actuals`, and
 /// `type_actuals`.
-pub fn bind_formals<R: MoveResolver>(
+pub fn bind_formals<R: GetModule>(
     accesses: &ReadWriteSet,
     module: &ModuleId,
     fun: &IdentStr,
     signers: &[AccountAddress],
     actuals: &[Vec<u8>],
     type_actuals: &[TypeTag],
-    module_cache: &ModuleCache<R>,
+    module_cache: &R,
 ) -> Result<ConcretizedFormals> {
     let subst_map = type_actuals
         .iter()

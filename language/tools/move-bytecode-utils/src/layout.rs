@@ -1,73 +1,19 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
+use crate::module_cache::GetModule;
+use anyhow::{anyhow, bail, Result};
+use move_binary_format::{
     access::ModuleAccess,
     file_format::{SignatureToken, StructDefinition, StructFieldInformation, StructHandleIndex},
     CompiledModule,
 };
-use anyhow::{anyhow, bail, Result};
 use move_core_types::{
     identifier::IdentStr,
     language_storage::{ModuleId, StructTag, TypeTag},
-    resolver::ModuleResolver,
     value::{MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
 };
-use std::{collections::BTreeMap, fmt::Debug, sync::RwLock};
-
-/// A persistent storage that can fetch the bytecode for a given module id
-/// TODO: do we want to implement this in a way that allows clients to cache struct layouts?
-pub trait GetModule {
-    type Error: Debug;
-
-    fn get_module_by_id(&self, id: &ModuleId) -> Result<Option<CompiledModule>, Self::Error>;
-}
-
-/// Simple in-memory module cache
-pub struct ModuleCache<R: ModuleResolver> {
-    cache: RwLock<BTreeMap<ModuleId, CompiledModule>>,
-    resolver: R,
-}
-
-impl<R: ModuleResolver> ModuleCache<R> {
-    pub fn new(resolver: R) -> Self {
-        ModuleCache {
-            cache: RwLock::new(BTreeMap::new()),
-            resolver,
-        }
-    }
-
-    pub fn add(&self, id: ModuleId, m: CompiledModule) {
-        self.cache.write().unwrap().insert(id, m);
-    }
-}
-
-impl<R: ModuleResolver> GetModule for ModuleCache<R> {
-    type Error = anyhow::Error;
-
-    fn get_module_by_id(&self, id: &ModuleId) -> Result<Option<CompiledModule>, Self::Error> {
-        if let Some(compiled_module) = self.cache.read().unwrap().get(id) {
-            return Ok(Some(compiled_module.clone()));
-        }
-
-        if let Some(module_bytes) = self
-            .resolver
-            .get_module(id)
-            .map_err(|_| anyhow!("Failed to get module {:?}", id))?
-        {
-            let module = CompiledModule::deserialize(&module_bytes)
-                .map_err(|_| anyhow!("Failure deserializing module {:?}", id))?;
-
-            self.cache
-                .write()
-                .unwrap()
-                .insert(id.clone(), module.clone());
-            Ok(Some(module))
-        } else {
-            Ok(None)
-        }
-    }
-}
+use std::fmt::Debug;
 
 pub enum TypeLayoutBuilder {}
 pub enum StructLayoutBuilder {}

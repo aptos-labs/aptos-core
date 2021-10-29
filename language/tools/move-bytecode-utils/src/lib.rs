@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod dependency_graph;
+pub mod layout;
+pub mod module_cache;
 
 use crate::dependency_graph::DependencyGraph;
 use move_binary_format::{access::ModuleAccess, file_format::CompiledModule};

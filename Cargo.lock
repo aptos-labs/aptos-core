@@ -2775,6 +2775,7 @@ dependencies = [
  "fail",
  "mirai-annotations",
  "move-binary-format",
+ "move-bytecode-utils",
  "move-core-types",
  "move-stdlib",
  "move-vm-runtime",
@@ -6762,6 +6763,7 @@ dependencies = [
  "anyhow",
  "diem-workspace-hack",
  "move-binary-format",
+ "move-bytecode-utils",
  "move-core-types",
  "read-write-set-types",
 ]

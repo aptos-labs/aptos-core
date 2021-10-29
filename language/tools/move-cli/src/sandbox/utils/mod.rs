@@ -36,7 +36,7 @@ pub mod on_disk_state_view;
 pub mod package;
 
 pub use mode::*;
-use move_binary_format::layout::GetModule;
+use move_bytecode_utils::module_cache::GetModule;
 pub use on_disk_state_view::*;
 pub use package::*;
 

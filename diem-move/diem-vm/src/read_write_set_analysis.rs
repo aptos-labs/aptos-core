@@ -13,7 +13,7 @@ use diem_types::{
     account_config,
     transaction::{SignedTransaction, TransactionPayload},
 };
-use move_binary_format::layout::ModuleCache;
+use move_bytecode_utils::module_cache::SyncModuleCache;
 use move_core_types::{
     ident_str,
     identifier::{IdentStr, Identifier},
@@ -27,7 +27,7 @@ use std::ops::Deref;
 
 pub struct ReadWriteSetAnalysis<'a, R: ModuleResolver> {
     normalized_analysis_result: &'a NormalizedReadWriteSetAnalysis,
-    module_cache: ModuleCache<&'a R>,
+    module_cache: SyncModuleCache<&'a R>,
     blockchain_view: &'a R,
 }
 
@@ -53,7 +53,7 @@ impl<'a, R: MoveResolver> ReadWriteSetAnalysis<'a, R> {
     pub fn new(rw: &'a NormalizedReadWriteSetAnalysis, blockchain_view: &'a R) -> Self {
         ReadWriteSetAnalysis {
             normalized_analysis_result: rw,
-            module_cache: ModuleCache::new(blockchain_view),
+            module_cache: SyncModuleCache::new(blockchain_view),
             blockchain_view,
         }
     }

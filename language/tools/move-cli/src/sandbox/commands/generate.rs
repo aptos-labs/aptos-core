@@ -3,7 +3,7 @@
 
 use crate::sandbox::utils::on_disk_state_view::OnDiskStateView;
 use anyhow::{bail, Result};
-use move_binary_format::layout::StructLayoutBuilder;
+use move_bytecode_utils::layout::StructLayoutBuilder;
 use move_core_types::{
     identifier::Identifier,
     language_storage::{StructTag, TypeTag},

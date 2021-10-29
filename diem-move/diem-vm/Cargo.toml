@@ -28,6 +28,7 @@ move-core-types = { path = "../../language/move-core/types" }
 move-vm-runtime = { path = "../../language/move-vm/runtime" }
 move-vm-types = { path = "../../language/move-vm/types" }
 move-binary-format = { path = "../../language/move-binary-format" }
+move-bytecode-utils = { path = "../../language/tools/move-bytecode-utils" }
 move-stdlib = { path = "../../language/move-stdlib" }
 diem-framework = { path = "../../diem-move/diem-framework" }
 serde_json = "1.0.64"

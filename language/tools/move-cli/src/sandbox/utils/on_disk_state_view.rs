@@ -8,8 +8,8 @@ use move_binary_format::{
     access::ModuleAccess,
     binary_views::BinaryIndexedView,
     file_format::{CompiledModule, CompiledScript, FunctionDefinitionIndex},
-    layout::GetModule,
 };
+use move_bytecode_utils::module_cache::GetModule;
 use move_command_line_common::files::MOVE_COMPILED_EXTENSION;
 use move_core_types::{
     account_address::AccountAddress,

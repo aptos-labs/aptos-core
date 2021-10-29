@@ -5,7 +5,7 @@ use crate::dynamic_analysis::{
     bind_formals, concretize, ConcretizedFormals, ConcretizedSecondaryIndexes,
 };
 use anyhow::{anyhow, bail, Result};
-use move_binary_format::layout::ModuleCache;
+use move_bytecode_utils::module_cache::GetModule;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
@@ -146,14 +146,14 @@ impl NormalizedReadWriteSetAnalysis {
     ///
     /// We say "partially concretized" because the summary may contain secondary indexes that require reads from the current blockchain state to be concretized. If desired, the caller can concretized them using <add API for this>
     /// be resolved or not.
-    pub fn get_partially_concretized_summary<R: MoveResolver>(
+    pub fn get_partially_concretized_summary<R: GetModule>(
         &self,
         module: &ModuleId,
         fun: &IdentStr,
         signers: &[AccountAddress],
         actuals: &[Vec<u8>],
         type_actuals: &[TypeTag],
-        module_cache: &ModuleCache<R>,
+        module_cache: &R,
     ) -> Result<ConcretizedFormals> {
         let state = self
             .get_summary(module, fun)
