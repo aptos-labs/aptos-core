@@ -470,14 +470,15 @@ fn poll_write_all<TSocket>(
 where
     TSocket: AsyncWrite,
 {
+    assert!(*offset <= buf.len());
     loop {
         let n = ready!(socket.as_mut().poll_write(&mut context, &buf[*offset..]))?;
         trace!("poll_write_all: wrote {}/{} bytes", *offset + n, buf.len());
         if n == 0 {
             return Poll::Ready(Err(io::ErrorKind::WriteZero.into()));
         }
+        assert!(n <= buf.len() - *offset);
         *offset += n;
-        assert!(*offset <= buf.len());
 
         if *offset == buf.len() {
             return Poll::Ready(Ok(()));
@@ -524,14 +525,15 @@ fn poll_read_exact<TSocket>(
 where
     TSocket: AsyncRead,
 {
+    assert!(*offset <= buf.len());
     loop {
         let n = ready!(socket.as_mut().poll_read(&mut context, &mut buf[*offset..]))?;
         trace!("poll_read_exact: read {}/{} bytes", *offset + n, buf.len());
         if n == 0 {
             return Poll::Ready(Err(io::ErrorKind::UnexpectedEof.into()));
         }
+        assert!(n <= buf.len() - *offset);
         *offset += n;
-        assert!(*offset <= buf.len());
         if *offset == buf.len() {
             return Poll::Ready(Ok(()));
         }
