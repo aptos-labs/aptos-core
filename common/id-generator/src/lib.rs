@@ -13,7 +13,7 @@ pub trait IdGenerator<Id: Copy + Debug> {
     fn next(&self) -> Id;
 }
 
-/// A generic in order [`IdGenerator`] using an [`AtomicU64`] to guarantee uniqueness
+/// A generic in order [`IdGenerator`] using an [`AtomicU32`] to guarantee uniqueness
 #[derive(Debug)]
 pub struct U32IdGenerator {
     inner: AtomicU32,

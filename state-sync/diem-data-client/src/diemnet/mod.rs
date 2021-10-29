@@ -7,6 +7,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use diem_config::network_id::PeerNetworkId;
+use diem_id_generator::{IdGenerator, U64IdGenerator};
 use diem_infallible::RwLock;
 use diem_logger::trace;
 use diem_time_service::{TimeService, TimeServiceTrait};
@@ -16,15 +17,7 @@ use network::{
     protocols::{rpc::error::RpcError, wire::handshake::v1::ProtocolId},
 };
 use rand::seq::SliceRandom;
-use std::{
-    collections::HashMap,
-    convert::TryInto,
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc,
-    },
-    time::Duration,
-};
+use std::{collections::HashMap, convert::TryInto, sync::Arc, time::Duration};
 use storage_service_client::StorageServiceClient;
 use storage_service_types::{
     AccountStatesChunkWithProofRequest, EpochEndingLedgerInfoRequest, StorageServerSummary,
@@ -69,7 +62,7 @@ pub struct DiemNetDataClient {
     /// A cached, aggregate data summary of all unbanned peers' data summaries.
     global_summary_cache: Arc<RwLock<GlobalDataSummary>>,
     /// Used for generating the next request/response id.
-    next_response_id: Arc<AtomicU64>,
+    response_id_generator: Arc<U64IdGenerator>,
 }
 
 impl DiemNetDataClient {
@@ -81,7 +74,7 @@ impl DiemNetDataClient {
             network_client,
             peer_states: Arc::new(RwLock::new(PeerStates::new())),
             global_summary_cache: Arc::new(RwLock::new(GlobalDataSummary::empty())),
-            next_response_id: Arc::new(AtomicU64::new(0)),
+            response_id_generator: Arc::new(U64IdGenerator::new()),
         };
         let poller =
             DataSummaryPoller::new(time_service, client.clone(), DATA_SUMMARY_POLL_INTERVAL);
@@ -89,7 +82,7 @@ impl DiemNetDataClient {
     }
 
     fn next_response_id(&self) -> u64 {
-        self.next_response_id.fetch_add(1, Ordering::Relaxed)
+        self.response_id_generator.next()
     }
 
     /// Update a peer's data summary.

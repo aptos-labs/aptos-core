@@ -1762,6 +1762,7 @@ dependencies = [
  "claim",
  "diem-config",
  "diem-crypto",
+ "diem-id-generator",
  "diem-infallible",
  "diem-logger",
  "diem-time-service",
