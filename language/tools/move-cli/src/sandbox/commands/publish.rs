@@ -30,7 +30,7 @@ pub fn publish(
         println!("Compiling Move modules...")
     }
 
-    let (_, compiled_units) = Compiler::new(files, &[state.interface_files_dir()?])
+    let (files, compiled_units) = Compiler::new(files, &[state.interface_files_dir()?])
         .set_flags(Flags::empty().set_sources_shadow_deps(republish))
         .set_named_address_values(named_address_mapping.clone())
         .build_and_report()?;
@@ -61,6 +61,7 @@ pub fn publish(
                     annot_module.address_name.map(|n| n.value),
                 ),
                 annot_module.named_module.module,
+                annot_module.named_module.source_map,
             )),
         }
     }
@@ -69,7 +70,7 @@ pub fn publish(
     if !ignore_breaking_changes {
         let id_to_ident: BTreeMap<_, _> = modules
             .iter()
-            .map(|((_, addr_name_opt), module)| {
+            .map(|((_, addr_name_opt), module, _)| {
                 let id = module.self_id();
                 (id, *addr_name_opt)
             })
@@ -82,7 +83,7 @@ pub fn publish(
         let mut has_error = false;
         match override_ordering {
             None => {
-                for (_, module) in &modules {
+                for (_, module, src_map) in &modules {
                     let mut module_bytes = vec![];
                     module.serialize(&mut module_bytes)?;
 
@@ -91,7 +92,7 @@ pub fn publish(
 
                     let res = session.publish_module(module_bytes, sender, &mut gas_status);
                     if let Err(err) = res {
-                        explain_publish_error(err, state, module)?;
+                        explain_publish_error(err, state, module, src_map, &files)?;
                         has_error = true;
                         break;
                     }
@@ -100,7 +101,7 @@ pub fn publish(
             Some(ordering) => {
                 let module_map: BTreeMap<_, _> = modules
                     .into_iter()
-                    .map(|((ident, _), m)| (ident.value.module.0.value.to_string(), m))
+                    .map(|((ident, _), m, _)| (ident.value.module.0.value.to_string(), m))
                     .collect();
 
                 let mut sender_opt = None;
@@ -158,7 +159,7 @@ pub fn publish(
         // backward incompatible changes, as as result, if this flag is set, we skip the VM process
         // and force the CLI to override the on-disk state directly
         let mut serialized_modules = vec![];
-        for ((_, address_name_opt), module) in modules {
+        for ((_, address_name_opt), module, _) in modules {
             let id = module.self_id();
             let mut module_bytes = vec![];
             module.serialize(&mut module_bytes)?;

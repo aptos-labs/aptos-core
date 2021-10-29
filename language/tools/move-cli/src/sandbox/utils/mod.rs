@@ -6,8 +6,8 @@ use move_binary_format::{
     access::ModuleAccess,
     compatibility::Compatibility,
     errors::VMError,
-    file_format::{AbilitySet, CompiledModule, SignatureToken},
-    normalized,
+    file_format::{AbilitySet, CompiledModule, FunctionDefinitionIndex, SignatureToken},
+    normalized, IndexKind,
 };
 use move_bytecode_utils::Modules;
 use move_command_line_common::files::MOVE_COMPILED_EXTENSION;
@@ -20,9 +20,13 @@ use move_core_types::{
     transaction_argument::TransactionArgument,
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
+use move_ir_types::location::Loc;
 use resource_viewer::{AnnotatedMoveStruct, MoveValueAnnotator};
 
 use move_vm_types::gas_schedule::GasStatus;
+
+use bytecode_source_map::source_map::SourceMap;
+use move_lang::diagnostics::{self, report_diagnostics, Diagnostic, Diagnostics, FilesSourceText};
 
 use anyhow::{bail, Result};
 use std::{collections::BTreeMap, fs, path::Path};
@@ -266,10 +270,13 @@ pub(crate) fn explain_publish_error(
     error: VMError,
     state: &OnDiskStateView,
     module: &CompiledModule,
+    src_map: &SourceMap,
+    files: &FilesSourceText,
 ) -> Result<()> {
     use StatusCode::*;
 
     let module_id = module.self_id();
+    let error_clone = error.clone();
     match error.into_vm_status() {
         VMStatus::Error(DUPLICATE_MODULE_NAME) => {
             println!(
@@ -343,6 +350,33 @@ pub(crate) fn explain_publish_error(
                 }
             }
             println!("Re-run with --ignore-breaking-changes to publish anyway.")
+        }
+        VMStatus::Error(MISSING_DEPENDENCY) => {
+            let err_indices = error_clone.indices();
+            let mut diags = Diagnostics::new();
+            for (ind_kind, table_ind) in err_indices {
+                if let IndexKind::FunctionHandle = ind_kind {
+                    let native_function = &(module.function_defs())[*table_ind as usize];
+                    let fh = module.function_handle_at(native_function.function);
+                    let mh = module.module_handle_at(fh.module);
+                    let function_source_map =
+                        src_map.get_function_source_map(FunctionDefinitionIndex(*table_ind));
+                    if let Ok(map) = function_source_map {
+                        let err_string = format!(
+                            "Missing implementation for the native function {}::{}",
+                            module.identifier_at(mh.name).as_str(),
+                            module.identifier_at(fh.name).as_str()
+                        );
+                        let diag = Diagnostic::new(
+                            diagnostics::codes::Declarations::InvalidFunction,
+                            (map.definition_location, err_string),
+                            Vec::<(Loc, String)>::new(),
+                        );
+                        diags.add(diag);
+                    }
+                }
+            }
+            report_diagnostics(files, diags)
         }
         VMStatus::Error(status_code) => {
             println!("Publishing failed with unexpected error {:?}", status_code)
