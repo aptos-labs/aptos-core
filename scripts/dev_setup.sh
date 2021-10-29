@@ -26,6 +26,7 @@ HELM_VERSION=3.2.4
 VAULT_VERSION=1.5.0
 Z3_VERSION=4.8.9
 CVC4_VERSION=aac53f51
+CVC5_VERSION=0.0.3
 DOTNET_VERSION=5.0
 BOOGIE_VERSION=2.9.0
 PYRE_CHECK_VERSION=0.0.59
@@ -42,7 +43,7 @@ function usage {
   echo "-p update ${HOME}/.profile"
   echo "-t install build tools"
   echo "-o install operations tooling as well: helm, terraform, hadolint, yamllint, vault, docker, kubectl, python3"
-  echo "-y installs or updates Move prover tools: z3, cvc4, dotnet, boogie"
+  echo "-y installs or updates Move prover tools: z3, cvc4, cvc5, dotnet, boogie"
   echo "-s installs or updates requirements to test code-generation for Move SDKs"
   echo "-v verbose mode"
   echo "-i installs an individual tool by name"
@@ -88,6 +89,7 @@ function update_path_and_profile {
     add_to_profile "export PATH=\"${DOTNET_ROOT}/tools:\$PATH\""
     add_to_profile "export Z3_EXE=\"${BIN_DIR}/z3\""
     add_to_profile "export CVC4_EXE=\"${BIN_DIR}/cvc4\""
+    add_to_profile "export CVC5_EXE=\"${BIN_DIR}/cvc5\""
     add_to_profile "export BOOGIE_EXE=\"${DOTNET_ROOT}/tools/boogie\""
   fi
   if [[ "$INSTALL_CODEGEN" == "true" ]] && [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
@@ -528,6 +530,37 @@ function install_cvc4 {
   rm -rf "$TMPFILE"
 }
 
+function install_cvc5 {
+  echo "Installing cvc5"
+  if which /usr/local/bin/cvc5 &>/dev/null; then
+    echo "cvc5 already exists at /usr/local/bin/cvc5"
+    echo "but this install will go to $${INSTALL_DIR}cvc5."
+    echo "you may want to remove the shared instance to avoid version confusion"
+  fi
+  if which "${INSTALL_DIR}cvc5" &>/dev/null && [[ "$("${INSTALL_DIR}cvc5" --version || true)" =~ .*${CVC5_VERSION}.* ]]; then
+     echo "cvc5 ${CVC5_VERSION} already installed"
+     return
+  fi
+  if [[ "$(uname)" == "Linux" ]]; then
+    CVC5_PKG="cvc5-Linux"
+  elif [[ "$(uname)" == "Darwin" ]]; then
+    CVC5_PKG="cvc5-macOS"
+  else
+    echo "cvc5 support not configured for this platform (uname=$(uname))"
+    return
+  fi
+  TMPFILE=$(mktemp)
+  rm "$TMPFILE"
+  mkdir -p "$TMPFILE"/
+  (
+    cd "$TMPFILE" || exit
+    curl -LOs "https://github.com/cvc5/cvc5/releases/download/cvc5-$CVC5_VERSION/$CVC5_PKG"
+    cp "$CVC5_PKG" "${INSTALL_DIR}cvc5"
+    chmod +x "${INSTALL_DIR}cvc5"
+  )
+  rm -rf "$TMPFILE"
+}
+
 function install_golang {
     if [[ $(go version | grep -c "go1.14" || true) == "0" ]]; then
       if [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
@@ -635,6 +668,7 @@ cat <<EOF
 Move prover tools (since -y was provided):
   * z3
   * cvc4
+  * cvc5
   * dotnet
   * boogie
 EOF
@@ -865,6 +899,7 @@ if [[ "$INSTALL_PROVER" == "true" ]]; then
   fi
   install_z3
   install_cvc4
+  install_cvc5
   install_dotnet
   install_boogie
 fi
