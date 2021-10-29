@@ -25,6 +25,11 @@ pub struct ConsensusConfig {
     // how many times to wait for txns from mempool when propose
     pub mempool_poll_count: u64,
     pub channel_size: usize,
+    // TODO: delete unused field
+    #[serde(default)]
+    pub decoupled_execution: bool,
+    #[serde(default)]
+    pub back_pressure_limit: u64,
 }
 
 impl Default for ConsensusConfig {
@@ -44,6 +49,8 @@ impl Default for ConsensusConfig {
             sync_only: false,
             mempool_poll_count: 1,
             channel_size: 30, // hard-coded
+            decoupled_execution: false,
+            back_pressure_limit: 10,
         }
     }
 }

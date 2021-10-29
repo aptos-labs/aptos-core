@@ -39,15 +39,16 @@ impl OnChainConsensusConfig {
         }
     }
 
-    /// Backpressure controls how much gaps can be between ordered and committed blocks in decoupled
-    /// execution setup.
+    /// Backpressure controls
+    /// 1. how much gaps can be between ordered and committed blocks in decoupled execution setup.
+    /// 2. how much gaps can be between the root and the remote sync info ledger.
     pub fn back_pressure_limit(&self) -> u64 {
         if !self.decoupled_execution() {
-            return 0;
+            return 10;
         }
         match &self {
             OnChainConsensusConfig::V2(config) => config.back_pressure_limit,
-            _ => 0,
+            _ => 10,
         }
     }
 }
