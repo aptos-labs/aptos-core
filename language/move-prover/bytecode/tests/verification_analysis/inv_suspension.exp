@@ -96,14 +96,14 @@ invariant applicability: [
   InvRelevance::outer_T: {
     accessed: [@0*, @1*]
     modified: [@0*, @1*]
-    directly accessed: [@0*, @1*]
-    directly modified: [@0*, @1*]
+    directly accessed: [@1*]
+    directly modified: [@1*]
   }
   InvRelevance::outer_bool: {
     accessed: [@0*]
     modified: [@0*]
-    directly accessed: [@0*]
-    directly modified: [@0*]
+    directly accessed: []
+    directly modified: []
   }
   InvRelevance::outer_u64: {
     accessed: [@1*]

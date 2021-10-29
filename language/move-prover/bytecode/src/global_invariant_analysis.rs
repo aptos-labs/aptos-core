@@ -8,7 +8,7 @@ use crate::{
     function_target_pipeline::{
         FunctionTargetProcessor, FunctionTargetsHolder, FunctionVariant, VerificationFlavor,
     },
-    stackless_bytecode::{BorrowNode, Bytecode, Operation},
+    stackless_bytecode::{BorrowNode, Bytecode, Operation, PropKind},
     usage_analysis,
     verification_analysis::{is_invariant_suspendable, InvariantAnalysisData},
 };
@@ -16,7 +16,7 @@ use crate::{
 use move_binary_format::file_format::CodeOffset;
 use move_model::{
     ast::ConditionKind,
-    model::{FunctionEnv, GlobalEnv, GlobalId, QualifiedInstId, StructId},
+    model::{FunId, FunctionEnv, GlobalEnv, GlobalId, QualifiedId, QualifiedInstId, StructId},
     ty::{Type, TypeDisplayContext, TypeInstantiationDerivation, TypeUnificationAdapter, Variance},
 };
 
@@ -32,6 +32,14 @@ pub struct PerBytecodeRelevance {
     /// associated value is a set of `inst_inv` (instantiation of invariant type parameters) that
     /// are applicable to the concrete function instance `F<inst_fun>`.
     pub insts: BTreeMap<Vec<Type>, BTreeSet<Vec<Type>>>,
+}
+
+impl PerBytecodeRelevance {
+    fn merge(&mut self, other: PerBytecodeRelevance) {
+        for (fun_inst, inv_insts) in other.insts {
+            self.insts.entry(fun_inst).or_default().extend(inv_insts);
+        }
+    }
 }
 
 /// A named struct for holding the information on how invariants are relevant to a function.
@@ -246,67 +254,11 @@ impl PerFunctionRelevance {
             .get(&fid)
             .expect("Invariant applicability not available");
 
-        let mem_analysis = usage_analysis::get_memory_usage(target);
-
         let fun_type_params = target.get_type_parameters();
         let fun_type_params_arity = fun_type_params.len();
 
-        // collect invariant applicability and instantiation information for entrypoint assumptions
-        //
-        // NOTE: why do we use the `InvariantRelevance::accessed` set instead of other sets?
-        //
-        // - The reason we choose `accessed` over `direct_accessed` is that sometimes we need to
-        //   assume invariants that are applicable to callees only and not applicable to the caller.
-        //   The reason is that if we inline a callee function, proving properties about the inlined
-        //   function might require assumptions about the memories it touches (e.g., proving the
-        //   `borrow_global_mut<R>(addr)` does not abort with the invariant that resource `R` must
-        //   exist under account `addr` after operation has started).
-        //
-        //   It does not hurt (in terms of soundness or completeness of the proofs) to assume extra
-        //   invariants in the `accessed` set even when these assumptions are not actually used in
-        //   proofs of any asserts. We might re-consider this when performance (due to too many
-        //   assumptions added to the proof system) becomes an issue.
-        //
-        // - The reason we choose `direct_accessed` over `direct_modified` is that we may need
-        //   assumptions from global invariants to prove properties in the code.
-        //
-        //   For example, we may have an `invariant exists<A>(0x1) ==> exists<B>(0x1);` while in
-        //   the code, we have `if (exists<A>(0x1)) { borrow_global<B>(0x1); }`. With the global
-        //   invariant, we know that the `borrow_global` won't abort. But we won't be able to prove
-        //   this property without the global invariant.
-        let entrypoint_invariants: BTreeSet<_> = inv_applicability
-            .accessed
-            .iter()
-            .filter_map(|&inv_id| {
-                let inv = env.get_global_invariant(inv_id).unwrap();
-                // update invariants should not be assumed at function entrypoint.
-                matches!(inv.kind, ConditionKind::GlobalInvariant(..)).then(|| inv_id)
-            })
-            .collect();
-        let entrypoint_assumptions = Self::calculate_invariant_relevance(
-            env,
-            mem_analysis.accessed.all.iter(),
-            &entrypoint_invariants,
-            fun_type_params_arity,
-        );
-
-        // if this function defers invariant checking on return, filter out invariants that are
-        // suspended in body.
-        //
-        // NOTE: why do we use the `InvariantRelevance::direct_modified` set instead of other sets?
-        //
-        // First, be reminded that in the rest of this function, we aim to find which invariants
-        // should be *asserted* at each bytecode instruction. Therefore, if a bytecode instruction
-        // only reads some memory but never modifies one, we don't need to assert the invariant.
-        // This rules out the `direct_accessed` and `accessed` sets.
-        //
-        // Second, similar to the reason why we choose `direct_accessed` set over `accessed` for
-        // invariants that constitute entrypoint assumptions, we choose `direct_modified` over
-        // `modified` is that we don't want to assert invariants that are applicable to callees
-        // only and not applicable to the caller. The reason is still: if a suspendable invariant is
-        // delegated to the caller, that invariant will appear in the `direct_modified` set on the
-        // caller side.
-        let (inv_related_return, inv_related_normal): (BTreeSet<_>, BTreeSet<_>) =
+        let inv_ro = &inv_applicability.accessed;
+        let (inv_rw_return, inv_rw_normal): (BTreeSet<_>, BTreeSet<_>) =
             if check_suspendable_inv_on_return {
                 inv_applicability
                     .direct_modified
@@ -320,123 +272,117 @@ impl PerFunctionRelevance {
         // collect invariant applicability and instantiation information per bytecode, i.e.,
         // - which invariants should be instrumented after each instruction and
         // - per each invariant applicable, how to instantiate them.
+        let mut entrypoint_assumptions = BTreeMap::new();
         let mut per_bytecode_assertions = BTreeMap::new();
-        let mut mem_related_on_return = BTreeSet::new();
-        let mut exitpoint_assertions = None;
+        let mut exitpoint_assertions = BTreeMap::new();
 
         for (code_offset, bc) in target.data.code.iter().enumerate() {
             let code_offset = code_offset as CodeOffset;
 
-            // collect memory modified in operations
-            let mem_related = match bc {
+            // collect memory accessed/modified in operations
+            let (mem_ro, mem_rw) = match bc {
                 Call(_, _, oper, _, _) => match oper {
-                    Function(mid, fid, inst) | OpaqueCallEnd(mid, fid, inst) => {
+                    Function(mid, fid, inst) => {
                         let callee_fid = mid.qualified(*fid);
-
-                        // shortcut the call if the callee does not delegate invariant checking.
-                        //
-                        // NOTE: in this case, memories modified by the callee are NOT back
-                        // propagated to the caller in the `verification_analysis.rs`, which means,
-                        // the `InvariantRelevance::direct_modified` set for the caller does NOT
-                        // necessarily cover invariants that are related to the callee.
-                        if !inv_analysis.fun_set_with_no_inv_check.contains(&callee_fid) {
-                            continue;
-                        }
-
-                        let callee_env = env.get_function(callee_fid);
-                        let callee_target =
-                            targets.get_target(&callee_env, &FunctionVariant::Baseline);
-                        let callee_usage = usage_analysis::get_memory_usage(&callee_target);
-
-                        // NOTE: it is important to include *ALL* memories modified by the callee
-                        // instead of just the direct ones --- if a function `F` delegates
-                        // suspendable invariant checking to its caller, all the functions that `F`
-                        // calls will not check suspendable invariants anymore.
-                        callee_usage.modified.get_all_inst(inst)
+                        get_callee_memory_usage_for_invariant_instrumentation(
+                            env, targets, callee_fid, inst,
+                        )
+                    }
+                    OpaqueCallBegin(mid, fid, inst) => {
+                        let callee_fid = mid.qualified(*fid);
+                        let (mem_ro, _) = get_callee_memory_usage_for_invariant_instrumentation(
+                            env, targets, callee_fid, inst,
+                        );
+                        (mem_ro, BTreeSet::new())
+                    }
+                    OpaqueCallEnd(mid, fid, inst) => {
+                        let callee_fid = mid.qualified(*fid);
+                        let (_, mem_rw) = get_callee_memory_usage_for_invariant_instrumentation(
+                            env, targets, callee_fid, inst,
+                        );
+                        (BTreeSet::new(), mem_rw)
                     }
 
                     MoveTo(mid, sid, inst) | MoveFrom(mid, sid, inst) => {
                         let mem = mid.qualified_inst(*sid, inst.to_owned());
-                        std::iter::once(mem).collect()
+                        (BTreeSet::new(), std::iter::once(mem).collect())
                     }
-                    WriteBack(GlobalRoot(mem), _) => std::iter::once(mem.clone()).collect(),
+                    WriteBack(GlobalRoot(mem), _) => {
+                        (BTreeSet::new(), std::iter::once(mem.clone()).collect())
+                    }
+
+                    Exists(mid, sid, inst) | GetGlobal(mid, sid, inst) => {
+                        let mem = mid.qualified_inst(*sid, inst.to_owned());
+                        (std::iter::once(mem).collect(), BTreeSet::new())
+                    }
 
                     // shortcut other operations
                     _ => continue,
                 },
 
-                Ret(..) if check_suspendable_inv_on_return => {
-                    std::mem::take(&mut mem_related_on_return)
-                }
+                Prop(_, PropKind::Assert, exp) | Prop(_, PropKind::Assume, exp) => (
+                    exp.used_memory(env)
+                        .into_iter()
+                        .map(|(usage, _)| usage)
+                        .collect(),
+                    BTreeSet::new(),
+                ),
 
                 // shortcut other bytecodes
                 _ => continue,
             };
 
-            // mark whether we are processing a return instruction
-            let is_return = matches!(bc, Ret(..));
-
-            // select the related invariants based on whether this bytecode instruction is a return
-            let inv_related = if is_return {
-                &inv_related_return
-            } else {
-                &inv_related_normal
-            };
-
-            // collect instantiation information
-            let relevance = Self::calculate_invariant_relevance(
+            // collect instantiation information (step 1)
+            // - entrypoint assumptions arised from memories that are read-only from the bytecode
+            let relevance_ro = Self::calculate_invariant_relevance(
                 env,
-                mem_related.iter(),
-                inv_related,
+                mem_ro.iter(),
+                inv_ro,
                 fun_type_params_arity,
             );
 
-            if is_return {
-                // capture invariants asserted before return
-                if exitpoint_assertions.is_some() {
-                    panic!("Expect at most one return instruction in the function body");
-                }
-                exitpoint_assertions = Some(relevance);
-            } else {
-                // capture invariants asserted after the bytecode
-                per_bytecode_assertions.insert(code_offset, relevance);
+            // collect instantiation information (step 2)
+            // - invariants that need to be assumed and asserted for read-write operations
+            let relevance_rw_normal = Self::calculate_invariant_relevance(
+                env,
+                mem_rw.iter(),
+                &inv_rw_normal,
+                fun_type_params_arity,
+            );
+            let relevance_rw_return = Self::calculate_invariant_relevance(
+                env,
+                mem_rw.iter(),
+                &inv_rw_return,
+                fun_type_params_arity,
+            );
 
-                // save the related memories for return point if the function defers that
-                if check_suspendable_inv_on_return {
-                    mem_related_on_return.extend(mem_related);
+            // entrypoint assumptions are about both the ro invariants and rw invariants, and
+            // regardless of whether they are checked in-place or deferred to the exit point.
+            for (inv_id, inv_rel) in relevance_ro
+                .iter()
+                .chain(relevance_rw_normal.iter())
+                .chain(relevance_rw_return.iter())
+            {
+                let inv = env.get_global_invariant(*inv_id).unwrap();
+                if matches!(inv.kind, ConditionKind::GlobalInvariantUpdate(..)) {
+                    // update invariants should not be assumed at function entrypoint
+                    continue;
                 }
+                entrypoint_assumptions
+                    .entry(*inv_id)
+                    .or_insert_with(PerBytecodeRelevance::default)
+                    .merge(inv_rel.clone());
             }
-        }
 
-        // sanity check: the deferred memory is indeed consumed by a return instruction, UNLESS
-        // the deferred memory do not touch anything that is checked in any suspendable invariant.
-        if !mem_related_on_return.is_empty() {
-            let mut deferred_invs = vec![];
-            'error_check: for inv_id in inv_related_return {
-                let inv = env.get_global_invariant(inv_id).unwrap();
-                for inv_mem in &inv.mem_usage {
-                    let inv_ty = inv_mem.to_type();
-                    for rel_mem in &mem_related_on_return {
-                        let rel_ty = rel_mem.to_type();
-                        let adapter =
-                            TypeUnificationAdapter::new_pair(&rel_ty, &inv_ty, true, true);
-                        if adapter.unify(Variance::Allow, false).is_none() {
-                            deferred_invs.push(inv_id);
-                            continue 'error_check;
-                        }
-                    }
-                }
-            }
-            if !deferred_invs.is_empty() {
-                env.error(
-                    &target.get_loc(),
-                    &format!(
-                        "Function `{}` defers the checking of {} suspendable invariants to the \
-                        return point, but the function never returns",
-                        target.func_env.get_full_name_str(),
-                        deferred_invs.len(),
-                    ),
-                );
+            // normal rw invariants are asserted in-place, right after the bytecode
+            per_bytecode_assertions.insert(code_offset, relevance_rw_normal);
+
+            // exitpoint assertions are only about the rw invariants deferred to the exit point.
+            for (inv_id, inv_rel) in relevance_rw_return {
+                exitpoint_assertions
+                    .entry(inv_id)
+                    .or_insert_with(PerBytecodeRelevance::default)
+                    .merge(inv_rel);
             }
         }
 
@@ -444,7 +390,7 @@ impl PerFunctionRelevance {
         Self {
             entrypoint_assumptions,
             per_bytecode_assertions,
-            exitpoint_assertions: exitpoint_assertions.unwrap_or_default(),
+            exitpoint_assertions,
         }
     }
 
@@ -546,5 +492,38 @@ impl PerFunctionRelevance {
         }
 
         result
+    }
+}
+
+fn get_callee_memory_usage_for_invariant_instrumentation(
+    env: &GlobalEnv,
+    targets: &FunctionTargetsHolder,
+    callee_fid: QualifiedId<FunId>,
+    callee_inst: &[Type],
+) -> (
+    BTreeSet<QualifiedInstId<StructId>>, // memory constitute to entry-point assumptions
+    BTreeSet<QualifiedInstId<StructId>>, // memory constitute to in-line or exit-point assertions
+) {
+    let inv_analysis = env
+        .get_extension::<InvariantAnalysisData>()
+        .expect("Verification analysis not performed");
+
+    let callee_env = env.get_function(callee_fid);
+    let callee_target = targets.get_target(&callee_env, &FunctionVariant::Baseline);
+    let callee_usage = usage_analysis::get_memory_usage(&callee_target);
+
+    // NOTE: it is important to include *ALL* memories accessed/modified by the callee
+    // instead of just the direct ones. Reasons include:
+    // - if a function `F` delegates suspendable invariant checking to its caller,
+    //   all the functions that `F` calls will not check suspendable invariants anymore.
+    // - if a function `F` is inlined, then all its callee might be inlined as well and
+    //   it is important to assume the invariants for them.
+    let all_accessed = callee_usage.accessed.get_all_inst(callee_inst);
+    if inv_analysis.fun_set_with_no_inv_check.contains(&callee_fid) {
+        let mem_rw = callee_usage.modified.get_all_inst(callee_inst);
+        let mem_ro = all_accessed.difference(&mem_rw).cloned().collect();
+        (mem_ro, mem_rw)
+    } else {
+        (all_accessed, BTreeSet::new())
     }
 }

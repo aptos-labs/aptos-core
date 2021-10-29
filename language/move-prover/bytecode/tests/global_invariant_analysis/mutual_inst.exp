@@ -397,6 +397,8 @@ A::good: [
       ]
     ]
   }
+  2: S::publish_x_y<u64, bool>($t0, $t2, $t3) on_abort goto L2 with $t4 {}
+  5: S::publish_x_y<u64, bool>($t1, $t5, $t6) on_abort goto L2 with $t4 {}
   exitpoint {}
 ]
 

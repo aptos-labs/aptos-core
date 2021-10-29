@@ -96,12 +96,14 @@ Demo::f1: [
       ]
     ]
   }
+  0: $t1 := exists<Demo::S1<bool>>($t0) {}
   10: write_back[Demo::S1<bool>@]($t3) {
     assert @0 = [
       <> -> [
       ]
     ]
   }
+  12: $t6 := exists<Demo::S1<u64>>($t0) {}
   22: write_back[Demo::S1<u64>@]($t8) {
     assert @0 = [
       <> -> [
