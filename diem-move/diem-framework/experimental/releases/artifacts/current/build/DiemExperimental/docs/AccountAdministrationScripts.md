@@ -238,7 +238,7 @@ resource stored under the account at <code>recovery_address</code>.
 | Name                 | Type      | Description                                                                                               |
 | ------               | ------    | -------------                                                                                             |
 | <code>to_recover_account</code> | <code>signer</code>  | The signer of the sending account of this transaction.                                                    |
-| <code>recovery_address</code>   | <code>address</code> | The account address where the <code>to_recover_account</code>'s <code><a href="DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code> will be stored. |
+| <code>recovery_address</code>   | <code><b>address</b></code> | The account address where the <code>to_recover_account</code>'s <code><a href="DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code> will be stored. |
 
 
 <a name="@Common_Abort_Conditions_8"></a>
@@ -261,7 +261,7 @@ resource stored under the account at <code>recovery_address</code>.
 * <code><a href="AccountAdministrationScripts.md#0x1_AccountAdministrationScripts_rotate_authentication_key_with_recovery_address">AccountAdministrationScripts::rotate_authentication_key_with_recovery_address</a></code>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="AccountAdministrationScripts.md#0x1_AccountAdministrationScripts_add_recovery_rotation_capability">add_recovery_rotation_capability</a>(to_recover_account: signer, recovery_address: address)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="AccountAdministrationScripts.md#0x1_AccountAdministrationScripts_add_recovery_rotation_capability">add_recovery_rotation_capability</a>(to_recover_account: signer, recovery_address: <b>address</b>)
 </code></pre>
 
 
@@ -270,7 +270,7 @@ resource stored under the account at <code>recovery_address</code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="AccountAdministrationScripts.md#0x1_AccountAdministrationScripts_add_recovery_rotation_capability">add_recovery_rotation_capability</a>(to_recover_account: signer, recovery_address: address) {
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="AccountAdministrationScripts.md#0x1_AccountAdministrationScripts_add_recovery_rotation_capability">add_recovery_rotation_capability</a>(to_recover_account: signer, recovery_address: <b>address</b>) {
     <a href="RecoveryAddress.md#0x1_RecoveryAddress_add_rotation_capability">RecoveryAddress::add_rotation_capability</a>(
         <a href="DiemAccount.md#0x1_DiemAccount_extract_key_rotation_capability">DiemAccount::extract_key_rotation_capability</a>(&to_recover_account), recovery_address
     )
@@ -775,8 +775,8 @@ This transaction can be sent either by the <code>to_recover</code> account, or b
 | Name               | Type         | Description                                                                                                                   |
 | ------             | ------       | -------------                                                                                                                 |
 | <code>account</code>          | <code>signer</code>     | Signer of the sending account of the transaction.                                                                             |
-| <code>recovery_address</code> | <code>address</code>    | Address where <code><a href="RecoveryAddress.md#0x1_RecoveryAddress_RecoveryAddress">RecoveryAddress::RecoveryAddress</a></code> that holds <code>to_recover</code>'s <code><a href="DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code> is published. |
-| <code>to_recover</code>       | <code>address</code>    | The address of the account whose authentication key will be updated.                                                          |
+| <code>recovery_address</code> | <code><b>address</b></code>    | Address where <code><a href="RecoveryAddress.md#0x1_RecoveryAddress_RecoveryAddress">RecoveryAddress::RecoveryAddress</a></code> that holds <code>to_recover</code>'s <code><a href="DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code> is published. |
+| <code>to_recover</code>       | <code><b>address</b></code>    | The address of the account whose authentication key will be updated.                                                          |
 | <code>new_key</code>          | <code>vector&lt;u8&gt;</code> | New authentication key to be used for the account at the <code>to_recover</code> address.                                                |
 
 
@@ -801,7 +801,7 @@ This transaction can be sent either by the <code>to_recover</code> account, or b
 * <code><a href="AccountAdministrationScripts.md#0x1_AccountAdministrationScripts_rotate_authentication_key_with_nonce_admin">AccountAdministrationScripts::rotate_authentication_key_with_nonce_admin</a></code>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="AccountAdministrationScripts.md#0x1_AccountAdministrationScripts_rotate_authentication_key_with_recovery_address">rotate_authentication_key_with_recovery_address</a>(account: signer, recovery_address: address, to_recover: address, new_key: vector&lt;u8&gt;)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="AccountAdministrationScripts.md#0x1_AccountAdministrationScripts_rotate_authentication_key_with_recovery_address">rotate_authentication_key_with_recovery_address</a>(account: signer, recovery_address: <b>address</b>, to_recover: <b>address</b>, new_key: vector&lt;u8&gt;)
 </code></pre>
 
 
@@ -812,8 +812,8 @@ This transaction can be sent either by the <code>to_recover</code> account, or b
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="AccountAdministrationScripts.md#0x1_AccountAdministrationScripts_rotate_authentication_key_with_recovery_address">rotate_authentication_key_with_recovery_address</a>(
         account: signer,
-        recovery_address: address,
-        to_recover: address,
+        recovery_address: <b>address</b>,
+        to_recover: <b>address</b>,
         new_key: vector&lt;u8&gt;
         ) {
     <a href="RecoveryAddress.md#0x1_RecoveryAddress_rotate_authentication_key">RecoveryAddress::rotate_authentication_key</a>(&account, recovery_address, to_recover, new_key)

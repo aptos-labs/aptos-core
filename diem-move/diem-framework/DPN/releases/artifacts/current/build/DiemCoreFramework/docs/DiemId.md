@@ -37,7 +37,7 @@ Module managing Diem ID.
 This resource holds an entity's domain names needed to send and receive payments using diem IDs.
 
 
-<pre><code><b>struct</b> <a href="DiemId.md#0x1_DiemId_DiemIdDomains">DiemIdDomains</a> has key
+<pre><code><b>struct</b> <a href="DiemId.md#0x1_DiemId_DiemIdDomains">DiemIdDomains</a> <b>has</b> key
 </code></pre>
 
 
@@ -87,7 +87,7 @@ The list of <code><a href="DiemId.md#0x1_DiemId_DiemIdDomain">DiemIdDomain</a></
 Struct to store the limit on-chain
 
 
-<pre><code><b>struct</b> <a href="DiemId.md#0x1_DiemId_DiemIdDomain">DiemIdDomain</a> has <b>copy</b>, drop, store
+<pre><code><b>struct</b> <a href="DiemId.md#0x1_DiemId_DiemIdDomain">DiemIdDomain</a> <b>has</b> <b>copy</b>, drop, store
 </code></pre>
 
 
@@ -128,7 +128,7 @@ All <code><a href="DiemId.md#0x1_DiemId_DiemIdDomain">DiemIdDomain</a></code>s m
 
 
 
-<pre><code><b>struct</b> <a href="DiemId.md#0x1_DiemId_DiemIdDomainManager">DiemIdDomainManager</a> has key
+<pre><code><b>struct</b> <a href="DiemId.md#0x1_DiemId_DiemIdDomainManager">DiemIdDomainManager</a> <b>has</b> key
 </code></pre>
 
 
@@ -156,7 +156,7 @@ All <code><a href="DiemId.md#0x1_DiemId_DiemIdDomain">DiemIdDomain</a></code>s m
 
 
 
-<pre><code><b>struct</b> <a href="DiemId.md#0x1_DiemId_DiemIdDomainEvent">DiemIdDomainEvent</a> has drop, store
+<pre><code><b>struct</b> <a href="DiemId.md#0x1_DiemId_DiemIdDomainEvent">DiemIdDomainEvent</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -179,7 +179,7 @@ All <code><a href="DiemId.md#0x1_DiemId_DiemIdDomain">DiemIdDomain</a></code>s m
  Diem ID Domain string of the account
 </dd>
 <dt>
-<code>address: address</code>
+<code><b>address</b>: <b>address</b></code>
 </dt>
 <dd>
  On-chain account address
@@ -339,7 +339,7 @@ a transaction that invokes <code>add_domain_id</code> to set the <code>domains</
         !<b>exists</b>&lt;<a href="DiemId.md#0x1_DiemId_DiemIdDomains">DiemIdDomains</a>&gt;(<a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(vasp_account)),
         <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_already_published">Errors::already_published</a>(<a href="DiemId.md#0x1_DiemId_EDIEM_ID_DOMAIN">EDIEM_ID_DOMAIN</a>)
     );
-    move_to(vasp_account, <a href="DiemId.md#0x1_DiemId_DiemIdDomains">DiemIdDomains</a> {
+    <b>move_to</b>(vasp_account, <a href="DiemId.md#0x1_DiemId_DiemIdDomains">DiemIdDomains</a> {
         domains: <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_empty">Vector::empty</a>(),
     })
 }
@@ -367,7 +367,7 @@ a transaction that invokes <code>add_domain_id</code> to set the <code>domains</
 
 
 <pre><code><b>schema</b> <a href="DiemId.md#0x1_DiemId_PublishDiemIdDomainsAbortsIf">PublishDiemIdDomainsAbortsIf</a> {
-    vasp_addr: address;
+    vasp_addr: <b>address</b>;
     <b>aborts_if</b> <a href="DiemId.md#0x1_DiemId_has_diem_id_domains">has_diem_id_domains</a>(vasp_addr) <b>with</b> Errors::ALREADY_PUBLISHED;
 }
 </code></pre>
@@ -379,7 +379,7 @@ a transaction that invokes <code>add_domain_id</code> to set the <code>domains</
 
 
 <pre><code><b>schema</b> <a href="DiemId.md#0x1_DiemId_PublishDiemIdDomainsEnsures">PublishDiemIdDomainsEnsures</a> {
-    vasp_addr: address;
+    vasp_addr: <b>address</b>;
     <b>ensures</b> <b>exists</b>&lt;<a href="DiemId.md#0x1_DiemId_DiemIdDomains">DiemIdDomains</a>&gt;(vasp_addr);
     <b>ensures</b> <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_is_empty">Vector::is_empty</a>(<b>global</b>&lt;<a href="DiemId.md#0x1_DiemId_DiemIdDomains">DiemIdDomains</a>&gt;(vasp_addr).domains);
 }
@@ -395,7 +395,7 @@ a transaction that invokes <code>add_domain_id</code> to set the <code>domains</
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="DiemId.md#0x1_DiemId_has_diem_id_domains">has_diem_id_domains</a>(addr: address): bool
+<pre><code><b>public</b> <b>fun</b> <a href="DiemId.md#0x1_DiemId_has_diem_id_domains">has_diem_id_domains</a>(addr: <b>address</b>): bool
 </code></pre>
 
 
@@ -404,7 +404,7 @@ a transaction that invokes <code>add_domain_id</code> to set the <code>domains</
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="DiemId.md#0x1_DiemId_has_diem_id_domains">has_diem_id_domains</a>(addr: address): bool {
+<pre><code><b>public</b> <b>fun</b> <a href="DiemId.md#0x1_DiemId_has_diem_id_domains">has_diem_id_domains</a>(addr: <b>address</b>): bool {
     <b>exists</b>&lt;<a href="DiemId.md#0x1_DiemId_DiemIdDomains">DiemIdDomains</a>&gt;(addr)
 }
 </code></pre>
@@ -452,7 +452,7 @@ When Treasury Compliance account sends a transaction that invokes either <code>a
         !<b>exists</b>&lt;<a href="DiemId.md#0x1_DiemId_DiemIdDomainManager">DiemIdDomainManager</a>&gt;(<a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(tc_account)),
         <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_already_published">Errors::already_published</a>(<a href="DiemId.md#0x1_DiemId_EDIEM_ID_DOMAIN_MANAGER">EDIEM_ID_DOMAIN_MANAGER</a>)
     );
-    move_to(
+    <b>move_to</b>(
         tc_account,
         <a href="DiemId.md#0x1_DiemId_DiemIdDomainManager">DiemIdDomainManager</a> {
             diem_id_domain_events: <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event_new_event_handle">Event::new_event_handle</a>&lt;<a href="DiemId.md#0x1_DiemId_DiemIdDomainEvent">DiemIdDomainEvent</a>&gt;(tc_account),
@@ -490,7 +490,7 @@ However, since domains are case insensitive, it is possible by error that two sa
 different lowercase and uppercase format gets added.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="DiemId.md#0x1_DiemId_add_diem_id_domain">add_diem_id_domain</a>(tc_account: &signer, address: address, domain: vector&lt;u8&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="DiemId.md#0x1_DiemId_add_diem_id_domain">add_diem_id_domain</a>(tc_account: &signer, <b>address</b>: <b>address</b>, domain: vector&lt;u8&gt;)
 </code></pre>
 
 
@@ -501,17 +501,17 @@ different lowercase and uppercase format gets added.
 
 <pre><code><b>public</b> <b>fun</b> <a href="DiemId.md#0x1_DiemId_add_diem_id_domain">add_diem_id_domain</a>(
     tc_account: &signer,
-    address: address,
+    <b>address</b>: <b>address</b>,
     domain: vector&lt;u8&gt;,
 ) <b>acquires</b> <a href="DiemId.md#0x1_DiemId_DiemIdDomainManager">DiemIdDomainManager</a>, <a href="DiemId.md#0x1_DiemId_DiemIdDomains">DiemIdDomains</a> {
     <a href="Roles.md#0x1_Roles_assert_treasury_compliance">Roles::assert_treasury_compliance</a>(tc_account);
     <b>assert</b>!(<a href="DiemId.md#0x1_DiemId_tc_domain_manager_exists">tc_domain_manager_exists</a>(), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="DiemId.md#0x1_DiemId_EDIEM_ID_DOMAIN_MANAGER">EDIEM_ID_DOMAIN_MANAGER</a>));
     <b>assert</b>!(
-        <b>exists</b>&lt;<a href="DiemId.md#0x1_DiemId_DiemIdDomains">DiemIdDomains</a>&gt;(address),
+        <b>exists</b>&lt;<a href="DiemId.md#0x1_DiemId_DiemIdDomains">DiemIdDomains</a>&gt;(<b>address</b>),
         <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="DiemId.md#0x1_DiemId_EDIEM_ID_DOMAINS_NOT_PUBLISHED">EDIEM_ID_DOMAINS_NOT_PUBLISHED</a>)
     );
 
-    <b>let</b> account_domains = borrow_global_mut&lt;<a href="DiemId.md#0x1_DiemId_DiemIdDomains">DiemIdDomains</a>&gt;(address);
+    <b>let</b> account_domains = <b>borrow_global_mut</b>&lt;<a href="DiemId.md#0x1_DiemId_DiemIdDomains">DiemIdDomains</a>&gt;(<b>address</b>);
     <b>let</b> diem_id_domain = <a href="DiemId.md#0x1_DiemId_create_diem_id_domain">create_diem_id_domain</a>(domain);
 
     <b>assert</b>!(
@@ -522,11 +522,11 @@ different lowercase and uppercase format gets added.
     <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_push_back">Vector::push_back</a>(&<b>mut</b> account_domains.domains, <b>copy</b> diem_id_domain);
 
     <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event_emit_event">Event::emit_event</a>(
-        &<b>mut</b> borrow_global_mut&lt;<a href="DiemId.md#0x1_DiemId_DiemIdDomainManager">DiemIdDomainManager</a>&gt;(@TreasuryCompliance).diem_id_domain_events,
+        &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="DiemId.md#0x1_DiemId_DiemIdDomainManager">DiemIdDomainManager</a>&gt;(@TreasuryCompliance).diem_id_domain_events,
         <a href="DiemId.md#0x1_DiemId_DiemIdDomainEvent">DiemIdDomainEvent</a> {
             removed: <b>false</b>,
             domain: diem_id_domain,
-            address,
+            <b>address</b>,
         },
     );
 }
@@ -554,12 +554,12 @@ different lowercase and uppercase format gets added.
 
 <pre><code><b>schema</b> <a href="DiemId.md#0x1_DiemId_AddDiemIdDomainAbortsIf">AddDiemIdDomainAbortsIf</a> {
     tc_account: signer;
-    address: address;
+    <b>address</b>: <b>address</b>;
     domain: vector&lt;u8&gt;;
-    <b>let</b> domains = <b>global</b>&lt;<a href="DiemId.md#0x1_DiemId_DiemIdDomains">DiemIdDomains</a>&gt;(address).domains;
+    <b>let</b> domains = <b>global</b>&lt;<a href="DiemId.md#0x1_DiemId_DiemIdDomains">DiemIdDomains</a>&gt;(<b>address</b>).domains;
     <b>include</b> <a href="Roles.md#0x1_Roles_AbortsIfNotTreasuryCompliance">Roles::AbortsIfNotTreasuryCompliance</a>{account: tc_account};
     <b>include</b> <a href="DiemId.md#0x1_DiemId_CreateDiemIdDomainAbortsIf">CreateDiemIdDomainAbortsIf</a>;
-    <b>aborts_if</b> !<b>exists</b>&lt;<a href="DiemId.md#0x1_DiemId_DiemIdDomains">DiemIdDomains</a>&gt;(address) <b>with</b> Errors::NOT_PUBLISHED;
+    <b>aborts_if</b> !<b>exists</b>&lt;<a href="DiemId.md#0x1_DiemId_DiemIdDomains">DiemIdDomains</a>&gt;(<b>address</b>) <b>with</b> Errors::NOT_PUBLISHED;
     <b>aborts_if</b> !<a href="DiemId.md#0x1_DiemId_tc_domain_manager_exists">tc_domain_manager_exists</a>() <b>with</b> Errors::NOT_PUBLISHED;
     <b>aborts_if</b> contains(domains, <a href="DiemId.md#0x1_DiemId_DiemIdDomain">DiemIdDomain</a> { domain }) <b>with</b> Errors::INVALID_ARGUMENT;
 }
@@ -572,9 +572,9 @@ different lowercase and uppercase format gets added.
 
 
 <pre><code><b>schema</b> <a href="DiemId.md#0x1_DiemId_AddDiemIdDomainEnsures">AddDiemIdDomainEnsures</a> {
-    address: address;
+    <b>address</b>: <b>address</b>;
     domain: vector&lt;u8&gt;;
-    <b>let</b> post domains = <b>global</b>&lt;<a href="DiemId.md#0x1_DiemId_DiemIdDomains">DiemIdDomains</a>&gt;(address).domains;
+    <b>let</b> <b>post</b> domains = <b>global</b>&lt;<a href="DiemId.md#0x1_DiemId_DiemIdDomains">DiemIdDomains</a>&gt;(<b>address</b>).domains;
     <b>ensures</b> contains(domains, <a href="DiemId.md#0x1_DiemId_DiemIdDomain">DiemIdDomain</a> { domain });
 }
 </code></pre>
@@ -586,15 +586,15 @@ different lowercase and uppercase format gets added.
 
 
 <pre><code><b>schema</b> <a href="DiemId.md#0x1_DiemId_AddDiemIdDomainEmits">AddDiemIdDomainEmits</a> {
-    address: address;
+    <b>address</b>: <b>address</b>;
     domain: vector&lt;u8&gt;;
     <b>let</b> handle = <b>global</b>&lt;<a href="DiemId.md#0x1_DiemId_DiemIdDomainManager">DiemIdDomainManager</a>&gt;(@TreasuryCompliance).diem_id_domain_events;
     <b>let</b> msg = <a href="DiemId.md#0x1_DiemId_DiemIdDomainEvent">DiemIdDomainEvent</a> {
         removed: <b>false</b>,
         domain: <a href="DiemId.md#0x1_DiemId_DiemIdDomain">DiemIdDomain</a> { domain },
-        address,
+        <b>address</b>,
     };
-    emits msg <b>to</b> handle;
+    <b>emits</b> msg <b>to</b> handle;
 }
 </code></pre>
 
@@ -609,7 +609,7 @@ different lowercase and uppercase format gets added.
 Remove a DiemIdDomain from a parent VASP's DiemIdDomains resource.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="DiemId.md#0x1_DiemId_remove_diem_id_domain">remove_diem_id_domain</a>(tc_account: &signer, address: address, domain: vector&lt;u8&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="DiemId.md#0x1_DiemId_remove_diem_id_domain">remove_diem_id_domain</a>(tc_account: &signer, <b>address</b>: <b>address</b>, domain: vector&lt;u8&gt;)
 </code></pre>
 
 
@@ -620,32 +620,32 @@ Remove a DiemIdDomain from a parent VASP's DiemIdDomains resource.
 
 <pre><code><b>public</b> <b>fun</b> <a href="DiemId.md#0x1_DiemId_remove_diem_id_domain">remove_diem_id_domain</a>(
     tc_account: &signer,
-    address: address,
+    <b>address</b>: <b>address</b>,
     domain: vector&lt;u8&gt;,
 ) <b>acquires</b> <a href="DiemId.md#0x1_DiemId_DiemIdDomainManager">DiemIdDomainManager</a>, <a href="DiemId.md#0x1_DiemId_DiemIdDomains">DiemIdDomains</a> {
     <a href="Roles.md#0x1_Roles_assert_treasury_compliance">Roles::assert_treasury_compliance</a>(tc_account);
     <b>assert</b>!(<a href="DiemId.md#0x1_DiemId_tc_domain_manager_exists">tc_domain_manager_exists</a>(), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="DiemId.md#0x1_DiemId_EDIEM_ID_DOMAIN_MANAGER">EDIEM_ID_DOMAIN_MANAGER</a>));
     <b>assert</b>!(
-        <b>exists</b>&lt;<a href="DiemId.md#0x1_DiemId_DiemIdDomains">DiemIdDomains</a>&gt;(address),
+        <b>exists</b>&lt;<a href="DiemId.md#0x1_DiemId_DiemIdDomains">DiemIdDomains</a>&gt;(<b>address</b>),
         <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="DiemId.md#0x1_DiemId_EDIEM_ID_DOMAINS_NOT_PUBLISHED">EDIEM_ID_DOMAINS_NOT_PUBLISHED</a>)
     );
 
-    <b>let</b> account_domains = borrow_global_mut&lt;<a href="DiemId.md#0x1_DiemId_DiemIdDomains">DiemIdDomains</a>&gt;(address);
+    <b>let</b> account_domains = <b>borrow_global_mut</b>&lt;<a href="DiemId.md#0x1_DiemId_DiemIdDomains">DiemIdDomains</a>&gt;(<b>address</b>);
     <b>let</b> diem_id_domain = <a href="DiemId.md#0x1_DiemId_create_diem_id_domain">create_diem_id_domain</a>(domain);
 
-    <b>let</b> (has, index) = <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_index_of">Vector::index_of</a>(&account_domains.domains, &diem_id_domain);
-    <b>if</b> (has) {
+    <b>let</b> (<b>has</b>, index) = <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_index_of">Vector::index_of</a>(&account_domains.domains, &diem_id_domain);
+    <b>if</b> (<b>has</b>) {
         <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_remove">Vector::remove</a>(&<b>mut</b> account_domains.domains, index);
     } <b>else</b> {
         <b>abort</b> <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="DiemId.md#0x1_DiemId_EDOMAIN_NOT_FOUND">EDOMAIN_NOT_FOUND</a>)
     };
 
     <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event_emit_event">Event::emit_event</a>(
-        &<b>mut</b> borrow_global_mut&lt;<a href="DiemId.md#0x1_DiemId_DiemIdDomainManager">DiemIdDomainManager</a>&gt;(@TreasuryCompliance).diem_id_domain_events,
+        &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="DiemId.md#0x1_DiemId_DiemIdDomainManager">DiemIdDomainManager</a>&gt;(@TreasuryCompliance).diem_id_domain_events,
         <a href="DiemId.md#0x1_DiemId_DiemIdDomainEvent">DiemIdDomainEvent</a> {
             removed: <b>true</b>,
             domain: diem_id_domain,
-            address: address,
+            <b>address</b>: <b>address</b>,
         },
     );
 }
@@ -673,12 +673,12 @@ Remove a DiemIdDomain from a parent VASP's DiemIdDomains resource.
 
 <pre><code><b>schema</b> <a href="DiemId.md#0x1_DiemId_RemoveDiemIdDomainAbortsIf">RemoveDiemIdDomainAbortsIf</a> {
     tc_account: signer;
-    address: address;
+    <b>address</b>: <b>address</b>;
     domain: vector&lt;u8&gt;;
-    <b>let</b> domains = <b>global</b>&lt;<a href="DiemId.md#0x1_DiemId_DiemIdDomains">DiemIdDomains</a>&gt;(address).domains;
+    <b>let</b> domains = <b>global</b>&lt;<a href="DiemId.md#0x1_DiemId_DiemIdDomains">DiemIdDomains</a>&gt;(<b>address</b>).domains;
     <b>include</b> <a href="Roles.md#0x1_Roles_AbortsIfNotTreasuryCompliance">Roles::AbortsIfNotTreasuryCompliance</a>{account: tc_account};
     <b>include</b> <a href="DiemId.md#0x1_DiemId_CreateDiemIdDomainAbortsIf">CreateDiemIdDomainAbortsIf</a>;
-    <b>aborts_if</b> !<b>exists</b>&lt;<a href="DiemId.md#0x1_DiemId_DiemIdDomains">DiemIdDomains</a>&gt;(address) <b>with</b> Errors::NOT_PUBLISHED;
+    <b>aborts_if</b> !<b>exists</b>&lt;<a href="DiemId.md#0x1_DiemId_DiemIdDomains">DiemIdDomains</a>&gt;(<b>address</b>) <b>with</b> Errors::NOT_PUBLISHED;
     <b>aborts_if</b> !<a href="DiemId.md#0x1_DiemId_tc_domain_manager_exists">tc_domain_manager_exists</a>() <b>with</b> Errors::NOT_PUBLISHED;
     <b>aborts_if</b> !contains(domains, <a href="DiemId.md#0x1_DiemId_DiemIdDomain">DiemIdDomain</a> { domain }) <b>with</b> Errors::INVALID_ARGUMENT;
 }
@@ -691,9 +691,9 @@ Remove a DiemIdDomain from a parent VASP's DiemIdDomains resource.
 
 
 <pre><code><b>schema</b> <a href="DiemId.md#0x1_DiemId_RemoveDiemIdDomainEnsures">RemoveDiemIdDomainEnsures</a> {
-    address: address;
+    <b>address</b>: <b>address</b>;
     domain: vector&lt;u8&gt;;
-    <b>let</b> post domains = <b>global</b>&lt;<a href="DiemId.md#0x1_DiemId_DiemIdDomains">DiemIdDomains</a>&gt;(address).domains;
+    <b>let</b> <b>post</b> domains = <b>global</b>&lt;<a href="DiemId.md#0x1_DiemId_DiemIdDomains">DiemIdDomains</a>&gt;(<b>address</b>).domains;
     <b>ensures</b> !contains(domains, <a href="DiemId.md#0x1_DiemId_DiemIdDomain">DiemIdDomain</a> { domain });
 }
 </code></pre>
@@ -706,15 +706,15 @@ Remove a DiemIdDomain from a parent VASP's DiemIdDomains resource.
 
 <pre><code><b>schema</b> <a href="DiemId.md#0x1_DiemId_RemoveDiemIdDomainEmits">RemoveDiemIdDomainEmits</a> {
     tc_account: signer;
-    address: address;
+    <b>address</b>: <b>address</b>;
     domain: vector&lt;u8&gt;;
     <b>let</b> handle = <b>global</b>&lt;<a href="DiemId.md#0x1_DiemId_DiemIdDomainManager">DiemIdDomainManager</a>&gt;(@TreasuryCompliance).diem_id_domain_events;
     <b>let</b> msg = <a href="DiemId.md#0x1_DiemId_DiemIdDomainEvent">DiemIdDomainEvent</a> {
         removed: <b>true</b>,
         domain: <a href="DiemId.md#0x1_DiemId_DiemIdDomain">DiemIdDomain</a> { domain },
-        address,
+        <b>address</b>,
     };
-    emits msg <b>to</b> handle;
+    <b>emits</b> msg <b>to</b> handle;
 }
 </code></pre>
 
@@ -728,7 +728,7 @@ Remove a DiemIdDomain from a parent VASP's DiemIdDomains resource.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="DiemId.md#0x1_DiemId_has_diem_id_domain">has_diem_id_domain</a>(addr: address, domain: vector&lt;u8&gt;): bool
+<pre><code><b>public</b> <b>fun</b> <a href="DiemId.md#0x1_DiemId_has_diem_id_domain">has_diem_id_domain</a>(addr: <b>address</b>, domain: vector&lt;u8&gt;): bool
 </code></pre>
 
 
@@ -737,12 +737,12 @@ Remove a DiemIdDomain from a parent VASP's DiemIdDomains resource.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="DiemId.md#0x1_DiemId_has_diem_id_domain">has_diem_id_domain</a>(addr: address, domain: vector&lt;u8&gt;): bool <b>acquires</b> <a href="DiemId.md#0x1_DiemId_DiemIdDomains">DiemIdDomains</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="DiemId.md#0x1_DiemId_has_diem_id_domain">has_diem_id_domain</a>(addr: <b>address</b>, domain: vector&lt;u8&gt;): bool <b>acquires</b> <a href="DiemId.md#0x1_DiemId_DiemIdDomains">DiemIdDomains</a> {
     <b>assert</b>!(
         <b>exists</b>&lt;<a href="DiemId.md#0x1_DiemId_DiemIdDomains">DiemIdDomains</a>&gt;(addr),
         <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="DiemId.md#0x1_DiemId_EDIEM_ID_DOMAINS_NOT_PUBLISHED">EDIEM_ID_DOMAINS_NOT_PUBLISHED</a>)
     );
-    <b>let</b> account_domains = borrow_global&lt;<a href="DiemId.md#0x1_DiemId_DiemIdDomains">DiemIdDomains</a>&gt;(addr);
+    <b>let</b> account_domains = <b>borrow_global</b>&lt;<a href="DiemId.md#0x1_DiemId_DiemIdDomains">DiemIdDomains</a>&gt;(addr);
     <b>let</b> diem_id_domain = <a href="DiemId.md#0x1_DiemId_create_diem_id_domain">create_diem_id_domain</a>(domain);
     <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_contains">Vector::contains</a>(&account_domains.domains, &diem_id_domain)
 }
@@ -769,7 +769,7 @@ Remove a DiemIdDomain from a parent VASP's DiemIdDomains resource.
 
 
 <pre><code><b>schema</b> <a href="DiemId.md#0x1_DiemId_HasDiemIdDomainAbortsIf">HasDiemIdDomainAbortsIf</a> {
-    addr: address;
+    addr: <b>address</b>;
     domain: vector&lt;u8&gt;;
     <b>include</b> <a href="DiemId.md#0x1_DiemId_CreateDiemIdDomainAbortsIf">CreateDiemIdDomainAbortsIf</a>;
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="DiemId.md#0x1_DiemId_DiemIdDomains">DiemIdDomains</a>&gt;(addr) <b>with</b> Errors::NOT_PUBLISHED;

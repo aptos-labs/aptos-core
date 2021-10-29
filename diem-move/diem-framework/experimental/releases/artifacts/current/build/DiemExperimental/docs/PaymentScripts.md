@@ -80,7 +80,7 @@ Successful execution of this script emits two events:
 | ------               | ------       | -------------                                                                                                                |
 | <code>Currency</code>           | Type         | The Move type for the <code>Currency</code> being sent in this transaction. <code>Currency</code> must be an already-registered currency on-chain. |
 | <code>payer</code>              | <code>signer</code>     | The signer of the sending account that coins are being transferred from.                                                     |
-| <code>payee</code>              | <code>address</code>    | The address of the account the coins are being transferred to.                                                               |
+| <code>payee</code>              | <code><b>address</b></code>    | The address of the account the coins are being transferred to.                                                               |
 | <code>metadata</code>           | <code>vector&lt;u8&gt;</code> | Optional metadata about this payment.                                                                                        |
 | <code>metadata_signature</code> | <code>vector&lt;u8&gt;</code> | Optional signature over <code>metadata</code> and payment information. See                                                              |
 
@@ -113,7 +113,7 @@ Successful execution of this script emits two events:
 * <code><a href="PaymentScripts.md#0x1_PaymentScripts_peer_to_peer_by_signers">PaymentScripts::peer_to_peer_by_signers</a></code>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="PaymentScripts.md#0x1_PaymentScripts_peer_to_peer_with_metadata">peer_to_peer_with_metadata</a>&lt;Currency&gt;(payer: signer, payee: address, amount: u64, metadata: vector&lt;u8&gt;, metadata_signature: vector&lt;u8&gt;)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="PaymentScripts.md#0x1_PaymentScripts_peer_to_peer_with_metadata">peer_to_peer_with_metadata</a>&lt;Currency&gt;(payer: signer, payee: <b>address</b>, amount: u64, metadata: vector&lt;u8&gt;, metadata_signature: vector&lt;u8&gt;)
 </code></pre>
 
 
@@ -124,7 +124,7 @@ Successful execution of this script emits two events:
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="PaymentScripts.md#0x1_PaymentScripts_peer_to_peer_with_metadata">peer_to_peer_with_metadata</a>&lt;Currency&gt;(
     payer: signer,
-    payee: address,
+    payee: <b>address</b>,
     amount: u64,
     metadata: vector&lt;u8&gt;,
     metadata_signature: vector&lt;u8&gt;
@@ -275,7 +275,7 @@ Successful execution of this script emits two events:
 
 <pre><code><b>schema</b> <a href="PaymentScripts.md#0x1_PaymentScripts_PeerToPeer">PeerToPeer</a>&lt;Currency&gt; {
     payer_signer: signer;
-    payee: address;
+    payee: <b>address</b>;
     amount: u64;
     metadata: vector&lt;u8&gt;;
     <b>include</b> <a href="DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: payer_signer};

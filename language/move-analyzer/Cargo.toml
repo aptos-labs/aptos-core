@@ -14,6 +14,8 @@ lsp-server = "0.5.1"
 lsp-types = "0.90.1"
 serde_json = "1.0.64"
 structopt = "0.3.21"
+move-command-line-common = { path = "../move-command-line-common" }
+move-lang = { path = "../move-lang" }
 
 [dev-dependencies]
 diem-workspace-hack = { path = "../../common/workspace-hack" }

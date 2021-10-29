@@ -28,7 +28,7 @@
 
 
 
-<pre><code><b>struct</b> <a href="BitVector.md#0x1_BitVector">BitVector</a> has <b>copy</b>, drop, store
+<pre><code><b>struct</b> <a href="BitVector.md#0x1_BitVector">BitVector</a> <b>has</b> <b>copy</b>, drop, store
 </code></pre>
 
 

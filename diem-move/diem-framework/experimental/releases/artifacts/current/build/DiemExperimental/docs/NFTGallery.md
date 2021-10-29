@@ -33,7 +33,7 @@
 Gallery holding tokens of <code>TokenType</code> as well as information of approved operators.
 
 
-<pre><code><b>struct</b> <a href="NFTGallery.md#0x1_NFTGallery">NFTGallery</a>&lt;TokenType: store&gt; has key
+<pre><code><b>struct</b> <a href="NFTGallery.md#0x1_NFTGallery">NFTGallery</a>&lt;TokenType: store&gt; <b>has</b> key
 </code></pre>
 
 
@@ -130,7 +130,7 @@ Add a token to the owner's gallery. If there is already a token of the same id i
 gallery, we combine it with the new one and make a token of greater value.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="NFTGallery.md#0x1_NFTGallery_add_to_gallery">add_to_gallery</a>&lt;TokenType: store&gt;(owner: address, token: <a href="NFT.md#0x1_NFT_Token">NFT::Token</a>&lt;TokenType&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="NFTGallery.md#0x1_NFTGallery_add_to_gallery">add_to_gallery</a>&lt;TokenType: store&gt;(owner: <b>address</b>, token: <a href="NFT.md#0x1_NFT_Token">NFT::Token</a>&lt;TokenType&gt;)
 </code></pre>
 
 
@@ -139,17 +139,17 @@ gallery, we combine it with the new one and make a token of greater value.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="NFTGallery.md#0x1_NFTGallery_add_to_gallery">add_to_gallery</a>&lt;TokenType: store&gt;(owner: address, token: Token&lt;TokenType&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="NFTGallery.md#0x1_NFTGallery_add_to_gallery">add_to_gallery</a>&lt;TokenType: store&gt;(owner: <b>address</b>, token: Token&lt;TokenType&gt;)
 <b>acquires</b> <a href="NFTGallery.md#0x1_NFTGallery">NFTGallery</a> {
     <b>assert</b>!(<b>exists</b>&lt;<a href="NFTGallery.md#0x1_NFTGallery">NFTGallery</a>&lt;TokenType&gt;&gt;(owner), <a href="NFTGallery.md#0x1_NFTGallery_EBALANCE_NOT_PUBLISHED">EBALANCE_NOT_PUBLISHED</a>);
     <b>let</b> id = <a href="NFT.md#0x1_NFT_id">NFT::id</a>&lt;TokenType&gt;(&token);
     <b>if</b> (<a href="NFTGallery.md#0x1_NFTGallery_has_token">has_token</a>&lt;TokenType&gt;(owner, &id)) {
-        // If `owner` already has a token <b>with</b> the same id, remove it from the gallery
+        // If `owner` already <b>has</b> a token <b>with</b> the same id, remove it from the gallery
         // and join it <b>with</b> the new token.
         <b>let</b> original_token = <a href="NFTGallery.md#0x1_NFTGallery_remove_from_gallery">remove_from_gallery</a>&lt;TokenType&gt;(owner, &id);
         <a href="NFT.md#0x1_NFT_join">NFT::join</a>&lt;TokenType&gt;(&<b>mut</b> token, original_token);
     };
-    <b>let</b> gallery = &<b>mut</b> borrow_global_mut&lt;<a href="NFTGallery.md#0x1_NFTGallery">NFTGallery</a>&lt;TokenType&gt;&gt;(owner).gallery;
+    <b>let</b> gallery = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="NFTGallery.md#0x1_NFTGallery">NFTGallery</a>&lt;TokenType&gt;&gt;(owner).gallery;
     <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_push_back">Vector::push_back</a>(gallery, token)
 }
 </code></pre>
@@ -165,7 +165,7 @@ gallery, we combine it with the new one and make a token of greater value.
 Remove a token of certain id from the owner's gallery and return it.
 
 
-<pre><code><b>fun</b> <a href="NFTGallery.md#0x1_NFTGallery_remove_from_gallery">remove_from_gallery</a>&lt;TokenType: store&gt;(owner: address, id: &<a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID_ID">GUID::ID</a>): <a href="NFT.md#0x1_NFT_Token">NFT::Token</a>&lt;TokenType&gt;
+<pre><code><b>fun</b> <a href="NFTGallery.md#0x1_NFTGallery_remove_from_gallery">remove_from_gallery</a>&lt;TokenType: store&gt;(owner: <b>address</b>, id: &<a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID_ID">GUID::ID</a>): <a href="NFT.md#0x1_NFT_Token">NFT::Token</a>&lt;TokenType&gt;
 </code></pre>
 
 
@@ -174,10 +174,10 @@ Remove a token of certain id from the owner's gallery and return it.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="NFTGallery.md#0x1_NFTGallery_remove_from_gallery">remove_from_gallery</a>&lt;TokenType: store&gt;(owner: address, id: &<a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID_ID">GUID::ID</a>): Token&lt;TokenType&gt;
+<pre><code><b>fun</b> <a href="NFTGallery.md#0x1_NFTGallery_remove_from_gallery">remove_from_gallery</a>&lt;TokenType: store&gt;(owner: <b>address</b>, id: &<a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID_ID">GUID::ID</a>): Token&lt;TokenType&gt;
 <b>acquires</b> <a href="NFTGallery.md#0x1_NFTGallery">NFTGallery</a> {
     <b>assert</b>!(<b>exists</b>&lt;<a href="NFTGallery.md#0x1_NFTGallery">NFTGallery</a>&lt;TokenType&gt;&gt;(owner), <a href="NFTGallery.md#0x1_NFTGallery_EBALANCE_NOT_PUBLISHED">EBALANCE_NOT_PUBLISHED</a>);
-    <b>let</b> gallery = &<b>mut</b> borrow_global_mut&lt;<a href="NFTGallery.md#0x1_NFTGallery">NFTGallery</a>&lt;TokenType&gt;&gt;(owner).gallery;
+    <b>let</b> gallery = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="NFTGallery.md#0x1_NFTGallery">NFTGallery</a>&lt;TokenType&gt;&gt;(owner).gallery;
     <b>let</b> index_opt = <a href="NFTGallery.md#0x1_NFTGallery_index_of_token">index_of_token</a>&lt;TokenType&gt;(gallery, id);
     <b>assert</b>!(<a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_is_some">Option::is_some</a>(&index_opt), <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_limit_exceeded">Errors::limit_exceeded</a>(<a href="NFTGallery.md#0x1_NFTGallery_EID_NOT_FOUND">EID_NOT_FOUND</a>));
     <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_remove">Vector::remove</a>(gallery, <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_extract">Option::extract</a>(&<b>mut</b> index_opt))
@@ -228,7 +228,7 @@ Finds the index of token with the given id in the gallery.
 Returns whether the owner has a token with given id.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="NFTGallery.md#0x1_NFTGallery_has_token">has_token</a>&lt;TokenType: store&gt;(owner: address, token_id: &<a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID_ID">GUID::ID</a>): bool
+<pre><code><b>public</b> <b>fun</b> <a href="NFTGallery.md#0x1_NFTGallery_has_token">has_token</a>&lt;TokenType: store&gt;(owner: <b>address</b>, token_id: &<a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID_ID">GUID::ID</a>): bool
 </code></pre>
 
 
@@ -237,8 +237,8 @@ Returns whether the owner has a token with given id.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="NFTGallery.md#0x1_NFTGallery_has_token">has_token</a>&lt;TokenType: store&gt;(owner: address, token_id: &<a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID_ID">GUID::ID</a>): bool <b>acquires</b> <a href="NFTGallery.md#0x1_NFTGallery">NFTGallery</a> {
-    <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_is_some">Option::is_some</a>(&<a href="NFTGallery.md#0x1_NFTGallery_index_of_token">index_of_token</a>(&borrow_global&lt;<a href="NFTGallery.md#0x1_NFTGallery">NFTGallery</a>&lt;TokenType&gt;&gt;(owner).gallery, token_id))
+<pre><code><b>public</b> <b>fun</b> <a href="NFTGallery.md#0x1_NFTGallery_has_token">has_token</a>&lt;TokenType: store&gt;(owner: <b>address</b>, token_id: &<a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID_ID">GUID::ID</a>): bool <b>acquires</b> <a href="NFTGallery.md#0x1_NFTGallery">NFTGallery</a> {
+    <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_is_some">Option::is_some</a>(&<a href="NFTGallery.md#0x1_NFTGallery_index_of_token">index_of_token</a>(&<b>borrow_global</b>&lt;<a href="NFTGallery.md#0x1_NFTGallery">NFTGallery</a>&lt;TokenType&gt;&gt;(owner).gallery, token_id))
 }
 </code></pre>
 
@@ -252,7 +252,7 @@ Returns whether the owner has a token with given id.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="NFTGallery.md#0x1_NFTGallery_get_token_balance">get_token_balance</a>&lt;TokenType: store&gt;(owner: address, token_id: &<a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID_ID">GUID::ID</a>): u64
+<pre><code><b>public</b> <b>fun</b> <a href="NFTGallery.md#0x1_NFTGallery_get_token_balance">get_token_balance</a>&lt;TokenType: store&gt;(owner: <b>address</b>, token_id: &<a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID_ID">GUID::ID</a>): u64
 </code></pre>
 
 
@@ -261,9 +261,9 @@ Returns whether the owner has a token with given id.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="NFTGallery.md#0x1_NFTGallery_get_token_balance">get_token_balance</a>&lt;TokenType: store&gt;(owner: address, token_id: &<a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID_ID">GUID::ID</a>
+<pre><code><b>public</b> <b>fun</b> <a href="NFTGallery.md#0x1_NFTGallery_get_token_balance">get_token_balance</a>&lt;TokenType: store&gt;(owner: <b>address</b>, token_id: &<a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID_ID">GUID::ID</a>
 ): u64 <b>acquires</b> <a href="NFTGallery.md#0x1_NFTGallery">NFTGallery</a> {
-    <b>let</b> gallery = &borrow_global&lt;<a href="NFTGallery.md#0x1_NFTGallery">NFTGallery</a>&lt;TokenType&gt;&gt;(owner).gallery;
+    <b>let</b> gallery = &<b>borrow_global</b>&lt;<a href="NFTGallery.md#0x1_NFTGallery">NFTGallery</a>&lt;TokenType&gt;&gt;(owner).gallery;
     <b>let</b> index_opt = <a href="NFTGallery.md#0x1_NFTGallery_index_of_token">index_of_token</a>&lt;TokenType&gt;(gallery, token_id);
 
     <b>if</b> (<a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_is_none">Option::is_none</a>(&index_opt)) {
@@ -288,7 +288,7 @@ balance to <code><b>to</b></code>'s balance. This operation has to be done by ei
 approved operator of the owner.
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="NFTGallery.md#0x1_NFTGallery_transfer_token_between_galleries">transfer_token_between_galleries</a>&lt;TokenType: store&gt;(account: signer, <b>to</b>: address, amount: u64, creator: address, creation_num: u64)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="NFTGallery.md#0x1_NFTGallery_transfer_token_between_galleries">transfer_token_between_galleries</a>&lt;TokenType: store&gt;(account: signer, <b>to</b>: <b>address</b>, amount: u64, creator: <b>address</b>, creation_num: u64)
 </code></pre>
 
 
@@ -299,9 +299,9 @@ approved operator of the owner.
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="NFTGallery.md#0x1_NFTGallery_transfer_token_between_galleries">transfer_token_between_galleries</a>&lt;TokenType: store&gt;(
     account: signer,
-    <b>to</b>: address,
+    <b>to</b>: <b>address</b>,
     amount: u64,
-    creator: address,
+    creator: <b>address</b>,
     creation_num: u64
 ) <b>acquires</b> <a href="NFTGallery.md#0x1_NFTGallery">NFTGallery</a> {
     <b>let</b> owner = <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(&account);
@@ -352,7 +352,7 @@ approved operator of the owner.
 
 <pre><code><b>public</b> <b>fun</b> <a href="NFTGallery.md#0x1_NFTGallery_publish_gallery">publish_gallery</a>&lt;TokenType: store&gt;(account: &signer) {
     <b>assert</b>!(!<b>exists</b>&lt;<a href="NFTGallery.md#0x1_NFTGallery">NFTGallery</a>&lt;TokenType&gt;&gt;(<a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account)), <a href="NFTGallery.md#0x1_NFTGallery_EBALANCE_ALREADY_PUBLISHED">EBALANCE_ALREADY_PUBLISHED</a>);
-    move_to(account, <a href="NFTGallery.md#0x1_NFTGallery">NFTGallery</a>&lt;TokenType&gt; { gallery: <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_empty">Vector::empty</a>() });
+    <b>move_to</b>(account, <a href="NFTGallery.md#0x1_NFTGallery">NFTGallery</a>&lt;TokenType&gt; { gallery: <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_empty">Vector::empty</a>() });
 }
 </code></pre>
 

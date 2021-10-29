@@ -45,7 +45,7 @@ which reflect that the system has been successfully initialized.
 A singleton resource holding the current Unix time in microseconds
 
 
-<pre><code><b>struct</b> <a href="DiemTimestamp.md#0x1_DiemTimestamp_CurrentTimeMicroseconds">CurrentTimeMicroseconds</a> has key
+<pre><code><b>struct</b> <a href="DiemTimestamp.md#0x1_DiemTimestamp_CurrentTimeMicroseconds">CurrentTimeMicroseconds</a> <b>has</b> key
 </code></pre>
 
 
@@ -132,7 +132,7 @@ account.
     <a href="DiemTimestamp.md#0x1_DiemTimestamp_assert_genesis">assert_genesis</a>();
     <a href="CoreAddresses.md#0x1_CoreAddresses_assert_diem_root">CoreAddresses::assert_diem_root</a>(dr_account);
     <b>let</b> timer = <a href="DiemTimestamp.md#0x1_DiemTimestamp_CurrentTimeMicroseconds">CurrentTimeMicroseconds</a> { microseconds: 0 };
-    move_to(dr_account, timer);
+    <b>move_to</b>(dr_account, timer);
 }
 </code></pre>
 
@@ -203,7 +203,7 @@ and need to hold.
 Updates the wall clock time by consensus. Requires VM privilege and will be invoked during block prologue.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="DiemTimestamp.md#0x1_DiemTimestamp_update_global_time">update_global_time</a>(account: &signer, proposer: address, timestamp: u64)
+<pre><code><b>public</b> <b>fun</b> <a href="DiemTimestamp.md#0x1_DiemTimestamp_update_global_time">update_global_time</a>(account: &signer, proposer: <b>address</b>, timestamp: u64)
 </code></pre>
 
 
@@ -214,17 +214,17 @@ Updates the wall clock time by consensus. Requires VM privilege and will be invo
 
 <pre><code><b>public</b> <b>fun</b> <a href="DiemTimestamp.md#0x1_DiemTimestamp_update_global_time">update_global_time</a>(
     account: &signer,
-    proposer: address,
+    proposer: <b>address</b>,
     timestamp: u64
 ) <b>acquires</b> <a href="DiemTimestamp.md#0x1_DiemTimestamp_CurrentTimeMicroseconds">CurrentTimeMicroseconds</a> {
     <a href="DiemTimestamp.md#0x1_DiemTimestamp_assert_operating">assert_operating</a>();
     // Can only be invoked by DiemVM signer.
     <a href="CoreAddresses.md#0x1_CoreAddresses_assert_vm">CoreAddresses::assert_vm</a>(account);
 
-    <b>let</b> global_timer = borrow_global_mut&lt;<a href="DiemTimestamp.md#0x1_DiemTimestamp_CurrentTimeMicroseconds">CurrentTimeMicroseconds</a>&gt;(@DiemRoot);
+    <b>let</b> global_timer = <b>borrow_global_mut</b>&lt;<a href="DiemTimestamp.md#0x1_DiemTimestamp_CurrentTimeMicroseconds">CurrentTimeMicroseconds</a>&gt;(@DiemRoot);
     <b>let</b> now = global_timer.microseconds;
     <b>if</b> (proposer == @VMReserved) {
-        // NIL block <b>with</b> null address <b>as</b> proposer. Timestamp must be equal.
+        // NIL block <b>with</b> null <b>address</b> <b>as</b> proposer. Timestamp must be equal.
         <b>assert</b>!(now == timestamp, <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="DiemTimestamp.md#0x1_DiemTimestamp_ETIMESTAMP">ETIMESTAMP</a>));
     } <b>else</b> {
         // Normal block. Time must advance
@@ -246,7 +246,7 @@ Updates the wall clock time by consensus. Requires VM privilege and will be invo
 <pre><code><b>pragma</b> opaque;
 <b>modifies</b> <b>global</b>&lt;<a href="DiemTimestamp.md#0x1_DiemTimestamp_CurrentTimeMicroseconds">CurrentTimeMicroseconds</a>&gt;(@DiemRoot);
 <b>let</b> now = <a href="DiemTimestamp.md#0x1_DiemTimestamp_spec_now_microseconds">spec_now_microseconds</a>();
-<b>let</b> post post_now = <a href="DiemTimestamp.md#0x1_DiemTimestamp_spec_now_microseconds">spec_now_microseconds</a>();
+<b>let</b> <b>post</b> post_now = <a href="DiemTimestamp.md#0x1_DiemTimestamp_spec_now_microseconds">spec_now_microseconds</a>();
 </code></pre>
 
 
@@ -294,7 +294,7 @@ Gets the current time in microseconds.
 
 <pre><code><b>public</b> <b>fun</b> <a href="DiemTimestamp.md#0x1_DiemTimestamp_now_microseconds">now_microseconds</a>(): u64 <b>acquires</b> <a href="DiemTimestamp.md#0x1_DiemTimestamp_CurrentTimeMicroseconds">CurrentTimeMicroseconds</a> {
     <a href="DiemTimestamp.md#0x1_DiemTimestamp_assert_operating">assert_operating</a>();
-    borrow_global&lt;<a href="DiemTimestamp.md#0x1_DiemTimestamp_CurrentTimeMicroseconds">CurrentTimeMicroseconds</a>&gt;(@DiemRoot).microseconds
+    <b>borrow_global</b>&lt;<a href="DiemTimestamp.md#0x1_DiemTimestamp_CurrentTimeMicroseconds">CurrentTimeMicroseconds</a>&gt;(@DiemRoot).microseconds
 }
 </code></pre>
 

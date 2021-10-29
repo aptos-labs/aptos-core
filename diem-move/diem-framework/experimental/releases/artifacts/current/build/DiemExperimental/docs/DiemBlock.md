@@ -32,7 +32,7 @@ This module defines a struct storing the metadata of the block and new block eve
 
 
 
-<pre><code><b>struct</b> <a href="DiemBlock.md#0x1_DiemBlock_BlockMetadata">BlockMetadata</a> has key
+<pre><code><b>struct</b> <a href="DiemBlock.md#0x1_DiemBlock_BlockMetadata">BlockMetadata</a> <b>has</b> key
 </code></pre>
 
 
@@ -65,7 +65,7 @@ This module defines a struct storing the metadata of the block and new block eve
 
 
 
-<pre><code><b>struct</b> <a href="DiemBlock.md#0x1_DiemBlock_NewBlockEvent">NewBlockEvent</a> has drop, store
+<pre><code><b>struct</b> <a href="DiemBlock.md#0x1_DiemBlock_NewBlockEvent">NewBlockEvent</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -82,13 +82,13 @@ This module defines a struct storing the metadata of the block and new block eve
 
 </dd>
 <dt>
-<code>proposer: address</code>
+<code>proposer: <b>address</b></code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>previous_block_votes: vector&lt;address&gt;</code>
+<code>previous_block_votes: vector&lt;<b>address</b>&gt;</code>
 </dt>
 <dd>
 
@@ -148,11 +148,11 @@ Currently, it is invoked in the genesis transaction
 
 <pre><code><b>public</b> <b>fun</b> <a href="DiemBlock.md#0x1_DiemBlock_initialize_block_metadata">initialize_block_metadata</a>(account: &signer) {
     <a href="DiemTimestamp.md#0x1_DiemTimestamp_assert_genesis">DiemTimestamp::assert_genesis</a>();
-    // Operational constraint, only callable by the Association address
+    // Operational constraint, only callable by the Association <b>address</b>
     <a href="CoreAddresses.md#0x1_CoreAddresses_assert_diem_root">CoreAddresses::assert_diem_root</a>(account);
 
     <b>assert</b>!(!<a href="DiemBlock.md#0x1_DiemBlock_is_initialized">is_initialized</a>(), <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_already_published">Errors::already_published</a>(<a href="DiemBlock.md#0x1_DiemBlock_EBLOCK_METADATA">EBLOCK_METADATA</a>));
-    move_to&lt;<a href="DiemBlock.md#0x1_DiemBlock_BlockMetadata">BlockMetadata</a>&gt;(
+    <b>move_to</b>&lt;<a href="DiemBlock.md#0x1_DiemBlock_BlockMetadata">BlockMetadata</a>&gt;(
         account,
         <a href="DiemBlock.md#0x1_DiemBlock_BlockMetadata">BlockMetadata</a> {
             height: 0,
@@ -215,7 +215,7 @@ Set the metadata for the current block.
 The runtime always runs this before executing the transactions in a block.
 
 
-<pre><code><b>fun</b> <a href="DiemBlock.md#0x1_DiemBlock_block_prologue">block_prologue</a>(vm: signer, round: u64, timestamp: u64, previous_block_votes: vector&lt;address&gt;, proposer: address)
+<pre><code><b>fun</b> <a href="DiemBlock.md#0x1_DiemBlock_block_prologue">block_prologue</a>(vm: signer, round: u64, timestamp: u64, previous_block_votes: vector&lt;<b>address</b>&gt;, proposer: <b>address</b>)
 </code></pre>
 
 
@@ -228,8 +228,8 @@ The runtime always runs this before executing the transactions in a block.
     vm: signer,
     round: u64,
     timestamp: u64,
-    previous_block_votes: vector&lt;address&gt;,
-    proposer: address
+    previous_block_votes: vector&lt;<b>address</b>&gt;,
+    proposer: <b>address</b>
 ) <b>acquires</b> <a href="DiemBlock.md#0x1_DiemBlock_BlockMetadata">BlockMetadata</a> {
     <a href="DiemTimestamp.md#0x1_DiemTimestamp_assert_operating">DiemTimestamp::assert_operating</a>();
     // Operational constraint: can only be invoked by the VM.
@@ -241,7 +241,7 @@ The runtime always runs this before executing the transactions in a block.
         <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_requires_address">Errors::requires_address</a>(<a href="DiemBlock.md#0x1_DiemBlock_EVM_OR_VALIDATOR">EVM_OR_VALIDATOR</a>)
     );
 
-    <b>let</b> block_metadata_ref = borrow_global_mut&lt;<a href="DiemBlock.md#0x1_DiemBlock_BlockMetadata">BlockMetadata</a>&gt;(@DiemRoot);
+    <b>let</b> block_metadata_ref = <b>borrow_global_mut</b>&lt;<a href="DiemBlock.md#0x1_DiemBlock_BlockMetadata">BlockMetadata</a>&gt;(@DiemRoot);
     <a href="DiemTimestamp.md#0x1_DiemTimestamp_update_global_time">DiemTimestamp::update_global_time</a>(&vm, proposer, timestamp);
     block_metadata_ref.height = block_metadata_ref.height + 1;
     <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event_emit_event">Event::emit_event</a>&lt;<a href="DiemBlock.md#0x1_DiemBlock_NewBlockEvent">NewBlockEvent</a>&gt;(
@@ -284,8 +284,8 @@ The runtime always runs this before executing the transactions in a block.
 <pre><code><b>schema</b> <a href="DiemBlock.md#0x1_DiemBlock_BlockPrologueEmits">BlockPrologueEmits</a> {
     round: u64;
     timestamp: u64;
-    previous_block_votes: vector&lt;address&gt;;
-    proposer: address;
+    previous_block_votes: vector&lt;<b>address</b>&gt;;
+    proposer: <b>address</b>;
     <b>let</b> handle = <b>global</b>&lt;<a href="DiemBlock.md#0x1_DiemBlock_BlockMetadata">BlockMetadata</a>&gt;(@DiemRoot).new_block_events;
     <b>let</b> msg = <a href="DiemBlock.md#0x1_DiemBlock_NewBlockEvent">NewBlockEvent</a> {
         round,
@@ -293,7 +293,7 @@ The runtime always runs this before executing the transactions in a block.
         previous_block_votes,
         time_microseconds: timestamp,
     };
-    emits msg <b>to</b> handle;
+    <b>emits</b> msg <b>to</b> handle;
 }
 </code></pre>
 
@@ -319,7 +319,7 @@ Get the current block height
 
 <pre><code><b>public</b> <b>fun</b> <a href="DiemBlock.md#0x1_DiemBlock_get_current_block_height">get_current_block_height</a>(): u64 <b>acquires</b> <a href="DiemBlock.md#0x1_DiemBlock_BlockMetadata">BlockMetadata</a> {
     <b>assert</b>!(<a href="DiemBlock.md#0x1_DiemBlock_is_initialized">is_initialized</a>(), <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="DiemBlock.md#0x1_DiemBlock_EBLOCK_METADATA">EBLOCK_METADATA</a>));
-    borrow_global&lt;<a href="DiemBlock.md#0x1_DiemBlock_BlockMetadata">BlockMetadata</a>&gt;(@DiemRoot).height
+    <b>borrow_global</b>&lt;<a href="DiemBlock.md#0x1_DiemBlock_BlockMetadata">BlockMetadata</a>&gt;(@DiemRoot).height
 }
 </code></pre>
 

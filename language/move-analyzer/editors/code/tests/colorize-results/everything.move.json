@@ -925,13 +925,13 @@
 	},
 	{
 		"c": "move_to",
-		"t": "source.move meta.function.move entity.name.function.move",
+		"t": "source.move support.function.move",
 		"r": {
-			"dark_plus": "entity.name.function: #DCDCAA",
-			"light_plus": "entity.name.function: #795E26",
+			"dark_plus": "support.function: #DCDCAA",
+			"light_plus": "support.function: #795E26",
 			"dark_vs": "default: #D4D4D4",
 			"light_vs": "default: #000000",
-			"hc_black": "entity.name.function: #DCDCAA"
+			"hc_black": "support.function: #DCDCAA"
 		}
 	},
 	{

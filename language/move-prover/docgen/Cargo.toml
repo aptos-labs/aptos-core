@@ -8,6 +8,7 @@ license = "Apache-2.0"
 
 [dependencies]
 # diem dependencies
+move-lang = { path = "../../move-lang" }
 move-model = { path = "../../move-model" }
 bytecode = { path = "../bytecode" }
 diem-workspace-hack = { path = "../../../common/workspace-hack" }

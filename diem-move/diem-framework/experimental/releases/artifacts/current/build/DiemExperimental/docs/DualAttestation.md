@@ -56,7 +56,7 @@ This resource holds an entity's globally unique name and all of the metadata it 
 participate in off-chain protocols.
 
 
-<pre><code><b>struct</b> <a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a> has key
+<pre><code><b>struct</b> <a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a> <b>has</b> key
 </code></pre>
 
 
@@ -123,7 +123,7 @@ participate in off-chain protocols.
 Struct to store the limit on-chain
 
 
-<pre><code><b>struct</b> <a href="DualAttestation.md#0x1_DualAttestation_Limit">Limit</a> has key
+<pre><code><b>struct</b> <a href="DualAttestation.md#0x1_DualAttestation_Limit">Limit</a> <b>has</b> key
 </code></pre>
 
 
@@ -151,7 +151,7 @@ Struct to store the limit on-chain
 The message sent whenever the compliance public key for a <code><a href="DualAttestation.md#0x1_DualAttestation">DualAttestation</a></code> resource is rotated.
 
 
-<pre><code><b>struct</b> <a href="DualAttestation.md#0x1_DualAttestation_ComplianceKeyRotationEvent">ComplianceKeyRotationEvent</a> has drop, store
+<pre><code><b>struct</b> <a href="DualAttestation.md#0x1_DualAttestation_ComplianceKeyRotationEvent">ComplianceKeyRotationEvent</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -185,7 +185,7 @@ The message sent whenever the compliance public key for a <code><a href="DualAtt
 The message sent whenever the base url for a <code><a href="DualAttestation.md#0x1_DualAttestation">DualAttestation</a></code> resource is rotated.
 
 
-<pre><code><b>struct</b> <a href="DualAttestation.md#0x1_DualAttestation_BaseUrlRotationEvent">BaseUrlRotationEvent</a> has drop, store
+<pre><code><b>struct</b> <a href="DualAttestation.md#0x1_DualAttestation_BaseUrlRotationEvent">BaseUrlRotationEvent</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -365,7 +365,7 @@ the <code>created</code> account must send a transaction that invokes <code>rota
         !<b>exists</b>&lt;<a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a>&gt;(<a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(created)),
         <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_already_published">Errors::already_published</a>(<a href="DualAttestation.md#0x1_DualAttestation_ECREDENTIAL">ECREDENTIAL</a>)
     );
-    move_to(created, <a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a> {
+    <b>move_to</b>(created, <a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a> {
         human_name,
         base_url: <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_empty">Vector::empty</a>(),
         compliance_public_key: <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_empty">Vector::empty</a>(),
@@ -399,7 +399,7 @@ The permission "RotateDualAttestationInfo" is granted to ParentVASP and Designat
 <a name="0x1_DualAttestation_spec_has_credential"></a>
 
 
-<pre><code><b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_spec_has_credential">spec_has_credential</a>(addr: address): bool {
+<pre><code><b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_spec_has_credential">spec_has_credential</a>(addr: <b>address</b>): bool {
    <b>exists</b>&lt;<a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a>&gt;(addr)
 }
 </code></pre>
@@ -427,7 +427,7 @@ Rotate the base URL for <code>account</code> to <code>new_url</code>
 <pre><code><b>public</b> <b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_rotate_base_url">rotate_base_url</a>(account: &signer, new_url: vector&lt;u8&gt;) <b>acquires</b> <a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a> {
     <b>let</b> addr = <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
     <b>assert</b>!(<b>exists</b>&lt;<a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a>&gt;(addr), <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="DualAttestation.md#0x1_DualAttestation_ECREDENTIAL">ECREDENTIAL</a>));
-    <b>let</b> credential = borrow_global_mut&lt;<a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a>&gt;(addr);
+    <b>let</b> credential = <b>borrow_global_mut</b>&lt;<a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a>&gt;(addr);
     credential.base_url = <b>copy</b> new_url;
     <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event_emit_event">Event::emit_event</a>(&<b>mut</b> credential.base_url_rotation_events, <a href="DualAttestation.md#0x1_DualAttestation_BaseUrlRotationEvent">BaseUrlRotationEvent</a> {
         new_base_url: new_url,
@@ -479,7 +479,7 @@ Must abort if the account does not have the resource Credential [[H17]][PERMISSI
 
 
 <pre><code><b>schema</b> <a href="DualAttestation.md#0x1_DualAttestation_AbortsIfNoCredential">AbortsIfNoCredential</a> {
-    addr: address;
+    addr: <b>address</b>;
     <b>aborts_if</b> !<a href="DualAttestation.md#0x1_DualAttestation_spec_has_credential">spec_has_credential</a>(addr) <b>with</b> Errors::NOT_PUBLISHED;
 }
 </code></pre>
@@ -503,7 +503,7 @@ The sender can only rotate its own base url [[H17]][PERMISSION].
 
 
 <pre><code><b>schema</b> <a href="DualAttestation.md#0x1_DualAttestation_RotateBaseUrlEnsures">RotateBaseUrlEnsures</a> {
-    <b>ensures</b> <b>forall</b> addr1:address <b>where</b> addr1 != sender:
+    <b>ensures</b> <b>forall</b> addr1:<b>address</b> <b>where</b> addr1 != sender:
         <b>global</b>&lt;<a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a>&gt;(addr1).base_url == <b>old</b>(<b>global</b>&lt;<a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a>&gt;(addr1).base_url);
 }
 </code></pre>
@@ -523,7 +523,7 @@ The sender can only rotate its own base url [[H17]][PERMISSION].
         new_base_url: new_url,
         time_rotated_seconds: <a href="DiemTimestamp.md#0x1_DiemTimestamp_spec_now_seconds">DiemTimestamp::spec_now_seconds</a>(),
     };
-    emits msg <b>to</b> handle;
+    <b>emits</b> msg <b>to</b> handle;
 }
 </code></pre>
 
@@ -554,7 +554,7 @@ Rotate the compliance public key for <code>account</code> to <code>new_key</code
     <b>let</b> addr = <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
     <b>assert</b>!(<b>exists</b>&lt;<a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a>&gt;(addr), <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="DualAttestation.md#0x1_DualAttestation_ECREDENTIAL">ECREDENTIAL</a>));
     <b>assert</b>!(<a href="Signature.md#0x1_Signature_ed25519_validate_pubkey">Signature::ed25519_validate_pubkey</a>(<b>copy</b> new_key), <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="DualAttestation.md#0x1_DualAttestation_EINVALID_PUBLIC_KEY">EINVALID_PUBLIC_KEY</a>));
-    <b>let</b> credential = borrow_global_mut&lt;<a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a>&gt;(addr);
+    <b>let</b> credential = <b>borrow_global_mut</b>&lt;<a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a>&gt;(addr);
     credential.compliance_public_key = <b>copy</b> new_key;
     <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event_emit_event">Event::emit_event</a>(&<b>mut</b> credential.compliance_key_rotation_events, <a href="DualAttestation.md#0x1_DualAttestation_ComplianceKeyRotationEvent">ComplianceKeyRotationEvent</a> {
         new_compliance_public_key: new_key,
@@ -621,7 +621,7 @@ The sender only rotates its own compliance_public_key [[H17]][PERMISSION].
 
 
 <pre><code><b>schema</b> <a href="DualAttestation.md#0x1_DualAttestation_RotateCompliancePublicKeyEnsures">RotateCompliancePublicKeyEnsures</a> {
-    <b>ensures</b> <b>forall</b> addr1: address <b>where</b> addr1 != sender:
+    <b>ensures</b> <b>forall</b> addr1: <b>address</b> <b>where</b> addr1 != sender:
         <b>global</b>&lt;<a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a>&gt;(addr1).compliance_public_key == <b>old</b>(<b>global</b>&lt;<a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a>&gt;(addr1).compliance_public_key);
 }
 </code></pre>
@@ -641,7 +641,7 @@ The sender only rotates its own compliance_public_key [[H17]][PERMISSION].
         new_compliance_public_key: new_key,
         time_rotated_seconds: <a href="DiemTimestamp.md#0x1_DiemTimestamp_spec_now_seconds">DiemTimestamp::spec_now_seconds</a>(),
     };
-    emits msg <b>to</b> handle;
+    <b>emits</b> msg <b>to</b> handle;
 }
 </code></pre>
 
@@ -657,7 +657,7 @@ Return the human-readable name for the VASP account.
 Aborts if <code>addr</code> does not have a <code><a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a></code> resource.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_human_name">human_name</a>(addr: address): vector&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_human_name">human_name</a>(addr: <b>address</b>): vector&lt;u8&gt;
 </code></pre>
 
 
@@ -666,9 +666,9 @@ Aborts if <code>addr</code> does not have a <code><a href="DualAttestation.md#0x
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_human_name">human_name</a>(addr: address): vector&lt;u8&gt; <b>acquires</b> <a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_human_name">human_name</a>(addr: <b>address</b>): vector&lt;u8&gt; <b>acquires</b> <a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a> {
     <b>assert</b>!(<b>exists</b>&lt;<a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a>&gt;(addr), <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="DualAttestation.md#0x1_DualAttestation_ECREDENTIAL">ECREDENTIAL</a>));
-    *&borrow_global&lt;<a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a>&gt;(addr).human_name
+    *&<b>borrow_global</b>&lt;<a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a>&gt;(addr).human_name
 }
 </code></pre>
 
@@ -698,7 +698,7 @@ Return the base URL for <code>addr</code>.
 Aborts if <code>addr</code> does not have a <code><a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a></code> resource.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_base_url">base_url</a>(addr: address): vector&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_base_url">base_url</a>(addr: <b>address</b>): vector&lt;u8&gt;
 </code></pre>
 
 
@@ -707,9 +707,9 @@ Aborts if <code>addr</code> does not have a <code><a href="DualAttestation.md#0x
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_base_url">base_url</a>(addr: address): vector&lt;u8&gt; <b>acquires</b> <a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_base_url">base_url</a>(addr: <b>address</b>): vector&lt;u8&gt; <b>acquires</b> <a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a> {
     <b>assert</b>!(<b>exists</b>&lt;<a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a>&gt;(addr), <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="DualAttestation.md#0x1_DualAttestation_ECREDENTIAL">ECREDENTIAL</a>));
-    *&borrow_global&lt;<a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a>&gt;(addr).base_url
+    *&<b>borrow_global</b>&lt;<a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a>&gt;(addr).base_url
 }
 </code></pre>
 
@@ -734,7 +734,7 @@ Spec version of <code><a href="DualAttestation.md#0x1_DualAttestation_base_url">
 <a name="0x1_DualAttestation_spec_base_url"></a>
 
 
-<pre><code><b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_spec_base_url">spec_base_url</a>(addr: address): vector&lt;u8&gt; {
+<pre><code><b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_spec_base_url">spec_base_url</a>(addr: <b>address</b>): vector&lt;u8&gt; {
    <b>global</b>&lt;<a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a>&gt;(addr).base_url
 }
 </code></pre>
@@ -751,7 +751,7 @@ Return the compliance public key for <code>addr</code>.
 Aborts if <code>addr</code> does not have a <code><a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a></code> resource.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_compliance_public_key">compliance_public_key</a>(addr: address): vector&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_compliance_public_key">compliance_public_key</a>(addr: <b>address</b>): vector&lt;u8&gt;
 </code></pre>
 
 
@@ -760,9 +760,9 @@ Aborts if <code>addr</code> does not have a <code><a href="DualAttestation.md#0x
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_compliance_public_key">compliance_public_key</a>(addr: address): vector&lt;u8&gt; <b>acquires</b> <a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_compliance_public_key">compliance_public_key</a>(addr: <b>address</b>): vector&lt;u8&gt; <b>acquires</b> <a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a> {
     <b>assert</b>!(<b>exists</b>&lt;<a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a>&gt;(addr), <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="DualAttestation.md#0x1_DualAttestation_ECREDENTIAL">ECREDENTIAL</a>));
-    *&borrow_global&lt;<a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a>&gt;(addr).compliance_public_key
+    *&<b>borrow_global</b>&lt;<a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a>&gt;(addr).compliance_public_key
 }
 </code></pre>
 
@@ -787,7 +787,7 @@ Spec version of <code><a href="DualAttestation.md#0x1_DualAttestation_compliance
 <a name="0x1_DualAttestation_spec_compliance_public_key"></a>
 
 
-<pre><code><b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_spec_compliance_public_key">spec_compliance_public_key</a>(addr: address): vector&lt;u8&gt; {
+<pre><code><b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_spec_compliance_public_key">spec_compliance_public_key</a>(addr: <b>address</b>): vector&lt;u8&gt; {
    <b>global</b>&lt;<a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a>&gt;(addr).compliance_public_key
 }
 </code></pre>
@@ -804,7 +804,7 @@ Return the expiration date <code>addr</code>
 Aborts if <code>addr</code> does not have a <code><a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a></code> resource.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_expiration_date">expiration_date</a>(addr: address): u64
+<pre><code><b>public</b> <b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_expiration_date">expiration_date</a>(addr: <b>address</b>): u64
 </code></pre>
 
 
@@ -813,9 +813,9 @@ Aborts if <code>addr</code> does not have a <code><a href="DualAttestation.md#0x
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_expiration_date">expiration_date</a>(addr: address): u64  <b>acquires</b> <a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_expiration_date">expiration_date</a>(addr: <b>address</b>): u64  <b>acquires</b> <a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a> {
     <b>assert</b>!(<b>exists</b>&lt;<a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a>&gt;(addr), <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="DualAttestation.md#0x1_DualAttestation_ECREDENTIAL">ECREDENTIAL</a>));
-    *&borrow_global&lt;<a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a>&gt;(addr).expiration_date
+    *&<b>borrow_global</b>&lt;<a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a>&gt;(addr).expiration_date
 }
 </code></pre>
 
@@ -844,7 +844,7 @@ Aborts if <code>addr</code> does not have a <code><a href="DualAttestation.md#0x
 Return the address where the credentials for <code>addr</code> are stored
 
 
-<pre><code><b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_credential_address">credential_address</a>(addr: address): address
+<pre><code><b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_credential_address">credential_address</a>(addr: <b>address</b>): <b>address</b>
 </code></pre>
 
 
@@ -853,7 +853,7 @@ Return the address where the credentials for <code>addr</code> are stored
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_credential_address">credential_address</a>(addr: address): address {
+<pre><code><b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_credential_address">credential_address</a>(addr: <b>address</b>): <b>address</b> {
     <b>if</b> (<a href="VASP.md#0x1_VASP_is_child">VASP::is_child</a>(addr)) <a href="VASP.md#0x1_VASP_parent_address">VASP::parent_address</a>(addr) <b>else</b> addr
 }
 </code></pre>
@@ -878,7 +878,7 @@ Return the address where the credentials for <code>addr</code> are stored
 <a name="0x1_DualAttestation_spec_credential_address"></a>
 
 
-<pre><code><b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_spec_credential_address">spec_credential_address</a>(addr: address): address {
+<pre><code><b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_spec_credential_address">spec_credential_address</a>(addr: <b>address</b>): <b>address</b> {
    <b>if</b> (<a href="VASP.md#0x1_VASP_is_child">VASP::is_child</a>(addr)) {
        <a href="VASP.md#0x1_VASP_spec_parent_address">VASP::spec_parent_address</a>(addr)
    } <b>else</b> {
@@ -898,7 +898,7 @@ Return the address where the credentials for <code>addr</code> are stored
 Helper which returns true if dual attestion is required for a deposit.
 
 
-<pre><code><b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_dual_attestation_required">dual_attestation_required</a>&lt;Token&gt;(payer: address, payee: address, deposit_value: u64): bool
+<pre><code><b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_dual_attestation_required">dual_attestation_required</a>&lt;Token&gt;(payer: <b>address</b>, payee: <b>address</b>, deposit_value: u64): bool
 </code></pre>
 
 
@@ -908,7 +908,7 @@ Helper which returns true if dual attestion is required for a deposit.
 
 
 <pre><code><b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_dual_attestation_required">dual_attestation_required</a>&lt;Token&gt;(
-    payer: address, payee: address, deposit_value: u64
+    payer: <b>address</b>, payee: <b>address</b>, deposit_value: u64
 ): bool <b>acquires</b> <a href="DualAttestation.md#0x1_DualAttestation_Limit">Limit</a> {
     // travel rule applies for payments over a limit
     <b>let</b> travel_rule_limit_microdiem = <a href="DualAttestation.md#0x1_DualAttestation_get_cur_microdiem_limit">get_cur_microdiem_limit</a>();
@@ -961,7 +961,7 @@ Helper which returns true if dual attestion is required for a deposit.
 <a name="0x1_DualAttestation_spec_is_inter_vasp"></a>
 
 
-<pre><code><b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_spec_is_inter_vasp">spec_is_inter_vasp</a>(payer: address, payee: address): bool {
+<pre><code><b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_spec_is_inter_vasp">spec_is_inter_vasp</a>(payer: <b>address</b>, payee: <b>address</b>): bool {
    <a href="VASP.md#0x1_VASP_is_vasp">VASP::is_vasp</a>(payer) && <a href="VASP.md#0x1_VASP_is_vasp">VASP::is_vasp</a>(payee)
        && <a href="VASP.md#0x1_VASP_spec_parent_address">VASP::spec_parent_address</a>(payer) != <a href="VASP.md#0x1_VASP_spec_parent_address">VASP::spec_parent_address</a>(payee)
 }
@@ -975,7 +975,7 @@ Helper functions which simulates <code><a href="DualAttestation.md#0x1_DualAttes
 
 
 <pre><code><b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_spec_dual_attestation_required">spec_dual_attestation_required</a>&lt;Token&gt;(
-   payer: address, payee: address, deposit_value: u64
+   payer: <b>address</b>, payee: <b>address</b>, deposit_value: u64
 ): bool {
    <a href="Diem.md#0x1_Diem_spec_approx_xdx_for_value">Diem::spec_approx_xdx_for_value</a>&lt;Token&gt;(deposit_value)
                &gt;= <a href="DualAttestation.md#0x1_DualAttestation_spec_get_cur_microdiem_limit">spec_get_cur_microdiem_limit</a>() &&
@@ -996,7 +996,7 @@ Helper to construct a message for dual attestation.
 Message is <code>metadata</code> | <code>payer</code> | <code>amount</code> | <code><a href="DualAttestation.md#0x1_DualAttestation_DOMAIN_SEPARATOR">DOMAIN_SEPARATOR</a></code>.
 
 
-<pre><code><b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_dual_attestation_message">dual_attestation_message</a>(payer: address, metadata: vector&lt;u8&gt;, deposit_value: u64): vector&lt;u8&gt;
+<pre><code><b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_dual_attestation_message">dual_attestation_message</a>(payer: <b>address</b>, metadata: vector&lt;u8&gt;, deposit_value: u64): vector&lt;u8&gt;
 </code></pre>
 
 
@@ -1006,7 +1006,7 @@ Message is <code>metadata</code> | <code>payer</code> | <code>amount</code> | <c
 
 
 <pre><code><b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_dual_attestation_message">dual_attestation_message</a>(
-    payer: address, metadata: vector&lt;u8&gt;, deposit_value: u64
+    payer: <b>address</b>, metadata: vector&lt;u8&gt;, deposit_value: u64
 ): vector&lt;u8&gt; {
     <b>let</b> message = metadata;
     <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_append">Vector::append</a>(&<b>mut</b> message, <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/BCS.md#0x1_BCS_to_bytes">BCS::to_bytes</a>(&payer));
@@ -1043,7 +1043,7 @@ the verification of callers.
 <a name="0x1_DualAttestation_spec_dual_attestation_message"></a>
 
 
-<pre><code><b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_spec_dual_attestation_message">spec_dual_attestation_message</a>(payer: address, metadata: vector&lt;u8&gt;, deposit_value: u64): vector&lt;u8&gt;;
+<pre><code><b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_spec_dual_attestation_message">spec_dual_attestation_message</a>(payer: <b>address</b>, metadata: vector&lt;u8&gt;, deposit_value: u64): vector&lt;u8&gt;;
 </code></pre>
 
 
@@ -1057,7 +1057,7 @@ the verification of callers.
 Helper function to check validity of a signature when dual attestion is required.
 
 
-<pre><code><b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_assert_signature_is_valid">assert_signature_is_valid</a>(payer: address, payee: address, metadata_signature: vector&lt;u8&gt;, metadata: vector&lt;u8&gt;, deposit_value: u64)
+<pre><code><b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_assert_signature_is_valid">assert_signature_is_valid</a>(payer: <b>address</b>, payee: <b>address</b>, metadata_signature: vector&lt;u8&gt;, metadata: vector&lt;u8&gt;, deposit_value: u64)
 </code></pre>
 
 
@@ -1067,8 +1067,8 @@ Helper function to check validity of a signature when dual attestion is required
 
 
 <pre><code><b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_assert_signature_is_valid">assert_signature_is_valid</a>(
-    payer: address,
-    payee: address,
+    payer: <b>address</b>,
+    payee: <b>address</b>,
     metadata_signature: vector&lt;u8&gt;,
     metadata: vector&lt;u8&gt;,
     deposit_value: u64
@@ -1119,8 +1119,8 @@ Helper function to check validity of a signature when dual attestion is required
 
 
 <pre><code><b>schema</b> <a href="DualAttestation.md#0x1_DualAttestation_AssertSignatureValidAbortsIf">AssertSignatureValidAbortsIf</a> {
-    payer: address;
-    payee: address;
+    payer: <b>address</b>;
+    payee: <b>address</b>;
     metadata_signature: vector&lt;u8&gt;;
     metadata: vector&lt;u8&gt;;
     deposit_value: u64;
@@ -1140,8 +1140,8 @@ Returns true if signature is valid.
 
 
 <pre><code><b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_spec_signature_is_valid">spec_signature_is_valid</a>(
-   payer: address,
-   payee: address,
+   payer: <b>address</b>,
+   payee: <b>address</b>,
    metadata_signature: vector&lt;u8&gt;,
    metadata: vector&lt;u8&gt;,
    deposit_value: u64
@@ -1175,7 +1175,7 @@ It aborts with an appropriate error code if dual attestation is required, but on
 the conditions in (2) is not met.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_assert_payment_ok">assert_payment_ok</a>&lt;Currency&gt;(payer: address, payee: address, value: u64, metadata: vector&lt;u8&gt;, metadata_signature: vector&lt;u8&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_assert_payment_ok">assert_payment_ok</a>&lt;Currency&gt;(payer: <b>address</b>, payee: <b>address</b>, value: u64, metadata: vector&lt;u8&gt;, metadata_signature: vector&lt;u8&gt;)
 </code></pre>
 
 
@@ -1185,8 +1185,8 @@ the conditions in (2) is not met.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_assert_payment_ok">assert_payment_ok</a>&lt;Currency&gt;(
-    payer: address,
-    payee: address,
+    payer: <b>address</b>,
+    payee: <b>address</b>,
     value: u64,
     metadata: vector&lt;u8&gt;,
     metadata_signature: vector&lt;u8&gt;
@@ -1219,8 +1219,8 @@ the conditions in (2) is not met.
 
 
 <pre><code><b>schema</b> <a href="DualAttestation.md#0x1_DualAttestation_AssertPaymentOkAbortsIf">AssertPaymentOkAbortsIf</a>&lt;Currency&gt; {
-    payer: address;
-    payee: address;
+    payer: <b>address</b>;
+    payee: <b>address</b>;
     value: u64;
     metadata: vector&lt;u8&gt;;
     metadata_signature: vector&lt;u8&gt;;
@@ -1256,7 +1256,7 @@ Travel rule limit set during genesis
     <b>assert</b>!(!<b>exists</b>&lt;<a href="DualAttestation.md#0x1_DualAttestation_Limit">Limit</a>&gt;(@DiemRoot), <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_already_published">Errors::already_published</a>(<a href="DualAttestation.md#0x1_DualAttestation_ELIMIT">ELIMIT</a>));
     <b>let</b> initial_limit = (<a href="DualAttestation.md#0x1_DualAttestation_INITIAL_DUAL_ATTESTATION_LIMIT">INITIAL_DUAL_ATTESTATION_LIMIT</a> <b>as</b> u128) * (<a href="Diem.md#0x1_Diem_scaling_factor">Diem::scaling_factor</a>&lt;<a href="XDX.md#0x1_XDX">XDX</a>&gt;() <b>as</b> u128);
     <b>assert</b>!(initial_limit &lt;= <a href="DualAttestation.md#0x1_DualAttestation_MAX_U64">MAX_U64</a>, <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_limit_exceeded">Errors::limit_exceeded</a>(<a href="DualAttestation.md#0x1_DualAttestation_ELIMIT">ELIMIT</a>));
-    move_to(
+    <b>move_to</b>(
         dr_account,
         <a href="DualAttestation.md#0x1_DualAttestation_Limit">Limit</a> {
             micro_xdx_limit: (initial_limit <b>as</b> u64)
@@ -1304,7 +1304,7 @@ Return the current dual attestation limit in microdiem
 
 <pre><code><b>public</b> <b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_get_cur_microdiem_limit">get_cur_microdiem_limit</a>(): u64 <b>acquires</b> <a href="DualAttestation.md#0x1_DualAttestation_Limit">Limit</a> {
     <b>assert</b>!(<b>exists</b>&lt;<a href="DualAttestation.md#0x1_DualAttestation_Limit">Limit</a>&gt;(@DiemRoot), <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="DualAttestation.md#0x1_DualAttestation_ELIMIT">ELIMIT</a>));
-    borrow_global&lt;<a href="DualAttestation.md#0x1_DualAttestation_Limit">Limit</a>&gt;(@DiemRoot).micro_xdx_limit
+    <b>borrow_global</b>&lt;<a href="DualAttestation.md#0x1_DualAttestation_Limit">Limit</a>&gt;(@DiemRoot).micro_xdx_limit
 }
 </code></pre>
 
@@ -1346,7 +1346,7 @@ Aborts if <code>tc_account</code> does not have the TreasuryCompliance role
 <pre><code><b>public</b> <b>fun</b> <a href="DualAttestation.md#0x1_DualAttestation_set_microdiem_limit">set_microdiem_limit</a>(tc_account: &signer, micro_xdx_limit: u64) <b>acquires</b> <a href="DualAttestation.md#0x1_DualAttestation_Limit">Limit</a> {
     <a href="Roles.md#0x1_Roles_assert_treasury_compliance">Roles::assert_treasury_compliance</a>(tc_account);
     <b>assert</b>!(<b>exists</b>&lt;<a href="DualAttestation.md#0x1_DualAttestation_Limit">Limit</a>&gt;(@DiemRoot), <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="DualAttestation.md#0x1_DualAttestation_ELIMIT">ELIMIT</a>));
-    borrow_global_mut&lt;<a href="DualAttestation.md#0x1_DualAttestation_Limit">Limit</a>&gt;(@DiemRoot).micro_xdx_limit = micro_xdx_limit;
+    <b>borrow_global_mut</b>&lt;<a href="DualAttestation.md#0x1_DualAttestation_Limit">Limit</a>&gt;(@DiemRoot).micro_xdx_limit = micro_xdx_limit;
 }
 </code></pre>
 
@@ -1427,7 +1427,7 @@ Mirrors <code><a href="DualAttestation.md#0x1_DualAttestation_get_cur_microdiem_
 Only TreasuryCompliance can change the limit [[H6]][PERMISSION].
 
 
-<pre><code><b>invariant</b> <b>update</b> <b>forall</b> a: address <b>where</b> <b>old</b>(<b>exists</b>&lt;<a href="DualAttestation.md#0x1_DualAttestation_Limit">Limit</a>&gt;(@DiemRoot)):
+<pre><code><b>invariant</b> <b>update</b> <b>forall</b> a: <b>address</b> <b>where</b> <b>old</b>(<b>exists</b>&lt;<a href="DualAttestation.md#0x1_DualAttestation_Limit">Limit</a>&gt;(@DiemRoot)):
     <a href="DualAttestation.md#0x1_DualAttestation_spec_get_cur_microdiem_limit">spec_get_cur_microdiem_limit</a>() != <b>old</b>(<a href="DualAttestation.md#0x1_DualAttestation_spec_get_cur_microdiem_limit">spec_get_cur_microdiem_limit</a>())
 		     ==&gt; <a href="Roles.md#0x1_Roles_spec_signed_by_treasury_compliance_role">Roles::spec_signed_by_treasury_compliance_role</a>();
 </code></pre>
@@ -1437,7 +1437,7 @@ The permission "RotateDualAttestationInfo(addr)" is only granted to ParentVASP o
 "Credential" resources are only published under ParentVASP or DD accounts.
 
 
-<pre><code><b>invariant</b> <b>forall</b> addr1: address:
+<pre><code><b>invariant</b> <b>forall</b> addr1: <b>address</b>:
     <a href="DualAttestation.md#0x1_DualAttestation_spec_has_credential">spec_has_credential</a>(addr1) ==&gt;
         (<a href="Roles.md#0x1_Roles_spec_has_parent_VASP_role_addr">Roles::spec_has_parent_VASP_role_addr</a>(addr1) ||
         <a href="Roles.md#0x1_Roles_spec_has_designated_dealer_role_addr">Roles::spec_has_designated_dealer_role_addr</a>(addr1));
@@ -1447,10 +1447,10 @@ The permission "RotateDualAttestationInfo(addr)" is only granted to ParentVASP o
 Only the one who owns Credential can rotate the dual attenstation info [[H17]][PERMISSION].
 
 
-<pre><code><b>invariant</b> <b>update</b> <b>forall</b> a: address <b>where</b> <b>old</b>(<a href="DualAttestation.md#0x1_DualAttestation_spec_has_credential">spec_has_credential</a>(a)):
+<pre><code><b>invariant</b> <b>update</b> <b>forall</b> a: <b>address</b> <b>where</b> <b>old</b>(<a href="DualAttestation.md#0x1_DualAttestation_spec_has_credential">spec_has_credential</a>(a)):
     <b>global</b>&lt;<a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a>&gt;(a).compliance_public_key != <b>old</b>(<b>global</b>&lt;<a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a>&gt;(a).compliance_public_key)
 		     ==&gt; Signer::is_txn_signer_addr(a);
-<b>invariant</b> <b>update</b> <b>forall</b> a: address <b>where</b> <b>old</b>(<a href="DualAttestation.md#0x1_DualAttestation_spec_has_credential">spec_has_credential</a>(a)):
+<b>invariant</b> <b>update</b> <b>forall</b> a: <b>address</b> <b>where</b> <b>old</b>(<a href="DualAttestation.md#0x1_DualAttestation_spec_has_credential">spec_has_credential</a>(a)):
     <b>global</b>&lt;<a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a>&gt;(a).base_url != <b>old</b>(<b>global</b>&lt;<a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a>&gt;(a).base_url)
 		     ==&gt; Signer::is_txn_signer_addr(a);
 </code></pre>
@@ -1460,6 +1460,6 @@ The permission "RotateDualAttestationInfo(addr)" is not transferred [[J17]][PERM
 resource struct <code><a href="DualAttestation.md#0x1_DualAttestation_Credential">Credential</a></code> is persistent.
 
 
-<pre><code><b>invariant</b>&lt;CoinType&gt; <b>update</b> <b>forall</b> a: address:
+<pre><code><b>invariant</b>&lt;CoinType&gt; <b>update</b> <b>forall</b> a: <b>address</b>:
     <b>old</b>(<a href="DualAttestation.md#0x1_DualAttestation_spec_has_credential">spec_has_credential</a>(a)) ==&gt; <a href="DualAttestation.md#0x1_DualAttestation_spec_has_credential">spec_has_credential</a>(a);
 </code></pre>

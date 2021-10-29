@@ -47,7 +47,7 @@ min_nonce                       min_nonce + k - 1
 ```
 
 
-<pre><code><b>struct</b> <a href="CRSN.md#0x1_CRSN">CRSN</a> has key
+<pre><code><b>struct</b> <a href="CRSN.md#0x1_CRSN">CRSN</a> <b>has</b> key
 </code></pre>
 
 
@@ -94,7 +94,7 @@ Whenever a force shift is performed a <code><a href="CRSN.md#0x1_CRSN_ForceShift
 This is used to prove the absence of a transaction at a specific sequence nonce.
 
 
-<pre><code><b>struct</b> <a href="CRSN.md#0x1_CRSN_ForceShiftEvent">ForceShiftEvent</a> has drop, store
+<pre><code><b>struct</b> <a href="CRSN.md#0x1_CRSN_ForceShiftEvent">ForceShiftEvent</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -139,7 +139,7 @@ This is used to prove the absence of a transaction at a specific sequence nonce.
 Flag stored in memory to turn on CRSNs
 
 
-<pre><code><b>struct</b> <a href="CRSN.md#0x1_CRSN_CRSNsAllowed">CRSNsAllowed</a> has key
+<pre><code><b>struct</b> <a href="CRSN.md#0x1_CRSN_CRSNsAllowed">CRSNsAllowed</a> <b>has</b> key
 </code></pre>
 
 
@@ -262,7 +262,7 @@ The size given to the CRSN at the time of publishing was zero, which is not supp
 <pre><code><b>public</b> <b>fun</b> <a href="CRSN.md#0x1_CRSN_allow_crsns">allow_crsns</a>(account: &signer) {
     <a href="Roles.md#0x1_Roles_assert_diem_root">Roles::assert_diem_root</a>(account);
     <b>assert</b>!(!<b>exists</b>&lt;<a href="CRSN.md#0x1_CRSN_CRSNsAllowed">CRSNsAllowed</a>&gt;(<a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account)), <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="CRSN.md#0x1_CRSN_EALREADY_INITIALIZED">EALREADY_INITIALIZED</a>));
-    move_to(account, <a href="CRSN.md#0x1_CRSN_CRSNsAllowed">CRSNsAllowed</a> { })
+    <b>move_to</b>(account, <a href="CRSN.md#0x1_CRSN_CRSNsAllowed">CRSNsAllowed</a> { })
 }
 </code></pre>
 
@@ -291,7 +291,7 @@ Publish a DSN under <code>account</code>. Cannot already have a DSN published.
     <b>assert</b>!(size &gt; 0, <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="CRSN.md#0x1_CRSN_EZERO_SIZE_CRSN">EZERO_SIZE_CRSN</a>));
     <b>assert</b>!(size &lt;= <a href="CRSN.md#0x1_CRSN_MAX_CRSN_SIZE">MAX_CRSN_SIZE</a>, <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="CRSN.md#0x1_CRSN_ECRSN_SIZE_TOO_LARGE">ECRSN_SIZE_TOO_LARGE</a>));
     <b>assert</b>!(<b>exists</b>&lt;<a href="CRSN.md#0x1_CRSN_CRSNsAllowed">CRSNsAllowed</a>&gt;(@DiemRoot), <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="CRSN.md#0x1_CRSN_ENOT_INITIALIZED">ENOT_INITIALIZED</a>));
-    move_to(account, <a href="CRSN.md#0x1_CRSN">CRSN</a> {
+    <b>move_to</b>(account, <a href="CRSN.md#0x1_CRSN">CRSN</a> {
         min_nonce,
         size,
         slots: <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/BitVector.md#0x1_BitVector_new">BitVector::new</a>(size),
@@ -343,14 +343,14 @@ Record <code>sequence_nonce</code> under the <code>account</code>. Returns true 
     <b>let</b> addr = <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
     <b>if</b> (<a href="CRSN.md#0x1_CRSN_check">check</a>(account, sequence_nonce)) {
         // <a href="CRSN.md#0x1_CRSN">CRSN</a> <b>exists</b> by `check`.
-        <b>let</b> crsn = borrow_global_mut&lt;<a href="CRSN.md#0x1_CRSN">CRSN</a>&gt;(addr);
+        <b>let</b> crsn = <b>borrow_global_mut</b>&lt;<a href="CRSN.md#0x1_CRSN">CRSN</a>&gt;(addr);
         // accept nonce
         <b>let</b> scaled_nonce = sequence_nonce - crsn.min_nonce;
         <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/BitVector.md#0x1_BitVector_set">BitVector::set</a>(&<b>mut</b> crsn.slots, scaled_nonce);
         <a href="CRSN.md#0x1_CRSN_shift_window_right">shift_window_right</a>(crsn);
         <b>return</b> <b>true</b>
     } <b>else</b> <b>if</b> (<b>exists</b>&lt;<a href="CRSN.md#0x1_CRSN">CRSN</a>&gt;(addr)) { // window was force shifted in this transaction
-        <b>let</b> crsn = borrow_global&lt;<a href="CRSN.md#0x1_CRSN">CRSN</a>&gt;(addr);
+        <b>let</b> crsn = <b>borrow_global</b>&lt;<a href="CRSN.md#0x1_CRSN">CRSN</a>&gt;(addr);
         <b>if</b> (crsn.min_nonce &gt; sequence_nonce) <b>return</b> <b>true</b>
     };
 
@@ -383,7 +383,7 @@ will be accepted, and <code><b>false</b></code> otherwise.
 <b>acquires</b> <a href="CRSN.md#0x1_CRSN">CRSN</a> {
     <b>let</b> addr = <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
     <b>assert</b>!(<a href="CRSN.md#0x1_CRSN_has_crsn">has_crsn</a>(addr), <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="CRSN.md#0x1_CRSN_ENO_CRSN">ENO_CRSN</a>));
-    <b>let</b> crsn = borrow_global_mut&lt;<a href="CRSN.md#0x1_CRSN">CRSN</a>&gt;(addr);
+    <b>let</b> crsn = <b>borrow_global_mut</b>&lt;<a href="CRSN.md#0x1_CRSN">CRSN</a>&gt;(addr);
 
     // Don't accept <b>if</b> it's outside of the window
     <b>if</b> ((sequence_nonce &lt; crsn.min_nonce) ||
@@ -418,7 +418,7 @@ will be accepted, and <code><b>false</b></code> otherwise.
 
 
 <pre><code><b>schema</b> <a href="CRSN.md#0x1_CRSN_CheckAbortsIf">CheckAbortsIf</a> {
-    addr: address;
+    addr: <b>address</b>;
     sequence_nonce: u64;
     <b>let</b> crsn = <b>global</b>&lt;<a href="CRSN.md#0x1_CRSN">CRSN</a>&gt;(addr);
     <b>let</b> scaled_nonce = sequence_nonce - crsn.min_nonce;
@@ -436,7 +436,7 @@ will be accepted, and <code><b>false</b></code> otherwise.
 <a name="0x1_CRSN_spec_check"></a>
 
 
-<pre><code><b>fun</b> <a href="CRSN.md#0x1_CRSN_spec_check">spec_check</a>(addr: address, sequence_nonce: u64): bool {
+<pre><code><b>fun</b> <a href="CRSN.md#0x1_CRSN_spec_check">spec_check</a>(addr: <b>address</b>, sequence_nonce: u64): bool {
    <b>let</b> crsn = <b>global</b>&lt;<a href="CRSN.md#0x1_CRSN">CRSN</a>&gt;(addr);
    <b>if</b> ((sequence_nonce &lt; crsn.min_nonce) ||
        (sequence_nonce &gt;= crsn.min_nonce + <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/BitVector.md#0x1_BitVector_length">BitVector::length</a>(crsn.slots))) {
@@ -475,7 +475,7 @@ then shifted over set bits as define by the <code>shift_window_right</code> func
     <b>assert</b>!(shift_amount &gt; 0, <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="CRSN.md#0x1_CRSN_EINVALID_SHIFT">EINVALID_SHIFT</a>));
     <b>let</b> addr = <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
     <b>assert</b>!(<a href="CRSN.md#0x1_CRSN_has_crsn">has_crsn</a>(addr), <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="CRSN.md#0x1_CRSN_ENO_CRSN">ENO_CRSN</a>));
-    <b>let</b> crsn = borrow_global_mut&lt;<a href="CRSN.md#0x1_CRSN">CRSN</a>&gt;(addr);
+    <b>let</b> crsn = <b>borrow_global_mut</b>&lt;<a href="CRSN.md#0x1_CRSN">CRSN</a>&gt;(addr);
 
     <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event_emit_event">Event::emit_event</a>(&<b>mut</b> crsn.force_shift_events, <a href="CRSN.md#0x1_CRSN_ForceShiftEvent">ForceShiftEvent</a> {
         current_min_nonce: crsn.min_nonce,
@@ -502,7 +502,7 @@ then shifted over set bits as define by the <code>shift_window_right</code> func
 Return whether this address has a CRSN resource published under it.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="CRSN.md#0x1_CRSN_has_crsn">has_crsn</a>(addr: address): bool
+<pre><code><b>public</b> <b>fun</b> <a href="CRSN.md#0x1_CRSN_has_crsn">has_crsn</a>(addr: <b>address</b>): bool
 </code></pre>
 
 
@@ -511,7 +511,7 @@ Return whether this address has a CRSN resource published under it.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="CRSN.md#0x1_CRSN_has_crsn">has_crsn</a>(addr: address): bool {
+<pre><code><b>public</b> <b>fun</b> <a href="CRSN.md#0x1_CRSN_has_crsn">has_crsn</a>(addr: <b>address</b>): bool {
     <b>exists</b>&lt;<a href="CRSN.md#0x1_CRSN">CRSN</a>&gt;(addr)
 }
 </code></pre>

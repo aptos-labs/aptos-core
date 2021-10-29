@@ -35,7 +35,7 @@ When nonce X is recorded, all transactions with nonces lower then X-128 will abo
 
 
 
-<pre><code><b>struct</b> <a href="SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a> has key
+<pre><code><b>struct</b> <a href="SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a> <b>has</b> key
 </code></pre>
 
 
@@ -362,7 +362,7 @@ Returns 0 if a nonce was recorded and non-0 otherwise
         <b>return</b> 0
     };
     <b>assert</b>!(<b>exists</b>&lt;<a href="SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a>&gt;(<a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account)), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">ESLIDING_NONCE</a>));
-    <b>let</b> t = borrow_global_mut&lt;<a href="SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a>&gt;(<a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account));
+    <b>let</b> t = <b>borrow_global_mut</b>&lt;<a href="SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a>&gt;(<a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account));
     // The `seq_nonce` is outside the current window <b>to</b> the "left" and is
     // no longer valid since we can't shift the window back.
     <b>if</b> (t.min_nonce &gt; seq_nonce) {
@@ -398,7 +398,7 @@ Returns 0 if a nonce was recorded and non-0 otherwise
             t.min_nonce = t.min_nonce + shift;
         }
     };
-    // The window has been (possibly) shifted over so that `seq_nonce` lies
+    // The window <b>has</b> been (possibly) shifted over so that `seq_nonce` lies
     // within the window. Recompute the bit positition that needs <b>to</b> be set
     // within the (possibly) new window.
     <b>let</b> bit_pos = seq_nonce - t.min_nonce;
@@ -465,7 +465,7 @@ This is required before other functions in this module can be called for <code>a
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="SlidingNonce.md#0x1_SlidingNonce_publish">publish</a>(account: &signer) {
     <b>assert</b>!(!<b>exists</b>&lt;<a href="SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a>&gt;(<a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account)), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_already_published">Errors::already_published</a>(<a href="SlidingNonce.md#0x1_SlidingNonce_ENONCE_ALREADY_PUBLISHED">ENONCE_ALREADY_PUBLISHED</a>));
-    move_to(account, <a href="SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a> {  min_nonce: 0, nonce_mask: 0 });
+    <b>move_to</b>(account, <a href="SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a> {  min_nonce: 0, nonce_mask: 0 });
 }
 </code></pre>
 

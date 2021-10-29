@@ -48,7 +48,7 @@ to synchronize configuration changes for the validators.
 A generic singleton resource that holds a value of a specific type.
 
 
-<pre><code><b>struct</b> <a href="DiemConfig.md#0x1_DiemConfig">DiemConfig</a>&lt;Config: <b>copy</b>, drop, store&gt; has store, key
+<pre><code><b>struct</b> <a href="DiemConfig.md#0x1_DiemConfig">DiemConfig</a>&lt;Config: <b>copy</b>, drop, store&gt; <b>has</b> store, key
 </code></pre>
 
 
@@ -78,7 +78,7 @@ with new configuration information. This is also called a
 "reconfiguration event"
 
 
-<pre><code><b>struct</b> <a href="DiemConfig.md#0x1_DiemConfig_NewEpochEvent">NewEpochEvent</a> has drop, store
+<pre><code><b>struct</b> <a href="DiemConfig.md#0x1_DiemConfig_NewEpochEvent">NewEpochEvent</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -106,7 +106,7 @@ with new configuration information. This is also called a
 Holds information about state of reconfiguration
 
 
-<pre><code><b>struct</b> <a href="DiemConfig.md#0x1_DiemConfig_Configuration">Configuration</a> has key
+<pre><code><b>struct</b> <a href="DiemConfig.md#0x1_DiemConfig_Configuration">Configuration</a> <b>has</b> key
 </code></pre>
 
 
@@ -146,7 +146,7 @@ Holds information about state of reconfiguration
 Accounts with this privilege can modify DiemConfig<TypeName> under Diem root address.
 
 
-<pre><code><b>struct</b> <a href="DiemConfig.md#0x1_DiemConfig_ModifyConfigCapability">ModifyConfigCapability</a>&lt;TypeName&gt; has store, key
+<pre><code><b>struct</b> <a href="DiemConfig.md#0x1_DiemConfig_ModifyConfigCapability">ModifyConfigCapability</a>&lt;TypeName&gt; <b>has</b> store, key
 </code></pre>
 
 
@@ -174,7 +174,7 @@ Accounts with this privilege can modify DiemConfig<TypeName> under Diem root add
 Reconfiguration disabled if this resource occurs under LibraRoot.
 
 
-<pre><code><b>struct</b> <a href="DiemConfig.md#0x1_DiemConfig_DisableReconfiguration">DisableReconfiguration</a> has key
+<pre><code><b>struct</b> <a href="DiemConfig.md#0x1_DiemConfig_DisableReconfiguration">DisableReconfiguration</a> <b>has</b> key
 </code></pre>
 
 
@@ -272,7 +272,7 @@ Publishes <code><a href="DiemConfig.md#0x1_DiemConfig_Configuration">Configurati
     <a href="DiemTimestamp.md#0x1_DiemTimestamp_assert_genesis">DiemTimestamp::assert_genesis</a>();
     <a href="CoreAddresses.md#0x1_CoreAddresses_assert_diem_root">CoreAddresses::assert_diem_root</a>(dr_account);
     <b>assert</b>!(!<b>exists</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig_Configuration">Configuration</a>&gt;(@DiemRoot), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_already_published">Errors::already_published</a>(<a href="DiemConfig.md#0x1_DiemConfig_ECONFIGURATION">ECONFIGURATION</a>));
-    move_to&lt;<a href="DiemConfig.md#0x1_DiemConfig_Configuration">Configuration</a>&gt;(
+    <b>move_to</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig_Configuration">Configuration</a>&gt;(
         dr_account,
         <a href="DiemConfig.md#0x1_DiemConfig_Configuration">Configuration</a> {
             epoch: 0,
@@ -321,7 +321,7 @@ Publishes <code><a href="DiemConfig.md#0x1_DiemConfig_Configuration">Configurati
 
 <pre><code><b>schema</b> <a href="DiemConfig.md#0x1_DiemConfig_InitializeEnsures">InitializeEnsures</a> {
     <b>ensures</b> <a href="DiemConfig.md#0x1_DiemConfig_spec_has_config">spec_has_config</a>();
-    <b>let</b> post post_config = <b>global</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig_Configuration">Configuration</a>&gt;(@DiemRoot);
+    <b>let</b> <b>post</b> post_config = <b>global</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig_Configuration">Configuration</a>&gt;(@DiemRoot);
     <b>ensures</b> post_config.epoch == 0;
     <b>ensures</b> post_config.last_reconfiguration_time == 0;
 }
@@ -351,7 +351,7 @@ Returns a copy of <code>Config</code> value stored under <code>addr</code>.
 <b>acquires</b> <a href="DiemConfig.md#0x1_DiemConfig">DiemConfig</a> {
     <b>let</b> addr = @DiemRoot;
     <b>assert</b>!(<b>exists</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig">DiemConfig</a>&lt;Config&gt;&gt;(addr), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="DiemConfig.md#0x1_DiemConfig_EDIEM_CONFIG">EDIEM_CONFIG</a>));
-    *&borrow_global&lt;<a href="DiemConfig.md#0x1_DiemConfig">DiemConfig</a>&lt;Config&gt;&gt;(addr).payload
+    *&<b>borrow_global</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig">DiemConfig</a>&lt;Config&gt;&gt;(addr).payload
 }
 </code></pre>
 
@@ -410,7 +410,7 @@ resource published under it.
 
     <b>let</b> addr = @DiemRoot;
     <b>assert</b>!(<b>exists</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig">DiemConfig</a>&lt;Config&gt;&gt;(addr), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="DiemConfig.md#0x1_DiemConfig_EDIEM_CONFIG">EDIEM_CONFIG</a>));
-    <b>let</b> config = borrow_global_mut&lt;<a href="DiemConfig.md#0x1_DiemConfig">DiemConfig</a>&lt;Config&gt;&gt;(addr);
+    <b>let</b> config = <b>borrow_global_mut</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig">DiemConfig</a>&lt;Config&gt;&gt;(addr);
     config.payload = payload;
 
     <a href="DiemConfig.md#0x1_DiemConfig_reconfigure_">reconfigure_</a>();
@@ -507,7 +507,7 @@ a Diem root signer.
 ) <b>acquires</b> <a href="DiemConfig.md#0x1_DiemConfig">DiemConfig</a>, <a href="DiemConfig.md#0x1_DiemConfig_Configuration">Configuration</a> {
     <b>let</b> addr = @DiemRoot;
     <b>assert</b>!(<b>exists</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig">DiemConfig</a>&lt;Config&gt;&gt;(addr), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="DiemConfig.md#0x1_DiemConfig_EDIEM_CONFIG">EDIEM_CONFIG</a>));
-    <b>let</b> config = borrow_global_mut&lt;<a href="DiemConfig.md#0x1_DiemConfig">DiemConfig</a>&lt;Config&gt;&gt;(addr);
+    <b>let</b> config = <b>borrow_global_mut</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig">DiemConfig</a>&lt;Config&gt;&gt;(addr);
     config.payload = payload;
     <a href="DiemConfig.md#0x1_DiemConfig_reconfigure_">reconfigure_</a>();
 }
@@ -561,7 +561,7 @@ This function should only be used for offline WriteSet generation purpose and sh
     );
     <a href="Roles.md#0x1_Roles_assert_diem_root">Roles::assert_diem_root</a>(dr_account);
     <b>assert</b>!(<a href="DiemConfig.md#0x1_DiemConfig_reconfiguration_enabled">reconfiguration_enabled</a>(), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="DiemConfig.md#0x1_DiemConfig_ECONFIGURATION">ECONFIGURATION</a>));
-    move_to(dr_account, <a href="DiemConfig.md#0x1_DiemConfig_DisableReconfiguration">DisableReconfiguration</a> {} )
+    <b>move_to</b>(dr_account, <a href="DiemConfig.md#0x1_DiemConfig_DisableReconfiguration">DisableReconfiguration</a> {} )
 }
 </code></pre>
 
@@ -594,7 +594,7 @@ This function should only be used for offline WriteSet generation purpose and sh
     <a href="Roles.md#0x1_Roles_assert_diem_root">Roles::assert_diem_root</a>(dr_account);
 
     <b>assert</b>!(!<a href="DiemConfig.md#0x1_DiemConfig_reconfiguration_enabled">reconfiguration_enabled</a>(), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="DiemConfig.md#0x1_DiemConfig_ECONFIGURATION">ECONFIGURATION</a>));
-    <a href="DiemConfig.md#0x1_DiemConfig_DisableReconfiguration">DisableReconfiguration</a> {} = move_from&lt;<a href="DiemConfig.md#0x1_DiemConfig_DisableReconfiguration">DisableReconfiguration</a>&gt;(<a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(dr_account));
+    <a href="DiemConfig.md#0x1_DiemConfig_DisableReconfiguration">DisableReconfiguration</a> {} = <b>move_from</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig_DisableReconfiguration">DisableReconfiguration</a>&gt;(<a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(dr_account));
 }
 </code></pre>
 
@@ -654,7 +654,7 @@ Does not trigger a reconfiguration.
         !<b>exists</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig">DiemConfig</a>&lt;Config&gt;&gt;(<a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(dr_account)),
         <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_already_published">Errors::already_published</a>(<a href="DiemConfig.md#0x1_DiemConfig_EDIEM_CONFIG">EDIEM_CONFIG</a>)
     );
-    move_to(dr_account, <a href="DiemConfig.md#0x1_DiemConfig">DiemConfig</a> { payload });
+    <b>move_to</b>(dr_account, <a href="DiemConfig.md#0x1_DiemConfig">DiemConfig</a> { payload });
     <a href="DiemConfig.md#0x1_DiemConfig_ModifyConfigCapability">ModifyConfigCapability</a>&lt;Config&gt; {}
 }
 </code></pre>
@@ -718,7 +718,7 @@ Does not trigger a reconfiguration.
         !<b>exists</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig_ModifyConfigCapability">ModifyConfigCapability</a>&lt;Config&gt;&gt;(<a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(dr_account)),
         <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_already_published">Errors::already_published</a>(<a href="DiemConfig.md#0x1_DiemConfig_EMODIFY_CAPABILITY">EMODIFY_CAPABILITY</a>)
     );
-    move_to(dr_account, capability);
+    <b>move_to</b>(dr_account, capability);
 }
 </code></pre>
 
@@ -834,24 +834,24 @@ Private function to do reconfiguration.  Updates reconfiguration status resource
 
 
 <pre><code><b>fun</b> <a href="DiemConfig.md#0x1_DiemConfig_reconfigure_">reconfigure_</a>() <b>acquires</b> <a href="DiemConfig.md#0x1_DiemConfig_Configuration">Configuration</a> {
-    // Do not do anything <b>if</b> genesis has not finished.
+    // Do not do anything <b>if</b> genesis <b>has</b> not finished.
     <b>if</b> (<a href="DiemTimestamp.md#0x1_DiemTimestamp_is_genesis">DiemTimestamp::is_genesis</a>() || <a href="DiemTimestamp.md#0x1_DiemTimestamp_now_microseconds">DiemTimestamp::now_microseconds</a>() == 0 || !<a href="DiemConfig.md#0x1_DiemConfig_reconfiguration_enabled">reconfiguration_enabled</a>()) {
         <b>return</b> ()
     };
 
-    <b>let</b> config_ref = borrow_global_mut&lt;<a href="DiemConfig.md#0x1_DiemConfig_Configuration">Configuration</a>&gt;(@DiemRoot);
+    <b>let</b> config_ref = <b>borrow_global_mut</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig_Configuration">Configuration</a>&gt;(@DiemRoot);
     <b>let</b> current_time = <a href="DiemTimestamp.md#0x1_DiemTimestamp_now_microseconds">DiemTimestamp::now_microseconds</a>();
 
     // Do not do anything <b>if</b> a reconfiguration event is already emitted within this transaction.
     //
     // This is OK because:
     // - The time changes in every non-empty block
-    // - A block automatically ends after a transaction that emits a reconfiguration event, which is guaranteed by
+    // - A block automatically ends after a transaction that <b>emits</b> a reconfiguration event, which is guaranteed by
     //   DiemVM <b>spec</b> that all transactions comming after a reconfiguration transaction will be returned <b>as</b> Retry
     //   status.
     // - Each transaction must emit at most one reconfiguration event
     //
-    // Thus, this check <b>ensures</b> that a transaction that does multiple "reconfiguration required" actions emits only
+    // Thus, this check <b>ensures</b> that a transaction that does multiple "reconfiguration required" actions <b>emits</b> only
     // one reconfiguration event.
     //
     <b>if</b> (current_time == config_ref.last_reconfiguration_time) {
@@ -885,9 +885,9 @@ Private function to do reconfiguration.  Updates reconfiguration status resource
 <b>requires</b> <a href="DiemTimestamp.md#0x1_DiemTimestamp_is_operating">DiemTimestamp::is_operating</a>() ==&gt; <a href="DiemConfig.md#0x1_DiemConfig_spec_has_config">spec_has_config</a>();
 <b>ensures</b> <b>old</b>(<a href="DiemConfig.md#0x1_DiemConfig_spec_has_config">spec_has_config</a>()) == <a href="DiemConfig.md#0x1_DiemConfig_spec_has_config">spec_has_config</a>();
 <b>let</b> config = <b>global</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig_Configuration">Configuration</a>&gt;(@DiemRoot);
-<b>let</b> post post_config = <b>global</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig_Configuration">Configuration</a>&gt;(@DiemRoot);
+<b>let</b> <b>post</b> post_config = <b>global</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig_Configuration">Configuration</a>&gt;(@DiemRoot);
 <b>let</b> now = <a href="DiemTimestamp.md#0x1_DiemTimestamp_spec_now_microseconds">DiemTimestamp::spec_now_microseconds</a>();
-<b>let</b> post post_now = <a href="DiemTimestamp.md#0x1_DiemTimestamp_spec_now_microseconds">DiemTimestamp::spec_now_microseconds</a>();
+<b>let</b> <b>post</b> post_now = <a href="DiemTimestamp.md#0x1_DiemTimestamp_spec_now_microseconds">DiemTimestamp::spec_now_microseconds</a>();
 <b>include</b> !<a href="DiemConfig.md#0x1_DiemConfig_spec_reconfigure_omitted">spec_reconfigure_omitted</a>() || (config.last_reconfiguration_time == now)
     ==&gt; <a href="DiemConfig.md#0x1_DiemConfig_InternalReconfigureAbortsIf">InternalReconfigureAbortsIf</a> && <a href="DiemConfig.md#0x1_DiemConfig_ReconfigureAbortsIf">ReconfigureAbortsIf</a>;
 <b>ensures</b> <a href="DiemConfig.md#0x1_DiemConfig_spec_reconfigure_omitted">spec_reconfigure_omitted</a>() || (config.last_reconfiguration_time == now)
@@ -946,13 +946,13 @@ This schema is to be used by callers of <code>reconfigure</code>
 
 <pre><code><b>schema</b> <a href="DiemConfig.md#0x1_DiemConfig_ReconfigureEmits">ReconfigureEmits</a> {
     <b>let</b> config = <b>global</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig_Configuration">Configuration</a>&gt;(@DiemRoot);
-    <b>let</b> post post_config = <b>global</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig_Configuration">Configuration</a>&gt;(@DiemRoot);
-    <b>let</b> post now = <a href="DiemTimestamp.md#0x1_DiemTimestamp_spec_now_microseconds">DiemTimestamp::spec_now_microseconds</a>();
-    <b>let</b> post msg = <a href="DiemConfig.md#0x1_DiemConfig_NewEpochEvent">NewEpochEvent</a> {
+    <b>let</b> <b>post</b> post_config = <b>global</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig_Configuration">Configuration</a>&gt;(@DiemRoot);
+    <b>let</b> <b>post</b> now = <a href="DiemTimestamp.md#0x1_DiemTimestamp_spec_now_microseconds">DiemTimestamp::spec_now_microseconds</a>();
+    <b>let</b> <b>post</b> msg = <a href="DiemConfig.md#0x1_DiemConfig_NewEpochEvent">NewEpochEvent</a> {
         epoch: post_config.epoch,
     };
     <b>let</b> handle = config.events;
-    emits msg <b>to</b> handle <b>if</b> (!<a href="DiemConfig.md#0x1_DiemConfig_spec_reconfigure_omitted">spec_reconfigure_omitted</a>() && now != config.last_reconfiguration_time);
+    <b>emits</b> msg <b>to</b> handle <b>if</b> (!<a href="DiemConfig.md#0x1_DiemConfig_spec_reconfigure_omitted">spec_reconfigure_omitted</a>() && now != config.last_reconfiguration_time);
 }
 </code></pre>
 
@@ -979,7 +979,7 @@ reconfiguration event.
 
 <pre><code><b>fun</b> <a href="DiemConfig.md#0x1_DiemConfig_emit_genesis_reconfiguration_event">emit_genesis_reconfiguration_event</a>() <b>acquires</b> <a href="DiemConfig.md#0x1_DiemConfig_Configuration">Configuration</a> {
     <b>assert</b>!(<b>exists</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig_Configuration">Configuration</a>&gt;(@DiemRoot), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="DiemConfig.md#0x1_DiemConfig_ECONFIGURATION">ECONFIGURATION</a>));
-    <b>let</b> config_ref = borrow_global_mut&lt;<a href="DiemConfig.md#0x1_DiemConfig_Configuration">Configuration</a>&gt;(@DiemRoot);
+    <b>let</b> config_ref = <b>borrow_global_mut</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig_Configuration">Configuration</a>&gt;(@DiemRoot);
     <b>assert</b>!(config_ref.epoch == 0 && config_ref.last_reconfiguration_time == 0, <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="DiemConfig.md#0x1_DiemConfig_ECONFIGURATION">ECONFIGURATION</a>));
     config_ref.epoch = 1;
 
@@ -1001,12 +1001,12 @@ reconfiguration event.
 
 
 
-<pre><code><b>let</b> post config = <b>global</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig_Configuration">Configuration</a>&gt;(@DiemRoot);
-<b>let</b> post handle = config.events;
-<b>let</b> post msg = <a href="DiemConfig.md#0x1_DiemConfig_NewEpochEvent">NewEpochEvent</a> {
+<pre><code><b>let</b> <b>post</b> config = <b>global</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig_Configuration">Configuration</a>&gt;(@DiemRoot);
+<b>let</b> <b>post</b> handle = config.events;
+<b>let</b> <b>post</b> msg = <a href="DiemConfig.md#0x1_DiemConfig_NewEpochEvent">NewEpochEvent</a> {
         epoch: config.epoch,
 };
-emits msg <b>to</b> handle;
+<b>emits</b> msg <b>to</b> handle;
 </code></pre>
 
 
@@ -1052,7 +1052,7 @@ Configurations are only stored at the diem root address.
 
 
 <pre><code><b>invariant</b>&lt;ConfigType&gt;
-    <b>forall</b> config_address: address <b>where</b> <b>exists</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig">DiemConfig</a>&lt;ConfigType&gt;&gt;(config_address):
+    <b>forall</b> config_address: <b>address</b> <b>where</b> <b>exists</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig">DiemConfig</a>&lt;ConfigType&gt;&gt;(config_address):
         config_address == @DiemRoot;
 </code></pre>
 

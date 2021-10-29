@@ -42,7 +42,7 @@ characters you should use the <code>all_characters_printable</code> predicate
 defined in this module.
 
 
-<pre><code><b>struct</b> <a href="ASCII.md#0x1_ASCII_String">String</a> has <b>copy</b>, drop, store
+<pre><code><b>struct</b> <a href="ASCII.md#0x1_ASCII_String">String</a> <b>has</b> <b>copy</b>, drop, store
 </code></pre>
 
 
@@ -82,7 +82,7 @@ defined in this module.
 An ASCII character.
 
 
-<pre><code><b>struct</b> <a href="ASCII.md#0x1_ASCII_Char">Char</a> has <b>copy</b>, drop, store
+<pre><code><b>struct</b> <a href="ASCII.md#0x1_ASCII_Char">Char</a> <b>has</b> <b>copy</b>, drop, store
 </code></pre>
 
 

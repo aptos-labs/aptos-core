@@ -481,7 +481,7 @@ A function to create an error from from a category and a reason.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="Errors.md#0x1_Errors_internal">internal</a>(reason: u64): u64
+<pre><code><b>public</b> <b>fun</b> <b>internal</b>(reason: u64): u64
 </code></pre>
 
 
@@ -490,7 +490,7 @@ A function to create an error from from a category and a reason.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="Errors.md#0x1_Errors_internal">internal</a>(reason: u64): u64 { <a href="Errors.md#0x1_Errors_make">make</a>(<a href="Errors.md#0x1_Errors_INTERNAL">INTERNAL</a>, reason) }
+<pre><code><b>public</b> <b>fun</b> <b>internal</b>(reason: u64): u64 { <a href="Errors.md#0x1_Errors_make">make</a>(<a href="Errors.md#0x1_Errors_INTERNAL">INTERNAL</a>, reason) }
 </code></pre>
 
 

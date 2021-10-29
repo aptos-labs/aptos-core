@@ -57,7 +57,7 @@ every time a new ballot is created. The proposers
 address is also part of the ballot id.
 
 
-<pre><code><b>struct</b> <a href="Vote.md#0x1_Vote_BallotID">BallotID</a> has <b>copy</b>, drop, store
+<pre><code><b>struct</b> <a href="Vote.md#0x1_Vote_BallotID">BallotID</a> <b>has</b> <b>copy</b>, drop, store
 </code></pre>
 
 
@@ -74,7 +74,7 @@ address is also part of the ballot id.
 
 </dd>
 <dt>
-<code>proposer: address</code>
+<code>proposer: <b>address</b></code>
 </dt>
 <dd>
 
@@ -92,7 +92,7 @@ WeightedVoter represents a voter with a weight
 The voter is represented by the bcs serialization of address
 
 
-<pre><code><b>struct</b> <a href="Vote.md#0x1_Vote_WeightedVoter">WeightedVoter</a> has <b>copy</b>, drop, store
+<pre><code><b>struct</b> <a href="Vote.md#0x1_Vote_WeightedVoter">WeightedVoter</a> <b>has</b> <b>copy</b>, drop, store
 </code></pre>
 
 
@@ -129,7 +129,7 @@ and it carries the proposal, the approval policy,
 expiration timestamp
 
 
-<pre><code><b>struct</b> <a href="Vote.md#0x1_Vote_Ballot">Ballot</a>&lt;Proposal: drop, store&gt; has <b>copy</b>, drop, store
+<pre><code><b>struct</b> <a href="Vote.md#0x1_Vote_Ballot">Ballot</a>&lt;Proposal: drop, store&gt; <b>has</b> <b>copy</b>, drop, store
 </code></pre>
 
 
@@ -207,7 +207,7 @@ It also contains the handles for all the events associated
 with the ballots created by a proposer
 
 
-<pre><code><b>struct</b> <a href="Vote.md#0x1_Vote_Ballots">Ballots</a>&lt;Proposal: drop, store&gt; has key
+<pre><code><b>struct</b> <a href="Vote.md#0x1_Vote_Ballots">Ballots</a>&lt;Proposal: drop, store&gt; <b>has</b> key
 </code></pre>
 
 
@@ -261,7 +261,7 @@ everytime they create a new ballot. This is used for creating unique
 global identifiers for Ballots
 
 
-<pre><code><b>struct</b> <a href="Vote.md#0x1_Vote_BallotCounter">BallotCounter</a> has key
+<pre><code><b>struct</b> <a href="Vote.md#0x1_Vote_BallotCounter">BallotCounter</a> <b>has</b> key
 </code></pre>
 
 
@@ -290,7 +290,7 @@ CreateBallotEvent is emitted when a ballot is
 created by a proposer
 
 
-<pre><code><b>struct</b> <a href="Vote.md#0x1_Vote_CreateBallotEvent">CreateBallotEvent</a>&lt;Proposal: drop, store&gt; has drop, store
+<pre><code><b>struct</b> <a href="Vote.md#0x1_Vote_CreateBallotEvent">CreateBallotEvent</a>&lt;Proposal: drop, store&gt; <b>has</b> drop, store
 </code></pre>
 
 
@@ -328,7 +328,7 @@ been removed. This can either happen because:
 * ballot was expired and garbage collected
 
 
-<pre><code><b>struct</b> <a href="Vote.md#0x1_Vote_RemoveBallotEvent">RemoveBallotEvent</a> has drop, store
+<pre><code><b>struct</b> <a href="Vote.md#0x1_Vote_RemoveBallotEvent">RemoveBallotEvent</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -357,7 +357,7 @@ VotedEvent is emitted when a valid vote has
 been accepted by the ballot
 
 
-<pre><code><b>struct</b> <a href="Vote.md#0x1_Vote_VotedEvent">VotedEvent</a> has drop, store
+<pre><code><b>struct</b> <a href="Vote.md#0x1_Vote_VotedEvent">VotedEvent</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -374,7 +374,7 @@ been accepted by the ballot
 
 </dd>
 <dt>
-<code>voter: address</code>
+<code>voter: <b>address</b></code>
 </dt>
 <dd>
 
@@ -398,7 +398,7 @@ BallotApprovedEvent is emitted when a ballot has
 been approved by the voters
 
 
-<pre><code><b>struct</b> <a href="Vote.md#0x1_Vote_BallotApprovedEvent">BallotApprovedEvent</a> has drop, store
+<pre><code><b>struct</b> <a href="Vote.md#0x1_Vote_BallotApprovedEvent">BallotApprovedEvent</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -514,7 +514,7 @@ per address.
 A constructor for BallotID
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="Vote.md#0x1_Vote_new_ballot_id">new_ballot_id</a>(counter: u64, proposer: address): <a href="Vote.md#0x1_Vote_BallotID">Vote::BallotID</a>
+<pre><code><b>public</b> <b>fun</b> <a href="Vote.md#0x1_Vote_new_ballot_id">new_ballot_id</a>(counter: u64, proposer: <b>address</b>): <a href="Vote.md#0x1_Vote_BallotID">Vote::BallotID</a>
 </code></pre>
 
 
@@ -525,7 +525,7 @@ A constructor for BallotID
 
 <pre><code><b>public</b> <b>fun</b> <a href="Vote.md#0x1_Vote_new_ballot_id">new_ballot_id</a>(
     counter: u64,
-    proposer: address,
+    proposer: <b>address</b>,
 ): <a href="Vote.md#0x1_Vote_BallotID">BallotID</a> {
     <a href="Vote.md#0x1_Vote_BallotID">BallotID</a> {
         counter,
@@ -598,12 +598,12 @@ Create a ballot under the signer's address and return the <code><a href="Vote.md
     <b>assert</b>!(<a href="DiemTimestamp.md#0x1_DiemTimestamp_now_seconds">DiemTimestamp::now_seconds</a>() &lt; expiration_timestamp_secs, <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="Vote.md#0x1_Vote_EINVALID_TIMESTAMP">EINVALID_TIMESTAMP</a>));
 
     <b>if</b> (!<b>exists</b>&lt;<a href="Vote.md#0x1_Vote_BallotCounter">BallotCounter</a>&gt;(ballot_address)) {
-        move_to(ballot_account, <a href="Vote.md#0x1_Vote_BallotCounter">BallotCounter</a> {
+        <b>move_to</b>(ballot_account, <a href="Vote.md#0x1_Vote_BallotCounter">BallotCounter</a> {
             counter: 0,
         });
     };
     <b>if</b> (!<b>exists</b>&lt;<a href="Vote.md#0x1_Vote_Ballots">Ballots</a>&lt;Proposal&gt;&gt;(ballot_address)) {
-        move_to(ballot_account, <a href="Vote.md#0x1_Vote_Ballots">Ballots</a>&lt;Proposal&gt; {
+        <b>move_to</b>(ballot_account, <a href="Vote.md#0x1_Vote_Ballots">Ballots</a>&lt;Proposal&gt; {
             ballots: <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_empty">Vector::empty</a>(),
             create_ballot_handle: <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event_new_event_handle">Event::new_event_handle</a>&lt;<a href="Vote.md#0x1_Vote_CreateBallotEvent">CreateBallotEvent</a>&lt;Proposal&gt;&gt;(ballot_account),
             remove_ballot_handle: <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event_new_event_handle">Event::new_event_handle</a>&lt;<a href="Vote.md#0x1_Vote_RemoveBallotEvent">RemoveBallotEvent</a>&gt;(ballot_account),
@@ -612,7 +612,7 @@ Create a ballot under the signer's address and return the <code><a href="Vote.md
         });
     };
 
-    <b>let</b> ballot_data = borrow_global_mut&lt;<a href="Vote.md#0x1_Vote_Ballots">Ballots</a>&lt;Proposal&gt;&gt;(ballot_address);
+    <b>let</b> ballot_data = <b>borrow_global_mut</b>&lt;<a href="Vote.md#0x1_Vote_Ballots">Ballots</a>&lt;Proposal&gt;&gt;(ballot_address);
 
     // Remove any expired ballots
     <a href="Vote.md#0x1_Vote_gc_internal">gc_internal</a>&lt;Proposal&gt;(ballot_data);
@@ -709,7 +709,7 @@ approved after this vote
     proposal_type: vector&lt;u8&gt;,
     proposal: Proposal,
 ): bool <b>acquires</b> <a href="Vote.md#0x1_Vote_Ballots">Ballots</a> {
-    <b>let</b> ballot_data = borrow_global_mut&lt;<a href="Vote.md#0x1_Vote_Ballots">Ballots</a>&lt;Proposal&gt;&gt;(ballot_id.proposer);
+    <b>let</b> ballot_data = <b>borrow_global_mut</b>&lt;<a href="Vote.md#0x1_Vote_Ballots">Ballots</a>&lt;Proposal&gt;&gt;(ballot_id.proposer);
 
     // Remove any expired ballots
     <a href="Vote.md#0x1_Vote_gc_internal">gc_internal</a>&lt;Proposal&gt;(ballot_data);
@@ -784,7 +784,7 @@ under the provided address <code>addr</code>. The signer can be anybody
 and does not need to have the same address as <code>addr</code>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="Vote.md#0x1_Vote_gc_ballots">gc_ballots</a>&lt;Proposal: drop, store&gt;(_signer: signer, addr: address)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="Vote.md#0x1_Vote_gc_ballots">gc_ballots</a>&lt;Proposal: drop, store&gt;(_signer: signer, addr: <b>address</b>)
 </code></pre>
 
 
@@ -795,9 +795,9 @@ and does not need to have the same address as <code>addr</code>
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="Vote.md#0x1_Vote_gc_ballots">gc_ballots</a>&lt;Proposal: store + drop&gt;(
     _signer: signer,
-    addr: address,
+    addr: <b>address</b>,
 ) <b>acquires</b> <a href="Vote.md#0x1_Vote_Ballots">Ballots</a> {
-    <a href="Vote.md#0x1_Vote_gc_internal">gc_internal</a>&lt;Proposal&gt;(borrow_global_mut&lt;<a href="Vote.md#0x1_Vote_Ballots">Ballots</a>&lt;Proposal&gt;&gt;(addr));
+    <a href="Vote.md#0x1_Vote_gc_internal">gc_internal</a>&lt;Proposal&gt;(<b>borrow_global_mut</b>&lt;<a href="Vote.md#0x1_Vote_Ballots">Ballots</a>&lt;Proposal&gt;&gt;(addr));
 }
 </code></pre>
 
@@ -811,7 +811,7 @@ and does not need to have the same address as <code>addr</code>
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="Vote.md#0x1_Vote_gc_test_helper">gc_test_helper</a>&lt;Proposal: drop, store&gt;(addr: address): vector&lt;<a href="Vote.md#0x1_Vote_BallotID">Vote::BallotID</a>&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="Vote.md#0x1_Vote_gc_test_helper">gc_test_helper</a>&lt;Proposal: drop, store&gt;(addr: <b>address</b>): vector&lt;<a href="Vote.md#0x1_Vote_BallotID">Vote::BallotID</a>&gt;
 </code></pre>
 
 
@@ -821,9 +821,9 @@ and does not need to have the same address as <code>addr</code>
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="Vote.md#0x1_Vote_gc_test_helper">gc_test_helper</a>&lt;Proposal: store + drop&gt;(
-    addr: address,
+    addr: <b>address</b>,
 ): vector&lt;<a href="Vote.md#0x1_Vote_BallotID">BallotID</a>&gt;  <b>acquires</b> <a href="Vote.md#0x1_Vote_Ballots">Ballots</a> {
-    <a href="Vote.md#0x1_Vote_gc_internal">gc_internal</a>&lt;Proposal&gt;(borrow_global_mut&lt;<a href="Vote.md#0x1_Vote_Ballots">Ballots</a>&lt;Proposal&gt;&gt;(addr))
+    <a href="Vote.md#0x1_Vote_gc_internal">gc_internal</a>&lt;Proposal&gt;(<b>borrow_global_mut</b>&lt;<a href="Vote.md#0x1_Vote_Ballots">Ballots</a>&lt;Proposal&gt;&gt;(addr))
 }
 </code></pre>
 
@@ -897,7 +897,7 @@ and does not need to have the same address as <code>addr</code>
     ballot_id: <a href="Vote.md#0x1_Vote_BallotID">BallotID</a>,
 ) <b>acquires</b> <a href="Vote.md#0x1_Vote_Ballots">Ballots</a> {
     <b>let</b> addr = <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(&account);
-    <b>let</b> ballot_data = borrow_global_mut&lt;<a href="Vote.md#0x1_Vote_Ballots">Ballots</a>&lt;Proposal&gt;&gt;(addr);
+    <b>let</b> ballot_data = <b>borrow_global_mut</b>&lt;<a href="Vote.md#0x1_Vote_Ballots">Ballots</a>&lt;Proposal&gt;&gt;(addr);
     <b>let</b> ballots = &<b>mut</b> ballot_data.ballots;
     <b>let</b> remove_handle = &<b>mut</b> ballot_data.remove_ballot_handle;
     <b>let</b> i = 0;
@@ -972,7 +972,7 @@ account
 
 <pre><code><b>fun</b> <a href="Vote.md#0x1_Vote_incr_counter">incr_counter</a>(account: &signer): u64 <b>acquires</b> <a href="Vote.md#0x1_Vote_BallotCounter">BallotCounter</a> {
     <b>let</b> addr = <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
-    <b>let</b> counter = &<b>mut</b> borrow_global_mut&lt;<a href="Vote.md#0x1_Vote_BallotCounter">BallotCounter</a>&gt;(addr).counter;
+    <b>let</b> counter = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="Vote.md#0x1_Vote_BallotCounter">BallotCounter</a>&gt;(addr).counter;
     <b>let</b> count = *counter;
     *counter = *counter + 1;
     count

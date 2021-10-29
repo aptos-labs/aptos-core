@@ -6,7 +6,7 @@
 Provides a way to transfer structs from one account to another in two transactions.
 Unlike many languages, Move cannot move data from one account to another with
 single-signer transactions. As of this writing, ordinary transactions can only have
-a single signer, and Move code can only store to an address (via <code>move_to</code>) if it
+a single signer, and Move code can only store to an address (via <code><b>move_to</b></code>) if it
 can supply a reference to a signer for the destination address (there are special case
 exceptions in Genesis and DiemAccount where there can temporarily be multiple signers).
 
@@ -46,7 +46,7 @@ redeemed it.
 A wrapper around value <code>offered</code> that can be claimed by the address stored in <code>for</code>.
 
 
-<pre><code><b>struct</b> <a href="Offer.md#0x1_Offer">Offer</a>&lt;Offered&gt; has key
+<pre><code><b>struct</b> <a href="Offer.md#0x1_Offer">Offer</a>&lt;Offered&gt; <b>has</b> key
 </code></pre>
 
 
@@ -63,7 +63,7 @@ A wrapper around value <code>offered</code> that can be claimed by the address s
 
 </dd>
 <dt>
-<code>for: address</code>
+<code>for: <b>address</b></code>
 </dt>
 <dd>
 
@@ -116,7 +116,7 @@ Publish a value of type <code>Offered</code> under the sender's account. The val
 either the <code>for</code> address or the transaction sender.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="Offer.md#0x1_Offer_create">create</a>&lt;Offered: store&gt;(account: &signer, offered: Offered, for: address)
+<pre><code><b>public</b> <b>fun</b> <a href="Offer.md#0x1_Offer_create">create</a>&lt;Offered: store&gt;(account: &signer, offered: Offered, for: <b>address</b>)
 </code></pre>
 
 
@@ -125,9 +125,9 @@ either the <code>for</code> address or the transaction sender.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="Offer.md#0x1_Offer_create">create</a>&lt;Offered: store&gt;(account: &signer, offered: Offered, for: address) {
+<pre><code><b>public</b> <b>fun</b> <a href="Offer.md#0x1_Offer_create">create</a>&lt;Offered: store&gt;(account: &signer, offered: Offered, for: <b>address</b>) {
   <b>assert</b>!(!<b>exists</b>&lt;<a href="Offer.md#0x1_Offer">Offer</a>&lt;Offered&gt;&gt;(<a href="_address_of">Signer::address_of</a>(account)), <a href="_already_published">Errors::already_published</a>(<a href="Offer.md#0x1_Offer_EOFFER_ALREADY_CREATED">EOFFER_ALREADY_CREATED</a>));
-  move_to(account, <a href="Offer.md#0x1_Offer">Offer</a>&lt;Offered&gt; { offered, for });
+  <b>move_to</b>(account, <a href="Offer.md#0x1_Offer">Offer</a>&lt;Offered&gt; { offered, for });
 }
 </code></pre>
 
@@ -163,7 +163,7 @@ publisher <code>offer_address</code>.
 Also fails if there is no <code><a href="Offer.md#0x1_Offer">Offer</a>&lt;Offered&gt;</code> published.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="Offer.md#0x1_Offer_redeem">redeem</a>&lt;Offered: store&gt;(account: &signer, offer_address: address): Offered
+<pre><code><b>public</b> <b>fun</b> <a href="Offer.md#0x1_Offer_redeem">redeem</a>&lt;Offered: store&gt;(account: &signer, offer_address: <b>address</b>): Offered
 </code></pre>
 
 
@@ -172,9 +172,9 @@ Also fails if there is no <code><a href="Offer.md#0x1_Offer">Offer</a>&lt;Offere
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="Offer.md#0x1_Offer_redeem">redeem</a>&lt;Offered: store&gt;(account: &signer, offer_address: address): Offered <b>acquires</b> <a href="Offer.md#0x1_Offer">Offer</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="Offer.md#0x1_Offer_redeem">redeem</a>&lt;Offered: store&gt;(account: &signer, offer_address: <b>address</b>): Offered <b>acquires</b> <a href="Offer.md#0x1_Offer">Offer</a> {
   <b>assert</b>!(<b>exists</b>&lt;<a href="Offer.md#0x1_Offer">Offer</a>&lt;Offered&gt;&gt;(offer_address), <a href="_not_published">Errors::not_published</a>(<a href="Offer.md#0x1_Offer_EOFFER_DOES_NOT_EXIST">EOFFER_DOES_NOT_EXIST</a>));
-  <b>let</b> <a href="Offer.md#0x1_Offer">Offer</a>&lt;Offered&gt; { offered, for } = move_from&lt;<a href="Offer.md#0x1_Offer">Offer</a>&lt;Offered&gt;&gt;(offer_address);
+  <b>let</b> <a href="Offer.md#0x1_Offer">Offer</a>&lt;Offered&gt; { offered, for } = <b>move_from</b>&lt;<a href="Offer.md#0x1_Offer">Offer</a>&lt;Offered&gt;&gt;(offer_address);
   <b>let</b> sender = <a href="_address_of">Signer::address_of</a>(account);
   <b>assert</b>!(sender == for || sender == offer_address, <a href="_invalid_argument">Errors::invalid_argument</a>(<a href="Offer.md#0x1_Offer_EOFFER_DNE_FOR_ACCOUNT">EOFFER_DNE_FOR_ACCOUNT</a>));
   offered
@@ -212,7 +212,7 @@ Ensures that the offered struct under <code>offer_address</code> is removed.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="Offer.md#0x1_Offer_exists_at">exists_at</a>&lt;Offered: store&gt;(offer_address: address): bool
+<pre><code><b>public</b> <b>fun</b> <a href="Offer.md#0x1_Offer_exists_at">exists_at</a>&lt;Offered: store&gt;(offer_address: <b>address</b>): bool
 </code></pre>
 
 
@@ -221,7 +221,7 @@ Ensures that the offered struct under <code>offer_address</code> is removed.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="Offer.md#0x1_Offer_exists_at">exists_at</a>&lt;Offered: store&gt;(offer_address: address): bool {
+<pre><code><b>public</b> <b>fun</b> <a href="Offer.md#0x1_Offer_exists_at">exists_at</a>&lt;Offered: store&gt;(offer_address: <b>address</b>): bool {
   <b>exists</b>&lt;<a href="Offer.md#0x1_Offer">Offer</a>&lt;Offered&gt;&gt;(offer_address)
 }
 </code></pre>
@@ -255,7 +255,7 @@ Returns whether or not an <code><a href="Offer.md#0x1_Offer">Offer</a></code> re
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="Offer.md#0x1_Offer_address_of">address_of</a>&lt;Offered: store&gt;(offer_address: address): address
+<pre><code><b>public</b> <b>fun</b> <a href="Offer.md#0x1_Offer_address_of">address_of</a>&lt;Offered: store&gt;(offer_address: <b>address</b>): <b>address</b>
 </code></pre>
 
 
@@ -264,9 +264,9 @@ Returns whether or not an <code><a href="Offer.md#0x1_Offer">Offer</a></code> re
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="Offer.md#0x1_Offer_address_of">address_of</a>&lt;Offered: store&gt;(offer_address: address): address <b>acquires</b> <a href="Offer.md#0x1_Offer">Offer</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="Offer.md#0x1_Offer_address_of">address_of</a>&lt;Offered: store&gt;(offer_address: <b>address</b>): <b>address</b> <b>acquires</b> <a href="Offer.md#0x1_Offer">Offer</a> {
   <b>assert</b>!(<b>exists</b>&lt;<a href="Offer.md#0x1_Offer">Offer</a>&lt;Offered&gt;&gt;(offer_address), <a href="_not_published">Errors::not_published</a>(<a href="Offer.md#0x1_Offer_EOFFER_DOES_NOT_EXIST">EOFFER_DOES_NOT_EXIST</a>));
-  borrow_global&lt;<a href="Offer.md#0x1_Offer">Offer</a>&lt;Offered&gt;&gt;(offer_address).for
+  <b>borrow_global</b>&lt;<a href="Offer.md#0x1_Offer">Offer</a>&lt;Offered&gt;&gt;(offer_address).for
 }
 </code></pre>
 
@@ -315,7 +315,7 @@ except <code>create</code>
 
 
 <pre><code><b>schema</b> <a href="Offer.md#0x1_Offer_NoOfferCreated">NoOfferCreated</a>&lt;Offered&gt; {
-    <b>ensures</b> <b>forall</b> addr: address <b>where</b> !<b>old</b>(<b>exists</b>&lt;<a href="Offer.md#0x1_Offer">Offer</a>&lt;Offered&gt;&gt;(addr)) : !<b>exists</b>&lt;<a href="Offer.md#0x1_Offer">Offer</a>&lt;Offered&gt;&gt;(addr);
+    <b>ensures</b> <b>forall</b> addr: <b>address</b> <b>where</b> !<b>old</b>(<b>exists</b>&lt;<a href="Offer.md#0x1_Offer">Offer</a>&lt;Offered&gt;&gt;(addr)) : !<b>exists</b>&lt;<a href="Offer.md#0x1_Offer">Offer</a>&lt;Offered&gt;&gt;(addr);
 }
 </code></pre>
 
@@ -341,7 +341,7 @@ Says no offer is removed for any address. Applied below to everything except <co
 
 
 <pre><code><b>schema</b> <a href="Offer.md#0x1_Offer_NoOfferRemoved">NoOfferRemoved</a>&lt;Offered&gt; {
-    <b>ensures</b> <b>forall</b> addr: address <b>where</b> <b>old</b>(<b>exists</b>&lt;<a href="Offer.md#0x1_Offer">Offer</a>&lt;Offered&gt;&gt;(addr)) :
+    <b>ensures</b> <b>forall</b> addr: <b>address</b> <b>where</b> <b>old</b>(<b>exists</b>&lt;<a href="Offer.md#0x1_Offer">Offer</a>&lt;Offered&gt;&gt;(addr)) :
               (<b>exists</b>&lt;<a href="Offer.md#0x1_Offer">Offer</a>&lt;Offered&gt;&gt;(addr) && <b>global</b>&lt;<a href="Offer.md#0x1_Offer">Offer</a>&lt;Offered&gt;&gt;(addr) == <b>old</b>(<b>global</b>&lt;<a href="Offer.md#0x1_Offer">Offer</a>&lt;Offered&gt;&gt;(addr)));
 }
 </code></pre>
@@ -368,7 +368,7 @@ and false otherwise.
 <a name="0x1_Offer_is_allowed_recipient"></a>
 
 
-<pre><code><b>fun</b> <a href="Offer.md#0x1_Offer_is_allowed_recipient">is_allowed_recipient</a>&lt;Offered&gt;(offer_addr: address, recipient: address): bool {
+<pre><code><b>fun</b> <a href="Offer.md#0x1_Offer_is_allowed_recipient">is_allowed_recipient</a>&lt;Offered&gt;(offer_addr: <b>address</b>, recipient: <b>address</b>): bool {
   recipient == <b>global</b>&lt;<a href="Offer.md#0x1_Offer">Offer</a>&lt;Offered&gt;&gt;(offer_addr).for || recipient == offer_addr
 }
 </code></pre>

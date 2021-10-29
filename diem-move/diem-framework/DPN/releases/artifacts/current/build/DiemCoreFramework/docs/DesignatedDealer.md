@@ -37,7 +37,7 @@ currencies it can hold. All <code><a href="DesignatedDealer.md#0x1_DesignatedDea
 currencies will be emitted on <code>mint_event_handle</code>.
 
 
-<pre><code><b>struct</b> <a href="DesignatedDealer.md#0x1_DesignatedDealer_Dealer">Dealer</a> has key
+<pre><code><b>struct</b> <a href="DesignatedDealer.md#0x1_DesignatedDealer_Dealer">Dealer</a> <b>has</b> key
 </code></pre>
 
 
@@ -67,7 +67,7 @@ tier a mint to a DD needs to be in.
 DEPRECATED: This resource is no longer used and will be removed from the system
 
 
-<pre><code><b>struct</b> <a href="DesignatedDealer.md#0x1_DesignatedDealer_TierInfo">TierInfo</a>&lt;CoinType&gt; has key
+<pre><code><b>struct</b> <a href="DesignatedDealer.md#0x1_DesignatedDealer_TierInfo">TierInfo</a>&lt;CoinType&gt; <b>has</b> key
 </code></pre>
 
 
@@ -107,7 +107,7 @@ DEPRECATED: This resource is no longer used and will be removed from the system
 Message for mint events
 
 
-<pre><code><b>struct</b> <a href="DesignatedDealer.md#0x1_DesignatedDealer_ReceivedMintEvent">ReceivedMintEvent</a> has drop, store
+<pre><code><b>struct</b> <a href="DesignatedDealer.md#0x1_DesignatedDealer_ReceivedMintEvent">ReceivedMintEvent</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -124,7 +124,7 @@ Message for mint events
  The currency minted
 </dd>
 <dt>
-<code>destination_address: address</code>
+<code>destination_address: <b>address</b></code>
 </dt>
 <dd>
  The address that receives the mint
@@ -191,7 +191,7 @@ for each known currency at launch.
     <a href="Roles.md#0x1_Roles_assert_treasury_compliance">Roles::assert_treasury_compliance</a>(tc_account);
     <a href="Roles.md#0x1_Roles_assert_designated_dealer">Roles::assert_designated_dealer</a>(dd);
     <b>assert</b>!(!<b>exists</b>&lt;<a href="DesignatedDealer.md#0x1_DesignatedDealer_Dealer">Dealer</a>&gt;(<a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(dd)), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_already_published">Errors::already_published</a>(<a href="DesignatedDealer.md#0x1_DesignatedDealer_EDEALER">EDEALER</a>));
-    move_to(dd, <a href="DesignatedDealer.md#0x1_DesignatedDealer_Dealer">Dealer</a> { mint_event_handle: <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event_new_event_handle">Event::new_event_handle</a>&lt;<a href="DesignatedDealer.md#0x1_DesignatedDealer_ReceivedMintEvent">ReceivedMintEvent</a>&gt;(dd) });
+    <b>move_to</b>(dd, <a href="DesignatedDealer.md#0x1_DesignatedDealer_Dealer">Dealer</a> { mint_event_handle: <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event_new_event_handle">Event::new_event_handle</a>&lt;<a href="DesignatedDealer.md#0x1_DesignatedDealer_ReceivedMintEvent">ReceivedMintEvent</a>&gt;(dd) });
     <b>if</b> (add_all_currencies) {
         <a href="DesignatedDealer.md#0x1_DesignatedDealer_add_currency">add_currency</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;(dd, tc_account);
     } <b>else</b> {
@@ -278,7 +278,7 @@ multi-signer transactions in order to add a new currency to an existing DD.
 
 
 <pre><code><b>schema</b> <a href="DesignatedDealer.md#0x1_DesignatedDealer_AddCurrencyAbortsIf">AddCurrencyAbortsIf</a>&lt;CoinType&gt; {
-    dd_addr: address;
+    dd_addr: <b>address</b>;
     <b>include</b> <a href="Diem.md#0x1_Diem_AbortsIfNoCurrency">Diem::AbortsIfNoCurrency</a>&lt;CoinType&gt;;
     <b>aborts_if</b> <a href="Diem.md#0x1_Diem_is_synthetic_currency">Diem::is_synthetic_currency</a>&lt;CoinType&gt;() <b>with</b> Errors::INVALID_ARGUMENT;
     <b>aborts_if</b> <b>exists</b>&lt;<a href="Diem.md#0x1_Diem_PreburnQueue">Diem::PreburnQueue</a>&lt;CoinType&gt;&gt;(dd_addr) <b>with</b> Errors::ALREADY_PUBLISHED;
@@ -320,7 +320,7 @@ multi-signer transactions in order to add a new currency to an existing DD.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="DesignatedDealer.md#0x1_DesignatedDealer_tiered_mint">tiered_mint</a>&lt;CoinType&gt;(tc_account: &signer, amount: u64, dd_addr: address, _tier_index: u64): <a href="Diem.md#0x1_Diem_Diem">Diem::Diem</a>&lt;CoinType&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="DesignatedDealer.md#0x1_DesignatedDealer_tiered_mint">tiered_mint</a>&lt;CoinType&gt;(tc_account: &signer, amount: u64, dd_addr: <b>address</b>, _tier_index: u64): <a href="Diem.md#0x1_Diem_Diem">Diem::Diem</a>&lt;CoinType&gt;
 </code></pre>
 
 
@@ -332,7 +332,7 @@ multi-signer transactions in order to add a new currency to an existing DD.
 <pre><code><b>public</b> <b>fun</b> <a href="DesignatedDealer.md#0x1_DesignatedDealer_tiered_mint">tiered_mint</a>&lt;CoinType&gt;(
     tc_account: &signer,
     amount: u64,
-    dd_addr: address,
+    dd_addr: <b>address</b>,
     // tiers are deprecated. We <b>continue</b> <b>to</b> accept this argument for backward
     // compatibility, but it will be ignored.
     _tier_index: u64,
@@ -344,12 +344,12 @@ multi-signer transactions in order to add a new currency to an existing DD.
     // Delete deprecated `<a href="DesignatedDealer.md#0x1_DesignatedDealer_TierInfo">TierInfo</a>` resources.
     // TODO: delete this code once there are no more <a href="DesignatedDealer.md#0x1_DesignatedDealer_TierInfo">TierInfo</a> resources in the system
     <b>if</b> (<b>exists</b>&lt;<a href="DesignatedDealer.md#0x1_DesignatedDealer_TierInfo">TierInfo</a>&lt;CoinType&gt;&gt;(dd_addr)) {
-        <b>let</b> <a href="DesignatedDealer.md#0x1_DesignatedDealer_TierInfo">TierInfo</a> { window_start: _, window_inflow: _, tiers: _ } = move_from&lt;<a href="DesignatedDealer.md#0x1_DesignatedDealer_TierInfo">TierInfo</a>&lt;CoinType&gt;&gt;(dd_addr);
+        <b>let</b> <a href="DesignatedDealer.md#0x1_DesignatedDealer_TierInfo">TierInfo</a> { window_start: _, window_inflow: _, tiers: _ } = <b>move_from</b>&lt;<a href="DesignatedDealer.md#0x1_DesignatedDealer_TierInfo">TierInfo</a>&lt;CoinType&gt;&gt;(dd_addr);
     };
 
     // Send <a href="DesignatedDealer.md#0x1_DesignatedDealer_ReceivedMintEvent">ReceivedMintEvent</a>
     <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event_emit_event">Event::emit_event</a>&lt;<a href="DesignatedDealer.md#0x1_DesignatedDealer_ReceivedMintEvent">ReceivedMintEvent</a>&gt;(
-        &<b>mut</b> borrow_global_mut&lt;<a href="DesignatedDealer.md#0x1_DesignatedDealer_Dealer">Dealer</a>&gt;(dd_addr).mint_event_handle,
+        &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="DesignatedDealer.md#0x1_DesignatedDealer_Dealer">Dealer</a>&gt;(dd_addr).mint_event_handle,
         <a href="DesignatedDealer.md#0x1_DesignatedDealer_ReceivedMintEvent">ReceivedMintEvent</a> {
             currency_code: <a href="Diem.md#0x1_Diem_currency_code">Diem::currency_code</a>&lt;CoinType&gt;(),
             destination_address: dd_addr,
@@ -379,7 +379,7 @@ multi-signer transactions in order to add a new currency to an existing DD.
 <b>modifies</b> <b>global</b>&lt;<a href="DesignatedDealer.md#0x1_DesignatedDealer_TierInfo">TierInfo</a>&lt;CoinType&gt;&gt;(dd_addr);
 <b>ensures</b> !<b>exists</b>&lt;<a href="DesignatedDealer.md#0x1_DesignatedDealer_TierInfo">TierInfo</a>&lt;CoinType&gt;&gt;(dd_addr);
 <b>let</b> currency_info = <b>global</b>&lt;<a href="Diem.md#0x1_Diem_CurrencyInfo">Diem::CurrencyInfo</a>&lt;CoinType&gt;&gt;(@CurrencyInfo);
-<b>let</b> post post_currency_info = <b>global</b>&lt;<a href="Diem.md#0x1_Diem_CurrencyInfo">Diem::CurrencyInfo</a>&lt;CoinType&gt;&gt;(@CurrencyInfo);
+<b>let</b> <b>post</b> post_currency_info = <b>global</b>&lt;<a href="Diem.md#0x1_Diem_CurrencyInfo">Diem::CurrencyInfo</a>&lt;CoinType&gt;&gt;(@CurrencyInfo);
 <b>ensures</b> result.value == amount;
 <b>ensures</b> post_currency_info == update_field(currency_info, total_value, currency_info.total_value + amount);
 </code></pre>
@@ -392,7 +392,7 @@ multi-signer transactions in order to add a new currency to an existing DD.
 
 <pre><code><b>schema</b> <a href="DesignatedDealer.md#0x1_DesignatedDealer_TieredMintAbortsIf">TieredMintAbortsIf</a>&lt;CoinType&gt; {
     tc_account: signer;
-    dd_addr: address;
+    dd_addr: <b>address</b>;
     amount: u64;
     <b>include</b> <a href="Roles.md#0x1_Roles_AbortsIfNotTreasuryCompliance">Roles::AbortsIfNotTreasuryCompliance</a>{account: tc_account};
     <b>aborts_if</b> amount == 0 <b>with</b> Errors::INVALID_ARGUMENT;
@@ -409,7 +409,7 @@ multi-signer transactions in order to add a new currency to an existing DD.
 
 
 <pre><code><b>schema</b> <a href="DesignatedDealer.md#0x1_DesignatedDealer_TieredMintEmits">TieredMintEmits</a>&lt;CoinType&gt; {
-    dd_addr: address;
+    dd_addr: <b>address</b>;
     amount: u64;
     <b>let</b> handle = <b>global</b>&lt;<a href="DesignatedDealer.md#0x1_DesignatedDealer_Dealer">Dealer</a>&gt;(dd_addr).mint_event_handle;
     <b>let</b> msg = <a href="DesignatedDealer.md#0x1_DesignatedDealer_ReceivedMintEvent">ReceivedMintEvent</a> {
@@ -417,7 +417,7 @@ multi-signer transactions in order to add a new currency to an existing DD.
         destination_address: dd_addr,
         amount,
     };
-    emits msg <b>to</b> handle;
+    <b>emits</b> msg <b>to</b> handle;
     <b>include</b> <a href="Diem.md#0x1_Diem_MintEmits">Diem::MintEmits</a>&lt;CoinType&gt;{value: amount};
 }
 </code></pre>
@@ -432,7 +432,7 @@ multi-signer transactions in order to add a new currency to an existing DD.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="DesignatedDealer.md#0x1_DesignatedDealer_exists_at">exists_at</a>(dd_addr: address): bool
+<pre><code><b>public</b> <b>fun</b> <a href="DesignatedDealer.md#0x1_DesignatedDealer_exists_at">exists_at</a>(dd_addr: <b>address</b>): bool
 </code></pre>
 
 
@@ -441,7 +441,7 @@ multi-signer transactions in order to add a new currency to an existing DD.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="DesignatedDealer.md#0x1_DesignatedDealer_exists_at">exists_at</a>(dd_addr: address): bool {
+<pre><code><b>public</b> <b>fun</b> <a href="DesignatedDealer.md#0x1_DesignatedDealer_exists_at">exists_at</a>(dd_addr: <b>address</b>): bool {
     <b>exists</b>&lt;<a href="DesignatedDealer.md#0x1_DesignatedDealer_Dealer">Dealer</a>&gt;(dd_addr)
 }
 </code></pre>
@@ -473,7 +473,7 @@ multi-signer transactions in order to add a new currency to an existing DD.
 resource struct Dealer persists after publication
 
 
-<pre><code><b>invariant</b> <b>update</b> <b>forall</b> addr: address <b>where</b> <b>old</b>(<b>exists</b>&lt;<a href="DesignatedDealer.md#0x1_DesignatedDealer_Dealer">Dealer</a>&gt;(addr)): <b>exists</b>&lt;<a href="DesignatedDealer.md#0x1_DesignatedDealer_Dealer">Dealer</a>&gt;(addr);
+<pre><code><b>invariant</b> <b>update</b> <b>forall</b> addr: <b>address</b> <b>where</b> <b>old</b>(<b>exists</b>&lt;<a href="DesignatedDealer.md#0x1_DesignatedDealer_Dealer">Dealer</a>&gt;(addr)): <b>exists</b>&lt;<a href="DesignatedDealer.md#0x1_DesignatedDealer_Dealer">Dealer</a>&gt;(addr);
 </code></pre>
 
 

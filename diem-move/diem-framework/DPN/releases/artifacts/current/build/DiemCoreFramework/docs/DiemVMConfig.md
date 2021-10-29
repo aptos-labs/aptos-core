@@ -33,7 +33,7 @@ including different costs of running the VM.
 The struct to hold config data needed to operate the DiemVM.
 
 
-<pre><code><b>struct</b> <a href="DiemVMConfig.md#0x1_DiemVMConfig">DiemVMConfig</a> has <b>copy</b>, drop, store
+<pre><code><b>struct</b> <a href="DiemVMConfig.md#0x1_DiemVMConfig">DiemVMConfig</a> <b>has</b> <b>copy</b>, drop, store
 </code></pre>
 
 
@@ -71,7 +71,7 @@ address, and will preload the vector with the gas schedule for instructions. The
 load this into memory at the startup of each block.
 
 
-<pre><code><b>struct</b> <a href="DiemVMConfig.md#0x1_DiemVMConfig_GasSchedule">GasSchedule</a> has <b>copy</b>, drop, store
+<pre><code><b>struct</b> <a href="DiemVMConfig.md#0x1_DiemVMConfig_GasSchedule">GasSchedule</a> <b>has</b> <b>copy</b>, drop, store
 </code></pre>
 
 
@@ -110,7 +110,7 @@ load this into memory at the startup of each block.
 
 
 
-<pre><code><b>struct</b> <a href="DiemVMConfig.md#0x1_DiemVMConfig_GasConstants">GasConstants</a> has <b>copy</b>, drop, store
+<pre><code><b>struct</b> <a href="DiemVMConfig.md#0x1_DiemVMConfig_GasConstants">GasConstants</a> <b>has</b> <b>copy</b>, drop, store
 </code></pre>
 
 
@@ -442,7 +442,7 @@ No one can update DiemVMConfig except for the Diem Root account [[H11]][PERMISSI
 The permission "UpdateVMConfig" is granted to DiemRoot [[H11]][PERMISSION].
 
 
-<pre><code><b>invariant</b> [suspendable] <b>forall</b> addr: address
+<pre><code><b>invariant</b> [suspendable] <b>forall</b> addr: <b>address</b>
     <b>where</b> <b>exists</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig">DiemConfig</a>&lt;<a href="DiemVMConfig.md#0x1_DiemVMConfig">DiemVMConfig</a>&gt;&gt;(addr): addr == @DiemRoot;
 <b>invariant</b> <b>update</b> [suspendable] <b>old</b>(<a href="DiemConfig.md#0x1_DiemConfig_spec_is_published">DiemConfig::spec_is_published</a>&lt;<a href="DiemVMConfig.md#0x1_DiemVMConfig">DiemVMConfig</a>&gt;())
     && <a href="DiemConfig.md#0x1_DiemConfig_spec_is_published">DiemConfig::spec_is_published</a>&lt;<a href="DiemVMConfig.md#0x1_DiemVMConfig">DiemVMConfig</a>&gt;()

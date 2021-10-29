@@ -20,7 +20,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="Signer.md#0x1_Signer_borrow_address">borrow_address</a>(s: &signer): &address
+<pre><code><b>public</b> <b>fun</b> <a href="Signer.md#0x1_Signer_borrow_address">borrow_address</a>(s: &signer): &<b>address</b>
 </code></pre>
 
 
@@ -29,7 +29,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>public</b> <b>fun</b> <a href="Signer.md#0x1_Signer_borrow_address">borrow_address</a>(s: &signer): &address;
+<pre><code><b>native</b> <b>public</b> <b>fun</b> <a href="Signer.md#0x1_Signer_borrow_address">borrow_address</a>(s: &signer): &<b>address</b>;
 </code></pre>
 
 
@@ -42,7 +42,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="Signer.md#0x1_Signer_address_of">address_of</a>(s: &signer): address
+<pre><code><b>public</b> <b>fun</b> <a href="Signer.md#0x1_Signer_address_of">address_of</a>(s: &signer): <b>address</b>
 </code></pre>
 
 
@@ -51,7 +51,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="Signer.md#0x1_Signer_address_of">address_of</a>(s: &signer): address {
+<pre><code><b>public</b> <b>fun</b> <a href="Signer.md#0x1_Signer_address_of">address_of</a>(s: &signer): <b>address</b> {
     *<a href="Signer.md#0x1_Signer_borrow_address">borrow_address</a>(s)
 }
 </code></pre>
@@ -80,7 +80,7 @@ Return true only if <code>a</code> is a transaction signer address. This is a sp
 <a name="0x1_Signer_is_txn_signer_addr"></a>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="Signer.md#0x1_Signer_is_txn_signer_addr">is_txn_signer_addr</a>(a: address): bool;
+<pre><code><b>native</b> <b>fun</b> <a href="Signer.md#0x1_Signer_is_txn_signer_addr">is_txn_signer_addr</a>(a: <b>address</b>): bool;
 </code></pre>
 
 

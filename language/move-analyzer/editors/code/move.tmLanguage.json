@@ -114,7 +114,7 @@
             }
         },
         "keyword": {
-            "comment": "Keywords such as 'if' or 'let'.",
+            "comment": "Keywords such as 'if' or 'let', operator keywords such as 'move' or 'copy', contextual keywords such as 'invariant' or 'phantom', or builtin functions such as 'borrow_global_mut'.",
             "patterns": [
                 {
                     "name": "keyword.control.move",
@@ -130,15 +130,19 @@
                 },
                 {
                     "name": "keyword.other.move.specification",
-                    "match": "\\b(?:aborts_if|aborts_with|apply|assert|assume|axiom|decreases|emits|ensures|global|include|local|modifies|pragma|requires|schema|succeeds_if|to|update|with)\\b"
+                    "match": "\\b(?:aborts_if|aborts_with|apply|assume|axiom|choose|decreases|emits|ensures|except|forall|global|include|internal|local|min|modifies|pragma|requires|schema|succeeds_if|to|update|with|where)\\b"
                 },
                 {
                     "name": "storage.type.move",
-                    "match": "\\b(address|const|fun|let|module|script|struct)\\b"
+                    "match": "\\b(?:address|const|fun|let|module|post|script|struct|phantom)\\b"
                 },
                 {
                     "name": "storage.modifier.move",
-                    "match": "\\b(native|public|mut)\\b"
+                    "match": "\\b(?:mut|native|public)\\b"
+                },
+                {
+                    "name": "support.function.move",
+                    "match": "\\b(?:assert|borrow_global|borrow_global_mut|exists|freeze|move_from|move_to|old)\\b"
                 }
             ]
         },

@@ -45,7 +45,7 @@ the VASP's globally unique name and all of the metadata that other VASPs need to
 off-chain protocols with this one.
 
 
-<pre><code><b>struct</b> <a href="VASP.md#0x1_VASP_ParentVASP">ParentVASP</a> has key
+<pre><code><b>struct</b> <a href="VASP.md#0x1_VASP_ParentVASP">ParentVASP</a> <b>has</b> key
 </code></pre>
 
 
@@ -73,7 +73,7 @@ off-chain protocols with this one.
 A resource that represents a child account of the parent VASP account at <code>parent_vasp_addr</code>
 
 
-<pre><code><b>struct</b> <a href="VASP.md#0x1_VASP_ChildVASP">ChildVASP</a> has key
+<pre><code><b>struct</b> <a href="VASP.md#0x1_VASP_ChildVASP">ChildVASP</a> <b>has</b> key
 </code></pre>
 
 
@@ -84,7 +84,7 @@ A resource that represents a child account of the parent VASP account at <code>p
 
 <dl>
 <dt>
-<code>parent_vasp_addr: address</code>
+<code>parent_vasp_addr: <b>address</b></code>
 </dt>
 <dd>
 
@@ -173,7 +173,7 @@ or if there is already a VASP (child or parent) at this account.
     <a href="Roles.md#0x1_Roles_assert_parent_vasp_role">Roles::assert_parent_vasp_role</a>(vasp);
     <b>let</b> vasp_addr = <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(vasp);
     <b>assert</b>!(!<a href="VASP.md#0x1_VASP_is_vasp">is_vasp</a>(vasp_addr), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_already_published">Errors::already_published</a>(<a href="VASP.md#0x1_VASP_EPARENT_OR_CHILD_VASP">EPARENT_OR_CHILD_VASP</a>));
-    move_to(vasp, <a href="VASP.md#0x1_VASP_ParentVASP">ParentVASP</a> { num_children: 0 });
+    <b>move_to</b>(vasp, <a href="VASP.md#0x1_VASP_ParentVASP">ParentVASP</a> { num_children: 0 });
 }
 </code></pre>
 
@@ -201,7 +201,7 @@ or if there is already a VASP (child or parent) at this account.
 
 
 <pre><code><b>schema</b> <a href="VASP.md#0x1_VASP_PublishParentVASPEnsures">PublishParentVASPEnsures</a> {
-    vasp_addr: address;
+    vasp_addr: <b>address</b>;
     <b>ensures</b> <a href="VASP.md#0x1_VASP_is_parent">is_parent</a>(vasp_addr);
     <b>ensures</b> <a href="VASP.md#0x1_VASP_spec_num_children">spec_num_children</a>(vasp_addr) == 0;
 }
@@ -238,11 +238,11 @@ Aborts if <code>parent</code> is not a ParentVASP
     <b>assert</b>!(!<a href="VASP.md#0x1_VASP_is_vasp">is_vasp</a>(child_vasp_addr), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_already_published">Errors::already_published</a>(<a href="VASP.md#0x1_VASP_EPARENT_OR_CHILD_VASP">EPARENT_OR_CHILD_VASP</a>));
     <b>let</b> parent_vasp_addr = <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(parent);
     <b>assert</b>!(<a href="VASP.md#0x1_VASP_is_parent">is_parent</a>(parent_vasp_addr), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="VASP.md#0x1_VASP_ENOT_A_PARENT_VASP">ENOT_A_PARENT_VASP</a>));
-    <b>let</b> num_children = &<b>mut</b> borrow_global_mut&lt;<a href="VASP.md#0x1_VASP_ParentVASP">ParentVASP</a>&gt;(parent_vasp_addr).num_children;
+    <b>let</b> num_children = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="VASP.md#0x1_VASP_ParentVASP">ParentVASP</a>&gt;(parent_vasp_addr).num_children;
     // Abort <b>if</b> creating this child account would put the parent <a href="VASP.md#0x1_VASP">VASP</a> over the limit
     <b>assert</b>!(*<a href="VASP.md#0x1_VASP_num_children">num_children</a> &lt; <a href="VASP.md#0x1_VASP_MAX_CHILD_ACCOUNTS">MAX_CHILD_ACCOUNTS</a>, <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_limit_exceeded">Errors::limit_exceeded</a>(<a href="VASP.md#0x1_VASP_ETOO_MANY_CHILDREN">ETOO_MANY_CHILDREN</a>));
     *num_children = *num_children + 1;
-    move_to(child, <a href="VASP.md#0x1_VASP_ChildVASP">ChildVASP</a> { parent_vasp_addr });
+    <b>move_to</b>(child, <a href="VASP.md#0x1_VASP_ChildVASP">ChildVASP</a> { parent_vasp_addr });
 }
 </code></pre>
 
@@ -269,7 +269,7 @@ Aborts if <code>parent</code> is not a ParentVASP
 
 <pre><code><b>schema</b> <a href="VASP.md#0x1_VASP_PublishChildVASPAbortsIf">PublishChildVASPAbortsIf</a> {
     parent: signer;
-    child_addr: address;
+    child_addr: <b>address</b>;
     <b>let</b> parent_addr = <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(parent);
     <b>include</b> <a href="Roles.md#0x1_Roles_AbortsIfNotParentVasp">Roles::AbortsIfNotParentVasp</a>{account: parent};
     <b>aborts_if</b> <a href="VASP.md#0x1_VASP_is_vasp">is_vasp</a>(child_addr) <b>with</b> Errors::ALREADY_PUBLISHED;
@@ -285,8 +285,8 @@ Aborts if <code>parent</code> is not a ParentVASP
 
 
 <pre><code><b>schema</b> <a href="VASP.md#0x1_VASP_PublishChildVASPEnsures">PublishChildVASPEnsures</a> {
-    parent_addr: address;
-    child_addr: address;
+    parent_addr: <b>address</b>;
+    child_addr: <b>address</b>;
     <b>ensures</b> <a href="VASP.md#0x1_VASP_spec_num_children">spec_num_children</a>(parent_addr) == <b>old</b>(<a href="VASP.md#0x1_VASP_spec_num_children">spec_num_children</a>(parent_addr)) + 1;
     <b>ensures</b> <a href="VASP.md#0x1_VASP_is_child">is_child</a>(child_addr);
     <b>ensures</b> <a href="VASP.md#0x1_VASP_spec_parent_address">spec_parent_address</a>(child_addr) == parent_addr;
@@ -306,7 +306,7 @@ Return <code><b>true</b></code> if <code>addr</code> is a parent or child VASP w
 Aborts if <code>addr</code> is not a VASP
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="VASP.md#0x1_VASP_has_account_limits">has_account_limits</a>&lt;CoinType&gt;(addr: address): bool
+<pre><code><b>public</b> <b>fun</b> <a href="VASP.md#0x1_VASP_has_account_limits">has_account_limits</a>&lt;CoinType&gt;(addr: <b>address</b>): bool
 </code></pre>
 
 
@@ -315,7 +315,7 @@ Aborts if <code>addr</code> is not a VASP
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="VASP.md#0x1_VASP_has_account_limits">has_account_limits</a>&lt;CoinType&gt;(addr: address): bool <b>acquires</b> <a href="VASP.md#0x1_VASP_ChildVASP">ChildVASP</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="VASP.md#0x1_VASP_has_account_limits">has_account_limits</a>&lt;CoinType&gt;(addr: <b>address</b>): bool <b>acquires</b> <a href="VASP.md#0x1_VASP_ChildVASP">ChildVASP</a> {
     <a href="AccountLimits.md#0x1_AccountLimits_has_window_published">AccountLimits::has_window_published</a>&lt;CoinType&gt;(<a href="VASP.md#0x1_VASP_parent_address">parent_address</a>(addr))
 }
 </code></pre>
@@ -332,7 +332,7 @@ Return <code>addr</code> if <code>addr</code> is a <code><a href="VASP.md#0x1_VA
 Aborts otherwise
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="VASP.md#0x1_VASP_parent_address">parent_address</a>(addr: address): address
+<pre><code><b>public</b> <b>fun</b> <a href="VASP.md#0x1_VASP_parent_address">parent_address</a>(addr: <b>address</b>): <b>address</b>
 </code></pre>
 
 
@@ -341,11 +341,11 @@ Aborts otherwise
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="VASP.md#0x1_VASP_parent_address">parent_address</a>(addr: address): address <b>acquires</b> <a href="VASP.md#0x1_VASP_ChildVASP">ChildVASP</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="VASP.md#0x1_VASP_parent_address">parent_address</a>(addr: <b>address</b>): <b>address</b> <b>acquires</b> <a href="VASP.md#0x1_VASP_ChildVASP">ChildVASP</a> {
     <b>if</b> (<a href="VASP.md#0x1_VASP_is_parent">is_parent</a>(addr)) {
         addr
     } <b>else</b> <b>if</b> (<a href="VASP.md#0x1_VASP_is_child">is_child</a>(addr)) {
-        borrow_global&lt;<a href="VASP.md#0x1_VASP_ChildVASP">ChildVASP</a>&gt;(addr).parent_vasp_addr
+        <b>borrow_global</b>&lt;<a href="VASP.md#0x1_VASP_ChildVASP">ChildVASP</a>&gt;(addr).parent_vasp_addr
     } <b>else</b> { // wrong account type, <b>abort</b>
         <b>abort</b>(<a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="VASP.md#0x1_VASP_ENOT_A_VASP">ENOT_A_VASP</a>))
     }
@@ -374,7 +374,7 @@ Spec version of <code><a href="VASP.md#0x1_VASP_parent_address">Self::parent_add
 <a name="0x1_VASP_spec_parent_address"></a>
 
 
-<pre><code><b>fun</b> <a href="VASP.md#0x1_VASP_spec_parent_address">spec_parent_address</a>(addr: address): address {
+<pre><code><b>fun</b> <a href="VASP.md#0x1_VASP_spec_parent_address">spec_parent_address</a>(addr: <b>address</b>): <b>address</b> {
     <b>if</b> (<a href="VASP.md#0x1_VASP_is_parent">is_parent</a>(addr)) {
         addr
     } <b>else</b> {
@@ -382,7 +382,7 @@ Spec version of <code><a href="VASP.md#0x1_VASP_parent_address">Self::parent_add
     }
 }
 <a name="0x1_VASP_spec_has_account_limits"></a>
-<b>fun</b> <a href="VASP.md#0x1_VASP_spec_has_account_limits">spec_has_account_limits</a>&lt;Token&gt;(addr: address): bool {
+<b>fun</b> <a href="VASP.md#0x1_VASP_spec_has_account_limits">spec_has_account_limits</a>&lt;Token&gt;(addr: <b>address</b>): bool {
     <a href="AccountLimits.md#0x1_AccountLimits_has_window_published">AccountLimits::has_window_published</a>&lt;Token&gt;(<a href="VASP.md#0x1_VASP_spec_parent_address">spec_parent_address</a>(addr))
 }
 </code></pre>
@@ -398,7 +398,7 @@ Spec version of <code><a href="VASP.md#0x1_VASP_parent_address">Self::parent_add
 Returns true if <code>addr</code> is a parent VASP.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="VASP.md#0x1_VASP_is_parent">is_parent</a>(addr: address): bool
+<pre><code><b>public</b> <b>fun</b> <a href="VASP.md#0x1_VASP_is_parent">is_parent</a>(addr: <b>address</b>): bool
 </code></pre>
 
 
@@ -407,7 +407,7 @@ Returns true if <code>addr</code> is a parent VASP.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="VASP.md#0x1_VASP_is_parent">is_parent</a>(addr: address): bool {
+<pre><code><b>public</b> <b>fun</b> <a href="VASP.md#0x1_VASP_is_parent">is_parent</a>(addr: <b>address</b>): bool {
     <b>exists</b>&lt;<a href="VASP.md#0x1_VASP_ParentVASP">ParentVASP</a>&gt;(addr)
 }
 </code></pre>
@@ -437,7 +437,7 @@ Returns true if <code>addr</code> is a parent VASP.
 Returns true if <code>addr</code> is a child VASP.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="VASP.md#0x1_VASP_is_child">is_child</a>(addr: address): bool
+<pre><code><b>public</b> <b>fun</b> <a href="VASP.md#0x1_VASP_is_child">is_child</a>(addr: <b>address</b>): bool
 </code></pre>
 
 
@@ -446,7 +446,7 @@ Returns true if <code>addr</code> is a child VASP.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="VASP.md#0x1_VASP_is_child">is_child</a>(addr: address): bool {
+<pre><code><b>public</b> <b>fun</b> <a href="VASP.md#0x1_VASP_is_child">is_child</a>(addr: <b>address</b>): bool {
     <b>exists</b>&lt;<a href="VASP.md#0x1_VASP_ChildVASP">ChildVASP</a>&gt;(addr)
 }
 </code></pre>
@@ -476,7 +476,7 @@ Returns true if <code>addr</code> is a child VASP.
 Returns true if <code>addr</code> is a VASP.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="VASP.md#0x1_VASP_is_vasp">is_vasp</a>(addr: address): bool
+<pre><code><b>public</b> <b>fun</b> <a href="VASP.md#0x1_VASP_is_vasp">is_vasp</a>(addr: <b>address</b>): bool
 </code></pre>
 
 
@@ -485,7 +485,7 @@ Returns true if <code>addr</code> is a VASP.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="VASP.md#0x1_VASP_is_vasp">is_vasp</a>(addr: address): bool {
+<pre><code><b>public</b> <b>fun</b> <a href="VASP.md#0x1_VASP_is_vasp">is_vasp</a>(addr: <b>address</b>): bool {
     <a href="VASP.md#0x1_VASP_is_parent">is_parent</a>(addr) || <a href="VASP.md#0x1_VASP_is_child">is_child</a>(addr)
 }
 </code></pre>
@@ -511,7 +511,7 @@ Returns true if <code>addr</code> is a VASP.
 
 
 <pre><code><b>schema</b> <a href="VASP.md#0x1_VASP_AbortsIfNotVASP">AbortsIfNotVASP</a> {
-    addr: address;
+    addr: <b>address</b>;
     <b>aborts_if</b> !<a href="VASP.md#0x1_VASP_is_vasp">is_vasp</a>(addr);
 }
 </code></pre>
@@ -527,7 +527,7 @@ Returns true if <code>addr</code> is a VASP.
 Returns true if both addresses are VASPs and they have the same parent address.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="VASP.md#0x1_VASP_is_same_vasp">is_same_vasp</a>(addr1: address, addr2: address): bool
+<pre><code><b>public</b> <b>fun</b> <a href="VASP.md#0x1_VASP_is_same_vasp">is_same_vasp</a>(addr1: <b>address</b>, addr2: <b>address</b>): bool
 </code></pre>
 
 
@@ -536,7 +536,7 @@ Returns true if both addresses are VASPs and they have the same parent address.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="VASP.md#0x1_VASP_is_same_vasp">is_same_vasp</a>(addr1: address, addr2: address): bool <b>acquires</b> <a href="VASP.md#0x1_VASP_ChildVASP">ChildVASP</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="VASP.md#0x1_VASP_is_same_vasp">is_same_vasp</a>(addr1: <b>address</b>, addr2: <b>address</b>): bool <b>acquires</b> <a href="VASP.md#0x1_VASP_ChildVASP">ChildVASP</a> {
     <a href="VASP.md#0x1_VASP_is_vasp">is_vasp</a>(addr1) && <a href="VASP.md#0x1_VASP_is_vasp">is_vasp</a>(addr2) && <a href="VASP.md#0x1_VASP_parent_address">parent_address</a>(addr1) == <a href="VASP.md#0x1_VASP_parent_address">parent_address</a>(addr2)
 }
 </code></pre>
@@ -562,7 +562,7 @@ Spec version of <code><a href="VASP.md#0x1_VASP_is_same_vasp">Self::is_same_vasp
 <a name="0x1_VASP_spec_is_same_vasp"></a>
 
 
-<pre><code><b>fun</b> <a href="VASP.md#0x1_VASP_spec_is_same_vasp">spec_is_same_vasp</a>(addr1: address, addr2: address): bool {
+<pre><code><b>fun</b> <a href="VASP.md#0x1_VASP_spec_is_same_vasp">spec_is_same_vasp</a>(addr1: <b>address</b>, addr2: <b>address</b>): bool {
    <a href="VASP.md#0x1_VASP_is_vasp">is_vasp</a>(addr1) && <a href="VASP.md#0x1_VASP_is_vasp">is_vasp</a>(addr2) && <a href="VASP.md#0x1_VASP_spec_parent_address">spec_parent_address</a>(addr1) == <a href="VASP.md#0x1_VASP_spec_parent_address">spec_parent_address</a>(addr2)
 }
 </code></pre>
@@ -581,7 +581,7 @@ The total number of accounts for this VASP is num_children() + 1
 Aborts if <code>addr</code> is not a ParentVASP or ChildVASP account
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="VASP.md#0x1_VASP_num_children">num_children</a>(addr: address): u64
+<pre><code><b>public</b> <b>fun</b> <a href="VASP.md#0x1_VASP_num_children">num_children</a>(addr: <b>address</b>): u64
 </code></pre>
 
 
@@ -590,9 +590,9 @@ Aborts if <code>addr</code> is not a ParentVASP or ChildVASP account
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="VASP.md#0x1_VASP_num_children">num_children</a>(addr: address): u64  <b>acquires</b> <a href="VASP.md#0x1_VASP_ChildVASP">ChildVASP</a>, <a href="VASP.md#0x1_VASP_ParentVASP">ParentVASP</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="VASP.md#0x1_VASP_num_children">num_children</a>(addr: <b>address</b>): u64  <b>acquires</b> <a href="VASP.md#0x1_VASP_ChildVASP">ChildVASP</a>, <a href="VASP.md#0x1_VASP_ParentVASP">ParentVASP</a> {
     // If parent <a href="VASP.md#0x1_VASP">VASP</a> succeeds, the parent is guaranteed <b>to</b> exist.
-    *&borrow_global&lt;<a href="VASP.md#0x1_VASP_ParentVASP">ParentVASP</a>&gt;(<a href="VASP.md#0x1_VASP_parent_address">parent_address</a>(addr)).num_children
+    *&<b>borrow_global</b>&lt;<a href="VASP.md#0x1_VASP_ParentVASP">ParentVASP</a>&gt;(<a href="VASP.md#0x1_VASP_parent_address">parent_address</a>(addr)).num_children
 }
 </code></pre>
 
@@ -615,7 +615,7 @@ Spec version of <code><a href="VASP.md#0x1_VASP_num_children">Self::num_children
 <a name="0x1_VASP_spec_num_children"></a>
 
 
-<pre><code><b>fun</b> <a href="VASP.md#0x1_VASP_spec_num_children">spec_num_children</a>(parent: address): u64 {
+<pre><code><b>fun</b> <a href="VASP.md#0x1_VASP_spec_num_children">spec_num_children</a>(parent: <b>address</b>): u64 {
    <b>global</b>&lt;<a href="VASP.md#0x1_VASP_ParentVASP">ParentVASP</a>&gt;(parent).num_children
 }
 </code></pre>
@@ -636,9 +636,9 @@ Spec version of <code><a href="VASP.md#0x1_VASP_num_children">Self::num_children
 
 
 
-<pre><code><b>invariant</b> <b>update</b> <b>forall</b> addr: address <b>where</b> <b>old</b>(<a href="VASP.md#0x1_VASP_is_parent">is_parent</a>(addr)):
+<pre><code><b>invariant</b> <b>update</b> <b>forall</b> addr: <b>address</b> <b>where</b> <b>old</b>(<a href="VASP.md#0x1_VASP_is_parent">is_parent</a>(addr)):
     <a href="VASP.md#0x1_VASP_is_parent">is_parent</a>(addr);
-<b>invariant</b> <b>update</b> <b>forall</b> addr: address <b>where</b> <b>old</b>(<a href="VASP.md#0x1_VASP_is_child">is_child</a>(addr)):
+<b>invariant</b> <b>update</b> <b>forall</b> addr: <b>address</b> <b>where</b> <b>old</b>(<a href="VASP.md#0x1_VASP_is_child">is_child</a>(addr)):
     <a href="VASP.md#0x1_VASP_is_child">is_child</a>(addr);
 </code></pre>
 
@@ -651,7 +651,7 @@ Spec version of <code><a href="VASP.md#0x1_VASP_num_children">Self::num_children
 
 
 <pre><code><b>invariant</b>
-    <b>forall</b> child_addr: address <b>where</b> <a href="VASP.md#0x1_VASP_is_child">is_child</a>(child_addr):
+    <b>forall</b> child_addr: <b>address</b> <b>where</b> <a href="VASP.md#0x1_VASP_is_child">is_child</a>(child_addr):
         <a href="VASP.md#0x1_VASP_is_parent">is_parent</a>(<b>global</b>&lt;<a href="VASP.md#0x1_VASP_ChildVASP">ChildVASP</a>&gt;(child_addr).parent_vasp_addr);
 </code></pre>
 
@@ -687,7 +687,7 @@ previous state.
 
 
 <pre><code><b>schema</b> <a href="VASP.md#0x1_VASP_ChildVASPsDontChange">ChildVASPsDontChange</a> {
-    <b>ensures</b> <b>forall</b> a: address : <b>exists</b>&lt;<a href="VASP.md#0x1_VASP_ChildVASP">ChildVASP</a>&gt;(a) == <b>old</b>(<b>exists</b>&lt;<a href="VASP.md#0x1_VASP_ChildVASP">ChildVASP</a>&gt;(a));
+    <b>ensures</b> <b>forall</b> a: <b>address</b> : <b>exists</b>&lt;<a href="VASP.md#0x1_VASP_ChildVASP">ChildVASP</a>&gt;(a) == <b>old</b>(<b>exists</b>&lt;<a href="VASP.md#0x1_VASP_ChildVASP">ChildVASP</a>&gt;(a));
 }
 </code></pre>
 
@@ -698,7 +698,7 @@ previous state.
 
 
 <pre><code><b>schema</b> <a href="VASP.md#0x1_VASP_NumChildrenRemainsSame">NumChildrenRemainsSame</a> {
-    <b>ensures</b> <b>forall</b> parent: address
+    <b>ensures</b> <b>forall</b> parent: <b>address</b>
         <b>where</b> <b>old</b>(<a href="VASP.md#0x1_VASP_is_parent">is_parent</a>(parent)):
             <a href="VASP.md#0x1_VASP_spec_num_children">spec_num_children</a>(parent) == <b>old</b>(<a href="VASP.md#0x1_VASP_spec_num_children">spec_num_children</a>(parent));
 }
@@ -715,7 +715,7 @@ The parent address stored at ChildVASP resource never changes.
 
 
 <pre><code><b>invariant</b> <b>update</b>
-    <b>forall</b> a: address <b>where</b> <b>old</b>(<a href="VASP.md#0x1_VASP_is_child">is_child</a>(a)): <a href="VASP.md#0x1_VASP_spec_parent_address">spec_parent_address</a>(a) == <b>old</b>(<a href="VASP.md#0x1_VASP_spec_parent_address">spec_parent_address</a>(a));
+    <b>forall</b> a: <b>address</b> <b>where</b> <b>old</b>(<a href="VASP.md#0x1_VASP_is_child">is_child</a>(a)): <a href="VASP.md#0x1_VASP_spec_parent_address">spec_parent_address</a>(a) == <b>old</b>(<a href="VASP.md#0x1_VASP_spec_parent_address">spec_parent_address</a>(a));
 </code></pre>
 
 

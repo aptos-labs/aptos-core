@@ -31,7 +31,7 @@ This code provides a container for storing a chain id and functions to initializ
 
 
 
-<pre><code><b>struct</b> <a href="ChainId.md#0x1_ChainId">ChainId</a> has key
+<pre><code><b>struct</b> <a href="ChainId.md#0x1_ChainId">ChainId</a> <b>has</b> key
 </code></pre>
 
 
@@ -87,7 +87,7 @@ Publish the chain ID <code>id</code> of this Diem instance under the DiemRoot ac
     <a href="DiemTimestamp.md#0x1_DiemTimestamp_assert_genesis">DiemTimestamp::assert_genesis</a>();
     <a href="CoreAddresses.md#0x1_CoreAddresses_assert_diem_root">CoreAddresses::assert_diem_root</a>(dr_account);
     <b>assert</b>!(!<b>exists</b>&lt;<a href="ChainId.md#0x1_ChainId">ChainId</a>&gt;(<a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(dr_account)), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_already_published">Errors::already_published</a>(<a href="ChainId.md#0x1_ChainId_ECHAIN_ID">ECHAIN_ID</a>));
-    move_to(dr_account, <a href="ChainId.md#0x1_ChainId">ChainId</a> { id })
+    <b>move_to</b>(dr_account, <a href="ChainId.md#0x1_ChainId">ChainId</a> { id })
 }
 </code></pre>
 
@@ -131,7 +131,7 @@ Return the chain ID of this Diem instance
 
 <pre><code><b>public</b> <b>fun</b> <a href="ChainId.md#0x1_ChainId_get">get</a>(): u8 <b>acquires</b> <a href="ChainId.md#0x1_ChainId">ChainId</a> {
     <a href="DiemTimestamp.md#0x1_DiemTimestamp_assert_operating">DiemTimestamp::assert_operating</a>();
-    borrow_global&lt;<a href="ChainId.md#0x1_ChainId">ChainId</a>&gt;(@DiemRoot).id
+    <b>borrow_global</b>&lt;<a href="ChainId.md#0x1_ChainId">ChainId</a>&gt;(@DiemRoot).id
 }
 </code></pre>
 

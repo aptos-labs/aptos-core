@@ -71,7 +71,7 @@ coins, and also each reserve component that holds the backing for these coins on
 Currently this holds no coins since XDX is not able to be minted/created.
 
 
-<pre><code><b>struct</b> <a href="XDX.md#0x1_XDX_Reserve">Reserve</a> has key
+<pre><code><b>struct</b> <a href="XDX.md#0x1_XDX_Reserve">Reserve</a> <b>has</b> key
 </code></pre>
 
 
@@ -164,7 +164,7 @@ restrictions are enforced in the <code><a href="Diem.md#0x1_Diem_register_curren
     <a href="Diem.md#0x1_Diem_update_minting_ability">Diem::update_minting_ability</a>&lt;<a href="XDX.md#0x1_XDX">XDX</a>&gt;(tc_account, <b>false</b>);
     <a href="AccountLimits.md#0x1_AccountLimits_publish_unrestricted_limits">AccountLimits::publish_unrestricted_limits</a>&lt;<a href="XDX.md#0x1_XDX">XDX</a>&gt;(dr_account);
     <b>let</b> preburn_cap = <a href="Diem.md#0x1_Diem_create_preburn">Diem::create_preburn</a>&lt;<a href="XDX.md#0x1_XDX">XDX</a>&gt;(tc_account);
-    move_to(dr_account, <a href="XDX.md#0x1_XDX_Reserve">Reserve</a> { mint_cap, burn_cap, preburn_cap });
+    <b>move_to</b>(dr_account, <a href="XDX.md#0x1_XDX_Reserve">Reserve</a> { mint_cap, burn_cap, preburn_cap });
 }
 </code></pre>
 
@@ -275,7 +275,7 @@ Returns true if <code>CoinType</code> is <code><a href="XDX.md#0x1_XDX_XDX">XDX:
 Return the account address where the globally unique XDX::Reserve resource is stored
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="XDX.md#0x1_XDX_reserve_address">reserve_address</a>(): address
+<pre><code><b>public</b> <b>fun</b> <a href="XDX.md#0x1_XDX_reserve_address">reserve_address</a>(): <b>address</b>
 </code></pre>
 
 
@@ -284,7 +284,7 @@ Return the account address where the globally unique XDX::Reserve resource is st
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="XDX.md#0x1_XDX_reserve_address">reserve_address</a>(): address {
+<pre><code><b>public</b> <b>fun</b> <a href="XDX.md#0x1_XDX_reserve_address">reserve_address</a>(): <b>address</b> {
     @CurrencyInfo
 }
 </code></pre>
@@ -389,7 +389,7 @@ it does not hold for all types (but does hold for XDX).
 <code>LimitsDefinition&lt;<a href="XDX.md#0x1_XDX">XDX</a>&gt;</code> is not published at any other address
 
 
-<pre><code><b>invariant</b> [suspendable] <b>forall</b> addr: address <b>where</b> <b>exists</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">AccountLimits::LimitsDefinition</a>&lt;<a href="XDX.md#0x1_XDX">XDX</a>&gt;&gt;(addr):
+<pre><code><b>invariant</b> [suspendable] <b>forall</b> addr: <b>address</b> <b>where</b> <b>exists</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">AccountLimits::LimitsDefinition</a>&lt;<a href="XDX.md#0x1_XDX">XDX</a>&gt;&gt;(addr):
     addr == @DiemRoot;
 </code></pre>
 

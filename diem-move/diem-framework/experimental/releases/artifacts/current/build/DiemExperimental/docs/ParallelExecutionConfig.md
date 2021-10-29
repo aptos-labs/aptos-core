@@ -30,7 +30,7 @@ including different costs of running the VM.
 The struct to hold the read/write set analysis result for the whole Diem Framework.
 
 
-<pre><code><b>struct</b> <a href="ParallelExecutionConfig.md#0x1_ParallelExecutionConfig">ParallelExecutionConfig</a> has <b>copy</b>, drop, store
+<pre><code><b>struct</b> <a href="ParallelExecutionConfig.md#0x1_ParallelExecutionConfig">ParallelExecutionConfig</a> <b>has</b> <b>copy</b>, drop, store
 </code></pre>
 
 
@@ -226,7 +226,7 @@ No one can update DiemVMConfig except for the Diem Root account [[H11]][PERMISSI
 The permission "UpdateParallelExecutionConfig" is granted to DiemRoot [[H11]][PERMISSION].
 
 
-<pre><code><b>invariant</b> [suspendable] <b>forall</b> addr: address
+<pre><code><b>invariant</b> [suspendable] <b>forall</b> addr: <b>address</b>
     <b>where</b> <b>exists</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig">DiemConfig</a>&lt;<a href="ParallelExecutionConfig.md#0x1_ParallelExecutionConfig">ParallelExecutionConfig</a>&gt;&gt;(addr): addr == @DiemRoot;
 <b>invariant</b> <b>update</b> [suspendable] <b>old</b>(<a href="DiemConfig.md#0x1_DiemConfig_spec_is_published">DiemConfig::spec_is_published</a>&lt;<a href="ParallelExecutionConfig.md#0x1_ParallelExecutionConfig">ParallelExecutionConfig</a>&gt;())
     && <a href="DiemConfig.md#0x1_DiemConfig_spec_is_published">DiemConfig::spec_is_published</a>&lt;<a href="ParallelExecutionConfig.md#0x1_ParallelExecutionConfig">ParallelExecutionConfig</a>&gt;()

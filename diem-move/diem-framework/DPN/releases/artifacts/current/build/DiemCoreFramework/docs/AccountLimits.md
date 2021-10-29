@@ -47,7 +47,7 @@ An operations capability that restricts callers of this module since
 the operations can mutate account states.
 
 
-<pre><code><b>struct</b> <a href="AccountLimits.md#0x1_AccountLimits_AccountLimitMutationCapability">AccountLimitMutationCapability</a> has store
+<pre><code><b>struct</b> <a href="AccountLimits.md#0x1_AccountLimits_AccountLimitMutationCapability">AccountLimitMutationCapability</a> <b>has</b> store
 </code></pre>
 
 
@@ -78,7 +78,7 @@ accounts may have different account limit definitons. In such cases, they will h
 <code><a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">LimitsDefinition</a></code> published under their (root) account.
 
 
-<pre><code><b>struct</b> <a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">LimitsDefinition</a>&lt;CoinType&gt; has key
+<pre><code><b>struct</b> <a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">LimitsDefinition</a>&lt;CoinType&gt; <b>has</b> key
 </code></pre>
 
 
@@ -141,7 +141,7 @@ starting at <code>window_start</code> and lasting for the <code>time_period</cod
 in the limits definition at <code>limit_address</code>.
 
 
-<pre><code><b>struct</b> <a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a>&lt;CoinType&gt; has key
+<pre><code><b>struct</b> <a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a>&lt;CoinType&gt; <b>has</b> key
 </code></pre>
 
 
@@ -176,7 +176,7 @@ in the limits definition at <code>limit_address</code>.
  The balance that this account has held during this time period.
 </dd>
 <dt>
-<code>limit_address: address</code>
+<code>limit_address: <b>address</b></code>
 </dt>
 <dd>
  address storing the LimitsDefinition resource that governs this window
@@ -280,7 +280,7 @@ account at <code>addr</code> is amenable with their account limits.
 Returns false if this deposit violates the account limits.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="AccountLimits.md#0x1_AccountLimits_update_deposit_limits">update_deposit_limits</a>&lt;CoinType&gt;(amount: u64, addr: address, _cap: &<a href="AccountLimits.md#0x1_AccountLimits_AccountLimitMutationCapability">AccountLimits::AccountLimitMutationCapability</a>): bool
+<pre><code><b>public</b> <b>fun</b> <a href="AccountLimits.md#0x1_AccountLimits_update_deposit_limits">update_deposit_limits</a>&lt;CoinType&gt;(amount: u64, addr: <b>address</b>, _cap: &<a href="AccountLimits.md#0x1_AccountLimits_AccountLimitMutationCapability">AccountLimits::AccountLimitMutationCapability</a>): bool
 </code></pre>
 
 
@@ -291,13 +291,13 @@ Returns false if this deposit violates the account limits.
 
 <pre><code><b>public</b> <b>fun</b> <a href="AccountLimits.md#0x1_AccountLimits_update_deposit_limits">update_deposit_limits</a>&lt;CoinType&gt;(
     amount: u64,
-    addr: address,
+    addr: <b>address</b>,
     _cap: &<a href="AccountLimits.md#0x1_AccountLimits_AccountLimitMutationCapability">AccountLimitMutationCapability</a>,
 ): bool <b>acquires</b> <a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">LimitsDefinition</a>, <a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a> {
     <b>assert</b>!(<b>exists</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a>&lt;CoinType&gt;&gt;(addr), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="AccountLimits.md#0x1_AccountLimits_EWINDOW">EWINDOW</a>));
     <a href="AccountLimits.md#0x1_AccountLimits_can_receive_and_update_window">can_receive_and_update_window</a>&lt;CoinType&gt;(
         amount,
-        borrow_global_mut&lt;<a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a>&lt;CoinType&gt;&gt;(addr),
+        <b>borrow_global_mut</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a>&lt;CoinType&gt;&gt;(addr),
     )
 }
 </code></pre>
@@ -328,7 +328,7 @@ Returns false if this deposit violates the account limits.
 
 <pre><code><b>schema</b> <a href="AccountLimits.md#0x1_AccountLimits_UpdateDepositLimitsAbortsIf">UpdateDepositLimitsAbortsIf</a>&lt;CoinType&gt; {
     amount: u64;
-    addr: address;
+    addr: <b>address</b>;
     <b>include</b> <a href="AccountLimits.md#0x1_AccountLimits_AbortsIfNoWindow">AbortsIfNoWindow</a>&lt;CoinType&gt;;
     <b>include</b> <a href="AccountLimits.md#0x1_AccountLimits_CanReceiveAbortsIf">CanReceiveAbortsIf</a>&lt;CoinType&gt;{receiving: <b>global</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a>&lt;CoinType&gt;&gt;(addr)};
 }
@@ -341,7 +341,7 @@ Returns false if this deposit violates the account limits.
 
 
 <pre><code><b>schema</b> <a href="AccountLimits.md#0x1_AccountLimits_AbortsIfNoWindow">AbortsIfNoWindow</a>&lt;CoinType&gt; {
-    addr: address;
+    addr: <b>address</b>;
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a>&lt;CoinType&gt;&gt;(addr) <b>with</b> Errors::NOT_PUBLISHED;
 }
 </code></pre>
@@ -352,7 +352,7 @@ Returns false if this deposit violates the account limits.
 <a name="0x1_AccountLimits_spec_update_deposit_limits"></a>
 
 
-<pre><code><b>fun</b> <a href="AccountLimits.md#0x1_AccountLimits_spec_update_deposit_limits">spec_update_deposit_limits</a>&lt;CoinType&gt;(amount: u64, addr: address): bool {
+<pre><code><b>fun</b> <a href="AccountLimits.md#0x1_AccountLimits_spec_update_deposit_limits">spec_update_deposit_limits</a>&lt;CoinType&gt;(amount: u64, addr: <b>address</b>): bool {
    <a href="AccountLimits.md#0x1_AccountLimits_spec_receiving_limits_ok">spec_receiving_limits_ok</a>(<b>global</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a>&lt;CoinType&gt;&gt;(addr), amount)
 }
 </code></pre>
@@ -370,7 +370,7 @@ the account at <code>addr</code> would violate the account limits for that accou
 Returns <code><b>false</b></code> if this withdrawal violates account limits.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="AccountLimits.md#0x1_AccountLimits_update_withdrawal_limits">update_withdrawal_limits</a>&lt;CoinType&gt;(amount: u64, addr: address, _cap: &<a href="AccountLimits.md#0x1_AccountLimits_AccountLimitMutationCapability">AccountLimits::AccountLimitMutationCapability</a>): bool
+<pre><code><b>public</b> <b>fun</b> <a href="AccountLimits.md#0x1_AccountLimits_update_withdrawal_limits">update_withdrawal_limits</a>&lt;CoinType&gt;(amount: u64, addr: <b>address</b>, _cap: &<a href="AccountLimits.md#0x1_AccountLimits_AccountLimitMutationCapability">AccountLimits::AccountLimitMutationCapability</a>): bool
 </code></pre>
 
 
@@ -381,13 +381,13 @@ Returns <code><b>false</b></code> if this withdrawal violates account limits.
 
 <pre><code><b>public</b> <b>fun</b> <a href="AccountLimits.md#0x1_AccountLimits_update_withdrawal_limits">update_withdrawal_limits</a>&lt;CoinType&gt;(
     amount: u64,
-    addr: address,
+    addr: <b>address</b>,
     _cap: &<a href="AccountLimits.md#0x1_AccountLimits_AccountLimitMutationCapability">AccountLimitMutationCapability</a>,
 ): bool <b>acquires</b> <a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">LimitsDefinition</a>, <a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a> {
     <b>assert</b>!(<b>exists</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a>&lt;CoinType&gt;&gt;(addr), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="AccountLimits.md#0x1_AccountLimits_EWINDOW">EWINDOW</a>));
     <a href="AccountLimits.md#0x1_AccountLimits_can_withdraw_and_update_window">can_withdraw_and_update_window</a>&lt;CoinType&gt;(
         amount,
-        borrow_global_mut&lt;<a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a>&lt;CoinType&gt;&gt;(addr),
+        <b>borrow_global_mut</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a>&lt;CoinType&gt;&gt;(addr),
     )
 }
 </code></pre>
@@ -416,7 +416,7 @@ Returns <code><b>false</b></code> if this withdrawal violates account limits.
 
 <pre><code><b>schema</b> <a href="AccountLimits.md#0x1_AccountLimits_UpdateWithdrawalLimitsAbortsIf">UpdateWithdrawalLimitsAbortsIf</a>&lt;CoinType&gt; {
     amount: u64;
-    addr: address;
+    addr: <b>address</b>;
     <b>include</b> <a href="AccountLimits.md#0x1_AccountLimits_AbortsIfNoWindow">AbortsIfNoWindow</a>&lt;CoinType&gt;;
     <b>include</b> <a href="AccountLimits.md#0x1_AccountLimits_CanWithdrawAbortsIf">CanWithdrawAbortsIf</a>&lt;CoinType&gt;{sending: <b>global</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a>&lt;CoinType&gt;&gt;(addr)};
 }
@@ -428,7 +428,7 @@ Returns <code><b>false</b></code> if this withdrawal violates account limits.
 <a name="0x1_AccountLimits_spec_update_withdrawal_limits"></a>
 
 
-<pre><code><b>fun</b> <a href="AccountLimits.md#0x1_AccountLimits_spec_update_withdrawal_limits">spec_update_withdrawal_limits</a>&lt;CoinType&gt;(amount: u64, addr: address): bool {
+<pre><code><b>fun</b> <a href="AccountLimits.md#0x1_AccountLimits_spec_update_withdrawal_limits">spec_update_withdrawal_limits</a>&lt;CoinType&gt;(amount: u64, addr: <b>address</b>): bool {
    <a href="AccountLimits.md#0x1_AccountLimits_spec_withdrawal_limits_ok">spec_withdrawal_limits_ok</a>(<b>global</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a>&lt;CoinType&gt;&gt;(addr), amount)
 }
 </code></pre>
@@ -447,7 +447,7 @@ Root accounts for multi-account entities will hold this resource at
 their root/parent account.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="AccountLimits.md#0x1_AccountLimits_publish_window">publish_window</a>&lt;CoinType&gt;(dr_account: &signer, to_limit: &signer, limit_address: address)
+<pre><code><b>public</b> <b>fun</b> <a href="AccountLimits.md#0x1_AccountLimits_publish_window">publish_window</a>&lt;CoinType&gt;(dr_account: &signer, to_limit: &signer, limit_address: <b>address</b>)
 </code></pre>
 
 
@@ -459,7 +459,7 @@ their root/parent account.
 <pre><code><b>public</b> <b>fun</b> <a href="AccountLimits.md#0x1_AccountLimits_publish_window">publish_window</a>&lt;CoinType&gt;(
     dr_account: &signer,
     to_limit: &signer,
-    limit_address: address,
+    limit_address: <b>address</b>,
 ) {
     <a href="Roles.md#0x1_Roles_assert_diem_root">Roles::assert_diem_root</a>(dr_account);
     <b>assert</b>!(<b>exists</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">LimitsDefinition</a>&lt;CoinType&gt;&gt;(limit_address), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="AccountLimits.md#0x1_AccountLimits_ELIMITS_DEFINITION">ELIMITS_DEFINITION</a>));
@@ -468,7 +468,7 @@ their root/parent account.
         !<b>exists</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a>&lt;CoinType&gt;&gt;(<a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(to_limit)),
         <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_already_published">Errors::already_published</a>(<a href="AccountLimits.md#0x1_AccountLimits_EWINDOW">EWINDOW</a>)
     );
-    move_to(
+    <b>move_to</b>(
         to_limit,
         <a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a>&lt;CoinType&gt; {
             window_start: <a href="AccountLimits.md#0x1_AccountLimits_current_time">current_time</a>(),
@@ -502,7 +502,7 @@ their root/parent account.
 <pre><code><b>schema</b> <a href="AccountLimits.md#0x1_AccountLimits_PublishWindowAbortsIf">PublishWindowAbortsIf</a>&lt;CoinType&gt; {
     dr_account: signer;
     to_limit: signer;
-    limit_address: address;
+    limit_address: <b>address</b>;
 }
 </code></pre>
 
@@ -548,7 +548,7 @@ resource once it's published.
         !<b>exists</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">LimitsDefinition</a>&lt;CoinType&gt;&gt;(<a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(publish_account)),
         <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_already_published">Errors::already_published</a>(<a href="AccountLimits.md#0x1_AccountLimits_ELIMITS_DEFINITION">ELIMITS_DEFINITION</a>)
     );
-    move_to(
+    <b>move_to</b>(
         publish_account,
         <a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">LimitsDefinition</a>&lt;CoinType&gt; {
             max_inflow: <a href="AccountLimits.md#0x1_AccountLimits_MAX_U64">MAX_U64</a>,
@@ -646,7 +646,7 @@ Updates the <code><a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">
 If any of the field arguments is <code>0</code> the corresponding field is not updated.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="AccountLimits.md#0x1_AccountLimits_update_limits_definition">update_limits_definition</a>&lt;CoinType&gt;(tc_account: &signer, limit_address: address, new_max_inflow: u64, new_max_outflow: u64, new_max_holding_balance: u64, new_time_period: u64)
+<pre><code><b>public</b> <b>fun</b> <a href="AccountLimits.md#0x1_AccountLimits_update_limits_definition">update_limits_definition</a>&lt;CoinType&gt;(tc_account: &signer, limit_address: <b>address</b>, new_max_inflow: u64, new_max_outflow: u64, new_max_holding_balance: u64, new_time_period: u64)
 </code></pre>
 
 
@@ -657,7 +657,7 @@ If any of the field arguments is <code>0</code> the corresponding field is not u
 
 <pre><code><b>public</b> <b>fun</b> <a href="AccountLimits.md#0x1_AccountLimits_update_limits_definition">update_limits_definition</a>&lt;CoinType&gt;(
     tc_account: &signer,
-    limit_address: address,
+    limit_address: <b>address</b>,
     new_max_inflow: u64,
     new_max_outflow: u64,
     new_max_holding_balance: u64,
@@ -668,7 +668,7 @@ If any of the field arguments is <code>0</code> the corresponding field is not u
 
     // As we don't have Optionals for txn scripts, in update_account_limit_definition.<b>move</b>
     // we <b>use</b> 0 value <b>to</b> represent a None (ie no <b>update</b> <b>to</b> that variable)
-    <b>let</b> limits_def = borrow_global_mut&lt;<a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">LimitsDefinition</a>&lt;CoinType&gt;&gt;(limit_address);
+    <b>let</b> limits_def = <b>borrow_global_mut</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">LimitsDefinition</a>&lt;CoinType&gt;&gt;(limit_address);
     <b>if</b> (new_max_inflow &gt; 0) { limits_def.max_inflow = new_max_inflow };
     <b>if</b> (new_max_outflow &gt; 0) { limits_def.max_outflow = new_max_outflow };
     <b>if</b> (new_max_holding_balance &gt; 0) { limits_def.max_holding = new_max_holding_balance };
@@ -690,7 +690,7 @@ If any of the field arguments is <code>0</code> the corresponding field is not u
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">LimitsDefinition</a>&lt;CoinType&gt;&gt;(limit_address) <b>with</b> Errors::NOT_PUBLISHED;
 <b>ensures</b> <b>exists</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">LimitsDefinition</a>&lt;CoinType&gt;&gt;(limit_address);
 <b>let</b> old_limits_def = <b>global</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">LimitsDefinition</a>&lt;CoinType&gt;&gt;(limit_address);
-<b>let</b> post new_limits_def = <b>global</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">LimitsDefinition</a>&lt;CoinType&gt;&gt;(limit_address);
+<b>let</b> <b>post</b> new_limits_def = <b>global</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">LimitsDefinition</a>&lt;CoinType&gt;&gt;(limit_address);
 <b>ensures</b> new_max_inflow &gt; 0 ==&gt; new_limits_def.max_inflow == new_max_inflow;
 <b>ensures</b> new_max_inflow == 0 ==&gt; new_limits_def.max_inflow == old_limits_def.max_inflow;
 <b>ensures</b> new_max_outflow &gt; 0 ==&gt; new_limits_def.max_outflow == new_max_outflow;
@@ -721,7 +721,7 @@ but the <code>limit_address</code> should remain the same, the current
 <code>limit_address</code> needs to be passed in for <code>new_limit_address</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="AccountLimits.md#0x1_AccountLimits_update_window_info">update_window_info</a>&lt;CoinType&gt;(tc_account: &signer, window_address: address, aggregate_balance: u64, new_limit_address: address)
+<pre><code><b>public</b> <b>fun</b> <a href="AccountLimits.md#0x1_AccountLimits_update_window_info">update_window_info</a>&lt;CoinType&gt;(tc_account: &signer, window_address: <b>address</b>, aggregate_balance: u64, new_limit_address: <b>address</b>)
 </code></pre>
 
 
@@ -732,12 +732,12 @@ but the <code>limit_address</code> should remain the same, the current
 
 <pre><code><b>public</b> <b>fun</b> <a href="AccountLimits.md#0x1_AccountLimits_update_window_info">update_window_info</a>&lt;CoinType&gt;(
     tc_account: &signer,
-    window_address: address,
+    window_address: <b>address</b>,
     aggregate_balance: u64,
-    new_limit_address: address,
+    new_limit_address: <b>address</b>,
 ) <b>acquires</b> <a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a> {
     <a href="Roles.md#0x1_Roles_assert_treasury_compliance">Roles::assert_treasury_compliance</a>(tc_account);
-    <b>let</b> window = borrow_global_mut&lt;<a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a>&lt;CoinType&gt;&gt;(window_address);
+    <b>let</b> window = <b>borrow_global_mut</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a>&lt;CoinType&gt;&gt;(window_address);
     <b>if</b> (aggregate_balance != 0)  { window.tracked_balance = aggregate_balance };
     <b>assert</b>!(<b>exists</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">LimitsDefinition</a>&lt;CoinType&gt;&gt;(new_limit_address), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="AccountLimits.md#0x1_AccountLimits_ELIMITS_DEFINITION">ELIMITS_DEFINITION</a>));
     window.limit_address = new_limit_address;
@@ -759,7 +759,7 @@ but the <code>limit_address</code> should remain the same, the current
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">LimitsDefinition</a>&lt;CoinType&gt;&gt;(new_limit_address) <b>with</b> Errors::NOT_PUBLISHED;
 <b>ensures</b> <b>exists</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a>&lt;CoinType&gt;&gt;(window_address);
 <b>let</b> old_window = <b>global</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a>&lt;CoinType&gt;&gt;(window_address);
-<b>let</b> post new_window = <b>global</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a>&lt;CoinType&gt;&gt;(window_address);
+<b>let</b> <b>post</b> new_window = <b>global</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a>&lt;CoinType&gt;&gt;(window_address);
 <b>ensures</b> aggregate_balance != 0 ==&gt; new_window.tracked_balance == aggregate_balance;
 <b>ensures</b> aggregate_balance == 0 ==&gt; new_window.tracked_balance == old_window.tracked_balance;
 <b>ensures</b> new_window.limit_address == new_limit_address;
@@ -902,7 +902,7 @@ If the receipt of <code>amount</code> doesn't violate the limits <code>amount</c
     receiving: &<b>mut</b> <a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a>&lt;CoinType&gt;,
 ): bool <b>acquires</b> <a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">LimitsDefinition</a> {
     <b>assert</b>!(<b>exists</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">LimitsDefinition</a>&lt;CoinType&gt;&gt;(receiving.limit_address), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="AccountLimits.md#0x1_AccountLimits_ELIMITS_DEFINITION">ELIMITS_DEFINITION</a>));
-    <b>let</b> limits_definition = borrow_global&lt;<a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">LimitsDefinition</a>&lt;CoinType&gt;&gt;(receiving.limit_address);
+    <b>let</b> limits_definition = <b>borrow_global</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">LimitsDefinition</a>&lt;CoinType&gt;&gt;(receiving.limit_address);
     // If the limits are unrestricted then don't do any more work.
     <b>if</b> (<a href="AccountLimits.md#0x1_AccountLimits_is_unrestricted">is_unrestricted</a>(limits_definition)) <b>return</b> <b>true</b>;
 
@@ -1082,7 +1082,7 @@ If the withdrawal of <code>amount</code> doesn't violate the limits <code>amount
     sending: &<b>mut</b> <a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a>&lt;CoinType&gt;,
 ): bool <b>acquires</b> <a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">LimitsDefinition</a> {
     <b>assert</b>!(<b>exists</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">LimitsDefinition</a>&lt;CoinType&gt;&gt;(sending.limit_address), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="AccountLimits.md#0x1_AccountLimits_ELIMITS_DEFINITION">ELIMITS_DEFINITION</a>));
-    <b>let</b> limits_definition = borrow_global&lt;<a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">LimitsDefinition</a>&lt;CoinType&gt;&gt;(sending.limit_address);
+    <b>let</b> limits_definition = <b>borrow_global</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">LimitsDefinition</a>&lt;CoinType&gt;&gt;(sending.limit_address);
     // If the limits are unrestricted then don't do any more work.
     <b>if</b> (<a href="AccountLimits.md#0x1_AccountLimits_is_unrestricted">is_unrestricted</a>(limits_definition)) <b>return</b> <b>true</b>;
 
@@ -1260,7 +1260,7 @@ Checks whether the limits definition is unrestricted.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="AccountLimits.md#0x1_AccountLimits_limits_definition_address">limits_definition_address</a>&lt;CoinType&gt;(addr: address): address
+<pre><code><b>public</b> <b>fun</b> <a href="AccountLimits.md#0x1_AccountLimits_limits_definition_address">limits_definition_address</a>&lt;CoinType&gt;(addr: <b>address</b>): <b>address</b>
 </code></pre>
 
 
@@ -1269,8 +1269,8 @@ Checks whether the limits definition is unrestricted.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="AccountLimits.md#0x1_AccountLimits_limits_definition_address">limits_definition_address</a>&lt;CoinType&gt;(addr: address): address <b>acquires</b> <a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a> {
-    borrow_global&lt;<a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a>&lt;CoinType&gt;&gt;(addr).limit_address
+<pre><code><b>public</b> <b>fun</b> <a href="AccountLimits.md#0x1_AccountLimits_limits_definition_address">limits_definition_address</a>&lt;CoinType&gt;(addr: <b>address</b>): <b>address</b> <b>acquires</b> <a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a> {
+    <b>borrow_global</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a>&lt;CoinType&gt;&gt;(addr).limit_address
 }
 </code></pre>
 
@@ -1284,7 +1284,7 @@ Checks whether the limits definition is unrestricted.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="AccountLimits.md#0x1_AccountLimits_has_limits_published">has_limits_published</a>&lt;CoinType&gt;(addr: address): bool
+<pre><code><b>public</b> <b>fun</b> <a href="AccountLimits.md#0x1_AccountLimits_has_limits_published">has_limits_published</a>&lt;CoinType&gt;(addr: <b>address</b>): bool
 </code></pre>
 
 
@@ -1293,7 +1293,7 @@ Checks whether the limits definition is unrestricted.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="AccountLimits.md#0x1_AccountLimits_has_limits_published">has_limits_published</a>&lt;CoinType&gt;(addr: address): bool {
+<pre><code><b>public</b> <b>fun</b> <a href="AccountLimits.md#0x1_AccountLimits_has_limits_published">has_limits_published</a>&lt;CoinType&gt;(addr: <b>address</b>): bool {
     <b>exists</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">LimitsDefinition</a>&lt;CoinType&gt;&gt;(addr)
 }
 </code></pre>
@@ -1308,7 +1308,7 @@ Checks whether the limits definition is unrestricted.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="AccountLimits.md#0x1_AccountLimits_has_window_published">has_window_published</a>&lt;CoinType&gt;(addr: address): bool
+<pre><code><b>public</b> <b>fun</b> <a href="AccountLimits.md#0x1_AccountLimits_has_window_published">has_window_published</a>&lt;CoinType&gt;(addr: <b>address</b>): bool
 </code></pre>
 
 
@@ -1317,7 +1317,7 @@ Checks whether the limits definition is unrestricted.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="AccountLimits.md#0x1_AccountLimits_has_window_published">has_window_published</a>&lt;CoinType&gt;(addr: address): bool {
+<pre><code><b>public</b> <b>fun</b> <a href="AccountLimits.md#0x1_AccountLimits_has_window_published">has_window_published</a>&lt;CoinType&gt;(addr: <b>address</b>): bool {
     <b>exists</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a>&lt;CoinType&gt;&gt;(addr)
 }
 </code></pre>
@@ -1340,7 +1340,7 @@ Checks whether the limits definition is unrestricted.
 <a name="0x1_AccountLimits_spec_has_window_published"></a>
 
 
-<pre><code><b>fun</b> <a href="AccountLimits.md#0x1_AccountLimits_spec_has_window_published">spec_has_window_published</a>&lt;CoinType&gt;(addr: address): bool {
+<pre><code><b>fun</b> <a href="AccountLimits.md#0x1_AccountLimits_spec_has_window_published">spec_has_window_published</a>&lt;CoinType&gt;(addr: <b>address</b>): bool {
     <b>exists</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a>&lt;CoinType&gt;&gt;(addr)
 }
 </code></pre>
@@ -1383,7 +1383,7 @@ Checks whether the limits definition is unrestricted.
 
 
 <pre><code><b>invariant</b>&lt;CoinType&gt; <b>update</b>
-    <b>forall</b> addr: address <b>where</b> <b>old</b>(<b>exists</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">LimitsDefinition</a>&lt;CoinType&gt;&gt;(addr)):
+    <b>forall</b> addr: <b>address</b> <b>where</b> <b>old</b>(<b>exists</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">LimitsDefinition</a>&lt;CoinType&gt;&gt;(addr)):
         <b>exists</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">LimitsDefinition</a>&lt;CoinType&gt;&gt;(addr);
 </code></pre>
 
@@ -1392,7 +1392,7 @@ Checks whether the limits definition is unrestricted.
 
 
 <pre><code><b>invariant</b>&lt;CoinType&gt; <b>update</b>
-    <b>forall</b> window_addr: address <b>where</b> <b>old</b>(<b>exists</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a>&lt;CoinType&gt;&gt;(window_addr)):
+    <b>forall</b> window_addr: <b>address</b> <b>where</b> <b>old</b>(<b>exists</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a>&lt;CoinType&gt;&gt;(window_addr)):
         <b>exists</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a>&lt;CoinType&gt;&gt;(window_addr);
 </code></pre>
 
@@ -1401,7 +1401,7 @@ Invariant that <code><a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinitio
 
 
 <pre><code><b>invariant</b>&lt;CoinType&gt;
-   <b>forall</b> window_addr: address <b>where</b> <b>exists</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a>&lt;CoinType&gt;&gt;(window_addr):
+   <b>forall</b> window_addr: <b>address</b> <b>where</b> <b>exists</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a>&lt;CoinType&gt;&gt;(window_addr):
         <b>exists</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">LimitsDefinition</a>&lt;CoinType&gt;&gt;(<b>global</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a>&lt;CoinType&gt;&gt;(window_addr).limit_address);
 </code></pre>
 
@@ -1416,7 +1416,7 @@ Only ParentVASP and ChildVASP can have the account limits [[E1]][ROLE][[E2]][ROL
 
 
 <pre><code><b>invariant</b>&lt;CoinType&gt;
-    <b>forall</b> addr: address <b>where</b> <b>exists</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a>&lt;CoinType&gt;&gt;(addr):
+    <b>forall</b> addr: <b>address</b> <b>where</b> <b>exists</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a>&lt;CoinType&gt;&gt;(addr):
         <b>exists</b>&lt;<a href="Roles.md#0x1_Roles_RoleId">Roles::RoleId</a>&gt;(addr) &&
         (<b>global</b>&lt;<a href="Roles.md#0x1_Roles_RoleId">Roles::RoleId</a>&gt;(addr).role_id == <a href="Roles.md#0x1_Roles_PARENT_VASP_ROLE_ID">Roles::PARENT_VASP_ROLE_ID</a> ||
             <b>global</b>&lt;<a href="Roles.md#0x1_Roles_RoleId">Roles::RoleId</a>&gt;(addr).role_id == <a href="Roles.md#0x1_Roles_CHILD_VASP_ROLE_ID">Roles::CHILD_VASP_ROLE_ID</a>);

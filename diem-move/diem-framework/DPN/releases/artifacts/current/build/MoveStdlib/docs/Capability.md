@@ -124,7 +124,7 @@ is_valid_delegate_for_feature(d);
 The token representing an acquired capability. Cannot be stored in memory, but copied and dropped freely.
 
 
-<pre><code><b>struct</b> <a href="Capability.md#0x1_Capability_Cap">Cap</a>&lt;Feature&gt; has <b>copy</b>, drop
+<pre><code><b>struct</b> <a href="Capability.md#0x1_Capability_Cap">Cap</a>&lt;Feature&gt; <b>has</b> <b>copy</b>, drop
 </code></pre>
 
 
@@ -135,7 +135,7 @@ The token representing an acquired capability. Cannot be stored in memory, but c
 
 <dl>
 <dt>
-<code>root: address</code>
+<code>root: <b>address</b></code>
 </dt>
 <dd>
 
@@ -153,7 +153,7 @@ A linear version of a capability token. This can be used if an acquired capabili
 to be used only once for an authorization.
 
 
-<pre><code><b>struct</b> <a href="Capability.md#0x1_Capability_LinearCap">LinearCap</a>&lt;Feature&gt; has drop
+<pre><code><b>struct</b> <a href="Capability.md#0x1_Capability_LinearCap">LinearCap</a>&lt;Feature&gt; <b>has</b> drop
 </code></pre>
 
 
@@ -164,7 +164,7 @@ to be used only once for an authorization.
 
 <dl>
 <dt>
-<code>root: address</code>
+<code>root: <b>address</b></code>
 </dt>
 <dd>
 
@@ -181,7 +181,7 @@ to be used only once for an authorization.
 An internal data structure for representing a configured capability.
 
 
-<pre><code><b>struct</b> <a href="Capability.md#0x1_Capability_CapState">CapState</a>&lt;Feature&gt; has key
+<pre><code><b>struct</b> <a href="Capability.md#0x1_Capability_CapState">CapState</a>&lt;Feature&gt; <b>has</b> key
 </code></pre>
 
 
@@ -192,7 +192,7 @@ An internal data structure for representing a configured capability.
 
 <dl>
 <dt>
-<code>delegates: vector&lt;address&gt;</code>
+<code>delegates: vector&lt;<b>address</b>&gt;</code>
 </dt>
 <dd>
 
@@ -209,7 +209,7 @@ An internal data structure for representing a configured capability.
 An internal data structure for representing a configured delegated capability.
 
 
-<pre><code><b>struct</b> <a href="Capability.md#0x1_Capability_CapDelegateState">CapDelegateState</a>&lt;Feature&gt; has key
+<pre><code><b>struct</b> <a href="Capability.md#0x1_Capability_CapDelegateState">CapDelegateState</a>&lt;Feature&gt; <b>has</b> key
 </code></pre>
 
 
@@ -220,7 +220,7 @@ An internal data structure for representing a configured delegated capability.
 
 <dl>
 <dt>
-<code>root: address</code>
+<code>root: <b>address</b></code>
 </dt>
 <dd>
 
@@ -273,7 +273,7 @@ they own the <code>Feature</code> type parameter.
 <pre><code><b>public</b> <b>fun</b> <a href="Capability.md#0x1_Capability_create">create</a>&lt;Feature&gt;(owner: &signer, _feature_witness: &Feature) {
     <b>let</b> addr = <a href="Signer.md#0x1_Signer_address_of">Signer::address_of</a>(owner);
     <b>assert</b>!(!<b>exists</b>&lt;<a href="Capability.md#0x1_Capability_CapState">CapState</a>&lt;Feature&gt;&gt;(addr), <a href="Errors.md#0x1_Errors_already_published">Errors::already_published</a>(<a href="Capability.md#0x1_Capability_ECAP">ECAP</a>));
-    move_to&lt;<a href="Capability.md#0x1_Capability_CapState">CapState</a>&lt;Feature&gt;&gt;(owner, <a href="Capability.md#0x1_Capability_CapState">CapState</a>{ delegates: <a href="Vector.md#0x1_Vector_empty">Vector::empty</a>() });
+    <b>move_to</b>&lt;<a href="Capability.md#0x1_Capability_CapState">CapState</a>&lt;Feature&gt;&gt;(owner, <a href="Capability.md#0x1_Capability_CapState">CapState</a>{ delegates: <a href="Vector.md#0x1_Vector_empty">Vector::empty</a>() });
 }
 </code></pre>
 
@@ -343,7 +343,7 @@ whether to expose a linear or non-linear capability.
 Helper to validate an acquire. Returns the root address of the capability.
 
 
-<pre><code><b>fun</b> <a href="Capability.md#0x1_Capability_validate_acquire">validate_acquire</a>&lt;Feature&gt;(requester: &signer): address
+<pre><code><b>fun</b> <a href="Capability.md#0x1_Capability_validate_acquire">validate_acquire</a>&lt;Feature&gt;(requester: &signer): <b>address</b>
 </code></pre>
 
 
@@ -352,14 +352,14 @@ Helper to validate an acquire. Returns the root address of the capability.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="Capability.md#0x1_Capability_validate_acquire">validate_acquire</a>&lt;Feature&gt;(requester: &signer): address
+<pre><code><b>fun</b> <a href="Capability.md#0x1_Capability_validate_acquire">validate_acquire</a>&lt;Feature&gt;(requester: &signer): <b>address</b>
 <b>acquires</b> <a href="Capability.md#0x1_Capability_CapState">CapState</a>, <a href="Capability.md#0x1_Capability_CapDelegateState">CapDelegateState</a> {
     <b>let</b> addr = <a href="Signer.md#0x1_Signer_address_of">Signer::address_of</a>(requester);
     <b>if</b> (<b>exists</b>&lt;<a href="Capability.md#0x1_Capability_CapDelegateState">CapDelegateState</a>&lt;Feature&gt;&gt;(addr)) {
-        <b>let</b> root_addr = borrow_global&lt;<a href="Capability.md#0x1_Capability_CapDelegateState">CapDelegateState</a>&lt;Feature&gt;&gt;(addr).root;
+        <b>let</b> root_addr = <b>borrow_global</b>&lt;<a href="Capability.md#0x1_Capability_CapDelegateState">CapDelegateState</a>&lt;Feature&gt;&gt;(addr).root;
         // double check that requester is actually registered <b>as</b> a delegate
         <b>assert</b>!(<b>exists</b>&lt;<a href="Capability.md#0x1_Capability_CapState">CapState</a>&lt;Feature&gt;&gt;(root_addr), <a href="Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="Capability.md#0x1_Capability_EDELEGATE">EDELEGATE</a>));
-        <b>assert</b>!(<a href="Vector.md#0x1_Vector_contains">Vector::contains</a>(&borrow_global&lt;<a href="Capability.md#0x1_Capability_CapState">CapState</a>&lt;Feature&gt;&gt;(root_addr).delegates, &addr),
+        <b>assert</b>!(<a href="Vector.md#0x1_Vector_contains">Vector::contains</a>(&<b>borrow_global</b>&lt;<a href="Capability.md#0x1_Capability_CapState">CapState</a>&lt;Feature&gt;&gt;(root_addr).delegates, &addr),
                <a href="Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="Capability.md#0x1_Capability_EDELEGATE">EDELEGATE</a>));
         root_addr
     } <b>else</b> {
@@ -381,7 +381,7 @@ Returns the root address associated with the given capability token. Only the ow
 of the feature can do this.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="Capability.md#0x1_Capability_root_addr">root_addr</a>&lt;Feature&gt;(cap: <a href="Capability.md#0x1_Capability_Cap">Capability::Cap</a>&lt;Feature&gt;, _feature_witness: &Feature): address
+<pre><code><b>public</b> <b>fun</b> <a href="Capability.md#0x1_Capability_root_addr">root_addr</a>&lt;Feature&gt;(cap: <a href="Capability.md#0x1_Capability_Cap">Capability::Cap</a>&lt;Feature&gt;, _feature_witness: &Feature): <b>address</b>
 </code></pre>
 
 
@@ -390,7 +390,7 @@ of the feature can do this.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="Capability.md#0x1_Capability_root_addr">root_addr</a>&lt;Feature&gt;(cap: <a href="Capability.md#0x1_Capability_Cap">Cap</a>&lt;Feature&gt;, _feature_witness: &Feature): address {
+<pre><code><b>public</b> <b>fun</b> <a href="Capability.md#0x1_Capability_root_addr">root_addr</a>&lt;Feature&gt;(cap: <a href="Capability.md#0x1_Capability_Cap">Cap</a>&lt;Feature&gt;, _feature_witness: &Feature): <b>address</b> {
     cap.root
 }
 </code></pre>
@@ -406,7 +406,7 @@ of the feature can do this.
 Returns the root address associated with the given linear capability token.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="Capability.md#0x1_Capability_linear_root_addr">linear_root_addr</a>&lt;Feature&gt;(cap: <a href="Capability.md#0x1_Capability_LinearCap">Capability::LinearCap</a>&lt;Feature&gt;, _feature_witness: &Feature): address
+<pre><code><b>public</b> <b>fun</b> <a href="Capability.md#0x1_Capability_linear_root_addr">linear_root_addr</a>&lt;Feature&gt;(cap: <a href="Capability.md#0x1_Capability_LinearCap">Capability::LinearCap</a>&lt;Feature&gt;, _feature_witness: &Feature): <b>address</b>
 </code></pre>
 
 
@@ -415,7 +415,7 @@ Returns the root address associated with the given linear capability token.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="Capability.md#0x1_Capability_linear_root_addr">linear_root_addr</a>&lt;Feature&gt;(cap: <a href="Capability.md#0x1_Capability_LinearCap">LinearCap</a>&lt;Feature&gt;, _feature_witness: &Feature): address {
+<pre><code><b>public</b> <b>fun</b> <a href="Capability.md#0x1_Capability_linear_root_addr">linear_root_addr</a>&lt;Feature&gt;(cap: <a href="Capability.md#0x1_Capability_LinearCap">LinearCap</a>&lt;Feature&gt;, _feature_witness: &Feature): <b>address</b> {
     cap.root
 }
 </code></pre>
@@ -445,8 +445,8 @@ nothing.
 <b>acquires</b> <a href="Capability.md#0x1_Capability_CapState">CapState</a> {
     <b>let</b> addr = <a href="Signer.md#0x1_Signer_address_of">Signer::address_of</a>(<b>to</b>);
     <b>if</b> (<b>exists</b>&lt;<a href="Capability.md#0x1_Capability_CapDelegateState">CapDelegateState</a>&lt;Feature&gt;&gt;(addr)) <b>return</b>;
-    move_to(<b>to</b>, <a href="Capability.md#0x1_Capability_CapDelegateState">CapDelegateState</a>&lt;Feature&gt;{root: cap.root});
-    <a href="Capability.md#0x1_Capability_add_element">add_element</a>(&<b>mut</b> borrow_global_mut&lt;<a href="Capability.md#0x1_Capability_CapState">CapState</a>&lt;Feature&gt;&gt;(cap.root).delegates, addr);
+    <b>move_to</b>(<b>to</b>, <a href="Capability.md#0x1_Capability_CapDelegateState">CapDelegateState</a>&lt;Feature&gt;{root: cap.root});
+    <a href="Capability.md#0x1_Capability_add_element">add_element</a>(&<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="Capability.md#0x1_Capability_CapState">CapState</a>&lt;Feature&gt;&gt;(cap.root).delegates, addr);
 }
 </code></pre>
 
@@ -461,7 +461,7 @@ nothing.
 Revokes a delegation relation. If no relation exists, this function does nothing.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="Capability.md#0x1_Capability_revoke">revoke</a>&lt;Feature&gt;(cap: <a href="Capability.md#0x1_Capability_Cap">Capability::Cap</a>&lt;Feature&gt;, _feature_witness: &Feature, from: address)
+<pre><code><b>public</b> <b>fun</b> <a href="Capability.md#0x1_Capability_revoke">revoke</a>&lt;Feature&gt;(cap: <a href="Capability.md#0x1_Capability_Cap">Capability::Cap</a>&lt;Feature&gt;, _feature_witness: &Feature, from: <b>address</b>)
 </code></pre>
 
 
@@ -470,12 +470,12 @@ Revokes a delegation relation. If no relation exists, this function does nothing
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="Capability.md#0x1_Capability_revoke">revoke</a>&lt;Feature&gt;(cap: <a href="Capability.md#0x1_Capability_Cap">Cap</a>&lt;Feature&gt;, _feature_witness: &Feature, from: address)
+<pre><code><b>public</b> <b>fun</b> <a href="Capability.md#0x1_Capability_revoke">revoke</a>&lt;Feature&gt;(cap: <a href="Capability.md#0x1_Capability_Cap">Cap</a>&lt;Feature&gt;, _feature_witness: &Feature, from: <b>address</b>)
 <b>acquires</b> <a href="Capability.md#0x1_Capability_CapState">CapState</a>, <a href="Capability.md#0x1_Capability_CapDelegateState">CapDelegateState</a>
 {
     <b>if</b> (!<b>exists</b>&lt;<a href="Capability.md#0x1_Capability_CapDelegateState">CapDelegateState</a>&lt;Feature&gt;&gt;(from)) <b>return</b>;
-    <b>let</b> <a href="Capability.md#0x1_Capability_CapDelegateState">CapDelegateState</a>{root: _root} = move_from&lt;<a href="Capability.md#0x1_Capability_CapDelegateState">CapDelegateState</a>&lt;Feature&gt;&gt;(from);
-    <a href="Capability.md#0x1_Capability_remove_element">remove_element</a>(&<b>mut</b> borrow_global_mut&lt;<a href="Capability.md#0x1_Capability_CapState">CapState</a>&lt;Feature&gt;&gt;(cap.root).delegates, &from);
+    <b>let</b> <a href="Capability.md#0x1_Capability_CapDelegateState">CapDelegateState</a>{root: _root} = <b>move_from</b>&lt;<a href="Capability.md#0x1_Capability_CapDelegateState">CapDelegateState</a>&lt;Feature&gt;&gt;(from);
+    <a href="Capability.md#0x1_Capability_remove_element">remove_element</a>(&<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="Capability.md#0x1_Capability_CapState">CapState</a>&lt;Feature&gt;&gt;(cap.root).delegates, &from);
 }
 </code></pre>
 
@@ -548,7 +548,7 @@ Helper specification function to check whether a capability exists at address.
 <a name="0x1_Capability_spec_has_cap"></a>
 
 
-<pre><code><b>fun</b> <a href="Capability.md#0x1_Capability_spec_has_cap">spec_has_cap</a>&lt;Feature&gt;(addr: address): bool {
+<pre><code><b>fun</b> <a href="Capability.md#0x1_Capability_spec_has_cap">spec_has_cap</a>&lt;Feature&gt;(addr: <b>address</b>): bool {
    <b>exists</b>&lt;<a href="Capability.md#0x1_Capability_CapState">CapState</a>&lt;Feature&gt;&gt;(addr)
 }
 </code></pre>
@@ -560,7 +560,7 @@ Helper specification function to obtain the delegates of a capability.
 <a name="0x1_Capability_spec_delegates"></a>
 
 
-<pre><code><b>fun</b> <a href="Capability.md#0x1_Capability_spec_delegates">spec_delegates</a>&lt;Feature&gt;(addr: address): vector&lt;address&gt; {
+<pre><code><b>fun</b> <a href="Capability.md#0x1_Capability_spec_delegates">spec_delegates</a>&lt;Feature&gt;(addr: <b>address</b>): vector&lt;<b>address</b>&gt; {
    <b>global</b>&lt;<a href="Capability.md#0x1_Capability_CapState">CapState</a>&lt;Feature&gt;&gt;(addr).delegates
 }
 </code></pre>

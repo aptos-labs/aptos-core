@@ -38,7 +38,7 @@ be careful about using floating-point to convert these values to
 decimal.
 
 
-<pre><code><b>struct</b> <a href="FixedPoint32.md#0x1_FixedPoint32">FixedPoint32</a> has <b>copy</b>, drop, store
+<pre><code><b>struct</b> <a href="FixedPoint32.md#0x1_FixedPoint32">FixedPoint32</a> <b>has</b> <b>copy</b>, drop, store
 </code></pre>
 
 
@@ -143,11 +143,11 @@ overflows.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="FixedPoint32.md#0x1_FixedPoint32_multiply_u64">multiply_u64</a>(val: u64, multiplier: <a href="FixedPoint32.md#0x1_FixedPoint32">FixedPoint32</a>): u64 {
-    // The product of two 64 bit values has 128 bits, so perform the
+    // The product of two 64 bit values <b>has</b> 128 bits, so perform the
     // multiplication <b>with</b> u128 types and keep the full 128 bit product
     // <b>to</b> avoid losing accuracy.
     <b>let</b> unscaled_product = (val <b>as</b> u128) * (multiplier.value <b>as</b> u128);
-    // The unscaled product has 32 fractional bits (from the multiplier)
+    // The unscaled product <b>has</b> 32 fractional bits (from the multiplier)
     // so rescale it by shifting away the low bits.
     <b>let</b> product = unscaled_product &gt;&gt; 32;
     // Check whether the value is too large.

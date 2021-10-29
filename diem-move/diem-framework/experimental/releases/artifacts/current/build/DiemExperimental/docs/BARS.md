@@ -29,7 +29,7 @@
 
 
 
-<pre><code><b>struct</b> <a href="BARS.md#0x1_BARSToken">BARSToken</a> has store
+<pre><code><b>struct</b> <a href="BARS.md#0x1_BARSToken">BARSToken</a> <b>has</b> store
 </code></pre>
 
 
@@ -111,10 +111,10 @@ consumes a signer
 
 
 <pre><code><b>fun</b> <a href="BARS.md#0x1_BARSToken_register_user_internal">register_user_internal</a>(user: &signer) {
-    // publish TokenBalance&lt;<a href="BARS.md#0x1_BARSToken">BARSToken</a>&gt; <b>resource</b>
+    // publish TokenBalance&lt;<a href="BARS.md#0x1_BARSToken">BARSToken</a>&gt; resource
     <a href="NFTGallery.md#0x1_NFTGallery_publish_gallery">NFTGallery::publish_gallery</a>&lt;<a href="BARS.md#0x1_BARSToken">BARSToken</a>&gt;(user);
 
-    // publish TokenDataCollection&lt;<a href="BARS.md#0x1_BARSToken">BARSToken</a>&gt; <b>resource</b>
+    // publish TokenDataCollection&lt;<a href="BARS.md#0x1_BARSToken">BARSToken</a>&gt; resource
     <a href="NFT.md#0x1_NFT_publish_token_data_collection">NFT::publish_token_data_collection</a>&lt;<a href="BARS.md#0x1_BARSToken">BARSToken</a>&gt;(user);
 
     // The user gives BARS account capability <b>to</b> generate BARS NFTs on their behalf.
@@ -133,7 +133,7 @@ consumes a signer
 BARS account mints <code>amount</code> copies of BARS tokens to the artist's account.
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="BARS.md#0x1_BARSToken_mint_bars">mint_bars</a>(bars_account: signer, artist: address, artist_name: vector&lt;u8&gt;, content_uri: vector&lt;u8&gt;, amount: u64)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="BARS.md#0x1_BARSToken_mint_bars">mint_bars</a>(bars_account: signer, artist: <b>address</b>, artist_name: vector&lt;u8&gt;, content_uri: vector&lt;u8&gt;, amount: u64)
 </code></pre>
 
 
@@ -144,7 +144,7 @@ BARS account mints <code>amount</code> copies of BARS tokens to the artist's acc
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="BARS.md#0x1_BARSToken_mint_bars">mint_bars</a>(
     bars_account: signer,
-    artist: address,
+    artist: <b>address</b>,
     artist_name: vector&lt;u8&gt;,
     content_uri: vector&lt;u8&gt;,
     amount: u64
@@ -165,7 +165,7 @@ Need this internal function for testing, since the script fun version
 consumes a signer
 
 
-<pre><code><b>fun</b> <a href="BARS.md#0x1_BARSToken_mint_internal">mint_internal</a>(bars_account: &signer, artist: address, artist_name: vector&lt;u8&gt;, content_uri: vector&lt;u8&gt;, amount: u64)
+<pre><code><b>fun</b> <a href="BARS.md#0x1_BARSToken_mint_internal">mint_internal</a>(bars_account: &signer, artist: <b>address</b>, artist_name: vector&lt;u8&gt;, content_uri: vector&lt;u8&gt;, amount: u64)
 </code></pre>
 
 
@@ -176,7 +176,7 @@ consumes a signer
 
 <pre><code><b>fun</b> <a href="BARS.md#0x1_BARSToken_mint_internal">mint_internal</a>(
     bars_account: &signer,
-    artist: address,
+    artist: <b>address</b>,
     artist_name: vector&lt;u8&gt;,
     content_uri: vector&lt;u8&gt;,
     amount: u64
@@ -202,7 +202,7 @@ consumes a signer
 
 
 
-<pre><code><b>fun</b> <a href="BARS.md#0x1_BARSToken_create_bars_token">create_bars_token</a>(address: &signer, artist_name: vector&lt;u8&gt;): <a href="BARS.md#0x1_BARSToken_BARSToken">BARSToken::BARSToken</a>
+<pre><code><b>fun</b> <a href="BARS.md#0x1_BARSToken_create_bars_token">create_bars_token</a>(<b>address</b>: &signer, artist_name: vector&lt;u8&gt;): <a href="BARS.md#0x1_BARSToken_BARSToken">BARSToken::BARSToken</a>
 </code></pre>
 
 
@@ -211,8 +211,8 @@ consumes a signer
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="BARS.md#0x1_BARSToken_create_bars_token">create_bars_token</a>(address: &signer, artist_name: vector&lt;u8&gt;): <a href="BARS.md#0x1_BARSToken">BARSToken</a> {
-    <b>assert</b>!(Std::Signer::address_of(address) == @BARS, <a href="BARS.md#0x1_BARSToken_ENOT_BARS_OWNER">ENOT_BARS_OWNER</a>);
+<pre><code><b>fun</b> <a href="BARS.md#0x1_BARSToken_create_bars_token">create_bars_token</a>(<b>address</b>: &signer, artist_name: vector&lt;u8&gt;): <a href="BARS.md#0x1_BARSToken">BARSToken</a> {
+    <b>assert</b>!(Std::Signer::address_of(<b>address</b>) == @BARS, <a href="BARS.md#0x1_BARSToken_ENOT_BARS_OWNER">ENOT_BARS_OWNER</a>);
     <a href="BARS.md#0x1_BARSToken">BARSToken</a> { artist_name }
 }
 </code></pre>

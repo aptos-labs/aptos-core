@@ -88,7 +88,7 @@ or does not have a <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_Validat
 | <code>dr_account</code>        | <code>signer</code>     | The signer of the sending account of this transaction. Must be the Diem Root signer.                                               |
 | <code>sliding_nonce</code>     | <code>u64</code>        | The <code>sliding_nonce</code> (see: <code><a href="SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction.                                                         |
 | <code>validator_name</code>    | <code>vector&lt;u8&gt;</code> | ASCII-encoded human name for the validator. Must match the human name in the <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> for the validator. |
-| <code>validator_address</code> | <code>address</code>    | The validator account address to be added to the validator set.                                                                    |
+| <code>validator_address</code> | <code><b>address</b></code>    | The validator account address to be added to the validator set.                                                                    |
 
 
 <a name="@Common_Abort_Conditions_3"></a>
@@ -123,7 +123,7 @@ or does not have a <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_Validat
 * <code><a href="ValidatorAdministrationScripts.md#0x1_ValidatorAdministrationScripts_set_validator_config_and_reconfigure">ValidatorAdministrationScripts::set_validator_config_and_reconfigure</a></code>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="ValidatorAdministrationScripts.md#0x1_ValidatorAdministrationScripts_add_validator_and_reconfigure">add_validator_and_reconfigure</a>(dr_account: signer, sliding_nonce: u64, validator_name: vector&lt;u8&gt;, validator_address: address)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="ValidatorAdministrationScripts.md#0x1_ValidatorAdministrationScripts_add_validator_and_reconfigure">add_validator_and_reconfigure</a>(dr_account: signer, sliding_nonce: u64, validator_name: vector&lt;u8&gt;, validator_address: <b>address</b>)
 </code></pre>
 
 
@@ -136,7 +136,7 @@ or does not have a <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_Validat
     dr_account: signer,
     sliding_nonce: u64,
     validator_name: vector&lt;u8&gt;,
-    validator_address: address
+    validator_address: <b>address</b>
 ) {
     <a href="SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&dr_account, sliding_nonce);
     <b>assert</b>!(<a href="ValidatorConfig.md#0x1_ValidatorConfig_get_human_name">ValidatorConfig::get_human_name</a>(validator_address) == validator_name, 0);
@@ -224,7 +224,7 @@ only "locally" under the <code>validator_account</code> account address.
 | Name                          | Type         | Description                                                                                                        |
 | ------                        | ------       | -------------                                                                                                      |
 | <code>validator_operator_account</code>  | <code>signer</code>     | Signer of the sending account. Must be the registered validator operator for the validator at <code>validator_address</code>. |
-| <code>validator_account</code>           | <code>address</code>    | The address of the validator's <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> resource being updated.                          |
+| <code>validator_account</code>           | <code><b>address</b></code>    | The address of the validator's <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> resource being updated.                          |
 | <code>consensus_pubkey</code>            | <code>vector&lt;u8&gt;</code> | New Ed25519 public key to be used in the updated <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code>.                               |
 | <code>validator_network_addresses</code> | <code>vector&lt;u8&gt;</code> | New set of <code>validator_network_addresses</code> to be used in the updated <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code>.             |
 | <code>fullnode_network_addresses</code>  | <code>vector&lt;u8&gt;</code> | New set of <code>fullnode_network_addresses</code> to be used in the updated <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code>.              |
@@ -254,7 +254,7 @@ only "locally" under the <code>validator_account</code> account address.
 * <code><a href="ValidatorAdministrationScripts.md#0x1_ValidatorAdministrationScripts_set_validator_config_and_reconfigure">ValidatorAdministrationScripts::set_validator_config_and_reconfigure</a></code>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="ValidatorAdministrationScripts.md#0x1_ValidatorAdministrationScripts_register_validator_config">register_validator_config</a>(validator_operator_account: signer, validator_account: address, consensus_pubkey: vector&lt;u8&gt;, validator_network_addresses: vector&lt;u8&gt;, fullnode_network_addresses: vector&lt;u8&gt;)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="ValidatorAdministrationScripts.md#0x1_ValidatorAdministrationScripts_register_validator_config">register_validator_config</a>(validator_operator_account: signer, validator_account: <b>address</b>, consensus_pubkey: vector&lt;u8&gt;, validator_network_addresses: vector&lt;u8&gt;, fullnode_network_addresses: vector&lt;u8&gt;)
 </code></pre>
 
 
@@ -265,8 +265,8 @@ only "locally" under the <code>validator_account</code> account address.
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="ValidatorAdministrationScripts.md#0x1_ValidatorAdministrationScripts_register_validator_config">register_validator_config</a>(
     validator_operator_account: signer,
-    // TODO Rename <b>to</b> validator_addr, since it is an address.
-    validator_account: address,
+    // TODO Rename <b>to</b> validator_addr, since it is an <b>address</b>.
+    validator_account: <b>address</b>,
     consensus_pubkey: vector&lt;u8&gt;,
     validator_network_addresses: vector&lt;u8&gt;,
     fullnode_network_addresses: vector&lt;u8&gt;,
@@ -349,7 +349,7 @@ is not in the validator set.
 | <code>dr_account</code>        | <code>signer</code>     | The signer of the sending account of this transaction. Must be the Diem Root signer.                                               |
 | <code>sliding_nonce</code>     | <code>u64</code>        | The <code>sliding_nonce</code> (see: <code><a href="SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction.                                                         |
 | <code>validator_name</code>    | <code>vector&lt;u8&gt;</code> | ASCII-encoded human name for the validator. Must match the human name in the <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> for the validator. |
-| <code>validator_address</code> | <code>address</code>    | The validator account address to be removed from the validator set.                                                                |
+| <code>validator_address</code> | <code><b>address</b></code>    | The validator account address to be removed from the validator set.                                                                |
 
 
 <a name="@Common_Abort_Conditions_13"></a>
@@ -383,7 +383,7 @@ is not in the validator set.
 * <code><a href="ValidatorAdministrationScripts.md#0x1_ValidatorAdministrationScripts_set_validator_config_and_reconfigure">ValidatorAdministrationScripts::set_validator_config_and_reconfigure</a></code>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="ValidatorAdministrationScripts.md#0x1_ValidatorAdministrationScripts_remove_validator_and_reconfigure">remove_validator_and_reconfigure</a>(dr_account: signer, sliding_nonce: u64, validator_name: vector&lt;u8&gt;, validator_address: address)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="ValidatorAdministrationScripts.md#0x1_ValidatorAdministrationScripts_remove_validator_and_reconfigure">remove_validator_and_reconfigure</a>(dr_account: signer, sliding_nonce: u64, validator_name: vector&lt;u8&gt;, validator_address: <b>address</b>)
 </code></pre>
 
 
@@ -396,7 +396,7 @@ is not in the validator set.
     dr_account: signer,
     sliding_nonce: u64,
     validator_name: vector&lt;u8&gt;,
-    validator_address: address
+    validator_address: <b>address</b>
 ) {
     <a href="SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&dr_account, sliding_nonce);
     // TODO: Use an error code from <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors">Errors</a>.<b>move</b>
@@ -483,7 +483,7 @@ on-chain with the updated <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_
 | Name                          | Type         | Description                                                                                                        |
 | ------                        | ------       | -------------                                                                                                      |
 | <code>validator_operator_account</code>  | <code>signer</code>     | Signer of the sending account. Must be the registered validator operator for the validator at <code>validator_address</code>. |
-| <code>validator_account</code>           | <code>address</code>    | The address of the validator's <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> resource being updated.                          |
+| <code>validator_account</code>           | <code><b>address</b></code>    | The address of the validator's <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> resource being updated.                          |
 | <code>consensus_pubkey</code>            | <code>vector&lt;u8&gt;</code> | New Ed25519 public key to be used in the updated <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code>.                               |
 | <code>validator_network_addresses</code> | <code>vector&lt;u8&gt;</code> | New set of <code>validator_network_addresses</code> to be used in the updated <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code>.             |
 | <code>fullnode_network_addresses</code>  | <code>vector&lt;u8&gt;</code> | New set of <code>fullnode_network_addresses</code> to be used in the updated <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code>.              |
@@ -515,7 +515,7 @@ on-chain with the updated <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_
 * <code><a href="ValidatorAdministrationScripts.md#0x1_ValidatorAdministrationScripts_register_validator_config">ValidatorAdministrationScripts::register_validator_config</a></code>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="ValidatorAdministrationScripts.md#0x1_ValidatorAdministrationScripts_set_validator_config_and_reconfigure">set_validator_config_and_reconfigure</a>(validator_operator_account: signer, validator_account: address, consensus_pubkey: vector&lt;u8&gt;, validator_network_addresses: vector&lt;u8&gt;, fullnode_network_addresses: vector&lt;u8&gt;)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="ValidatorAdministrationScripts.md#0x1_ValidatorAdministrationScripts_set_validator_config_and_reconfigure">set_validator_config_and_reconfigure</a>(validator_operator_account: signer, validator_account: <b>address</b>, consensus_pubkey: vector&lt;u8&gt;, validator_network_addresses: vector&lt;u8&gt;, fullnode_network_addresses: vector&lt;u8&gt;)
 </code></pre>
 
 
@@ -526,7 +526,7 @@ on-chain with the updated <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="ValidatorAdministrationScripts.md#0x1_ValidatorAdministrationScripts_set_validator_config_and_reconfigure">set_validator_config_and_reconfigure</a>(
     validator_operator_account: signer,
-    validator_account: address,
+    validator_account: <b>address</b>,
     consensus_pubkey: vector&lt;u8&gt;,
     validator_network_addresses: vector&lt;u8&gt;,
     fullnode_network_addresses: vector&lt;u8&gt;,
@@ -643,7 +643,7 @@ resource published under it. The sending <code>account</code> must be a Validato
 | ------             | ------       | -------------                                                                                |
 | <code>account</code>          | <code>signer</code>     | The signer of the sending account of the transaction.                                        |
 | <code>operator_name</code>    | <code>vector&lt;u8&gt;</code> | Validator operator's human name.                                                             |
-| <code>operator_account</code> | <code>address</code>    | Address of the validator operator account to be added as the <code>account</code> validator's operator. |
+| <code>operator_account</code> | <code><b>address</b></code>    | Address of the validator operator account to be added as the <code>account</code> validator's operator. |
 
 
 <a name="@Common_Abort_Conditions_23"></a>
@@ -672,7 +672,7 @@ resource published under it. The sending <code>account</code> must be a Validato
 * <code><a href="ValidatorAdministrationScripts.md#0x1_ValidatorAdministrationScripts_set_validator_config_and_reconfigure">ValidatorAdministrationScripts::set_validator_config_and_reconfigure</a></code>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="ValidatorAdministrationScripts.md#0x1_ValidatorAdministrationScripts_set_validator_operator">set_validator_operator</a>(account: signer, operator_name: vector&lt;u8&gt;, operator_account: address)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="ValidatorAdministrationScripts.md#0x1_ValidatorAdministrationScripts_set_validator_operator">set_validator_operator</a>(account: signer, operator_name: vector&lt;u8&gt;, operator_account: <b>address</b>)
 </code></pre>
 
 
@@ -684,7 +684,7 @@ resource published under it. The sending <code>account</code> must be a Validato
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="ValidatorAdministrationScripts.md#0x1_ValidatorAdministrationScripts_set_validator_operator">set_validator_operator</a>(
     account: signer,
     operator_name: vector&lt;u8&gt;,
-    operator_account: address
+    operator_account: <b>address</b>
 ) {
     <b>assert</b>!(<a href="ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_get_human_name">ValidatorOperatorConfig::get_human_name</a>(operator_account) == operator_name, 0);
     <a href="ValidatorConfig.md#0x1_ValidatorConfig_set_operator">ValidatorConfig::set_operator</a>(&account, operator_account);
@@ -769,7 +769,7 @@ the system is initiated by this script.
 | <code>account</code>          | <code>signer</code>     | Signer of account specified in the <code>execute_as</code> field of the write set transaction.           |
 | <code>sliding_nonce</code>    | <code>u64</code>        | The <code>sliding_nonce</code> (see: <code><a href="SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction for Diem Root.      |
 | <code>operator_name</code>    | <code>vector&lt;u8&gt;</code> | Validator operator's human name.                                                              |
-| <code>operator_account</code> | <code>address</code>    | Address of the validator operator account to be added as the <code>account</code> validator's operator.  |
+| <code>operator_account</code> | <code><b>address</b></code>    | Address of the validator operator account to be added as the <code>account</code> validator's operator.  |
 
 
 <a name="@Common_Abort_Conditions_28"></a>
@@ -803,7 +803,7 @@ the system is initiated by this script.
 * <code><a href="ValidatorAdministrationScripts.md#0x1_ValidatorAdministrationScripts_set_validator_config_and_reconfigure">ValidatorAdministrationScripts::set_validator_config_and_reconfigure</a></code>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="ValidatorAdministrationScripts.md#0x1_ValidatorAdministrationScripts_set_validator_operator_with_nonce_admin">set_validator_operator_with_nonce_admin</a>(dr_account: signer, account: signer, sliding_nonce: u64, operator_name: vector&lt;u8&gt;, operator_account: address)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="ValidatorAdministrationScripts.md#0x1_ValidatorAdministrationScripts_set_validator_operator_with_nonce_admin">set_validator_operator_with_nonce_admin</a>(dr_account: signer, account: signer, sliding_nonce: u64, operator_name: vector&lt;u8&gt;, operator_account: <b>address</b>)
 </code></pre>
 
 
@@ -817,7 +817,7 @@ the system is initiated by this script.
     account: signer,
     sliding_nonce: u64,
     operator_name: vector&lt;u8&gt;,
-    operator_account: address
+    operator_account: <b>address</b>
 ) {
     <a href="SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&dr_account, sliding_nonce);
     <b>assert</b>!(<a href="ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_get_human_name">ValidatorOperatorConfig::get_human_name</a>(operator_account) == operator_name, 0);

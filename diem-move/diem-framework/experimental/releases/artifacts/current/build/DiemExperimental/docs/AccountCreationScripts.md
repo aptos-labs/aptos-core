@@ -103,7 +103,7 @@ This is emitted on the new Child VASPS's <code><a href="DiemAccount.md#0x1_DiemA
 | ------                  | ------       | -------------                                                                                                                               |
 | <code>CoinType</code>              | Type         | The Move type for the <code>CoinType</code> that the child account should be created with. <code>CoinType</code> must be an already-registered currency on-chain. |
 | <code>parent_vasp</code>           | <code>signer</code>     | The reference of the sending account. Must be a Parent VASP account.                                                                        |
-| <code>child_address</code>         | <code>address</code>    | Address of the to-be-created Child VASP account.                                                                                            |
+| <code>child_address</code>         | <code><b>address</b></code>    | Address of the to-be-created Child VASP account.                                                                                            |
 | <code>auth_key_prefix</code>       | <code>vector&lt;u8&gt;</code> | The authentication key prefix that will be used initially for the newly created account.                                                    |
 | <code>add_all_currencies</code>    | <code>bool</code>       | Whether to publish balance resources for all known currencies when the account is created.                                                  |
 | <code>child_initial_balance</code> | <code>u64</code>        | The initial balance in <code>CoinType</code> to give the child account when it's created.                                                              |
@@ -137,7 +137,7 @@ This is emitted on the new Child VASPS's <code><a href="DiemAccount.md#0x1_DiemA
 * <code><a href="AccountAdministrationScripts.md#0x1_AccountAdministrationScripts_create_recovery_address">AccountAdministrationScripts::create_recovery_address</a></code>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="AccountCreationScripts.md#0x1_AccountCreationScripts_create_child_vasp_account">create_child_vasp_account</a>&lt;CoinType&gt;(parent_vasp: signer, child_address: address, auth_key_prefix: vector&lt;u8&gt;, add_all_currencies: bool, child_initial_balance: u64)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="AccountCreationScripts.md#0x1_AccountCreationScripts_create_child_vasp_account">create_child_vasp_account</a>&lt;CoinType&gt;(parent_vasp: signer, child_address: <b>address</b>, auth_key_prefix: vector&lt;u8&gt;, add_all_currencies: bool, child_initial_balance: u64)
 </code></pre>
 
 
@@ -148,7 +148,7 @@ This is emitted on the new Child VASPS's <code><a href="DiemAccount.md#0x1_DiemA
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="AccountCreationScripts.md#0x1_AccountCreationScripts_create_child_vasp_account">create_child_vasp_account</a>&lt;CoinType&gt;(
     parent_vasp: signer,
-    child_address: address,
+    child_address: <b>address</b>,
     auth_key_prefix: vector&lt;u8&gt;,
     add_all_currencies: bool,
     child_initial_balance: u64
@@ -272,7 +272,7 @@ and the <code>rold_id</code> field being <code><a href="Roles.md#0x1_Roles_VALID
 | ------                | ------       | -------------                                                                            |
 | <code>dr_account</code>          | <code>signer</code>     | The signer of the sending account of this transaction. Must be the Diem Root signer.     |
 | <code>sliding_nonce</code>       | <code>u64</code>        | The <code>sliding_nonce</code> (see: <code><a href="SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction.               |
-| <code>new_account_address</code> | <code>address</code>    | Address of the to-be-created Validator account.                                          |
+| <code>new_account_address</code> | <code><b>address</b></code>    | Address of the to-be-created Validator account.                                          |
 | <code>auth_key_prefix</code>     | <code>vector&lt;u8&gt;</code> | The authentication key prefix that will be used initially for the newly created account. |
 | <code>human_name</code>          | <code>vector&lt;u8&gt;</code> | ASCII-encoded human name for the validator.                                              |
 
@@ -305,7 +305,7 @@ and the <code>rold_id</code> field being <code><a href="Roles.md#0x1_Roles_VALID
 * <code><a href="ValidatorAdministrationScripts.md#0x1_ValidatorAdministrationScripts_set_validator_config_and_reconfigure">ValidatorAdministrationScripts::set_validator_config_and_reconfigure</a></code>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="AccountCreationScripts.md#0x1_AccountCreationScripts_create_validator_operator_account">create_validator_operator_account</a>(dr_account: signer, sliding_nonce: u64, new_account_address: address, auth_key_prefix: vector&lt;u8&gt;, human_name: vector&lt;u8&gt;)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="AccountCreationScripts.md#0x1_AccountCreationScripts_create_validator_operator_account">create_validator_operator_account</a>(dr_account: signer, sliding_nonce: u64, new_account_address: <b>address</b>, auth_key_prefix: vector&lt;u8&gt;, human_name: vector&lt;u8&gt;)
 </code></pre>
 
 
@@ -317,7 +317,7 @@ and the <code>rold_id</code> field being <code><a href="Roles.md#0x1_Roles_VALID
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="AccountCreationScripts.md#0x1_AccountCreationScripts_create_validator_operator_account">create_validator_operator_account</a>(
     dr_account: signer,
     sliding_nonce: u64,
-    new_account_address: address,
+    new_account_address: <b>address</b>,
     auth_key_prefix: vector&lt;u8&gt;,
     human_name: vector&lt;u8&gt;
 ) {
@@ -418,7 +418,7 @@ and the <code>rold_id</code> field being <code><a href="Roles.md#0x1_Roles_VALID
 | ------                | ------       | -------------                                                                            |
 | <code>dr_account</code>          | <code>signer</code>     | The signer of the sending account of this transaction. Must be the Diem Root signer.     |
 | <code>sliding_nonce</code>       | <code>u64</code>        | The <code>sliding_nonce</code> (see: <code><a href="SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction.               |
-| <code>new_account_address</code> | <code>address</code>    | Address of the to-be-created Validator account.                                          |
+| <code>new_account_address</code> | <code><b>address</b></code>    | Address of the to-be-created Validator account.                                          |
 | <code>auth_key_prefix</code>     | <code>vector&lt;u8&gt;</code> | The authentication key prefix that will be used initially for the newly created account. |
 | <code>human_name</code>          | <code>vector&lt;u8&gt;</code> | ASCII-encoded human name for the validator.                                              |
 
@@ -451,7 +451,7 @@ and the <code>rold_id</code> field being <code><a href="Roles.md#0x1_Roles_VALID
 * <code><a href="ValidatorAdministrationScripts.md#0x1_ValidatorAdministrationScripts_set_validator_config_and_reconfigure">ValidatorAdministrationScripts::set_validator_config_and_reconfigure</a></code>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="AccountCreationScripts.md#0x1_AccountCreationScripts_create_validator_account">create_validator_account</a>(dr_account: signer, sliding_nonce: u64, new_account_address: address, auth_key_prefix: vector&lt;u8&gt;, human_name: vector&lt;u8&gt;)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="AccountCreationScripts.md#0x1_AccountCreationScripts_create_validator_account">create_validator_account</a>(dr_account: signer, sliding_nonce: u64, new_account_address: <b>address</b>, auth_key_prefix: vector&lt;u8&gt;, human_name: vector&lt;u8&gt;)
 </code></pre>
 
 
@@ -463,7 +463,7 @@ and the <code>rold_id</code> field being <code><a href="Roles.md#0x1_Roles_VALID
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="AccountCreationScripts.md#0x1_AccountCreationScripts_create_validator_account">create_validator_account</a>(
     dr_account: signer,
     sliding_nonce: u64,
-    new_account_address: address,
+    new_account_address: <b>address</b>,
     auth_key_prefix: vector&lt;u8&gt;,
     human_name: vector&lt;u8&gt;,
 ) {
@@ -534,7 +534,7 @@ Creates a Parent VASP account with the specified human name. Must be called by t
 
 ### Technical Description
 
-Creates an account with the Parent VASP role at <code>address</code> with authentication key
+Creates an account with the Parent VASP role at <code><b>address</b></code> with authentication key
 <code>auth_key_prefix</code> | <code>new_account_address</code> and a 0 balance of type <code>CoinType</code>. If
 <code>add_all_currencies</code> is true, 0 balances for all available currencies in the system will
 also be added. This can only be invoked by an TreasuryCompliance account.
@@ -562,7 +562,7 @@ and the <code>rold_id</code> field being <code><a href="Roles.md#0x1_Roles_PAREN
 | <code>CoinType</code>            | Type         | The Move type for the <code>CoinType</code> currency that the Parent VASP account should be initialized with. <code>CoinType</code> must be an already-registered currency on-chain. |
 | <code>tc_account</code>          | <code>signer</code>     | The signer of the sending account of this transaction. Must be the Treasury Compliance account.                                                                |
 | <code>sliding_nonce</code>       | <code>u64</code>        | The <code>sliding_nonce</code> (see: <code><a href="SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction.                                                                                     |
-| <code>new_account_address</code> | <code>address</code>    | Address of the to-be-created Parent VASP account.                                                                                                              |
+| <code>new_account_address</code> | <code><b>address</b></code>    | Address of the to-be-created Parent VASP account.                                                                                                              |
 | <code>auth_key_prefix</code>     | <code>vector&lt;u8&gt;</code> | The authentication key prefix that will be used initially for the newly created account.                                                                       |
 | <code>human_name</code>          | <code>vector&lt;u8&gt;</code> | ASCII-encoded human name for the Parent VASP.                                                                                                                  |
 | <code>add_all_currencies</code>  | <code>bool</code>       | Whether to publish balance resources for all known currencies when the account is created.                                                                     |
@@ -596,7 +596,7 @@ and the <code>rold_id</code> field being <code><a href="Roles.md#0x1_Roles_PAREN
 * <code><a href="AccountAdministrationScripts.md#0x1_AccountAdministrationScripts_rotate_dual_attestation_info">AccountAdministrationScripts::rotate_dual_attestation_info</a></code>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="AccountCreationScripts.md#0x1_AccountCreationScripts_create_parent_vasp_account">create_parent_vasp_account</a>&lt;CoinType&gt;(tc_account: signer, sliding_nonce: u64, new_account_address: address, auth_key_prefix: vector&lt;u8&gt;, human_name: vector&lt;u8&gt;, add_all_currencies: bool)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="AccountCreationScripts.md#0x1_AccountCreationScripts_create_parent_vasp_account">create_parent_vasp_account</a>&lt;CoinType&gt;(tc_account: signer, sliding_nonce: u64, new_account_address: <b>address</b>, auth_key_prefix: vector&lt;u8&gt;, human_name: vector&lt;u8&gt;, add_all_currencies: bool)
 </code></pre>
 
 
@@ -608,7 +608,7 @@ and the <code>rold_id</code> field being <code><a href="Roles.md#0x1_Roles_PAREN
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="AccountCreationScripts.md#0x1_AccountCreationScripts_create_parent_vasp_account">create_parent_vasp_account</a>&lt;CoinType&gt;(
     tc_account: signer,
     sliding_nonce: u64,
-    new_account_address: address,
+    new_account_address: <b>address</b>,
     auth_key_prefix: vector&lt;u8&gt;,
     human_name: vector&lt;u8&gt;,
     add_all_currencies: bool
@@ -706,7 +706,7 @@ and the <code>rold_id</code> field being <code><a href="Roles.md#0x1_Roles_DESIG
 | <code>Currency</code>           | Type         | The Move type for the <code>Currency</code> that the Designated Dealer should be initialized with. <code>Currency</code> must be an already-registered currency on-chain. |
 | <code>tc_account</code>         | <code>signer</code>     | The signer of the sending account of this transaction. Must be the Treasury Compliance account.                                                     |
 | <code>sliding_nonce</code>      | <code>u64</code>        | The <code>sliding_nonce</code> (see: <code><a href="SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction.                                                                          |
-| <code>addr</code>               | <code>address</code>    | Address of the to-be-created Designated Dealer account.                                                                                             |
+| <code>addr</code>               | <code><b>address</b></code>    | Address of the to-be-created Designated Dealer account.                                                                                             |
 | <code>auth_key_prefix</code>    | <code>vector&lt;u8&gt;</code> | The authentication key prefix that will be used initially for the newly created account.                                                            |
 | <code>human_name</code>         | <code>vector&lt;u8&gt;</code> | ASCII-encoded human name for the Designated Dealer.                                                                                                 |
 | <code>add_all_currencies</code> | <code>bool</code>       | Whether to publish preburn, balance, and tier info resources for all known (SCS) currencies or just <code>Currency</code> when the account is created.         |
@@ -738,7 +738,7 @@ and the <code>rold_id</code> field being <code><a href="Roles.md#0x1_Roles_DESIG
 * <code><a href="AccountAdministrationScripts.md#0x1_AccountAdministrationScripts_rotate_dual_attestation_info">AccountAdministrationScripts::rotate_dual_attestation_info</a></code>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="AccountCreationScripts.md#0x1_AccountCreationScripts_create_designated_dealer">create_designated_dealer</a>&lt;Currency&gt;(tc_account: signer, sliding_nonce: u64, addr: address, auth_key_prefix: vector&lt;u8&gt;, human_name: vector&lt;u8&gt;, add_all_currencies: bool)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="AccountCreationScripts.md#0x1_AccountCreationScripts_create_designated_dealer">create_designated_dealer</a>&lt;Currency&gt;(tc_account: signer, sliding_nonce: u64, addr: <b>address</b>, auth_key_prefix: vector&lt;u8&gt;, human_name: vector&lt;u8&gt;, add_all_currencies: bool)
 </code></pre>
 
 
@@ -750,7 +750,7 @@ and the <code>rold_id</code> field being <code><a href="Roles.md#0x1_Roles_DESIG
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="AccountCreationScripts.md#0x1_AccountCreationScripts_create_designated_dealer">create_designated_dealer</a>&lt;Currency&gt;(
     tc_account: signer,
     sliding_nonce: u64,
-    addr: address,
+    addr: <b>address</b>,
     auth_key_prefix: vector&lt;u8&gt;,
     human_name: vector&lt;u8&gt;,
     add_all_currencies: bool,
@@ -807,7 +807,7 @@ Only the Treasury Compliance account can create Designated Dealer accounts [[A5]
 
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="AccountCreationScripts.md#0x1_AccountCreationScripts_create_account">create_account</a>&lt;CoinType&gt;(_account: signer, new_account_address: address, auth_key_prefix: vector&lt;u8&gt;)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="AccountCreationScripts.md#0x1_AccountCreationScripts_create_account">create_account</a>&lt;CoinType&gt;(_account: signer, new_account_address: <b>address</b>, auth_key_prefix: vector&lt;u8&gt;)
 </code></pre>
 
 
@@ -818,7 +818,7 @@ Only the Treasury Compliance account can create Designated Dealer accounts [[A5]
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="AccountCreationScripts.md#0x1_AccountCreationScripts_create_account">create_account</a>&lt;CoinType&gt;(
     _account: signer,
-    new_account_address: address,
+    new_account_address: <b>address</b>,
     auth_key_prefix: vector&lt;u8&gt;,
 ) {
     <a href="DiemAccount.md#0x1_DiemAccount_create_account">DiemAccount::create_account</a>&lt;CoinType&gt;(

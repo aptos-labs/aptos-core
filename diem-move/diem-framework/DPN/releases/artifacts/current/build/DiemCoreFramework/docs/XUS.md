@@ -163,7 +163,7 @@ it does not hold for all types (but does hold for XUS).
 <code>LimitsDefinition&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;</code> is not published at any other address
 
 
-<pre><code><b>invariant</b> [suspendable] <b>forall</b> addr: address <b>where</b> <b>exists</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">AccountLimits::LimitsDefinition</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;&gt;(addr):
+<pre><code><b>invariant</b> [suspendable] <b>forall</b> addr: <b>address</b> <b>where</b> <b>exists</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">AccountLimits::LimitsDefinition</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;&gt;(addr):
     addr == @DiemRoot;
 </code></pre>
 
@@ -216,7 +216,7 @@ If an account has MintCapability<XUS>, it is a TreasuryCompliance account.
 
 
 <pre><code><b>invariant</b>
-    <b>forall</b> a: address:
+    <b>forall</b> a: <b>address</b>:
         <a href="Diem.md#0x1_Diem_spec_has_mint_capability">Diem::spec_has_mint_capability</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;(a) ==&gt;
             <a href="Roles.md#0x1_Roles_spec_has_treasury_compliance_role_addr">Roles::spec_has_treasury_compliance_role_addr</a>(a);
 </code></pre>
@@ -240,7 +240,7 @@ At most one address has a MintCapability<XUS>.
 
 
 <pre><code><b>invariant</b>
-    <b>forall</b> a1: address, a2: address:
+    <b>forall</b> a1: <b>address</b>, a2: <b>address</b>:
         (<a href="Diem.md#0x1_Diem_spec_has_mint_capability">Diem::spec_has_mint_capability</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;(a1) && <a href="Diem.md#0x1_Diem_spec_has_mint_capability">Diem::spec_has_mint_capability</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;(a2)) ==&gt; a1 == a2;
 </code></pre>
 
@@ -250,7 +250,7 @@ MintCapability<XUS> is not copiable, and once it's published, it's not removed.
 
 
 <pre><code><b>invariant</b> <b>update</b>
-    <b>forall</b> a: address
+    <b>forall</b> a: <b>address</b>
         <b>where</b> <b>old</b>(<b>exists</b>&lt;<a href="Diem.md#0x1_Diem_MintCapability">Diem::MintCapability</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;&gt;(a)):
             <b>exists</b>&lt;<a href="Diem.md#0x1_Diem_MintCapability">Diem::MintCapability</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;&gt;(a);
 </code></pre>
@@ -267,7 +267,7 @@ If an account has BurnCapability<XUS>, it is a TreasuryCompliance account.
 
 
 <pre><code><b>invariant</b>
-    <b>forall</b> a: address:
+    <b>forall</b> a: <b>address</b>:
         <a href="Diem.md#0x1_Diem_spec_has_burn_capability">Diem::spec_has_burn_capability</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;(a) ==&gt;
             <a href="Roles.md#0x1_Roles_spec_has_treasury_compliance_role_addr">Roles::spec_has_treasury_compliance_role_addr</a>(a);
 </code></pre>
@@ -296,7 +296,7 @@ At most one address has a BurnCapability<XUS>.
 
 
 <pre><code><b>invariant</b>
-    <b>forall</b> a1: address, a2: address:
+    <b>forall</b> a1: <b>address</b>, a2: <b>address</b>:
         (<a href="Diem.md#0x1_Diem_spec_has_burn_capability">Diem::spec_has_burn_capability</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;(a1) && <a href="Diem.md#0x1_Diem_spec_has_burn_capability">Diem::spec_has_burn_capability</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;(a2)) ==&gt; a1 == a2;
 </code></pre>
 
@@ -306,7 +306,7 @@ BurnCapability<XUS> is not copiable, and once it's published, it's not removed.
 
 
 <pre><code><b>invariant</b> <b>update</b> [suspendable]
-    <b>forall</b> a: address
+    <b>forall</b> a: <b>address</b>
         <b>where</b> <b>old</b>(<b>exists</b>&lt;<a href="Diem.md#0x1_Diem_BurnCapability">Diem::BurnCapability</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;&gt;(a)):
             <b>exists</b>&lt;<a href="Diem.md#0x1_Diem_BurnCapability">Diem::BurnCapability</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;&gt;(a);
 </code></pre>
@@ -323,7 +323,7 @@ If an account has PreburnQueue<XUS> or Preburn<XUS>, it is a DesignatedDealer ac
 
 
 <pre><code><b>invariant</b>
-    <b>forall</b> a: address:
+    <b>forall</b> a: <b>address</b>:
         (<a href="Diem.md#0x1_Diem_spec_has_preburn_queue">Diem::spec_has_preburn_queue</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;(a) || <a href="Diem.md#0x1_Diem_spec_has_preburn">Diem::spec_has_preburn</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;(a)) ==&gt;
             <a href="Roles.md#0x1_Roles_spec_has_designated_dealer_role_addr">Roles::spec_has_designated_dealer_role_addr</a>(a);
 </code></pre>
@@ -347,7 +347,7 @@ PreburnQueue<XUS> is not copiable, and once it's published, it's not removed.
 
 
 <pre><code><b>invariant</b> <b>update</b> [suspendable]
-    <b>forall</b> a: address
+    <b>forall</b> a: <b>address</b>
         <b>where</b> <b>old</b>(<b>exists</b>&lt;<a href="Diem.md#0x1_Diem_PreburnQueue">Diem::PreburnQueue</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;&gt;(a)):
             <b>exists</b>&lt;<a href="Diem.md#0x1_Diem_PreburnQueue">Diem::PreburnQueue</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;&gt;(a);
 </code></pre>

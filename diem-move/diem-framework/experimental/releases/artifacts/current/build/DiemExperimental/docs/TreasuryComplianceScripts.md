@@ -153,7 +153,7 @@ being <code>preburn_address</code>.
 | ------            | ------    | -------------                                                                                                                        |
 | <code>Token</code>           | Type      | The Move type for the <code>Token</code> currenty that burning is being cancelled for. <code>Token</code> must be an already-registered currency on-chain. |
 | <code>account</code>         | <code>signer</code>  | The signer of the sending account of this transaction, must have a burn capability for <code>Token</code> published under it.                   |
-| <code>preburn_address</code> | <code>address</code> | The address where the coins to-be-burned are currently held.                                                                         |
+| <code>preburn_address</code> | <code><b>address</b></code> | The address where the coins to-be-burned are currently held.                                                                         |
 | <code>amount</code>          | <code>u64</code>     | The amount to be cancelled.                                                                                                          |
 
 
@@ -181,7 +181,7 @@ being <code>preburn_address</code>.
 * <code><a href="TreasuryComplianceScripts.md#0x1_TreasuryComplianceScripts_preburn">TreasuryComplianceScripts::preburn</a></code>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TreasuryComplianceScripts.md#0x1_TreasuryComplianceScripts_cancel_burn_with_amount">cancel_burn_with_amount</a>&lt;Token&gt;(account: signer, preburn_address: address, amount: u64)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TreasuryComplianceScripts.md#0x1_TreasuryComplianceScripts_cancel_burn_with_amount">cancel_burn_with_amount</a>&lt;Token&gt;(account: signer, preburn_address: <b>address</b>, amount: u64)
 </code></pre>
 
 
@@ -190,7 +190,7 @@ being <code>preburn_address</code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TreasuryComplianceScripts.md#0x1_TreasuryComplianceScripts_cancel_burn_with_amount">cancel_burn_with_amount</a>&lt;Token&gt;(account: signer, preburn_address: address, amount: u64) {
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TreasuryComplianceScripts.md#0x1_TreasuryComplianceScripts_cancel_burn_with_amount">cancel_burn_with_amount</a>&lt;Token&gt;(account: signer, preburn_address: <b>address</b>, amount: u64) {
     <a href="DiemAccount.md#0x1_DiemAccount_cancel_burn">DiemAccount::cancel_burn</a>&lt;Token&gt;(&account, preburn_address, amount)
 }
 </code></pre>
@@ -211,11 +211,11 @@ being <code>preburn_address</code>.
 <b>let</b> total_preburn_value = <b>global</b>&lt;<a href="Diem.md#0x1_Diem_CurrencyInfo">Diem::CurrencyInfo</a>&lt;Token&gt;&gt;(
     @CurrencyInfo
 ).preburn_value;
-<b>let</b> post post_total_preburn_value = <b>global</b>&lt;<a href="Diem.md#0x1_Diem_CurrencyInfo">Diem::CurrencyInfo</a>&lt;Token&gt;&gt;(
+<b>let</b> <b>post</b> post_total_preburn_value = <b>global</b>&lt;<a href="Diem.md#0x1_Diem_CurrencyInfo">Diem::CurrencyInfo</a>&lt;Token&gt;&gt;(
     @CurrencyInfo
 ).preburn_value;
 <b>let</b> balance_at_addr = <a href="DiemAccount.md#0x1_DiemAccount_balance">DiemAccount::balance</a>&lt;Token&gt;(preburn_address);
-<b>let</b> post post_balance_at_addr = <a href="DiemAccount.md#0x1_DiemAccount_balance">DiemAccount::balance</a>&lt;Token&gt;(preburn_address);
+<b>let</b> <b>post</b> post_balance_at_addr = <a href="DiemAccount.md#0x1_DiemAccount_balance">DiemAccount::balance</a>&lt;Token&gt;(preburn_address);
 </code></pre>
 
 
@@ -311,7 +311,7 @@ held in the <code><a href="Diem.md#0x1_Diem_CurrencyInfo">Diem::CurrencyInfo</a>
 | <code>Token</code>           | Type      | The Move type for the <code>Token</code> currency being burned. <code>Token</code> must be an already-registered currency on-chain.      |
 | <code>tc_account</code>      | <code>signer</code>  | The signer of the sending account of this transaction, must have a burn capability for <code>Token</code> published under it. |
 | <code>sliding_nonce</code>   | <code>u64</code>     | The <code>sliding_nonce</code> (see: <code><a href="SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction.                                         |
-| <code>preburn_address</code> | <code>address</code> | The address where the coins to-be-burned are currently held.                                                       |
+| <code>preburn_address</code> | <code><b>address</b></code> | The address where the coins to-be-burned are currently held.                                                       |
 | <code>amount</code>          | <code>u64</code>     | The amount to be burned.                                                                                           |
 
 
@@ -340,7 +340,7 @@ held in the <code><a href="Diem.md#0x1_Diem_CurrencyInfo">Diem::CurrencyInfo</a>
 * <code><a href="TreasuryComplianceScripts.md#0x1_TreasuryComplianceScripts_preburn">TreasuryComplianceScripts::preburn</a></code>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TreasuryComplianceScripts.md#0x1_TreasuryComplianceScripts_burn_with_amount">burn_with_amount</a>&lt;Token&gt;(account: signer, sliding_nonce: u64, preburn_address: address, amount: u64)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TreasuryComplianceScripts.md#0x1_TreasuryComplianceScripts_burn_with_amount">burn_with_amount</a>&lt;Token&gt;(account: signer, sliding_nonce: u64, preburn_address: <b>address</b>, amount: u64)
 </code></pre>
 
 
@@ -349,7 +349,7 @@ held in the <code><a href="Diem.md#0x1_Diem_CurrencyInfo">Diem::CurrencyInfo</a>
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TreasuryComplianceScripts.md#0x1_TreasuryComplianceScripts_burn_with_amount">burn_with_amount</a>&lt;Token&gt;(account: signer, sliding_nonce: u64, preburn_address: address, amount: u64) {
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TreasuryComplianceScripts.md#0x1_TreasuryComplianceScripts_burn_with_amount">burn_with_amount</a>&lt;Token&gt;(account: signer, sliding_nonce: u64, preburn_address: <b>address</b>, amount: u64) {
     <a href="SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&account, sliding_nonce);
     <a href="Diem.md#0x1_Diem_burn">Diem::burn</a>&lt;Token&gt;(&account, preburn_address, amount)
 }
@@ -645,7 +645,7 @@ resource published under the <code>designated_dealer_address</code>.
 | <code>CoinType</code>                  | Type      | The Move type for the <code>CoinType</code> being minted. <code>CoinType</code> must be an already-registered currency on-chain. |
 | <code>tc_account</code>                | <code>signer</code>  | The signer of the sending account of this transaction. Must be the Treasury Compliance account.            |
 | <code>sliding_nonce</code>             | <code>u64</code>     | The <code>sliding_nonce</code> (see: <code><a href="SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction.                                 |
-| <code>designated_dealer_address</code> | <code>address</code> | The address of the Designated Dealer account being minted to.                                              |
+| <code>designated_dealer_address</code> | <code><b>address</b></code> | The address of the Designated Dealer account being minted to.                                              |
 | <code>mint_amount</code>               | <code>u64</code>     | The number of coins to be minted.                                                                          |
 | <code>tier_index</code>                | <code>u64</code>     | [Deprecated] The mint tier index to use for the Designated Dealer account. Will be ignored                 |
 
@@ -678,7 +678,7 @@ resource published under the <code>designated_dealer_address</code>.
 * <code><a href="AccountAdministrationScripts.md#0x1_AccountAdministrationScripts_rotate_dual_attestation_info">AccountAdministrationScripts::rotate_dual_attestation_info</a></code>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TreasuryComplianceScripts.md#0x1_TreasuryComplianceScripts_tiered_mint">tiered_mint</a>&lt;CoinType&gt;(tc_account: signer, sliding_nonce: u64, designated_dealer_address: address, mint_amount: u64, tier_index: u64)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TreasuryComplianceScripts.md#0x1_TreasuryComplianceScripts_tiered_mint">tiered_mint</a>&lt;CoinType&gt;(tc_account: signer, sliding_nonce: u64, designated_dealer_address: <b>address</b>, mint_amount: u64, tier_index: u64)
 </code></pre>
 
 
@@ -690,7 +690,7 @@ resource published under the <code>designated_dealer_address</code>.
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TreasuryComplianceScripts.md#0x1_TreasuryComplianceScripts_tiered_mint">tiered_mint</a>&lt;CoinType&gt;(
     tc_account: signer,
     sliding_nonce: u64,
-    designated_dealer_address: address,
+    designated_dealer_address: <b>address</b>,
     mint_amount: u64,
     tier_index: u64
 ) {
@@ -746,7 +746,7 @@ Only the Treasury Compliance account can mint [[H1]][PERMISSION].
 
 ### Summary
 
-Freezes the account at <code>address</code>. The sending account of this transaction
+Freezes the account at <code><b>address</b></code>. The sending account of this transaction
 must be the Treasury Compliance account. The account being frozen cannot be
 the Diem Root or Treasury Compliance account. After the successful
 execution of this transaction no transactions may be sent from the frozen
@@ -784,7 +784,7 @@ under <code>0xA550C18</code> with the <code>frozen_address</code> being the <cod
 | ------              | ------    | -------------                                                                                   |
 | <code>tc_account</code>        | <code>signer</code>  | The signer of the sending account of this transaction. Must be the Treasury Compliance account. |
 | <code>sliding_nonce</code>     | <code>u64</code>     | The <code>sliding_nonce</code> (see: <code><a href="SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction.                      |
-| <code>to_freeze_account</code> | <code>address</code> | The account address to be frozen.                                                               |
+| <code>to_freeze_account</code> | <code><b>address</b></code> | The account address to be frozen.                                                               |
 
 
 <a name="@Common_Abort_Conditions_34"></a>
@@ -810,7 +810,7 @@ under <code>0xA550C18</code> with the <code>frozen_address</code> being the <cod
 * <code><a href="TreasuryComplianceScripts.md#0x1_TreasuryComplianceScripts_unfreeze_account">TreasuryComplianceScripts::unfreeze_account</a></code>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TreasuryComplianceScripts.md#0x1_TreasuryComplianceScripts_freeze_account">freeze_account</a>(tc_account: signer, sliding_nonce: u64, to_freeze_account: address)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TreasuryComplianceScripts.md#0x1_TreasuryComplianceScripts_freeze_account">freeze_account</a>(tc_account: signer, sliding_nonce: u64, to_freeze_account: <b>address</b>)
 </code></pre>
 
 
@@ -819,7 +819,7 @@ under <code>0xA550C18</code> with the <code>frozen_address</code> being the <cod
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TreasuryComplianceScripts.md#0x1_TreasuryComplianceScripts_freeze_account">freeze_account</a>(tc_account: signer, sliding_nonce: u64, to_freeze_account: address) {
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TreasuryComplianceScripts.md#0x1_TreasuryComplianceScripts_freeze_account">freeze_account</a>(tc_account: signer, sliding_nonce: u64, to_freeze_account: <b>address</b>) {
     <a href="SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&tc_account, sliding_nonce);
     <a href="AccountFreezing.md#0x1_AccountFreezing_freeze_account">AccountFreezing::freeze_account</a>(&tc_account, to_freeze_account);
 }
@@ -838,7 +838,7 @@ under <code>0xA550C18</code> with the <code>frozen_address</code> being the <cod
 
 ### Summary
 
-Unfreezes the account at <code>address</code>. The sending account of this transaction must be the
+Unfreezes the account at <code><b>address</b></code>. The sending account of this transaction must be the
 Treasury Compliance account. After the successful execution of this transaction transactions
 may be sent from the previously frozen account, and coins may be sent and received.
 
@@ -869,7 +869,7 @@ the <code>unfrozen_address</code> set the <code>to_unfreeze_account</code>'s add
 | ------                | ------    | -------------                                                                                   |
 | <code>tc_account</code>          | <code>signer</code>  | The signer of the sending account of this transaction. Must be the Treasury Compliance account. |
 | <code>sliding_nonce</code>       | <code>u64</code>     | The <code>sliding_nonce</code> (see: <code><a href="SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction.                      |
-| <code>to_unfreeze_account</code> | <code>address</code> | The account address to be frozen.                                                               |
+| <code>to_unfreeze_account</code> | <code><b>address</b></code> | The account address to be frozen.                                                               |
 
 
 <a name="@Common_Abort_Conditions_40"></a>
@@ -892,7 +892,7 @@ the <code>unfrozen_address</code> set the <code>to_unfreeze_account</code>'s add
 * <code><a href="TreasuryComplianceScripts.md#0x1_TreasuryComplianceScripts_freeze_account">TreasuryComplianceScripts::freeze_account</a></code>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TreasuryComplianceScripts.md#0x1_TreasuryComplianceScripts_unfreeze_account">unfreeze_account</a>(account: signer, sliding_nonce: u64, to_unfreeze_account: address)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TreasuryComplianceScripts.md#0x1_TreasuryComplianceScripts_unfreeze_account">unfreeze_account</a>(account: signer, sliding_nonce: u64, to_unfreeze_account: <b>address</b>)
 </code></pre>
 
 
@@ -901,7 +901,7 @@ the <code>unfrozen_address</code> set the <code>to_unfreeze_account</code>'s add
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TreasuryComplianceScripts.md#0x1_TreasuryComplianceScripts_unfreeze_account">unfreeze_account</a>(account: signer, sliding_nonce: u64, to_unfreeze_account: address) {
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TreasuryComplianceScripts.md#0x1_TreasuryComplianceScripts_unfreeze_account">unfreeze_account</a>(account: signer, sliding_nonce: u64, to_unfreeze_account: <b>address</b>) {
     <a href="SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&account, sliding_nonce);
     <a href="AccountFreezing.md#0x1_AccountFreezing_unfreeze_account">AccountFreezing::unfreeze_account</a>(&account, to_unfreeze_account);
 }
@@ -1207,7 +1207,7 @@ the Treasury Compliance account.
 ### Technical Description
 
 Adds a <code><a href="VASPDomain.md#0x1_VASPDomain_VASPDomain">VASPDomain::VASPDomain</a></code> to the <code>domains</code> field of the <code><a href="VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomain::VASPDomains</a></code> resource published under
-the account at <code>address</code>.
+the account at <code><b>address</b></code>.
 
 
 <a name="@Parameters_59"></a>
@@ -1217,7 +1217,7 @@ the account at <code>address</code>.
 | Name         | Type         | Description                                                                                     |
 | ------       | ------       | -------------                                                                                   |
 | <code>tc_account</code> | <code>signer</code>     | The signer of the sending account of this transaction. Must be the Treasury Compliance account. |
-| <code>address</code>    | <code>address</code>    | The <code>address</code> of the parent VASP account that will have have <code>domain</code> added to its domains.     |
+| <code><b>address</b></code>    | <code><b>address</b></code>    | The <code><b>address</b></code> of the parent VASP account that will have have <code>domain</code> added to its domains.     |
 | <code>domain</code>     | <code>vector&lt;u8&gt;</code> | The domain to be added.                                                                         |
 
 
@@ -1230,12 +1230,12 @@ the account at <code>address</code>.
 | <code>Errors::REQUIRES_ROLE</code>    | <code><a href="Roles.md#0x1_Roles_ETREASURY_COMPLIANCE">Roles::ETREASURY_COMPLIANCE</a></code>            | The sending account is not the Treasury Compliance account.                                                                            |
 | <code>Errors::REQUIRES_ADDRESS</code> | <code><a href="CoreAddresses.md#0x1_CoreAddresses_ETREASURY_COMPLIANCE">CoreAddresses::ETREASURY_COMPLIANCE</a></code>    | <code>tc_account</code> is not the Treasury Compliance account.                                                                                   |
 | <code>Errors::NOT_PUBLISHED</code>    | <code><a href="VASPDomain.md#0x1_VASPDomain_EVASP_DOMAIN_MANAGER">VASPDomain::EVASP_DOMAIN_MANAGER</a></code>        | The <code><a href="VASPDomain.md#0x1_VASPDomain_VASPDomainManager">VASPDomain::VASPDomainManager</a></code> resource is not yet published under the Treasury Compliance account.                                 |
-| <code>Errors::NOT_PUBLISHED</code>    | <code><a href="VASPDomain.md#0x1_VASPDomain_EVASP_DOMAINS_NOT_PUBLISHED">VASPDomain::EVASP_DOMAINS_NOT_PUBLISHED</a></code> | <code>address</code> does not have a <code><a href="VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomain::VASPDomains</a></code> resource published under it.                                                         |
-| <code>Errors::INVALID_ARGUMENT</code> | <code>VASPDomain::EDOMAIN_ALREADY_EXISTS</code>         | The <code>domain</code> already exists in the list of <code><a href="VASPDomain.md#0x1_VASPDomain_VASPDomain">VASPDomain::VASPDomain</a></code>s  in the <code><a href="VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomain::VASPDomains</a></code> resource published under <code>address</code>. |
+| <code>Errors::NOT_PUBLISHED</code>    | <code><a href="VASPDomain.md#0x1_VASPDomain_EVASP_DOMAINS_NOT_PUBLISHED">VASPDomain::EVASP_DOMAINS_NOT_PUBLISHED</a></code> | <code><b>address</b></code> does not have a <code><a href="VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomain::VASPDomains</a></code> resource published under it.                                                         |
+| <code>Errors::INVALID_ARGUMENT</code> | <code>VASPDomain::EDOMAIN_ALREADY_EXISTS</code>         | The <code>domain</code> already exists in the list of <code><a href="VASPDomain.md#0x1_VASPDomain_VASPDomain">VASPDomain::VASPDomain</a></code>s  in the <code><a href="VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomain::VASPDomains</a></code> resource published under <code><b>address</b></code>. |
 | <code>Errors::INVALID_ARGUMENT</code> | <code><a href="VASPDomain.md#0x1_VASPDomain_EINVALID_VASP_DOMAIN">VASPDomain::EINVALID_VASP_DOMAIN</a></code>        | The <code>domain</code> is greater in length than <code><a href="VASPDomain.md#0x1_VASPDomain_DOMAIN_LENGTH">VASPDomain::DOMAIN_LENGTH</a></code>.                                                                        |
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TreasuryComplianceScripts.md#0x1_TreasuryComplianceScripts_add_vasp_domain">add_vasp_domain</a>(tc_account: signer, address: address, domain: vector&lt;u8&gt;)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TreasuryComplianceScripts.md#0x1_TreasuryComplianceScripts_add_vasp_domain">add_vasp_domain</a>(tc_account: signer, <b>address</b>: <b>address</b>, domain: vector&lt;u8&gt;)
 </code></pre>
 
 
@@ -1246,10 +1246,10 @@ the account at <code>address</code>.
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TreasuryComplianceScripts.md#0x1_TreasuryComplianceScripts_add_vasp_domain">add_vasp_domain</a> (
     tc_account: signer,
-    address: address,
+    <b>address</b>: <b>address</b>,
     domain: vector&lt;u8&gt;,
 ) {
-    <a href="VASPDomain.md#0x1_VASPDomain_add_vasp_domain">VASPDomain::add_vasp_domain</a>(&tc_account, address, domain);
+    <a href="VASPDomain.md#0x1_VASPDomain_add_vasp_domain">VASPDomain::add_vasp_domain</a>(&tc_account, <b>address</b>, domain);
 }
 </code></pre>
 
@@ -1295,7 +1295,7 @@ the Treasury Compliance account.
 ### Technical Description
 
 Removes a <code><a href="VASPDomain.md#0x1_VASPDomain_VASPDomain">VASPDomain::VASPDomain</a></code> from the <code>domains</code> field of the <code><a href="VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomain::VASPDomains</a></code> resource published under
-account with <code>address</code>.
+account with <code><b>address</b></code>.
 
 
 <a name="@Parameters_63"></a>
@@ -1305,7 +1305,7 @@ account with <code>address</code>.
 | Name         | Type         | Description                                                                                     |
 | ------       | ------       | -------------                                                                                   |
 | <code>tc_account</code> | <code>signer</code>     | The signer of the sending account of this transaction. Must be the Treasury Compliance account. |
-| <code>address</code>    | <code>address</code>    | The <code>address</code> of parent VASP account that will update its domains.                              |
+| <code><b>address</b></code>    | <code><b>address</b></code>    | The <code><b>address</b></code> of parent VASP account that will update its domains.                              |
 | <code>domain</code>     | <code>vector&lt;u8&gt;</code> | The domain name.                                                                                |
 
 
@@ -1318,12 +1318,12 @@ account with <code>address</code>.
 | <code>Errors::REQUIRES_ROLE</code>    | <code><a href="Roles.md#0x1_Roles_ETREASURY_COMPLIANCE">Roles::ETREASURY_COMPLIANCE</a></code>            | The sending account is not the Treasury Compliance account.                                                                            |
 | <code>Errors::REQUIRES_ADDRESS</code> | <code><a href="CoreAddresses.md#0x1_CoreAddresses_ETREASURY_COMPLIANCE">CoreAddresses::ETREASURY_COMPLIANCE</a></code>    | <code>tc_account</code> is not the Treasury Compliance account.                                                                                   |
 | <code>Errors::NOT_PUBLISHED</code>    | <code><a href="VASPDomain.md#0x1_VASPDomain_EVASP_DOMAIN_MANAGER">VASPDomain::EVASP_DOMAIN_MANAGER</a></code>        | The <code><a href="VASPDomain.md#0x1_VASPDomain_VASPDomainManager">VASPDomain::VASPDomainManager</a></code> resource is not yet published under the Treasury Compliance account.                                 |
-| <code>Errors::NOT_PUBLISHED</code>    | <code><a href="VASPDomain.md#0x1_VASPDomain_EVASP_DOMAINS_NOT_PUBLISHED">VASPDomain::EVASP_DOMAINS_NOT_PUBLISHED</a></code> | <code>address</code> does not have a <code><a href="VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomain::VASPDomains</a></code> resource published under it.                                                         |
+| <code>Errors::NOT_PUBLISHED</code>    | <code><a href="VASPDomain.md#0x1_VASPDomain_EVASP_DOMAINS_NOT_PUBLISHED">VASPDomain::EVASP_DOMAINS_NOT_PUBLISHED</a></code> | <code><b>address</b></code> does not have a <code><a href="VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomain::VASPDomains</a></code> resource published under it.                                                         |
 | <code>Errors::INVALID_ARGUMENT</code> | <code><a href="VASPDomain.md#0x1_VASPDomain_EINVALID_VASP_DOMAIN">VASPDomain::EINVALID_VASP_DOMAIN</a></code>        | The <code>domain</code> is greater in length than <code><a href="VASPDomain.md#0x1_VASPDomain_DOMAIN_LENGTH">VASPDomain::DOMAIN_LENGTH</a></code>.                                                                        |
-| <code>Errors::INVALID_ARGUMENT</code> | <code><a href="VASPDomain.md#0x1_VASPDomain_EVASP_DOMAIN_NOT_FOUND">VASPDomain::EVASP_DOMAIN_NOT_FOUND</a></code>              | The <code>domain</code> does not exist in the list of <code><a href="VASPDomain.md#0x1_VASPDomain_VASPDomain">VASPDomain::VASPDomain</a></code>s  in the <code><a href="VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomain::VASPDomains</a></code> resource published under <code>address</code>. |
+| <code>Errors::INVALID_ARGUMENT</code> | <code><a href="VASPDomain.md#0x1_VASPDomain_EVASP_DOMAIN_NOT_FOUND">VASPDomain::EVASP_DOMAIN_NOT_FOUND</a></code>              | The <code>domain</code> does not exist in the list of <code><a href="VASPDomain.md#0x1_VASPDomain_VASPDomain">VASPDomain::VASPDomain</a></code>s  in the <code><a href="VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomain::VASPDomains</a></code> resource published under <code><b>address</b></code>. |
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TreasuryComplianceScripts.md#0x1_TreasuryComplianceScripts_remove_vasp_domain">remove_vasp_domain</a>(tc_account: signer, address: address, domain: vector&lt;u8&gt;)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TreasuryComplianceScripts.md#0x1_TreasuryComplianceScripts_remove_vasp_domain">remove_vasp_domain</a>(tc_account: signer, <b>address</b>: <b>address</b>, domain: vector&lt;u8&gt;)
 </code></pre>
 
 
@@ -1334,10 +1334,10 @@ account with <code>address</code>.
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TreasuryComplianceScripts.md#0x1_TreasuryComplianceScripts_remove_vasp_domain">remove_vasp_domain</a> (
     tc_account: signer,
-    address: address,
+    <b>address</b>: <b>address</b>,
     domain: vector&lt;u8&gt;,
 ) {
-    <a href="VASPDomain.md#0x1_VASPDomain_remove_vasp_domain">VASPDomain::remove_vasp_domain</a>(&tc_account, address, domain);
+    <a href="VASPDomain.md#0x1_VASPDomain_remove_vasp_domain">VASPDomain::remove_vasp_domain</a>(&tc_account, <b>address</b>, domain);
 }
 </code></pre>
 

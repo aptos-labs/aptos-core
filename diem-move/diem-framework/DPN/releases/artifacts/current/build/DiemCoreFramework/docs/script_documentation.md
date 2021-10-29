@@ -593,7 +593,7 @@ Script documentation: <code><a href="script_documentation.md#0x1_TreasuryComplia
 #### Script freeze_account
 
 
-Freezes the account at <code>address</code>. The sending account of this transaction
+Freezes the account at <code><b>address</b></code>. The sending account of this transaction
 must be the Treasury Compliance account. The account being frozen cannot be
 the Diem Root or Treasury Compliance account. After the successful
 execution of this transaction no transactions may be sent from the frozen
@@ -609,7 +609,7 @@ Script documentation: <code><a href="script_documentation.md#0x1_TreasuryComplia
 #### Script unfreeze_account
 
 
-Unfreezes the account at <code>address</code>. The sending account of this transaction must be the
+Unfreezes the account at <code><b>address</b></code>. The sending account of this transaction must be the
 Treasury Compliance account. After the successful execution of this transaction transactions
 may be sent from the previously frozen account, and coins may be sent and received.
 
@@ -760,7 +760,7 @@ This is emitted on the new Child VASPS's <code><a href="DiemAccount.md#0x1_DiemA
 | ------                  | ------       | -------------                                                                                                                               |
 | <code>CoinType</code>              | Type         | The Move type for the <code>CoinType</code> that the child account should be created with. <code>CoinType</code> must be an already-registered currency on-chain. |
 | <code>parent_vasp</code>           | <code>signer</code>     | The reference of the sending account. Must be a Parent VASP account.                                                                        |
-| <code>child_address</code>         | <code>address</code>    | Address of the to-be-created Child VASP account.                                                                                            |
+| <code>child_address</code>         | <code><b>address</b></code>    | Address of the to-be-created Child VASP account.                                                                                            |
 | <code>auth_key_prefix</code>       | <code>vector&lt;u8&gt;</code> | The authentication key prefix that will be used initially for the newly created account.                                                    |
 | <code>add_all_currencies</code>    | <code>bool</code>       | Whether to publish balance resources for all known currencies when the account is created.                                                  |
 | <code>child_initial_balance</code> | <code>u64</code>        | The initial balance in <code>CoinType</code> to give the child account when it's created.                                                              |
@@ -794,7 +794,7 @@ This is emitted on the new Child VASPS's <code><a href="DiemAccount.md#0x1_DiemA
 * <code><a href="script_documentation.md#0x1_AccountAdministrationScripts_create_recovery_address">AccountAdministrationScripts::create_recovery_address</a></code>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_AccountCreationScripts_create_child_vasp_account">create_child_vasp_account</a>&lt;CoinType&gt;(parent_vasp: signer, child_address: address, auth_key_prefix: vector&lt;u8&gt;, add_all_currencies: bool, child_initial_balance: u64)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_AccountCreationScripts_create_child_vasp_account">create_child_vasp_account</a>&lt;CoinType&gt;(parent_vasp: signer, child_address: <b>address</b>, auth_key_prefix: vector&lt;u8&gt;, add_all_currencies: bool, child_initial_balance: u64)
 </code></pre>
 
 
@@ -805,7 +805,7 @@ This is emitted on the new Child VASPS's <code><a href="DiemAccount.md#0x1_DiemA
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_AccountCreationScripts_create_child_vasp_account">create_child_vasp_account</a>&lt;CoinType&gt;(
     parent_vasp: signer,
-    child_address: address,
+    child_address: <b>address</b>,
     auth_key_prefix: vector&lt;u8&gt;,
     add_all_currencies: bool,
     child_initial_balance: u64
@@ -929,7 +929,7 @@ and the <code>rold_id</code> field being <code><a href="Roles.md#0x1_Roles_VALID
 | ------                | ------       | -------------                                                                            |
 | <code>dr_account</code>          | <code>signer</code>     | The signer of the sending account of this transaction. Must be the Diem Root signer.     |
 | <code>sliding_nonce</code>       | <code>u64</code>        | The <code>sliding_nonce</code> (see: <code><a href="SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction.               |
-| <code>new_account_address</code> | <code>address</code>    | Address of the to-be-created Validator account.                                          |
+| <code>new_account_address</code> | <code><b>address</b></code>    | Address of the to-be-created Validator account.                                          |
 | <code>auth_key_prefix</code>     | <code>vector&lt;u8&gt;</code> | The authentication key prefix that will be used initially for the newly created account. |
 | <code>human_name</code>          | <code>vector&lt;u8&gt;</code> | ASCII-encoded human name for the validator.                                              |
 
@@ -962,7 +962,7 @@ and the <code>rold_id</code> field being <code><a href="Roles.md#0x1_Roles_VALID
 * <code><a href="script_documentation.md#0x1_ValidatorAdministrationScripts_set_validator_config_and_reconfigure">ValidatorAdministrationScripts::set_validator_config_and_reconfigure</a></code>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_AccountCreationScripts_create_validator_operator_account">create_validator_operator_account</a>(dr_account: signer, sliding_nonce: u64, new_account_address: address, auth_key_prefix: vector&lt;u8&gt;, human_name: vector&lt;u8&gt;)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_AccountCreationScripts_create_validator_operator_account">create_validator_operator_account</a>(dr_account: signer, sliding_nonce: u64, new_account_address: <b>address</b>, auth_key_prefix: vector&lt;u8&gt;, human_name: vector&lt;u8&gt;)
 </code></pre>
 
 
@@ -974,7 +974,7 @@ and the <code>rold_id</code> field being <code><a href="Roles.md#0x1_Roles_VALID
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_AccountCreationScripts_create_validator_operator_account">create_validator_operator_account</a>(
     dr_account: signer,
     sliding_nonce: u64,
-    new_account_address: address,
+    new_account_address: <b>address</b>,
     auth_key_prefix: vector&lt;u8&gt;,
     human_name: vector&lt;u8&gt;
 ) {
@@ -1075,7 +1075,7 @@ and the <code>rold_id</code> field being <code><a href="Roles.md#0x1_Roles_VALID
 | ------                | ------       | -------------                                                                            |
 | <code>dr_account</code>          | <code>signer</code>     | The signer of the sending account of this transaction. Must be the Diem Root signer.     |
 | <code>sliding_nonce</code>       | <code>u64</code>        | The <code>sliding_nonce</code> (see: <code><a href="SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction.               |
-| <code>new_account_address</code> | <code>address</code>    | Address of the to-be-created Validator account.                                          |
+| <code>new_account_address</code> | <code><b>address</b></code>    | Address of the to-be-created Validator account.                                          |
 | <code>auth_key_prefix</code>     | <code>vector&lt;u8&gt;</code> | The authentication key prefix that will be used initially for the newly created account. |
 | <code>human_name</code>          | <code>vector&lt;u8&gt;</code> | ASCII-encoded human name for the validator.                                              |
 
@@ -1108,7 +1108,7 @@ and the <code>rold_id</code> field being <code><a href="Roles.md#0x1_Roles_VALID
 * <code><a href="script_documentation.md#0x1_ValidatorAdministrationScripts_set_validator_config_and_reconfigure">ValidatorAdministrationScripts::set_validator_config_and_reconfigure</a></code>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_AccountCreationScripts_create_validator_account">create_validator_account</a>(dr_account: signer, sliding_nonce: u64, new_account_address: address, auth_key_prefix: vector&lt;u8&gt;, human_name: vector&lt;u8&gt;)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_AccountCreationScripts_create_validator_account">create_validator_account</a>(dr_account: signer, sliding_nonce: u64, new_account_address: <b>address</b>, auth_key_prefix: vector&lt;u8&gt;, human_name: vector&lt;u8&gt;)
 </code></pre>
 
 
@@ -1120,7 +1120,7 @@ and the <code>rold_id</code> field being <code><a href="Roles.md#0x1_Roles_VALID
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_AccountCreationScripts_create_validator_account">create_validator_account</a>(
     dr_account: signer,
     sliding_nonce: u64,
-    new_account_address: address,
+    new_account_address: <b>address</b>,
     auth_key_prefix: vector&lt;u8&gt;,
     human_name: vector&lt;u8&gt;,
 ) {
@@ -1191,7 +1191,7 @@ Creates a Parent VASP account with the specified human name. Must be called by t
 
 ###### Technical Description
 
-Creates an account with the Parent VASP role at <code>address</code> with authentication key
+Creates an account with the Parent VASP role at <code><b>address</b></code> with authentication key
 <code>auth_key_prefix</code> | <code>new_account_address</code> and a 0 balance of type <code>CoinType</code>. If
 <code>add_all_currencies</code> is true, 0 balances for all available currencies in the system will
 also be added. This can only be invoked by an TreasuryCompliance account.
@@ -1219,7 +1219,7 @@ and the <code>rold_id</code> field being <code><a href="Roles.md#0x1_Roles_PAREN
 | <code>CoinType</code>            | Type         | The Move type for the <code>CoinType</code> currency that the Parent VASP account should be initialized with. <code>CoinType</code> must be an already-registered currency on-chain. |
 | <code>tc_account</code>          | <code>signer</code>     | The signer of the sending account of this transaction. Must be the Treasury Compliance account.                                                                |
 | <code>sliding_nonce</code>       | <code>u64</code>        | The <code>sliding_nonce</code> (see: <code><a href="SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction.                                                                                     |
-| <code>new_account_address</code> | <code>address</code>    | Address of the to-be-created Parent VASP account.                                                                                                              |
+| <code>new_account_address</code> | <code><b>address</b></code>    | Address of the to-be-created Parent VASP account.                                                                                                              |
 | <code>auth_key_prefix</code>     | <code>vector&lt;u8&gt;</code> | The authentication key prefix that will be used initially for the newly created account.                                                                       |
 | <code>human_name</code>          | <code>vector&lt;u8&gt;</code> | ASCII-encoded human name for the Parent VASP.                                                                                                                  |
 | <code>add_all_currencies</code>  | <code>bool</code>       | Whether to publish balance resources for all known currencies when the account is created.                                                                     |
@@ -1253,7 +1253,7 @@ and the <code>rold_id</code> field being <code><a href="Roles.md#0x1_Roles_PAREN
 * <code><a href="script_documentation.md#0x1_AccountAdministrationScripts_rotate_dual_attestation_info">AccountAdministrationScripts::rotate_dual_attestation_info</a></code>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_AccountCreationScripts_create_parent_vasp_account">create_parent_vasp_account</a>&lt;CoinType&gt;(tc_account: signer, sliding_nonce: u64, new_account_address: address, auth_key_prefix: vector&lt;u8&gt;, human_name: vector&lt;u8&gt;, add_all_currencies: bool)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_AccountCreationScripts_create_parent_vasp_account">create_parent_vasp_account</a>&lt;CoinType&gt;(tc_account: signer, sliding_nonce: u64, new_account_address: <b>address</b>, auth_key_prefix: vector&lt;u8&gt;, human_name: vector&lt;u8&gt;, add_all_currencies: bool)
 </code></pre>
 
 
@@ -1265,7 +1265,7 @@ and the <code>rold_id</code> field being <code><a href="Roles.md#0x1_Roles_PAREN
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_AccountCreationScripts_create_parent_vasp_account">create_parent_vasp_account</a>&lt;CoinType&gt;(
     tc_account: signer,
     sliding_nonce: u64,
-    new_account_address: address,
+    new_account_address: <b>address</b>,
     auth_key_prefix: vector&lt;u8&gt;,
     human_name: vector&lt;u8&gt;,
     add_all_currencies: bool
@@ -1363,7 +1363,7 @@ and the <code>rold_id</code> field being <code><a href="Roles.md#0x1_Roles_DESIG
 | <code>Currency</code>           | Type         | The Move type for the <code>Currency</code> that the Designated Dealer should be initialized with. <code>Currency</code> must be an already-registered currency on-chain. |
 | <code>tc_account</code>         | <code>signer</code>     | The signer of the sending account of this transaction. Must be the Treasury Compliance account.                                                     |
 | <code>sliding_nonce</code>      | <code>u64</code>        | The <code>sliding_nonce</code> (see: <code><a href="SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction.                                                                          |
-| <code>addr</code>               | <code>address</code>    | Address of the to-be-created Designated Dealer account.                                                                                             |
+| <code>addr</code>               | <code><b>address</b></code>    | Address of the to-be-created Designated Dealer account.                                                                                             |
 | <code>auth_key_prefix</code>    | <code>vector&lt;u8&gt;</code> | The authentication key prefix that will be used initially for the newly created account.                                                            |
 | <code>human_name</code>         | <code>vector&lt;u8&gt;</code> | ASCII-encoded human name for the Designated Dealer.                                                                                                 |
 | <code>add_all_currencies</code> | <code>bool</code>       | Whether to publish preburn, balance, and tier info resources for all known (SCS) currencies or just <code>Currency</code> when the account is created.         |
@@ -1395,7 +1395,7 @@ and the <code>rold_id</code> field being <code><a href="Roles.md#0x1_Roles_DESIG
 * <code><a href="script_documentation.md#0x1_AccountAdministrationScripts_rotate_dual_attestation_info">AccountAdministrationScripts::rotate_dual_attestation_info</a></code>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_AccountCreationScripts_create_designated_dealer">create_designated_dealer</a>&lt;Currency&gt;(tc_account: signer, sliding_nonce: u64, addr: address, auth_key_prefix: vector&lt;u8&gt;, human_name: vector&lt;u8&gt;, add_all_currencies: bool)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_AccountCreationScripts_create_designated_dealer">create_designated_dealer</a>&lt;Currency&gt;(tc_account: signer, sliding_nonce: u64, addr: <b>address</b>, auth_key_prefix: vector&lt;u8&gt;, human_name: vector&lt;u8&gt;, add_all_currencies: bool)
 </code></pre>
 
 
@@ -1407,7 +1407,7 @@ and the <code>rold_id</code> field being <code><a href="Roles.md#0x1_Roles_DESIG
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_AccountCreationScripts_create_designated_dealer">create_designated_dealer</a>&lt;Currency&gt;(
     tc_account: signer,
     sliding_nonce: u64,
-    addr: address,
+    addr: <b>address</b>,
     auth_key_prefix: vector&lt;u8&gt;,
     human_name: vector&lt;u8&gt;,
     add_all_currencies: bool,
@@ -1628,7 +1628,7 @@ resource stored under the account at <code>recovery_address</code>.
 | Name                 | Type      | Description                                                                                               |
 | ------               | ------    | -------------                                                                                             |
 | <code>to_recover_account</code> | <code>signer</code>  | The signer of the sending account of this transaction.                                                    |
-| <code>recovery_address</code>   | <code>address</code> | The account address where the <code>to_recover_account</code>'s <code><a href="DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code> will be stored. |
+| <code>recovery_address</code>   | <code><b>address</b></code> | The account address where the <code>to_recover_account</code>'s <code><a href="DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code> will be stored. |
 
 
 <a name="@Common_Abort_Conditions_86"></a>
@@ -1651,7 +1651,7 @@ resource stored under the account at <code>recovery_address</code>.
 * <code><a href="script_documentation.md#0x1_AccountAdministrationScripts_rotate_authentication_key_with_recovery_address">AccountAdministrationScripts::rotate_authentication_key_with_recovery_address</a></code>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_AccountAdministrationScripts_add_recovery_rotation_capability">add_recovery_rotation_capability</a>(to_recover_account: signer, recovery_address: address)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_AccountAdministrationScripts_add_recovery_rotation_capability">add_recovery_rotation_capability</a>(to_recover_account: signer, recovery_address: <b>address</b>)
 </code></pre>
 
 
@@ -1660,7 +1660,7 @@ resource stored under the account at <code>recovery_address</code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_AccountAdministrationScripts_add_recovery_rotation_capability">add_recovery_rotation_capability</a>(to_recover_account: signer, recovery_address: address) {
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_AccountAdministrationScripts_add_recovery_rotation_capability">add_recovery_rotation_capability</a>(to_recover_account: signer, recovery_address: <b>address</b>) {
     <a href="RecoveryAddress.md#0x1_RecoveryAddress_add_rotation_capability">RecoveryAddress::add_rotation_capability</a>(
         <a href="DiemAccount.md#0x1_DiemAccount_extract_key_rotation_capability">DiemAccount::extract_key_rotation_capability</a>(&to_recover_account), recovery_address
     )
@@ -2165,8 +2165,8 @@ This transaction can be sent either by the <code>to_recover</code> account, or b
 | Name               | Type         | Description                                                                                                                   |
 | ------             | ------       | -------------                                                                                                                 |
 | <code>account</code>          | <code>signer</code>     | Signer of the sending account of the transaction.                                                                             |
-| <code>recovery_address</code> | <code>address</code>    | Address where <code><a href="RecoveryAddress.md#0x1_RecoveryAddress_RecoveryAddress">RecoveryAddress::RecoveryAddress</a></code> that holds <code>to_recover</code>'s <code><a href="DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code> is published. |
-| <code>to_recover</code>       | <code>address</code>    | The address of the account whose authentication key will be updated.                                                          |
+| <code>recovery_address</code> | <code><b>address</b></code>    | Address where <code><a href="RecoveryAddress.md#0x1_RecoveryAddress_RecoveryAddress">RecoveryAddress::RecoveryAddress</a></code> that holds <code>to_recover</code>'s <code><a href="DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code> is published. |
+| <code>to_recover</code>       | <code><b>address</b></code>    | The address of the account whose authentication key will be updated.                                                          |
 | <code>new_key</code>          | <code>vector&lt;u8&gt;</code> | New authentication key to be used for the account at the <code>to_recover</code> address.                                                |
 
 
@@ -2191,7 +2191,7 @@ This transaction can be sent either by the <code>to_recover</code> account, or b
 * <code><a href="script_documentation.md#0x1_AccountAdministrationScripts_rotate_authentication_key_with_nonce_admin">AccountAdministrationScripts::rotate_authentication_key_with_nonce_admin</a></code>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_AccountAdministrationScripts_rotate_authentication_key_with_recovery_address">rotate_authentication_key_with_recovery_address</a>(account: signer, recovery_address: address, to_recover: address, new_key: vector&lt;u8&gt;)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_AccountAdministrationScripts_rotate_authentication_key_with_recovery_address">rotate_authentication_key_with_recovery_address</a>(account: signer, recovery_address: <b>address</b>, to_recover: <b>address</b>, new_key: vector&lt;u8&gt;)
 </code></pre>
 
 
@@ -2202,8 +2202,8 @@ This transaction can be sent either by the <code>to_recover</code> account, or b
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_AccountAdministrationScripts_rotate_authentication_key_with_recovery_address">rotate_authentication_key_with_recovery_address</a>(
         account: signer,
-        recovery_address: address,
-        to_recover: address,
+        recovery_address: <b>address</b>,
+        to_recover: <b>address</b>,
         new_key: vector&lt;u8&gt;
         ) {
     <a href="RecoveryAddress.md#0x1_RecoveryAddress_rotate_authentication_key">RecoveryAddress::rotate_authentication_key</a>(&account, recovery_address, to_recover, new_key)
@@ -2825,7 +2825,7 @@ Successful execution of this script emits two events:
 | ------               | ------       | -------------                                                                                                                |
 | <code>Currency</code>           | Type         | The Move type for the <code>Currency</code> being sent in this transaction. <code>Currency</code> must be an already-registered currency on-chain. |
 | <code>payer</code>              | <code>signer</code>     | The signer of the sending account that coins are being transferred from.                                                     |
-| <code>payee</code>              | <code>address</code>    | The address of the account the coins are being transferred to.                                                               |
+| <code>payee</code>              | <code><b>address</b></code>    | The address of the account the coins are being transferred to.                                                               |
 | <code>metadata</code>           | <code>vector&lt;u8&gt;</code> | Optional metadata about this payment.                                                                                        |
 | <code>metadata_signature</code> | <code>vector&lt;u8&gt;</code> | Optional signature over <code>metadata</code> and payment information. See                                                              |
 
@@ -2858,7 +2858,7 @@ Successful execution of this script emits two events:
 * <code><a href="script_documentation.md#0x1_PaymentScripts_peer_to_peer_by_signers">PaymentScripts::peer_to_peer_by_signers</a></code>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_PaymentScripts_peer_to_peer_with_metadata">peer_to_peer_with_metadata</a>&lt;Currency&gt;(payer: signer, payee: address, amount: u64, metadata: vector&lt;u8&gt;, metadata_signature: vector&lt;u8&gt;)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_PaymentScripts_peer_to_peer_with_metadata">peer_to_peer_with_metadata</a>&lt;Currency&gt;(payer: signer, payee: <b>address</b>, amount: u64, metadata: vector&lt;u8&gt;, metadata_signature: vector&lt;u8&gt;)
 </code></pre>
 
 
@@ -2869,7 +2869,7 @@ Successful execution of this script emits two events:
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_PaymentScripts_peer_to_peer_with_metadata">peer_to_peer_with_metadata</a>&lt;Currency&gt;(
     payer: signer,
-    payee: address,
+    payee: <b>address</b>,
     amount: u64,
     metadata: vector&lt;u8&gt;,
     metadata_signature: vector&lt;u8&gt;
@@ -3020,7 +3020,7 @@ Successful execution of this script emits two events:
 
 <pre><code><b>schema</b> <a href="script_documentation.md#0x1_PaymentScripts_PeerToPeer">PeerToPeer</a>&lt;Currency&gt; {
     payer_signer: signer;
-    payee: address;
+    payee: <b>address</b>;
     amount: u64;
     metadata: vector&lt;u8&gt;;
     <b>include</b> <a href="DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: payer_signer};
@@ -3130,7 +3130,7 @@ or does not have a <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_Validat
 | <code>dr_account</code>        | <code>signer</code>     | The signer of the sending account of this transaction. Must be the Diem Root signer.                                               |
 | <code>sliding_nonce</code>     | <code>u64</code>        | The <code>sliding_nonce</code> (see: <code><a href="SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction.                                                         |
 | <code>validator_name</code>    | <code>vector&lt;u8&gt;</code> | ASCII-encoded human name for the validator. Must match the human name in the <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> for the validator. |
-| <code>validator_address</code> | <code>address</code>    | The validator account address to be added to the validator set.                                                                    |
+| <code>validator_address</code> | <code><b>address</b></code>    | The validator account address to be added to the validator set.                                                                    |
 
 
 <a name="@Common_Abort_Conditions_158"></a>
@@ -3165,7 +3165,7 @@ or does not have a <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_Validat
 * <code><a href="script_documentation.md#0x1_ValidatorAdministrationScripts_set_validator_config_and_reconfigure">ValidatorAdministrationScripts::set_validator_config_and_reconfigure</a></code>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_ValidatorAdministrationScripts_add_validator_and_reconfigure">add_validator_and_reconfigure</a>(dr_account: signer, sliding_nonce: u64, validator_name: vector&lt;u8&gt;, validator_address: address)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_ValidatorAdministrationScripts_add_validator_and_reconfigure">add_validator_and_reconfigure</a>(dr_account: signer, sliding_nonce: u64, validator_name: vector&lt;u8&gt;, validator_address: <b>address</b>)
 </code></pre>
 
 
@@ -3178,7 +3178,7 @@ or does not have a <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_Validat
     dr_account: signer,
     sliding_nonce: u64,
     validator_name: vector&lt;u8&gt;,
-    validator_address: address
+    validator_address: <b>address</b>
 ) {
     <a href="SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&dr_account, sliding_nonce);
     <b>assert</b>!(<a href="ValidatorConfig.md#0x1_ValidatorConfig_get_human_name">ValidatorConfig::get_human_name</a>(validator_address) == validator_name, 0);
@@ -3266,7 +3266,7 @@ only "locally" under the <code>validator_account</code> account address.
 | Name                          | Type         | Description                                                                                                        |
 | ------                        | ------       | -------------                                                                                                      |
 | <code>validator_operator_account</code>  | <code>signer</code>     | Signer of the sending account. Must be the registered validator operator for the validator at <code>validator_address</code>. |
-| <code>validator_account</code>           | <code>address</code>    | The address of the validator's <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> resource being updated.                          |
+| <code>validator_account</code>           | <code><b>address</b></code>    | The address of the validator's <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> resource being updated.                          |
 | <code>consensus_pubkey</code>            | <code>vector&lt;u8&gt;</code> | New Ed25519 public key to be used in the updated <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code>.                               |
 | <code>validator_network_addresses</code> | <code>vector&lt;u8&gt;</code> | New set of <code>validator_network_addresses</code> to be used in the updated <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code>.             |
 | <code>fullnode_network_addresses</code>  | <code>vector&lt;u8&gt;</code> | New set of <code>fullnode_network_addresses</code> to be used in the updated <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code>.              |
@@ -3296,7 +3296,7 @@ only "locally" under the <code>validator_account</code> account address.
 * <code><a href="script_documentation.md#0x1_ValidatorAdministrationScripts_set_validator_config_and_reconfigure">ValidatorAdministrationScripts::set_validator_config_and_reconfigure</a></code>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_ValidatorAdministrationScripts_register_validator_config">register_validator_config</a>(validator_operator_account: signer, validator_account: address, consensus_pubkey: vector&lt;u8&gt;, validator_network_addresses: vector&lt;u8&gt;, fullnode_network_addresses: vector&lt;u8&gt;)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_ValidatorAdministrationScripts_register_validator_config">register_validator_config</a>(validator_operator_account: signer, validator_account: <b>address</b>, consensus_pubkey: vector&lt;u8&gt;, validator_network_addresses: vector&lt;u8&gt;, fullnode_network_addresses: vector&lt;u8&gt;)
 </code></pre>
 
 
@@ -3307,8 +3307,8 @@ only "locally" under the <code>validator_account</code> account address.
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_ValidatorAdministrationScripts_register_validator_config">register_validator_config</a>(
     validator_operator_account: signer,
-    // TODO Rename <b>to</b> validator_addr, since it is an address.
-    validator_account: address,
+    // TODO Rename <b>to</b> validator_addr, since it is an <b>address</b>.
+    validator_account: <b>address</b>,
     consensus_pubkey: vector&lt;u8&gt;,
     validator_network_addresses: vector&lt;u8&gt;,
     fullnode_network_addresses: vector&lt;u8&gt;,
@@ -3391,7 +3391,7 @@ is not in the validator set.
 | <code>dr_account</code>        | <code>signer</code>     | The signer of the sending account of this transaction. Must be the Diem Root signer.                                               |
 | <code>sliding_nonce</code>     | <code>u64</code>        | The <code>sliding_nonce</code> (see: <code><a href="SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction.                                                         |
 | <code>validator_name</code>    | <code>vector&lt;u8&gt;</code> | ASCII-encoded human name for the validator. Must match the human name in the <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> for the validator. |
-| <code>validator_address</code> | <code>address</code>    | The validator account address to be removed from the validator set.                                                                |
+| <code>validator_address</code> | <code><b>address</b></code>    | The validator account address to be removed from the validator set.                                                                |
 
 
 <a name="@Common_Abort_Conditions_168"></a>
@@ -3425,7 +3425,7 @@ is not in the validator set.
 * <code><a href="script_documentation.md#0x1_ValidatorAdministrationScripts_set_validator_config_and_reconfigure">ValidatorAdministrationScripts::set_validator_config_and_reconfigure</a></code>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_ValidatorAdministrationScripts_remove_validator_and_reconfigure">remove_validator_and_reconfigure</a>(dr_account: signer, sliding_nonce: u64, validator_name: vector&lt;u8&gt;, validator_address: address)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_ValidatorAdministrationScripts_remove_validator_and_reconfigure">remove_validator_and_reconfigure</a>(dr_account: signer, sliding_nonce: u64, validator_name: vector&lt;u8&gt;, validator_address: <b>address</b>)
 </code></pre>
 
 
@@ -3438,7 +3438,7 @@ is not in the validator set.
     dr_account: signer,
     sliding_nonce: u64,
     validator_name: vector&lt;u8&gt;,
-    validator_address: address
+    validator_address: <b>address</b>
 ) {
     <a href="SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&dr_account, sliding_nonce);
     // TODO: Use an error code from <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors">Errors</a>.<b>move</b>
@@ -3525,7 +3525,7 @@ on-chain with the updated <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_
 | Name                          | Type         | Description                                                                                                        |
 | ------                        | ------       | -------------                                                                                                      |
 | <code>validator_operator_account</code>  | <code>signer</code>     | Signer of the sending account. Must be the registered validator operator for the validator at <code>validator_address</code>. |
-| <code>validator_account</code>           | <code>address</code>    | The address of the validator's <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> resource being updated.                          |
+| <code>validator_account</code>           | <code><b>address</b></code>    | The address of the validator's <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> resource being updated.                          |
 | <code>consensus_pubkey</code>            | <code>vector&lt;u8&gt;</code> | New Ed25519 public key to be used in the updated <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code>.                               |
 | <code>validator_network_addresses</code> | <code>vector&lt;u8&gt;</code> | New set of <code>validator_network_addresses</code> to be used in the updated <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code>.             |
 | <code>fullnode_network_addresses</code>  | <code>vector&lt;u8&gt;</code> | New set of <code>fullnode_network_addresses</code> to be used in the updated <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code>.              |
@@ -3557,7 +3557,7 @@ on-chain with the updated <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_
 * <code><a href="script_documentation.md#0x1_ValidatorAdministrationScripts_register_validator_config">ValidatorAdministrationScripts::register_validator_config</a></code>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_ValidatorAdministrationScripts_set_validator_config_and_reconfigure">set_validator_config_and_reconfigure</a>(validator_operator_account: signer, validator_account: address, consensus_pubkey: vector&lt;u8&gt;, validator_network_addresses: vector&lt;u8&gt;, fullnode_network_addresses: vector&lt;u8&gt;)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_ValidatorAdministrationScripts_set_validator_config_and_reconfigure">set_validator_config_and_reconfigure</a>(validator_operator_account: signer, validator_account: <b>address</b>, consensus_pubkey: vector&lt;u8&gt;, validator_network_addresses: vector&lt;u8&gt;, fullnode_network_addresses: vector&lt;u8&gt;)
 </code></pre>
 
 
@@ -3568,7 +3568,7 @@ on-chain with the updated <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_ValidatorAdministrationScripts_set_validator_config_and_reconfigure">set_validator_config_and_reconfigure</a>(
     validator_operator_account: signer,
-    validator_account: address,
+    validator_account: <b>address</b>,
     consensus_pubkey: vector&lt;u8&gt;,
     validator_network_addresses: vector&lt;u8&gt;,
     fullnode_network_addresses: vector&lt;u8&gt;,
@@ -3685,7 +3685,7 @@ resource published under it. The sending <code>account</code> must be a Validato
 | ------             | ------       | -------------                                                                                |
 | <code>account</code>          | <code>signer</code>     | The signer of the sending account of the transaction.                                        |
 | <code>operator_name</code>    | <code>vector&lt;u8&gt;</code> | Validator operator's human name.                                                             |
-| <code>operator_account</code> | <code>address</code>    | Address of the validator operator account to be added as the <code>account</code> validator's operator. |
+| <code>operator_account</code> | <code><b>address</b></code>    | Address of the validator operator account to be added as the <code>account</code> validator's operator. |
 
 
 <a name="@Common_Abort_Conditions_178"></a>
@@ -3714,7 +3714,7 @@ resource published under it. The sending <code>account</code> must be a Validato
 * <code><a href="script_documentation.md#0x1_ValidatorAdministrationScripts_set_validator_config_and_reconfigure">ValidatorAdministrationScripts::set_validator_config_and_reconfigure</a></code>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_ValidatorAdministrationScripts_set_validator_operator">set_validator_operator</a>(account: signer, operator_name: vector&lt;u8&gt;, operator_account: address)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_ValidatorAdministrationScripts_set_validator_operator">set_validator_operator</a>(account: signer, operator_name: vector&lt;u8&gt;, operator_account: <b>address</b>)
 </code></pre>
 
 
@@ -3726,7 +3726,7 @@ resource published under it. The sending <code>account</code> must be a Validato
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_ValidatorAdministrationScripts_set_validator_operator">set_validator_operator</a>(
     account: signer,
     operator_name: vector&lt;u8&gt;,
-    operator_account: address
+    operator_account: <b>address</b>
 ) {
     <b>assert</b>!(<a href="ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_get_human_name">ValidatorOperatorConfig::get_human_name</a>(operator_account) == operator_name, 0);
     <a href="ValidatorConfig.md#0x1_ValidatorConfig_set_operator">ValidatorConfig::set_operator</a>(&account, operator_account);
@@ -3811,7 +3811,7 @@ the system is initiated by this script.
 | <code>account</code>          | <code>signer</code>     | Signer of account specified in the <code>execute_as</code> field of the write set transaction.           |
 | <code>sliding_nonce</code>    | <code>u64</code>        | The <code>sliding_nonce</code> (see: <code><a href="SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction for Diem Root.      |
 | <code>operator_name</code>    | <code>vector&lt;u8&gt;</code> | Validator operator's human name.                                                              |
-| <code>operator_account</code> | <code>address</code>    | Address of the validator operator account to be added as the <code>account</code> validator's operator.  |
+| <code>operator_account</code> | <code><b>address</b></code>    | Address of the validator operator account to be added as the <code>account</code> validator's operator.  |
 
 
 <a name="@Common_Abort_Conditions_183"></a>
@@ -3845,7 +3845,7 @@ the system is initiated by this script.
 * <code><a href="script_documentation.md#0x1_ValidatorAdministrationScripts_set_validator_config_and_reconfigure">ValidatorAdministrationScripts::set_validator_config_and_reconfigure</a></code>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_ValidatorAdministrationScripts_set_validator_operator_with_nonce_admin">set_validator_operator_with_nonce_admin</a>(dr_account: signer, account: signer, sliding_nonce: u64, operator_name: vector&lt;u8&gt;, operator_account: address)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_ValidatorAdministrationScripts_set_validator_operator_with_nonce_admin">set_validator_operator_with_nonce_admin</a>(dr_account: signer, account: signer, sliding_nonce: u64, operator_name: vector&lt;u8&gt;, operator_account: <b>address</b>)
 </code></pre>
 
 
@@ -3859,7 +3859,7 @@ the system is initiated by this script.
     account: signer,
     sliding_nonce: u64,
     operator_name: vector&lt;u8&gt;,
-    operator_account: address
+    operator_account: <b>address</b>
 ) {
     <a href="SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&dr_account, sliding_nonce);
     <b>assert</b>!(<a href="ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_get_human_name">ValidatorOperatorConfig::get_human_name</a>(operator_account) == operator_name, 0);
@@ -3994,7 +3994,7 @@ being <code>preburn_address</code>.
 | ------            | ------    | -------------                                                                                                                        |
 | <code>Token</code>           | Type      | The Move type for the <code>Token</code> currenty that burning is being cancelled for. <code>Token</code> must be an already-registered currency on-chain. |
 | <code>account</code>         | <code>signer</code>  | The signer of the sending account of this transaction, must have a burn capability for <code>Token</code> published under it.                   |
-| <code>preburn_address</code> | <code>address</code> | The address where the coins to-be-burned are currently held.                                                                         |
+| <code>preburn_address</code> | <code><b>address</b></code> | The address where the coins to-be-burned are currently held.                                                                         |
 | <code>amount</code>          | <code>u64</code>     | The amount to be cancelled.                                                                                                          |
 
 
@@ -4022,7 +4022,7 @@ being <code>preburn_address</code>.
 * <code><a href="script_documentation.md#0x1_TreasuryComplianceScripts_preburn">TreasuryComplianceScripts::preburn</a></code>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_TreasuryComplianceScripts_cancel_burn_with_amount">cancel_burn_with_amount</a>&lt;Token&gt;(account: signer, preburn_address: address, amount: u64)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_TreasuryComplianceScripts_cancel_burn_with_amount">cancel_burn_with_amount</a>&lt;Token&gt;(account: signer, preburn_address: <b>address</b>, amount: u64)
 </code></pre>
 
 
@@ -4031,7 +4031,7 @@ being <code>preburn_address</code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_TreasuryComplianceScripts_cancel_burn_with_amount">cancel_burn_with_amount</a>&lt;Token&gt;(account: signer, preburn_address: address, amount: u64) {
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_TreasuryComplianceScripts_cancel_burn_with_amount">cancel_burn_with_amount</a>&lt;Token&gt;(account: signer, preburn_address: <b>address</b>, amount: u64) {
     <a href="DiemAccount.md#0x1_DiemAccount_cancel_burn">DiemAccount::cancel_burn</a>&lt;Token&gt;(&account, preburn_address, amount)
 }
 </code></pre>
@@ -4052,11 +4052,11 @@ being <code>preburn_address</code>.
 <b>let</b> total_preburn_value = <b>global</b>&lt;<a href="Diem.md#0x1_Diem_CurrencyInfo">Diem::CurrencyInfo</a>&lt;Token&gt;&gt;(
     @CurrencyInfo
 ).preburn_value;
-<b>let</b> post post_total_preburn_value = <b>global</b>&lt;<a href="Diem.md#0x1_Diem_CurrencyInfo">Diem::CurrencyInfo</a>&lt;Token&gt;&gt;(
+<b>let</b> <b>post</b> post_total_preburn_value = <b>global</b>&lt;<a href="Diem.md#0x1_Diem_CurrencyInfo">Diem::CurrencyInfo</a>&lt;Token&gt;&gt;(
     @CurrencyInfo
 ).preburn_value;
 <b>let</b> balance_at_addr = <a href="DiemAccount.md#0x1_DiemAccount_balance">DiemAccount::balance</a>&lt;Token&gt;(preburn_address);
-<b>let</b> post post_balance_at_addr = <a href="DiemAccount.md#0x1_DiemAccount_balance">DiemAccount::balance</a>&lt;Token&gt;(preburn_address);
+<b>let</b> <b>post</b> post_balance_at_addr = <a href="DiemAccount.md#0x1_DiemAccount_balance">DiemAccount::balance</a>&lt;Token&gt;(preburn_address);
 </code></pre>
 
 
@@ -4152,7 +4152,7 @@ held in the <code><a href="Diem.md#0x1_Diem_CurrencyInfo">Diem::CurrencyInfo</a>
 | <code>Token</code>           | Type      | The Move type for the <code>Token</code> currency being burned. <code>Token</code> must be an already-registered currency on-chain.      |
 | <code>tc_account</code>      | <code>signer</code>  | The signer of the sending account of this transaction, must have a burn capability for <code>Token</code> published under it. |
 | <code>sliding_nonce</code>   | <code>u64</code>     | The <code>sliding_nonce</code> (see: <code><a href="SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction.                                         |
-| <code>preburn_address</code> | <code>address</code> | The address where the coins to-be-burned are currently held.                                                       |
+| <code>preburn_address</code> | <code><b>address</b></code> | The address where the coins to-be-burned are currently held.                                                       |
 | <code>amount</code>          | <code>u64</code>     | The amount to be burned.                                                                                           |
 
 
@@ -4181,7 +4181,7 @@ held in the <code><a href="Diem.md#0x1_Diem_CurrencyInfo">Diem::CurrencyInfo</a>
 * <code><a href="script_documentation.md#0x1_TreasuryComplianceScripts_preburn">TreasuryComplianceScripts::preburn</a></code>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_TreasuryComplianceScripts_burn_with_amount">burn_with_amount</a>&lt;Token&gt;(account: signer, sliding_nonce: u64, preburn_address: address, amount: u64)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_TreasuryComplianceScripts_burn_with_amount">burn_with_amount</a>&lt;Token&gt;(account: signer, sliding_nonce: u64, preburn_address: <b>address</b>, amount: u64)
 </code></pre>
 
 
@@ -4190,7 +4190,7 @@ held in the <code><a href="Diem.md#0x1_Diem_CurrencyInfo">Diem::CurrencyInfo</a>
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_TreasuryComplianceScripts_burn_with_amount">burn_with_amount</a>&lt;Token&gt;(account: signer, sliding_nonce: u64, preburn_address: address, amount: u64) {
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_TreasuryComplianceScripts_burn_with_amount">burn_with_amount</a>&lt;Token&gt;(account: signer, sliding_nonce: u64, preburn_address: <b>address</b>, amount: u64) {
     <a href="SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&account, sliding_nonce);
     <a href="Diem.md#0x1_Diem_burn">Diem::burn</a>&lt;Token&gt;(&account, preburn_address, amount)
 }
@@ -4486,7 +4486,7 @@ resource published under the <code>designated_dealer_address</code>.
 | <code>CoinType</code>                  | Type      | The Move type for the <code>CoinType</code> being minted. <code>CoinType</code> must be an already-registered currency on-chain. |
 | <code>tc_account</code>                | <code>signer</code>  | The signer of the sending account of this transaction. Must be the Treasury Compliance account.            |
 | <code>sliding_nonce</code>             | <code>u64</code>     | The <code>sliding_nonce</code> (see: <code><a href="SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction.                                 |
-| <code>designated_dealer_address</code> | <code>address</code> | The address of the Designated Dealer account being minted to.                                              |
+| <code>designated_dealer_address</code> | <code><b>address</b></code> | The address of the Designated Dealer account being minted to.                                              |
 | <code>mint_amount</code>               | <code>u64</code>     | The number of coins to be minted.                                                                          |
 | <code>tier_index</code>                | <code>u64</code>     | [Deprecated] The mint tier index to use for the Designated Dealer account. Will be ignored                 |
 
@@ -4519,7 +4519,7 @@ resource published under the <code>designated_dealer_address</code>.
 * <code><a href="script_documentation.md#0x1_AccountAdministrationScripts_rotate_dual_attestation_info">AccountAdministrationScripts::rotate_dual_attestation_info</a></code>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_TreasuryComplianceScripts_tiered_mint">tiered_mint</a>&lt;CoinType&gt;(tc_account: signer, sliding_nonce: u64, designated_dealer_address: address, mint_amount: u64, tier_index: u64)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_TreasuryComplianceScripts_tiered_mint">tiered_mint</a>&lt;CoinType&gt;(tc_account: signer, sliding_nonce: u64, designated_dealer_address: <b>address</b>, mint_amount: u64, tier_index: u64)
 </code></pre>
 
 
@@ -4531,7 +4531,7 @@ resource published under the <code>designated_dealer_address</code>.
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_TreasuryComplianceScripts_tiered_mint">tiered_mint</a>&lt;CoinType&gt;(
     tc_account: signer,
     sliding_nonce: u64,
-    designated_dealer_address: address,
+    designated_dealer_address: <b>address</b>,
     mint_amount: u64,
     tier_index: u64
 ) {
@@ -4587,7 +4587,7 @@ Only the Treasury Compliance account can mint [[H1]][PERMISSION].
 
 ###### Summary
 
-Freezes the account at <code>address</code>. The sending account of this transaction
+Freezes the account at <code><b>address</b></code>. The sending account of this transaction
 must be the Treasury Compliance account. The account being frozen cannot be
 the Diem Root or Treasury Compliance account. After the successful
 execution of this transaction no transactions may be sent from the frozen
@@ -4625,7 +4625,7 @@ under <code>0xA550C18</code> with the <code>frozen_address</code> being the <cod
 | ------              | ------    | -------------                                                                                   |
 | <code>tc_account</code>        | <code>signer</code>  | The signer of the sending account of this transaction. Must be the Treasury Compliance account. |
 | <code>sliding_nonce</code>     | <code>u64</code>     | The <code>sliding_nonce</code> (see: <code><a href="SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction.                      |
-| <code>to_freeze_account</code> | <code>address</code> | The account address to be frozen.                                                               |
+| <code>to_freeze_account</code> | <code><b>address</b></code> | The account address to be frozen.                                                               |
 
 
 <a name="@Common_Abort_Conditions_220"></a>
@@ -4651,7 +4651,7 @@ under <code>0xA550C18</code> with the <code>frozen_address</code> being the <cod
 * <code><a href="script_documentation.md#0x1_TreasuryComplianceScripts_unfreeze_account">TreasuryComplianceScripts::unfreeze_account</a></code>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_TreasuryComplianceScripts_freeze_account">freeze_account</a>(tc_account: signer, sliding_nonce: u64, to_freeze_account: address)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_TreasuryComplianceScripts_freeze_account">freeze_account</a>(tc_account: signer, sliding_nonce: u64, to_freeze_account: <b>address</b>)
 </code></pre>
 
 
@@ -4660,7 +4660,7 @@ under <code>0xA550C18</code> with the <code>frozen_address</code> being the <cod
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_TreasuryComplianceScripts_freeze_account">freeze_account</a>(tc_account: signer, sliding_nonce: u64, to_freeze_account: address) {
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_TreasuryComplianceScripts_freeze_account">freeze_account</a>(tc_account: signer, sliding_nonce: u64, to_freeze_account: <b>address</b>) {
     <a href="SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&tc_account, sliding_nonce);
     <a href="AccountFreezing.md#0x1_AccountFreezing_freeze_account">AccountFreezing::freeze_account</a>(&tc_account, to_freeze_account);
 }
@@ -4679,7 +4679,7 @@ under <code>0xA550C18</code> with the <code>frozen_address</code> being the <cod
 
 ###### Summary
 
-Unfreezes the account at <code>address</code>. The sending account of this transaction must be the
+Unfreezes the account at <code><b>address</b></code>. The sending account of this transaction must be the
 Treasury Compliance account. After the successful execution of this transaction transactions
 may be sent from the previously frozen account, and coins may be sent and received.
 
@@ -4710,7 +4710,7 @@ the <code>unfrozen_address</code> set the <code>to_unfreeze_account</code>'s add
 | ------                | ------    | -------------                                                                                   |
 | <code>tc_account</code>          | <code>signer</code>  | The signer of the sending account of this transaction. Must be the Treasury Compliance account. |
 | <code>sliding_nonce</code>       | <code>u64</code>     | The <code>sliding_nonce</code> (see: <code><a href="SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction.                      |
-| <code>to_unfreeze_account</code> | <code>address</code> | The account address to be frozen.                                                               |
+| <code>to_unfreeze_account</code> | <code><b>address</b></code> | The account address to be frozen.                                                               |
 
 
 <a name="@Common_Abort_Conditions_226"></a>
@@ -4733,7 +4733,7 @@ the <code>unfrozen_address</code> set the <code>to_unfreeze_account</code>'s add
 * <code><a href="script_documentation.md#0x1_TreasuryComplianceScripts_freeze_account">TreasuryComplianceScripts::freeze_account</a></code>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_TreasuryComplianceScripts_unfreeze_account">unfreeze_account</a>(account: signer, sliding_nonce: u64, to_unfreeze_account: address)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_TreasuryComplianceScripts_unfreeze_account">unfreeze_account</a>(account: signer, sliding_nonce: u64, to_unfreeze_account: <b>address</b>)
 </code></pre>
 
 
@@ -4742,7 +4742,7 @@ the <code>unfrozen_address</code> set the <code>to_unfreeze_account</code>'s add
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_TreasuryComplianceScripts_unfreeze_account">unfreeze_account</a>(account: signer, sliding_nonce: u64, to_unfreeze_account: address) {
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_TreasuryComplianceScripts_unfreeze_account">unfreeze_account</a>(account: signer, sliding_nonce: u64, to_unfreeze_account: <b>address</b>) {
     <a href="SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&account, sliding_nonce);
     <a href="AccountFreezing.md#0x1_AccountFreezing_unfreeze_account">AccountFreezing::unfreeze_account</a>(&account, to_unfreeze_account);
 }
@@ -5048,7 +5048,7 @@ the Treasury Compliance account.
 ###### Technical Description
 
 Adds a <code><a href="VASPDomain.md#0x1_VASPDomain_VASPDomain">VASPDomain::VASPDomain</a></code> to the <code>domains</code> field of the <code><a href="VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomain::VASPDomains</a></code> resource published under
-the account at <code>address</code>.
+the account at <code><b>address</b></code>.
 
 
 <a name="@Parameters_245"></a>
@@ -5058,7 +5058,7 @@ the account at <code>address</code>.
 | Name         | Type         | Description                                                                                     |
 | ------       | ------       | -------------                                                                                   |
 | <code>tc_account</code> | <code>signer</code>     | The signer of the sending account of this transaction. Must be the Treasury Compliance account. |
-| <code>address</code>    | <code>address</code>    | The <code>address</code> of the parent VASP account that will have have <code>domain</code> added to its domains.     |
+| <code><b>address</b></code>    | <code><b>address</b></code>    | The <code><b>address</b></code> of the parent VASP account that will have have <code>domain</code> added to its domains.     |
 | <code>domain</code>     | <code>vector&lt;u8&gt;</code> | The domain to be added.                                                                         |
 
 
@@ -5071,12 +5071,12 @@ the account at <code>address</code>.
 | <code>Errors::REQUIRES_ROLE</code>    | <code><a href="Roles.md#0x1_Roles_ETREASURY_COMPLIANCE">Roles::ETREASURY_COMPLIANCE</a></code>            | The sending account is not the Treasury Compliance account.                                                                            |
 | <code>Errors::REQUIRES_ADDRESS</code> | <code><a href="CoreAddresses.md#0x1_CoreAddresses_ETREASURY_COMPLIANCE">CoreAddresses::ETREASURY_COMPLIANCE</a></code>    | <code>tc_account</code> is not the Treasury Compliance account.                                                                                   |
 | <code>Errors::NOT_PUBLISHED</code>    | <code><a href="VASPDomain.md#0x1_VASPDomain_EVASP_DOMAIN_MANAGER">VASPDomain::EVASP_DOMAIN_MANAGER</a></code>        | The <code><a href="VASPDomain.md#0x1_VASPDomain_VASPDomainManager">VASPDomain::VASPDomainManager</a></code> resource is not yet published under the Treasury Compliance account.                                 |
-| <code>Errors::NOT_PUBLISHED</code>    | <code><a href="VASPDomain.md#0x1_VASPDomain_EVASP_DOMAINS_NOT_PUBLISHED">VASPDomain::EVASP_DOMAINS_NOT_PUBLISHED</a></code> | <code>address</code> does not have a <code><a href="VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomain::VASPDomains</a></code> resource published under it.                                                         |
-| <code>Errors::INVALID_ARGUMENT</code> | <code>VASPDomain::EDOMAIN_ALREADY_EXISTS</code>         | The <code>domain</code> already exists in the list of <code><a href="VASPDomain.md#0x1_VASPDomain_VASPDomain">VASPDomain::VASPDomain</a></code>s  in the <code><a href="VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomain::VASPDomains</a></code> resource published under <code>address</code>. |
+| <code>Errors::NOT_PUBLISHED</code>    | <code><a href="VASPDomain.md#0x1_VASPDomain_EVASP_DOMAINS_NOT_PUBLISHED">VASPDomain::EVASP_DOMAINS_NOT_PUBLISHED</a></code> | <code><b>address</b></code> does not have a <code><a href="VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomain::VASPDomains</a></code> resource published under it.                                                         |
+| <code>Errors::INVALID_ARGUMENT</code> | <code>VASPDomain::EDOMAIN_ALREADY_EXISTS</code>         | The <code>domain</code> already exists in the list of <code><a href="VASPDomain.md#0x1_VASPDomain_VASPDomain">VASPDomain::VASPDomain</a></code>s  in the <code><a href="VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomain::VASPDomains</a></code> resource published under <code><b>address</b></code>. |
 | <code>Errors::INVALID_ARGUMENT</code> | <code><a href="VASPDomain.md#0x1_VASPDomain_EINVALID_VASP_DOMAIN">VASPDomain::EINVALID_VASP_DOMAIN</a></code>        | The <code>domain</code> is greater in length than <code><a href="VASPDomain.md#0x1_VASPDomain_DOMAIN_LENGTH">VASPDomain::DOMAIN_LENGTH</a></code>.                                                                        |
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_TreasuryComplianceScripts_add_vasp_domain">add_vasp_domain</a>(tc_account: signer, address: address, domain: vector&lt;u8&gt;)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_TreasuryComplianceScripts_add_vasp_domain">add_vasp_domain</a>(tc_account: signer, <b>address</b>: <b>address</b>, domain: vector&lt;u8&gt;)
 </code></pre>
 
 
@@ -5087,10 +5087,10 @@ the account at <code>address</code>.
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_TreasuryComplianceScripts_add_vasp_domain">add_vasp_domain</a> (
     tc_account: signer,
-    address: address,
+    <b>address</b>: <b>address</b>,
     domain: vector&lt;u8&gt;,
 ) {
-    <a href="VASPDomain.md#0x1_VASPDomain_add_vasp_domain">VASPDomain::add_vasp_domain</a>(&tc_account, address, domain);
+    <a href="VASPDomain.md#0x1_VASPDomain_add_vasp_domain">VASPDomain::add_vasp_domain</a>(&tc_account, <b>address</b>, domain);
 }
 </code></pre>
 
@@ -5136,7 +5136,7 @@ the Treasury Compliance account.
 ###### Technical Description
 
 Removes a <code><a href="VASPDomain.md#0x1_VASPDomain_VASPDomain">VASPDomain::VASPDomain</a></code> from the <code>domains</code> field of the <code><a href="VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomain::VASPDomains</a></code> resource published under
-account with <code>address</code>.
+account with <code><b>address</b></code>.
 
 
 <a name="@Parameters_249"></a>
@@ -5146,7 +5146,7 @@ account with <code>address</code>.
 | Name         | Type         | Description                                                                                     |
 | ------       | ------       | -------------                                                                                   |
 | <code>tc_account</code> | <code>signer</code>     | The signer of the sending account of this transaction. Must be the Treasury Compliance account. |
-| <code>address</code>    | <code>address</code>    | The <code>address</code> of parent VASP account that will update its domains.                              |
+| <code><b>address</b></code>    | <code><b>address</b></code>    | The <code><b>address</b></code> of parent VASP account that will update its domains.                              |
 | <code>domain</code>     | <code>vector&lt;u8&gt;</code> | The domain name.                                                                                |
 
 
@@ -5159,12 +5159,12 @@ account with <code>address</code>.
 | <code>Errors::REQUIRES_ROLE</code>    | <code><a href="Roles.md#0x1_Roles_ETREASURY_COMPLIANCE">Roles::ETREASURY_COMPLIANCE</a></code>            | The sending account is not the Treasury Compliance account.                                                                            |
 | <code>Errors::REQUIRES_ADDRESS</code> | <code><a href="CoreAddresses.md#0x1_CoreAddresses_ETREASURY_COMPLIANCE">CoreAddresses::ETREASURY_COMPLIANCE</a></code>    | <code>tc_account</code> is not the Treasury Compliance account.                                                                                   |
 | <code>Errors::NOT_PUBLISHED</code>    | <code><a href="VASPDomain.md#0x1_VASPDomain_EVASP_DOMAIN_MANAGER">VASPDomain::EVASP_DOMAIN_MANAGER</a></code>        | The <code><a href="VASPDomain.md#0x1_VASPDomain_VASPDomainManager">VASPDomain::VASPDomainManager</a></code> resource is not yet published under the Treasury Compliance account.                                 |
-| <code>Errors::NOT_PUBLISHED</code>    | <code><a href="VASPDomain.md#0x1_VASPDomain_EVASP_DOMAINS_NOT_PUBLISHED">VASPDomain::EVASP_DOMAINS_NOT_PUBLISHED</a></code> | <code>address</code> does not have a <code><a href="VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomain::VASPDomains</a></code> resource published under it.                                                         |
+| <code>Errors::NOT_PUBLISHED</code>    | <code><a href="VASPDomain.md#0x1_VASPDomain_EVASP_DOMAINS_NOT_PUBLISHED">VASPDomain::EVASP_DOMAINS_NOT_PUBLISHED</a></code> | <code><b>address</b></code> does not have a <code><a href="VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomain::VASPDomains</a></code> resource published under it.                                                         |
 | <code>Errors::INVALID_ARGUMENT</code> | <code><a href="VASPDomain.md#0x1_VASPDomain_EINVALID_VASP_DOMAIN">VASPDomain::EINVALID_VASP_DOMAIN</a></code>        | The <code>domain</code> is greater in length than <code><a href="VASPDomain.md#0x1_VASPDomain_DOMAIN_LENGTH">VASPDomain::DOMAIN_LENGTH</a></code>.                                                                        |
-| <code>Errors::INVALID_ARGUMENT</code> | <code><a href="VASPDomain.md#0x1_VASPDomain_EVASP_DOMAIN_NOT_FOUND">VASPDomain::EVASP_DOMAIN_NOT_FOUND</a></code>              | The <code>domain</code> does not exist in the list of <code><a href="VASPDomain.md#0x1_VASPDomain_VASPDomain">VASPDomain::VASPDomain</a></code>s  in the <code><a href="VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomain::VASPDomains</a></code> resource published under <code>address</code>. |
+| <code>Errors::INVALID_ARGUMENT</code> | <code><a href="VASPDomain.md#0x1_VASPDomain_EVASP_DOMAIN_NOT_FOUND">VASPDomain::EVASP_DOMAIN_NOT_FOUND</a></code>              | The <code>domain</code> does not exist in the list of <code><a href="VASPDomain.md#0x1_VASPDomain_VASPDomain">VASPDomain::VASPDomain</a></code>s  in the <code><a href="VASPDomain.md#0x1_VASPDomain_VASPDomains">VASPDomain::VASPDomains</a></code> resource published under <code><b>address</b></code>. |
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_TreasuryComplianceScripts_remove_vasp_domain">remove_vasp_domain</a>(tc_account: signer, address: address, domain: vector&lt;u8&gt;)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_TreasuryComplianceScripts_remove_vasp_domain">remove_vasp_domain</a>(tc_account: signer, <b>address</b>: <b>address</b>, domain: vector&lt;u8&gt;)
 </code></pre>
 
 
@@ -5175,10 +5175,10 @@ account with <code>address</code>.
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="script_documentation.md#0x1_TreasuryComplianceScripts_remove_vasp_domain">remove_vasp_domain</a> (
     tc_account: signer,
-    address: address,
+    <b>address</b>: <b>address</b>,
     domain: vector&lt;u8&gt;,
 ) {
-    <a href="VASPDomain.md#0x1_VASPDomain_remove_vasp_domain">VASPDomain::remove_vasp_domain</a>(&tc_account, address, domain);
+    <a href="VASPDomain.md#0x1_VASPDomain_remove_vasp_domain">VASPDomain::remove_vasp_domain</a>(&tc_account, <b>address</b>, domain);
 }
 </code></pre>
 

@@ -3154,6 +3154,7 @@ dependencies = [
  "diem-workspace-hack",
  "itertools 0.10.1",
  "log",
+ "move-lang",
  "move-model",
  "move-prover",
  "move-prover-test-utils",
@@ -5029,6 +5030,8 @@ dependencies = [
  "diem-workspace-hack",
  "lsp-server",
  "lsp-types",
+ "move-command-line-common",
+ "move-lang",
  "serde_json",
  "structopt 0.3.21",
 ]

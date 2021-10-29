@@ -42,7 +42,7 @@ The authentication key for A can be "buried in the mountain" and dug up only if 
 recover one of accounts in <code>rotation_caps</code> arises.
 
 
-<pre><code><b>struct</b> <a href="RecoveryAddress.md#0x1_RecoveryAddress">RecoveryAddress</a> has key
+<pre><code><b>struct</b> <a href="RecoveryAddress.md#0x1_RecoveryAddress">RecoveryAddress</a> <b>has</b> key
 </code></pre>
 
 
@@ -169,7 +169,7 @@ Aborts if <code>recovery_account</code> has delegated its <code>KeyRotationCapab
 
 <pre><code><b>public</b> <b>fun</b> <a href="RecoveryAddress.md#0x1_RecoveryAddress_publish">publish</a>(recovery_account: &signer, rotation_cap: KeyRotationCapability) {
     <b>let</b> addr = <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(recovery_account);
-    // Only VASPs can create a recovery address
+    // Only VASPs can create a recovery <b>address</b>
     <b>assert</b>!(<a href="VASP.md#0x1_VASP_is_vasp">VASP::is_vasp</a>(addr), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="RecoveryAddress.md#0x1_RecoveryAddress_ENOT_A_VASP">ENOT_A_VASP</a>));
     // put the rotation capability for the recovery account itself in `rotation_caps`. This
     // <b>ensures</b> two things:
@@ -181,7 +181,7 @@ Aborts if <code>recovery_account</code> has delegated its <code>KeyRotationCapab
          <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="RecoveryAddress.md#0x1_RecoveryAddress_EKEY_ROTATION_DEPENDENCY_CYCLE">EKEY_ROTATION_DEPENDENCY_CYCLE</a>)
     );
     <b>assert</b>!(!<b>exists</b>&lt;<a href="RecoveryAddress.md#0x1_RecoveryAddress">RecoveryAddress</a>&gt;(addr), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_already_published">Errors::already_published</a>(<a href="RecoveryAddress.md#0x1_RecoveryAddress_ERECOVERY_ADDRESS">ERECOVERY_ADDRESS</a>));
-    move_to(
+    <b>move_to</b>(
         recovery_account,
         <a href="RecoveryAddress.md#0x1_RecoveryAddress">RecoveryAddress</a> { rotation_caps: <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_singleton">Vector::singleton</a>(rotation_cap) }
     )
@@ -247,7 +247,7 @@ Rotate the authentication key of <code>to_recover</code> to <code>new_key</code>
 Aborts if <code>recovery_address</code> does not have the <code>KeyRotationCapability</code> for <code>to_recover</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="RecoveryAddress.md#0x1_RecoveryAddress_rotate_authentication_key">rotate_authentication_key</a>(account: &signer, recovery_address: address, to_recover: address, new_key: vector&lt;u8&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="RecoveryAddress.md#0x1_RecoveryAddress_rotate_authentication_key">rotate_authentication_key</a>(account: &signer, recovery_address: <b>address</b>, to_recover: <b>address</b>, new_key: vector&lt;u8&gt;)
 </code></pre>
 
 
@@ -258,22 +258,22 @@ Aborts if <code>recovery_address</code> does not have the <code>KeyRotationCapab
 
 <pre><code><b>public</b> <b>fun</b> <a href="RecoveryAddress.md#0x1_RecoveryAddress_rotate_authentication_key">rotate_authentication_key</a>(
     account: &signer,
-    recovery_address: address,
-    to_recover: address,
+    recovery_address: <b>address</b>,
+    to_recover: <b>address</b>,
     new_key: vector&lt;u8&gt;
 ) <b>acquires</b> <a href="RecoveryAddress.md#0x1_RecoveryAddress">RecoveryAddress</a> {
-    // Check that `recovery_address` has a `<a href="RecoveryAddress.md#0x1_RecoveryAddress">RecoveryAddress</a>` <b>resource</b>
+    // Check that `recovery_address` <b>has</b> a `<a href="RecoveryAddress.md#0x1_RecoveryAddress">RecoveryAddress</a>` resource
     <b>assert</b>!(<b>exists</b>&lt;<a href="RecoveryAddress.md#0x1_RecoveryAddress">RecoveryAddress</a>&gt;(recovery_address), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="RecoveryAddress.md#0x1_RecoveryAddress_ERECOVERY_ADDRESS">ERECOVERY_ADDRESS</a>));
     <b>let</b> sender = <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
     <b>assert</b>!(
         // The original owner of a key rotation capability can rotate its own key
         sender == to_recover ||
-        // The owner of the `<a href="RecoveryAddress.md#0x1_RecoveryAddress">RecoveryAddress</a>` <b>resource</b> can rotate any key
+        // The owner of the `<a href="RecoveryAddress.md#0x1_RecoveryAddress">RecoveryAddress</a>` resource can rotate any key
         sender == recovery_address,
         <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="RecoveryAddress.md#0x1_RecoveryAddress_ECANNOT_ROTATE_KEY">ECANNOT_ROTATE_KEY</a>)
     );
 
-    <b>let</b> caps = &borrow_global&lt;<a href="RecoveryAddress.md#0x1_RecoveryAddress">RecoveryAddress</a>&gt;(recovery_address).rotation_caps;
+    <b>let</b> caps = &<b>borrow_global</b>&lt;<a href="RecoveryAddress.md#0x1_RecoveryAddress">RecoveryAddress</a>&gt;(recovery_address).rotation_caps;
     <b>let</b> i = 0;
     <b>let</b> len = <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_length">Vector::length</a>(caps);
     <b>while</b> ({
@@ -295,7 +295,7 @@ Aborts if <code>recovery_address</code> does not have the <code>KeyRotationCapab
         <b>assert</b> i == len;
         <b>assert</b> <b>forall</b> j in 0..len: caps[j].account_address != to_recover;
     };
-    // Couldn't find `to_recover` in the account recovery <b>resource</b>; <b>abort</b>
+    // Couldn't find `to_recover` in the account recovery resource; <b>abort</b>
     <b>abort</b> <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="RecoveryAddress.md#0x1_RecoveryAddress_EACCOUNT_NOT_RECOVERABLE">EACCOUNT_NOT_RECOVERABLE</a>)
 }
 </code></pre>
@@ -321,8 +321,8 @@ Aborts if <code>recovery_address</code> does not have the <code>KeyRotationCapab
 
 <pre><code><b>schema</b> <a href="RecoveryAddress.md#0x1_RecoveryAddress_RotateAuthenticationKeyAbortsIf">RotateAuthenticationKeyAbortsIf</a> {
     account: signer;
-    recovery_address: address;
-    to_recover: address;
+    recovery_address: <b>address</b>;
+    to_recover: <b>address</b>;
     new_key: vector&lt;u8&gt;;
     <b>aborts_if</b> !<a href="RecoveryAddress.md#0x1_RecoveryAddress_spec_is_recovery_address">spec_is_recovery_address</a>(recovery_address) <b>with</b> Errors::NOT_PUBLISHED;
     <b>aborts_if</b> !<a href="DiemAccount.md#0x1_DiemAccount_exists_at">DiemAccount::exists_at</a>(to_recover) <b>with</b> Errors::NOT_PUBLISHED;
@@ -340,7 +340,7 @@ Aborts if <code>recovery_address</code> does not have the <code>KeyRotationCapab
 
 
 <pre><code><b>schema</b> <a href="RecoveryAddress.md#0x1_RecoveryAddress_RotateAuthenticationKeyEnsures">RotateAuthenticationKeyEnsures</a> {
-    to_recover: address;
+    to_recover: <b>address</b>;
     new_key: vector&lt;u8&gt;;
     <b>ensures</b> <a href="DiemAccount.md#0x1_DiemAccount_authentication_key">DiemAccount::authentication_key</a>(to_recover) == new_key;
 }
@@ -355,11 +355,11 @@ Aborts if <code>recovery_address</code> does not have the <code>KeyRotationCapab
 ## Function `add_rotation_capability`
 
 Add <code>to_recover</code> to the <code><a href="RecoveryAddress.md#0x1_RecoveryAddress">RecoveryAddress</a></code> resource under <code>recovery_address</code>.
-Aborts if <code>to_recover.address</code> and <code>recovery_address</code> belong to different VASPs, or if
+Aborts if <code>to_recover.<b>address</b></code> and <code>recovery_address</code> belong to different VASPs, or if
 <code>recovery_address</code> does not have a <code><a href="RecoveryAddress.md#0x1_RecoveryAddress">RecoveryAddress</a></code> resource.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="RecoveryAddress.md#0x1_RecoveryAddress_add_rotation_capability">add_rotation_capability</a>(to_recover: <a href="DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a>, recovery_address: address)
+<pre><code><b>public</b> <b>fun</b> <a href="RecoveryAddress.md#0x1_RecoveryAddress_add_rotation_capability">add_rotation_capability</a>(to_recover: <a href="DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a>, recovery_address: <b>address</b>)
 </code></pre>
 
 
@@ -368,9 +368,9 @@ Aborts if <code>to_recover.address</code> and <code>recovery_address</code> belo
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="RecoveryAddress.md#0x1_RecoveryAddress_add_rotation_capability">add_rotation_capability</a>(to_recover: KeyRotationCapability, recovery_address: address)
+<pre><code><b>public</b> <b>fun</b> <a href="RecoveryAddress.md#0x1_RecoveryAddress_add_rotation_capability">add_rotation_capability</a>(to_recover: KeyRotationCapability, recovery_address: <b>address</b>)
 <b>acquires</b> <a href="RecoveryAddress.md#0x1_RecoveryAddress">RecoveryAddress</a> {
-    // Check that `recovery_address` has a `<a href="RecoveryAddress.md#0x1_RecoveryAddress">RecoveryAddress</a>` <b>resource</b>
+    // Check that `recovery_address` <b>has</b> a `<a href="RecoveryAddress.md#0x1_RecoveryAddress">RecoveryAddress</a>` resource
     <b>assert</b>!(<b>exists</b>&lt;<a href="RecoveryAddress.md#0x1_RecoveryAddress">RecoveryAddress</a>&gt;(recovery_address), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="RecoveryAddress.md#0x1_RecoveryAddress_ERECOVERY_ADDRESS">ERECOVERY_ADDRESS</a>));
     // Only accept the rotation capability <b>if</b> both accounts belong <b>to</b> the same <a href="VASP.md#0x1_VASP">VASP</a>
     <b>let</b> to_recover_address = *<a href="DiemAccount.md#0x1_DiemAccount_key_rotation_capability_address">DiemAccount::key_rotation_capability_address</a>(&to_recover);
@@ -379,7 +379,7 @@ Aborts if <code>to_recover.address</code> and <code>recovery_address</code> belo
         <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="RecoveryAddress.md#0x1_RecoveryAddress_EINVALID_KEY_ROTATION_DELEGATION">EINVALID_KEY_ROTATION_DELEGATION</a>)
     );
 
-    <b>let</b> recovery_caps = &<b>mut</b> borrow_global_mut&lt;<a href="RecoveryAddress.md#0x1_RecoveryAddress">RecoveryAddress</a>&gt;(recovery_address).rotation_caps;
+    <b>let</b> recovery_caps = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="RecoveryAddress.md#0x1_RecoveryAddress">RecoveryAddress</a>&gt;(recovery_address).rotation_caps;
     <b>assert</b>!(
         <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_length">Vector::length</a>(recovery_caps) &lt; <a href="RecoveryAddress.md#0x1_RecoveryAddress_MAX_REGISTERED_KEYS">MAX_REGISTERED_KEYS</a>,
         <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_limit_exceeded">Errors::limit_exceeded</a>(<a href="RecoveryAddress.md#0x1_RecoveryAddress_EMAX_KEYS_REGISTERED">EMAX_KEYS_REGISTERED</a>)
@@ -410,7 +410,7 @@ Aborts if <code>to_recover.address</code> and <code>recovery_address</code> belo
 
 <pre><code><b>schema</b> <a href="RecoveryAddress.md#0x1_RecoveryAddress_AddRotationCapabilityAbortsIf">AddRotationCapabilityAbortsIf</a> {
     to_recover: KeyRotationCapability;
-    recovery_address: address;
+    recovery_address: <b>address</b>;
     <b>aborts_if</b> !<a href="RecoveryAddress.md#0x1_RecoveryAddress_spec_is_recovery_address">spec_is_recovery_address</a>(recovery_address) <b>with</b> Errors::NOT_PUBLISHED;
     <b>aborts_if</b> len(<b>global</b>&lt;<a href="RecoveryAddress.md#0x1_RecoveryAddress">RecoveryAddress</a>&gt;(recovery_address).rotation_caps) &gt;= <a href="RecoveryAddress.md#0x1_RecoveryAddress_MAX_REGISTERED_KEYS">MAX_REGISTERED_KEYS</a> <b>with</b> Errors::LIMIT_EXCEEDED;
     <b>let</b> to_recover_address = <a href="DiemAccount.md#0x1_DiemAccount_key_rotation_capability_address">DiemAccount::key_rotation_capability_address</a>(to_recover);
@@ -426,8 +426,8 @@ Aborts if <code>to_recover.address</code> and <code>recovery_address</code> belo
 
 <pre><code><b>schema</b> <a href="RecoveryAddress.md#0x1_RecoveryAddress_AddRotationCapabilityEnsures">AddRotationCapabilityEnsures</a> {
     to_recover: KeyRotationCapability;
-    recovery_address: address;
-    <b>let</b> post num_rotation_caps = len(<a href="RecoveryAddress.md#0x1_RecoveryAddress_spec_get_rotation_caps">spec_get_rotation_caps</a>(recovery_address));
+    recovery_address: <b>address</b>;
+    <b>let</b> <b>post</b> num_rotation_caps = len(<a href="RecoveryAddress.md#0x1_RecoveryAddress_spec_get_rotation_caps">spec_get_rotation_caps</a>(recovery_address));
     <b>ensures</b> <a href="RecoveryAddress.md#0x1_RecoveryAddress_spec_get_rotation_caps">spec_get_rotation_caps</a>(recovery_address)[num_rotation_caps - 1] == to_recover;
 }
 </code></pre>
@@ -450,7 +450,7 @@ Aborts if <code>to_recover.address</code> and <code>recovery_address</code> belo
 A RecoveryAddress has its own <code>KeyRotationCapability</code>.
 
 
-<pre><code><b>invariant</b> <b>forall</b> addr: address
+<pre><code><b>invariant</b> <b>forall</b> addr: <b>address</b>
     <b>where</b> <a href="RecoveryAddress.md#0x1_RecoveryAddress_spec_is_recovery_address">spec_is_recovery_address</a>(addr): (
         len(<a href="RecoveryAddress.md#0x1_RecoveryAddress_spec_get_rotation_caps">spec_get_rotation_caps</a>(addr)) &gt; 0 &&
         <a href="RecoveryAddress.md#0x1_RecoveryAddress_spec_get_rotation_caps">spec_get_rotation_caps</a>(addr)[0].account_address == addr
@@ -466,7 +466,7 @@ A RecoveryAddress has its own <code>KeyRotationCapability</code>.
 
 
 <pre><code><b>invariant</b> <b>update</b>
-   <b>forall</b> addr: address:
+   <b>forall</b> addr: <b>address</b>:
        <b>old</b>(<a href="RecoveryAddress.md#0x1_RecoveryAddress_spec_is_recovery_address">spec_is_recovery_address</a>(addr)) ==&gt; <a href="RecoveryAddress.md#0x1_RecoveryAddress_spec_is_recovery_address">spec_is_recovery_address</a>(addr);
 </code></pre>
 
@@ -480,7 +480,7 @@ A RecoveryAddress has its own <code>KeyRotationCapability</code>.
 <code><a href="RecoveryAddress.md#0x1_RecoveryAddress">RecoveryAddress</a></code> persists
 
 
-<pre><code><b>invariant</b> <b>update</b> <b>forall</b> addr: address <b>where</b> <b>old</b>(<b>exists</b>&lt;<a href="RecoveryAddress.md#0x1_RecoveryAddress">RecoveryAddress</a>&gt;(addr)):
+<pre><code><b>invariant</b> <b>update</b> <b>forall</b> addr: <b>address</b> <b>where</b> <b>old</b>(<b>exists</b>&lt;<a href="RecoveryAddress.md#0x1_RecoveryAddress">RecoveryAddress</a>&gt;(addr)):
     <b>exists</b>&lt;<a href="RecoveryAddress.md#0x1_RecoveryAddress">RecoveryAddress</a>&gt;(addr);
 </code></pre>
 
@@ -490,7 +490,7 @@ in the previous state, then it continues to hold the capability after the update
 
 
 <pre><code><b>invariant</b> <b>update</b>
-    <b>forall</b> recovery_addr: address, to_recovery_addr: address
+    <b>forall</b> recovery_addr: <b>address</b>, to_recovery_addr: <b>address</b>
     <b>where</b> <b>old</b>(<a href="RecoveryAddress.md#0x1_RecoveryAddress_spec_is_recovery_address">spec_is_recovery_address</a>(recovery_addr)):
         <b>old</b>(<a href="RecoveryAddress.md#0x1_RecoveryAddress_spec_holds_key_rotation_cap_for">spec_holds_key_rotation_cap_for</a>(recovery_addr, to_recovery_addr))
         ==&gt; <a href="RecoveryAddress.md#0x1_RecoveryAddress_spec_holds_key_rotation_cap_for">spec_holds_key_rotation_cap_for</a>(recovery_addr, to_recovery_addr);
@@ -506,7 +506,7 @@ in the previous state, then it continues to hold the capability after the update
 Only VASPs can hold <code>RecoverAddress</code> resources.
 
 
-<pre><code><b>invariant</b> <b>forall</b> addr: address
+<pre><code><b>invariant</b> <b>forall</b> addr: <b>address</b>
     <b>where</b> <a href="RecoveryAddress.md#0x1_RecoveryAddress_spec_is_recovery_address">spec_is_recovery_address</a>(addr): <a href="VASP.md#0x1_VASP_is_vasp">VASP::is_vasp</a>(addr);
 </code></pre>
 
@@ -523,7 +523,7 @@ Returns true if <code>addr</code> is a recovery address.
 <a name="0x1_RecoveryAddress_spec_is_recovery_address"></a>
 
 
-<pre><code><b>fun</b> <a href="RecoveryAddress.md#0x1_RecoveryAddress_spec_is_recovery_address">spec_is_recovery_address</a>(addr: address): bool
+<pre><code><b>fun</b> <a href="RecoveryAddress.md#0x1_RecoveryAddress_spec_is_recovery_address">spec_is_recovery_address</a>(addr: <b>address</b>): bool
 {
     <b>exists</b>&lt;<a href="RecoveryAddress.md#0x1_RecoveryAddress">RecoveryAddress</a>&gt;(addr)
 }
@@ -536,7 +536,7 @@ Returns all the <code>KeyRotationCapability</code>s held at <code>recovery_addre
 <a name="0x1_RecoveryAddress_spec_get_rotation_caps"></a>
 
 
-<pre><code><b>fun</b> <a href="RecoveryAddress.md#0x1_RecoveryAddress_spec_get_rotation_caps">spec_get_rotation_caps</a>(recovery_address: address):
+<pre><code><b>fun</b> <a href="RecoveryAddress.md#0x1_RecoveryAddress_spec_get_rotation_caps">spec_get_rotation_caps</a>(recovery_address: <b>address</b>):
     vector&lt;<a href="DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a>&gt;
 {
     <b>global</b>&lt;<a href="RecoveryAddress.md#0x1_RecoveryAddress">RecoveryAddress</a>&gt;(recovery_address).rotation_caps
@@ -552,8 +552,8 @@ Returns true if <code>recovery_address</code> holds the
 
 
 <pre><code><b>fun</b> <a href="RecoveryAddress.md#0x1_RecoveryAddress_spec_holds_key_rotation_cap_for">spec_holds_key_rotation_cap_for</a>(
-    recovery_address: address,
-    addr: address): bool
+    recovery_address: <b>address</b>,
+    addr: <b>address</b>): bool
 {
     <b>exists</b> i: u64
         <b>where</b> 0 &lt;= i && i &lt; len(<a href="RecoveryAddress.md#0x1_RecoveryAddress_spec_get_rotation_caps">spec_get_rotation_caps</a>(recovery_address)):

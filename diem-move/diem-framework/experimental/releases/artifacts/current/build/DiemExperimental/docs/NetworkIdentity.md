@@ -37,7 +37,7 @@ Module managing Diemnet NetworkIdentity
 Holder for all <code><a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a></code> in an account
 
 
-<pre><code><b>struct</b> <a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a> has key
+<pre><code><b>struct</b> <a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a> <b>has</b> key
 </code></pre>
 
 
@@ -76,7 +76,7 @@ Holder for all <code><a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIde
 
 
 
-<pre><code><b>struct</b> <a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityEventHandle">NetworkIdentityEventHandle</a> has key
+<pre><code><b>struct</b> <a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityEventHandle">NetworkIdentityEventHandle</a> <b>has</b> key
 </code></pre>
 
 
@@ -104,7 +104,7 @@ Holder for all <code><a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIde
 Message sent when there are updates to the <code><a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a></code>.
 
 
-<pre><code><b>struct</b> <a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityChangeNotification">NetworkIdentityChangeNotification</a> has drop, store
+<pre><code><b>struct</b> <a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityChangeNotification">NetworkIdentityChangeNotification</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -115,7 +115,7 @@ Message sent when there are updates to the <code><a href="NetworkIdentity.md#0x1
 
 <dl>
 <dt>
-<code>account: address</code>
+<code>account: <b>address</b></code>
 </dt>
 <dd>
  The address of the account that changed identities
@@ -215,7 +215,7 @@ No identities provided for changes
     <b>let</b> event_handle = <a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityEventHandle">NetworkIdentityEventHandle</a> {
         identity_change_events: <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event_new_event_handle">Event::new_event_handle</a>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityChangeNotification">NetworkIdentityChangeNotification</a>&gt;(tc_account),
     };
-    move_to(
+    <b>move_to</b>(
         tc_account,
         event_handle,
     );
@@ -268,7 +268,7 @@ Initialize <code><a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentit
 
 <pre><code><b>fun</b> <a href="NetworkIdentity.md#0x1_NetworkIdentity_initialize_network_identity">initialize_network_identity</a>(account: &signer) {
     <b>let</b> identities = <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_empty">Vector::empty</a>&lt;vector&lt;u8&gt;&gt;();
-    move_to(account, <a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a> { identities });
+    <b>move_to</b>(account, <a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a> { identities });
 }
 </code></pre>
 
@@ -296,7 +296,7 @@ Initialize <code><a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentit
 Return the underlying <code><a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a></code> bytes
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="NetworkIdentity.md#0x1_NetworkIdentity_get">get</a>(account_addr: address): vector&lt;vector&lt;u8&gt;&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="NetworkIdentity.md#0x1_NetworkIdentity_get">get</a>(account_addr: <b>address</b>): vector&lt;vector&lt;u8&gt;&gt;
 </code></pre>
 
 
@@ -305,12 +305,12 @@ Return the underlying <code><a href="NetworkIdentity.md#0x1_NetworkIdentity">Net
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="NetworkIdentity.md#0x1_NetworkIdentity_get">get</a>(account_addr: address): vector&lt;vector&lt;u8&gt;&gt; <b>acquires</b> <a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="NetworkIdentity.md#0x1_NetworkIdentity_get">get</a>(account_addr: <b>address</b>): vector&lt;vector&lt;u8&gt;&gt; <b>acquires</b> <a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a> {
     <b>assert</b>!(
         <b>exists</b>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a>&gt;(account_addr),
         <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="NetworkIdentity.md#0x1_NetworkIdentity_ENETWORK_ID_DOESNT_EXIST">ENETWORK_ID_DOESNT_EXIST</a>)
     );
-    *&borrow_global&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a>&gt;(account_addr).identities
+    *&<b>borrow_global</b>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a>&gt;(account_addr).identities
 }
 </code></pre>
 
@@ -356,7 +356,7 @@ Update and create if not exist <code><a href="NetworkIdentity.md#0x1_NetworkIden
         <a href="NetworkIdentity.md#0x1_NetworkIdentity_initialize_network_identity">initialize_network_identity</a>(account);
     };
     <b>let</b> account_addr = <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
-    <b>let</b> identity = borrow_global_mut&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a>&gt;(account_addr);
+    <b>let</b> identity = <b>borrow_global_mut</b>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a>&gt;(account_addr);
     <b>let</b> identities = &<b>mut</b> identity.identities;
 
     <b>assert</b>!(
@@ -367,7 +367,7 @@ Update and create if not exist <code><a href="NetworkIdentity.md#0x1_NetworkIden
     <b>let</b> has_change = <a href="NetworkIdentity.md#0x1_NetworkIdentity_add_members_internal">add_members_internal</a>(identities, &to_add);
     <b>if</b> (has_change) {
         <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event_emit_event">Event::emit_event</a>(
-            &<b>mut</b> borrow_global_mut&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityEventHandle">NetworkIdentityEventHandle</a>&gt;(@TreasuryCompliance).identity_change_events,
+            &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityEventHandle">NetworkIdentityEventHandle</a>&gt;(@TreasuryCompliance).identity_change_events,
             <a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityChangeNotification">NetworkIdentityChangeNotification</a> {
                 account: account_addr,
                 identities: *&identity.identities,
@@ -395,8 +395,8 @@ Update and create if not exist <code><a href="NetworkIdentity.md#0x1_NetworkIden
     vec()
 };
 <b>let</b> has_change = (<b>exists</b> e in to_add: !contains(prior_identities, e));
-<b>let</b> post handle = <b>global</b>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityEventHandle">NetworkIdentityEventHandle</a>&gt;(@TreasuryCompliance).identity_change_events;
-<b>let</b> post msg = <a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityChangeNotification">NetworkIdentityChangeNotification</a> {
+<b>let</b> <b>post</b> handle = <b>global</b>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityEventHandle">NetworkIdentityEventHandle</a>&gt;(@TreasuryCompliance).identity_change_events;
+<b>let</b> <b>post</b> msg = <a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityChangeNotification">NetworkIdentityChangeNotification</a> {
     account: account_addr,
     identities: <b>global</b>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a>&gt;(account_addr).identities,
     time_rotated_seconds: <a href="DiemTimestamp.md#0x1_DiemTimestamp_spec_now_seconds">DiemTimestamp::spec_now_seconds</a>(),
@@ -411,7 +411,7 @@ Update and create if not exist <code><a href="NetworkIdentity.md#0x1_NetworkIden
     new_members: <b>global</b>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a>&gt;(account_addr).identities,
 };
 <b>modifies</b> <b>global</b>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a>&gt;(account_addr);
-emits msg <b>to</b> handle <b>if</b> has_change;
+<b>emits</b> msg <b>to</b> handle <b>if</b> has_change;
 </code></pre>
 
 
@@ -449,13 +449,13 @@ Remove <code><a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a
         <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="NetworkIdentity.md#0x1_NetworkIdentity_ENETWORK_ID_DOESNT_EXIST">ENETWORK_ID_DOESNT_EXIST</a>)
     );
 
-    <b>let</b> identity = borrow_global_mut&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a>&gt;(account_addr);
+    <b>let</b> identity = <b>borrow_global_mut</b>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a>&gt;(account_addr);
     <b>let</b> identities = &<b>mut</b> identity.identities;
 
     <b>let</b> has_change = <a href="NetworkIdentity.md#0x1_NetworkIdentity_remove_members_internal">remove_members_internal</a>(identities, &to_remove);
     <b>if</b> (has_change) {
         <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event_emit_event">Event::emit_event</a>(
-            &<b>mut</b> borrow_global_mut&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityEventHandle">NetworkIdentityEventHandle</a>&gt;(@TreasuryCompliance).identity_change_events,
+            &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityEventHandle">NetworkIdentityEventHandle</a>&gt;(@TreasuryCompliance).identity_change_events,
             <a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityChangeNotification">NetworkIdentityChangeNotification</a> {
                 account: account_addr,
                 identities: *&identity.identities,
@@ -478,8 +478,8 @@ Remove <code><a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a
 <pre><code><b>let</b> account_addr = <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
 <b>let</b> prior_identities = <b>global</b>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a>&gt;(account_addr).identities;
 <b>let</b> has_change = (<b>exists</b> e in to_remove: contains(prior_identities, e));
-<b>let</b> post handle = <b>global</b>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityEventHandle">NetworkIdentityEventHandle</a>&gt;(@TreasuryCompliance).identity_change_events;
-<b>let</b> post msg = <a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityChangeNotification">NetworkIdentityChangeNotification</a> {
+<b>let</b> <b>post</b> handle = <b>global</b>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityEventHandle">NetworkIdentityEventHandle</a>&gt;(@TreasuryCompliance).identity_change_events;
+<b>let</b> <b>post</b> msg = <a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityChangeNotification">NetworkIdentityChangeNotification</a> {
     account: account_addr,
     identities: <b>global</b>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a>&gt;(account_addr).identities,
     time_rotated_seconds: <a href="DiemTimestamp.md#0x1_DiemTimestamp_spec_now_seconds">DiemTimestamp::spec_now_seconds</a>(),
@@ -494,7 +494,7 @@ Remove <code><a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a
     new_members: <b>global</b>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a>&gt;(account_addr).identities,
 };
 <b>modifies</b> <b>global</b>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a>&gt;(account_addr);
-emits msg <b>to</b> handle <b>if</b> has_change;
+<b>emits</b> msg <b>to</b> handle <b>if</b> has_change;
 </code></pre>
 
 

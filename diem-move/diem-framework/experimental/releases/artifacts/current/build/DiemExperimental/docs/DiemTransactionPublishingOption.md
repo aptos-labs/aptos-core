@@ -44,7 +44,7 @@ Defines and holds the publishing policies for the VM. There are three possible c
 We represent these as the following resource.
 
 
-<pre><code><b>struct</b> <a href="DiemTransactionPublishingOption.md#0x1_DiemTransactionPublishingOption">DiemTransactionPublishingOption</a> has <b>copy</b>, drop, store
+<pre><code><b>struct</b> <a href="DiemTransactionPublishingOption.md#0x1_DiemTransactionPublishingOption">DiemTransactionPublishingOption</a> <b>has</b> <b>copy</b>, drop, store
 </code></pre>
 
 
@@ -79,7 +79,7 @@ We represent these as the following resource.
 If published, halts transactions from all accounts except DiemRoot
 
 
-<pre><code><b>struct</b> <a href="DiemTransactionPublishingOption.md#0x1_DiemTransactionPublishingOption_HaltAllTransactions">HaltAllTransactions</a> has key
+<pre><code><b>struct</b> <a href="DiemTransactionPublishingOption.md#0x1_DiemTransactionPublishingOption_HaltAllTransactions">HaltAllTransactions</a> <b>has</b> key
 </code></pre>
 
 
@@ -415,7 +415,7 @@ If called, transactions cannot be sent from any account except DiemRoot
         !<b>exists</b>&lt;<a href="DiemTransactionPublishingOption.md#0x1_DiemTransactionPublishingOption_HaltAllTransactions">HaltAllTransactions</a>&gt;(<a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(dr_account)),
         <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_already_published">Errors::already_published</a>(<a href="DiemTransactionPublishingOption.md#0x1_DiemTransactionPublishingOption_EHALT_ALL_TRANSACTIONS">EHALT_ALL_TRANSACTIONS</a>),
     );
-    move_to(dr_account, <a href="DiemTransactionPublishingOption.md#0x1_DiemTransactionPublishingOption_HaltAllTransactions">HaltAllTransactions</a> {});
+    <b>move_to</b>(dr_account, <a href="DiemTransactionPublishingOption.md#0x1_DiemTransactionPublishingOption_HaltAllTransactions">HaltAllTransactions</a> {});
 }
 </code></pre>
 
@@ -447,7 +447,7 @@ If called, transactions can be sent from any account once again
         <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_already_published">Errors::already_published</a>(<a href="DiemTransactionPublishingOption.md#0x1_DiemTransactionPublishingOption_EHALT_ALL_TRANSACTIONS">EHALT_ALL_TRANSACTIONS</a>),
     );
 
-    <b>let</b> <a href="DiemTransactionPublishingOption.md#0x1_DiemTransactionPublishingOption_HaltAllTransactions">HaltAllTransactions</a> {} = move_from&lt;<a href="DiemTransactionPublishingOption.md#0x1_DiemTransactionPublishingOption_HaltAllTransactions">HaltAllTransactions</a>&gt;(dr_address);
+    <b>let</b> <a href="DiemTransactionPublishingOption.md#0x1_DiemTransactionPublishingOption_HaltAllTransactions">HaltAllTransactions</a> {} = <b>move_from</b>&lt;<a href="DiemTransactionPublishingOption.md#0x1_DiemTransactionPublishingOption_HaltAllTransactions">HaltAllTransactions</a>&gt;(dr_address);
 }
 </code></pre>
 

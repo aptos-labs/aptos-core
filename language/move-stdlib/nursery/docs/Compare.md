@@ -71,7 +71,7 @@ bytecode operations for polymorphic equality.
 <code>compare_bcs_bytes(bcs(t1), bcs(t2)) == <a href="Compare.md#0x1_Compare_LESS_THAN">LESS_THAN</a></code> iff <code>t1 &gt; t2</code>.
 
 For all other types, the order is whatever the BCS encoding of the type and the comparison
-strategy above gives you. One case where the order might be surprising is the <code>address</code>
+strategy above gives you. One case where the order might be surprising is the <code><b>address</b></code>
 type.
 CoreAddresses are 16 byte hex values that BCS encodes with the identity function. The right
 to left, byte-by-byte comparison means that (for example)
@@ -98,7 +98,7 @@ Keep this in mind when using this function to compare addresses.
     <b>let</b> i2 = <a href="_length">Vector::length</a>(v2);
     <b>let</b> len_cmp = <a href="Compare.md#0x1_Compare_cmp_u64">cmp_u64</a>(i1, i2);
 
-    // <a href="">BCS</a> uses little endian encoding for all integer types, so we choose <b>to</b> compare from left
+    // <a href="">BCS</a> uses little endian encoding for all integer types, so we <b>choose</b> <b>to</b> compare from left
     // <b>to</b> right. Going right <b>to</b> left would make the behavior of <a href="Compare.md#0x1_Compare">Compare</a>.cmp diverge from the
     // bytecode operators &lt; and &gt; on integer values (which would be confusing).
     <b>while</b> (i1 &gt; 0 && i2 &gt; 0) {

@@ -31,7 +31,7 @@ DiemConfig, and may be updated by Diem root.
 
 
 
-<pre><code><b>struct</b> <a href="DiemVersion.md#0x1_DiemVersion">DiemVersion</a> has <b>copy</b>, drop, store
+<pre><code><b>struct</b> <a href="DiemVersion.md#0x1_DiemVersion">DiemVersion</a> <b>has</b> <b>copy</b>, drop, store
 </code></pre>
 
 
@@ -197,7 +197,7 @@ After genesis, version is published.
 The permission "UpdateDiemProtocolVersion" is granted to DiemRoot [[H10]][PERMISSION].
 
 
-<pre><code><b>invariant</b> [suspendable] <b>forall</b> addr: address
+<pre><code><b>invariant</b> [suspendable] <b>forall</b> addr: <b>address</b>
     <b>where</b> <b>exists</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig">DiemConfig</a>&lt;<a href="DiemVersion.md#0x1_DiemVersion">DiemVersion</a>&gt;&gt;(addr): addr == @DiemRoot;
 <b>invariant</b> <b>update</b> [suspendable] <b>old</b>(<a href="DiemConfig.md#0x1_DiemConfig_spec_is_published">DiemConfig::spec_is_published</a>&lt;<a href="DiemVersion.md#0x1_DiemVersion">DiemVersion</a>&gt;())
     && <a href="DiemConfig.md#0x1_DiemConfig_spec_is_published">DiemConfig::spec_is_published</a>&lt;<a href="DiemVersion.md#0x1_DiemVersion">DiemVersion</a>&gt;()

@@ -48,7 +48,7 @@ of the <code><a href="DiemSystem.md#0x1_DiemSystem_DiemSystem">DiemSystem::DiemS
 
 
 
-<pre><code><b>struct</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_Config">Config</a> has <b>copy</b>, drop, store
+<pre><code><b>struct</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_Config">Config</a> <b>has</b> <b>copy</b>, drop, store
 </code></pre>
 
 
@@ -87,7 +87,7 @@ of the <code><a href="DiemSystem.md#0x1_DiemSystem_DiemSystem">DiemSystem::DiemS
 
 
 
-<pre><code><b>struct</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a> has key
+<pre><code><b>struct</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a> <b>has</b> key
 </code></pre>
 
 
@@ -104,7 +104,7 @@ of the <code><a href="DiemSystem.md#0x1_DiemSystem_DiemSystem">DiemSystem::DiemS
  set and rotated by the operator_account
 </dd>
 <dt>
-<code>operator_account: <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_Option">Option::Option</a>&lt;address&gt;</code>
+<code>operator_account: <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_Option">Option::Option</a>&lt;<b>address</b>&gt;</code>
 </dt>
 <dd>
 
@@ -195,7 +195,7 @@ and the address of the validator operator.
         !<b>exists</b>&lt;<a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a>&gt;(<a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(validator_account)),
         <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_already_published">Errors::already_published</a>(<a href="ValidatorConfig.md#0x1_ValidatorConfig_EVALIDATOR_CONFIG">EVALIDATOR_CONFIG</a>)
     );
-    move_to(validator_account, <a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a> {
+    <b>move_to</b>(validator_account, <a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a> {
         config: <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_none">Option::none</a>(),
         operator_account: <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_none">Option::none</a>(),
         human_name,
@@ -245,7 +245,7 @@ and the address of the validator operator.
 Returns true if a ValidatorConfig resource exists under addr.
 
 
-<pre><code><b>fun</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_exists_config">exists_config</a>(addr: address): bool
+<pre><code><b>fun</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_exists_config">exists_config</a>(addr: <b>address</b>): bool
 </code></pre>
 
 
@@ -254,7 +254,7 @@ Returns true if a ValidatorConfig resource exists under addr.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_exists_config">exists_config</a>(addr: address): bool {
+<pre><code><b>fun</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_exists_config">exists_config</a>(addr: <b>address</b>): bool {
     <b>exists</b>&lt;<a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a>&gt;(addr)
 }
 </code></pre>
@@ -271,7 +271,7 @@ Sets a new operator account, preserving the old config.
 Note: Access control.  No one but the owner of the account may change .operator_account
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_set_operator">set_operator</a>(validator_account: &signer, operator_addr: address)
+<pre><code><b>public</b> <b>fun</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_set_operator">set_operator</a>(validator_account: &signer, operator_addr: <b>address</b>)
 </code></pre>
 
 
@@ -280,17 +280,17 @@ Note: Access control.  No one but the owner of the account may change .operator_
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_set_operator">set_operator</a>(validator_account: &signer, operator_addr: address) <b>acquires</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_set_operator">set_operator</a>(validator_account: &signer, operator_addr: <b>address</b>) <b>acquires</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a> {
     <a href="Roles.md#0x1_Roles_assert_validator">Roles::assert_validator</a>(validator_account);
     // Check for validator role is not necessary since the role is checked when the config
-    // <b>resource</b> is published.
+    // resource is published.
     <b>assert</b>!(
         <a href="ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_has_validator_operator_config">ValidatorOperatorConfig::has_validator_operator_config</a>(operator_addr),
         <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="ValidatorConfig.md#0x1_ValidatorConfig_ENOT_A_VALIDATOR_OPERATOR">ENOT_A_VALIDATOR_OPERATOR</a>)
     );
     <b>let</b> sender = <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(validator_account);
     <b>assert</b>!(<a href="ValidatorConfig.md#0x1_ValidatorConfig_exists_config">exists_config</a>(sender), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="ValidatorConfig.md#0x1_ValidatorConfig_EVALIDATOR_CONFIG">EVALIDATOR_CONFIG</a>));
-    (borrow_global_mut&lt;<a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a>&gt;(sender)).operator_account = <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_some">Option::some</a>(operator_addr);
+    (<b>borrow_global_mut</b>&lt;<a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a>&gt;(sender)).operator_account = <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_some">Option::some</a>(operator_addr);
 }
 </code></pre>
 
@@ -320,7 +320,7 @@ Must abort if the signer does not have the Validator role [B24].
 
 <pre><code><b>schema</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_SetOperatorAbortsIf">SetOperatorAbortsIf</a> {
     validator_account: signer;
-    operator_addr: address;
+    operator_addr: <b>address</b>;
     <b>let</b> validator_addr = <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(validator_account);
     <b>include</b> <a href="Roles.md#0x1_Roles_AbortsIfNotValidator">Roles::AbortsIfNotValidator</a>{account: validator_account};
     <b>aborts_if</b> !<a href="ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_has_validator_operator_config">ValidatorOperatorConfig::has_validator_operator_config</a>(operator_addr)
@@ -338,7 +338,7 @@ Must abort if the signer does not have the Validator role [B24].
 
 <pre><code><b>schema</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_SetOperatorEnsures">SetOperatorEnsures</a> {
     validator_account: signer;
-    operator_addr: address;
+    operator_addr: <b>address</b>;
     <b>let</b> validator_addr = <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(validator_account);
     <b>ensures</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_spec_has_operator">spec_has_operator</a>(validator_addr);
     <b>ensures</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_get_operator">get_operator</a>(validator_addr) == operator_addr;
@@ -350,7 +350,7 @@ The signer can only change its own operator account [[H16]][PERMISSION].
 
 
 <pre><code><b>schema</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_SetOperatorEnsures">SetOperatorEnsures</a> {
-    <b>ensures</b> <b>forall</b> addr: address <b>where</b> addr != validator_addr:
+    <b>ensures</b> <b>forall</b> addr: <b>address</b> <b>where</b> addr != validator_addr:
         <b>global</b>&lt;<a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a>&gt;(addr).operator_account == <b>old</b>(<b>global</b>&lt;<a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a>&gt;(addr).operator_account);
 }
 </code></pre>
@@ -381,7 +381,7 @@ The old config is preserved.
     <b>let</b> sender = <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(validator_account);
     // <a href="ValidatorConfig.md#0x1_ValidatorConfig_Config">Config</a> field remains set
     <b>assert</b>!(<a href="ValidatorConfig.md#0x1_ValidatorConfig_exists_config">exists_config</a>(sender), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="ValidatorConfig.md#0x1_ValidatorConfig_EVALIDATOR_CONFIG">EVALIDATOR_CONFIG</a>));
-    (borrow_global_mut&lt;<a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a>&gt;(sender)).operator_account = <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_none">Option::none</a>();
+    (<b>borrow_global_mut</b>&lt;<a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a>&gt;(sender)).operator_account = <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_none">Option::none</a>();
 }
 </code></pre>
 
@@ -406,7 +406,7 @@ Must abort if the signer does not have the Validator role [[H16]][PERMISSION].
 The signer can only change its own operator account [[H16]][PERMISSION].
 
 
-<pre><code><b>ensures</b> <b>forall</b> addr: address <b>where</b> addr != sender:
+<pre><code><b>ensures</b> <b>forall</b> addr: <b>address</b> <b>where</b> addr != sender:
     <b>global</b>&lt;<a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a>&gt;(addr).operator_account == <b>old</b>(<b>global</b>&lt;<a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a>&gt;(addr).operator_account);
 </code></pre>
 
@@ -423,7 +423,7 @@ Once the config is set, it can not go back to <code><a href="../../../../../../.
 of the DiemSystem's code.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_set_config">set_config</a>(validator_operator_account: &signer, validator_addr: address, consensus_pubkey: vector&lt;u8&gt;, validator_network_addresses: vector&lt;u8&gt;, fullnode_network_addresses: vector&lt;u8&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_set_config">set_config</a>(validator_operator_account: &signer, validator_addr: <b>address</b>, consensus_pubkey: vector&lt;u8&gt;, validator_network_addresses: vector&lt;u8&gt;, fullnode_network_addresses: vector&lt;u8&gt;)
 </code></pre>
 
 
@@ -434,7 +434,7 @@ of the DiemSystem's code.
 
 <pre><code><b>public</b> <b>fun</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_set_config">set_config</a>(
     validator_operator_account: &signer,
-    validator_addr: address,
+    validator_addr: <b>address</b>,
     consensus_pubkey: vector&lt;u8&gt;,
     validator_network_addresses: vector&lt;u8&gt;,
     fullnode_network_addresses: vector&lt;u8&gt;,
@@ -449,7 +449,7 @@ of the DiemSystem's code.
     );
     // TODO(valerini): verify the proof of posession for consensus_pubkey
     <b>assert</b>!(<a href="ValidatorConfig.md#0x1_ValidatorConfig_exists_config">exists_config</a>(validator_addr), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="ValidatorConfig.md#0x1_ValidatorConfig_EVALIDATOR_CONFIG">EVALIDATOR_CONFIG</a>));
-    <b>let</b> t_ref = borrow_global_mut&lt;<a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a>&gt;(validator_addr);
+    <b>let</b> t_ref = <b>borrow_global_mut</b>&lt;<a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a>&gt;(validator_addr);
     t_ref.config = <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_some">Option::some</a>(<a href="ValidatorConfig.md#0x1_ValidatorConfig_Config">Config</a> {
         consensus_pubkey,
         validator_network_addresses,
@@ -489,7 +489,7 @@ of the DiemSystem's code.
 
 <pre><code><b>schema</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_SetConfigAbortsIf">SetConfigAbortsIf</a> {
     validator_operator_account: signer;
-    validator_addr: address;
+    validator_addr: <b>address</b>;
     consensus_pubkey: vector&lt;u8&gt;;
     <b>aborts_if</b> <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(validator_operator_account) != <a href="ValidatorConfig.md#0x1_ValidatorConfig_get_operator">get_operator</a>(validator_addr)
         <b>with</b> Errors::INVALID_ARGUMENT;
@@ -514,7 +514,7 @@ that if the validator account becomes valid, it stays valid, e.g.
 all validators in the Validator Set are valid
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_is_valid">is_valid</a>(addr: address): bool
+<pre><code><b>public</b> <b>fun</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_is_valid">is_valid</a>(addr: <b>address</b>): bool
 </code></pre>
 
 
@@ -523,8 +523,8 @@ all validators in the Validator Set are valid
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_is_valid">is_valid</a>(addr: address): bool <b>acquires</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a> {
-    <b>exists</b>&lt;<a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a>&gt;(addr) && <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_is_some">Option::is_some</a>(&borrow_global&lt;<a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a>&gt;(addr).config)
+<pre><code><b>public</b> <b>fun</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_is_valid">is_valid</a>(addr: <b>address</b>): bool <b>acquires</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a> {
+    <b>exists</b>&lt;<a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a>&gt;(addr) && <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_is_some">Option::is_some</a>(&<b>borrow_global</b>&lt;<a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a>&gt;(addr).config)
 }
 </code></pre>
 
@@ -554,7 +554,7 @@ Get Config
 Aborts if there is no ValidatorConfig resource or if its config is empty
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_get_config">get_config</a>(addr: address): <a href="ValidatorConfig.md#0x1_ValidatorConfig_Config">ValidatorConfig::Config</a>
+<pre><code><b>public</b> <b>fun</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_get_config">get_config</a>(addr: <b>address</b>): <a href="ValidatorConfig.md#0x1_ValidatorConfig_Config">ValidatorConfig::Config</a>
 </code></pre>
 
 
@@ -563,9 +563,9 @@ Aborts if there is no ValidatorConfig resource or if its config is empty
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_get_config">get_config</a>(addr: address): <a href="ValidatorConfig.md#0x1_ValidatorConfig_Config">Config</a> <b>acquires</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_get_config">get_config</a>(addr: <b>address</b>): <a href="ValidatorConfig.md#0x1_ValidatorConfig_Config">Config</a> <b>acquires</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a> {
     <b>assert</b>!(<a href="ValidatorConfig.md#0x1_ValidatorConfig_exists_config">exists_config</a>(addr), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="ValidatorConfig.md#0x1_ValidatorConfig_EVALIDATOR_CONFIG">EVALIDATOR_CONFIG</a>));
-    <b>let</b> config = &borrow_global&lt;<a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a>&gt;(addr).config;
+    <b>let</b> config = &<b>borrow_global</b>&lt;<a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a>&gt;(addr).config;
     <b>assert</b>!(<a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_is_some">Option::is_some</a>(config), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="ValidatorConfig.md#0x1_ValidatorConfig_EVALIDATOR_CONFIG">EVALIDATOR_CONFIG</a>));
     *<a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_borrow">Option::borrow</a>(config)
 }
@@ -593,7 +593,7 @@ Returns the config published under addr.
 <a name="0x1_ValidatorConfig_spec_get_config"></a>
 
 
-<pre><code><b>fun</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_spec_get_config">spec_get_config</a>(addr: address): <a href="ValidatorConfig.md#0x1_ValidatorConfig_Config">Config</a> {
+<pre><code><b>fun</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_spec_get_config">spec_get_config</a>(addr: <b>address</b>): <a href="ValidatorConfig.md#0x1_ValidatorConfig_Config">Config</a> {
    <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_borrow">Option::borrow</a>(<b>global</b>&lt;<a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a>&gt;(addr).config)
 }
 </code></pre>
@@ -610,7 +610,7 @@ Get validator's account human name
 Aborts if there is no ValidatorConfig resource
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_get_human_name">get_human_name</a>(addr: address): vector&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_get_human_name">get_human_name</a>(addr: <b>address</b>): vector&lt;u8&gt;
 </code></pre>
 
 
@@ -619,9 +619,9 @@ Aborts if there is no ValidatorConfig resource
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_get_human_name">get_human_name</a>(addr: address): vector&lt;u8&gt; <b>acquires</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_get_human_name">get_human_name</a>(addr: <b>address</b>): vector&lt;u8&gt; <b>acquires</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a> {
     <b>assert</b>!(<b>exists</b>&lt;<a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a>&gt;(addr), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="ValidatorConfig.md#0x1_ValidatorConfig_EVALIDATOR_CONFIG">EVALIDATOR_CONFIG</a>));
-    <b>let</b> t_ref = borrow_global&lt;<a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a>&gt;(addr);
+    <b>let</b> t_ref = <b>borrow_global</b>&lt;<a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a>&gt;(addr);
     *&t_ref.human_name
 }
 </code></pre>
@@ -653,7 +653,7 @@ Aborts if there is no ValidatorConfig resource or
 if the operator_account is unset
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_get_operator">get_operator</a>(addr: address): address
+<pre><code><b>public</b> <b>fun</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_get_operator">get_operator</a>(addr: <b>address</b>): <b>address</b>
 </code></pre>
 
 
@@ -662,9 +662,9 @@ if the operator_account is unset
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_get_operator">get_operator</a>(addr: address): address <b>acquires</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_get_operator">get_operator</a>(addr: <b>address</b>): <b>address</b> <b>acquires</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a> {
     <b>assert</b>!(<b>exists</b>&lt;<a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a>&gt;(addr), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="ValidatorConfig.md#0x1_ValidatorConfig_EVALIDATOR_CONFIG">EVALIDATOR_CONFIG</a>));
-    <b>let</b> t_ref = borrow_global&lt;<a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a>&gt;(addr);
+    <b>let</b> t_ref = <b>borrow_global</b>&lt;<a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a>&gt;(addr);
     <b>assert</b>!(<a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_is_some">Option::is_some</a>(&t_ref.operator_account), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="ValidatorConfig.md#0x1_ValidatorConfig_EVALIDATOR_CONFIG">EVALIDATOR_CONFIG</a>));
     *<a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_borrow">Option::borrow</a>(&t_ref.operator_account)
 }
@@ -691,7 +691,7 @@ if the operator_account is unset
 
 
 <pre><code><b>schema</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_AbortsIfGetOperator">AbortsIfGetOperator</a> {
-    addr: address;
+    addr: <b>address</b>;
     <b>include</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_AbortsIfNoValidatorConfig">AbortsIfNoValidatorConfig</a>;
     <b>aborts_if</b> !<a href="ValidatorConfig.md#0x1_ValidatorConfig_spec_has_operator">spec_has_operator</a>(addr) <b>with</b> Errors::INVALID_ARGUMENT;
 }
@@ -772,7 +772,7 @@ Never aborts
 The permission "{Set,Remove}ValidatorOperator(addr)" is granted to Validator [[H16]][PERMISSION]
 
 
-<pre><code><b>invariant</b> <b>update</b> <b>forall</b> a: address <b>where</b> <b>old</b>(<b>exists</b>&lt;<a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a>&gt;(a)) && <b>exists</b>&lt;<a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a>&gt;(a):
+<pre><code><b>invariant</b> <b>update</b> <b>forall</b> a: <b>address</b> <b>where</b> <b>old</b>(<b>exists</b>&lt;<a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a>&gt;(a)) && <b>exists</b>&lt;<a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a>&gt;(a):
     <b>old</b>(<b>global</b>&lt;<a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a>&gt;(a).operator_account) != <b>global</b>&lt;<a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a>&gt;(a).operator_account
         ==&gt; Signer::is_txn_signer_addr(a) && <a href="Roles.md#0x1_Roles_spec_has_validator_role_addr">Roles::spec_has_validator_role_addr</a>(a);
 </code></pre>
@@ -789,7 +789,7 @@ A validator stays valid once it becomes valid.
 
 
 <pre><code><b>invariant</b> <b>update</b>
-    <b>forall</b> validator: address <b>where</b> <b>old</b>(<a href="ValidatorConfig.md#0x1_ValidatorConfig_is_valid">is_valid</a>(validator)): <a href="ValidatorConfig.md#0x1_ValidatorConfig_is_valid">is_valid</a>(validator);
+    <b>forall</b> validator: <b>address</b> <b>where</b> <b>old</b>(<a href="ValidatorConfig.md#0x1_ValidatorConfig_is_valid">is_valid</a>(validator)): <a href="ValidatorConfig.md#0x1_ValidatorConfig_is_valid">is_valid</a>(validator);
 </code></pre>
 
 
@@ -802,7 +802,7 @@ A validator stays valid once it becomes valid.
 Every address that has a ValidatorConfig also has a validator role.
 
 
-<pre><code><b>invariant</b> <b>forall</b> addr: address <b>where</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_exists_config">exists_config</a>(addr):
+<pre><code><b>invariant</b> <b>forall</b> addr: <b>address</b> <b>where</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_exists_config">exists_config</a>(addr):
     <a href="Roles.md#0x1_Roles_spec_has_validator_role_addr">Roles::spec_has_validator_role_addr</a>(addr);
 </code></pre>
 
@@ -811,7 +811,7 @@ DIP-6 Property: If address has a ValidatorConfig, it has a validator role.  This
 in DiemSystem so we don't have to check whether every validator address has a validator role.
 
 
-<pre><code><b>invariant</b> <b>forall</b> addr: address <b>where</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_exists_config">exists_config</a>(addr):
+<pre><code><b>invariant</b> <b>forall</b> addr: <b>address</b> <b>where</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_exists_config">exists_config</a>(addr):
     <a href="Roles.md#0x1_Roles_spec_has_validator_role_addr">Roles::spec_has_validator_role_addr</a>(addr);
 </code></pre>
 
@@ -822,7 +822,7 @@ of the previous invariant, but it is not inductive and can't be proved without t
 previous one as a helper.
 
 
-<pre><code><b>invariant</b> <b>forall</b> addr: address <b>where</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_is_valid">is_valid</a>(addr):
+<pre><code><b>invariant</b> <b>forall</b> addr: <b>address</b> <b>where</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_is_valid">is_valid</a>(addr):
     <a href="Roles.md#0x1_Roles_spec_has_validator_role_addr">Roles::spec_has_validator_role_addr</a>(addr);
 </code></pre>
 
@@ -838,7 +838,7 @@ Returns true if addr has an operator account.
 <a name="0x1_ValidatorConfig_spec_has_operator"></a>
 
 
-<pre><code><b>fun</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_spec_has_operator">spec_has_operator</a>(addr: address): bool {
+<pre><code><b>fun</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_spec_has_operator">spec_has_operator</a>(addr: <b>address</b>): bool {
    <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_is_some">Option::is_some</a>(<b>global</b>&lt;<a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a>&gt;(addr).operator_account)
 }
 </code></pre>

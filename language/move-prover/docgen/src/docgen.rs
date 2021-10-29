@@ -6,6 +6,7 @@ use log::{debug, info, warn};
 
 use codespan::{ByteIndex, Span};
 use itertools::Itertools;
+use move_lang::parser::keywords::{BUILTINS, CONTEXTUAL_KEYWORDS, KEYWORDS};
 use move_model::{
     ast::{ModuleName, SpecBlockInfo, SpecBlockTarget},
     code_writer::{CodeWriter, CodeWriterLabel},
@@ -30,64 +31,6 @@ use std::{
     process::{Command, Stdio},
     rc::Rc,
 };
-
-const KEYWORDS: &[&str] = &[
-    "abort",
-    "acquires",
-    "as",
-    "break",
-    "const",
-    "continue",
-    "copy",
-    "copyable",
-    "else",
-    "false",
-    "if",
-    "invariant",
-    "let",
-    "loop",
-    "module",
-    "move",
-    "native",
-    "public",
-    "friend",
-    "resource",
-    "return",
-    "spec",
-    "struct",
-    "true",
-    "use",
-    "while",
-    "fun",
-    "script",
-];
-
-const WEAK_KEYWORDS: &[&str] = &[
-    "aborts_if",
-    "aborts_with",
-    "apply",
-    "assert",
-    "assume",
-    "decreases",
-    "except",
-    "forall",
-    "global",
-    "modifies",
-    "ensures",
-    "exists",
-    "include",
-    "mut",
-    "old",
-    "pragma",
-    "pack",
-    "unpack",
-    "update",
-    "requires",
-    "schema",
-    "to",
-    "with",
-    "where",
-];
 
 /// The maximum number of subheadings that are allowed
 const MAX_SUBSECTIONS: usize = 6;
@@ -1574,7 +1517,10 @@ impl<'env> Docgen<'env> {
                 } else if let Some(m) = cap.name("ident") {
                     let is_call = cap.name("call").is_some();
                     let s = m.as_str();
-                    if KEYWORDS.contains(&s) || WEAK_KEYWORDS.contains(&s) {
+                    if KEYWORDS.contains(&s)
+                        || CONTEXTUAL_KEYWORDS.contains(&s)
+                        || BUILTINS.contains(&s)
+                    {
                         format!("<b>{}</b>", &code[at + m.start()..at + m.end()])
                     } else if let Some(label) = self.resolve_to_label(s, is_call) {
                         format!("<a href=\"{}\">{}</a>", label, s)

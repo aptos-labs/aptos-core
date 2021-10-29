@@ -39,7 +39,7 @@ The <code><a href="TransactionFee.md#0x1_TransactionFee">TransactionFee</a></cod
 fiat <code>CoinType</code> that can be collected as a transaction fee.
 
 
-<pre><code><b>struct</b> <a href="TransactionFee.md#0x1_TransactionFee">TransactionFee</a>&lt;CoinType&gt; has key
+<pre><code><b>struct</b> <a href="TransactionFee.md#0x1_TransactionFee">TransactionFee</a>&lt;CoinType&gt; <b>has</b> key
 </code></pre>
 
 
@@ -214,7 +214,7 @@ Sets up the needed transaction fee state for a given <code>CoinType</code> curre
         !<a href="TransactionFee.md#0x1_TransactionFee_is_coin_initialized">is_coin_initialized</a>&lt;CoinType&gt;(),
         <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_already_published">Errors::already_published</a>(<a href="TransactionFee.md#0x1_TransactionFee_ETRANSACTION_FEE">ETRANSACTION_FEE</a>)
     );
-    move_to(
+    <b>move_to</b>(
         tc_account,
         <a href="TransactionFee.md#0x1_TransactionFee">TransactionFee</a>&lt;CoinType&gt; {
             balance: <a href="Diem.md#0x1_Diem_zero">Diem::zero</a>(),
@@ -247,7 +247,7 @@ Deposit <code>coin</code> into the transaction fees bucket
 <pre><code><b>public</b> <b>fun</b> <a href="TransactionFee.md#0x1_TransactionFee_pay_fee">pay_fee</a>&lt;CoinType&gt;(coin: <a href="Diem.md#0x1_Diem">Diem</a>&lt;CoinType&gt;) <b>acquires</b> <a href="TransactionFee.md#0x1_TransactionFee">TransactionFee</a> {
     <a href="DiemTimestamp.md#0x1_DiemTimestamp_assert_operating">DiemTimestamp::assert_operating</a>();
     <b>assert</b>!(<a href="TransactionFee.md#0x1_TransactionFee_is_coin_initialized">is_coin_initialized</a>&lt;CoinType&gt;(), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="TransactionFee.md#0x1_TransactionFee_ETRANSACTION_FEE">ETRANSACTION_FEE</a>));
-    <b>let</b> fees = borrow_global_mut&lt;<a href="TransactionFee.md#0x1_TransactionFee">TransactionFee</a>&lt;CoinType&gt;&gt;(@TreasuryCompliance);
+    <b>let</b> fees = <b>borrow_global_mut</b>&lt;<a href="TransactionFee.md#0x1_TransactionFee">TransactionFee</a>&lt;CoinType&gt;&gt;(@TreasuryCompliance);
     <a href="Diem.md#0x1_Diem_deposit">Diem::deposit</a>(&<b>mut</b> fees.balance, coin)
 }
 </code></pre>
@@ -264,7 +264,7 @@ Deposit <code>coin</code> into the transaction fees bucket
 <pre><code><b>include</b> <a href="DiemTimestamp.md#0x1_DiemTimestamp_AbortsIfNotOperating">DiemTimestamp::AbortsIfNotOperating</a>;
 <b>aborts_if</b> !<a href="TransactionFee.md#0x1_TransactionFee_is_coin_initialized">is_coin_initialized</a>&lt;CoinType&gt;() <b>with</b> Errors::NOT_PUBLISHED;
 <b>let</b> fees = <a href="TransactionFee.md#0x1_TransactionFee_spec_transaction_fee">spec_transaction_fee</a>&lt;CoinType&gt;().balance;
-<b>let</b> post post_fees = <a href="TransactionFee.md#0x1_TransactionFee_spec_transaction_fee">spec_transaction_fee</a>&lt;CoinType&gt;().balance;
+<b>let</b> <b>post</b> post_fees = <a href="TransactionFee.md#0x1_TransactionFee_spec_transaction_fee">spec_transaction_fee</a>&lt;CoinType&gt;().balance;
 <b>include</b> <a href="Diem.md#0x1_Diem_DepositAbortsIf">Diem::DepositAbortsIf</a>&lt;CoinType&gt;{coin: fees, check: coin};
 <b>ensures</b> post_fees.value == fees.value + coin.value;
 </code></pre>
@@ -299,11 +299,11 @@ underlying fiat.
     <b>assert</b>!(<a href="TransactionFee.md#0x1_TransactionFee_is_coin_initialized">is_coin_initialized</a>&lt;CoinType&gt;(), <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="TransactionFee.md#0x1_TransactionFee_ETRANSACTION_FEE">ETRANSACTION_FEE</a>));
     <b>if</b> (<a href="XDX.md#0x1_XDX_is_xdx">XDX::is_xdx</a>&lt;CoinType&gt;()) {
         // TODO: Once the composition of <a href="XDX.md#0x1_XDX">XDX</a> is determined fill this in <b>to</b>
-        // <b>unpack</b> and burn the backing coins of the <a href="XDX.md#0x1_XDX">XDX</a> coin.
+        // unpack and burn the backing coins of the <a href="XDX.md#0x1_XDX">XDX</a> coin.
         <b>abort</b> <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="TransactionFee.md#0x1_TransactionFee_ETRANSACTION_FEE">ETRANSACTION_FEE</a>)
     } <b>else</b> {
         // extract fees
-        <b>let</b> fees = borrow_global_mut&lt;<a href="TransactionFee.md#0x1_TransactionFee">TransactionFee</a>&lt;CoinType&gt;&gt;(@TreasuryCompliance);
+        <b>let</b> fees = <b>borrow_global_mut</b>&lt;<a href="TransactionFee.md#0x1_TransactionFee">TransactionFee</a>&lt;CoinType&gt;&gt;(@TreasuryCompliance);
         <b>let</b> coin = <a href="Diem.md#0x1_Diem_withdraw_all">Diem::withdraw_all</a>(&<b>mut</b> fees.balance);
         <b>let</b> burn_cap = <a href="Diem.md#0x1_Diem_remove_burn_capability">Diem::remove_burn_capability</a>&lt;CoinType&gt;(tc_account);
         // burn
@@ -444,7 +444,7 @@ If time has started ticking, then <code><a href="TransactionFee.md#0x1_Transacti
 
 
 <pre><code><b>fun</b> <a href="TransactionFee.md#0x1_TransactionFee_spec_transaction_fee">spec_transaction_fee</a>&lt;CoinType&gt;(): <a href="TransactionFee.md#0x1_TransactionFee">TransactionFee</a>&lt;CoinType&gt; {
-   borrow_global&lt;<a href="TransactionFee.md#0x1_TransactionFee">TransactionFee</a>&lt;CoinType&gt;&gt;(@TreasuryCompliance)
+   <b>borrow_global</b>&lt;<a href="TransactionFee.md#0x1_TransactionFee">TransactionFee</a>&lt;CoinType&gt;&gt;(@TreasuryCompliance)
 }
 </code></pre>
 
