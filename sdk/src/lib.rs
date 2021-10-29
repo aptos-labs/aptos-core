@@ -31,8 +31,8 @@
 //! let mut account_2 = LocalAccount::generate(&mut OsRng);
 //!
 //! // Fund and create account 1 and 2
-//! faucet.fund(Currency::XUS.as_str(), account_1.authentication_key(), 100).unwrap();
-//! faucet.fund(Currency::XUS.as_str(), account_2.authentication_key(), 50).unwrap();
+//! faucet.mint(Currency::XUS.as_str(), account_1.authentication_key(), 100).unwrap();
+//! faucet.mint(Currency::XUS.as_str(), account_2.authentication_key(), 50).unwrap();
 //!
 //! let transaction = account_1.sign_with_transaction_builder(
 //!     transaction_factory.peer_to_peer(Currency::XUS, account_2.address(), 10)

@@ -83,7 +83,7 @@ impl Coffer {
     pub fn fund(&self, currency: Currency, auth_key: AuthenticationKey, amount: u64) -> Result<()> {
         match self {
             Coffer::Faucet(faucet) => faucet
-                .fund(currency.as_str(), auth_key, amount)
+                .mint(currency.as_str(), auth_key, amount)
                 .map_err(Into::into),
         }
     }

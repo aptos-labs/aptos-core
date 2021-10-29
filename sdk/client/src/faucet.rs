@@ -43,7 +43,7 @@ impl FaucetClient {
         Ok(())
     }
 
-    pub fn fund(
+    pub fn mint(
         &self,
         currency_code: &str,
         auth_key: AuthenticationKey,
