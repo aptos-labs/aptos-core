@@ -104,30 +104,28 @@ fn test_genesis_transaction_flow() {
         .wait_for_all_nodes_to_catchup(Instant::now() + Duration::from_secs(60))
         .unwrap();
 
-    let mut known_version = None;
+    let mut known_round = None;
     for i in 0..5 {
         for validator in swarm.validators() {
-            let version = validator
-                .json_rpc_client()
-                .get_metadata()
+            let round = validator
+                .get_metric("diem_consensus_current_round{}")
                 .unwrap()
-                .into_inner()
-                .version;
-            match known_version {
-                Some(v) if v != version => panic!(
-                    "version not equal, last known: {}, node {} is {}",
-                    v,
+                .unwrap();
+            match known_round {
+                Some(r) if r != round => panic!(
+                    "round not equal, last known: {}, node {} is {}",
+                    r,
                     validator.name(),
-                    version,
+                    round,
                 ),
-                None => known_version = Some(version),
+                None => known_round = Some(round),
                 _ => continue,
             }
         }
         println!(
             "The last know round after {} sec is {}",
             i,
-            known_version.unwrap()
+            known_round.unwrap()
         );
         sleep(Duration::from_secs(1));
     }
