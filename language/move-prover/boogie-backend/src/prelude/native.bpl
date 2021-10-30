@@ -217,7 +217,7 @@ $1_Vector_index_of{{S}}(v: Vec ({{T}}), e: {{T}}) returns (res1: bool, res2: int
 // Serialize is modeled as an uninterpreted function, with an additional
 // axiom to say it's an injection.
 
-function {:inline} $1_BCS_serialize{{S}}(v: {{T}}): Vec int;
+function $1_BCS_serialize{{S}}(v: {{T}}): Vec int;
 
 axiom (forall v1, v2: {{T}} :: {$1_BCS_serialize{{S}}(v1), $1_BCS_serialize{{S}}(v2)}
    $IsEqual{{S}}(v1, v2) <==> $IsEqual'vec'u8''($1_BCS_serialize{{S}}(v1), $1_BCS_serialize{{S}}(v2)));
