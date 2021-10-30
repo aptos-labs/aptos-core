@@ -272,7 +272,7 @@ function install_pkg {
   if [ "$(whoami)" != 'root' ]; then
     PRE_COMMAND=(sudo)
   fi
-  if which "$package" &>/dev/null; then
+  if command -v "$package" &>/dev/null; then
     echo "$package is already installed"
   else
     echo "Installing ${package}."
@@ -469,12 +469,12 @@ function install_boogie {
 
 function install_z3 {
   echo "Installing Z3"
-  if which /usr/local/bin/z3 &>/dev/null; then
+  if command -v /usr/local/bin/z3 &>/dev/null; then
     echo "z3 already exists at /usr/local/bin/z3"
     echo "but this install will go to ${INSTALL_DIR}/z3."
     echo "you may want to remove the shared instance to avoid version confusion"
   fi
-  if which "${INSTALL_DIR}z3" &>/dev/null && [[ "$("${INSTALL_DIR}z3" --version || true)" =~ .*${Z3_VERSION}.* ]]; then
+  if command -v "${INSTALL_DIR}z3" &>/dev/null && [[ "$("${INSTALL_DIR}z3" --version || true)" =~ .*${Z3_VERSION}.* ]]; then
      echo "Z3 ${Z3_VERSION} already installed"
      return
   fi
@@ -501,12 +501,12 @@ function install_z3 {
 
 function install_cvc4 {
   echo "Installing CVC4"
-  if which /usr/local/bin/cvc4 &>/dev/null; then
+  if command -v /usr/local/bin/cvc4 &>/dev/null; then
     echo "cvc4 already exists at /usr/local/bin/cvc4"
     echo "but this install will go to $${INSTALL_DIR}cvc4."
     echo "you may want to remove the shared instance to avoid version confusion"
   fi
-  if which "${INSTALL_DIR}cvc4" &>/dev/null && [[ "$("${INSTALL_DIR}cvc4" --version || true)" =~ .*${CVC4_VERSION}.* ]]; then
+  if command -v "${INSTALL_DIR}cvc4" &>/dev/null && [[ "$("${INSTALL_DIR}cvc4" --version || true)" =~ .*${CVC4_VERSION}.* ]]; then
      echo "CVC4 ${CVC4_VERSION} already installed"
      return
   fi
@@ -533,12 +533,12 @@ function install_cvc4 {
 
 function install_cvc5 {
   echo "Installing cvc5"
-  if which /usr/local/bin/cvc5 &>/dev/null; then
+  if command -v /usr/local/bin/cvc5 &>/dev/null; then
     echo "cvc5 already exists at /usr/local/bin/cvc5"
     echo "but this install will go to $${INSTALL_DIR}cvc5."
     echo "you may want to remove the shared instance to avoid version confusion"
   fi
-  if which "${INSTALL_DIR}cvc5" &>/dev/null && [[ "$("${INSTALL_DIR}cvc5" --version || true)" =~ .*${CVC5_VERSION}.* ]]; then
+  if command -v "${INSTALL_DIR}cvc5" &>/dev/null && [[ "$("${INSTALL_DIR}cvc5" --version || true)" =~ .*${CVC5_VERSION}.* ]]; then
      echo "cvc5 ${CVC5_VERSION} already installed"
      return
   fi
@@ -796,7 +796,7 @@ if [[ "$(uname)" == "Linux" ]]; then
 		exit 1
 	fi
 elif [[ "$(uname)" == "Darwin" ]]; then
-	if which brew &>/dev/null; then
+	if command -v brew &>/dev/null; then
 		PACKAGE_MANAGER="brew"
 	else
 		echo "Missing package manager Homebrew (https://brew.sh/). Abort"
