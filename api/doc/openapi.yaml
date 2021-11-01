@@ -359,11 +359,11 @@ paths:
   /accounts/{address}/events/{event_handle_struct}/{field_name}:
     get:
       summary: Get events by event handle.
+      operationId: get-account-events
       description: >-
         This API extracts event key from the account resource identified
         by the `event_handle_struct` and `field_name`, then returns
         events identified by the event key.
-      operationId: get-events
       tags:
         - events
         - accounts
