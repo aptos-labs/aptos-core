@@ -493,7 +493,7 @@ jobs:
       - name: docker lints
         uses: ./.github/actions/docker-checks
       - name: deno lints
-        run: deno lint ./shuffle && deno lint ./language/move-analyzer
+        run: deno lint ./shuffle
 
   lint:
     runs-on: ubuntu-20.04-xl
