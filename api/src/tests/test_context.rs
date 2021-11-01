@@ -92,7 +92,7 @@ pub struct TestContext {
     pub db: Arc<DiemDB>,
     rng: rand::rngs::StdRng,
     root_keys: Arc<RootKeys>,
-    executor: Arc<Box<dyn BlockExecutor>>,
+    executor: Arc<dyn BlockExecutor>,
     expect_status_code: u16,
 }
 
@@ -111,7 +111,7 @@ impl TestContext {
             rng,
             root_keys: Arc::new(root_keys),
             validator_owner,
-            executor: Arc::new(executor),
+            executor: executor.into(),
             mempool: Arc::new(mempool),
             expect_status_code: 200,
             db,

@@ -169,10 +169,11 @@ impl SubmissionWorker {
                 }
             }
             if self.params.wait_committed {
+                let total_duration = (Instant::now() - start_time).as_millis() as u64;
+
                 if let Err(uncommitted) =
                     wait_for_accounts_sequence(&self.client, &mut self.accounts).await
                 {
-                    let total_duration = (Instant::now() - start_time).as_millis() as u64;
                     let num_committed = (num_requests - uncommitted.len()) as u64;
                     // To avoid negative result caused by uncommitted tx occur
                     // Simplified from:
@@ -198,7 +199,6 @@ impl SubmissionWorker {
                         self.client, uncommitted
                     );
                 } else {
-                    let total_duration = (Instant::now() - start_time).as_millis() as u64;
                     let latency = total_duration - txn_offset_time / num_requests as u64;
                     self.stats
                         .committed

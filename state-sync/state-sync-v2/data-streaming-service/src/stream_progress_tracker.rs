@@ -31,7 +31,7 @@ macro_rules! invalid_client_request {
         panic!(
             "Invalid client request {:?} found for the data stream tracker {:?}",
             $client_request, $stream_tracker
-        );
+        )
     };
 }
 
@@ -40,7 +40,7 @@ macro_rules! invalid_response_type {
         panic!(
             "The client response is type mismatched: {:?}",
             $client_response
-        );
+        )
     };
 }
 
@@ -49,7 +49,7 @@ macro_rules! invalid_stream_request {
         panic!(
             "Invalid stream request found {:?}",
             format!("{:?}", $stream_request)
-        );
+        )
     };
 }
 

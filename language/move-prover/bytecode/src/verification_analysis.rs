@@ -46,7 +46,7 @@ pub fn get_info(target: &FunctionTarget<'_>) -> VerificationInfo {
         .get_annotations()
         .get::<VerificationInfo>()
         .cloned()
-        .unwrap_or_else(VerificationInfo::default)
+        .unwrap_or_default()
 }
 
 /// A named tuple for holding the information on how an invariant is relevant to a function.

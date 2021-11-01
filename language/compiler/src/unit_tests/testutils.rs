@@ -21,7 +21,7 @@ macro_rules! instr_count {
             .code
             .iter()
             .filter(|ins| matches!(ins, $instr))
-            .count();
+            .count()
     };
 }
 

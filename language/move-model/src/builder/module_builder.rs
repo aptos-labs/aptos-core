@@ -2991,7 +2991,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     let struct_spec = self
                         .struct_specs
                         .remove(&name)
-                        .unwrap_or_else(Spec::default);
+                        .unwrap_or_default();
                     Some((
                         StructId::new(name),
                         self.parent.env.create_move_struct_data(
@@ -3027,7 +3027,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 } else {
                     self.symbol_pool().make(name_str)
                 };
-                let fun_spec = self.fun_specs.remove(&name).unwrap_or_else(Spec::default);
+                let fun_spec = self.fun_specs.remove(&name).unwrap_or_default();
                 if let Some(entry) = self.parent.fun_table.get(&self.qualified_by_module(name)) {
                     let arg_names = project_1st(&entry.params);
                     let type_arg_names = project_1st(&entry.type_params);

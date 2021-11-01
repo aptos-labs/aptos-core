@@ -1615,7 +1615,7 @@ impl VectorRef {
 
         macro_rules! err_pop_empty_vec {
             () => {
-                return Err(PartialVMError::new(StatusCode::ABORTED).with_sub_status(POP_EMPTY_VEC));
+                return Err(PartialVMError::new(StatusCode::ABORTED).with_sub_status(POP_EMPTY_VEC))
             };
         }
 

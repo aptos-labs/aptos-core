@@ -1355,7 +1355,7 @@ macro_rules! state_stack_bin_op {
         Box::new(move |state| stack_bin_op(state, crate::transitions::StackBinOpResult::Right))
     };
     () => {
-        state_stack_bin_op!(#left);
+        state_stack_bin_op!(#left)
     };
     ($e: expr) => {
         Box::new(move |state| stack_bin_op(state, crate::transitions::StackBinOpResult::Other($e)))

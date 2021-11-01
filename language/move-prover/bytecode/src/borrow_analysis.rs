@@ -62,10 +62,7 @@ impl BorrowInfo {
 
     /// Gets incoming edges (together with sources) of this node.
     pub fn get_incoming(&self, node: &BorrowNode) -> SetDomain<(BorrowNode, BorrowEdge)> {
-        self.borrows_from
-            .get(node)
-            .cloned()
-            .unwrap_or_else(SetDomain::default)
+        self.borrows_from.get(node).cloned().unwrap_or_default()
     }
 
     /// Returns true if this node is conditional, that is, it borrows from multiple parents,

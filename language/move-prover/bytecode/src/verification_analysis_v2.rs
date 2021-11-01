@@ -37,7 +37,7 @@ pub fn get_info(target: &FunctionTarget<'_>) -> VerificationInfoV2 {
         .get_annotations()
         .get::<VerificationInfoV2>()
         .cloned()
-        .unwrap_or_else(VerificationInfoV2::default)
+        .unwrap_or_default()
 }
 
 // Analysis info to save for global_invariant_instrumentation phase
