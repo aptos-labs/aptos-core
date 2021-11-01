@@ -120,6 +120,7 @@ mod tests {
         let runtime = tokio::runtime::Runtime::new().unwrap();
         let context = runtime.block_on(new_test_context_async());
         let mut cfg = NodeConfig::default();
+        cfg.randomize_ports();
         // same port but different host
         cfg.api.address = format!("10.10.10.10:{}", cfg.json_rpc.address.port())
             .parse()
@@ -138,7 +139,8 @@ mod tests {
         let runtime = tokio::runtime::Runtime::new().unwrap();
         let context = runtime.block_on(new_test_context_async());
         let mut cfg = NodeConfig::default();
-        // same port but different host
+        cfg.randomize_ports();
+        // same port and host
         cfg.api.address = cfg.json_rpc.address;
         let ret = bootstrap(
             &cfg,
@@ -155,9 +157,8 @@ mod tests {
         let runtime = tokio::runtime::Runtime::new().unwrap();
         let context = runtime.block_on(new_test_context_async());
         let mut cfg = NodeConfig::default();
-        // same port but different host
-        cfg.api.address.set_port(8081);
-        cfg.json_rpc.address.set_port(8080);
+        // different ports should be generated
+        cfg.randomize_ports();
         let ret = bootstrap(
             &cfg,
             ChainId::test(),
