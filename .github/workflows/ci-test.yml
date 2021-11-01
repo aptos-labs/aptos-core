@@ -1265,7 +1265,7 @@ jobs:
           }}"
           if [[ "$success" != "true" ]]; then
             jq -n \
-              --arg msg "Alert: Two LBT tests results are mismatch." \
+              --arg msg "Alert: Two LBT tests results are mismatch. CT ${{needs.land-blocking-test.result}} != Forge ${{needs.land-blocking-test-forge.outputs.forge-result}}" \
               --arg url "https://github.com/${{ github.repository }}/actions/runs/${{github.run_id}}" \
               --arg pr_url "https://github.com/${{ github.repository }}/pull/${{ needs.prepare.outputs.changes-pull-request-number }}" \
             '{
