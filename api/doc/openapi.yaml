@@ -234,67 +234,47 @@ paths:
           $ref: '#/components/responses/400'
         "500":
           $ref: '#/components/responses/500'
-  /transactions/{txn_hash}:
+  /transactions/{txn_hash_or_version}:
     get:
-      summary: Get transaction by hash
+      summary: Get transaction
       description: >-
-        Server first looks up on-chain transaction by hash; if no on-chain transaction found,
-        then look up transaction by hash in the mempool transactions.
+        There are two type transaction identifiers:
 
-        It is possible transaction is commited on-chain, but server responses
-        404 not found due to various reasons, e.g. broken index.
+          1. Tranasction hash: included in any transaction JSON respond from server.
+          2. Transaction version: included in on-chain transaction JSON respond from server.
+
+
+        When given transaction hash, server first looks up on-chain transaction by hash;
+        if no on-chain transaction found, then look up transaction by hash in the mempool
+        (pending) transactions.
+
+
+        When given transaction version, server looks up the transaction on-chain by version.
+
+
+        To create transaction hash:
+          1. Create hash message bytes: "DIEM::Transaction" bytes + BCS bytes of [Transaction](https://diem.github.io/diem/diem_types/transaction/enum.Transaction.html).
+          2. Apply hash algorithm `SHA3-256` to the hash message bytes.
+          3. Hex-encode the hash bytes with `0x` prefix.
       operationId: get-transaction
       tags:
         - transactions
       parameters:
-        - name: txn_hash
+        - name: txn_hash_or_version
           in: path
           required: true
-          description: hex-encoded transaction hash with `0x` prefix.
           schema:
-            $ref: '#/components/schemas/HexEncodedBytes'
+            $ref: '#/components/schemas/TransactionHashOrVersion'
       responses:
         "200":
           description: >-
-            Returns transaction matches the given hash.
+            Returns a pending / on-chain transaction.
           content:
             application/json:
               schema:
                 oneOf:
-                  - $ref: '#/components/schemas/OnChainTransaction'
                   - $ref: '#/components/schemas/PendingTransaction'
-        "400":
-          $ref: '#/components/responses/400'
-        "404":
-          $ref: '#/components/responses/404'
-        "500":
-          $ref: '#/components/responses/500'
-  /transactions/{txn_version}:
-    get:
-      summary: Get transaction by version
-      description: >-
-        Looks up transaction on-chain by version.
-
-        Note: as pending transaction in the mempool does not have a version,
-              this API does not look for pending transaction in the mempool.
-      operationId: get-transaction-by-version
-      tags:
-        - transactions
-      parameters:
-        - name: txn_version
-          in: path
-          required: true
-          description: On-chain transaction version
-          schema:
-            type: integer
-      responses:
-        "200":
-          description: >-
-            Returns on-chain transaction by the given version.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OnChainTransaction'
+                  - $ref: '#/components/schemas/OnChainTransaction'
         "400":
           $ref: '#/components/responses/400'
         "404":
@@ -525,6 +505,13 @@ components:
       example: "52635485"
       description: >-
         The version of the latest transaction in the ledger.
+    TransactionHashOrVersion:
+      description: >-
+        Transaction hash should be hex-encoded bytes string.
+        Transaction version should be an unsigned int64.
+      oneOf:
+        - $ref: '#/components/schemas/HexEncodedBytes'
+        - $ref: '#/components/schemas/u64'
     EventKey:
       type: string
       format: hex
