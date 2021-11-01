@@ -17,6 +17,8 @@ pub mod java;
 pub mod python3;
 /// Support for code-generation in Rust.
 pub mod rust;
+/// Support for code-generation in Swift.
+pub mod swift;
 /// Support for code-generation in TypeScript.
 pub mod typescript;
 

@@ -12,7 +12,7 @@ edition = "2018"
 [dependencies]
 rand = "0.8.3"
 serde = { version = "1.0.124", features = ["derive"] }
-serde-reflection = "0.3.4"
+serde-reflection = "0.3.5"
 serde_yaml = "0.8.17"
 structopt = "0.3.21"
 

@@ -69,12 +69,11 @@ pub(crate) fn make_abi_enum_container(abis: &[ScriptABI]) -> ContainerFormat {
         for arg in abi.args() {
             fields.push(quote_parameter_as_field(arg));
         }
-        let format = VariantFormat::Struct(fields);
         variants.insert(
             index as u32,
             Named {
                 name: abi.name().to_camel_case(),
-                value: format,
+                value: VariantFormat::Struct(fields),
             },
         );
     }

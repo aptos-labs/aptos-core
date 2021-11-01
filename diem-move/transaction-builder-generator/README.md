@@ -43,6 +43,8 @@ The following languages are currently supported:
 
 * TypeScript / JavaScript
 
+* Swift (version 5.3)
+
 
 ## Quick Start
 
@@ -193,6 +195,52 @@ dotnet add Demo.csproj reference ../Diem/Types/Diem.Types.csproj
 dotnet add Demo.csproj reference ../Serde/Serde.csproj
 dotnet add Demo.csproj reference ../Bcs/Bcs.csproj
 dotnet run --project Demo.csproj
+```
+
+### Swift
+
+To install Swift source `Serde`, `Bcs`, `DiemTypes`, and `DiemStdlib` into a target directory `$DEST`, run:
+```bash
+target/debug/generate-transaction-builders \
+    --language swift \
+    --module-name DiemStdlib \
+    --with-diem-types "testsuite/generate-format/tests/staged/diem.yaml" \
+    --target-source-dir "$DEST" \
+    "language/diem-framework/DPN/releases/legacy" \
+    "language/diem-framework/DPN/releases/artifacts/current"
+```
+
+Next, you may copy the [Swift demo](examples/swift/main.swift), create the
+Swift package for the transaction builders, and execute the example with the
+following:
+
+```bash
+cp language/transaction-builder/generator/examples/swift/main.swift "$DEST/Sources/DiemStdlib"
+cd "$DEST"
+cat >Package.swift <<EOF
+// swift-tools-version:5.3
+
+import PackageDescription
+
+let package = Package(
+    name: "DiemStdlib",
+    targets: [
+        .target(
+            name: "Serde",
+            dependencies: []
+        ),
+        .target(
+            name: "DiemTypes",
+            dependencies: ["Serde"]
+        ),
+        .target(
+            name: "DiemStdlib",
+            dependencies: ["Serde", "DiemTypes"]
+        ),
+    ]
+)
+EOF
+swift run
 ```
 
 ## Adding Support for a New Language

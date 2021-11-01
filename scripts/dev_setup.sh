@@ -95,6 +95,7 @@ function update_path_and_profile {
     add_to_profile "export BOOGIE_EXE=\"${DOTNET_ROOT}/tools/boogie\""
   fi
   if [[ "$INSTALL_CODEGEN" == "true" ]] && [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
+    add_to_profile "export PATH=\$PATH:${INSTALL_DIR}swift/usr/bin"
     if [[ -n "${GOBIN}" ]]; then
       add_to_profile "export PATH=\$PATH:/usr/lib/golang/bin"
     else
@@ -590,6 +591,20 @@ function install_deno {
   chmod +x "${INSTALL_DIR}deno"
 }
 
+function install_swift {
+    echo Installing Swift.
+    install_pkg wget "$PACKAGE_MANAGER"
+    install_pkg libncurses5 "$PACKAGE_MANAGER"
+    install_pkg clang "$PACKAGE_MANAGER"
+    install_pkg libcurl4 "$PACKAGE_MANAGER"
+    install_pkg libpython2.7 "$PACKAGE_MANAGER"
+    install_pkg libpython2.7-dev "$PACKAGE_MANAGER"
+    wget -q https://swift.org/builds/swift-5.3.3-release/ubuntu1804/swift-5.3.3-RELEASE/swift-5.3.3-RELEASE-ubuntu18.04.tar.gz
+    tar xzf swift-5.3.3-RELEASE-ubuntu18.04.tar.gz
+    rm -rf swift-5.3.3-RELEASE-ubuntu18.04.tar.gz
+    mv swift-5.3.3-RELEASE-ubuntu18.04 "${INSTALL_DIR}swift"
+}
+
 function install_java {
     if [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
       "${PRE_COMMAND[@]}" apt-get install -y default-jdk
@@ -707,6 +722,7 @@ Codegen tools (since -s was provided):
   * Golang
   * Java
   * Deno
+  * Swift
 EOF
   fi
 
@@ -948,6 +964,13 @@ if [[ "$INSTALL_CODEGEN" == "true" ]]; then
   install_deno
   install_java
   install_golang
+  if [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
+    # Only looked at this for a little while, but depends on glibc so alpine
+    # support isn't easily added. On Mac it requires XCode to be installed,
+    # which is quite largs, so probably something we don't want to download in
+    # this script.
+    install_swift
+  fi
   if [[ "$PACKAGE_MANAGER" != "apk" ]]; then
     # depends on wheels which needs glibc which doesn't work on alpine's python.
     # Only invested a hour or so in this, a work around may exist.

@@ -305,6 +305,70 @@ fn test_that_cpp_code_compiles_and_demo_runs() {
 
 #[test]
 #[ignore]
+fn test_that_swift_code_compiles_and_demo_runs() {
+    let registry = get_diem_registry();
+    let abis = get_stdlib_script_abis();
+    let path = tempdir().unwrap().path().to_owned();
+
+    let config = serdegen::CodeGeneratorConfig::new("DiemTypes".to_string())
+        .with_encodings(vec![serdegen::Encoding::Bcs]);
+    let bcs_installer = serdegen::swift::Installer::new(path.clone());
+    bcs_installer.install_module(&config, &registry).unwrap();
+    bcs_installer.install_serde_runtime().unwrap();
+    bcs_installer.install_bcs_runtime().unwrap();
+
+    let abi_installer = buildgen::swift::Installer::new(path.clone());
+    abi_installer
+        .install_transaction_builders("DiemStdlib", &abis)
+        .unwrap();
+
+    std::fs::copy(
+        "examples/swift/main.swift",
+        path.join("Sources").join("DiemStdlib").join("main.swift"),
+    )
+    .unwrap();
+    std::fs::write(
+        path.join("Package.swift"),
+        r#"// swift-tools-version:5.3
+
+import PackageDescription
+
+let package = Package(
+    name: "DiemStdlib",
+    targets: [
+        .target(
+            name: "Serde",
+            dependencies: []
+        ),
+        .target(
+            name: "DiemTypes",
+            dependencies: ["Serde"]
+        ),
+        .target(
+            name: "DiemStdlib",
+            dependencies: ["Serde", "DiemTypes"]
+        ),
+    ]
+)
+        "#,
+    )
+    .unwrap();
+
+    let output = Command::new("swift")
+        .arg("run")
+        .arg("--package-path")
+        .arg(path)
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    assert_eq!(
+        std::str::from_utf8(&output.stdout).unwrap(),
+        EXPECTED_OUTPUT
+    );
+}
+
+#[test]
+#[ignore]
 fn test_that_java_code_compiles_and_demo_runs() {
     let registry = get_diem_registry();
     let abis = get_stdlib_script_abis();

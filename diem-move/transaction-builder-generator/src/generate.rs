@@ -22,7 +22,8 @@ enum Language {
     Java,
     Csharp,
     Go,
-    TypeScript
+    TypeScript,
+    Swift,
 }
 }
 
@@ -114,6 +115,9 @@ fn main() {
                 Language::TypeScript => {
                     buildgen::typescript::output(&mut out, &abis).unwrap();
                 }
+                Language::Swift => {
+                    buildgen::swift::output(&mut out, &abis).unwrap();
+                }
                 Language::Csharp => {
                     panic!("Code generation in C# requires --target_source_dir");
                 }
@@ -138,6 +142,7 @@ fn main() {
                 Language::TypeScript => {
                     Box::new(serdegen::typescript::Installer::new(install_dir.clone()))
                 }
+                Language::Swift => Box::new(serdegen::swift::Installer::new(install_dir.clone())),
                 Language::Go => Box::new(serdegen::golang::Installer::new(
                     install_dir.clone(),
                     options.serde_package_name.clone(),
@@ -171,6 +176,7 @@ fn main() {
             Language::Csharp => ("Diem.Types".to_string(), vec!["Diem", "Types"]),
             Language::Go => ("diemtypes".to_string(), vec!["diemtypes"]),
             Language::TypeScript => ("diemTypes".to_string(), vec!["diemTypes"]),
+            Language::Swift => ("DiemTypes".to_string(), vec!["DiemTypes"]),
             _ => ("diem_types".to_string(), vec!["diem_types"]),
         };
         let custom_diem_code = buildgen::read_custom_code_from_paths(
@@ -192,6 +198,7 @@ fn main() {
                 options.diem_package_name,
             )),
             Language::TypeScript => Box::new(buildgen::typescript::Installer::new(install_dir)),
+            Language::Swift => Box::new(buildgen::swift::Installer::new(install_dir)),
             Language::Rust => Box::new(buildgen::rust::Installer::new(
                 install_dir,
                 options.diem_version_number,
