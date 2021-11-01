@@ -29,6 +29,11 @@ pub struct ConcretizedFormals(ReadWriteSet);
 pub struct ConcretizedSecondaryIndexes(ConcretizedFormals);
 
 impl ConcretizedFormals {
+    /// Return a `Self` that accesses nothing.
+    pub fn empty() -> Self {
+        Self(ReadWriteSet::new())
+    }
+
     /// Return the `ResourceKey`'s that may be written by `self`.
     /// For example: if `self` is 0x7/0x1::AModule::AResource/f/g -> ReadWrite, this will return
     /// 0x7/0x1::AModule.
@@ -258,13 +263,23 @@ pub fn bind_formals<R: GetModule>(
         .map_err(|_| anyhow!("Failed to get module from storage"))?
         .ok_or_else(|| anyhow!("Failed to get module"))?;
 
-    let func_type = Function::new_from_name(&compiled_module, fun)
-        .ok_or_else(|| anyhow!("Failed to find function"))?
+    let func_sig = Function::new_from_name(&compiled_module, fun)
+        .ok_or_else(|| anyhow!("Failed to find function"))?;
+
+    // Check arity before binding. Otherwise we might get out-of-bound errors.
+    if func_sig.parameters.len() != actuals.len() + signers.len()
+        || func_sig.type_parameters.len() != type_actuals.len()
+    {
+        bail!("Script arity doesn't match");
+    }
+
+    let func_type = func_sig
         .parameters
         .iter()
         .map(|ty| ty.subst(&subst_map).into_type_tag())
         .collect::<Option<Vec<_>>>()
         .ok_or_else(|| anyhow!("Failed to substitute types"))?;
+
     ConcretizedFormals::from_args(
         accesses,
         signers,

@@ -29,7 +29,7 @@ use crate::{
 };
 use diem_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 use diem_types::{
-    transaction::{SignedTransaction, Transaction, TransactionStatus},
+    transaction::{SignedTransaction, TransactionStatus},
     vm_status::{known_locations, KeptVMStatus, StatusCode},
 };
 use once_cell::sync::Lazy;

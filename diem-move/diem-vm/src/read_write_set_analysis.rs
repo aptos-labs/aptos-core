@@ -245,14 +245,19 @@ impl<'a, R: MoveResolver> ReadWriteSetAnalysis<'a, R> {
             &[gas_currency.clone()],
             &self.module_cache,
         )?;
-        let script_accesses = self.get_partially_concretized_summary(
-            module_name,
-            script_name,
-            &signers,
-            actuals,
-            type_actuals,
-            &self.module_cache,
-        )?;
+
+        // If any error occurs while analyzing the body, skip the read/writeset result as only the
+        // prologue and epilogue will be run by this transaction.
+        let script_accesses = self
+            .get_partially_concretized_summary(
+                module_name,
+                script_name,
+                &signers,
+                actuals,
+                type_actuals,
+                &self.module_cache,
+            )
+            .unwrap_or_else(ConcretizedFormals::empty);
 
         let mut keys_read = vec![];
         let mut keys_written = vec![];
