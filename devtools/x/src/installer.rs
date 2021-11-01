@@ -149,6 +149,7 @@ pub fn install_cargo_component_if_needed(
         } else {
             cmd.arg("--version").arg(&installation.version);
         }
+        cmd.arg("--locked");
         cmd.arg(name);
 
         let result = cmd.run();

@@ -1,5 +1,5 @@
 [grcov.installer]
-version = "0.8.0"
+version = "0.8.2"
 
 [system-tests]
 smoke-test = { path = "smoke-test" }
