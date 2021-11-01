@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::tests::new_test_context;
+use crate::tests::{assert_json, new_test_context};
 use serde_json::json;
 
 #[tokio::test]
@@ -71,5 +71,47 @@ async fn test_openapi_spec() {
         let req = warp::test::request().method("GET").path(path);
         let resp = context.reply(req).await;
         assert_eq!(resp.status(), 200);
+    }
+}
+
+#[tokio::test]
+async fn test_cors() {
+    let context = new_test_context();
+    let paths = ["/openapi.yaml", "/spec.html", "/", "/transactions"];
+    for path in paths {
+        let req = warp::test::request()
+            .header("origin", "test")
+            .header("access-control-headers", "any-header")
+            .header("access-control-request-method", "POST")
+            .method("OPTIONS")
+            .path(path);
+        let resp = context.reply(req).await;
+        assert_eq!(resp.status(), 200);
+        let cors_header = resp.headers().get("access-control-allow-origin").unwrap();
+        assert_eq!(cors_header, "test");
+    }
+}
+
+#[tokio::test]
+async fn test_cors_forbidden() {
+    let context = new_test_context();
+    let paths = ["/openapi.yaml", "/spec.html", "/", "/transactions"];
+    for path in paths {
+        let req = warp::test::request()
+            .header("origin", "test")
+            .header("access-control-headers", "any-header")
+            .header("access-control-request-method", "PUT")
+            .method("OPTIONS")
+            .path(path);
+        let resp = context.reply(req).await;
+        assert_eq!(resp.status(), 403);
+        let err: serde_json::Value = serde_json::from_slice(resp.body()).unwrap();
+        assert_json(
+            err,
+            json!({
+              "code": 403,
+              "message": "CORS request forbidden: request-method not allowed"
+            }),
+        )
     }
 }

@@ -5,7 +5,10 @@ use crate::{accounts, context::Context, events, log, transactions};
 use diem_api_types::{Error, Response};
 
 use std::convert::Infallible;
-use warp::{http::StatusCode, reject::MethodNotAllowed, reply, Filter, Rejection, Reply};
+use warp::{
+    cors::CorsForbidden, http::StatusCode, reject::MethodNotAllowed, reply, Filter, Rejection,
+    Reply,
+};
 
 pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Infallible> + Clone {
     index(context.clone())
@@ -17,6 +20,11 @@ pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Inf
         // jsonrpc routes must before `recover` and after `index`
         // so that POST '/' can be handled by jsonrpc routes instead of `index` route
         .or(context.jsonrpc_routes())
+        .with(
+            warp::cors()
+                .allow_any_origin()
+                .allow_methods(vec!["POST", "GET"]),
+        )
         .recover(handle_rejection)
         .with(log::logger())
 }
@@ -55,12 +63,16 @@ pub async fn handle_index(context: Context) -> Result<impl Reply, Rejection> {
 async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> {
     let code;
     let body;
+
     if err.is_not_found() {
         code = StatusCode::NOT_FOUND;
         body = reply::json(&Error::new(code, "Not Found".to_owned()));
     } else if let Some(error) = err.find::<Error>() {
         code = error.status_code();
         body = reply::json(error);
+    } else if let Some(cause) = err.find::<CorsForbidden>() {
+        code = StatusCode::FORBIDDEN;
+        body = reply::json(&Error::new(code, cause.to_string()));
     } else if err.find::<MethodNotAllowed>().is_some() {
         code = StatusCode::BAD_REQUEST;
         body = reply::json(&Error::new(
