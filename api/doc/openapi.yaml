@@ -216,7 +216,9 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UserTransactionRequestWithSignature'
+              allOf:
+                - $ref: '#/components/schemas/UserTransactionRequest'
+                - $ref: '#/components/schemas/UserTransactionSignature'
           application/vnd.bcs+signed_transaction:
             schema:
               type: string
@@ -509,7 +511,7 @@ components:
       description: >-
         Transaction hash should be hex-encoded bytes string.
         Transaction version should be an unsigned int64.
-      oneOf:
+      anyOf:
         - $ref: '#/components/schemas/HexEncodedBytes'
         - $ref: '#/components/schemas/u64'
     EventKey:
@@ -855,210 +857,126 @@ components:
           $ref: '#/components/schemas/TimestampSec'
         payload:
           $ref: '#/components/schemas/TransactionPayload'
-    UserTransactionRequestWithSignature:
+    UserTransactionSignature:
       type: object
       required:
-        - sender
-        - sequence_number
-        - max_gas_amount
-        - gas_unit_price
-        - gas_currency_code
-        - expiration_timestamp_secs
-        - payload
+        - signature
+      description: >-
+        This schema is used for merging with `UserTransactionRequest`
+        to append `signature` field when it is required.
       properties:
-        sender:
-          $ref: '#/components/schemas/address'
-        sequence_number:
-          $ref: '#/components/schemas/u64'
-        max_gas_amount:
-          $ref: '#/components/schemas/u64'
-        gas_unit_price:
-          $ref: '#/components/schemas/u64'
-        gas_currency_code:
-          type: string
-        expiration_timestamp_secs:
-          $ref: '#/components/schemas/TimestampSec'
-        payload:
-          $ref: '#/components/schemas/TransactionPayload'
         signature:
           $ref: '#/components/schemas/TransactionSignature'
     PendingTransaction:
-      type: object
-      required:
-        - type
-        - hash
-        - sender
-        - sequence_number
-        - max_gas_amount
-        - gas_unit_price
-        - gas_currency_code
-        - expiration_timestamp_secs
-        - payload
-        - signature
-      properties:
-        type:
-          type: string
-          enum:
-            - pending_transaction
-        hash:
-          $ref: '#/components/schemas/HexEncodedBytes'
-        sender:
-          $ref: '#/components/schemas/address'
-        sequence_number:
-          $ref: '#/components/schemas/u64'
-        max_gas_amount:
-          $ref: '#/components/schemas/u64'
-        gas_unit_price:
-          $ref: '#/components/schemas/u64'
-        gas_currency_code:
-          type: string
-        expiration_timestamp_secs:
-          $ref: '#/components/schemas/TimestampSec'
-        payload:
-          $ref: '#/components/schemas/TransactionPayload'
-        signature:
-          $ref: '#/components/schemas/TransactionSignature'
+      allOf:
+        - type: object
+          required:
+            - type
+            - hash
+          properties:
+            type:
+              type: string
+              enum:
+                - pending_transaction
+            hash:
+              $ref: '#/components/schemas/HexEncodedBytes'
+        - $ref: '#/components/schemas/UserTransactionRequest'
+        - $ref: '#/components/schemas/UserTransactionSignature'
     OnChainTransaction:
       oneOf:
         - $ref: '#/components/schemas/GenesisTransaction'
         - $ref: '#/components/schemas/UserTransaction'
         - $ref: '#/components/schemas/BlockMetadataTransaction'
+    OnChainTransactionInfo:
+      type: object
+      required:
+        - version
+        - hash
+        - state_root_hash
+        - event_root_hash
+        - gas_used
+        - success
+        - vm_status
+      properties:
+        version:
+          $ref: '#/components/schemas/u64'
+        hash:
+          $ref: '#/components/schemas/HexEncodedBytes'
+        state_root_hash:
+          $ref: '#/components/schemas/HexEncodedBytes'
+        event_root_hash:
+          $ref: '#/components/schemas/HexEncodedBytes'
+        gas_used:
+          $ref: '#/components/schemas/u64'
+        success:
+          type: boolean
+        vm_status:
+          type: string
     UserTransaction:
-      type: object
-      required:
-        - type
-        - version
-        - hash
-        - state_root_hash
-        - event_root_hash
-        - gas_used
-        - success
-        - sender
-        - sequence_number
-        - max_gas_amount
-        - gas_unit_price
-        - gas_currency_code
-        - expiration_timestamp_secs
-        - payload
-        - signature
-      properties:
-        type:
-          type: string
-          enum:
-            - user_transaction
-        version:
-          $ref: '#/components/schemas/u64'
-        hash:
-          $ref: '#/components/schemas/HexEncodedBytes'
-        state_root_hash:
-          $ref: '#/components/schemas/HexEncodedBytes'
-        event_root_hash:
-          $ref: '#/components/schemas/HexEncodedBytes'
-        gas_used:
-          $ref: '#/components/schemas/u64'
-        success:
-          type: boolean
-        vm_status:
-          type: string
-        sender:
-          $ref: '#/components/schemas/address'
-        sequence_number:
-          $ref: '#/components/schemas/u64'
-        max_gas_amount:
-          $ref: '#/components/schemas/u64'
-        gas_unit_price:
-          $ref: '#/components/schemas/u64'
-        gas_currency_code:
-          type: string
-        expiration_timestamp_secs:
-          $ref: '#/components/schemas/TimestampSec'
-        payload:
-          $ref: '#/components/schemas/TransactionPayload'
-        signature:
-          $ref: '#/components/schemas/TransactionSignature'
+      allOf:
+        - type: object
+          required:
+            - type
+            - events
+          properties:
+            type:
+              type: string
+              enum:
+                - user_transaction
+            events:
+              type: array
+              items:
+                $ref: '#/components/schemas/Event'
+        - $ref: '#/components/schemas/UserTransactionRequest'
+        - $ref: '#/components/schemas/UserTransactionSignature'
+        - $ref: '#/components/schemas/OnChainTransactionInfo'
     BlockMetadataTransaction:
-      type: object
-      required:
-        - type
-        - version
-        - hash
-        - state_root_hash
-        - event_root_hash
-        - gas_used
-        - success
-        - id
-        - round
-        - previous_block_votes
-        - proposer
-        - timestamp
-      properties:
-        type:
-          type: string
-          enum:
-            - block_metadata_transaction
-        version:
-          $ref: '#/components/schemas/u64'
-        hash:
-          $ref: '#/components/schemas/HexEncodedBytes'
-        state_root_hash:
-          $ref: '#/components/schemas/HexEncodedBytes'
-        event_root_hash:
-          $ref: '#/components/schemas/HexEncodedBytes'
-        gas_used:
-          $ref: '#/components/schemas/u64'
-        success:
-          type: boolean
-        vm_status:
-          type: string
-        id:
-          $ref: '#/components/schemas/HexEncodedBytes'
-        round:
-          $ref: '#/components/schemas/u64'
-        previous_block_votes:
-          type: array
-          items:
-            $ref: '#/components/schemas/address'
-        proposer:
-          $ref: '#/components/schemas/address'
-        timestamp:
-          $ref: '#/components/schemas/TimestampUsec'
+      allOf:
+        - type: object
+          required:
+            - type
+            - id
+            - round
+            - previous_block_votes
+            - proposer
+            - timestamp
+          properties:
+            type:
+              type: string
+              enum:
+                - block_metadata_transaction
+            id:
+              $ref: '#/components/schemas/HexEncodedBytes'
+            round:
+              $ref: '#/components/schemas/u64'
+            previous_block_votes:
+              type: array
+              items:
+                $ref: '#/components/schemas/address'
+            proposer:
+              $ref: '#/components/schemas/address'
+            timestamp:
+              $ref: '#/components/schemas/TimestampUsec'
+        - $ref: '#/components/schemas/OnChainTransactionInfo'
     GenesisTransaction:
-      type: object
-      required:
-        - type
-        - version
-        - hash
-        - state_root_hash
-        - event_root_hash
-        - gas_used
-        - success
-        - payload
-        - events
-      properties:
-        type:
-          type: string
-          enum:
-            - genesis_transaction
-        version:
-          $ref: '#/components/schemas/u64'
-        hash:
-          $ref: '#/components/schemas/HexEncodedBytes'
-        state_root_hash:
-          $ref: '#/components/schemas/HexEncodedBytes'
-        event_root_hash:
-          $ref: '#/components/schemas/HexEncodedBytes'
-        gas_used:
-          $ref: '#/components/schemas/u64'
-        success:
-          type: boolean
-        vm_status:
-          type: string
-        payload:
-          $ref: '#/components/schemas/WriteSetPayload'
-        events:
-          type: array
-          items:
-            $ref: '#/components/schemas/Event'
+      allOf:
+        - type: object
+          required:
+            - type
+            - payload
+            - events
+          properties:
+            type:
+              type: string
+              enum:
+                - genesis_transaction
+            payload:
+              $ref: '#/components/schemas/WriteSetPayload'
+            events:
+              type: array
+              items:
+                $ref: '#/components/schemas/Event'
+        - $ref: '#/components/schemas/OnChainTransactionInfo'
     TransactionPayload:
       oneOf:
         - $ref: '#/components/schemas/ScriptFunctionPayload'
