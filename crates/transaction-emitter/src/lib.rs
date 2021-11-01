@@ -1,7 +1,6 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::ChainInfo;
 use anyhow::{anyhow, format_err, Context, Result};
 use diem_logger::*;
 use diem_sdk::{
@@ -245,22 +244,28 @@ impl SubmissionWorker {
 }
 
 #[derive(Debug)]
-pub struct TxnEmitter<'t> {
+pub struct TxnEmitter<'t, 'd> {
     accounts: Vec<LocalAccount>,
     txn_factory: TransactionFactory,
-    chain_info: ChainInfo<'t>,
+    treasury_compliance_account: &'t mut LocalAccount,
+    designated_dealer_account: &'d mut LocalAccount,
     client: JsonRpcClient,
     rng: ::rand::rngs::StdRng,
 }
 
-impl<'t> TxnEmitter<'t> {
-    pub fn new(chain_info: ChainInfo<'t>, rng: ::rand::rngs::StdRng) -> Self {
-        let txn_factory = TransactionFactory::new(chain_info.chain_id());
-        let client = JsonRpcClient::new(chain_info.json_rpc());
+impl<'t, 'd> TxnEmitter<'t, 'd> {
+    pub fn new(
+        treasury_compliance_account: &'t mut LocalAccount,
+        designated_dealer_account: &'d mut LocalAccount,
+        client: JsonRpcClient,
+        transaction_factory: TransactionFactory,
+        rng: ::rand::rngs::StdRng,
+    ) -> Self {
         Self {
             accounts: vec![],
-            txn_factory,
-            chain_info,
+            txn_factory: transaction_factory,
+            treasury_compliance_account,
+            designated_dealer_account,
             client,
             rng,
         }
@@ -277,7 +282,7 @@ impl<'t> TxnEmitter<'t> {
     pub async fn get_money_source(&mut self, coins_total: u64) -> Result<&mut LocalAccount> {
         let client = self.client.clone();
         println!("Creating and minting faucet account");
-        let mut faucet_account = &mut self.chain_info.designated_dealer_account;
+        let mut faucet_account = &mut self.designated_dealer_account;
         let mint_txn = gen_transfer_txn_request(
             faucet_account,
             &faucet_account.address(),
@@ -313,7 +318,7 @@ impl<'t> TxnEmitter<'t> {
             let client = self.pick_mint_client(json_rpc_clients).clone();
             let batch_size = min(MAX_TXN_BATCH_SIZE, seed_account_num - i);
             let mut batch = gen_random_accounts(batch_size, self.rng());
-            let creation_account = &mut self.chain_info.treasury_compliance_account;
+            let creation_account = &mut self.treasury_compliance_account;
             let txn_factory = &self.txn_factory;
             let create_requests = batch
                 .iter()

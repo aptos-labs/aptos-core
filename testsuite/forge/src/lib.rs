@@ -14,8 +14,7 @@ pub use runner::*;
 mod backend;
 pub use backend::*;
 
-mod txn_emitter;
-pub use txn_emitter::*;
+pub use transaction_emitter::*;
 
 mod report;
 pub use report::*;

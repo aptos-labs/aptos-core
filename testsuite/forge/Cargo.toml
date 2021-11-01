@@ -11,37 +11,38 @@ edition = "2018"
 
 [dependencies]
 anyhow = { version = "1.0", features = ["backtrace"] }
+base64 = "0.13.0"
 futures = "0.3.12"
-hyper-proxy = "0.9.1"
 hyper = { version = "0.14.4", features = ["full"] }
+hyper-proxy = "0.9.1"
 hyper-tls = "0.5.0"
 itertools = "0.10.0"
+k8s-openapi = { version = "0.11.0", default-features = false, features = ["v1_15"] }
+kube = "0.51.0"
 rand = "0.8.3"
+rand_core = "0.6.2"
 rayon = "1.5.0"
 regex = "1.4.3"
+reqwest = { version = "0.11.2", features = ["blocking", "json"] }
 rusoto_core = "0.46.0"
+rusoto_credential = "0.46.0"
 rusoto_eks = "0.46.0"
 rusoto_sts = "0.46.0"
-rusoto_credential = "0.46.0"
-structopt = "0.3.21"
-termcolor = "1.1.2"
-tokio = { version = "1.8.1", features = ["full"] }
-reqwest = { version = "0.11.2", features = ["blocking", "json"] }
-rand_core = "0.6.2"
 serde = { version = "1.0.124", features = ["derive"] }
 serde_json = "1.0.64"
-url = "2.2.2"
+structopt = "0.3.21"
 tempfile = "3.2.0"
+termcolor = "1.1.2"
+tokio = { version = "1.8.1", features = ["full"] }
+url = "2.2.2"
 
-diem-sdk = { path = "../../sdk" }
 debug-interface = { path = "../../common/debug-interface" }
-diem-logger = { path = "../../common/logger" }
 diem-config = { path = "../../config" }
-diem-workspace-hack = { path = "../../common/workspace-hack" }
 diem-framework-releases = { path = "../../diem-move/diem-framework/DPN/releases" }
 diem-genesis-tool = { path = "../../config/management/genesis" }
+diem-logger = { path = "../../common/logger" }
 diem-retrier = { path = "../../common/retrier" }
+diem-sdk = { path = "../../sdk" }
 diem-secure-storage = { path = "../../secure/storage" }
-base64 = "0.13.0"
-kube = "0.51.0"
-k8s-openapi = { version = "0.11.0", default-features = false, features = ["v1_15"] }
+diem-workspace-hack = { path = "../../common/workspace-hack" }
+transaction-emitter = { path = "../../crates/transaction-emitter" }

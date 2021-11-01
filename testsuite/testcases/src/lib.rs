@@ -7,7 +7,9 @@ pub mod gas_price_test;
 pub mod partial_nodes_down_test;
 pub mod performance_test;
 
-use diem_sdk::types::PeerId;
+use diem_sdk::{
+    client::Client as JsonRpcClient, transaction_builder::TransactionFactory, types::PeerId,
+};
 use forge::{EmitJobRequest, NetworkContext, NodeExt, Result, TxnEmitter, TxnStats, Version};
 use rand::SeedableRng;
 use std::time::{Duration, Instant};
@@ -49,7 +51,15 @@ pub fn generate_traffic<'t>(
         .filter(|v| validators.contains(&v.peer_id()))
         .map(|n| n.async_json_rpc_client())
         .collect::<Vec<_>>();
-    let mut emitter = TxnEmitter::new(ctx.swarm().chain_info(), rng);
+    let chain_info = ctx.swarm().chain_info();
+    let transaction_factory = TransactionFactory::new(chain_info.chain_id);
+    let mut emitter = TxnEmitter::new(
+        chain_info.treasury_compliance_account,
+        chain_info.designated_dealer_account,
+        JsonRpcClient::new(&chain_info.json_rpc_url),
+        transaction_factory,
+        rng,
+    );
     let emit_job_request = match fixed_tps {
         Some(tps) => EmitJobRequest::fixed_tps(validator_clients, tps, gas_price),
         None => EmitJobRequest::default(validator_clients, gas_price),

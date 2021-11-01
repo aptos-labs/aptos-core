@@ -3523,6 +3523,7 @@ dependencies = [
  "tempfile",
  "termcolor",
  "tokio",
+ "transaction-emitter",
  "url",
 ]
 
@@ -8930,6 +8931,21 @@ dependencies = [
  "tempfile",
  "textwrap 0.13.4",
  "which",
+]
+
+[[package]]
+name = "transaction-emitter"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "diem-logger",
+ "diem-sdk",
+ "diem-workspace-hack",
+ "futures",
+ "itertools 0.10.1",
+ "rand 0.8.4",
+ "rand_core 0.6.2",
+ "tokio",
 ]
 
 [[package]]
