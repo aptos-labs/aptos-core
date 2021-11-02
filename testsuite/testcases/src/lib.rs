@@ -12,7 +12,10 @@ use diem_sdk::{
 };
 use forge::{EmitJobRequest, NetworkContext, NodeExt, Result, TxnEmitter, TxnStats, Version};
 use rand::SeedableRng;
-use std::time::{Duration, Instant};
+use std::{
+    convert::TryInto,
+    time::{Duration, Instant},
+};
 use tokio::runtime::Runtime;
 
 fn batch_update<'t>(
@@ -60,10 +63,10 @@ pub fn generate_traffic<'t>(
         transaction_factory,
         rng,
     );
-    let emit_job_request = match fixed_tps {
-        Some(tps) => EmitJobRequest::fixed_tps(validator_clients, tps, gas_price),
-        None => EmitJobRequest::default(validator_clients, gas_price),
-    };
+    let mut emit_job_request = EmitJobRequest::new(validator_clients).gas_price(gas_price);
+    if let Some(target_tps) = fixed_tps {
+        emit_job_request = emit_job_request.fixed_tps(target_tps.try_into().unwrap());
+    }
     let stats = rt.block_on(emitter.emit_txn_for(duration, emit_job_request))?;
 
     Ok(stats)

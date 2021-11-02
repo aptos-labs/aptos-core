@@ -10,6 +10,7 @@ use diem_sdk::{
     transaction_builder::{Currency, TransactionFactory},
     types::{
         account_config::XUS_NAME,
+        chain_id::ChainId,
         transaction::{authenticator::AuthenticationKey, SignedTransaction, Transaction},
         LocalAccount,
     },
@@ -17,13 +18,15 @@ use diem_sdk::{
 use futures::future::{try_join_all, FutureExt};
 use itertools::zip;
 use rand::{
+    distributions::{Distribution, Standard},
     seq::{IteratorRandom, SliceRandom},
-    Rng,
+    Rng, RngCore,
 };
 use rand_core::SeedableRng;
 use std::{
     cmp::{max, min},
     collections::HashSet,
+    num::NonZeroU64,
     sync::{
         atomic::{AtomicBool, AtomicU64, Ordering},
         Arc,
@@ -57,46 +60,66 @@ impl Default for EmitThreadParams {
 }
 
 pub struct EmitJobRequest {
-    pub json_rpc_clients: Vec<JsonRpcClient>,
-    pub accounts_per_client: usize,
-    pub workers_per_endpoint: Option<usize>,
-    pub thread_params: EmitThreadParams,
-    pub gas_price: u64,
+    json_rpc_clients: Vec<JsonRpcClient>,
+    accounts_per_client: usize,
+    workers_per_endpoint: Option<usize>,
+    thread_params: EmitThreadParams,
+    gas_price: u64,
+    invalid_transaction_ratio: usize,
 }
 
 impl EmitJobRequest {
-    pub fn default(json_rpc_clients: Vec<JsonRpcClient>, gas_price: u64) -> Self {
+    pub fn new(json_rpc_clients: Vec<JsonRpcClient>) -> Self {
         Self {
             json_rpc_clients,
             accounts_per_client: 15,
             workers_per_endpoint: None,
             thread_params: EmitThreadParams::default(),
-            gas_price,
+            gas_price: 0,
+            invalid_transaction_ratio: 0,
         }
     }
 
-    pub fn fixed_tps_params(clients_count: usize, tps: u64) -> (usize, u64) {
-        if tps < 1 {
-            panic!("Target tps {} can not less than 1", tps)
-        }
-        let num_workers = tps as usize / clients_count + 1;
-        let wait_time = (clients_count * num_workers * 1000_usize / tps as usize) as u64;
-        (num_workers, wait_time)
+    pub fn json_rpc_clients(mut self, json_rpc_clients: Vec<JsonRpcClient>) -> Self {
+        self.json_rpc_clients = json_rpc_clients;
+        self
     }
 
-    pub fn fixed_tps(json_rpc_clients: Vec<JsonRpcClient>, tps: u64, gas_price: u64) -> Self {
-        let (num_workers, wait_time) =
-            EmitJobRequest::fixed_tps_params(json_rpc_clients.len(), tps);
-        Self {
-            json_rpc_clients,
-            accounts_per_client: 1,
-            workers_per_endpoint: Some(num_workers),
-            thread_params: EmitThreadParams {
+    pub fn accounts_per_client(mut self, accounts_per_client: usize) -> Self {
+        self.accounts_per_client = accounts_per_client;
+        self
+    }
+
+    pub fn workers_per_endpoint(mut self, workers_per_endpoint: usize) -> Self {
+        self.workers_per_endpoint = Some(workers_per_endpoint);
+        self
+    }
+
+    pub fn thread_params(mut self, thread_params: EmitThreadParams) -> Self {
+        self.thread_params = thread_params;
+        self
+    }
+
+    pub fn gas_price(mut self, gas_price: u64) -> Self {
+        self.gas_price = gas_price;
+        self
+    }
+
+    pub fn invalid_transaction_ratio(mut self, invalid_transaction_ratio: usize) -> Self {
+        self.invalid_transaction_ratio = invalid_transaction_ratio;
+        self
+    }
+
+    pub fn fixed_tps(self, target_tps: NonZeroU64) -> Self {
+        let clients_count = self.json_rpc_clients.len() as u64;
+        let num_workers = target_tps.get() / clients_count + 1;
+        let wait_time = clients_count * num_workers * 1000 / target_tps.get();
+
+        self.workers_per_endpoint(num_workers as usize)
+            .thread_params(EmitThreadParams {
                 wait_millis: wait_time,
                 wait_committed: true,
-            },
-            gas_price,
-        }
+            })
     }
 }
 
@@ -145,6 +168,7 @@ struct SubmissionWorker {
     params: EmitThreadParams,
     stats: Arc<StatsAccumulator>,
     txn_factory: TransactionFactory,
+    invalid_transaction_ratio: usize,
     rng: ::rand::rngs::StdRng,
 }
 
@@ -225,18 +249,38 @@ impl SubmissionWorker {
             .iter_mut()
             .choose_multiple(&mut self.rng, batch_size);
         let mut requests = Vec::with_capacity(accounts.len());
+        let invalid_size = if self.invalid_transaction_ratio != 0 {
+            // if enable mix invalid tx, at least 1 invalid tx per batch
+            max(1, accounts.len() * self.invalid_transaction_ratio / 100)
+        } else {
+            0
+        };
+        let mut num_valid_tx = accounts.len() - invalid_size;
         for sender in accounts {
             let receiver = self
                 .all_addresses
                 .choose(&mut self.rng)
                 .expect("all_addresses can't be empty");
-            let request = gen_transfer_txn_request(
-                sender,
-                receiver,
-                SEND_AMOUNT,
-                &self.txn_factory,
-                gas_price,
-            );
+            let request = if num_valid_tx > 0 {
+                num_valid_tx -= 1;
+                gen_transfer_txn_request(
+                    sender,
+                    receiver,
+                    SEND_AMOUNT,
+                    &self.txn_factory,
+                    gas_price,
+                )
+            } else {
+                generate_invalid_transaction(
+                    sender,
+                    receiver,
+                    SEND_AMOUNT,
+                    &self.txn_factory,
+                    gas_price,
+                    &requests,
+                    &mut self.rng,
+                )
+            };
             requests.push(request);
         }
         requests
@@ -469,6 +513,7 @@ impl<'t, 'd> TxnEmitter<'t, 'd> {
                     params,
                     stats,
                     txn_factory: self.txn_factory.clone(),
+                    invalid_transaction_ratio: req.invalid_transaction_ratio,
                     rng: self.from_rng(),
                 };
                 let join_handle = tokio_handle.spawn(worker.run(req.gas_price).boxed());
@@ -819,6 +864,53 @@ pub fn gen_transfer_txn_request(
     )
 }
 
+fn generate_invalid_transaction<R>(
+    sender: &mut LocalAccount,
+    receiver: &AccountAddress,
+    num_coins: u64,
+    transaction_factory: &TransactionFactory,
+    gas_price: u64,
+    reqs: &[SignedTransaction],
+    rng: &mut R,
+) -> SignedTransaction
+where
+    R: ::rand_core::RngCore + ::rand_core::CryptoRng,
+{
+    let mut invalid_account = LocalAccount::generate(rng);
+    let invalid_address = invalid_account.address();
+    match Standard.sample(rng) {
+        InvalidTransactionType::ChainId => {
+            let txn_factory = transaction_factory.clone().with_chain_id(ChainId::new(255));
+            gen_transfer_txn_request(sender, receiver, num_coins, &txn_factory, gas_price)
+        }
+        InvalidTransactionType::Sender => gen_transfer_txn_request(
+            &mut invalid_account,
+            receiver,
+            num_coins,
+            transaction_factory,
+            gas_price,
+        ),
+        InvalidTransactionType::Receiver => gen_transfer_txn_request(
+            sender,
+            &invalid_address,
+            num_coins,
+            transaction_factory,
+            gas_price,
+        ),
+        InvalidTransactionType::Duplication => {
+            // if this is the first tx, default to generate invalid tx with wrong chain id
+            // otherwise, make a duplication of an exist valid tx
+            if reqs.is_empty() {
+                let txn_factory = transaction_factory.clone().with_chain_id(ChainId::new(255));
+                gen_transfer_txn_request(sender, receiver, num_coins, &txn_factory, gas_price)
+            } else {
+                let random_index = rng.gen_range(0..reqs.len());
+                reqs[random_index].clone()
+            }
+        }
+    }
+}
+
 impl StatsAccumulator {
     pub fn accumulate(&self) -> TxnStats {
         TxnStats {
@@ -843,6 +935,29 @@ impl TxnStats {
                 self.latency / self.committed
             },
             p99_latency: self.latency_buckets.percentile(99, 100),
+        }
+    }
+}
+
+#[derive(Debug)]
+enum InvalidTransactionType {
+    /// invalid tx with wrong chain id
+    ChainId,
+    /// invalid tx with sender not on chain
+    Sender,
+    /// invalid tx with receiver not on chain
+    Receiver,
+    /// duplicate an exist tx
+    Duplication,
+}
+
+impl Distribution<InvalidTransactionType> for Standard {
+    fn sample<R: RngCore + ?Sized>(&self, rng: &mut R) -> InvalidTransactionType {
+        match rng.gen_range(0..=3) {
+            0 => InvalidTransactionType::ChainId,
+            1 => InvalidTransactionType::Sender,
+            2 => InvalidTransactionType::Receiver,
+            _ => InvalidTransactionType::Duplication,
         }
     }
 }
