@@ -34,7 +34,7 @@ COPY --from=builder /diem/target/release/diem-operational-tool /usr/local/bin
 
 ### Get DPN Move modules bytecodes for genesis ceremony
 RUN mkdir -p /diem/move
-COPY --from=builder /diem/language/diem-framework/DPN/releases/artifacts/current/**/bytecode_modules/*.mv /diem/move
+COPY --from=builder /diem/language/diem-framework/DPN/releases/artifacts/current /diem/move
 ### Get experimental Move modules bytecodes for genesis ceremony
 RUN mkdir -p /experimental/move
 COPY --from=builder /diem/language/diem-framework/experimental/releases/artifacts/current /experimental/move

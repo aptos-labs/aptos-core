@@ -204,6 +204,13 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
         .expect("There has to be at least 1 version")
     }
 
+    pub fn genesis_version(&self) -> Version {
+        self.factory
+            .versions()
+            .max()
+            .expect("There has to be at least 1 version")
+    }
+
     pub fn run(&self) -> Result<TestReport> {
         let test_count = self.filter_tests(self.tests.all_tests()).count();
         let filtered_out = test_count.saturating_sub(self.tests.all_tests().count());
@@ -221,11 +228,13 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                     .collect::<Vec<_>>()
             );
             let initial_version = self.initial_version();
+            let genesis_version = self.genesis_version();
             let mut rng = ::rand::rngs::StdRng::from_seed(OsRng.gen());
             let mut swarm = self.factory.launch_swarm(
                 &mut rng,
                 self.tests.initial_validator_count,
                 &initial_version,
+                &genesis_version,
             )?;
 
             // Run PublicUsageTests

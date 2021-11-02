@@ -225,7 +225,7 @@ pub fn clean_k8s_cluster(
     helm_repo: String,
     base_num_validators: usize,
     base_validator_image_tag: String,
-    base_testnet_image_tag: String,
+    base_genesis_image_tag: String,
     require_validator_healthcheck: bool,
 ) -> Result<()> {
     assert!(base_num_validators <= MAX_NUM_VALIDATORS);
@@ -311,7 +311,7 @@ pub fn clean_k8s_cluster(
         "--set",
         &format!("genesis.numValidators={}", base_num_validators),
         "--set",
-        &format!("imageTag={}", &base_testnet_image_tag),
+        &format!("imageTag={}", &base_genesis_image_tag),
         "--set",
         "monitoring.prometheus.useHttps=false",
     ];

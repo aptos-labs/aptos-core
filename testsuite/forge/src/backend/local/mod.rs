@@ -163,6 +163,7 @@ impl Factory for LocalFactory {
         rng: &mut StdRng,
         node_num: NonZeroUsize,
         version: &Version,
+        _genesis_version: &Version,
     ) -> Result<Box<dyn Swarm>> {
         let swarm = self.new_swarm_with_version(rng, node_num, version)?;
 

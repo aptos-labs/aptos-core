@@ -15,5 +15,6 @@ pub trait Factory {
         rng: &mut StdRng,
         node_num: NonZeroUsize,
         version: &Version,
+        genesis_version: &Version,
     ) -> Result<Box<dyn Swarm>>;
 }
