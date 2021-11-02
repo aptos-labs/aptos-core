@@ -40,16 +40,6 @@ runs:
           mv /Users/runner/work/diem/diem /opt/git/diem
           ln -s /opt/git/diem /Users/runner/work/diem/diem
           cd /opt/git/diem
-        else
-          # FIXME delete after GHA image pull outage; this temporarily sets up
-          # the work dir that the rest of the workflow depends on.
-          if [[ ! -d /opt/git/diem ]]; then
-            sudo mkdir -p /opt/git && sudo mkdir -p /opt/cargo
-            sudo chmod -R g+rw /opt/
-            mv /home/runner/work/diem/diem /opt/git/diem
-            ln -s /opt/git/diem /home/runner/work/diem/diem
-            cd /opt/git/diem
-          fi
         fi
 
         # prepare move lang prover tooling.

@@ -496,8 +496,8 @@ jobs:
     timeout-minutes: 10
     needs: prepare
     if: ${{ needs.prepare.outputs.test-non-rust-lint == 'true'  }}
-      #container:
-      #image: diem/build_environment:${{ needs.prepare.outputs.changes-target-branch }}
+    container:
+      image: diem/build_environment:${{ needs.prepare.outputs.changes-target-branch }}
     steps:
       - uses: actions/checkout@v2.3.4
         with:
@@ -526,10 +526,10 @@ jobs:
     timeout-minutes: 30
     needs: prepare
     if: ${{ needs.prepare.outputs.any-changes-founds == 'true' }}
-      #container:
-      #image: diem/build_environment:${{ needs.prepare.outputs.changes-target-branch }}
-      #volumes:
-      #  - "${{github.workspace}}:/opt/git/diem"
+    container:
+      image: diem/build_environment:${{ needs.prepare.outputs.changes-target-branch }}
+      volumes:
+        - "${{github.workspace}}:/opt/git/diem"
     steps:
       - uses: actions/checkout@v2.3.4
         with:
@@ -558,10 +558,10 @@ jobs:
     timeout-minutes: 60
     needs: prepare
     if: ${{ needs.prepare.outputs.test-rust == 'true' }}
-      #container:
-      #image: diem/build_environment:${{ needs.prepare.outputs.changes-target-branch }}
-      #volumes:
-      #  - "${{github.workspace}}:/opt/git/diem"
+    container:
+      image: diem/build_environment:${{ needs.prepare.outputs.changes-target-branch }}
+      volumes:
+        - "${{github.workspace}}:/opt/git/diem"
     steps:
       - uses: actions/checkout@v2.3.4
         with:
@@ -604,10 +604,10 @@ jobs:
     timeout-minutes: 60
     needs: prepare
     if: ${{ needs.prepare.outputs.test-rust == 'true' }}
-      #container:
-      #image: diem/build_environment:${{ needs.prepare.outputs.changes-target-branch }}
-      #volumes:
-      #  - "${{github.workspace}}:/opt/git/diem"
+    container:
+      image: diem/build_environment:${{ needs.prepare.outputs.changes-target-branch }}
+      volumes:
+        - "${{github.workspace}}:/opt/git/diem"
     steps:
       - uses: actions/checkout@v2.3.4
         with:
@@ -640,10 +640,10 @@ jobs:
     timeout-minutes: 60
     needs: prepare
     if: ${{ needs.prepare.outputs.test-rust == 'true' }}
-      #container:
-      #image: diem/build_environment:${{ needs.prepare.outputs.changes-target-branch }}
-      #volumes:
-      #  - "${{github.workspace}}:/opt/git/diem"
+    container:
+      image: diem/build_environment:${{ needs.prepare.outputs.changes-target-branch }}
+      volumes:
+        - "${{github.workspace}}:/opt/git/diem"
     strategy:
       fail-fast: false
       matrix:
@@ -727,10 +727,10 @@ jobs:
     timeout-minutes: 40
     needs: prepare
     if: ${{ needs.prepare.outputs.test-rust == 'true' && needs.prepare.outputs.test-compatibility == 'true' }}
-      #container:
-      #image: diem/build_environment:${{ needs.prepare.outputs.changes-target-branch }}
-      #volumes:
-      #  - "${{github.workspace}}:/opt/git/diem"
+    container:
+      image: diem/build_environment:${{ needs.prepare.outputs.changes-target-branch }}
+      volumes:
+        - "${{github.workspace}}:/opt/git/diem"
     steps:
       - uses: actions/checkout@v2.3.4
         with:
@@ -802,10 +802,10 @@ jobs:
     timeout-minutes: 60
     needs: prepare
     if: ${{ needs.prepare.outputs.test-rust == 'true' }}
-      #container:
-      #image: diem/build_environment:${{ needs.prepare.outputs.changes-target-branch }}
-      #volumes:
-      #  - "${{github.workspace}}:/opt/git/diem"
+    container:
+      image: diem/build_environment:${{ needs.prepare.outputs.changes-target-branch }}
+      volumes:
+        - "${{github.workspace}}:/opt/git/diem"
     steps:
       - uses: actions/checkout@v2.3.4
         with:
@@ -830,10 +830,10 @@ jobs:
     timeout-minutes: 30
     needs: prepare
     if: ${{ needs.prepare.outputs.test-test-coverage == 'true' }}
-      #container:
-      #image: diem/build_environment:${{ needs.prepare.outputs.changes-target-branch }}
-      #volumes:
-      #  - "${{github.workspace}}:/opt/git/diem"
+    container:
+      image: diem/build_environment:${{ needs.prepare.outputs.changes-target-branch }}
+      volumes:
+        - "${{github.workspace}}:/opt/git/diem"
     steps:
       - uses: actions/checkout@v2.3.4
         with:
@@ -938,10 +938,10 @@ jobs:
     timeout-minutes: 30
     needs: prepare
     if: ${{ needs.prepare.outputs.test-rust == 'true' }}
-      #container:
-      #image: diem/build_environment:${{ needs.prepare.outputs.changes-target-branch }}
-      #volumes:
-      #  - "${{github.workspace}}:/opt/git/diem"
+    container:
+      image: diem/build_environment:${{ needs.prepare.outputs.changes-target-branch }}
+      volumes:
+        - "${{github.workspace}}:/opt/git/diem"
     steps:
       - uses: actions/checkout@v2.3.4
         with:
@@ -966,10 +966,10 @@ jobs:
     timeout-minutes: 30
     needs: prepare
     if: ${{ needs.prepare.outputs.test-rust == 'true' }}
-      #container:
-      #image: diem/build_environment:${{ needs.prepare.outputs.changes-target-branch }}
-      #volumes:
-      #  - "${{github.workspace}}:/opt/git/diem"
+    container:
+      image: diem/build_environment:${{ needs.prepare.outputs.changes-target-branch }}
+      volumes:
+        - "${{github.workspace}}:/opt/git/diem"
     steps:
       - uses: actions/checkout@v2.3.4
         with:
