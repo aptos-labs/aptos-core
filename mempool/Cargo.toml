@@ -52,6 +52,7 @@ enum_dispatch = "0.3.5"
 proptest = "1.0.0"
 
 diem-config = { path = "../config", features = ["fuzzing"] }
+diem-id-generator = { path = "../common/id-generator" }
 network = { path = "../network", features = ["fuzzing"] }
 storage-interface = { path = "../storage/storage-interface", features = ["fuzzing"] }
 
