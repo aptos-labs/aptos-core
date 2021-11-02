@@ -7745,6 +7745,7 @@ dependencies = [
  "hex",
  "include_dir",
  "move-binary-format",
+ "move-cli",
  "move-lang",
  "move-package",
  "once_cell",

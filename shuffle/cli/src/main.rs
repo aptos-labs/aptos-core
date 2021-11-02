@@ -1,6 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::test::TestCommand;
 use anyhow::{anyhow, Result};
 use diem_types::account_address::AccountAddress;
 use std::{fs, path::PathBuf, str::FromStr};
@@ -24,20 +25,20 @@ pub async fn main() -> Result<()> {
         Subcommand::New { blockchain, path } => new::handle(blockchain, path),
         Subcommand::Node { genesis } => node::handle(genesis),
         Subcommand::Build { project_path } => {
-            build::handle(&normalized_project_path(project_path)?)
+            build::handle(&shared::normalized_project_path(project_path)?)
         }
         Subcommand::Deploy { project_path } => {
-            deploy::handle(&normalized_project_path(project_path)?)
+            deploy::handle(&shared::normalized_project_path(project_path)?)
         }
         Subcommand::Account { root } => account::handle(root),
-        Subcommand::Test { project_path } => test::handle(&normalized_project_path(project_path)?),
+        Subcommand::Test { cmd } => test::handle(cmd),
         Subcommand::Console {
             project_path,
             network,
             key_path,
             address,
         } => console::handle(
-            &normalized_project_path(project_path)?,
+            &shared::normalized_project_path(project_path)?,
             network,
             &normalized_key_path(key_path)?,
             normalized_address(address)?,
@@ -106,8 +107,8 @@ pub enum Subcommand {
     },
     #[structopt(about = "Runs end to end .ts tests")]
     Test {
-        #[structopt(short, long)]
-        project_path: Option<PathBuf>,
+        #[structopt(subcommand)]
+        cmd: TestCommand,
     },
     #[structopt(
         about = "Captures last 10 transactions and continuously polls for new transactions from the account"
@@ -133,13 +134,6 @@ pub enum Subcommand {
         #[structopt(short, help = "Blocks and streams future transactions as they happen")]
         tail: Option<Option<bool>>,
     },
-}
-
-fn normalized_project_path(project_path: Option<PathBuf>) -> Result<PathBuf> {
-    match project_path {
-        Some(path) => Ok(path),
-        None => shared::get_shuffle_project_path(&std::env::current_dir()?),
-    }
 }
 
 fn normalized_address(account_address: Option<String>) -> Result<AccountAddress> {

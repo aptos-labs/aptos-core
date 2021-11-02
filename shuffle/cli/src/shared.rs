@@ -334,6 +334,13 @@ fn generate_transaction_builders(pkg_path: &Path, target_dir: &Path) -> Result<(
     Ok(())
 }
 
+pub fn normalized_project_path(project_path: Option<PathBuf>) -> Result<PathBuf> {
+    match project_path {
+        Some(path) => Ok(path),
+        None => get_shuffle_project_path(&std::env::current_dir()?),
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::{generate_typescript_libraries, get_shuffle_project_path};

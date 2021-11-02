@@ -38,6 +38,7 @@ diem-types = { path = "../../types" }
 diem-workspace-hack = { path = "../../common/workspace-hack" }
 generate-key = { path = "../../config/generate-key" }
 move-lang = { path = "../../language/move-lang" }
+move-cli = { path = "../../language/tools/move-cli" }
 move-package = { path = "../../language/tools/move-package" }
 move-binary-format = { path = "../../language/move-binary-format" }
 shuffle-custom-node = { path = "../genesis" }
