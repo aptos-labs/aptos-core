@@ -7,8 +7,10 @@ use debug_interface::node_debug_service::NodeDebugService;
 use diem_api::runtime::bootstrap as bootstrap_api;
 use diem_config::{
     config::{NetworkConfig, NodeConfig, PersistableConfig},
+    network_id::NetworkId,
     utils::get_genesis_txn,
 };
+use diem_data_client::diemnet::DiemNetDataClient;
 use diem_infallible::RwLock;
 use diem_json_rpc::bootstrap_from_config as bootstrap_rpc;
 use diem_logger::{prelude::*, Logger};
@@ -33,7 +35,7 @@ use network_builder::builder::NetworkBuilder;
 use state_sync_v1::bootstrapper::StateSyncBootstrapper;
 use std::{
     boxed::Box,
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     convert::TryFrom,
     io::Write,
     net::ToSocketAddrs,
@@ -47,7 +49,11 @@ use std::{
 };
 use storage_interface::default_protocol::DbReaderWriter;
 use storage_service::start_storage_service_with_db;
-use tokio::runtime::{Builder, Runtime};
+use storage_service_client::{StorageServiceClient, StorageServiceMultiSender};
+use storage_service_server::{
+    network::StorageServiceNetworkEvents, StorageReader, StorageServiceServer,
+};
+use tokio::runtime::{Builder, Handle, Runtime};
 use tokio_stream::wrappers::IntervalStream;
 
 const AC_SMP_CHANNEL_BUFFER_SIZE: usize = 1_024;
@@ -56,12 +62,13 @@ const MEMPOOL_NETWORK_CHANNEL_BUFFER_SIZE: usize = 1_024;
 
 pub struct DiemHandle {
     _api: Runtime,
-    _mempool: Runtime,
-    _state_sync_bootstrapper: StateSyncBootstrapper,
-    _network_runtimes: Vec<Runtime>,
+    _backup: Runtime,
     _consensus_runtime: Option<Runtime>,
     _debug: NodeDebugService,
-    _backup: Runtime,
+    _mempool: Runtime,
+    _network_runtimes: Vec<Runtime>,
+    _state_sync_bootstrapper: StateSyncBootstrapper,
+    _storage_service: Runtime,
 }
 
 pub fn start(config: &NodeConfig, log_file: Option<PathBuf>) {
@@ -217,6 +224,42 @@ fn setup_debug_interface(config: &NodeConfig, logger: Option<Arc<Logger>>) -> No
     NodeDebugService::new(addr, logger, config)
 }
 
+fn setup_storage_service_servers(
+    network_handles: Vec<StorageServiceNetworkEvents>,
+    db_rw: &DbReaderWriter,
+) -> Runtime {
+    // For now, spawn all of the storage-service servers on the same runtime.
+    let rt = Builder::new_multi_thread()
+        .thread_name("storage-service-servers")
+        .enable_all()
+        .build()
+        .expect("Failed to start the DiemNet storage-service runtime.");
+    let storage_reader = StorageReader::new(Arc::clone(&db_rw.reader));
+    for events in network_handles {
+        let service =
+            StorageServiceServer::new(rt.handle().clone(), storage_reader.clone(), events);
+        rt.spawn(service.start());
+    }
+    rt
+}
+
+fn setup_diemnet_data_client(
+    _runtime_handle: &Handle,
+    network_handles: HashMap<NetworkId, storage_service_client::StorageServiceNetworkSender>,
+    peer_metadata_storage: Arc<PeerMetadataStorage>,
+) -> DiemNetDataClient {
+    // Combine all storage service client handles
+    let network_client = StorageServiceClient::new(
+        StorageServiceMultiSender::new(network_handles),
+        peer_metadata_storage,
+    );
+    let (diemnet_data_client, _data_summary_poller) =
+        DiemNetDataClient::new(TimeService::real(), network_client);
+    // TODO(philiphayes): uncomment this when we're ready to start doing e2e tests
+    // runtime_handle.spawn(data_summary_poller);
+    diemnet_data_client
+}
+
 async fn periodic_state_dump(node_config: NodeConfig, db: DbReaderWriter) {
     use futures::stream::StreamExt;
 
@@ -315,6 +358,8 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
     let mut state_sync_network_handles = vec![];
     let mut mempool_network_handles = vec![];
     let mut consensus_network_handles = None;
+    let mut storage_service_server_network_handles = vec![];
+    let mut storage_service_client_network_handles = HashMap::new();
 
     // Create an event subscription service so that components can be notified of events and reconfigs
     let mut event_subscription_service = EventSubscriptionService::new(
@@ -385,6 +430,20 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
             network_builder.add_p2p_service(&state_sync_v1::network::network_endpoint_config());
         state_sync_network_handles.push((network_id, state_sync_sender, state_sync_events));
 
+        // TODO(philiphayes): configure which networks we serve the storage service
+        // on? for example, if we're a light node we wouldn't want to provide the
+        // storage service at all.
+
+        // Register the network-facing storage service with Network.
+        let storage_service_events = network_builder
+            .add_service(&storage_service_server::network::network_endpoint_config());
+        storage_service_server_network_handles.push(storage_service_events);
+
+        // Register the storage-service clients with Network
+        let storage_service_sender =
+            network_builder.add_client(&storage_service_client::network_endpoint_config());
+        storage_service_client_network_handles.insert(network_id, storage_service_sender);
+
         // Create the endpoints to connect the Network to mempool.
         let (mempool_sender, mempool_events) = network_builder.add_p2p_service(
             &diem_mempool::network::network_endpoint_config(MEMPOOL_NETWORK_CHANNEL_BUFFER_SIZE),
@@ -414,6 +473,16 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
 
     // TODO set up on-chain discovery network based on UpstreamConfig.fallback_network
     // and pass network handles to mempool/state sync
+
+    let storage_service_rt =
+        setup_storage_service_servers(storage_service_server_network_handles, &db_rw);
+
+    let _diemnet_data_client = setup_diemnet_data_client(
+        // TODO(philiphayes): probably use state-sync-v2 handle here?
+        storage_service_rt.handle(),
+        storage_service_client_network_handles,
+        peer_metadata_storage.clone(),
+    );
 
     // For state sync to send notifications to mempool and receive notifications from consensus.
     let (mempool_notifier, mempool_listener) =
@@ -497,12 +566,13 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
         .spawn(periodic_state_dump(node_config.to_owned(), db_rw));
 
     DiemHandle {
-        _network_runtimes: network_runtimes,
-        _mempool: mempool,
-        _state_sync_bootstrapper: state_sync_bootstrapper,
+        _api: api_runtime,
+        _backup: backup_service,
         _consensus_runtime: consensus_runtime,
         _debug: debug_if,
-        _backup: backup_service,
-        _api: api_runtime,
+        _mempool: mempool,
+        _network_runtimes: network_runtimes,
+        _state_sync_bootstrapper: state_sync_bootstrapper,
+        _storage_service: storage_service_rt,
     }
 }

@@ -184,7 +184,6 @@ members = [
     "cli",
     "cluster-test",
     "testcases",
-    "diem-data-client", # Will be removed once the Diem data client is plugged into diem-node.
     "diem-documentation-tool",
     "diem-e2e-tests-replay",
     "diem-fuzz",
@@ -234,9 +233,6 @@ members = [
     "smoke-test",
     "socket-bench-server",
     "state-sync-v2", # Will be removed once state sync v2 is plugged into diem-node.
-    "storage-service-client", # Will be removed once the storage service is plugged into diem-node.
-    "storage-service-server", # Will be removed once the storage service is plugged into diem-node.
-    "storage-service-types", # Will be removed once the storage service is plugged into diem-node.
     "test-generation",
     "x",
     "x-core",

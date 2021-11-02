@@ -32,6 +32,7 @@ executor-types = { path = "../execution/executor-types" }
 diem-api = { path = "../api" }
 diem-config = { path = "../config" }
 diem-crypto = { path = "../crypto/crypto" }
+diem-data-client = { path = "../state-sync/diem-data-client" }
 diem-framework-releases = { path = "../diem-move/diem-framework/DPN/releases" }
 diem-genesis-tool = {path = "../config/management/genesis", features = ["testing"] }
 diem-json-rpc = { path = "../json-rpc" }
@@ -52,6 +53,8 @@ state-sync-v1 = { path = "../state-sync/state-sync-v1" }
 storage-client = { path = "../storage/storage-client" }
 storage-interface= { path = "../storage/storage-interface" }
 storage-service = { path = "../storage/storage-service" }
+storage-service-client = { path = "../state-sync/storage-service/client" }
+storage-service-server = { path = "../state-sync/storage-service/server" }
 
 [features]
 default = []
