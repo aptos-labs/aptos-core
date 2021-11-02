@@ -257,7 +257,7 @@ impl<'a, R: MoveResolver> ReadWriteSetAnalysis<'a, R> {
                 type_actuals,
                 &self.module_cache,
             )
-            .unwrap_or_else(ConcretizedFormals::empty);
+            .unwrap_or_else(|_| ConcretizedFormals::empty());
 
         let mut keys_read = vec![];
         let mut keys_written = vec![];

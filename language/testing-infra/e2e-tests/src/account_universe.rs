@@ -382,18 +382,9 @@ pub fn run_and_assert_universe(
         .iter()
         .map(|transaction_gen| transaction_gen.clone().apply(&mut universe))
         .unzip();
-    let outputs = executor.execute_block(transactions.clone()).unwrap();
-    let outputs_parallel = executor
-        .execute_transaction_block_parallel(
-            transactions
-                .into_iter()
-                .map(Transaction::UserTransaction)
-                .collect(),
-        )
-        .unwrap();
+    let outputs = executor.execute_block(transactions).unwrap();
 
     prop_assert_eq!(outputs.len(), expected_values.len());
-    prop_assert_eq!(outputs.clone(), outputs_parallel);
 
     for (idx, (output, expected)) in outputs.iter().zip(&expected_values).enumerate() {
         prop_assert!(

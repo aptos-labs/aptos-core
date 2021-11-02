@@ -389,7 +389,9 @@ impl FakeExecutor {
             }
         }
 
-        let output = DiemVM::execute_block(txn_block, &self.data_store);
+        let output = DiemVM::execute_block(txn_block.clone(), &self.data_store);
+        let parallel_output = self.execute_transaction_block_parallel(txn_block);
+        assert_eq!(output, parallel_output);
 
         if let Some(logger) = &self.executed_output {
             logger.log(format!("{:?}\n", output).as_str());
