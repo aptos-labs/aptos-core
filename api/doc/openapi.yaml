@@ -30,6 +30,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/LedgerInfo'
+        "400":
+          $ref: '#/components/responses/400'
         "500":
           $ref: '#/components/responses/500'
   /spec.html:
@@ -41,6 +43,8 @@ paths:
       responses:
         "200":
           description: Returns OpenAPI specification html document.
+        "400":
+          $ref: '#/components/responses/400'
   /openapi.yaml:
     get:
       summary: OpenAPI YAML specification.
@@ -50,6 +54,8 @@ paths:
       responses:
         "200":
           description: Returns OpenAPI specification YAML document.
+        "400":
+          $ref: '#/components/responses/400'
   /accounts/{address}/resources:
     get:
       summary: Get account resources
@@ -216,9 +222,7 @@ paths:
         content:
           application/json:
             schema:
-              allOf:
-                - $ref: '#/components/schemas/UserTransactionRequest'
-                - $ref: '#/components/schemas/UserTransactionSignature'
+              $ref: '#/components/schemas/SubmitTransactionRequest'
           application/vnd.bcs+signed_transaction:
             schema:
               type: string
@@ -265,8 +269,12 @@ paths:
         - name: txn_hash_or_version
           in: path
           required: true
+          description: >-
+            * Transaction hash should be hex-encoded bytes string with `0x` prefix.
+
+            * Transaction version is an `uint64` number.
           schema:
-            $ref: '#/components/schemas/TransactionHashOrVersion'
+            type: string
       responses:
         "200":
           description: >-
@@ -274,9 +282,7 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                  - $ref: '#/components/schemas/PendingTransaction'
-                  - $ref: '#/components/schemas/OnChainTransaction'
+                $ref: '#/components/schemas/Transaction'
         "400":
           $ref: '#/components/responses/400'
         "404":
@@ -375,7 +381,7 @@ paths:
           in: path
           required: true
           schema:
-            $ref: '#/components/schemas/MoveStructTagID'
+            $ref: '#/components/schemas/MoveStructTagId'
           example: 0x1::DiemAccount::DiemAccount
         - name: field_name
           in: path
@@ -408,7 +414,7 @@ components:
       in: path
       required: true
       schema:
-        $ref: '#/components/schemas/address'
+        $ref: '#/components/schemas/Address'
     LedgerVersion:
       name: ledger_version
       in: path
@@ -468,7 +474,7 @@ components:
           type: string
         diem_ledger_version:
           $ref: '#/components/schemas/LedgerVersion'
-    address:
+    Address:
       type: string
       format: address
       description: >-
@@ -488,7 +494,7 @@ components:
         two hex digits per byte.
 
 
-        Different with `address` type, hex-encoded bytes should not trim any zeros.
+        Different with `Address` type, hex-encoded bytes should not trim any zeros.
     TimestampSec:
       type: string
       format: uint64
@@ -507,13 +513,6 @@ components:
       example: "52635485"
       description: >-
         The version of the latest transaction in the ledger.
-    TransactionHashOrVersion:
-      description: >-
-        Transaction hash should be hex-encoded bytes string.
-        Transaction version should be an unsigned int64.
-      anyOf:
-        - $ref: '#/components/schemas/HexEncodedBytes'
-        - $ref: '#/components/schemas/u64'
     EventKey:
       type: string
       format: hex
@@ -562,51 +561,124 @@ components:
         - value
       properties:
         type:
-          $ref: '#/components/schemas/MoveStructTagID'
+          $ref: '#/components/schemas/MoveStructTagId'
         value:
           type: "object"
           description: >-
-            Account resource data value, deserialized from Move data, field name map to field value, use `type` field information to decode.
-    MoveTypeTagID:
-      oneOf:
-        - $ref: '#/components/schemas/MovePrimitiveTypeID'
-        - $ref: '#/components/schemas/MoveVectorTypeID'
-        - $ref: '#/components/schemas/MoveStructTagID'
-    MoveTypeID:
-      oneOf:
-        - $ref: '#/components/schemas/MovePrimitiveTypeID'
-        - $ref: '#/components/schemas/MoveVectorTypeID'
-        - $ref: '#/components/schemas/MoveStructTagID'
-        - $ref: '#/components/schemas/MoveReferenceTypeID'
-        - $ref: '#/components/schemas/MoveGenericTypeID'
-    MovePrimitiveTypeID:
+            Account resource data value, deserialized from Move data.
+            The sibling property `type` is the Move struct type tag identifier for the value.
+
+
+            The property name is from Move struct field name, and property value is the
+            Move struct field value.
+    MoveTypeTagId:
       type: string
-      format: move_type
-      enum:
-        - bool
-        - u8
-        - u64
-        - u128
-        - address
-        - signer
-    MoveVectorTypeID:
-      type: string
-      format: move_type
-      pattern: '^vector<.+>$'
+      pattern: '^(bool|u8|u64|u128|address|signer|vector<.+>|0x[0-9a-zA-Z:_<>]+)$'
       description: >-
-        String representation of an on-chain Move vector: `vector<{non-reference MoveTypeID}>`
+        String representation of an on-chain Move type tag that is exposed in transaction payload.
+
+        Values:
+          - bool
+          - u8
+          - u64
+          - u128
+          - address
+          - signer
+          - vector: `vector<{non-reference MoveTypeId}>`
+          - struct: `{address}::{module_name}::{struct_name}::<{generic types}>`
 
 
-        Examples:
+        Vector type value examples:
           * `vector<u8>`
           * `vector<vector<u64>>`
           * `vector<0x1::DiemAccount::Balance<0x1::XDX::XDX>>`
 
 
-        See [doc](https://diem.github.io/move/vector.html) for more details.
-      example:
-        - "vector<u8>"
-    MoveStructTagID:
+        Struct type value examples:
+          * `0x1::Diem::Diem<0x1::XDX::XDX>`
+          * `0x1::Abc::Abc<vector<u8>, vector<u64>>`
+          * `0x1::DiemAccount::AccountOperationsCapability`
+
+
+        Note:
+          1. Empty chars should be ignored when comparing 2 struct tag ids.
+          2. When used in an URL path, should be encoded by url-encoding (AKA percent-encoding).
+      example: >-
+        0x1::DiemAccount::Balance<0x1::XUS::XUS>
+    MoveTypeId:
+      type: string
+      pattern: '^(bool|u8|u64|u128|address|signer|vector<.+>|0x[0-9a-zA-Z:_<>]+|^&(mut )?.+$|T\d+)$'
+      description: >-
+        String representation of an on-chain Move type identifier defined by the Move language.
+
+
+        Values:
+          - bool
+          - u8
+          - u64
+          - u128
+          - address
+          - signer
+          - vector: `vector<{non-reference MoveTypeId}>`
+          - struct: `{address}::{module_name}::{struct_name}::<{generic types}>`
+          - reference: immutable `&` and mutable `&mut` references.
+          - generic_type_parameter: it is always start with `T` and following an index number,
+            which is the position of the generic type parameter in the `struct` or
+            `function` generic type parameters definition.
+
+
+        Vector type value examples:
+          * `vector<u8>`
+          * `vector<vector<u64>>`
+          * `vector<0x1::DiemAccount::Balance<0x1::XDX::XDX>>`
+
+
+        Struct type value examples:
+          * `0x1::Diem::Diem<0x1::XDX::XDX>`
+          * `0x1::Abc::Abc<vector<u8>, vector<u64>>`
+          * `0x1::DiemAccount::AccountOperationsCapability`
+
+
+        Reference type value examples:
+          * `&signer`
+          * `&mut address`
+          * `&mut vector<u8>`
+
+
+        Generic type parameter value example, the following is `0x1::TransactionFee::TransactionFee` JSON representation:
+
+            {
+                "name": "TransactionFee",
+                "is_native": false,
+                "abilities": ["key"],
+                "generic_type_params": [
+                    {"constraints": [], "is_phantom": true}
+                ],
+                "fields": [
+                    { "name": "balance", "type": "0x1::Diem::Diem<T0>" },
+                    { "name": "preburn", "type": "0x1::Diem::Preburn<T0>" }
+                ]
+            }
+
+        It's Move source code:
+
+            module DiemFramework::TransactionFee {
+                struct TransactionFee<phantom CoinType> has key {
+                    balance: Diem<CoinType>,
+                    preburn: Preburn<CoinType>,
+                }
+            }
+
+        The `T0` in the above JSON representation is the generic type place holder for
+        the `CoinType` in the Move source code.
+
+
+        Note:
+          1. Empty chars should be ignored when comparing 2 struct tag ids.
+          2. When used in an URL path, should be encoded by url-encoding (AKA percent-encoding).
+      example: >-
+        &mut 0x1::DiemAccount::Balance<0x1::XUS::XUS>
+    MoveStructTagId:
       type: string
       format: move_type
       pattern: '^0x[0-9a-zA-Z:_<>]+$'
@@ -633,63 +705,6 @@ components:
         See [doc](https://diem.github.io/move/structs-and-resources.html) for more details.
       example:
         - "0x1::DiemAccount::DiemAccount"
-    MoveReferenceTypeID:
-      type: string
-      format: move_type
-      pattern: '^&(mut )?.+$'
-      description: >-
-        A reference type string representation.
-
-
-        Move has two types of references: immutable `&` and mutable `&mut`.
-        For example:
-          * `&signer`
-          * `&mut address`
-          * `&mut vector<u8>`
-
-
-        See [doc](https://diem.github.io/move/references.html) for more details.
-      example: >-
-        &signer
-    MoveGenericTypeID:
-      type: string
-      format: move_type
-      pattern: '^T\d+$'
-      description: >-
-        A generic type parameter type string representation.
-
-
-        It is always start with `T` and following an index number, which
-        is the position of the generic type parameter in the `struct` or
-        `function` generic type parameters definition.
-
-
-        For example, the following is `0x1::TransactionFee::TransactionFee` JSON representation:
-
-            {
-                "name": "TransactionFee",
-                "is_native": false,
-                "abilities": ["key"],
-                "generic_type_params": [
-                    {"constraints": [], "is_phantom": true}
-                ],
-                "fields": [
-                    { "name": "balance", "type": "0x1::Diem::Diem<T0>" },
-                    { "name": "preburn", "type": "0x1::Diem::Preburn<T0>" }
-                ]
-            }
-
-        It's Move source code:
-
-            module DiemFramework::TransactionFee {
-                struct TransactionFee<phantom CoinType> has key {
-                    balance: Diem<CoinType>,
-                    preburn: Preburn<CoinType>,
-                }
-            }
-
-        The `T0` in the above JSON representation is the generic type place holder for
-        the `CoinType` in the Move source code.
     MoveModuleBytecode:
       type: object
       required:
@@ -701,6 +716,8 @@ components:
           $ref: '#/components/schemas/MoveModule'
     MoveModule:
       type: object
+      description: >-
+        JSON format of Move module interface definition.
       required:
         - address
         - name
@@ -709,7 +726,7 @@ components:
         - structs
       properties:
         address:
-          $ref: '#/components/schemas/address'
+          $ref: '#/components/schemas/Address'
         name:
           type: string
           example: "Diem"
@@ -769,7 +786,7 @@ components:
         name:
           type: string
         type:
-          $ref: '#/components/schemas/MoveTypeID'
+          $ref: '#/components/schemas/MoveTypeId'
     MoveFunction:
       type: object
       required:
@@ -786,7 +803,6 @@ components:
           type: string
           enum:
             - public
-            - private
             - script
             - friend
         generic_type_params:
@@ -803,11 +819,11 @@ components:
         params:
           type: array
           items:
-            $ref: '#/components/schemas/MoveTypeID'
+            $ref: '#/components/schemas/MoveTypeId'
         return:
           type: array
           items:
-            $ref: '#/components/schemas/MoveTypeID'
+            $ref: '#/components/schemas/MoveTypeId'
     MoveAbility:
       type: string
       enum:
@@ -827,7 +843,7 @@ components:
         - name
       properties:
         address:
-          $ref: '#/components/schemas/address'
+          $ref: '#/components/schemas/Address'
         name:
           type: string
           description: Module identifier / name
@@ -844,13 +860,13 @@ components:
         - payload
       properties:
         sender:
-          $ref: '#/components/schemas/address'
+          $ref: '#/components/schemas/Address'
         sequence_number:
-          $ref: '#/components/schemas/u64'
+          $ref: '#/components/schemas/Uint64'
         max_gas_amount:
-          $ref: '#/components/schemas/u64'
+          $ref: '#/components/schemas/Uint64'
         gas_unit_price:
-          $ref: '#/components/schemas/u64'
+          $ref: '#/components/schemas/Uint64'
         gas_currency_code:
           type: string
         expiration_timestamp_secs:
@@ -862,31 +878,52 @@ components:
       required:
         - signature
       description: >-
-        This schema is used for merging with `UserTransactionRequest`
-        to append `signature` field when it is required.
+        This schema is used for appending `signature` field to another schema.
       properties:
         signature:
           $ref: '#/components/schemas/TransactionSignature'
-    PendingTransaction:
+    Transaction:
+      oneOf:
+        - $ref: '#/components/schemas/PendingTransaction'
+        - $ref: '#/components/schemas/GenesisTransaction'
+        - $ref: '#/components/schemas/UserTransaction'
+        - $ref: '#/components/schemas/BlockMetadataTransaction'
+      discriminator:
+        propertyName: type
+        mapping:
+          pending_transaction: '#/components/schemas/PendingTransaction'
+          genesis_transaction: '#/components/schemas/GenesisTransaction'
+          user_transaction: '#/components/schemas/UserTransaction'
+          block_metadata_transaction: '#/components/schemas/BlockMetadataTransaction'
+    SubmitTransactionRequest:
       allOf:
-        - type: object
-          required:
-            - type
-            - hash
-          properties:
-            type:
-              type: string
-              enum:
-                - pending_transaction
-            hash:
-              $ref: '#/components/schemas/HexEncodedBytes'
         - $ref: '#/components/schemas/UserTransactionRequest'
         - $ref: '#/components/schemas/UserTransactionSignature'
+    PendingTransactionProperties:
+      type: object
+      required:
+        - type
+        - hash
+      properties:
+        type:
+          type: string
+        hash:
+          $ref: '#/components/schemas/HexEncodedBytes'
+    PendingTransaction:
+      allOf:
+        - $ref: '#/components/schemas/PendingTransactionProperties'
+        - $ref: '#/components/schemas/SubmitTransactionRequest'
     OnChainTransaction:
       oneOf:
         - $ref: '#/components/schemas/GenesisTransaction'
         - $ref: '#/components/schemas/UserTransaction'
         - $ref: '#/components/schemas/BlockMetadataTransaction'
+      discriminator:
+        propertyName: type
+        mapping:
+          genesis_transaction: '#/components/schemas/GenesisTransaction'
+          user_transaction: '#/components/schemas/UserTransaction'
+          block_metadata_transaction: '#/components/schemas/BlockMetadataTransaction'
     OnChainTransactionInfo:
       type: object
       required:
@@ -899,7 +936,7 @@ components:
         - vm_status
       properties:
         version:
-          $ref: '#/components/schemas/u64'
+          $ref: '#/components/schemas/Uint64'
         hash:
           $ref: '#/components/schemas/HexEncodedBytes'
         state_root_hash:
@@ -907,75 +944,80 @@ components:
         event_root_hash:
           $ref: '#/components/schemas/HexEncodedBytes'
         gas_used:
-          $ref: '#/components/schemas/u64'
+          $ref: '#/components/schemas/Uint64'
         success:
           type: boolean
+          description: >-
+            Transaction execution result (success: true, failure: false).
+            See `vm_status` for human readable error message from Diem VM.
         vm_status:
           type: string
+          description: >-
+            Human readable transaction execution result message from Diem VM.
+    UserTransactionProperties:
+      type: object
+      required:
+        - type
+        - events
+      properties:
+        type:
+          type: string
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/Event'
     UserTransaction:
       allOf:
-        - type: object
-          required:
-            - type
-            - events
-          properties:
-            type:
-              type: string
-              enum:
-                - user_transaction
-            events:
-              type: array
-              items:
-                $ref: '#/components/schemas/Event'
+        - $ref: '#/components/schemas/UserTransactionProperties'
         - $ref: '#/components/schemas/UserTransactionRequest'
         - $ref: '#/components/schemas/UserTransactionSignature'
         - $ref: '#/components/schemas/OnChainTransactionInfo'
+    BlockMetadataTransactionProperties:
+      type: object
+      required:
+        - type
+        - id
+        - round
+        - previous_block_votes
+        - proposer
+        - timestamp
+      properties:
+        type:
+          type: string
+        id:
+          $ref: '#/components/schemas/HexEncodedBytes'
+        round:
+          $ref: '#/components/schemas/Uint64'
+        previous_block_votes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Address'
+        proposer:
+          $ref: '#/components/schemas/Address'
+        timestamp:
+          $ref: '#/components/schemas/TimestampUsec'
     BlockMetadataTransaction:
       allOf:
-        - type: object
-          required:
-            - type
-            - id
-            - round
-            - previous_block_votes
-            - proposer
-            - timestamp
-          properties:
-            type:
-              type: string
-              enum:
-                - block_metadata_transaction
-            id:
-              $ref: '#/components/schemas/HexEncodedBytes'
-            round:
-              $ref: '#/components/schemas/u64'
-            previous_block_votes:
-              type: array
-              items:
-                $ref: '#/components/schemas/address'
-            proposer:
-              $ref: '#/components/schemas/address'
-            timestamp:
-              $ref: '#/components/schemas/TimestampUsec'
+        - $ref: '#/components/schemas/BlockMetadataTransactionProperties'
         - $ref: '#/components/schemas/OnChainTransactionInfo'
+    GenesisTransactionProperties:
+      type: object
+      required:
+        - type
+        - payload
+        - events
+      properties:
+        type:
+          type: string
+        payload:
+          $ref: '#/components/schemas/WriteSetPayload'
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/Event'
     GenesisTransaction:
       allOf:
-        - type: object
-          required:
-            - type
-            - payload
-            - events
-          properties:
-            type:
-              type: string
-              enum:
-                - genesis_transaction
-            payload:
-              $ref: '#/components/schemas/WriteSetPayload'
-            events:
-              type: array
-              items:
-                $ref: '#/components/schemas/Event'
+        - $ref: '#/components/schemas/GenesisTransactionProperties'
         - $ref: '#/components/schemas/OnChainTransactionInfo'
     TransactionPayload:
       oneOf:
@@ -983,6 +1025,13 @@ components:
         - $ref: '#/components/schemas/ScriptPayload'
         - $ref: '#/components/schemas/MoveModuleBytecodePayload'
         - $ref: '#/components/schemas/WriteSetPayload'
+      discriminator:
+        propertyName: type
+        mapping:
+          script_function_payload: '#/components/schemas/ScriptFunctionPayload'
+          script_payload: '#/components/schemas/ScriptPayload'
+          move_module_bytecode_payload: '#/components/schemas/MoveModuleBytecodePayload'
+          write_set_payload: '#/components/schemas/WriteSetPayload'
     ScriptFunctionPayload:
       type: object
       required:
@@ -994,8 +1043,6 @@ components:
       properties:
         type:
           type: string
-          enum:
-            - script_function_payload
         module:
           type: string
           description: Module identifier / name, case sensitive
@@ -1006,7 +1053,7 @@ components:
           type: array
           description: Generic type arguments required by the script function.
           items:
-            $ref: '#/components/schemas/MoveTypeTagID'
+            $ref: '#/components/schemas/MoveTypeTagId'
         arguments:
           type: array
           description: The script function arguments.
@@ -1022,14 +1069,12 @@ components:
       properties:
         type:
           type: string
-          enum:
-            - script_payload
         code:
           $ref: '#/components/schemas/MoveScriptBytecode'
         type_arguments:
           type: array
           items:
-            $ref: '#/components/schemas/MoveTypeTagID'
+            $ref: '#/components/schemas/MoveTypeTagId'
         arguments:
           type: array
           items:
@@ -1042,8 +1087,6 @@ components:
       properties:
         type:
           type: string
-          enum:
-            - module_payload
         bytecode:
           $ref: '#/components/schemas/HexEncodedBytes'
         abi:
@@ -1056,14 +1099,17 @@ components:
       properties:
         type:
           type: string
-          enum:
-            - write_set_payload
         write_set:
           $ref: '#/components/schemas/WriteSet'
     WriteSet:
       oneOf:
         - $ref: '#/components/schemas/ScriptWriteSet'
         - $ref: '#/components/schemas/DirectWriteSet'
+      discriminator:
+        propertyName: type
+        mapping:
+          script_write_set: '#/components/schemas/ScriptWriteSet'
+          direct_write_set: '#/components/schemas/DirectWriteSet'
     ScriptWriteSet:
       type: object
       required:
@@ -1073,10 +1119,8 @@ components:
       properties:
         type:
           type: string
-          enum:
-            - script_write_set
         execute_as:
-          $ref: '#/components/schemas/address'
+          $ref: '#/components/schemas/Address'
         script:
           $ref: '#/components/schemas/Script'
     DirectWriteSet:
@@ -1088,8 +1132,6 @@ components:
       properties:
         type:
           type: string
-          enum:
-            - direct_write_set
         changes:
           type: array
           items:
@@ -1104,6 +1146,13 @@ components:
         - $ref: '#/components/schemas/DeleteResource'
         - $ref: '#/components/schemas/WriteModule'
         - $ref: '#/components/schemas/WriteResource'
+      discriminator:
+        propertyName: type
+        mapping:
+          delete_module: '#/components/schemas/DeleteModule'
+          delete_resource: '#/components/schemas/DeleteResource'
+          write_module: '#/components/schemas/WriteModule'
+          write_resource: '#/components/schemas/WriteResource'
     DeleteModule:
       type: object
       required:
@@ -1113,10 +1162,8 @@ components:
       properties:
         type:
           type: string
-          enum:
-            - delete_module
         address:
-          $ref: '#/components/schemas/address'
+          $ref: '#/components/schemas/Address'
         module:
           $ref: '#/components/schemas/MoveModuleId'
     DeleteResource:
@@ -1129,12 +1176,10 @@ components:
       properties:
         type:
           type: string
-          enum:
-            - delete_resource
         address:
-          $ref: '#/components/schemas/address'
+          $ref: '#/components/schemas/Address'
         resource:
-          $ref: '#/components/schemas/MoveStructTagID'
+          $ref: '#/components/schemas/MoveStructTagId'
     WriteModule:
       type: object
       description: Write move module
@@ -1145,10 +1190,8 @@ components:
       properties:
         type:
           type: string
-          enum:
-            - write_module
         address:
-          $ref: '#/components/schemas/address'
+          $ref: '#/components/schemas/Address'
         data:
           $ref: '#/components/schemas/MoveModuleBytecode'
     WriteResource:
@@ -1161,10 +1204,8 @@ components:
       properties:
         type:
           type: string
-          enum:
-            - write_resource
         address:
-          $ref: '#/components/schemas/address'
+          $ref: '#/components/schemas/Address'
         data:
           $ref: '#/components/schemas/MoveResource'
     Script:
@@ -1179,7 +1220,7 @@ components:
         type_arguments:
           type: array
           items:
-            $ref: '#/components/schemas/MoveTypeTagID'
+            $ref: '#/components/schemas/MoveTypeTagId'
         arguments:
           type: array
           items:
@@ -1193,37 +1234,32 @@ components:
           $ref: '#/components/schemas/HexEncodedBytes'
         abi:
           $ref: '#/components/schemas/MoveFunction'
-    bool:
-      type: boolean
-      description: Move `bool` type value
-    u8:
-      type: integer
-      description: Unsiged int8 type value
-    u64:
+    Uint64:
       type: string
       format: uint64
       description: Unsiged int64 type value
-    u128:
-      type: string
-      format: uint128
-      description: Unsiged int128 type value
-    vector:
-      type: array
-      items:
-        $ref: '#/components/schemas/MoveValue'
-    struct:
-      type: object
-      description: Move struct value, object properties map to struct field name and value
-      additionalProperties: true
     MoveValue:
       oneOf:
-        - $ref: '#/components/schemas/bool'
-        - $ref: '#/components/schemas/u8'
-        - $ref: '#/components/schemas/u64'
-        - $ref: '#/components/schemas/u128'
-        - $ref: '#/components/schemas/address'
-        - $ref: '#/components/schemas/vector'
-        - $ref: '#/components/schemas/struct'
+        - type: string
+          description: >-
+            Move `uint64`, `uint128` or `address` type value.
+
+
+            Move `address` type value is hex-encoded 16 bytes Diem account address;
+            it is prefixed with `0x` and leading zeros are trimmed.
+        - type: boolean
+          description: >-
+            Move `bool` type value
+        - type: integer
+          description: >-
+            Move `u8` type value
+        - type: array
+          items:
+            $ref: '#/components/schemas/MoveValue'
+        - type: object
+          description: >-
+            Move struct value; the property name is serialized from Move struct field name
+            and the property value is serialized from struct field value(`MoveValue`).
     Event:
       type: object
       required:
@@ -1246,7 +1282,7 @@ components:
         sequence_number:
           $ref: '#/components/schemas/EventSequenceNumber'
         type:
-          $ref: '#/components/schemas/MoveTypeTagID'
+          $ref: '#/components/schemas/MoveTypeTagId'
         data:
           $ref: '#/components/schemas/MoveValue'
     TransactionSignature:
@@ -1254,6 +1290,12 @@ components:
         - $ref: '#/components/schemas/Ed25519Signature'
         - $ref: '#/components/schemas/MultiEd25519Signature'
         - $ref: '#/components/schemas/MultiAgentSignature'
+      discriminator:
+        propertyName: type
+        mapping:
+          ed25519_signature: '#/components/schemas/Ed25519Signature'
+          multi_ed25519_signature: '#/components/schemas/MultiEd25519Signature'
+          multi_agent_signature: '#/components/schemas/MultiAgentSignature'
     Ed25519Signature:
       type: object
       description: >-
@@ -1266,8 +1308,6 @@ components:
       properties:
         type:
           type: string
-          enum:
-            - ed25519_signature
         public_key:
           $ref: '#/components/schemas/HexEncodedBytes'
         signature:
@@ -1285,8 +1325,6 @@ components:
       properties:
         type:
           type: string
-          enum:
-            - multi_ed25519_signature
         public_keys:
           type: array
           description: all public keys of the sender account
@@ -1307,16 +1345,19 @@ components:
       description: >-
         Multi agent signature, please refer to TBD.
       required:
+        - type
         - sender
         - secondary_signer_addresses
         - secondary_signers
       properties:
+        type:
+          type: string
         sender:
           $ref: '#/components/schemas/AccountSignature'
         secondary_signer_addresses:
           type: array
           items:
-            $ref: '#/components/schemas/address'
+            $ref: '#/components/schemas/Address'
         secondary_signers:
           type: array
           items:
@@ -1325,3 +1366,8 @@ components:
       oneOf:
         - $ref: '#/components/schemas/Ed25519Signature'
         - $ref: '#/components/schemas/MultiEd25519Signature'
+      discriminator:
+        propertyName: type
+        mapping:
+          ed25519_signature: '#/components/schemas/Ed25519Signature'
+          multi_ed25519_signature: '#/components/schemas/MultiEd25519Signature'
