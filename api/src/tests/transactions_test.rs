@@ -614,7 +614,7 @@ async fn test_post_transaction_rejected_by_mempool() {
         resp,
         json!({
           "code": 400,
-          "message": "transaction is rejected: InvalidUpdate - Failed to update gas price to 0"
+          "message": "transaction is rejected: InvalidUpdate - Transaction already in mempool"
         }),
     );
 }

@@ -784,7 +784,7 @@ impl PublicUsageTest for MempoolValidationError {
             let resp = env.submit(&txn2);
             assert_eq!(
                 resp.error.expect("error").message,
-                "Server error: Mempool submission error: \"Failed to update gas price to 0\""
+                "Server error: Mempool submission error: \"Transaction already in mempool\""
                     .to_string(),
             );
         });

@@ -140,9 +140,8 @@ impl TransactionStore {
                         self.index_remove(&txn);
                     }
                 } else {
-                    return MempoolStatus::new(MempoolStatusCode::InvalidUpdate).with_message(
-                        format!("Failed to update gas price to {}", txn.get_gas_price()),
-                    );
+                    return MempoolStatus::new(MempoolStatusCode::InvalidUpdate)
+                        .with_message("Transaction already in mempool".to_string());
                 }
             }
         }
