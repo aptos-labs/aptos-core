@@ -33,11 +33,18 @@ COPY --from=builder /diem/target/release/diem-genesis-tool /usr/local/bin
 COPY --from=builder /diem/target/release/diem-operational-tool /usr/local/bin
 
 ### Get DPN Move modules bytecodes for genesis ceremony
-RUN mkdir -p /diem/move
-COPY --from=builder /diem/diem-move/diem-framework/DPN/releases/artifacts/current /diem/move
+RUN mkdir -p /diem/move/build
+RUN mkdir -p /diem/move/modules
+COPY --from=builder /diem/diem-move/diem-framework/DPN/releases/artifacts/current/build /diem/move/build
+RUN mv /diem/move/build/**/bytecode_modules/*.mv /diem/move/modules
+RUN rm -rf /diem/move/build
+
 ### Get experimental Move modules bytecodes for genesis ceremony
-RUN mkdir -p /experimental/move
-COPY --from=builder /diem/diem-move/diem-framework/experimental/releases/artifacts/current /experimental/move
+RUN mkdir -p /experimental/move/build
+RUN mkdir -p /experimental/move/modules
+COPY --from=builder /diem/diem-move/diem-framework/experimental/releases/artifacts/current/build /experimental/move/build
+RUN mv /experimental/move/build/**/bytecode_modules/*.mv /experimental/move/modules
+RUN rm -rf /experimental/move/build
 
 FROM pre-prod as testing
 
