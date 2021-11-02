@@ -42,7 +42,7 @@ diem-json-rpc = { path = "../../json-rpc", features = ["fuzzing"] }
 diem-mempool = { path = "../../mempool"}
 diem-secure-storage = { path = "../storage", features = ["testing"] }
 diem-time-service = { path = "../../common/time-service", features = ["testing"] }
-diem-vm = { path = "../../language/diem-vm" }
+diem-vm = { path = "../../diem-move/diem-vm" }
 diemdb = { path = "../../storage/diemdb" }
 storage-interface= { path = "../../storage/storage-interface" }
 vm-validator = { path = "../../vm-validator" }

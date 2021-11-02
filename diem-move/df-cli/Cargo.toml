@@ -17,7 +17,7 @@ structopt = "0.3.21"
 diem-workspace-hack = { path = "../../common/workspace-hack" }
 move-core-types = { path = "../../language/move-core/types" }
 move-cli = { path = "../../language/tools/move-cli" }
-diem-vm = { path = "../../language/diem-vm" }
+diem-vm = { path = "../diem-vm" }
 diem-framework-releases = { path = "../../language/diem-framework/DPN/releases" }
 
 [dev-dependencies]

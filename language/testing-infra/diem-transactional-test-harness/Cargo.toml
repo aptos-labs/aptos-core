@@ -23,7 +23,7 @@ language-e2e-tests = { path = "../e2e-tests" }
 move-lang = { path = "../../move-lang" }
 move-binary-format = { path = "../../move-binary-format" }
 move-core-types = { path = "../../move-core/types" }
-diem-vm =  { path = "../../diem-vm" }
+diem-vm =  { path = "../../../diem-move/diem-vm" }
 diem-types = { path = "../../../types", features = ["fuzzing"] }
 diem-transaction-builder = { path = "../../../sdk/transaction-builder" }
 diem-crypto = { path = "../../../crypto/crypto" }

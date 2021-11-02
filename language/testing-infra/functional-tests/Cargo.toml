@@ -15,7 +15,7 @@ move-command-line-common = { path = "../../move-command-line-common" }
 hex = "0.4.3"
 diem-state-view = { path = "../../../storage/state-view" }
 diem-types = { path = "../../../types" }
-diem-vm = { path = "../../diem-vm" }
+diem-vm = { path = "../../../diem-move/diem-vm" }
 move-binary-format = { path = "../../move-binary-format" }
 bytecode-verifier = { path = "../../bytecode-verifier" }
 language-e2e-tests = { path = "../e2e-tests" }

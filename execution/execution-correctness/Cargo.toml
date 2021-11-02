@@ -23,7 +23,7 @@ diem-secure-net = { path = "../../secure/net" }
 diem-secure-storage = { path = "../../secure/storage" }
 diem-temppath = { path = "../../common/temppath" }
 diem-types = { path = "../../types" }
-diem-vm = { path = "../../language/diem-vm" }
+diem-vm = { path = "../../diem-move/diem-vm" }
 diem-workspace-hack = { path = "../../common/workspace-hack" }
 serde = { version = "1.0.124", default-features = false }
 storage-client = { path = "../../storage/storage-client" }

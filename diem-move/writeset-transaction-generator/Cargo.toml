@@ -34,7 +34,7 @@ diem-state-view = { path = "../../storage/state-view" }
 diem-validator-interface = { path = "../diem-validator-interface" }
 diem-transaction-replay = { path = "../transaction-replay" }
 diemdb = { path = "../../storage/diemdb" }
-diem-vm = { path = "../../language/diem-vm" }
+diem-vm = { path = "../diem-vm" }
 move-binary-format = { path = "../../language/move-binary-format"}
 move-vm-types = { path = "../../language/move-vm/types" }
 move-core-types = { path = "../../language/move-core/types" }

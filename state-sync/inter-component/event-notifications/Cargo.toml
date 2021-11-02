@@ -31,7 +31,7 @@ claim = "0.5.0"
 
 diem-crypto = { path = "../../../crypto/crypto" }
 diem-temppath = { path = "../../../common/temppath" }
-diem-vm = { path = "../../../language/diem-vm" }
+diem-vm = { path = "../../../diem-move/diem-vm" }
 diemdb = { path = "../../../storage/diemdb" }
 executor-test-helpers = { path = "../../../execution/executor-test-helpers" }
 move-core-types = { path = "../../../language/move-core/types" }

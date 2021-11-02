@@ -20,7 +20,7 @@ diem-workspace-hack = { path = "../../common/workspace-hack" }
 
 read-write-set = { path = "../tools/read-write-set" }
 read-write-set-dynamic = { path = "../tools/read-write-set/dynamic" }
-diem-vm = { path = "../diem-vm" }
+diem-vm = { path = "../../diem-move/diem-vm" }
 diem-framework-releases = { path = "../diem-framework/DPN/releases" }
 
 [[bench]]

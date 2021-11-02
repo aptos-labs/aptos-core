@@ -24,24 +24,24 @@ diem-metrics = { path = "../../common/metrics" }
 diem-state-view = { path = "../../storage/state-view" }
 diem-types = { path = "../../types" }
 diem-workspace-hack = { path = "../../common/workspace-hack" }
-move-core-types = { path = "../move-core/types" }
-move-vm-runtime = { path = "../move-vm/runtime" }
-move-vm-types = { path = "../move-vm/types" }
-move-binary-format = { path = "../move-binary-format" }
-move-stdlib = { path = "../move-stdlib" }
-diem-framework = { path = "../diem-framework" }
+move-core-types = { path = "../../language/move-core/types" }
+move-vm-runtime = { path = "../../language/move-vm/runtime" }
+move-vm-types = { path = "../../language/move-vm/types" }
+move-binary-format = { path = "../../language/move-binary-format" }
+move-stdlib = { path = "../../language/move-stdlib" }
+diem-framework = { path = "../../language/diem-framework" }
 serde_json = "1.0.64"
 serde = { version = "1.0.124", default-features = false }
-read-write-set-dynamic = { path = "../tools/read-write-set/dynamic"}
+read-write-set-dynamic = { path = "../../language/tools/read-write-set/dynamic"}
 
-mvhashmap = { path = "mvhashmap" }
-diem-parallel-executor = {path = "parallel-executor" }
+mvhashmap = { path = "../mvhashmap" }
+diem-parallel-executor = {path = "../parallel-executor" }
 
 [dev-dependencies]
 proptest = "1.0.0"
 
 diem-types = { path = "../../types", features = ["fuzzing"] }
-diem-framework-releases = { path = "../diem-framework/DPN/releases" }
+diem-framework-releases = { path = "../../language/diem-framework/DPN/releases" }
 
 [features]
 default = []

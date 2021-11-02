@@ -11,6 +11,6 @@ edition = "2018"
 [dependencies]
 diem-framework = { path = "../../language/diem-framework" }
 diem-workspace-hack = { path = "../../common/workspace-hack" }
-diem-vm = { path = "../../language/diem-vm" }
+diem-vm = { path = "../../diem-move/diem-vm" }
 move-stdlib = { path = "../../language/move-stdlib" }
 move-unit-test = { path = "../../language/tools/move-unit-test" }

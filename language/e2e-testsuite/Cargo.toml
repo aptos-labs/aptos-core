@@ -24,7 +24,7 @@ move-vm-runtime = { path = "../move-vm/runtime" }
 move-vm-types = { path = "../move-vm/types" }
 diem-transaction-builder = { path = "../../sdk/transaction-builder"}
 move-binary-format = { path = "../move-binary-format" }
-diem-vm = { path = "../diem-vm" }
+diem-vm = { path = "../../diem-move/diem-vm" }
 proptest = "1.0.0"
 diem-logger = { path = "../../common/logger" }
 diem-framework-releases = { path = "../diem-framework/DPN/releases" }

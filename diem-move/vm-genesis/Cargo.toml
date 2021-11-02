@@ -29,7 +29,7 @@ diem-framework = { path = "../../language/diem-framework" }
 diem-framework-releases = { path = "../../language/diem-framework/DPN/releases" }
 diem-transaction-builder = { path = "../../sdk/transaction-builder"}
 move-binary-format = { path = "../../language/move-binary-format" }
-diem-vm = { path = "../../language/diem-vm" }
+diem-vm = { path = "../diem-vm" }
 
 [dev-dependencies]
 proptest = "1.0.0"

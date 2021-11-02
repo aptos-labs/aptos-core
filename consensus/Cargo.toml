@@ -47,7 +47,7 @@ diem-infallible = { path = "../common/infallible" }
 diem-secure-storage = { path = "../secure/storage" }
 diem-temppath = { path = "../common/temppath" }
 diem-types = { path = "../types" }
-diem-vm = { path = "../language/diem-vm" }
+diem-vm = { path = "../diem-move/diem-vm" }
 diem-workspace-hack = { path = "../common/workspace-hack" }
 network = { path = "../network" }
 safety-rules = { path = "safety-rules" }

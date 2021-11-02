@@ -17,7 +17,7 @@ diem-workspace-hack = { path = "../../common/workspace-hack" }
 bytecode-interpreter = { path = "../../language/move-prover/interpreter" }
 diem-types = { path = "../../types", features = ["fuzzing"] }
 diem-framework = { path = "../../language/diem-framework" }
-diem-vm = { path = "../../language/diem-vm" }
+diem-vm = { path = "../../diem-move/diem-vm" }
 language-e2e-tests = { path = "../../language/testing-infra/e2e-tests" }
 move-binary-format = { path = "../../language/move-binary-format" }
 move-core-types = { path = "../../language/move-core/types" }

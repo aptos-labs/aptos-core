@@ -28,7 +28,7 @@ diem-secure-net = { path = "../../secure/net" }
 diem-state-view = { path = "../../storage/state-view" }
 diem-types = { path = "../../types" }
 move-core-types = { path = "../../language/move-core/types" }
-diem-vm = { path = "../../language/diem-vm" }
+diem-vm = { path = "../../diem-move/diem-vm" }
 diem-workspace-hack = { path = "../../common/workspace-hack" }
 scratchpad = { path = "../../storage/scratchpad" }
 storage-interface = { path = "../../storage/storage-interface" }

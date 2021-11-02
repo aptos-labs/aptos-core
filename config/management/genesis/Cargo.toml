@@ -31,7 +31,7 @@ diem-secure-storage = { path = "../../../secure/storage" }
 diem-types = { path = "../../../types" }
 diem-workspace-hack = { path = "../../../common/workspace-hack" }
 diem-temppath = { path = "../../../common/temppath" }
-diem-vm = { path = "../../../language/diem-vm" }
+diem-vm = { path = "../../../diem-move/diem-vm" }
 diemdb = { path = "../../../storage/diemdb" }
 storage-interface = { path = "../../../storage/storage-interface" }
 vm-genesis = { path = "../../../diem-move/vm-genesis" }

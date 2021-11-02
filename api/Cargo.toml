@@ -48,6 +48,6 @@ diem-genesis-tool = {path = "../config/management/genesis", features = ["testing
 diem-framework-releases = { path = "../language/diem-framework/DPN/releases" }
 diem-sdk = { path = "../sdk" }
 vm-validator = { path = "../vm-validator" }
-diem-vm = { path = "../language/diem-vm" }
+diem-vm = { path = "../diem-move/diem-vm" }
 executor = { path = "../execution/executor" }
 executor-types = { path = "../execution/executor-types" }

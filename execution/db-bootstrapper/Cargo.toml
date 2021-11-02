@@ -20,6 +20,6 @@ diem-config = { path = "../../config" }
 diem-crypto = { path = "../../crypto/crypto" }
 diem-temppath = { path = "../../common/temppath" }
 diem-types = { path = "../../types" }
-diem-vm = { path = "../../language/diem-vm" }
+diem-vm = { path = "../../diem-move/diem-vm" }
 diem-workspace-hack = { path = "../../common/workspace-hack" }
 storage-interface = { path = "../../storage/storage-interface" }

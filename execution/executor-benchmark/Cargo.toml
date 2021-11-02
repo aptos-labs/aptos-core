@@ -29,7 +29,7 @@ diem-infallible = { path = "../../common/infallible" }
 diem-jellyfish-merkle = { path = "../../storage/jellyfish-merkle" }
 diem-logger = { path = "../../common/logger" }
 diem-types = { path = "../../types" }
-diem-vm= { path = "../../language/diem-vm" }
+diem-vm= { path = "../../diem-move/diem-vm" }
 diem-workspace-hack = { path = "../../common/workspace-hack" }
 schemadb = { path = "../../storage/schemadb" }
 storage-client = { path = "../../storage/storage-client" }

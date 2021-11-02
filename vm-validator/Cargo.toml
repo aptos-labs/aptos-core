@@ -16,7 +16,7 @@ scratchpad = { path = "../storage/scratchpad" }
 diem-state-view = { path = "../storage/state-view" }
 storage-interface = { path = "../storage/storage-interface" }
 diem-types = { path = "../types" }
-diem-vm = { path = "../language/diem-vm" }
+diem-vm = { path = "../diem-move/diem-vm" }
 diem-workspace-hack = { path = "../common/workspace-hack" }
 
 [dev-dependencies]
@@ -27,7 +27,7 @@ executor-test-helpers = { path = "../execution/executor-test-helpers" }
 diem-crypto = { path = "../crypto/crypto", features = ["fuzzing"] }
 diem-temppath = { path = "../common/temppath" }
 diem-types = { path = "../types", features = ["fuzzing"] }
-diem-vm = { path = "../language/diem-vm" }
+diem-vm = { path = "../diem-move/diem-vm" }
 diemdb = { path = "../storage/diemdb", features = ["fuzzing"] }
 storage-service = { path = "../storage/storage-service" }
 diem-transaction-builder = { path = "../sdk/transaction-builder" }

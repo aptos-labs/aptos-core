@@ -15,7 +15,7 @@ edition = "2018"
 once_cell = "1.7.2"
 rayon = "1.5.0"
 num_cpus = "1.13.0"
-diem-workspace-hack = { path = "../../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../common/workspace-hack" }
 
 [dev-dependencies]
 proptest = "1.0.0"
