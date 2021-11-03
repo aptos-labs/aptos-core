@@ -495,6 +495,7 @@ components:
 
 
         Different with `Address` type, hex-encoded bytes should not trim any zeros.
+      example: "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1"
     TimestampSec:
       type: string
       format: uint64
@@ -604,7 +605,7 @@ components:
           1. Empty chars should be ignored when comparing 2 struct tag ids.
           2. When used in an URL path, should be encoded by url-encoding (AKA percent-encoding).
       example: >-
-        0x1::DiemAccount::Balance<0x1::XUS::XUS>
+        0x1::XUS::XUS
     MoveTypeId:
       type: string
       pattern: '^(bool|u8|u64|u128|address|signer|vector<.+>|0x[0-9a-zA-Z:_<>]+|^&(mut )?.+$|T\d+)$'
@@ -869,6 +870,7 @@ components:
           $ref: '#/components/schemas/Uint64'
         gas_currency_code:
           type: string
+          example: "XDX"
         expiration_timestamp_secs:
           $ref: '#/components/schemas/TimestampSec'
         payload:
@@ -907,6 +909,7 @@ components:
       properties:
         type:
           type: string
+          example: "pending_transaction"
         hash:
           $ref: '#/components/schemas/HexEncodedBytes'
     PendingTransaction:
@@ -962,6 +965,7 @@ components:
       properties:
         type:
           type: string
+          example: "user_transaction"
         events:
           type: array
           items:
@@ -984,6 +988,7 @@ components:
       properties:
         type:
           type: string
+          example: "block_metadata_transaction"
         id:
           $ref: '#/components/schemas/HexEncodedBytes'
         round:
@@ -1009,6 +1014,7 @@ components:
       properties:
         type:
           type: string
+          example: "genesis_transaction"
         payload:
           $ref: '#/components/schemas/WriteSetPayload'
         events:
@@ -1043,22 +1049,32 @@ components:
       properties:
         type:
           type: string
+          example: script_function_payload
         module:
           type: string
+          example: 0x1::PaymentScripts
           description: Module identifier / name, case sensitive
         function:
           type: string
+          example: peer_to_peer_with_metadata
           description: Script function name, case sensitive.
         type_arguments:
           type: array
           description: Generic type arguments required by the script function.
           items:
             $ref: '#/components/schemas/MoveTypeTagId'
+          example:
+            - "0x1::XDX::XDX"
         arguments:
           type: array
           description: The script function arguments.
           items:
             $ref: '#/components/schemas/MoveValue'
+          example:
+            - "0x1668f6be25668c1a17cd8caf6b8d2f25"
+            - "2021000000"
+            - "0x"
+            - "0x"
     ScriptPayload:
       type: object
       required:
@@ -1069,6 +1085,7 @@ components:
       properties:
         type:
           type: string
+          example: script_payload
         code:
           $ref: '#/components/schemas/MoveScriptBytecode'
         type_arguments:
@@ -1087,6 +1104,7 @@ components:
       properties:
         type:
           type: string
+          example: move_module_bytecode_payload
         bytecode:
           $ref: '#/components/schemas/HexEncodedBytes'
         abi:
@@ -1099,6 +1117,7 @@ components:
       properties:
         type:
           type: string
+          example: write_set_payload
         write_set:
           $ref: '#/components/schemas/WriteSet'
     WriteSet:
@@ -1119,6 +1138,7 @@ components:
       properties:
         type:
           type: string
+          example: script_write_set
         execute_as:
           $ref: '#/components/schemas/Address'
         script:
@@ -1132,6 +1152,7 @@ components:
       properties:
         type:
           type: string
+          example: direct_write_set
         changes:
           type: array
           items:
@@ -1162,6 +1183,7 @@ components:
       properties:
         type:
           type: string
+          example: delete_module
         address:
           $ref: '#/components/schemas/Address'
         module:
@@ -1176,6 +1198,7 @@ components:
       properties:
         type:
           type: string
+          example: delete_resource
         address:
           $ref: '#/components/schemas/Address'
         resource:
@@ -1190,6 +1213,7 @@ components:
       properties:
         type:
           type: string
+          example: write_module
         address:
           $ref: '#/components/schemas/Address'
         data:
@@ -1204,6 +1228,7 @@ components:
       properties:
         type:
           type: string
+          example: write_resource
         address:
           $ref: '#/components/schemas/Address'
         data:
@@ -1238,28 +1263,50 @@ components:
       type: string
       format: uint64
       description: Unsiged int64 type value
+      example: "0"
     MoveValue:
-      oneOf:
-        - type: string
-          description: >-
-            Move `uint64`, `uint128` or `address` type value.
+      description: >-
+        Move `bool` type value is serialized into `boolean`.
 
 
-            Move `address` type value is hex-encoded 16 bytes Diem account address;
-            it is prefixed with `0x` and leading zeros are trimmed.
-        - type: boolean
-          description: >-
-            Move `bool` type value
-        - type: integer
-          description: >-
-            Move `u8` type value
-        - type: array
-          items:
-            $ref: '#/components/schemas/MoveValue'
-        - type: object
-          description: >-
-            Move struct value; the property name is serialized from Move struct field name
-            and the property value is serialized from struct field value(`MoveValue`).
+        Move `u8` type value is serialized into `integer`.
+
+
+        Move `u64` and `u128` type value is serialized into `string`.
+
+
+        Move `address` type value(16 bytes Diem account address) is serialized into
+        hex-encoded string, which is prefixed with `0x` and leading zeros are trimmed.
+
+
+        For example:
+          * `0x1`
+          * `0x1668f6be25668c1a17cd8caf6b8d2f25`
+
+
+        Move `vector` type value is serialized into `array`, except `vector<u8>` which is
+        serialized into hex-encoded string with `0x` prefix.
+
+
+        For example:
+          * `vector<u64>{255, 255}` => `["255", "255"]`
+          * `vector<u8>{255, 255}` => `0xffff`
+
+
+        Move `struct` type value is serialized into `object` that looks like this:
+
+          ```json
+          {
+            field1_name: field1_value,
+            field2_name: field2_value,
+            ......
+          }
+          ```
+
+        For example:
+          `{ "created": "0xa550c18", "role_id": "0" }`
+
+      example: "3344000000"
     Event:
       type: object
       required:
@@ -1282,9 +1329,16 @@ components:
         sequence_number:
           $ref: '#/components/schemas/EventSequenceNumber'
         type:
-          $ref: '#/components/schemas/MoveTypeTagId'
+          allOf:
+            - $ref: '#/components/schemas/MoveTypeTagId'
+            - example: >-
+                0x1::DiemAccount::CreateAccountEvent
         data:
-          $ref: '#/components/schemas/MoveValue'
+          allOf:
+            - $ref: '#/components/schemas/MoveValue'
+            - example:
+                created: "0xa550c18"
+                role_id: "0"
     TransactionSignature:
       oneOf:
         - $ref: '#/components/schemas/Ed25519Signature'
@@ -1308,6 +1362,7 @@ components:
       properties:
         type:
           type: string
+          example: ed25519_signature
         public_key:
           $ref: '#/components/schemas/HexEncodedBytes'
         signature:
@@ -1325,6 +1380,7 @@ components:
       properties:
         type:
           type: string
+          example: multi_ed25519_signature
         public_keys:
           type: array
           description: all public keys of the sender account
@@ -1352,6 +1408,7 @@ components:
       properties:
         type:
           type: string
+          example: multi_agent_signature
         sender:
           $ref: '#/components/schemas/AccountSignature'
         secondary_signer_addresses:
