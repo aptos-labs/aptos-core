@@ -145,7 +145,7 @@ impl Analyzer {
         let mut func_insts = BTreeSet::new();
 
         let fun_mems = &usage_analysis::get_memory_usage(target).accessed.all;
-        let fun_arity = target.get_type_parameters().len();
+        let fun_arity = target.get_type_parameter_count();
         for inv_mem in &invariant.mem_usage {
             for fun_mem in fun_mems.iter() {
                 if inv_mem.module_id != fun_mem.module_id || inv_mem.id != fun_mem.id {

@@ -2173,7 +2173,7 @@ impl<'env> FunctionContext<'env> {
 
         // check and convert type arguments
         if cfg!(debug_assertions) {
-            let callee_ty_params = callee_target.get_type_parameters();
+            let callee_ty_params = callee_target.func_env.get_type_parameters();
             // TODO (mengxu) verify type constraints
             assert_eq!(callee_ty_params.len(), ty_args.len());
         }

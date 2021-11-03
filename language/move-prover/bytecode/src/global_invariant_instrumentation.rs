@@ -44,46 +44,23 @@ struct InstrumentationPack {
     /// - Key: global invariants that needs to be assumed before the first instruction,
     /// - Value: the instantiation information per each related invariant.
     exitpoint_assertions: BTreeMap<GlobalId, BTreeSet<Vec<Type>>>,
+
+    /// Number of ghost type parameters introduced in order to instantiate all asserted invariants
+    ghost_type_param_count: usize,
 }
 
 impl InstrumentationPack {
     fn transpose(relevance: &PerFunctionRelevance) -> Self {
-        // TODO(mengxu): this is needed here because we haven't finalized the approach to handle
-        // uninstantiated type parameters in the invariant yet. An example is:
-        // ```
-        // invariant<CoinType>
-        //   forall cap_owner: address where exists<MintCapability<CoinType>>(cap_owner):
-        //      Roles::spec_has_treasury_compliance_role_addr(cap_owner)
-        // ```
-        // is applicable to function `Roles::grant_role()` (i.e., the invariant should be checked).
-        // But the `CoinType` on the invariant side can not be instantiated.
-        //
-        // Currently, in the analysis pass implemented in `global_invariant_analysis.rs`, an
-        // uninstantiated type parameter in the invariant side is marked as `Type::Error`.
-        // Therefore, we can easily filter them out.
-        //
-        // Fortunately, there aren't many of such cases in the Diem Framework code base
-        // (5 invariants out of 100+). Therefore, finalizing a solution to handle them is currently
-        // in a lower priority. But we do hope to check them in the next iteration.
-        fn filter_uninst_params(insts: &BTreeSet<Vec<Type>>) -> BTreeSet<Vec<Type>> {
-            insts
-                .iter()
-                .filter(|inst| inst.iter().all(|t| !matches!(t, Type::Error)))
-                .cloned()
-                .collect()
-        }
-
         let mut result = Self::default();
 
         // transpose the `entrypoint_assumptions`
         for (inv_id, inv_rel) in &relevance.entrypoint_assumptions {
             for inv_insts in inv_rel.insts.values() {
-                let inv_insts = filter_uninst_params(inv_insts);
                 result
                     .entrypoint_assumptions
                     .entry(*inv_id)
                     .or_default()
-                    .extend(inv_insts);
+                    .extend(inv_insts.clone());
             }
         }
 
@@ -91,14 +68,13 @@ impl InstrumentationPack {
         for (code_offset, per_code) in &relevance.per_bytecode_assertions {
             for (inv_id, inv_rel) in per_code {
                 for inv_insts in inv_rel.insts.values() {
-                    let inv_insts = filter_uninst_params(inv_insts);
                     result
                         .per_bytecode_assertions
                         .entry(*code_offset)
                         .or_default()
                         .entry(*inv_id)
                         .or_default()
-                        .extend(inv_insts);
+                        .extend(inv_insts.clone());
                 }
             }
         }
@@ -106,14 +82,16 @@ impl InstrumentationPack {
         // transpose the `exitpoint_assertions`
         for (inv_id, inv_rel) in &relevance.exitpoint_assertions {
             for inv_insts in inv_rel.insts.values() {
-                let inv_insts = filter_uninst_params(inv_insts);
                 result
                     .exitpoint_assertions
                     .entry(*inv_id)
                     .or_default()
-                    .extend(inv_insts);
+                    .extend(inv_insts.clone());
             }
         }
+
+        // set the number of ghost type parameters
+        result.ghost_type_param_count = relevance.ghost_type_param_count;
 
         result
     }
@@ -257,6 +235,9 @@ impl<'env> Instrumenter<'env> {
                 self.assert_or_assume_translated_invariants(xlated, PropKind::Assert);
             }
         }
+
+        // override the number of ghost type parameters
+        self.builder.data.ghost_type_param_count = pack.ghost_type_param_count;
 
         // Finally, return with the new data accumulated
         self.builder.data

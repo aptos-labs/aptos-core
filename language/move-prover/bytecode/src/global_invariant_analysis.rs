@@ -59,6 +59,9 @@ pub struct PerFunctionRelevance {
     /// - Key: global invariants that needs to be assumed before the first instruction,
     /// - Value: the instantiation information per each related invariant.
     pub exitpoint_assertions: BTreeMap<GlobalId, PerBytecodeRelevance>,
+
+    /// Number of ghost type parameters introduced in order to instantiate all asserted invariants
+    pub ghost_type_param_count: usize,
 }
 
 /// Get verification information for this function.
@@ -253,9 +256,7 @@ impl PerFunctionRelevance {
             .fun_to_inv_map
             .get(&fid)
             .expect("Invariant applicability not available");
-
-        let fun_type_params = target.get_type_parameters();
-        let fun_type_params_arity = fun_type_params.len();
+        let fun_type_params_arity = target.get_type_parameter_count();
 
         let inv_ro = &inv_applicability.accessed;
         let (inv_rw_return, inv_rw_normal): (BTreeSet<_>, BTreeSet<_>) =
@@ -275,6 +276,7 @@ impl PerFunctionRelevance {
         let mut entrypoint_assumptions = BTreeMap::new();
         let mut per_bytecode_assertions = BTreeMap::new();
         let mut exitpoint_assertions = BTreeMap::new();
+        let mut ghost_type_param_count = 0;
 
         for (code_offset, bc) in target.data.code.iter().enumerate() {
             let code_offset = code_offset as CodeOffset;
@@ -339,6 +341,8 @@ impl PerFunctionRelevance {
                 mem_ro.iter(),
                 inv_ro,
                 fun_type_params_arity,
+                &mut ghost_type_param_count,
+                /* ignore_uninstantiated_invariant */ true,
             );
 
             // collect instantiation information (step 2)
@@ -348,12 +352,16 @@ impl PerFunctionRelevance {
                 mem_rw.iter(),
                 &inv_rw_normal,
                 fun_type_params_arity,
+                &mut ghost_type_param_count,
+                /* ignore_uninstantiated_invariant */ false,
             );
             let relevance_rw_return = Self::calculate_invariant_relevance(
                 env,
                 mem_rw.iter(),
                 &inv_rw_return,
                 fun_type_params_arity,
+                &mut ghost_type_param_count,
+                /* ignore_uninstantiated_invariant */ false,
             );
 
             // entrypoint assumptions are about both the ro invariants and rw invariants, and
@@ -391,6 +399,7 @@ impl PerFunctionRelevance {
             entrypoint_assumptions,
             per_bytecode_assertions,
             exitpoint_assertions,
+            ghost_type_param_count,
         }
     }
 
@@ -402,6 +411,8 @@ impl PerFunctionRelevance {
         mem_related: impl Iterator<Item = &'a QualifiedInstId<StructId>>,
         inv_related: &BTreeSet<GlobalId>,
         fun_type_params_arity: usize,
+        fun_type_params_ghost_count: &mut usize,
+        ignore_uninstantiated_invariant: bool,
     ) -> BTreeMap<GlobalId, PerBytecodeRelevance> {
         let mut result = BTreeMap::new();
 
@@ -471,8 +482,23 @@ impl PerFunctionRelevance {
                         let mut wellformed_inv_inst = vec![];
                         for inv_inst in inv_insts {
                             if inv_inst.iter().any(|t| matches!(t, Type::Error)) {
-                                // TODO(mengxu): handle uninstantiable generic invariants.
-                                // One possibility is to handle them via phantom type parameters.
+                                if ignore_uninstantiated_invariant {
+                                    continue;
+                                }
+                                let adapted_inv_inst = inv_inst
+                                    .into_iter()
+                                    .map(|t| {
+                                        if matches!(t, Type::Error) {
+                                            let ghost_idx = fun_type_params_arity
+                                                + *fun_type_params_ghost_count;
+                                            *fun_type_params_ghost_count += 1;
+                                            Type::TypeParameter(ghost_idx as u16)
+                                        } else {
+                                            t
+                                        }
+                                    })
+                                    .collect();
+                                wellformed_inv_inst.push(adapted_inv_inst);
                             } else {
                                 wellformed_inv_inst.push(inv_inst);
                             }

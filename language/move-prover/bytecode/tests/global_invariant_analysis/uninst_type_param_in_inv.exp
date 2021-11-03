@@ -93,6 +93,8 @@ Demo::f1: [
   entrypoint {
     assume @0 = [
       <> -> [
+        <bool, #0>
+        <u64, #1>
       ]
     ]
   }
@@ -100,6 +102,7 @@ Demo::f1: [
   10: write_back[Demo::S1<bool>@]($t3) {
     assert @0 = [
       <> -> [
+        <bool, #0>
       ]
     ]
   }
@@ -107,6 +110,7 @@ Demo::f1: [
   22: write_back[Demo::S1<u64>@]($t8) {
     assert @0 = [
       <> -> [
+        <u64, #1>
       ]
     ]
   }

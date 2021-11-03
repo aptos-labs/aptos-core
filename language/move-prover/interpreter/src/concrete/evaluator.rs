@@ -818,7 +818,7 @@ impl<'env> Evaluator<'env> {
         // convert type args
         let callee_inst = env.get_node_instantiation(node_id);
         if cfg!(debug_assertions) {
-            let callee_ty_params = callee_target.get_type_parameters();
+            let callee_ty_params = callee_target.func_env.get_type_parameters();
             assert_eq!(decl.type_params.len(), callee_ty_params.len());
             assert_eq!(decl.type_params.len(), callee_inst.len());
         }

@@ -275,8 +275,7 @@ impl<'a> Analyzer<'a> {
         // Analyze instantiations (when this function is a verification target)
         if self.inst_opt.is_none() {
             // collect information
-            let fun_type_params = target.get_type_parameters();
-            let fun_type_params_arity = fun_type_params.len();
+            let fun_type_params_arity = target.get_type_parameter_count();
             let usage_state = UsageProcessor::analyze(self.targets, target.func_env, target.data);
 
             // collect instantiations

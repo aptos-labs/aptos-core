@@ -12,7 +12,6 @@ use move_model::{
     ast::Spec,
     model::{
         FunId, FunctionEnv, FunctionVisibility, GlobalEnv, Loc, ModuleEnv, QualifiedId, StructId,
-        TypeParameter,
     },
     symbol::{Symbol, SymbolPool},
     ty::{Type, TypeDisplayContext},
@@ -87,6 +86,8 @@ pub struct FunctionData {
     pub name_to_index: BTreeMap<Symbol, usize>,
     /// A cache of targets modified by this function.
     pub modify_targets: BTreeMap<QualifiedId<StructId>, Vec<Exp>>,
+    /// The number of ghost type parameters introduced in order to instantiate related invariants
+    pub ghost_type_param_count: usize,
 }
 
 impl<'env> FunctionTarget<'env> {
@@ -180,9 +181,13 @@ impl<'env> FunctionTarget<'env> {
         self.func_env.is_mutating()
     }
 
-    /// Returns the type parameters associated with this function.
-    pub fn get_type_parameters(&self) -> Vec<TypeParameter> {
-        self.func_env.get_type_parameters()
+    /// Returns the number of type parameters associated with this function, this includes both
+    /// the defined type parameters and the ghost type parameters.
+    ///
+    /// NOTE: with the existence of ghost type parameters, the number returned here can be different
+    /// from the number returned by `FunctionEnv`.
+    pub fn get_type_parameter_count(&self) -> usize {
+        self.func_env.get_type_parameters().len() + self.data.ghost_type_param_count
     }
 
     /// Returns return type at given index.
@@ -432,6 +437,7 @@ impl FunctionData {
             annotations: Default::default(),
             name_to_index,
             modify_targets,
+            ghost_type_param_count: 0,
         }
     }
 
@@ -587,14 +593,18 @@ impl<'env> fmt::Display for FunctionTarget<'env> {
                 .display(self.symbol_pool()),
             self.get_name().display(self.symbol_pool())
         )?;
-        let tparams = &self.get_type_parameters();
-        if !tparams.is_empty() {
+        let tparams_count_all = self.get_type_parameter_count();
+        let tparams_count_defined = self.func_env.get_type_parameter_count();
+        if tparams_count_all != 0 {
             write!(f, "<")?;
-            for i in 0..tparams.len() {
+            for i in 0..tparams_count_all {
                 if i > 0 {
                     write!(f, ", ")?;
                 }
                 write!(f, "#{}", i)?;
+                if i >= tparams_count_defined {
+                    write!(f, "*")?; // denotes a ghost type parameter
+                }
             }
             write!(f, ">")?;
         }
