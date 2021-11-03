@@ -60,7 +60,7 @@ fn main() -> Result<()> {
     let create_new_account_txn =
         account.sign_with_transaction_builder(TransactionFactory::new(ChainId::test()).payload(
             // See examples in this file for script function construction using various ty_args and args
-            // language/diem-framework/DPN/releases/artifacts/current/transaction_script_builder.rs
+            // diem-move/diem-framework/DPN/releases/artifacts/current/transaction_script_builder.rs
             // Example for constructing TypeTag for ty_args
             // let token = TypeTag::Struct(StructTag {
             //     address: AccountAddress::from_hex_literal("0x1").unwrap(),

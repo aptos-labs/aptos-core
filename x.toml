@@ -256,9 +256,6 @@ members = [
 # yelling at you, you should redesign your crate and properly remove that
 # dependency, instead of adding the crate to this list and silencing the lint.
 diem_crates_in_language = [
-    "diem-framework",
-    "diem-framework-releases",
-    "framework-releases",
     "diem-transactional-test-harness",
     "diem-transaction-benchmarks",
     "language-e2e-testsuite",
@@ -346,13 +343,13 @@ mark-changed = []
 
 [[determinator.path-rule]]
 # Required by get_stdlib_script_abis in transaction-builder-generator.
-globs = ["language/diem-framework/DPN/releases/artifacts/current/**/*"]
+globs = ["diem-move/diem-framework/DPN/releases/artifacts/current/**/*"]
 mark-changed = ["transaction-builder-generator"]
 post-rule = "skip-rules"
 
 [[determinator.path-rule]]
 # On changes of diem-framework or move-stdlib, rerun the tests in move-prover.
-globs = ["language/diem-framework/**/*", "language/move-stdlib/**/*"]
+globs = ["diem-move/diem-framework/**/*", "language/move-stdlib/**/*"]
 mark-changed = ["move-prover"]
 
 [[determinator.path-rule]]

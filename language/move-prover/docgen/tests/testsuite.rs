@@ -18,7 +18,7 @@ use std::{fs::File, io::Read};
 const FLAGS: &[&str] = &[
     "--verbose=warn",
     "--dependency=../../move-stdlib/sources",
-    "--dependency=../../diem-framework/core/sources",
+    "--dependency=../../../diem-move/diem-framework/core/sources",
     "--docgen",
 ];
 

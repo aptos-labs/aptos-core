@@ -1,0 +1,54 @@
+[package]
+name = "diem-framework"
+version = "0.1.0"
+edition = "2018"
+authors = ["Diem Association <opensource@diem.com>"]
+description = "Diem stdlib"
+repository = "https://github.com/diem/diem"
+homepage = "https://diem.com"
+license = "Apache-2.0"
+publish = false
+
+[dependencies]
+bytecode-verifier = { path = "../../language/bytecode-verifier" }
+abigen = { path = "../../language/move-prover/abigen" }
+docgen = { path = "../../language/move-prover/docgen" }
+move-command-line-common = { path = "../../language/move-command-line-common" }
+errmapgen = { path = "../../language/move-prover/errmapgen" }
+move-lang = { path = "../../language/move-lang" }
+move-prover = { path = "../../language/move-prover" }
+diem-crypto = { path = "../../crypto/crypto" }
+diem-types = { path = "../../types" }
+diem-workspace-hack = { path = "../../common/workspace-hack" }
+move-binary-format = { path = "../../language/move-binary-format" }
+transaction-builder-generator = { path = "../../language/transaction-builder/generator" }
+move-stdlib = { path = "../../language/move-stdlib" }
+move-symbol-pool = { path = "../../language/move-symbol-pool" }
+move-core-types = { path = "../../language/move-core/types" }
+move-vm-types = { path = "../../language/move-vm/types" }
+move-vm-runtime = { path = "../../language/move-vm/runtime" }
+move-package = { path = "../../language/tools/move-package" }
+move-bytecode-utils = { path = "../../language/tools/move-bytecode-utils" }
+
+bcs = "0.1.2"
+anyhow = "1.0.38"
+clap = "2.33.3"
+log = "0.4.14"
+rayon = "1.5.0"
+sha2 = "0.9.3"
+once_cell = "1.7.2"
+smallvec = "1.6.1"
+structopt = "0.3.21"
+include_dir = "0.6.0"
+
+[dev-dependencies]
+datatest-stable = "0.1.1"
+move-unit-test = { path = "../../language/tools/move-unit-test" }
+diem-vm = { path = "../../diem-move/diem-vm" }
+
+tempfile = "3.2.0"
+dir-diff = "0.3.2"
+
+[features]
+default = []
+fuzzing = ["diem-types/fuzzing"]

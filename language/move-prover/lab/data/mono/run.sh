@@ -9,7 +9,7 @@ echo "https://github.com/diem/diem/commit/2b248773729ef75c805e94982cce7c941b11cb
 exit 1
 
 DIEM="$(git rev-parse --show-toplevel)"
-FRAMEWORK="$DIEM/language/diem-framework/core/sources"
+FRAMEWORK="$DIEM/diem-move/diem-framework/core/sources"
 STDLIB="$DIEM/language/move-stdlib/sources"
 
 for config in *.toml ; do

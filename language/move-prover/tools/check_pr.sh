@@ -88,7 +88,7 @@ fi
 
 ARTIFACT_CRATES="\
   $BASE/language/move-stdlib\
-  $BASE/language/diem-framework\
+  $BASE/diem-move/diem-framework\
 "
 
 MOVE_TEST_CRATES="\

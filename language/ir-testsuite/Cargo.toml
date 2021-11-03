@@ -18,7 +18,7 @@ ir-to-bytecode = { path = "../compiler/ir-to-bytecode" }
 diem-types = { path = "../../types" }
 diem-workspace-hack = { path = "../../common/workspace-hack" }
 move-ir-types = { path = "../move-ir/types" }
-diem-framework-releases = { path = "../diem-framework/DPN/releases" }
+diem-framework-releases = { path = "../../diem-move/diem-framework/DPN/releases" }
 move-binary-format = { path = "../move-binary-format" }
 move-core-types = { path = "../move-core/types" }
 move-symbol-pool = { path = "../move-symbol-pool" }

@@ -37,9 +37,9 @@ To create your VASP accounts:
 3. **The DPN creates your ParentVASP account**
       Once you share your account information, Diem Networks will send a transaction that creates a ParentVASP account with your authentication key.
 4. **Set up the base URL and compliance public key for off-chain APIs**:
-      In order to use off-chain APIs, you must send a transaction to set the base URL and compliance public key values on your ParentVASP account using [this transaction script](https://github.com/diem/diem/blob/main/language/diem-framework/transaction_scripts/doc/transaction_script_documentation.md#script-rotate_dual_attestation_info).
+      In order to use off-chain APIs, you must send a transaction to set the base URL and compliance public key values on your ParentVASP account using [this transaction script](https://github.com/diem/diem/blob/main/diem-move/diem-framework/transaction_scripts/doc/transaction_script_documentation.md#script-rotate_dual_attestation_info).
 5. **Create your ChildVASP account**
-      If you want to, you can create a new ChildVASP account from your ParentVASP account using [this transaction script](https://github.com/diem/diem/blob/master/language/diem-framework/transaction_scripts/doc/transaction_script_documentation.md#script-create_child_vasp_account). You need a ParentVASP account to create a ChildVASP account.
+      If you want to, you can create a new ChildVASP account from your ParentVASP account using [this transaction script](https://github.com/diem/diem/blob/master/diem-move/diem-framework/transaction_scripts/doc/transaction_script_documentation.md#script-create_child_vasp_account). You need a ParentVASP account to create a ChildVASP account.
 6. **Start transacting**
       Once the previous steps have been completed, you can send transactions from your account on-chain using the keypair from step 1.
 
@@ -50,7 +50,7 @@ When you are creating your ParentVASP account, you will need to choose at least 
 
 When there is more than one [Diem Coin currency](/docs/basics/basics-accounts#currencies) available, you can share with the DPN which one you would like to associate with your account. You can also request the DPN to choose all the Diem Coin currencies available.
 
-You can add new Diem Coin currencies to an existing account via the [`add_currency_to_account` transaction script](https://github.com/diem/diem/blob/main/language/diem-framework/transaction_scripts/doc/transaction_script_documentation.md#script-add_currency_to_account). You can add all currencies offered on the DPN to your ChildVASP accounts by using the `add_all_currencies` flag in the account creation scripts.
+You can add new Diem Coin currencies to an existing account via the [`add_currency_to_account` transaction script](https://github.com/diem/diem/blob/main/diem-move/diem-framework/transaction_scripts/doc/transaction_script_documentation.md#script-add_currency_to_account). You can add all currencies offered on the DPN to your ChildVASP accounts by using the `add_all_currencies` flag in the account creation scripts.
 
 When available, at the Move level, each Diem Coin currency will be a different generic instantiation of the same Diem type (i.e. `Diem<XUS>`).
 
@@ -148,7 +148,7 @@ More information about refunds can be found [here](https://drive.google.com/file
 
 ## Send Payments
 
-You can send payments using [this transaction script](https://github.com/diem/diem/blob/main/language/diem-framework/transaction_scripts/doc/transaction_script_documentation.md#script-peer_to_peer_with_metadata).
+You can send payments using [this transaction script](https://github.com/diem/diem/blob/main/diem-move/diem-framework/transaction_scripts/doc/transaction_script_documentation.md#script-peer_to_peer_with_metadata).
 
 This script requires the following:
 

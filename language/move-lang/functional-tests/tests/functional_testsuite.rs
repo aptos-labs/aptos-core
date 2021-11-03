@@ -16,7 +16,7 @@ use once_cell::sync::Lazy;
 use std::{fmt, io::Write, path::Path};
 use tempfile::NamedTempFile;
 
-pub const STD_LIB_DIR: &str = "../../diem-framework/core/sources";
+pub const STD_LIB_DIR: &str = "../../../diem-move/diem-framework/core/sources";
 pub const FUNCTIONAL_TEST_DIR: &str = "tests";
 
 struct MoveSourceCompiler<'a> {

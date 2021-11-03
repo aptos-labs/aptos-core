@@ -24,7 +24,7 @@ const MOVE_MODULES_DIR: &str = "../move/src/modules";
 const COMPILED_SCRIPTS_ABI_DIR: &str = "compiled/script_abis";
 /// The path for Diem Framework transaction script ABIs.
 const DF_COMPILED_SCRIPTS_ABI_DIR: &str =
-    "../../language/diem-framework/DPN/releases/artifacts/current/script_abis";
+    "../../diem-move/diem-framework/DPN/releases/artifacts/current/script_abis";
 /// The output path for generated transaction builders
 const TRANSACTION_BUILDERS_GENERATED_SOURCE_PATH: &str = "../transaction-builder/src/framework.rs";
 

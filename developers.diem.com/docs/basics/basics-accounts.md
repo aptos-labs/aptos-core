@@ -39,14 +39,14 @@ Creating a K-of-N multisig authentication key is similar to creating a single si
 
 Every account on the DPN is created with at least two resources:
 
-* [RoleId](https://github.com/diem/diem/blob/main/language/diem-framework/core/doc/Roles.md#resource-roleid), which grants the account a single, immutable [role](basics-accounts.md#account-roles) for [access control](https://github.com/diem/dip/blob/main/dips/dip-2.md).
-* [DiemAccount](https://github.com/diem/diem/blob/main/language/diem-framework/core/doc/DiemAccount.md#resource-diemaccount), which holds the account’s [sequence number](../reference/glossary#sequence-number), authentication key, and event handles.
+* [RoleId](https://github.com/diem/diem/blob/main/diem-move/diem-framework/core/doc/Roles.md#resource-roleid), which grants the account a single, immutable [role](basics-accounts.md#account-roles) for [access control](https://github.com/diem/dip/blob/main/dips/dip-2.md).
+* [DiemAccount](https://github.com/diem/diem/blob/main/diem-move/diem-framework/core/doc/DiemAccount.md#resource-diemaccount), which holds the account’s [sequence number](../reference/glossary#sequence-number), authentication key, and event handles.
 
 ### Currencies
 
 The DPN supports an account transacting in different currencies.
 
-From a standards perspective, [`Diem<CoinType>`](https://github.com/diem/diem/blob/main/language/diem-framework/core/doc/Diem.md#resource-diem) is the Diem Blockchain equivalent of [ERC20](https://eips.ethereum.org/EIPS/eip-20). At the Move level, these are different generic instantiations of the same Diem resource type (e.g., `Diem<Coin1>`, `Diem<XUS>`).
+From a standards perspective, [`Diem<CoinType>`](https://github.com/diem/diem/blob/main/diem-move/diem-framework/core/doc/Diem.md#resource-diem) is the Diem Blockchain equivalent of [ERC20](https://eips.ethereum.org/EIPS/eip-20). At the Move level, these are different generic instantiations of the same Diem resource type (e.g., `Diem<Coin1>`, `Diem<XUS>`).
 
 `Diem<XUS>` will be the currency type available at launch.
 
@@ -54,7 +54,7 @@ From a standards perspective, [`Diem<CoinType>`](https://github.com/diem/diem/bl
 
 A zero balance of `Diem<CoinType>` is added whenever `Diem<CoinType>` currency is authorized for an account.
 
-Each non-administrative account stores one or more [Balance`<CoinType>`](https://github.com/diem/diem/blob/main/language/diem-framework/core/doc/DiemAccount.md#resource-balance) resources. For each currency type that the account holds such as `Diem<Coin1>` or `Diem<XUS>`, there will be a separate Balance resource such as Balance`<Diem<Coin1>>` or Balance`<Diem<XUS>>`.
+Each non-administrative account stores one or more [Balance`<CoinType>`](https://github.com/diem/diem/blob/main/diem-move/diem-framework/core/doc/DiemAccount.md#resource-balance) resources. For each currency type that the account holds such as `Diem<Coin1>` or `Diem<XUS>`, there will be a separate Balance resource such as Balance`<Diem<Coin1>>` or Balance`<Diem<XUS>>`.
 
 When a client sends funds of type CoinType to an account, they should:
 * check if the account address exists

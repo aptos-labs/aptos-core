@@ -16,7 +16,7 @@ walkdir = "2.3.1"
 diem-workspace-hack = { path = "../../common/workspace-hack" }
 bytecode-interpreter = { path = "../../language/move-prover/interpreter" }
 diem-types = { path = "../../types", features = ["fuzzing"] }
-diem-framework = { path = "../../language/diem-framework" }
+diem-framework = { path = "../../diem-move/diem-framework" }
 diem-vm = { path = "../../diem-move/diem-vm" }
 language-e2e-tests = { path = "../../language/testing-infra/e2e-tests" }
 move-binary-format = { path = "../../language/move-binary-format" }

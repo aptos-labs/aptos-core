@@ -1,7 +1,7 @@
 # Tests for the Move Prover
 
 This directory contains the tests for the Move Prover. The tests are defined by the `.move` files in
-this tree, as well as all the `.move` files in the [Diem framework](../../diem-framework) and the
+this tree, as well as all the `.move` files in the [Diem framework](../../../diem-move/diem-framework) and the
 [Move stdlib](../../move-stdlib).
 
 *Note*: in order to run these tests locally, you must have installed tools and setup a few
@@ -69,7 +69,7 @@ MVP_TEST_FLAGS="-T=20" cargo test -p move-prover
 If the flag `--check-inconsistency` is given, the prover not only verifies a target, but also checks
 if there is any inconsistent assumption in the verification. If the environment
 variable `MVP_TEST_INCONSISTENCY=1` is set, `cargo test`
-will perform the inconsistency check while running the tests in `../../diem-framework`
+will perform the inconsistency check while running the tests in `../../../diem-move/diem-framework`
 and `../../move-stdlib` (i.e., the prover will run those tests with the
 flag `--check-inconsistency`).
 

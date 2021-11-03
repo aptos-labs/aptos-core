@@ -4,7 +4,7 @@
 
 [PRE_POST_REFERENCE]: https://en.wikipedia.org/wiki/Design_by_contract
 
-[FRAMEWORK]: ../../../diem-framework/core/doc/overview.md
+[FRAMEWORK]: ../../../../diem-move/diem-framework/core/doc/overview.md
 
 # Move Specification Language
 

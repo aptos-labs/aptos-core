@@ -26,8 +26,8 @@ diem-workspace-hack = { path = "../../common/workspace-hack" }
 diem-crypto-derive = { path = "../../crypto/crypto-derive" }
 diem-crypto = { path = "../../crypto/crypto" }
 diem-types = { path = "../../types" }
-diem-framework-releases = { path = "../../language/diem-framework/DPN/releases" }
-diem-framework = { path = "../../language/diem-framework" }
+diem-framework-releases = { path = "../../diem-move/diem-framework/DPN/releases" }
+diem-framework = { path = "../../diem-move/diem-framework" }
 move-lang = { path = "../../language/move-lang" }
 bcs = "0.1.2"
 diem-state-view = { path = "../../storage/state-view" }

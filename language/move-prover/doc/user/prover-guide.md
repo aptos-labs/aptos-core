@@ -45,7 +45,7 @@ set an environment variable which contains a path to the default configuration f
 for example, to let the prover automatically find dependencies to the Move standard library, as shown below:
 
 ```shell script
-> echo "move_deps = [\"<path-to-diem>/language/diem-framework/core/sources\"]" > ~/.mvprc
+> echo "move_deps = [\"<path-to-diem>/diem-move/diem-framework/core/sources\"]" > ~/.mvprc
 > export MOVE_PROVER_CONFIG=~/.mvprc
 ```
 

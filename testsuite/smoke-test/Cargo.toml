@@ -20,8 +20,8 @@ reqwest = { version = "0.11.2", features = ["json"] }
 compiler = { path = "../../language/compiler" }
 diem-config = { path = "../../config" }
 diem-events-fetcher = { path = "../../diem-move/diem-events-fetcher" }
-diem-framework = { path = "../../language/diem-framework" }
-diem-framework-releases = { path = "../../language/diem-framework/DPN/releases" }
+diem-framework = { path = "../../diem-move/diem-framework" }
+diem-framework-releases = { path = "../../diem-move/diem-framework/DPN/releases" }
 diem-sdk = { path = "../../sdk" }
 diem-temppath = { path = "../../common/temppath" }
 diem-transaction-replay = { path = "../../diem-move/transaction-replay" }

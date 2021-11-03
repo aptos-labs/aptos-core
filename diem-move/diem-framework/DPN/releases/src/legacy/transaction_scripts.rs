@@ -271,7 +271,7 @@ mod test {
             assert_eq!(
                 script.name(),
                 script.abi().name(),
-                "The main function in language/diem-framework/transaction_scripts/{}.move is named `{}` instead of `{}`.",
+                "The main function in diem-move/diem-framework/transaction_scripts/{}.move is named `{}` instead of `{}`.",
                 script.name(),
                 script.abi().name(),
                 script.name(),
@@ -285,7 +285,7 @@ mod test {
         for script in LegacyStdlibScript::all() {
             assert!(
                 !script.abi().doc().is_empty(),
-                "The main function in language/diem-framework/transaction_scripts/{}.move does not have a `///` inline doc comment.",
+                "The main function in diem-move/diem-framework/transaction_scripts/{}.move does not have a `///` inline doc comment.",
                 script.name(),
             );
         }

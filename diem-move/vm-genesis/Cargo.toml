@@ -25,8 +25,8 @@ move-bytecode-utils = { path = "../../language/tools/move-bytecode-utils" }
 move-core-types = { path = "../../language/move-core/types" }
 move-vm-runtime = { path = "../../language/move-vm/runtime"}
 move-vm-types = { path = "../../language/move-vm/types" }
-diem-framework = { path = "../../language/diem-framework" }
-diem-framework-releases = { path = "../../language/diem-framework/DPN/releases" }
+diem-framework = { path = "../../diem-move/diem-framework" }
+diem-framework-releases = { path = "../../diem-move/diem-framework/DPN/releases" }
 diem-transaction-builder = { path = "../../sdk/transaction-builder"}
 move-binary-format = { path = "../../language/move-binary-format" }
 diem-vm = { path = "../diem-vm" }

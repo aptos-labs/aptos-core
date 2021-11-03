@@ -13,7 +13,7 @@ anyhow = "1.0.38"
 structopt = "0.3.21"
 tempfile = "3.2.0"
 
-diem-framework-releases = { path = "../../language/diem-framework/DPN/releases" }
+diem-framework-releases = { path = "../../diem-move/diem-framework/DPN/releases" }
 diemdb = { path = "../diemdb" }
 diem-config = { path = "../../config" }
 diem-crypto = { path = "../../crypto/crypto" }

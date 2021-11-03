@@ -29,7 +29,7 @@ move-vm-runtime = { path = "../../language/move-vm/runtime" }
 move-vm-types = { path = "../../language/move-vm/types" }
 move-binary-format = { path = "../../language/move-binary-format" }
 move-stdlib = { path = "../../language/move-stdlib" }
-diem-framework = { path = "../../language/diem-framework" }
+diem-framework = { path = "../../diem-move/diem-framework" }
 serde_json = "1.0.64"
 serde = { version = "1.0.124", default-features = false }
 read-write-set-dynamic = { path = "../../language/tools/read-write-set/dynamic"}
@@ -41,7 +41,7 @@ diem-parallel-executor = {path = "../parallel-executor" }
 proptest = "1.0.0"
 
 diem-types = { path = "../../types", features = ["fuzzing"] }
-diem-framework-releases = { path = "../../language/diem-framework/DPN/releases" }
+diem-framework-releases = { path = "../../diem-move/diem-framework/DPN/releases" }
 
 [features]
 default = []

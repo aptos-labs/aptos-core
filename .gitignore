@@ -47,8 +47,8 @@ build/
 
 # Do not ignore the Move build output under the releases for DPN, core, and
 # experimental -- these are the release code.
-!language/diem-framework/DPN/releases/artifacts/**
-!language/diem-framework/experimental/releases/artifacts/**
+!diem-move/diem-framework/DPN/releases/artifacts/**
+!diem-move/diem-framework/experimental/releases/artifacts/**
 
 # Docker incremental build temporary files and directories
 target-out-docker

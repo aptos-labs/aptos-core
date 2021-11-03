@@ -11,4 +11,4 @@ CurrencyInfo = "0xA550C18"
 VMReserved = "0x0"
 
 [dependencies]
-MoveStdlib = { local = "../../move-stdlib" }
+MoveStdlib = { local = "../../../language/move-stdlib" }

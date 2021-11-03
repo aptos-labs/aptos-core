@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 DIEM="$(git rev-parse --show-toplevel)"
-FRAMEWORK="$DIEM/language/diem-framework/core/sources"
+FRAMEWORK="$DIEM/diem-move/diem-framework/core/sources"
 STDLIB="$DIEM/language/move-stdlib/sources"
 
 if [[ "$EXP_BOOGIE_EXE" == "" ]]; then

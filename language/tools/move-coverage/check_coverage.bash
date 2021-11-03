@@ -10,7 +10,7 @@ TRACE_PATH=$HOME/trace
 export MOVE_VM_TRACE=$TRACE_PATH
 
 echo "Rebuilding stdlib..."
-pushd ../../diem-framework || exit 1
+pushd ../../../diem-move/diem-framework || exit 1
 cargo run
 popd || exit 1
 
@@ -42,7 +42,7 @@ echo "Building Move modules and source maps.."
 echo "---------------------------------------------------------------------------"
 pushd ../../move-lang || exit 1
 rm -rf build
-cargo run --bin move-build -- ../diem-framework/core/sources -m
+cargo run --bin move-build -- ../../diem-move/diem-framework/core/sources -m
 popd || exit 1
 
 echo "---------------------------------------------------------------------------"
@@ -53,14 +53,14 @@ cargo run --bin move-trace-conversion -- -f "$TRACE_PATH" -o trace.mvcov
 echo "---------------------------------------------------------------------------"
 echo "Producing coverage summaries..."
 echo "---------------------------------------------------------------------------"
-cargo run --bin coverage-summaries -- -t trace.mvcov -s ../../diem-framework/DPN/releases/artifacts/current/modules
+cargo run --bin coverage-summaries -- -t trace.mvcov -s ../../../diem-move/diem-framework/DPN/releases/artifacts/current/modules
 
 echo "==========================================================================="
 echo "You can check source coverage for a module by running:"
-echo "> cargo run --bin source-coverage -- -t trace.mvcov -b ../../move-lang/build/modules/<LOOK_FOR_MODULE_HERE>.mv -s ../../diem-framework/core/modules/<SOURCE_MODULE>.move"
+echo "> cargo run --bin source-coverage -- -t trace.mvcov -b ../../move-lang/build/modules/<LOOK_FOR_MODULE_HERE>.mv -s ../../../diem-move/diem-framework/core/modules/<SOURCE_MODULE>.move"
 echo "---------------------------------------------------------------------------"
 echo "You can can also get a finer-grained coverage summary for each function by running:"
-echo "> cargo run --bin coverage-summaries -- -t trace.mvcov -s ../../diem-framework/DPN/releases/artifacts/current/stdlib.mv"
+echo "> cargo run --bin coverage-summaries -- -t trace.mvcov -s ../../../diem-move/diem-framework/DPN/releases/artifacts/current/stdlib.mv"
 echo "==========================================================================="
 
 unset MOVE_VM_TRACE

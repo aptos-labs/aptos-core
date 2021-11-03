@@ -39,7 +39,7 @@ proptest = { version = "1.0.0", optional = true }
 proptest = "1.0.0"
 rand = "0.8.3"
 
-diem-framework-releases = { path = "../../language/diem-framework/DPN/releases" }
+diem-framework-releases = { path = "../../diem-move/diem-framework/DPN/releases" }
 compiler = { path = "../../language/compiler" }
 executor-test-helpers = { path = "../executor-test-helpers" }
 diem-config = { path = "../../config" }

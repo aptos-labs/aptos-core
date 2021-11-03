@@ -18,7 +18,7 @@ diem-workspace-hack = { path = "../../common/workspace-hack" }
 move-core-types = { path = "../../language/move-core/types" }
 move-cli = { path = "../../language/tools/move-cli" }
 diem-vm = { path = "../diem-vm" }
-diem-framework-releases = { path = "../../language/diem-framework/DPN/releases" }
+diem-framework-releases = { path = "../../diem-move/diem-framework/DPN/releases" }
 
 [dev-dependencies]
 datatest-stable = "0.1.1"

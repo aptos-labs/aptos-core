@@ -32,7 +32,7 @@ If you are a Regulated VASP, and have been approved by Diem Networks as a partic
 
 Once Diem Networks creates your ParentVASP account (let’s call it Account **A**), you can create a [ChildVASP account](../reference/glossary#childvasp-account) if you wish.
 
-To create a ChildVASP account, send the [create_child_vasp_account](https://github.com/diem/diem/blob/main/language/diem-framework/script_documentation/script_documentation.md#script-create_child_vasp_account) transaction script from your **Account A** (your ParentVASP account).
+To create a ChildVASP account, send the [create_child_vasp_account](https://github.com/diem/diem/blob/main/diem-move/diem-framework/script_documentation/script_documentation.md#script-create_child_vasp_account) transaction script from your **Account A** (your ParentVASP account).
 
 With a single ParentVASP account, you can create up to 256 ChildVASP accounts. This transaction script allows you to specify:
 * Which currency the new account should hold, or if it should hold all known currencies.

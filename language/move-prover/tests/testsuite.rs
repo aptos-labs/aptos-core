@@ -27,14 +27,14 @@ const ENV_TEST_FEATURE: &str = "MVP_TEST_FEATURE";
 const ENV_TEST_ON_CI: &str = "MVP_TEST_ON_CI";
 const INCONSISTENCY_TEST_FLAGS: &[&str] = &[
     "--dependency=../move-stdlib/sources",
-    "--dependency=../diem-framework/core/sources",
-    "--dependency=../diem-framework/experimental/sources",
+    "--dependency=../../diem-move/diem-framework/core/sources",
+    "--dependency=../../diem-move/diem-framework/experimental/sources",
     "--check-inconsistency",
 ];
 const REGULAR_TEST_FLAGS: &[&str] = &[
     "--dependency=../move-stdlib/sources",
-    "--dependency=../diem-framework/core/sources",
-    "--dependency=../diem-framework/experimental/sources",
+    "--dependency=../../diem-move/diem-framework/core/sources",
+    "--dependency=../../diem-move/diem-framework/experimental/sources",
 ];
 
 static NOT_CONFIGURED_WARNED: AtomicBool = AtomicBool::new(false);
@@ -315,13 +315,23 @@ fn main() {
         } else {
             collect_enabled_tests(&mut reqs, "unit", feature, "tests/sources");
             collect_enabled_tests(&mut reqs, "stdlib", feature, "../move-stdlib/sources");
-            collect_enabled_tests(&mut reqs, "diem", feature, "../diem-framework/core/sources");
-            collect_enabled_tests(&mut reqs, "diem", feature, "../diem-framework/DPN/sources");
             collect_enabled_tests(
                 &mut reqs,
                 "diem",
                 feature,
-                "../diem-framework/experimental/sources",
+                "../../diem-move/diem-framework/core/sources",
+            );
+            collect_enabled_tests(
+                &mut reqs,
+                "diem",
+                feature,
+                "../../diem-move/diem-framework/DPN/sources",
+            );
+            collect_enabled_tests(
+                &mut reqs,
+                "diem",
+                feature,
+                "../../diem-move/diem-framework/experimental/sources",
             );
         }
     }
