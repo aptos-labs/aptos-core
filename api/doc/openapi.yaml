@@ -7,22 +7,59 @@ info:
     name: Apache 2.0
     url: http://www.apache.org/licenses/LICENSE-2.0.html
   version: 0.1.0
+  contact:
+    name: The Diem Core Contributors
+    url: https://github.com/diem/diem
 tags:
-  - name: info
-    description: API for getting the latest ledger information.
-  - name: accounts
-    description: API for getting account resources, modules / events.
+  - name: general
+    description: General information
   - name: transactions
-    description: API for getting, creating, and submitting transactions.
+    description: Access to transactions
+  - name: accounts
+    description: Access to account resources and modules
   - name: events
-    description: API for getting events.
+    description: Access to events
+  - name: transaction_model
+    x-displayName: Transaction
+    description: |
+      <SchemaDefinition schemaRef="#/components/schemas/Transaction"/>
+  - name: account_resource_model
+    x-displayName: AccountResource
+    description: |
+      <SchemaDefinition schemaRef="#/components/schemas/MoveResource"/>
+  - name: account_module_model
+    x-displayName: AccountModule
+    description: |
+      <SchemaDefinition schemaRef="#/components/schemas/MoveModuleBytecode"/>
+  - name: event_model
+    x-displayName: Event
+    description: |
+      <SchemaDefinition schemaRef="#/components/schemas/Event"/>
+  - name: move_value_model
+    x-displayName: MoveValue
+    description: |
+      <SchemaDefinition schemaRef="#/components/schemas/MoveValue"/>
+x-tagGroups:
+  - name: API
+    tags:
+      - general
+      - transactions
+      - accounts
+      - events
+  - name: Models
+    tags:
+      - transaction_model
+      - account_resource_model
+      - account_module_model
+      - event_model
+      - move_value_model
 paths:
   /:
     get:
-      summary: Get the latest ledger information.
+      summary: Ledger information
       operationId: get_ledger_info
       tags:
-        - info
+        - general
       responses:
         "200":
           description: Returns the latest ledger information.
@@ -36,26 +73,26 @@ paths:
           $ref: '#/components/responses/500'
   /spec.html:
     get:
-      summary: API specification document.
+      summary: API document
       operationId: get_spec_html
       tags:
-        - info
+        - general
       responses:
         "200":
           description: Returns OpenAPI specification html document.
         "400":
-          $ref: '#/components/responses/400'
+          description: Bad Request
   /openapi.yaml:
     get:
-      summary: OpenAPI YAML specification.
+      summary: OpenAPI specification
       operationId: get_spec_yaml
       tags:
-        - info
+        - general
       responses:
         "200":
           description: Returns OpenAPI specification YAML document.
         "400":
-          $ref: '#/components/responses/400'
+          description: Bad Request
   /accounts/{address}/resources:
     get:
       summary: Get account resources
@@ -366,7 +403,7 @@ paths:
           $ref: '#/components/responses/500'
   /accounts/{address}/events/{event_handle_struct}/{field_name}:
     get:
-      summary: Get events by event handle.
+      summary: Get events by event handle
       operationId: get_account_events
       description: >-
         This API extracts event key from the account resource identified
@@ -374,7 +411,6 @@ paths:
         events identified by the event key.
       tags:
         - events
-        - accounts
       parameters:
         - $ref: '#/components/parameters/AccountAddress'
         - name: event_handle_struct
