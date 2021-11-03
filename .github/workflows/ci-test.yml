@@ -35,6 +35,7 @@ jobs:
       test-non-rust-lint: ${{ steps.non-rust-lint-changes.outputs.changes-found }}
       test-docker-compose: ${{ steps.docker-compose-changes.outputs.changes-found }}
       test-test-coverage: ${{ steps.test-coverage.outputs.changes-found }}
+      test-api-spec: ${{ steps.test-api-spec.outputs.changes-found }}
     steps:
       - uses: actions/checkout@v2.4.0
         with:
@@ -140,6 +141,11 @@ jobs:
         uses: diem/actions/matches@faadd16607b77dfa2231a8f366883e01717b3225
         with:
           pattern: '^rust.toolchain\|^x.toml\|^devtools\|^.github\|common/logger'
+      - id: test-api-spec
+        name: find api changes.
+        uses: diem/actions/matches@faadd16607b77dfa2231a8f366883e01717b3225
+        with:
+          pattern: '^api'
 
   dev-setup-sh-test:
     runs-on: ubuntu-20.04-xl
@@ -930,6 +936,21 @@ jobs:
         uses: ./.github/actions/early-terminator
         with:
           github-token: ${{secrets.GITHUB_TOKEN}}
+
+  api_spec_test:
+    name: API specification test
+    runs-on: ubuntu-20.04
+    needs: prepare
+    if: ${{ needs.prepare.outputs.test-api-spec == 'true' }}
+    steps:
+      - uses: actions/checkout@v2.3.4
+      - name: Use Node.js 14
+        uses: actions/setup-node@v2.4.0
+        with:
+          node-version: '14'
+      - name:
+        working-directory: api
+        run: make test
 
   # Compile (but don't run) the benchmarks, to insulate against bit rot
   build-benchmarks:
