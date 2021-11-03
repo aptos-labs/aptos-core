@@ -6,27 +6,27 @@ module DiemFramework::CRSNTests {
     use Std::BitVector;
 
     #[test_only]
-    public(script) fun setup(dr: &signer, tc: &signer, _: &signer) {
+    public fun setup(dr: &signer, tc: &signer, _: &signer) {
         Genesis::setup(dr, tc);
         CRSN::allow_crsns(dr)
     }
 
     #[test(a=@0xCAFE, tc = @TreasuryCompliance, dr = @DiemRoot)]
     #[expected_failure(abort_code = 1281)]
-    public(script) fun cant_publish_until_init(a: signer, tc: signer, dr: signer) {
+    public fun cant_publish_until_init(a: signer, tc: signer, dr: signer) {
         Genesis::setup(&dr, &tc);
         CRSN::test_publish(&a, 0, 10);
     }
 
     #[test(a=@0xCAFE, tc = @TreasuryCompliance, dr = @DiemRoot)]
     #[expected_failure(abort_code = 1537)]
-    public(script) fun double_init(a: signer, tc: signer, dr: signer) {
+    public fun double_init(a: signer, tc: signer, dr: signer) {
         setup(&dr, &tc, &a);
         CRSN::allow_crsns(&dr);
     }
 
     #[test(a=@0xCAFE, tc = @TreasuryCompliance, dr = @DiemRoot)]
-    public(script) fun publish_exists_after_small_size(a: signer, tc: signer, dr: signer) {
+    public fun publish_exists_after_small_size(a: signer, tc: signer, dr: signer) {
         setup(&dr, &tc, &a);
         let addr = Signer::address_of(&a);
 
@@ -37,7 +37,7 @@ module DiemFramework::CRSNTests {
     }
 
     #[test(a=@0xCAFE, tc = @TreasuryCompliance, dr = @DiemRoot)]
-    public(script) fun publish_exists_after_medium_size(a: signer, tc: signer, dr: signer) {
+    public fun publish_exists_after_medium_size(a: signer, tc: signer, dr: signer) {
         setup(&dr, &tc, &a);
         let addr = Signer::address_of(&a);
 
@@ -48,7 +48,7 @@ module DiemFramework::CRSNTests {
     }
 
     #[test(a=@0xCAFE, tc = @TreasuryCompliance, dr = @DiemRoot)]
-    public(script) fun publish_exists_after_large_size(a: signer, tc: signer, dr: signer) {
+    public fun publish_exists_after_large_size(a: signer, tc: signer, dr: signer) {
         setup(&dr, &tc, &a);
         let addr = Signer::address_of(&a);
 
@@ -61,7 +61,7 @@ module DiemFramework::CRSNTests {
 
     #[test(a=@0xCAFE, tc = @TreasuryCompliance, dr = @DiemRoot)]
     #[expected_failure(abort_code = 257)]
-    public(script) fun double_publish(a: signer, tc: signer, dr: signer) {
+    public fun double_publish(a: signer, tc: signer, dr: signer) {
         setup(&dr, &tc, &a);
         CRSN::test_publish(&a, 0, 10);
         CRSN::test_publish(&a, 0, 10);
@@ -69,26 +69,26 @@ module DiemFramework::CRSNTests {
 
     #[test(a=@0xCAFE, tc = @TreasuryCompliance, dr = @DiemRoot)]
     #[expected_failure(abort_code = 519)]
-    public(script) fun publish_zero_size(a: signer, tc: signer, dr: signer) {
+    public fun publish_zero_size(a: signer, tc: signer, dr: signer) {
         setup(&dr, &tc, &a);
         CRSN::test_publish(&a, 10, 0);
     }
 
     #[test(a=@0xCAFE, tc = @TreasuryCompliance, dr = @DiemRoot)]
-    public(script) fun publish_at_max_size(a: signer, tc: signer, dr: signer) {
+    public fun publish_at_max_size(a: signer, tc: signer, dr: signer) {
         setup(&dr, &tc, &a);
         CRSN::test_publish(&a, 10, CRSN::max_crsn_size());
     }
 
     #[test(a=@0xCAFE, tc = @TreasuryCompliance, dr = @DiemRoot)]
     #[expected_failure(abort_code = 775)]
-    public(script) fun publish_above_max_size(a: signer, tc: signer, dr: signer) {
+    public fun publish_above_max_size(a: signer, tc: signer, dr: signer) {
         setup(&dr, &tc, &a);
         CRSN::test_publish(&a, 10, CRSN::max_crsn_size() + 1);
     }
 
     #[test(a=@0xCAFE, tc = @TreasuryCompliance, dr = @DiemRoot)]
-    public(script) fun test_has_crsn(a: signer, tc: signer, dr: signer) {
+    public fun test_has_crsn(a: signer, tc: signer, dr: signer) {
         setup(&dr, &tc, &a);
         let addr = Signer::address_of(&a);
         assert!(!CRSN::has_crsn(addr), 0);
@@ -98,12 +98,12 @@ module DiemFramework::CRSNTests {
 
     #[test(a=@0xCAFE)]
     #[expected_failure(abort_code = 1)]
-    public(script) fun record_no_crsn(a: signer) {
+    public fun record_no_crsn(a: signer) {
         CRSN::test_record(&a, 0);
     }
 
     #[test(a=@0xCAFE, tc = @TreasuryCompliance, dr = @DiemRoot)]
-    public(script) fun record_too_high_low_accept(a: signer, tc: signer, dr: signer) {
+    public fun record_too_high_low_accept(a: signer, tc: signer, dr: signer) {
         setup(&dr, &tc, &a);
         CRSN::test_publish(&a, 100, 10);
         assert!(!CRSN::test_record(&a, 110), 0);
@@ -118,7 +118,7 @@ module DiemFramework::CRSNTests {
     }
 
     #[test(a=@0xCAFE, tc = @TreasuryCompliance, dr = @DiemRoot)]
-    public(script) fun prevent_replay(a: signer, tc: signer, dr: signer) {
+    public fun prevent_replay(a: signer, tc: signer, dr: signer) {
         setup(&dr, &tc, &a);
         CRSN::test_publish(&a, 100, 10);
         assert!(CRSN::test_record(&a, 101), 0);
@@ -126,7 +126,7 @@ module DiemFramework::CRSNTests {
     }
 
     #[test(a=@0xCAFE, tc = @TreasuryCompliance, dr = @DiemRoot)]
-    public(script) fun prevent_replay_with_shift(a: signer, tc: signer, dr: signer) {
+    public fun prevent_replay_with_shift(a: signer, tc: signer, dr: signer) {
         setup(&dr, &tc, &a);
         CRSN::test_publish(&a, 100, 10);
         assert!(CRSN::test_record(&a, 100), 0);
@@ -136,7 +136,7 @@ module DiemFramework::CRSNTests {
     }
 
     #[test(a=@0xCAFE, tc = @TreasuryCompliance, dr = @DiemRoot)]
-    public(script) fun multiple_shifts_of_window(a: signer, tc: signer, dr: signer) {
+    public fun multiple_shifts_of_window(a: signer, tc: signer, dr: signer) {
         setup(&dr, &tc, &a);
         let addr = Signer::address_of(&a);
         CRSN::test_publish(&a, 100, 10);
@@ -172,7 +172,7 @@ module DiemFramework::CRSNTests {
 
     #[test(a=@0xCAFE, tc = @TreasuryCompliance, dr = @DiemRoot)]
     #[expected_failure(abort_code = 1031)]
-    public(script) fun force_expire_zero(a: signer, tc: signer, dr: signer) {
+    public fun force_expire_zero(a: signer, tc: signer, dr: signer) {
         setup(&dr, &tc, &a);
         CRSN::test_publish(&a, 100, 10);
         CRSN::test_force_expire(&a, 0);
@@ -180,7 +180,7 @@ module DiemFramework::CRSNTests {
 
 
     #[test(a=@0xCAFE, tc = @TreasuryCompliance, dr = @DiemRoot)]
-    public(script) fun force_expire_single(a: signer, tc: signer, dr: signer) {
+    public fun force_expire_single(a: signer, tc: signer, dr: signer) {
         setup(&dr, &tc, &a);
         let addr = Signer::address_of(&a);
         CRSN::test_publish(&a, 100, 10);
@@ -189,7 +189,7 @@ module DiemFramework::CRSNTests {
     }
 
     #[test(a=@0xCAFE, tc = @TreasuryCompliance, dr = @DiemRoot)]
-    public(script) fun force_expire_shift_over_set_bits(a: signer, tc: signer, dr: signer) {
+    public fun force_expire_shift_over_set_bits(a: signer, tc: signer, dr: signer) {
         setup(&dr, &tc, &a);
         let addr = Signer::address_of(&a);
         CRSN::test_publish(&a, 0, 100);
@@ -201,7 +201,7 @@ module DiemFramework::CRSNTests {
     }
 
     #[test(a=@0xCAFE, tc = @TreasuryCompliance, dr = @DiemRoot)]
-    public(script) fun force_expire_past_set_bits(a: signer, tc: signer, dr: signer) {
+    public fun force_expire_past_set_bits(a: signer, tc: signer, dr: signer) {
         setup(&dr, &tc, &a);
         let addr = Signer::address_of(&a);
         CRSN::test_publish(&a, 0, 100);
@@ -221,7 +221,7 @@ module DiemFramework::CRSNTests {
     }
 
     #[test(a=@0xCAFE, tc = @TreasuryCompliance, dr = @DiemRoot)]
-    public(script) fun force_expire_past_window_size(a: signer, tc: signer, dr: signer) {
+    public fun force_expire_past_window_size(a: signer, tc: signer, dr: signer) {
         setup(&dr, &tc, &a);
         let addr = Signer::address_of(&a);
         CRSN::test_publish(&a, 0, 100);

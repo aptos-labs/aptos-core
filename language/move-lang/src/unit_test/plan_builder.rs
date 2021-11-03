@@ -103,7 +103,7 @@ fn build_test_info<'func>(
             // expected failures cannot be annotated on non-#[test] functions
             if let Some(abort_attribute) = abort_attribute_opt {
                 let fn_msg = "Only functions defined as a test with #[test] can also have an \
-                      #[expected_failure] attribute";
+                              #[expected_failure] attribute";
                 let abort_msg = "Attributed as #[expected_failure] here";
                 context.env.add_diag(diag!(
                     Attributes::InvalidUsage,

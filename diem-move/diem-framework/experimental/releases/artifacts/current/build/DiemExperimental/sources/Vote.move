@@ -372,7 +372,7 @@ module DiemFramework::Vote {
     /// `ballot_id` from the address of the provided `account`
     /// If a ballot with `ballot_id` is not found, then it
     /// does nothing
-    public(script) fun remove_ballot<Proposal: store + drop>(
+    public fun remove_ballot<Proposal: store + drop>(
         account: signer,
         ballot_id: BallotID,
     ) acquires Ballots {

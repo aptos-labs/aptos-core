@@ -44,7 +44,11 @@ module Sender::NFT { // TODO: Swap {Sender,TroveFramework}
     // Error codes
     /* const ENOT_ADMIN: u64 = 0; */
 
-    public(script) fun initialize<Type: store + drop>(account: &signer) {
+    public(script) fun initialize<Type: store + drop>(account: signer) {
+        initialize_<Type>(&account)
+    }
+
+    public fun initialize_<Type: store + drop>(account: &signer) {
         /* assert!(Signer::address_of(account) == ADMIN, ENOT_ADMIN); */
         // dimroc: work around for hackathon to allow duplicate initialize invocations
         if (!exists<Admin<Type>>(Signer::address_of(account))) { // Added dup initialize check
@@ -53,7 +57,7 @@ module Sender::NFT { // TODO: Swap {Sender,TroveFramework}
     }
 
     /// Create a` NFT<Type>` that wraps `token`
-    public(script) fun create<Type: store + drop>(
+    public fun create<Type: store + drop>(
         account: &signer, token: Type, content_uri: vector<u8>
     ): NFT<Type> acquires Admin {
         let creator = Signer::address_of(account);
@@ -72,27 +76,27 @@ module Sender::NFT { // TODO: Swap {Sender,TroveFramework}
     }
 
     /// Publish the non-fungible token `nft` under `account`.
-    public(script) fun publish<Type: store + drop>(account: &signer, nft: NFT<Type>) {
+    public fun publish<Type: store + drop>(account: &signer, nft: NFT<Type>) {
         move_to(account, nft)
     }
 
     /// Remove the `NFT<Type>` under `account`
-    public(script) fun remove<Type: store + drop>(account: &signer): NFT<Type> acquires NFT {
+    public fun remove<Type: store + drop>(account: &signer): NFT<Type> acquires NFT {
         move_from<NFT<Type>>(Signer::address_of(account))
     }
 
     /// Return the globally unique identifier of `nft`
-    public(script) fun id<Type: store + drop>(nft: &NFT<Type>): &GUID {
+    public fun id<Type: store + drop>(nft: &NFT<Type>): &GUID {
         &nft.token_id
     }
 
     /// Return the creator of this NFT
-    public(script) fun creator<Type: store + drop>(nft: &NFT<Type>): address {
+    public fun creator<Type: store + drop>(nft: &NFT<Type>): address {
         GUID::creator_address(id<Type>(nft))
     }
 
     /// View the underlying token of a NFT
-    public(script) fun token<Type: store + drop>(nft: &NFT<Type>): &Type {
+    public fun token<Type: store + drop>(nft: &NFT<Type>): &Type {
         &nft.token
     }
 }

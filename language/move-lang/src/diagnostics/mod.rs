@@ -36,6 +36,7 @@ pub type FilesSourceText = HashMap<FileHash, (FileName, String)>;
 type FileMapping = HashMap<FileHash, FileId>;
 
 #[derive(PartialEq, Eq, Clone, Debug, Hash)]
+#[must_use]
 pub struct Diagnostic {
     info: DiagnosticInfo,
     primary_label: (Loc, String),
@@ -259,6 +260,11 @@ impl Diagnostic {
                 .map(|(loc, msg)| (loc, msg.to_string()))
                 .collect(),
         }
+    }
+
+    pub fn set_code(mut self, code: impl DiagnosticCode) -> Self {
+        self.info = code.into_info();
+        self
     }
 
     #[allow(unused)]

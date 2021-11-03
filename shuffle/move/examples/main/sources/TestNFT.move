@@ -7,7 +7,7 @@ module Sender::TestNFT {
     // account constraint
     // TODO: convert to vec
     public(script) fun create_nft(account: signer, content_uri: vector<u8>) {
-      NFT::initialize<TestNFT>(&account); // assumes account is sender/creator/ADMIN
+      NFT::initialize_<TestNFT>(&account); // assumes account is sender/creator/ADMIN
       let token = TestNFT{};
       let instance = NFT::create<TestNFT>(
         &account,

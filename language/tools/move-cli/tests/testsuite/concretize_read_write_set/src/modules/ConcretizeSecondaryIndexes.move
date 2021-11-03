@@ -10,13 +10,13 @@ module 0x1::ConcretizeSecondaryIndexes {
         move_to(&account, S { f: 10 })
     }
 
-    public(script) fun read_indirect(a: address): u64 acquires Addr, S {
+    public(script) fun read_indirect(a: address) acquires Addr, S {
         let addr = *&borrow_global<Addr>(a).a;
-        borrow_global<S>(addr).f
+        borrow_global<S>(addr).f;
     }
 
-    public(script) fun multi_arg(_s: signer, a: address, _i: u64): u64 acquires Addr, S {
+    public(script) fun multi_arg(_s: signer, a: address, _i: u64) acquires Addr, S {
         let addr = *&borrow_global<Addr>(a).a;
-        borrow_global<S>(addr).f
+        borrow_global<S>(addr).f;
     }
 }

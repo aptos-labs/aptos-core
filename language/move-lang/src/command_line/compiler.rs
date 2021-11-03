@@ -316,7 +316,9 @@ macro_rules! ast_stepped_compilers {
                     Ok(())
                 }
 
-                pub fn build(self) -> Result<(Vec<AnnotatedCompiledUnit>, Diagnostics), Diagnostics> {
+                pub fn build(
+                    self
+                ) -> Result<(Vec<AnnotatedCompiledUnit>, Diagnostics), Diagnostics> {
                     let units = self.run::<PASS_COMPILATION>()?.into_compiled_units();
                     Ok(units)
                 }

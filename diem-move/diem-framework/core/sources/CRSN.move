@@ -65,7 +65,7 @@ module DiemFramework::CRSN {
 
     const MAX_CRSN_SIZE: u64 = 256;
 
-    public(script) fun allow_crsns(account: &signer) {
+    public fun allow_crsns(account: &signer) {
         Roles::assert_diem_root(account);
         assert!(!exists<CRSNsAllowed>(Signer::address_of(account)), Errors::invalid_state(EALREADY_INITIALIZED));
         move_to(account, CRSNsAllowed { })

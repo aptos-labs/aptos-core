@@ -305,8 +305,8 @@ fn use_local(context: &mut Context, loc: &Loc, local: &Var) {
             match unavailable_reason {
                 UnavailableReason::Unassigned => {
                     let msg = format!(
-                        "The variable '{}' {} not have a value. The variable must be \
-                         assigned a value before being used.",
+                        "The variable '{}' {} not have a value. The variable must be assigned a \
+                         value before being used.",
                         vstr,
                         match state {
                             LocalState::Available(_) => unreachable!(),
@@ -331,7 +331,9 @@ fn use_local(context: &mut Context, loc: &Loc, local: &Var) {
                     };
                     let suggestion = format!("Suggestion: use 'copy {}' to avoid the move.", vstr);
                     let reason = if *loc == unavailable {
-                        "In a loop, this typically means it was moved in the first iteration, and is not available by the second iteration.".to_string()
+                        "In a loop, this typically means it was moved in the first iteration, and \
+                         is not available by the second iteration."
+                            .to_string()
                     } else {
                         format!("The value of '{}' {} previously moved here.", vstr, verb)
                     };

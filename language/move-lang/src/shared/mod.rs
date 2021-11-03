@@ -163,7 +163,11 @@ pub fn parse_named_address(s: &str) -> anyhow::Result<(String, NumericalAddress)
     let before_after = s.split('=').collect::<Vec<_>>();
 
     if before_after.len() != 2 {
-        anyhow::bail!("Invalid named address assignment. Must be of the form <address_name>=<address>, but found '{}'", s);
+        anyhow::bail!(
+            "Invalid named address assignment. Must be of the form <address_name>=<address>, but \
+             found '{}'",
+            s
+        );
     }
     let name = before_after[0].parse()?;
     let addr = NumericalAddress::parse_str(before_after[1])

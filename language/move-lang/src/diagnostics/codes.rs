@@ -175,6 +175,11 @@ codes!(
             { msg: "cyclic type instantiation", severity: NonblockingError },
         MissingAcquires: { msg: "missing acquires annotation", severity: NonblockingError },
         InvalidNum: { msg: "invalid number after type inference", severity: NonblockingError },
+        NonInvocablePublicScript: {
+            msg: "script function cannot be invoked with this signature \
+                (NOTE: this may become an error in the future)",
+            severity: Warning
+        },
     ],
     // errors for ability rules. mostly typing/translate
     AbilitySafety: [
