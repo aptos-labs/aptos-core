@@ -43,10 +43,10 @@ pub fn handle(root: Option<PathBuf>) -> Result<()> {
         }
     }
 
-    let config = NodeConfig::load(&home.get_node_config_path()).with_context(|| {
+    let config = NodeConfig::load(&home.get_validator_config_path()).with_context(|| {
         format!(
             "Failed to load NodeConfig from file: {:?}",
-            home.get_node_config_path()
+            home.get_validator_config_path()
         )
     })?;
     let json_rpc_url = format!("http://0.0.0.0:{}", config.json_rpc.address.port());

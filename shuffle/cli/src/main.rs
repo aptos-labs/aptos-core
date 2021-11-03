@@ -21,7 +21,7 @@ pub async fn main() -> Result<()> {
     let subcommand = Subcommand::from_args();
     match subcommand {
         Subcommand::New { blockchain, path } => new::handle(blockchain, path),
-        Subcommand::Node {} => node::handle(),
+        Subcommand::Node { genesis } => node::handle(genesis),
         Subcommand::Build { project_path } => {
             build::handle(&normalized_project_path(project_path)?)
         }
@@ -65,7 +65,10 @@ pub enum Subcommand {
         path: PathBuf,
     },
     #[structopt(about = "Runs a local devnet with prefunded accounts")]
-    Node {},
+    Node {
+        #[structopt(short, long, help = "Move package directory to be used for genesis")]
+        genesis: Option<String>,
+    },
     #[structopt(about = "Compiles the Move package and generates typescript files")]
     Build {
         #[structopt(short, long)]

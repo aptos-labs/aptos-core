@@ -1,7 +1,10 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{account, deploy, shared};
+use crate::{
+    account, deploy,
+    shared::{self, MAIN_PKG_PATH},
+};
 use anyhow::{Context, Result};
 use diem_config::config::{NodeConfig, DEFAULT_PORT};
 use diem_crypto::PrivateKey;
@@ -17,10 +20,10 @@ pub fn handle(project_path: &Path) -> Result<()> {
     shared::generate_typescript_libraries(project_path)?;
     let home = Home::new(shared::get_home_path().as_path())?;
 
-    let config = NodeConfig::load(&home.get_node_config_path()).with_context(|| {
+    let config = NodeConfig::load(&home.get_validator_config_path()).with_context(|| {
         format!(
             "Failed to load NodeConfig from file: {:?}",
-            home.get_node_config_path()
+            home.get_validator_config_path()
         )
     })?;
     let json_rpc_url = format!("http://0.0.0.0:{}", config.json_rpc.address.port());
@@ -84,7 +87,7 @@ fn send_module_transaction(
         project_path.to_string_lossy().to_string()
     );
 
-    let compiled_package = shared::build_move_packages(project_path)?;
+    let compiled_package = shared::build_move_package(project_path.join(MAIN_PKG_PATH).as_ref())?;
     deploy::send_module_transaction(&compiled_package, client, new_account, factory)?;
     deploy::check_module_exists(client, new_account)
 }

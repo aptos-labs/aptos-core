@@ -29,7 +29,8 @@ pub fn handle(project_path: &Path) -> Result<()> {
             "An account hasn't been created yet! Run shuffle account first."
         ));
     }
-    let compiled_package = shared::build_move_packages(project_path)?;
+    let compiled_package =
+        shared::build_move_package(project_path.join(shared::MAIN_PKG_PATH).as_ref())?;
     publish_packages_as_transaction(home.get_latest_key_path(), compiled_package)
 }
 

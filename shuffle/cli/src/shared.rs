@@ -108,31 +108,35 @@ pub fn get_shuffle_dir() -> PathBuf {
 
 // Contains all the commonly used paths in shuffle/cli
 pub struct Home {
-    shuffle_path: PathBuf,
-    root_key_path: PathBuf,
-    node_config_path: PathBuf,
     account_path: PathBuf,
-    latest_path: PathBuf,
-    latest_key_path: PathBuf,
     latest_address_path: PathBuf,
-    test_path: PathBuf,
-    test_key_path: PathBuf,
+    latest_key_path: PathBuf,
+    latest_path: PathBuf,
+    node_config_path: PathBuf,
+    root_key_path: PathBuf,
+    shuffle_path: PathBuf,
     test_key_address_path: PathBuf,
+    test_key_path: PathBuf,
+    test_path: PathBuf,
+    validator_config_path: PathBuf,
+    validator_log_path: PathBuf,
 }
 
 impl Home {
     pub fn new(home_path: &Path) -> Result<Self> {
         Ok(Self {
-            shuffle_path: home_path.join(".shuffle"),
-            root_key_path: home_path.join(".shuffle/nodeconfig/mint.key"),
-            node_config_path: home_path.join(".shuffle/nodeconfig/0/node.yaml"),
             account_path: home_path.join(".shuffle/accounts"),
-            latest_path: home_path.join(".shuffle/accounts/latest"),
-            latest_key_path: home_path.join(".shuffle/accounts/latest/dev.key"),
             latest_address_path: home_path.join(".shuffle/accounts/latest/address"),
-            test_path: home_path.join(".shuffle/accounts/test"),
-            test_key_path: home_path.join(".shuffle/accounts/test/dev.key"),
+            latest_key_path: home_path.join(".shuffle/accounts/latest/dev.key"),
+            latest_path: home_path.join(".shuffle/accounts/latest"),
+            node_config_path: home_path.join(".shuffle/nodeconfig"),
+            root_key_path: home_path.join(".shuffle/nodeconfig/mint.key"),
+            shuffle_path: home_path.join(".shuffle"),
             test_key_address_path: home_path.join(".shuffle/accounts/test/address"),
+            test_key_path: home_path.join(".shuffle/accounts/test/dev.key"),
+            test_path: home_path.join(".shuffle/accounts/test"),
+            validator_config_path: home_path.join(".shuffle/nodeconfig/0/node.yaml"),
+            validator_log_path: home_path.join(".shuffle/nodeconfig/validator.log"),
         })
     }
 
@@ -146,6 +150,14 @@ impl Home {
 
     pub fn get_node_config_path(&self) -> &Path {
         &self.node_config_path
+    }
+
+    pub fn get_validator_config_path(&self) -> &Path {
+        &self.validator_config_path
+    }
+
+    pub fn get_validator_log_path(&self) -> &Path {
+        &self.validator_log_path
     }
 
     pub fn get_latest_path(&self) -> &Path {
@@ -243,15 +255,19 @@ impl Home {
         generate_key::save_key(new_root_key, self.latest_key_path.as_path());
         Ok(())
     }
+
+    pub fn read_genesis_waypoint(&self) -> Result<String> {
+        fs::read_to_string(self.get_node_config_path().join("waypoint.txt"))
+            .map_err(anyhow::Error::new)
+    }
 }
 
 /// Generates the typescript bindings for the main Move package based on the embedded
 /// diem types and Move stdlib. Mimics much of the transaction_builder_generator's CLI
 /// except with typescript defaults and embedded content, as opposed to repo directory paths.
 pub fn generate_typescript_libraries(project_path: &Path) -> Result<()> {
-    let _compiled_package = build_move_packages(project_path)?;
-
     let pkg_path = project_path.join(MAIN_PKG_PATH);
+    let _compiled_package = build_move_package(&pkg_path)?;
     let target_dir = pkg_path.join("generated");
     let installer = serdegen::typescript::Installer::new(target_dir.clone());
     generate_runtime(&installer)?;
@@ -282,10 +298,9 @@ fn generate_runtime(installer: &serdegen::typescript::Installer) -> Result<()> {
     Ok(())
 }
 
-/// Builds the packages in the shuffle project using the move package system.
-pub fn build_move_packages(project_path: &Path) -> Result<CompiledPackage> {
-    println!("Building Examples...");
-    let pkgdir = project_path.join(MAIN_PKG_PATH);
+/// Builds a package using the move package system.
+pub fn build_move_package(pkg_path: &Path) -> Result<CompiledPackage> {
+    println!("Building {}...", pkg_path.display());
     let config = move_package::BuildConfig {
         dev_mode: true,
         test_mode: false,
@@ -294,7 +309,7 @@ pub fn build_move_packages(project_path: &Path) -> Result<CompiledPackage> {
         install_dir: None,
     };
 
-    config.compile_package(pkgdir.as_path(), &mut std::io::stdout())
+    config.compile_package(pkg_path, &mut std::io::stdout())
 }
 
 fn generate_transaction_builders(pkg_path: &Path, target_dir: &Path) -> Result<()> {
@@ -496,7 +511,7 @@ mod test {
         let dir = tempdir().unwrap();
         let home = Home::new(dir.path()).unwrap();
         let correct_dir = dir.path().join(".shuffle/nodeconfig/0/node.yaml");
-        assert_eq!(correct_dir, home.get_node_config_path());
+        assert_eq!(correct_dir, home.get_validator_config_path());
     }
 
     #[test]
