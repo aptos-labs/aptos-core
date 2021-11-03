@@ -133,7 +133,6 @@ async fn test_notifications_continuous_outputs() {
                     let ledger_info = ledger_info_with_sigs.ledger_info();
                     // Verify the epoch of the ledger info
                     assert_eq!(ledger_info.epoch(), next_expected_epoch);
-                    assert_eq!(ledger_info.epoch(), next_expected_epoch);
 
                     // Verify the output start version matches the expected version
                     let first_output_version = outputs_with_proofs.first_transaction_output_version;

@@ -48,7 +48,7 @@ pub const MIN_ADVERTISED_TRANSACTION_OUTPUT: u64 = 1000;
 pub const MAX_ADVERTISED_TRANSACTION_OUTPUT: u64 = 10000;
 
 /// Test timeout constant
-pub const MAX_NOTIFICATION_TIMEOUT_SECS: u64 = 5;
+pub const MAX_NOTIFICATION_TIMEOUT_SECS: u64 = 10;
 
 /// A simple mock of the Diem Data Client
 #[derive(Clone, Debug)]
