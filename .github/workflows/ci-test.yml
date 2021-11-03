@@ -113,7 +113,7 @@ jobs:
         name: find shell/dockerfile changes
         uses: diem/actions/matches@faadd16607b77dfa2231a8f366883e01717b3225
         with:
-          pattern: 'Dockerfile$\|.*.sh$\|^developers.diem.com\|^api'
+          pattern: 'Dockerfile$\|.*.sh$\|^developers.diem.com'
       - id: helm-changes
         name: find helm changes
         uses: diem/actions/matches@faadd16607b77dfa2231a8f366883e01717b3225
@@ -514,8 +514,6 @@ jobs:
         uses: ./.github/actions/docker-checks
       - name: deno lints
         run: deno lint ./shuffle
-      - name: openapi lints
-        run: scripts/api_lint.sh
       - name: Early terminate workflow
         if: ${{ failure() }}
         uses: ./.github/actions/early-terminator
