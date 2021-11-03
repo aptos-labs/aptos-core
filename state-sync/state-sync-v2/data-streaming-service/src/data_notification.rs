@@ -17,6 +17,7 @@ use std::fmt::{Debug, Formatter};
 pub type NotificationId = u64;
 
 /// A generic data client response enum.
+// TODO(joshlind): remove me!
 pub type DataClientResponse = Response<ResponsePayload>;
 
 /// A single data notification with an ID and data payload.
