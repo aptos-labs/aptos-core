@@ -239,4 +239,51 @@ module 0x42::TestArithmetic {
     spec overflow_u128_mul {
         aborts_if x * y > max_u128(); // U128_MAX
     }
+
+
+    // --------------------------
+    // Non-linear arithmetic
+    // --------------------------
+
+    fun mul5(a: u64, b: u64, c: u64, d: u64, e: u64): u64 {
+        spec {
+            assume a < b;
+            assume b < c;
+            assume c < d;
+            assume d < e;
+        };
+        a * b * c * d * e
+    }
+    spec mul5 {
+        // a, b, c, d and e do not exist such that a<b<c<d<e and a*b*c*d*e==72.
+        ensures result != 72;
+    }
+
+    fun mul5_incorrect(a: u64, b: u64, c: u64, d: u64, e: u64): u64 {
+        spec {
+            assume a < b;
+            assume b < c;
+            assume c < d;
+            assume d < e;
+        };
+        a * b * c * d * e
+    }
+    spec mul5_incorrect {
+        // a=1, b=2, c=3, d=4, e=30, a*b*c*d*e==720
+        ensures result != 720;
+    }
+
+    fun distribution_law(a: u64, b: u64, c: u64 , d: u64): u64 {
+        a * b * (c + d)
+    }
+    spec distribution_law {
+        ensures result == a*b*c + a*b*d;
+    }
+
+    fun distribution_law_incorrect(a: u64, b: u64, c: u64 , d: u64): u64 {
+        a * b * (c + d)
+    }
+    spec distribution_law_incorrect {
+        ensures result == a*b*c + a*b*d + a*b;
+    }
 }

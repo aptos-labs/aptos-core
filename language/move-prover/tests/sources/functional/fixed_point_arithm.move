@@ -1,8 +1,10 @@
+// separate_baseline: cvc4
+// TODO(cvc4): cvc4 currently produces false positives.
 module 0x42::FixedPointArithmetic {
 
     use Std::FixedPoint32::{Self, FixedPoint32};
     spec module {
-        pragma verify = false;
+       pragma verify = true;
     }
 
     // -------------------------------
@@ -123,10 +125,26 @@ module 0x42::FixedPointArithmetic {
         FixedPoint32::multiply_u64(z, FixedPoint32::create_from_raw_value(y_raw_val))
     }
     spec div_mul_incorrect {
+        pragma verify=false; // TODO: disabled due to the CVC4 timeout
         ensures result >= x; // disproved
         ensures result == x; // disproved
         ensures result < x; // disproved
         ensures result > x; // disproved
     }
 
+    fun mul_2_times_incorrect(a: u64, b: FixedPoint32, c: FixedPoint32): u64 {
+        FixedPoint32::multiply_u64(FixedPoint32::multiply_u64(a, b), c)
+    }
+    spec mul_2_times_incorrect {
+        // there exists a, b and c such that their product is equal to 10.
+        ensures result != 10;
+    }
+
+    fun mul_3_times_incorrect(a: u64, b: FixedPoint32, c: FixedPoint32, d: FixedPoint32): u64 {
+        FixedPoint32::multiply_u64(FixedPoint32::multiply_u64(FixedPoint32::multiply_u64(a, b), c), d)
+    }
+    spec mul_3_times_incorrect {
+        // there exists a, b, c and d such that their product is equal to 10.
+        ensures result != 10;
+    }
 }
