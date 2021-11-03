@@ -20,7 +20,7 @@ paths:
   /:
     get:
       summary: Get the latest ledger information.
-      operationId: get-ledger-info
+      operationId: get_ledger_info
       tags:
         - info
       responses:
@@ -37,7 +37,7 @@ paths:
   /spec.html:
     get:
       summary: API specification document.
-      operationId: get-spec-html
+      operationId: get_spec_html
       tags:
         - info
       responses:
@@ -48,7 +48,7 @@ paths:
   /openapi.yaml:
     get:
       summary: OpenAPI YAML specification.
-      operationId: get-spec-yaml
+      operationId: get_spec_yaml
       tags:
         - info
       responses:
@@ -59,7 +59,7 @@ paths:
   /accounts/{address}/resources:
     get:
       summary: Get account resources
-      operationId: get-account-resources
+      operationId: get_account_resources
       tags:
         - accounts
       parameters:
@@ -82,7 +82,7 @@ paths:
   /accounts/{address}/modules:
     get:
       summary: Get account modules
-      operationId: get-account-modules
+      operationId: get_account_modules
       tags:
         - accounts
       parameters:
@@ -105,7 +105,7 @@ paths:
   /ledger/{ledger_version}/accounts/{address}/resources:
     get:
       summary: Get account resources by ledger version
-      operationId: get-account-resources-by-version
+      operationId: get_account_resources_by_version
       description: >-
         This API returns account resources for a specific ledger version (AKA transaction version).
 
@@ -146,7 +146,7 @@ paths:
 
 
         When the data is pruned, server responds 404.
-      operationId: get-account-modules-by-version
+      operationId: get_account_modules_by_version
       tags:
         - accounts
       parameters:
@@ -171,7 +171,7 @@ paths:
   /transactions:
     get:
       summary: Get transactions
-      operationId: get-transactions
+      operationId: get_transactions
       tags:
         - transactions
       parameters:
@@ -192,7 +192,7 @@ paths:
           $ref: '#/components/responses/500'
     post:
       summary: Submit transaction
-      operationId: submit-transaction
+      operationId: submit_transaction
       description: >-
         **Submit transaction using JSON without additional tools**
 
@@ -262,7 +262,7 @@ paths:
           1. Create hash message bytes: "DIEM::Transaction" bytes + BCS bytes of [Transaction](https://diem.github.io/diem/diem_types/transaction/enum.Transaction.html).
           2. Apply hash algorithm `SHA3-256` to the hash message bytes.
           3. Hex-encode the hash bytes with `0x` prefix.
-      operationId: get-transaction
+      operationId: get_transaction
       tags:
         - transactions
       parameters:
@@ -304,7 +304,7 @@ paths:
 
           1. Client first needs to HEX decode the `message` into bytes.
           2. Then sign the bytes to create signature.
-      operationId: create-signing-message
+      operationId: create_signing_message
       tags:
         - transactions
       requestBody:
@@ -336,7 +336,7 @@ paths:
   /events/{event_key}:
     get:
       summary: Get events by event key
-      operationId: get-events
+      operationId: get_events
       tags:
         - events
       parameters:
@@ -367,7 +367,7 @@ paths:
   /accounts/{address}/events/{event_handle_struct}/{field_name}:
     get:
       summary: Get events by event handle.
-      operationId: get-account-events
+      operationId: get_account_events
       description: >-
         This API extracts event key from the account resource identified
         by the `event_handle_struct` and `field_name`, then returns
