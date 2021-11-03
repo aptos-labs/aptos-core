@@ -9,6 +9,7 @@ use std::{
 
 use diem_logger::{info, warn};
 use diem_types::chain_id::ChainId;
+use rand::{prelude::StdRng, rngs::OsRng, Rng, SeedableRng};
 use reqwest::Url;
 use structopt::{clap::ArgGroup, StructOpt};
 use termion::{color, style};
@@ -26,11 +27,10 @@ use cluster_test::{
     prometheus::Prometheus,
     report::SuiteReport,
     suite::ExperimentSuite,
-    tx_emitter::{EmitJobRequest, EmitThreadParams, TxEmitter},
 };
 use diem_config::config::DEFAULT_JSON_RPC_PORT;
-use diem_sdk::types::LocalAccount;
-use forge::SlackClient;
+use diem_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
+use forge::{query_sequence_numbers, EmitJobRequest, EmitThreadParams, SlackClient, TxnEmitter};
 use futures::{
     future::{join_all, FutureExt},
     select,
@@ -95,7 +95,7 @@ struct Args {
     )]
     duration: u64,
     #[structopt(long, help = "Percentage of invalid txs", default_value = "0")]
-    invalid_tx: u64,
+    invalid_tx: usize,
 
     #[structopt(
         long,
@@ -273,7 +273,9 @@ struct ClusterTestRunner {
     health_check_runner: HealthCheckRunner,
     slack: SlackClient,
     slack_changelog_url: Option<Url>,
-    tx_emitter: TxEmitter,
+    root_account: LocalAccount,
+    treasury_compliance_account: LocalAccount,
+    designated_dealer_account: LocalAccount,
     prometheus: Prometheus,
     github: GitHub,
     report: SuiteReport,
@@ -305,27 +307,36 @@ fn parse_host_port(s: &str) -> Result<(String, u32, Option<u32>)> {
 }
 
 async fn emit_tx(cluster: &Cluster, args: &Args) -> Result<()> {
-    let accounts_per_client = args.accounts_per_client;
-    let workers_per_ac = args.workers_per_ac;
     let thread_params = EmitThreadParams {
         wait_millis: args.wait_millis,
         wait_committed: !args.burst,
     };
     let duration = Duration::from_secs(args.duration);
-    let mut emitter = TxEmitter::new(cluster, args.vasp);
+    let client = cluster.random_validator_instance().json_rpc_client();
+    let mut treasury_compliance_account = cluster.load_tc_account(&client).await?;
+    let mut designated_dealer_account = cluster.load_faucet_account(&client).await?;
+    let mut emitter = TxnEmitter::new(
+        &mut treasury_compliance_account,
+        &mut designated_dealer_account,
+        client,
+        TransactionFactory::new(cluster.chain_id),
+        StdRng::from_seed(OsRng.gen()),
+    );
+    let mut emit_job_request = EmitJobRequest::new(
+        cluster
+            .validator_instances()
+            .iter()
+            .map(Instance::json_rpc_client)
+            .collect(),
+    )
+    .accounts_per_client(args.accounts_per_client)
+    .thread_params(thread_params)
+    .invalid_transaction_ratio(args.invalid_tx);
+    if let Some(workers_per_endpoint) = args.workers_per_ac {
+        emit_job_request = emit_job_request.workers_per_endpoint(workers_per_endpoint);
+    }
     let stats = emitter
-        .emit_txn_for_with_stats(
-            duration,
-            EmitJobRequest {
-                instances: cluster.validator_instances().to_vec(),
-                accounts_per_client,
-                workers_per_ac,
-                thread_params,
-                gas_price: 0,
-                invalid_tx: args.invalid_tx,
-            },
-            10,
-        )
+        .emit_txn_for_with_stats(duration, emit_job_request, 10)
         .await?;
     println!("Total stats: {}", stats);
     println!("Average rate: {}", stats.rate(duration));
@@ -371,21 +382,33 @@ impl BasicSwarmUtil {
     }
 
     pub async fn diag(&self, vasp: bool) -> Result<()> {
-        let emitter = TxEmitter::new(&self.cluster, vasp);
+        let client = self.cluster.random_validator_instance().json_rpc_client();
+        let mut treasury_compliance_account = self.cluster.load_tc_account(&client).await?;
+        let mut designated_dealer_account = self.cluster.load_faucet_account(&client).await?;
+        let emitter = TxnEmitter::new(
+            &mut treasury_compliance_account,
+            &mut designated_dealer_account,
+            client,
+            TransactionFactory::new(self.cluster.chain_id),
+            StdRng::from_seed(OsRng.gen()),
+        );
         let mut faucet_account: Option<LocalAccount> = None;
         let instances: Vec<_> = self.cluster.validator_and_fullnode_instances().collect();
         for instance in &instances {
             let client = instance.json_rpc_client();
             print!("Getting faucet account sequence number on {}...", instance);
             let account = if vasp {
-                emitter
+                self.cluster
                     .load_dd_account(&client)
                     .await
                     .map_err(|e| format_err!("Failed to get dd account: {}", e))?
             } else {
-                emitter.load_faucet_account(&client).await.map_err(|e| {
-                    format_err!("Failed to get faucet account sequence number: {}", e)
-                })?
+                self.cluster
+                    .load_faucet_account(&client)
+                    .await
+                    .map_err(|e| {
+                        format_err!("Failed to get faucet account sequence number: {}", e)
+                    })?
             };
             println!("seq={}", account.sequence_number());
             if let Some(faucet_account) = &faucet_account {
@@ -407,7 +430,7 @@ impl BasicSwarmUtil {
             print!("Submitting txn through {}...", instance);
             let deadline = emitter
                 .submit_single_transaction(
-                    instance,
+                    &instance.json_rpc_client(),
                     &mut faucet_account,
                     &faucet_account_address,
                     10,
@@ -420,15 +443,20 @@ impl BasicSwarmUtil {
                 faucet_account.sequence_number()
             );
             loop {
-                let futures = instances.iter().map(|instance| {
-                    emitter.query_sequence_numbers(instance, &faucet_account_address)
-                });
+                let addresses = &[faucet_account_address];
+                let clients = instances
+                    .iter()
+                    .map(|instance| instance.json_rpc_client())
+                    .collect::<Vec<_>>();
+                let futures = clients
+                    .iter()
+                    .map(|client| query_sequence_numbers(client, addresses));
                 let results = join_all(futures).await;
                 let mut all_good = true;
                 for (instance, result) in zip(instances.iter(), results) {
                     let seq = result.map_err(|e| {
                         format_err!("Failed to query sequence number from {}: {}", instance, e)
-                    })?;
+                    })?[0];
                     let ip = instance.ip();
                     let color = if seq != faucet_account.sequence_number() {
                         all_good = false;
@@ -504,22 +532,25 @@ impl ClusterTestRunner {
         let slack_changelog_url = env::var("SLACK_CHANGELOG_URL")
             .map(|u| u.parse().expect("Failed to parse SLACK_CHANGELOG_URL"))
             .ok();
-        let tx_emitter = TxEmitter::new(&cluster, args.vasp);
+        let client = cluster.random_validator_instance().json_rpc_client();
+        let root_account = cluster.load_diem_root_account(&client).await?;
+        let treasury_compliance_account = cluster.load_tc_account(&client).await?;
+        let designated_dealer_account = cluster.load_faucet_account(&client).await?;
         let github = GitHub::new();
         let mut report = SuiteReport::new();
         let end_time = (Instant::now() - start_time).as_secs() as u64;
         report.report_text(format!("Test runner setup time spent {} secs", end_time));
-        let global_emit_job_request = EmitJobRequest {
-            instances: vec![],
-            accounts_per_client: args.accounts_per_client,
-            workers_per_ac: args.workers_per_ac,
-            thread_params: EmitThreadParams {
+        let mut global_emit_job_request = EmitJobRequest::default()
+            .accounts_per_client(args.accounts_per_client)
+            .thread_params(EmitThreadParams {
                 wait_millis: args.wait_millis,
                 wait_committed: !args.burst,
-            },
-            gas_price: 0,
-            invalid_tx: args.invalid_tx,
-        };
+            })
+            .invalid_transaction_ratio(args.invalid_tx);
+        if let Some(workers_per_endpoint) = args.workers_per_ac {
+            global_emit_job_request =
+                global_emit_job_request.workers_per_endpoint(workers_per_endpoint);
+        }
         let emit_to_validator =
             if cluster.fullnode_instances().len() < cluster.validator_instances().len() {
                 true
@@ -534,7 +565,9 @@ impl ClusterTestRunner {
             health_check_runner,
             slack,
             slack_changelog_url,
-            tx_emitter,
+            root_account,
+            treasury_compliance_account,
+            designated_dealer_account,
             prometheus,
             github,
             report,
@@ -704,7 +737,9 @@ impl ClusterTestRunner {
     ) -> Result<()> {
         let affected_validators = experiment.affected_validators();
         let mut context = Context::new(
-            &mut self.tx_emitter,
+            &mut self.root_account,
+            &mut self.treasury_compliance_account,
+            &mut self.designated_dealer_account,
             &self.prometheus,
             &mut self.cluster_builder,
             &self.cluster_builder_params,

@@ -7,7 +7,6 @@ use crate::{
     cluster::Cluster,
     experiments::{Context, Experiment, ExperimentParam},
     instance::Instance,
-    tx_emitter::{execute_and_wait_transactions, EmitJobRequest},
 };
 use anyhow::ensure;
 use async_trait::async_trait;
@@ -21,6 +20,8 @@ use diem_types::{
     ledger_info::LedgerInfoWithSignatures,
     on_chain_config::{ConsensusConfigV2, OnChainConsensusConfig},
 };
+use forge::{execute_and_wait_transactions, TxnEmitter};
+use rand::{prelude::StdRng, rngs::OsRng, Rng, SeedableRng};
 use std::{
     collections::HashSet,
     fmt,
@@ -94,13 +95,20 @@ impl Experiment for Reconfiguration {
     }
 
     async fn run(&mut self, context: &mut Context<'_>) -> anyhow::Result<()> {
+        let mut txn_emitter = TxnEmitter::new(
+            &mut context.treasury_compliance_account,
+            &mut context.designated_dealer_account,
+            context
+                .cluster
+                .random_validator_instance()
+                .json_rpc_client(),
+            TransactionFactory::new(context.cluster.chain_id),
+            StdRng::from_seed(OsRng.gen()),
+        );
         let full_node = context.cluster.random_fullnode_instance();
         let tx_factory = TransactionFactory::new(ChainId::test());
-        let mut full_node_client = full_node.json_rpc_client();
-        let mut diem_root_account = context
-            .tx_emitter
-            .load_diem_root_account(&full_node_client)
-            .await?;
+        let full_node_client = full_node.json_rpc_client();
+        let mut diem_root_account = &mut context.root_account;
         let allowed_nonce = 0;
         let emit_job = if self.emit_txn {
             info!("Start emitting txn");
@@ -112,9 +120,8 @@ impl Experiment for Reconfiguration {
                 .cloned()
                 .collect();
             Some(
-                context
-                    .tx_emitter
-                    .start_job(EmitJobRequest::for_instances(
+                txn_emitter
+                    .start_job(crate::util::emit_job_request_for_instances(
                         instances,
                         context.global_emit_job_request,
                         0,
@@ -139,7 +146,7 @@ impl Experiment for Reconfiguration {
                 ),
             );
             execute_and_wait_transactions(
-                &mut full_node_client,
+                &full_node_client,
                 &mut diem_root_account,
                 vec![remove_txn],
             )
@@ -152,12 +159,8 @@ impl Experiment for Reconfiguration {
                     self.affected_peer_id,
                 ),
             );
-            execute_and_wait_transactions(
-                &mut full_node_client,
-                &mut diem_root_account,
-                vec![add_txn],
-            )
-            .await?;
+            execute_and_wait_transactions(&full_node_client, &mut diem_root_account, vec![add_txn])
+                .await?;
             version = expect_epoch(&full_node_client, version, 3).await?;
         }
 
@@ -178,7 +181,7 @@ impl Experiment for Reconfiguration {
                     ),
                 );
                 execute_and_wait_transactions(
-                    &mut full_node_client,
+                    &full_node_client,
                     &mut diem_root_account,
                     vec![upgrade_txn],
                 )
@@ -191,7 +194,7 @@ impl Experiment for Reconfiguration {
                     ),
                 );
                 execute_and_wait_transactions(
-                    &mut full_node_client,
+                    &full_node_client,
                     &mut diem_root_account,
                     vec![downgrade_txn],
                 )
@@ -208,7 +211,7 @@ impl Experiment for Reconfiguration {
                     .update_diem_version(allowed_nonce, magic_number),
             );
             execute_and_wait_transactions(
-                &mut full_node_client,
+                &full_node_client,
                 &mut diem_root_account,
                 vec![update_txn],
             )
@@ -217,7 +220,7 @@ impl Experiment for Reconfiguration {
         }
         let elapsed = timer.elapsed();
         if let Some(job) = emit_job {
-            let stats = context.tx_emitter.stop_job(job).await;
+            let stats = txn_emitter.stop_job(job).await;
             context
                 .report
                 .report_txn_stats(self.to_string(), stats, elapsed, "");

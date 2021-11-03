@@ -15,9 +15,29 @@ pub mod prometheus;
 pub mod report;
 pub mod stats;
 pub mod suite;
-pub mod tx_emitter;
 
 pub mod util {
+    use crate::instance::Instance;
+    use forge::EmitJobRequest;
+
+    pub fn emit_job_request_for_instances(
+        instances: Vec<Instance>,
+        global_emit_job_request: &Option<EmitJobRequest>,
+        gas_price: u64,
+        invalid_tx: usize,
+    ) -> EmitJobRequest {
+        let clients = instances
+            .into_iter()
+            .map(|instance| instance.json_rpc_client())
+            .collect();
+
+        global_emit_job_request
+            .clone()
+            .unwrap_or_default()
+            .json_rpc_clients(clients)
+            .gas_price(gas_price)
+            .invalid_transaction_ratio(invalid_tx)
+    }
 
     pub fn human_readable_bytes_per_sec(bytes_per_sec: f64) -> String {
         if bytes_per_sec.round() < 1024.0 {

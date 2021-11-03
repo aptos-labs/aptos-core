@@ -6,7 +6,6 @@
 use crate::{
     cluster::Cluster,
     experiments::{Context, Experiment, ExperimentParam},
-    tx_emitter::{gen_transfer_txn_request, EmitJobRequest},
 };
 use anyhow::Result;
 use async_trait::async_trait;
@@ -16,6 +15,7 @@ use diem_mempool::network::{MempoolNetworkEvents, MempoolNetworkSender};
 use diem_sdk::transaction_builder::TransactionFactory;
 use diem_time_service::TimeService;
 use diem_types::{account_config::diem_root_address, chain_id::ChainId};
+use forge::{gen_transfer_txn_request, TxnEmitter};
 use futures::{sink::SinkExt, StreamExt};
 use network::{
     application::storage::PeerMetadataStorage,
@@ -24,6 +24,7 @@ use network::{
     ConnectivityRequest,
 };
 use network_builder::builder::NetworkBuilder;
+use rand::{prelude::StdRng, rngs::OsRng, Rng, SeedableRng};
 use state_sync_v1::network::{StateSyncEvents, StateSyncSender};
 use std::{
     collections::HashSet,
@@ -81,6 +82,17 @@ impl Experiment for LoadTest {
     }
 
     async fn run(&mut self, context: &mut Context<'_>) -> anyhow::Result<()> {
+        let mut txn_emitter = TxnEmitter::new(
+            &mut context.treasury_compliance_account,
+            &mut context.designated_dealer_account,
+            context
+                .cluster
+                .random_validator_instance()
+                .json_rpc_client(),
+            TransactionFactory::new(context.cluster.chain_id),
+            StdRng::from_seed(OsRng.gen()),
+        );
+
         // spin up StubbedNode
         let vfn = context.cluster.random_fullnode_instance();
         info!("Node {:?} is selected", vfn.peer_name());
@@ -120,9 +132,8 @@ impl Experiment for LoadTest {
             // emit txns to JSON RPC
             // spawn future
             emit_job = Some(
-                context
-                    .tx_emitter
-                    .start_job(EmitJobRequest::for_instances(
+                txn_emitter
+                    .start_job(crate::util::emit_job_request_for_instances(
                         context.cluster.fullnode_instances().to_vec(),
                         context.global_emit_job_request,
                         0,
@@ -157,16 +168,11 @@ impl Experiment for LoadTest {
         // await on all spawned tasks
         tokio::time::sleep(Duration::from_secs(self.duration)).await;
         if let Some(j) = emit_job {
-            let stats = context.tx_emitter.stop_job(j).await;
-            let full_node = context.cluster.random_fullnode_instance();
-            let full_node_client = full_node.json_rpc_client();
-            let mut sender = context
-                .tx_emitter
-                .load_diem_root_account(&full_node_client)
-                .await?;
+            let stats = txn_emitter.stop_job(j).await;
+            let mut sender = &mut context.root_account;
             let receiver = diem_root_address();
             let tx_factory = TransactionFactory::new(ChainId::test());
-            let dummy_tx = gen_transfer_txn_request(&mut sender, &receiver, 0, tx_factory);
+            let dummy_tx = gen_transfer_txn_request(&mut sender, &receiver, 0, &tx_factory, 0);
             let total_byte = dummy_tx.raw_txn_bytes_len() as u64 * stats.submitted;
             info!("Total tx emitter stats: {}, bytes: {}", stats, total_byte);
             info!(

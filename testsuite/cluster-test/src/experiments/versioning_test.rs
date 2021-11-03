@@ -10,7 +10,6 @@ use crate::{
     },
     instance,
     instance::Instance,
-    tx_emitter::{execute_and_wait_transactions, EmitJobRequest},
 };
 use anyhow::format_err;
 use async_trait::async_trait;
@@ -18,7 +17,9 @@ use diem_logger::prelude::*;
 use diem_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use diem_transaction_builder::stdlib::encode_update_diem_version_script;
 use diem_types::{chain_id::ChainId, transaction::TransactionPayload};
+use forge::{execute_and_wait_transactions, TxnEmitter};
 use language_e2e_tests::common_transactions::multi_agent_p2p_script_function;
+use rand::{prelude::StdRng, rngs::OsRng, Rng, SeedableRng};
 use std::{collections::HashSet, fmt, time::Duration};
 use structopt::StructOpt;
 
@@ -84,11 +85,21 @@ impl Experiment for ValidatorVersioning {
     }
 
     async fn run(&mut self, context: &mut Context<'_>) -> anyhow::Result<()> {
+        let mut txn_emitter = TxnEmitter::new(
+            &mut context.treasury_compliance_account,
+            &mut context.designated_dealer_account,
+            context
+                .cluster
+                .random_validator_instance()
+                .json_rpc_client(),
+            TransactionFactory::new(context.cluster.chain_id),
+            StdRng::from_seed(OsRng.gen()),
+        );
+
         // Mint a number of accounts
-        context
-            .tx_emitter
+        txn_emitter
             .mint_accounts(
-                &EmitJobRequest::for_instances(
+                &crate::util::emit_job_request_for_instances(
                     context.cluster.validator_instances().to_vec(),
                     context.global_emit_job_request,
                     0,
@@ -97,8 +108,8 @@ impl Experiment for ValidatorVersioning {
                 150,
             )
             .await?;
-        let mut account = context.tx_emitter.take_account();
-        let secondary_signer_account = context.tx_emitter.take_account();
+        let mut account = txn_emitter.take_account();
+        let secondary_signer_account = txn_emitter.take_account();
 
         // Define the transaction generator
         //
@@ -118,11 +129,11 @@ impl Experiment for ValidatorVersioning {
 
         // grab a validator node
         let old_validator_node = context.cluster.random_validator_instance();
-        let mut old_client = old_validator_node.json_rpc_client();
+        let old_client = old_validator_node.json_rpc_client();
 
         info!("1. Send a transaction using the new feature to a validator node");
         let txn1 = txn_gen(&mut account, &secondary_signer_account);
-        if execute_and_wait_transactions(&mut old_client, &mut account, vec![txn1])
+        if execute_and_wait_transactions(&old_client, &mut account, vec![txn1])
             .await
             .is_ok()
         {
@@ -135,7 +146,7 @@ impl Experiment for ValidatorVersioning {
 
         info!("2. Update the first batch of validator nodes");
         update_batch_instance(
-            context,
+            context.cluster_swarm,
             &self.first_batch,
             &self.first_batch_lsr,
             self.updated_image_tag.clone(),
@@ -147,11 +158,11 @@ impl Experiment for ValidatorVersioning {
             .first_batch
             .get(0)
             .expect("getting an updated validator instance requires a non-empty list");
-        let mut new_client = new_validator_node.json_rpc_client();
+        let new_client = new_validator_node.json_rpc_client();
 
         info!("3. Send the transaction using the new feature to an updated validator node");
         let txn3 = txn_gen(&mut account, &secondary_signer_account);
-        if execute_and_wait_transactions(&mut new_client, &mut account, vec![txn3])
+        if execute_and_wait_transactions(&new_client, &mut account, vec![txn3])
             .await
             .is_ok()
         {
@@ -163,7 +174,7 @@ impl Experiment for ValidatorVersioning {
 
         info!("4. Update the rest of the validator nodes");
         update_batch_instance(
-            context,
+            context.cluster_swarm,
             &self.second_batch,
             &self.second_batch_lsr,
             self.updated_image_tag.clone(),
@@ -172,7 +183,7 @@ impl Experiment for ValidatorVersioning {
 
         info!("5. Send the transaction using the new feature to an updated validator node again");
         let txn4 = txn_gen(&mut account, &secondary_signer_account);
-        if execute_and_wait_transactions(&mut new_client, &mut account, vec![txn4])
+        if execute_and_wait_transactions(&new_client, &mut account, vec![txn4])
             .await
             .is_ok()
         {
@@ -183,20 +194,17 @@ impl Experiment for ValidatorVersioning {
         info!("-- The transaction is still rejected as expected, because the new feature is gated");
 
         info!("6. Activate the new feature multi agent");
-        let mut diem_root_account = context
-            .tx_emitter
-            .load_diem_root_account(&new_client)
-            .await?;
+        let mut diem_root_account = &mut context.root_account;
         let allowed_nonce = 0;
         let update_txn = diem_root_account.sign_with_transaction_builder(tx_factory.payload(
             TransactionPayload::Script(encode_update_diem_version_script(allowed_nonce, 3)),
         ));
-        execute_and_wait_transactions(&mut new_client, &mut diem_root_account, vec![update_txn])
+        execute_and_wait_transactions(&new_client, &mut diem_root_account, vec![update_txn])
             .await?;
 
         info!("7. Send the transaction using the new feature after Diem version update");
         let txn5 = txn_gen(&mut account, &secondary_signer_account);
-        execute_and_wait_transactions(&mut new_client, &mut account, vec![txn5]).await?;
+        execute_and_wait_transactions(&new_client, &mut account, vec![txn5]).await?;
         info!("-- [Expected] The transaction goes through");
 
         Ok(())

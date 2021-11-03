@@ -5,14 +5,20 @@
 
 use crate::{
     cluster::Cluster,
+    cluster_swarm::ClusterSwarm,
     experiments::{Context, Experiment, ExperimentParam},
     instance,
     instance::Instance,
-    tx_emitter::EmitJobRequest,
 };
 use async_trait::async_trait;
 use diem_logger::prelude::*;
+use diem_sdk::transaction_builder::TransactionFactory;
+use forge::TxnEmitter;
 use futures::future::try_join_all;
+use rand::{
+    rngs::{OsRng, StdRng},
+    Rng, SeedableRng,
+};
 use std::{
     collections::HashSet,
     env, fmt,
@@ -24,7 +30,7 @@ use tokio::time;
 
 /// Reboot `updated_instance` with newer image tag
 pub async fn update_batch_instance(
-    context: &mut Context<'_>,
+    cluster_swarm: &dyn ClusterSwarm,
     updated_instance: &[Instance],
     updated_lsr: &[Instance],
     updated_tag: String,
@@ -43,7 +49,7 @@ pub async fn update_batch_instance(
             .map(|instance| {
                 let mut newer_config = instance.instance_config().clone();
                 newer_config.replace_tag(updated_tag.clone()).unwrap();
-                context.cluster_swarm.spawn_new_instance(newer_config)
+                cluster_swarm.spawn_new_instance(newer_config)
             })
             .collect();
         try_join_all(futures).await?;
@@ -57,7 +63,7 @@ pub async fn update_batch_instance(
         .map(|instance| {
             let mut newer_config = instance.instance_config().clone();
             newer_config.replace_tag(updated_tag.clone()).unwrap();
-            context.cluster_swarm.spawn_new_instance(newer_config)
+            cluster_swarm.spawn_new_instance(newer_config)
         })
         .collect();
     let instances = try_join_all(futures).await?;
@@ -182,6 +188,17 @@ impl Experiment for CompatibilityTest {
     }
 
     async fn run(&mut self, context: &mut Context<'_>) -> anyhow::Result<()> {
+        let mut txn_emitter = TxnEmitter::new(
+            &mut context.treasury_compliance_account,
+            &mut context.designated_dealer_account,
+            context
+                .cluster
+                .random_validator_instance()
+                .json_rpc_client(),
+            TransactionFactory::new(context.cluster.chain_id),
+            StdRng::from_seed(OsRng.gen()),
+        );
+
         let job_duration = Duration::from_secs(3);
         context.report.report_text(format!(
             "Compatibility test results for {} ==> {} (PR)",
@@ -195,14 +212,13 @@ impl Experiment for CompatibilityTest {
         );
         info!("{}", msg);
         context.report.report_text(msg);
-        let all_full_nodes_request = EmitJobRequest::for_instances(
+        let all_full_nodes_request = crate::util::emit_job_request_for_instances(
             context.cluster.fullnode_instances().to_vec(),
             context.global_emit_job_request,
             0,
             0,
         );
-        context
-            .tx_emitter
+        txn_emitter
             .emit_txn_for(job_duration, all_full_nodes_request)
             .await
             .map_err(|e| anyhow::format_err!("Failed to generate traffic: {}", e))?;
@@ -218,7 +234,7 @@ impl Experiment for CompatibilityTest {
             get_instance_list_str(&self.first_full_node)
         );
         update_batch_instance(
-            context,
+            context.cluster_swarm,
             &self.first_full_node,
             &[],
             self.updated_image_tag.clone(),
@@ -226,11 +242,10 @@ impl Experiment for CompatibilityTest {
         .await?;
 
         // Full node running at n+1, validator running n
-        context
-            .tx_emitter
+        txn_emitter
             .emit_txn_for(
                 job_duration,
-                EmitJobRequest::for_instances(
+                crate::util::emit_job_request_for_instances(
                     self.first_full_node.clone(),
                     context.global_emit_job_request,
                     0,
@@ -249,17 +264,16 @@ impl Experiment for CompatibilityTest {
         info!("Upgrading validator: {}", self.first_node);
         let first_node = vec![self.first_node.clone()];
         update_batch_instance(
-            context,
+            context.cluster_swarm,
             &first_node,
             &self.first_lsr,
             self.updated_image_tag.clone(),
         )
         .await?;
-        context
-            .tx_emitter
+        txn_emitter
             .emit_txn_for(
                 job_duration,
-                EmitJobRequest::for_instances(
+                crate::util::emit_job_request_for_instances(
                     self.first_full_node.clone(),
                     context.global_emit_job_request,
                     0,
@@ -282,7 +296,7 @@ impl Experiment for CompatibilityTest {
         );
         context.report.report_text(msg);
         update_batch_instance(
-            context,
+            context.cluster_swarm,
             &self.first_batch,
             &self.first_batch_lsr,
             self.updated_image_tag.clone(),
@@ -290,11 +304,10 @@ impl Experiment for CompatibilityTest {
         .await?;
 
         // Full node running at n, validator running n+1
-        context
-            .tx_emitter
+        txn_emitter
             .emit_txn_for(
                 job_duration,
-                EmitJobRequest::for_instances(
+                crate::util::emit_job_request_for_instances(
                     self.first_full_nodes_batch.clone(),
                     context.global_emit_job_request,
                     0,
@@ -317,7 +330,7 @@ impl Experiment for CompatibilityTest {
             get_instance_list_str(&self.first_full_nodes_batch)
         );
         update_batch_instance(
-            context,
+            context.cluster_swarm,
             &self.first_full_nodes_batch,
             &[],
             self.updated_image_tag.clone(),
@@ -337,17 +350,16 @@ impl Experiment for CompatibilityTest {
             get_instance_list_str(&self.second_batch)
         );
         update_batch_instance(
-            context,
+            context.cluster_swarm,
             &self.second_batch,
             &self.second_batch_lsr,
             self.updated_image_tag.clone(),
         )
         .await?;
-        context
-            .tx_emitter
+        txn_emitter
             .emit_txn_for(
                 job_duration,
-                EmitJobRequest::for_instances(
+                crate::util::emit_job_request_for_instances(
                     self.second_batch.clone(),
                     context.global_emit_job_request,
                     0,
@@ -372,17 +384,16 @@ impl Experiment for CompatibilityTest {
         );
         context.report.report_text(msg);
         update_batch_instance(
-            context,
+            context.cluster_swarm,
             &self.second_full_nodes_batch,
             &[],
             self.updated_image_tag.clone(),
         )
         .await?;
-        context
-            .tx_emitter
+        txn_emitter
             .emit_txn_for(
                 job_duration,
-                EmitJobRequest::for_instances(
+                crate::util::emit_job_request_for_instances(
                     self.second_full_nodes_batch.clone(),
                     context.global_emit_job_request,
                     0,

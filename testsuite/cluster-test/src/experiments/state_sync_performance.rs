@@ -5,6 +5,9 @@
 
 use std::{collections::HashSet, fmt, time::Duration};
 
+use diem_sdk::transaction_builder::TransactionFactory;
+use forge::TxnEmitter;
+use rand::{prelude::StdRng, rngs::OsRng, Rng, SeedableRng};
 use structopt::StructOpt;
 use tokio::time;
 
@@ -12,7 +15,6 @@ use crate::{
     cluster::Cluster,
     experiments::{Context, Experiment, ExperimentParam},
     instance::Instance,
-    tx_emitter::EmitJobRequest,
 };
 use async_trait::async_trait;
 use diem_logger::info;
@@ -63,6 +65,17 @@ impl Experiment for StateSyncPerformance {
     }
 
     async fn run(&mut self, context: &mut Context<'_>) -> anyhow::Result<()> {
+        let mut txn_emitter = TxnEmitter::new(
+            &mut context.treasury_compliance_account,
+            &mut context.designated_dealer_account,
+            context
+                .cluster
+                .random_validator_instance()
+                .json_rpc_client(),
+            TransactionFactory::new(context.cluster.chain_id),
+            StdRng::from_seed(OsRng.gen()),
+        );
+
         // Stop the fullnode and clear all data so that it falls behind
         info!("Stopping the fullnode: {}", self.fullnode_instance);
         self.fullnode_instance.stop().await?;
@@ -74,14 +87,13 @@ impl Experiment for StateSyncPerformance {
             "Executing transactions for {} seconds",
             emit_transactions_duration_secs
         );
-        let emit_job_request = EmitJobRequest::for_instances(
+        let emit_job_request = crate::util::emit_job_request_for_instances(
             context.cluster.validator_instances().to_vec(),
             context.global_emit_job_request,
             0,
             0,
         );
-        let _ = context
-            .tx_emitter
+        let _ = txn_emitter
             .emit_txn_for(
                 Duration::from_secs(emit_transactions_duration_secs),
                 emit_job_request,

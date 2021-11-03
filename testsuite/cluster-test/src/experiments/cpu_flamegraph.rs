@@ -1,27 +1,25 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::{
+    cluster::Cluster,
+    experiments::{Context, Experiment, ExperimentParam},
+    instance,
+    instance::Instance,
+};
+use anyhow::{anyhow, format_err, Result};
+use async_trait::async_trait;
+use diem_sdk::transaction_builder::TransactionFactory;
+use forge::TxnEmitter;
+use futures::{future::FutureExt, join};
+use rand::{prelude::StdRng, rngs::OsRng, Rng, SeedableRng};
 use std::{
     collections::HashSet,
     env,
     fmt::{Display, Error, Formatter},
     time::Duration,
 };
-
-use anyhow::{anyhow, format_err, Result};
-
-use futures::{future::FutureExt, join};
 use structopt::StructOpt;
-
-use async_trait::async_trait;
-
-use crate::{
-    cluster::Cluster,
-    experiments::{Context, Experiment, ExperimentParam},
-    instance,
-    instance::Instance,
-    tx_emitter::EmitJobRequest,
-};
 
 #[derive(StructOpt, Debug)]
 pub struct CpuFlamegraphParams {
@@ -56,16 +54,25 @@ impl Experiment for CpuFlamegraph {
     }
 
     async fn run(&mut self, context: &mut Context<'_>) -> Result<()> {
+        let mut txn_emitter = TxnEmitter::new(
+            &mut context.treasury_compliance_account,
+            &mut context.designated_dealer_account,
+            context
+                .cluster
+                .random_validator_instance()
+                .json_rpc_client(),
+            TransactionFactory::new(context.cluster.chain_id),
+            StdRng::from_seed(OsRng.gen()),
+        );
         let buffer = Duration::from_secs(60);
         let tx_emitter_duration = 2 * buffer + Duration::from_secs(self.duration_secs as u64);
-        let emit_job_request = EmitJobRequest::for_instances(
+        let emit_job_request = crate::util::emit_job_request_for_instances(
             context.cluster.validator_instances().to_vec(),
             context.global_emit_job_request,
             0,
             0,
         );
-        let emit_future = context
-            .tx_emitter
+        let emit_future = txn_emitter
             .emit_txn_for(tx_emitter_duration, emit_job_request)
             .boxed();
         let run_id = env::var("RUN_ID")

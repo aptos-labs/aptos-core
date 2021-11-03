@@ -8,13 +8,14 @@ use crate::{
     experiments::{Context, Experiment, ExperimentParam},
     instance,
     instance::Instance,
-    tx_emitter::EmitJobRequest,
 };
 use async_trait::async_trait;
 use diem_infallible::duration_since_epoch;
 use diem_logger::info;
+use diem_sdk::transaction_builder::TransactionFactory;
+use forge::TxnEmitter;
 use futures::future::try_join_all;
-use rand::Rng;
+use rand::{prelude::StdRng, rngs::OsRng, Rng, SeedableRng};
 use std::{
     collections::HashSet,
     fmt,
@@ -64,6 +65,16 @@ impl Experiment for TwinValidators {
     }
 
     async fn run(&mut self, context: &mut Context<'_>) -> anyhow::Result<()> {
+        let mut txn_emitter = TxnEmitter::new(
+            &mut context.treasury_compliance_account,
+            &mut context.designated_dealer_account,
+            context
+                .cluster
+                .random_validator_instance()
+                .json_rpc_client(),
+            TransactionFactory::new(context.cluster.chain_id),
+            StdRng::from_seed(OsRng.gen()),
+        );
         let buffer = Duration::from_secs(60);
         let window = Duration::from_secs(240);
         let mut new_instances = vec![];
@@ -102,13 +113,14 @@ impl Experiment for TwinValidators {
             new_instances.push(new_inst.clone());
         }
         let instances = self.instances.clone();
-        let emit_job_request =
-            EmitJobRequest::for_instances(instances, context.global_emit_job_request, 0, 0);
+        let emit_job_request = crate::util::emit_job_request_for_instances(
+            instances,
+            context.global_emit_job_request,
+            0,
+            0,
+        );
         info!("Starting txn generation");
-        let stats = context
-            .tx_emitter
-            .emit_txn_for(window, emit_job_request)
-            .await?;
+        let stats = txn_emitter.emit_txn_for(window, emit_job_request).await?;
         let end = duration_since_epoch() - buffer;
         let start = end - window + 2 * buffer;
         info!(

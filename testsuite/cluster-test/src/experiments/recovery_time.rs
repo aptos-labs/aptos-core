@@ -5,6 +5,9 @@
 
 use std::{collections::HashSet, fmt, time::Duration};
 
+use diem_sdk::transaction_builder::TransactionFactory;
+use forge::TxnEmitter;
+use rand::{prelude::StdRng, rngs::OsRng, Rng, SeedableRng};
 use structopt::StructOpt;
 use tokio::time;
 
@@ -12,7 +15,6 @@ use crate::{
     cluster::Cluster,
     experiments::{Context, Experiment, ExperimentParam},
     instance::Instance,
-    tx_emitter::EmitJobRequest,
 };
 use async_trait::async_trait;
 use diem_logger::info;
@@ -53,10 +55,20 @@ impl Experiment for RecoveryTime {
     }
 
     async fn run(&mut self, context: &mut Context<'_>) -> anyhow::Result<()> {
-        context
-            .tx_emitter
+        let mut txn_emitter = TxnEmitter::new(
+            &mut context.treasury_compliance_account,
+            &mut context.designated_dealer_account,
+            context
+                .cluster
+                .random_validator_instance()
+                .json_rpc_client(),
+            TransactionFactory::new(context.cluster.chain_id),
+            StdRng::from_seed(OsRng.gen()),
+        );
+
+        txn_emitter
             .mint_accounts(
-                &EmitJobRequest::for_instances(
+                &crate::util::emit_job_request_for_instances(
                     context.cluster.validator_instances().to_vec(),
                     context.global_emit_job_request,
                     0,

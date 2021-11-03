@@ -18,13 +18,26 @@ mod state_sync_performance;
 mod twin_validator;
 mod versioning_test;
 
+use crate::{
+    cluster::Cluster,
+    cluster_builder::{ClusterBuilder, ClusterBuilderParams},
+    cluster_swarm::{cluster_swarm_kube::ClusterSwarmKube, ClusterSwarm},
+    experiments::accurate_measurment::AccurateMeasurementParams,
+    prometheus::Prometheus,
+    report::SuiteReport,
+};
+use async_trait::async_trait;
+use diem_sdk::types::LocalAccount;
+use forge::EmitJobRequest;
 use std::{
     collections::{HashMap, HashSet},
     fmt::Display,
     time::Duration,
 };
+use structopt::{clap::AppSettings, StructOpt};
 
 pub use compatibility_test::{CompatibilityTest, CompatiblityTestParams};
+pub use cpu_flamegraph::{CpuFlamegraph, CpuFlamegraphParams};
 pub use load_test::LoadTestParams;
 pub use packet_loss_random_validators::{
     PacketLossRandomValidators, PacketLossRandomValidatorsParams,
@@ -41,22 +54,6 @@ pub use state_sync_performance::{StateSyncPerformance, StateSyncPerformanceParam
 pub use twin_validator::{TwinValidators, TwinValidatorsParams};
 pub use versioning_test::{ValidatorVersioning, ValidatorVersioningParams};
 
-use crate::{
-    cluster::Cluster,
-    cluster_builder::{ClusterBuilder, ClusterBuilderParams},
-    prometheus::Prometheus,
-    report::SuiteReport,
-    tx_emitter::{EmitJobRequest, TxEmitter},
-};
-
-use crate::{
-    cluster_swarm::{cluster_swarm_kube::ClusterSwarmKube, ClusterSwarm},
-    experiments::accurate_measurment::AccurateMeasurementParams,
-};
-use async_trait::async_trait;
-pub use cpu_flamegraph::{CpuFlamegraph, CpuFlamegraphParams};
-use structopt::{clap::AppSettings, StructOpt};
-
 #[async_trait]
 pub trait Experiment: Display + Send {
     fn affected_validators(&self) -> HashSet<String> {
@@ -72,7 +69,9 @@ pub trait ExperimentParam {
 }
 
 pub struct Context<'a> {
-    pub tx_emitter: &'a mut TxEmitter,
+    pub root_account: &'a mut LocalAccount,
+    pub treasury_compliance_account: &'a mut LocalAccount,
+    pub designated_dealer_account: &'a mut LocalAccount,
     pub prometheus: &'a Prometheus,
     pub cluster_builder: &'a mut ClusterBuilder,
     pub cluster_builder_params: &'a ClusterBuilderParams,
@@ -87,7 +86,9 @@ pub struct Context<'a> {
 
 impl<'a> Context<'a> {
     pub fn new(
-        tx_emitter: &'a mut TxEmitter,
+        root_account: &'a mut LocalAccount,
+        treasury_compliance_account: &'a mut LocalAccount,
+        designated_dealer_account: &'a mut LocalAccount,
         prometheus: &'a Prometheus,
         cluster_builder: &'a mut ClusterBuilder,
         cluster_builder_params: &'a ClusterBuilderParams,
@@ -99,7 +100,9 @@ impl<'a> Context<'a> {
         current_tag: &'a str,
     ) -> Self {
         Context {
-            tx_emitter,
+            root_account,
+            treasury_compliance_account,
+            designated_dealer_account,
             prometheus,
             cluster_builder,
             cluster_builder_params,

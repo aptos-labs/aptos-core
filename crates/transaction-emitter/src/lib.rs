@@ -26,6 +26,7 @@ use rand_core::SeedableRng;
 use std::{
     cmp::{max, min},
     collections::HashSet,
+    fmt,
     num::NonZeroU64,
     sync::{
         atomic::{AtomicBool, AtomicU64, Ordering},
@@ -43,6 +44,7 @@ const MAX_TXN_BATCH_SIZE: usize = 100;
 const MAX_TXNS: u64 = 1_000_000;
 const SEND_AMOUNT: u64 = 1;
 const TXN_EXPIRATION_SECONDS: u64 = 180;
+const TXN_MAX_WAIT: Duration = Duration::from_secs(TXN_EXPIRATION_SECONDS as u64 + 30);
 
 #[derive(Clone)]
 pub struct EmitThreadParams {
@@ -59,6 +61,7 @@ impl Default for EmitThreadParams {
     }
 }
 
+#[derive(Clone)]
 pub struct EmitJobRequest {
     json_rpc_clients: Vec<JsonRpcClient>,
     accounts_per_client: usize,
@@ -68,16 +71,22 @@ pub struct EmitJobRequest {
     invalid_transaction_ratio: usize,
 }
 
-impl EmitJobRequest {
-    pub fn new(json_rpc_clients: Vec<JsonRpcClient>) -> Self {
+impl Default for EmitJobRequest {
+    fn default() -> Self {
         Self {
-            json_rpc_clients,
+            json_rpc_clients: Vec::new(),
             accounts_per_client: 15,
             workers_per_endpoint: None,
             thread_params: EmitThreadParams::default(),
             gas_price: 0,
             invalid_transaction_ratio: 0,
         }
+    }
+}
+
+impl EmitJobRequest {
+    pub fn new(json_rpc_clients: Vec<JsonRpcClient>) -> Self {
+        Self::default().json_rpc_clients(json_rpc_clients)
     }
 
     pub fn json_rpc_clients(mut self, json_rpc_clients: Vec<JsonRpcClient>) -> Self {
@@ -315,6 +324,14 @@ impl<'t, 'd> TxnEmitter<'t, 'd> {
         }
     }
 
+    pub fn take_account(&mut self) -> LocalAccount {
+        self.accounts.remove(0)
+    }
+
+    pub fn clear(&mut self) {
+        self.accounts.clear();
+    }
+
     pub fn rng(&mut self) -> &mut ::rand::rngs::StdRng {
         &mut self.rng
     }
@@ -540,6 +557,23 @@ impl<'t, 'd> TxnEmitter<'t, 'd> {
         job.stats.accumulate()
     }
 
+    pub fn peek_job_stats(&self, job: &EmitJob) -> TxnStats {
+        job.stats.accumulate()
+    }
+
+    pub async fn periodic_stat(&mut self, job: &EmitJob, duration: Duration, interval_secs: u64) {
+        let deadline = Instant::now() + duration;
+        let mut prev_stats: Option<TxnStats> = None;
+        while Instant::now() < deadline {
+            let window = Duration::from_secs(interval_secs);
+            tokio::time::sleep(window).await;
+            let stats = self.peek_job_stats(job);
+            let delta = &stats - &prev_stats.unwrap_or_default();
+            prev_stats = Some(stats);
+            info!("{}", delta.rate(window));
+        }
+    }
+
     pub async fn emit_txn_for(
         &mut self,
         duration: Duration,
@@ -552,10 +586,42 @@ impl<'t, 'd> TxnEmitter<'t, 'd> {
         Ok(stats)
     }
 
+    pub async fn emit_txn_for_with_stats(
+        &mut self,
+        duration: Duration,
+        emit_job_request: EmitJobRequest,
+        interval_secs: u64,
+    ) -> Result<TxnStats> {
+        let job = self.start_job(emit_job_request).await?;
+        self.periodic_stat(&job, duration, interval_secs).await;
+        let stats = self.stop_job(job).await;
+        Ok(stats)
+    }
+
     fn pick_mint_client<'a>(&mut self, clients: &'a [JsonRpcClient]) -> &'a JsonRpcClient {
         clients
             .choose(self.rng())
             .expect("json-rpc clients can not be empty")
+    }
+
+    pub async fn submit_single_transaction(
+        &self,
+        client: &JsonRpcClient,
+        sender: &mut LocalAccount,
+        receiver: &AccountAddress,
+        num_coins: u64,
+    ) -> Result<Instant> {
+        client
+            .submit(&gen_transfer_txn_request(
+                sender,
+                receiver,
+                num_coins,
+                &self.txn_factory,
+                0,
+            ))
+            .await?;
+        let deadline = Instant::now() + TXN_MAX_WAIT;
+        Ok(deadline)
     }
 }
 
@@ -936,6 +1002,40 @@ impl TxnStats {
             },
             p99_latency: self.latency_buckets.percentile(99, 100),
         }
+    }
+}
+
+impl std::ops::Sub for &TxnStats {
+    type Output = TxnStats;
+
+    fn sub(self, other: &TxnStats) -> TxnStats {
+        TxnStats {
+            submitted: self.submitted - other.submitted,
+            committed: self.committed - other.committed,
+            expired: self.expired - other.expired,
+            latency: self.latency - other.latency,
+            latency_buckets: &self.latency_buckets - &other.latency_buckets,
+        }
+    }
+}
+
+impl fmt::Display for TxnStats {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "submitted: {}, committed: {}, expired: {}",
+            self.submitted, self.committed, self.expired,
+        )
+    }
+}
+
+impl fmt::Display for TxnStatsRate {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "submitted: {} txn/s, committed: {} txn/s, expired: {} txn/s, latency: {} ms, p99 latency: {} ms",
+            self.submitted, self.committed, self.expired, self.latency, self.p99_latency,
+        )
     }
 }
 

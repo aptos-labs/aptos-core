@@ -7,17 +7,24 @@ use crate::{
     instance,
     instance::Instance,
     stats::PrometheusRangeView,
-    tx_emitter::{EmitJobRequest, TxStats},
     util::human_readable_bytes_per_sec,
 };
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use diem_infallible::duration_since_epoch;
 use diem_logger::{info, warn};
+use diem_sdk::transaction_builder::TransactionFactory;
+use forge::{EmitJobRequest, TxnEmitter, TxnStats};
 use futures::{future::try_join_all, FutureExt};
-use rand::{rngs::ThreadRng, seq::SliceRandom};
+use rand::{
+    prelude::StdRng,
+    rngs::{OsRng, ThreadRng},
+    seq::SliceRandom,
+    Rng, SeedableRng,
+};
 use std::{
     collections::HashSet,
+    convert::TryInto,
     fmt::{Display, Error, Formatter},
     time::Duration,
 };
@@ -162,6 +169,16 @@ impl Experiment for PerformanceBenchmark {
     }
 
     async fn run(&mut self, context: &mut Context<'_>) -> Result<()> {
+        let mut txn_emitter = TxnEmitter::new(
+            &mut context.treasury_compliance_account,
+            &mut context.designated_dealer_account,
+            context
+                .cluster
+                .random_validator_instance()
+                .json_rpc_client(),
+            TransactionFactory::new(context.cluster.chain_id),
+            StdRng::from_seed(OsRng.gen()),
+        );
         let futures: Vec<_> = self.down_validators.iter().map(Instance::stop).collect();
         try_join_all(futures).await?;
 
@@ -174,23 +191,24 @@ impl Experiment for PerformanceBenchmark {
             self.up_fullnodes.clone()
         };
         let emit_job_request = match self.tps {
-            Some(tps) => EmitJobRequest::fixed_tps(instances, tps, self.gas_price, self.invalid_tx),
-            None => EmitJobRequest::for_instances(
+            Some(tps) => {
+                EmitJobRequest::new(instances.into_iter().map(|i| i.json_rpc_client()).collect())
+                    .fixed_tps(tps.try_into().unwrap())
+                    .gas_price(self.gas_price)
+                    .invalid_transaction_ratio(self.invalid_tx as usize)
+            }
+            None => crate::util::emit_job_request_for_instances(
                 instances,
                 context.global_emit_job_request,
                 self.gas_price,
-                self.invalid_tx,
+                self.invalid_tx as usize,
             ),
         };
         let emit_txn = match self.periodic_stats {
-            Some(interval) => context
-                .tx_emitter
+            Some(interval) => txn_emitter
                 .emit_txn_for_with_stats(window, emit_job_request, interval)
                 .boxed(),
-            None => context
-                .tx_emitter
-                .emit_txn_for(window, emit_job_request)
-                .boxed(),
+            None => txn_emitter.emit_txn_for(window, emit_job_request).boxed(),
         };
 
         let stats = emit_txn.await;
@@ -246,7 +264,7 @@ impl PerformanceBenchmark {
         context: &mut Context<'_>,
         buffer: Duration,
         window: Duration,
-        stats: TxStats,
+        stats: TxnStats,
     ) -> Result<()> {
         let end = duration_since_epoch() - buffer;
         let start = end - window + 2 * buffer;

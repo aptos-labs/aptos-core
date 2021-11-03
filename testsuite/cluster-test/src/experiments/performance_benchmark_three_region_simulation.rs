@@ -5,10 +5,12 @@ use crate::{
     cluster::Cluster,
     effects::{self, network_delay},
     experiments::{Context, Experiment, ExperimentParam},
-    tx_emitter::EmitJobRequest,
 };
 use anyhow::Result;
 use async_trait::async_trait;
+use diem_sdk::transaction_builder::TransactionFactory;
+use forge::TxnEmitter;
+use rand::{prelude::StdRng, rngs::OsRng, Rng, SeedableRng};
 use std::{
     fmt::{Display, Error, Formatter},
     time::Duration,
@@ -34,6 +36,17 @@ impl ExperimentParam for PerformanceBenchmarkThreeRegionSimulationParams {
 #[async_trait]
 impl Experiment for PerformanceBenchmarkThreeRegionSimulation {
     async fn run(&mut self, context: &mut Context<'_>) -> anyhow::Result<()> {
+        let mut txn_emitter = TxnEmitter::new(
+            &mut context.treasury_compliance_account,
+            &mut context.designated_dealer_account,
+            context
+                .cluster
+                .random_validator_instance()
+                .json_rpc_client(),
+            TransactionFactory::new(context.cluster.chain_id),
+            StdRng::from_seed(OsRng.gen()),
+        );
+
         let num_nodes = self.cluster.validator_instances().len();
         let split_country_num = ((num_nodes as f64) * 0.8) as usize;
         let split_region_num = split_country_num / 2;
@@ -56,24 +69,21 @@ impl Experiment for PerformanceBenchmarkThreeRegionSimulation {
 
         let window = Duration::from_secs(240);
         let emit_job_request = if context.emit_to_validator {
-            EmitJobRequest::for_instances(
+            crate::util::emit_job_request_for_instances(
                 context.cluster.validator_instances().to_vec(),
                 context.global_emit_job_request,
                 0,
                 0,
             )
         } else {
-            EmitJobRequest::for_instances(
+            crate::util::emit_job_request_for_instances(
                 context.cluster.fullnode_instances().to_vec(),
                 context.global_emit_job_request,
                 0,
                 0,
             )
         };
-        let stats = context
-            .tx_emitter
-            .emit_txn_for(window, emit_job_request)
-            .await?;
+        let stats = txn_emitter.emit_txn_for(window, emit_job_request).await?;
         effects::deactivate_all(&mut effects).await?;
         context
             .report

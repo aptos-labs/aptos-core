@@ -5,13 +5,15 @@ use crate::{
     cluster::Cluster,
     experiments::{Context, Experiment, ExperimentParam},
     instance::Instance,
-    tx_emitter::EmitJobRequest,
 };
 use anyhow::Result;
 use async_trait::async_trait;
 use core::fmt;
+use diem_sdk::transaction_builder::TransactionFactory;
+use forge::{EmitJobRequest, TxnEmitter};
 use futures::FutureExt;
-use std::{collections::HashSet, time::Duration};
+use rand::{prelude::StdRng, rngs::OsRng, Rng, SeedableRng};
+use std::{collections::HashSet, convert::TryInto, time::Duration};
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
@@ -64,6 +66,16 @@ impl Experiment for AccurateMeasurement {
     }
 
     async fn run(&mut self, context: &mut Context<'_>) -> Result<()> {
+        let mut txn_emitter = TxnEmitter::new(
+            &mut context.treasury_compliance_account,
+            &mut context.designated_dealer_account,
+            context
+                .cluster
+                .random_validator_instance()
+                .json_rpc_client(),
+            TransactionFactory::new(context.cluster.chain_id),
+            StdRng::from_seed(OsRng.gen()),
+        );
         let instances = if context.emit_to_validator {
             self.validators.clone()
         } else {
@@ -72,11 +84,10 @@ impl Experiment for AccurateMeasurement {
         for i in 0..self.step_num {
             let tps = self.base_tps + self.step_length * i;
             let window = self.duration / self.step_num as u32;
-            let emit_job_request = EmitJobRequest::fixed_tps(instances.clone(), tps, 0, 0);
-            let emit_txn = context
-                .tx_emitter
-                .emit_txn_for(window, emit_job_request)
-                .boxed();
+            let emit_job_request =
+                EmitJobRequest::new(instances.iter().map(Instance::json_rpc_client).collect())
+                    .fixed_tps(tps.try_into().unwrap());
+            let emit_txn = txn_emitter.emit_txn_for(window, emit_job_request).boxed();
             let stats = emit_txn.await?;
             // Report
             let test_step = format!("Step {}", i);

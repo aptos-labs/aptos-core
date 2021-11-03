@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::tx_emitter::TxStats;
+use forge::TxnStats;
 use serde::Serialize;
 use std::{fmt, time::Duration};
 
@@ -50,7 +50,7 @@ impl SuiteReport {
     pub fn report_txn_stats(
         &mut self,
         experiment: String,
-        stats: TxStats,
+        stats: TxnStats,
         window: Duration,
         additional: &str,
     ) {
