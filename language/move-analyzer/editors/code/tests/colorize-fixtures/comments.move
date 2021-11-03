@@ -68,6 +68,24 @@ address 0x1 {}
 /**/ address 0x2 {}
 /***/ address 0x3 {}
 
+// Test that the "Trojan source" vulnerability is mitigated by the TextMate language grammar.
+// See the byte representation in https://trojansource.codes/trojan-source.pdf, figure 3, where
+// U+202E is RLO, U+2066 is LRI, U+2069 is PDI:
+//
+// ```
+// /*<U+202E> } <U+2066>if (isAdmin)<U+2069> <U+2066> begin admins only */
+//     printf("You are an admin.\n");
+// /* end admin only <U+202E> { <U+2066>*/
+// ```
+//
+// `if (isAdmin) {` and `}` should be tokenized as comments.
+fun trojan_source() {
+  let isAdmin = false;
+  /*‮ } ⁦if (isAdmin)⁩ ⁦ begin admins only */
+      performPrivilegedOperation();
+  /* end admin only ‮ { ⁦*/
+}
+
 // FIXME: In VS Code, the comment extends until the carriage return `\r`, then
 // ends. Instead, line comments in Move extend until a line feed `\n`, and so
 // everything up to and including "return" should be part of the line comment.
