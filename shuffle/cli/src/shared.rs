@@ -69,13 +69,13 @@ pub fn send_transaction(
     use diem_json_rpc_types::views::VMStatusView;
 
     client.submit(&tx)?;
-    assert_eq!(
-        client
-            .wait_for_signed_transaction(&tx, Some(std::time::Duration::from_secs(60)), None)?
-            .into_inner()
-            .vm_status,
-        VMStatusView::Executed,
-    );
+    let status = client
+        .wait_for_signed_transaction(&tx, Some(std::time::Duration::from_secs(60)), None)?
+        .into_inner()
+        .vm_status;
+    if status != VMStatusView::Executed {
+        return Err(anyhow::anyhow!("transaction execution failed: {}", status));
+    }
     Ok(())
 }
 
