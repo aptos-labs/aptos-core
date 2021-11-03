@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::shared::{build_move_packages, get_shuffle_dir, send};
+use crate::{shared, shared::Home};
 use anyhow::{anyhow, Result};
 use diem_crypto::PrivateKey;
 use diem_sdk::{
@@ -23,17 +23,14 @@ use std::{convert::TryFrom, path::Path};
 
 /// Deploys shuffle's main Move Package to the sender's address.
 pub fn handle(project_path: &Path) -> Result<()> {
-    let account_key_path = get_shuffle_dir()
-        .join("accounts")
-        .join("latest")
-        .join("dev.key");
-    if !account_key_path.exists() {
+    let home = Home::new(shared::get_home_path().as_path())?;
+    if !home.get_latest_key_path().exists() {
         return Err(anyhow!(
             "An account hasn't been created yet! Run shuffle account first."
         ));
     }
-    let compiled_package = build_move_packages(project_path)?;
-    publish_packages_as_transaction(&account_key_path, compiled_package)
+    let compiled_package = shared::build_move_packages(project_path)?;
+    publish_packages_as_transaction(home.get_latest_key_path(), compiled_package)
 }
 
 fn publish_packages_as_transaction(
@@ -86,7 +83,7 @@ pub fn send_module_transaction(
                 factory.payload(TransactionPayload::Module(Module::new(binary))),
             );
 
-            send(client, publish_txn)?;
+            shared::send_transaction(client, publish_txn)?;
         } else {
             println!("Skipping Module: {}", module_id);
         }

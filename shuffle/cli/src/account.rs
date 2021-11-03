@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::shared::{get_home_path, send, Home};
+use crate::shared::{get_home_path, send_transaction, Home};
 use anyhow::{anyhow, Context, Result};
 use diem_config::config::NodeConfig;
 use diem_crypto::PrivateKey;
@@ -156,7 +156,7 @@ pub fn create_account_onchain(
                 false,
             ),
         ));
-        send(client, create_new_account_txn)?;
+        send_transaction(client, create_new_account_txn)?;
         println!("Successfully created account {}", new_account.address());
     }
     println!(

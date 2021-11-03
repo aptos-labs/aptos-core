@@ -62,7 +62,10 @@ pub fn read_config(project_path: &Path) -> Result<Config> {
 }
 
 /// Send a transaction to the blockchain through the blocking client.
-pub fn send(client: &BlockingClient, tx: diem_types::transaction::SignedTransaction) -> Result<()> {
+pub fn send_transaction(
+    client: &BlockingClient,
+    tx: diem_types::transaction::SignedTransaction,
+) -> Result<()> {
     use diem_json_rpc_types::views::VMStatusView;
 
     client.submit(&tx)?;
