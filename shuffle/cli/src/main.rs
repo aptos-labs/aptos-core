@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{anyhow, Result};
-use std::{fs, path::PathBuf};
+use diem_types::account_address::AccountAddress;
+use std::{fs, path::PathBuf, str::FromStr};
 use structopt::StructOpt;
-use url::Url;
+use url::{ParseError, Url};
 
 mod account;
 mod build;
@@ -39,12 +40,18 @@ pub async fn main() -> Result<()> {
             &normalized_project_path(project_path)?,
             network,
             &normalized_key_path(key_path)?,
-            &normalized_address(address)?,
+            normalized_address(address)?,
         ),
-        Subcommand::Transactions { network, tail, raw } => {
+        Subcommand::Transactions {
+            network,
+            tail,
+            address,
+            raw,
+        } => {
             transactions::handle(
-                normalized_network(network.as_str())?,
+                normalized_network(network)?,
                 unwrap_nested_boolean_option(tail),
+                normalized_address(address)?,
                 unwrap_nested_boolean_option(raw),
             )
             .await
@@ -103,11 +110,11 @@ pub enum Subcommand {
         project_path: Option<PathBuf>,
     },
     #[structopt(
-        about = "Captures last 10 transactions and continuously polls for new transactions"
+        about = "Captures last 10 transactions and continuously polls for new transactions from the account"
     )]
     Transactions {
         #[structopt(short, long)]
-        network: String,
+        network: Option<String>,
 
         #[structopt(
             short,
@@ -115,6 +122,13 @@ pub enum Subcommand {
             help = "Writes out transactions without pretty formatting"
         )]
         raw: Option<Option<bool>>,
+
+        #[structopt(
+            short,
+            long,
+            help = "Captures and polls transactions deployed from a given address"
+        )]
+        address: Option<String>,
 
         #[structopt(short, help = "Blocks and streams future transactions as they happen")]
         tail: Option<Option<bool>>,
@@ -128,26 +142,26 @@ fn normalized_project_path(project_path: Option<PathBuf>) -> Result<PathBuf> {
     }
 }
 
-fn normalized_address(account_address: Option<String>) -> Result<String> {
-    let home = shared::Home::new(shared::get_home_path().as_path())?;
-    match account_address {
-        Some(address) => {
-            if &address[0..2] != "0x" {
-                Ok("0x".to_owned() + &address)
+fn normalized_address(account_address: Option<String>) -> Result<AccountAddress> {
+    let normalized_string = match account_address {
+        Some(input_address) => {
+            if &input_address[0..2] != "0x" {
+                "0x".to_owned() + &input_address
             } else {
-                Ok(address)
+                input_address
             }
         }
-        None => {
-            if !home.get_account_path().is_dir() {
-                return Err(anyhow!(
-                    "An account hasn't been created yet! Run shuffle account first"
-                ));
-            }
-            let address = fs::read_to_string(home.get_latest_address_path())?;
-            Ok("0x".to_owned() + &address)
-        }
-    }
+        None => get_latest_address()?,
+    };
+    Ok(AccountAddress::from_hex_literal(
+        normalized_string.as_str(),
+    )?)
+}
+
+fn get_latest_address() -> Result<String> {
+    let home = shared::Home::new(shared::get_home_path().as_path())?;
+    home.check_account_path_exists()?;
+    Ok("0x".to_owned() + &fs::read_to_string(home.get_latest_address_path())?)
 }
 
 fn normalized_key_path(diem_root_key_path: Option<PathBuf>) -> Result<PathBuf> {
@@ -165,10 +179,10 @@ fn normalized_key_path(diem_root_key_path: Option<PathBuf>) -> Result<PathBuf> {
     }
 }
 
-fn normalized_network(network: &str) -> Result<Url> {
-    match Url::parse(network) {
-        Ok(_res) => Ok(Url::parse(network)?),
-        Err(_e) => Ok(Url::parse(("http://".to_owned() + network).as_str())?),
+fn normalized_network(network: Option<String>) -> Result<Url, ParseError> {
+    match network {
+        Some(network) => Url::parse(network.as_str()),
+        None => Url::from_str("http://127.0.0.1:8081"),
     }
 }
 

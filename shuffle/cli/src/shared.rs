@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 use crate::new::DEFAULT_NETWORK;
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use diem_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 use diem_sdk::client::BlockingClient;
 use diem_types::transaction::authenticator::AuthenticationKey;
@@ -259,6 +259,15 @@ impl Home {
     pub fn read_genesis_waypoint(&self) -> Result<String> {
         fs::read_to_string(self.get_node_config_path().join("waypoint.txt"))
             .map_err(anyhow::Error::new)
+    }
+
+    pub fn check_account_path_exists(&self) -> Result<()> {
+        match self.account_path.is_dir() {
+            true => Ok(()),
+            false => Err(anyhow!(
+                "An account hasn't been created yet! Run shuffle account first"
+            )),
+        }
     }
 }
 
@@ -551,5 +560,17 @@ mod test {
         let new_root_key = generate_key::load_key(home.latest_key_path);
 
         assert_eq!(new_root_key, user_root_key);
+    }
+
+    #[test]
+    fn test_check_account_dir_exists() {
+        let bad_dir = tempdir().unwrap();
+        let home = Home::new(bad_dir.path()).unwrap();
+        assert_eq!(home.check_account_path_exists().is_err(), true);
+
+        let good_dir = tempdir().unwrap();
+        fs::create_dir_all(good_dir.path().join(".shuffle/accounts")).unwrap();
+        let home = Home::new(good_dir.path()).unwrap();
+        assert_eq!(home.check_account_path_exists().is_err(), false);
     }
 }

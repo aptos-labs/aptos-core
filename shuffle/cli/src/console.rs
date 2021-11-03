@@ -3,6 +3,7 @@
 
 use crate::shared;
 use anyhow::Result;
+use diem_types::account_address::AccountAddress;
 use std::{collections::HashMap, path::Path, process::Command};
 
 /// Launches a Deno REPL for the shuffle project, generating transaction
@@ -11,7 +12,7 @@ pub fn handle(
     project_path: &Path,
     network: Option<String>,
     key_path: &Path,
-    sender_address: &str,
+    sender_address: AccountAddress,
 ) -> Result<()> {
     let config = shared::read_config(project_path)?;
     shared::generate_typescript_libraries(project_path)?;
@@ -49,7 +50,10 @@ pub fn handle(
         String::from("SHUFFLE_HOME"),
         shared::get_shuffle_dir().to_string_lossy().to_string(),
     );
-    filtered_envs.insert(String::from("SENDER_ADDRESS"), String::from(sender_address));
+    filtered_envs.insert(
+        String::from("SENDER_ADDRESS"),
+        sender_address.to_hex_literal(),
+    );
     filtered_envs.insert(
         String::from("PRIVATE_KEY_PATH"),
         key_path.to_string_lossy().to_string(),
