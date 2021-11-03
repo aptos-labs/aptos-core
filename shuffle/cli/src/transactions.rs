@@ -11,7 +11,7 @@ use url::Url;
 const DIEM_ACCOUNT_TYPE: &str = "0x1::DiemAccount::DiemAccount";
 
 // Will list the last 10 transactions and has the ability to block and stream future transactions.
-pub async fn handle(network: Url, tail: bool) -> Result<()> {
+pub async fn handle(network: Url, tail: bool, raw: bool) -> Result<()> {
     let home = Home::new(get_home_path().as_path())?;
     let address_str = fs::read_to_string(home.get_latest_address_path())?;
     let address = AccountAddress::from_str(address_str.as_str())?;
@@ -28,7 +28,7 @@ pub async fn handle(network: Url, tail: bool) -> Result<()> {
         .as_array()
         .ok_or_else(|| anyhow::anyhow!("Failed to get transactions"))?;
 
-    write_out_txns(all_transactions.to_vec(), &mut io::stdout())?;
+    write_out_txns(all_transactions.to_vec(), &mut io::stdout(), raw)?;
 
     if !all_transactions.is_empty() {
         prev_seq_num = parse_txn_for_seq_num(
@@ -71,7 +71,7 @@ pub async fn handle(network: Url, tail: bool) -> Result<()> {
                     .ok_or_else(|| anyhow!("Couldn't get last transaction"))?,
             )?;
             if last_txn_seq_num > prev_seq_num {
-                write_out_txns(txn_array, &mut io::stdout())?;
+                write_out_txns(txn_array, &mut io::stdout(), raw)?;
             }
             prev_seq_num = last_txn_seq_num;
         }
@@ -79,9 +79,9 @@ pub async fn handle(network: Url, tail: bool) -> Result<()> {
     Ok(())
 }
 
-fn write_out_txns<W: Write>(all_transactions: Vec<Value>, mut stdout: W) -> Result<()> {
+fn write_out_txns<W: Write>(all_transactions: Vec<Value>, mut stdout: W, raw: bool) -> Result<()> {
     for txn in all_transactions.iter() {
-        write_into(&mut stdout, txn)?;
+        write_into(&mut stdout, txn, raw)?;
     }
 
     Ok(())
@@ -135,12 +135,14 @@ fn parse_json_for_account_seq_num(json_objects: Vec<Value>) -> Result<u64> {
     Ok(seq_number)
 }
 
-fn write_into<W>(writer: &mut W, json: &serde_json::Value) -> io::Result<()>
+fn write_into<W>(writer: &mut W, json: &serde_json::Value, raw: bool) -> io::Result<()>
 where
     W: Write,
 {
-    writeln!(writer, "{}", json)?;
-    writeln!(writer)
+    match raw {
+        true => writeln!(writer, "{}", json),
+        false => writeln!(writer, "{:#}", json),
+    }
 }
 
 #[cfg(test)]
@@ -214,9 +216,16 @@ mod test {
     fn test_write_into() {
         let mut stdout = Vec::new();
         let txn = get_sample_txn();
-        write_into(&mut stdout, &txn[0]).unwrap();
+        write_into(&mut stdout, &txn[0], false).unwrap();
         assert_eq!(
-            txn[0].to_string() + "\n\n",
+            format!("{:#}\n", txn[0]),
+            String::from_utf8(stdout).unwrap().as_str()
+        );
+
+        stdout = Vec::new();
+        write_into(&mut stdout, &txn[0], true).unwrap();
+        assert_eq!(
+            format!("{}\n", txn[0]),
             String::from_utf8(stdout).unwrap().as_str()
         );
     }
@@ -226,10 +235,17 @@ mod test {
         let all_txns = get_sample_txn();
         let txn_array = all_txns.as_array().unwrap();
         let mut stdout = Vec::new();
-        write_out_txns(txn_array.to_vec(), &mut stdout).unwrap();
+        write_out_txns(txn_array.to_vec(), &mut stdout, false).unwrap();
         assert_eq!(
             String::from_utf8(stdout).unwrap().as_str(),
-            txn_array[0].to_string() + "\n\n" + &*txn_array[1].to_string() + "\n\n"
+            format!("{:#}\n{:#}\n", txn_array[0], txn_array[1])
+        );
+
+        stdout = Vec::new();
+        write_out_txns(txn_array.to_vec(), &mut stdout, true).unwrap();
+        assert_eq!(
+            String::from_utf8(stdout).unwrap().as_str(),
+            format!("{}\n{}\n", txn_array[0], txn_array[1])
         )
     }
 

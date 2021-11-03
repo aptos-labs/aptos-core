@@ -41,8 +41,13 @@ pub async fn main() -> Result<()> {
             &normalized_key_path(key_path)?,
             &normalized_address(address)?,
         ),
-        Subcommand::Transactions { network, tail } => {
-            transactions::handle(normalized_network(network.as_str())?, should_tail(tail)).await
+        Subcommand::Transactions { network, tail, raw } => {
+            transactions::handle(
+                normalized_network(network.as_str())?,
+                unwrap_nested_boolean_option(tail),
+                unwrap_nested_boolean_option(raw),
+            )
+            .await
         }
     }
 }
@@ -101,6 +106,13 @@ pub enum Subcommand {
         #[structopt(short, long)]
         network: String,
 
+        #[structopt(
+            short,
+            long,
+            help = "Writes out transactions without pretty formatting"
+        )]
+        raw: Option<Option<bool>>,
+
         #[structopt(short, help = "Blocks and streams future transactions as they happen")]
         tail: Option<Option<bool>>,
     },
@@ -157,8 +169,8 @@ fn normalized_network(network: &str) -> Result<Url> {
     }
 }
 
-fn should_tail(tail_flag: Option<Option<bool>>) -> bool {
-    match tail_flag {
+fn unwrap_nested_boolean_option(option: Option<Option<bool>>) -> bool {
+    match option {
         Some(Some(val)) => val,
         Some(_val) => true,
         None => false,
