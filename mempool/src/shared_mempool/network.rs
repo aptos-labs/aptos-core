@@ -93,7 +93,7 @@ pub struct MempoolNetworkSender {
 
 pub fn network_endpoint_config(max_broadcasts_per_peer: usize) -> AppConfig {
     AppConfig::p2p(
-        [ProtocolId::MempoolDirectSend, ProtocolId::MempoolRpc],
+        [ProtocolId::MempoolDirectSend],
         diem_channel::Config::new(max_broadcasts_per_peer)
             .queue_style(QueueStyle::KLAST)
             .counters(&counters::PENDING_MEMPOOL_NETWORK_EVENTS),
