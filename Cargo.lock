@@ -2276,6 +2276,7 @@ dependencies = [
  "short-hex-str",
  "storage-interface",
  "storage-service",
+ "thiserror",
  "tokio",
  "tokio-stream",
  "vm-validator",

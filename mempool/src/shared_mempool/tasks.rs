@@ -6,7 +6,7 @@ use crate::{
     core_mempool::{CoreMempool, TimelineState, TxnPointer},
     counters,
     logging::{LogEntry, LogEvent, LogSchema},
-    network::MempoolSyncMsg,
+    network::{BroadcastError, MempoolSyncMsg},
     shared_mempool::types::{
         notify_subscribers, ScheduledBroadcast, SharedMempool, SharedMempoolNotification,
         SubmissionStatusBundle, TransactionSummary,
@@ -43,7 +43,7 @@ use vm_validator::vm_validator::{get_account_sequence_number, TransactionValidat
 // ============================== //
 
 /// Attempts broadcast to `peer` and schedules the next broadcast.
-pub(crate) fn execute_broadcast<V>(
+pub(crate) async fn execute_broadcast<V>(
     peer: PeerNetworkId,
     backoff: bool,
     smp: &mut SharedMempool<V>,
@@ -55,7 +55,22 @@ pub(crate) fn execute_broadcast<V>(
     let network_interface = &smp.network_interface.clone();
     // If there's no connection, don't bother to broadcast
     if network_interface.app_data().read(&peer).is_some() {
-        network_interface.execute_broadcast(peer, backoff, smp);
+        if let Err(err) = network_interface
+            .execute_broadcast(peer, backoff, smp)
+            .await
+        {
+            match err {
+                BroadcastError::NetworkError(peer, error) => error!(LogSchema::event_log(
+                    LogEntry::BroadcastTransaction,
+                    LogEvent::NetworkSendFail
+                )
+                .peer(&peer)
+                .error(&error)),
+                _ => {
+                    trace!("{:?}", err)
+                }
+            }
+        }
     } else {
         // Drop the scheduled broadcast, we're not connected anymore
         return;

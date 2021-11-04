@@ -82,7 +82,7 @@ pub(crate) async fn coordinator<V>(
                 handle_mempool_reconfig_event(&mut smp, &bounded_executor, reconfig_notification.on_chain_configs).await;
             },
             (peer, backoff) = scheduled_broadcasts.select_next_some() => {
-                tasks::execute_broadcast(peer, backoff, &mut smp, &mut scheduled_broadcasts, executor.clone());
+                tasks::execute_broadcast(peer, backoff, &mut smp, &mut scheduled_broadcasts, executor.clone()).await;
             },
             (network_id, event) = events.select_next_some() => {
                 handle_network_event(&executor, &bounded_executor, &mut scheduled_broadcasts, &mut smp, network_id, event).await;
@@ -245,7 +245,8 @@ async fn handle_network_event<V>(
                 .is_upstream_peer(is_upstream_peer));
             notify_subscribers(SharedMempoolNotification::PeerStateChange, &smp.subscribers);
             if is_new_peer && is_upstream_peer {
-                tasks::execute_broadcast(peer, false, smp, scheduled_broadcasts, executor.clone());
+                tasks::execute_broadcast(peer, false, smp, scheduled_broadcasts, executor.clone())
+                    .await;
             }
         }
         Event::LostPeer(metadata) => {
