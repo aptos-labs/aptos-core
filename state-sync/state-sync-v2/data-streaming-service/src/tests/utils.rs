@@ -5,7 +5,8 @@ use crate::{data_notification::DataNotification, data_stream::DataStreamListener
 use async_trait::async_trait;
 use diem_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use diem_data_client::{
-    AdvertisedData, DiemDataClient, GlobalDataSummary, OptimalChunkSizes, Response, ResponseError,
+    AdvertisedData, DiemDataClient, GlobalDataSummary, OptimalChunkSizes, Response,
+    ResponseCallback, ResponseContext, ResponseError,
 };
 use diem_logger::Level;
 use diem_types::{
@@ -200,16 +201,26 @@ impl DiemDataClient for MockDiemDataClient {
         // Return the transaction list with proofs
         Ok(create_data_client_response(transaction_list_with_proof))
     }
+}
 
-    fn notify_bad_response(&self, _response_id: u64, _response_error: ResponseError) {
-        // TODO(joshlind): update me to handle some score emulation!
+#[derive(Debug)]
+pub struct NoopResponseCallback;
+
+impl ResponseCallback for NoopResponseCallback {
+    fn notify_bad_response(&self, _error: ResponseError) {
+        // TODO(philiphayes): do something here
     }
 }
 
 /// Creates a data client response using a specified payload and random id
-pub fn create_data_client_response<T>(response_payload: T) -> Response<T> {
-    let response_id = create_random_u64(MAX_RESPONSE_ID);
-    Response::new(response_id, response_payload)
+pub fn create_data_client_response<T>(payload: T) -> Response<T> {
+    let id = create_random_u64(MAX_RESPONSE_ID);
+    let response_callback = Box::new(NoopResponseCallback);
+    let context = ResponseContext {
+        id,
+        response_callback,
+    };
+    Response::new(context, payload)
 }
 
 /// Creates a ledger info with the given version and epoch. If `epoch_ending`

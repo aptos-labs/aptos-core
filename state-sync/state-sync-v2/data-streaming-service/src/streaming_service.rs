@@ -215,7 +215,7 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStreamingService<T> {
     ) -> Result<(), Error> {
         let global_data_summary = self.global_data_summary.clone();
 
-        let data_stream = self.get_data_stream(data_stream_id);
+        let data_stream = self.get_data_stream_mut(data_stream_id);
         if !data_stream.data_requests_initialized() {
             // Initialize the request batch by sending out data client requests
             data_stream.initialize_data_requests(global_data_summary)?;
@@ -242,7 +242,18 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStreamingService<T> {
 
     /// Returns the data stream associated with the given `data_stream_id`.
     /// Note: this method assumes the caller has already verified the stream exists.
-    fn get_data_stream(&mut self, data_stream_id: &DataStreamId) -> &mut DataStream<T> {
+    fn get_data_stream(&self, data_stream_id: &DataStreamId) -> &DataStream<T> {
+        self.data_streams.get(data_stream_id).unwrap_or_else(|| {
+            panic!(
+                "Expected a data stream with ID: {:?}, but found None!",
+                data_stream_id
+            )
+        })
+    }
+
+    /// Returns the data stream associated with the given `data_stream_id`.
+    /// Note: this method assumes the caller has already verified the stream exists.
+    fn get_data_stream_mut(&mut self, data_stream_id: &DataStreamId) -> &mut DataStream<T> {
         self.data_streams
             .get_mut(data_stream_id)
             .unwrap_or_else(|| {

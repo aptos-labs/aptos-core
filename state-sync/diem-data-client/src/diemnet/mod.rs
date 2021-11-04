@@ -3,7 +3,7 @@
 
 use crate::{
     AdvertisedData, DiemDataClient, Error, GlobalDataSummary, OptimalChunkSizes, Response,
-    ResponseError, Result,
+    ResponseCallback, ResponseContext, ResponseError, ResponseId, Result,
 };
 use async_trait::async_trait;
 use diem_config::network_id::PeerNetworkId;
@@ -26,7 +26,7 @@ use network::{
     protocols::{rpc::error::RpcError, wire::handshake::v1::ProtocolId},
 };
 use rand::seq::SliceRandom;
-use std::{collections::HashMap, convert::TryFrom, sync::Arc, time::Duration};
+use std::{collections::HashMap, convert::TryFrom, fmt, sync::Arc, time::Duration};
 use storage_service_client::StorageServiceClient;
 use storage_service_types::{
     AccountStatesChunkWithProofRequest, Epoch, EpochEndingLedgerInfoRequest, StorageServerSummary,
@@ -169,17 +169,19 @@ impl DiemNetDataClient {
     {
         let response = self.send_request_to_peer(peer, request).await?;
 
-        let id = response.id;
+        let (context, payload) = response.into_parts();
 
         // try to convert the storage service enum into the exact variant we're expecting.
-        let result = response.and_then(T::try_from).map_err(Into::into);
-
-        // if the variant doesn't match what we're expecting, report the issue.
-        if result.is_err() {
-            self.notify_bad_response(id, ResponseError::InvalidPayloadDataType);
+        match T::try_from(payload) {
+            Ok(new_payload) => Ok(Response::new(context, new_payload)),
+            // if the variant doesn't match what we're expecting, report the issue.
+            Err(err) => {
+                context
+                    .response_callback
+                    .notify_bad_response(ResponseError::InvalidPayloadDataType);
+                Err(err.into())
+            }
         }
-
-        result
     }
 
     async fn send_request_to_peer(
@@ -187,24 +189,59 @@ impl DiemNetDataClient {
         peer: PeerNetworkId,
         request: StorageServiceRequest,
     ) -> Result<Response<StorageServiceResponse>, Error> {
-        let response_id = self.next_response_id();
+        let id = self.next_response_id();
         let result = self
             .network_client
-            .send_request(peer, request, DEFAULT_TIMEOUT)
+            .send_request(peer, request.clone(), DEFAULT_TIMEOUT)
             .await;
-        let storage_response = match result {
-            Ok(response) => Ok(response),
-            Err(storage_service_client::Error::RpcError(err)) => match err {
-                RpcError::NotConnected(_) => Err(Error::DataIsUnavailable(err.to_string())),
-                RpcError::TimedOut => Err(Error::TimeoutWaitingForResponse(err.to_string())),
-                _ => Err(Error::UnexpectedErrorEncountered(err.to_string())),
+
+        // convert network error and storage service error types into data client
+        // errors.
+        let result = result.map_err(|err| match err {
+            storage_service_client::Error::RpcError(err) => match err {
+                RpcError::NotConnected(_) => Error::DataIsUnavailable(err.to_string()),
+                RpcError::TimedOut => Error::TimeoutWaitingForResponse(err.to_string()),
+                _ => Error::UnexpectedErrorEncountered(err.to_string()),
             },
-            Err(storage_service_client::Error::StorageServiceError(err)) => {
-                Err(Error::UnexpectedErrorEncountered(err.to_string()))
+            storage_service_client::Error::StorageServiceError(err) => {
+                Error::UnexpectedErrorEncountered(err.to_string())
             }
-        }?;
-        // TODO(philiphayes): update peer scores on error
-        Ok(Response::new(response_id, storage_response))
+        });
+
+        match result {
+            Ok(response) => {
+                let data_client = self.clone();
+                // package up all of the context needed to fully report an error
+                // with this RPC.
+                let response_callback = DiemNetResponseCallback {
+                    data_client,
+                    id,
+                    peer,
+                    request,
+                };
+                let context = ResponseContext {
+                    id,
+                    response_callback: Box::new(response_callback),
+                };
+                Ok(Response::new(context, response))
+            }
+            Err(err) => {
+                // TODO(philiphayes): convert `err` into `ResponseError`
+                let error_type = ResponseError::InvalidData;
+                self.notify_bad_response(id, peer, &request, error_type);
+                Err(err)
+            }
+        }
+    }
+
+    fn notify_bad_response(
+        &self,
+        _id: ResponseId,
+        _peer: PeerNetworkId,
+        _request: &StorageServiceRequest,
+        _error: ResponseError,
+    ) {
+        // TODO(philiphayes): update peer score
     }
 }
 
@@ -225,10 +262,6 @@ fn range_len(start: u64, end: u64) -> Result<u64, Error> {
 impl DiemDataClient for DiemNetDataClient {
     fn get_global_data_summary(&self) -> GlobalDataSummary {
         self.global_summary_cache.read().clone()
-    }
-
-    fn notify_bad_response(&self, _response_id: u64, _response_error: ResponseError) {
-        todo!()
     }
 
     async fn get_account_states_with_proof(
@@ -297,6 +330,32 @@ impl DiemDataClient for DiemNetDataClient {
                 include_events,
             });
         self.send_request_and_decode(request).await
+    }
+}
+
+/// The DiemNet-specific request context needed to update a peer's scoring.
+struct DiemNetResponseCallback {
+    data_client: DiemNetDataClient,
+    id: ResponseId,
+    peer: PeerNetworkId,
+    request: StorageServiceRequest,
+}
+
+impl ResponseCallback for DiemNetResponseCallback {
+    fn notify_bad_response(&self, error: ResponseError) {
+        self.data_client
+            .notify_bad_response(self.id, self.peer, &self.request, error);
+    }
+}
+
+impl fmt::Debug for DiemNetResponseCallback {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DiemNetResponseCallback")
+            .field("data_client", &"..")
+            .field("id", &self.id)
+            .field("peer", &self.peer)
+            .field("request", &self.request)
+            .finish()
     }
 }
 

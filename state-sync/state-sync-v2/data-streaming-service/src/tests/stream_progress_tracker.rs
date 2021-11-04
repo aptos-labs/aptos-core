@@ -6,10 +6,12 @@ use crate::{
     error::Error,
     stream_progress_tracker::{DataStreamTracker, EpochEndingStreamTracker, StreamProgressTracker},
     streaming_client::{GetAllEpochEndingLedgerInfosRequest, StreamRequest},
-    tests::utils::initialize_logger,
+    tests::utils::{initialize_logger, NoopResponseCallback},
 };
 use claim::{assert_matches, assert_ok};
-use diem_data_client::{GlobalDataSummary, OptimalChunkSizes, Response, ResponsePayload};
+use diem_data_client::{
+    GlobalDataSummary, OptimalChunkSizes, Response, ResponseContext, ResponsePayload,
+};
 use diem_id_generator::U64IdGenerator;
 use std::{cmp, sync::Arc};
 use storage_service_types::CompleteDataRange;
@@ -196,7 +198,7 @@ fn test_update_epoch_ending_stream_progress() {
                     start_epoch,
                     end_epoch,
                 }),
-                &create_empty_client_response(),
+                create_empty_client_response_payload(),
                 create_notification_id_generator(),
             )
             .unwrap();
@@ -219,7 +221,7 @@ fn test_update_epoch_ending_stream_panic() {
                 start_epoch: 0,
                 end_epoch: 100,
             }),
-            &create_empty_client_response(),
+            create_empty_client_response_payload(),
             create_notification_id_generator(),
         )
         .unwrap();
@@ -231,7 +233,7 @@ fn test_update_epoch_ending_stream_panic() {
                 start_epoch: 50,
                 end_epoch: 1100,
             }),
-            &create_empty_client_response(),
+            create_empty_client_response_payload(),
             create_notification_id_generator(),
         )
         .unwrap();
@@ -283,6 +285,14 @@ fn create_notification_id_generator() -> Arc<U64IdGenerator> {
     Arc::new(U64IdGenerator::new())
 }
 
+fn create_empty_client_response_payload() -> ResponsePayload {
+    ResponsePayload::EpochEndingLedgerInfos(vec![])
+}
+
 fn create_empty_client_response() -> DataClientResponse {
-    Response::new(0, ResponsePayload::EpochEndingLedgerInfos(vec![]))
+    let context = ResponseContext {
+        id: 0,
+        response_callback: Box::new(NoopResponseCallback),
+    };
+    Response::new(context, create_empty_client_response_payload())
 }

@@ -8,8 +8,8 @@ use crate::{
             AccountsWithProof, EpochEndingLedgerInfos, NumberOfAccounts,
             TransactionOutputsWithProof, TransactionsWithProof,
         },
-        DataClientResponse, DataNotification, DataPayload, EpochEndingLedgerInfosRequest,
-        NumberOfAccountsRequest, TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
+        DataNotification, DataPayload, EpochEndingLedgerInfosRequest, NumberOfAccountsRequest,
+        TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
     },
     error::Error,
     logging::{LogEntry, LogEvent, LogSchema},
@@ -77,7 +77,7 @@ pub trait DataStreamTracker {
     fn transform_client_response_into_notification(
         &mut self,
         client_request: &DataClientRequest,
-        client_response: &DataClientResponse,
+        client_response_payload: ResponsePayload,
         notification_id_generator: Arc<U64IdGenerator>,
     ) -> Result<Option<DataNotification>, Error>;
 }
@@ -249,7 +249,7 @@ impl DataStreamTracker for AccountsStreamTracker {
     fn transform_client_response_into_notification(
         &mut self,
         client_request: &DataClientRequest,
-        client_response: &DataClientResponse,
+        client_response_payload: ResponsePayload,
         notification_id_generator: Arc<U64IdGenerator>,
     ) -> Result<Option<DataNotification>, Error> {
         match client_request {
@@ -278,14 +278,14 @@ impl DataStreamTracker for AccountsStreamTracker {
                 // Create a new data notification
                 let data_notification = create_data_notification(
                     notification_id_generator,
-                    client_response,
+                    client_response_payload,
                     self.clone().into(),
                 );
                 return Ok(Some(data_notification));
             }
             NumberOfAccounts(request) => {
                 if let ResponsePayload::NumberOfAccountStates(number_of_accounts) =
-                    client_response.payload
+                    client_response_payload
                 {
                     info!(
                         (LogSchema::new(LogEntry::ReceivedDataResponse)
@@ -388,13 +388,13 @@ impl ContinuousTransactionStreamTracker {
     fn create_data_notification(
         &mut self,
         request_end_version: Version,
-        client_response: &DataClientResponse,
+        client_response_payload: ResponsePayload,
         notification_id_generator: Arc<U64IdGenerator>,
     ) -> Result<DataNotification, Error> {
         // Create a new data notification
         let data_notification = create_data_notification(
             notification_id_generator,
-            client_response,
+            client_response_payload,
             self.clone().into(),
         );
 
@@ -593,13 +593,13 @@ impl DataStreamTracker for ContinuousTransactionStreamTracker {
     fn transform_client_response_into_notification(
         &mut self,
         client_request: &DataClientRequest,
-        client_response: &DataClientResponse,
+        client_response_payload: ResponsePayload,
         notification_id_generator: Arc<U64IdGenerator>,
     ) -> Result<Option<DataNotification>, Error> {
         match client_request {
             EpochEndingLedgerInfos(_) => {
                 if let ResponsePayload::EpochEndingLedgerInfos(epoch_ending_ledger_infos) =
-                    &client_response.payload
+                    client_response_payload
                 {
                     match &epoch_ending_ledger_infos[..] {
                         [target_ledger_info] => {
@@ -631,7 +631,7 @@ impl DataStreamTracker for ContinuousTransactionStreamTracker {
                             .event(LogEvent::Error)
                             .message(&format!(
                                 "Received an invalid epoch ending ledger response: {:?}",
-                                client_response.payload
+                                client_response_payload
                             )))
                     );
                 }
@@ -646,7 +646,7 @@ impl DataStreamTracker for ContinuousTransactionStreamTracker {
                     )?;
                     let data_notification = self.create_data_notification(
                         request.end_version,
-                        client_response,
+                        client_response_payload,
                         notification_id_generator,
                     )?;
                     Ok(Some(data_notification))
@@ -661,7 +661,7 @@ impl DataStreamTracker for ContinuousTransactionStreamTracker {
                     )?;
                     let data_notification = self.create_data_notification(
                         request.end_version,
-                        client_response,
+                        client_response_payload,
                         notification_id_generator,
                     )?;
                     Ok(Some(data_notification))
@@ -798,7 +798,7 @@ impl DataStreamTracker for EpochEndingStreamTracker {
     fn transform_client_response_into_notification(
         &mut self,
         client_request: &DataClientRequest,
-        client_response: &DataClientResponse,
+        client_response_payload: ResponsePayload,
         notification_id_generator: Arc<U64IdGenerator>,
     ) -> Result<Option<DataNotification>, Error> {
         match client_request {
@@ -822,7 +822,7 @@ impl DataStreamTracker for EpochEndingStreamTracker {
                 // Create a new data notification
                 let data_notification = create_data_notification(
                     notification_id_generator,
-                    client_response,
+                    client_response_payload,
                     self.clone().into(),
                 );
                 Ok(Some(data_notification))
@@ -992,7 +992,7 @@ impl DataStreamTracker for TransactionStreamTracker {
     fn transform_client_response_into_notification(
         &mut self,
         client_request: &DataClientRequest,
-        client_response: &DataClientResponse,
+        client_response_payload: ResponsePayload,
         notification_id_generator: Arc<U64IdGenerator>,
     ) -> Result<Option<DataNotification>, Error> {
         match &self.request {
@@ -1024,7 +1024,7 @@ impl DataStreamTracker for TransactionStreamTracker {
         // Create a new data notification
         let data_notification = create_data_notification(
             notification_id_generator,
-            client_response,
+            client_response_payload,
             self.clone().into(),
         );
         Ok(Some(data_notification))
@@ -1218,46 +1218,47 @@ fn highest_synced_ledger_info(
 /// Creates a new data notification for the given client response.
 fn create_data_notification(
     notification_id_generator: Arc<U64IdGenerator>,
-    client_response: &DataClientResponse,
+    client_response_payload: ResponsePayload,
     stream_progress_tracker: StreamProgressTracker,
 ) -> DataNotification {
     let notification_id = notification_id_generator.next();
 
-    let data_payload = match &client_response.payload {
+    let client_response_type = client_response_payload.method_name();
+    let data_payload = match client_response_payload {
         ResponsePayload::AccountStatesWithProof(accounts_chunk) => {
-            DataPayload::AccountStatesWithProof(accounts_chunk.clone())
+            DataPayload::AccountStatesWithProof(accounts_chunk)
         }
         ResponsePayload::EpochEndingLedgerInfos(ledger_infos) => {
-            DataPayload::EpochEndingLedgerInfos(ledger_infos.clone())
+            DataPayload::EpochEndingLedgerInfos(ledger_infos)
         }
         ResponsePayload::TransactionsWithProof(transactions_chunk) => match stream_progress_tracker
         {
             StreamProgressTracker::ContinuousTransactionStreamTracker(stream_tracker) => {
                 DataPayload::ContinuousTransactionsWithProof(
                     stream_tracker.get_target_ledger_info().clone(),
-                    transactions_chunk.clone(),
+                    transactions_chunk,
                 )
             }
             StreamProgressTracker::TransactionStreamTracker(_) => {
-                DataPayload::TransactionsWithProof(transactions_chunk.clone())
+                DataPayload::TransactionsWithProof(transactions_chunk)
             }
-            _ => invalid_response_type!(client_response),
+            _ => invalid_response_type!(client_response_type),
         },
         ResponsePayload::TransactionOutputsWithProof(transactions_output_chunk) => {
             match stream_progress_tracker {
                 StreamProgressTracker::ContinuousTransactionStreamTracker(stream_tracker) => {
                     DataPayload::ContinuousTransactionOutputsWithProof(
                         stream_tracker.get_target_ledger_info().clone(),
-                        transactions_output_chunk.clone(),
+                        transactions_output_chunk,
                     )
                 }
                 StreamProgressTracker::TransactionStreamTracker(_) => {
-                    DataPayload::TransactionOutputsWithProof(transactions_output_chunk.clone())
+                    DataPayload::TransactionOutputsWithProof(transactions_output_chunk)
                 }
-                _ => invalid_response_type!(client_response),
+                _ => invalid_response_type!(client_response_type),
             }
         }
-        _ => invalid_response_type!(client_response),
+        _ => invalid_response_type!(client_response_type),
     };
 
     DataNotification {

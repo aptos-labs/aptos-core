@@ -16,14 +16,15 @@ use crate::{
     tests::utils::{
         create_data_client_response, create_ledger_info, create_random_u64,
         create_transaction_list_with_proof, get_data_notification, initialize_logger,
-        MockDiemDataClient, MAX_ADVERTISED_ACCOUNTS, MAX_ADVERTISED_EPOCH,
+        MockDiemDataClient, NoopResponseCallback, MAX_ADVERTISED_ACCOUNTS, MAX_ADVERTISED_EPOCH,
         MAX_ADVERTISED_TRANSACTION_OUTPUT, MAX_NOTIFICATION_TIMEOUT_SECS, MIN_ADVERTISED_ACCOUNTS,
         MIN_ADVERTISED_EPOCH, MIN_ADVERTISED_TRANSACTION_OUTPUT,
     },
 };
 use claim::{assert_err, assert_ge, assert_none, assert_ok};
 use diem_data_client::{
-    AdvertisedData, GlobalDataSummary, OptimalChunkSizes, Response, ResponsePayload,
+    AdvertisedData, GlobalDataSummary, OptimalChunkSizes, Response, ResponseContext,
+    ResponsePayload,
 };
 use diem_id_generator::U64IdGenerator;
 use diem_infallible::Mutex;
@@ -52,10 +53,14 @@ async fn test_stream_blocked() {
                 start_epoch: 0,
                 end_epoch: 0,
             });
+        let context = ResponseContext {
+            id: 0,
+            response_callback: Box::new(NoopResponseCallback),
+        };
         let pending_response = PendingClientResponse {
             client_request: client_request.clone(),
             client_response: Some(Ok(DataClientResponse {
-                id: 0,
+                context,
                 payload: ResponsePayload::NumberOfAccountStates(10),
             })),
         };
@@ -201,12 +206,14 @@ async fn test_stream_invalid_response() {
         start_epoch: MIN_ADVERTISED_EPOCH,
         end_epoch: MIN_ADVERTISED_EPOCH + 1,
     });
+    let context = ResponseContext {
+        id: 0,
+        response_callback: Box::new(NoopResponseCallback),
+    };
+    let client_response = Response::new(context, ResponsePayload::NumberOfAccountStates(10));
     let pending_response = PendingClientResponse {
         client_request: client_request.clone(),
-        client_response: Some(Ok(Response::new(
-            0,
-            ResponsePayload::NumberOfAccountStates(10),
-        ))),
+        client_response: Some(Ok(client_response)),
     };
     insert_response_into_pending_queue(&mut data_stream, pending_response);
 

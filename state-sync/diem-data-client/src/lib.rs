@@ -13,6 +13,7 @@ use diem_types::{
     },
 };
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use storage_service::UnexpectedResponseError;
 use storage_service_types::{self as storage_service, CompleteDataRange, Epoch};
 use thiserror::Error;
@@ -53,15 +54,6 @@ impl From<UnexpectedResponseError> for Error {
     }
 }
 
-/// A response error that users of the Diem Data Client can use to notify
-/// the Data Client about invalid or malformed responses.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub enum ResponseError {
-    InvalidData,
-    InvalidPayloadDataType,
-    ProofVerificationError,
-}
-
 /// The API offered by the Diem Data Client.
 #[async_trait]
 pub trait DiemDataClient {
@@ -70,20 +62,6 @@ pub trait DiemDataClient {
     /// This API is intended to be relatively cheap to call, usually returning a
     /// cached view of this data client's available data.
     fn get_global_data_summary(&self) -> GlobalDataSummary;
-
-    /// Notifies the Diem Data Client about a previously received response that
-    /// was bad (e.g., invalid or malformed).
-    ///
-    /// This API is intended to be relatively cheap to call.
-    ///
-    /// Note: this is required because the Diem Data Client can only fetch
-    /// data from peers in the network, but it is not able to fully verify that
-    /// the given data responses are valid (e.g., it is unable to verify proofs).
-    /// This API call provides a simple feedback mechanism for users of the Diem
-    /// Data Client to alert it to bad responses so that the peers responsible
-    /// for providing this data can be penalized. The `response_id` is the handle
-    /// used by clients to notify the Diem Data Client of invalid responses.
-    fn notify_bad_response(&self, response_id: u64, response_error: ResponseError);
 
     /// Returns a single account states chunk with proof, containing the accounts
     /// from start to end index (inclusive) at the specified version. The proof
@@ -132,49 +110,71 @@ pub trait DiemDataClient {
     ) -> Result<Response<TransactionListWithProof>>;
 }
 
-/// A response from the Data Client for a single API call.
+/// A response error that users of the Diem Data Client can use to notify
+/// the Data Client about invalid or malformed responses.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub enum ResponseError {
+    InvalidData,
+    InvalidPayloadDataType,
+    ProofVerificationError,
+}
+
+/// A callback that lets the consumer provide error feedback about a response.
+/// Typically, this will contain a reference to the underlying data client and
+/// any additional request context needed to update internal scoring.
 ///
-/// Note: the `response_id` is a simple handle returned by the Diem Data Client
-/// that allows API callers to notify the Diem Data Client that the given
-/// response payload is bad (e.g., it contains invalid or malformed data, or
-/// the proof failed verification). This can be done using the
-/// `notify_bad_response()` API call above.
-#[derive(Clone, Debug)]
-pub struct Response<T> {
+/// This feedback mechanism is required because a Data Client is not always able
+/// to fully verify that a given data response is valid (e.g., it is unable
+/// to verify all proofs).
+///
+/// This trait provides a simple feedback mechanism for users of the Data Client
+/// to alert it to bad responses so that the peers responsible for providing this
+/// data can be penalized.
+pub trait ResponseCallback: fmt::Debug + Send + 'static {
+    // TODO(philiphayes): ideally this would take a `self: Box<Self>`, i.e.,
+    // consume the callback, which better communicates that you should only report
+    // an error once. however, the current state-sync-v2 code makes this difficult...
+    fn notify_bad_response(&self, error: ResponseError);
+}
+
+#[derive(Debug)]
+pub struct ResponseContext {
+    /// A unique identifier for this request/response pair. Intended mostly for
+    /// debugging.
     pub id: ResponseId,
+    /// A callback for notifying the data-client source about an error with this
+    /// response.
+    pub response_callback: Box<dyn ResponseCallback>,
+}
+
+/// A response from the Data Client for a single API call.
+#[derive(Debug)]
+pub struct Response<T> {
+    /// Additional context.
+    pub context: ResponseContext,
+    /// The actual response payload.
     pub payload: T,
 }
 
 impl<T> Response<T> {
-    pub fn new(id: u64, payload: T) -> Self {
-        Self { id, payload }
+    pub fn new(context: ResponseContext, payload: T) -> Self {
+        Self { context, payload }
     }
 
     pub fn into_payload(self) -> T {
         self.payload
     }
 
-    pub fn into_parts(self) -> (ResponseId, T) {
-        (self.id, self.payload)
+    pub fn into_parts(self) -> (ResponseContext, T) {
+        (self.context, self.payload)
     }
 
     pub fn map<U, F>(self, f: F) -> Response<U>
     where
         F: FnOnce(T) -> U,
     {
-        let (id, payload) = self.into_parts();
-        Response::new(id, f(payload))
-    }
-
-    pub fn and_then<U, E, F>(self, f: F) -> Result<Response<U>, E>
-    where
-        F: FnOnce(T) -> Result<U, E>,
-    {
-        let (id, payload) = self.into_parts();
-        match f(payload) {
-            Ok(new_payload) => Ok(Response::new(id, new_payload)),
-            Err(err) => Err(err),
-        }
+        let (context, payload) = self.into_parts();
+        Response::new(context, f(payload))
     }
 }
 
@@ -186,6 +186,18 @@ pub enum ResponsePayload {
     NumberOfAccountStates(u64),
     TransactionOutputsWithProof(TransactionOutputListWithProof),
     TransactionsWithProof(TransactionListWithProof),
+}
+
+impl ResponsePayload {
+    pub fn method_name(&self) -> &'static str {
+        match self {
+            Self::AccountStatesWithProof(_) => "AccountStatesWithProof",
+            Self::EpochEndingLedgerInfos(_) => "EpochEndingLedgerInfos",
+            Self::NumberOfAccountStates(_) => "NumberOfAccountStates",
+            Self::TransactionOutputsWithProof(_) => "TransactionOutputsWithProof",
+            Self::TransactionsWithProof(_) => "TransactionsWithProof",
+        }
+    }
 }
 
 // Conversions from the inner enum variants to the outer enum
