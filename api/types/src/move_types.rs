@@ -3,6 +3,7 @@
 
 use crate::{Address, Bytecode};
 
+use anyhow::format_err;
 use diem_types::{event::EventKey, transaction::Module};
 use move_binary_format::{
     access::ModuleAccess,
@@ -540,7 +541,7 @@ impl From<CompiledModule> for MoveModule {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct MoveModuleId {
     pub address: Address,
     pub name: Identifier,
@@ -565,6 +566,41 @@ impl From<MoveModuleId> for ModuleId {
 impl fmt::Display for MoveModuleId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}::{}", self.address, self.name)
+    }
+}
+
+impl FromStr for MoveModuleId {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if let Some((address, name)) = s.split_once("::") {
+            return Ok(Self {
+                address: address.parse().map_err(|_| invalid_move_module_id(s))?,
+                name: name.parse().map_err(|_| invalid_move_module_id(s))?,
+            });
+        }
+        Err(invalid_move_module_id(s))
+    }
+}
+
+#[inline]
+fn invalid_move_module_id(s: &str) -> anyhow::Error {
+    format_err!("invalid Move module id: {}", s)
+}
+
+impl Serialize for MoveModuleId {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.to_string().serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for MoveModuleId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let module_id = <String>::deserialize(deserializer)?;
+        module_id.parse().map_err(D::Error::custom)
     }
 }
 
@@ -797,7 +833,7 @@ impl MoveScriptBytecode {
 
 #[cfg(test)]
 mod tests {
-    use crate::{HexEncodedBytes, MoveResource, MoveType, U128, U64};
+    use crate::{HexEncodedBytes, MoveModuleId, MoveResource, MoveType, U128, U64};
 
     use diem_types::account_address::AccountAddress;
     use move_binary_format::file_format::AbilitySet;
@@ -923,6 +959,57 @@ mod tests {
     #[test]
     fn test_serialize_deserialize_u128() {
         test_serialize_deserialize(U128::from(u128::MAX), json!(u128::MAX.to_string()))
+    }
+
+    #[test]
+    fn test_serialize_deserialize_move_module_id() {
+        test_serialize_deserialize(
+            MoveModuleId {
+                address: "0x1".parse().unwrap(),
+                name: "Diem".parse().unwrap(),
+            },
+            json!("0x1::Diem"),
+        );
+    }
+
+    #[test]
+    fn test_parse_invalid_move_module_id_string() {
+        assert_eq!(
+            "invalid Move module id: 0x1",
+            "0x1".parse::<MoveModuleId>().err().unwrap().to_string()
+        );
+        assert_eq!(
+            "invalid Move module id: 0x1:",
+            "0x1:".parse::<MoveModuleId>().err().unwrap().to_string()
+        );
+        assert_eq!(
+            "invalid Move module id: 0x1:::",
+            "0x1:::".parse::<MoveModuleId>().err().unwrap().to_string()
+        );
+        assert_eq!(
+            "invalid Move module id: 0x1::???",
+            "0x1::???"
+                .parse::<MoveModuleId>()
+                .err()
+                .unwrap()
+                .to_string()
+        );
+        assert_eq!(
+            "invalid Move module id: Diem::Diem",
+            "Diem::Diem"
+                .parse::<MoveModuleId>()
+                .err()
+                .unwrap()
+                .to_string()
+        );
+        assert_eq!(
+            "invalid Move module id: 0x1::Diem::Diem",
+            "0x1::Diem::Diem"
+                .parse::<MoveModuleId>()
+                .err()
+                .unwrap()
+                .to_string()
+        );
     }
 
     #[test]

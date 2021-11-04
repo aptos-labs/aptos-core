@@ -309,10 +309,7 @@ async fn test_get_transactions_output_user_transaction_with_script_function_payl
             ],
             "payload": {
                 "type": "script_function_payload",
-                "module": {
-                    "address": "0x1",
-                    "name": "AccountCreationScripts"
-                },
+                "module": "0x1::AccountCreationScripts",
                 "function": "create_parent_vasp_account",
                 "type_arguments": [
                     "0x1::XUS::XUS"
@@ -475,10 +472,7 @@ async fn test_get_transactions_output_user_transaction_with_write_set_payload() 
                     {
                         "type": "delete_module",
                         "address": "0x1",
-                        "module": {
-                            "address": "0x1",
-                            "name": "AccountAdministrationScripts"
-                        }
+                        "module": "0x1::AccountAdministrationScripts"
                     },
                     {
                         "type": "delete_resource",
@@ -527,10 +521,7 @@ async fn test_post_bcs_format_transaction() {
             "expiration_timestamp_secs": expiration_timestamp.to_string(),
             "payload": {
                 "type": "script_function_payload",
-                "module": {
-                    "address": "0x1",
-                    "name": "AccountCreationScripts"
-                },
+                "module": "0x1::AccountCreationScripts",
                 "function": "create_parent_vasp_account",
                 "type_arguments": [
                     "0x1::XUS::XUS"
@@ -872,7 +863,7 @@ async fn test_signing_message_with_script_function_payload() {
 
     let payload = json!({
         "type": "script_function_payload",
-        "module": { "address": "0x1", "name": "AccountCreationScripts"},
+        "module": "0x1::AccountCreationScripts",
         "function": "create_parent_vasp_account",
         "type_arguments": [
             "0x1::XUS::XUS"
@@ -983,10 +974,7 @@ async fn test_signing_message_with_write_set_payload() {
                 {
                     "type": "delete_module",
                     "address": "0x1",
-                    "module": {
-                        "address": "0x1",
-                        "name": "AccountAdministrationScripts"
-                    }
+                    "module": "0x1::AccountAdministrationScripts"
                 },
                 {
                     "type": "delete_resource",

@@ -189,30 +189,12 @@ async fn test_get_module_diem_config() {
             "address": "0x1",
             "name": "DiemConfig",
             "friends": [
-                {
-                    "address": "0x1",
-                    "name": "DiemConsensusConfig"
-                },
-                {
-                    "address": "0x1",
-                    "name": "DiemSystem"
-                },
-                {
-                    "address": "0x1",
-                    "name": "DiemTransactionPublishingOption"
-                },
-                {
-                    "address": "0x1",
-                    "name": "DiemVMConfig"
-                },
-                {
-                    "address": "0x1",
-                    "name": "DiemVersion"
-                },
-                {
-                    "address": "0x1",
-                    "name": "RegisteredCurrencies"
-                }
+                "0x1::DiemConsensusConfig",
+                "0x1::DiemSystem",
+                "0x1::DiemTransactionPublishingOption",
+                "0x1::DiemVMConfig",
+                "0x1::DiemVersion",
+                "0x1::RegisteredCurrencies"
             ],
             "exposed_functions": [
                 {
