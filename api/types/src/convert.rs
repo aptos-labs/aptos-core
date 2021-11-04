@@ -3,9 +3,10 @@
 
 use crate::{
     Bytecode, DirectWriteSet, Event, HexEncodedBytes, MoveFunction, MoveModuleBytecode,
-    MoveResource, MoveScriptBytecode, MoveType, MoveValue, ScriptFunctionPayload, ScriptPayload,
-    ScriptWriteSet, Transaction, TransactionData, TransactionInfo, TransactionOnChainData,
-    TransactionPayload, UserTransactionRequest, WriteSet, WriteSetChange, WriteSetPayload,
+    MoveResource, MoveScriptBytecode, MoveType, MoveValue, ScriptFunctionId, ScriptFunctionPayload,
+    ScriptPayload, ScriptWriteSet, Transaction, TransactionData, TransactionInfo,
+    TransactionOnChainData, TransactionPayload, UserTransactionRequest, WriteSet, WriteSetChange,
+    WriteSetPayload,
 };
 use diem_transaction_builder::error_explain;
 use diem_types::{
@@ -145,8 +146,10 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
 
                 TransactionPayload::ScriptFunctionPayload(ScriptFunctionPayload {
                     arguments: json_args,
-                    module: module.into(),
-                    function,
+                    function: ScriptFunctionId {
+                        module: module.into(),
+                        name: function,
+                    },
                     type_arguments: ty_args.into_iter().map(|arg| arg.into()).collect(),
                 })
             }
@@ -276,15 +279,15 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
         let ret = match payload {
             TransactionPayload::ScriptFunctionPayload(script_func_payload) => {
                 let ScriptFunctionPayload {
-                    module,
                     function,
                     type_arguments,
                     arguments,
                 } = script_func_payload;
 
+                let module = function.module.clone();
                 let code = self.inner.get_module(&module.clone().into())? as Rc<dyn Bytecode>;
                 let func = code
-                    .find_script_function(function.as_ident_str())
+                    .find_script_function(function.name.as_ident_str())
                     .ok_or_else(|| format_err!("could not find script function by {}", function))?;
                 let args = self
                     .try_into_move_values(func, arguments)?
@@ -294,7 +297,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
 
                 Target::ScriptFunction(ScriptFunction::new(
                     module.into(),
-                    function,
+                    function.name,
                     type_arguments
                         .into_iter()
                         .map(|v| v.try_into())

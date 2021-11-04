@@ -1080,7 +1080,6 @@ components:
       type: object
       required:
         - type
-        - module
         - function
         - type_arguments
         - arguments
@@ -1088,14 +1087,8 @@ components:
         type:
           type: string
           example: script_function_payload
-        module:
-          type: string
-          example: 0x1::PaymentScripts
-          description: Module identifier / name, case sensitive
         function:
-          type: string
-          example: peer_to_peer_with_metadata
-          description: Script function name, case sensitive.
+          $ref: '#/components/schemas/ScriptFunctionId'
         type_arguments:
           type: array
           description: Generic type arguments required by the script function.
@@ -1113,6 +1106,15 @@ components:
             - "2021000000"
             - "0x"
             - "0x"
+    ScriptFunctionId:
+      type: string
+      example: 0x1::PaymentScripts::peer_to_peer_with_metadata
+      description: |
+        Script function id is string representation of a script function defined on-chain.
+
+        Format: `{address}::{module name}::{function name}`
+
+        Both `module name` and `function name` are case sensitive.
     ScriptPayload:
       type: object
       required:

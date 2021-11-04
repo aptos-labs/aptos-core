@@ -831,9 +831,59 @@ impl MoveScriptBytecode {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct ScriptFunctionId {
+    pub module: MoveModuleId,
+    pub name: Identifier,
+}
+
+impl FromStr for ScriptFunctionId {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if let Some((module, name)) = s.rsplit_once("::") {
+            return Ok(Self {
+                module: module.parse().map_err(|_| invalid_script_function_id(s))?,
+                name: name.parse().map_err(|_| invalid_script_function_id(s))?,
+            });
+        }
+        Err(invalid_script_function_id(s))
+    }
+}
+
+#[inline]
+fn invalid_script_function_id(s: &str) -> anyhow::Error {
+    format_err!("invalid script function id: {}", s)
+}
+
+impl Serialize for ScriptFunctionId {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.to_string().serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for ScriptFunctionId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let script_fun_id = <String>::deserialize(deserializer)?;
+        script_fun_id.parse().map_err(D::Error::custom)
+    }
+}
+
+impl fmt::Display for ScriptFunctionId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}::{}", self.module, self.name)
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::{HexEncodedBytes, MoveModuleId, MoveResource, MoveType, U128, U64};
+    use crate::{
+        move_types::ScriptFunctionId, HexEncodedBytes, MoveModuleId, MoveResource, MoveType, U128,
+        U64,
+    };
 
     use diem_types::account_address::AccountAddress;
     use move_binary_format::file_format::AbilitySet;
@@ -1006,6 +1056,76 @@ mod tests {
             "invalid Move module id: 0x1::Diem::Diem",
             "0x1::Diem::Diem"
                 .parse::<MoveModuleId>()
+                .err()
+                .unwrap()
+                .to_string()
+        );
+    }
+
+    #[test]
+    fn test_serialize_deserialize_move_script_function_id() {
+        test_serialize_deserialize(
+            ScriptFunctionId {
+                module: MoveModuleId {
+                    address: "0x1".parse().unwrap(),
+                    name: "Diem".parse().unwrap(),
+                },
+                name: "Add".parse().unwrap(),
+            },
+            json!("0x1::Diem::Add"),
+        );
+    }
+
+    #[test]
+    fn test_parse_invalid_move_script_function_id_string() {
+        assert_eq!(
+            "invalid script function id: 0x1",
+            "0x1".parse::<ScriptFunctionId>().err().unwrap().to_string()
+        );
+        assert_eq!(
+            "invalid script function id: 0x1:",
+            "0x1:"
+                .parse::<ScriptFunctionId>()
+                .err()
+                .unwrap()
+                .to_string()
+        );
+        assert_eq!(
+            "invalid script function id: 0x1:::",
+            "0x1:::"
+                .parse::<ScriptFunctionId>()
+                .err()
+                .unwrap()
+                .to_string()
+        );
+        assert_eq!(
+            "invalid script function id: 0x1::???",
+            "0x1::???"
+                .parse::<ScriptFunctionId>()
+                .err()
+                .unwrap()
+                .to_string()
+        );
+        assert_eq!(
+            "invalid script function id: Diem::Diem",
+            "Diem::Diem"
+                .parse::<ScriptFunctionId>()
+                .err()
+                .unwrap()
+                .to_string()
+        );
+        assert_eq!(
+            "invalid script function id: Diem::Diem::??",
+            "Diem::Diem::??"
+                .parse::<ScriptFunctionId>()
+                .err()
+                .unwrap()
+                .to_string()
+        );
+        assert_eq!(
+            "invalid script function id: 0x1::Diem::Diem::Diem",
+            "0x1::Diem::Diem::Diem"
+                .parse::<ScriptFunctionId>()
                 .err()
                 .unwrap()
                 .to_string()

@@ -3,7 +3,7 @@
 
 use crate::{
     Address, EventKey, HashValue, HexEncodedBytes, MoveModuleBytecode, MoveModuleId, MoveResource,
-    MoveScriptBytecode, MoveStructTag, MoveType, MoveValue, U64,
+    MoveScriptBytecode, MoveStructTag, MoveType, MoveValue, ScriptFunctionId, U64,
 };
 
 use diem_crypto::{
@@ -21,7 +21,6 @@ use diem_types::{
         Script, SignedTransaction, TransactionInfoTrait,
     },
 };
-use move_core_types::identifier::Identifier;
 
 use serde::{Deserialize, Serialize};
 use std::{
@@ -278,8 +277,7 @@ pub enum TransactionPayload {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ScriptFunctionPayload {
-    pub module: MoveModuleId,
-    pub function: Identifier,
+    pub function: ScriptFunctionId,
     pub type_arguments: Vec<MoveType>,
     pub arguments: Vec<serde_json::Value>,
 }
