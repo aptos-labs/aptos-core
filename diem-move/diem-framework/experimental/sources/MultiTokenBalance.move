@@ -12,6 +12,23 @@ module DiemFramework::MultiTokenBalance {
         gallery: vector<Token<TokenType>>
     }
 
+    spec TokenBalance {
+        invariant forall i1 in range(gallery), i2 in range(gallery) where gallery[i1].id == gallery[i2].id:
+        i1 == i2;
+    }
+
+    spec fun get_token_balance_gallery<TokenType>(addr: address): vector<Token<TokenType>>{
+        global<TokenBalance<TokenType>>(addr).gallery
+    }
+
+    spec fun is_in_gallery<TokenType>(gallery: vector<Token<TokenType>>, token_id: GUID::ID): bool {
+        exists i in range(gallery): gallery[i].id == token_id
+    }
+
+    spec fun find_token_index_by_id<TokenType>(gallery: vector<Token<TokenType>>, id: GUID::ID): u64 {
+        choose i in range(gallery) where gallery[i].id == id
+    }
+
     const MAX_U64: u128 = 18446744073709551615u128;
     // Error codes
     const EID_NOT_FOUND: u64 = 0;
@@ -21,6 +38,8 @@ module DiemFramework::MultiTokenBalance {
     const EALREADY_IS_OPERATOR: u64 = 4;
     const ENOT_OPERATOR: u64 = 5;
     const EINVALID_APPROVAL_TARGET: u64 = 6;
+
+
 
     /// Add a token to the owner's gallery. If there is already a token of the same id in the
     /// gallery, we combine it with the new one and make a token of greater value.
@@ -35,7 +54,27 @@ module DiemFramework::MultiTokenBalance {
             MultiToken::join<TokenType>(&mut token, original_token);
         };
         let gallery = &mut borrow_global_mut<TokenBalance<TokenType>>(owner).gallery;
-        Vector::push_back(gallery, token)
+        Vector::push_back(gallery, token);
+    }
+
+
+
+    spec add_to_gallery {
+        let gallery = get_token_balance_gallery<TokenType>(owner);
+        let token_bal = token.balance;
+        let min_token_idx = find_token_index_by_id(gallery, token.id);
+        let balance = gallery[min_token_idx].balance;
+        let post post_gallery = get_token_balance_gallery<TokenType>(owner);
+
+        aborts_if !exists<TokenBalance<TokenType>>(owner);
+        aborts_if is_in_gallery(gallery, token.id) && MAX_U64 - token.balance < balance;
+
+        ensures is_in_gallery(gallery, token.id) ==> len(gallery) == len(post_gallery);
+        ensures !is_in_gallery(gallery, token.id) ==> len(gallery) + 1 == len(post_gallery);
+
+        ensures is_in_gallery(gallery, token.id) ==> post_gallery[len(gallery) - 1].balance ==
+            token_bal + gallery[min_token_idx].balance;
+        ensures post_gallery[len(post_gallery) - 1].id == token.id;
     }
 
     /// Remove a token of certain id from the owner's gallery and return it.
@@ -48,11 +87,22 @@ module DiemFramework::MultiTokenBalance {
         Vector::remove(gallery, Option::extract(&mut index_opt))
     }
 
+    spec remove_from_gallery {
+        let gallery = get_token_balance_gallery<TokenType>(owner);
+        aborts_if !exists<TokenBalance<TokenType>>(owner);
+        aborts_if !is_in_gallery(gallery, id);
+        ensures !is_in_gallery(get_token_balance_gallery<TokenType>(owner), id);
+    }
+
     /// Finds the index of token with the given id in the gallery.
     fun index_of_token<TokenType: store>(gallery: &vector<Token<TokenType>>, id: &GUID::ID): Option<u64> {
         let i = 0;
         let len = Vector::length(gallery);
-        while (i < len) {
+        while ({spec {
+            invariant i >= 0;
+            invariant i <= len(gallery);
+            invariant forall k in 0..i: gallery[k].id != id;
+        };(i < len)}) {
             if (MultiToken::id<TokenType>(Vector::borrow(gallery, i)) == *id) {
                 return Option::some(i)
             };
@@ -61,9 +111,21 @@ module DiemFramework::MultiTokenBalance {
         Option::none()
     }
 
+    spec index_of_token{
+        let min_token_idx = choose min i in range(gallery) where gallery[i].id == id;
+        let post res_id = Option::borrow(result);
+        ensures is_in_gallery(gallery, id) <==> (Option::is_some(result) && res_id == min_token_idx);
+        ensures result ==  Option::spec_none() <==> !is_in_gallery(gallery, id);
+    }
+
     /// Returns whether the owner has a token with given id.
     public fun has_token<TokenType: store>(owner: address, token_id: &GUID::ID): bool acquires TokenBalance {
         Option::is_some(&index_of_token(&borrow_global<TokenBalance<TokenType>>(owner).gallery, token_id))
+    }
+
+    spec has_token {
+        let gallery = global<TokenBalance<TokenType>>(owner).gallery;
+        ensures result <==> is_in_gallery(gallery, token_id);
     }
 
     public fun get_token_balance<TokenType: store>(owner: address, token_id: &GUID::ID
@@ -77,6 +139,13 @@ module DiemFramework::MultiTokenBalance {
             let index = Option::extract(&mut index_opt);
             MultiToken::balance(Vector::borrow(gallery, index))
         }
+    }
+
+    spec get_token_balance {
+        let gallery = get_token_balance_gallery<TokenType>(owner);
+        let min_token_idx = find_token_index_by_id(gallery, token_id);
+        ensures !is_in_gallery(gallery, token_id) ==> result == 0;
+        ensures is_in_gallery(gallery, token_id) ==> result == gallery[min_token_idx].balance;
     }
 
     /// Transfer `amount` of token with id `GUID::id(creator, creation_num)` from `owner`'s
@@ -111,12 +180,60 @@ module DiemFramework::MultiTokenBalance {
 
             // Add tokens to `to`'s gallery
             add_to_gallery<TokenType>(to, to_token);
-        }
+        };
+
         // TODO: add event emission
+    }
+
+    spec transfer_multi_token_between_galleries {
+        let owner = Signer::address_of(account);
+        let gallery_owner = get_token_balance_gallery<TokenType>(owner);
+        let gallery_to = get_token_balance_gallery<TokenType>(to);
+        let post post_gallery_owner = get_token_balance_gallery<TokenType>(owner);
+        let post post_gallery_to = get_token_balance_gallery<TokenType>(to);
+
+        let id = GUID::create_id(creator, creation_num);
+
+        let min_token_idx = find_token_index_by_id(gallery_owner, id);
+        let min_token_idx_to = find_token_index_by_id(gallery_to, id);
+
+        aborts_if amount <= 0;
+        aborts_if !exists<TokenBalance<TokenType>>(owner);
+        aborts_if !exists<TokenBalance<TokenType>>(to);
+        aborts_if !is_in_gallery(gallery_owner, id);
+        aborts_if amount > gallery_owner[min_token_idx].balance;
+        aborts_if owner != to && is_in_gallery(gallery_to, id) && MAX_U64 - amount < gallery_to[min_token_idx_to].balance;
+
+        ensures (gallery_owner[min_token_idx].balance == amount && to != owner) ==>
+                !is_in_gallery(post_gallery_owner, id);
+
+        ensures gallery_owner[min_token_idx].balance > amount ==>
+                post_gallery_owner[len(post_gallery_owner) - 1].id == id;
+        ensures post_gallery_to[len(post_gallery_to) - 1].id == id;
+
+        ensures (gallery_owner[min_token_idx].balance > amount && to != owner) ==>
+                post_gallery_owner[len(post_gallery_owner) - 1].balance ==
+                  gallery_owner[min_token_idx].balance - amount;
+
+        ensures (to != owner && !is_in_gallery(gallery_to, id) )==>
+                post_gallery_to[len(post_gallery_to) - 1].balance == amount;
+        ensures (to != owner && is_in_gallery(gallery_to, id) )==>
+                post_gallery_to[len(post_gallery_to) - 1].balance ==
+                   gallery_to[min_token_idx_to].balance + amount;
+
+        ensures to == owner ==> post_gallery_owner[len(post_gallery_owner) - 1].balance ==
+                                gallery_owner[min_token_idx].balance;
+
     }
 
     public fun publish_balance<TokenType: store>(account: &signer) {
         assert!(!exists<TokenBalance<TokenType>>(Signer::address_of(account)), EBALANCE_ALREADY_PUBLISHED);
         move_to(account, TokenBalance<TokenType> { gallery: Vector::empty() });
+    }
+
+    spec publish_balance {
+        let addr = Signer::address_of(account);
+        aborts_if exists<TokenBalance<TokenType>>(addr);
+        ensures exists<TokenBalance<TokenType>>(addr);
     }
 }
