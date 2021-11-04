@@ -74,9 +74,6 @@ export async function invokeScriptFunction(
   args: any[],
 ) {
   privateKeyBytes = normalizePrivateKey(privateKeyBytes);
-  const [sfAddress, sfModule, sfFunction] = splitFullyQualifiedName(
-    scriptFunction,
-  );
 
   // deno-lint-ignore no-explicit-any
   const request: any = {
@@ -88,11 +85,7 @@ export async function invokeScriptFunction(
     "expiration_timestamp_secs": "99999999999",
     "payload": {
       "type": "script_function_payload",
-      "module": {
-        "address": sfAddress,
-        "name": sfModule,
-      },
-      "function": sfFunction,
+      "function": scriptFunction,
       "type_arguments": typeArguments,
       "arguments": normalizeScriptFunctionArgs(args),
     },
@@ -139,13 +132,6 @@ export async function invokeScriptFunction(
 
 function isSuccess(status: number) {
   return status >= 200 && status < 300;
-}
-
-function splitFullyQualifiedName(
-  scriptFunction: string,
-): [string, string, string] {
-  const [addr, moduleName, functionName]: string[] = scriptFunction.split("::");
-  return [addr, moduleName, functionName];
 }
 
 export function newRawTransaction(

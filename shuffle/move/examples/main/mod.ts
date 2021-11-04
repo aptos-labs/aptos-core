@@ -98,6 +98,13 @@ export async function createTestNFTScriptFunction(
   );
 }
 
+// Example usage:
+// await main.invokeScriptFunction(
+//   await Shuffle.sequenceNumber(),
+//   "0x24163AFCC6E33B0A9473852E18327FA9::Message::set_message",
+//   [],
+//   ["invoked"]
+// );
 export async function invokeScriptFunction(
   sequenceNumber: number,
   scriptFunction: string,
