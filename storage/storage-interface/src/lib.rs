@@ -211,6 +211,11 @@ pub trait DbReader<PS: ProtocolSpec>: Send + Sync {
         fetch_events: bool,
     ) -> Result<TransactionWithProof<PS::TransactionInfo>>;
 
+    /// See [`DiemDB::get_first_write_set_version`].
+    ///
+    /// [`DiemDB::get_first_write_set_version`]: ../diemdb/struct.DiemDB.html#method.get_first_write_set_version
+    fn get_first_write_set_version(&self) -> Result<Option<Version>>;
+
     /// See [`DiemDB::get_transaction_outputs`].
     ///
     /// [`DiemDB::get_transaction_outputs`]: ../diemdb/struct.DiemDB.html#method.get_transaction_outputs

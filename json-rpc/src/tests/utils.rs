@@ -278,6 +278,10 @@ impl DbReader<DpnProto> for MockDiemDB {
         unimplemented!()
     }
 
+    fn get_first_write_set_version(&self) -> Result<Option<Version>> {
+        unimplemented!()
+    }
+
     fn get_transaction_outputs(
         &self,
         _start_version: Version,

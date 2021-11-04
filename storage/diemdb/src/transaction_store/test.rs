@@ -38,6 +38,8 @@ proptest! {
         }
         store.db.write_schemas(cs.batch).unwrap();
 
+        assert_eq!(store.get_first_write_set_version().unwrap(), Some(0));
+
         let ledger_version = txns.len() as Version - 1;
         for (ver, (txn, write_set)) in itertools::zip_eq(txns.iter(), write_sets.iter()).enumerate() {
             prop_assert_eq!(store.get_transaction(ver as Version).unwrap(), txn.clone());
