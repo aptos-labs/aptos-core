@@ -14,6 +14,7 @@ use move_core_types::{
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
 };
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 /// Defines normalized representations of Move types, fields, kinds, structs, functions, and
@@ -26,7 +27,7 @@ use std::collections::BTreeMap;
 /// A normalized version of `SignatureToken`, a type expression appearing in struct or function
 /// declarations. Unlike `SignatureToken`s, `normalized::Type`s from different modules can safely be
 /// compared.
-#[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Serialize, Deserialize)]
 pub enum Type {
     Bool,
     U8,

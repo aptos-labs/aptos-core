@@ -186,4 +186,8 @@ impl NormalizedReadWriteSetAnalysis {
         });
         Ok(has_secondary_index)
     }
+
+    pub fn into_inner(self) -> BTreeMap<ModuleId, BTreeMap<Identifier, ReadWriteSet>> {
+        self.0
+    }
 }

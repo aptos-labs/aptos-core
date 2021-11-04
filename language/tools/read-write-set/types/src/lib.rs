@@ -10,13 +10,14 @@ use move_core_types::{
     account_address::AccountAddress,
     language_storage::{ResourceKey, TypeTag},
 };
+use serde::{Deserialize, Serialize};
 use std::{
     collections::btree_map::BTreeMap,
     fmt::{self, Formatter},
 };
 
 /// Offset of an access path: either a field, vector index, or global key
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum Offset {
     /// Index into contents of a struct by field offset
     Field(usize),
@@ -26,7 +27,7 @@ pub enum Offset {
     Global(Type),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TrieNode {
     /// Optional data associated with the parent in the trie
     data: Option<Access>,
@@ -34,13 +35,13 @@ pub struct TrieNode {
     children: BTreeMap<Offset, TrieNode>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum RootAddress {
     Const(AccountAddress),
     Formal(usize),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Root {
     pub root: RootAddress,
     pub type_: Type,
@@ -52,7 +53,7 @@ pub struct AccessPath {
     pub offsets: Vec<Offset>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ReadWriteSet(BTreeMap<Root, TrieNode>);
 
 impl Root {

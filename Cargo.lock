@@ -4970,6 +4970,7 @@ dependencies = [
  "proptest",
  "proptest-derive",
  "ref-cast",
+ "serde",
  "serde_json",
  "variant_count",
 ]
@@ -5321,6 +5322,7 @@ dependencies = [
  "diem-workspace-hack",
  "move-binary-format",
  "move-core-types",
+ "serde",
 ]
 
 [[package]]
