@@ -503,6 +503,7 @@ where
             Err(anyhow::anyhow!("Injected error in execute_chunk"))
         });
 
+        let transactions_executed = transaction_outputs.is_none();
         let vm_outputs = if let Some(outputs) = transaction_outputs {
             ensure!(
                 transactions.len() == outputs.len(),
@@ -521,9 +522,17 @@ where
 
         // Since other validators have committed these transactions, their status should all be
         // TransactionStatus::Keep.
-        for output in &vm_outputs {
-            if let TransactionStatus::Discard(_) = output.status() {
-                bail!("Syncing transactions that should be discarded.");
+        for (index, output) in vm_outputs.iter().enumerate() {
+            if let TransactionStatus::Discard(status_code) = output.status() {
+                let bail_error_message = format!(
+                    "Syncing a transaction that should be discarded! Transaction version: {:?}, status code: {:?}.",
+                    first_version + index as u64, status_code
+                );
+                error!("{}", bail_error_message);
+                info!("Discarded transaction: {:?}", transactions[index]);
+                info!("Discarded transaction output: {:?}", output);
+                info!("Transactions were executed: {:?}", transactions_executed);
+                bail!(bail_error_message);
             }
         }
 
