@@ -3,11 +3,13 @@
 
 import * as DiemTypes from "./generated/diemTypes/mod.ts";
 import * as ed from "https://deno.land/x/ed25519@1.0.1/mod.ts";
+import * as util from "https://deno.land/std@0.85.0/node/util.ts";
 import { BcsSerializer } from "./generated/bcs/mod.ts";
-import { bytes, ListTuple, Seq, uint8 } from "./generated/serde/types.ts";
+import { bytes, ListTuple, uint8 } from "./generated/serde/types.ts";
 import { createHash } from "https://deno.land/std@0.77.0/hash/mod.ts";
-import * as path from "https://deno.land/std@0.110.0/path/mod.ts";
 import { nodeUrl } from "../repl.ts";
+
+const textEncoder = new util.TextEncoder();
 
 export async function buildAndSubmitTransaction(
   addressStr: string,
@@ -46,8 +48,8 @@ export function buildScriptFunctionTransaction(
   moduleAddress: string,
   moduleName: string,
   functionName: string,
-  tyArgs: Seq<DiemTypes.TypeTag>, //[0,9,8]
-  args: Seq<bytes>, // new Uint8Array(9,0,9)
+  tyArgs: DiemTypes.TypeTag[],
+  args: bytes[],
 ): DiemTypes.TransactionPayload {
   const moduleId: DiemTypes.ModuleId = new DiemTypes.ModuleId(
     hexToAccountAddress(moduleAddress),
@@ -61,37 +63,89 @@ export function buildScriptFunctionTransaction(
   );
 }
 
-// Example Usage:
-// await DiemHelpers.buildAndSubmitScriptFunctionTransaction("0xE73FFAAB476ED3F57E1A6877F3EE3891", "Foo", "Bar", [], [], 0)
-export async function buildAndSubmitScriptFunctionTransaction(
-  moduleAddress: string,
-  moduleName: string,
-  functionName: string,
-  tyArgs: Seq<DiemTypes.TypeTag>,
-  args: Seq<bytes>,
+// Invokes a script function using the Dev API's signing_message/ JSON endpoint.
+export async function invokeScriptFunction(
+  addressStr: string,
   sequenceNumber: number,
+  privateKeyBytes: Uint8Array,
+  scriptFunction: string,
+  typeArguments: string[],
+  // deno-lint-ignore no-explicit-any
+  args: any[],
 ) {
-  const payload: DiemTypes.TransactionPayload = buildScriptFunctionTransaction(
-    moduleAddress,
-    moduleName,
-    functionName,
-    tyArgs,
-    args,
+  privateKeyBytes = normalizePrivateKey(privateKeyBytes);
+  const [sfAddress, sfModule, sfFunction] = splitFullyQualifiedName(
+    scriptFunction,
   );
 
-  // TODO(dimroc) : Help clean this up
-  const shuffleDir = Deno.env.get("SHUFFLE_HOME") || "unknown";
-  const privateKeyPath = path.join(shuffleDir, "accounts/latest/dev.key");
-  const senderAddressPath = path.join(shuffleDir, "accounts/latest/address");
-  const senderAddress = await Deno.readTextFile(senderAddressPath);
-  const fullSenderAddress = "0x" + senderAddress;
-  const privateKeyBytes = await Deno.readFile(privateKeyPath);
-  return await buildAndSubmitTransaction(
-    fullSenderAddress,
-    sequenceNumber,
-    privateKeyBytes,
-    payload,
-  );
+  // deno-lint-ignore no-explicit-any
+  const request: any = {
+    "sender": addressStr,
+    "sequence_number": `${sequenceNumber}`,
+    "max_gas_amount": "1000000",
+    "gas_unit_price": "0",
+    "gas_currency_code": "XUS",
+    "expiration_timestamp_secs": "99999999999",
+    "payload": {
+      "type": "script_function_payload",
+      "module": {
+        "address": sfAddress,
+        "name": sfModule,
+      },
+      "function": sfFunction,
+      "type_arguments": typeArguments,
+      "arguments": normalizeScriptFunctionArgs(args),
+    },
+  };
+
+  const resp = await fetch(relativeUrl("/transactions/signing_message"), {
+    method: "POST",
+    body: JSON.stringify(request),
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!isSuccess(resp.status)) {
+    const errorMsg = (await resp.json()).message;
+    throw `unable to create signing message: ${resp.statusText}. ${errorMsg}`;
+  }
+
+  const signingMsgPayload = await resp.json();
+  const signingMsg = signingMsgPayload.message.slice(2); // remove 0x prefix
+
+  const publicKey = bufferToHex(await ed.getPublicKey(privateKeyBytes));
+  const signature = await ed.sign(signingMsg, privateKeyBytes);
+  request.signature = {
+    "type": "ed25519_signature",
+    "public_key": publicKey,
+    "signature": signature,
+  };
+
+  // deno-lint-ignore no-explicit-any
+  const txnResponse: any = await fetch(relativeUrl("/transactions"), {
+    method: "POST",
+    body: JSON.stringify(request),
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+  if (!isSuccess(txnResponse.status)) {
+    const errorMsg = (await txnResponse.json()).message;
+    throw `unable to create signing message: ${txnResponse.statusText}. ${errorMsg}`;
+  }
+  return await txnResponse.json();
+}
+
+function isSuccess(status: number) {
+  return status >= 200 && status < 300;
+}
+
+function splitFullyQualifiedName(
+  scriptFunction: string,
+): [string, string, string] {
+  const [addr, moduleName, functionName]: string[] = scriptFunction.split("::");
+  return [addr, moduleName, functionName];
 }
 
 export function newRawTransaction(
@@ -151,14 +205,26 @@ export async function newSignedTransaction(
 }
 
 export function hexToAccountAddress(hex: string): DiemTypes.AccountAddress {
-  if (hex.startsWith("0x")) {
-    hex = hex.slice(2);
-  }
   const senderListTuple: ListTuple<[uint8]> = [];
   for (const entry of hexToBytes(hex)) { // encode as bytes
     senderListTuple.push([entry]);
   }
   return new DiemTypes.AccountAddress(senderListTuple);
+}
+
+// deno-lint-ignore no-explicit-any
+function normalizeScriptFunctionArgs(args: any[]) {
+  return args.map((a) => {
+    if (isString(a) && !a.startsWith("0x")) {
+      return bufferToHex(textEncoder.encode(a));
+    }
+    return a;
+  });
+}
+
+// deno-lint-ignore no-explicit-any
+function isString(value: any) {
+  return typeof value === "string" || value instanceof String;
 }
 
 // deno-lint-ignore no-explicit-any
@@ -175,7 +241,10 @@ function appendBuffer(buffer1: Uint8Array, buffer2: Uint8Array): Uint8Array {
   return tmp;
 }
 
-function hexToBytes(hex: string) {
+function hexToBytes(hex: string): Uint8Array {
+  if (hex.startsWith("0x")) {
+    hex = hex.slice(2);
+  }
   const bytes = new Uint8Array(hex.length / 2);
   for (let i = 0; i !== bytes.length; i++) {
     bytes[i] = parseInt(hex.substr(i * 2, 2), 16);

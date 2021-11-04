@@ -98,6 +98,24 @@ export async function createTestNFTScriptFunction(
   );
 }
 
+export async function invokeScriptFunction(
+  sequenceNumber: number,
+  scriptFunction: string,
+  types: string[],
+  // deno-lint-ignore no-explicit-any
+  args: any[],
+) {
+  const privateKeyBytes = await Deno.readFile(privateKeyPath);
+  return await DiemHelpers.invokeScriptFunction(
+    fullSenderAddress,
+    sequenceNumber,
+    privateKeyBytes,
+    scriptFunction,
+    types,
+    args,
+  );
+}
+
 // deno-lint-ignore no-explicit-any
 export function resourcesWithName(resources: any[], resourceName: string) {
   return resources
