@@ -25,7 +25,7 @@ use std::{
 use structopt::StructOpt;
 use url::Url;
 
-pub fn run_e2e_tests(home: &Home, project_path: &Path, network: Url) -> Result<()> {
+pub async fn run_e2e_tests(home: &Home, project_path: &Path, network: Url) -> Result<()> {
     let _config = shared::read_project_config(project_path)?;
     shared::generate_typescript_libraries(project_path)?;
 
@@ -39,9 +39,10 @@ pub fn run_e2e_tests(home: &Home, project_path: &Path, network: Url) -> Result<(
     let client = BlockingClient::new(network.as_str());
     let factory = TransactionFactory::new(ChainId::test());
 
-    let mut new_account = create_test_account(home, &client, &factory)?;
+    let new_account = create_test_account(home, &client, &factory)?;
     create_receiver_account(home, &client, &factory)?;
-    send_module_transaction(&client, &mut new_account, project_path, &factory)?;
+    deploy::handle(home, project_path, network.clone()).await?;
+
     run_deno_test(
         project_path,
         &config,
@@ -81,29 +82,6 @@ fn create_receiver_account(
     account::create_account_onchain(&mut root_account, &receiver_account, factory, client)?;
 
     Ok(receiver_account)
-}
-
-// Publish user made module onchain
-fn send_module_transaction(
-    client: &BlockingClient,
-    new_account: &mut LocalAccount,
-    project_path: &Path,
-    factory: &TransactionFactory,
-) -> Result<()> {
-    let account_seq_num = client
-        .get_account(new_account.address())?
-        .into_inner()
-        .unwrap()
-        .sequence_number;
-    *new_account.sequence_number_mut() = account_seq_num;
-    println!(
-        "Deploy move module in {} ----------",
-        project_path.to_string_lossy().to_string()
-    );
-
-    let compiled_package = shared::build_move_package(project_path.join(MAIN_PKG_PATH).as_ref())?;
-    deploy::send_module_transaction(&compiled_package, client, new_account, factory)?;
-    deploy::check_module_exists(client, new_account)
 }
 
 // Run shuffle test using deno
@@ -218,16 +196,19 @@ pub enum TestCommand {
     },
 }
 
-pub fn handle(home: &Home, cmd: TestCommand) -> Result<()> {
+pub async fn handle(home: &Home, cmd: TestCommand) -> Result<()> {
     match cmd {
         TestCommand::E2e {
             project_path,
             network,
-        } => run_e2e_tests(
-            home,
-            shared::normalized_project_path(project_path)?.as_path(),
-            shared::normalized_network(home, network)?,
-        ),
+        } => {
+            run_e2e_tests(
+                home,
+                shared::normalized_project_path(project_path)?.as_path(),
+                shared::normalized_network(home, network)?,
+            )
+            .await
+        }
         TestCommand::Unit { project_path } => {
             run_move_unit_tests(shared::normalized_project_path(project_path)?.as_path())
         }
@@ -242,6 +223,7 @@ pub fn handle(home: &Home, cmd: TestCommand) -> Result<()> {
                 normalized_path.as_path(),
                 shared::normalized_network(home, network)?,
             )
+            .await
         }
     }
 }

@@ -6,9 +6,11 @@ use diem_sdk::client::{AccountAddress, BlockingClient};
 use diem_types::transaction::authenticator::AuthenticationKey;
 use directories::BaseDirs;
 use move_package::compilation::compiled_package::CompiledPackage;
+use reqwest::{Client, Response, StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_generate as serdegen;
 use serde_generate::SourceInstaller;
+use serde_json::Value;
 use serde_reflection::Registry;
 use std::{
     collections::{BTreeMap, HashMap},
@@ -27,6 +29,7 @@ pub const MAIN_PKG_PATH: &str = "main";
 const NEW_KEY_FILE_CONTENT: &[u8] = include_bytes!("../new_account.key");
 pub const LOCALHOST_NETWORK_NAME: &str = "localhost";
 pub const LOCALHOST_NETWORK_BASE: &str = "http://127.0.0.1";
+const DIEM_ACCOUNT_TYPE: &str = "0x1::DiemAccount::DiemAccount";
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "kebab-case")]
@@ -124,6 +127,91 @@ pub fn get_filtered_envs_for_deno(
 
     filtered_envs.insert(String::from("SHUFFLE_NETWORK"), network.to_string());
     filtered_envs
+}
+
+pub struct DevApiClient {
+    client: Client,
+    network: Url,
+}
+
+// Client that will make GET and POST requests based off of Dev API
+impl DevApiClient {
+    pub fn new(client: Client, network: Url) -> Result<Self> {
+        Ok(Self { client, network })
+    }
+
+    pub async fn get_transactions_by_hash(&self, hash: &str) -> Result<Response> {
+        let path = self
+            .network
+            .join(format!("transactions/{}", hash).as_str())?;
+        Ok(self.client.get(path.as_str()).send().await?)
+    }
+
+    pub async fn post_transactions(&self, txn_bytes: Vec<u8>) -> Result<Response> {
+        let path = self.network.join("transactions")?;
+        Ok(self
+            .client
+            .post(path.as_str())
+            .header("Content-Type", "application/vnd.bcs+signed_transaction")
+            .body(txn_bytes)
+            .send()
+            .await?)
+    }
+
+    async fn get_account_resources(&self, address: AccountAddress) -> Result<Response> {
+        let path = self
+            .network
+            .join(format!("accounts/{}/resources", address.to_hex_literal()).as_str())?;
+        Ok(self.client.get(path.as_str()).send().await?)
+    }
+
+    pub async fn get_account_sequence_number(&self, address: AccountAddress) -> Result<u64> {
+        let resp = self.get_account_resources(address).await?;
+        DevApiClient::check_accounts_resources_response_status_code(&resp.status())?;
+        let json: Vec<Value> = serde_json::from_str(resp.text().await?.as_str())?;
+        DevApiClient::parse_json_for_account_seq_num(json)
+    }
+
+    fn check_accounts_resources_response_status_code(status_code: &StatusCode) -> Result<()> {
+        match status_code == &StatusCode::from_u16(200)? {
+            true => Ok(()),
+            false => Err(anyhow!(
+                "Failed to get account resources with provided address"
+            )),
+        }
+    }
+
+    fn parse_json_for_account_seq_num(json_objects: Vec<Value>) -> Result<u64> {
+        let mut seq_number_string = "";
+        for object in &json_objects {
+            if object["type"] == DIEM_ACCOUNT_TYPE {
+                seq_number_string = object["value"]["sequence_number"]
+                    .as_str()
+                    .ok_or_else(|| anyhow!("Invalid sequence number string"))?;
+                break;
+            };
+        }
+        let seq_number: u64 = seq_number_string.parse()?;
+        Ok(seq_number)
+    }
+
+    pub async fn get_account_transactions_response(
+        &self,
+        address: AccountAddress,
+        start: u64,
+        limit: u64,
+    ) -> Result<Response> {
+        let path = self
+            .network
+            .join(format!("accounts/{}/transactions", address).as_str())?;
+        Ok(self
+            .client
+            .get(path.as_str())
+            .query(&[("start", start.to_string().as_str())])
+            .query(&[("limit", limit.to_string().as_str())])
+            .send()
+            .await?)
+    }
 }
 
 // Contains all the commonly used paths in shuffle/cli
@@ -434,12 +522,10 @@ pub fn normalized_project_path(project_path: Option<PathBuf>) -> Result<PathBuf>
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{
-        new,
-        shared::{Home, NetworksConfig},
-    };
+    use crate::{new, shared::Home};
     use diem_crypto::PrivateKey;
     use diem_infallible::duration_since_epoch;
+    use serde_json::json;
     use std::fs;
     use tempfile::tempdir;
 
@@ -754,5 +840,49 @@ mod test {
             filtered_envs.get("SHUFFLE_NETWORK").unwrap(),
             &network.to_string()
         )
+    }
+
+    #[test]
+    fn test_parse_json_for_seq_num() {
+        let value_obj = json!({
+            "type":"0x1::DiemAccount::DiemAccount",
+            "value": {
+                "authentication_key": "0x88cae30f0fea7879708788df9e7c9b7524163afcc6e33b0a9473852e18327fa9",
+                "key_rotation_capability":{
+                    "vec":[{"account_address":"0x24163afcc6e33b0a9473852e18327fa9"}]
+                },
+                "received_events":{
+                    "counter":"0",
+                    "guid":{}
+                },
+                "sent_events":{},
+                "sequence_number":"3",
+                "withdraw_capability":{
+                    "vec":[{"account_address":"0x24163afcc6e33b0a9473852e18327fa9"}]
+                }
+            }
+        });
+
+        let json_obj: Vec<Value> = vec![value_obj];
+        let ret_seq_num = DevApiClient::parse_json_for_account_seq_num(json_obj).unwrap();
+        assert_eq!(ret_seq_num, 3);
+    }
+
+    #[test]
+    fn test_check_accounts_resources_response_status_code() {
+        assert_eq!(
+            DevApiClient::check_accounts_resources_response_status_code(
+                &StatusCode::from_u16(200).unwrap()
+            )
+            .is_err(),
+            false
+        );
+        assert_eq!(
+            DevApiClient::check_accounts_resources_response_status_code(
+                &StatusCode::from_u16(404).unwrap()
+            )
+            .is_err(),
+            true
+        );
     }
 }

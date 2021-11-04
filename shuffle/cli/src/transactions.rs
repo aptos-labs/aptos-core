@@ -1,21 +1,20 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
+use crate::shared::DevApiClient;
 use anyhow::{anyhow, Result};
 use diem_types::account_address::AccountAddress;
-use reqwest::{Client, Response, StatusCode};
 use serde_json::Value;
 use std::{cmp::max, io, io::Write, thread, time};
 use url::Url;
 
-const DIEM_ACCOUNT_TYPE: &str = "0x1::DiemAccount::DiemAccount";
-
 // Will list the last 10 transactions and has the ability to block and stream future transactions.
 pub async fn handle(network: Url, tail: bool, address: AccountAddress, raw: bool) -> Result<()> {
-    let client = reqwest::Client::new();
-    let account_seq_num = get_account_sequence_number(&client, &network, address).await?;
+    let client = DevApiClient::new(reqwest::Client::new(), network)?;
+    let account_seq_num = client.get_account_sequence_number(address).await?;
     let mut prev_seq_num = max(account_seq_num as i64 - 10, 0);
-    let resp =
-        get_account_transactions_response(&client, address, &network, prev_seq_num, 10).await?;
+    let resp = client
+        .get_account_transactions_response(address, prev_seq_num as u64, 10)
+        .await?;
     let json_with_txns: serde_json::Value = serde_json::from_str(resp.text().await?.as_str())?;
 
     let all_transactions = json_with_txns
@@ -40,14 +39,9 @@ pub async fn handle(network: Url, tail: bool, address: AccountAddress, raw: bool
         // listening for incoming transactions
         loop {
             thread::sleep(time::Duration::from_millis(1000));
-            let resp = get_account_transactions_response(
-                &client,
-                address,
-                &network,
-                prev_seq_num + 1,
-                100,
-            )
-            .await?;
+            let resp = client
+                .get_account_transactions_response(address, (prev_seq_num + 1) as u64, 100)
+                .await?;
             let json_with_txns: serde_json::Value =
                 serde_json::from_str(resp.text().await?.as_str())?;
             let txn_array = json_with_txns
@@ -81,64 +75,11 @@ fn write_out_txns<W: Write>(all_transactions: Vec<Value>, mut stdout: W, raw: bo
     Ok(())
 }
 
-async fn get_account_transactions_response(
-    client: &Client,
-    address: AccountAddress,
-    network: &Url,
-    start: i64,
-    limit: u64,
-) -> Result<Response> {
-    let path =
-        network.join(format!("accounts/{}/transactions", address.to_hex_literal()).as_str())?;
-    Ok(client
-        .get(path.as_str())
-        .query(&[("start", start.to_string().as_str())])
-        .query(&[("limit", limit.to_string().as_str())])
-        .send()
-        .await?)
-}
-
-async fn get_account_sequence_number(
-    client: &Client,
-    network: &Url,
-    address: AccountAddress,
-) -> Result<u64> {
-    let path =
-        network.join(format!("accounts/{}/resources/", address.to_hex_literal()).as_str())?;
-    let resp = client.get(path.as_str()).send().await?;
-    check_accounts_resources_response_status_code(&resp.status())?;
-    let json: Vec<Value> = serde_json::from_str(resp.text().await?.as_str())?;
-    parse_json_for_account_seq_num(json)
-}
-
-fn check_accounts_resources_response_status_code(status_code: &StatusCode) -> Result<()> {
-    match status_code == &StatusCode::from_u16(200)? {
-        true => Ok(()),
-        false => Err(anyhow!(
-            "Failed to get account resources with provided address"
-        )),
-    }
-}
-
 fn parse_txn_for_seq_num(last_txn: &Value) -> Result<i64> {
     Ok(last_txn["sequence_number"]
         .to_string()
         .replace('"', "")
         .parse::<i64>()?)
-}
-
-fn parse_json_for_account_seq_num(json_objects: Vec<Value>) -> Result<u64> {
-    let mut seq_number_string = "";
-    for object in &json_objects {
-        if object["type"] == DIEM_ACCOUNT_TYPE {
-            seq_number_string = object["value"]["sequence_number"]
-                .as_str()
-                .ok_or_else(|| anyhow!("Invalid sequence number string"))?;
-            break;
-        };
-    }
-    let seq_number: u64 = seq_number_string.parse()?;
-    Ok(seq_number)
 }
 
 fn write_into<W>(writer: &mut W, json: &serde_json::Value, raw: bool) -> io::Result<()>
@@ -193,32 +134,6 @@ mod test {
     }
 
     #[test]
-    fn test_parse_json_for_seq_num() {
-        let value_obj = json!({
-            "type":"0x1::DiemAccount::DiemAccount",
-            "value": {
-                "authentication_key": "0x88cae30f0fea7879708788df9e7c9b7524163afcc6e33b0a9473852e18327fa9",
-                "key_rotation_capability":{
-                    "vec":[{"account_address":"0x24163afcc6e33b0a9473852e18327fa9"}]
-                },
-                "received_events":{
-                    "counter":"0",
-                    "guid":{}
-                },
-                "sent_events":{},
-                "sequence_number":"3",
-                "withdraw_capability":{
-                    "vec":[{"account_address":"0x24163afcc6e33b0a9473852e18327fa9"}]
-                }
-            }
-        });
-
-        let json_obj: Vec<Value> = vec![value_obj];
-        let ret_seq_num = parse_json_for_account_seq_num(json_obj).unwrap();
-        assert_eq!(ret_seq_num, 3);
-    }
-
-    #[test]
     fn test_write_into() {
         let mut stdout = Vec::new();
         let txn = get_sample_txn();
@@ -260,19 +175,5 @@ mod test {
         let txn = get_sample_txn();
         let seq_num = parse_txn_for_seq_num(&txn[0]).unwrap();
         assert_eq!(seq_num, 2);
-    }
-
-    #[test]
-    fn test_check_accounts_resources_response_status_code() {
-        assert_eq!(
-            check_accounts_resources_response_status_code(&StatusCode::from_u16(200).unwrap())
-                .is_err(),
-            false
-        );
-        assert_eq!(
-            check_accounts_resources_response_status_code(&StatusCode::from_u16(404).unwrap())
-                .is_err(),
-            true
-        );
     }
 }

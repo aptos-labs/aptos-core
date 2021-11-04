@@ -33,13 +33,16 @@ pub async fn main() -> Result<()> {
         Subcommand::Deploy {
             project_path,
             network,
-        } => deploy::handle(
-            &home,
-            &shared::normalized_project_path(project_path)?,
-            shared::normalized_network(&home, network)?,
-        ),
+        } => {
+            deploy::handle(
+                &home,
+                &shared::normalized_project_path(project_path)?,
+                shared::normalized_network(&home, network)?,
+            )
+            .await
+        }
         Subcommand::Account { root } => account::handle(&home, root),
-        Subcommand::Test { cmd } => test::handle(&home, cmd),
+        Subcommand::Test { cmd } => test::handle(&home, cmd).await,
         Subcommand::Console {
             project_path,
             network,
