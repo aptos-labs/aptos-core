@@ -8,26 +8,22 @@ import {
   fail,
 } from "https://deno.land/std@0.85.0/testing/asserts.ts";
 import * as DiemHelpers from "../main/helpers.ts";
+import * as context from "../main/context.ts";
 import * as main from "../main/mod.ts";
-import * as Shuffle from "../repl.ts";
 
-Shuffle.test("Test Assert", () => {
+Deno.test("Test Assert", () => {
   assert("Hello");
 });
 
-Shuffle.test("Ability to set message", async () => {
-  const sender = Shuffle.senderAddress;
-  console.log("Test sender address: " + sender);
-  const receiver = Shuffle.receiverAddress;
-  console.log("Test receiver address: " + receiver);
+Deno.test("Ability to set message", async () => {
+  console.log("Test sender address: " + context.senderAddress);
+  console.log("Test receiver address: " + context.receiverAddress);
   await main.setMessageScriptFunction(
     "hello blockchain",
-    (await Shuffle.sequenceNumber())!.valueOf(),
   );
 
   for (let i = 0; i < 10; i++) {
-    const resources = await Shuffle.resources(sender);
-    const messageResource = main.resourcesWithName(resources, "MessageHolder")[0];
+    const messageResource = (await main.resourcesWithName("MessageHolder"))[0];
     if (messageResource !== undefined) {
       const result = DiemHelpers.hexToAscii(messageResource["value"]["message"])
         .toString() === "\x00hello blockchain";

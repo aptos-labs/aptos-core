@@ -1,13 +1,15 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+// deno-lint-ignore-file no-explicit-any
 import * as DiemTypes from "./generated/diemTypes/mod.ts";
+import * as context from "./context.ts";
+import * as devapi from "./devapi.ts";
 import * as ed from "https://deno.land/x/ed25519@1.0.1/mod.ts";
 import * as util from "https://deno.land/std@0.85.0/node/util.ts";
 import { BcsSerializer } from "./generated/bcs/mod.ts";
 import { bytes, ListTuple, uint8 } from "./generated/serde/types.ts";
 import { createHash } from "https://deno.land/std@0.77.0/hash/mod.ts";
-import { nodeUrl } from "../repl.ts";
 
 const textEncoder = new util.TextEncoder();
 
@@ -18,7 +20,7 @@ export async function buildAndSubmitTransaction(
   payload: DiemTypes.TransactionPayload,
 ) {
   if (sequenceNumber == undefined) {
-    throw "Must pass in parameter sequenceNumber. Try Shuffle.sequenceNumber()";
+    throw "Must pass in parameter sequenceNumber. Try devapi.sequenceNumber()";
   }
 
   const rawTxn = newRawTransaction(
@@ -28,20 +30,12 @@ export async function buildAndSubmitTransaction(
   );
   const signingMsg = generateSigningMessage(rawTxn);
   const signedTxnBytes = await newSignedTransaction(
-    normalizePrivateKey(privateKeyBytes),
+    privateKeyBytes,
     rawTxn,
     signingMsg,
   );
 
-  const settings = {
-    method: "POST",
-    body: signedTxnBytes,
-    headers: {
-      "Content-Type": "application/vnd.bcs+signed_transaction",
-    },
-  };
-  const res = await fetch(relativeUrl("/transactions"), settings);
-  return await res.json();
+  return await devapi.postTransactionBcs(signedTxnBytes);
 }
 
 export function buildScriptFunctionTransaction(
@@ -65,17 +59,29 @@ export function buildScriptFunctionTransaction(
 
 // Invokes a script function using the Dev API's signing_message/ JSON endpoint.
 export async function invokeScriptFunction(
+  scriptFunction: string,
+  typeArguments: string[],
+  args: any[],
+): Promise<any> {
+  return await invokeScriptFunctionWithoutContext(
+    context.senderAddress,
+    await devapi.sequenceNumber(),
+    context.privateKey(),
+    scriptFunction,
+    typeArguments,
+    args,
+  );
+}
+
+// Invokes a script function using the Dev API's signing_message/ JSON endpoint.
+export async function invokeScriptFunctionWithoutContext(
   addressStr: string,
   sequenceNumber: number,
   privateKeyBytes: Uint8Array,
   scriptFunction: string,
   typeArguments: string[],
-  // deno-lint-ignore no-explicit-any
   args: any[],
-) {
-  privateKeyBytes = normalizePrivateKey(privateKeyBytes);
-
-  // deno-lint-ignore no-explicit-any
+): Promise<any> {
   const request: any = {
     "sender": addressStr,
     "sequence_number": `${sequenceNumber}`,
@@ -91,20 +97,9 @@ export async function invokeScriptFunction(
     },
   };
 
-  const resp = await fetch(relativeUrl("/transactions/signing_message"), {
-    method: "POST",
-    body: JSON.stringify(request),
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
-
-  if (!isSuccess(resp.status)) {
-    const errorMsg = (await resp.json()).message;
-    throw `unable to create signing message: ${resp.statusText}. ${errorMsg}`;
-  }
-
-  const signingMsgPayload = await resp.json();
+  const signingMsgPayload = await devapi.postTransactionSigningMessage(
+    JSON.stringify(request),
+  );
   const signingMsg = signingMsgPayload.message.slice(2); // remove 0x prefix
 
   const publicKey = bufferToHex(await ed.getPublicKey(privateKeyBytes));
@@ -115,23 +110,7 @@ export async function invokeScriptFunction(
     "signature": signature,
   };
 
-  // deno-lint-ignore no-explicit-any
-  const txnResponse: any = await fetch(relativeUrl("/transactions"), {
-    method: "POST",
-    body: JSON.stringify(request),
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
-  if (!isSuccess(txnResponse.status)) {
-    const errorMsg = (await txnResponse.json()).message;
-    throw `unable to create signing message: ${txnResponse.statusText}. ${errorMsg}`;
-  }
-  return await txnResponse.json();
-}
-
-function isSuccess(status: number) {
-  return status >= 200 && status < 300;
+  return await devapi.postTransactionJson(JSON.stringify(request));
 }
 
 export function newRawTransaction(
@@ -198,7 +177,6 @@ export function hexToAccountAddress(hex: string): DiemTypes.AccountAddress {
   return new DiemTypes.AccountAddress(senderListTuple);
 }
 
-// deno-lint-ignore no-explicit-any
 function normalizeScriptFunctionArgs(args: any[]) {
   return args.map((a) => {
     if (isString(a) && !a.startsWith("0x")) {
@@ -208,12 +186,10 @@ function normalizeScriptFunctionArgs(args: any[]) {
   });
 }
 
-// deno-lint-ignore no-explicit-any
 function isString(value: any) {
   return typeof value === "string" || value instanceof String;
 }
 
-// deno-lint-ignore no-explicit-any
 export function bufferToHex(buffer: any) {
   return [...new Uint8Array(buffer)]
     .map((b) => b.toString(16).padStart(2, "0"))
@@ -245,16 +221,4 @@ export function hexToAscii(hexx: string) {
     str += String.fromCharCode(parseInt(hex.substr(i, 2), 16));
   }
   return str;
-}
-
-function normalizePrivateKey(privateKeyBytes: Uint8Array): Uint8Array {
-  if (privateKeyBytes.length == 33) {
-    // slice off first BIP type byte, rest of 32 bytes is private key
-    privateKeyBytes = privateKeyBytes.slice(1);
-  }
-  return privateKeyBytes;
-}
-
-function relativeUrl(tail: string) {
-  return new URL(tail, nodeUrl).href;
 }

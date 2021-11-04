@@ -15,8 +15,6 @@ pub const DEFAULT_BLOCKCHAIN: &str = "goodday";
 /// Directory of generated transaction builders for helloblockchain.
 const EXAMPLES_DIR: Dir = include_dir!("../move/examples");
 
-const REPL_FILE_CONTENT: &[u8] = include_bytes!("../repl.ts");
-
 pub fn handle(blockchain: String, pathbuf: PathBuf) -> Result<()> {
     let project_path = pathbuf.as_path();
     println!("Creating shuffle project in {}", project_path.display());
@@ -35,9 +33,6 @@ fn write_project_files(path: &Path, config: &shared::ProjectConfig) -> Result<()
     let toml_path = path.join("Shuffle.toml");
     let toml_string = toml::to_string(config)?;
     fs::write(toml_path, toml_string)?;
-
-    let repl_ts_path = path.join("repl.ts");
-    fs::write(repl_ts_path, REPL_FILE_CONTENT)?;
     Ok(())
 }
 

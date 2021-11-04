@@ -1,23 +1,18 @@
-export const helpObject = {
-    "Note 1" : "This is a Typescript/Javascript repl.",
-    "Note 2" : "There are 4 top level objects available for use: Shuffle, main, codegen, and DiemHelpers",
-    "Note 3" : "Run each of the top level objects in the repl to see all of the methods that can be invoked",
-    "Note 4" : "Try running these commands: `Shuffle`, `main`, `DiemHelpers`, `codegen`",
-    "Note 5" : "To invoke any Function, run [top level object].Function(args)",
-    "Note 6" : "Try running this command: DiemHelpers.hexToAscii(\"0x48656c6c6f\")",
-    "Note 7" : "To invoke any AsyncFunction, prefix the method with await",
-    "Note 8" : "Try running these commands: `await Shuffle.transactions()`, `await Shuffle.modules()`",
-    "Note 9" : "Shuffle provides information about ledger information, transactions, modules, ",
-    "9 cont" : "and all other information related to the account being used",
-    "Note 10" : "To find which arguments must be passed into each method in Shuffle look at “project_path”/repl.ts",
-    "Note 11" : "main provides scripts and script functions that interact with the modules deployed",
-    "Note 12" : "To find which arguments must be passed into each method in main look at “project_path”/main/mod.ts",
-    "Note 13" : "DiemHelpers provide a set of helper methods that can be used to build, create, sign, ",
-    "13 cont" : "and submit transactions",
-    "Note 14" : "To find which arguments must be passed into each method in DiemHelpers look ",
-    "14 cont" : "at “project_path”/main/helpers.ts",
-    "Note 15" : "Codegen encapsulates all of the generated typescript from transaction-builders ",
-    "15 cont" : "being run on package main",
-    "Note 16" : "To find which arguments must be passed into each method in ",
-    "16 cont" : "codegen look at “project_path”/generated/diemTypes/mod.ts"
-}
+// Copyright (c) The Diem Core Contributors
+// SPDX-License-Identifier: Apache-2.0
+
+export const helpObject = [
+  "This is a Typescript/Javascript repl, with some helper!",
+  "To invoke any AsyncFunction, prefix the method with await",
+  "Let's start with the `devapi`.",
+  "Try running: `await devapi.transactions();`, `await devapi.modules();`",
+  "Now, let's check out `helpers`.",
+  "Try running: `await helpers.setMessageScriptFunction('hello');`",
+  "Now run `await devapi.accountTransactions();`",
+  "To find which arguments must be passed into each method in DiemHelpers look ",
+  "at “project_path”/main/helpers.ts",
+  "Codegen encapsulates all of the generated typescript from transaction-builders",
+  "being run on package main",
+  "To find which arguments must be passed into each method in ",
+  "codegen look at “project_path”/generated/diemTypes/mod.ts",
+];

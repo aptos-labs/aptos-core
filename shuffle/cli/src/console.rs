@@ -17,12 +17,24 @@ pub fn handle(
 ) -> Result<()> {
     shared::generate_typescript_libraries(project_path)?;
     let deno_bootstrap = format!(
-        r#"import * as Shuffle from "{shuffle}";
+        r#"import * as context from "{context}";
+        import * as devapi from "{devapi}";
+        import * as helpers from "{helpers}";
         import * as main from "{main}";
         import * as codegen from "{codegen}";
-        import * as DiemHelpers from "{helpers}";
         import * as help from "{repl_help}";"#,
-        shuffle = project_path.join("repl.ts").to_string_lossy(),
+        context = project_path
+            .join(shared::MAIN_PKG_PATH)
+            .join("context.ts")
+            .to_string_lossy(),
+        devapi = project_path
+            .join(shared::MAIN_PKG_PATH)
+            .join("devapi.ts")
+            .to_string_lossy(),
+        helpers = project_path
+            .join(shared::MAIN_PKG_PATH)
+            .join("helpers.ts")
+            .to_string_lossy(),
         main = project_path
             .join(shared::MAIN_PKG_PATH)
             .join("mod.ts")
@@ -30,10 +42,6 @@ pub fn handle(
         codegen = project_path
             .join(shared::MAIN_PKG_PATH)
             .join("generated/diemTypes/mod.ts")
-            .to_string_lossy(),
-        helpers = project_path
-            .join(shared::MAIN_PKG_PATH)
-            .join("helpers.ts")
             .to_string_lossy(),
         repl_help = project_path
             .join(shared::MAIN_PKG_PATH)
