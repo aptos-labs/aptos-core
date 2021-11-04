@@ -115,6 +115,7 @@ fn accounts_routes(
 #[serde(rename_all = "kebab-case")]
 struct CreateAccountParams {
     authentication_key: AuthenticationKey,
+    currency: Currency,
 }
 
 fn create_account_route(
@@ -176,7 +177,7 @@ async fn create_account(
         }
 
         let builder = service.transaction_factory.create_parent_vasp_account(
-            Currency::XUS,
+            params.currency,
             0, // sliding_nonce
             params.authentication_key,
             &format!("No. {}", treasury_account.sequence_number()),

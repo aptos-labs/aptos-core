@@ -21,11 +21,18 @@ impl FaucetClient {
         }
     }
 
-    pub fn create_account(&self, authentication_key: AuthenticationKey) -> Result<()> {
+    pub fn create_account(
+        &self,
+        authentication_key: AuthenticationKey,
+        currency_code: &str,
+    ) -> Result<()> {
         let client = reqwest::blocking::Client::new();
         let mut url = Url::parse(&self.url).map_err(Error::request)?;
         url.set_path("accounts");
-        let query = format!("authentication-key={}", authentication_key);
+        let query = format!(
+            "authentication-key={}&currency={}",
+            authentication_key, currency_code
+        );
         url.set_query(Some(&query));
 
         // Faucet returns the transaction that creates the account and needs to be waited on before
@@ -76,30 +83,8 @@ impl FaucetClient {
         auth_key: AuthenticationKey,
         amount: u64,
     ) -> Result<()> {
-        let client = reqwest::blocking::Client::new();
-
-        let url = format!(
-            "{}?amount={}&auth_key={}&currency_code={}&return_txns=true",
-            self.url, amount, auth_key, currency_code,
-        );
-
-        // Faucet returns a list of txns that need to be waited on before returning. 1) a txn for
-        // creating the account (if it doesn't already exist) and 2) to issue funds to said
-        // account.
-        let response = client.post(&url).send().map_err(Error::request)?;
-        let status_code = response.status();
-        let body = response.text().map_err(Error::decode)?;
-        if !status_code.is_success() {
-            return Err(Error::status(status_code.as_u16()));
-        }
-        let bytes = hex::decode(body).map_err(Error::decode)?;
-        let txns: Vec<SignedTransaction> = bcs::from_bytes(&bytes).map_err(Error::decode)?;
-
-        for txn in txns {
-            self.json_rpc_client
-                .wait_for_signed_transaction(&txn, None, None)
-                .map_err(Error::unknown)?;
-        }
+        self.create_account(auth_key, currency_code)?;
+        self.fund(auth_key.derived_address(), currency_code, amount)?;
 
         Ok(())
     }

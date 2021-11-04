@@ -650,7 +650,7 @@ mod tests {
             "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d",
         )
         .unwrap();
-        tokio::task::spawn_blocking(move || faucet_client.create_account(auth_key).unwrap())
+        tokio::task::spawn_blocking(move || faucet_client.create_account(auth_key, "XUS").unwrap())
             .await
             .unwrap();
     }
@@ -670,7 +670,7 @@ mod tests {
         )
         .unwrap();
         tokio::task::spawn_blocking(move || {
-            faucet_client.create_account(auth_key).unwrap();
+            faucet_client.create_account(auth_key, "XUS").unwrap();
             faucet_client
                 .fund(auth_key.derived_address(), "XUS", 10)
                 .unwrap()
