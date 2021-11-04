@@ -109,6 +109,9 @@ compiled_package_info:
       name: Option
     : Std
     ? address: "00000000000000000000000000000001"
+      name: ParallelExecutionConfig
+    : DiemFramework
+    ? address: "00000000000000000000000000000001"
       name: PaymentScripts
     : DiemFramework
     ? address: "00000000000000000000000000000001"

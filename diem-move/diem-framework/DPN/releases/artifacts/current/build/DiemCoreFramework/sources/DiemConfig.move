@@ -13,6 +13,7 @@ module DiemFramework::DiemConfig {
     friend DiemFramework::DiemVMConfig;
     friend DiemFramework::DiemSystem;
     friend DiemFramework::DiemConsensusConfig;
+    friend DiemFramework::ParallelExecutionConfig;
 
     /// A generic singleton resource that holds a value of a specific type.
     struct DiemConfig<Config: copy + drop + store> has key, store {

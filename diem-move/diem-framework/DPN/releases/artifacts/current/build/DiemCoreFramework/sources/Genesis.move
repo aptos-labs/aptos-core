@@ -20,6 +20,7 @@ module DiemFramework::Genesis {
     use DiemFramework::DiemVersion;
     use DiemFramework::TransactionFee;
     use DiemFramework::DiemVMConfig;
+    use DiemFramework::ParallelExecutionConfig;
     use DiemFramework::ValidatorConfig;
     use DiemFramework::ValidatorOperatorConfig;
     use Std::Signer;
@@ -77,6 +78,9 @@ module DiemFramework::Genesis {
 
         // Consensus config setup
         DiemConsensusConfig::initialize(dr_account);
+
+        // Parallel execution config setup
+        ParallelExecutionConfig::initialize_parallel_execution(dr_account);
 
         // Currency setup
         Diem::initialize(dr_account);

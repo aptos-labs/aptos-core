@@ -194,6 +194,7 @@ async fn test_get_module_diem_config() {
                 "0x1::DiemTransactionPublishingOption",
                 "0x1::DiemVMConfig",
                 "0x1::DiemVersion",
+                "0x1::ParallelExecutionConfig",
                 "0x1::RegisteredCurrencies"
             ],
             "exposed_functions": [
