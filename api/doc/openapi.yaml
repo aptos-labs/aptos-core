@@ -240,7 +240,7 @@ paths:
         **Submit transaction using signed transaction BCS bytes**
 
           * Generate Diem core types and transaction script functions for the client application langauge
-            by [Tranaction Builder](https://github.com/diem/diem/tree/main/language/transaction-builder/generator)
+            by [Tranaction Builder](https://github.com/diem/diem/tree/main/diem-move/transaction-builder-generator)
           * Create [RawTransaction](https://diem.github.io/diem/diem_types/transaction/struct.RawTransaction.html).
           * Create transaction signing message: bytes("DIEM::RawTransaction") + BCS bytes of the RawTransaction.
             See [Crypto Spec](https://github.com/diem/diem/blob/main/specifications/crypto/README.md) for more details.

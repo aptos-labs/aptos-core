@@ -65,13 +65,13 @@ target/debug/generate-transaction-builders \
     --module-name diem_framework \
     --with-diem-types "testsuite/generate-format/tests/staged/diem.yaml" \
     --target-source-dir "$DEST" \
-    --with-custom-diem-code language/transaction-builder/generator/examples/python3/custom_diem_code/*.py -- \
+    --with-custom-diem-code diem-move/transaction-builder-generator/examples/python3/custom_diem_code/*.py -- \
     "diem-move/diem-framework/DPN/releases/legacy" \
     "diem-move/diem-framework/DPN/releases/artifacts/current"
 ```
 Next, you may copy and execute the [Python demo file](examples/python3/stdlib_demo.py) with:
 ```bash
-cp language/transaction-builder/generator/examples/python3/stdlib_demo.py "$DEST"
+cp diem-move/transaction-builder-generator/examples/python3/stdlib_demo.py "$DEST"
 PYTHONPATH="$PYTHONPATH:$DEST" python3 "$DEST/stdlib_demo.py"
 ```
 
@@ -89,7 +89,7 @@ target/debug/generate-transaction-builders \
 ```
 Next, you may copy and execute the [C++ demo file](examples/cpp/stdlib_demo.cpp) with:
 ```bash
-cp language/transaction-builder/generator/examples/cpp/stdlib_demo.cpp "$DEST"
+cp diem-move/transaction-builder-generator/examples/cpp/stdlib_demo.cpp "$DEST"
 clang++ --std=c++17 -I "$DEST" "$DEST/diem_framework.cpp" "$DEST/stdlib_demo.cpp" -o "$DEST/stdlib_demo"
 "$DEST/stdlib_demo"
 ```
@@ -103,13 +103,13 @@ target/debug/generate-transaction-builders \
     --module-name com.diem.stdlib \
     --with-diem-types "testsuite/generate-format/tests/staged/diem.yaml" \
     --target-source-dir "$DEST" \
-    --with-custom-diem-code language/transaction-builder/generator/examples/java/custom_diem_code/*.java -- \
+    --with-custom-diem-code diem-move/transaction-builder-generator/examples/java/custom_diem_code/*.java -- \
     "diem-move/diem-framework/DPN/releases/legacy" \
     "diem-move/diem-framework/DPN/releases/artifacts/current"
 ```
 Next, you may copy and execute the [Java demo file](examples/java/StdlibDemo.java) with:
 ```bash
-cp language/transaction-builder/generator/examples/java/StdlibDemo.java "$DEST"
+cp diem-move/transaction-builder-generator/examples/java/StdlibDemo.java "$DEST"
 (find "$DEST" -name "*.java" | xargs javac -cp "$DEST")
 java -enableassertions -cp "$DEST" StdlibDemo
 ```
@@ -131,7 +131,7 @@ target/debug/generate-transaction-builders \
 Next, you may copy and execute the [Go demo file](examples/golang/stdlib_demo.go) as follows:
 (Note that `$DEST` must be an absolute path)
 ```bash
-cp language/transaction-builder/generator/examples/golang/stdlib_demo.go "$DEST"
+cp diem-move/transaction-builder-generator/examples/golang/stdlib_demo.go "$DEST"
 (cd "$DEST" && go mod init testing && go mod edit -replace testing="$DEST" && go run stdlib_demo.go)
 ```
 
@@ -172,14 +172,14 @@ target/debug/generate-transaction-builders \
     --module-name Diem.Stdlib \
     --with-diem-types "testsuite/generate-format/tests/staged/diem.yaml" \
     --target-source-dir "$DEST" \
-    --with-custom-diem-code language/transaction-builder/generator/examples/csharp/custom_diem_code/*.cs -- \
+    --with-custom-diem-code diem-move/transaction-builder-generator/examples/csharp/custom_diem_code/*.cs -- \
     "diem-move/diem-framework/DPN/releases/legacy" \
     "diem-move/diem-framework/DPN/releases/artifacts/current"
 ```
 Next, you may copy and execute the [C# demo file](examples/csharp/StdlibDemo.cs) with:
 ```bash
 mkdir "$DEST"/Demo
-cp language/transaction-builder/generator/examples/csharp/StdlibDemo.cs "$DEST/Demo"
+cp diem-move/transaction-builder-generator/examples/csharp/StdlibDemo.cs "$DEST/Demo"
 cd "$DEST/Diem/Stdlib"
 dotnet new classlib -n Diem.Stdlib -o .
 dotnet add Diem.Stdlib.csproj reference ../Types/Diem.Types.csproj

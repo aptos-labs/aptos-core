@@ -19,9 +19,9 @@ serde-reflection = "0.3.4"
 serde-generate = "0.20.2"
 serde_yaml = "0.8.17"
 
-diem-types = { path = "../../../types" }
-diem-workspace-hack = { path = "../../../common/workspace-hack" }
-move-core-types = { path = "../../move-core/types" }
+diem-types = { path = "../../types" }
+diem-workspace-hack = { path = "../../common/workspace-hack" }
+move-core-types = { path = "../../language/move-core/types" }
 bcs = "0.1.2"
 
 [dev-dependencies]

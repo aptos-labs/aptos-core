@@ -22,7 +22,7 @@ diem-types = { path = "../../types" }
 diem-workspace-hack = { path = "../../common/workspace-hack" }
 generate-key = { path = "../../config/generate-key" }
 move-prover = { path = "../../language/move-prover" }
-transaction-builder-generator = { path = "../../language/transaction-builder/generator" }
+transaction-builder-generator = { path = "../../diem-move/transaction-builder-generator" }
 move-core-types = { path = "../../language/move-core/types" }
 shuffle-transaction-builder = { path = "../transaction-builder" }
 

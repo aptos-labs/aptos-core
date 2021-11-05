@@ -26,7 +26,7 @@ generate-key = { path = "../../config/generate-key" }
 move-command-line-common = { path = "../../language/move-command-line-common" }
 move-prover = { path = "../../language/move-prover" }
 move-stdlib = { path = "../../language/move-stdlib" }
-transaction-builder-generator = { path = "../../language/transaction-builder/generator" }
+transaction-builder-generator = { path = "../../diem-move/transaction-builder-generator" }
 
 anyhow = "1.0.38"
 bcs = "0.1.2"

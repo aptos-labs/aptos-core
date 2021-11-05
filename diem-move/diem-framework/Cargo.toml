@@ -21,7 +21,7 @@ diem-crypto = { path = "../../crypto/crypto" }
 diem-types = { path = "../../types" }
 diem-workspace-hack = { path = "../../common/workspace-hack" }
 move-binary-format = { path = "../../language/move-binary-format" }
-transaction-builder-generator = { path = "../../language/transaction-builder/generator" }
+transaction-builder-generator = { path = "../transaction-builder-generator" }
 move-stdlib = { path = "../../language/move-stdlib" }
 move-symbol-pool = { path = "../../language/move-symbol-pool" }
 move-core-types = { path = "../../language/move-core/types" }

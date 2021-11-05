@@ -15,13 +15,13 @@ proptest = "1.0.0"
 criterion-cpu-time = "0.1.0"
 
 diem-types = { path = "../../types", features = ["fuzzing"] }
-language-e2e-tests = { path = "../testing-infra/e2e-tests" }
+language-e2e-tests = { path = "../../language/testing-infra/e2e-tests" }
 diem-workspace-hack = { path = "../../common/workspace-hack" }
 
-read-write-set = { path = "../tools/read-write-set" }
-read-write-set-dynamic = { path = "../tools/read-write-set/dynamic" }
-diem-vm = { path = "../../diem-move/diem-vm" }
-diem-framework-releases = { path = "../../diem-move/diem-framework/DPN/releases" }
+read-write-set = { path = "../../language/tools/read-write-set" }
+read-write-set-dynamic = { path = "../../language/tools/read-write-set/dynamic" }
+diem-vm = { path = "../diem-vm" }
+diem-framework-releases = { path = "../diem-framework/DPN/releases" }
 
 [[bench]]
 name = "transaction_benches"
