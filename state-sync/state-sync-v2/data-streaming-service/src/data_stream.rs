@@ -3,9 +3,7 @@
 
 use crate::{
     data_notification,
-    data_notification::{
-        DataClientRequest, DataClientResponse, DataNotification, DataPayload, NotificationId,
-    },
+    data_notification::{DataClientRequest, DataNotification, DataPayload, NotificationId},
     error::Error,
     logging::{LogEntry, LogEvent, LogSchema},
     stream_progress_tracker::{DataStreamTracker, StreamProgressTracker},
@@ -13,7 +11,7 @@ use crate::{
 };
 use channel::{diem_channel, message_queues::QueueStyle};
 use diem_data_client::{
-    AdvertisedData, DiemDataClient, GlobalDataSummary, ResponseContext, ResponseError,
+    AdvertisedData, DiemDataClient, GlobalDataSummary, Response, ResponseContext, ResponseError,
     ResponsePayload,
 };
 use diem_id_generator::{IdGenerator, U64IdGenerator};
@@ -469,7 +467,7 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStream<T> {
     fn send_data_notification_to_client(
         &mut self,
         data_client_request: &DataClientRequest,
-        data_client_response: DataClientResponse,
+        data_client_response: Response<ResponsePayload>,
     ) -> Result<(), Error> {
         let (response_context, response_payload) = data_client_response.into_parts();
 
@@ -644,7 +642,7 @@ impl FusedStream for DataStreamListener {
 /// of the original request. No other sanity checks are done.
 fn sanity_check_client_response(
     data_client_request: &DataClientRequest,
-    data_client_response: &DataClientResponse,
+    data_client_response: &Response<ResponsePayload>,
 ) -> bool {
     match data_client_request {
         DataClientRequest::AccountsWithProof(_) => {

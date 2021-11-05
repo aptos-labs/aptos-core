@@ -3,8 +3,7 @@
 
 use crate::{
     data_notification::{
-        DataClientRequest, DataClientResponse, DataPayload, EpochEndingLedgerInfosRequest,
-        PendingClientResponse,
+        DataClientRequest, DataPayload, EpochEndingLedgerInfosRequest, PendingClientResponse,
     },
     data_stream::{
         DataStream, DataStreamListener, MAX_NOTIFICATION_ID_MAPPINGS, MAX_REQUEST_RETRY,
@@ -59,7 +58,7 @@ async fn test_stream_blocked() {
         };
         let pending_response = PendingClientResponse {
             client_request: client_request.clone(),
-            client_response: Some(Ok(DataClientResponse {
+            client_response: Some(Ok(Response {
                 context,
                 payload: ResponsePayload::NumberOfAccountStates(10),
             })),

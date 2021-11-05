@@ -16,10 +16,6 @@ use std::fmt::{Debug, Formatter};
 /// A unique ID used to identify each notification.
 pub type NotificationId = u64;
 
-/// A generic data client response enum.
-// TODO(joshlind): remove me!
-pub type DataClientResponse = Response<ResponsePayload>;
-
 /// A single data notification with an ID and data payload.
 #[derive(Clone, Debug)]
 pub struct DataNotification {
@@ -92,7 +88,7 @@ pub struct TransactionOutputsWithProofRequest {
 /// network and will be available in `client_response` when received.
 pub struct PendingClientResponse {
     pub client_request: DataClientRequest,
-    pub client_response: Option<Result<DataClientResponse, diem_data_client::Error>>,
+    pub client_response: Option<Result<Response<ResponsePayload>, diem_data_client::Error>>,
 }
 
 impl Debug for PendingClientResponse {

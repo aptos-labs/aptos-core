@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    data_notification::{DataClientRequest, DataClientResponse, EpochEndingLedgerInfosRequest},
+    data_notification::{DataClientRequest, EpochEndingLedgerInfosRequest},
     error::Error,
     stream_progress_tracker::{DataStreamTracker, EpochEndingStreamTracker, StreamProgressTracker},
     streaming_client::{GetAllEpochEndingLedgerInfosRequest, StreamRequest},
@@ -289,7 +289,7 @@ fn create_empty_client_response_payload() -> ResponsePayload {
     ResponsePayload::EpochEndingLedgerInfos(vec![])
 }
 
-fn create_empty_client_response() -> DataClientResponse {
+fn create_empty_client_response() -> Response<ResponsePayload> {
     let context = ResponseContext {
         id: 0,
         response_callback: Box::new(NoopResponseCallback),
