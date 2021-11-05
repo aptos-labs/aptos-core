@@ -18,12 +18,13 @@ use move_cli::package::cli;
 use move_package::BuildConfig;
 use shared::Home;
 use std::{
-    collections::HashMap,
     panic,
     path::{Path, PathBuf},
     process::Command,
+    str::FromStr,
 };
 use structopt::StructOpt;
+use url::Url;
 
 pub fn run_e2e_tests(project_path: &Path) -> Result<()> {
     let _config = shared::read_project_config(project_path)?;
@@ -37,9 +38,9 @@ pub fn run_e2e_tests(project_path: &Path) -> Result<()> {
         )
     })?;
     let json_rpc_url = format!("http://0.0.0.0:{}", config.json_rpc.address.port());
-    let network = json_rpc_url.as_str();
+    let network = Url::from_str(json_rpc_url.as_str())?;
     println!("Connecting to {}...", network);
-    let client = BlockingClient::new(network);
+    let client = BlockingClient::new(network.as_str());
     let factory = TransactionFactory::new(ChainId::test());
 
     let mut new_account = create_test_account(&client, &home, &factory)?;
@@ -48,7 +49,7 @@ pub fn run_e2e_tests(project_path: &Path) -> Result<()> {
     run_deno_test(
         project_path,
         &config,
-        network,
+        &network,
         home.get_test_key_path(),
         new_account.address(),
     )
@@ -113,7 +114,7 @@ fn send_module_transaction(
 fn run_deno_test(
     project_path: &Path,
     config: &NodeConfig,
-    network: &str,
+    network: &Url,
     key_path: &Path,
     sender_address: AccountAddress,
 ) -> Result<()> {
@@ -123,24 +124,8 @@ fn run_deno_test(
         .to_string_lossy()
         .to_string();
 
-    let mut filtered_envs: HashMap<String, String> = HashMap::new();
-    filtered_envs.insert(
-        String::from("PROJECT_PATH"),
-        project_path.to_str().unwrap().to_string(),
-    );
-    filtered_envs.insert(
-        String::from("SHUFFLE_HOME"),
-        shared::get_shuffle_dir().to_str().unwrap().to_string(),
-    );
-
-    filtered_envs.insert(String::from("SENDER_ADDRESS"), sender_address.to_string());
-    filtered_envs.insert(
-        String::from("PRIVATE_KEY_PATH"),
-        key_path.to_string_lossy().to_string(),
-    );
-
-    filtered_envs.insert(String::from("SHUFFLE_NETWORK"), network.to_string());
-
+    let filtered_envs =
+        shared::get_filtered_envs_for_deno(project_path, network, key_path, sender_address);
     Command::new("deno")
         .args([
             "test",

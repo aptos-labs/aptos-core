@@ -4,7 +4,7 @@
 use crate::shared;
 use anyhow::Result;
 use diem_types::account_address::AccountAddress;
-use std::{collections::HashMap, path::Path, process::Command};
+use std::{path::Path, process::Command};
 use url::Url;
 
 /// Launches a Deno REPL for the shuffle project, generating transaction
@@ -40,27 +40,8 @@ pub fn handle(
             .join("repl_help.ts")
             .to_string_lossy()
     );
-
-    let mut filtered_envs: HashMap<String, String> = HashMap::new();
-    filtered_envs.insert(
-        String::from("PROJECT_PATH"),
-        project_path.to_string_lossy().to_string(),
-    );
-    filtered_envs.insert(
-        String::from("SHUFFLE_HOME"),
-        shared::get_shuffle_dir().to_string_lossy().to_string(),
-    );
-    filtered_envs.insert(
-        String::from("SENDER_ADDRESS"),
-        sender_address.to_hex_literal(),
-    );
-    filtered_envs.insert(
-        String::from("PRIVATE_KEY_PATH"),
-        key_path.to_string_lossy().to_string(),
-    );
-
-    filtered_envs.insert(String::from("SHUFFLE_NETWORK"), network.to_string());
-
+    let filtered_envs =
+        shared::get_filtered_envs_for_deno(project_path, &network, key_path, sender_address);
     Command::new("deno")
         .args(["repl", "--unstable", "--eval", deno_bootstrap.as_str()])
         .envs(&filtered_envs)

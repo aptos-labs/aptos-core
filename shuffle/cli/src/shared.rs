@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 use anyhow::{anyhow, Result};
 use diem_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
-use diem_sdk::client::BlockingClient;
+use diem_sdk::client::{AccountAddress, BlockingClient};
 use diem_types::transaction::authenticator::AuthenticationKey;
 use directories::BaseDirs;
 use move_package::compilation::compiled_package::CompiledPackage;
@@ -11,7 +11,7 @@ use serde_generate as serdegen;
 use serde_generate::SourceInstaller;
 use serde_reflection::Registry;
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashMap},
     fs,
     fs::File,
     io::Write,
@@ -96,6 +96,34 @@ pub fn get_shuffle_project_path(cwd: &Path) -> Result<PathBuf> {
 // returns ~/.shuffle
 pub fn get_shuffle_dir() -> PathBuf {
     BaseDirs::new().unwrap().home_dir().join(".shuffle")
+}
+
+pub fn get_filtered_envs_for_deno(
+    project_path: &Path,
+    network: &Url,
+    key_path: &Path,
+    sender_address: AccountAddress,
+) -> HashMap<String, String> {
+    let mut filtered_envs: HashMap<String, String> = HashMap::new();
+    filtered_envs.insert(
+        String::from("PROJECT_PATH"),
+        project_path.to_string_lossy().to_string(),
+    );
+    filtered_envs.insert(
+        String::from("SHUFFLE_HOME"),
+        get_shuffle_dir().to_string_lossy().to_string(),
+    );
+    filtered_envs.insert(
+        String::from("SENDER_ADDRESS"),
+        sender_address.to_hex_literal(),
+    );
+    filtered_envs.insert(
+        String::from("PRIVATE_KEY_PATH"),
+        key_path.to_string_lossy().to_string(),
+    );
+
+    filtered_envs.insert(String::from("SHUFFLE_NETWORK"), network.to_string());
+    filtered_envs
 }
 
 // Contains all the commonly used paths in shuffle/cli
@@ -668,5 +696,37 @@ mod test {
         let correct_url = Url::from_str("http://127.0.0.1:8081").unwrap();
         assert_eq!(generated_url, correct_url);
         assert_eq!(build_url("trove", &all_networks).is_err(), true);
+    }
+
+    #[test]
+    fn test_get_filtered_envs_for_deno() {
+        let project_path = Path::new("/Users/project_path");
+        let network = Url::from_str("http://127.0.0.1:8081").unwrap();
+        let key_path = Path::new("/Users/private_key_path/dev.key");
+        let address = AccountAddress::random();
+        let shuffle_dir = get_shuffle_dir();
+
+        let filtered_envs = get_filtered_envs_for_deno(project_path, &network, key_path, address);
+
+        assert_eq!(
+            filtered_envs.get("PROJECT_PATH").unwrap(),
+            &project_path.to_string_lossy().to_string()
+        );
+        assert_eq!(
+            filtered_envs.get("SHUFFLE_HOME").unwrap(),
+            &shuffle_dir.to_str().unwrap().to_string()
+        );
+        assert_eq!(
+            filtered_envs.get("SENDER_ADDRESS").unwrap(),
+            &address.to_hex_literal()
+        );
+        assert_eq!(
+            filtered_envs.get("PRIVATE_KEY_PATH").unwrap(),
+            &key_path.to_string_lossy().to_string()
+        );
+        assert_eq!(
+            filtered_envs.get("SHUFFLE_NETWORK").unwrap(),
+            &network.to_string()
+        )
     }
 }
