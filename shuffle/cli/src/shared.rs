@@ -1,6 +1,5 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
-use crate::new::DEFAULT_NETWORK;
 use anyhow::{anyhow, Result};
 use diem_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 use diem_sdk::client::BlockingClient;
@@ -12,39 +11,32 @@ use serde_generate as serdegen;
 use serde_generate::SourceInstaller;
 use serde_reflection::Registry;
 use std::{
+    collections::BTreeMap,
     fs,
     fs::File,
     io::Write,
     path::{Path, PathBuf},
+    str::FromStr,
     time::Duration,
 };
 use transaction_builder_generator as buildgen;
 use transaction_builder_generator::SourceInstaller as BuildgenSourceInstaller;
+use url::Url;
 
 pub const MAIN_PKG_PATH: &str = "main";
 const NEW_KEY_FILE_CONTENT: &[u8] = include_bytes!("../new_account.key");
+pub const LOCALHOST_NETWORK_NAME: &str = "localhost";
+pub const LOCALHOST_NETWORK_BASE: &str = "http://127.0.0.1";
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "kebab-case")]
-pub struct Config {
+pub struct ProjectConfig {
     blockchain: String,
-    network: String,
 }
 
-impl Config {
-    pub fn new(config_blockchain: String, config_network: Option<String>) -> Self {
-        let normalized_network = match config_network {
-            Some(network) => network,
-            None => String::from(DEFAULT_NETWORK),
-        };
-        Self {
-            blockchain: config_blockchain,
-            network: normalized_network,
-        }
-    }
-
-    pub fn get_network(&self) -> &str {
-        &self.network
+impl ProjectConfig {
+    pub fn new(blockchain: String) -> Self {
+        Self { blockchain }
     }
 }
 
@@ -55,9 +47,9 @@ pub fn get_home_path() -> PathBuf {
         .to_path_buf()
 }
 
-pub fn read_config(project_path: &Path) -> Result<Config> {
+pub fn read_project_config(project_path: &Path) -> Result<ProjectConfig> {
     let config_string = fs::read_to_string(project_path.join("Shuffle").with_extension("toml"))?;
-    let read_config: Config = toml::from_str(config_string.as_str())?;
+    let read_config: ProjectConfig = toml::from_str(config_string.as_str())?;
     Ok(read_config)
 }
 
@@ -112,6 +104,7 @@ pub struct Home {
     latest_address_path: PathBuf,
     latest_key_path: PathBuf,
     latest_path: PathBuf,
+    networks_config_path: PathBuf,
     node_config_path: PathBuf,
     root_key_path: PathBuf,
     shuffle_path: PathBuf,
@@ -129,6 +122,7 @@ impl Home {
             latest_address_path: home_path.join(".shuffle/accounts/latest/address"),
             latest_key_path: home_path.join(".shuffle/accounts/latest/dev.key"),
             latest_path: home_path.join(".shuffle/accounts/latest"),
+            networks_config_path: home_path.join(".shuffle/Networks.toml"),
             node_config_path: home_path.join(".shuffle/nodeconfig"),
             root_key_path: home_path.join(".shuffle/nodeconfig/mint.key"),
             shuffle_path: home_path.join(".shuffle"),
@@ -256,6 +250,12 @@ impl Home {
         Ok(())
     }
 
+    pub fn read_networks_toml(&self) -> Result<NetworksConfig> {
+        let network_toml_contents = fs::read_to_string(self.networks_config_path.as_path())?;
+        let network_toml: NetworksConfig = toml::from_str(network_toml_contents.as_str())?;
+        Ok(network_toml)
+    }
+
     pub fn read_genesis_waypoint(&self) -> Result<String> {
         fs::read_to_string(self.get_node_config_path().join("waypoint.txt"))
             .map_err(anyhow::Error::new)
@@ -269,6 +269,57 @@ impl Home {
             )),
         }
     }
+
+    pub fn write_top_level_networks_config_into_toml(&self) -> Result<()> {
+        let network_config_path = self.shuffle_path.join("Networks.toml");
+        let network_config_string = toml::to_string_pretty(&generate_top_level_networks_config())?;
+        fs::write(network_config_path, network_config_string)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+pub struct NetworksConfig {
+    networks: BTreeMap<String, Network>,
+}
+
+fn generate_top_level_networks_config() -> NetworksConfig {
+    let mut network_map = BTreeMap::new();
+    network_map.insert("localhost".to_string(), generate_localhost_network());
+    NetworksConfig {
+        networks: network_map,
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+pub struct Network {
+    name: String,
+    base: String,
+    json_rpc_port: u16,
+    dev_api_port: u16,
+}
+
+fn generate_localhost_network() -> Network {
+    Network {
+        name: String::from(LOCALHOST_NETWORK_NAME),
+        base: String::from(LOCALHOST_NETWORK_BASE),
+        json_rpc_port: 8080,
+        dev_api_port: 8081,
+    }
+}
+
+pub fn build_url(network_name: &str, all_networks: &NetworksConfig) -> Result<Url> {
+    let specified_network = all_networks
+        .networks
+        .get(network_name)
+        .ok_or_else(|| anyhow!("Please add specified network to the ~/.shuffle/Networks.json"))?;
+    Ok(Url::from_str(
+        format!(
+            "{}:{}",
+            specified_network.base, specified_network.dev_api_port
+        )
+        .as_str(),
+    )?)
 }
 
 /// Generates the typescript bindings for the main Move package based on the embedded
@@ -343,10 +394,10 @@ pub fn normalized_project_path(project_path: Option<PathBuf>) -> Result<PathBuf>
 
 #[cfg(test)]
 mod test {
-    use super::{generate_typescript_libraries, get_shuffle_project_path};
+    use super::*;
     use crate::{
         new,
-        shared::{Config, Home},
+        shared::{Home, NetworksConfig},
     };
     use diem_crypto::PrivateKey;
     use diem_infallible::duration_since_epoch;
@@ -547,15 +598,6 @@ mod test {
     }
 
     #[test]
-    fn test_get_network() {
-        let temp_config = Config::new(
-            String::from("goodday"),
-            Option::Some(String::from("127.0.0.1:8081")),
-        );
-        assert_eq!(temp_config.get_network(), "127.0.0.1:8081");
-    }
-
-    #[test]
     fn test_save_root_key() {
         let dir = tempdir().unwrap();
         fs::create_dir_all(dir.path().join(".shuffle/accounts/latest")).unwrap();
@@ -579,5 +621,52 @@ mod test {
         fs::create_dir_all(good_dir.path().join(".shuffle/accounts")).unwrap();
         let home = Home::new(good_dir.path()).unwrap();
         assert_eq!(home.check_account_path_exists().is_err(), false);
+    }
+
+    #[test]
+    fn test_read_networks_toml() {
+        let dir = tempdir().unwrap();
+        let home = Home::new(dir.path()).unwrap();
+        fs::create_dir_all(dir.path().join(".shuffle")).unwrap();
+        home.write_top_level_networks_config_into_toml().unwrap();
+        let networks_cfg = home.read_networks_toml().unwrap();
+        assert_eq!(networks_cfg, generate_top_level_networks_config());
+    }
+
+    fn get_test_network() -> Network {
+        Network {
+            name: "localhost".to_string(),
+            base: "http://127.0.0.1".to_string(),
+            json_rpc_port: 8080,
+            dev_api_port: 8081,
+        }
+    }
+
+    #[test]
+    fn test_generate_top_level_networks_config() {
+        let mut network_map = BTreeMap::new();
+        network_map.insert("localhost".to_string(), get_test_network());
+        let networks_cfg = NetworksConfig {
+            networks: network_map,
+        };
+        assert_eq!(generate_top_level_networks_config(), networks_cfg);
+    }
+
+    #[test]
+    fn test_generate_localhost_network() {
+        assert_eq!(generate_localhost_network(), get_test_network());
+    }
+
+    #[test]
+    fn test_build_url() {
+        let mut network_map = BTreeMap::new();
+        network_map.insert("localhost".to_string(), generate_localhost_network());
+        let all_networks = NetworksConfig {
+            networks: network_map,
+        };
+        let generated_url = build_url("localhost", &all_networks).unwrap();
+        let correct_url = Url::from_str("http://127.0.0.1:8081").unwrap();
+        assert_eq!(generated_url, correct_url);
+        assert_eq!(build_url("trove", &all_networks).is_err(), true);
     }
 }

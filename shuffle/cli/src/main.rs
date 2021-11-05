@@ -4,9 +4,9 @@
 use crate::test::TestCommand;
 use anyhow::{anyhow, Result};
 use diem_types::account_address::AccountAddress;
-use std::{fs, path::PathBuf, str::FromStr};
+use std::{fs, path::PathBuf};
 use structopt::StructOpt;
-use url::{ParseError, Url};
+use url::Url;
 
 mod account;
 mod build;
@@ -39,7 +39,7 @@ pub async fn main() -> Result<()> {
             address,
         } => console::handle(
             &shared::normalized_project_path(project_path)?,
-            network,
+            normalized_network(network)?,
             &normalized_key_path(key_path)?,
             normalized_address(address)?,
         ),
@@ -173,10 +173,17 @@ fn normalized_key_path(diem_root_key_path: Option<PathBuf>) -> Result<PathBuf> {
     }
 }
 
-fn normalized_network(network: Option<String>) -> Result<Url, ParseError> {
+fn normalized_network(network: Option<String>) -> Result<Url> {
+    let home = shared::Home::new(shared::get_home_path().as_path())?;
     match network {
-        Some(network) => Url::parse(network.as_str()),
-        None => Url::from_str("http://127.0.0.1:8081"),
+        Some(input) => Ok(shared::build_url(
+            input.as_str(),
+            &home.read_networks_toml()?,
+        )?),
+        None => Ok(shared::build_url(
+            shared::LOCALHOST_NETWORK_NAME,
+            &home.read_networks_toml()?,
+        )?),
     }
 }
 

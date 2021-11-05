@@ -38,7 +38,7 @@ pub fn handle(genesis: Option<String>) -> Result<()> {
 
 fn create_node(home: &Home, genesis: Option<String>) -> Result<()> {
     fs::create_dir_all(home.get_shuffle_path())?;
-
+    home.write_top_level_networks_config_into_toml()?;
     let publishing_option = VMPublishingOption::open();
     let genesis_modules = genesis_modules_from_path(&genesis)?;
     diem_node::load_test_environment(

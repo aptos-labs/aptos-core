@@ -11,7 +11,6 @@ use std::{
 
 /// Default blockchain configuration
 pub const DEFAULT_BLOCKCHAIN: &str = "goodday";
-pub const DEFAULT_NETWORK: &str = "127.0.0.1:8081";
 
 /// Directory of generated transaction builders for helloblockchain.
 const EXAMPLES_DIR: Dir = include_dir!("../move/examples");
@@ -23,7 +22,7 @@ pub fn handle(blockchain: String, pathbuf: PathBuf) -> Result<()> {
     println!("Creating shuffle project in {}", project_path.display());
     fs::create_dir_all(project_path)?;
 
-    let config = shared::Config::new(blockchain, Some(String::from(DEFAULT_NETWORK)));
+    let config = shared::ProjectConfig::new(blockchain);
     write_project_files(project_path, &config)?;
     write_example_move_packages(project_path)?;
 
@@ -32,7 +31,7 @@ pub fn handle(blockchain: String, pathbuf: PathBuf) -> Result<()> {
     Ok(())
 }
 
-fn write_project_files(path: &Path, config: &shared::Config) -> Result<()> {
+fn write_project_files(path: &Path, config: &shared::ProjectConfig) -> Result<()> {
     let toml_path = path.join("Shuffle.toml");
     let toml_string = toml::to_string(config)?;
     fs::write(toml_path, toml_string)?;
@@ -62,22 +61,19 @@ pub(crate) fn write_example_move_packages(project_path: &Path) -> Result<()> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use shared::Config;
+    use shared::ProjectConfig;
     use tempfile::tempdir;
 
     #[test]
     fn test_write_project_config() {
         let dir = tempdir().unwrap();
-        let config = Config::new(
-            String::from(DEFAULT_BLOCKCHAIN),
-            Some(String::from(DEFAULT_NETWORK)),
-        );
+        let config = ProjectConfig::new(String::from(DEFAULT_BLOCKCHAIN));
 
         write_project_files(dir.path(), &config).unwrap();
 
         let config_string =
             fs::read_to_string(dir.path().join("Shuffle").with_extension("toml")).unwrap();
-        let read_config: Config = toml::from_str(config_string.as_str()).unwrap();
+        let read_config: ProjectConfig = toml::from_str(config_string.as_str()).unwrap();
         assert_eq!(config, read_config);
     }
 

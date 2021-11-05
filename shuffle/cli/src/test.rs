@@ -26,7 +26,7 @@ use std::{
 use structopt::StructOpt;
 
 pub fn run_e2e_tests(project_path: &Path) -> Result<()> {
-    let _config = shared::read_config(project_path)?;
+    let _config = shared::read_project_config(project_path)?;
     shared::generate_typescript_libraries(project_path)?;
     let home = Home::new(shared::get_home_path().as_path())?;
 
