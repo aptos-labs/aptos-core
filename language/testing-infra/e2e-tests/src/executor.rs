@@ -28,7 +28,9 @@ use diem_types::{
         type_tag_for_currency_code, AccountResource, BalanceResource, CORE_CODE_ADDRESS,
     },
     block_metadata::{new_block_event_key, BlockMetadata, NewBlockEvent},
-    on_chain_config::{DiemVersion, OnChainConfig, VMPublishingOption, ValidatorSet},
+    on_chain_config::{
+        DiemVersion, OnChainConfig, ParallelExecutionConfig, VMPublishingOption, ValidatorSet,
+    },
     transaction::{
         ChangeSet, SignedTransaction, Transaction, TransactionOutput, TransactionStatus,
         VMValidatorResult,
@@ -39,6 +41,9 @@ use diem_types::{
 use diem_vm::{
     convert_changeset_and_events, data_cache::RemoteStorage, parallel_executor::ParallelDiemVM,
     read_write_set_analysis::add_on_functions_list, DiemVM, VMExecutor, VMValidator,
+};
+use diem_writeset_generator::{
+    encode_disable_parallel_execution, encode_enable_parallel_execution_with_config,
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -385,6 +390,7 @@ impl FakeExecutor {
         }
 
         let output = DiemVM::execute_block(txn_block, &self.data_store);
+
         if let Some(logger) = &self.executed_output {
             logger.log(format!("{:?}\n", output).as_str());
         }
@@ -479,6 +485,38 @@ impl FakeExecutor {
         assert_eq!(event.key(), &new_block_event_key());
         assert!(bcs::from_bytes::<NewBlockEvent>(event.event_data()).is_ok());
         self.apply_write_set(output.write_set());
+    }
+
+    pub fn enable_parallel_execution(&mut self) {
+        let diem_root = Account::new_diem_root();
+        let seq_num = self
+            .read_account_resource_at_address(diem_root.address())
+            .unwrap()
+            .sequence_number();
+
+        let txn = diem_root
+            .transaction()
+            .write_set(encode_enable_parallel_execution_with_config())
+            .sequence_number(seq_num)
+            .sign();
+        self.execute_and_apply(txn);
+        assert!(ParallelExecutionConfig::fetch_config(&self.data_store).is_some());
+    }
+
+    pub fn disable_parallel_execution(&mut self) {
+        if ParallelExecutionConfig::fetch_config(&self.data_store).is_some() {
+            let diem_root = Account::new_diem_root();
+            let txn = diem_root
+                .transaction()
+                .write_set(encode_disable_parallel_execution())
+                .sequence_number(
+                    self.read_account_resource_at_address(diem_root.address())
+                        .unwrap()
+                        .sequence_number(),
+                )
+                .sign();
+            self.execute_and_apply(txn);
+        }
     }
 
     fn module(name: &str) -> ModuleId {

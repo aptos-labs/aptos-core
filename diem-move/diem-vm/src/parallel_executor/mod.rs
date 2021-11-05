@@ -12,7 +12,6 @@ use crate::{
     parallel_executor::{
         read_write_set_analyzer::ReadWriteSetAnalysisWrapper, vm_wrapper::DiemVMWrapper,
     },
-    VMExecutor,
 };
 use diem_parallel_executor::{
     errors::Error,
@@ -99,7 +98,14 @@ impl ParallelDiemVM {
                 None,
             )),
             Err(err @ Error::InferencerError) | Err(err @ Error::UnestimatedWrite) => {
-                Ok((DiemVM::execute_block(transactions, state_view)?, Some(err)))
+                let output = DiemVM::execute_block_and_keep_vm_status(transactions, state_view)?;
+                Ok((
+                    output
+                        .into_iter()
+                        .map(|(_vm_status, txn_output)| txn_output)
+                        .collect(),
+                    Some(err),
+                ))
             }
             Err(Error::InvariantViolation) => Err(VMStatus::Error(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,

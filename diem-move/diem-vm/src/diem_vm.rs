@@ -8,7 +8,7 @@ use crate::{
         validate_signed_transaction, PreprocessedTransaction, VMAdapter,
     },
     counters::*,
-    data_cache::StateViewCache,
+    data_cache::{RemoteStorage, StateViewCache},
     diem_vm_impl::{
         charge_global_write_gas_usage, convert_changeset_and_events, get_currency_info,
         get_gas_currency_code, get_transaction_output, DiemVMImpl, DiemVMInternals,
@@ -26,7 +26,10 @@ use diem_state_view::StateView;
 use diem_types::{
     account_config,
     block_metadata::BlockMetadata,
-    on_chain_config::{DiemVersion, VMConfig, VMPublishingOption, DIEM_VERSION_2, DIEM_VERSION_3},
+    on_chain_config::{
+        DiemVersion, OnChainConfig, ParallelExecutionConfig, VMConfig, VMPublishingOption,
+        DIEM_VERSION_2, DIEM_VERSION_3,
+    },
     transaction::{
         ChangeSet, ModuleBundle, SignatureCheckedTransaction, SignedTransaction, Transaction,
         TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
@@ -46,6 +49,7 @@ use move_core_types::{
 };
 use move_vm_runtime::session::Session;
 use move_vm_types::gas_schedule::GasStatus;
+use read_write_set_dynamic::NormalizedReadWriteSetAnalysis;
 use std::{
     collections::HashSet,
     convert::{AsMut, AsRef},
@@ -717,11 +721,29 @@ impl VMExecutor for DiemVM {
             ))
         });
 
-        let output = Self::execute_block_and_keep_vm_status(transactions, state_view)?;
-        Ok(output
-            .into_iter()
-            .map(|(_vm_status, txn_output)| txn_output)
-            .collect())
+        // Execute transactions in parallel if on chain config is set and loaded.
+        if let Some(read_write_set_analysis) =
+            ParallelExecutionConfig::fetch_config(&RemoteStorage::new(state_view))
+                .and_then(|config| config.read_write_analysis_result)
+                .map(|config| config.into_inner())
+        {
+            let analysis_reuslt = NormalizedReadWriteSetAnalysis::new(read_write_set_analysis);
+
+            // Note that writeset transactions will be executed sequentially as it won't be inferred
+            // by the read write set analysis and thus fall into the sequential path.
+            let (result, _) = crate::parallel_executor::ParallelDiemVM::execute_block(
+                &analysis_reuslt,
+                transactions,
+                state_view,
+            )?;
+            Ok(result)
+        } else {
+            let output = Self::execute_block_and_keep_vm_status(transactions, state_view)?;
+            Ok(output
+                .into_iter()
+                .map(|(_vm_status, txn_output)| txn_output)
+                .collect())
+        }
     }
 }
 
