@@ -5,10 +5,13 @@ use anyhow::Result;
 use diem_types::{
     account_address::AccountAddress,
     account_config::diem_root_address,
+    on_chain_config::ReadWriteSetAnalysis,
     transaction::{Script, WriteSetPayload},
 };
 use handlebars::Handlebars;
+use move_core_types::transaction_argument::TransactionArgument;
 use move_lang::{compiled_unit::AnnotatedCompiledUnit, Compiler, Flags};
+use read_write_set::analyze;
 use serde::Serialize;
 use std::{collections::HashMap, io::Write, path::PathBuf};
 use tempfile::NamedTempFile;
@@ -98,6 +101,55 @@ pub fn encode_halt_network_payload() -> WriteSetPayload {
             compile_script(script.to_str().unwrap().to_owned()),
             vec![],
             vec![],
+        ),
+        execute_as: diem_root_address(),
+    }
+}
+
+pub fn encode_initialize_parallel_execution() -> WriteSetPayload {
+    let mut script = template_path();
+    script.push("initialize_parallel_execution.move");
+
+    WriteSetPayload::Script {
+        script: Script::new(
+            compile_script(script.to_str().unwrap().to_owned()),
+            vec![],
+            vec![],
+        ),
+        execute_as: diem_root_address(),
+    }
+}
+
+pub fn encode_disable_parallel_execution() -> WriteSetPayload {
+    let mut script = template_path();
+    script.push("disable_parallel_execution.move");
+
+    WriteSetPayload::Script {
+        script: Script::new(
+            compile_script(script.to_str().unwrap().to_owned()),
+            vec![],
+            vec![],
+        ),
+        execute_as: diem_root_address(),
+    }
+}
+
+pub fn encode_enable_parallel_execution_with_config() -> WriteSetPayload {
+    let payload = bcs::to_bytes(&ReadWriteSetAnalysis::V1(
+        analyze(diem_framework_releases::current_modules())
+            .expect("Failed to get ReadWriteSet for current Diem Framework")
+            .normalize_all_scripts(diem_vm::read_write_set_analysis::add_on_functions_list())
+            .into_inner(),
+    ))
+    .expect("Failed to serialize analyze result");
+
+    let mut script = template_path();
+    script.push("update_parallel_execution_config.move");
+    WriteSetPayload::Script {
+        script: Script::new(
+            compile_script(script.to_str().unwrap().to_owned()),
+            vec![],
+            vec![TransactionArgument::U8Vector(payload)],
         ),
         execute_as: diem_root_address(),
     }
