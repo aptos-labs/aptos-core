@@ -33,8 +33,8 @@ use diem_types::{
     transaction::{
         authenticator::AuthenticationKey,
         helpers::{create_unsigned_txn, create_user_txn, TransactionSigner},
-        parse_transaction_argument, ChangeSet, Module, RawTransaction, Script, SignedTransaction,
-        TransactionArgument, TransactionPayload, Version, WriteSetPayload,
+        parse_transaction_argument, ChangeSet, ModuleBundle, RawTransaction, Script,
+        SignedTransaction, TransactionArgument, TransactionPayload, Version, WriteSetPayload,
     },
     waypoint::Waypoint,
     write_set::{WriteOp, WriteSetMut},
@@ -1002,7 +1002,7 @@ impl ClientProxy {
         let module_bytes = fs::read(space_delim_strings[2])?;
         self.submit_program(
             space_delim_strings,
-            TransactionPayload::Module(Module::new(module_bytes)),
+            TransactionPayload::ModuleBundle(ModuleBundle::singleton(module_bytes)),
         )
     }
 

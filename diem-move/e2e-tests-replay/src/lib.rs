@@ -975,7 +975,7 @@ fn replay_trace<P: AsRef<Path>>(
                             // be in the diem framework.
                             (vec![signed_txn.sender()], script_fun.clone(), false)
                         }
-                        TransactionPayload::Module(_) => {
+                        TransactionPayload::ModuleBundle(_) => {
                             // TODO: there is not much we can do as the module is written in IR,
                             // hence, exit the test and call it successful
                             if flags.warning {

@@ -28,7 +28,7 @@ use diem_types::{
     block_metadata::BlockMetadata,
     on_chain_config::{DiemVersion, VMConfig, VMPublishingOption, DIEM_VERSION_2, DIEM_VERSION_3},
     transaction::{
-        ChangeSet, Module, SignatureCheckedTransaction, SignedTransaction, Transaction,
+        ChangeSet, ModuleBundle, SignatureCheckedTransaction, SignedTransaction, Transaction,
         TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
         WriteSetPayload,
     },
@@ -248,7 +248,7 @@ impl DiemVM {
                         gas_status,
                     )
                 }
-                TransactionPayload::Module(_) | TransactionPayload::WriteSet(_) => {
+                TransactionPayload::ModuleBundle(_) | TransactionPayload::WriteSet(_) => {
                     return Err(VMStatus::Error(StatusCode::UNREACHABLE));
                 }
             }
@@ -266,12 +266,12 @@ impl DiemVM {
         }
     }
 
-    fn execute_module<S: MoveResolver>(
+    fn execute_modules<S: MoveResolver>(
         &self,
         mut session: Session<S>,
         gas_status: &mut GasStatus,
         txn_data: &TransactionMetadata,
-        module: &Module,
+        modules: &ModuleBundle,
         account_currency_symbol: &IdentStr,
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, TransactionOutput), VMStatus> {
@@ -293,7 +293,7 @@ impl DiemVM {
             .map_err(|e| e.into_vm_status())?;
 
         session
-            .publish_module(module.code().to_vec(), module_address, gas_status)
+            .publish_module_bundle(modules.clone().into_inner(), module_address, gas_status)
             .map_err(|e| e.into_vm_status())?;
 
         charge_global_write_gas_usage(gas_status, &session, &txn_data.sender())?;
@@ -360,7 +360,7 @@ impl DiemVM {
                     &account_currency_symbol,
                     log_context,
                 ),
-            TransactionPayload::Module(m) => self.execute_module(
+            TransactionPayload::ModuleBundle(m) => self.execute_modules(
                 session,
                 &mut gas_status,
                 &txn_data,
@@ -579,7 +579,7 @@ impl DiemVM {
             storage,
             match txn.payload() {
                 TransactionPayload::WriteSet(writeset_payload) => writeset_payload,
-                TransactionPayload::Module(_)
+                TransactionPayload::ModuleBundle(_)
                 | TransactionPayload::Script(_)
                 | TransactionPayload::ScriptFunction(_) => {
                     log_context.alert();
@@ -810,7 +810,7 @@ impl VMAdapter for DiemVM {
                 self.0
                     .run_script_prologue(session, &txn_data, &currency_code, log_context)
             }
-            TransactionPayload::Module(_module) => {
+            TransactionPayload::ModuleBundle(_module) => {
                 self.0.check_gas(&txn_data, log_context)?;
                 self.0
                     .run_module_prologue(session, &txn_data, &currency_code, log_context)

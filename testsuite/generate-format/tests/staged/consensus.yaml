@@ -227,6 +227,11 @@ LedgerInfoWithV0:
 Module:
   STRUCT:
     - code: BYTES
+ModuleBundle:
+  STRUCT:
+    - codes:
+        SEQ:
+          TYPENAME: Module
 ModuleId:
   STRUCT:
     - address:
@@ -402,9 +407,9 @@ TransactionPayload:
         NEWTYPE:
           TYPENAME: Script
     2:
-      Module:
+      ModuleBundle:
         NEWTYPE:
-          TYPENAME: Module
+          TYPENAME: ModuleBundle
     3:
       ScriptFunction:
         NEWTYPE:

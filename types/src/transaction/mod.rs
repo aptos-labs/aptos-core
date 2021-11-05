@@ -46,7 +46,7 @@ mod script;
 mod transaction_argument;
 
 pub use change_set::ChangeSet;
-pub use module::Module;
+pub use module::{Module, ModuleBundle};
 pub use script::{
     ArgumentABI, Script, ScriptABI, ScriptFunction, ScriptFunctionABI, TransactionScriptABI,
     TypeArgumentABI,
@@ -190,7 +190,33 @@ impl RawTransaction {
         RawTransaction {
             sender,
             sequence_number,
-            payload: TransactionPayload::Module(module),
+            payload: TransactionPayload::ModuleBundle(ModuleBundle::from(module)),
+            max_gas_amount,
+            gas_unit_price,
+            gas_currency_code,
+            expiration_timestamp_secs,
+            chain_id,
+        }
+    }
+
+    /// Create a new `RawTransaction` with a list of modules to publish.
+    ///
+    /// A module transaction is the only way to publish code. Multiple modules per transaction
+    /// can be published.
+    pub fn new_module_bundle(
+        sender: AccountAddress,
+        sequence_number: u64,
+        modules: ModuleBundle,
+        max_gas_amount: u64,
+        gas_unit_price: u64,
+        gas_currency_code: String,
+        expiration_timestamp_secs: u64,
+        chain_id: ChainId,
+    ) -> Self {
+        RawTransaction {
+            sender,
+            sequence_number,
+            payload: TransactionPayload::ModuleBundle(modules),
             max_gas_amount,
             gas_unit_price,
             gas_currency_code,
@@ -343,7 +369,7 @@ impl RawTransaction {
                 format!("{}::{}", script_fn.module(), script_fn.function()),
                 script_fn.args().to_vec(),
             ),
-            TransactionPayload::Module(_) => ("module publishing".to_string(), vec![]),
+            TransactionPayload::ModuleBundle(_) => ("module publishing".to_string(), vec![]),
         };
         let mut f_args: String = "".to_string();
         for arg in args {
@@ -415,8 +441,8 @@ pub enum TransactionPayload {
     WriteSet(WriteSetPayload),
     /// A transaction that executes code.
     Script(Script),
-    /// A transaction that publishes code.
-    Module(Module),
+    /// A transaction that publishes multiple modules at the same time.
+    ModuleBundle(ModuleBundle),
     /// A transaction that executes an existing script function published on-chain.
     ScriptFunction(ScriptFunction),
 }
@@ -425,7 +451,7 @@ impl TransactionPayload {
     pub fn should_trigger_reconfiguration_by_default(&self) -> bool {
         match self {
             Self::WriteSet(ws) => ws.should_trigger_reconfiguration_by_default(),
-            Self::Script(_) | Self::ScriptFunction(_) | Self::Module(_) => false,
+            Self::Script(_) | Self::ScriptFunction(_) | Self::ModuleBundle(_) => false,
         }
     }
 

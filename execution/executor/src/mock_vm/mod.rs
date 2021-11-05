@@ -376,7 +376,7 @@ fn decode_transaction(txn: &SignedTransaction) -> MockVMTransaction {
             // Use WriteSet for reconfig only for testing.
             MockVMTransaction::Reconfiguration
         }
-        TransactionPayload::Module(_) => {
+        TransactionPayload::ModuleBundle(_) => {
             unimplemented!("MockVM does not support Module transaction payload.")
         }
     }

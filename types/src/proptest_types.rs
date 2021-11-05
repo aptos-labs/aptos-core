@@ -18,9 +18,10 @@ use crate::{
     on_chain_config::ValidatorSet,
     proof::TransactionInfoListWithProof,
     transaction::{
-        ChangeSet, Module, RawTransaction, Script, SignatureCheckedTransaction, SignedTransaction,
-        Transaction, TransactionArgument, TransactionInfo, TransactionListWithProof,
-        TransactionPayload, TransactionStatus, TransactionToCommit, Version, WriteSetPayload,
+        ChangeSet, Module, ModuleBundle, RawTransaction, Script, SignatureCheckedTransaction,
+        SignedTransaction, Transaction, TransactionArgument, TransactionInfo,
+        TransactionListWithProof, TransactionPayload, TransactionStatus, TransactionToCommit,
+        Version, WriteSetPayload,
     },
     validator_info::ValidatorInfo,
     validator_signer::ValidatorSigner,
@@ -325,7 +326,7 @@ fn new_raw_transaction(
 ) -> RawTransaction {
     let chain_id = ChainId::test();
     match payload {
-        TransactionPayload::Module(module) => RawTransaction::new_module(
+        TransactionPayload::ModuleBundle(module) => RawTransaction::new_module_bundle(
             sender,
             sequence_number,
             module,
@@ -520,7 +521,8 @@ impl TransactionPayload {
     }
 
     pub fn module_strategy() -> impl Strategy<Value = Self> {
-        any::<Module>().prop_map(TransactionPayload::Module)
+        any::<Module>()
+            .prop_map(|module| TransactionPayload::ModuleBundle(ModuleBundle::from(module)))
     }
 
     pub fn write_set_strategy() -> impl Strategy<Value = Self> {

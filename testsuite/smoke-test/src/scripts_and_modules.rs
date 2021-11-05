@@ -17,7 +17,7 @@ use diem_sdk::{
     transaction_builder::{Currency, TransactionFactory},
     types::{
         account_address::AccountAddress,
-        transaction::{Module, Script, TransactionArgument, TransactionPayload},
+        transaction::{ModuleBundle, Script, TransactionArgument, TransactionPayload},
         LocalAccount,
     },
 };
@@ -144,9 +144,9 @@ impl AdminTest for ExecuteCustomModuleAndScript {
             ],
         )?;
 
-        let publish_txn = account1.sign_with_transaction_builder(
-            factory.payload(TransactionPayload::Module(Module::new(compiled_module))),
-        );
+        let publish_txn = account1.sign_with_transaction_builder(factory.payload(
+            TransactionPayload::ModuleBundle(ModuleBundle::singleton(compiled_module)),
+        ));
         client.submit(&publish_txn)?;
         client.wait_for_signed_transaction(&publish_txn, None, None)?;
 

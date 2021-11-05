@@ -7,7 +7,7 @@ use diem_crypto::PrivateKey;
 use diem_sdk::{
     transaction_builder::TransactionFactory,
     types::{
-        transaction::{Module, TransactionPayload},
+        transaction::{ModuleBundle, TransactionPayload},
         LocalAccount,
     },
 };
@@ -71,9 +71,9 @@ async fn send_module_transaction(
     module_binary: Vec<u8>,
 ) -> Result<String> {
     let factory = TransactionFactory::new(ChainId::test());
-    let publish_txn = account.sign_with_transaction_builder(
-        factory.payload(TransactionPayload::Module(Module::new(module_binary))),
-    );
+    let publish_txn = account.sign_with_transaction_builder(factory.payload(
+        TransactionPayload::ModuleBundle(ModuleBundle::singleton(module_binary)),
+    ));
     let bytes = bcs::to_bytes(&publish_txn)?;
     let resp = client.post_transactions(bytes).await?;
     let json: serde_json::Value = serde_json::from_str(resp.text().await?.as_str())?;

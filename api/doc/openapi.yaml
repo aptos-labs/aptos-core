@@ -1092,14 +1092,14 @@ components:
       oneOf:
         - $ref: '#/components/schemas/ScriptFunctionPayload'
         - $ref: '#/components/schemas/ScriptPayload'
-        - $ref: '#/components/schemas/MoveModuleBytecodePayload'
+        - $ref: '#/components/schemas/ModuleBundlePayload'
         - $ref: '#/components/schemas/WriteSetPayload'
       discriminator:
         propertyName: type
         mapping:
           script_function_payload: '#/components/schemas/ScriptFunctionPayload'
           script_payload: '#/components/schemas/ScriptPayload'
-          move_module_bytecode_payload: '#/components/schemas/MoveModuleBytecodePayload'
+          module_bundle_payload: '#/components/schemas/ModuleBundlePayload'
           write_set_payload: '#/components/schemas/WriteSetPayload'
     ScriptFunctionPayload:
       type: object
@@ -1161,19 +1161,19 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MoveValue'
-    MoveModuleBytecodePayload:
+    ModuleBundlePayload:
       type: object
       required:
         - type
-        - bytecode
+        - modules
       properties:
         type:
           type: string
-          example: move_module_bytecode_payload
-        bytecode:
-          $ref: '#/components/schemas/HexEncodedBytes'
-        abi:
-          $ref: '#/components/schemas/MoveModule'
+          example: module_bundle_payload
+        modules:
+          type: array
+          items:
+            $ref: '#/components/schemas/MoveModuleBytecode'
     WriteSetPayload:
       type: object
       required:

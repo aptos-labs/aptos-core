@@ -17,8 +17,8 @@ use diem_types::{
     chain_id::ChainId,
     event::EventHandle,
     transaction::{
-        authenticator::AuthenticationKey, Module, RawTransaction, Script, ScriptFunction,
-        SignedTransaction, TransactionPayload, WriteSetPayload,
+        authenticator::AuthenticationKey, Module, ModuleBundle, RawTransaction, Script,
+        ScriptFunction, SignedTransaction, TransactionPayload, WriteSetPayload,
     },
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
@@ -256,7 +256,7 @@ impl TransactionBuilder {
     }
 
     pub fn module(mut self, m: Module) -> Self {
-        self.program = Some(TransactionPayload::Module(m));
+        self.program = Some(TransactionPayload::ModuleBundle(ModuleBundle::from(m)));
         self
     }
 

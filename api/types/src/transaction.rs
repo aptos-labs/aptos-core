@@ -271,8 +271,13 @@ pub enum GenesisPayload {
 pub enum TransactionPayload {
     ScriptFunctionPayload(ScriptFunctionPayload),
     ScriptPayload(ScriptPayload),
-    ModulePayload(MoveModuleBytecode),
+    ModuleBundlePayload(ModuleBundlePayload),
     WriteSetPayload(WriteSetPayload),
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ModuleBundlePayload {
+    pub modules: Vec<MoveModuleBytecode>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

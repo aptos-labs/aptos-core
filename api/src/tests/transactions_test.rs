@@ -397,23 +397,27 @@ async fn test_get_transactions_output_user_transaction_with_module_payload() {
     assert_json(
         txns[0]["payload"].clone(),
         json!({
-            "type": "module_payload",
-            "bytecode": format!("0x{}", code),
-            "abi": {
-                "address": "0xb1e55ed",
-                "name": "MyModule",
-                "friends": [],
-                "exposed_functions": [
-                    {
-                        "name": "id",
-                        "visibility": "public",
-                        "generic_type_params": [],
-                        "params": [],
-                        "return": ["u8"]
+            "type": "module_bundle_payload",
+            "modules": [
+                {
+                    "bytecode": format!("0x{}", code),
+                    "abi": {
+                        "address": "0xb1e55ed",
+                        "name": "MyModule",
+                        "friends": [],
+                        "exposed_functions": [
+                            {
+                                "name": "id",
+                                "visibility": "public",
+                                "generic_type_params": [],
+                                "params": [],
+                                "return": ["u8"]
+                            }
+                        ],
+                        "structs": []
                     }
-                ],
-                "structs": []
-            }
+                },
+            ]
         }),
     )
 }
@@ -887,8 +891,10 @@ async fn test_signing_message_with_module_payload() {
             .module(hex::decode(code).unwrap()),
     );
     let payload = json!({
-            "type": "module_payload",
-            "bytecode": format!("0x{}", code),
+            "type": "module_bundle_payload",
+            "modules" : [
+                {"bytecode": format!("0x{}", code)},
+            ],
     });
 
     test_signing_message_with_payload(context, txn, payload).await;

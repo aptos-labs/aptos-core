@@ -14,7 +14,8 @@ use diem_types::{
     chain_id::ChainId,
     contract_event::ContractEvent,
     transaction::{
-        Module, RawTransaction, Script, ScriptFunction, SignedTransaction, TransactionInfoTrait,
+        ModuleBundle, RawTransaction, Script, ScriptFunction, SignedTransaction,
+        TransactionInfoTrait,
     },
     vm_status::{AbortLocation, KeptVMStatus},
     write_set::WriteOp,
@@ -27,6 +28,7 @@ use move_core_types::{
 };
 use resource_viewer::MoveValueAnnotator;
 
+use crate::transaction::ModuleBundlePayload;
 use anyhow::{ensure, format_err, Result};
 use serde_json::Value;
 use std::{
@@ -124,10 +126,12 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
         let ret = match payload {
             WriteSet(v) => TransactionPayload::WriteSetPayload(self.try_into_write_set_payload(v)?),
             Script(s) => TransactionPayload::ScriptPayload(s.try_into()?),
-            Module(m) => {
-                let code = MoveModuleBytecode::from(m);
-                TransactionPayload::ModulePayload(code.try_parse_abi()?)
-            }
+            ModuleBundle(modules) => TransactionPayload::ModuleBundlePayload(ModuleBundlePayload {
+                modules: modules
+                    .into_iter()
+                    .map(|module| MoveModuleBytecode::from(module).try_parse_abi())
+                    .collect::<Result<Vec<_>>>()?,
+            }),
             ScriptFunction(fun) => {
                 let (module, function, ty_args, args) = fun.into_inner();
                 let func_args = self
@@ -305,8 +309,14 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                     args,
                 ))
             }
-            TransactionPayload::ModulePayload(module) => {
-                Target::Module(Module::new(module.bytecode.into()))
+            TransactionPayload::ModuleBundlePayload(payload) => {
+                Target::ModuleBundle(ModuleBundle::new(
+                    payload
+                        .modules
+                        .into_iter()
+                        .map(|m| m.bytecode.into())
+                        .collect(),
+                ))
             }
             TransactionPayload::ScriptPayload(script) => {
                 let ScriptPayload {
