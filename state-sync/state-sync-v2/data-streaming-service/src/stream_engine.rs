@@ -26,10 +26,10 @@ use itertools::Itertools;
 use std::{cmp, sync::Arc};
 
 macro_rules! invalid_client_request {
-    ($client_request:expr, $stream_tracker:expr) => {
+    ($client_request:expr, $stream_engine:expr) => {
         panic!(
-            "Invalid client request {:?} found for the data stream tracker {:?}",
-            $client_request, $stream_tracker
+            "Invalid client request {:?} found for the data stream engine {:?}",
+            $client_request, $stream_engine
         )
     };
 }
@@ -52,9 +52,9 @@ macro_rules! invalid_stream_request {
     };
 }
 
-/// The interface offered by each stream tracker.
+/// The interface offered by each data stream engine.
 #[enum_dispatch]
-pub trait DataStreamTracker {
+pub trait DataStreamEngine {
     /// Creates a batch of data client requests (up to `max_number_of_requests`)
     /// that can be sent to the diem data client to progress the stream.
     fn create_data_client_requests(
@@ -82,41 +82,41 @@ pub trait DataStreamTracker {
     ) -> Result<Option<DataNotification>, Error>;
 }
 
-/// A single progress tracker that allows each data stream type to track and
-/// update progress through the `DataStreamTracker` interface.
-#[enum_dispatch(DataStreamTracker)]
+/// Different types of data stream engines that allow each data stream to
+/// track and update progress through the `DataStreamEngine` interface.
+#[enum_dispatch(DataStreamEngine)]
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
-pub enum StreamProgressTracker {
-    AccountsStreamTracker,
-    ContinuousTransactionStreamTracker,
-    EpochEndingStreamTracker,
-    TransactionStreamTracker,
+pub enum StreamEngine {
+    AccountsStreamEngine,
+    ContinuousTransactionStreamEngine,
+    EpochEndingStreamEngine,
+    TransactionStreamEngine,
 }
 
-impl StreamProgressTracker {
+impl StreamEngine {
     pub fn new(
         stream_request: &StreamRequest,
         advertised_data: &AdvertisedData,
     ) -> Result<Self, Error> {
         match stream_request {
             StreamRequest::ContinuouslyStreamTransactionOutputs(_) => {
-                Ok(ContinuousTransactionStreamTracker::new(stream_request)?.into())
+                Ok(ContinuousTransactionStreamEngine::new(stream_request)?.into())
             }
             StreamRequest::ContinuouslyStreamTransactions(_) => {
-                Ok(ContinuousTransactionStreamTracker::new(stream_request)?.into())
+                Ok(ContinuousTransactionStreamEngine::new(stream_request)?.into())
             }
             StreamRequest::GetAllAccounts(request) => {
-                Ok(AccountsStreamTracker::new(request)?.into())
+                Ok(AccountsStreamEngine::new(request)?.into())
             }
             StreamRequest::GetAllEpochEndingLedgerInfos(request) => {
-                Ok(EpochEndingStreamTracker::new(request, advertised_data)?.into())
+                Ok(EpochEndingStreamEngine::new(request, advertised_data)?.into())
             }
             StreamRequest::GetAllTransactionOutputs(_) => {
-                Ok(TransactionStreamTracker::new(stream_request)?.into())
+                Ok(TransactionStreamEngine::new(stream_request)?.into())
             }
             StreamRequest::GetAllTransactions(_) => {
-                Ok(TransactionStreamTracker::new(stream_request)?.into())
+                Ok(TransactionStreamEngine::new(stream_request)?.into())
             }
             _ => Err(Error::UnsupportedRequestEncountered(format!(
                 "Stream request not supported: {:?}",
@@ -127,7 +127,7 @@ impl StreamProgressTracker {
 }
 
 #[derive(Clone, Debug)]
-pub struct AccountsStreamTracker {
+pub struct AccountsStreamEngine {
     // The original accounts request made by the client
     pub request: GetAllAccountsRequest,
 
@@ -149,9 +149,9 @@ pub struct AccountsStreamTracker {
     pub stream_is_complete: bool,
 }
 
-impl AccountsStreamTracker {
+impl AccountsStreamEngine {
     fn new(request: &GetAllAccountsRequest) -> Result<Self, Error> {
-        Ok(AccountsStreamTracker {
+        Ok(AccountsStreamEngine {
             request: request.clone(),
             account_num_requested: false,
             number_of_accounts: None,
@@ -173,12 +173,9 @@ impl AccountsStreamTracker {
                             Error::IntegerOverflow("Next request index has overflown!".into())
                         })?;
                 }
-                request => {
-                    invalid_client_request!(request, self);
-                }
+                request => invalid_client_request!(request, self),
             }
         }
-
         Ok(())
     }
 
@@ -188,7 +185,7 @@ impl AccountsStreamTracker {
     }
 }
 
-impl DataStreamTracker for AccountsStreamTracker {
+impl DataStreamEngine for AccountsStreamEngine {
     fn create_data_client_requests(
         &mut self,
         max_number_of_requests: u64,
@@ -314,7 +311,7 @@ impl DataStreamTracker for AccountsStreamTracker {
 }
 
 #[derive(Clone, Debug)]
-pub struct ContinuousTransactionStreamTracker {
+pub struct ContinuousTransactionStreamEngine {
     // The original stream request made by the client (i.e., a continuous
     // transaction or transaction output stream request).
     pub request: StreamRequest,
@@ -334,11 +331,11 @@ pub struct ContinuousTransactionStreamTracker {
     pub next_request_version_and_epoch: (Version, Epoch),
 }
 
-impl ContinuousTransactionStreamTracker {
+impl ContinuousTransactionStreamEngine {
     fn new(stream_request: &StreamRequest) -> Result<Self, Error> {
         match stream_request {
             StreamRequest::ContinuouslyStreamTransactions(request) => {
-                Ok(ContinuousTransactionStreamTracker {
+                Ok(ContinuousTransactionStreamEngine {
                     request: stream_request.clone(),
                     target_ledger_info: None,
                     end_of_epoch_requested: false,
@@ -347,7 +344,7 @@ impl ContinuousTransactionStreamTracker {
                 })
             }
             StreamRequest::ContinuouslyStreamTransactionOutputs(request) => {
-                Ok(ContinuousTransactionStreamTracker {
+                Ok(ContinuousTransactionStreamEngine {
                     request: stream_request.clone(),
                     target_ledger_info: None,
                     end_of_epoch_requested: false,
@@ -489,7 +486,7 @@ impl ContinuousTransactionStreamTracker {
     }
 }
 
-impl DataStreamTracker for ContinuousTransactionStreamTracker {
+impl DataStreamEngine for ContinuousTransactionStreamEngine {
     fn create_data_client_requests(
         &mut self,
         max_number_of_requests: u64,
@@ -674,7 +671,7 @@ impl DataStreamTracker for ContinuousTransactionStreamTracker {
 }
 
 #[derive(Clone, Debug)]
-pub struct EpochEndingStreamTracker {
+pub struct EpochEndingStreamEngine {
     // The original epoch ending ledger infos request made by the client
     pub request: GetAllEpochEndingLedgerInfosRequest,
 
@@ -693,7 +690,7 @@ pub struct EpochEndingStreamTracker {
     pub stream_is_complete: bool,
 }
 
-impl EpochEndingStreamTracker {
+impl EpochEndingStreamEngine {
     fn new(
         request: &GetAllEpochEndingLedgerInfosRequest,
         advertised_data: &AdvertisedData,
@@ -733,7 +730,7 @@ impl EpochEndingStreamTracker {
                 )))
         );
 
-        Ok(EpochEndingStreamTracker {
+        Ok(EpochEndingStreamEngine {
             request: request.clone(),
             end_epoch,
             next_stream_epoch: request.start_epoch,
@@ -762,7 +759,7 @@ impl EpochEndingStreamTracker {
     }
 }
 
-impl DataStreamTracker for EpochEndingStreamTracker {
+impl DataStreamEngine for EpochEndingStreamEngine {
     fn create_data_client_requests(
         &mut self,
         max_number_of_requests: u64,
@@ -833,7 +830,7 @@ impl DataStreamTracker for EpochEndingStreamTracker {
 }
 
 #[derive(Clone, Debug)]
-pub struct TransactionStreamTracker {
+pub struct TransactionStreamEngine {
     // The original stream request made by the client (i.e., a transaction or
     // transaction output stream request).
     pub request: StreamRequest,
@@ -850,16 +847,16 @@ pub struct TransactionStreamTracker {
     pub stream_is_complete: bool,
 }
 
-impl TransactionStreamTracker {
+impl TransactionStreamEngine {
     fn new(stream_request: &StreamRequest) -> Result<Self, Error> {
         match stream_request {
-            StreamRequest::GetAllTransactions(request) => Ok(TransactionStreamTracker {
+            StreamRequest::GetAllTransactions(request) => Ok(TransactionStreamEngine {
                 request: stream_request.clone(),
                 next_stream_version: request.start_version,
                 next_request_version: request.start_version,
                 stream_is_complete: false,
             }),
-            StreamRequest::GetAllTransactionOutputs(request) => Ok(TransactionStreamTracker {
+            StreamRequest::GetAllTransactionOutputs(request) => Ok(TransactionStreamEngine {
                 request: stream_request.clone(),
                 next_stream_version: request.start_version,
                 next_request_version: request.start_version,
@@ -933,7 +930,7 @@ impl TransactionStreamTracker {
     }
 }
 
-impl DataStreamTracker for TransactionStreamTracker {
+impl DataStreamEngine for TransactionStreamEngine {
     fn create_data_client_requests(
         &mut self,
         max_number_of_requests: u64,
@@ -1048,13 +1045,13 @@ fn verify_client_request_indices(expected_next_index: u64, start_index: u64, end
     }
 }
 
-/// Creates a batch of data client requests for the given stream progress tracker
+/// Creates a batch of data client requests for the given stream engine
 fn create_data_client_requests(
     start_index: u64,
     end_index: u64,
     max_number_of_requests: u64,
     optimal_chunk_size: u64,
-    stream_progress_tracker: StreamProgressTracker,
+    stream_engine: StreamEngine,
 ) -> Result<Vec<DataClientRequest>, Error> {
     if start_index > end_index {
         return Ok(vec![]);
@@ -1082,11 +1079,8 @@ fn create_data_client_requests(
             .ok_or_else(|| Error::IntegerOverflow("End index to fetch has overflown!".into()))?;
 
         // Create the data client requests
-        let data_client_request = create_data_client_request(
-            request_start_index,
-            request_end_index,
-            &stream_progress_tracker,
-        );
+        let data_client_request =
+            create_data_client_request(request_start_index, request_end_index, &stream_engine);
         data_client_requests.push(data_client_request);
 
         // Update the local loop state
@@ -1104,27 +1098,27 @@ fn create_data_client_requests(
     Ok(data_client_requests)
 }
 
-/// Creates a data client request for the given stream tracker using the
+/// Creates a data client request for the given stream engine using the
 /// specified start and end indices.
 fn create_data_client_request(
     start_index: u64,
     end_index: u64,
-    stream_progress_tracker: &StreamProgressTracker,
+    stream_engine: &StreamEngine,
 ) -> DataClientRequest {
-    match stream_progress_tracker {
-        StreamProgressTracker::AccountsStreamTracker(stream_tracker) => {
+    match stream_engine {
+        StreamEngine::AccountsStreamEngine(stream_engine) => {
             DataClientRequest::AccountsWithProof(AccountsWithProofRequest {
-                version: stream_tracker.request.version,
+                version: stream_engine.request.version,
                 start_index,
                 end_index,
             })
         }
-        StreamProgressTracker::ContinuousTransactionStreamTracker(stream_tracker) => {
-            let target_ledger_info_version = stream_tracker
+        StreamEngine::ContinuousTransactionStreamEngine(stream_engine) => {
+            let target_ledger_info_version = stream_engine
                 .get_target_ledger_info()
                 .ledger_info()
                 .version();
-            match &stream_tracker.request {
+            match &stream_engine.request {
                 StreamRequest::ContinuouslyStreamTransactions(request) => {
                     DataClientRequest::TransactionsWithProof(TransactionsWithProofRequest {
                         start_version: start_index,
@@ -1145,34 +1139,30 @@ fn create_data_client_request(
                 request => invalid_stream_request!(request),
             }
         }
-        StreamProgressTracker::EpochEndingStreamTracker(_) => {
+        StreamEngine::EpochEndingStreamEngine(_) => {
             DataClientRequest::EpochEndingLedgerInfos(EpochEndingLedgerInfosRequest {
                 start_epoch: start_index,
                 end_epoch: end_index,
             })
         }
-        StreamProgressTracker::TransactionStreamTracker(stream_tracker) => {
-            match &stream_tracker.request {
-                StreamRequest::GetAllTransactions(request) => {
-                    DataClientRequest::TransactionsWithProof(TransactionsWithProofRequest {
-                        start_version: start_index,
-                        end_version: end_index,
-                        max_proof_version: request.max_proof_version,
-                        include_events: request.include_events,
-                    })
-                }
-                StreamRequest::GetAllTransactionOutputs(request) => {
-                    DataClientRequest::TransactionOutputsWithProof(
-                        TransactionOutputsWithProofRequest {
-                            start_version: start_index,
-                            end_version: end_index,
-                            max_proof_version: request.max_proof_version,
-                        },
-                    )
-                }
-                request => invalid_stream_request!(request),
+        StreamEngine::TransactionStreamEngine(stream_engine) => match &stream_engine.request {
+            StreamRequest::GetAllTransactions(request) => {
+                DataClientRequest::TransactionsWithProof(TransactionsWithProofRequest {
+                    start_version: start_index,
+                    end_version: end_index,
+                    max_proof_version: request.max_proof_version,
+                    include_events: request.include_events,
+                })
             }
-        }
+            StreamRequest::GetAllTransactionOutputs(request) => {
+                DataClientRequest::TransactionOutputsWithProof(TransactionOutputsWithProofRequest {
+                    start_version: start_index,
+                    end_version: end_index,
+                    max_proof_version: request.max_proof_version,
+                })
+            }
+            request => invalid_stream_request!(request),
+        },
     }
 }
 
@@ -1218,41 +1208,40 @@ fn highest_synced_ledger_info(
 /// Creates a new data notification for the given client response.
 fn create_data_notification(
     notification_id_generator: Arc<U64IdGenerator>,
-    client_response_payload: ResponsePayload,
-    stream_progress_tracker: StreamProgressTracker,
+    client_response: ResponsePayload,
+    stream_engine: StreamEngine,
 ) -> DataNotification {
     let notification_id = notification_id_generator.next();
 
-    let client_response_type = client_response_payload.method_name();
-    let data_payload = match client_response_payload {
+    let client_response_type = client_response.method_name();
+    let data_payload = match client_response {
         ResponsePayload::AccountStatesWithProof(accounts_chunk) => {
             DataPayload::AccountStatesWithProof(accounts_chunk)
         }
         ResponsePayload::EpochEndingLedgerInfos(ledger_infos) => {
             DataPayload::EpochEndingLedgerInfos(ledger_infos)
         }
-        ResponsePayload::TransactionsWithProof(transactions_chunk) => match stream_progress_tracker
-        {
-            StreamProgressTracker::ContinuousTransactionStreamTracker(stream_tracker) => {
+        ResponsePayload::TransactionsWithProof(transactions_chunk) => match stream_engine {
+            StreamEngine::ContinuousTransactionStreamEngine(stream_engine) => {
                 DataPayload::ContinuousTransactionsWithProof(
-                    stream_tracker.get_target_ledger_info().clone(),
+                    stream_engine.get_target_ledger_info().clone(),
                     transactions_chunk,
                 )
             }
-            StreamProgressTracker::TransactionStreamTracker(_) => {
+            StreamEngine::TransactionStreamEngine(_) => {
                 DataPayload::TransactionsWithProof(transactions_chunk)
             }
             _ => invalid_response_type!(client_response_type),
         },
         ResponsePayload::TransactionOutputsWithProof(transactions_output_chunk) => {
-            match stream_progress_tracker {
-                StreamProgressTracker::ContinuousTransactionStreamTracker(stream_tracker) => {
+            match stream_engine {
+                StreamEngine::ContinuousTransactionStreamEngine(stream_engine) => {
                     DataPayload::ContinuousTransactionOutputsWithProof(
-                        stream_tracker.get_target_ledger_info().clone(),
+                        stream_engine.get_target_ledger_info().clone(),
                         transactions_output_chunk,
                     )
                 }
-                StreamProgressTracker::TransactionStreamTracker(_) => {
+                StreamEngine::TransactionStreamEngine(_) => {
                     DataPayload::TransactionOutputsWithProof(transactions_output_chunk)
                 }
                 _ => invalid_response_type!(client_response_type),

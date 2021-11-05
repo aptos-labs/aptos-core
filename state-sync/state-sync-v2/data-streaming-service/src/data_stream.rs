@@ -6,7 +6,7 @@ use crate::{
     data_notification::{DataClientRequest, DataNotification, DataPayload, NotificationId},
     error::Error,
     logging::{LogEntry, LogEvent, LogSchema},
-    stream_progress_tracker::{DataStreamTracker, StreamProgressTracker},
+    stream_engine::{DataStreamEngine, StreamEngine},
     streaming_client::{NotificationFeedback, StreamRequest},
 };
 use channel::{diem_channel, message_queues::QueueStyle};
@@ -63,8 +63,8 @@ pub struct DataStream<T> {
     // The data client through which to fetch data from the Diem network
     diem_data_client: T,
 
-    // The fulfillment progress tracker for this data stream
-    stream_progress_tracker: StreamProgressTracker,
+    // The engine for this data stream
+    stream_engine: StreamEngine,
 
     // The current queue of data client requests and pending responses. When the
     // request at the head of the queue completes (i.e., we receive a response),
@@ -106,14 +106,14 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStream<T> {
             diem_channel::new(QueueStyle::KLAST, DATA_STREAM_CHANNEL_SIZE, None);
         let data_stream_listener = DataStreamListener::new(notification_receiver);
 
-        // Create a new stream progress tracker
-        let stream_progress_tracker = StreamProgressTracker::new(stream_request, advertised_data)?;
+        // Create a new stream engine
+        let stream_engine = StreamEngine::new(stream_request, advertised_data)?;
 
         // Create a new data stream
         let data_stream = Self {
             data_stream_id,
             diem_data_client,
-            stream_progress_tracker,
+            stream_engine,
             sent_data_requests: None,
             spawned_tasks: vec![],
             notifications_to_responses: BTreeMap::new(),
@@ -203,7 +203,7 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStream<T> {
 
         if max_num_requests_to_send > 0 {
             for client_request in self
-                .stream_progress_tracker
+                .stream_engine
                 .create_data_client_requests(max_num_requests_to_send, global_data_summary)?
             {
                 // Send the client request
@@ -331,7 +331,7 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStream<T> {
         &mut self,
         global_data_summary: GlobalDataSummary,
     ) -> Result<(), Error> {
-        if self.stream_progress_tracker.is_stream_complete()
+        if self.stream_engine.is_stream_complete()
             || self.request_failure_count >= MAX_REQUEST_RETRY
         {
             if self.stream_end_notification_id.is_none() {
@@ -473,7 +473,7 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStream<T> {
 
         // Create a new data notification
         if let Some(data_notification) = self
-            .stream_progress_tracker
+            .stream_engine
             .transform_client_response_into_notification(
                 data_client_request,
                 response_payload,
@@ -565,12 +565,12 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStream<T> {
     /// currently advertised data in the network. If not, returns an error.
     pub fn ensure_data_is_available(&self, advertised_data: &AdvertisedData) -> Result<(), Error> {
         if !self
-            .stream_progress_tracker
+            .stream_engine
             .is_remaining_data_available(advertised_data)
         {
             return Err(Error::DataIsUnavailable(format!(
-                "Unable to satisfy stream progress tracker: {:?}, with advertised data: {:?}",
-                self.stream_progress_tracker, advertised_data
+                "Unable to satisfy stream engine: {:?}, with advertised data: {:?}",
+                self.stream_engine, advertised_data
             )));
         }
         Ok(())

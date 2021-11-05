@@ -4,7 +4,7 @@
 use crate::{
     data_notification::{DataClientRequest, EpochEndingLedgerInfosRequest},
     error::Error,
-    stream_progress_tracker::{DataStreamTracker, EpochEndingStreamTracker, StreamProgressTracker},
+    stream_engine::{DataStreamEngine, EpochEndingStreamEngine, StreamEngine},
     streaming_client::{GetAllEpochEndingLedgerInfosRequest, StreamRequest},
     tests::utils::{initialize_logger, NoopResponseCallback},
 };
@@ -18,11 +18,11 @@ use storage_service_types::CompleteDataRange;
 
 #[test]
 fn test_create_epoch_ending_requests() {
-    // Create a new data stream progress tracker
-    let mut stream_tracker = create_epoch_ending_progress_tracker(0, 900);
+    // Create a new data stream engine
+    let mut stream_engine = create_epoch_ending_stream_engine(0, 900);
 
     // Create a batch of large client requests and verify the result
-    let client_requests = stream_tracker
+    let client_requests = stream_engine
         .create_data_client_requests(5, &create_epoch_ending_chunk_sizes(10000))
         .unwrap();
     let expected_requests = vec![DataClientRequest::EpochEndingLedgerInfos(
@@ -34,7 +34,7 @@ fn test_create_epoch_ending_requests() {
     assert_eq!(client_requests, expected_requests);
 
     // Create a batch of regular client requests and verify the result
-    let client_requests = stream_tracker
+    let client_requests = stream_engine
         .create_data_client_requests(3, &create_epoch_ending_chunk_sizes(50))
         .unwrap();
     for (i, client_request) in client_requests.iter().enumerate() {
@@ -48,7 +48,7 @@ fn test_create_epoch_ending_requests() {
     }
 
     // Create a batch of small client requests and verify the result
-    let client_requests = stream_tracker
+    let client_requests = stream_engine
         .create_data_client_requests(100, &create_epoch_ending_chunk_sizes(14))
         .unwrap();
     for (i, client_request) in client_requests.iter().enumerate() {
@@ -64,14 +64,14 @@ fn test_create_epoch_ending_requests() {
 
 #[test]
 fn test_create_epoch_ending_requests_dynamic() {
-    // Create a new data stream progress tracker
-    let mut stream_tracker = create_epoch_ending_progress_tracker(0, 1000);
+    // Create a new data stream engine
+    let mut stream_engine = create_epoch_ending_stream_engine(0, 1000);
 
-    // Update the tracker with a new next request epoch
-    stream_tracker.next_request_epoch = 150;
+    // Update the engine with a new next request epoch
+    stream_engine.next_request_epoch = 150;
 
     // Create a batch of client requests and verify the result
-    let client_requests = stream_tracker
+    let client_requests = stream_engine
         .create_data_client_requests(5, &create_epoch_ending_chunk_sizes(700))
         .unwrap();
     let expected_requests = vec![
@@ -86,11 +86,11 @@ fn test_create_epoch_ending_requests_dynamic() {
     ];
     assert_eq!(client_requests, expected_requests);
 
-    // Update the tracker with a new next request epoch
-    stream_tracker.next_request_epoch = 700;
+    // Update the engine with a new next request epoch
+    stream_engine.next_request_epoch = 700;
 
     // Create a batch of client requests and verify the result
-    let client_requests = stream_tracker
+    let client_requests = stream_engine
         .create_data_client_requests(10, &create_epoch_ending_chunk_sizes(50))
         .unwrap();
     for (i, client_request) in client_requests.iter().enumerate() {
@@ -103,11 +103,11 @@ fn test_create_epoch_ending_requests_dynamic() {
         assert_eq!(*client_request, expected_request);
     }
 
-    // Update the tracker with a new next request epoch that matches the stream end
-    stream_tracker.next_request_epoch = 999;
+    // Update the engine with a new next request epoch that matches the stream end
+    stream_engine.next_request_epoch = 999;
 
     // Create a batch of client requests and verify the result
-    let client_requests = stream_tracker
+    let client_requests = stream_engine
         .create_data_client_requests(5, &create_epoch_ending_chunk_sizes(700))
         .unwrap();
     let expected_requests = vec![DataClientRequest::EpochEndingLedgerInfos(
@@ -118,27 +118,26 @@ fn test_create_epoch_ending_requests_dynamic() {
     )];
     assert_eq!(client_requests, expected_requests);
 
-    // Update the tracker with a new next request epoch that is at the end
-    stream_tracker.next_request_epoch = 1000;
+    // Update the engine with a new next request epoch that is at the end
+    stream_engine.next_request_epoch = 1000;
 
     // Create a batch of client requests and verify no error
     let client_requests =
-        stream_tracker.create_data_client_requests(10, &create_epoch_ending_chunk_sizes(50));
+        stream_engine.create_data_client_requests(10, &create_epoch_ending_chunk_sizes(50));
     assert_ok!(client_requests);
 }
 
 #[test]
-fn test_epoch_ending_stream_tracker() {
+fn test_epoch_ending_stream_engine() {
     // Create an epoch ending stream request
     let stream_request =
         StreamRequest::GetAllEpochEndingLedgerInfos(GetAllEpochEndingLedgerInfosRequest {
             start_epoch: 0,
         });
 
-    // Try to create a progress stream tracker where there is no advertised data
+    // Try to create a stream engine where there is no advertised data
     // and verify an error is returned.
-    let result =
-        StreamProgressTracker::new(&stream_request, &GlobalDataSummary::empty().advertised_data);
+    let result = StreamEngine::new(&stream_request, &GlobalDataSummary::empty().advertised_data);
     assert_matches!(result, Err(Error::DataIsUnavailable(_)));
 
     // Create a data summary with various advertised epoch ranges (common highest is zero)
@@ -151,9 +150,9 @@ fn test_epoch_ending_stream_tracker() {
         CompleteDataRange::new(0, 1).unwrap(),
     ];
 
-    // Try to create a progress stream tracker where the highest epoch is zero
+    // Try to create a stream engine where the highest epoch is zero
     // and verify an error is returned.
-    let result = StreamProgressTracker::new(&stream_request, &global_data_summary.advertised_data);
+    let result = StreamEngine::new(&stream_request, &global_data_summary.advertised_data);
     assert_matches!(result, Err(Error::NoDataToFetch(_)));
 
     // Create a global data summary with non-zero advertised epoch ranges
@@ -167,17 +166,16 @@ fn test_epoch_ending_stream_tracker() {
         CompleteDataRange::new(0, 100).unwrap(),
     ];
 
-    // Create a new data stream progress tracker and verify the most common highest
+    // Create a new data stream engine and verify the most common highest
     // epoch is chosen.
-    match StreamProgressTracker::new(&stream_request, &global_data_summary.advertised_data).unwrap()
-    {
-        StreamProgressTracker::EpochEndingStreamTracker(stream_tracker) => {
-            assert_eq!(stream_tracker.end_epoch, 99); // End epoch is highest - 1
+    match StreamEngine::new(&stream_request, &global_data_summary.advertised_data).unwrap() {
+        StreamEngine::EpochEndingStreamEngine(stream_engine) => {
+            assert_eq!(stream_engine.end_epoch, 99); // End epoch is highest - 1
         }
-        unexpected_tracker => {
+        unexpected_engine => {
             panic!(
-                "Expected epoch ending stream tracker but got {:?}",
-                unexpected_tracker
+                "Expected epoch ending stream engine but got {:?}",
+                unexpected_engine
             );
         }
     }
@@ -185,14 +183,14 @@ fn test_epoch_ending_stream_tracker() {
 
 #[test]
 fn test_update_epoch_ending_stream_progress() {
-    // Create a new data stream progress tracker
-    let mut stream_tracker = create_epoch_ending_progress_tracker(0, 1000);
+    // Create a new data stream engine
+    let mut stream_engine = create_epoch_ending_stream_engine(0, 1000);
 
-    // Update the progress tracker using valid sent data notifications
+    // Update the stream engine using valid sent data notifications
     for i in 0..10 {
         let start_epoch = i * 100;
         let end_epoch = (i * 100) + 99;
-        let _ = stream_tracker
+        let _ = stream_engine
             .transform_client_response_into_notification(
                 &DataClientRequest::EpochEndingLedgerInfos(EpochEndingLedgerInfosRequest {
                     start_epoch,
@@ -204,18 +202,18 @@ fn test_update_epoch_ending_stream_progress() {
             .unwrap();
 
         // Verify internal state
-        assert_eq!(stream_tracker.next_stream_epoch, end_epoch + 1);
+        assert_eq!(stream_engine.next_stream_epoch, end_epoch + 1);
     }
 }
 
 #[test]
 #[should_panic(expected = "The start index did not match the expected next index!")]
 fn test_update_epoch_ending_stream_panic() {
-    // Create a new data stream progress tracker
-    let mut stream_tracker = create_epoch_ending_progress_tracker(0, 1000);
+    // Create a new data stream engine
+    let mut stream_engine = create_epoch_ending_stream_engine(0, 1000);
 
-    // Update the tracker with a valid notification
-    let _ = stream_tracker
+    // Update the engine with a valid notification
+    let _ = stream_engine
         .transform_client_response_into_notification(
             &DataClientRequest::EpochEndingLedgerInfos(EpochEndingLedgerInfosRequest {
                 start_epoch: 0,
@@ -226,8 +224,8 @@ fn test_update_epoch_ending_stream_panic() {
         )
         .unwrap();
 
-    // Update the tracker with an old notification and verify a panic
-    let _ = stream_tracker
+    // Update the engine with an old notification and verify a panic
+    let _ = stream_engine
         .transform_client_response_into_notification(
             &DataClientRequest::EpochEndingLedgerInfos(EpochEndingLedgerInfosRequest {
                 start_epoch: 50,
@@ -239,10 +237,10 @@ fn test_update_epoch_ending_stream_panic() {
         .unwrap();
 }
 
-fn create_epoch_ending_progress_tracker(
+fn create_epoch_ending_stream_engine(
     start_epoch: u64,
     max_advertised_epoch: u64,
-) -> EpochEndingStreamTracker {
+) -> EpochEndingStreamEngine {
     initialize_logger();
 
     // Create an epoch ending stream request
@@ -258,14 +256,13 @@ fn create_epoch_ending_progress_tracker(
         .epoch_ending_ledger_infos =
         vec![CompleteDataRange::new(start_epoch, max_advertised_epoch).unwrap()];
 
-    // Create a new epoch ending stream progress tracker
-    match StreamProgressTracker::new(&stream_request, &global_data_summary.advertised_data).unwrap()
-    {
-        StreamProgressTracker::EpochEndingStreamTracker(stream_tracker) => stream_tracker,
-        unexpected_tracker => {
+    // Create a new epoch ending stream engine
+    match StreamEngine::new(&stream_request, &global_data_summary.advertised_data).unwrap() {
+        StreamEngine::EpochEndingStreamEngine(stream_engine) => stream_engine,
+        unexpected_engine => {
             panic!(
-                "Expected epoch ending stream tracker but got {:?}",
-                unexpected_tracker
+                "Expected epoch ending stream engine but got {:?}",
+                unexpected_engine
             );
         }
     }
