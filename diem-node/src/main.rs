@@ -46,6 +46,13 @@ struct Args {
         requires("test")
     )]
     genesis_modules: Option<Vec<PathBuf>>,
+
+    #[structopt(
+        long,
+        help = "Lazy mode, set this flag will set `consensus#mempool_poll_count` config to `u64::MAX` and only commit a block when there is user transaction in mempool",
+        requires("test")
+    )]
+    lazy: bool,
 }
 
 #[global_allocator]
@@ -73,6 +80,7 @@ fn main() {
         diem_node::load_test_environment(
             args.config,
             args.random_ports,
+            args.lazy,
             publishing_option,
             genesis_modules,
             rng,

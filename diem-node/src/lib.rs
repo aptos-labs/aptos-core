@@ -110,6 +110,7 @@ pub fn start(config: &NodeConfig, log_file: Option<PathBuf>) {
 pub fn load_test_environment<R>(
     config_path: Option<PathBuf>,
     random_ports: bool,
+    lazy: bool,
     publishing_option: Option<VMPublishingOption>,
     genesis_modules: Vec<Vec<u8>>,
     rng: R,
@@ -180,6 +181,12 @@ pub fn load_test_environment<R>(
     );
     println!("\tChainId: {}", ChainId::test());
     println!();
+    if lazy {
+        println!("\tLazy mode is enabled");
+        config.consensus.mempool_poll_count = u64::MAX;
+        println!();
+    }
+
     println!("Diem is running, press ctrl-c to exit");
     println!();
 

@@ -44,6 +44,7 @@ fn create_node(home: &Home, genesis: Option<String>) -> Result<()> {
     diem_node::load_test_environment(
         Some(PathBuf::from(home.get_node_config_path())),
         false,
+        true,
         Some(publishing_option),
         genesis_modules,
         rand::rngs::OsRng,
