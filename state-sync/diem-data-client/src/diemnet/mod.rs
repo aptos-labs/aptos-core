@@ -245,19 +245,6 @@ impl DiemNetDataClient {
     }
 }
 
-/// Calculate `(start..=end).len()`. Returns an error if `end < start` or
-/// `end == u64::MAX`.
-fn range_len(start: u64, end: u64) -> Result<u64, Error> {
-    // len = end - start + 1
-    let len = end.checked_sub(start).ok_or_else(|| {
-        Error::InvalidRequest(format!("end ({}) must be >= start ({})", end, start))
-    })?;
-    let len = len
-        .checked_add(1)
-        .ok_or_else(|| Error::InvalidRequest(format!("end ({}) must not be u64::MAX", end)))?;
-    Ok(len)
-}
-
 #[async_trait]
 impl DiemDataClient for DiemNetDataClient {
     fn get_global_data_summary(&self) -> GlobalDataSummary {
@@ -274,7 +261,7 @@ impl DiemDataClient for DiemNetDataClient {
             AccountStatesChunkWithProofRequest {
                 version,
                 start_account_index,
-                expected_num_account_states: range_len(start_account_index, end_account_index)?,
+                end_account_index,
             },
         );
         self.send_request_and_decode(request).await
@@ -309,7 +296,7 @@ impl DiemDataClient for DiemNetDataClient {
             TransactionOutputsWithProofRequest {
                 proof_version,
                 start_version,
-                expected_num_outputs: range_len(start_version, end_version)?,
+                end_version,
             },
         );
         self.send_request_and_decode(request).await
@@ -326,7 +313,7 @@ impl DiemDataClient for DiemNetDataClient {
             StorageServiceRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
                 proof_version,
                 start_version,
-                expected_num_transactions: range_len(start_version, end_version)?,
+                end_version,
                 include_events,
             });
         self.send_request_and_decode(request).await

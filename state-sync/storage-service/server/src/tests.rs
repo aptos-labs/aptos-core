@@ -78,7 +78,7 @@ async fn test_get_account_states_chunk_with_proof() {
         StorageServiceRequest::GetAccountStatesChunkWithProof(AccountStatesChunkWithProofRequest {
             version: 0,
             start_account_index: 0,
-            expected_num_account_states: 0,
+            end_account_index: 0,
         });
 
     // Process the request
@@ -146,11 +146,11 @@ async fn test_get_transactions_with_proof_events() {
 
     // Create a request to fetch transactions with a proof
     let start_version = 0;
-    let expected_num_transactions = 10;
+    let end_version = 10;
     let request = StorageServiceRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
         proof_version: 100,
         start_version,
-        expected_num_transactions,
+        end_version,
         include_events: true,
     });
 
@@ -161,8 +161,8 @@ async fn test_get_transactions_with_proof_events() {
     match response {
         StorageServiceResponse::TransactionsWithProof(transactions_with_proof) => {
             assert_eq!(
-                transactions_with_proof.transactions.len(),
-                expected_num_transactions as usize
+                transactions_with_proof.transactions.len() as u64,
+                end_version - start_version + 1,
             );
             assert_eq!(
                 transactions_with_proof.first_transaction_version,
@@ -170,9 +170,7 @@ async fn test_get_transactions_with_proof_events() {
             );
             assert_some!(transactions_with_proof.events);
         }
-        _ => {
-            panic!("Expected transactions with proof but got: {:?}", response);
-        }
+        _ => panic!("Expected transactions with proof but got: {:?}", response),
     };
 }
 
@@ -183,11 +181,11 @@ async fn test_get_transactions_with_proof_no_events() {
 
     // Create a request to fetch transactions with a proof (excluding events)
     let start_version = 10;
-    let expected_num_transactions = 20;
+    let end_version = 30;
     let request = StorageServiceRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
         proof_version: 1000,
         start_version,
-        expected_num_transactions,
+        end_version,
         include_events: false,
     });
 
@@ -198,8 +196,8 @@ async fn test_get_transactions_with_proof_no_events() {
     match response {
         StorageServiceResponse::TransactionsWithProof(transactions_with_proof) => {
             assert_eq!(
-                transactions_with_proof.transactions.len(),
-                expected_num_transactions as usize
+                transactions_with_proof.transactions.len() as u64,
+                end_version - start_version + 1,
             );
             assert_eq!(
                 transactions_with_proof.first_transaction_version,
@@ -207,9 +205,7 @@ async fn test_get_transactions_with_proof_no_events() {
             );
             assert_none!(transactions_with_proof.events);
         }
-        _ => {
-            panic!("Expected transactions with proof but got: {:?}", response);
-        }
+        _ => panic!("Expected transactions with proof but got: {:?}", response),
     };
 }
 
@@ -223,7 +219,7 @@ async fn test_get_transaction_outputs_with_proof() {
         StorageServiceRequest::GetTransactionOutputsWithProof(TransactionOutputsWithProofRequest {
             proof_version: 1000,
             start_version: 0,
-            expected_num_outputs: 10,
+            end_version: 0,
         });
 
     // Process the request
@@ -266,9 +262,7 @@ async fn test_get_epoch_ending_ledger_infos() {
                 );
             }
         }
-        _ => {
-            panic!("Expected epoch ending ledger infos but got: {:?}", response);
-        }
+        _ => panic!("Expected epoch ending ledger infos but got: {:?}", response),
     };
 }
 

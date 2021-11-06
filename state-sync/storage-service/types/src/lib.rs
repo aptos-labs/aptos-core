@@ -189,27 +189,27 @@ impl TryFrom<StorageServiceResponse> for TransactionListWithProof {
 /// specified version.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct AccountStatesChunkWithProofRequest {
-    pub version: u64,                     // The version to fetch the account states at
-    pub start_account_index: u64,         // The account index to start fetching account states
-    pub expected_num_account_states: u64, // Expected number of account states to fetch
+    pub version: u64,             // The version to fetch the account states at
+    pub start_account_index: u64, // The account index to start fetching account states
+    pub end_account_index: u64,   // The account index to stop fetching account states (inclusive)
 }
 
 /// A storage service request for fetching a transaction output list with a
 /// corresponding proof.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct TransactionOutputsWithProofRequest {
-    pub proof_version: u64,        // The version the proof should be relative to
-    pub start_version: u64,        // The starting version of the transaction output list
-    pub expected_num_outputs: u64, // Expected number of transaction outputs in the list
+    pub proof_version: u64, // The version the proof should be relative to
+    pub start_version: u64, // The starting version of the transaction output list
+    pub end_version: u64,   // The ending version of the transaction output list (inclusive)
 }
 
 /// A storage service request for fetching a transaction list with a
 /// corresponding proof.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct TransactionsWithProofRequest {
-    pub proof_version: u64, // The version the proof should be relative to
-    pub start_version: u64, // The starting version of the transaction list
-    pub expected_num_transactions: u64, // Expected number of transactions in the list
+    pub proof_version: u64,   // The version the proof should be relative to
+    pub start_version: u64,   // The starting version of the transaction list
+    pub end_version: u64,     // The ending version of the transaction list (inclusive)
     pub include_events: bool, // Whether or not to include events in the response
 }
 

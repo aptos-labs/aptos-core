@@ -158,7 +158,7 @@ async fn test_request_works_only_when_data_available() {
             request,
             StorageServiceRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
                 start_version: 50,
-                expected_num_transactions: 51,
+                end_version: 100,
                 proof_version: 100,
                 include_events: false,
             })
