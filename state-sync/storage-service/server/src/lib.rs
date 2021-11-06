@@ -354,14 +354,16 @@ impl StorageReaderInterface for StorageReader {
 
     fn get_transaction_outputs_with_proof(
         &self,
-        _proof_version: u64,
-        _start_version: u64,
-        _end_version: u64,
+        proof_version: u64,
+        start_version: u64,
+        end_version: u64,
     ) -> Result<TransactionOutputListWithProof, Error> {
-        // TODO(joshlind): implement this once the transaction outputs are persisted in the DB.
-        Err(Error::UnexpectedErrorEncountered(
-            "Unimplemented! This API call needs to be implemented!".into(),
-        ))
+        let expected_num_outputs = inclusive_range_len(start_version, end_version)?;
+        let output_list_with_proof = self
+            .storage
+            .get_transaction_outputs(start_version, expected_num_outputs, proof_version)
+            .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
+        Ok(output_list_with_proof)
     }
 
     fn get_account_states_chunk_with_proof(
