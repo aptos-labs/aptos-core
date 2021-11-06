@@ -3,13 +3,18 @@
 
 #![forbid(unsafe_code)]
 
+mod logging;
 pub mod network;
 
 #[cfg(test)]
 mod tests;
 
-use crate::network::StorageServiceNetworkEvents;
+use crate::{
+    logging::{LogEntry, LogSchema},
+    network::StorageServiceNetworkEvents,
+};
 use bounded_executor::BoundedExecutor;
+use diem_logger::prelude::*;
 use diem_types::{
     account_state_blob::AccountStatesChunkWithProof,
     epoch_change::EpochChangeProof,
@@ -77,15 +82,23 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
 
     pub async fn start(mut self) {
         while let Some(request) = self.network_requests.next().await {
-            let storage = self.storage.clone();
+            // Log the request
+            let (peer, protocol, request, response_sender) = request;
+            debug!(LogSchema::new(LogEntry::ReceivedStorageRequest)
+                .request(&request)
+                .message(&format!(
+                    "Received storage request. Peer: {:?}, protocol: {:?}.",
+                    peer, protocol,
+                )));
 
             // All handler methods are currently CPU-bound and synchronous
             // I/O-bound, so we want to spawn on the blocking thread pool to
             // avoid starving other async tasks on the same runtime.
+            let storage = self.storage.clone();
             self.bounded_executor
                 .spawn_blocking(move || {
-                    let (_peer, _protocol, request, response_sender) = request;
                     let response = Handler::new(storage).call(request);
+                    debug!(LogSchema::new(LogEntry::SentStorageResponse).response(&response));
                     response_sender.send(response);
                 })
                 .await;
@@ -107,7 +120,7 @@ impl<T: StorageReaderInterface> Handler<T> {
     }
 
     pub fn call(&self, request: StorageServiceRequest) -> Result<StorageServiceResponse> {
-        let response = match request {
+        let response = match &request {
             StorageServiceRequest::GetAccountStatesChunkWithProof(request) => {
                 self.get_account_states_chunk_with_proof(request)
             }
@@ -115,7 +128,7 @@ impl<T: StorageReaderInterface> Handler<T> {
                 self.get_epoch_ending_ledger_infos(request)
             }
             StorageServiceRequest::GetNumberOfAccountsAtVersion(version) => {
-                self.get_number_of_accounts_at_version(version)
+                self.get_number_of_accounts_at_version(*version)
             }
             StorageServiceRequest::GetServerProtocolVersion => self.get_server_protocol_version(),
             StorageServiceRequest::GetStorageServerSummary => self.get_storage_server_summary(),
@@ -127,17 +140,19 @@ impl<T: StorageReaderInterface> Handler<T> {
             }
         };
 
-        // If any requests resulted in an unexpected error, return an InternalStorageError to the
-        // client and log the actual error.
-        response.map_err(|_err| {
-            // TODO(joshlind): add logging support to this library so we can log _error
-            StorageServiceError::InternalError
+        // If any requests resulted in an unexpected error, log and return the
+        // error to the client.
+        response.map_err(|error| {
+            error!(LogSchema::new(LogEntry::StorageServiceError)
+                .error(&error)
+                .request(&request));
+            StorageServiceError::InternalError(error.to_string())
         })
     }
 
     fn get_account_states_chunk_with_proof(
         &self,
-        request: AccountStatesChunkWithProofRequest,
+        request: &AccountStatesChunkWithProofRequest,
     ) -> Result<StorageServiceResponse, Error> {
         let account_states_chunk_with_proof = self.storage.get_account_states_chunk_with_proof(
             request.version,
@@ -152,7 +167,7 @@ impl<T: StorageReaderInterface> Handler<T> {
 
     fn get_epoch_ending_ledger_infos(
         &self,
-        request: EpochEndingLedgerInfoRequest,
+        request: &EpochEndingLedgerInfoRequest,
     ) -> Result<StorageServiceResponse, Error> {
         let epoch_change_proof = self
             .storage
@@ -201,7 +216,7 @@ impl<T: StorageReaderInterface> Handler<T> {
 
     fn get_transaction_outputs_with_proof(
         &self,
-        request: TransactionOutputsWithProofRequest,
+        request: &TransactionOutputsWithProofRequest,
     ) -> Result<StorageServiceResponse, Error> {
         let transaction_output_list_with_proof = self.storage.get_transaction_outputs_with_proof(
             request.proof_version,
@@ -216,7 +231,7 @@ impl<T: StorageReaderInterface> Handler<T> {
 
     fn get_transactions_with_proof(
         &self,
-        request: TransactionsWithProofRequest,
+        request: &TransactionsWithProofRequest,
     ) -> Result<StorageServiceResponse, Error> {
         let transactions_with_proof = self.storage.get_transactions_with_proof(
             request.proof_version,
@@ -366,19 +381,19 @@ impl StorageReaderInterface for StorageReader {
         Ok(output_list_with_proof)
     }
 
-    fn get_account_states_chunk_with_proof(
-        &self,
-        _version: u64,
-        _start_account_index: u64,
-        _end_account_index: u64,
-    ) -> Result<AccountStatesChunkWithProof, Error> {
+    fn get_number_of_accounts(&self, _version: u64) -> Result<u64, Error> {
         // TODO(joshlind): implement this once DbReaderWriter supports these calls.
         Err(Error::UnexpectedErrorEncountered(
             "Unimplemented! This API call needs to be implemented!".into(),
         ))
     }
 
-    fn get_number_of_accounts(&self, _version: u64) -> Result<u64, Error> {
+    fn get_account_states_chunk_with_proof(
+        &self,
+        _version: u64,
+        _start_account_index: u64,
+        _end_account_index: u64,
+    ) -> Result<AccountStatesChunkWithProof, Error> {
         // TODO(joshlind): implement this once DbReaderWriter supports these calls.
         Err(Error::UnexpectedErrorEncountered(
             "Unimplemented! This API call needs to be implemented!".into(),

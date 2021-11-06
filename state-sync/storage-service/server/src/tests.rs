@@ -8,6 +8,7 @@ use anyhow::Result;
 use channel::diem_channel;
 use claim::{assert_matches, assert_none, assert_some};
 use diem_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
+use diem_logger::Level;
 use diem_types::{
     account_address::AccountAddress,
     account_state_blob::{default_protocol::AccountStateWithProof, AccountStateBlob},
@@ -87,7 +88,7 @@ async fn test_get_account_states_chunk_with_proof() {
     let error = mock_client.send_request(request).await.unwrap_err();
 
     // Verify the response is correct (the API call is currently unsupported)
-    assert_matches!(error, StorageServiceError::InternalError);
+    assert_matches!(error, StorageServiceError::InternalError(_));
 }
 
 #[tokio::test]
@@ -102,7 +103,7 @@ async fn test_get_number_of_accounts_at_version() {
     let error = mock_client.send_request(request).await.unwrap_err();
 
     // Verify the response is correct (the API call is currently unsupported)
-    assert_matches!(error, StorageServiceError::InternalError);
+    assert_matches!(error, StorageServiceError::InternalError(_));
 }
 
 #[tokio::test]
@@ -290,6 +291,7 @@ struct MockClient {
 
 impl MockClient {
     fn new() -> (Self, StorageServiceServer<StorageReader>) {
+        initialize_logger();
         let storage = StorageReader::new(Arc::new(MockDbReader));
 
         let queue_cfg = crate::network::network_endpoint_config()
@@ -610,4 +612,12 @@ impl DbReader<DpnProto> for MockDbReader {
     ) -> Result<LedgerInfoWithSignatures> {
         unimplemented!()
     }
+}
+
+/// Initializes the Diem logger for tests
+pub fn initialize_logger() {
+    diem_logger::DiemLogger::builder()
+        .is_async(false)
+        .level(Level::Debug)
+        .build();
 }

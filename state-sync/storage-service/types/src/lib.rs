@@ -24,8 +24,8 @@ pub type Result<T, E = StorageServiceError> = ::std::result::Result<T, E>;
 /// to process a service request.
 #[derive(Clone, Debug, Deserialize, Eq, Error, PartialEq, Serialize)]
 pub enum StorageServiceError {
-    #[error("Internal service error")]
-    InternalError,
+    #[error("Internal service error: {0}")]
+    InternalError(String),
 }
 
 /// A single storage service message sent or received over DiemNet.
