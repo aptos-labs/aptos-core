@@ -57,24 +57,10 @@ fn start_node(home: &Home) -> Result<()> {
     println!("\tConfig path: {:?}", home.get_validator_config_path());
     println!("\tDiem root key path: {:?}", home.get_root_key_path());
     println!("\tWaypoint: {}", home.read_genesis_waypoint()?);
-    // Configure json rpc to bind on 0.0.0.0
-    let mut config = NodeConfig::load(home.get_validator_config_path()).unwrap();
-    config.json_rpc.address = format!("0.0.0.0:{}", config.json_rpc.address.port())
-        .parse()
-        .unwrap();
-    println!("\tJSON-RPC endpoint: {}", config.json_rpc.address);
-    config.json_rpc.stream_rpc.enabled = true;
-    println!("\tStream-RPC enabled!");
-    config.api.enabled = true;
-    println!("\tREST API enabled!");
-    println!("\tREST API: {}", config.api.address);
-
-    println!(
-        "\tFullNode network: {}",
-        config.full_node_networks[0].listen_address
-    );
     println!("\tChainId: {}", ChainId::test());
-    println!();
+    let config = NodeConfig::load(home.get_validator_config_path()).unwrap();
+    diem_node::print_api_config(&config);
+
     println!("Diem is running, press ctrl-c to exit");
     println!();
 

@@ -129,8 +129,19 @@ pub fn load_test_environment<R>(
     // Build a single validator network
     let mut maybe_config = PathBuf::from(&config_path);
     maybe_config.push("validator_node_template.yaml");
-    let template = NodeConfig::load_config(maybe_config)
+    let mut template = NodeConfig::load_config(maybe_config)
         .unwrap_or_else(|_| NodeConfig::default_for_validator());
+
+    // enable REST and JSON-RPC API
+    template.json_rpc.address = format!("0.0.0.0:{}", template.json_rpc.address.port())
+        .parse()
+        .unwrap();
+    template.json_rpc.stream_rpc.enabled = true;
+    template.api.enabled = true;
+    if lazy {
+        template.consensus.mempool_poll_count = u64::MAX;
+    }
+
     let mut builder =
         diem_genesis_tool::validator_builder::ValidatorBuilder::new(&config_path, genesis_modules)
             .template(template)
@@ -163,15 +174,19 @@ pub fn load_test_environment<R>(
     println!("\tConfig path: {:?}", validators[0].config_path());
     println!("\tDiem root key path: {:?}", diem_root_key_path);
     println!("\tWaypoint: {}", genesis_waypoint);
-    // Configure json rpc to bind on 0.0.0.0
-    let mut config = NodeConfig::load(validators[0].config_path()).unwrap();
-    config.json_rpc.address = format!("0.0.0.0:{}", config.json_rpc.address.port())
-        .parse()
-        .unwrap();
+    println!("\tChainId: {}", ChainId::test());
+
+    print_api_config(&validators[0].config);
+
+    println!("Diem is running, press ctrl-c to exit");
+    println!();
+
+    start(&validators[0].config, Some(log_file))
+}
+
+pub fn print_api_config(config: &NodeConfig) {
     println!("\tJSON-RPC endpoint: {}", config.json_rpc.address);
-    config.json_rpc.stream_rpc.enabled = true;
     println!("\tStream-RPC enabled!");
-    config.api.enabled = true;
     println!("\tREST API enabled!");
     println!("\tREST API: {}", config.api.address);
 
@@ -179,18 +194,11 @@ pub fn load_test_environment<R>(
         "\tFullNode network: {}",
         config.full_node_networks[0].listen_address
     );
-    println!("\tChainId: {}", ChainId::test());
     println!();
-    if lazy {
+    if config.consensus.mempool_poll_count == u64::MAX {
         println!("\tLazy mode is enabled");
-        config.consensus.mempool_poll_count = u64::MAX;
         println!();
     }
-
-    println!("Diem is running, press ctrl-c to exit");
-    println!();
-
-    start(&config, Some(log_file))
 }
 
 // Fetch chain ID from on-chain resource
