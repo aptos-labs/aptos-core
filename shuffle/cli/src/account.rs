@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::shared::{get_home_path, send_transaction, Home};
+use crate::shared::{send_transaction, Home};
 use anyhow::{anyhow, Context, Result};
 use diem_config::config::NodeConfig;
 use diem_crypto::PrivateKey;
@@ -23,8 +23,7 @@ use std::{
 };
 
 // Creates new account from randomly generated private/public key pair.
-pub fn handle(root: Option<PathBuf>) -> Result<()> {
-    let home = Home::new(get_home_path().as_path())?;
+pub fn handle(home: &Home, root: Option<PathBuf>) -> Result<()> {
     if !home.get_shuffle_path().is_dir() {
         return Err(anyhow!(
             "A node hasn't been created yet! Run shuffle node first"
@@ -32,7 +31,7 @@ pub fn handle(root: Option<PathBuf>) -> Result<()> {
     }
 
     if home.get_latest_path().exists() {
-        let wants_another_key = confirm_user_decision(&home);
+        let wants_another_key = confirm_user_decision(home);
         if wants_another_key {
             let time = duration_since_epoch();
             let archive_dir = home.create_archive_dir(time)?;

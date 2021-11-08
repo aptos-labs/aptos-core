@@ -1,12 +1,14 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::test::TestCommand;
+use crate::{
+    shared::{get_home_path, Home},
+    test::TestCommand,
+};
 use anyhow::{anyhow, Result};
 use diem_types::account_address::AccountAddress;
 use std::{fs, path::PathBuf};
 use structopt::StructOpt;
-use url::Url;
 
 mod account;
 mod build;
@@ -20,18 +22,24 @@ mod transactions;
 
 #[tokio::main]
 pub async fn main() -> Result<()> {
+    let home = Home::new(get_home_path().as_path())?;
     let subcommand = Subcommand::from_args();
     match subcommand {
         Subcommand::New { blockchain, path } => new::handle(blockchain, path),
-        Subcommand::Node { genesis } => node::handle(genesis),
+        Subcommand::Node { genesis } => node::handle(&home, genesis),
         Subcommand::Build { project_path } => {
             build::handle(&shared::normalized_project_path(project_path)?)
         }
-        Subcommand::Deploy { project_path } => {
-            deploy::handle(&shared::normalized_project_path(project_path)?)
-        }
-        Subcommand::Account { root } => account::handle(root),
-        Subcommand::Test { cmd } => test::handle(cmd),
+        Subcommand::Deploy {
+            project_path,
+            network,
+        } => deploy::handle(
+            &home,
+            &shared::normalized_project_path(project_path)?,
+            shared::normalized_network(&home, network)?,
+        ),
+        Subcommand::Account { root } => account::handle(&home, root),
+        Subcommand::Test { cmd } => test::handle(&home, cmd),
         Subcommand::Console {
             project_path,
             network,
@@ -39,9 +47,9 @@ pub async fn main() -> Result<()> {
             address,
         } => console::handle(
             &shared::normalized_project_path(project_path)?,
-            normalized_network(network)?,
-            &normalized_key_path(key_path)?,
-            normalized_address(address)?,
+            shared::normalized_network(&home, network)?,
+            &normalized_key_path(&home, key_path)?,
+            normalized_address(&home, address)?,
         ),
         Subcommand::Transactions {
             network,
@@ -50,9 +58,9 @@ pub async fn main() -> Result<()> {
             raw,
         } => {
             transactions::handle(
-                normalized_network(network)?,
+                shared::normalized_network(&home, network)?,
                 unwrap_nested_boolean_option(tail),
-                normalized_address(address)?,
+                normalized_address(&home, address)?,
                 unwrap_nested_boolean_option(raw),
             )
             .await
@@ -86,6 +94,9 @@ pub enum Subcommand {
     Deploy {
         #[structopt(short, long)]
         project_path: Option<PathBuf>,
+
+        #[structopt(short, long)]
+        network: Option<String>,
     },
     Account {
         #[structopt(short, long, help = "Creates account from mint.key passed in by user")]
@@ -136,7 +147,7 @@ pub enum Subcommand {
     },
 }
 
-fn normalized_address(account_address: Option<String>) -> Result<AccountAddress> {
+fn normalized_address(home: &Home, account_address: Option<String>) -> Result<AccountAddress> {
     let normalized_string = match account_address {
         Some(input_address) => {
             if &input_address[0..2] != "0x" {
@@ -145,21 +156,22 @@ fn normalized_address(account_address: Option<String>) -> Result<AccountAddress>
                 input_address
             }
         }
-        None => get_latest_address()?,
+        None => get_latest_address(home)?,
     };
     Ok(AccountAddress::from_hex_literal(
         normalized_string.as_str(),
     )?)
 }
 
-fn get_latest_address() -> Result<String> {
-    let home = shared::Home::new(shared::get_home_path().as_path())?;
+fn get_latest_address(home: &Home) -> Result<String> {
     home.check_account_path_exists()?;
-    Ok("0x".to_owned() + &fs::read_to_string(home.get_latest_address_path())?)
+    Ok(
+        AccountAddress::from_hex(fs::read_to_string(home.get_latest_address_path())?)?
+            .to_hex_literal(),
+    )
 }
 
-fn normalized_key_path(diem_root_key_path: Option<PathBuf>) -> Result<PathBuf> {
-    let home = shared::Home::new(shared::get_home_path().as_path())?;
+fn normalized_key_path(home: &Home, diem_root_key_path: Option<PathBuf>) -> Result<PathBuf> {
     match diem_root_key_path {
         Some(key_path) => Ok(key_path),
         None => {
@@ -170,20 +182,6 @@ fn normalized_key_path(diem_root_key_path: Option<PathBuf>) -> Result<PathBuf> {
             }
             Ok(PathBuf::from(home.get_latest_key_path()))
         }
-    }
-}
-
-fn normalized_network(network: Option<String>) -> Result<Url> {
-    let home = shared::Home::new(shared::get_home_path().as_path())?;
-    match network {
-        Some(input) => Ok(shared::build_url(
-            input.as_str(),
-            &home.read_networks_toml()?,
-        )?),
-        None => Ok(shared::build_url(
-            shared::LOCALHOST_NETWORK_NAME,
-            &home.read_networks_toml()?,
-        )?),
     }
 }
 

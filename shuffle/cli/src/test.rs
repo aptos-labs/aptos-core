@@ -21,15 +21,13 @@ use std::{
     panic,
     path::{Path, PathBuf},
     process::Command,
-    str::FromStr,
 };
 use structopt::StructOpt;
 use url::Url;
 
-pub fn run_e2e_tests(project_path: &Path) -> Result<()> {
+pub fn run_e2e_tests(home: &Home, project_path: &Path, network: Url) -> Result<()> {
     let _config = shared::read_project_config(project_path)?;
     shared::generate_typescript_libraries(project_path)?;
-    let home = Home::new(shared::get_home_path().as_path())?;
 
     let config = NodeConfig::load(&home.get_validator_config_path()).with_context(|| {
         format!(
@@ -37,14 +35,12 @@ pub fn run_e2e_tests(project_path: &Path) -> Result<()> {
             home.get_validator_config_path()
         )
     })?;
-    let json_rpc_url = format!("http://0.0.0.0:{}", config.json_rpc.address.port());
-    let network = Url::from_str(json_rpc_url.as_str())?;
-    println!("Connecting to {}...", network);
+    println!("Connecting to {}...", network.as_str());
     let client = BlockingClient::new(network.as_str());
     let factory = TransactionFactory::new(ChainId::test());
 
-    let mut new_account = create_test_account(&client, &home, &factory)?;
-    create_receiver_account(&client, &home, &factory)?;
+    let mut new_account = create_test_account(home, &client, &factory)?;
+    create_receiver_account(home, &client, &factory)?;
     send_module_transaction(&client, &mut new_account, project_path, &factory)?;
     run_deno_test(
         project_path,
@@ -57,8 +53,8 @@ pub fn run_e2e_tests(project_path: &Path) -> Result<()> {
 
 // Set up a new test account
 fn create_test_account(
-    client: &BlockingClient,
     home: &Home,
+    client: &BlockingClient,
     factory: &TransactionFactory,
 ) -> Result<LocalAccount> {
     let mut root_account = account::get_root_account(client, home.get_root_key_path());
@@ -73,8 +69,8 @@ fn create_test_account(
 
 // Set up a new test account
 fn create_receiver_account(
-    client: &BlockingClient,
     home: &Home,
+    client: &BlockingClient,
     factory: &TransactionFactory,
 ) -> Result<LocalAccount> {
     let mut root_account = account::get_root_account(client, home.get_root_key_path());
@@ -196,6 +192,9 @@ pub enum TestCommand {
     E2e {
         #[structopt(short, long)]
         project_path: Option<PathBuf>,
+
+        #[structopt(short, long)]
+        network: Option<String>,
     },
 
     #[structopt(about = "Runs move move unit tests in project folder")]
@@ -210,21 +209,36 @@ pub enum TestCommand {
     All {
         #[structopt(short, long)]
         project_path: Option<PathBuf>,
+
+        #[structopt(short, long)]
+        network: Option<String>,
     },
 }
 
-pub fn handle(cmd: TestCommand) -> Result<()> {
+pub fn handle(home: &Home, cmd: TestCommand) -> Result<()> {
     match cmd {
-        TestCommand::E2e { project_path } => {
-            run_e2e_tests(shared::normalized_project_path(project_path)?.as_path())
-        }
+        TestCommand::E2e {
+            project_path,
+            network,
+        } => run_e2e_tests(
+            home,
+            shared::normalized_project_path(project_path)?.as_path(),
+            shared::normalized_network(home, network)?,
+        ),
         TestCommand::Unit { project_path } => {
             run_move_unit_tests(shared::normalized_project_path(project_path)?.as_path())
         }
-        TestCommand::All { project_path } => {
+        TestCommand::All {
+            project_path,
+            network,
+        } => {
             let normalized_path = shared::normalized_project_path(project_path)?;
             run_move_unit_tests(normalized_path.as_path())?;
-            run_e2e_tests(normalized_path.as_path())
+            run_e2e_tests(
+                home,
+                normalized_path.as_path(),
+                shared::normalized_network(home, network)?,
+            )
         }
     }
 }

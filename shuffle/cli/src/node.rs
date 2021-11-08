@@ -10,15 +10,14 @@ use std::{
     path::{Path, PathBuf},
 };
 
-pub fn handle(genesis: Option<String>) -> Result<()> {
-    let home = Home::new(shared::get_home_path().as_path())?;
+pub fn handle(home: &Home, genesis: Option<String>) -> Result<()> {
     if !home.get_shuffle_path().is_dir() {
         println!(
             "Creating node config in {}",
             home.get_shuffle_path().display()
         );
 
-        create_node(&home, genesis)
+        create_node(home, genesis)
     } else {
         println!(
             "Accessing node config in {}",
@@ -32,13 +31,13 @@ pub fn handle(genesis: Option<String>) -> Result<()> {
             );
         }
 
-        start_node(&home)
+        start_node(home)
     }
 }
 
 fn create_node(home: &Home, genesis: Option<String>) -> Result<()> {
     fs::create_dir_all(home.get_shuffle_path())?;
-    home.write_top_level_networks_config_into_toml()?;
+    home.write_default_networks_config_into_toml()?;
     let publishing_option = VMPublishingOption::open();
     let genesis_modules = genesis_modules_from_path(&genesis)?;
     diem_node::load_test_environment(

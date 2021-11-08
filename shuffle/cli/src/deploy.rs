@@ -20,10 +20,10 @@ use generate_key::load_key;
 use move_binary_format::{file_format::CompiledModule, normalized};
 use move_package::compilation::compiled_package::CompiledPackage;
 use std::{convert::TryFrom, path::Path};
+use url::Url;
 
 /// Deploys shuffle's main Move Package to the sender's address.
-pub fn handle(project_path: &Path) -> Result<()> {
-    let home = Home::new(shared::get_home_path().as_path())?;
+pub fn handle(home: &Home, project_path: &Path, network: Url) -> Result<()> {
     if !home.get_latest_key_path().exists() {
         return Err(anyhow!(
             "An account hasn't been created yet! Run shuffle account first."
@@ -31,19 +31,19 @@ pub fn handle(project_path: &Path) -> Result<()> {
     }
     let compiled_package =
         shared::build_move_package(project_path.join(shared::MAIN_PKG_PATH).as_ref())?;
-    publish_packages_as_transaction(home.get_latest_key_path(), compiled_package)
+    publish_packages_as_transaction(home.get_latest_key_path(), compiled_package, &network)
 }
 
 fn publish_packages_as_transaction(
     account_key_path: &Path,
     compiled_package: CompiledPackage,
+    network: &Url,
 ) -> Result<()> {
     let new_account_key = load_key(account_key_path);
-    let json_rpc_url = format!("http://0.0.0.0:{}", 8080); // TODO: Hardcoded to local devnet
     let factory = TransactionFactory::new(ChainId::test());
-    println!("Connecting to {}", json_rpc_url);
+    println!("Connecting to {}", network.as_str());
 
-    let client = BlockingClient::new(json_rpc_url);
+    let client = BlockingClient::new(network.as_str());
 
     println!("Using Public Key {}", &new_account_key.public_key());
     let derived_address =

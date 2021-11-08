@@ -298,11 +298,18 @@ impl Home {
         }
     }
 
-    pub fn write_top_level_networks_config_into_toml(&self) -> Result<()> {
+    pub fn write_default_networks_config_into_toml(&self) -> Result<()> {
         let network_config_path = self.shuffle_path.join("Networks.toml");
-        let network_config_string = toml::to_string_pretty(&generate_top_level_networks_config())?;
+        let network_config_string = toml::to_string_pretty(&NetworksConfig::default())?;
         fs::write(network_config_path, network_config_string)?;
         Ok(())
+    }
+}
+
+pub fn normalized_network(home: &Home, network: Option<String>) -> Result<Url> {
+    match network {
+        Some(input) => Ok(home.read_networks_toml()?.url_for(input.as_str())?),
+        None => Ok(home.read_networks_toml()?.url_for(LOCALHOST_NETWORK_NAME)?),
     }
 }
 
@@ -311,11 +318,26 @@ pub struct NetworksConfig {
     networks: BTreeMap<String, Network>,
 }
 
-fn generate_top_level_networks_config() -> NetworksConfig {
-    let mut network_map = BTreeMap::new();
-    network_map.insert("localhost".to_string(), generate_localhost_network());
-    NetworksConfig {
-        networks: network_map,
+impl NetworksConfig {
+    pub fn default() -> Self {
+        let mut network_map = BTreeMap::new();
+        network_map.insert("localhost".to_string(), Network::default());
+        NetworksConfig {
+            networks: network_map,
+        }
+    }
+
+    pub fn url_for(&self, network_name: &str) -> Result<Url> {
+        let specified_network = self.networks.get(network_name).ok_or_else(|| {
+            anyhow!("Please add specified network to the ~/.shuffle/Networks.json")
+        })?;
+        Ok(Url::from_str(
+            format!(
+                "{}:{}",
+                specified_network.base, specified_network.dev_api_port
+            )
+            .as_str(),
+        )?)
     }
 }
 
@@ -327,27 +349,15 @@ pub struct Network {
     dev_api_port: u16,
 }
 
-fn generate_localhost_network() -> Network {
-    Network {
-        name: String::from(LOCALHOST_NETWORK_NAME),
-        base: String::from(LOCALHOST_NETWORK_BASE),
-        json_rpc_port: 8080,
-        dev_api_port: 8081,
+impl Network {
+    pub fn default() -> Self {
+        Network {
+            name: String::from(LOCALHOST_NETWORK_NAME),
+            base: String::from(LOCALHOST_NETWORK_BASE),
+            json_rpc_port: 8080,
+            dev_api_port: 8081,
+        }
     }
-}
-
-pub fn build_url(network_name: &str, all_networks: &NetworksConfig) -> Result<Url> {
-    let specified_network = all_networks
-        .networks
-        .get(network_name)
-        .ok_or_else(|| anyhow!("Please add specified network to the ~/.shuffle/Networks.json"))?;
-    Ok(Url::from_str(
-        format!(
-            "{}:{}",
-            specified_network.base, specified_network.dev_api_port
-        )
-        .as_str(),
-    )?)
 }
 
 /// Generates the typescript bindings for the main Move package based on the embedded
@@ -640,6 +650,22 @@ mod test {
     }
 
     #[test]
+    fn test_normalized_network() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join(".shuffle")).unwrap();
+        let home = Home::new(dir.path()).unwrap();
+        home.write_default_networks_config_into_toml().unwrap();
+
+        let url_from_some = normalized_network(&home, Some("localhost".to_string())).unwrap();
+        let url_from_none = normalized_network(&home, None).unwrap();
+
+        let correct_url = Url::from_str("http://127.0.0.1:8081").unwrap();
+
+        assert_eq!(url_from_some, correct_url);
+        assert_eq!(url_from_none, correct_url);
+    }
+
+    #[test]
     fn test_check_account_dir_exists() {
         let bad_dir = tempdir().unwrap();
         let home = Home::new(bad_dir.path()).unwrap();
@@ -656,9 +682,9 @@ mod test {
         let dir = tempdir().unwrap();
         let home = Home::new(dir.path()).unwrap();
         fs::create_dir_all(dir.path().join(".shuffle")).unwrap();
-        home.write_top_level_networks_config_into_toml().unwrap();
+        home.write_default_networks_config_into_toml().unwrap();
         let networks_cfg = home.read_networks_toml().unwrap();
-        assert_eq!(networks_cfg, generate_top_level_networks_config());
+        assert_eq!(networks_cfg, NetworksConfig::default());
     }
 
     fn get_test_network() -> Network {
@@ -671,31 +697,30 @@ mod test {
     }
 
     #[test]
-    fn test_generate_top_level_networks_config() {
+    fn test_generate_default_networks_config() {
         let mut network_map = BTreeMap::new();
         network_map.insert("localhost".to_string(), get_test_network());
         let networks_cfg = NetworksConfig {
             networks: network_map,
         };
-        assert_eq!(generate_top_level_networks_config(), networks_cfg);
+        assert_eq!(NetworksConfig::default(), networks_cfg);
     }
 
     #[test]
-    fn test_generate_localhost_network() {
-        assert_eq!(generate_localhost_network(), get_test_network());
+    fn test_generate_default_network() {
+        assert_eq!(Network::default(), get_test_network());
     }
 
     #[test]
-    fn test_build_url() {
+    fn test_url_for() {
         let mut network_map = BTreeMap::new();
-        network_map.insert("localhost".to_string(), generate_localhost_network());
+        network_map.insert("localhost".to_string(), Network::default());
         let all_networks = NetworksConfig {
             networks: network_map,
         };
-        let generated_url = build_url("localhost", &all_networks).unwrap();
         let correct_url = Url::from_str("http://127.0.0.1:8081").unwrap();
-        assert_eq!(generated_url, correct_url);
-        assert_eq!(build_url("trove", &all_networks).is_err(), true);
+        assert_eq!(all_networks.url_for("localhost").unwrap(), correct_url);
+        assert_eq!(all_networks.url_for("trove").is_err(), true);
     }
 
     #[test]
