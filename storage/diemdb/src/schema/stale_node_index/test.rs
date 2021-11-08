@@ -3,7 +3,7 @@
 
 use super::*;
 use proptest::prelude::*;
-use schemadb::schema::assert_encode_decode;
+use schemadb::{schema::fuzzing::assert_encode_decode, test_no_panic_decoding};
 
 proptest! {
     #[test]
@@ -13,3 +13,5 @@ proptest! {
         assert_encode_decode::<StaleNodeIndexSchema>(&stale_node_index, &());
     }
 }
+
+test_no_panic_decoding!(StaleNodeIndexSchema);

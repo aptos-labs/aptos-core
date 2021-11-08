@@ -4,7 +4,7 @@
 use super::*;
 use diem_types::transaction::{TransactionInfo, Version};
 use proptest::prelude::*;
-use schemadb::schema::assert_encode_decode;
+use schemadb::{schema::fuzzing::assert_encode_decode, test_no_panic_decoding};
 
 proptest! {
     #[test]
@@ -12,3 +12,5 @@ proptest! {
         assert_encode_decode::<TransactionInfoSchema>(&version, &txn_info);
     }
 }
+
+test_no_panic_decoding!(TransactionInfoSchema);

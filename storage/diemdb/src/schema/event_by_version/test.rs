@@ -3,7 +3,7 @@
 
 use super::*;
 use proptest::prelude::*;
-use schemadb::schema::assert_encode_decode;
+use schemadb::{schema::fuzzing::assert_encode_decode, test_no_panic_decoding};
 
 proptest! {
     #[test]
@@ -16,3 +16,5 @@ proptest! {
         assert_encode_decode::<EventByVersionSchema>(&(event_key, version, seq_num), &index);
     }
 }
+
+test_no_panic_decoding!(EventByVersionSchema);

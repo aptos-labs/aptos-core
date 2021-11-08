@@ -4,7 +4,7 @@
 use super::*;
 use diem_types::ledger_info::LedgerInfoWithSignatures;
 use proptest::prelude::*;
-use schemadb::schema::assert_encode_decode;
+use schemadb::{schema::fuzzing::assert_encode_decode, test_no_panic_decoding};
 
 proptest! {
     #[test]
@@ -15,3 +15,5 @@ proptest! {
         assert_encode_decode::<LedgerInfoSchema>(&epoch, &ledger_info_with_sigs);
     }
 }
+
+test_no_panic_decoding!(LedgerInfoSchema);

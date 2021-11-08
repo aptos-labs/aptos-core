@@ -62,42 +62,32 @@ fn ensure_slice_len_gt(data: &[u8], len: usize) -> Result<()> {
 
 #[cfg(feature = "fuzzing")]
 pub mod fuzzing {
-    use schemadb::schema::{KeyCodec, Schema, ValueCodec};
-
-    macro_rules! decode_key_value {
-        ($schema_type: ty, $data: ident) => {
-            <<$schema_type as Schema>::Key as KeyCodec<$schema_type>>::decode_key($data);
-            <<$schema_type as Schema>::Value as ValueCodec<$schema_type>>::decode_value($data);
-        };
-    }
+    use schemadb::schema::fuzzing::assert_no_panic_decoding;
 
     pub fn fuzz_decode(data: &[u8]) {
         #[allow(unused_must_use)]
         {
-            decode_key_value!(super::epoch_by_version::EpochByVersionSchema, data);
-            decode_key_value!(super::event::EventSchema, data);
-            decode_key_value!(super::event_accumulator::EventAccumulatorSchema, data);
-            decode_key_value!(super::event_by_key::EventByKeySchema, data);
-            decode_key_value!(super::event_by_version::EventByVersionSchema, data);
-            decode_key_value!(
-                super::jellyfish_merkle_node::JellyfishMerkleNodeSchema,
-                data
+            assert_no_panic_decoding::<super::epoch_by_version::EpochByVersionSchema>(data);
+            assert_no_panic_decoding::<super::event::EventSchema>(data);
+            assert_no_panic_decoding::<super::event_accumulator::EventAccumulatorSchema>(data);
+            assert_no_panic_decoding::<super::event_by_key::EventByKeySchema>(data);
+            assert_no_panic_decoding::<super::event_by_version::EventByVersionSchema>(data);
+            assert_no_panic_decoding::<super::jellyfish_merkle_node::JellyfishMerkleNodeSchema>(
+                data,
             );
-            decode_key_value!(super::ledger_counters::LedgerCountersSchema, data);
-            decode_key_value!(super::ledger_info::LedgerInfoSchema, data);
-            decode_key_value!(super::stale_node_index::StaleNodeIndexSchema, data);
-            decode_key_value!(super::transaction::TransactionSchema, data);
-            decode_key_value!(
-                super::transaction_accumulator::TransactionAccumulatorSchema,
-                data
+            assert_no_panic_decoding::<super::ledger_counters::LedgerCountersSchema>(data);
+            assert_no_panic_decoding::<super::ledger_info::LedgerInfoSchema>(data);
+            assert_no_panic_decoding::<super::stale_node_index::StaleNodeIndexSchema>(data);
+            assert_no_panic_decoding::<super::transaction::TransactionSchema>(data);
+            assert_no_panic_decoding::<super::transaction_accumulator::TransactionAccumulatorSchema>(
+                data,
             );
-            decode_key_value!(
-                super::transaction_by_account::TransactionByAccountSchema,
-                data
+            assert_no_panic_decoding::<super::transaction_by_account::TransactionByAccountSchema>(
+                data,
             );
-            decode_key_value!(super::transaction_by_hash::TransactionByHashSchema, data);
-            decode_key_value!(super::transaction_info::TransactionInfoSchema, data);
-            decode_key_value!(super::write_set::WriteSetSchema, data);
+            assert_no_panic_decoding::<super::transaction_by_hash::TransactionByHashSchema>(data);
+            assert_no_panic_decoding::<super::transaction_info::TransactionInfoSchema>(data);
+            assert_no_panic_decoding::<super::write_set::WriteSetSchema>(data);
         }
     }
 }

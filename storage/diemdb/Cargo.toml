@@ -49,8 +49,9 @@ diem-jellyfish-merkle = { path = "../jellyfish-merkle", features = ["fuzzing"] }
 diem-proptest-helpers = { path = "../../common/proptest-helpers" }
 diem-temppath = { path = "../../common/temppath" }
 diem-types = { path = "../../types", features = ["fuzzing"] }
+schemadb = { path = "../schemadb", features = ["fuzzing"] }
 
 [features]
 default = []
 diemsum = []
-fuzzing = ["proptest", "proptest-derive", "diem-proptest-helpers", "diem-temppath", "diem-crypto/fuzzing", "diem-jellyfish-merkle/fuzzing", "diem-types/fuzzing"]
+fuzzing = ["proptest", "proptest-derive", "diem-proptest-helpers", "diem-temppath", "diem-crypto/fuzzing", "diem-jellyfish-merkle/fuzzing", "diem-types/fuzzing", "schemadb/fuzzing"]

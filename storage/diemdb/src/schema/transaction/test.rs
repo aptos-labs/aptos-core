@@ -3,7 +3,7 @@
 
 use super::*;
 use proptest::prelude::*;
-use schemadb::schema::assert_encode_decode;
+use schemadb::{schema::fuzzing::assert_encode_decode, test_no_panic_decoding};
 
 proptest! {
     #[test]
@@ -11,3 +11,5 @@ proptest! {
         assert_encode_decode::<TransactionSchema>(&0u64, &txn);
     }
 }
+
+test_no_panic_decoding!(TransactionSchema);

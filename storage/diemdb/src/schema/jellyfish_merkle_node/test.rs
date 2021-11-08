@@ -6,7 +6,7 @@ use diem_crypto::HashValue;
 use diem_jellyfish_merkle::node_type::Node;
 use diem_types::account_state_blob::AccountStateBlob;
 use proptest::prelude::*;
-use schemadb::schema::assert_encode_decode;
+use schemadb::{schema::fuzzing::assert_encode_decode, test_no_panic_decoding};
 
 proptest! {
     #[test]
@@ -21,3 +21,5 @@ proptest! {
         );
     }
 }
+
+test_no_panic_decoding!(JellyfishMerkleNodeSchema);
