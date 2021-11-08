@@ -9,7 +9,6 @@
 
 // deno-lint-ignore-file no-explicit-any
 // deno-lint-ignore-file ban-types
-import { createRemote } from "https://deno.land/x/gentle_rpc@v3.1/mod.ts";
 import * as context from "./context.ts";
 
 console.log(await ledgerInfo());
@@ -22,11 +21,10 @@ export async function transactions() {
   return await checkingFetch(context.relativeUrl("/transactions"));
 }
 
-export async function accountTransactions() {
-  const remote = createRemote("http://127.0.0.1:8080/v1");
-  return await remote.call(
-    "get_account_transactions",
-    [context.senderAddress.substring(2), 0, 10, true],
+export async function accountTransactions(addr?: string) {
+  addr = context.addressOrDefault(addr);
+  return await checkingFetch(
+    context.relativeUrl(`/accounts/${addr}/transactions`),
   );
 }
 
@@ -124,16 +122,13 @@ export async function resourcesWithName(resourceName: string): Promise<any[]> {
 
 async function checkingFetch(
   relativePath: string,
+  // deno-lint-ignore ban-types
   settings?: object,
 ): Promise<any> {
   const res = await fetch(context.relativeUrl(relativePath), settings);
   if (!isSuccess(res.status)) {
-    try {
-      const payload = await res.json();
-      throw `error with fetch: ${res.statusText}. ${payload}`;
-    } catch (_e) {
-      throw `error with fetch: ${res.statusText}.`;
-    }
+    const payload = await res.json();
+    throw `error with fetch: ${res.status} ${res.statusText}. ${payload.message}`;
   } else {
     return await res.json();
   }
