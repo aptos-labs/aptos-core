@@ -96,7 +96,7 @@ It is good to first generate some corpus and run the fuzzer over it for a bit (t
 To test coverage of our fuzzers you can run the following command with [grcov](https://github.com/mozilla/grcov):
 
 ```sh
-RUSTFLAGS='--cfg feature="fuzzing"' CORPUS_PATH=fuzz/corpus cargo xtest --html-cov-dir <some path for html output> -p diem-fuzzer -- coverage
+RUSTFLAGS='--cfg feature="fuzzing"' CORPUS_PATH=fuzz/corpus cargo xtest --html-cov-dir <some path for html output> -p diem-fuzzer -- --test-threads 1 --ignored coverage
 ```
 
 ### Building a single fuzzer
