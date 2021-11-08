@@ -14,7 +14,7 @@ ENV RUSTUP_HOME "/opt/rustup"
 RUN mkdir -p /github/home && \
     mkdir -p /opt/cargo/ && \
     mkdir -p /opt/git/ && \
-    /diem/scripts/dev_setup.sh -t -o -b -p -y -s -n && \
+    /diem/scripts/dev_setup.sh -t -o -b -p -y -s -n -a && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -54,6 +54,6 @@ RUN [ -x "$(set -x; command -v shellcheck)" ] \
 
 # should be a no-op
 # sccache builds fine, but is not executable ??? in alpine, ends up being recompiled.  Wierd.
-RUN /diem/scripts/dev_setup.sh -t -o -y -b -p -s
+RUN /diem/scripts/dev_setup.sh -t -o -y -b -p -s -a
 
 FROM setup_ci as build_environment

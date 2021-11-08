@@ -46,6 +46,7 @@ function usage {
   echo "-o install operations tooling as well: helm, terraform, hadolint, yamllint, vault, docker, kubectl, python3"
   echo "-y installs or updates Move prover tools: z3, cvc4, cvc5, dotnet, boogie"
   echo "-s installs or updates requirements to test code-generation for Move SDKs"
+  echo "-a install tools for build and test api"
   echo "-v verbose mode"
   echo "-i installs an individual tool by name"
   echo "-n will target the /opt/ dir rather than the $HOME dir.  /opt/bin/, /opt/rustup/, and /opt/dotnet/ rather than $HOME/bin/, $HOME/.rustup/, and $HOME/.dotnet/"
@@ -624,6 +625,28 @@ function install_xsltproc {
     fi
 }
 
+function install_nodejs {
+    if [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
+      curl -fsSL https://deb.nodesource.com/setup_14.x | bash -
+      apt-get install -y nodejs
+    else
+      install_pkg nodejs "$PACKAGE_MANAGER"
+    fi
+    install_pkg npm "$PACKAGE_MANAGER"
+}
+
+function install_python3 {
+  if [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
+    install_pkg python3-all-dev "$PACKAGE_MANAGER"
+    install_pkg python3-setuptools "$PACKAGE_MANAGER"
+    install_pkg python3-pip "$PACKAGE_MANAGER"
+  elif [[ "$PACKAGE_MANAGER" == "apk" ]]; then
+    install_pkg python3-dev "$PACKAGE_MANAGER"
+  else
+    install_pkg python3 "$PACKAGE_MANAGER"
+  fi
+}
+
 function welcome_message {
 cat <<EOF
 Welcome to Diem!
@@ -687,6 +710,14 @@ Codegen tools (since -s was provided):
 EOF
   fi
 
+  if [[ "$INSTALL_API_BUILD_TOOLS" == "true" ]]; then
+cat <<EOF
+API build and testing tools (since -a was provided):
+  * Python3 (schemathesis)
+  * Node-js/NPM
+EOF
+  fi
+
   if [[ "$INSTALL_PROFILE" == "true" ]]; then
 cat <<EOF
 Moreover, ~/.profile will be updated (since -p was provided).
@@ -706,13 +737,14 @@ OPERATIONS=false;
 INSTALL_PROFILE=false;
 INSTALL_PROVER=false;
 INSTALL_CODEGEN=false;
+INSTALL_API_BUILD_TOOLS=false;
 INSTALL_INDIVIDUAL=false;
 INSTALL_PACKAGES=();
 INSTALL_DIR="${HOME}/bin/"
 OPT_DIR="false"
 
 #parse args
-while getopts "btopvysh:i:n" arg; do
+while getopts "btopvysah:i:n" arg; do
   case "$arg" in
     b)
       BATCH_MODE="true"
@@ -734,6 +766,9 @@ while getopts "btopvysh:i:n" arg; do
       ;;
     s)
       INSTALL_CODEGEN="true"
+      ;;
+    a)
+      INSTALL_API_BUILD_TOOLS="true"
       ;;
     i)
       INSTALL_INDIVIDUAL="true"
@@ -759,6 +794,7 @@ if [[ "$INSTALL_BUILD_TOOLS" == "false" ]] && \
    [[ "$INSTALL_PROFILE" == "false" ]] && \
    [[ "$INSTALL_PROVER" == "false" ]] && \
    [[ "$INSTALL_CODEGEN" == "false" ]] && \
+   [[ "$INSTALL_API_BUILD_TOOLS" == "false" ]] && \
    [[ "$INSTALL_INDIVIDUAL" == "false" ]]; then
    INSTALL_BUILD_TOOLS="true"
 fi
@@ -908,17 +944,8 @@ fi
 if [[ "$INSTALL_CODEGEN" == "true" ]]; then
   install_pkg clang "$PACKAGE_MANAGER"
   install_pkg llvm "$PACKAGE_MANAGER"
-  if [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
-    install_pkg python3-all-dev "$PACKAGE_MANAGER"
-    install_pkg python3-setuptools "$PACKAGE_MANAGER"
-    install_pkg python3-pip "$PACKAGE_MANAGER"
-  elif [[ "$PACKAGE_MANAGER" == "apk" ]]; then
-    install_pkg python3-dev "$PACKAGE_MANAGER"
-  else
-    install_pkg python3 "$PACKAGE_MANAGER"
-  fi
-  install_pkg nodejs "$PACKAGE_MANAGER"
-  install_pkg npm "$PACKAGE_MANAGER"
+  install_python3
+  install_nodejs
   install_deno
   install_java
   install_golang
@@ -928,6 +955,15 @@ if [[ "$INSTALL_CODEGEN" == "true" ]]; then
     "${PRE_COMMAND[@]}" python3 -m pip install pyre-check=="${PYRE_CHECK_VERSION}"
   fi
   "${PRE_COMMAND[@]}" python3 -m pip install numpy=="${NUMPY_VERSION}"
+fi
+
+if [[ "$INSTALL_API_BUILD_TOOLS" == "true" ]]; then
+  # nodejs and tools
+  install_nodejs
+
+  # python and tools
+  install_python3
+  "${PRE_COMMAND[@]}" python3 -m pip install schemathesis
 fi
 
 if [[ "${BATCH_MODE}" == "false" ]]; then
