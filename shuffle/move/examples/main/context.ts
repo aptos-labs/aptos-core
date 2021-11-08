@@ -3,6 +3,7 @@
 
 import * as path from "https://deno.land/std@0.110.0/path/mod.ts";
 import urlcat from "https://deno.land/x/urlcat@v2.0.4/src/index.ts";
+import { BcsDeserializer } from "./generated/bcs/mod.ts";
 import { green } from "https://deno.land/x/nanocolors@0.1.12/mod.ts";
 import { isURL } from "https://deno.land/x/is_url@v1.0.1/mod.ts";
 
@@ -13,8 +14,8 @@ export const nodeUrl = getNetworkEndpoint(
 );
 export const senderAddress = String(Deno.env.get("SENDER_ADDRESS"));
 export const privateKeyPath = String(Deno.env.get("PRIVATE_KEY_PATH"));
-const privateKeyBytes = normalizePrivateKey(
-  await Deno.readFile(privateKeyPath),
+const privateKeyBytes = bcsToBytes(
+  await Deno.readFile(privateKeyPath)
 );
 
 export const receiverPrivateKeyPath = path.join(
@@ -64,12 +65,9 @@ function getNetworkEndpoint(inputNetwork: string) {
   return network;
 }
 
-function normalizePrivateKey(privateKeyBytes: Uint8Array): Uint8Array {
-  if (privateKeyBytes.length == 33) {
-    // slice off first BIP type byte, rest of 32 bytes is private key
-    privateKeyBytes = privateKeyBytes.slice(1);
-  }
-  return privateKeyBytes;
+function bcsToBytes(bcsBytes: Uint8Array): Uint8Array {
+  const bcsDeserializer = new BcsDeserializer(bcsBytes);
+  return bcsDeserializer.deserializeBytes()
 }
 
 export function relativeUrl(tail: string) {
