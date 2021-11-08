@@ -50,6 +50,7 @@ pub mod model;
 pub mod native;
 pub mod options;
 pub mod pragmas;
+pub mod simplifier;
 pub mod spec_translator;
 pub mod symbol;
 pub mod ty;
@@ -571,6 +572,19 @@ fn run_spec_checker(
     }
     // After all specs have been processed, warn about any unused schemas.
     builder.warn_unused_schemas();
+
+    // Apply simplification passes
+    run_spec_simplifier(env);
+}
+
+fn run_spec_simplifier(env: &mut GlobalEnv) {
+    let options = env
+        .get_extension::<ModelBuilderOptions>()
+        .expect("options for model builder");
+    for pass in &options.simplification_pipeline {
+        pass.run(env)
+            .unwrap_or_else(|e| panic!("Failed to run simplification pass {}: {}", pass, e))
+    }
 }
 
 // =================================================================================================

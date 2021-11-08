@@ -1517,6 +1517,26 @@ impl GlobalEnv {
         }
         total
     }
+
+    /// Override the specification for a given function
+    pub fn override_function_spec(&mut self, fid: QualifiedId<FunId>, spec: Spec) {
+        let func_data = self
+            .module_data
+            .iter_mut()
+            .filter(|m| m.id == fid.module_id)
+            .map(|m| {
+                m.function_data
+                    .iter_mut()
+                    .filter(|(k, _)| **k == fid.id)
+                    .map(|(_, v)| v)
+            })
+            .flatten()
+            .exactly_one()
+            .unwrap_or_else(|_| {
+                panic!("Expect one and only one function for {:?}", fid);
+            });
+        func_data.spec = spec;
+    }
 }
 
 impl Default for GlobalEnv {
@@ -2713,7 +2733,7 @@ pub struct FunctionData {
     type_arg_names: Vec<Symbol>,
 
     /// Specification associated with this function.
-    pub spec: Spec,
+    spec: Spec,
 
     /// A cache for the called functions.
     called_funs: RefCell<Option<BTreeSet<QualifiedId<FunId>>>>,

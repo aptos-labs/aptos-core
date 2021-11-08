@@ -15,6 +15,7 @@ use move_model::{
     model::{FunId, GlobalEnv, QualifiedId, VerificationScope},
     options::ModelBuilderOptions,
     run_model_builder_with_options,
+    simplifier::SimplificationPass,
 };
 use move_prover::{cli::Options as CliOptions, generate_boogie, verify_boogie};
 
@@ -39,6 +40,10 @@ pub struct WorkflowOptions {
     /// Extra mappings for named address
     #[structopt(short = "a", long = "address", parse(try_from_str = parse_named_address))]
     pub named_addresses_extra: Option<Vec<(String, NumericalAddress)>>,
+
+    /// Simplification pipeline at the Move model end
+    #[structopt(short = "s", long = "simplify")]
+    pub simplification_pipeline: Vec<SimplificationPass>,
 
     /// Verbose mode
     #[structopt(short, long)]
@@ -75,7 +80,7 @@ pub(crate) fn prepare_with_override(
     let mut env = run_model_builder_with_options(
         &options.srcs,
         &options.deps,
-        ModelBuilderOptions::default(),
+        get_model_options(options),
         named_addresses,
     )?;
     if env.has_errors() {
@@ -84,21 +89,7 @@ pub(crate) fn prepare_with_override(
 
     // override the spec for functions (if requested)
     for (fun_id, spec) in spec_override {
-        let module_data = env
-            .module_data
-            .iter_mut()
-            .find(|m| m.id == fun_id.module_id)
-            .ok_or_else(|| {
-                anyhow!(
-                    "Unable to find module with id `{}`",
-                    fun_id.module_id.to_usize()
-                )
-            })?;
-        let function_data = module_data
-            .function_data
-            .get_mut(&fun_id.id)
-            .ok_or_else(|| anyhow!("Unable to find function with id `{:?}`", fun_id.id.symbol()))?;
-        function_data.spec = spec;
+        env.override_function_spec(fun_id, spec);
     }
 
     // run bytecode transformation pipeline
@@ -152,10 +143,18 @@ fn get_prover_options(options: &WorkflowOptions) -> ProverOptions {
     }
 }
 
+fn get_model_options(options: &WorkflowOptions) -> ModelBuilderOptions {
+    ModelBuilderOptions {
+        simplification_pipeline: options.simplification_pipeline.clone(),
+        ..Default::default()
+    }
+}
+
 fn get_cli_options(options: &WorkflowOptions) -> CliOptions {
     CliOptions {
         move_sources: options.srcs.clone(),
         move_deps: options.deps.clone(),
+        model_builder: get_model_options(options),
         prover: get_prover_options(options),
         ..Default::default()
     }

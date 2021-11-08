@@ -7,6 +7,7 @@
 
 use std::{
     collections::BTreeMap,
+    str::FromStr,
     sync::atomic::{AtomicBool, Ordering},
 };
 
@@ -26,7 +27,9 @@ use bytecode::options::{AutoTraceLevel, ProverOptions};
 use codespan_reporting::diagnostic::Severity;
 use docgen::DocgenOptions;
 use errmapgen::ErrmapOptions;
-use move_model::{model::VerificationScope, options::ModelBuilderOptions};
+use move_model::{
+    model::VerificationScope, options::ModelBuilderOptions, simplifier::SimplificationPass,
+};
 
 /// Atomic used to prevent re-initialization of logging.
 static LOGGER_CONFIGURED: AtomicBool = AtomicBool::new(false);
@@ -268,6 +271,15 @@ impl Options {
                     .long("ignore-pragma-opaque-internal-only")
                     .help("Ignore the \"opaque\" pragma on specs of \
                     internal functions when possible"),
+            )
+            .arg(
+                Arg::with_name("simplification-pipeline")
+                    .long("simplify")
+                    .takes_value(true)
+                    .multiple(true)
+                    .number_of_values(1)
+                    .help("Specify one simplification pass to run on the specifications. \
+                    This option May be specified multiple times to compose a pipeline")
             )
             .arg(
                 Arg::with_name("docgen")
@@ -643,6 +655,13 @@ impl Options {
         }
         if matches.is_present("ignore-pragma-opaque-internal-only") {
             options.model_builder.ignore_pragma_opaque_internal_only = true;
+        }
+        if matches.occurrences_of("simplification-pipeline") > 0 {
+            for name in get_vec("simplification-pipeline") {
+                let pass = SimplificationPass::from_str(&name)
+                    .map_err(|e| anyhow!("Unknown simplification pass: {}", e))?;
+                options.model_builder.simplification_pipeline.push(pass);
+            }
         }
         if matches.is_present("docgen") {
             options.run_docgen = true;

@@ -11,8 +11,7 @@ use move_model::ast::SpecBlockTarget;
 mod ast_print;
 mod workflow;
 
-// spec simplification pass
-mod exp_inlining;
+// spec flattening pass
 mod exp_trimming;
 
 use ast_print::SpecPrinter;
@@ -20,18 +19,16 @@ use workflow::WorkflowOptions;
 
 /// List of simplification passes available
 #[derive(Clone, Debug)]
-pub enum SimplificationPass {
-    Inline,
+pub enum FlattenPass {
     TrimAbortsIf,
 }
 
-impl FromStr for SimplificationPass {
+impl FromStr for FlattenPass {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let r = match s {
-            "inline" => SimplificationPass::Inline,
-            "trim_aborts_if" => SimplificationPass::TrimAbortsIf,
+            "trim_aborts_if" => FlattenPass::TrimAbortsIf,
             _ => return Err(s.to_string()),
         };
         Ok(r)
@@ -45,9 +42,9 @@ pub struct FlattenOptions {
     #[structopt(flatten)]
     pub workflow: WorkflowOptions,
 
-    /// Simplification processing pipeline
-    #[structopt(short, long)]
-    pub pipeline: Vec<SimplificationPass>,
+    /// Spec flattening pipeline
+    #[structopt(short = "f", long = "flatten")]
+    pub flattening_pipeline: Vec<FlattenPass>,
 
     /// Dump stepwise result
     #[structopt(long = "dump-stepwise")]
@@ -118,14 +115,11 @@ pub fn run(options: &FlattenOptions) -> Result<()> {
         }
 
         // pass the spec through the simplification pipeline
-        for (i, pass) in options.pipeline.iter().enumerate() {
+        for (i, pass) in options.flattening_pipeline.iter().enumerate() {
             let target = fun_target.clone();
             let old_spec = fun_spec.take().unwrap();
             let new_spec = match pass {
-                SimplificationPass::Inline => {
-                    exp_inlining::inline_all_exp_in_spec(workflow_options, target, old_spec)
-                }
-                SimplificationPass::TrimAbortsIf => {
+                FlattenPass::TrimAbortsIf => {
                     exp_trimming::trim_aborts_ifs(workflow_options, target, old_spec)
                 }
             }?;
