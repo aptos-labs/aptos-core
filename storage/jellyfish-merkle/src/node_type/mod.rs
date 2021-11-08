@@ -292,23 +292,30 @@ impl InternalNode {
     }
 
     pub fn new_migration(children: Children, leaf_count_migration: bool) -> Self {
+        Self::new_impl(children, leaf_count_migration).expect("Input children are logical.")
+    }
+
+    pub fn new_impl(children: Children, leaf_count_migration: bool) -> Result<Self> {
         // Assert the internal node must have >= 1 children. If it only has one child, it cannot be
         // a leaf node. Otherwise, the leaf node should be a child of this internal node's parent.
-        assert!(!children.is_empty());
+        ensure!(!children.is_empty(), "Children must not be empty");
         if children.len() == 1 {
-            assert!(!children
-                .values()
-                .next()
-                .expect("Must have 1 element")
-                .is_leaf())
+            ensure!(
+                !children
+                    .values()
+                    .next()
+                    .expect("Must have 1 element")
+                    .is_leaf(),
+                "If there's only one child, it must not be a leaf."
+            );
         }
 
         let leaf_count = Self::sum_leaf_count(&children);
-        Self {
+        Ok(Self {
             children,
             leaf_count,
             leaf_count_migration,
-        }
+        })
     }
 
     fn sum_leaf_count(children: &Children) -> Option<usize> {
@@ -438,10 +445,7 @@ impl InternalNode {
 
         // The "leaf_count_migration" flag doesn't matter here, since a deserialized node should
         // not be persisted again to the DB.
-        Ok(Self::new_migration(
-            children,
-            read_leaf_counts, /* leaf_count_migration */
-        ))
+        Self::new_impl(children, read_leaf_counts /* leaf_count_migration */)
     }
 
     /// Gets the `n`-th child.
