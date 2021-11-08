@@ -209,7 +209,7 @@
                     "match": "([_a-z][_a-zA-Z0-9]*)(\\()",
                     "captures": {
                         "1": { "name": "meta.function.move entity.name.function.move" },
-                        "2": { "name": "meta.punctuation.less.move" }
+                        "2": { "name": "meta.punctuation.left-parenthesis.move" }
                     }
                 }
             ]
