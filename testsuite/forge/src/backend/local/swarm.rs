@@ -118,7 +118,7 @@ impl LocalSwarmBuilder {
         self
     }
 
-    pub fn build<R>(self, rng: R) -> Result<LocalSwarm>
+    pub fn build<R>(mut self, rng: R) -> Result<LocalSwarm>
     where
         R: ::rand::RngCore + ::rand::CryptoRng,
     {
@@ -131,6 +131,13 @@ impl LocalSwarmBuilder {
         } else {
             SwarmDirectory::Temporary(TempDir::new()?)
         };
+
+        // Single node orders blocks too fast which would trigger backpressure and stall for 1 sec
+        // which cause flakiness in tests.
+        if self.number_of_validators.get() == 1 {
+            // this delays empty block by (10-1) * 30ms
+            self.template.consensus.mempool_poll_count = 10;
+        }
 
         let (root_keys, genesis, genesis_waypoint, validators) = ValidatorBuilder::new(
             &dir,
