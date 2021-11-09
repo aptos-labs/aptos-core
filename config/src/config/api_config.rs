@@ -8,6 +8,7 @@ use std::net::SocketAddr;
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct ApiConfig {
+    #[serde(default = "default_enabled")]
     pub enabled: bool,
     pub address: SocketAddr,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -17,7 +18,11 @@ pub struct ApiConfig {
 }
 
 pub const DEFAULT_ADDRESS: &str = "127.0.0.1";
-pub const DEFAULT_PORT: u16 = 8081;
+pub const DEFAULT_PORT: u16 = 8080;
+
+fn default_enabled() -> bool {
+    true
+}
 
 impl Default for ApiConfig {
     fn default() -> ApiConfig {

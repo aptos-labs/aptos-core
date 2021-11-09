@@ -136,8 +136,8 @@ pub fn load_test_environment<R>(
     template.json_rpc.address = format!("0.0.0.0:{}", template.json_rpc.address.port())
         .parse()
         .unwrap();
+    template.api.address = template.json_rpc.address;
     template.json_rpc.stream_rpc.enabled = true;
-    template.api.enabled = true;
     if lazy {
         template.consensus.mempool_poll_count = u64::MAX;
     }
@@ -186,9 +186,8 @@ pub fn load_test_environment<R>(
 
 pub fn print_api_config(config: &NodeConfig) {
     println!("\tJSON-RPC endpoint: {}", config.json_rpc.address);
+    println!("\tREST API endpoint: {}", config.api.address);
     println!("\tStream-RPC enabled!");
-    println!("\tREST API enabled!");
-    println!("\tREST API: {}", config.api.address);
 
     println!(
         "\tFullNode network: {}",

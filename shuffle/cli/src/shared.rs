@@ -443,7 +443,7 @@ impl Network {
             name: String::from(LOCALHOST_NETWORK_NAME),
             base: String::from(LOCALHOST_NETWORK_BASE),
             json_rpc_port: 8080,
-            dev_api_port: 8081,
+            dev_api_port: 8080,
         }
     }
 }
@@ -746,7 +746,7 @@ mod test {
         let url_from_some = normalized_network(&home, Some("localhost".to_string())).unwrap();
         let url_from_none = normalized_network(&home, None).unwrap();
 
-        let correct_url = Url::from_str("http://127.0.0.1:8081").unwrap();
+        let correct_url = Url::from_str("http://127.0.0.1:8080").unwrap();
 
         assert_eq!(url_from_some, correct_url);
         assert_eq!(url_from_none, correct_url);
@@ -779,7 +779,7 @@ mod test {
             name: "localhost".to_string(),
             base: "http://127.0.0.1".to_string(),
             json_rpc_port: 8080,
-            dev_api_port: 8081,
+            dev_api_port: 8080,
         }
     }
 
@@ -805,7 +805,7 @@ mod test {
         let all_networks = NetworksConfig {
             networks: network_map,
         };
-        let correct_url = Url::from_str("http://127.0.0.1:8081").unwrap();
+        let correct_url = Url::from_str("http://127.0.0.1:8080").unwrap();
         assert_eq!(all_networks.url_for("localhost").unwrap(), correct_url);
         assert_eq!(all_networks.url_for("trove").is_err(), true);
     }
@@ -813,7 +813,7 @@ mod test {
     #[test]
     fn test_get_filtered_envs_for_deno() {
         let project_path = Path::new("/Users/project_path");
-        let network = Url::from_str("http://127.0.0.1:8081").unwrap();
+        let network = Url::from_str("http://127.0.0.1:8080").unwrap();
         let key_path = Path::new("/Users/private_key_path/dev.key");
         let address = AccountAddress::random();
         let shuffle_dir = get_shuffle_dir();

@@ -24,7 +24,7 @@ use std::{collections::HashMap, convert::TryFrom, env, process::Command, str, sy
 use tokio::time::Duration;
 
 const JSON_RPC_PORT: u32 = 80;
-const REST_API_PORT: u32 = 8081;
+const REST_API_PORT: u32 = 80;
 const VALIDATOR_LB: &str = "validator-fullnode-lb";
 
 pub struct K8sSwarm {

@@ -74,12 +74,6 @@ An `anyhow::Error` is considered as server internal error (500) by default.
 All internal errors should be converted into `anyhow::Error` first.
 An `diem_api_types.Error` is defined for converting `anyhow::Error` to `warp.Rejection` with HTTP error code.
 
-## Logging
-
-The request log level is set to DEBUG by default.
-
-You can add `diem_api=DEBUG` into RUST_LOG environment to configure the log output.
-
 ## Testing
 
 ### Unit Test
@@ -105,3 +99,7 @@ cargo test --test "forge" "api::"
 
 * Run `scripts/dev_setup.sh -a` to setup tools.
 * Run `make test` inside the `api` directory.
+
+## Diem Node Operation
+
+Please refer to [Operation](Operation.md) document for details, including configuration, logging, metrics etc.
