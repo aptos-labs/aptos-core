@@ -13,10 +13,16 @@ use diem_sdk::{
     types::LocalAccount,
 };
 use diem_types::{
-    account_config, chain_id::ChainId, transaction::authenticator::AuthenticationKey,
+    account_address::AccountAddress,
+    account_config,
+    chain_id::ChainId,
+    transaction::{authenticator::AuthenticationKey, ScriptFunction, TransactionPayload},
 };
 use generate_key::load_key;
-use shuffle_transaction_builder::framework::encode_create_parent_vasp_account_script_function;
+use move_core_types::{
+    ident_str,
+    language_storage::{ModuleId, TypeTag},
+};
 use std::{
     io,
     path::{Path, PathBuf},
@@ -164,4 +170,29 @@ pub fn create_account_onchain(
     );
     println!("Public key: {}", new_account.public_key());
     Ok(())
+}
+
+fn encode_create_parent_vasp_account_script_function(
+    coin_type: TypeTag,
+    sliding_nonce: u64,
+    new_account_address: AccountAddress,
+    auth_key_prefix: Vec<u8>,
+    human_name: Vec<u8>,
+    add_all_currencies: bool,
+) -> TransactionPayload {
+    TransactionPayload::ScriptFunction(ScriptFunction::new(
+        ModuleId::new(
+            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            ident_str!("AccountCreationScripts").to_owned(),
+        ),
+        ident_str!("create_parent_vasp_account").to_owned(),
+        vec![coin_type],
+        vec![
+            bcs::to_bytes(&sliding_nonce).unwrap(),
+            bcs::to_bytes(&new_account_address).unwrap(),
+            bcs::to_bytes(&auth_key_prefix).unwrap(),
+            bcs::to_bytes(&human_name).unwrap(),
+            bcs::to_bytes(&add_all_currencies).unwrap(),
+        ],
+    ))
 }

@@ -40,10 +40,9 @@ diem-workspace-hack = { path = "../../common/workspace-hack" }
 generate-key = { path = "../../config/generate-key" }
 move-lang = { path = "../../language/move-lang" }
 move-cli = { path = "../../language/tools/move-cli" }
+move-core-types = { path = "../../language/move-core/types" }
 move-package = { path = "../../language/tools/move-package" }
 move-binary-format = { path = "../../language/move-binary-format" }
-shuffle-custom-node = { path = "../genesis" }
-shuffle-transaction-builder = { path = "../transaction-builder" }
 serde-reflection = "0.3.4"
 serde-generate = "0.20.2"
 serde_json = "1.0.68"

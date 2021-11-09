@@ -7727,6 +7727,7 @@ dependencies = [
  "include_dir",
  "move-binary-format",
  "move-cli",
+ "move-core-types",
  "move-lang",
  "move-package",
  "once_cell",
@@ -7737,8 +7738,6 @@ dependencies = [
  "serde-reflection",
  "serde_json",
  "serde_yaml",
- "shuffle-custom-node",
- "shuffle-transaction-builder",
  "structopt 0.3.21",
  "tempfile",
  "tokio",
@@ -7756,55 +7755,6 @@ dependencies = [
  "diem-workspace-hack",
  "move-stdlib",
  "move-unit-test",
-]
-
-[[package]]
-name = "shuffle-custom-node"
-version = "0.1.0"
-dependencies = [
- "abigen",
- "anyhow",
- "bcs",
- "diem-config",
- "diem-crypto",
- "diem-framework",
- "diem-framework-releases",
- "diem-genesis-tool",
- "diem-json-rpc-types",
- "diem-node",
- "diem-sdk",
- "diem-temppath",
- "diem-types",
- "diem-workspace-hack",
- "diemdb",
- "generate-key",
- "log",
- "move-command-line-common",
- "move-prover",
- "move-stdlib",
- "rand 0.8.4",
- "structopt 0.3.21",
- "transaction-builder-generator",
- "walkdir",
-]
-
-[[package]]
-name = "shuffle-transaction-builder"
-version = "0.0.1"
-dependencies = [
- "anyhow",
- "bcs",
- "diem-types",
- "diem-workspace-hack",
- "hex",
- "log",
- "move-core-types",
- "once_cell",
- "parking_lot",
- "proptest",
- "proptest-derive",
- "thiserror",
- "tokio",
 ]
 
 [[package]]
