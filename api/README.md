@@ -103,18 +103,5 @@ cargo test --test "forge" "api::"
 
 ### API Specification Test
 
-* Build diem-node: `cargo build -p diem-node`
-* Install [dredd](https://dredd.org/en/latest/)
-* Run `dredd` inside the 'api' directory.
-
-
-### Render API into HTML Document
-
-
-For example, use [snowboard](https://github.com/bukalapak/snowboard)
-
-```
-npm install -g snowboard
-snowboard http blueprint.apib
-open http://localhost:8088
-```
+* Run `scripts/dev_setup.sh -a` to setup tools.
+* Run `make test` inside the `api` directory.
