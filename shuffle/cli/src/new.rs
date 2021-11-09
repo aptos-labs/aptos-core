@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::shared;
+use crate::{shared, shared::Home};
 use anyhow::Result;
 use include_dir::{include_dir, Dir};
 use std::{
@@ -15,7 +15,7 @@ pub const DEFAULT_BLOCKCHAIN: &str = "goodday";
 /// Directory of generated transaction builders for helloblockchain.
 const EXAMPLES_DIR: Dir = include_dir!("../move/examples");
 
-pub fn handle(blockchain: String, pathbuf: PathBuf) -> Result<()> {
+pub fn handle(home: &Home, blockchain: String, pathbuf: PathBuf) -> Result<()> {
     let project_path = pathbuf.as_path();
     println!("Creating shuffle project in {}", project_path.display());
     fs::create_dir_all(project_path)?;
@@ -23,6 +23,9 @@ pub fn handle(blockchain: String, pathbuf: PathBuf) -> Result<()> {
     let config = shared::ProjectConfig::new(blockchain);
     write_project_files(project_path, &config)?;
     write_example_move_packages(project_path)?;
+    home.generate_shuffle_path_if_nonexistent()?;
+    // Writing default localhost network into Networks.toml
+    home.write_default_networks_config_into_toml_if_nonexistent()?;
 
     println!("Generating Typescript Libraries...");
     shared::generate_typescript_libraries(project_path)?;
@@ -75,7 +78,13 @@ mod test {
     #[test]
     fn test_handle_e2e() {
         let dir = tempdir().unwrap();
-        handle(String::from(DEFAULT_BLOCKCHAIN), PathBuf::from(dir.path())).unwrap();
+        let home = Home::new(dir.path()).unwrap();
+        handle(
+            &home,
+            String::from(DEFAULT_BLOCKCHAIN),
+            PathBuf::from(dir.path()),
+        )
+        .unwrap();
 
         // spot check move starter files
         let expected_example_content = String::from_utf8_lossy(include_bytes!(

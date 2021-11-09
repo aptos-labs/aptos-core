@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::shared::{build_move_package, DevApiClient, Home, MAIN_PKG_PATH};
+use crate::shared::{build_move_package, DevApiClient, NetworkHome, MAIN_PKG_PATH};
 use anyhow::{anyhow, Result};
 use diem_crypto::PrivateKey;
 use diem_sdk::{
@@ -24,14 +24,14 @@ use std::{
 use url::Url;
 
 /// Deploys shuffle's main Move Package to the sender's address.
-pub async fn handle(home: &Home, project_path: &Path, network: Url) -> Result<()> {
+pub async fn handle(network_home: &NetworkHome, project_path: &Path, network: Url) -> Result<()> {
     let client = DevApiClient::new(reqwest::Client::new(), network)?;
-    if !home.get_latest_key_path().exists() {
+    if !network_home.get_latest_account_key_path().exists() {
         return Err(anyhow!(
             "An account hasn't been created yet! Run shuffle account first."
         ));
     }
-    let new_account_key = load_key(home.get_latest_key_path());
+    let new_account_key = load_key(network_home.get_latest_account_key_path());
     println!("Using Public Key {}", &new_account_key.public_key());
     let derived_address =
         AuthenticationKey::ed25519(&new_account_key.public_key()).derived_address();

@@ -30,7 +30,7 @@ pub const MAIN_PKG_PATH: &str = "main";
 const NEW_KEY_FILE_CONTENT: &[u8] = include_bytes!("../new_account.key");
 const DIEM_ACCOUNT_TYPE: &str = "0x1::DiemAccount::DiemAccount";
 
-const LOCALHOST_NAME: &str = "localhost";
+pub const LOCALHOST_NAME: &str = "localhost";
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "kebab-case")]
@@ -100,18 +100,18 @@ pub fn get_shuffle_project_path(cwd: &Path) -> Result<PathBuf> {
 pub fn get_filtered_envs_for_deno(
     home: &Home,
     project_path: &Path,
-    dev_api_url: &Url,
+    network: &Network,
     key_path: &Path,
     sender_address: AccountAddress,
-) -> HashMap<String, String> {
+) -> Result<HashMap<String, String>> {
     let mut filtered_envs: HashMap<String, String> = HashMap::new();
     filtered_envs.insert(
         String::from("PROJECT_PATH"),
         project_path.to_string_lossy().to_string(),
     );
     filtered_envs.insert(
-        String::from("SHUFFLE_HOME"),
-        home.get_shuffle_path().to_string_lossy().to_string(),
+        String::from("SHUFFLE_BASE_NETWORKS_PATH"),
+        home.get_networks_path().to_string_lossy().to_string(),
     );
     filtered_envs.insert(
         String::from("SENDER_ADDRESS"),
@@ -122,8 +122,12 @@ pub fn get_filtered_envs_for_deno(
         key_path.to_string_lossy().to_string(),
     );
 
-    filtered_envs.insert(String::from("SHUFFLE_NETWORK"), dev_api_url.to_string());
-    filtered_envs
+    filtered_envs.insert(String::from("SHUFFLE_NETWORK_NAME"), network.get_name());
+    filtered_envs.insert(
+        String::from("SHUFFLE_NETWORK_DEV_API_URL"),
+        network.get_dev_api_url()?.to_string(),
+    );
+    Ok(filtered_envs)
 }
 
 pub struct DevApiClient {
@@ -246,76 +250,45 @@ impl DevApiClient {
     }
 }
 
-// Contains all the commonly used paths in shuffle/cli
-pub struct Home {
-    account_path: PathBuf,
-    latest_address_path: PathBuf,
-    latest_key_path: PathBuf,
-    latest_path: PathBuf,
-    networks_config_path: PathBuf,
-    node_config_path: PathBuf,
-    root_key_path: PathBuf,
-    shuffle_path: PathBuf,
-    test_key_address_path: PathBuf,
-    test_key_path: PathBuf,
+pub struct NetworkHome {
+    network_base_path: PathBuf,
+    accounts_path: PathBuf,
+    latest_account_path: PathBuf,
+    latest_account_key_path: PathBuf,
+    latest_account_address_path: PathBuf,
     test_path: PathBuf,
-    validator_config_path: PathBuf,
-    validator_log_path: PathBuf,
+    test_key_path: PathBuf,
+    test_key_address_path: PathBuf,
 }
 
-impl Home {
-    pub fn new(home_path: &Path) -> Result<Self> {
-        Ok(Self {
-            account_path: home_path.join(".shuffle/accounts"),
-            latest_address_path: home_path.join(".shuffle/accounts/latest/address"),
-            latest_key_path: home_path.join(".shuffle/accounts/latest/dev.key"),
-            latest_path: home_path.join(".shuffle/accounts/latest"),
-            networks_config_path: home_path.join(".shuffle/Networks.toml"),
-            node_config_path: home_path.join(".shuffle/nodeconfig"),
-            root_key_path: home_path.join(".shuffle/nodeconfig/mint.key"),
-            shuffle_path: home_path.join(".shuffle"),
-            test_key_address_path: home_path.join(".shuffle/accounts/test/address"),
-            test_key_path: home_path.join(".shuffle/accounts/test/dev.key"),
-            test_path: home_path.join(".shuffle/accounts/test"),
-            validator_config_path: home_path.join(".shuffle/nodeconfig/0/node.yaml"),
-            validator_log_path: home_path.join(".shuffle/nodeconfig/validator.log"),
-        })
+impl NetworkHome {
+    pub fn new(network_base_path: &Path) -> Self {
+        NetworkHome {
+            network_base_path: network_base_path.to_path_buf(),
+            accounts_path: network_base_path.join("accounts"),
+            latest_account_path: network_base_path.join("accounts/latest"),
+            latest_account_key_path: network_base_path.join("accounts/latest/dev.key"),
+            latest_account_address_path: network_base_path.join("accounts/latest/address"),
+            test_path: network_base_path.join("accounts/test"),
+            test_key_path: network_base_path.join("accounts/test/dev.key"),
+            test_key_address_path: network_base_path.join("accounts/test/address"),
+        }
     }
 
-    pub fn get_shuffle_path(&self) -> &Path {
-        &self.shuffle_path
+    pub fn get_latest_account_path(&self) -> &Path {
+        &self.latest_account_path
     }
 
-    pub fn get_root_key_path(&self) -> &Path {
-        &self.root_key_path
+    pub fn get_latest_account_key_path(&self) -> &Path {
+        &self.latest_account_key_path
     }
 
-    pub fn get_node_config_path(&self) -> &Path {
-        &self.node_config_path
+    pub fn get_latest_account_address_path(&self) -> &Path {
+        &self.latest_account_address_path
     }
 
-    pub fn get_validator_config_path(&self) -> &Path {
-        &self.validator_config_path
-    }
-
-    pub fn get_validator_log_path(&self) -> &Path {
-        &self.validator_log_path
-    }
-
-    pub fn get_latest_path(&self) -> &Path {
-        &self.latest_path
-    }
-
-    pub fn get_latest_key_path(&self) -> &Path {
-        &self.latest_key_path
-    }
-
-    pub fn get_latest_address_path(&self) -> &Path {
-        &self.latest_address_path
-    }
-
-    pub fn get_account_path(&self) -> &Path {
-        &self.account_path
+    pub fn get_accounts_path(&self) -> &Path {
+        &self.accounts_path
     }
 
     pub fn get_test_key_path(&self) -> &Path {
@@ -329,35 +302,42 @@ impl Home {
     }
 
     pub fn create_archive_dir(&self, time: Duration) -> Result<PathBuf> {
-        let archived_dir = self.account_path.join(time.as_secs().to_string());
-        fs::create_dir_all(&archived_dir)?;
+        let archived_dir = self.accounts_path.join(time.as_secs().to_string());
+        fs::create_dir(&archived_dir)?;
         Ok(archived_dir)
     }
 
     pub fn archive_old_key(&self, archived_dir: &Path) -> Result<()> {
-        let old_key_path = self.latest_key_path.as_path();
+        let old_key_path = self.latest_account_key_path.as_path();
         let archived_key_path = archived_dir.join("dev.key");
         fs::copy(old_key_path, archived_key_path)?;
         Ok(())
     }
 
     pub fn archive_old_address(&self, archived_dir: &Path) -> Result<()> {
-        let old_address_path = self.latest_address_path.as_path();
+        let old_address_path = self.latest_account_address_path.as_path();
         let archived_address_path = archived_dir.join("address");
         fs::copy(old_address_path, archived_address_path)?;
         Ok(())
     }
 
-    pub fn generate_shuffle_accounts_path(&self) -> Result<()> {
-        if !self.account_path.is_dir() {
-            fs::create_dir_all(self.account_path.as_path())?;
+    pub fn generate_network_accounts_path_if_nonexistent(&self) -> Result<()> {
+        if !self.accounts_path.is_dir() {
+            fs::create_dir(self.accounts_path.as_path())?;
         }
         Ok(())
     }
 
-    pub fn generate_shuffle_latest_path(&self) -> Result<()> {
-        if !self.latest_path.is_dir() {
-            fs::create_dir_all(self.latest_path.as_path())?;
+    pub fn generate_network_latest_account_path_if_nonexistent(&self) -> Result<()> {
+        if !self.latest_account_path.is_dir() {
+            fs::create_dir(self.latest_account_path.as_path())?;
+        }
+        Ok(())
+    }
+
+    pub fn generate_network_base_path_if_nonexistent(&self) -> Result<()> {
+        if !self.network_base_path.is_dir() {
+            fs::create_dir_all(self.network_base_path.as_path())?;
         }
         Ok(())
     }
@@ -365,19 +345,21 @@ impl Home {
     pub fn generate_key_file(&self) -> Result<Ed25519PrivateKey> {
         // Using NEW_KEY_FILE for now due to hard coded address in
         // /diem/shuffle/move/examples/main/sources/move.toml
-        fs::write(self.latest_key_path.as_path(), NEW_KEY_FILE_CONTENT)?;
-        Ok(generate_key::load_key(self.latest_key_path.as_path()))
+        fs::write(self.latest_account_key_path.as_path(), NEW_KEY_FILE_CONTENT)?;
+        Ok(generate_key::load_key(
+            self.latest_account_key_path.as_path(),
+        ))
     }
 
     pub fn generate_address_file(&self, public_key: &Ed25519PublicKey) -> Result<()> {
         let address = AuthenticationKey::ed25519(public_key).derived_address();
-        let address_filepath = self.latest_address_path.as_path();
+        let address_filepath = self.latest_account_address_path.as_path();
         let mut file = File::create(address_filepath)?;
         file.write_all(address.to_string().as_ref())?;
         Ok(())
     }
 
-    pub fn generate_shuffle_test_path(&self) -> Result<()> {
+    pub fn generate_shuffle_test_path_if_nonexistent(&self) -> Result<()> {
         if !self.test_path.is_dir() {
             fs::create_dir_all(self.test_path.as_path())?;
         }
@@ -400,42 +382,125 @@ impl Home {
 
     pub fn save_root_key(&self, root_key_path: &Path) -> Result<()> {
         let new_root_key = generate_key::load_key(root_key_path);
-        generate_key::save_key(new_root_key, self.latest_key_path.as_path());
+        generate_key::save_key(new_root_key, self.latest_account_key_path.as_path());
         Ok(())
     }
 
-    pub fn read_networks_toml(&self) -> Result<NetworksConfig> {
-        let network_toml_contents = fs::read_to_string(self.networks_config_path.as_path())?;
-        let network_toml: NetworksConfig = toml::from_str(network_toml_contents.as_str())?;
-        Ok(network_toml)
-    }
-
-    pub fn read_genesis_waypoint(&self) -> Result<String> {
-        fs::read_to_string(self.get_node_config_path().join("waypoint.txt"))
-            .map_err(anyhow::Error::new)
-    }
-
     pub fn check_account_path_exists(&self) -> Result<()> {
-        match self.account_path.is_dir() {
+        match self.accounts_path.is_dir() {
             true => Ok(()),
             false => Err(anyhow!(
                 "An account hasn't been created yet! Run shuffle account first"
             )),
         }
     }
+}
 
-    pub fn write_default_networks_config_into_toml(&self) -> Result<()> {
-        let networks_config_path = self.shuffle_path.join("Networks.toml");
-        let networks_config_string = toml::to_string_pretty(&NetworksConfig::default())?;
-        fs::write(networks_config_path, networks_config_string)?;
+// Contains all the commonly used paths in shuffle/cli
+pub struct Home {
+    shuffle_path: PathBuf,
+    networks_path: PathBuf,
+    networks_config_path: PathBuf,
+    node_config_path: PathBuf,
+    root_key_path: PathBuf,
+    validator_config_path: PathBuf,
+    validator_log_path: PathBuf,
+}
+
+impl Home {
+    pub fn new(home_path: &Path) -> Result<Self> {
+        Ok(Self {
+            shuffle_path: home_path.join(".shuffle"),
+            networks_path: home_path.join(".shuffle/networks"),
+            networks_config_path: home_path.join(".shuffle/Networks.toml"),
+            node_config_path: home_path.join(".shuffle/nodeconfig"),
+            root_key_path: home_path.join(".shuffle/nodeconfig/mint.key"),
+            validator_log_path: home_path.join(".shuffle/nodeconfig/validator.log"),
+            validator_config_path: home_path.join(".shuffle/nodeconfig/0/node.yaml"),
+        })
+    }
+
+    pub fn get_shuffle_path(&self) -> &Path {
+        &self.shuffle_path
+    }
+
+    pub fn get_networks_path(&self) -> &Path {
+        &self.networks_path
+    }
+
+    pub fn get_root_key_path(&self) -> &Path {
+        &self.root_key_path
+    }
+
+    pub fn get_node_config_path(&self) -> &Path {
+        &self.node_config_path
+    }
+
+    pub fn get_validator_config_path(&self) -> &Path {
+        &self.validator_config_path
+    }
+
+    pub fn get_validator_log_path(&self) -> &Path {
+        &self.validator_log_path
+    }
+
+    pub fn get_network_home(&self, network_name: &str) -> NetworkHome {
+        NetworkHome::new(self.networks_path.join(network_name).as_path())
+    }
+
+    pub fn read_networks_toml(&self) -> Result<NetworksConfig> {
+        self.check_networks_toml_exists()?;
+        let network_toml_contents = fs::read_to_string(self.networks_config_path.as_path())?;
+        let network_toml: NetworksConfig = toml::from_str(network_toml_contents.as_str())?;
+        Ok(network_toml)
+    }
+
+    fn check_networks_toml_exists(&self) -> Result<()> {
+        match self.networks_config_path.exists() {
+            true => Ok(()),
+            false => Err(anyhow!(
+                "A project hasn't been created yet. Run shuffle new first"
+            )),
+        }
+    }
+
+    pub fn read_genesis_waypoint(&self) -> Result<String> {
+        fs::read_to_string(self.node_config_path.join("waypoint.txt")).map_err(anyhow::Error::new)
+    }
+
+    pub fn write_default_networks_config_into_toml_if_nonexistent(&self) -> Result<()> {
+        if !&self.networks_config_path.exists() {
+            let networks_config_string = toml::to_string_pretty(&NetworksConfig::default())?;
+            fs::write(&self.networks_config_path, networks_config_string)?;
+        }
         Ok(())
+    }
+
+    pub fn generate_shuffle_path_if_nonexistent(&self) -> Result<()> {
+        if !self.shuffle_path.exists() {
+            // creates .shuffle folder which will contain localhost nodeconfig,
+            // Networks.toml, and account key/address pairs of each network
+            fs::create_dir(&self.shuffle_path)?;
+        }
+        Ok(())
+    }
+
+    pub fn get_network_struct_from_toml(&self, network: &str) -> Result<Network> {
+        self.read_networks_toml()?.get(network)
     }
 }
 
-pub fn normalized_network(home: &Home, network: Option<String>) -> Result<Url> {
+pub fn normalized_network_url(home: &Home, network: Option<String>) -> Result<Url> {
     match network {
         Some(input) => Ok(home.read_networks_toml()?.get(input.as_str())?.dev_api_url),
         None => Ok(home.read_networks_toml()?.get(LOCALHOST_NAME)?.dev_api_url),
+    }
+}
+
+pub fn normalized_network_name(network: Option<String>) -> String {
+    match network {
+        Some(net) => net,
+        None => String::from(LOCALHOST_NAME),
     }
 }
 
@@ -470,6 +535,20 @@ pub struct Network {
     json_rpc_url: Url,
     dev_api_url: Url,
     faucet_url: Option<Url>,
+}
+
+impl Network {
+    pub fn get_name(&self) -> String {
+        String::from(&self.name)
+    }
+
+    pub fn get_json_rpc_url(&self) -> Result<Url> {
+        Ok(Url::from_str(self.json_rpc_url.as_str())?)
+    }
+
+    pub fn get_dev_api_url(&self) -> Result<Url> {
+        Ok(Url::from_str(self.dev_api_url.as_str())?)
+    }
 }
 
 impl Default for Network {
@@ -575,34 +654,34 @@ mod test {
     }
 
     #[test]
-    fn test_home_create_archive_dir() {
+    fn test_network_home_create_archive_dir() {
         let dir = tempdir().unwrap();
-        fs::create_dir_all(dir.path().join(".shuffle/accounts")).unwrap();
+        fs::create_dir_all(dir.path().join("localhost/accounts")).unwrap();
 
-        let home = Home::new(dir.path()).unwrap();
+        let network_home = NetworkHome::new(dir.path().join("localhost").as_path());
         let time = duration_since_epoch();
-        home.create_archive_dir(time).unwrap();
+        network_home.create_archive_dir(time).unwrap();
         let test_archive_dir = dir
             .path()
-            .join(".shuffle/accounts")
+            .join("localhost/accounts")
             .join(time.as_secs().to_string());
         assert_eq!(test_archive_dir.is_dir(), true);
     }
 
     #[test]
-    fn test_home_archive_old_key() {
+    fn test_network_home_archive_old_key() {
         let dir = tempdir().unwrap();
-        fs::create_dir_all(dir.path().join(".shuffle/accounts/latest")).unwrap();
+        fs::create_dir_all(dir.path().join("localhost/accounts/latest")).unwrap();
 
-        let home = Home::new(dir.path()).unwrap();
-        let private_key = home.generate_key_file().unwrap();
+        let network_home = NetworkHome::new(dir.path().join("localhost").as_path());
+        let private_key = network_home.generate_key_file().unwrap();
 
         let time = duration_since_epoch();
-        let archived_dir = home.create_archive_dir(time).unwrap();
-        home.archive_old_key(&archived_dir).unwrap();
+        let archived_dir = network_home.create_archive_dir(time).unwrap();
+        network_home.archive_old_key(&archived_dir).unwrap();
         let test_archive_key_path = dir
             .path()
-            .join(".shuffle/accounts")
+            .join("localhost/accounts")
             .join(time.as_secs().to_string())
             .join("dev.key");
         let archived_key = generate_key::load_key(test_archive_key_path);
@@ -611,22 +690,23 @@ mod test {
     }
 
     #[test]
-    fn test_home_archive_old_address() {
+    fn test_network_home_archive_old_address() {
         let dir = tempdir().unwrap();
-        fs::create_dir_all(dir.path().join(".shuffle/accounts/latest")).unwrap();
+        fs::create_dir_all(dir.path().join("localhost/accounts/latest")).unwrap();
 
-        let home = Home::new(dir.path()).unwrap();
-        let private_key = home.generate_key_file().unwrap();
-        home.generate_address_file(&private_key.public_key())
+        let network_home = NetworkHome::new(dir.path().join("localhost").as_path());
+        let private_key = network_home.generate_key_file().unwrap();
+        network_home
+            .generate_address_file(&private_key.public_key())
             .unwrap();
-        let address_path = dir.path().join(".shuffle/accounts/latest/address");
+        let address_path = dir.path().join("localhost/accounts/latest/address");
 
         let time = duration_since_epoch();
-        let archived_dir = home.create_archive_dir(time).unwrap();
-        home.archive_old_address(&archived_dir).unwrap();
+        let archived_dir = network_home.create_archive_dir(time).unwrap();
+        network_home.archive_old_address(&archived_dir).unwrap();
         let test_archive_address_path = dir
             .path()
-            .join(".shuffle/accounts")
+            .join("localhost/accounts")
             .join(time.as_secs().to_string())
             .join("address");
 
@@ -637,48 +717,56 @@ mod test {
     }
 
     #[test]
-    fn test_home_generate_shuffle_accounts_path() {
+    fn test_network_generate_network_accounts_path_if_nonexistent() {
         let dir = tempdir().unwrap();
-        fs::create_dir_all(dir.path().join(".shuffle")).unwrap();
+        fs::create_dir_all(dir.path().join("localhost")).unwrap();
 
-        let home = Home::new(dir.path()).unwrap();
-        home.generate_shuffle_accounts_path().unwrap();
-        assert_eq!(dir.path().join(".shuffle/accounts").is_dir(), true);
+        let network_home = NetworkHome::new(dir.path().join("localhost").as_path());
+        network_home
+            .generate_network_accounts_path_if_nonexistent()
+            .unwrap();
+        assert_eq!(dir.path().join("localhost/accounts").is_dir(), true);
     }
 
     #[test]
-    fn test_home_generate_shuffle_latest_path() {
+    fn test_network_home_generate_network_latest_account_path_if_nonexistent() {
         let dir = tempdir().unwrap();
-        fs::create_dir_all(dir.path().join(".shuffle/accounts")).unwrap();
+        fs::create_dir_all(dir.path().join("localhost/accounts")).unwrap();
 
-        let home = Home::new(dir.path()).unwrap();
-        home.generate_shuffle_latest_path().unwrap();
-        assert_eq!(dir.path().join(".shuffle/accounts/latest").is_dir(), true);
+        let network_home = NetworkHome::new(dir.path().join("localhost").as_path());
+        network_home
+            .generate_network_latest_account_path_if_nonexistent()
+            .unwrap();
+        assert_eq!(dir.path().join("localhost/accounts/latest").is_dir(), true);
     }
 
     #[test]
-    fn test_home_generate_key_file() {
+    fn test_network_home_generate_key_file() {
         let dir = tempdir().unwrap();
-        fs::create_dir_all(dir.path().join(".shuffle/accounts/latest")).unwrap();
+        fs::create_dir_all(dir.path().join("localhost/accounts/latest")).unwrap();
 
-        let home = Home::new(dir.path()).unwrap();
-        home.generate_key_file().unwrap();
+        let network_home = NetworkHome::new(dir.path().join("localhost").as_path());
+        network_home.generate_key_file().unwrap();
         assert_eq!(
-            dir.path().join(".shuffle/accounts/latest/dev.key").exists(),
+            dir.path()
+                .join("localhost/accounts/latest/dev.key")
+                .exists(),
             true
         );
     }
 
     #[test]
-    fn test_home_generate_address_file() {
+    fn test_network_home_generate_address_file() {
         let dir = tempdir().unwrap();
-        fs::create_dir_all(dir.path().join(".shuffle/accounts/latest")).unwrap();
+        fs::create_dir_all(dir.path().join("localhost/accounts/latest")).unwrap();
 
-        let home = Home::new(dir.path()).unwrap();
-        let public_key = home.generate_key_file().unwrap().public_key();
-        home.generate_address_file(&public_key).unwrap();
+        let network_home = NetworkHome::new(dir.path().join("localhost").as_path());
+        let public_key = network_home.generate_key_file().unwrap().public_key();
+        network_home.generate_address_file(&public_key).unwrap();
         assert_eq!(
-            dir.path().join(".shuffle/accounts/latest/address").exists(),
+            dir.path()
+                .join("localhost/accounts/latest/address")
+                .exists(),
             true
         );
     }
@@ -715,19 +803,19 @@ mod test {
     }
 
     #[test]
-    fn test_home_get_latest_path() {
+    fn test_network_home_get_latest_path() {
         let dir = tempdir().unwrap();
-        let home = Home::new(dir.path()).unwrap();
-        let correct_dir = dir.path().join(".shuffle/accounts/latest");
-        assert_eq!(correct_dir, home.get_latest_path());
+        let network_home = NetworkHome::new(dir.path().join("localhost").as_path());
+        let correct_dir = dir.path().join("localhost/accounts/latest");
+        assert_eq!(correct_dir, network_home.get_latest_account_path());
     }
 
     #[test]
-    fn test_home_get_account_path() {
+    fn test_network_home_get_accounts_path() {
         let dir = tempdir().unwrap();
-        let home = Home::new(dir.path()).unwrap();
-        let correct_dir = dir.path().join(".shuffle/accounts");
-        assert_eq!(correct_dir, home.get_account_path());
+        let network_home = NetworkHome::new(dir.path().join("localhost").as_path());
+        let correct_dir = dir.path().join("localhost/accounts");
+        assert_eq!(correct_dir, network_home.get_accounts_path());
     }
 
     #[test]
@@ -739,6 +827,15 @@ mod test {
     }
 
     #[test]
+    fn test_home_generate_shuffle_path_if_nonexistent() {
+        let dir = tempdir().unwrap();
+        let home = Home::new(dir.path()).unwrap();
+        assert_eq!(dir.path().join(".shuffle").exists(), false);
+        home.generate_shuffle_path_if_nonexistent().unwrap();
+        assert_eq!(dir.path().join(".shuffle").exists(), true);
+    }
+
+    #[test]
     fn test_home_get_root_key_path() {
         let dir = tempdir().unwrap();
         let home = Home::new(dir.path()).unwrap();
@@ -747,23 +844,23 @@ mod test {
     }
 
     #[test]
-    fn test_home_get_latest_key_path() {
+    fn test_network_home_get_latest_key_path() {
         let dir = tempdir().unwrap();
-        let home = Home::new(dir.path()).unwrap();
-        let correct_dir = dir.path().join(".shuffle/accounts/latest/dev.key");
-        assert_eq!(correct_dir, home.get_latest_key_path());
+        let network_home = NetworkHome::new(dir.path().join("localhost").as_path());
+        let correct_dir = dir.path().join("localhost/accounts/latest/dev.key");
+        assert_eq!(correct_dir, network_home.get_latest_account_key_path());
     }
 
     #[test]
-    fn test_save_root_key() {
+    fn test_network_home_save_root_key() {
         let dir = tempdir().unwrap();
-        fs::create_dir_all(dir.path().join(".shuffle/accounts/latest")).unwrap();
+        fs::create_dir_all(dir.path().join("localhost/accounts/latest")).unwrap();
         let user_root_key_path = dir.path().join("root.key");
         let user_root_key = generate_key::generate_and_save_key(&user_root_key_path);
 
-        let home = Home::new(dir.path()).unwrap();
-        home.save_root_key(&user_root_key_path).unwrap();
-        let new_root_key = generate_key::load_key(home.latest_key_path);
+        let network_home = NetworkHome::new(dir.path().join("localhost").as_path());
+        network_home.save_root_key(&user_root_key_path).unwrap();
+        let new_root_key = generate_key::load_key(network_home.get_latest_account_key_path());
 
         assert_eq!(new_root_key, user_root_key);
     }
@@ -773,10 +870,11 @@ mod test {
         let dir = tempdir().unwrap();
         fs::create_dir_all(dir.path().join(".shuffle")).unwrap();
         let home = Home::new(dir.path()).unwrap();
-        home.write_default_networks_config_into_toml().unwrap();
+        home.write_default_networks_config_into_toml_if_nonexistent()
+            .unwrap();
 
-        let url_from_some = normalized_network(&home, Some("localhost".to_string())).unwrap();
-        let url_from_none = normalized_network(&home, None).unwrap();
+        let url_from_some = normalized_network_url(&home, Some("localhost".to_string())).unwrap();
+        let url_from_none = normalized_network_url(&home, None).unwrap();
 
         let correct_url = Url::from_str("http://127.0.0.1:8080").unwrap();
 
@@ -785,15 +883,15 @@ mod test {
     }
 
     #[test]
-    fn test_check_account_dir_exists() {
+    fn test_network_home_check_account_dir_exists() {
         let bad_dir = tempdir().unwrap();
-        let home = Home::new(bad_dir.path()).unwrap();
-        assert_eq!(home.check_account_path_exists().is_err(), true);
+        let network_home = NetworkHome::new(bad_dir.path().join("localhost").as_path());
+        assert_eq!(network_home.check_account_path_exists().is_err(), true);
 
         let good_dir = tempdir().unwrap();
-        fs::create_dir_all(good_dir.path().join(".shuffle/accounts")).unwrap();
-        let home = Home::new(good_dir.path()).unwrap();
-        assert_eq!(home.check_account_path_exists().is_err(), false);
+        fs::create_dir_all(good_dir.path().join("localhost/accounts")).unwrap();
+        let network_home = NetworkHome::new(good_dir.path().join("localhost").as_path());
+        assert_eq!(network_home.check_account_path_exists().is_err(), false);
     }
 
     #[test]
@@ -801,7 +899,8 @@ mod test {
         let dir = tempdir().unwrap();
         let home = Home::new(dir.path()).unwrap();
         fs::create_dir_all(dir.path().join(".shuffle")).unwrap();
-        home.write_default_networks_config_into_toml().unwrap();
+        home.write_default_networks_config_into_toml_if_nonexistent()
+            .unwrap();
         let networks_cfg = home.read_networks_toml().unwrap();
         assert_eq!(networks_cfg, NetworksConfig::default());
     }
@@ -846,19 +945,19 @@ mod test {
         let dir = tempdir().unwrap();
         let home = Home::new(dir.path()).unwrap();
         let project_path = Path::new("/Users/project_path");
-        let network = Url::from_str("http://127.0.0.1:8080").unwrap();
+        let network = get_test_localhost_network();
         let key_path = Path::new("/Users/private_key_path/dev.key");
         let address = AccountAddress::random();
         let filtered_envs =
-            get_filtered_envs_for_deno(&home, project_path, &network, key_path, address);
+            get_filtered_envs_for_deno(&home, project_path, &network, key_path, address).unwrap();
 
         assert_eq!(
             filtered_envs.get("PROJECT_PATH").unwrap(),
             &project_path.to_string_lossy().to_string()
         );
         assert_eq!(
-            filtered_envs.get("SHUFFLE_HOME").unwrap(),
-            home.get_shuffle_path().to_string_lossy().as_ref(),
+            filtered_envs.get("SHUFFLE_BASE_NETWORKS_PATH").unwrap(),
+            home.get_networks_path().to_string_lossy().as_ref(),
         );
         assert_eq!(
             filtered_envs.get("SENDER_ADDRESS").unwrap(),
@@ -869,8 +968,12 @@ mod test {
             &key_path.to_string_lossy().to_string()
         );
         assert_eq!(
-            filtered_envs.get("SHUFFLE_NETWORK").unwrap(),
-            &network.to_string()
+            filtered_envs.get("SHUFFLE_NETWORK_NAME").unwrap(),
+            &network.name
+        );
+        assert_eq!(
+            filtered_envs.get("SHUFFLE_NETWORK_DEV_API_URL").unwrap(),
+            &network.dev_api_url.to_string()
         )
     }
 

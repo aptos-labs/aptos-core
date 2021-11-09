@@ -5,15 +5,12 @@ use crate::{shared, shared::Home};
 use anyhow::Result;
 use diem_config::config::NodeConfig;
 use diem_types::{chain_id::ChainId, on_chain_config::VMPublishingOption};
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 const LAZY_ENABLED: bool = true;
 
 pub fn handle(home: &Home, genesis: Option<String>) -> Result<()> {
-    if !home.get_shuffle_path().is_dir() {
+    if !home.get_node_config_path().is_dir() {
         println!(
             "Creating node config in {}",
             home.get_shuffle_path().display()
@@ -38,8 +35,6 @@ pub fn handle(home: &Home, genesis: Option<String>) -> Result<()> {
 }
 
 fn create_node(home: &Home, genesis: Option<String>) -> Result<()> {
-    fs::create_dir_all(home.get_shuffle_path())?;
-    home.write_default_networks_config_into_toml()?;
     let publishing_option = VMPublishingOption::open();
     let genesis_modules = genesis_modules_from_path(&genesis)?;
     diem_node::load_test_environment(

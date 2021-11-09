@@ -1,18 +1,17 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::shared;
+use crate::{shared, shared::Network};
 use anyhow::Result;
 use diem_types::account_address::AccountAddress;
 use std::{path::Path, process::Command};
-use url::Url;
 
 /// Launches a Deno REPL for the shuffle project, generating transaction
 /// builders and loading them into the REPL namespace for easy on chain interaction.
 pub fn handle(
     home: &shared::Home,
     project_path: &Path,
-    network: Url,
+    network: Network,
     key_path: &Path,
     sender_address: AccountAddress,
 ) -> Result<()> {
@@ -50,7 +49,7 @@ pub fn handle(
             .to_string_lossy()
     );
     let filtered_envs =
-        shared::get_filtered_envs_for_deno(home, project_path, &network, key_path, sender_address);
+        shared::get_filtered_envs_for_deno(home, project_path, &network, key_path, sender_address)?;
     Command::new("deno")
         .args(["repl", "--unstable", "--eval", deno_bootstrap.as_str()])
         .envs(&filtered_envs)
