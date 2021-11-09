@@ -583,12 +583,15 @@ impl<'env> SpecTranslator<'env> {
             }
             ExpData::IfElse(node_id, cond, on_true, on_false) => {
                 self.set_writer_location(*node_id);
-                emit!(self.writer, "if (");
-                self.translate_exp(cond);
-                emit!(self.writer, ") then ");
+                // The whole ITE is one expression so we wrap it with a parenthesis
+                emit!(self.writer, "(");
+                emit!(self.writer, "if ");
+                self.translate_exp_parenthesised(cond);
+                emit!(self.writer, " then ");
                 self.translate_exp_parenthesised(on_true);
                 emit!(self.writer, " else ");
                 self.translate_exp_parenthesised(on_false);
+                emit!(self.writer, ")");
             }
             ExpData::Invalid(_) => panic!("unexpected error expression"),
         }
