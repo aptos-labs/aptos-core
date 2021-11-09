@@ -33,10 +33,7 @@ use network::{
         conn_notifs_channel, ConnectionNotification, ConnectionRequestSender,
         PeerManagerNotification, PeerManagerRequest, PeerManagerRequestSender,
     },
-    protocols::{
-        network::{NetworkEvents, NewNetworkEvents, NewNetworkSender},
-        wire::handshake::v1::ProtocolIdSet,
-    },
+    protocols::network::{NetworkEvents, NewNetworkEvents, NewNetworkSender},
     transport::ConnectionMetadata,
     DisconnectReason, ProtocolId,
 };
@@ -412,7 +409,9 @@ impl Node {
     ) {
         let mut metadata =
             ConnectionMetadata::mock_with_role_and_origin(new_peer.peer_id(), peer_role, origin);
-        metadata.application_protocols = ProtocolIdSet::all_known();
+        metadata
+            .application_protocols
+            .insert(ProtocolId::MempoolDirectSend);
         let notif = ConnectionNotification::NewPeer(metadata.clone(), NetworkContext::mock());
         self.peer_metadata_storage
             .insert_connection(new_peer.network_id(), metadata);
