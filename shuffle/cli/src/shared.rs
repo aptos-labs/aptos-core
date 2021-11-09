@@ -27,9 +27,9 @@ use url::Url;
 
 pub const MAIN_PKG_PATH: &str = "main";
 const NEW_KEY_FILE_CONTENT: &[u8] = include_bytes!("../new_account.key");
-pub const LOCALHOST_NETWORK_NAME: &str = "localhost";
-pub const LOCALHOST_NETWORK_BASE: &str = "http://127.0.0.1";
 const DIEM_ACCOUNT_TYPE: &str = "0x1::DiemAccount::DiemAccount";
+
+const LOCALHOST_NAME: &str = "localhost";
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "kebab-case")]
@@ -387,17 +387,17 @@ impl Home {
     }
 
     pub fn write_default_networks_config_into_toml(&self) -> Result<()> {
-        let network_config_path = self.shuffle_path.join("Networks.toml");
-        let network_config_string = toml::to_string_pretty(&NetworksConfig::default())?;
-        fs::write(network_config_path, network_config_string)?;
+        let networks_config_path = self.shuffle_path.join("Networks.toml");
+        let networks_config_string = toml::to_string_pretty(&NetworksConfig::default())?;
+        fs::write(networks_config_path, networks_config_string)?;
         Ok(())
     }
 }
 
 pub fn normalized_network(home: &Home, network: Option<String>) -> Result<Url> {
     match network {
-        Some(input) => Ok(home.read_networks_toml()?.url_for(input.as_str())?),
-        None => Ok(home.read_networks_toml()?.url_for(LOCALHOST_NETWORK_NAME)?),
+        Some(input) => Ok(home.read_networks_toml()?.get(input.as_str())?.dev_api_url),
+        None => Ok(home.read_networks_toml()?.get(LOCALHOST_NAME)?.dev_api_url),
     }
 }
 
@@ -407,43 +407,40 @@ pub struct NetworksConfig {
 }
 
 impl NetworksConfig {
-    pub fn default() -> Self {
+    pub fn get(&self, network_name: &str) -> Result<Network> {
+        Ok(self
+            .networks
+            .get(network_name)
+            .ok_or_else(|| anyhow!("Please add specified network to the ~/.shuffle/Networks.json"))?
+            .clone())
+    }
+}
+
+impl Default for NetworksConfig {
+    fn default() -> Self {
         let mut network_map = BTreeMap::new();
-        network_map.insert("localhost".to_string(), Network::default());
+        network_map.insert(LOCALHOST_NAME.to_string(), Network::default());
         NetworksConfig {
             networks: network_map,
         }
     }
-
-    pub fn url_for(&self, network_name: &str) -> Result<Url> {
-        let specified_network = self.networks.get(network_name).ok_or_else(|| {
-            anyhow!("Please add specified network to the ~/.shuffle/Networks.json")
-        })?;
-        Ok(Url::from_str(
-            format!(
-                "{}:{}",
-                specified_network.base, specified_network.dev_api_port
-            )
-            .as_str(),
-        )?)
-    }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct Network {
     name: String,
-    base: String,
-    json_rpc_port: u16,
-    dev_api_port: u16,
+    json_rpc_url: Url,
+    dev_api_url: Url,
+    faucet_url: Option<Url>,
 }
 
-impl Network {
-    pub fn default() -> Self {
+impl Default for Network {
+    fn default() -> Self {
         Network {
-            name: String::from(LOCALHOST_NETWORK_NAME),
-            base: String::from(LOCALHOST_NETWORK_BASE),
-            json_rpc_port: 8080,
-            dev_api_port: 8080,
+            name: String::from(LOCALHOST_NAME),
+            json_rpc_url: Url::from_str("http://127.0.0.1:8080").unwrap(),
+            dev_api_url: Url::from_str("http://127.0.0.1:8080").unwrap(),
+            faucet_url: None,
         }
     }
 }
@@ -774,40 +771,39 @@ mod test {
         assert_eq!(networks_cfg, NetworksConfig::default());
     }
 
-    fn get_test_network() -> Network {
+    fn get_test_localhost_network() -> Network {
         Network {
             name: "localhost".to_string(),
-            base: "http://127.0.0.1".to_string(),
-            json_rpc_port: 8080,
-            dev_api_port: 8080,
+            json_rpc_url: Url::from_str("http://127.0.0.1:8080").unwrap(),
+            dev_api_url: Url::from_str("http://127.0.0.1:8080").unwrap(),
+            faucet_url: None,
+        }
+    }
+
+    fn get_test_networks_config() -> NetworksConfig {
+        let mut network_map = BTreeMap::new();
+        network_map.insert("localhost".to_string(), get_test_localhost_network());
+        NetworksConfig {
+            networks: network_map,
         }
     }
 
     #[test]
     fn test_generate_default_networks_config() {
-        let mut network_map = BTreeMap::new();
-        network_map.insert("localhost".to_string(), get_test_network());
-        let networks_cfg = NetworksConfig {
-            networks: network_map,
-        };
-        assert_eq!(NetworksConfig::default(), networks_cfg);
+        assert_eq!(NetworksConfig::default(), get_test_networks_config());
+    }
+
+    #[test]
+    fn test_networks_config_get() {
+        let networks_config = get_test_networks_config();
+        let network = networks_config.get("localhost").unwrap();
+        let correct_network = get_test_localhost_network();
+        assert_eq!(network, correct_network);
     }
 
     #[test]
     fn test_generate_default_network() {
-        assert_eq!(Network::default(), get_test_network());
-    }
-
-    #[test]
-    fn test_url_for() {
-        let mut network_map = BTreeMap::new();
-        network_map.insert("localhost".to_string(), Network::default());
-        let all_networks = NetworksConfig {
-            networks: network_map,
-        };
-        let correct_url = Url::from_str("http://127.0.0.1:8080").unwrap();
-        assert_eq!(all_networks.url_for("localhost").unwrap(), correct_url);
-        assert_eq!(all_networks.url_for("trove").is_err(), true);
+        assert_eq!(Network::default(), get_test_localhost_network());
     }
 
     #[test]
