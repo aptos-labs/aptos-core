@@ -17,6 +17,7 @@ use crate::{
     },
 };
 use claim::{assert_le, assert_matches, assert_ok, assert_some};
+use diem_config::config::DataStreamingServiceConfig;
 
 macro_rules! unexpected_payload_type {
     ($received:expr) => {
@@ -749,7 +750,11 @@ fn create_new_streaming_client_and_service() -> StreamingServiceClient {
 
     // Create the streaming service and connect it to the listener
     let diem_data_client = MockDiemDataClient::new();
-    let streaming_service = DataStreamingService::new(diem_data_client, streaming_service_listener);
+    let streaming_service = DataStreamingService::new(
+        DataStreamingServiceConfig::default(),
+        diem_data_client,
+        streaming_service_listener,
+    );
     tokio::spawn(streaming_service.start_service());
 
     streaming_client

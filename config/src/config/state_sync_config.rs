@@ -27,12 +27,10 @@ pub struct StateSyncConfig {
     pub sync_request_timeout_ms: u64,
     // interval used for checking state synchronization progress
     pub tick_interval_ms: u64,
-
+    // TODO(joshlind): plug these in when required.
     // Everything above belongs to state sync v1 and will be removed in the future.
-
-    // The config for the storage service running on each node. Required by
-    // state sync v2.
-    pub storage_service: StorageServiceConfig,
+    // pub data_streaming_service: DataStreamingServiceConfig,
+    // pub storage_service: StorageServiceConfig,
 }
 
 impl Default for StateSyncConfig {
@@ -47,12 +45,11 @@ impl Default for StateSyncConfig {
             multicast_timeout_ms: 30_000,
             sync_request_timeout_ms: 60_000,
             tick_interval_ms: 100,
-            storage_service: StorageServiceConfig::default(),
         }
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Copy, Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct StorageServiceConfig {
     pub max_account_states_chunk_sizes: u64, // Max num of accounts per chunk
@@ -70,6 +67,45 @@ impl Default for StorageServiceConfig {
             max_epoch_chunk_size: 100,
             max_transaction_chunk_size: 1000,
             max_transaction_output_chunk_size: 1000,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct DataStreamingServiceConfig {
+    // The interval (milliseconds) at which to refresh the global data summary.
+    pub global_summary_refresh_interval_ms: u64,
+
+    // Maximum number of concurrent data client requests (per stream).
+    pub max_concurrent_requests: u64,
+
+    // Maximum channel sizes for each data stream listener. If messages are not
+    // consumed, they will be dropped (oldest messages first). The remaining
+    // messages will be retrieved using FIFO ordering.
+    pub max_data_stream_channel_sizes: u64,
+
+    // Maximum number of retries for a single client request before a data
+    // stream will terminate.
+    pub max_request_retry: u64,
+
+    // Maximum number of notification ID to response context mappings held in
+    // memory. Once the number grows beyond this value, garbage collection occurs.
+    pub max_notification_id_mappings: u64,
+
+    // The interval (milliseconds) at which to check the progress of each stream.
+    pub progress_check_interval_ms: u64,
+}
+
+impl Default for DataStreamingServiceConfig {
+    fn default() -> Self {
+        Self {
+            global_summary_refresh_interval_ms: 1000,
+            max_concurrent_requests: 3,
+            max_data_stream_channel_sizes: 1000,
+            max_request_retry: 10,
+            max_notification_id_mappings: 2000,
+            progress_check_interval_ms: 100,
         }
     }
 }

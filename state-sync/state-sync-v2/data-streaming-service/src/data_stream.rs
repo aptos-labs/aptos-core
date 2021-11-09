@@ -10,6 +10,7 @@ use crate::{
     streaming_client::{NotificationFeedback, StreamRequest},
 };
 use channel::{diem_channel, message_queues::QueueStyle};
+use diem_config::config::DataStreamingServiceConfig;
 use diem_data_client::{
     AdvertisedData, DiemDataClient, GlobalDataSummary, Response, ResponseContext, ResponseError,
     ResponsePayload,
@@ -25,21 +26,6 @@ use std::{
     task::{Context, Poll},
 };
 use tokio::task::JoinHandle;
-
-// Maximum channel sizes for each stream listener. If messages are not
-// consumed, they will be dropped (oldest messages first). The remaining
-// messages will be retrieved using FIFO ordering.
-const DATA_STREAM_CHANNEL_SIZE: usize = 1000;
-
-// Maximum number of concurrent data client requests (per stream)
-const MAX_CONCURRENT_REQUESTS: u64 = 3;
-
-// Maximum number of retries for a single client request before the stream terminates
-pub const MAX_REQUEST_RETRY: u64 = 10;
-
-// Maximum number of notification ID to response ID mappings held in memory.
-// Once the number of mappings grow beyond this value, garbage collection occurs.
-pub const MAX_NOTIFICATION_ID_MAPPINGS: u64 = 2000;
 
 /// A unique ID used to identify each stream.
 pub type DataStreamId = u64;
@@ -57,6 +43,9 @@ pub type PendingClientResponse = Arc<Mutex<Box<data_notification::PendingClientR
 /// proofs must be sent with monotonically increasing versions).
 #[derive(Debug)]
 pub struct DataStream<T> {
+    // The configuration for this data stream
+    config: DataStreamingServiceConfig,
+
     // The unique ID for this data stream. This is useful for logging.
     data_stream_id: DataStreamId,
 
@@ -95,6 +84,7 @@ pub struct DataStream<T> {
 
 impl<T: DiemDataClient + Send + Clone + 'static> DataStream<T> {
     pub fn new(
+        config: DataStreamingServiceConfig,
         data_stream_id: DataStreamId,
         stream_request: &StreamRequest,
         diem_data_client: T,
@@ -102,8 +92,11 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStream<T> {
         advertised_data: &AdvertisedData,
     ) -> Result<(Self, DataStreamListener), Error> {
         // Create a new data stream listener
-        let (notification_sender, notification_receiver) =
-            diem_channel::new(QueueStyle::KLAST, DATA_STREAM_CHANNEL_SIZE, None);
+        let (notification_sender, notification_receiver) = diem_channel::new(
+            QueueStyle::KLAST,
+            config.max_data_stream_channel_sizes as usize,
+            None,
+        );
         let data_stream_listener = DataStreamListener::new(notification_receiver);
 
         // Create a new stream engine
@@ -111,6 +104,7 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStream<T> {
 
         // Create a new data stream
         let data_stream = Self {
+            config,
             data_stream_id,
             diem_data_client,
             stream_engine,
@@ -195,7 +189,9 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStream<T> {
     ) -> Result<(), Error> {
         // Determine how many requests (at most) can be sent to the network
         let num_sent_requests = self.get_sent_data_requests().len() as u64;
-        let max_num_requests_to_send = MAX_CONCURRENT_REQUESTS
+        let max_num_requests_to_send = self
+            .config
+            .max_concurrent_requests
             .checked_sub(num_sent_requests)
             .ok_or_else(|| {
                 Error::IntegerOverflow("Max number of requests to send has overflown!".into())
@@ -332,7 +328,7 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStream<T> {
         global_data_summary: GlobalDataSummary,
     ) -> Result<(), Error> {
         if self.stream_engine.is_stream_complete()
-            || self.request_failure_count >= MAX_REQUEST_RETRY
+            || self.request_failure_count >= self.config.max_request_retry
         {
             if self.stream_end_notification_id.is_none() {
                 self.send_end_of_stream_notification()?;
@@ -341,7 +337,7 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStream<T> {
         }
 
         // Process any ready data responses
-        for _ in 0..MAX_CONCURRENT_REQUESTS {
+        for _ in 0..self.config.max_concurrent_requests {
             if let Some(pending_response) = self.pop_pending_response_queue() {
                 let mut pending_response = pending_response.lock();
                 let client_response = pending_response
@@ -523,10 +519,11 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStream<T> {
     }
 
     fn garbage_collect_notification_response_map(&mut self) -> Result<(), Error> {
+        let max_notification_id_mappings = self.config.max_notification_id_mappings;
         let map_length = self.notifications_to_responses.len() as u64;
-        if map_length > MAX_NOTIFICATION_ID_MAPPINGS {
+        if map_length > max_notification_id_mappings {
             let num_entries_to_remove = map_length
-                .checked_sub(MAX_NOTIFICATION_ID_MAPPINGS)
+                .checked_sub(max_notification_id_mappings)
                 .ok_or_else(|| {
                     Error::IntegerOverflow("Number of entries to remove has overflown!".into())
                 })?;

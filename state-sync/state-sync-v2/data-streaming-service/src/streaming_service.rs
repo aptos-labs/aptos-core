@@ -9,6 +9,7 @@ use crate::{
         StreamRequest, StreamRequestMessage, StreamingServiceListener, TerminateStreamRequest,
     },
 };
+use diem_config::config::DataStreamingServiceConfig;
 use diem_data_client::{DiemDataClient, GlobalDataSummary, OptimalChunkSizes};
 use diem_id_generator::{IdGenerator, U64IdGenerator};
 use diem_logger::prelude::*;
@@ -17,12 +18,11 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::time::interval;
 use tokio_stream::wrappers::IntervalStream;
 
-/// Constants for state management frequencies
-const DATA_REFRESH_INTERVAL_MS: u64 = 1000;
-const PROGRESS_CHECK_INTERVAL_MS: u64 = 100;
-
 /// The data streaming service that responds to data stream requests.
 pub struct DataStreamingService<T> {
+    // The configuration for this streaming service.
+    config: DataStreamingServiceConfig,
+
     // The data client through which to fetch data from the Diem network
     diem_data_client: T,
 
@@ -41,8 +41,13 @@ pub struct DataStreamingService<T> {
 }
 
 impl<T: DiemDataClient + Send + Clone + 'static> DataStreamingService<T> {
-    pub fn new(diem_data_client: T, stream_requests: StreamingServiceListener) -> Self {
+    pub fn new(
+        config: DataStreamingServiceConfig,
+        diem_data_client: T,
+        stream_requests: StreamingServiceListener,
+    ) -> Self {
         Self {
+            config,
             diem_data_client,
             global_data_summary: GlobalDataSummary::empty(),
             data_streams: HashMap::new(),
@@ -54,10 +59,14 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStreamingService<T> {
 
     /// Starts the dedicated streaming service
     pub async fn start_service(mut self) {
-        let mut data_refresh_interval =
-            IntervalStream::new(interval(Duration::from_millis(DATA_REFRESH_INTERVAL_MS))).fuse();
-        let mut progress_check_interval =
-            IntervalStream::new(interval(Duration::from_millis(PROGRESS_CHECK_INTERVAL_MS))).fuse();
+        let mut data_refresh_interval = IntervalStream::new(interval(Duration::from_millis(
+            self.config.global_summary_refresh_interval_ms,
+        )))
+        .fuse();
+        let mut progress_check_interval = IntervalStream::new(interval(Duration::from_millis(
+            self.config.progress_check_interval_ms,
+        )))
+        .fuse();
 
         loop {
             ::futures::select! {
@@ -149,6 +158,7 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStreamingService<T> {
         // Create a new data stream
         let stream_id = self.stream_id_generator.next();
         let (data_stream, stream_listener) = DataStream::new(
+            self.config,
             stream_id,
             &request_message.stream_request,
             self.diem_data_client.clone(),

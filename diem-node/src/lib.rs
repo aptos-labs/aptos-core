@@ -251,12 +251,8 @@ fn setup_storage_service_servers(
         .expect("Failed to start the DiemNet storage-service runtime.");
     let storage_reader = StorageReader::new(Arc::clone(&db_rw.reader));
     for events in network_handles {
-        let service = StorageServiceServer::new(
-            config.clone(),
-            rt.handle().clone(),
-            storage_reader.clone(),
-            events,
-        );
+        let service =
+            StorageServiceServer::new(config, rt.handle().clone(), storage_reader.clone(), events);
         rt.spawn(service.start());
     }
     rt
@@ -494,9 +490,8 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
     // TODO set up on-chain discovery network based on UpstreamConfig.fallback_network
     // and pass network handles to mempool/state sync
 
-    let storage_service_config = node_config.state_sync.storage_service.clone();
     let storage_service_rt = setup_storage_service_servers(
-        storage_service_config.clone(),
+        StorageServiceConfig::default(),
         storage_service_server_network_handles,
         &db_rw,
     );
@@ -504,7 +499,7 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
     let _diemnet_data_client = setup_diemnet_data_client(
         // TODO(philiphayes): probably use state-sync-v2 handle here?
         storage_service_rt.handle(),
-        storage_service_config,
+        StorageServiceConfig::default(),
         storage_service_client_network_handles,
         peer_metadata_storage.clone(),
     );

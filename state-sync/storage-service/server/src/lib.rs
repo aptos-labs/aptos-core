@@ -95,7 +95,7 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
             // I/O-bound, so we want to spawn on the blocking thread pool to
             // avoid starving other async tasks on the same runtime.
             let storage = self.storage.clone();
-            let config = self.config.clone();
+            let config = self.config;
             self.bounded_executor
                 .spawn_blocking(move || {
                     let response = Handler::new(config, storage).call(request);
