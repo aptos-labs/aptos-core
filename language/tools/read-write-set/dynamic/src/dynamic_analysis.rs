@@ -14,7 +14,7 @@ use move_core_types::{
     resolver::MoveResolver,
     value::MoveValue,
 };
-use read_write_set_types::{Access, AccessPath, Offset, ReadWriteSet, RootAddress};
+use move_read_write_set_types::{Access, AccessPath, Offset, ReadWriteSet, RootAddress};
 use std::{
     fmt::{self, Formatter},
     ops::Deref,

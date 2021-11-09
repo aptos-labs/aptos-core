@@ -1,12 +1,12 @@
 [package]
 name = "move-binary-format"
-version = "0.1.0"
+version = "0.0.3"
 authors = ["Diem Association <opensource@diem.com>"]
 description = "Move Binary Format"
 repository = "https://github.com/diem/diem"
 homepage = "https://diem.com"
 license = "Apache-2.0"
-publish = false
+publish = ["crates-io"]
 edition = "2018"
 
 [dependencies]
@@ -17,10 +17,10 @@ proptest = { version = "1.0.0", optional = true }
 proptest-derive = { version = "0.3.0", optional = true }
 ref-cast = "1.0.6"
 variant_count = "1.1.0"
-diem-workspace-hack = { path = "../../common/workspace-hack" }
-move-core-types = { path = "../move-core/types" }
+move-core-types = { path = "../move-core/types", version = "0.0.3" }
 
 [dev-dependencies]
+diem-workspace-hack = { path = "../../common/workspace-hack" }
 proptest = "1.0.0"
 proptest-derive = "0.3.0"
 move-core-types = { path = "../move-core/types", features = ["fuzzing"] }

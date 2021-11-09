@@ -26,7 +26,7 @@ use move_model::{
     model::{FunctionEnv, GlobalEnv, ModuleId, StructId},
     ty::Type,
 };
-use read_write_set_types::{
+use move_read_write_set_types::{
     Access, AccessPath as RWAccessPath, Offset as RWOffset, ReadWriteSet, Root as RWRoot,
     RootAddress as RWRootAddress,
 };

@@ -605,12 +605,12 @@ dependencies = [
  "move-core-types",
  "move-model",
  "move-prover-test-utils",
+ "move-read-write-set-types",
  "move-stdlib",
  "num 0.4.0",
  "once_cell",
  "paste",
  "petgraph 0.5.1",
- "read-write-set-types",
  "serde",
  "serde_json",
 ]
@@ -4960,7 +4960,7 @@ dependencies = [
 
 [[package]]
 name = "move-binary-format"
-version = "0.1.0"
+version = "0.0.3"
 dependencies = [
  "anyhow",
  "diem-workspace-hack",
@@ -5311,6 +5311,16 @@ dependencies = [
  "move-command-line-common",
  "prettydiff",
  "regex",
+]
+
+[[package]]
+name = "move-read-write-set-types"
+version = "0.0.3"
+dependencies = [
+ "anyhow",
+ "diem-workspace-hack",
+ "move-binary-format",
+ "move-core-types",
 ]
 
 [[package]]
@@ -6728,8 +6738,8 @@ dependencies = [
  "move-bytecode-utils",
  "move-core-types",
  "move-model",
+ "move-read-write-set-types",
  "read-write-set-dynamic",
- "read-write-set-types",
  "resource-viewer",
 ]
 
@@ -6742,17 +6752,7 @@ dependencies = [
  "move-binary-format",
  "move-bytecode-utils",
  "move-core-types",
- "read-write-set-types",
-]
-
-[[package]]
-name = "read-write-set-types"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "diem-workspace-hack",
- "move-binary-format",
- "move-core-types",
+ "move-read-write-set-types",
 ]
 
 [[package]]

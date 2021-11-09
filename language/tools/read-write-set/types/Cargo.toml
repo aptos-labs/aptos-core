@@ -1,16 +1,18 @@
 [package]
-name = "read-write-set-types"
-version = "0.1.0"
+name = "move-read-write-set-types"
+version = "0.0.3"
 authors = ["Diem Association <opensource@diem.com>"]
 description = "Type definition for read/write set inference for Move bytecode programs"
 repository = "https://github.com/diem/diem"
 homepage = "https://diem.com"
 license = "Apache-2.0"
-publish = false
+publish = ["crates-io"]
 edition = "2018"
 
 [dependencies]
 anyhow = "1.0.38"
+move-binary-format = { path = "../../../move-binary-format", version = "0.0.3" }
+move-core-types = { path = "../../../move-core/types", version = "0.0.3" }
+
+[dev-dependencies]
 diem-workspace-hack = { path = "../../../../common/workspace-hack" }
-move-binary-format = { path = "../../../move-binary-format" }
-move-core-types = { path = "../../../move-core/types" }

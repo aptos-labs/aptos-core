@@ -12,7 +12,7 @@ use move_core_types::{
     language_storage::{ModuleId, ResourceKey, TypeTag},
     resolver::MoveResolver,
 };
-use read_write_set_types::ReadWriteSet;
+use move_read_write_set_types::ReadWriteSet;
 use std::collections::BTreeMap;
 
 pub struct NormalizedReadWriteSetAnalysis(BTreeMap<ModuleId, BTreeMap<Identifier, ReadWriteSet>>);

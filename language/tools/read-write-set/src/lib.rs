@@ -9,12 +9,12 @@ use move_core_types::{
     language_storage::ModuleId,
 };
 use move_model::model::{FunctionEnv, GlobalEnv};
+use move_read_write_set_types::ReadWriteSet;
 use prover_bytecode::{
     function_target_pipeline::{FunctionTargetPipeline, FunctionTargetsHolder, FunctionVariant},
     read_write_set_analysis::{ReadWriteSetProcessor, ReadWriteSetState},
 };
 use read_write_set_dynamic::NormalizedReadWriteSetAnalysis;
-use read_write_set_types::ReadWriteSet;
 use std::collections::BTreeMap;
 
 pub struct ReadWriteSetAnalysis {
