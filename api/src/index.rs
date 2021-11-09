@@ -1,7 +1,13 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{accounts, context::Context, events, log, transactions};
+use crate::{
+    accounts,
+    context::Context,
+    events, log,
+    metrics::{metrics, status_metrics},
+    transactions,
+};
 use diem_api_types::{Error, Response};
 
 use std::convert::Infallible;
@@ -16,10 +22,10 @@ pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Inf
         .or(accounts::routes(context.clone()))
         .or(transactions::routes(context.clone()))
         .or(events::routes(context.clone()))
-        .or(context.health_check_route())
+        .or(context.health_check_route().with(metrics("health_check")))
         // jsonrpc routes must before `recover` and after `index`
         // so that POST '/' can be handled by jsonrpc routes instead of `index` route
-        .or(context.jsonrpc_routes())
+        .or(context.jsonrpc_routes().with(metrics("json_rpc")))
         .with(
             warp::cors()
                 .allow_any_origin()
@@ -27,6 +33,7 @@ pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Inf
         )
         .recover(handle_rejection)
         .with(log::logger())
+        .with(status_metrics())
 }
 
 // GET /openapi.yaml
@@ -35,7 +42,8 @@ pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Inf
 pub fn openapi_spec() -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
     let spec = warp::path!("openapi.yaml")
         .and(warp::get())
-        .map(|| include_str!("../doc/openapi.yaml"));
+        .map(|| include_str!("../doc/openapi.yaml"))
+        .with(metrics("openapi_yaml"));
     let renderer = warp::path!("redoc.standalone.js").and(warp::get()).map(|| {
         warp::http::Response::builder()
             .header("Content-Type", "text/javascript")
@@ -43,7 +51,8 @@ pub fn openapi_spec() -> impl Filter<Extract = impl Reply, Error = Rejection> + 
     });
     let html = warp::path!("spec.html")
         .and(warp::get())
-        .map(|| reply::html(include_str!("../doc/spec.html")));
+        .map(|| reply::html(include_str!("../doc/spec.html")))
+        .with(metrics("spec_html"));
     spec.or(renderer).or(html)
 }
 
@@ -53,6 +62,7 @@ pub fn index(context: Context) -> impl Filter<Extract = impl Reply, Error = Reje
         .and(warp::get())
         .and(context.filter())
         .and_then(handle_index)
+        .with(metrics("get_ledger_info"))
 }
 
 pub async fn handle_index(context: Context) -> Result<impl Reply, Rejection> {

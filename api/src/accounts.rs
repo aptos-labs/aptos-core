@@ -3,6 +3,7 @@
 
 use crate::{
     context::Context,
+    metrics::metrics,
     param::{AddressParam, LedgerVersionParam, MoveIdentifierParam, MoveStructTagParam},
 };
 
@@ -34,6 +35,7 @@ pub fn get_account_resources(
         .map(|address, ctx| (None, address, ctx))
         .untuple_one()
         .and_then(handle_get_account_resources)
+        .with(metrics("get_account_resources"))
 }
 
 // GET /ledger/<version>/accounts/<address>/resources
@@ -46,6 +48,7 @@ pub fn get_account_resources_by_ledger_version(
         .map(|version, address, ctx| (Some(version), address, ctx))
         .untuple_one()
         .and_then(handle_get_account_resources)
+        .with(metrics("get_account_resources_by_ledger_version"))
 }
 
 // GET /accounts/<address>/modules
@@ -58,6 +61,7 @@ pub fn get_account_modules(
         .map(|address, ctx| (None, address, ctx))
         .untuple_one()
         .and_then(handle_get_account_modules)
+        .with(metrics("get_account_modules"))
 }
 
 // GET /ledger/<version>/accounts/<address>/modules
@@ -70,6 +74,7 @@ pub fn get_account_modules_by_ledger_version(
         .map(|version, address, ctx| (Some(version), address, ctx))
         .untuple_one()
         .and_then(handle_get_account_modules)
+        .with(metrics("get_account_modules_by_ledger_version"))
 }
 
 async fn handle_get_account_resources(

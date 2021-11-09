@@ -16,6 +16,7 @@ bytes = "1.0.1"
 futures = "0.3.12"
 hex = "0.4.3"
 hyper = "0.14.4"
+once_cell = "1.7.2"
 percent-encoding = "2.1.0"
 serde = { version = "1.0.124", features = ["derive"], default-features = false }
 serde_json = "1.0.64"
@@ -27,6 +28,7 @@ diem-crypto = { path = "../crypto/crypto" }
 diem-json-rpc = { path = "../json-rpc" }
 diem-logger = { path = "../common/logger" }
 diem-mempool = { path = "../mempool"}
+diem-metrics = { path = "../common/metrics" }
 diem-types = { path = "../types" }
 diem-workspace-hack = { path = "../common/workspace-hack" }
 diem-api-types = { path = "./types", package = "diem-api-types" }

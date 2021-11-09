@@ -3,6 +3,7 @@
 
 use crate::{
     context::Context,
+    metrics::metrics,
     page::Page,
     param::{AddressParam, TransactionIdParam},
 };
@@ -27,7 +28,7 @@ pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Rej
         .or(get_transactions(context.clone()))
         .or(get_account_transactions(context.clone()))
         .or(post_transactions(context.clone()))
-        .or(post_signing_message(context))
+        .or(create_signing_message(context))
 }
 
 // GET /transactions/{txn-hash / version}
@@ -38,6 +39,7 @@ pub fn get_transaction(
         .and(warp::get())
         .and(context.filter())
         .and_then(handle_get_transaction)
+        .with(metrics("get_transaction"))
 }
 
 async fn handle_get_transaction(
@@ -58,6 +60,7 @@ pub fn get_transactions(
         .and(warp::query::<Page>())
         .and(context.filter())
         .and_then(handle_get_transactions)
+        .with(metrics("get_transactions"))
 }
 
 async fn handle_get_transactions(page: Page, context: Context) -> Result<impl Reply, Rejection> {
@@ -73,6 +76,7 @@ pub fn get_account_transactions(
         .and(warp::query::<Page>())
         .and(context.filter())
         .and_then(handle_get_account_transactions)
+        .with(metrics("get_account_transactions"))
 }
 
 async fn handle_get_account_transactions(
@@ -93,6 +97,7 @@ pub fn post_transactions(
         .and(warp::body::bytes())
         .and(context.filter())
         .and_then(handle_post_transactions)
+        .with(metrics("submit_transactions"))
 }
 
 async fn handle_post_transactions(
@@ -126,7 +131,7 @@ async fn handle_post_transactions(
 }
 
 // POST /transactions/signing_message
-pub fn post_signing_message(
+pub fn create_signing_message(
     context: Context,
 ) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
     warp::path!("transactions" / "signing_message")
@@ -134,10 +139,11 @@ pub fn post_signing_message(
         .and(warp::header::exact(CONTENT_TYPE.as_str(), mime_types::JSON))
         .and(warp::body::bytes())
         .and(context.filter())
-        .and_then(handle_post_signing_message)
+        .and_then(handle_create_signing_message)
+        .with(metrics("create_signing_message"))
 }
 
-async fn handle_post_signing_message(
+async fn handle_create_signing_message(
     body: bytes::Bytes,
     context: Context,
 ) -> Result<impl Reply, Rejection> {

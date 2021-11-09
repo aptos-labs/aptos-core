@@ -4,6 +4,7 @@
 use crate::{
     accounts::Account,
     context::Context,
+    metrics::metrics,
     page::Page,
     param::{AddressParam, EventKeyParam, MoveIdentifierParam, MoveStructTagParam},
 };
@@ -15,32 +16,34 @@ use diem_types::event::EventKey;
 use warp::{Filter, Rejection, Reply};
 
 pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
-    get_events(context.clone()).or(get_account_events(context))
+    get_events_by_event_key(context.clone()).or(get_events_by_event_handle(context))
 }
 
 // GET /events/<event_key>
-pub fn get_events(
+pub fn get_events_by_event_key(
     context: Context,
 ) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
     warp::path!("events" / EventKeyParam)
         .and(warp::get())
         .and(warp::query::<Page>())
         .and(context.filter())
-        .and_then(handle_get_events)
+        .and_then(handle_get_events_by_event_key)
+        .with(metrics("get_events_by_event_key"))
 }
 
 // GET /accounts/<address>/events/<event_handle_struct>/<field_name>
-pub fn get_account_events(
+pub fn get_events_by_event_handle(
     context: Context,
 ) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
     warp::path!("accounts" / AddressParam / "events" / MoveStructTagParam / MoveIdentifierParam)
         .and(warp::get())
         .and(warp::query::<Page>())
         .and(context.filter())
-        .and_then(handle_get_account_events)
+        .and_then(handle_get_events_by_event_handle)
+        .with(metrics("get_events_by_event_handle"))
 }
 
-async fn handle_get_events(
+async fn handle_get_events_by_event_key(
     event_key: EventKeyParam,
     page: Page,
     context: Context,
@@ -48,7 +51,7 @@ async fn handle_get_events(
     Ok(Events::new(event_key.parse("event key")?.into(), context)?.list(page)?)
 }
 
-async fn handle_get_account_events(
+async fn handle_get_events_by_event_handle(
     address: AddressParam,
     struct_tag: MoveStructTagParam,
     field_name: MoveIdentifierParam,

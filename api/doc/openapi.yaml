@@ -142,7 +142,7 @@ paths:
   /ledger/{ledger_version}/accounts/{address}/resources:
     get:
       summary: Get account resources by ledger version
-      operationId: get_account_resources_by_version
+      operationId: get_account_resources_by_ledger_version
       description: >-
         This API returns account resources for a specific ledger version (AKA transaction version).
 
@@ -183,7 +183,7 @@ paths:
 
 
         When the data is pruned, server responds 404.
-      operationId: get_account_modules_by_version
+      operationId: get_account_modules_by_ledger_version
       tags:
         - accounts
       parameters:
@@ -398,7 +398,7 @@ paths:
   /events/{event_key}:
     get:
       summary: Get events by event key
-      operationId: get_events
+      operationId: get_events_by_event_key
       tags:
         - events
       parameters:
@@ -429,7 +429,7 @@ paths:
   /accounts/{address}/events/{event_handle_struct}/{field_name}:
     get:
       summary: Get events by event handle
-      operationId: get_account_events
+      operationId: get_events_by_event_handle
       description: >-
         This API extracts event key from the account resource identified
         by the `event_handle_struct` and `field_name`, then returns
