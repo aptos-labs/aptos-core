@@ -146,6 +146,8 @@ impl MempoolNode {
             let status = receiver.await.unwrap().unwrap();
             assert_eq!(status.0.code, MempoolStatusCode::Accepted)
         }
+
+        self.assert_txns_in_mempool(txns);
     }
 
     /// Commits transactions and removes them from the local mempool, stops them from being broadcasted later
@@ -164,9 +166,20 @@ impl MempoolNode {
         }
     }
 
-    pub fn assert_txns_in_mempool(&self, txns: &[TestTransaction]) {
+    pub fn assert_only_txns_in_mempool(&self, txns: &[TestTransaction]) {
         if let Err((actual, expected)) =
             self.assert_condition_on_mempool_txns(txns, block_only_contains_transactions)
+        {
+            panic!(
+                "Expected to contain test transactions {:?}, but got {:?}",
+                expected, actual
+            );
+        }
+    }
+
+    pub fn assert_txns_in_mempool(&self, txns: &[TestTransaction]) {
+        if let Err((actual, expected)) =
+            self.assert_condition_on_mempool_txns(txns, block_contains_all_transactions)
         {
             panic!(
                 "Expected to contain test transactions {:?}, but got {:?}",
@@ -497,6 +510,15 @@ pub fn block_only_contains_transactions(
     txns.iter()
         .all(|txn| block_contains_transaction(block, txn))
         && block.len() == txns.len()
+}
+
+/// Tells us if a [`SignedTransaction`] block contains all the [`TestTransaction`]s
+pub fn block_contains_all_transactions(
+    block: &[SignedTransaction],
+    txns: &[TestTransaction],
+) -> bool {
+    txns.iter()
+        .all(|txn| block_contains_transaction(block, txn))
 }
 
 /// Tells us if a [`SignedTransaction`] block contains any of the [`TestTransaction`]s

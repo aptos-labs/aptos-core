@@ -49,7 +49,7 @@ async fn single_node_test() {
 
     // Now submit another txn and check
     node.add_txns_via_client(&all_txns[1..2]).await;
-    node.assert_txns_in_mempool(&all_txns[0..2]);
+    node.assert_only_txns_in_mempool(&all_txns[0..2]);
     node.verify_broadcast_and_ack(other_peer_network_id, &all_txns[1..2])
         .await;
 
@@ -60,7 +60,7 @@ async fn single_node_test() {
         &all_txns[2..3],
     )
     .await;
-    node.assert_txns_in_mempool(&all_txns[0..3]);
+    node.assert_only_txns_in_mempool(&all_txns[0..3]);
     node.commit_txns(&all_txns[0..3]);
     node.assert_txns_not_in_mempool(&all_txns[0..3]);
 }
@@ -109,7 +109,7 @@ async fn vfn_middle_man_test() {
         &test_txns,
     )
     .await;
-    node.assert_txns_in_mempool(&test_txns);
+    node.assert_only_txns_in_mempool(&test_txns);
 
     // And they should be forwarded upstream
     node.verify_broadcast_and_ack(validator_peer_network_id, &test_txns)
@@ -142,7 +142,7 @@ async fn fn_to_val_test() {
     let pfn_future = async move {
         pfn.connect(pfn_vfn_network, vfn_metadata);
         pfn.add_txns_via_client(&pfn_txns).await;
-        pfn.assert_txns_in_mempool(&pfn_txns);
+        pfn.assert_only_txns_in_mempool(&pfn_txns);
         // Forward to VFN
         pfn.send_next_network_msg(pfn_vfn_network).await;
         pfn
@@ -153,7 +153,7 @@ async fn fn_to_val_test() {
 
         // Respond to PFN
         vfn.send_next_network_msg(pfn_vfn_network).await;
-        vfn.assert_txns_in_mempool(&vfn_txns);
+        vfn.assert_only_txns_in_mempool(&vfn_txns);
 
         // Forward to VAL
         vfn.send_next_network_msg(vfn_val_network).await;
@@ -163,7 +163,7 @@ async fn fn_to_val_test() {
     let val_future = async move {
         // Respond to VFN
         val.send_next_network_msg(vfn_val_network).await;
-        val.assert_txns_in_mempool(&val_txns);
+        val.assert_only_txns_in_mempool(&val_txns);
         val
     };
 
