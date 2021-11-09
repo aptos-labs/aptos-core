@@ -669,6 +669,7 @@ Build tools (since -t or no option was provided):
   * libssl-dev
   * sccache
   * if linux, gcc-powerpc-linux-gnu
+  * NodeJS / NPM
 EOF
   fi
 
@@ -705,7 +706,6 @@ Codegen tools (since -s was provided):
   * Python3 (numpy, pyre-check)
   * Golang
   * Java
-  * Node-js/NPM
   * Deno
 EOF
   fi
@@ -714,7 +714,6 @@ EOF
 cat <<EOF
 API build and testing tools (since -a was provided):
   * Python3 (schemathesis)
-  * Node-js/NPM
 EOF
   fi
 
@@ -892,6 +891,7 @@ if [[ "$INSTALL_BUILD_TOOLS" == "true" ]]; then
   install_grcov
   install_pkg git "$PACKAGE_MANAGER"
   install_lcov "$PACKAGE_MANAGER"
+  install_nodejs "$PACKAGE_MANAGER"
 fi
 
 if [[ "$OPERATIONS" == "true" ]]; then
@@ -945,7 +945,6 @@ if [[ "$INSTALL_CODEGEN" == "true" ]]; then
   install_pkg clang "$PACKAGE_MANAGER"
   install_pkg llvm "$PACKAGE_MANAGER"
   install_python3
-  install_nodejs
   install_deno
   install_java
   install_golang
@@ -958,9 +957,6 @@ if [[ "$INSTALL_CODEGEN" == "true" ]]; then
 fi
 
 if [[ "$INSTALL_API_BUILD_TOOLS" == "true" ]]; then
-  # nodejs and tools
-  install_nodejs
-
   # python and tools
   install_python3
   "${PRE_COMMAND[@]}" python3 -m pip install schemathesis

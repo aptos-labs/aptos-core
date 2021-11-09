@@ -16,6 +16,9 @@ use warp::{
     Reply,
 };
 
+const OPEN_API_HTML: &str = include_str!(concat!(env!("OUT_DIR"), "/spec.html"));
+const OPEN_API_SPEC: &str = include_str!("../doc/openapi.yaml");
+
 pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Infallible> + Clone {
     index(context.clone())
         .or(openapi_spec())
@@ -38,11 +41,10 @@ pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Inf
 
 // GET /openapi.yaml
 // GET /spec.html
-// GET /redoc.standalone.js
 pub fn openapi_spec() -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
     let spec = warp::path!("openapi.yaml")
         .and(warp::get())
-        .map(|| include_str!("../doc/openapi.yaml"))
+        .map(|| OPEN_API_SPEC)
         .with(metrics("openapi_yaml"));
     let renderer = warp::path!("redoc.standalone.js").and(warp::get()).map(|| {
         warp::http::Response::builder()
@@ -51,7 +53,7 @@ pub fn openapi_spec() -> impl Filter<Extract = impl Reply, Error = Rejection> + 
     });
     let html = warp::path!("spec.html")
         .and(warp::get())
-        .map(|| reply::html(include_str!("../doc/spec.html")))
+        .map(|| reply::html(OPEN_API_HTML))
         .with(metrics("spec_html"));
     spec.or(renderer).or(html)
 }

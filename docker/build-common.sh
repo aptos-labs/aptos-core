@@ -3,6 +3,10 @@
 # SPDX-License-Identifier: Apache-2.0
 set -e
 
+# nodejs is required for building api package
+curl -fsSL https://deb.nodesource.com/setup_14.x | bash -
+apt-get install -y nodejs
+
 #either release or test
 if [ -z "$IMAGE_TARGETS" ]; then
   IMAGE_TARGETS="all"

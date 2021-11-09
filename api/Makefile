@@ -33,4 +33,7 @@ test-api-spec:
 		http://localhost:8080/openapi.yaml
 
 
-.PHONY: test lint test-code-gen test-api-spec clean
+serve:
+	npx redoc-cli serve --watch doc/openapi.yaml
+
+.PHONY: test lint test-code-gen test-api-spec clean serve
