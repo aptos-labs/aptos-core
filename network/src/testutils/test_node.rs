@@ -46,10 +46,13 @@ impl InboundNetworkHandle {
     /// Push connection update, and update the local storage
     pub fn connect(
         &self,
-        self_peer_id: PeerId,
-        network_id: NetworkId,
+        role: RoleType,
+        self_peer_network_id: PeerNetworkId,
         conn_metadata: ConnectionMetadata,
     ) {
+        let self_peer_id = self_peer_network_id.peer_id();
+        let network_id = self_peer_network_id.network_id();
+
         // PeerManager pushes this data before it's received by events
         self.peer_metadata_storage
             .insert_connection(network_id, conn_metadata.clone());
@@ -58,8 +61,7 @@ impl InboundNetworkHandle {
                 conn_metadata.remote_peer_id,
                 ConnectionNotification::NewPeer(
                     conn_metadata,
-                    // TODO will `RoleType` matter
-                    NetworkContext::new(RoleType::Validator, network_id, self_peer_id),
+                    NetworkContext::new(role, network_id, self_peer_id),
                 ),
             )
             .unwrap();
@@ -68,10 +70,13 @@ impl InboundNetworkHandle {
     /// Push disconnect update, and update the local storage
     pub fn disconnect(
         &self,
-        self_peer_id: PeerId,
-        network_id: NetworkId,
+        role: RoleType,
+        self_peer_network_id: PeerNetworkId,
         conn_metadata: ConnectionMetadata,
     ) {
+        let self_peer_id = self_peer_network_id.peer_id();
+        let network_id = self_peer_network_id.network_id();
+
         // PeerManager pushes this data before it's received by events
         self.peer_metadata_storage.remove(&PeerNetworkId::new(
             network_id,
@@ -82,8 +87,7 @@ impl InboundNetworkHandle {
                 conn_metadata.remote_peer_id,
                 ConnectionNotification::LostPeer(
                     conn_metadata,
-                    // TODO will `RoleType` matter
-                    NetworkContext::new(RoleType::Validator, network_id, self_peer_id),
+                    NetworkContext::new(role, network_id, self_peer_id),
                     DisconnectReason::ConnectionLost,
                 ),
             )
@@ -209,32 +213,48 @@ pub trait TestNode: ApplicationNode + Sync {
     /// Connects a node to another node.  The other's inbound handle must already be added.
     fn connect(&self, network_id: NetworkId, metadata: ConnectionMetadata) {
         assert_eq!(ConnectionOrigin::Outbound, metadata.origin);
-        let self_peer_id = self.peer_network_id(network_id).peer_id();
         let self_metadata = self.conn_metadata(network_id, ConnectionOrigin::Inbound, None);
         let remote_peer_id = metadata.remote_peer_id;
 
         // Tell the other node it's good to send to the connected peer now
-        self.get_inbound_handle_for_peer(PeerNetworkId::new(network_id, remote_peer_id))
-            .connect(remote_peer_id, network_id, self_metadata);
+        let remote_peer_network_id = PeerNetworkId::new(network_id, remote_peer_id);
+        self.get_inbound_handle_for_peer(remote_peer_network_id)
+            .connect(self.node_id().role(), remote_peer_network_id, self_metadata);
 
         // Then connect us
-        self.get_inbound_handle(network_id)
-            .connect(self_peer_id, network_id, metadata);
+        self.connect_self(network_id, metadata);
+    }
+
+    /// Connects only the local side, useful for mocking the other node
+    fn connect_self(&self, network_id: NetworkId, metadata: ConnectionMetadata) {
+        self.get_inbound_handle(network_id).connect(
+            self.node_id().role(),
+            self.peer_network_id(network_id),
+            metadata,
+        );
     }
 
     /// Disconnects a node from another node
     fn disconnect(&self, network_id: NetworkId, metadata: ConnectionMetadata) {
-        let self_peer_id = self.peer_network_id(network_id).peer_id();
         let self_metadata = self.conn_metadata(network_id, ConnectionOrigin::Inbound, None);
         let remote_peer_id = metadata.remote_peer_id;
 
         // Tell the other node it's disconnected
-        self.get_inbound_handle_for_peer(PeerNetworkId::new(network_id, remote_peer_id))
-            .disconnect(remote_peer_id, network_id, self_metadata);
+        let remote_peer_network_id = PeerNetworkId::new(network_id, remote_peer_id);
+        self.get_inbound_handle_for_peer(remote_peer_network_id)
+            .disconnect(self.node_id().role(), remote_peer_network_id, self_metadata);
 
         // Then disconnect us
-        self.get_inbound_handle(network_id)
-            .disconnect(self_peer_id, network_id, metadata);
+        self.disconnect_self(network_id, metadata);
+    }
+
+    /// Disconnects only the local side, useful for mocking the other node
+    fn disconnect_self(&self, network_id: NetworkId, metadata: ConnectionMetadata) {
+        self.get_inbound_handle(network_id).disconnect(
+            self.node_id().role(),
+            self.peer_network_id(network_id),
+            metadata,
+        );
     }
 
     /// Find a common [`NetworkId`] between nodes based on [`NodeType`]
@@ -344,4 +364,73 @@ pub fn mock_conn_metadata(
         }
     }
     metadata
+}
+
+/// Creates a mock connection based on the `Validator` to `Validator` connection
+pub fn validator_mock_connection(
+    origin: ConnectionOrigin,
+    protocol_ids: &[ProtocolId],
+) -> (PeerNetworkId, ConnectionMetadata) {
+    mock_connection(
+        NetworkId::Validator,
+        PeerRole::Validator,
+        origin,
+        protocol_ids,
+    )
+}
+
+/// Creates a mock connection based on the `Vfn` to `Validator` connection
+pub fn vfn_validator_mock_connection(
+    origin: ConnectionOrigin,
+    protocol_ids: &[ProtocolId],
+) -> (PeerNetworkId, ConnectionMetadata) {
+    let peer_role = match origin {
+        ConnectionOrigin::Inbound => PeerRole::ValidatorFullNode,
+        ConnectionOrigin::Outbound => PeerRole::Validator,
+    };
+    mock_connection(NetworkId::Vfn, peer_role, origin, protocol_ids)
+}
+
+/// Creates a mock connection based on the `Pfn` to `Vfn` connection
+pub fn pfn_vfn_mock_connection(
+    origin: ConnectionOrigin,
+    protocol_ids: &[ProtocolId],
+) -> (PeerNetworkId, ConnectionMetadata) {
+    let peer_role = match origin {
+        ConnectionOrigin::Inbound => PeerRole::Unknown,
+        ConnectionOrigin::Outbound => PeerRole::ValidatorFullNode,
+    };
+    mock_connection(NetworkId::Public, peer_role, origin, protocol_ids)
+}
+
+/// Creates a mock connection based on the `Vfn` to `Vfn` connection
+pub fn vfn_vfn_mock_connection(
+    origin: ConnectionOrigin,
+    protocol_ids: &[ProtocolId],
+) -> (PeerNetworkId, ConnectionMetadata) {
+    mock_connection(
+        NetworkId::Public,
+        PeerRole::ValidatorFullNode,
+        origin,
+        protocol_ids,
+    )
+}
+
+/// Creates a mock connection based on the `Pfn` to `Pfn` connection
+pub fn pfn_pfn_mock_connection(
+    origin: ConnectionOrigin,
+    protocol_ids: &[ProtocolId],
+) -> (PeerNetworkId, ConnectionMetadata) {
+    mock_connection(NetworkId::Public, PeerRole::Known, origin, protocol_ids)
+}
+
+fn mock_connection(
+    network_id: NetworkId,
+    peer_role: PeerRole,
+    origin: ConnectionOrigin,
+    protocol_ids: &[ProtocolId],
+) -> (PeerNetworkId, ConnectionMetadata) {
+    let peer = PeerNetworkId::new(network_id, PeerId::random());
+    let metadata = mock_conn_metadata(peer, peer_role, origin, Some(protocol_ids));
+    (peer, metadata)
 }

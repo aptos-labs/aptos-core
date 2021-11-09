@@ -40,8 +40,8 @@ fn single_node_test() {
 
         // After we connect, we should try to send messages to it
         inbound_handle.connect(
-            node.peer_network_id(network_id).peer_id(),
-            network_id,
+            node.node_id().role(),
+            node.peer_network_id(network_id),
             other_metadata,
         );
 
@@ -96,14 +96,14 @@ fn vfn_middle_man_test() {
         let inbound_handle = node.get_inbound_handle(NetworkId::Vfn);
         // Connect upstream Validator and downstream FN
         inbound_handle.connect(
-            node.peer_network_id(NetworkId::Vfn).peer_id(),
-            NetworkId::Vfn,
+            node.node_id().role(),
+            node.peer_network_id(NetworkId::Vfn),
             validator_metadata,
         );
         let inbound_handle = node.get_inbound_handle(NetworkId::Public);
         inbound_handle.connect(
-            node.peer_network_id(NetworkId::Public).peer_id(),
-            NetworkId::Public,
+            node.node_id().role(),
+            node.peer_network_id(NetworkId::Public),
             fn_metadata,
         );
 

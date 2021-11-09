@@ -151,6 +151,21 @@ impl<Framework: TestFramework<Node>, Node: TestNode> TestFrameworkBuilder<Framew
         self.nodes.insert(node_id, node);
         self
     }
+
+    pub fn single_validator() -> Node {
+        let mut test_framework: Framework = TestFrameworkBuilder::new(1).add_validator(0).build();
+        test_framework.take_node(NodeId::validator(0))
+    }
+
+    pub fn single_vfn() -> Node {
+        let mut test_framework: Framework = TestFrameworkBuilder::new(1).add_vfn(0).build();
+        test_framework.take_node(NodeId::vfn(0))
+    }
+
+    pub fn single_pfn() -> Node {
+        let mut test_framework: Framework = TestFrameworkBuilder::new(1).add_pfn(0).build();
+        test_framework.take_node(NodeId::pfn(0))
+    }
 }
 
 /// Adds `receiving_node`'s peer_handle to the `sending_node`
