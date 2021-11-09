@@ -17,7 +17,12 @@ export async function ledgerInfo() {
   return await checkingFetch(context.relativeUrl("/"));
 }
 
-export async function transactions() {
+export async function transactions(versionOrHash?: string) {
+  if (versionOrHash) {
+    return await checkingFetch(
+      context.relativeUrl(`/transactions/${versionOrHash}`),
+    );
+  }
   return await checkingFetch(context.relativeUrl("/transactions"));
 }
 
