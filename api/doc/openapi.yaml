@@ -277,6 +277,29 @@ paths:
           $ref: '#/components/responses/400'
         "500":
           $ref: '#/components/responses/500'
+  /accounts/{address}/transactions:
+    get:
+      summary: Get account transactions
+      operationId: get_account_transactions
+      tags:
+        - transactions
+      parameters:
+        - $ref: '#/components/parameters/AccountAddress'
+        - $ref: '#/components/parameters/StartVersion'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        "200":
+          description: Returns on-chain transactions, paginated.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OnChainTransaction'
+        "400":
+          $ref: '#/components/responses/400'
+        "500":
+          $ref: '#/components/responses/500'
   /transactions/{txn_hash_or_version}:
     get:
       summary: Get transaction
