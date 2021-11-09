@@ -9,7 +9,12 @@ use crate::{
 };
 use consensus_types::block::{block_test_utils::certificate_for_genesis, Block};
 use diem_types::validator_signer::ValidatorSigner;
+use futures::{future::BoxFuture, FutureExt};
 use std::sync::Arc;
+
+fn empty_callback() -> BoxFuture<'static, ()> {
+    async move {}.boxed()
+}
 
 #[tokio::test]
 async fn test_proposal_generation_empty_tree() {
@@ -25,14 +30,20 @@ async fn test_proposal_generation_empty_tree() {
     let genesis = block_store.ordered_root();
 
     // Generate proposals for an empty tree.
-    let proposal_data = proposal_generator.generate_proposal(1).await.unwrap();
+    let proposal_data = proposal_generator
+        .generate_proposal(1, empty_callback())
+        .await
+        .unwrap();
     let proposal = Block::new_proposal_from_block_data(proposal_data, &signer);
     assert_eq!(proposal.parent_id(), genesis.id());
     assert_eq!(proposal.round(), 1);
     assert_eq!(proposal.quorum_cert().certified_block().id(), genesis.id());
 
     // Duplicate proposals on the same round are not allowed
-    let proposal_err = proposal_generator.generate_proposal(1).await.err();
+    let proposal_err = proposal_generator
+        .generate_proposal(1, empty_callback())
+        .await
+        .err();
     assert!(proposal_err.is_some());
 }
 
@@ -59,7 +70,7 @@ async fn test_proposal_generation_parent() {
     // generate proposals for an empty tree.
     assert_eq!(
         proposal_generator
-            .generate_proposal(10)
+            .generate_proposal(10, empty_callback())
             .await
             .unwrap()
             .parent_id(),
@@ -68,14 +79,20 @@ async fn test_proposal_generation_parent() {
 
     // Once a1 is certified, it should be the one to choose from
     inserter.insert_qc_for_block(a1.as_ref(), None);
-    let a1_child_res = proposal_generator.generate_proposal(11).await.unwrap();
+    let a1_child_res = proposal_generator
+        .generate_proposal(11, empty_callback())
+        .await
+        .unwrap();
     assert_eq!(a1_child_res.parent_id(), a1.id());
     assert_eq!(a1_child_res.round(), 11);
     assert_eq!(a1_child_res.quorum_cert().certified_block().id(), a1.id());
 
     // Once b1 is certified, it should be the one to choose from
     inserter.insert_qc_for_block(b1.as_ref(), None);
-    let b1_child_res = proposal_generator.generate_proposal(12).await.unwrap();
+    let b1_child_res = proposal_generator
+        .generate_proposal(12, empty_callback())
+        .await
+        .unwrap();
     assert_eq!(b1_child_res.parent_id(), b1.id());
     assert_eq!(b1_child_res.round(), 12);
     assert_eq!(b1_child_res.quorum_cert().certified_block().id(), b1.id());
@@ -98,6 +115,9 @@ async fn test_old_proposal_generation() {
         .await;
     inserter.insert_qc_for_block(a1.as_ref(), None);
 
-    let proposal_err = proposal_generator.generate_proposal(1).await.err();
+    let proposal_err = proposal_generator
+        .generate_proposal(1, empty_callback())
+        .await
+        .err();
     assert!(proposal_err.is_some());
 }

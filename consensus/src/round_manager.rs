@@ -42,6 +42,7 @@ use diem_types::{
     validator_verifier::ValidatorVerifier,
 };
 use fail::fail_point;
+use futures::FutureExt;
 #[cfg(test)]
 use safety_rules::ConsensusState;
 use safety_rules::TSafetyRules;
@@ -330,9 +331,17 @@ impl RoundManager {
         new_round_event: NewRoundEvent,
     ) -> anyhow::Result<ProposalMsg> {
         // Proposal generator will ensure that at most one proposal is generated per round
+        let sync_info = self.block_store.sync_info();
+        let mut sender = self.network.clone();
+        let callback = async move {
+            sender
+                .broadcast(ConsensusMsg::SyncInfo(Box::new(sync_info)))
+                .await;
+        }
+        .boxed();
         let proposal = self
             .proposal_generator
-            .generate_proposal(new_round_event.round)
+            .generate_proposal(new_round_event.round, callback)
             .await?;
         let signature = self.safety_rules.lock().sign_proposal(&proposal)?;
         let signed_proposal =

@@ -13,6 +13,7 @@ use consensus_types::{
 };
 
 use diem_infallible::Mutex;
+use futures::future::BoxFuture;
 use std::sync::Arc;
 
 #[cfg(test)]
@@ -82,7 +83,11 @@ impl ProposalGenerator {
     /// 2. The round is provided by the caller.
     /// 3. In case a given round is not greater than the calculated parent, return an OldRound
     /// error.
-    pub async fn generate_proposal(&mut self, round: Round) -> anyhow::Result<BlockData> {
+    pub async fn generate_proposal(
+        &mut self,
+        round: Round,
+        wait_callback: BoxFuture<'static, ()>,
+    ) -> anyhow::Result<BlockData> {
         {
             let mut last_round_generated = self.last_round_generated.lock();
             if *last_round_generated < round {
@@ -123,7 +128,7 @@ impl ProposalGenerator {
 
             let payload = self
                 .txn_manager
-                .pull_txns(self.max_block_size, exclude_payload)
+                .pull_txns(self.max_block_size, exclude_payload, wait_callback)
                 .await
                 .context("Fail to retrieve txn")?;
 

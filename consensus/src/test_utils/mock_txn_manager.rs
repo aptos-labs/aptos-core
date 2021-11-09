@@ -13,7 +13,7 @@ use diem_types::{
     vm_status::{KeptVMStatus, StatusCode},
 };
 use executor_types::StateComputeResult;
-use futures::channel::mpsc;
+use futures::{channel::mpsc, future::BoxFuture};
 use rand::Rng;
 
 #[derive(Clone)]
@@ -54,6 +54,7 @@ impl TxnManager for MockTransactionManager {
         &self,
         _max_size: u64,
         _exclude_txns: Vec<&Payload>,
+        _callback: BoxFuture<'static, ()>,
     ) -> Result<Payload, MempoolError> {
         // generate 1k txn is too slow with coverage instrumentation
         Ok(random_payload(10))
