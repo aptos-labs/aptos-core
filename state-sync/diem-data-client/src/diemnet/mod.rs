@@ -6,7 +6,7 @@ use crate::{
     ResponseCallback, ResponseContext, ResponseError, ResponseId, Result,
 };
 use async_trait::async_trait;
-use diem_config::network_id::PeerNetworkId;
+use diem_config::{config::StorageServiceConfig, network_id::PeerNetworkId};
 use diem_id_generator::{IdGenerator, U64IdGenerator};
 use diem_infallible::RwLock;
 use diem_logger::trace;
@@ -76,12 +76,13 @@ pub struct DiemNetDataClient {
 
 impl DiemNetDataClient {
     pub fn new(
+        config: StorageServiceConfig,
         time_service: TimeService,
         network_client: StorageServiceClient,
     ) -> (Self, DataSummaryPoller) {
         let client = Self {
             network_client,
-            peer_states: Arc::new(RwLock::new(PeerStates::new())),
+            peer_states: Arc::new(RwLock::new(PeerStates::new(config))),
             global_summary_cache: Arc::new(RwLock::new(GlobalDataSummary::empty())),
             response_id_generator: Arc::new(U64IdGenerator::new()),
         };
@@ -433,12 +434,14 @@ struct PeerState {
 /// advertisements and data-client internal metadata for scoring.
 #[derive(Debug)]
 struct PeerStates {
+    config: StorageServiceConfig,
     inner: HashMap<PeerNetworkId, PeerState>,
 }
 
 impl PeerStates {
-    fn new() -> Self {
+    fn new(config: StorageServiceConfig) -> Self {
         Self {
+            config,
             inner: HashMap::new(),
         }
     }
@@ -516,13 +519,13 @@ impl PeerStates {
         // TODO(philiphayes): move these constants somewhere?
         let aggregate_chunk_sizes = OptimalChunkSizes {
             account_states_chunk_size: median(&mut max_account_states_chunk_sizes)
-                .unwrap_or(storage_service_server::MAX_ACCOUNT_STATES_CHUNK_SIZE),
+                .unwrap_or(self.config.max_account_states_chunk_sizes),
             epoch_chunk_size: median(&mut max_epoch_chunk_sizes)
-                .unwrap_or(storage_service_server::MAX_EPOCH_CHUNK_SIZE),
+                .unwrap_or(self.config.max_epoch_chunk_size),
             transaction_chunk_size: median(&mut max_transaction_chunk_sizes)
-                .unwrap_or(storage_service_server::MAX_TRANSACTION_CHUNK_SIZE),
+                .unwrap_or(self.config.max_transaction_chunk_size),
             transaction_output_chunk_size: median(&mut max_transaction_output_chunk_sizes)
-                .unwrap_or(storage_service_server::MAX_TRANSACTION_OUTPUT_CHUNK_SIZE),
+                .unwrap_or(self.config.max_transaction_output_chunk_size),
         };
 
         GlobalDataSummary {

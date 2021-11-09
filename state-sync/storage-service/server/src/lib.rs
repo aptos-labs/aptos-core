@@ -14,6 +14,7 @@ use crate::{
     network::StorageServiceNetworkEvents,
 };
 use bounded_executor::BoundedExecutor;
+use diem_config::config::StorageServiceConfig;
 use diem_logger::prelude::*;
 use diem_types::{
     account_state_blob::AccountStatesChunkWithProof,
@@ -37,14 +38,8 @@ use storage_service_types::{
 use thiserror::Error;
 use tokio::runtime::Handle;
 
-// TODO(joshlind): make these configurable.
 /// Storage server constants.
-pub const MAX_EPOCH_CHUNK_SIZE: u64 = 1000;
-pub const MAX_TRANSACTION_CHUNK_SIZE: u64 = 1000;
-pub const MAX_TRANSACTION_OUTPUT_CHUNK_SIZE: u64 = 1000;
-pub const MAX_ACCOUNT_STATES_CHUNK_SIZE: u64 = 1000;
 pub const STORAGE_SERVER_VERSION: u64 = 1;
-pub const MAX_CONCURRENT_REQUESTS: u64 = 100;
 
 // TODO(philiphayes): is this error type providing enough value?
 #[derive(Clone, Debug, Deserialize, Error, PartialEq, Serialize)]
@@ -60,6 +55,7 @@ pub enum Error {
 /// The server-side actor for the storage service. Handles inbound storage
 /// service requests from clients.
 pub struct StorageServiceServer<T> {
+    config: StorageServiceConfig,
     bounded_executor: BoundedExecutor,
     storage: T,
     // TODO(philiphayes): would like a "multi-network" stream here, so we only
@@ -69,12 +65,16 @@ pub struct StorageServiceServer<T> {
 
 impl<T: StorageReaderInterface> StorageServiceServer<T> {
     pub fn new(
+        config: StorageServiceConfig,
         executor: Handle,
         storage: T,
         network_requests: StorageServiceNetworkEvents,
     ) -> Self {
+        let bounded_executor =
+            BoundedExecutor::new(config.max_concurrent_requests as usize, executor);
         Self {
-            bounded_executor: BoundedExecutor::new(MAX_CONCURRENT_REQUESTS as usize, executor),
+            config,
+            bounded_executor,
             storage,
             network_requests,
         }
@@ -95,9 +95,10 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
             // I/O-bound, so we want to spawn on the blocking thread pool to
             // avoid starving other async tasks on the same runtime.
             let storage = self.storage.clone();
+            let config = self.config.clone();
             self.bounded_executor
                 .spawn_blocking(move || {
-                    let response = Handler::new(storage).call(request);
+                    let response = Handler::new(config, storage).call(request);
                     debug!(LogSchema::new(LogEntry::SentStorageResponse).response(&response));
                     response_sender.send(response);
                 })
@@ -111,12 +112,13 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
 /// request. We usually clone/create a new handler for every request.
 #[derive(Clone)]
 pub struct Handler<T> {
+    config: StorageServiceConfig,
     storage: T,
 }
 
 impl<T: StorageReaderInterface> Handler<T> {
-    pub fn new(storage: T) -> Self {
-        Self { storage }
+    pub fn new(config: StorageServiceConfig, storage: T) -> Self {
+        Self { config, storage }
     }
 
     pub fn call(&self, request: StorageServiceRequest) -> Result<StorageServiceResponse> {
@@ -201,10 +203,10 @@ impl<T: StorageReaderInterface> Handler<T> {
     fn get_storage_server_summary(&self) -> Result<StorageServiceResponse, Error> {
         let storage_server_summary = StorageServerSummary {
             protocol_metadata: ProtocolMetadata {
-                max_epoch_chunk_size: MAX_EPOCH_CHUNK_SIZE,
-                max_transaction_chunk_size: MAX_TRANSACTION_CHUNK_SIZE,
-                max_transaction_output_chunk_size: MAX_TRANSACTION_OUTPUT_CHUNK_SIZE,
-                max_account_states_chunk_size: MAX_ACCOUNT_STATES_CHUNK_SIZE,
+                max_epoch_chunk_size: self.config.max_epoch_chunk_size,
+                max_transaction_chunk_size: self.config.max_transaction_chunk_size,
+                max_transaction_output_chunk_size: self.config.max_transaction_output_chunk_size,
+                max_account_states_chunk_size: self.config.max_account_states_chunk_sizes,
             },
             data_summary: self.storage.get_data_summary()?,
         };

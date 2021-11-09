@@ -27,6 +27,12 @@ pub struct StateSyncConfig {
     pub sync_request_timeout_ms: u64,
     // interval used for checking state synchronization progress
     pub tick_interval_ms: u64,
+
+    // Everything above belongs to state sync v1 and will be removed in the future.
+
+    // The config for the storage service running on each node. Required by
+    // state sync v2.
+    pub storage_service: StorageServiceConfig,
 }
 
 impl Default for StateSyncConfig {
@@ -41,6 +47,29 @@ impl Default for StateSyncConfig {
             multicast_timeout_ms: 30_000,
             sync_request_timeout_ms: 60_000,
             tick_interval_ms: 100,
+            storage_service: StorageServiceConfig::default(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct StorageServiceConfig {
+    pub max_account_states_chunk_sizes: u64, // Max num of accounts per chunk
+    pub max_concurrent_requests: u64,        // Max num of concurrent storage server tasks
+    pub max_epoch_chunk_size: u64,           // Max num of epoch ending ledger infos per chunk
+    pub max_transaction_chunk_size: u64,     // Max num of transactions per chunk
+    pub max_transaction_output_chunk_size: u64, // Max num of transaction outputs per chunk
+}
+
+impl Default for StorageServiceConfig {
+    fn default() -> Self {
+        Self {
+            max_account_states_chunk_sizes: 1000,
+            max_concurrent_requests: 50,
+            max_epoch_chunk_size: 100,
+            max_transaction_chunk_size: 1000,
+            max_transaction_output_chunk_size: 1000,
         }
     }
 }

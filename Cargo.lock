@@ -8237,6 +8237,7 @@ dependencies = [
  "bytes",
  "channel",
  "claim",
+ "diem-config",
  "diem-crypto",
  "diem-logger",
  "diem-types",

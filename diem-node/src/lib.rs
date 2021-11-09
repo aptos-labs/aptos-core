@@ -6,7 +6,7 @@ use consensus::consensus_provider::start_consensus;
 use debug_interface::node_debug_service::NodeDebugService;
 use diem_api::runtime::bootstrap as bootstrap_api;
 use diem_config::{
-    config::{NetworkConfig, NodeConfig, PersistableConfig},
+    config::{NetworkConfig, NodeConfig, PersistableConfig, StorageServiceConfig},
     network_id::NetworkId,
     utils::get_genesis_txn,
 };
@@ -239,6 +239,7 @@ fn setup_debug_interface(config: &NodeConfig, logger: Option<Arc<Logger>>) -> No
 }
 
 fn setup_storage_service_servers(
+    config: StorageServiceConfig,
     network_handles: Vec<StorageServiceNetworkEvents>,
     db_rw: &DbReaderWriter,
 ) -> Runtime {
@@ -250,8 +251,12 @@ fn setup_storage_service_servers(
         .expect("Failed to start the DiemNet storage-service runtime.");
     let storage_reader = StorageReader::new(Arc::clone(&db_rw.reader));
     for events in network_handles {
-        let service =
-            StorageServiceServer::new(rt.handle().clone(), storage_reader.clone(), events);
+        let service = StorageServiceServer::new(
+            config.clone(),
+            rt.handle().clone(),
+            storage_reader.clone(),
+            events,
+        );
         rt.spawn(service.start());
     }
     rt
@@ -259,6 +264,7 @@ fn setup_storage_service_servers(
 
 fn setup_diemnet_data_client(
     _runtime_handle: &Handle,
+    config: StorageServiceConfig,
     network_handles: HashMap<NetworkId, storage_service_client::StorageServiceNetworkSender>,
     peer_metadata_storage: Arc<PeerMetadataStorage>,
 ) -> DiemNetDataClient {
@@ -268,7 +274,7 @@ fn setup_diemnet_data_client(
         peer_metadata_storage,
     );
     let (diemnet_data_client, _data_summary_poller) =
-        DiemNetDataClient::new(TimeService::real(), network_client);
+        DiemNetDataClient::new(config, TimeService::real(), network_client);
     // TODO(philiphayes): uncomment this when we're ready to start doing e2e tests
     // runtime_handle.spawn(data_summary_poller);
     diemnet_data_client
@@ -488,12 +494,17 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
     // TODO set up on-chain discovery network based on UpstreamConfig.fallback_network
     // and pass network handles to mempool/state sync
 
-    let storage_service_rt =
-        setup_storage_service_servers(storage_service_server_network_handles, &db_rw);
+    let storage_service_config = node_config.state_sync.storage_service.clone();
+    let storage_service_rt = setup_storage_service_servers(
+        storage_service_config.clone(),
+        storage_service_server_network_handles,
+        &db_rw,
+    );
 
     let _diemnet_data_client = setup_diemnet_data_client(
         // TODO(philiphayes): probably use state-sync-v2 handle here?
         storage_service_rt.handle(),
+        storage_service_config,
         storage_service_client_network_handles,
         peer_metadata_storage.clone(),
     );

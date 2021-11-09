@@ -7,6 +7,7 @@ use crate::{network::StorageServiceNetworkEvents, StorageReader, StorageServiceS
 use anyhow::Result;
 use channel::diem_channel;
 use claim::{assert_matches, assert_none, assert_some};
+use diem_config::config::StorageServiceConfig;
 use diem_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use diem_logger::Level;
 use diem_types::{
@@ -295,7 +296,12 @@ impl MockClient {
             StorageServiceNetworkEvents::new(peer_mgr_notifs_rx, connection_notifs_rx);
 
         let executor = tokio::runtime::Handle::current();
-        let storage_server = StorageServiceServer::new(executor, storage, network_requests);
+        let storage_server = StorageServiceServer::new(
+            StorageServiceConfig::default(),
+            executor,
+            storage,
+            network_requests,
+        );
 
         (Self { peer_mgr_notifs_tx }, storage_server)
     }
