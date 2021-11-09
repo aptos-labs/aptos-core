@@ -4,7 +4,10 @@
 use crate::{
     application::storage::PeerMetadataStorage,
     peer_manager::{ConnectionNotification, PeerManagerNotification, PeerManagerRequest},
-    protocols::{direct_send::Message, rpc::InboundRpcRequest},
+    protocols::{
+        direct_send::Message,
+        rpc::{InboundRpcRequest, OutboundRpcRequest},
+    },
     transport::ConnectionMetadata,
     DisconnectReason, ProtocolId,
 };
@@ -297,13 +300,40 @@ pub trait TestNode: ApplicationNode + Sync {
         )
     }
 
-    /// Gets the next queued network message on `Node`'s network (`NetworkId`).  Doesn't propagate
-    /// to downstream node
+    /// Gets the next queued network message on `Node`'s network [`NetworkId`].  Doesn't propagate
+    /// to downstream node.  If dropping a message use [`TestNode::drop_next_network_msg`]
     async fn get_next_network_msg(&mut self, network_id: NetworkId) -> PeerManagerRequest {
         self.get_outbound_handle(network_id)
             .next()
             .await
             .expect("Expecting a message")
+    }
+
+    /// Drop a network message.  This is required over [`TestNode::get_network_msg`] because the
+    /// oneshot channel must be dropped.
+    async fn drop_next_network_msg(
+        &mut self,
+        network_id: NetworkId,
+    ) -> (PeerId, ProtocolId, bytes::Bytes) {
+        let message = self.get_next_network_msg(network_id).await;
+        match message {
+            PeerManagerRequest::SendRpc(
+                peer_id,
+                OutboundRpcRequest {
+                    protocol_id,
+                    res_tx,
+                    data,
+                    ..
+                },
+            ) => {
+                // Forcefully close the oneshot channel, otherwise listening task will hang forever.
+                drop(res_tx);
+                (peer_id, protocol_id, data)
+            }
+            PeerManagerRequest::SendDirectSend(peer_id, message) => {
+                (peer_id, message.protocol_id, message.mdata)
+            }
+        }
     }
 
     /// Sends the next queued network message on `Node`'s network (`NetworkId`)
