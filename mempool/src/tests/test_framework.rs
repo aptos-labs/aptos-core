@@ -26,9 +26,10 @@ use network::{
     peer_manager::{PeerManagerNotification, PeerManagerRequest},
     protocols::{direct_send::Message, rpc::InboundRpcRequest},
     testutils::{
+        builder::TestFrameworkBuilder,
         test_framework::{setup_node_networks, TestFramework},
         test_node::{
-            ApplicationNetworkHandle, ApplicationNode, InboundNetworkHandle, NodeId, NodeType,
+            ApplicationNetworkHandle, ApplicationNode, InboundNetworkHandle, NodeId,
             OutboundMessageReceiver, TestNode,
         },
     },
@@ -39,7 +40,7 @@ use std::{
     sync::Arc,
 };
 use storage_interface::{mock::MockDbReaderWriter, DbReaderWriter};
-use tokio::runtime::Handle;
+use tokio::{runtime::Handle, time::Duration};
 use tokio_stream::StreamExt;
 use vm_validator::mocks::mock_vm_validator::MockVMValidator;
 
@@ -150,19 +151,16 @@ impl MempoolNode {
         self.assert_txns_in_mempool(txns);
     }
 
-    /// Commits transactions and removes them from the local mempool, stops them from being broadcasted later
-    pub fn commit_txns(&self, txns: &[TestTransaction]) {
-        if NodeType::Validator == self.node_id.node_type {
-            let mut mempool = self.mempool.lock();
-            for txn in txns.iter() {
-                mempool.remove_transaction(
-                    &TestTransaction::get_address(txn.address),
-                    txn.sequence_number,
-                    false,
-                );
+    /// Asynchronously waits for up to 1 second for txns to appear in mempool
+    pub async fn wait_on_txns_in_mempool(&self, txns: &[TestTransaction]) {
+        for _ in 0..10 {
+            let block = self.mempool.lock().get_block(100, HashSet::new());
+
+            if block_contains_all_transactions(&block, txns) {
+                break;
             }
-        } else {
-            panic!("Can't commit transactions on anything but a validator");
+
+            tokio::time::sleep(Duration::from_millis(100)).await
         }
     }
 
@@ -375,6 +373,8 @@ impl MempoolNode {
 }
 
 impl TestNode for MempoolNode {}
+
+pub type MempoolTestFrameworkBuilder = TestFrameworkBuilder<MempoolTestFramework, MempoolNode>;
 
 /// A [`TestFramework`] for [`MempoolNode`]s to test Mempool in a single and multi-node mock network
 /// environment.
