@@ -160,7 +160,6 @@ members = [
     "shuffle/cli",
     "shuffle/genesis",
     "shuffle/move",
-    "shuffle/public-script-helper",
     "shuffle/transaction-builder",
     "state-sync/diem-data-client",
     "state-sync/inter-component/consensus-notifications",

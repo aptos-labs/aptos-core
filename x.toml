@@ -222,7 +222,6 @@ members = [
     "move-vm-integration-tests",
     "move-vm-transactional-tests",
     "offchain",
-    "public-script-helper",
     "scratchpad-benchmark",
     "sdk-compatibility",
     "serializer-tests",
