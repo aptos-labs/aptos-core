@@ -420,7 +420,7 @@ impl<'t, 'd> TxnEmitter<'t, 'd> {
             return Ok(());
         }
         let num_accounts = total_requested_accounts - self.accounts.len(); // Only minting extra accounts
-        let coins_per_account = SEND_AMOUNT * MAX_TXNS;
+        let coins_per_account = SEND_AMOUNT * MAX_TXNS * 10; // extra coins for secure to pay none zero gas price
         let coins_total = coins_per_account * num_accounts as u64;
         let txn_factory = self.txn_factory.clone();
         let client = self.pick_mint_client(&req.json_rpc_clients);
