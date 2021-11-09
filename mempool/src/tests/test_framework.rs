@@ -39,7 +39,7 @@ use std::{
     sync::Arc,
 };
 use storage_interface::{mock::MockDbReaderWriter, DbReaderWriter};
-use tokio::runtime::Runtime;
+use tokio::runtime::Handle;
 use tokio_stream::StreamExt;
 use vm_validator::mocks::mock_vm_validator::MockVMValidator;
 
@@ -55,8 +55,6 @@ pub struct MempoolNode {
     pub mempool: Arc<Mutex<CoreMempool>>,
     /// A generator for [`MempoolSyncMsg`] request ids.
     pub request_id_generator: U32IdGenerator,
-    /// This runtime has to be here to ensure that the channels don't close prematurely
-    _runtime: Arc<Runtime>,
 
     // Mempool specific channels
     /// Used for incoming JSON-RPC requests (e.g. adding new transactions)
@@ -393,23 +391,16 @@ impl TestFramework<MempoolNode> for MempoolTestFramework {
             network_ids.push(network_id);
             network_id_mapping.insert(network_id, *peer_network_id);
         }
-        let runtime = node_runtime(node_id);
 
         let (application_handles, inbound_handles, outbound_handles, peer_metadata_storage) =
             setup_node_networks(&network_ids);
         let (mempool_client_sender, mempool_consensus_sender, mempool_notifications, mempool) =
-            setup_mempool(
-                config,
-                application_handles,
-                peer_metadata_storage.clone(),
-                &runtime,
-            );
+            setup_mempool(config, application_handles, peer_metadata_storage.clone());
 
         MempoolNode {
             node_id,
             peer_network_ids: network_id_mapping,
             mempool,
-            _runtime: runtime,
             mempool_client_sender,
             mempool_consensus_sender,
             mempool_notifications,
@@ -434,7 +425,6 @@ fn setup_mempool(
     config: NodeConfig,
     network_handles: Vec<ApplicationNetworkHandle<MempoolNetworkSender, MempoolNetworkEvents>>,
     peer_metadata_storage: Arc<PeerMetadataStorage>,
-    runtime: &Runtime,
 ) -> (
     MempoolClientSender,
     MempoolConsensusSender,
@@ -456,7 +446,7 @@ fn setup_mempool(
     let reconfig_event_subscriber = event_subscriber.subscribe_to_reconfigurations().unwrap();
 
     start_shared_mempool(
-        runtime.handle(),
+        &Handle::current(),
         &config,
         mempool.clone(),
         network_handles,
@@ -475,17 +465,6 @@ fn setup_mempool(
         consensus_sender,
         mempool_notifier,
         mempool,
-    )
-}
-
-/// Builds a runtime for each node
-fn node_runtime(node_id: NodeId) -> Arc<Runtime> {
-    Arc::new(
-        tokio::runtime::Builder::new_multi_thread()
-            .thread_name(format!("node-{:?}", node_id))
-            .enable_all()
-            .build()
-            .expect("[test-framework] failed to create runtime"),
     )
 }
 

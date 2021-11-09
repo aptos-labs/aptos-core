@@ -7,7 +7,6 @@ use diem_config::{
     network_id::{NetworkId, PeerNetworkId},
 };
 use diem_types::PeerId;
-use futures::executor::block_on;
 use netcore::transport::ConnectionOrigin;
 use network::{
     testutils::{
@@ -18,8 +17,8 @@ use network::{
     ProtocolId,
 };
 
-#[test]
-fn single_node_test() {
+#[tokio::test]
+async fn single_node_test() {
     let mut test_framework: MempoolTestFramework =
         TestFrameworkBuilder::new(1).add_validator(0).build();
     let mut node = test_framework.take_node(NodeId::validator(0));
@@ -31,48 +30,45 @@ fn single_node_test() {
         ConnectionOrigin::Outbound,
         &[],
     );
-    let future = async move {
-        let all_txns = test_transactions(0, 3);
-        let all_txns = all_txns.as_slice();
-        let inbound_handle = node.get_inbound_handle(network_id);
-        node.assert_txns_not_in_mempool(&all_txns[0..1]);
-        node.add_txns_via_client(&all_txns[0..1]).await;
+    let all_txns = test_transactions(0, 3);
+    let all_txns = all_txns.as_slice();
+    let inbound_handle = node.get_inbound_handle(network_id);
+    node.assert_txns_not_in_mempool(&all_txns[0..1]);
+    node.add_txns_via_client(&all_txns[0..1]).await;
 
-        // After we connect, we should try to send messages to it
-        inbound_handle.connect(
-            node.node_id().role(),
-            node.peer_network_id(network_id),
-            other_metadata,
-        );
+    // After we connect, we should try to send messages to it
+    inbound_handle.connect(
+        node.node_id().role(),
+        node.peer_network_id(network_id),
+        other_metadata,
+    );
 
-        // Respond and at this point, txn will have shown up
-        node.verify_broadcast_and_ack(other_peer_network_id, &all_txns[0..1])
-            .await;
-
-        // Now submit another txn and check
-        node.add_txns_via_client(&all_txns[1..2]).await;
-        node.assert_txns_in_mempool(&all_txns[0..2]);
-        node.verify_broadcast_and_ack(other_peer_network_id, &all_txns[1..2])
-            .await;
-
-        // Let's also send it an incoming request with more txns and respond with an ack (DirectSend)
-        node.send_message(
-            ProtocolId::MempoolDirectSend,
-            other_peer_network_id,
-            &all_txns[2..3],
-        )
+    // Respond and at this point, txn will have shown up
+    node.verify_broadcast_and_ack(other_peer_network_id, &all_txns[0..1])
         .await;
-        node.assert_txns_in_mempool(&all_txns[0..3]);
-        node.commit_txns(&all_txns[0..3]);
-        node.assert_txns_not_in_mempool(&all_txns[0..3]);
-    };
-    block_on(future);
+
+    // Now submit another txn and check
+    node.add_txns_via_client(&all_txns[1..2]).await;
+    node.assert_txns_in_mempool(&all_txns[0..2]);
+    node.verify_broadcast_and_ack(other_peer_network_id, &all_txns[1..2])
+        .await;
+
+    // Let's also send it an incoming request with more txns and respond with an ack (DirectSend)
+    node.send_message(
+        ProtocolId::MempoolDirectSend,
+        other_peer_network_id,
+        &all_txns[2..3],
+    )
+    .await;
+    node.assert_txns_in_mempool(&all_txns[0..3]);
+    node.commit_txns(&all_txns[0..3]);
+    node.assert_txns_not_in_mempool(&all_txns[0..3]);
 }
 
 /// Tests if the node is a VFN, and it's getting forwarded messages from a PFN.  It should forward
 /// messages to the upstream VAL.  Upstream and downstream nodes are mocked.
-#[test]
-fn vfn_middle_man_test() {
+#[tokio::test]
+async fn vfn_middle_man_test() {
     let mut test_framework: MempoolTestFramework = TestFrameworkBuilder::new(1).add_vfn(0).build();
     let mut node = test_framework.take_node(NodeId::vfn(0));
     let validator_peer_network_id = PeerNetworkId::new(NetworkId::Vfn, PeerId::random());
@@ -91,42 +87,39 @@ fn vfn_middle_man_test() {
         &[],
     );
 
-    let future = async move {
-        let test_txns = test_transactions(0, 2);
-        let inbound_handle = node.get_inbound_handle(NetworkId::Vfn);
-        // Connect upstream Validator and downstream FN
-        inbound_handle.connect(
-            node.node_id().role(),
-            node.peer_network_id(NetworkId::Vfn),
-            validator_metadata,
-        );
-        let inbound_handle = node.get_inbound_handle(NetworkId::Public);
-        inbound_handle.connect(
-            node.node_id().role(),
-            node.peer_network_id(NetworkId::Public),
-            fn_metadata,
-        );
+    let test_txns = test_transactions(0, 2);
+    let inbound_handle = node.get_inbound_handle(NetworkId::Vfn);
+    // Connect upstream Validator and downstream FN
+    inbound_handle.connect(
+        node.node_id().role(),
+        node.peer_network_id(NetworkId::Vfn),
+        validator_metadata,
+    );
+    let inbound_handle = node.get_inbound_handle(NetworkId::Public);
+    inbound_handle.connect(
+        node.node_id().role(),
+        node.peer_network_id(NetworkId::Public),
+        fn_metadata,
+    );
 
-        // Incoming transactions should be accepted
-        node.send_message(
-            ProtocolId::MempoolDirectSend,
-            fn_peer_network_id,
-            &test_txns,
-        )
+    // Incoming transactions should be accepted
+    node.send_message(
+        ProtocolId::MempoolDirectSend,
+        fn_peer_network_id,
+        &test_txns,
+    )
+    .await;
+    node.assert_txns_in_mempool(&test_txns);
+
+    // And they should be forwarded upstream
+    node.verify_broadcast_and_ack(validator_peer_network_id, &test_txns)
         .await;
-        node.assert_txns_in_mempool(&test_txns);
-
-        // And they should be forwarded upstream
-        node.verify_broadcast_and_ack(validator_peer_network_id, &test_txns)
-            .await;
-    };
-    block_on(future);
 }
 
 /// Tests if the node is a VFN, and it's getting forwarded messages from a PFN.  It should forward
 /// messages to the upstream VAL.  Upstream and downstream nodes also are running nodes.
-#[test]
-fn fn_to_val_test() {
+#[tokio::test]
+async fn fn_to_val_test() {
     let mut test_framework: MempoolTestFramework = TestFrameworkBuilder::new(1)
         .add_validator(0)
         .add_vfn(0)
@@ -174,5 +167,5 @@ fn fn_to_val_test() {
         val
     };
 
-    let _ = block_on(futures::future::join3(pfn_future, vfn_future, val_future));
+    futures::future::join3(pfn_future, vfn_future, val_future).await;
 }
