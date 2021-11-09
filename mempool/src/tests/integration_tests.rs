@@ -29,7 +29,7 @@ fn single_node_test() {
         other_peer_network_id,
         PeerRole::Validator,
         ConnectionOrigin::Outbound,
-        Some(&[ProtocolId::MempoolDirectSend]),
+        &[],
     );
     let future = async move {
         let all_txns = test_transactions(0, 3);
@@ -80,7 +80,7 @@ fn vfn_middle_man_test() {
         validator_peer_network_id,
         PeerRole::Validator,
         ConnectionOrigin::Outbound,
-        Some(&[ProtocolId::MempoolDirectSend]),
+        &[],
     );
 
     let fn_peer_network_id = PeerNetworkId::new(NetworkId::Vfn, PeerId::random());
@@ -88,7 +88,7 @@ fn vfn_middle_man_test() {
         fn_peer_network_id,
         PeerRole::Unknown,
         ConnectionOrigin::Inbound,
-        Some(&[ProtocolId::MempoolDirectSend]),
+        &[],
     );
 
     let future = async move {
@@ -141,17 +141,9 @@ fn fn_to_val_test() {
     let val_txns = pfn_txns.clone();
 
     let pfn_vfn_network = pfn.find_common_network(&vfn).unwrap();
-    let vfn_metadata = vfn.conn_metadata(
-        pfn_vfn_network,
-        ConnectionOrigin::Outbound,
-        Some(&[ProtocolId::MempoolDirectSend]),
-    );
+    let vfn_metadata = vfn.conn_metadata(pfn_vfn_network, ConnectionOrigin::Outbound, &[]);
     let vfn_val_network = vfn.find_common_network(&val).unwrap();
-    let val_metadata = val.conn_metadata(
-        vfn_val_network,
-        ConnectionOrigin::Outbound,
-        Some(&[ProtocolId::MempoolDirectSend]),
-    );
+    let val_metadata = val.conn_metadata(vfn_val_network, ConnectionOrigin::Outbound, &[]);
 
     // NOTE: Always return node at end, or it will be dropped and channels closed
     let pfn_future = async move {
