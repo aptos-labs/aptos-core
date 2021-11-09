@@ -75,7 +75,7 @@ fn create_account(
     let public_key = account_key.public_key();
     let derived_address = AuthenticationKey::ed25519(&public_key).derived_address();
     let new_account = LocalAccount::new(derived_address, account_key, 0);
-    account::create_account_onchain(&mut treasury_account, &new_account, factory, client)?;
+    account::create_account_via_dev_api(&mut treasury_account, &new_account, factory, client)?;
     Ok(new_account)
 }
 

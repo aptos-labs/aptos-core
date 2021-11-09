@@ -41,13 +41,14 @@ pub async fn main() -> Result<()> {
             )
             .await
         }
-
-        Subcommand::Account { root, network } => account::handle(
-            &home,
-            root,
-            home.get_network_struct_from_toml(normalized_network_name(network).as_str())?,
-        ),
-
+        Subcommand::Account { root, network } => {
+            account::handle(
+                &home,
+                root,
+                home.get_network_struct_from_toml(normalized_network_name(network).as_str())?,
+            )
+            .await
+        }
         Subcommand::Test { cmd } => test::handle(&home, cmd).await,
         Subcommand::Console {
             project_path,

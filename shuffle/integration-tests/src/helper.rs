@@ -86,7 +86,7 @@ impl ShuffleTestHelper {
         self.network_home().save_key_as_latest(private_key)?;
         self.network_home()
             .generate_latest_address_file(new_account.public_key())?;
-        account::create_account_onchain(treasury_account, new_account, &factory, &client)
+        account::create_account_via_dev_api(treasury_account, new_account, &factory, &client)
     }
 
     pub fn create_project(&self) -> Result<()> {

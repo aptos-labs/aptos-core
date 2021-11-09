@@ -7,7 +7,7 @@ use diem_crypto::PrivateKey;
 
 use diem_infallible::duration_since_epoch;
 use diem_sdk::{
-    client::BlockingClient,
+    client::{BlockingClient, FaucetClient},
     transaction_builder::{Currency, TransactionFactory},
     types::LocalAccount,
 };
@@ -28,32 +28,38 @@ use std::{
 };
 
 // Creates new account from randomly generated private/public key pair.
-pub fn handle(home: &Home, root: Option<PathBuf>, network: Network) -> Result<()> {
+pub async fn handle(home: &Home, root: Option<PathBuf>, network: Network) -> Result<()> {
     let network_home = home.new_network_home(&network.get_name());
     network_home.generate_paths_if_nonexistent()?;
     check_nodeconfig_exists_if_localhost_used(home, &network)?;
 
-    if network_home.get_latest_account_path().exists() {
+    if network_home.get_latest_account_key_path().exists() {
         match user_wants_another_key(&network_home) {
             true => archive_current_files_in_latest(&network_home)?,
             false => return Ok(()),
         }
     }
-
-    println!("Connecting to {}...", network.get_json_rpc_url());
-    let client = BlockingClient::new(network.get_json_rpc_url());
-    let factory = TransactionFactory::new(ChainId::test());
-
-    if let Some(input_root_key) = root {
-        network_home.copy_key_to_latest(input_root_key.as_path())?
-    }
-
-    let mut treasury_account = get_treasury_account(&client, home.get_root_key_path())?;
     let new_account = generate_new_account(&network_home)?;
-    create_account_onchain(&mut treasury_account, &new_account, &factory, &client)?;
-
     let test_account = generate_test_account(&network_home)?;
-    create_account_onchain(&mut treasury_account, &test_account, &factory, &client)
+
+    match network.get_optional_faucet_url() {
+        Some(_) => {
+            create_account_via_faucet(&network, &new_account).await?;
+            create_account_via_faucet(&network, &test_account).await
+        }
+        None => {
+            println!("Connecting to {}...", network.get_json_rpc_url());
+            let client = BlockingClient::new(network.get_json_rpc_url());
+            let factory = TransactionFactory::new(ChainId::test());
+
+            if let Some(input_root_key) = root {
+                network_home.copy_key_to_latest(input_root_key.as_path())?
+            }
+            let mut treasury_account = get_treasury_account(&client, home.get_root_key_path())?;
+            create_account_via_dev_api(&mut treasury_account, &new_account, &factory, &client)?;
+            create_account_via_dev_api(&mut treasury_account, &test_account, &factory, &client)
+        }
+    }
 }
 
 fn check_nodeconfig_exists_if_localhost_used(home: &Home, network: &Network) -> Result<()> {
@@ -142,7 +148,7 @@ pub fn get_treasury_account(client: &BlockingClient, root_key_path: &Path) -> Re
     ))
 }
 
-pub fn create_account_onchain(
+pub fn create_account_via_dev_api(
     treasury_account: &mut LocalAccount,
     new_account: &LocalAccount,
     factory: &TransactionFactory,
@@ -171,6 +177,24 @@ pub fn create_account_onchain(
         println!("Successfully created account {}", new_account.address());
     }
     println!("Public key: {}", new_account.public_key());
+    Ok(())
+}
+
+async fn create_account_via_faucet(network: &Network, account: &LocalAccount) -> Result<()> {
+    let faucet_account_creation_url = network.get_faucet_url().join("accounts")?;
+    let faucet_client = FaucetClient::new(
+        faucet_account_creation_url.to_string(),
+        network.get_json_rpc_url().to_string(),
+    );
+
+    let auth_key = account.authentication_key();
+    tokio::task::spawn_blocking(move || faucet_client.create_account(auth_key, "XUS")).await??;
+    println!(
+        "Successfully created account {} onto {}",
+        account.address(),
+        network.get_name()
+    );
+    println!("Public key: {}", account.public_key());
     Ok(())
 }
 

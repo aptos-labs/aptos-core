@@ -271,10 +271,6 @@ impl NetworkHome {
         }
     }
 
-    pub fn get_latest_account_path(&self) -> &Path {
-        &self.latest_account_path
-    }
-
     pub fn get_latest_account_key_path(&self) -> &Path {
         &self.latest_account_key_path
     }
@@ -541,6 +537,21 @@ impl Network {
     pub fn get_dev_api_url(&self) -> Url {
         self.dev_api_url.clone()
     }
+
+    pub fn get_optional_faucet_url(&self) -> Option<Url> {
+        self.faucet_url.clone()
+    }
+
+    pub fn get_faucet_url(&self) -> Url {
+        Network::normalize_faucet_url(self).unwrap()
+    }
+
+    fn normalize_faucet_url(&self) -> Result<Url> {
+        match &self.faucet_url {
+            Some(faucet) => Ok(faucet.clone()),
+            None => Err(anyhow!("This network doesn't have a faucet url")),
+        }
+    }
 }
 
 impl Default for Network {
@@ -783,14 +794,6 @@ mod test {
     }
 
     #[test]
-    fn test_network_home_get_latest_path() {
-        let dir = tempdir().unwrap();
-        let network_home = NetworkHome::new(dir.path().join("localhost").as_path());
-        let correct_dir = dir.path().join("localhost/accounts/latest");
-        assert_eq!(correct_dir, network_home.get_latest_account_path());
-    }
-
-    #[test]
     fn test_network_home_get_accounts_path() {
         let dir = tempdir().unwrap();
         let network_home = NetworkHome::new(dir.path().join("localhost").as_path());
@@ -1016,5 +1019,16 @@ mod test {
 
         let correct_string = format!("Failed to get account resources with provided address. Here is the json block for the response that failed:\n{:?}", failed_obj);
         assert_eq!(context, correct_string);
+    }
+
+    #[test]
+    fn test_home_check_networks_toml_exists() {
+        let dir = tempdir().unwrap();
+        let home = Home::new(dir.path()).unwrap();
+        assert_eq!(home.check_networks_toml_exists().is_err(), true);
+        fs::create_dir_all(dir.path().join(".shuffle")).unwrap();
+        home.write_default_networks_config_into_toml_if_nonexistent()
+            .unwrap();
+        assert_eq!(home.check_networks_toml_exists().is_err(), false);
     }
 }
