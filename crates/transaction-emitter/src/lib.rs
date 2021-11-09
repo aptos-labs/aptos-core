@@ -129,6 +129,7 @@ impl EmitJobRequest {
                 wait_millis: wait_time,
                 wait_committed: true,
             })
+            .accounts_per_client(1)
     }
 }
 
