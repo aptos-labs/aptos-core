@@ -1,7 +1,14 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_logger::{debug, Schema};
+use std::time::Duration;
+
+use diem_logger::{
+    debug, error,
+    prelude::{sample, SampleRate},
+    sample::Sampling,
+    Schema,
+};
 use warp::{
     http::header,
     log::{custom, Info, Log},
@@ -9,19 +16,25 @@ use warp::{
 
 pub fn logger() -> Log<impl Fn(Info) + Copy> {
     let func = move |info: Info| {
-        debug!(HttpRequestLog {
+        let status = info.status().as_u16();
+        let log = HttpRequestLog {
             remote_addr: info.remote_addr(),
             method: info.method().to_string(),
             path: info.path().to_string(),
-            status: info.status().as_u16(),
+            status,
             referer: info.referer(),
             user_agent: info.user_agent(),
             elapsed: info.elapsed(),
             forwarded: info
                 .request_headers()
                 .get(header::FORWARDED)
-                .and_then(|v| v.to_str().ok())
-        });
+                .and_then(|v| v.to_str().ok()),
+        };
+        if status >= 500 {
+            sample!(SampleRate::Duration(Duration::from_secs(1)), error!(log));
+        } else {
+            debug!(log);
+        }
     };
     custom(func)
 }
