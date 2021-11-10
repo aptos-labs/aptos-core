@@ -159,6 +159,7 @@ prune_repo "diem/faucet"
 prune_repo "diem/tools"
 prune_repo "diem/validator"
 prune_repo "diem/validator_tcb"
+prune_repo "diem/forge"
 
 #We currently overwrite, no need to delete.
 #prune_repo "diem/build_environment"

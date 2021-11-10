@@ -276,6 +276,7 @@ jobs:
           docker/build_push.sh -u -p -b ${BRANCH} -n validator || success=$(echo "validator" >> "${tmpfile}"; echo 1)
           docker/build_push.sh -u -p -b ${BRANCH} -n validator-tcb || success=$(echo "validator-tcb" >> "${tmpfile}"; echo 1)
           docker/build_push.sh -u -p -b ${BRANCH} -n cluster-test || success=$(echo "cluster-test" >> "${tmpfile}"; echo 1)
+          docker/build_push.sh -u -p -b ${BRANCH} -n forge || success=$(echo "forge" >> "${tmpfile}"; echo 1)
           if [[ "$success" == "1" ]]; then
             cat "${tmpfile}"
           fi
@@ -297,6 +298,7 @@ jobs:
           docker/build_push.sh -u -b ${BRANCH} -n validator || success=$(echo "validator" >> "${tmpfile}"; echo 1)
           docker/build_push.sh -u -b ${BRANCH} -n validator-tcb || success=$(echo "validator-tcb" >> "${tmpfile}"; echo 1)
           docker/build_push.sh -u -b ${BRANCH} -n cluster-test || success=$(echo "cluster-test" >> "${tmpfile}"; echo 1)
+          docker/build_push.sh -u -b ${BRANCH} -n forge || success=$(echo "forge" >> "${tmpfile}"; echo 1)
           if [[ "$success" == "1" ]]; then
             cat "${tmpfile}"
           fi
