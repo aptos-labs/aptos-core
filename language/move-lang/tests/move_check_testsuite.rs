@@ -152,7 +152,7 @@ fn move_check_for_errors(
         Ok((units, warnings)) => (units, warnings),
         Err(diags) => return diags,
     };
-    let mut diags = move_lang::compiled_unit::verify_units(units).1;
+    let mut diags = move_lang::compiled_unit::verify_units(&units);
     diags.extend(warnings);
     diags
 }

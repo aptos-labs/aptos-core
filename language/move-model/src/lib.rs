@@ -233,7 +233,7 @@ pub fn run_model_builder_with_options_and_compilation_flags(
         }
     };
     // Check for bytecode verifier errors (there should not be any)
-    let (verified_units, diags) = compiled_unit::verify_units(units);
+    let diags = compiled_unit::verify_units(&units);
     if !diags.is_empty() {
         add_move_lang_diagnostics(&mut env, diags);
         return Ok(env);
@@ -241,7 +241,7 @@ pub fn run_model_builder_with_options_and_compilation_flags(
 
     // Now that it is known that the program has no errors, run the spec checker on verified units
     // plus expanded AST. This will populate the environment including any errors.
-    run_spec_checker(&mut env, addresses, verified_units, expansion_ast);
+    run_spec_checker(&mut env, addresses, units, expansion_ast);
     Ok(env)
 }
 

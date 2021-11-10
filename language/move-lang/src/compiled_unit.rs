@@ -115,58 +115,24 @@ impl AnnotatedCompiledModule {
 }
 
 impl AnnotatedCompiledUnit {
-    pub fn verify(self) -> (Self, Diagnostics) {
+    pub fn verify(&self) -> Diagnostics {
         match self {
             Self::Module(AnnotatedCompiledModule {
                 loc,
-                module_name_loc,
-                address_name,
-                named_module: module,
-                function_infos,
-            }) => {
-                let NamedCompiledModule {
-                    address: address_bytes,
-                    name,
-                    module,
-                    source_map,
-                } = module;
-                let (module, errors) = verify_module(loc, module);
-                let verified = AnnotatedCompiledModule {
-                    loc,
-                    module_name_loc,
-                    address_name,
-                    named_module: NamedCompiledModule {
-                        address: address_bytes,
-                        name,
-                        module,
-                        source_map,
+                named_module:
+                    NamedCompiledModule {
+                        module, source_map, ..
                     },
-                    function_infos,
-                };
-                (Self::Module(verified), errors)
-            }
+                ..
+            }) => verify_module(source_map, *loc, module),
             Self::Script(AnnotatedCompiledScript {
                 loc,
-                named_script: script,
-                function_info,
-            }) => {
-                let NamedCompiledScript {
-                    name,
-                    script,
-                    source_map,
-                } = script;
-                let (script, errors) = verify_script(loc, script);
-                let verified = AnnotatedCompiledScript {
-                    named_script: NamedCompiledScript {
-                        name,
-                        script,
-                        source_map,
+                named_script:
+                    NamedCompiledScript {
+                        script, source_map, ..
                     },
-                    loc,
-                    function_info,
-                };
-                (Self::Script(verified), errors)
-            }
+                ..
+            }) => verify_script(source_map, *loc, script),
         }
     }
 
@@ -240,41 +206,49 @@ impl CompiledUnit {
     }
 }
 
-fn verify_module(loc: Loc, cm: F::CompiledModule) -> (F::CompiledModule, Diagnostics) {
-    match move_bytecode_verifier::verifier::verify_module(&cm) {
-        Ok(_) => (cm, Diagnostics::new()),
-        Err(e) => (
-            cm,
-            Diagnostics::from(vec![diag!(
-                Bug::BytecodeVerification,
-                (loc, format!("ICE failed bytecode verifier: {:#?}", e)),
-            )]),
+fn bytecode_verifier_mismatch_bug(
+    sm: &SourceMap,
+    loc: Loc,
+    location: move_binary_format::errors::Location,
+    e: move_binary_format::errors::VMError,
+) -> Diagnostics {
+    let loc = match e.offsets().first() {
+        Some((fdef_idx, offset)) if &location == e.location() => {
+            sm.get_code_location(*fdef_idx, *offset).unwrap_or(loc)
+        }
+        _ => loc,
+    };
+    Diagnostics::from(vec![diag!(
+        Bug::BytecodeVerification,
+        (loc, format!("ICE failed bytecode verifier: {:#?}", e)),
+    )])
+}
+
+fn verify_module(sm: &SourceMap, loc: Loc, cm: &F::CompiledModule) -> Diagnostics {
+    match move_bytecode_verifier::verifier::verify_module(cm) {
+        Ok(_) => Diagnostics::new(),
+        Err(e) => bytecode_verifier_mismatch_bug(
+            sm,
+            loc,
+            move_binary_format::errors::Location::Module(cm.self_id()),
+            e,
         ),
     }
 }
 
-fn verify_script(loc: Loc, cs: F::CompiledScript) -> (F::CompiledScript, Diagnostics) {
-    match move_bytecode_verifier::verifier::verify_script(&cs) {
-        Ok(_) => (cs, Diagnostics::new()),
-        Err(e) => (
-            cs,
-            Diagnostics::from(vec![diag!(
-                Bug::BytecodeVerification,
-                (loc, format!("ICE failed bytecode verifier: {:#?}", e)),
-            )]),
-        ),
+fn verify_script(sm: &SourceMap, loc: Loc, cs: &F::CompiledScript) -> Diagnostics {
+    match move_bytecode_verifier::verifier::verify_script(cs) {
+        Ok(_) => Diagnostics::new(),
+        Err(e) => {
+            bytecode_verifier_mismatch_bug(sm, loc, move_binary_format::errors::Location::Script, e)
+        }
     }
 }
 
-pub fn verify_units(
-    units: Vec<AnnotatedCompiledUnit>,
-) -> (Vec<AnnotatedCompiledUnit>, Diagnostics) {
-    let mut new_units = vec![];
+pub fn verify_units<'a>(units: impl IntoIterator<Item = &'a AnnotatedCompiledUnit>) -> Diagnostics {
     let mut diags = Diagnostics::new();
     for unit in units {
-        let (unit, ds) = unit.verify();
-        new_units.push(unit);
-        diags.extend(ds);
+        diags.extend(unit.verify());
     }
-    (new_units, diags)
+    diags
 }
