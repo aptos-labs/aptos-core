@@ -1,4 +1,5 @@
 // no-boogie-test
+// separate_baseline: simplify
 module 0x42::M {
     struct S {
         f: u64

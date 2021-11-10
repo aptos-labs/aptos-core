@@ -1,115 +1,115 @@
 Move prover returns: exiting with verification errors
 error: post-condition does not hold
-   ┌─ tests/sources/functional/choice.move:54:9
+   ┌─ tests/sources/functional/choice.move:55:9
    │
-54 │         ensures choice == Signer::address_of(s2);
+55 │         ensures choice == Signer::address_of(s2);
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
-   =     at tests/sources/functional/choice.move:44: populate_R
-   =     at tests/sources/functional/choice.move:49: populate_R (spec)
+   =     at tests/sources/functional/choice.move:45: populate_R
    =     at tests/sources/functional/choice.move:50: populate_R (spec)
+   =     at tests/sources/functional/choice.move:51: populate_R (spec)
+   =     at tests/sources/functional/choice.move:54: populate_R (spec)
    =     at tests/sources/functional/choice.move:53: populate_R (spec)
-   =     at tests/sources/functional/choice.move:52: populate_R (spec)
-   =     at tests/sources/functional/choice.move:44: populate_R
+   =     at tests/sources/functional/choice.move:45: populate_R
    =         s1 = <redacted>
    =         s2 = <redacted>
-   =     at tests/sources/functional/choice.move:45: populate_R
    =     at tests/sources/functional/choice.move:46: populate_R
    =     at tests/sources/functional/choice.move:47: populate_R
-   =     at tests/sources/functional/choice.move:54: populate_R (spec)
+   =     at tests/sources/functional/choice.move:48: populate_R
+   =     at tests/sources/functional/choice.move:55: populate_R (spec)
 
 error: post-condition does not hold
-   ┌─ tests/sources/functional/choice.move:21:9
+   ┌─ tests/sources/functional/choice.move:22:9
    │
-21 │         ensures result == TRACE(choose x: u64 where x >= 4 && x <= 5);
+22 │         ensures result == TRACE(choose x: u64 where x >= 4 && x <= 5);
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
-   =     at tests/sources/functional/choice.move:15: simple_incorrect
-   =         b = <redacted>
    =     at tests/sources/functional/choice.move:16: simple_incorrect
+   =         b = <redacted>
+   =     at tests/sources/functional/choice.move:17: simple_incorrect
    =         <redacted> = <redacted>
    =         result = <redacted>
-   =     at tests/sources/functional/choice.move:17: simple_incorrect
-   =     at tests/sources/functional/choice.move:21: simple_incorrect (spec)
+   =     at tests/sources/functional/choice.move:18: simple_incorrect
+   =     at tests/sources/functional/choice.move:22: simple_incorrect (spec)
    =         `TRACE(choose x: u64 where x >= 4 && x <= 5)` = <redacted>
 
 error: post-condition does not hold
-   ┌─ tests/sources/functional/choice.move:98:9
+   ┌─ tests/sources/functional/choice.move:99:9
    │
-98 │         ensures result == TRACE(choose y: u64 where y > x);
+99 │         ensures result == TRACE(choose y: u64 where y > x);
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
-   =     at tests/sources/functional/choice.move:93: test_choice_dup_expected_fail
-   =         x = <redacted>
    =     at tests/sources/functional/choice.move:94: test_choice_dup_expected_fail
-   =         result = <redacted>
+   =         x = <redacted>
    =     at tests/sources/functional/choice.move:95: test_choice_dup_expected_fail
-   =     at tests/sources/functional/choice.move:98: test_choice_dup_expected_fail (spec)
+   =         result = <redacted>
+   =     at tests/sources/functional/choice.move:96: test_choice_dup_expected_fail
+   =     at tests/sources/functional/choice.move:99: test_choice_dup_expected_fail (spec)
    =         `TRACE(choose y: u64 where y > x)` = <redacted>
 
 error: post-condition does not hold
-    ┌─ tests/sources/functional/choice.move:156:9
+    ┌─ tests/sources/functional/choice.move:157:9
     │
-156 │         ensures evidence1 == evidence2;
+157 │         ensures evidence1 == evidence2;
     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/choice.move:154: test_different_choice_via_let (spec)
     =     at tests/sources/functional/choice.move:155: test_different_choice_via_let (spec)
-    =     at tests/sources/functional/choice.move:152: test_different_choice_via_let
     =     at tests/sources/functional/choice.move:156: test_different_choice_via_let (spec)
+    =     at tests/sources/functional/choice.move:153: test_different_choice_via_let
+    =     at tests/sources/functional/choice.move:157: test_different_choice_via_let (spec)
 
 error: post-condition does not hold
-    ┌─ tests/sources/functional/choice.move:180:9
+    ┌─ tests/sources/functional/choice.move:181:9
     │
-180 │         ensures choose_some_positive_u64() == choose_another_positive_u64();
+181 │         ensures choose_some_positive_u64() == choose_another_positive_u64();
     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/choice.move:178: test_different_choice_via_spec_fun
-    =     at tests/sources/functional/choice.move:180: test_different_choice_via_spec_fun (spec)
+    =     at tests/sources/functional/choice.move:179: test_different_choice_via_spec_fun
+    =     at tests/sources/functional/choice.move:181: test_different_choice_via_spec_fun (spec)
 
 error: post-condition does not hold
-   ┌─ tests/sources/functional/choice.move:85:9
+   ┌─ tests/sources/functional/choice.move:86:9
    │
-85 │         ensures TRACE(choose i in 0..len(result) where result[i] == 2) == 1;
+86 │         ensures TRACE(choose i in 0..len(result) where result[i] == 2) == 1;
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
-   =     at tests/sources/functional/choice.move:74: test_not_using_min_incorrect
-   =         v = <redacted>
    =     at tests/sources/functional/choice.move:75: test_not_using_min_incorrect
-   =         v_ref = <redacted>
+   =         v = <redacted>
    =     at tests/sources/functional/choice.move:76: test_not_using_min_incorrect
+   =         v_ref = <redacted>
    =     at tests/sources/functional/choice.move:77: test_not_using_min_incorrect
    =     at tests/sources/functional/choice.move:78: test_not_using_min_incorrect
    =     at tests/sources/functional/choice.move:79: test_not_using_min_incorrect
    =     at tests/sources/functional/choice.move:80: test_not_using_min_incorrect
    =     at tests/sources/functional/choice.move:81: test_not_using_min_incorrect
-   =         result = <redacted>
    =     at tests/sources/functional/choice.move:82: test_not_using_min_incorrect
-   =     at tests/sources/functional/choice.move:85: test_not_using_min_incorrect (spec)
+   =         result = <redacted>
+   =     at tests/sources/functional/choice.move:83: test_not_using_min_incorrect
+   =     at tests/sources/functional/choice.move:86: test_not_using_min_incorrect (spec)
    =         `TRACE(choose i in 0..len(result) where result[i] == 2)` = <redacted>
 
 error: post-condition does not hold
-    ┌─ tests/sources/functional/choice.move:217:9
+    ┌─ tests/sources/functional/choice.move:218:9
     │
-217 │         ensures result != (choose i: u64 where i >= k);
+218 │         ensures result != (choose i: u64 where i >= k);
     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/choice.move:234: test_same_choice_different_args_via_schema_2
-    =         result = <redacted>
     =     at tests/sources/functional/choice.move:235: test_same_choice_different_args_via_schema_2
-    =     at tests/sources/functional/choice.move:217
+    =         result = <redacted>
+    =     at tests/sources/functional/choice.move:236: test_same_choice_different_args_via_schema_2
+    =     at tests/sources/functional/choice.move:218
 
 error: post-condition does not hold
-    ┌─ tests/sources/functional/choice.move:208:9
+    ┌─ tests/sources/functional/choice.move:209:9
     │
-208 │         ensures evidence1 == evidence2;
+209 │         ensures evidence1 == evidence2;
     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/choice.move:204: test_same_choice_different_args_via_spec_fun
-    =     at tests/sources/functional/choice.move:206: test_same_choice_different_args_via_spec_fun (spec)
+    =     at tests/sources/functional/choice.move:205: test_same_choice_different_args_via_spec_fun
     =     at tests/sources/functional/choice.move:207: test_same_choice_different_args_via_spec_fun (spec)
-    =     at tests/sources/functional/choice.move:204: test_same_choice_different_args_via_spec_fun
+    =     at tests/sources/functional/choice.move:208: test_same_choice_different_args_via_spec_fun (spec)
+    =     at tests/sources/functional/choice.move:205: test_same_choice_different_args_via_spec_fun
     =         x = <redacted>
     =         y = <redacted>
     =         result = <redacted>
-    =     at tests/sources/functional/choice.move:208: test_same_choice_different_args_via_spec_fun (spec)
+    =     at tests/sources/functional/choice.move:209: test_same_choice_different_args_via_spec_fun (spec)

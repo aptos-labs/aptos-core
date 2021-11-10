@@ -5,14 +5,6 @@ error: function does not abort under this condition
 77 │         aborts_if sum != 0;
    │         ^^^^^^^^^^^^^^^^^^^
    │
-   = Related Bindings:
-   =         sum = <redacted>
-   = Execution Trace:
-   =     at tests/sources/functional/let.move:69: spec_let_with_abort_incorrect
-   =     at tests/sources/functional/let.move:75: spec_let_with_abort_incorrect (spec)
-   =         `let sum = a + b;` = <redacted>
-   =     at tests/sources/functional/let.move:76: spec_let_with_abort_incorrect (spec)
-   =         `let product = a * b;` = <redacted>
    =     at tests/sources/functional/let.move:69: spec_let_with_abort_incorrect
    =         a = <redacted>
    =         b = <redacted>
@@ -23,10 +15,11 @@ error: function does not abort under this condition
    =         a = <redacted>
    =         b = <redacted>
    =     at tests/sources/functional/let.move:73: spec_let_with_abort_incorrect
-   =     at tests/sources/functional/let.move:80: spec_let_with_abort_incorrect (spec)
-   =         `let post new_a = old(a) / sum;` = <redacted>
+   =     at tests/sources/functional/let.move:75: spec_let_with_abort_incorrect (spec)
    =     at tests/sources/functional/let.move:77: spec_let_with_abort_incorrect (spec)
    =         `aborts_if sum != 0;` = <redacted>
+   =     at tests/sources/functional/let.move:75: spec_let_with_abort_incorrect (spec)
+   =     at tests/sources/functional/let.move:77: spec_let_with_abort_incorrect (spec)
 
 error: abort not covered by any of the `aborts_if` clauses
    ┌─ tests/sources/functional/let.move:74:5
@@ -43,15 +36,6 @@ error: abort not covered by any of the `aborts_if` clauses
 83 │ │     }
    │ ╰─────^
    │
-   = Related Bindings:
-   =         a = <redacted>
-   =         b = <redacted>
-   = Execution Trace:
-   =     at tests/sources/functional/let.move:69: spec_let_with_abort_incorrect
-   =     at tests/sources/functional/let.move:75: spec_let_with_abort_incorrect (spec)
-   =         `let sum = a + b;` = <redacted>
-   =     at tests/sources/functional/let.move:76: spec_let_with_abort_incorrect (spec)
-   =         `let product = a * b;` = <redacted>
    =     at tests/sources/functional/let.move:69: spec_let_with_abort_incorrect
    =         a = <redacted>
    =         b = <redacted>

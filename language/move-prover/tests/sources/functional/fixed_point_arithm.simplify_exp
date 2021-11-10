@@ -129,10 +129,6 @@ error: post-condition does not hold
    =     at tests/sources/functional/fixed_point_arithm.move:78: multiply_x_1_incorrect
    =         x = <redacted>
    =     at tests/sources/functional/fixed_point_arithm.move:79: multiply_x_1_incorrect
-   =     at ../move-stdlib/sources/FixedPoint32.move:126
-   =     at ../move-stdlib/sources/FixedPoint32.move:127
-   =     at ../move-stdlib/sources/FixedPoint32.move:128
-   =     at tests/sources/functional/fixed_point_arithm.move:79: multiply_x_1_incorrect
    =         result = <redacted>
    =     at tests/sources/functional/fixed_point_arithm.move:80: multiply_x_1_incorrect
    =     at tests/sources/functional/fixed_point_arithm.move:82: multiply_x_1_incorrect (spec)

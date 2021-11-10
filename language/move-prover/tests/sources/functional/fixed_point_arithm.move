@@ -1,5 +1,6 @@
 // separate_baseline: cvc4
 // TODO(cvc4): cvc4 currently produces false positives.
+// separate_baseline: simplify
 module 0x42::FixedPointArithmetic {
 
     use Std::FixedPoint32::{Self, FixedPoint32};

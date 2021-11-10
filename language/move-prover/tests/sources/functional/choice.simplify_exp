@@ -6,9 +6,6 @@ error: post-condition does not hold
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
    =     at tests/sources/functional/choice.move:45: populate_R
-   =     at tests/sources/functional/choice.move:50: populate_R (spec)
-   =     at tests/sources/functional/choice.move:51: populate_R (spec)
-   =     at tests/sources/functional/choice.move:54: populate_R (spec)
    =     at tests/sources/functional/choice.move:53: populate_R (spec)
    =     at tests/sources/functional/choice.move:45: populate_R
    =         s1 = <redacted>
@@ -53,8 +50,6 @@ error: post-condition does not hold
 157 │         ensures evidence1 == evidence2;
     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/choice.move:155: test_different_choice_via_let (spec)
-    =     at tests/sources/functional/choice.move:156: test_different_choice_via_let (spec)
     =     at tests/sources/functional/choice.move:153: test_different_choice_via_let
     =     at tests/sources/functional/choice.move:157: test_different_choice_via_let (spec)
 
@@ -66,25 +61,6 @@ error: post-condition does not hold
     │
     =     at tests/sources/functional/choice.move:179: test_different_choice_via_spec_fun
     =     at tests/sources/functional/choice.move:181: test_different_choice_via_spec_fun (spec)
-
-error: post-condition does not hold
-   ┌─ tests/sources/functional/choice.move:71:9
-   │
-71 │         ensures (choose min i in 0..len(result) where result[i] == 2) == 1;
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   │
-   =     at tests/sources/functional/choice.move:62: test_min
-   =         v = <redacted>
-   =     at tests/sources/functional/choice.move:63: test_min
-   =         v_ref = <redacted>
-   =     at tests/sources/functional/choice.move:64: test_min
-   =     at tests/sources/functional/choice.move:65: test_min
-   =     at tests/sources/functional/choice.move:66: test_min
-   =     at tests/sources/functional/choice.move:67: test_min
-   =     at tests/sources/functional/choice.move:68: test_min
-   =         result = <redacted>
-   =     at tests/sources/functional/choice.move:69: test_min
-   =     at tests/sources/functional/choice.move:71: test_min (spec)
 
 error: post-condition does not hold
    ┌─ tests/sources/functional/choice.move:86:9
@@ -124,9 +100,6 @@ error: post-condition does not hold
 209 │         ensures evidence1 == evidence2;
     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/choice.move:205: test_same_choice_different_args_via_spec_fun
-    =     at tests/sources/functional/choice.move:207: test_same_choice_different_args_via_spec_fun (spec)
-    =     at tests/sources/functional/choice.move:208: test_same_choice_different_args_via_spec_fun (spec)
     =     at tests/sources/functional/choice.move:205: test_same_choice_different_args_via_spec_fun
     =         x = <redacted>
     =         y = <redacted>
