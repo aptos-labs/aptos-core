@@ -794,6 +794,11 @@ impl DbReader<DpnProto> for DiemDB {
         })
     }
 
+    /// Get the first version that txn starts existent.
+    fn get_first_txn_version(&self) -> Result<Option<Version>> {
+        self.transaction_store.get_first_txn_version()
+    }
+
     /// Get the first version that write set starts existent.
     fn get_first_write_set_version(&self) -> Result<Option<Version>> {
         self.transaction_store.get_first_write_set_version()

@@ -220,6 +220,13 @@ pub trait DbReader<PS: ProtocolSpec>: Send + Sync {
         unimplemented!()
     }
 
+    /// See [`DiemDB::get_txn_set_version`].
+    ///
+    /// [`DiemDB::get_first_txn_version`]: ../diemdb/struct.DiemDB.html#method.get_first_txn_version
+    fn get_first_txn_version(&self) -> Result<Option<Version>> {
+        unimplemented!()
+    }
+
     /// See [`DiemDB::get_first_write_set_version`].
     ///
     /// [`DiemDB::get_first_write_set_version`]: ../diemdb/struct.DiemDB.html#method.get_first_write_set_version
