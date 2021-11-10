@@ -369,14 +369,26 @@ impl StorageReaderInterface for StorageReader {
         let latest_epoch = latest_ledger_info.epoch();
         let latest_version = latest_ledger_info.version();
 
+        // Fetch the transaction output range
+        let smallest_output_version = self
+            .storage
+            .get_first_write_set_version()
+            .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
+        let transaction_outputs = if let Some(version) = smallest_output_version {
+            let complete_data_range = CompleteDataRange::new(version, latest_version)
+                .map_err(|error| Error::UnexpectedErrorEncountered(error.to_string()))?;
+            Some(complete_data_range)
+        } else {
+            None
+        };
+
         // TODO(joshlind): Update the DiemDB to support fetching all of this data!
-        // For now we assume everything (since genesis) is held.
         // Return the relevant data summary
         let data_summary = DataSummary {
             synced_ledger_info: Some(latest_ledger_info_with_sigs),
             epoch_ending_ledger_infos: Some(CompleteDataRange::from_genesis(latest_epoch - 1)),
             transactions: Some(CompleteDataRange::from_genesis(latest_version)),
-            transaction_outputs: Some(CompleteDataRange::from_genesis(latest_version)),
+            transaction_outputs,
             account_states: Some(CompleteDataRange::from_genesis(latest_version)),
         };
 
