@@ -157,15 +157,12 @@ compiled_package_info:
       name: Vector
     : Std
     ? address: "00000000000000000000000000000001"
-      name: Vote
-    : DiemFramework
-    ? address: "00000000000000000000000000000001"
       name: XDX
     : DiemFramework
     ? address: "00000000000000000000000000000001"
       name: XUS
     : DiemFramework
-  source_digest: 1FD3B7BC33E90BB82005A11A724DAFDA60E7240DA8BCB16367A8047FCC36A06D
+  source_digest: 035A382A032B3A3E8260FFD771C129FE7E218DD820BDFB3DB791C7D391ADD92E
   build_flags:
     dev_mode: false
     test_mode: false

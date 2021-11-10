@@ -157,9 +157,6 @@ compiled_package_info:
       name: Vector
     : Std
     ? address: "00000000000000000000000000000001"
-      name: Vote
-    : DiemFramework
-    ? address: "00000000000000000000000000000001"
       name: XDX
     : DiemFramework
     ? address: "00000000000000000000000000000001"

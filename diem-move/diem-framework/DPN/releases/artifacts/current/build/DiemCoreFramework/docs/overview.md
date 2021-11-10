@@ -137,7 +137,6 @@ The Move modules in the Diem Framework can be bucketed in to a couple categories
 -  [`0x1::ValidatorConfig`](ValidatorConfig.md#0x1_ValidatorConfig)
 -  [`0x1::ValidatorOperatorConfig`](ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig)
 -  [`0x1::Vector`](../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector)
--  [`0x1::Vote`](Vote.md#0x1_Vote)
 -  [`0x1::XDX`](XDX.md#0x1_XDX)
 -  [`0x1::XUS`](XUS.md#0x1_XUS)
 
