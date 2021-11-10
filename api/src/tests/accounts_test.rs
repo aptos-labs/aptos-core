@@ -79,7 +79,7 @@ async fn test_account_resources_response() {
         res,
         json!({
             "type": "0x1::DiemAccount::Balance<0x1::XDX::XDX>",
-            "value": {
+            "data": {
                 "coin": {
                     "value": "0"
                 }
@@ -484,7 +484,7 @@ async fn test_get_account_resources_by_ledger_version() {
     let tc_account = find_value(&ledger_version_1_resources, |f| {
         f["type"] == "0x1::DiemAccount::DiemAccount"
     });
-    assert_eq!(tc_account["value"]["sequence_number"], "1");
+    assert_eq!(tc_account["data"]["sequence_number"], "1");
 
     let ledger_version_0_resources = context
         .get(&account_resources_with_ledger_version(
@@ -495,7 +495,7 @@ async fn test_get_account_resources_by_ledger_version() {
     let tc_account = find_value(&ledger_version_0_resources, |f| {
         f["type"] == "0x1::DiemAccount::DiemAccount"
     });
-    assert_eq!(tc_account["value"]["sequence_number"], "0");
+    assert_eq!(tc_account["data"]["sequence_number"], "0");
 }
 
 #[tokio::test]

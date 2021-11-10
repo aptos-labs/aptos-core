@@ -33,7 +33,7 @@ use std::{
 pub struct MoveResource {
     #[serde(rename = "type")]
     pub typ: MoveStructTag,
-    pub value: MoveStructValue,
+    pub data: MoveStructValue,
 }
 
 impl TryFrom<AnnotatedMoveStruct> for MoveResource {
@@ -42,7 +42,7 @@ impl TryFrom<AnnotatedMoveStruct> for MoveResource {
     fn try_from(s: AnnotatedMoveStruct) -> anyhow::Result<Self> {
         Ok(Self {
             typ: s.type_.clone().into(),
-            value: s.try_into()?,
+            data: s.try_into()?,
         })
     }
 }
@@ -963,7 +963,7 @@ mod tests {
             value,
             json!({
                 "type": "0x1::Type::Values",
-                "value": {
+                "data": {
                     "field_u8": 7,
                     "field_u64": "7",
                     "field_u128": "7",
@@ -994,7 +994,7 @@ mod tests {
             value,
             json!({
                 "type": "0x1::Type::Values",
-                "value": {
+                "data": {
                     "address_0x0": "0x0",
                 }
             }),

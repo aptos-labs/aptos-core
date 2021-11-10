@@ -121,7 +121,7 @@ async fn test_get_transactions_output_genesis_transaction() {
             "address": "0xdd",
             "data": {
                 "type": "0x1::Roles::RoleId",
-                "value": {
+                "data": {
                     "role_id": "2"
                 }
             }

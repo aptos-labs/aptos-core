@@ -609,11 +609,11 @@ components:
       type: object
       required:
         - type
-        - value
+        - data
       properties:
         type:
           $ref: '#/components/schemas/MoveStructTagId'
-        value:
+        data:
           type: "object"
           description: |
             Account resource data is JSON representation of the Move struct `type`.
@@ -621,7 +621,7 @@ components:
             Move struct field name and value are serialized as object property name and value.
       example:
         type: "0x1::DiemAccount::Balance<0x1::XDX::XDX>"
-        value:
+        data:
           coin:
             value: "8000000000"
     MoveTypeTagId:

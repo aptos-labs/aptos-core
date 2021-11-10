@@ -83,7 +83,7 @@ export async function account(addr?: string) {
 export async function sequenceNumber(addr?: string): Promise<number> {
   const acc: any = await account(addr);
   if (acc) {
-    return parseInt(acc["value"]["sequence_number"]);
+    return parseInt(acc["data"]["sequence_number"]);
   }
   throw "unable to find account";
 }

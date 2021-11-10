@@ -237,7 +237,7 @@ impl DevApiClient {
         let mut seq_number_string = "";
         for object in &json_arr {
             if object["type"] == DIEM_ACCOUNT_TYPE {
-                seq_number_string = object["value"]["sequence_number"]
+                seq_number_string = object["data"]["sequence_number"]
                     .as_str()
                     .ok_or_else(|| anyhow!("Invalid sequence number string"))?;
                 break;
@@ -963,7 +963,7 @@ mod test {
     fn test_parse_json_for_seq_num() {
         let value_obj = json!([{
             "type":"0x1::DiemAccount::DiemAccount",
-            "value": {
+            "data": {
                 "authentication_key": "0x88cae30f0fea7879708788df9e7c9b7524163afcc6e33b0a9473852e18327fa9",
                 "key_rotation_capability":{
                     "vec":[{"account_address":"0x24163afcc6e33b0a9473852e18327fa9"}]

@@ -108,11 +108,11 @@ export async function createTestNFTScriptFunction(
 
 export async function decodedMessages() {
   return (await devapi.resourcesWithName("MessageHolder"))
-    .map((entry) => DiemHelpers.hexToAscii(entry.value.message));
+    .map((entry) => DiemHelpers.hexToAscii(entry.data.message));
 }
 
 export async function decodedNFTs() {
   return (await devapi.resourcesWithName("NFT"))
-    .filter((entry) => entry.value && entry.value.content_uri)
-    .map((entry) => DiemHelpers.hexToAscii(entry.value.content_uri));
+    .filter((entry) => entry.data && entry.data.content_uri)
+    .map((entry) => DiemHelpers.hexToAscii(entry.data.content_uri));
 }
