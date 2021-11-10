@@ -294,10 +294,12 @@ impl SafetyRules {
         match current_epoch.cmp(&epoch_state.epoch) {
             Ordering::Greater => {
                 // waypoint is not up to the current epoch.
-                return Err(Error::NotInitialized(format!(
-                    "Provided epoch {} is older than current {}, likely waypoint is too old",
-                    epoch_state.epoch, current_epoch
-                )));
+                return Err(Error::WaypointOutOfDate(
+                    waypoint.version(),
+                    new_waypoint.version(),
+                    current_epoch,
+                    epoch_state.epoch,
+                ));
             }
             Ordering::Less => {
                 // start new epoch

@@ -1083,6 +1083,7 @@ dependencies = [
  "byteorder",
  "bytes",
  "channel",
+ "claim",
  "consensus-notifications",
  "consensus-types",
  "diem-config",

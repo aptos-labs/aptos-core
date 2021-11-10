@@ -314,7 +314,7 @@ impl PersistentLivenessStorage for EmptyStorage {
     }
 
     fn retrieve_epoch_change_proof(&self, _version: u64) -> Result<EpochChangeProof> {
-        unimplemented!()
+        Ok(EpochChangeProof::new(vec![], false))
     }
 
     fn diem_db(&self) -> Arc<dyn DbReader<DpnProto>> {

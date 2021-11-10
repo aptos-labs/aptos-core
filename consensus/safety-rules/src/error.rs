@@ -51,6 +51,8 @@ pub enum Error {
     InconsistentExecutionResult(String, String),
     #[error("Invalid Ordered LedgerInfoWithSignatures: Empty or at least one of executed_state_id, version, or epoch_state are not dummy value: {0}")]
     InvalidOrderedLedgerInfo(String),
+    #[error("Waypoint out of date: Previous waypoint version {0}, updated version {1}, current epoch {2}, provided epoch {3}")]
+    WaypointOutOfDate(u64, u64, u64, u64),
 }
 
 impl From<serde_json::Error> for Error {
