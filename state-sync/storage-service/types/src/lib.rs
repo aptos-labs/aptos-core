@@ -53,6 +53,19 @@ pub enum StorageServiceRequest {
 }
 
 impl StorageServiceRequest {
+    /// Returns a summary label for the request
+    pub fn get_label(&self) -> &'static str {
+        match self {
+            Self::GetAccountStatesChunkWithProof(_) => "get_account_states_chunk_with_proof",
+            Self::GetEpochEndingLedgerInfos(_) => "get_epoch_ending_ledger_infos",
+            Self::GetNumberOfAccountsAtVersion(_) => "get_number_of_accounts_at_version",
+            Self::GetServerProtocolVersion => "get_server_protocol_version",
+            Self::GetStorageServerSummary => "get_storage_server_summary",
+            Self::GetTransactionOutputsWithProof(_) => "get_transaction_outputs_with_proof",
+            Self::GetTransactionsWithProof(_) => "get_transactions_with_proof",
+        }
+    }
+
     pub fn is_get_storage_server_summary(&self) -> bool {
         matches!(self, &Self::GetStorageServerSummary)
     }
@@ -74,15 +87,16 @@ pub enum StorageServiceResponse {
 
 // TODO(philiphayes): is there a proc-macro for this?
 impl StorageServiceResponse {
-    pub fn name(&self) -> &'static str {
+    /// Returns a summary label for the response
+    pub fn get_label(&self) -> &'static str {
         match self {
-            Self::AccountStatesChunkWithProof(_) => "AccountStatesChunkWithProof",
-            Self::EpochEndingLedgerInfos(_) => "EpochEndingLedgerInfos",
-            Self::NumberOfAccountsAtVersion(_) => "NumberOfAccountsAtVersion",
-            Self::ServerProtocolVersion(_) => "ServerProtocolVersion",
-            Self::StorageServerSummary(_) => "StorageServerSummary",
-            Self::TransactionOutputsWithProof(_) => "TransactionOutputsWithProof",
-            Self::TransactionsWithProof(_) => "TransactionsWithProof",
+            Self::AccountStatesChunkWithProof(_) => "account_states_chunk_with_proof",
+            Self::EpochEndingLedgerInfos(_) => "epoch_ending_ledger_infos",
+            Self::NumberOfAccountsAtVersion(_) => "number_of_accounts_at_version",
+            Self::ServerProtocolVersion(_) => "server_protocol_version",
+            Self::StorageServerSummary(_) => "storage_server_summary",
+            Self::TransactionOutputsWithProof(_) => "transaction_outputs_with_proof",
+            Self::TransactionsWithProof(_) => "transactions_with_proof",
         }
     }
 }
@@ -100,8 +114,8 @@ impl TryFrom<StorageServiceResponse> for AccountStatesChunkWithProof {
         match response {
             StorageServiceResponse::AccountStatesChunkWithProof(inner) => Ok(inner),
             _ => Err(UnexpectedResponseError(format!(
-                "expected AccountStatesChunkWithProof found {}",
-                response.name()
+                "expected account_states_chunk_with_proof, found {}",
+                response.get_label()
             ))),
         }
     }
@@ -113,8 +127,8 @@ impl TryFrom<StorageServiceResponse> for EpochChangeProof {
         match response {
             StorageServiceResponse::EpochEndingLedgerInfos(inner) => Ok(inner),
             _ => Err(UnexpectedResponseError(format!(
-                "expected EpochEndingLedgerInfos found {}",
-                response.name()
+                "expected epoch_ending_ledger_infos, found {}",
+                response.get_label()
             ))),
         }
     }
@@ -126,8 +140,8 @@ impl TryFrom<StorageServiceResponse> for u64 {
         match response {
             StorageServiceResponse::NumberOfAccountsAtVersion(inner) => Ok(inner),
             _ => Err(UnexpectedResponseError(format!(
-                "expected NumberOfAccountsAtVersion found {}",
-                response.name()
+                "expected number_of_accounts_at_version, found {}",
+                response.get_label()
             ))),
         }
     }
@@ -139,8 +153,8 @@ impl TryFrom<StorageServiceResponse> for ServerProtocolVersion {
         match response {
             StorageServiceResponse::ServerProtocolVersion(inner) => Ok(inner),
             _ => Err(UnexpectedResponseError(format!(
-                "expected ServerProtocolVersion found {}",
-                response.name()
+                "expected server_protocol_version, found {}",
+                response.get_label()
             ))),
         }
     }
@@ -152,8 +166,8 @@ impl TryFrom<StorageServiceResponse> for StorageServerSummary {
         match response {
             StorageServiceResponse::StorageServerSummary(inner) => Ok(inner),
             _ => Err(UnexpectedResponseError(format!(
-                "expected StorageServerSummary found {}",
-                response.name()
+                "expected storage_server_summary, found {}",
+                response.get_label()
             ))),
         }
     }
@@ -165,8 +179,8 @@ impl TryFrom<StorageServiceResponse> for TransactionOutputListWithProof {
         match response {
             StorageServiceResponse::TransactionOutputsWithProof(inner) => Ok(inner),
             _ => Err(UnexpectedResponseError(format!(
-                "expected TransactionOutputsWithProof found {}",
-                response.name()
+                "expected transaction_outputs_with_proof, found {}",
+                response.get_label()
             ))),
         }
     }
@@ -178,8 +192,8 @@ impl TryFrom<StorageServiceResponse> for TransactionListWithProof {
         match response {
             StorageServiceResponse::TransactionsWithProof(inner) => Ok(inner),
             _ => Err(UnexpectedResponseError(format!(
-                "expected TransactionsWithProof found {}",
-                response.name()
+                "expected transactions_with_proof, found {}",
+                response.get_label()
             ))),
         }
     }

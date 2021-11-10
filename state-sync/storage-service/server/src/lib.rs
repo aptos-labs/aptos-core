@@ -4,6 +4,7 @@
 #![forbid(unsafe_code)]
 
 mod logging;
+mod metrics;
 pub mod network;
 
 #[cfg(test)]
@@ -11,8 +12,10 @@ mod tests;
 
 use crate::{
     logging::{LogEntry, LogSchema},
+    metrics::{increment_counter, start_timer},
     network::StorageServiceNetworkEvents,
 };
+use ::network::ProtocolId;
 use bounded_executor::BoundedExecutor;
 use diem_config::config::StorageServiceConfig;
 use diem_logger::prelude::*;
@@ -41,7 +44,6 @@ use tokio::runtime::Handle;
 /// Storage server constants.
 pub const STORAGE_SERVER_VERSION: u64 = 1;
 
-// TODO(philiphayes): is this error type providing enough value?
 #[derive(Clone, Debug, Deserialize, Error, PartialEq, Serialize)]
 pub enum Error {
     #[error("Invalid request received: {0}")]
@@ -50,6 +52,17 @@ pub enum Error {
     StorageErrorEncountered(String),
     #[error("Unexpected error encountered: {0}")]
     UnexpectedErrorEncountered(String),
+}
+
+impl Error {
+    /// Returns a summary label for the error type
+    fn get_label(&self) -> &'static str {
+        match self {
+            Error::InvalidRequest(_) => "invalid_request",
+            Error::StorageErrorEncountered(_) => "storage_error",
+            Error::UnexpectedErrorEncountered(_) => "unexpected_error",
+        }
+    }
 }
 
 /// The server-side actor for the storage service. Handles inbound storage
@@ -98,7 +111,7 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
             let config = self.config;
             self.bounded_executor
                 .spawn_blocking(move || {
-                    let response = Handler::new(config, storage).call(request);
+                    let response = Handler::new(config, storage).call(protocol, request);
                     debug!(LogSchema::new(LogEntry::SentStorageResponse).response(&response));
                     response_sender.send(response);
                 })
@@ -121,7 +134,26 @@ impl<T: StorageReaderInterface> Handler<T> {
         Self { config, storage }
     }
 
-    pub fn call(&self, request: StorageServiceRequest) -> Result<StorageServiceResponse> {
+    pub fn call(
+        &self,
+        protocol: ProtocolId,
+        request: StorageServiceRequest,
+    ) -> Result<StorageServiceResponse> {
+        // Update the request count
+        increment_counter(
+            &metrics::STORAGE_REQUESTS_RECEIVED,
+            protocol,
+            request.get_label().into(),
+        );
+
+        // Time the request processing (the timer will stop when it's dropped)
+        let _timer = start_timer(
+            &metrics::STORAGE_REQUEST_PROCESSING_LATENCY,
+            protocol,
+            request.get_label().into(),
+        );
+
+        // Process the request
         let response = match &request {
             StorageServiceRequest::GetAccountStatesChunkWithProof(request) => {
                 self.get_account_states_chunk_with_proof(request)
@@ -142,14 +174,28 @@ impl<T: StorageReaderInterface> Handler<T> {
             }
         };
 
-        // If any requests resulted in an unexpected error, log and return the
-        // error to the client.
-        response.map_err(|error| {
-            error!(LogSchema::new(LogEntry::StorageServiceError)
-                .error(&error)
-                .request(&request));
-            StorageServiceError::InternalError(error.to_string())
-        })
+        // If the request resulted in an unexpected error, return an internal error
+        match response {
+            Err(error) => {
+                increment_counter(
+                    &metrics::STORAGE_ERRORS_ENCOUNTERED,
+                    protocol,
+                    error.get_label().into(),
+                );
+                error!(LogSchema::new(LogEntry::StorageServiceError)
+                    .error(&error)
+                    .request(&request));
+                Err(StorageServiceError::InternalError(error.to_string()))
+            }
+            Ok(response) => {
+                increment_counter(
+                    &metrics::STORAGE_RESPONSES_SENT,
+                    protocol,
+                    response.get_label().into(),
+                );
+                Ok(response)
+            }
+        }
     }
 
     fn get_account_states_chunk_with_proof(
