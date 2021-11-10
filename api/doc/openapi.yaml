@@ -213,7 +213,7 @@ paths:
           * Serialize [SignedTransaction](https://diem.github.io/diem/diem_types/transaction/struct.SignedTransaction.html)
             into BCS bytes.
           * Submit the [SignedTransaction](https://diem.github.io/diem/diem_types/transaction/struct.SignedTransaction.html)
-            BCS bytes (do not hex-encoded it). The request header "Content-Type" must set to "application/vnd.bcs+signed_transaction".
+            BCS bytes (do not hex-encoded it). The request header "Content-Type" must set to "application/x.diem.signed_transaction+bcs".
       tags:
         - transactions
       requestBody:
@@ -224,7 +224,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/SubmitTransactionRequest'
-          application/vnd.bcs+signed_transaction:
+          application/x.diem.signed_transaction+bcs:
             schema:
               type: string
               format: binary

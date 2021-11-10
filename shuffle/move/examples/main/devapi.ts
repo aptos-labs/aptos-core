@@ -100,7 +100,7 @@ export async function postTransactionBcs(
     method: "POST",
     body: body,
     headers: {
-      "Content-Type": "application/vnd.bcs+signed_transaction",
+      "Content-Type": "application/x.diem.signed_transaction+bcs",
     },
   };
   return await checkingFetch(context.relativeUrl("/transactions"), settings);
