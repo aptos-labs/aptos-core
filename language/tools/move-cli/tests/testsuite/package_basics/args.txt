@@ -1,5 +1,5 @@
 package build
-package test --coverage
+package test --coverage --threads 1
 package coverage summary --summarize-functions
 package coverage source --module AModule
 package coverage bytecode --module AModule

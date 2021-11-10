@@ -43,8 +43,8 @@ include_dir = "0.6.0"
 
 [dev-dependencies]
 datatest-stable = "0.1.1"
-move-unit-test = { path = "../../language/tools/move-unit-test" }
 diem-vm = { path = "../../diem-move/diem-vm" }
+move-cli = { path = "../../language/tools/move-cli" }
 
 tempfile = "3.2.0"
 dir-diff = "0.3.2"

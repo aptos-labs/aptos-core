@@ -1,13 +1,13 @@
 Command `package build`:
 BUILDING MoveStdlib
 BUILDING PackageBasics
-Command `package test --coverage`:
+Command `package test --coverage --threads 1`:
 BUILDING MoveStdlib
 BUILDING PackageBasics
 Running Move unit tests
 [ PASS    ] 0x1::AModule::double_three
-[ PASS    ] 0x1::AModuleTests::double_one_one
 [ PASS    ] 0x1::AModule::double_two
+[ PASS    ] 0x1::AModuleTests::double_one_one
 [ PASS    ] 0x1::AModuleTests::double_three
 [ PASS    ] 0x1::AModuleTests::double_zero_zero
 [ PASS    ] 0x1::AModuleTests::double_zero_zero_wrong

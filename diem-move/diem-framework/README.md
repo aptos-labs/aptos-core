@@ -17,9 +17,9 @@ files. See the [Layout](#layout) section for a more detailed overview of the str
 ## Documentation
 
 Each of the main components of the Diem Framework and contributing guidelines are documented separately. Particularly:
-* Documentation for the set of allowed transaction script can be found in [script_documentation/script_documentation.md](script_documentation/script_documentation.md).
-* The overview documentation for the Move modules can be found in [core/doc/overview.md](core/doc/overview.md).
-* An overview of the approach to formal verification of the framework can be found in [script_documentation/spec_documentation.md](script_documentation/spec_documentation.md).
+* Documentation for the set of allowed transaction scripts in DPN can be found in [script_documentation.md](DPN/releases/artifacts/current/build/DiemCoreFramework/docs/script_documentation.md).
+* The overview documentation for the Move modules can be found in [overview.md](DPN/releases/artifacts/current/build/DiemCoreFramework/docs/overview.md).
+* An overview of the approach to formal verification of the framework can be found in [spec_documentation.md](DPN/releases/artifacts/current/build/DiemCoreFramework/docs/spec_documentation.md).
 * Contributing guidelines and basic coding standards for the Diem Framework can be found in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Compilation and Generation

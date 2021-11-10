@@ -58,6 +58,19 @@ pub struct BuildConfig {
     pub force_recompilation: bool,
 }
 
+impl Default for BuildConfig {
+    fn default() -> Self {
+        Self {
+            dev_mode: false,
+            test_mode: false,
+            generate_docs: false,
+            generate_abis: false,
+            install_dir: None,
+            force_recompilation: false,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd)]
 pub struct ModelConfig {
     pub all_files_as_targets: bool,
