@@ -11,24 +11,16 @@ use diem_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey,
 use diem_logger::Level;
 use diem_types::{
     account_address::AccountAddress,
-    account_state_blob::{default_protocol::AccountStateWithProof, AccountStateBlob},
     block_info::BlockInfo,
     chain_id::ChainId,
-    contract_event::{
-        default_protocol::{EventByVersionWithProof, EventWithProof},
-        ContractEvent,
-    },
+    contract_event::ContractEvent,
     epoch_change::EpochChangeProof,
     event::EventKey,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    proof::{SparseMerkleProof, TransactionInfoListWithProof},
+    proof::TransactionInfoListWithProof,
     protocol_spec::DpnProto,
-    state_proof::StateProof,
     transaction::{
-        default_protocol::{
-            AccountTransactionsWithProof, TransactionListWithProof, TransactionOutputListWithProof,
-            TransactionWithProof,
-        },
+        default_protocol::{TransactionListWithProof, TransactionOutputListWithProof},
         RawTransaction, Script, SignedTransaction, Transaction, TransactionOutput,
         TransactionPayload, TransactionStatus, Version,
     },
@@ -44,7 +36,7 @@ use network::{
     },
 };
 use std::{collections::BTreeMap, sync::Arc};
-use storage_interface::{DbReader, Order, StartupInfo, TreeState};
+use storage_interface::DbReader;
 use storage_service_types::{
     AccountStatesChunkWithProofRequest, CompleteDataRange, DataSummary,
     EpochEndingLedgerInfoRequest, ProtocolMetadata, ServerProtocolVersion, StorageServerSummary,
@@ -450,28 +442,6 @@ impl DbReader<DpnProto> for MockDbReader {
         })
     }
 
-    fn get_transaction_by_hash(
-        &self,
-        _hash: HashValue,
-        _ledger_version: Version,
-        _fetch_events: bool,
-    ) -> Result<Option<TransactionWithProof>> {
-        unimplemented!()
-    }
-
-    fn get_transaction_by_version(
-        &self,
-        _version: u64,
-        _ledger_version: Version,
-        _fetch_events: bool,
-    ) -> Result<TransactionWithProof> {
-        unimplemented!()
-    }
-
-    fn get_first_write_set_version(&self) -> Result<Option<Version>> {
-        unimplemented!()
-    }
-
     fn get_transaction_outputs(
         &self,
         start_version: Version,
@@ -493,124 +463,9 @@ impl DbReader<DpnProto> for MockDbReader {
         })
     }
 
-    /// Returns events by given event key
-    fn get_events(
-        &self,
-        _event_key: &EventKey,
-        _start: u64,
-        _order: Order,
-        _limit: u64,
-    ) -> Result<Vec<(u64, ContractEvent)>> {
-        unimplemented!()
-    }
-
-    /// Returns events by given event key
-    fn get_events_with_proofs(
-        &self,
-        _event_key: &EventKey,
-        _start: u64,
-        _order: Order,
-        _limit: u64,
-        _known_version: Option<u64>,
-    ) -> Result<Vec<EventWithProof>> {
-        unimplemented!()
-    }
-
-    fn get_block_timestamp(&self, _version: u64) -> Result<u64> {
-        unimplemented!()
-    }
-
-    fn get_event_by_version_with_proof(
-        &self,
-        _event_key: &EventKey,
-        _version: u64,
-        _proof_version: u64,
-    ) -> Result<EventByVersionWithProof> {
-        unimplemented!()
-    }
-
-    fn get_latest_account_state(
-        &self,
-        _address: AccountAddress,
-    ) -> Result<Option<AccountStateBlob>> {
-        unimplemented!()
-    }
-
     /// Returns the latest ledger info.
     fn get_latest_ledger_info(&self) -> Result<LedgerInfoWithSignatures> {
         Ok(create_test_ledger_info_with_sigs(10, 100))
-    }
-
-    fn get_startup_info(&self) -> Result<Option<StartupInfo>> {
-        unimplemented!()
-    }
-
-    fn get_account_transaction(
-        &self,
-        _address: AccountAddress,
-        _seq_num: u64,
-        _include_events: bool,
-        _ledger_version: Version,
-    ) -> Result<Option<TransactionWithProof>> {
-        unimplemented!()
-    }
-
-    fn get_account_transactions(
-        &self,
-        _address: AccountAddress,
-        _start_seq_num: u64,
-        _limit: u64,
-        _include_events: bool,
-        _ledger_version: Version,
-    ) -> Result<AccountTransactionsWithProof> {
-        unimplemented!()
-    }
-
-    fn get_state_proof_with_ledger_info(
-        &self,
-        _known_version: u64,
-        _ledger_info: LedgerInfoWithSignatures,
-    ) -> Result<StateProof> {
-        unimplemented!()
-    }
-
-    fn get_state_proof(&self, _known_version: u64) -> Result<StateProof> {
-        unimplemented!()
-    }
-
-    fn get_account_state_with_proof(
-        &self,
-        _address: AccountAddress,
-        _version: Version,
-        _ledger_version: Version,
-    ) -> Result<AccountStateWithProof> {
-        unimplemented!()
-    }
-
-    fn get_account_state_with_proof_by_version(
-        &self,
-        _address: AccountAddress,
-        _version: Version,
-    ) -> Result<(
-        Option<AccountStateBlob>,
-        SparseMerkleProof<AccountStateBlob>,
-    )> {
-        unimplemented!()
-    }
-
-    fn get_latest_state_root(&self) -> Result<(Version, HashValue)> {
-        unimplemented!()
-    }
-
-    fn get_latest_tree_state(&self) -> Result<TreeState> {
-        unimplemented!()
-    }
-
-    fn get_epoch_ending_ledger_info(
-        &self,
-        _known_version: u64,
-    ) -> Result<LedgerInfoWithSignatures> {
-        unimplemented!()
     }
 }
 

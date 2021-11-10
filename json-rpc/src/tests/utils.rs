@@ -29,8 +29,7 @@ use diem_types::{
     state_proof::StateProof,
     transaction::{
         default_protocol::{
-            AccountTransactionsWithProof, TransactionListWithProof, TransactionOutputListWithProof,
-            TransactionWithProof,
+            AccountTransactionsWithProof, TransactionListWithProof, TransactionWithProof,
         },
         Transaction, TransactionInfo, TransactionInfoTrait, Version,
     },
@@ -57,7 +56,7 @@ use std::{
     net::SocketAddr,
     sync::Arc,
 };
-use storage_interface::{DbReader, MoveDbReader, Order, StartupInfo, TreeState};
+use storage_interface::{DbReader, MoveDbReader, Order};
 use tokio::runtime::Runtime;
 
 /// Creates JSON RPC server for a Validator node
@@ -260,37 +259,6 @@ impl DbReader<DpnProto> for MockDiemDB {
         })
     }
 
-    fn get_transaction_by_hash(
-        &self,
-        _hash: HashValue,
-        _ledger_version: Version,
-        _fetch_events: bool,
-    ) -> Result<Option<TransactionWithProof>> {
-        unimplemented!()
-    }
-
-    fn get_transaction_by_version(
-        &self,
-        _version: u64,
-        _ledger_version: Version,
-        _fetch_events: bool,
-    ) -> Result<TransactionWithProof> {
-        unimplemented!()
-    }
-
-    fn get_first_write_set_version(&self) -> Result<Option<Version>> {
-        unimplemented!()
-    }
-
-    fn get_transaction_outputs(
-        &self,
-        _start_version: Version,
-        _limit: u64,
-        _ledger_version: Version,
-    ) -> Result<TransactionOutputListWithProof> {
-        unimplemented!()
-    }
-
     fn get_events(
         &self,
         key: &EventKey,
@@ -369,10 +337,6 @@ impl DbReader<DpnProto> for MockDiemDB {
             .clone())
     }
 
-    fn get_startup_info(&self) -> Result<Option<StartupInfo>> {
-        unimplemented!()
-    }
-
     fn get_account_state_with_proof_by_version(
         &self,
         address: AccountAddress,
@@ -385,26 +349,6 @@ impl DbReader<DpnProto> for MockDiemDB {
             self.get_latest_account_state(address)?,
             SparseMerkleProof::new(None, vec![]),
         ))
-    }
-
-    fn get_latest_state_root(&self) -> Result<(u64, HashValue)> {
-        unimplemented!()
-    }
-
-    fn get_latest_tree_state(&self) -> Result<TreeState> {
-        unimplemented!()
-    }
-
-    fn get_epoch_ending_ledger_infos(
-        &self,
-        _start_epoch: u64,
-        _end_epoch: u64,
-    ) -> Result<EpochChangeProof> {
-        unimplemented!()
-    }
-
-    fn get_epoch_ending_ledger_info(&self, _: u64) -> Result<LedgerInfoWithSignatures> {
-        unimplemented!()
     }
 
     fn get_block_timestamp(&self, version: u64) -> Result<u64> {

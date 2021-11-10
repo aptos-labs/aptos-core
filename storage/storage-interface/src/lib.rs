@@ -169,6 +169,7 @@ pub enum Order {
 
 /// Trait that is implemented by a DB that supports certain public (to client) read APIs
 /// expected of a Diem DB
+#[allow(unused_variables)]
 pub trait DbReader<PS: ProtocolSpec>: Send + Sync {
     /// See [`DiemDB::get_epoch_ending_ledger_infos`].
     ///
@@ -178,7 +179,9 @@ pub trait DbReader<PS: ProtocolSpec>: Send + Sync {
         &self,
         start_epoch: u64,
         end_epoch: u64,
-    ) -> Result<EpochChangeProof>;
+    ) -> Result<EpochChangeProof> {
+        unimplemented!()
+    }
 
     /// See [`DiemDB::get_transactions`].
     ///
@@ -189,7 +192,9 @@ pub trait DbReader<PS: ProtocolSpec>: Send + Sync {
         batch_size: u64,
         ledger_version: Version,
         fetch_events: bool,
-    ) -> Result<TransactionListWithProof<PS::TransactionInfo>>;
+    ) -> Result<TransactionListWithProof<PS::TransactionInfo>> {
+        unimplemented!()
+    }
 
     /// See [`DiemDB::get_transaction_by_hash`].
     ///
@@ -199,7 +204,9 @@ pub trait DbReader<PS: ProtocolSpec>: Send + Sync {
         hash: HashValue,
         ledger_version: Version,
         fetch_events: bool,
-    ) -> Result<Option<TransactionWithProof<PS::TransactionInfo>>>;
+    ) -> Result<Option<TransactionWithProof<PS::TransactionInfo>>> {
+        unimplemented!()
+    }
 
     /// See [`DiemDB::get_transaction_by_version`].
     ///
@@ -209,12 +216,16 @@ pub trait DbReader<PS: ProtocolSpec>: Send + Sync {
         version: Version,
         ledger_version: Version,
         fetch_events: bool,
-    ) -> Result<TransactionWithProof<PS::TransactionInfo>>;
+    ) -> Result<TransactionWithProof<PS::TransactionInfo>> {
+        unimplemented!()
+    }
 
     /// See [`DiemDB::get_first_write_set_version`].
     ///
     /// [`DiemDB::get_first_write_set_version`]: ../diemdb/struct.DiemDB.html#method.get_first_write_set_version
-    fn get_first_write_set_version(&self) -> Result<Option<Version>>;
+    fn get_first_write_set_version(&self) -> Result<Option<Version>> {
+        unimplemented!()
+    }
 
     /// See [`DiemDB::get_transaction_outputs`].
     ///
@@ -224,7 +235,9 @@ pub trait DbReader<PS: ProtocolSpec>: Send + Sync {
         start_version: Version,
         limit: u64,
         ledger_version: Version,
-    ) -> Result<TransactionOutputListWithProof<PS::TransactionInfo>>;
+    ) -> Result<TransactionOutputListWithProof<PS::TransactionInfo>> {
+        unimplemented!()
+    }
 
     /// Returns events by given event key
     fn get_events(
@@ -233,7 +246,9 @@ pub trait DbReader<PS: ProtocolSpec>: Send + Sync {
         start: u64,
         order: Order,
         limit: u64,
-    ) -> Result<Vec<(u64, ContractEvent)>>;
+    ) -> Result<Vec<(u64, ContractEvent)>> {
+        unimplemented!()
+    }
 
     /// Returns events by given event key
     fn get_events_with_proofs(
@@ -243,13 +258,17 @@ pub trait DbReader<PS: ProtocolSpec>: Send + Sync {
         order: Order,
         limit: u64,
         known_version: Option<u64>,
-    ) -> Result<Vec<EventWithProof<PS::TransactionInfo>>>;
+    ) -> Result<Vec<EventWithProof<PS::TransactionInfo>>> {
+        unimplemented!()
+    }
 
     /// See [`DiemDB::get_block_timestamp`].
     ///
     /// [`DiemDB::get_block_timestamp`]:
     /// ../diemdb/struct.DiemDB.html#method.get_block_timestamp
-    fn get_block_timestamp(&self, version: u64) -> Result<u64>;
+    fn get_block_timestamp(&self, version: u64) -> Result<u64> {
+        unimplemented!()
+    }
 
     /// Returns the [`NewBlockEvent`] for the block containing the requested
     /// `version` and proof that the block actually contains the `version`.
@@ -258,7 +277,9 @@ pub trait DbReader<PS: ProtocolSpec>: Send + Sync {
         event_key: &EventKey,
         event_version: u64,
         proof_version: u64,
-    ) -> Result<EventByVersionWithProof<PS::TransactionInfo>>;
+    ) -> Result<EventByVersionWithProof<PS::TransactionInfo>> {
+        unimplemented!()
+    }
 
     /// Gets the version of the last transaction committed before timestamp,
     /// a commited block at or after the required timestamp must exist (otherwise it's possible
@@ -275,11 +296,17 @@ pub trait DbReader<PS: ProtocolSpec>: Send + Sync {
     ///
     /// [`DiemDB::get_latest_account_state`]:
     /// ../diemdb/struct.DiemDB.html#method.get_latest_account_state
-    fn get_latest_account_state(&self, address: AccountAddress)
-        -> Result<Option<AccountStateBlob>>;
+    fn get_latest_account_state(
+        &self,
+        address: AccountAddress,
+    ) -> Result<Option<AccountStateBlob>> {
+        unimplemented!()
+    }
 
     /// Returns the latest ledger info.
-    fn get_latest_ledger_info(&self) -> Result<LedgerInfoWithSignatures>;
+    fn get_latest_ledger_info(&self) -> Result<LedgerInfoWithSignatures> {
+        unimplemented!()
+    }
 
     /// Returns the latest ledger info.
     fn get_latest_version(&self) -> Result<Version> {
@@ -298,7 +325,9 @@ pub trait DbReader<PS: ProtocolSpec>: Send + Sync {
     ///
     /// [`DiemDB::get_startup_info`]:
     /// ../diemdb/struct.DiemDB.html#method.get_startup_info
-    fn get_startup_info(&self) -> Result<Option<StartupInfo>>;
+    fn get_startup_info(&self) -> Result<Option<StartupInfo>> {
+        unimplemented!()
+    }
 
     /// Returns a transaction that is the `seq_num`-th one associated with the given account. If
     /// the transaction with given `seq_num` doesn't exist, returns `None`.
@@ -308,7 +337,9 @@ pub trait DbReader<PS: ProtocolSpec>: Send + Sync {
         seq_num: u64,
         include_events: bool,
         ledger_version: Version,
-    ) -> Result<Option<TransactionWithProof<PS::TransactionInfo>>>;
+    ) -> Result<Option<TransactionWithProof<PS::TransactionInfo>>> {
+        unimplemented!()
+    }
 
     /// Returns the list of transactions sent by an account with `address` starting
     /// at sequence number `seq_num`. Will return no more than `limit` transactions.
@@ -321,7 +352,9 @@ pub trait DbReader<PS: ProtocolSpec>: Send + Sync {
         limit: u64,
         include_events: bool,
         ledger_version: Version,
-    ) -> Result<AccountTransactionsWithProof<PS::TransactionInfo>>;
+    ) -> Result<AccountTransactionsWithProof<PS::TransactionInfo>> {
+        unimplemented!()
+    }
 
     /// Returns proof of new state for a given ledger info with signatures relative to version known
     /// to client
@@ -329,10 +362,14 @@ pub trait DbReader<PS: ProtocolSpec>: Send + Sync {
         &self,
         known_version: u64,
         ledger_info: LedgerInfoWithSignatures,
-    ) -> Result<StateProof>;
+    ) -> Result<StateProof> {
+        unimplemented!()
+    }
 
     /// Returns proof of new state relative to version known to client
-    fn get_state_proof(&self, known_version: u64) -> Result<StateProof>;
+    fn get_state_proof(&self, known_version: u64) -> Result<StateProof> {
+        unimplemented!()
+    }
 
     /// Returns the account state corresponding to the given version and account address with proof
     /// based on `ledger_version`
@@ -341,7 +378,9 @@ pub trait DbReader<PS: ProtocolSpec>: Send + Sync {
         address: AccountAddress,
         version: Version,
         ledger_version: Version,
-    ) -> Result<AccountStateWithProof<PS::TransactionInfo>>;
+    ) -> Result<AccountStateWithProof<PS::TransactionInfo>> {
+        unimplemented!()
+    }
 
     // Gets an account state by account address, out of the ledger state indicated by the state
     // Merkle tree root with a sparse merkle proof proving state tree root.
@@ -358,20 +397,28 @@ pub trait DbReader<PS: ProtocolSpec>: Send + Sync {
     ) -> Result<(
         Option<AccountStateBlob>,
         SparseMerkleProof<AccountStateBlob>,
-    )>;
+    )> {
+        unimplemented!()
+    }
 
     /// See [`DiemDB::get_latest_state_root`].
     ///
     /// [`DiemDB::get_latest_state_root`]:
     /// ../diemdb/struct.DiemDB.html#method.get_latest_state_root
-    fn get_latest_state_root(&self) -> Result<(Version, HashValue)>;
+    fn get_latest_state_root(&self) -> Result<(Version, HashValue)> {
+        unimplemented!()
+    }
 
     /// Gets the latest TreeState no matter if db has been bootstrapped.
     /// Used by the Db-bootstrapper.
-    fn get_latest_tree_state(&self) -> Result<TreeState>;
+    fn get_latest_tree_state(&self) -> Result<TreeState> {
+        unimplemented!()
+    }
 
     /// Get the ledger info of the epoch that `known_version` belongs to.
-    fn get_epoch_ending_ledger_info(&self, known_version: u64) -> Result<LedgerInfoWithSignatures>;
+    fn get_epoch_ending_ledger_info(&self, known_version: u64) -> Result<LedgerInfoWithSignatures> {
+        unimplemented!()
+    }
 
     /// Gets the latest transaction info.
     /// N.B. Unlike get_startup_info(), even if the db is not bootstrapped, this can return `Some`
@@ -488,6 +535,7 @@ impl<PS: ProtocolSpec> MoveStorage for &dyn DbReader<PS> {
 
 /// Trait that is implemented by a DB that supports certain public (to client) write APIs
 /// expected of a Diem DB. This adds write APIs to DbReader.
+#[allow(unused_variables)]
 pub trait DbWriter<PS: ProtocolSpec>: Send + Sync {
     /// Persist transactions. Called by the executor module when either syncing nodes or committing
     /// blocks during normal operation.
@@ -499,7 +547,9 @@ pub trait DbWriter<PS: ProtocolSpec>: Send + Sync {
         txns_to_commit: &[TransactionToCommit],
         first_version: Version,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
-    ) -> Result<()>;
+    ) -> Result<()> {
+        unimplemented!()
+    }
 }
 
 pub trait MoveDbReader<PS: ProtocolSpec>:
