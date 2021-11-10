@@ -1,8 +1,8 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use move_binary_format::errors::PartialVMResult;
-use move_core_types::gas_schedule::GasAlgebra;
+use move_binary_format::errors::{PartialVMError, PartialVMResult};
+use move_core_types::{gas_schedule::GasAlgebra, vm_status::StatusCode};
 use move_vm_runtime::native_functions::NativeContext;
 use move_vm_types::{
     gas_schedule::NativeCostIndex,
@@ -68,7 +68,11 @@ pub fn native_borrow(
     let idx = pop_arg!(args, u64) as usize;
     let r = pop_arg!(args, VectorRef);
     let cost = native_gas(context.cost_table(), NativeCostIndex::BORROW, 1);
-    NativeResult::map_partial_vm_result_one(cost, r.borrow_elem(idx, &ty_args[0]))
+    NativeResult::map_partial_vm_result_one(
+        cost,
+        r.borrow_elem(idx, &ty_args[0])
+            .map_err(native_error_to_abort),
+    )
 }
 
 pub fn native_pop(
@@ -81,7 +85,7 @@ pub fn native_pop(
 
     let r = pop_arg!(args, VectorRef);
     let cost = native_gas(context.cost_table(), NativeCostIndex::POP_BACK, 1);
-    NativeResult::map_partial_vm_result_one(cost, r.pop(&ty_args[0]))
+    NativeResult::map_partial_vm_result_one(cost, r.pop(&ty_args[0]).map_err(native_error_to_abort))
 }
 
 pub fn native_destroy_empty(
@@ -94,7 +98,10 @@ pub fn native_destroy_empty(
 
     let v = pop_arg!(args, Vector);
     let cost = native_gas(context.cost_table(), NativeCostIndex::DESTROY_EMPTY, 1);
-    NativeResult::map_partial_vm_result_empty(cost, v.destroy_empty(&ty_args[0]))
+    NativeResult::map_partial_vm_result_empty(
+        cost,
+        v.destroy_empty(&ty_args[0]).map_err(native_error_to_abort),
+    )
 }
 
 pub fn native_swap(
@@ -109,5 +116,26 @@ pub fn native_swap(
     let idx1 = pop_arg!(args, u64) as usize;
     let r = pop_arg!(args, VectorRef);
     let cost = native_gas(context.cost_table(), NativeCostIndex::SWAP, 1);
-    NativeResult::map_partial_vm_result_empty(cost, r.swap(idx1, idx2, &ty_args[0]))
+    NativeResult::map_partial_vm_result_empty(
+        cost,
+        r.swap(idx1, idx2, &ty_args[0])
+            .map_err(native_error_to_abort),
+    )
+}
+
+fn native_error_to_abort(err: PartialVMError) -> PartialVMError {
+    let (major_status, sub_status_opt, message_opt, indices, offsets) = err.all_data();
+    let new_err = match major_status {
+        StatusCode::VECTOR_OPERATION_ERROR => PartialVMError::new(StatusCode::ABORTED),
+        _ => PartialVMError::new(major_status),
+    };
+    let new_err = match sub_status_opt {
+        None => new_err,
+        Some(code) => new_err.with_sub_status(code),
+    };
+    let new_err = match message_opt {
+        None => new_err,
+        Some(message) => new_err.with_message(message),
+    };
+    new_err.at_indices(indices).at_code_offsets(offsets)
 }

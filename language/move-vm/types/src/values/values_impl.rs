@@ -1602,9 +1602,8 @@ impl VectorRef {
         let c = self.0.container();
         check_elem_layout(type_param, c)?;
         if idx >= c.len() {
-            return Err(
-                PartialVMError::new(StatusCode::ABORTED).with_sub_status(INDEX_OUT_OF_BOUNDS)
-            );
+            return Err(PartialVMError::new(StatusCode::VECTOR_OPERATION_ERROR)
+                .with_sub_status(INDEX_OUT_OF_BOUNDS));
         }
         Ok(Value(self.0.borrow_elem(idx)?))
     }
@@ -1615,7 +1614,8 @@ impl VectorRef {
 
         macro_rules! err_pop_empty_vec {
             () => {
-                return Err(PartialVMError::new(StatusCode::ABORTED).with_sub_status(POP_EMPTY_VEC))
+                return Err(PartialVMError::new(StatusCode::VECTOR_OPERATION_ERROR)
+                    .with_sub_status(POP_EMPTY_VEC))
             };
         }
 
@@ -1659,7 +1659,7 @@ impl VectorRef {
             ($v: expr) => {{
                 let mut v = $v.borrow_mut();
                 if idx1 >= v.len() || idx2 >= v.len() {
-                    return Err(PartialVMError::new(StatusCode::ABORTED)
+                    return Err(PartialVMError::new(StatusCode::VECTOR_OPERATION_ERROR)
                         .with_sub_status(INDEX_OUT_OF_BOUNDS));
                 }
                 v.swap(idx1, idx2);
@@ -1765,7 +1765,7 @@ impl Vector {
         if expected_num as usize == elements.len() {
             Ok(elements)
         } else {
-            Err(PartialVMError::new(StatusCode::ABORTED)
+            Err(PartialVMError::new(StatusCode::VECTOR_OPERATION_ERROR)
                 .with_sub_status(VEC_UNPACK_PARITY_MISMATCH))
         }
     }

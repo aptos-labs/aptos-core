@@ -2,7 +2,7 @@ processed 3 tasks
 
 task 0 'run'. lines 1-10:
 Error: Script execution failed with VMError: {
-    major_status: ABORTED,
+    major_status: VECTOR_OPERATION_ERROR,
     sub_status: Some(1),
     location: script,
     indices: [],
@@ -11,7 +11,7 @@ Error: Script execution failed with VMError: {
 
 task 1 'run'. lines 12-21:
 Error: Script execution failed with VMError: {
-    major_status: ABORTED,
+    major_status: VECTOR_OPERATION_ERROR,
     sub_status: Some(1),
     location: script,
     indices: [],
@@ -20,7 +20,7 @@ Error: Script execution failed with VMError: {
 
 task 2 'run'. lines 23-31:
 Error: Script execution failed with VMError: {
-    major_status: ABORTED,
+    major_status: VECTOR_OPERATION_ERROR,
     sub_status: Some(1),
     location: script,
     indices: [],

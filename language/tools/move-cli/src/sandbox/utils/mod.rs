@@ -448,6 +448,10 @@ pub(crate) fn explain_execution_error(
                 ARITHMETIC_ERROR => "an arithmetic error (i.e., integer overflow/underflow, \
                                      div/mod by zero, or invalid shift)"
                     .to_string(),
+                VECTOR_OPERATION_ERROR => "an error originated from vector operations (i.e., \
+                                           index out of bound, pop an empty vector, or unpack a \
+                                           vector with a wrong parity)"
+                    .to_string(),
                 EXECUTION_STACK_OVERFLOW => "an execution stack overflow".to_string(),
                 CALL_STACK_OVERFLOW => "a call stack overflow".to_string(),
                 OUT_OF_GAS => "an out of gas error".to_string(),
