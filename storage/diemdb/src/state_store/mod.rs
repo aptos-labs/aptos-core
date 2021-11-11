@@ -12,19 +12,25 @@ use crate::{
     schema::{
         jellyfish_merkle_node::JellyfishMerkleNodeSchema, stale_node_index::StaleNodeIndexSchema,
     },
+    DiemDbError,
 };
-use anyhow::Result;
+use anyhow::{ensure, Result};
 use diem_crypto::HashValue;
-use diem_jellyfish_merkle::{node_type::NodeKey, JellyfishMerkleTree, TreeReader, TreeWriter};
+use diem_jellyfish_merkle::{
+    iterator::JellyfishMerkleIterator, node_type::NodeKey, restore::JellyfishMerkleRestore,
+    JellyfishMerkleTree, TreeReader, TreeWriter,
+};
 use diem_types::{
     account_address::{AccountAddress, HashAccountAddress},
-    account_state_blob::AccountStateBlob,
+    account_state_blob::{AccountStateBlob, AccountStatesChunkWithProof},
     nibble::{nibble_path::NibblePath, ROOT_NIBBLE_HEIGHT},
     proof::{SparseMerkleProof, SparseMerkleRangeProof},
     transaction::Version,
 };
+use itertools::process_results;
 use schemadb::{SchemaBatch, DB};
 use std::{collections::HashMap, sync::Arc};
+use storage_interface::StateSnapshotReceiver;
 
 type LeafNode = diem_jellyfish_merkle::node_type::LeafNode<AccountStateBlob>;
 type Node = diem_jellyfish_merkle::node_type::Node<AccountStateBlob>;
@@ -33,7 +39,7 @@ type NodeBatch = diem_jellyfish_merkle::NodeBatch<AccountStateBlob>;
 #[derive(Debug)]
 pub(crate) struct StateStore {
     db: Arc<DB>,
-    account_count_migration: bool,
+    pub account_count_migration: bool,
 }
 
 impl StateStore {
@@ -154,6 +160,49 @@ impl StateStore {
     pub fn get_account_count(&self, version: Version) -> Result<Option<usize>> {
         JellyfishMerkleTree::new_migration(self, self.account_count_migration)
             .get_leaf_count(version)
+    }
+
+    pub fn get_account_chunk_with_proof(
+        self: &Arc<Self>,
+        version: Version,
+        first_index: usize,
+        chunk_size: usize,
+    ) -> Result<AccountStatesChunkWithProof> {
+        let result_iter =
+            JellyfishMerkleIterator::new_by_index(Arc::clone(self), version, first_index)?
+                .take(chunk_size);
+        let account_blobs: Vec<(HashValue, AccountStateBlob)> =
+            process_results(result_iter, |iter| iter.collect())?;
+        ensure!(
+            !account_blobs.is_empty(),
+            DiemDbError::NotFound(format!("State chunk starting at {}", first_index)),
+        );
+        let last_index = (account_blobs.len() - 1 + first_index) as u64;
+        let first_key = account_blobs.first().expect("checked to exist").0;
+        let last_key = account_blobs.last().expect("checked to exist").0;
+        let proof = self.get_account_state_range_proof(last_key, version)?;
+
+        Ok(AccountStatesChunkWithProof {
+            first_index: first_index as u64,
+            last_index,
+            first_key,
+            last_key,
+            account_blobs,
+            proof,
+        })
+    }
+
+    pub fn get_snapshot_receiver(
+        self: &Arc<Self>,
+        version: Version,
+        expected_root_hash: HashValue,
+    ) -> Result<Box<dyn StateSnapshotReceiver<AccountStateBlob>>> {
+        Ok(Box::new(JellyfishMerkleRestore::new_overwrite(
+            Arc::clone(self),
+            version,
+            expected_root_hash,
+            self.account_count_migration,
+        )?))
     }
 }
 

@@ -7,7 +7,7 @@ use diem_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
     account_state::AccountState,
-    account_state_blob::{AccountStateBlob, AccountStateWithProof},
+    account_state_blob::{AccountStateBlob, AccountStateWithProof, AccountStatesChunkWithProof},
     contract_event::{ContractEvent, EventByVersionWithProof, EventWithProof},
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
@@ -16,7 +16,7 @@ use diem_types::{
     move_resource::MoveStorage,
     proof::{
         definition::LeafCount, AccumulatorConsistencyProof, SparseMerkleProof,
-        TransactionAccumulatorSummary,
+        SparseMerkleRangeProof, TransactionAccumulatorSummary,
     },
     protocol_spec::ProtocolSpec,
     state_proof::StateProof,
@@ -128,6 +128,18 @@ impl TreeState {
             "DB is empty, has no transaction or state."
         }
     }
+}
+
+pub trait StateSnapshotReceiver<V> {
+    fn add_chunk(
+        &mut self,
+        chunk: Vec<(HashValue, V)>,
+        proof: SparseMerkleRangeProof,
+    ) -> Result<()>;
+
+    fn finish(self) -> Result<()>;
+
+    fn finish_box(self: Box<Self>) -> Result<()>;
 }
 
 #[derive(Debug, Deserialize, Error, PartialEq, Serialize)]
@@ -477,6 +489,21 @@ pub trait DbReader<PS: ProtocolSpec>: Send + Sync {
             ledger_version,
         )
     }
+
+    /// Returns total number of accounts at given version.
+    fn get_account_count(&self, version: Version) -> Result<usize> {
+        unimplemented!()
+    }
+
+    /// Get a chunk of account data, addressed by the index of the account.
+    fn get_account_chunk_with_proof(
+        &self,
+        version: Version,
+        start_idx: usize,
+        chunk_size: usize,
+    ) -> Result<AccountStatesChunkWithProof> {
+        unimplemented!()
+    }
 }
 
 impl<PS: ProtocolSpec> MoveStorage for &dyn DbReader<PS> {
@@ -555,6 +582,17 @@ pub trait DbWriter<PS: ProtocolSpec>: Send + Sync {
         first_version: Version,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
     ) -> Result<()> {
+        unimplemented!()
+    }
+
+    /// Get a (stateful) state snapshot receiver.
+    ///
+    /// Chunk of accounts need to be added via `add_chunk()` before finishing up with `finish_box()`
+    fn get_state_snapshot_receiver(
+        &self,
+        version: Version,
+        expected_root_hash: HashValue,
+    ) -> Result<Box<dyn StateSnapshotReceiver<AccountStateBlob>>> {
         unimplemented!()
     }
 }

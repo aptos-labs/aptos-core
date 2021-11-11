@@ -2054,6 +2054,7 @@ dependencies = [
  "proptest-derive",
  "rand 0.8.4",
  "serde",
+ "storage-interface",
  "thiserror",
 ]
 

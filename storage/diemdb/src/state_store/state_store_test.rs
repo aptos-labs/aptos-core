@@ -15,6 +15,7 @@ use proptest::{
     prelude::*,
 };
 use std::collections::HashSet;
+use storage_interface::StateSnapshotReceiver;
 
 fn put_account_state_set(
     store: &StateStore,
@@ -265,7 +266,7 @@ proptest! {
     }
 
     #[test]
-    fn test_restore(
+    fn test_raw_restore(
         (input, batch1_size) in hash_map(any::<AccountAddress>(), any::<AccountStateBlob>(), 2..1000)
             .prop_flat_map(|input| {
                 let len = input.len();
@@ -320,6 +321,47 @@ proptest! {
 
         let actual_root_hash = store2.get_root_hash(version).unwrap();
         prop_assert_eq!(actual_root_hash, expected_root_hash);
+    }
+
+    #[test]
+    fn test_restore(
+        (input, batch_size) in hash_map(any::<AccountAddress>(), any::<AccountStateBlob>(), 2..1000)
+            .prop_flat_map(|input| {
+                let len = input.len();
+                (Just(input), 1..len*2)
+            })
+    ) {
+        let tmp_dir1 = TempPath::new();
+        let db1 = DiemDB::new_for_test(&tmp_dir1);
+        let store1 = &db1.state_store;
+        init_store(store1, input.clone().into_iter());
+
+        let version = (input.len() - 1) as Version;
+        let expected_root_hash = store1.get_root_hash(version).unwrap();
+        prop_assert_eq!(
+            store1.get_account_count(version).unwrap().unwrap(),
+            input.len()
+        );
+
+        let tmp_dir2 = TempPath::new();
+        let db2 = DiemDB::new_for_test(&tmp_dir2);
+        let store2 = &db2.state_store;
+
+        let mut restore = store2.get_snapshot_receiver(version, expected_root_hash).unwrap();
+        let mut current_idx = 0;
+        while current_idx < input.len() {
+            let chunk = store1.get_account_chunk_with_proof(version, current_idx, batch_size).unwrap();
+            restore.add_chunk(chunk.account_blobs, chunk.proof).unwrap();
+            current_idx += batch_size;
+        }
+
+        restore.finish_box().unwrap();
+        let actual_root_hash = store2.get_root_hash(version).unwrap();
+        prop_assert_eq!(actual_root_hash, expected_root_hash);
+        prop_assert_eq!(
+            store2.get_account_count(version).unwrap().unwrap(),
+            input.len()
+        );
     }
 
     #[test]

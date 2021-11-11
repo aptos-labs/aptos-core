@@ -29,6 +29,7 @@ use diem_types::{
 };
 use mirai_annotations::*;
 use std::sync::Arc;
+use storage_interface::StateSnapshotReceiver;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum ChildInfo<V> {
@@ -304,7 +305,7 @@ where
     /// Restores a chunk of accounts. This function will verify that the given chunk is correct
     /// using the proof and root hash, then write things to storage. If the chunk is invalid, an
     /// error will be returned and nothing will be written to storage.
-    pub fn add_chunk(
+    fn add_chunk_impl(
         &mut self,
         chunk: Vec<(HashValue, V)>,
         proof: SparseMerkleRangeProof,
@@ -660,7 +661,7 @@ where
 
     /// Finishes the restoration process. This tells the code that there is no more account,
     /// otherwise we can not freeze the rightmost leaf and its ancestors.
-    pub fn finish(mut self) -> Result<()> {
+    fn finish_impl(mut self) -> Result<()> {
         // Deal with the special case when the entire tree has a single leaf.
         if self.partial_nodes.len() == 1 {
             let mut num_children = 0;
@@ -687,5 +688,23 @@ where
 
         self.freeze(0);
         self.store.write_node_batch(&self.frozen_nodes)
+    }
+}
+
+impl<V: crate::Value> StateSnapshotReceiver<V> for JellyfishMerkleRestore<V> {
+    fn add_chunk(
+        &mut self,
+        chunk: Vec<(HashValue, V)>,
+        proof: SparseMerkleRangeProof,
+    ) -> Result<()> {
+        self.add_chunk_impl(chunk, proof)
+    }
+
+    fn finish(self) -> Result<()> {
+        self.finish_impl()
+    }
+
+    fn finish_box(self: Box<Self>) -> Result<()> {
+        self.finish_impl()
     }
 }

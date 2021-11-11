@@ -30,6 +30,7 @@ use diem_types::{
     transaction::{TransactionInfoTrait, Version},
 };
 use std::sync::Arc;
+use storage_interface::StateSnapshotReceiver;
 use structopt::StructOpt;
 
 #[derive(StructOpt)]

@@ -11,6 +11,7 @@ use diem_crypto::HashValue;
 use diem_types::transaction::Version;
 use proptest::{collection::btree_map, prelude::*};
 use std::{collections::BTreeMap, sync::Arc};
+use storage_interface::StateSnapshotReceiver;
 
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(10))]
@@ -143,7 +144,7 @@ fn restore_without_interruption<V>(
             .add_chunk(vec![(*key, value.clone())], proof)
             .unwrap();
     }
-    restore.finish().unwrap();
+    Box::new(restore).finish().unwrap();
 
     assert_success(target_db, expected_root_hash, btree, target_version);
 }

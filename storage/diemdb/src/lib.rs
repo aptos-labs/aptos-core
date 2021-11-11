@@ -62,7 +62,9 @@ use diem_logger::prelude::*;
 use diem_types::{
     account_address::AccountAddress,
     account_state::AccountState,
-    account_state_blob::{default_protocol::AccountStateWithProof, AccountStateBlob},
+    account_state_blob::{
+        default_protocol::AccountStateWithProof, AccountStateBlob, AccountStatesChunkWithProof,
+    },
     contract_event::{
         default_protocol::{EventByVersionWithProof, EventWithProof},
         ContractEvent,
@@ -101,7 +103,9 @@ use std::{
     thread::{self, JoinHandle},
     time::{Duration, Instant},
 };
-use storage_interface::{DbReader, DbWriter, MoveDbReader, Order, StartupInfo, TreeState};
+use storage_interface::{
+    DbReader, DbWriter, MoveDbReader, Order, StartupInfo, StateSnapshotReceiver, TreeState,
+};
 
 const MAX_LIMIT: u64 = 1000;
 
@@ -1170,6 +1174,31 @@ impl DbReader<DpnProto> for DiemDB {
                 .get_consistency_proof(client_known_version, ledger_version)
         })
     }
+
+    fn get_account_count(&self, version: Version) -> Result<usize> {
+        gauged_api("get_account_count", || {
+            self.state_store
+                .get_account_count(version)
+                .and_then(|count| {
+                    count.ok_or_else(|| {
+                        DiemDbError::NotFound(format!("Account count at version {}", version))
+                            .into()
+                    })
+                })
+        })
+    }
+
+    fn get_account_chunk_with_proof(
+        &self,
+        version: Version,
+        first_index: usize,
+        chunk_size: usize,
+    ) -> Result<AccountStatesChunkWithProof> {
+        gauged_api("get_account_chunk_with_proof", || {
+            self.state_store
+                .get_account_chunk_with_proof(version, first_index, chunk_size)
+        })
+    }
 }
 
 impl ModuleResolver for DiemDB {
@@ -1295,6 +1324,17 @@ impl DbWriter<DpnProto> for DiemDB {
             }
 
             Ok(())
+        })
+    }
+
+    fn get_state_snapshot_receiver(
+        &self,
+        version: Version,
+        expected_root_hash: HashValue,
+    ) -> Result<Box<dyn StateSnapshotReceiver<AccountStateBlob>>> {
+        gauged_api("get_state_snapshot_receiver", || {
+            self.state_store
+                .get_snapshot_receiver(version, expected_root_hash)
         })
     }
 }
