@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
-#![allow(dead_code)]
 
 use consensus_notifications::ConsensusNotificationListener;
 use diem_config::{config::NodeConfig, network_id::NetworkId};

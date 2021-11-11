@@ -10,7 +10,7 @@ mod error;
 mod logging;
 mod metrics;
 mod stream_engine;
-mod streaming_client;
+pub mod streaming_client;
 mod streaming_service;
 
 #[cfg(test)]

@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
-use std::time::Duration;
 
 use async_trait::async_trait;
 use diem_types::{
@@ -17,6 +16,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     pin::Pin,
     task::{Context, Poll},
+    time::Duration,
 };
 use thiserror::Error;
 use tokio::time::timeout;

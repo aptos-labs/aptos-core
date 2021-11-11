@@ -8047,6 +8047,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "state-sync-driver"
+version = "0.1.0"
+dependencies = [
+ "consensus-notifications",
+ "data-streaming-service",
+ "diem-config",
+ "diem-infallible",
+ "diem-types",
+ "diem-workspace-hack",
+ "event-notifications",
+ "executor",
+ "executor-types",
+ "futures",
+ "mempool-notifications",
+ "serde",
+ "storage-interface",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+]
+
+[[package]]
 name = "state-sync-multiplexer"
 version = "0.1.0"
 dependencies = [

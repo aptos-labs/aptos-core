@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
-use std::{fmt, time::Duration};
 
 use async_trait::async_trait;
 use diem_types::{account_address::AccountAddress, transaction::Transaction};
@@ -13,8 +12,10 @@ use futures::{
 };
 use serde::{Deserialize, Serialize};
 use std::{
+    fmt,
     pin::Pin,
     task::{Context, Poll},
+    time::Duration,
 };
 use thiserror::Error;
 use tokio::time::timeout;

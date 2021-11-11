@@ -3,13 +3,6 @@
 
 #![forbid(unsafe_code)]
 
-mod logging;
-mod metrics;
-pub mod network;
-
-#[cfg(test)]
-mod tests;
-
 use crate::{
     logging::{LogEntry, LogSchema},
     metrics::{increment_counter, start_timer},
@@ -40,6 +33,13 @@ use storage_service_types::{
 };
 use thiserror::Error;
 use tokio::runtime::Handle;
+
+mod logging;
+mod metrics;
+pub mod network;
+
+#[cfg(test)]
+mod tests;
 
 /// Storage server constants.
 pub const STORAGE_SERVER_VERSION: u64 = 1;
