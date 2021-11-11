@@ -25,11 +25,13 @@ pub trait TxnManager: Send + Sync {
     /// branch of blocks consensus is trying to extend.
     ///
     /// wait_callback is executed when there's no transactions available and it decides to wait.
+    /// pending_ordering indicates if we should long poll mempool or propose empty blocks to help commit pending txns
     async fn pull_txns(
         &self,
         max_size: u64,
         exclude: Vec<&Payload>,
         wait_callback: BoxFuture<'static, ()>,
+        pending_ordering: bool,
     ) -> Result<Payload, MempoolError>;
 
     /// Notifies TxnManager about the txns which failed execution. (Committed txns is notified by

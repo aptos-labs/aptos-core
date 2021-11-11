@@ -135,8 +135,8 @@ impl LocalSwarmBuilder {
         // Single node orders blocks too fast which would trigger backpressure and stall for 1 sec
         // which cause flakiness in tests.
         if self.number_of_validators.get() == 1 {
-            // this delays empty block by (10-1) * 30ms
-            self.template.consensus.mempool_poll_count = 10;
+            // this delays empty block by (30-1) * 30ms
+            self.template.consensus.mempool_poll_count = 30;
         }
 
         let (root_keys, genesis, genesis_waypoint, validators) = ValidatorBuilder::new(

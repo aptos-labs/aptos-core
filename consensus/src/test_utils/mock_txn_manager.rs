@@ -55,6 +55,7 @@ impl TxnManager for MockTransactionManager {
         _max_size: u64,
         _exclude_txns: Vec<&Payload>,
         _callback: BoxFuture<'static, ()>,
+        _pending_ordering: bool,
     ) -> Result<Payload, MempoolError> {
         // generate 1k txn is too slow with coverage instrumentation
         Ok(random_payload(10))

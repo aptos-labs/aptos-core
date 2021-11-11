@@ -91,6 +91,7 @@ impl TxnManager for MempoolProxy {
         max_size: u64,
         exclude_payloads: Vec<&Payload>,
         wait_callback: BoxFuture<'static, ()>,
+        pending_ordering: bool,
     ) -> Result<Payload, MempoolError> {
         fail_point!("consensus::pull_txns", |_| {
             Err(anyhow::anyhow!("Injected error in pull_txns").into())
@@ -105,13 +106,12 @@ impl TxnManager for MempoolProxy {
             }
         }
         let mut callback_wrapper = Some(wait_callback);
-        let no_pending_txns = exclude_txns.is_empty();
         // keep polling mempool until there's txn available or there's still pending txns
         let mut count = self.poll_count;
         let txns = loop {
             count -= 1;
             let txns = self.pull_internal(max_size, exclude_txns.clone()).await?;
-            if txns.is_empty() && no_pending_txns && count > 0 {
+            if txns.is_empty() && !pending_ordering && count > 0 {
                 if let Some(callback) = callback_wrapper.take() {
                     callback.await;
                 }
