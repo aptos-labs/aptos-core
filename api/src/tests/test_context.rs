@@ -7,7 +7,7 @@ use diem_api_types::{
     mime_types, TransactionOnChainData, X_DIEM_CHAIN_ID, X_DIEM_LEDGER_TIMESTAMP,
     X_DIEM_LEDGER_VERSION,
 };
-use diem_config::config::{JsonRpcConfig, RoleType};
+use diem_config::config::{ApiConfig, JsonRpcConfig, RoleType};
 use diem_crypto::hash::HashValue;
 use diem_genesis_tool::validator_builder::{RootKeys, ValidatorBuilder};
 use diem_global_constants::OWNER_ACCOUNT;
@@ -75,6 +75,7 @@ pub fn new_test_context() -> TestContext {
             mempool.ac_client.clone(),
             RoleType::Validator,
             JsonRpcConfig::default(),
+            ApiConfig::default(),
         ),
         rng,
         root_keys,

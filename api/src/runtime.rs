@@ -34,13 +34,13 @@ pub fn bootstrap(
     let role = config.base.role;
     let json_rpc_config = config.json_rpc.clone();
     let api_config = config.api.clone();
-    let api = WebServer::from(api_config);
+    let api = WebServer::from(api_config.clone());
     let jsonrpc = WebServer::from(json_rpc_config.clone());
     if api.port() == jsonrpc.port() && api != jsonrpc {
         bail!("API and JSON-RPC should have same configuration when they are configured to use same port. api: {:?}, jsonrpc: {:?}", api, jsonrpc);
     }
     runtime.spawn(async move {
-        let context = Context::new(chain_id, db, mp_sender, role, json_rpc_config);
+        let context = Context::new(chain_id, db, mp_sender, role, json_rpc_config, api_config);
         let routes = index::routes(context);
         if api.port() == jsonrpc.port() {
             api.serve(routes).await;

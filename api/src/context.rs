@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use diem_api_types::{Error, LedgerInfo, MoveConverter, TransactionOnChainData};
-use diem_config::config::{JsonRpcConfig, RoleType};
+use diem_config::config::{ApiConfig, JsonRpcConfig, RoleType};
 use diem_crypto::HashValue;
 use diem_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
 use diem_types::{
@@ -35,6 +35,7 @@ pub struct Context {
     mp_sender: MempoolClientSender,
     role: RoleType,
     jsonrpc_config: JsonRpcConfig,
+    api_config: ApiConfig,
 }
 
 impl Context {
@@ -44,6 +45,7 @@ impl Context {
         mp_sender: MempoolClientSender,
         role: RoleType,
         jsonrpc_config: JsonRpcConfig,
+        api_config: ApiConfig,
     ) -> Self {
         Self {
             chain_id,
@@ -51,6 +53,7 @@ impl Context {
             mp_sender,
             role,
             jsonrpc_config,
+            api_config,
         }
     }
 
@@ -60,6 +63,10 @@ impl Context {
 
     pub fn chain_id(&self) -> ChainId {
         self.chain_id
+    }
+
+    pub fn content_length_limit(&self) -> u64 {
+        self.api_config.content_length_limit()
     }
 
     pub fn filter(self) -> impl Filter<Extract = (Context,), Error = Infallible> + Clone {

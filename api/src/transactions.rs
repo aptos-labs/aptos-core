@@ -94,6 +94,9 @@ pub fn post_transactions(
     warp::path!("transactions")
         .and(warp::post())
         .and(warp::header::<String>(CONTENT_TYPE.as_str()))
+        .and(warp::body::content_length_limit(
+            context.content_length_limit(),
+        ))
         .and(warp::body::bytes())
         .and(context.filter())
         .and_then(handle_post_transactions)
@@ -137,6 +140,9 @@ pub fn create_signing_message(
     warp::path!("transactions" / "signing_message")
         .and(warp::post())
         .and(warp::header::exact(CONTENT_TYPE.as_str(), mime_types::JSON))
+        .and(warp::body::content_length_limit(
+            context.content_length_limit(),
+        ))
         .and(warp::body::bytes())
         .and(context.filter())
         .and_then(handle_create_signing_message)

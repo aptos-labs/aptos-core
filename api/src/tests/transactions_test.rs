@@ -25,6 +25,7 @@ use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag, CORE_CODE_ADDRESS},
 };
+use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use serde_json::json;
 
 #[tokio::test]
@@ -1484,4 +1485,77 @@ async fn test_transaction_vm_status(
         pretty(&resp)
     );
     assert_eq!(resp["vm_status"].as_str().unwrap(), vm_status);
+}
+
+#[tokio::test]
+async fn test_submit_transaction_rejects_payload_too_large_bcs_txn_body() {
+    let context = new_test_context();
+
+    let resp = context
+        .expect_status_code(413)
+        .post_bcs_txn(
+            "/transactions",
+            gen_string(context.context.content_length_limit() + 1).as_bytes(),
+        )
+        .await;
+    assert_json(
+        resp,
+        json!({
+          "code": 413,
+          "message": "The request payload is too large"
+        }),
+    );
+}
+
+#[tokio::test]
+async fn test_submit_transaction_rejects_payload_too_large_json_body() {
+    let context = new_test_context();
+
+    let resp = context
+        .expect_status_code(413)
+        .post(
+            "/transactions",
+            json!({
+                "data": gen_string(context.context.content_length_limit()+1).as_bytes(),
+            }),
+        )
+        .await;
+    assert_json(
+        resp,
+        json!({
+          "code": 413,
+          "message": "The request payload is too large"
+        }),
+    );
+}
+
+#[tokio::test]
+async fn test_create_signing_message_rejects_payload_too_large_json_body() {
+    let context = new_test_context();
+
+    let resp = context
+        .expect_status_code(413)
+        .post(
+            "/transactions/signing_message",
+            json!({
+                "data": gen_string(context.context.content_length_limit()+1).as_bytes(),
+            }),
+        )
+        .await;
+    assert_json(
+        resp,
+        json!({
+          "code": 413,
+          "message": "The request payload is too large"
+        }),
+    );
+}
+
+fn gen_string(len: u64) -> String {
+    let mut rng = thread_rng();
+    std::iter::repeat(())
+        .map(|()| rng.sample(Alphanumeric))
+        .take(len as usize)
+        .map(char::from)
+        .collect()
 }

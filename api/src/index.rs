@@ -12,8 +12,10 @@ use diem_api_types::{Error, Response};
 
 use std::convert::Infallible;
 use warp::{
-    cors::CorsForbidden, http::StatusCode, reject::MethodNotAllowed, reply, Filter, Rejection,
-    Reply,
+    cors::CorsForbidden,
+    http::StatusCode,
+    reject::{MethodNotAllowed, PayloadTooLarge},
+    reply, Filter, Rejection, Reply,
 };
 
 const OPEN_API_HTML: &str = include_str!(concat!(env!("OUT_DIR"), "/spec.html"));
@@ -84,6 +86,9 @@ async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> {
         body = reply::json(error);
     } else if let Some(cause) = err.find::<CorsForbidden>() {
         code = StatusCode::FORBIDDEN;
+        body = reply::json(&Error::new(code, cause.to_string()));
+    } else if let Some(cause) = err.find::<PayloadTooLarge>() {
+        code = StatusCode::PAYLOAD_TOO_LARGE;
         body = reply::json(&Error::new(code, cause.to_string()));
     } else if err.find::<MethodNotAllowed>().is_some() {
         code = StatusCode::BAD_REQUEST;
