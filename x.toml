@@ -2,8 +2,9 @@
 version = "0.8.2"
 
 [system-tests]
-smoke-test = { path = "smoke-test" }
 jsonrpc-integration-tests = { path = "json-rpc/integration-tests" }
+shuffle-integration-tests = { path = "shuffle/integration-tests" }
+smoke-test = { path = "smoke-test" }
 testcases = { path = "testsuite/testcases" }
 
 [cargo.sccache]
@@ -227,6 +228,7 @@ members = [
     "serializer-tests",
     "shuffle",
     "shuffle-custom-move-code",
+    "shuffle-integration-tests",
     "smoke-test",
     "socket-bench-server",
     "state-sync-v2", # Will be removed once state sync v2 is plugged into diem-node.

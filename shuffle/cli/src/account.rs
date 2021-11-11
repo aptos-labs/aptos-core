@@ -57,15 +57,23 @@ pub fn handle(home: &Home, root: Option<PathBuf>) -> Result<()> {
     let json_rpc_url = format!("http://0.0.0.0:{}", config.json_rpc.address.port());
     println!("Connecting to {}...", json_rpc_url);
     let client = BlockingClient::new(json_rpc_url);
-    let factory = TransactionFactory::new(ChainId::test());
-
     if root.is_some() {
         home.save_root_key(
             root.ok_or_else(|| anyhow::anyhow!("Invalid root key path"))?
                 .as_path(),
         )?;
     }
-    let mut root_account = get_root_account(&client, home.get_root_key_path());
+    let mut treasury_account = get_treasury_account(&client, home.get_root_key_path());
+
+    create_local_accounts(home, client, &mut treasury_account)
+}
+
+pub fn create_local_accounts(
+    home: &Home,
+    client: BlockingClient,
+    treasury_account: &mut LocalAccount,
+) -> Result<()> {
+    let factory = TransactionFactory::new(ChainId::test());
 
     home.generate_shuffle_accounts_path()?;
     home.generate_shuffle_latest_path()?;
@@ -80,7 +88,7 @@ pub fn handle(home: &Home, root: Option<PathBuf>) -> Result<()> {
     );
 
     // Create a new account.
-    create_account_onchain(&mut root_account, &new_account, &factory, &client)?;
+    create_account_onchain(treasury_account, &new_account, &factory, &client)?;
 
     home.generate_shuffle_test_path()?;
     let test_key = home.generate_testkey_file()?;
@@ -92,7 +100,7 @@ pub fn handle(home: &Home, root: Option<PathBuf>) -> Result<()> {
         0,
     );
 
-    create_account_onchain(&mut root_account, &test_account, &factory, &client)
+    create_account_onchain(treasury_account, &test_account, &factory, &client)
 }
 
 pub fn confirm_user_decision(home: &Home) -> bool {
@@ -120,10 +128,10 @@ pub fn confirm_user_decision(home: &Home) -> bool {
     true
 }
 
-pub fn get_root_account(client: &BlockingClient, root_key_path: &Path) -> LocalAccount {
+pub fn get_treasury_account(client: &BlockingClient, root_key_path: &Path) -> LocalAccount {
     let root_account_key = load_key(root_key_path);
 
-    let root_seq_num = client
+    let treasury_seq_num = client
         .get_account(account_config::treasury_compliance_account_address())
         .unwrap()
         .into_inner()
@@ -132,12 +140,12 @@ pub fn get_root_account(client: &BlockingClient, root_key_path: &Path) -> LocalA
     LocalAccount::new(
         account_config::treasury_compliance_account_address(),
         root_account_key,
-        root_seq_num,
+        treasury_seq_num,
     )
 }
 
 pub fn create_account_onchain(
-    root_account: &mut LocalAccount,
+    treasury_account: &mut LocalAccount,
     new_account: &LocalAccount,
     factory: &TransactionFactory,
     client: &BlockingClient,
@@ -151,16 +159,16 @@ pub fn create_account_onchain(
     {
         println!("Account already exists: {}", new_account.address());
     } else {
-        let create_new_account_txn = root_account.sign_with_transaction_builder(factory.payload(
-            encode_create_parent_vasp_account_script_function(
+        let create_new_account_txn = treasury_account.sign_with_transaction_builder(
+            factory.payload(encode_create_parent_vasp_account_script_function(
                 Currency::XUS.type_tag(),
                 0,
                 new_account.address(),
                 new_account.authentication_key().prefix().to_vec(),
                 vec![],
                 false,
-            ),
-        ));
+            )),
+        );
         send_transaction(client, create_new_account_txn)?;
         println!("Successfully created account {}", new_account.address());
     }

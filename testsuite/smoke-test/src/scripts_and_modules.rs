@@ -35,7 +35,7 @@ impl AdminTest for MalformedScript {
     fn run<'t>(&self, ctx: &mut AdminContext<'t>) -> Result<()> {
         let client = ctx.client();
         let transaction_factory = ctx.chain_info().transaction_factory();
-        enable_custom_script(
+        enable_open_publishing(
             &client,
             &transaction_factory,
             &mut ctx.chain_info().root_account,
@@ -95,7 +95,7 @@ impl AdminTest for ExecuteCustomModuleAndScript {
     fn run<'t>(&self, ctx: &mut AdminContext<'t>) -> Result<()> {
         let client = ctx.client();
         let factory = ctx.chain_info().transaction_factory();
-        enable_custom_script(&client, &factory, &mut ctx.chain_info().root_account)?;
+        enable_open_publishing(&client, &factory, &mut ctx.chain_info().root_account)?;
 
         let mut account1 = ctx.random_account();
         ctx.chain_info()
@@ -219,7 +219,7 @@ fn copy_file_with_sender_address(file_path: &Path, sender: AccountAddress) -> io
     Ok(tmp_source_path)
 }
 
-pub(crate) fn enable_custom_script(
+pub fn enable_open_publishing(
     client: &BlockingClient,
     transaction_factory: &TransactionFactory,
     root_account: &mut LocalAccount,

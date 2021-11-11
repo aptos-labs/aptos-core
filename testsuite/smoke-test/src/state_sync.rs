@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    scripts_and_modules::{compile_program, enable_custom_script},
+    scripts_and_modules::{compile_program, enable_open_publishing},
     smoke_test_environment::new_local_swarm,
     test_utils::{
         assert_balance, create_and_fund_account, diem_swarm_utils::insert_waypoint, transfer_coins,
@@ -280,7 +280,7 @@ fn test_state_sync_multichunk_epoch() {
         .unwrap()
         .json_rpc_client();
     let transaction_factory = swarm.chain_info().transaction_factory();
-    enable_custom_script(
+    enable_open_publishing(
         &client_0,
         &transaction_factory,
         swarm.chain_info().root_account,
@@ -341,7 +341,7 @@ fn test_state_sync_multichunk_epoch() {
     // Bump epoch by trigger a reconfig for multiple epochs
     for curr_epoch in 2..=3 {
         // bumps epoch from curr_epoch -> curr_epoch + 1
-        enable_custom_script(
+        enable_open_publishing(
             &client_0,
             &transaction_factory,
             swarm.chain_info().root_account,

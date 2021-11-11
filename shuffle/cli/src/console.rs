@@ -10,6 +10,7 @@ use url::Url;
 /// Launches a Deno REPL for the shuffle project, generating transaction
 /// builders and loading them into the REPL namespace for easy on chain interaction.
 pub fn handle(
+    home: &shared::Home,
     project_path: &Path,
     network: Url,
     key_path: &Path,
@@ -49,7 +50,7 @@ pub fn handle(
             .to_string_lossy()
     );
     let filtered_envs =
-        shared::get_filtered_envs_for_deno(project_path, &network, key_path, sender_address);
+        shared::get_filtered_envs_for_deno(home, project_path, &network, key_path, sender_address);
     Command::new("deno")
         .args(["repl", "--unstable", "--eval", deno_bootstrap.as_str()])
         .envs(&filtered_envs)

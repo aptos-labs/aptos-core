@@ -49,6 +49,7 @@ pub async fn main() -> Result<()> {
             key_path,
             address,
         } => console::handle(
+            &home,
             &shared::normalized_project_path(project_path)?,
             shared::normalized_network(&home, network)?,
             &normalized_key_path(&home, key_path)?,

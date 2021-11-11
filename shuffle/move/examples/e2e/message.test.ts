@@ -9,6 +9,7 @@ import {
 } from "https://deno.land/std@0.85.0/testing/asserts.ts";
 import * as DiemHelpers from "../main/helpers.ts";
 import * as context from "../main/context.ts";
+import * as devapi from "../main/devapi.ts";
 import * as main from "../main/mod.ts";
 
 Deno.test("Test Assert", () => {
@@ -23,7 +24,7 @@ Deno.test("Ability to set message", async () => {
   );
 
   for (let i = 0; i < 10; i++) {
-    const messageResource = (await main.resourcesWithName("MessageHolder"))[0];
+    const messageResource = (await devapi.resourcesWithName("MessageHolder"))[0];
     if (messageResource !== undefined) {
       const result = DiemHelpers.hexToAscii(messageResource["value"]["message"])
         .toString() === "\x00hello blockchain";

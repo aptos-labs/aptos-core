@@ -60,6 +60,10 @@ impl<'t> ChainInfo<'t> {
         BlockingClient::new(&self.json_rpc_url)
     }
 
+    pub fn rest_api(&self) -> &str {
+        &self.rest_api_url
+    }
+
     pub fn chain_id(&self) -> ChainId {
         self.chain_id
     }

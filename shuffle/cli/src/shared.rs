@@ -1,6 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 use anyhow::{anyhow, Result};
+use diem_api_types::mime_types;
 use diem_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 use diem_sdk::client::{AccountAddress, BlockingClient};
 use diem_types::transaction::authenticator::AuthenticationKey;
@@ -96,14 +97,10 @@ pub fn get_shuffle_project_path(cwd: &Path) -> Result<PathBuf> {
     }
 }
 
-// returns ~/.shuffle
-pub fn get_shuffle_dir() -> PathBuf {
-    BaseDirs::new().unwrap().home_dir().join(".shuffle")
-}
-
 pub fn get_filtered_envs_for_deno(
+    home: &Home,
     project_path: &Path,
-    network: &Url,
+    dev_api_url: &Url,
     key_path: &Path,
     sender_address: AccountAddress,
 ) -> HashMap<String, String> {
@@ -114,7 +111,7 @@ pub fn get_filtered_envs_for_deno(
     );
     filtered_envs.insert(
         String::from("SHUFFLE_HOME"),
-        get_shuffle_dir().to_string_lossy().to_string(),
+        home.get_shuffle_path().to_string_lossy().to_string(),
     );
     filtered_envs.insert(
         String::from("SENDER_ADDRESS"),
@@ -125,7 +122,7 @@ pub fn get_filtered_envs_for_deno(
         key_path.to_string_lossy().to_string(),
     );
 
-    filtered_envs.insert(String::from("SHUFFLE_NETWORK"), network.to_string());
+    filtered_envs.insert(String::from("SHUFFLE_NETWORK"), dev_api_url.to_string());
     filtered_envs
 }
 
@@ -152,7 +149,7 @@ impl DevApiClient {
         Ok(self
             .client
             .post(path.as_str())
-            .header("Content-Type", "application/vnd.bcs+signed_transaction")
+            .header("Content-Type", mime_types::BCS_SIGNED_TRANSACTION)
             .body(txn_bytes)
             .send()
             .await?)
@@ -290,9 +287,14 @@ impl Home {
         &self.test_key_path
     }
 
+    pub fn get_test_address(&self) -> Result<AccountAddress> {
+        let address_str = std::fs::read_to_string(&self.test_key_address_path)?;
+        AccountAddress::from_str(address_str.as_str()).map_err(anyhow::Error::new)
+    }
+
     pub fn create_archive_dir(&self, time: Duration) -> Result<PathBuf> {
         let archived_dir = self.account_path.join(time.as_secs().to_string());
-        fs::create_dir(&archived_dir)?;
+        fs::create_dir_all(&archived_dir)?;
         Ok(archived_dir)
     }
 
@@ -312,14 +314,14 @@ impl Home {
 
     pub fn generate_shuffle_accounts_path(&self) -> Result<()> {
         if !self.account_path.is_dir() {
-            fs::create_dir(self.account_path.as_path())?;
+            fs::create_dir_all(self.account_path.as_path())?;
         }
         Ok(())
     }
 
     pub fn generate_shuffle_latest_path(&self) -> Result<()> {
         if !self.latest_path.is_dir() {
-            fs::create_dir(self.latest_path.as_path())?;
+            fs::create_dir_all(self.latest_path.as_path())?;
         }
         Ok(())
     }
@@ -341,7 +343,7 @@ impl Home {
 
     pub fn generate_shuffle_test_path(&self) -> Result<()> {
         if !self.test_path.is_dir() {
-            fs::create_dir(self.test_path.as_path())?;
+            fs::create_dir_all(self.test_path.as_path())?;
         }
         Ok(())
     }
@@ -808,13 +810,14 @@ mod test {
 
     #[test]
     fn test_get_filtered_envs_for_deno() {
+        let dir = tempdir().unwrap();
+        let home = Home::new(dir.path()).unwrap();
         let project_path = Path::new("/Users/project_path");
         let network = Url::from_str("http://127.0.0.1:8080").unwrap();
         let key_path = Path::new("/Users/private_key_path/dev.key");
         let address = AccountAddress::random();
-        let shuffle_dir = get_shuffle_dir();
-
-        let filtered_envs = get_filtered_envs_for_deno(project_path, &network, key_path, address);
+        let filtered_envs =
+            get_filtered_envs_for_deno(&home, project_path, &network, key_path, address);
 
         assert_eq!(
             filtered_envs.get("PROJECT_PATH").unwrap(),
@@ -822,7 +825,7 @@ mod test {
         );
         assert_eq!(
             filtered_envs.get("SHUFFLE_HOME").unwrap(),
-            &shuffle_dir.to_str().unwrap().to_string()
+            home.get_shuffle_path().to_string_lossy().as_ref(),
         );
         assert_eq!(
             filtered_envs.get("SENDER_ADDRESS").unwrap(),

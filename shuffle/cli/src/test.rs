@@ -5,8 +5,8 @@ use crate::{
     account, deploy,
     shared::{self, MAIN_PKG_PATH},
 };
-use anyhow::{Context, Result};
-use diem_config::config::{NodeConfig, DEFAULT_PORT};
+use anyhow::{anyhow, Context, Result};
+use diem_config::config::NodeConfig;
 use diem_crypto::PrivateKey;
 use diem_sdk::{
     client::{AccountAddress, BlockingClient},
@@ -20,6 +20,7 @@ use shared::Home;
 use std::{
     path::{Path, PathBuf},
     process::Command,
+    str::FromStr,
 };
 use structopt::StructOpt;
 use url::Url;
@@ -43,8 +44,9 @@ pub async fn run_e2e_tests(home: &Home, project_path: &Path, network: Url) -> Re
     deploy::handle(home, project_path, network.clone()).await?;
 
     run_deno_test(
+        home,
         project_path,
-        &config,
+        &Url::from_str(config.json_rpc.address.to_string().as_str())?,
         &network,
         home.get_test_key_path(),
         new_account.address(),
@@ -57,13 +59,13 @@ fn create_test_account(
     client: &BlockingClient,
     factory: &TransactionFactory,
 ) -> Result<LocalAccount> {
-    let mut root_account = account::get_root_account(client, home.get_root_key_path());
+    let mut treasury_account = account::get_treasury_account(client, home.get_root_key_path());
     // TODO: generate random key by using let new_account_key = generate_key::generate_key();
     let new_account_key = generate_key::load_key(home.get_latest_key_path());
     let public_key = new_account_key.public_key();
     let derived_address = AuthenticationKey::ed25519(&public_key).derived_address();
     let new_account = LocalAccount::new(derived_address, new_account_key, 0);
-    account::create_account_onchain(&mut root_account, &new_account, factory, client)?;
+    account::create_account_onchain(&mut treasury_account, &new_account, factory, client)?;
     Ok(new_account)
 }
 
@@ -73,21 +75,22 @@ fn create_receiver_account(
     client: &BlockingClient,
     factory: &TransactionFactory,
 ) -> Result<LocalAccount> {
-    let mut root_account = account::get_root_account(client, home.get_root_key_path());
+    let mut treasury_account = account::get_treasury_account(client, home.get_root_key_path());
     let receiver_account_key = generate_key::load_key(home.get_test_key_path());
     let public_key = receiver_account_key.public_key();
     let address = AuthenticationKey::ed25519(&public_key).derived_address();
     let receiver_account = LocalAccount::new(address, receiver_account_key, 0);
-    account::create_account_onchain(&mut root_account, &receiver_account, factory, client)?;
+    account::create_account_onchain(&mut treasury_account, &receiver_account, factory, client)?;
 
     Ok(receiver_account)
 }
 
 // Run shuffle test using deno
-fn run_deno_test(
+pub fn run_deno_test(
+    home: &Home,
     project_path: &Path,
-    config: &NodeConfig,
-    network: &Url,
+    json_rpc_url: &Url,
+    dev_api_url: &Url,
     key_path: &Path,
     sender_address: AccountAddress,
 ) -> Result<()> {
@@ -97,8 +100,13 @@ fn run_deno_test(
         .to_string_lossy()
         .to_string();
 
-    let filtered_envs =
-        shared::get_filtered_envs_for_deno(project_path, network, key_path, sender_address);
+    let filtered_envs = shared::get_filtered_envs_for_deno(
+        home,
+        project_path,
+        dev_api_url,
+        key_path,
+        sender_address,
+    );
     Command::new("deno")
         .args([
             "test",
@@ -107,9 +115,9 @@ fn run_deno_test(
             "--allow-env=PROJECT_PATH,SHUFFLE_HOME,SHUFFLE_NETWORK,PRIVATE_KEY_PATH,SENDER_ADDRESS",
             "--allow-read",
             format!(
-                "--allow-net=:{},:{}",
-                DEFAULT_PORT,
-                config.json_rpc.address.port()
+                "--allow-net={},{}",
+                host_and_port(dev_api_url)?,
+                host_and_port(json_rpc_url)?,
             )
             .as_str(),
         ])
@@ -120,7 +128,17 @@ fn run_deno_test(
     Ok(())
 }
 
-fn run_move_unit_tests(project_path: &Path) -> Result<()> {
+fn host_and_port(url: &Url) -> Result<String> {
+    Ok(format!(
+        "{}:{}",
+        url.host_str()
+            .ok_or_else(|| anyhow!("url should have domain host"))?,
+        url.port_or_known_default()
+            .ok_or_else(|| anyhow!("url should have port or default"))?,
+    ))
+}
+
+pub fn run_move_unit_tests(project_path: &Path) -> Result<()> {
     let unit_test_cmd = cli::PackageCommand::UnitTest {
         // Setting to default values with exception of report_storage_on_error
         // to get more information about a failed test
