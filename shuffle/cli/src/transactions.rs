@@ -12,10 +12,9 @@ pub async fn handle(network: Url, tail: bool, address: AccountAddress, raw: bool
     let client = DevApiClient::new(reqwest::Client::new(), network)?;
     let account_seq_num = client.get_account_sequence_number(address).await?;
     let mut prev_seq_num = max(account_seq_num as i64 - 10, 0);
-    let resp = client
+    let json_with_txns = client
         .get_account_transactions_response(address, prev_seq_num as u64, 10)
         .await?;
-    let json_with_txns: serde_json::Value = serde_json::from_str(resp.text().await?.as_str())?;
 
     let all_transactions = json_with_txns
         .as_array()
@@ -39,11 +38,9 @@ pub async fn handle(network: Url, tail: bool, address: AccountAddress, raw: bool
         // listening for incoming transactions
         loop {
             thread::sleep(time::Duration::from_millis(1000));
-            let resp = client
+            let json_with_txns = client
                 .get_account_transactions_response(address, (prev_seq_num + 1) as u64, 100)
                 .await?;
-            let json_with_txns: serde_json::Value =
-                serde_json::from_str(resp.text().await?.as_str())?;
             let txn_array = json_with_txns
                 .as_array()
                 .ok_or_else(|| anyhow!("Couldn't convert to array"))?

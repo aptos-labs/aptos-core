@@ -137,50 +137,103 @@ impl DevApiClient {
         Ok(Self { client, network })
     }
 
-    pub async fn get_transactions_by_hash(&self, hash: &str) -> Result<Response> {
+    pub async fn get_transactions_by_hash(&self, hash: &str) -> Result<Value> {
         let path = self
             .network
             .join(format!("transactions/{}", hash).as_str())?;
-        Ok(self.client.get(path.as_str()).send().await?)
+
+        DevApiClient::check_response(
+            self.client.get(path.as_str()).send().await?,
+            "GET /transactions failed",
+        )
+        .await
     }
 
-    pub async fn post_transactions(&self, txn_bytes: Vec<u8>) -> Result<Response> {
+    pub async fn post_transactions(&self, txn_bytes: Vec<u8>) -> Result<Value> {
         let path = self.network.join("transactions")?;
-        Ok(self
-            .client
-            .post(path.as_str())
-            .header("Content-Type", mime_types::BCS_SIGNED_TRANSACTION)
-            .body(txn_bytes)
-            .send()
-            .await?)
+
+        DevApiClient::check_response(
+            self.client
+                .post(path.as_str())
+                .header("Content-Type", mime_types::BCS_SIGNED_TRANSACTION)
+                .body(txn_bytes)
+                .send()
+                .await?,
+            "POST /transactions failed",
+        )
+        .await
     }
 
-    async fn get_account_resources(&self, address: AccountAddress) -> Result<Response> {
+    async fn get_account_resources(&self, address: AccountAddress) -> Result<Value> {
         let path = self
             .network
             .join(format!("accounts/{}/resources", address.to_hex_literal()).as_str())?;
-        Ok(self.client.get(path.as_str()).send().await?)
+
+        DevApiClient::check_response(
+            self.client.get(path.as_str()).send().await?,
+            "Failed to get account resources with provided address",
+        )
+        .await
     }
 
-    pub async fn get_account_sequence_number(&self, address: AccountAddress) -> Result<u64> {
-        let resp = self.get_account_resources(address).await?;
-        DevApiClient::check_accounts_resources_response_status_code(&resp.status())?;
-        let json: Vec<Value> = serde_json::from_str(resp.text().await?.as_str())?;
-        DevApiClient::parse_json_for_account_seq_num(json)
+    pub async fn get_account_transactions_response(
+        &self,
+        address: AccountAddress,
+        start: u64,
+        limit: u64,
+    ) -> Result<Value> {
+        let path = self
+            .network
+            .join(format!("accounts/{}/transactions", address).as_str())?;
+
+        DevApiClient::check_response(
+            self.client
+                .get(path.as_str())
+                .query(&[("start", start.to_string().as_str())])
+                .query(&[("limit", limit.to_string().as_str())])
+                .send()
+                .await?,
+            "Failed to get account transactions with provided address",
+        )
+        .await
     }
 
-    fn check_accounts_resources_response_status_code(status_code: &StatusCode) -> Result<()> {
-        match status_code == &StatusCode::from_u16(200)? {
+    async fn check_response(resp: Response, failure_message: &str) -> Result<Value> {
+        let status = resp.status();
+        let json = resp.json().await?;
+        DevApiClient::check_response_status_code(
+            &status,
+            DevApiClient::response_context(failure_message, &json)?.as_str(),
+        )?;
+        Ok(json)
+    }
+
+    fn check_response_status_code(status: &StatusCode, context: &str) -> Result<()> {
+        match status >= &StatusCode::from_u16(200)? && status < &StatusCode::from_u16(300)? {
             true => Ok(()),
-            false => Err(anyhow!(
-                "Failed to get account resources with provided address"
-            )),
+            false => Err(anyhow!(context.to_string())),
         }
     }
 
-    fn parse_json_for_account_seq_num(json_objects: Vec<Value>) -> Result<u64> {
+    fn response_context(message: &str, json: &Value) -> Result<String> {
+        Ok(format!(
+            "{}. Here is the json block for the response that failed:\n{:?}",
+            message, json
+        ))
+    }
+
+    pub async fn get_account_sequence_number(&self, address: AccountAddress) -> Result<u64> {
+        let account_resources_json = self.get_account_resources(address).await?;
+        DevApiClient::parse_json_for_account_seq_num(account_resources_json)
+    }
+
+    fn parse_json_for_account_seq_num(json_objects: Value) -> Result<u64> {
+        let json_arr = json_objects
+            .as_array()
+            .ok_or_else(|| anyhow!("Couldn't convert to array"))?
+            .to_vec();
         let mut seq_number_string = "";
-        for object in &json_objects {
+        for object in &json_arr {
             if object["type"] == DIEM_ACCOUNT_TYPE {
                 seq_number_string = object["value"]["sequence_number"]
                     .as_str()
@@ -190,24 +243,6 @@ impl DevApiClient {
         }
         let seq_number: u64 = seq_number_string.parse()?;
         Ok(seq_number)
-    }
-
-    pub async fn get_account_transactions_response(
-        &self,
-        address: AccountAddress,
-        start: u64,
-        limit: u64,
-    ) -> Result<Response> {
-        let path = self
-            .network
-            .join(format!("accounts/{}/transactions", address).as_str())?;
-        Ok(self
-            .client
-            .get(path.as_str())
-            .query(&[("start", start.to_string().as_str())])
-            .query(&[("limit", limit.to_string().as_str())])
-            .send()
-            .await?)
     }
 }
 
@@ -841,7 +876,7 @@ mod test {
 
     #[test]
     fn test_parse_json_for_seq_num() {
-        let value_obj = json!({
+        let value_obj = json!([{
             "type":"0x1::DiemAccount::DiemAccount",
             "value": {
                 "authentication_key": "0x88cae30f0fea7879708788df9e7c9b7524163afcc6e33b0a9473852e18327fa9",
@@ -858,28 +893,43 @@ mod test {
                     "vec":[{"account_address":"0x24163afcc6e33b0a9473852e18327fa9"}]
                 }
             }
-        });
+        }]);
 
-        let json_obj: Vec<Value> = vec![value_obj];
-        let ret_seq_num = DevApiClient::parse_json_for_account_seq_num(json_obj).unwrap();
+        let ret_seq_num = DevApiClient::parse_json_for_account_seq_num(value_obj).unwrap();
         assert_eq!(ret_seq_num, 3);
     }
 
     #[test]
-    fn test_check_accounts_resources_response_status_code() {
+    fn test_check_response_status_code() {
         assert_eq!(
-            DevApiClient::check_accounts_resources_response_status_code(
-                &StatusCode::from_u16(200).unwrap()
+            DevApiClient::check_response_status_code(
+                &StatusCode::from_u16(200).unwrap(),
+                "Success"
             )
             .is_err(),
             false
         );
         assert_eq!(
-            DevApiClient::check_accounts_resources_response_status_code(
-                &StatusCode::from_u16(404).unwrap()
-            )
-            .is_err(),
+            DevApiClient::check_response_status_code(&StatusCode::from_u16(404).unwrap(), "Failed")
+                .is_err(),
             true
         );
+    }
+
+    #[test]
+    fn test_response_context() {
+        let failed_obj = json!({
+            "code": 404,
+            "message": "account not found by address(0x132412341234124) and ledger version(81)",
+            "diem_ledger_version": "81"
+        });
+        let context = DevApiClient::response_context(
+            "Failed to get account resources with provided address",
+            &failed_obj,
+        )
+        .unwrap();
+
+        let correct_string = format!("Failed to get account resources with provided address. Here is the json block for the response that failed:\n{:?}", failed_obj);
+        assert_eq!(context, correct_string);
     }
 }

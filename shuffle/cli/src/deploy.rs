@@ -75,20 +75,17 @@ async fn send_module_transaction(
         TransactionPayload::ModuleBundle(ModuleBundle::singleton(module_binary)),
     ));
     let bytes = bcs::to_bytes(&publish_txn)?;
-    let resp = client.post_transactions(bytes).await?;
-    let json: serde_json::Value = serde_json::from_str(resp.text().await?.as_str())?;
+    let json = client.post_transactions(bytes).await?;
     let hash = get_hash_from_post_txn(json)?;
     Ok(hash)
 }
 
 async fn check_txn_executed_from_hash(client: &DevApiClient, hash: &str) -> Result<()> {
-    let mut resp = client.get_transactions_by_hash(hash).await?;
-    let mut json: serde_json::Value = serde_json::from_str(resp.text().await?.as_str())?;
+    let mut json = client.get_transactions_by_hash(hash).await?;
     let start = Instant::now();
     while json["type"] == "pending_transaction" {
         thread::sleep(time::Duration::from_secs(1));
-        resp = client.get_transactions_by_hash(hash).await?;
-        json = serde_json::from_str(resp.text().await?.as_str())?;
+        json = client.get_transactions_by_hash(hash).await?;
         let duration = start.elapsed();
         if duration > Duration::from_secs(10) {
             break;
