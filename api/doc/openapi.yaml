@@ -277,6 +277,10 @@ paths:
                 $ref: '#/components/schemas/PendingTransaction'
         "400":
           $ref: '#/components/responses/400'
+        "413":
+          $ref: '#/components/responses/413'
+        "415":
+          $ref: '#/components/responses/415'
         "500":
           $ref: '#/components/responses/500'
   /accounts/{address}/transactions:
@@ -393,6 +397,10 @@ paths:
           $ref: '#/components/responses/400'
         "404":
           $ref: '#/components/responses/404'
+        "413":
+          $ref: '#/components/responses/413'
+        "415":
+          $ref: '#/components/responses/415'
         "500":
           $ref: '#/components/responses/500'
   /events/{event_key}:
@@ -511,6 +519,20 @@ components:
       description: >-
         Resource or data not found.
         Client may retry the request if it is waiting for transaction execution or ledger synchronization.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    "413":
+      description: >-
+        The request payload is too large.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    "415":
+      description: >-
+        The request's content-type is not supported.
       content:
         application/json:
           schema:
