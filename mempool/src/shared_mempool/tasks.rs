@@ -287,7 +287,7 @@ where
         .with_label_values(&[counters::VM_VALIDATION_LABEL])
         .start_timer();
     let validation_results = transactions
-        .par_iter()
+        .iter()
         .map(|t| smp.validator.read().validate_transaction(t.0.clone()))
         .collect::<Vec<_>>();
     vm_validation_timer.stop_and_record();
@@ -375,7 +375,10 @@ fn log_txn_process_results(results: &[SubmissionStatusBundle], sender: Option<Pe
 
 /// Only applies to Validators. Either provides transactions to consensus [`GetBlockRequest`] or
 /// handles rejecting transactions [`RejectNotification`]
-pub(crate) fn process_consensus_request(mempool: &Mutex<CoreMempool>, req: ConsensusRequest) {
+pub(crate) fn process_consensus_request<V: TransactionValidation>(
+    smp: &SharedMempool<V>,
+    req: ConsensusRequest,
+) {
     // Start latency timer
     let start_time = Instant::now();
     debug!(LogSchema::event_log(LogEntry::Consensus, LogEvent::Received).consensus_msg(&req));
@@ -388,7 +391,7 @@ pub(crate) fn process_consensus_request(mempool: &Mutex<CoreMempool>, req: Conse
                 .collect();
             let mut txns;
             {
-                let mut mempool = mempool.lock();
+                let mut mempool = smp.mempool.lock();
                 // gc before pulling block as extra protection against txns that may expire in consensus
                 // Note: this gc operation relies on the fact that consensus uses the system time to determine block timestamp
                 let curr_time = diem_infallible::duration_since_epoch();
@@ -411,7 +414,7 @@ pub(crate) fn process_consensus_request(mempool: &Mutex<CoreMempool>, req: Conse
                 counters::COMMIT_CONSENSUS_LABEL,
                 transactions.len(),
             );
-            process_committed_transactions(mempool, transactions, 0, true);
+            process_committed_transactions(&smp.mempool, transactions, 0, true);
             (
                 ConsensusResponse::CommitResponse(),
                 callback,
@@ -434,7 +437,7 @@ pub(crate) fn process_consensus_request(mempool: &Mutex<CoreMempool>, req: Conse
 }
 
 /// Remove transactions that are committed (or rejected) so that we can stop broadcasting them.
-pub fn process_committed_transactions(
+pub(crate) fn process_committed_transactions(
     mempool: &Mutex<CoreMempool>,
     transactions: Vec<TransactionSummary>,
     block_timestamp_usecs: u64,

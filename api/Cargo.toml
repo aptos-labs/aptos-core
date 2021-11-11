@@ -40,6 +40,7 @@ resource-viewer = { path = "../language/tools/resource-viewer" }
 rand = "0.8.3"
 reqwest = { version = "0.11.2", features = ["blocking", "json"], default_features = false }
 
+mempool-notifications = { path = "../state-sync/inter-component/mempool-notifications" }
 diemdb = { path = "../storage/diemdb", features = ["fuzzing"] }
 diem-crypto = { path = "../crypto/crypto" }
 diem-global-constants = { path = "../config/global-constants" }

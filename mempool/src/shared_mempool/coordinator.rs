@@ -73,7 +73,7 @@ pub(crate) async fn coordinator<V>(
                 handle_client_request(&mut smp, &bounded_executor, msg).await;
             },
             msg = consensus_requests.select_next_some() => {
-                tasks::process_consensus_request(&smp.mempool, msg);
+                tasks::process_consensus_request(&smp, msg);
             },
             msg = mempool_listener.select_next_some() => {
                 handle_commit_notification(&mut smp, msg, &mut mempool_listener);
@@ -170,7 +170,7 @@ fn handle_commit_notification<V>(
         msg.transactions.len(),
     );
     process_committed_transactions(
-        &smp.mempool.clone(),
+        &smp.mempool,
         msg.transactions
             .iter()
             .map(|txn| TransactionSummary {
@@ -181,6 +181,7 @@ fn handle_commit_notification<V>(
         msg.block_timestamp_usecs,
         false,
     );
+    smp.validator.write().notify_commit();
     let counter_result = if mempool_listener.ack_commit_notification(msg).is_err() {
         error!(LogSchema::event_log(
             LogEntry::StateSyncCommit,

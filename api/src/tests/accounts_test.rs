@@ -474,7 +474,7 @@ async fn test_get_account_resources_by_ledger_version() {
     let mut context = new_test_context();
     let account = context.gen_account();
     let txn = context.create_parent_vasp(&account);
-    context.commit_block(&vec![txn.clone()]);
+    context.commit_block(&vec![txn.clone()]).await;
 
     let ledger_version_1_resources = context
         .get(&account_resources(
@@ -547,7 +547,7 @@ async fn test_get_account_modules_by_ledger_version() {
             .transaction_factory()
             .module(hex::decode(code).unwrap()),
     );
-    context.commit_block(&vec![txn.clone()]);
+    context.commit_block(&vec![txn.clone()]).await;
 
     let modules = context
         .get(&account_modules(

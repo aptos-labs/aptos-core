@@ -234,7 +234,7 @@ async fn test_get_transactions_output_user_transaction_with_script_function_payl
     let mut context = new_test_context();
     let account = context.gen_account();
     let txn = context.create_parent_vasp(&account);
-    context.commit_block(&vec![txn.clone()]);
+    context.commit_block(&vec![txn.clone()]).await;
 
     let txns = context.get("/transactions?start=1").await;
     assert_eq!(2, txns.as_array().unwrap().len());
@@ -343,7 +343,7 @@ async fn test_get_transactions_output_user_transaction_with_script_payload() {
             .transaction_factory()
             .rotate_authentication_key_by_script(new_key),
     );
-    context.commit_block(&vec![txn.clone()]);
+    context.commit_block(&vec![txn.clone()]).await;
 
     let txns = context.get("/transactions?start=2").await;
     assert_eq!(1, txns.as_array().unwrap().len());
@@ -386,7 +386,7 @@ async fn test_get_transactions_output_user_transaction_with_module_payload() {
             .transaction_factory()
             .module(hex::decode(code).unwrap()),
     );
-    context.commit_block(&vec![txn.clone()]);
+    context.commit_block(&vec![txn.clone()]).await;
 
     let txns = context.get("/transactions?start=2").await;
     assert_eq!(1, txns.as_array().unwrap().len());
@@ -460,7 +460,7 @@ async fn test_get_transactions_output_user_transaction_with_write_set_payload() 
             vec![],
         )),
     );
-    context.commit_block(&vec![txn.clone()]);
+    context.commit_block(&vec![txn.clone()]).await;
 
     let txns = context.get("/transactions?start=2").await;
     assert_eq!(1, txns.as_array().unwrap().len());
@@ -689,7 +689,7 @@ async fn test_multi_ed25519_signed_transaction() {
     let create_account_txn = tc_account.sign_with_transaction_builder(
         factory.create_parent_vasp_account(Currency::XUS, 0, auth_key, "vasp", true),
     );
-    context.commit_block(&vec![create_account_txn]);
+    context.commit_block(&vec![create_account_txn]).await;
 
     let raw_txn = factory
         .create_recovery_address()
@@ -746,7 +746,7 @@ async fn test_get_transaction_by_hash() {
     let mut context = new_test_context();
     let account = context.gen_account();
     let txn = context.create_parent_vasp(&account);
-    context.commit_block(&vec![txn.clone()]);
+    context.commit_block(&vec![txn.clone()]).await;
 
     let txns = context.get("/transactions?start=2").await;
     assert_eq!(1, txns.as_array().unwrap().len());
@@ -818,7 +818,7 @@ async fn test_get_transaction_by_version() {
     let mut context = new_test_context();
     let account = context.gen_account();
     let txn = context.create_parent_vasp(&account);
-    context.commit_block(&vec![txn.clone()]);
+    context.commit_block(&vec![txn.clone()]).await;
 
     let txns = context.get("/transactions?start=2").await;
     assert_eq!(1, txns.as_array().unwrap().len());
@@ -1061,7 +1061,7 @@ async fn test_signing_message_with_payload(
         .post("/transactions", body)
         .await;
 
-    context.commit_mempool_txns(10);
+    context.commit_mempool_txns(10).await;
 
     let ledger = context.get("/").await;
     assert_eq!(ledger["ledger_version"].as_str().unwrap(), "2"); // one metadata + one txn
@@ -1072,7 +1072,7 @@ async fn test_get_account_transactions() {
     let mut context = new_test_context();
     let account = context.gen_account();
     let txn = context.create_parent_vasp(&account);
-    context.commit_block(&vec![txn]);
+    context.commit_block(&vec![txn]).await;
 
     let txns = context
         .get(format!("/accounts/{}/transactions", context.tc_account().address()).as_str())
@@ -1087,7 +1087,7 @@ async fn test_get_account_transactions_filter_transactions_by_start_sequence_num
     let mut context = new_test_context();
     let account = context.gen_account();
     let txn = context.create_parent_vasp(&account);
-    context.commit_block(&vec![txn]);
+    context.commit_block(&vec![txn]).await;
 
     let txns = context
         .get(
@@ -1106,7 +1106,7 @@ async fn test_get_account_transactions_filter_transactions_by_start_sequence_num
     let mut context = new_test_context();
     let account = context.gen_account();
     let txn = context.create_parent_vasp(&account);
-    context.commit_block(&vec![txn]);
+    context.commit_block(&vec![txn]).await;
 
     let txns = context
         .get(
@@ -1128,7 +1128,7 @@ async fn test_get_account_transactions_filter_transactions_by_limit() {
     let txn1 = context.create_parent_vasp_by_account(&mut tc_account, &account1);
     let account2 = context.gen_account();
     let txn2 = context.create_parent_vasp_by_account(&mut tc_account, &account2);
-    context.commit_block(&vec![txn1, txn2]);
+    context.commit_block(&vec![txn1, txn2]).await;
 
     let txns = context
         .get(
@@ -1347,7 +1347,9 @@ async fn test_get_txn_execute_failed_by_missing_script_function_arguments() {
 async fn test_get_txn_execute_failed_by_script_function_validation() {
     let mut context = new_test_context();
     let account = context.gen_account();
-    context.commit_block(&vec![context.create_parent_vasp(&account)]);
+    context
+        .commit_block(&vec![context.create_parent_vasp(&account)])
+        .await;
 
     test_get_txn_execute_failed_by_invalid_script_function(
         context,
@@ -1389,7 +1391,7 @@ async fn test_get_txn_execute_failed_by_script_function_execution_failure() {
     let module_txn = root_account
         .sign_with_transaction_builder(context.transaction_factory().module(hello_script_fun));
 
-    context.commit_block(&vec![module_txn]);
+    context.commit_block(&vec![module_txn]).await;
 
     test_get_txn_execute_failed_by_invalid_script_function(
         context,
@@ -1470,7 +1472,7 @@ async fn test_transaction_vm_status(
         .post_bcs_txn("/transactions", body)
         .await;
 
-    context.commit_mempool_txns(1);
+    context.commit_mempool_txns(1).await;
 
     let resp = context
         .get(format!("/transactions/{}", txn.committed_hash().to_hex_literal()).as_str())
