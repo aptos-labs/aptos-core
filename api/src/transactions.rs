@@ -9,8 +9,8 @@ use crate::{
 };
 
 use diem_api_types::{
-    mime_types, Error, LedgerInfo, Response, Transaction, TransactionData, TransactionId,
-    TransactionOnChainData, TransactionSigningMessage, UserTransactionRequest,
+    mime_types::BCS_SIGNED_TRANSACTION, Error, LedgerInfo, Response, Transaction, TransactionData,
+    TransactionId, TransactionOnChainData, TransactionSigningMessage, UserTransactionRequest,
 };
 use diem_types::{
     mempool_status::MempoolStatusCode,
@@ -27,7 +27,8 @@ pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Rej
     get_transaction(context.clone())
         .or(get_transactions(context.clone()))
         .or(get_account_transactions(context.clone()))
-        .or(post_transactions(context.clone()))
+        .or(submit_bcs_transactions(context.clone()))
+        .or(submit_json_transactions(context.clone()))
         .or(create_signing_message(context))
 }
 
@@ -87,49 +88,60 @@ async fn handle_get_account_transactions(
     Ok(Transactions::new(context)?.list_by_account(address, page)?)
 }
 
-// POST /transactions
-pub fn post_transactions(
+// POST /transactions with JSON
+pub fn submit_json_transactions(
     context: Context,
 ) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
     warp::path!("transactions")
         .and(warp::post())
-        .and(warp::header::<String>(CONTENT_TYPE.as_str()))
         .and(warp::body::content_length_limit(
             context.content_length_limit(),
         ))
-        .and(warp::body::bytes())
+        .and(warp::body::json::<UserTransactionRequest>())
         .and(context.filter())
-        .and_then(handle_post_transactions)
-        .with(metrics("submit_transactions"))
+        .and_then(handle_submit_json_transactions)
+        .with(metrics("submit_json_transactions"))
 }
 
-async fn handle_post_transactions(
-    content_type: String,
+// POST /transactions with BCS
+pub fn submit_bcs_transactions(
+    context: Context,
+) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+    // The `warp::body::bytes` does not check content-type like `warp::body::json`,
+    // so we used `warp::header::exact` to ensure only BCS signed txn matches this route.
+    // When the content-type is invalid (not json / bcs signed txn), `submit_json_transactions`
+    // route will emit correct rejection (UnsupportedMediaType) which will be handled by recover
+    // handler, the invalid header error should be ignored.
+    warp::path!("transactions")
+        .and(warp::post())
+        .and(warp::body::content_length_limit(
+            context.content_length_limit(),
+        ))
+        .and(warp::header::exact(
+            CONTENT_TYPE.as_str(),
+            BCS_SIGNED_TRANSACTION,
+        ))
+        .and(warp::body::bytes())
+        .and(context.filter())
+        .and_then(handle_submit_bcs_transactions)
+        .with(metrics("submit_bcs_transactions"))
+}
+
+async fn handle_submit_json_transactions(
+    body: UserTransactionRequest,
+    context: Context,
+) -> Result<impl Reply, Rejection> {
+    Ok(Transactions::new(context)?
+        .create_from_request(body)
+        .await?)
+}
+
+async fn handle_submit_bcs_transactions(
     body: bytes::Bytes,
     context: Context,
 ) -> Result<impl Reply, Rejection> {
-    let txn = match content_type.to_lowercase().as_str() {
-        mime_types::BCS_SIGNED_TRANSACTION => bcs::from_bytes(&body).map_err(|_| {
-            Error::invalid_request_body("deserialize SignedTransaction BCS bytes failed".to_owned())
-        })?,
-        mime_types::JSON => {
-            let txn = deserialize_user_transaction_request(body)?;
-            let converter = context.move_converter();
-            converter
-                .try_into_signed_transaction(txn, context.chain_id())
-                .map_err(|e| {
-                    Error::invalid_request_body(format!(
-                        "failed to create SignedTransaction from UserTransactionRequest: {}",
-                        e
-                    ))
-                })?
-        }
-        _ => {
-            return Err(
-                Error::bad_request(format!("unsupported content-type: {}", content_type)).into(),
-            )
-        }
-    };
+    let txn = bcs::from_bytes(&body)
+        .map_err(|err| Error::invalid_request_body(format!("deserialize error: {}", err)))?;
     Ok(Transactions::new(context)?.create(txn).await?)
 }
 
@@ -139,33 +151,20 @@ pub fn create_signing_message(
 ) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
     warp::path!("transactions" / "signing_message")
         .and(warp::post())
-        .and(warp::header::exact(CONTENT_TYPE.as_str(), mime_types::JSON))
         .and(warp::body::content_length_limit(
             context.content_length_limit(),
         ))
-        .and(warp::body::bytes())
+        .and(warp::body::json::<UserTransactionRequest>())
         .and(context.filter())
         .and_then(handle_create_signing_message)
         .with(metrics("create_signing_message"))
 }
 
 async fn handle_create_signing_message(
-    body: bytes::Bytes,
+    body: UserTransactionRequest,
     context: Context,
 ) -> Result<impl Reply, Rejection> {
-    let txn = deserialize_user_transaction_request(body)?;
-    Ok(Transactions::new(context)?.signing_message(txn)?)
-}
-
-fn deserialize_user_transaction_request(
-    body: bytes::Bytes,
-) -> Result<UserTransactionRequest, Error> {
-    serde_json::from_slice(&body).map_err(|e| {
-        Error::invalid_request_body(format!(
-            "deserialize into UserTransactionRequest failed: {:?}",
-            e
-        ))
-    })
+    Ok(Transactions::new(context)?.signing_message(body)?)
 }
 
 struct Transactions {
@@ -180,6 +179,23 @@ impl Transactions {
             ledger_info,
             context,
         })
+    }
+
+    pub async fn create_from_request(
+        self,
+        req: UserTransactionRequest,
+    ) -> Result<impl Reply, Error> {
+        let txn = self
+            .context
+            .move_converter()
+            .try_into_signed_transaction(req, self.context.chain_id())
+            .map_err(|e| {
+                Error::invalid_request_body(format!(
+                    "failed to create SignedTransaction from UserTransactionRequest: {}",
+                    e
+                ))
+            })?;
+        self.create(txn).await
     }
 
     pub async fn create(self, txn: SignedTransaction) -> Result<impl Reply, Error> {

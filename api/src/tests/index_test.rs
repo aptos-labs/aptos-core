@@ -30,13 +30,13 @@ async fn test_returns_not_found_for_the_invalid_path() {
 async fn test_return_bad_request_if_method_not_allowed() {
     let context = new_test_context();
     let resp = context
-        .expect_status_code(400)
+        .expect_status_code(405)
         .post("/accounts/0x1/resources", json!({}))
         .await;
 
     let expected = json!({
-        "code": 400,
-        "message": "Method not allowed or request body is invalid.",
+        "code": 405,
+        "message": "HTTP method not allowed",
     });
 
     assert_eq!(expected, resp);

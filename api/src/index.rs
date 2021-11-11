@@ -12,9 +12,10 @@ use diem_api_types::{Error, Response};
 
 use std::convert::Infallible;
 use warp::{
+    body::BodyDeserializeError,
     cors::CorsForbidden,
     http::StatusCode,
-    reject::{MethodNotAllowed, PayloadTooLarge},
+    reject::{MethodNotAllowed, PayloadTooLarge, UnsupportedMediaType},
     reply, Filter, Rejection, Reply,
 };
 
@@ -87,15 +88,18 @@ async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> {
     } else if let Some(cause) = err.find::<CorsForbidden>() {
         code = StatusCode::FORBIDDEN;
         body = reply::json(&Error::new(code, cause.to_string()));
+    } else if let Some(cause) = err.find::<BodyDeserializeError>() {
+        code = StatusCode::BAD_REQUEST;
+        body = reply::json(&Error::new(code, cause.to_string()));
     } else if let Some(cause) = err.find::<PayloadTooLarge>() {
         code = StatusCode::PAYLOAD_TOO_LARGE;
         body = reply::json(&Error::new(code, cause.to_string()));
-    } else if err.find::<MethodNotAllowed>().is_some() {
-        code = StatusCode::BAD_REQUEST;
-        body = reply::json(&Error::new(
-            code,
-            "Method not allowed or request body is invalid.".to_owned(),
-        ));
+    } else if let Some(cause) = err.find::<UnsupportedMediaType>() {
+        code = StatusCode::UNSUPPORTED_MEDIA_TYPE;
+        body = reply::json(&Error::new(code, cause.to_string()));
+    } else if let Some(cause) = err.find::<MethodNotAllowed>() {
+        code = StatusCode::METHOD_NOT_ALLOWED;
+        body = reply::json(&Error::new(code, cause.to_string()));
     } else {
         code = StatusCode::INTERNAL_SERVER_ERROR;
         body = reply::json(&Error::new(code, format!("unexpected error: {:?}", err)));

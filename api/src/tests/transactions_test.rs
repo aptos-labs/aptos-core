@@ -564,7 +564,7 @@ async fn test_post_invalid_bcs_format_transaction() {
         resp,
         json!({
           "code": 400,
-          "message": "invalid request body: deserialize SignedTransaction BCS bytes failed"
+          "message": "invalid request body: deserialize error: unexpected end of input"
         }),
     );
 }
@@ -1530,6 +1530,44 @@ async fn test_submit_transaction_rejects_payload_too_large_json_body() {
 }
 
 #[tokio::test]
+async fn test_submit_transaction_rejects_invalid_content_type() {
+    let context = new_test_context();
+    let req = warp::test::request()
+        .header("content-type", "invalid")
+        .method("POST")
+        .body("text")
+        .path("/transactions");
+
+    let resp = context.expect_status_code(415).execute(req).await;
+    assert_json(
+        resp,
+        json!({
+            "code": 415,
+            "message": "The request's content-type is not supported"
+        }),
+    );
+}
+
+#[tokio::test]
+async fn test_submit_transaction_rejects_invalid_json() {
+    let context = new_test_context();
+    let req = warp::test::request()
+        .header("content-type", "application/json")
+        .method("POST")
+        .body("invalid json")
+        .path("/transactions");
+
+    let resp = context.expect_status_code(400).execute(req).await;
+    assert_json(
+        resp,
+        json!({
+            "code": 400,
+            "message": "Request body deserialize error: expected value at line 1 column 1"
+        }),
+    );
+}
+
+#[tokio::test]
 async fn test_create_signing_message_rejects_payload_too_large_json_body() {
     let context = new_test_context();
 
@@ -1547,6 +1585,44 @@ async fn test_create_signing_message_rejects_payload_too_large_json_body() {
         json!({
           "code": 413,
           "message": "The request payload is too large"
+        }),
+    );
+}
+
+#[tokio::test]
+async fn test_create_signing_message_rejects_invalid_content_type() {
+    let context = new_test_context();
+    let req = warp::test::request()
+        .header("content-type", "invalid")
+        .method("POST")
+        .body("text")
+        .path("/transactions/signing_message");
+
+    let resp = context.expect_status_code(415).execute(req).await;
+    assert_json(
+        resp,
+        json!({
+            "code": 415,
+            "message": "The request's content-type is not supported"
+        }),
+    );
+}
+
+#[tokio::test]
+async fn test_create_signing_message_rejects_invalid_json() {
+    let context = new_test_context();
+    let req = warp::test::request()
+        .header("content-type", "application/json")
+        .method("POST")
+        .body("invalid json")
+        .path("/transactions/signing_message");
+
+    let resp = context.expect_status_code(400).execute(req).await;
+    assert_json(
+        resp,
+        json!({
+            "code": 400,
+            "message": "Request body deserialize error: expected value at line 1 column 1"
         }),
     );
 }
