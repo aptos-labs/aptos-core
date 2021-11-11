@@ -504,6 +504,11 @@ pub trait DbReader<PS: ProtocolSpec>: Send + Sync {
     ) -> Result<AccountStatesChunkWithProof> {
         unimplemented!()
     }
+
+    /// Get the state prune window config value.
+    fn get_state_prune_window(&self) -> Option<usize> {
+        unimplemented!()
+    }
 }
 
 impl<PS: ProtocolSpec> MoveStorage for &dyn DbReader<PS> {

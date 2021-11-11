@@ -228,6 +228,7 @@ pub struct DiemDB {
     system_store: SystemStore,
     rocksdb_property_reporter: RocksdbPropertyReporter,
     pruner: Option<Pruner>,
+    prune_window: Option<u64>,
 }
 
 impl DiemDB {
@@ -263,6 +264,7 @@ impl DiemDB {
             system_store: SystemStore::new(Arc::clone(&db)),
             rocksdb_property_reporter: RocksdbPropertyReporter::new(Arc::clone(&db)),
             pruner: prune_window.map(|n| Pruner::new(Arc::clone(&db), n)),
+            prune_window,
         }
     }
 
@@ -1198,6 +1200,10 @@ impl DbReader<DpnProto> for DiemDB {
             self.state_store
                 .get_account_chunk_with_proof(version, first_index, chunk_size)
         })
+    }
+
+    fn get_state_prune_window(&self) -> Option<usize> {
+        self.prune_window.map(|u| u as usize)
     }
 }
 
