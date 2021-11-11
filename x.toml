@@ -232,7 +232,6 @@ members = [
     "shuffle-integration-tests",
     "smoke-test",
     "socket-bench-server",
-    "state-sync-v2", # Will be removed once state sync v2 is plugged into diem-node.
     "test-generation",
     "transaction-emitter",
     "x",
