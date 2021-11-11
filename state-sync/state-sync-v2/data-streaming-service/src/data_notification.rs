@@ -46,6 +46,19 @@ pub enum DataClientRequest {
     TransactionOutputsWithProof(TransactionOutputsWithProofRequest),
 }
 
+impl DataClientRequest {
+    /// Returns a summary label for the request
+    pub fn get_label(&self) -> &'static str {
+        match self {
+            Self::AccountsWithProof(_) => "accounts_with_proof",
+            Self::EpochEndingLedgerInfos(_) => "epoch_ending_ledger_infos",
+            Self::NumberOfAccounts(_) => "number_of_accounts",
+            Self::TransactionsWithProof(_) => "transactions_with_proof",
+            Self::TransactionOutputsWithProof(_) => "transaction_outputs_with_proof",
+        }
+    }
+}
+
 /// A request for fetching account states.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AccountsWithProofRequest {

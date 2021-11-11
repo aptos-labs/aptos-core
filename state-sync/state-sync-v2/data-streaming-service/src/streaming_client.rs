@@ -129,6 +129,23 @@ pub enum StreamRequest {
     TerminateStream(TerminateStreamRequest),
 }
 
+impl StreamRequest {
+    /// Returns a summary label for the stream request
+    pub fn get_label(&self) -> &'static str {
+        match self {
+            Self::GetAllAccounts(_) => "get_all_accounts",
+            Self::GetAllEpochEndingLedgerInfos(_) => "get_all_epoch_ending_ledger_infos",
+            Self::GetAllTransactions(_) => "get_all_transactions",
+            Self::GetAllTransactionOutputs(_) => "get_all_transaction_outputs",
+            Self::ContinuouslyStreamTransactions(_) => "continuously_stream_transactions",
+            Self::ContinuouslyStreamTransactionOutputs(_) => {
+                "continuously_stream_transaction_outputs"
+            }
+            Self::TerminateStream(_) => "terminate_stream",
+        }
+    }
+}
+
 /// A client request for fetching all account states at a specified version.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct GetAllAccountsRequest {
@@ -188,6 +205,18 @@ pub enum NotificationFeedback {
     InvalidPayloadData,
     PayloadProofFailed,
     PayloadTypeIsIncorrect,
+}
+
+impl NotificationFeedback {
+    /// Returns a summary label for the notification feedback
+    pub fn get_label(&self) -> &'static str {
+        match self {
+            Self::EndOfStream => "end_of_stream",
+            Self::InvalidPayloadData => "invalid_payload_data",
+            Self::PayloadProofFailed => "payload_proof_failed",
+            Self::PayloadTypeIsIncorrect => "payload_type_is_correct",
+        }
+    }
 }
 
 /// The streaming service client that talks to the streaming service.

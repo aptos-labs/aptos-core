@@ -3,9 +3,15 @@
 
 use crate::{
     data_notification,
-    data_notification::{DataClientRequest, DataNotification, DataPayload, NotificationId},
+    data_notification::{
+        AccountsWithProofRequest, DataClientRequest, DataNotification, DataPayload,
+        EpochEndingLedgerInfosRequest, NotificationId, NumberOfAccountsRequest,
+        TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
+    },
     error::Error,
     logging::{LogEntry, LogEvent, LogSchema},
+    metrics,
+    metrics::{increment_counter, start_timer},
     stream_engine::{DataStreamEngine, StreamEngine},
     streaming_client::{NotificationFeedback, StreamRequest},
 };
@@ -237,60 +243,11 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStream<T> {
         )));
 
         // Send the request to the network
-        let diem_data_client = self.diem_data_client.clone();
-        let pending_response = pending_client_response.clone();
-        let join_handle = match data_client_request {
-            DataClientRequest::AccountsWithProof(request) => tokio::spawn(async move {
-                let client_response = diem_data_client.get_account_states_with_proof(
-                    request.version,
-                    request.start_index,
-                    request.end_index,
-                );
-                let client_response = client_response
-                    .await
-                    .map(|response| response.map(ResponsePayload::from));
-                pending_response.lock().client_response = Some(client_response);
-            }),
-            DataClientRequest::EpochEndingLedgerInfos(request) => tokio::spawn(async move {
-                let client_response = diem_data_client
-                    .get_epoch_ending_ledger_infos(request.start_epoch, request.end_epoch);
-                let client_response = client_response
-                    .await
-                    .map(|response| response.map(ResponsePayload::from));
-                pending_response.lock().client_response = Some(client_response);
-            }),
-            DataClientRequest::NumberOfAccounts(request) => tokio::spawn(async move {
-                let client_response =
-                    diem_data_client.get_number_of_account_states(request.version);
-                let client_response = client_response
-                    .await
-                    .map(|response| response.map(ResponsePayload::from));
-                pending_response.lock().client_response = Some(client_response);
-            }),
-            DataClientRequest::TransactionOutputsWithProof(request) => tokio::spawn(async move {
-                let client_response = diem_data_client.get_transaction_outputs_with_proof(
-                    request.max_proof_version,
-                    request.start_version,
-                    request.end_version,
-                );
-                let client_response = client_response
-                    .await
-                    .map(|response| response.map(ResponsePayload::from));
-                pending_response.lock().client_response = Some(client_response);
-            }),
-            DataClientRequest::TransactionsWithProof(request) => tokio::spawn(async move {
-                let client_response = diem_data_client.get_transactions_with_proof(
-                    request.max_proof_version,
-                    request.start_version,
-                    request.end_version,
-                    request.include_events,
-                );
-                let client_response = client_response
-                    .await
-                    .map(|response| response.map(ResponsePayload::from));
-                pending_response.lock().client_response = Some(client_response);
-            }),
-        };
+        let join_handle = spawn_request_task(
+            data_client_request,
+            self.diem_data_client.clone(),
+            pending_client_response.clone(),
+        );
         self.spawned_tasks.push(join_handle);
 
         pending_client_response
@@ -689,4 +646,124 @@ fn extract_response_error(notification_feedback: &NotificationFeedback) -> Respo
             )
         }
     }
+}
+
+fn spawn_request_task<T: DiemDataClient + Send + Clone + 'static>(
+    data_client_request: DataClientRequest,
+    diem_data_client: T,
+    pending_response: PendingClientResponse,
+) -> JoinHandle<()> {
+    // Update the requests sent counter
+    increment_counter(
+        &metrics::SENT_DATA_REQUESTS,
+        data_client_request.get_label().into(),
+    );
+
+    // Spawn the request
+    tokio::spawn(async move {
+        // Time the request (the timer will stop when it's dropped)
+        let _timer = start_timer(
+            &metrics::DATA_REQUEST_PROCESSING_LATENCY,
+            data_client_request.get_label().into(),
+        );
+
+        // Fetch the client response
+        let client_response = match data_client_request {
+            DataClientRequest::AccountsWithProof(request) => {
+                get_account_states_with_proof(diem_data_client, request).await
+            }
+            DataClientRequest::EpochEndingLedgerInfos(request) => {
+                get_epoch_ending_ledger_infos(diem_data_client, request).await
+            }
+            DataClientRequest::NumberOfAccounts(request) => {
+                get_number_of_account_states(diem_data_client, request).await
+            }
+            DataClientRequest::TransactionOutputsWithProof(request) => {
+                get_transaction_outputs_with_proof(diem_data_client, request).await
+            }
+            DataClientRequest::TransactionsWithProof(request) => {
+                get_transactions_with_proof(diem_data_client, request).await
+            }
+        };
+
+        // Increment the appropriate counter depending on the response
+        match &client_response {
+            Ok(response) => {
+                increment_counter(
+                    &metrics::RECEIVED_DATA_RESPONSE,
+                    response.payload.get_label().into(),
+                );
+            }
+            Err(error) => {
+                increment_counter(&metrics::RECEIVED_RESPONSE_ERROR, error.get_label().into());
+            }
+        }
+
+        // Save the response
+        pending_response.lock().client_response = Some(client_response);
+    })
+}
+
+async fn get_account_states_with_proof<T: DiemDataClient + Send + Clone + 'static>(
+    diem_data_client: T,
+    request: AccountsWithProofRequest,
+) -> Result<Response<ResponsePayload>, diem_data_client::Error> {
+    let client_response = diem_data_client.get_account_states_with_proof(
+        request.version,
+        request.start_index,
+        request.end_index,
+    );
+    client_response
+        .await
+        .map(|response| response.map(ResponsePayload::from))
+}
+
+async fn get_epoch_ending_ledger_infos<T: DiemDataClient + Send + Clone + 'static>(
+    diem_data_client: T,
+    request: EpochEndingLedgerInfosRequest,
+) -> Result<Response<ResponsePayload>, diem_data_client::Error> {
+    let client_response =
+        diem_data_client.get_epoch_ending_ledger_infos(request.start_epoch, request.end_epoch);
+    client_response
+        .await
+        .map(|response| response.map(ResponsePayload::from))
+}
+
+async fn get_number_of_account_states<T: DiemDataClient + Send + Clone + 'static>(
+    diem_data_client: T,
+    request: NumberOfAccountsRequest,
+) -> Result<Response<ResponsePayload>, diem_data_client::Error> {
+    let client_response = diem_data_client.get_number_of_account_states(request.version);
+    client_response
+        .await
+        .map(|response| response.map(ResponsePayload::from))
+}
+
+async fn get_transaction_outputs_with_proof<T: DiemDataClient + Send + Clone + 'static>(
+    diem_data_client: T,
+    request: TransactionOutputsWithProofRequest,
+) -> Result<Response<ResponsePayload>, diem_data_client::Error> {
+    let client_response = diem_data_client.get_transaction_outputs_with_proof(
+        request.max_proof_version,
+        request.start_version,
+        request.end_version,
+    );
+    client_response
+        .await
+        .map(|response| response.map(ResponsePayload::from))
+}
+
+async fn get_transactions_with_proof<T: DiemDataClient + Send + Clone + 'static>(
+    diem_data_client: T,
+    request: TransactionsWithProofRequest,
+) -> Result<Response<ResponsePayload>, diem_data_client::Error> {
+    let client_response = diem_data_client.get_transactions_with_proof(
+        request.max_proof_version,
+        request.start_version,
+        request.end_version,
+        request.include_events,
+    );
+    client_response
+        .await
+        .map(|response| response.map(ResponsePayload::from))
 }

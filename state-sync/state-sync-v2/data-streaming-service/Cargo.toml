@@ -14,6 +14,7 @@ async-trait = "0.1.42"
 enum_dispatch = "0.3.5"
 futures = "0.3.12"
 itertools = "0.10.0"
+once_cell = "1.7.2"
 serde = { version = "1.0.124", default-features = false }
 thiserror = "1.0.24"
 tokio = { version = "1.8.1", features = ["full"] }
@@ -26,8 +27,11 @@ diem-data-client = { path = "../../diem-data-client" }
 diem-id-generator = { path = "../../../common/id-generator" }
 diem-infallible = { path = "../../../common/infallible" }
 diem-logger = { path = "../../../common/logger" }
+diem-metrics = { path = "../../../common/metrics" }
 diem-types = { path = "../../../types" }
 diem-workspace-hack = { path = "../../../common/workspace-hack" }
+network = { path = "../../../network" }
+short-hex-str = { path = "../../../common/short-hex-str" }
 
 [dev-dependencies]
 claim = "0.5.0"

@@ -1213,7 +1213,7 @@ fn create_data_notification(
 ) -> DataNotification {
     let notification_id = notification_id_generator.next();
 
-    let client_response_type = client_response.method_name();
+    let client_response_type = client_response.get_label();
     let data_payload = match client_response {
         ResponsePayload::AccountStatesWithProof(accounts_chunk) => {
             DataPayload::AccountStatesWithProof(accounts_chunk)

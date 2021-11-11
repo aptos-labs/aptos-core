@@ -5,6 +5,8 @@ use crate::{
     data_stream::{DataStream, DataStreamId, DataStreamListener},
     error::Error,
     logging::{LogEntry, LogEvent, LogSchema},
+    metrics,
+    metrics::increment_counter,
     streaming_client::{
         StreamRequest, StreamRequestMessage, StreamingServiceListener, TerminateStreamRequest,
     },
@@ -120,10 +122,15 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStreamingService<T> {
         &mut self,
         terminate_request: &TerminateStreamRequest,
     ) -> Result<(), Error> {
-        let notification_id = &terminate_request.notification_id;
+        // Increment the stream termination counter
         let notification_feedback = &terminate_request.notification_feedback;
+        increment_counter(
+            &metrics::TERMINATE_DATA_STREAM,
+            notification_feedback.get_label().into(),
+        );
 
         // Find the data stream that sent the notification
+        let notification_id = &terminate_request.notification_id;
         let data_stream_ids = self.get_all_data_stream_ids();
         for data_stream_id in &data_stream_ids {
             let data_stream = self.get_data_stream(data_stream_id);
@@ -152,6 +159,12 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStreamingService<T> {
         &mut self,
         request_message: &StreamRequestMessage,
     ) -> Result<DataStreamListener, Error> {
+        // Increment the stream creation counter
+        increment_counter(
+            &metrics::CREATE_DATA_STREAM,
+            request_message.stream_request.get_label().into(),
+        );
+
         // Refresh the cached global data summary
         self.refresh_global_data_summary();
 
@@ -191,6 +204,10 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStreamingService<T> {
     /// Refreshes the global data summary by communicating with the Diem data client
     fn refresh_global_data_summary(&mut self) {
         if let Err(error) = self.fetch_global_data_summary() {
+            increment_counter(
+                &metrics::GLOBAL_DATA_SUMMARY_ERROR,
+                error.get_label().into(),
+            );
             error!(LogSchema::new(LogEntry::RefreshGlobalData)
                 .event(LogEvent::Error)
                 .error(&error));
@@ -209,6 +226,10 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStreamingService<T> {
         let data_stream_ids = self.get_all_data_stream_ids();
         for data_stream_id in &data_stream_ids {
             if let Err(error) = self.update_progress_of_data_stream(data_stream_id) {
+                increment_counter(
+                    &metrics::CHECK_STREAM_PROGRESS_ERROR,
+                    error.get_label().into(),
+                );
                 error!(LogSchema::new(LogEntry::CheckStreamProgress)
                     .stream_id(*data_stream_id)
                     .event(LogEvent::Error)
