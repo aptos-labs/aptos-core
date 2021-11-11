@@ -1,4 +1,4 @@
-address 0x1 {
+address DiemFramework {
 module MultiToken {
     use Std::Errors;
     use Std::Event;

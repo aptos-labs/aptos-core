@@ -1,8 +1,8 @@
 #[test_only]
-module 0x1::MultiTokenTests {
+module DiemFramework::MultiTokenTests {
     use Std::GUID;
-    use 0x1::MultiToken;
-    use 0x1::MultiTokenBalance;
+    use DiemFramework::MultiToken;
+    use DiemFramework::MultiTokenBalance;
 
     /// A test token type to instantiate generic Tokens with.
     struct Game has store {

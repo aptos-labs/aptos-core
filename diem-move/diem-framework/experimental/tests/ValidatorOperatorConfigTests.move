@@ -1,0 +1,1 @@
+../../core/tests/ValidatorOperatorConfigTests.move
