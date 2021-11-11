@@ -15,7 +15,7 @@ use warp::{
     body::BodyDeserializeError,
     cors::CorsForbidden,
     http::StatusCode,
-    reject::{MethodNotAllowed, PayloadTooLarge, UnsupportedMediaType},
+    reject::{LengthRequired, MethodNotAllowed, PayloadTooLarge, UnsupportedMediaType},
     reply, Filter, Rejection, Reply,
 };
 
@@ -90,6 +90,9 @@ async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> {
         body = reply::json(&Error::new(code, cause.to_string()));
     } else if let Some(cause) = err.find::<BodyDeserializeError>() {
         code = StatusCode::BAD_REQUEST;
+        body = reply::json(&Error::new(code, cause.to_string()));
+    } else if let Some(cause) = err.find::<LengthRequired>() {
+        code = StatusCode::LENGTH_REQUIRED;
         body = reply::json(&Error::new(code, cause.to_string()));
     } else if let Some(cause) = err.find::<PayloadTooLarge>() {
         code = StatusCode::PAYLOAD_TOO_LARGE;

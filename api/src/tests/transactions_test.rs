@@ -1627,6 +1627,24 @@ async fn test_create_signing_message_rejects_invalid_json() {
     );
 }
 
+#[tokio::test]
+async fn test_create_signing_message_rejects_no_content_length_request() {
+    let context = new_test_context();
+    let req = warp::test::request()
+        .header("content-type", "application/json")
+        .method("POST")
+        .path("/transactions/signing_message");
+
+    let resp = context.expect_status_code(411).execute(req).await;
+    assert_json(
+        resp,
+        json!({
+            "code": 411,
+            "message": "A content-length header is required"
+        }),
+    );
+}
+
 fn gen_string(len: u64) -> String {
     let mut rng = thread_rng();
     std::iter::repeat(())
