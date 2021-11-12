@@ -118,6 +118,9 @@ compiled_package_info:
       name: Option
     : Std
     ? address: "00000000000000000000000000000001"
+      name: ParallelExecutionConfig
+    : DiemFramework
+    ? address: "00000000000000000000000000000001"
       name: PaymentScripts
     : DiemFramework
     ? address: "00000000000000000000000000000001"
@@ -174,7 +177,7 @@ compiled_package_info:
     ? address: "00000000000000000000000000000001"
       name: XUS
     : DiemFramework
-  source_digest: B6B1052B5BA8D8D3C818362BE47FC06992FF7FBDA6B86D00D01244E5EB35389F
+  source_digest: 5A4BC7B8DA4DDBF528EF46AA48A2DE7BDD81AB098C97722CFA1184B39798C7C5
   build_flags:
     dev_mode: false
     test_mode: false
