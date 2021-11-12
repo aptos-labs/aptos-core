@@ -129,7 +129,7 @@ impl LocalFactory {
         R: ::rand::RngCore + ::rand::CryptoRng,
     {
         let version = self.versions.keys().max().unwrap();
-        self.new_swarm_with_version(rng, number_of_validators, version)
+        self.new_swarm_with_version(rng, number_of_validators, version, None)
     }
 
     pub fn new_swarm_with_version<R>(
@@ -137,14 +137,19 @@ impl LocalFactory {
         rng: R,
         number_of_validators: NonZeroUsize,
         version: &Version,
+        genesis_modules: Option<Vec<Vec<u8>>>,
     ) -> Result<LocalSwarm>
     where
         R: ::rand::RngCore + ::rand::CryptoRng,
     {
-        let mut swarm = LocalSwarm::builder(self.versions.clone())
+        let mut builder = LocalSwarm::builder(self.versions.clone())
             .number_of_validators(number_of_validators)
-            .initial_version(version.clone())
-            .build(rng)?;
+            .initial_version(version.clone());
+        if let Some(genesis_modules) = genesis_modules {
+            builder = builder.genesis_modules(genesis_modules);
+        }
+
+        let mut swarm = builder.build(rng)?;
         swarm
             .launch()
             .with_context(|| format!("Swarm logs can be found here: {}", swarm.logs_location()))?;
@@ -164,8 +169,14 @@ impl Factory for LocalFactory {
         node_num: NonZeroUsize,
         version: &Version,
         _genesis_version: &Version,
+        genesis_modules: Option<&[Vec<u8>]>,
     ) -> Result<Box<dyn Swarm>> {
-        let swarm = self.new_swarm_with_version(rng, node_num, version)?;
+        let swarm = self.new_swarm_with_version(
+            rng,
+            node_num,
+            version,
+            genesis_modules.map(|m| m.to_owned()),
+        )?;
 
         Ok(Box::new(swarm))
     }

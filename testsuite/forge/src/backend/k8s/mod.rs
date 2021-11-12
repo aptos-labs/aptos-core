@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{Factory, Result, Swarm, Version};
-use anyhow::format_err;
+use anyhow::{bail, format_err};
 use rand::rngs::StdRng;
 use std::{env, fs::File, io::Read, num::NonZeroUsize, path::PathBuf};
 use tokio::runtime::Runtime;
@@ -103,7 +103,12 @@ impl Factory for K8sFactory {
         node_num: NonZeroUsize,
         init_version: &Version,
         genesis_version: &Version,
+        genesis_modules: Option<&[Vec<u8>]>,
     ) -> Result<Box<dyn Swarm>> {
+        if genesis_modules.is_some() {
+            bail!("k8s forge backend does not support custom genesis modules");
+        }
+
         set_eks_nodegroup_size(self.cluster_name.clone(), node_num.get(), true)?;
         uninstall_from_k8s_cluster()?;
         clean_k8s_cluster(

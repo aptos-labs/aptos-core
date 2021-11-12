@@ -85,6 +85,7 @@ pub struct LocalSwarmBuilder {
     template: NodeConfig,
     number_of_validators: NonZeroUsize,
     dir: Option<PathBuf>,
+    genesis_modules: Option<Vec<Vec<u8>>>,
 }
 
 impl LocalSwarmBuilder {
@@ -95,6 +96,7 @@ impl LocalSwarmBuilder {
             template: NodeConfig::default_for_validator(),
             number_of_validators: NonZeroUsize::new(1).unwrap(),
             dir: None,
+            genesis_modules: None,
         }
     }
 
@@ -115,6 +117,11 @@ impl LocalSwarmBuilder {
 
     pub fn dir<T: AsRef<Path>>(mut self, dir: T) -> Self {
         self.dir = Some(dir.as_ref().into());
+        self
+    }
+
+    pub fn genesis_modules(mut self, genesis_modules: Vec<Vec<u8>>) -> Self {
+        self.genesis_modules = Some(genesis_modules);
         self
     }
 
@@ -141,7 +148,8 @@ impl LocalSwarmBuilder {
 
         let (root_keys, genesis, genesis_waypoint, validators) = ValidatorBuilder::new(
             &dir,
-            diem_framework_releases::current_module_blobs().to_vec(),
+            self.genesis_modules
+                .unwrap_or_else(|| diem_framework_releases::current_module_blobs().to_vec()),
         )
         .num_validators(self.number_of_validators)
         .template(self.template)

@@ -104,6 +104,9 @@ pub struct ForgeConfig<'cfg> {
 
     /// The initial version to use when the test harness creates a swarm
     initial_version: InitialVersion,
+
+    /// The initial genesis modules to use when starting a network
+    genesis_modules: Option<Vec<Vec<u8>>>,
 }
 
 impl<'cfg> ForgeConfig<'cfg> {
@@ -139,6 +142,11 @@ impl<'cfg> ForgeConfig<'cfg> {
         self
     }
 
+    pub fn with_genesis_modules(mut self, genesis_modules: Vec<Vec<u8>>) -> Self {
+        self.genesis_modules = Some(genesis_modules);
+        self
+    }
+
     pub fn number_of_tests(&self) -> usize {
         self.public_usage_tests.len() + self.admin_tests.len() + self.network_tests.len()
     }
@@ -160,6 +168,7 @@ impl<'cfg> Default for ForgeConfig<'cfg> {
             network_tests: &[],
             initial_validator_count: NonZeroUsize::new(1).unwrap(),
             initial_version: InitialVersion::Newest,
+            genesis_modules: None,
         }
     }
 }
@@ -235,6 +244,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                 self.tests.initial_validator_count,
                 &initial_version,
                 &genesis_version,
+                self.tests.genesis_modules.as_deref(),
             )?;
 
             // Run PublicUsageTests
