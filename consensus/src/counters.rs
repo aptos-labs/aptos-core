@@ -253,9 +253,9 @@ pub static PENDING_CONSENSUS_NETWORK_EVENTS: Lazy<IntCounterVec> = Lazy::new(|| 
     .unwrap()
 });
 
-pub static PENDING_COMMIT_VOTES: Lazy<IntCounterVec> = Lazy::new(|| {
+pub static BUFFER_MANAGER_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "diem_consensus_pending_commit_votes",
+        "diem_consensus_buffer_manager_msgs_count",
         "Counters(queued,dequeued,dropped) related to pending commit votes",
         &["state"]
     )
@@ -266,6 +266,16 @@ pub static PENDING_COMMIT_VOTES: Lazy<IntCounterVec> = Lazy::new(|| {
 pub static CONSENSUS_CHANNEL_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "diem_consensus_channel_msgs_count",
+        "Counters(queued,dequeued,dropped) related to consensus channel",
+        &["state"]
+    )
+    .unwrap()
+});
+
+/// Counters(queued,dequeued,dropped) related to consensus channel
+pub static ROUND_MANAGER_CHANNEL_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "diem_consensus_round_manager_msgs_count",
         "Counters(queued,dequeued,dropped) related to consensus channel",
         &["state"]
     )

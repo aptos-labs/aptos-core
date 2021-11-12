@@ -12,7 +12,6 @@ use diem_config::config::NodeConfig;
 use diem_crypto::{ed25519::Ed25519Signature, HashValue};
 use diem_logger::prelude::*;
 use diem_types::{
-    block_info::Round,
     epoch_change::EpochChangeProof,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     protocol_spec::DpnProto,
@@ -80,10 +79,6 @@ pub struct LedgerRecoveryData {
 impl LedgerRecoveryData {
     pub fn new(storage_ledger: LedgerInfoWithSignatures) -> Self {
         LedgerRecoveryData { storage_ledger }
-    }
-
-    pub fn commit_round(&self) -> Round {
-        self.storage_ledger.ledger_info().round()
     }
 
     /// Finds the root (last committed block) and returns the root block, the QC to the root block

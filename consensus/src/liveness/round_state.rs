@@ -162,15 +162,12 @@ pub struct RoundStateLogSchema<'a> {
 }
 
 impl<'a> RoundStateLogSchema<'a> {
-    pub fn new(round_state: Option<&'a RoundState>) -> Self {
-        match round_state {
-            Some(state) => Self {
-                round: Some(state.current_round),
-                committed_round: Some(state.highest_committed_round),
-                pending_votes: Some(&state.pending_votes),
-                self_vote: state.vote_sent.as_ref(),
-            },
-            None => Self::default(),
+    pub fn new(state: &'a RoundState) -> Self {
+        Self {
+            round: Some(state.current_round),
+            committed_round: Some(state.highest_committed_round),
+            pending_votes: Some(&state.pending_votes),
+            self_vote: state.vote_sent.as_ref(),
         }
     }
 }

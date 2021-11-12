@@ -7,21 +7,21 @@ use crate::{
         BlockReader, BlockRetriever, BlockStore,
     },
     counters,
-    error::VerifyError,
+    error::{error_kind, VerifyError},
     liveness::{
         proposal_generator::ProposalGenerator,
         proposer_election::ProposerElection,
-        round_state::{NewRoundEvent, NewRoundReason, RoundState},
+        round_state::{NewRoundEvent, NewRoundReason, RoundState, RoundStateLogSchema},
     },
     logging::{LogEvent, LogSchema},
     metrics_safety_rules::MetricsSafetyRules,
     network::{IncomingBlockRetrievalRequest, NetworkSender},
     network_interface::ConsensusMsg,
     pending_votes::VoteReceptionResult,
-    persistent_liveness_storage::{PersistentLivenessStorage, RecoveryData},
-    state_replication::StateComputer,
+    persistent_liveness_storage::PersistentLivenessStorage,
 };
 use anyhow::{bail, ensure, Context, Result};
+use channel::diem_channel;
 use consensus_types::{
     block::Block,
     block_retrieval::{BlockRetrievalResponse, BlockRetrievalStatus},
@@ -37,17 +37,18 @@ use consensus_types::{
 };
 use diem_infallible::{checked, Mutex};
 use diem_logger::prelude::*;
+use diem_metrics::monitor;
 use diem_types::{
     epoch_state::EpochState, on_chain_config::OnChainConsensusConfig,
     validator_verifier::ValidatorVerifier,
 };
 use fail::fail_point;
-use futures::FutureExt;
+use futures::{FutureExt, StreamExt};
 #[cfg(test)]
 use safety_rules::ConsensusState;
 use safety_rules::TSafetyRules;
 use serde::Serialize;
-use std::{sync::Arc, time::Duration};
+use std::{mem::Discriminant, sync::Arc, time::Duration};
 use termion::color::*;
 
 #[derive(Serialize, Clone)]
@@ -116,6 +117,8 @@ pub enum VerifiedEvent {
     SyncInfo(Box<SyncInfo>),
     CommitVote(Box<CommitVote>),
     CommitDecision(Box<CommitDecision>),
+    BlockRetrievalRequest(Box<IncomingBlockRetrievalRequest>),
+    LocalTimeout(Round),
 }
 
 #[cfg(test)]
@@ -125,85 +128,6 @@ mod round_manager_test;
 #[cfg(feature = "fuzzing")]
 #[path = "round_manager_fuzzing.rs"]
 pub mod round_manager_fuzzing;
-
-/// If the node can't recover corresponding blocks from local storage, RecoveryManager is responsible
-/// for processing the events carrying sync info and use the info to retrieve blocks from peers
-pub struct RecoveryManager {
-    epoch_state: EpochState,
-    network: NetworkSender,
-    storage: Arc<dyn PersistentLivenessStorage>,
-    state_computer: Arc<dyn StateComputer>,
-    last_committed_round: Round,
-    onchain_config: OnChainConsensusConfig,
-}
-
-impl RecoveryManager {
-    pub fn new(
-        epoch_state: EpochState,
-        network: NetworkSender,
-        storage: Arc<dyn PersistentLivenessStorage>,
-        state_computer: Arc<dyn StateComputer>,
-        last_committed_round: Round,
-        onchain_config: OnChainConsensusConfig,
-    ) -> Self {
-        RecoveryManager {
-            epoch_state,
-            network,
-            storage,
-            state_computer,
-            last_committed_round,
-            onchain_config,
-        }
-    }
-
-    pub async fn process_proposal_msg(
-        &mut self,
-        proposal_msg: ProposalMsg,
-    ) -> Result<RecoveryData> {
-        let author = proposal_msg.proposer();
-        let sync_info = proposal_msg.sync_info();
-        self.sync_up(sync_info, author).await
-    }
-
-    pub async fn process_vote_msg(&mut self, vote_msg: VoteMsg) -> Result<RecoveryData> {
-        let author = vote_msg.vote().author();
-        let sync_info = vote_msg.sync_info();
-        self.sync_up(sync_info, author).await
-    }
-
-    pub async fn sync_up(&mut self, sync_info: &SyncInfo, peer: Author) -> Result<RecoveryData> {
-        sync_info
-            .verify(&self.epoch_state.verifier)
-            .map_err(VerifyError::from)?;
-        ensure!(
-            sync_info.highest_round() > self.last_committed_round,
-            "[RecoveryManager] Received sync info has lower round number than committed block"
-        );
-        ensure!(
-            sync_info.epoch() == self.epoch_state.epoch,
-            "[RecoveryManager] Received sync info is in different epoch than committed block"
-        );
-        let mut retriever = BlockRetriever::new(self.network.clone(), peer);
-        let recovery_data = BlockStore::fast_forward_sync(
-            sync_info.highest_ordered_cert(),
-            sync_info.highest_ledger_info().clone(),
-            &mut retriever,
-            self.storage.clone(),
-            self.state_computer.clone(),
-        )
-        .await?;
-
-        Ok(recovery_data)
-    }
-
-    pub fn epoch_state(&self) -> &EpochState {
-        &self.epoch_state
-    }
-
-    pub fn onchain_config(&self) -> &OnChainConsensusConfig {
-        &self.onchain_config
-    }
-}
 
 /// Consensus SMR is working in an event based fashion: RoundManager is responsible for
 /// processing the individual events (e.g., process_new_round, process_proposal, process_vote,
@@ -863,7 +787,7 @@ impl RoundManager {
     }
 
     /// To jump start new round with the current certificates we have.
-    pub async fn start(&mut self, last_vote_sent: Option<Vote>) {
+    pub async fn init(&mut self, last_vote_sent: Option<Vote>) {
         let new_round_event = self
             .round_state
             .process_certificates(self.block_store.sync_info())
@@ -899,6 +823,57 @@ impl RoundManager {
         LogSchema::new(event)
             .round(self.round_state.current_round())
             .epoch(self.epoch_state.epoch)
+    }
+
+    /// Mainloop of processing messages.
+    pub async fn start(
+        mut self,
+        mut event_rx: diem_channel::Receiver<
+            (Author, Discriminant<VerifiedEvent>),
+            (Author, VerifiedEvent),
+        >,
+    ) {
+        info!(epoch = self.epoch_state().epoch, "RoundManager started");
+        while let Some((peer_id, event)) = event_rx.next().await {
+            let result = match event {
+                VerifiedEvent::ProposalMsg(proposal_msg) => {
+                    monitor!(
+                        "process_proposal",
+                        self.process_proposal_msg(*proposal_msg).await
+                    )
+                }
+                VerifiedEvent::VoteMsg(vote_msg) => {
+                    monitor!("process_vote", self.process_vote_msg(*vote_msg).await)
+                }
+                VerifiedEvent::SyncInfo(sync_info) => {
+                    monitor!(
+                        "process_sync_info",
+                        self.process_sync_info_msg(*sync_info, peer_id).await
+                    )
+                }
+                VerifiedEvent::BlockRetrievalRequest(block_retrival) => {
+                    monitor!(
+                        "process_block_retrieval",
+                        self.process_block_retrieval(*block_retrival).await
+                    )
+                }
+                VerifiedEvent::LocalTimeout(round) => monitor!(
+                    "process_local_timeout",
+                    self.process_local_timeout(round).await
+                ),
+                unexpected_event => unreachable!("Unexpected event: {:?}", unexpected_event),
+            }
+            .with_context(|| format!("from peer {}", peer_id));
+
+            let round_state = self.round_state();
+            match result {
+                Ok(_) => trace!(RoundStateLogSchema::new(round_state)),
+                Err(e) => {
+                    counters::ERROR_COUNT.inc();
+                    error!(error = ?e, kind = error_kind(&e), RoundStateLogSchema::new(round_state));
+                }
+            }
+        }
     }
 
     /// Given R1 <- B2 if R1 has the reconfiguration txn, we inject error on B2 if R1.round + 1 = B2.round

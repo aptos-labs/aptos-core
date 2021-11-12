@@ -224,7 +224,7 @@ impl NodeSetup {
             false,
             OnChainConsensusConfig::default(),
         );
-        block_on(round_manager.start(last_vote_sent));
+        block_on(round_manager.init(last_vote_sent));
         Self {
             block_store,
             round_manager,
