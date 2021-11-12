@@ -1746,6 +1746,12 @@ pub enum ScriptFunctionCall {
         amount: u64,
     },
 
+    CreateAccount {
+        coin_type: TypeTag,
+        new_account_address: AccountAddress,
+        auth_key_prefix: Bytes,
+    },
+
     /// # Summary
     /// Creates a Child VASP account with its parent being the sending account of the transaction.
     /// The sender of the transaction must be a Parent VASP account.
@@ -3505,6 +3511,15 @@ impl ScriptFunctionCall {
                 preburn_address,
                 amount,
             } => encode_cancel_burn_with_amount_script_function(token, preburn_address, amount),
+            CreateAccount {
+                coin_type,
+                new_account_address,
+                auth_key_prefix,
+            } => encode_create_account_script_function(
+                coin_type,
+                new_account_address,
+                auth_key_prefix,
+            ),
             CreateChildVaspAccount {
                 coin_type,
                 child_address,
@@ -4176,6 +4191,25 @@ pub fn encode_cancel_burn_with_amount_script_function(
         vec![
             bcs::to_bytes(&preburn_address).unwrap(),
             bcs::to_bytes(&amount).unwrap(),
+        ],
+    ))
+}
+
+pub fn encode_create_account_script_function(
+    coin_type: TypeTag,
+    new_account_address: AccountAddress,
+    auth_key_prefix: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::ScriptFunction(ScriptFunction::new(
+        ModuleId::new(
+            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            ident_str!("AccountCreationScripts").to_owned(),
+        ),
+        ident_str!("create_account").to_owned(),
+        vec![coin_type],
+        vec![
+            bcs::to_bytes(&new_account_address).unwrap(),
+            bcs::to_bytes(&auth_key_prefix).unwrap(),
         ],
     ))
 }
@@ -7894,6 +7928,20 @@ fn decode_cancel_burn_with_amount_script_function(
     }
 }
 
+fn decode_create_account_script_function(
+    payload: &TransactionPayload,
+) -> Option<ScriptFunctionCall> {
+    if let TransactionPayload::ScriptFunction(script) = payload {
+        Some(ScriptFunctionCall::CreateAccount {
+            coin_type: script.ty_args().get(0)?.clone(),
+            new_account_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+            auth_key_prefix: bcs::from_bytes(script.args().get(1)?).ok()?,
+        })
+    } else {
+        None
+    }
+}
+
 fn decode_create_child_vasp_account_script_function(
     payload: &TransactionPayload,
 ) -> Option<ScriptFunctionCall> {
@@ -8833,6 +8881,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<ScriptFunctionDecoderM
         map.insert(
             "TreasuryComplianceScriptscancel_burn_with_amount".to_string(),
             Box::new(decode_cancel_burn_with_amount_script_function),
+        );
+        map.insert(
+            "AccountCreationScriptscreate_account".to_string(),
+            Box::new(decode_create_account_script_function),
         );
         map.insert(
             "AccountCreationScriptscreate_child_vasp_account".to_string(),

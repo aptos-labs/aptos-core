@@ -361,10 +361,9 @@ module DiemFramework::RolesTests{
     }
 
     #[test(tc = @TreasuryCompliance, dr = @DiemRoot)]
-    #[expected_failure(abort_code = 5)]
     fun get_role_id_no_role(tc: signer, dr: signer) {
         Genesis::setup(&dr, &tc);
-        Roles::get_role_id(@0x1);
+        assert!(Roles::get_role_id(@0x1) == 100, 100);
     }
 
     #[test]

@@ -1495,6 +1495,20 @@ module DiemFramework::DiemAccount {
     }
 
     ///////////////////////////////////////////////////////////////////////////
+    /// Basic account creation method: no roles attached, no conditions checked.
+    ///////////////////////////////////////////////////////////////////////////
+    public fun create_account<Token>(
+        new_account_address: address,
+        auth_key_prefix: vector<u8>,
+    ) acquires AccountOperationsCapability {
+        let new_account = create_signer(new_account_address);
+        make_account(&new_account, auth_key_prefix);
+        // Create empty balance of the given token in order to enable this account to send transactions.
+        Diem::assert_is_currency<Token>();
+        move_to(&new_account, Balance<Token>{ coin: Diem::zero<Token>() })
+    }
+
+    ///////////////////////////////////////////////////////////////////////////
     // General purpose methods
     ///////////////////////////////////////////////////////////////////////////
 

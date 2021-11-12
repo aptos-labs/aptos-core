@@ -45,6 +45,7 @@ before and after every transaction.
 -  [Function `create_designated_dealer`](#0x1_DiemAccount_create_designated_dealer)
 -  [Function `create_parent_vasp_account`](#0x1_DiemAccount_create_parent_vasp_account)
 -  [Function `create_child_vasp_account`](#0x1_DiemAccount_create_child_vasp_account)
+-  [Function `create_account`](#0x1_DiemAccount_create_account)
 -  [Function `create_signer`](#0x1_DiemAccount_create_signer)
 -  [Function `publish_crsn`](#0x1_DiemAccount_publish_crsn)
 -  [Function `balance_for`](#0x1_DiemAccount_balance_for)
@@ -3219,6 +3220,38 @@ also be added. This account will be a child of <code>creator</code>, which must 
     <b>include</b> <a href="VASP.md#0x1_VASP_PublishChildVASPEnsures">VASP::PublishChildVASPEnsures</a>;
     <b>ensures</b> <a href="DiemAccount.md#0x1_DiemAccount_exists_at">exists_at</a>(child_addr);
     <b>ensures</b> <a href="Roles.md#0x1_Roles_spec_has_child_VASP_role_addr">Roles::spec_has_child_VASP_role_addr</a>(child_addr);
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_DiemAccount_create_account"></a>
+
+## Function `create_account`
+
+Basic account creation method: no roles attached, no conditions checked.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="DiemAccount.md#0x1_DiemAccount_create_account">create_account</a>&lt;Token&gt;(new_account_address: address, auth_key_prefix: vector&lt;u8&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="DiemAccount.md#0x1_DiemAccount_create_account">create_account</a>&lt;Token&gt;(
+    new_account_address: address,
+    auth_key_prefix: vector&lt;u8&gt;,
+) <b>acquires</b> <a href="DiemAccount.md#0x1_DiemAccount_AccountOperationsCapability">AccountOperationsCapability</a> {
+    <b>let</b> new_account = <a href="DiemAccount.md#0x1_DiemAccount_create_signer">create_signer</a>(new_account_address);
+    <a href="DiemAccount.md#0x1_DiemAccount_make_account">make_account</a>(&new_account, auth_key_prefix);
+    // Create empty balance of the given token in order <b>to</b> enable this account <b>to</b> send transactions.
+    <a href="Diem.md#0x1_Diem_assert_is_currency">Diem::assert_is_currency</a>&lt;Token&gt;();
+    move_to(&new_account, <a href="DiemAccount.md#0x1_DiemAccount_Balance">Balance</a>&lt;Token&gt;{ coin: <a href="Diem.md#0x1_Diem_zero">Diem::zero</a>&lt;Token&gt;() })
 }
 </code></pre>
 

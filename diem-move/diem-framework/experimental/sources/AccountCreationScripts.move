@@ -516,4 +516,19 @@ module DiemFramework::AccountCreationScripts {
         /// Only the Treasury Compliance account can create Designated Dealer accounts [[A5]][ROLE].
         include Roles::AbortsIfNotTreasuryCompliance{account: tc_account};
     }
+
+    ////////////////////////////////////////////////////////////////
+    // Basic account creation script.
+    // No roles attached, no conditions checked.
+    ////////////////////////////////////////////////////////////////
+    public(script) fun create_account<CoinType>(
+        _account: signer,
+        new_account_address: address,
+        auth_key_prefix: vector<u8>,
+    ) {
+        DiemAccount::create_account<CoinType>(
+            new_account_address,
+            auth_key_prefix,
+        );
+    }
 }

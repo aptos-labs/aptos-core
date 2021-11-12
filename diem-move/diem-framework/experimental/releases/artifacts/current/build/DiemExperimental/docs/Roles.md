@@ -216,6 +216,15 @@ The signer didn't have the required Validator Operator role
 
 
 
+<a name="0x1_Roles_NO_ROLE_ID"></a>
+
+
+
+<pre><code><b>const</b> <a href="Roles.md#0x1_Roles_NO_ROLE_ID">NO_ROLE_ID</a>: u64 = 100;
+</code></pre>
+
+
+
 <a name="0x1_Roles_PARENT_VASP_ROLE_ID"></a>
 
 
@@ -634,9 +643,7 @@ Helper function to grant a role.
 
 
 <pre><code><b>fun</b> <a href="Roles.md#0x1_Roles_has_role">has_role</a>(account: &signer, role_id: u64): bool <b>acquires</b> <a href="Roles.md#0x1_Roles_RoleId">RoleId</a> {
-   <b>let</b> addr = <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
-   <b>exists</b>&lt;<a href="Roles.md#0x1_Roles_RoleId">RoleId</a>&gt;(addr)
-       && borrow_global&lt;<a href="Roles.md#0x1_Roles_RoleId">RoleId</a>&gt;(addr).role_id == role_id
+    <a href="Roles.md#0x1_Roles_get_role_id">get_role_id</a>(<a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account)) == role_id
 }
 </code></pre>
 
@@ -818,7 +825,7 @@ Helper function to grant a role.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="Roles.md#0x1_Roles_get_role_id">get_role_id</a>(a: address): u64
+<pre><code><b>public</b> <b>fun</b> <a href="Roles.md#0x1_Roles_get_role_id">get_role_id</a>(addr: address): u64
 </code></pre>
 
 
@@ -827,9 +834,12 @@ Helper function to grant a role.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="Roles.md#0x1_Roles_get_role_id">get_role_id</a>(a: address): u64 <b>acquires</b> <a href="Roles.md#0x1_Roles_RoleId">RoleId</a> {
-    <b>assert</b>!(<b>exists</b>&lt;<a href="Roles.md#0x1_Roles_RoleId">RoleId</a>&gt;(a), <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="Roles.md#0x1_Roles_EROLE_ID">EROLE_ID</a>));
-    borrow_global&lt;<a href="Roles.md#0x1_Roles_RoleId">RoleId</a>&gt;(a).role_id
+<pre><code><b>public</b> <b>fun</b> <a href="Roles.md#0x1_Roles_get_role_id">get_role_id</a>(addr: address): u64 <b>acquires</b> <a href="Roles.md#0x1_Roles_RoleId">RoleId</a> {
+    <b>if</b> (<b>exists</b>&lt;<a href="Roles.md#0x1_Roles_RoleId">RoleId</a>&gt;(addr)) {
+        borrow_global&lt;<a href="Roles.md#0x1_Roles_RoleId">RoleId</a>&gt;(addr).role_id
+    } <b>else</b> {
+        <a href="Roles.md#0x1_Roles_NO_ROLE_ID">NO_ROLE_ID</a>
+    }
 }
 </code></pre>
 

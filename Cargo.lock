@@ -1530,6 +1530,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "demo-cli"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bcs",
+ "diem-json-rpc-types",
+ "diem-sdk",
+ "diem-types",
+ "diem-workspace-hack",
+ "generate-key",
+ "hex",
+ "log",
+ "move-core-types",
+ "rand 0.8.4",
+ "structopt 0.3.21",
+ "tokio",
+ "walkdir",
+]
+
+[[package]]
 name = "determinator"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -51,6 +51,7 @@ module DiemFramework::Roles {
     const VALIDATOR_OPERATOR_ROLE_ID: u64 = 4;
     const PARENT_VASP_ROLE_ID: u64 = 5;
     const CHILD_VASP_ROLE_ID: u64 = 6;
+    const NO_ROLE_ID: u64 = 100;
 
     /// The roleId contains the role id for the account. This is only moved
     /// to an account as a top-level resource, and is otherwise immovable.
@@ -192,9 +193,7 @@ module DiemFramework::Roles {
     // Role Checking
 
     fun has_role(account: &signer, role_id: u64): bool acquires RoleId {
-       let addr = Signer::address_of(account);
-       exists<RoleId>(addr)
-           && borrow_global<RoleId>(addr).role_id == role_id
+        get_role_id(Signer::address_of(account)) == role_id
     }
 
     public fun has_diem_root_role(account: &signer): bool acquires RoleId {
@@ -225,9 +224,12 @@ module DiemFramework::Roles {
         has_role(account, CHILD_VASP_ROLE_ID)
     }
 
-    public fun get_role_id(a: address): u64 acquires RoleId {
-        assert!(exists<RoleId>(a), Errors::not_published(EROLE_ID));
-        borrow_global<RoleId>(a).role_id
+    public fun get_role_id(addr: address): u64 acquires RoleId {
+        if (exists<RoleId>(addr)) {
+            borrow_global<RoleId>(addr).role_id
+        } else {
+            NO_ROLE_ID
+        }
     }
 
     /// Return true if `addr` is allowed to receive and send `Diem<T>` for any T

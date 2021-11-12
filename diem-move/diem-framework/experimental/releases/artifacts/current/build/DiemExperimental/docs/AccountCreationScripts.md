@@ -40,6 +40,7 @@
     -  [Parameters](#@Parameters_27)
     -  [Common Abort Conditions](#@Common_Abort_Conditions_28)
     -  [Related Scripts](#@Related_Scripts_29)
+-  [Function `create_account`](#0x1_AccountCreationScripts_create_account)
 
 
 <pre><code><b>use</b> <a href="DiemAccount.md#0x1_DiemAccount">0x1::DiemAccount</a>;
@@ -794,6 +795,37 @@ Only the Treasury Compliance account can create Designated Dealer accounts [[A5]
 
 
 <pre><code><b>include</b> <a href="Roles.md#0x1_Roles_AbortsIfNotTreasuryCompliance">Roles::AbortsIfNotTreasuryCompliance</a>{account: tc_account};
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_AccountCreationScripts_create_account"></a>
+
+## Function `create_account`
+
+
+
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="AccountCreationScripts.md#0x1_AccountCreationScripts_create_account">create_account</a>&lt;CoinType&gt;(_account: signer, new_account_address: address, auth_key_prefix: vector&lt;u8&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="AccountCreationScripts.md#0x1_AccountCreationScripts_create_account">create_account</a>&lt;CoinType&gt;(
+    _account: signer,
+    new_account_address: address,
+    auth_key_prefix: vector&lt;u8&gt;,
+) {
+    <a href="DiemAccount.md#0x1_DiemAccount_create_account">DiemAccount::create_account</a>&lt;CoinType&gt;(
+        new_account_address,
+        auth_key_prefix,
+    );
+}
 </code></pre>
 
 
