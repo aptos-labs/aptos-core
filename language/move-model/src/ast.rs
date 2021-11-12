@@ -379,7 +379,7 @@ pub enum ExpData {
         Vec<Vec<Exp>>,
         /// Optional `where` clause
         Option<Exp>,
-        // Body
+        /// Body
         Exp,
     ),
     /// Represents a block which contains a set of variable bindings and an expression

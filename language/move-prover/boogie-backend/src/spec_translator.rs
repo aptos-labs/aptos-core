@@ -4,7 +4,7 @@
 //! This module translates specification conditions to Boogie code.
 
 use std::{
-    collections::{BTreeMap, BTreeSet, HashMap},
+    collections::{BTreeSet, HashMap},
     rc::Rc,
 };
 
@@ -50,12 +50,14 @@ pub struct SpecTranslator<'env> {
     /// Counter for creating new variables.
     fresh_var_count: RefCell<usize>,
     /// Information about lifted choice expressions. Each choice expression in the
-    /// original program is uniquely identified by the node id. This allows us to capture
-    /// duplication of expressions and map them to the same uninterpreted choice
-    /// function. If an expression is duplicated and then later specialized by a type
+    /// original program is uniquely identified by the choice expression AST (verbatim),
+    /// which includes the node id of the expression.
+    ///
+    /// This allows us to capture duplication of expressions and map them to the same uninterpreted
+    /// choice function. If an expression is duplicated and then later specialized by a type
     /// instantiation, it will have a different node id, but again the same instantiations
     /// map to the same node id, which is the desired semantics.
-    lifted_choice_infos: Rc<RefCell<BTreeMap<NodeId, LiftedChoiceInfo>>>,
+    lifted_choice_infos: Rc<RefCell<HashMap<ExpData, LiftedChoiceInfo>>>,
 }
 
 /// A struct which contains information about a lifted choice expression (like `some x:int: p(x)`).
@@ -338,8 +340,12 @@ impl<'env> SpecTranslator<'env> {
     /// Translate lifted functions for choice expressions.
     fn translate_choice_functions(&self) {
         let env = self.env;
-        let infos = self.lifted_choice_infos.borrow();
-        for (_, info) in infos.iter() {
+        let infos_ref = self.lifted_choice_infos.borrow();
+        // need the sorting here because `lifted_choice_infos` is a hashmap while we want
+        // deterministic ordering of the output. Sorting uses the `.id` field, which represents the
+        // insertion order.
+        let infos_sorted = infos_ref.values().sorted_by(|v1, v2| v1.id.cmp(&v2.id));
+        for info in infos_sorted {
             let fun_name = boogie_choice_fun_name(info.id);
             let result_ty = &env.get_node_type(info.node_id);
             let exp_loc = env.get_node_loc(info.node_id);
@@ -1195,6 +1201,10 @@ impl<'env> SpecTranslator<'env> {
             .temporaries(self.env)
             .into_iter()
             .collect_vec();
+        let used_memory = range_and_body
+            .used_memory(self.env)
+            .into_iter()
+            .collect_vec();
 
         // Create a new uninterpreted function and choice info only if it does not
         // stem from the same original source than an existing one. This needs to be done to
@@ -1205,20 +1215,19 @@ impl<'env> SpecTranslator<'env> {
         // we can only guarantee this if we use the same uninterpreted function for each instance.
         let mut choice_infos = self.lifted_choice_infos.borrow_mut();
         let choice_count = choice_infos.len();
-        let info = choice_infos.entry(node_id).or_insert_with(|| {
-            let used_memory = body.used_memory(self.env).into_iter().collect_vec();
-            LiftedChoiceInfo {
+        let info = choice_infos
+            .entry(range_and_body)
+            .or_insert_with(|| LiftedChoiceInfo {
                 id: choice_count,
                 node_id,
                 kind,
                 free_vars: free_vars.clone(),
                 used_temps: used_temps.clone(),
-                used_memory,
+                used_memory: used_memory.clone(),
                 var: some_var,
                 range: range.1.clone(),
                 condition: body.clone(),
-            }
-        });
+            });
         let fun_name = boogie_choice_fun_name(info.id);
 
         // Construct the arguments. Notice that those might be different for each call of
@@ -1229,7 +1238,7 @@ impl<'env> SpecTranslator<'env> {
             .map(|(s, _)| s.display(self.env.symbol_pool()).to_string())
             .chain(used_temps.iter().map(|(t, _)| format!("$t{}", t)))
             .chain(
-                info.used_memory
+                used_memory
                     .iter()
                     .map(|(m, l)| boogie_resource_memory_name(self.env, m, l)),
             )

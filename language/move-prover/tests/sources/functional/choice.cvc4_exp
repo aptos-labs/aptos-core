@@ -48,6 +48,26 @@ error: post-condition does not hold
    =         `TRACE(choose y: u64 where y > x)` = <redacted>
 
 error: post-condition does not hold
+    ┌─ tests/sources/functional/choice.move:156:9
+    │
+156 │         ensures evidence1 == evidence2;
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/choice.move:154
+    =     at tests/sources/functional/choice.move:155
+    =     at tests/sources/functional/choice.move:152: test_different_choice_via_let
+    =     at tests/sources/functional/choice.move:156
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/choice.move:180:9
+    │
+180 │         ensures choose_some_positive_u64() == choose_another_positive_u64();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/choice.move:178: test_different_choice_via_spec_fun
+    =     at tests/sources/functional/choice.move:180
+
+error: post-condition does not hold
    ┌─ tests/sources/functional/choice.move:70:9
    │
 70 │         ensures (choose min i in 0..len(result) where result[i] == 2) == 1;
@@ -86,3 +106,29 @@ error: post-condition does not hold
    =     at tests/sources/functional/choice.move:82: test_not_using_min_incorrect
    =     at tests/sources/functional/choice.move:85
    =         `TRACE(choose i in 0..len(result) where result[i] == 2)` = <redacted>
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/choice.move:217:9
+    │
+217 │         ensures result != (choose i: u64 where i >= k);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/choice.move:234: test_same_choice_different_args_via_schema_2
+    =         result = <redacted>
+    =     at tests/sources/functional/choice.move:235: test_same_choice_different_args_via_schema_2
+    =     at tests/sources/functional/choice.move:217
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/choice.move:208:9
+    │
+208 │         ensures evidence1 == evidence2;
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/choice.move:204: test_same_choice_different_args_via_spec_fun
+    =     at tests/sources/functional/choice.move:206
+    =     at tests/sources/functional/choice.move:207
+    =     at tests/sources/functional/choice.move:204: test_same_choice_different_args_via_spec_fun
+    =         x = <redacted>
+    =         y = <redacted>
+    =         result = <redacted>
+    =     at tests/sources/functional/choice.move:208

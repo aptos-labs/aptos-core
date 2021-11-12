@@ -107,4 +107,135 @@ module 0x42::TestSome {
         // function, which leads to a type error in boogie.
         test_choice_dup_expected_fail(b)
     }
+
+    // Testing using the same choice in multiple verification targets
+    // ==============================================================
+
+    struct S has drop {
+        x: u64
+    }
+
+    fun test_less_than_1(x: u64): u64 {
+        x - 1
+    }
+
+    fun test_less_than_2(s: S): u64 {
+        s.x - 1
+    }
+
+    spec test_less_than_1 {
+        include EnsuresLessThan;
+    }
+
+    spec test_less_than_2 {
+        include EnsuresLessThan { x: s.x };
+    }
+
+    spec schema EnsuresLessThan {
+        x: u64;
+        result: u64;
+        ensures result != (choose i: u64 where i >= x);
+    }
+
+    // Semantics when the same-choice operator is referred
+    // ===================================================
+
+    // Refer to choice operators via let
+
+    fun test_same_choice_via_let() {}
+    spec test_same_choice_via_let {
+        let evidence = (choose i: u64 where i > 0);
+        ensures evidence == evidence;
+        // expect to pass
+    }
+
+    fun test_different_choice_via_let() {}
+    spec test_different_choice_via_let {
+        let evidence1 = (choose i: u64 where i > 0);
+        let evidence2 = (choose i: u64 where i > 0);
+        ensures evidence1 == evidence2;
+        // expect to fail, even though the choices are the same text-wise
+    }
+
+    // Refer to choice operators via spec fun
+
+    spec fun choose_some_positive_u64(): u64 {
+        choose i: u64 where i > 0
+    }
+    spec fun choose_another_positive_u64(): u64 {
+        choose i: u64 where i > 0
+    }
+    spec fun choose_some_positive_u64_indirect(): u64 {
+        choose_some_positive_u64()
+    }
+
+    fun test_same_choice_via_spec_fun() {}
+    spec test_same_choice_via_spec_fun {
+        ensures choose_some_positive_u64() == choose_some_positive_u64();
+        // expect to pass
+    }
+
+    fun test_different_choice_via_spec_fun() {}
+    spec test_different_choice_via_spec_fun {
+        ensures choose_some_positive_u64() == choose_another_positive_u64();
+        // expect to fail
+    }
+
+    fun test_same_choice_via_spec_fun_indirect() {}
+    spec test_same_choice_via_spec_fun_indirect {
+        ensures choose_some_positive_u64() == choose_some_positive_u64_indirect();
+        // expect to pass
+    }
+
+    // Refer to choice operators w/ arguments via spec fun
+
+    spec fun choose_a_larger_num(n: u64): u64 {
+        choose i: u64 where i > n
+    }
+
+    fun test_same_choice_same_args_via_spec_fun(n: u64): bool { n == 0 }
+    spec test_same_choice_same_args_via_spec_fun {
+        let evidence1 = choose_a_larger_num(n);
+        let evidence2 = choose_a_larger_num(n);
+        ensures evidence1 == evidence2;
+        // expect to pass
+    }
+
+    fun test_same_choice_different_args_via_spec_fun(x: u64, y: u64): bool { x == y }
+    spec test_same_choice_different_args_via_spec_fun {
+        let evidence1 = choose_a_larger_num(x);
+        let evidence2 = choose_a_larger_num(y);
+        ensures evidence1 == evidence2;
+        // expect to fail
+    }
+
+    // Refer to choice operators w/ arguments via schema
+
+    spec schema ResultLessThanK {
+        k: u64;
+        result: u64;
+        ensures result != (choose i: u64 where i >= k);
+    }
+
+    fun test_same_choice_different_args_via_schema(x: u64, y: u64): u64 {
+        if (x >= y) {
+            y - 1
+        } else {
+            x - 1
+        }
+    }
+    spec test_same_choice_different_args_via_schema {
+        include ResultLessThanK {k: x};
+        include ResultLessThanK {k: y};
+        // expect to pass
+    }
+
+    fun test_same_choice_different_args_via_schema_2(): u64 {
+        42
+    }
+    spec test_same_choice_different_args_via_schema_2 {
+        include ResultLessThanK { k: 100 };
+        include ResultLessThanK { k: 10 };
+        // expect to fail
+    }
 }
