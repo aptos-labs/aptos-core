@@ -37,7 +37,13 @@ use std::{
 use tokio::{runtime::Handle, task::JoinHandle, time};
 
 pub mod atomic_histogram;
+pub mod cluster;
+pub mod instance;
+
 use atomic_histogram::*;
+use diem_crypto::ed25519::Ed25519PrivateKey;
+use diem_sdk::types::AccountKey;
+use rand::rngs::StdRng;
 
 /// Max transactions per account in mempool
 const MAX_TXN_BATCH_SIZE: usize = 100;
@@ -45,6 +51,8 @@ const MAX_TXNS: u64 = 1_000_000;
 const SEND_AMOUNT: u64 = 1;
 const TXN_EXPIRATION_SECONDS: u64 = 180;
 const TXN_MAX_WAIT: Duration = Duration::from_secs(TXN_EXPIRATION_SECONDS as u64 + 30);
+const MAX_CHILD_VASP_NUM: usize = 65536;
+const MAX_VASP_ACCOUNT_NUM: usize = 16;
 
 #[derive(Clone)]
 pub struct EmitThreadParams {
@@ -69,6 +77,7 @@ pub struct EmitJobRequest {
     thread_params: EmitThreadParams,
     gas_price: u64,
     invalid_transaction_ratio: usize,
+    vasp: bool,
 }
 
 impl Default for EmitJobRequest {
@@ -80,6 +89,7 @@ impl Default for EmitJobRequest {
             thread_params: EmitThreadParams::default(),
             gas_price: 0,
             invalid_transaction_ratio: 0,
+            vasp: false,
         }
     }
 }
@@ -130,6 +140,11 @@ impl EmitJobRequest {
                 wait_committed: true,
             })
             .accounts_per_client(1)
+    }
+
+    pub fn vasp(mut self) -> Self {
+        self.vasp = true;
+        self
     }
 }
 
@@ -344,17 +359,7 @@ impl<'t, 'd> TxnEmitter<'t, 'd> {
     pub async fn get_money_source(&mut self, coins_total: u64) -> Result<&mut LocalAccount> {
         let client = self.client.clone();
         println!("Creating and minting faucet account");
-        let mut faucet_account = &mut self.designated_dealer_account;
-        let mint_txn = gen_transfer_txn_request(
-            faucet_account,
-            &faucet_account.address(),
-            coins_total,
-            &self.txn_factory,
-            0,
-        );
-        execute_and_wait_transactions(&client, &mut faucet_account, vec![mint_txn])
-            .await
-            .map_err(|e| format_err!("Failed to mint into faucet account: {}", e))?;
+        let faucet_account = &mut self.designated_dealer_account;
         let balance = retrieve_account_balance(&client, faucet_account.address()).await?;
         for b in balance {
             if b.currency.eq(XUS_NAME) {
@@ -368,14 +373,48 @@ impl<'t, 'd> TxnEmitter<'t, 'd> {
         Ok(faucet_account)
     }
 
+    pub async fn load_vasp_account(
+        &self,
+        client: &JsonRpcClient,
+        index: usize,
+    ) -> Result<LocalAccount> {
+        let file = "vasp".to_owned() + index.to_string().as_str() + ".key";
+        let mint_key: Ed25519PrivateKey = generate_key::load_key(file);
+        let account_key = AccountKey::from_private_key(mint_key);
+        let address = account_key.authentication_key().derived_address();
+        let sequence_number = query_sequence_numbers(client, &[address])
+            .await
+            .map_err(|e| {
+                format_err!(
+                    "query_sequence_numbers on {:?} for dd account failed: {}",
+                    client,
+                    e
+                )
+            })?[0];
+        Ok(LocalAccount::new(address, account_key, sequence_number))
+    }
+
     pub async fn get_seed_accounts(
         &mut self,
         json_rpc_clients: &[JsonRpcClient],
         seed_account_num: usize,
+        vasp: bool,
     ) -> Result<Vec<LocalAccount>> {
         info!("Creating and minting seeds accounts");
         let mut i = 0;
         let mut seed_accounts = vec![];
+        // load vasp account created by AOS directly
+        if vasp {
+            let client = self.pick_mint_client(json_rpc_clients).clone();
+            info!("Loading VASP account as seed accounts");
+            let load_account_num = min(seed_account_num, MAX_VASP_ACCOUNT_NUM);
+            for i in 0..load_account_num {
+                let account = self.load_vasp_account(&client, i).await?;
+                seed_accounts.push(account);
+            }
+            info!("Loaded {} VASP accounts", seed_accounts.len());
+            return Ok(seed_accounts);
+        }
         while i < seed_account_num {
             let client = self.pick_mint_client(json_rpc_clients).clone();
             let batch_size = min(MAX_TXN_BATCH_SIZE, seed_account_num - i);
@@ -419,6 +458,12 @@ impl<'t, 'd> TxnEmitter<'t, 'd> {
             info!("Already have enough accounts exist, do not need to mint more");
             return Ok(());
         }
+        let expected_num_seed_accounts =
+            if total_requested_accounts / req.json_rpc_clients.len() > MAX_CHILD_VASP_NUM {
+                total_requested_accounts / MAX_CHILD_VASP_NUM + 1
+            } else {
+                req.json_rpc_clients.len()
+            };
         let num_accounts = total_requested_accounts - self.accounts.len(); // Only minting extra accounts
         let coins_per_account = SEND_AMOUNT * MAX_TXNS * 10; // extra coins for secure to pay none zero gas price
         let coins_total = coins_per_account * num_accounts as u64;
@@ -427,7 +472,7 @@ impl<'t, 'd> TxnEmitter<'t, 'd> {
 
         // Create seed accounts with which we can create actual accounts concurrently
         let seed_accounts = self
-            .get_seed_accounts(&req.json_rpc_clients, req.json_rpc_clients.len())
+            .get_seed_accounts(&req.json_rpc_clients, expected_num_seed_accounts, req.vasp)
             .await?;
         let rng = self.from_rng();
         let faucet_account = self.get_money_source(coins_total).await?;
@@ -449,6 +494,7 @@ impl<'t, 'd> TxnEmitter<'t, 'd> {
         println!("Completed minting seed accounts");
         println!("Minting additional {} accounts", num_accounts);
 
+        let seed_rngs = gen_rng_for_reusable_account(actual_num_seed_accounts);
         // For each seed account, create a future and transfer diem from that seed account to new accounts
         let account_futures = seed_accounts
             .into_iter()
@@ -464,7 +510,12 @@ impl<'t, 'd> TxnEmitter<'t, 'd> {
                     20,
                     cur_client,
                     &txn_factory,
-                    self.from_rng(),
+                    req.vasp,
+                    if req.vasp {
+                        seed_rngs[i].clone()
+                    } else {
+                        self.from_rng()
+                    },
                 )
             });
         let mut minted_accounts = try_join_all(account_futures)
@@ -538,7 +589,7 @@ impl<'t, 'd> TxnEmitter<'t, 'd> {
                 workers.push(Worker { join_handle });
             }
         }
-        info!("Tx emitter workers started");
+        println!("Tx emitter workers started");
         Ok(EmitJob {
             workers,
             stop,
@@ -571,7 +622,7 @@ impl<'t, 'd> TxnEmitter<'t, 'd> {
             let stats = self.peek_job_stats(job);
             let delta = &stats - &prev_stats.unwrap_or_default();
             prev_stats = Some(stats);
-            info!("{}", delta.rate(window));
+            println!("{}", delta.rate(window));
         }
     }
 
@@ -820,6 +871,7 @@ async fn create_new_accounts<R>(
     max_num_accounts_per_batch: u64,
     client: JsonRpcClient,
     txn_factory: &TransactionFactory,
+    reuse_account: bool,
     mut rng: R,
 ) -> Result<Vec<LocalAccount>>
 where
@@ -832,20 +884,29 @@ where
             max_num_accounts_per_batch as usize,
             min(MAX_TXN_BATCH_SIZE, num_new_accounts - i),
         );
-        let mut batch = gen_random_accounts(batch_size, &mut rng);
-        let requests = batch
-            .as_slice()
-            .iter()
-            .map(|account| {
-                source_account.sign_with_transaction_builder(txn_factory.create_child_vasp_account(
-                    Currency::XUS,
-                    account.authentication_key(),
-                    false,
-                    diem_per_new_account,
-                ))
-            })
-            .collect();
-        execute_and_wait_transactions(&client, &mut source_account, requests).await?;
+        let mut batch = if reuse_account {
+            println!("loading {} accounts if they exist", batch_size);
+            gen_reusable_accounts(&client, batch_size, &mut rng).await?
+        } else {
+            let batch = gen_random_accounts(batch_size, &mut rng);
+            let requests = batch
+                .as_slice()
+                .iter()
+                .map(|account| {
+                    source_account.sign_with_transaction_builder(
+                        txn_factory.create_child_vasp_account(
+                            Currency::XUS,
+                            account.authentication_key(),
+                            false,
+                            diem_per_new_account,
+                        ),
+                    )
+                })
+                .collect();
+            execute_and_wait_transactions(&client, &mut source_account, requests).await?;
+            batch
+        };
+
         i += batch.len();
         accounts.append(&mut batch);
     }
@@ -1061,4 +1122,48 @@ impl Distribution<InvalidTransactionType> for Standard {
             _ => InvalidTransactionType::Duplication,
         }
     }
+}
+
+fn gen_rng_for_reusable_account(count: usize) -> Vec<StdRng> {
+    // use same seed for reuse account creation and reuse
+    let mut seed = [
+        0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0,
+        0, 0,
+    ];
+    let mut rngs = vec![];
+    for i in 0..count {
+        seed[31] = i as u8;
+        rngs.push(StdRng::from_seed(seed));
+    }
+    rngs
+}
+
+async fn gen_reusable_account<R>(client: &JsonRpcClient, rng: &mut R) -> Result<LocalAccount>
+where
+    R: ::rand_core::RngCore + ::rand_core::CryptoRng,
+{
+    let account_key = AccountKey::generate(rng);
+    let address = account_key.authentication_key().derived_address();
+    let sequence_number = match query_sequence_numbers(client, &[address]).await {
+        Ok(v) => v[0],
+        Err(_) => 0,
+    };
+    Ok(LocalAccount::new(address, account_key, sequence_number))
+}
+
+async fn gen_reusable_accounts<R>(
+    client: &JsonRpcClient,
+    num_accounts: usize,
+    rng: &mut R,
+) -> Result<Vec<LocalAccount>>
+where
+    R: ::rand_core::RngCore + ::rand_core::CryptoRng,
+{
+    let mut vasp_accounts = vec![];
+    let mut i = 0;
+    while i < num_accounts {
+        vasp_accounts.push(gen_reusable_account(client, rng).await?);
+        i += 1;
+    }
+    Ok(vasp_accounts)
 }

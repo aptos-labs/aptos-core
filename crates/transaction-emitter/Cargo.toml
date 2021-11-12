@@ -11,11 +11,18 @@ edition = "2018"
 [dependencies]
 anyhow = { version = "1.0", features = ["backtrace"] }
 futures = "0.3.12"
+generate-key = { path = "../../config/generate-key" }
 itertools = "0.10.0"
 rand = "0.8.3"
 rand_core = "0.6.2"
+reqwest = { version = "0.11.2", features = ["blocking", "json"] }
+structopt = "0.3.21"
+termion = "1.5.6"
 tokio = { version = "1.8.1", features = ["full"] }
 
+diem-client = { path = "../../sdk/client"}
+diem-config = { path = "../../config" }
+diem-crypto = { path = "../../crypto/crypto" }
 diem-logger = { path = "../../common/logger" }
 diem-sdk = { path = "../../sdk" }
 diem-workspace-hack = { path = "../../common/workspace-hack" }
