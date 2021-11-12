@@ -5,7 +5,7 @@ use crate::{
     account, deploy,
     shared::{self, MAIN_PKG_PATH},
 };
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use diem_config::config::{NodeConfig, DEFAULT_PORT};
 use diem_crypto::PrivateKey;
 use diem_sdk::{
@@ -18,7 +18,6 @@ use move_cli::package::cli;
 use move_package::BuildConfig;
 use shared::Home;
 use std::{
-    panic,
     path::{Path, PathBuf},
     process::Command,
 };
@@ -136,24 +135,12 @@ fn run_move_unit_tests(project_path: &Path) -> Result<()> {
         compute_coverage: false,
     };
 
-    panic::set_hook(Box::new(|_info| {
-        // Allows us to return the error below instead of panic!
-        // todo: Remove all panic catching after @tzakian PR lands
-    }));
-
-    let result = panic::catch_unwind(|| {
-        cli::handle_package_commands(
-            &Some(project_path.join(MAIN_PKG_PATH)),
-            generate_build_config_for_testing()?,
-            &unit_test_cmd,
-            diem_vm::natives::diem_natives(),
-        )
-    });
-
-    match result {
-        Ok(_) => Ok(()),
-        Err(_) => Err(anyhow!("Run move package build in the main folder of the project directory, then rerun shuffle test [subcommand]")),
-    }
+    cli::handle_package_commands(
+        &Some(project_path.join(MAIN_PKG_PATH)),
+        generate_build_config_for_testing()?,
+        &unit_test_cmd,
+        diem_vm::natives::diem_natives(),
+    )
 }
 
 fn generate_build_config_for_testing() -> Result<BuildConfig> {
