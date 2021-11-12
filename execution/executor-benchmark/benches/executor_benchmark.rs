@@ -3,7 +3,7 @@
 
 use criterion::{criterion_group, criterion_main, measurement::Measurement, BatchSize, Criterion};
 use executor_benchmark::{
-    create_storage_service_and_executor, transaction_executor::TransactionExecutor,
+    init_db_and_executor, transaction_executor::TransactionExecutor,
     transaction_generator::TransactionGenerator,
 };
 use std::sync::Arc;
@@ -21,7 +21,7 @@ pub const INITIAL_BALANCE: u64 = 1000000;
 fn executor_benchmark<M: Measurement + 'static>(c: &mut Criterion<M>) {
     let (config, genesis_key) = diem_genesis_tool::test_config();
 
-    let (_db, executor) = create_storage_service_and_executor(&config);
+    let (_db, executor) = init_db_and_executor(&config);
     let parent_block_id = executor.committed_block_id();
     let executor = Arc::new(executor);
 

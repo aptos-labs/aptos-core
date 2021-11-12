@@ -3372,7 +3372,6 @@ dependencies = [
  "serde",
  "storage-client",
  "storage-interface",
- "storage-service",
  "structopt 0.3.21",
  "toml",
 ]
