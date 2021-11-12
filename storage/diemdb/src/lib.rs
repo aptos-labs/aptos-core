@@ -462,7 +462,14 @@ impl DiemDB {
 
     /// Creates new physical DB checkpoint in directory specified by `path`.
     pub fn create_checkpoint<P: AsRef<Path>>(&self, path: P) -> Result<()> {
-        self.db.create_checkpoint(path)
+        let start = Instant::now();
+        self.db.create_checkpoint(&path).map(|_| {
+            info!(
+                path = path.as_ref(),
+                time_ms = %start.elapsed().as_millis(),
+                "Made DiemDB checkpoint."
+            );
+        })
     }
 
     // ================================== Private APIs ==================================

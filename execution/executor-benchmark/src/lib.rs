@@ -62,18 +62,16 @@ pub fn run_benchmark(
     }
     std::fs::create_dir_all(checkpoint_dir.as_ref()).unwrap();
 
-    {
-        DiemDB::open(
-            &source_dir,
-            true, /* readonly */
-            None, /* pruner */
-            RocksdbConfig::default(),
-            true, /* account_count_migration */
-        )
-        .expect("db open failure.")
-        .create_checkpoint(checkpoint_dir.as_ref().join("diemdb"))
-        .expect("db checkpoint creation fails.");
-    }
+    DiemDB::open(
+        &source_dir,
+        true, /* readonly */
+        None, /* pruner */
+        RocksdbConfig::default(),
+        true, /* account_count_migration */
+    )
+    .expect("db open failure.")
+    .create_checkpoint(checkpoint_dir.as_ref().join("diemdb"))
+    .expect("db checkpoint creation fails.");
 
     let (mut config, genesis_key) = diem_genesis_tool::test_config();
     config.storage.dir = checkpoint_dir.as_ref().to_path_buf();
