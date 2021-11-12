@@ -287,6 +287,7 @@ impl Home {
         &self.test_key_path
     }
 
+    #[allow(dead_code)]
     pub fn get_test_address(&self) -> Result<AccountAddress> {
         let address_str = std::fs::read_to_string(&self.test_key_address_path)?;
         AccountAddress::from_str(address_str.as_str()).map_err(anyhow::Error::new)
