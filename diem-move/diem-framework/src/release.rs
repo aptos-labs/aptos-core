@@ -77,12 +77,10 @@ impl ReleaseOptions {
         std::fs::create_dir_all(output_path.parent().unwrap()).unwrap();
 
         let build_config = move_package::BuildConfig {
-            dev_mode: false,
-            test_mode: false,
             generate_docs: !self.build_docs,
             generate_abis: !self.script_abis,
             install_dir: Some(output_path.clone()),
-            force_recompilation: false,
+            ..Default::default()
         };
 
         let package_path = Path::new(std::env!("CARGO_MANIFEST_DIR")).join(&self.package);

@@ -198,7 +198,18 @@ impl ResolvingGraph {
         };
 
         let mut renaming = BTreeMap::new();
-        let mut resolution_table = BTreeMap::new();
+        let mut resolution_table = self
+            .build_options
+            .additional_named_addresses
+            .clone()
+            .into_iter()
+            .map(|(name, addr)| {
+                (
+                    NamedAddress::from(name),
+                    ResolvingNamedAddress::new(Some(addr)),
+                )
+            })
+            .collect();
 
         // include dev dependencies if in dev mode
         let additional_deps = if self.build_options.dev_mode {

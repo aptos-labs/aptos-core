@@ -489,11 +489,8 @@ pub fn build_move_package(pkg_path: &Path) -> Result<CompiledPackage> {
     println!("Building {}...", pkg_path.display());
     let config = move_package::BuildConfig {
         dev_mode: true,
-        test_mode: false,
-        generate_docs: false,
         generate_abis: true,
-        force_recompilation: false,
-        install_dir: None,
+        ..Default::default()
     };
 
     config.compile_package(pkg_path, &mut std::io::stdout())

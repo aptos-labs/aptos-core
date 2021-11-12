@@ -7,10 +7,12 @@ pub mod source_package;
 
 use anyhow::Result;
 use compilation::compiled_package::CompilationCachingStatus;
+use move_core_types::account_address::AccountAddress;
 use move_model::model::GlobalEnv;
 use serde::{Deserialize, Serialize};
 use source_package::layout::SourcePackageLayout;
 use std::{
+    collections::BTreeMap,
     io::Write,
     path::{Path, PathBuf},
 };
@@ -56,6 +58,10 @@ pub struct BuildConfig {
     /// Force recompilation of all packages
     #[structopt(name = "force-recompilation", long = "force", short = "f")]
     pub force_recompilation: bool,
+
+    /// Additional named address mapping. Useful for tools in rust
+    #[structopt(skip)]
+    pub additional_named_addresses: BTreeMap<String, AccountAddress>,
 }
 
 impl Default for BuildConfig {
@@ -67,6 +73,7 @@ impl Default for BuildConfig {
             generate_abis: false,
             install_dir: None,
             force_recompilation: false,
+            additional_named_addresses: BTreeMap::new(),
         }
     }
 }

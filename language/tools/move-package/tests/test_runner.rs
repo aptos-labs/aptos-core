@@ -46,6 +46,7 @@ pub fn run_test(path: &Path) -> datatest_stable::Result<()> {
                     generate_abis: false,
                     install_dir: Some(tempdir().unwrap().path().to_path_buf()),
                     force_recompilation: false,
+                    ..Default::default()
                 },
             )
         })

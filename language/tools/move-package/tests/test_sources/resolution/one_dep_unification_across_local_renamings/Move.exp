@@ -9,6 +9,7 @@ ResolutionGraph {
             "ELIDED_FOR_TEST",
         ),
         force_recompilation: false,
+        additional_named_addresses: {},
     },
     root_package: SourceManifest {
         package: PackageInfo {

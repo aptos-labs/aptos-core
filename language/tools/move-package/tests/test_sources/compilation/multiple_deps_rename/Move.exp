@@ -37,5 +37,6 @@ CompiledPackageInfo {
             "ELIDED_FOR_TEST",
         ),
         force_recompilation: false,
+        additional_named_addresses: {},
     },
 }

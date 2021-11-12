@@ -168,10 +168,8 @@ fn generate_build_config_for_testing() -> Result<BuildConfig> {
     Ok(BuildConfig {
         dev_mode: true,
         test_mode: true,
-        generate_docs: false,
         generate_abis: true,
-        install_dir: None,
-        force_recompilation: false,
+        ..Default::default()
     })
 }
 
