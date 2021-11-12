@@ -176,7 +176,7 @@ pub fn load_test_environment<R>(
     println!("\tWaypoint: {}", genesis_waypoint);
     println!("\tChainId: {}", ChainId::test());
 
-    print_api_config(&validators[0].config);
+    print_api_config(&validators[0].config, lazy);
 
     println!("Diem is running, press ctrl-c to exit");
     println!();
@@ -184,7 +184,7 @@ pub fn load_test_environment<R>(
     start(&validators[0].config, Some(log_file))
 }
 
-pub fn print_api_config(config: &NodeConfig) {
+pub fn print_api_config(config: &NodeConfig, lazy: bool) {
     println!("\tJSON-RPC endpoint: {}", config.json_rpc.address);
     println!("\tREST API endpoint: {}", config.api.address);
     println!("\tStream-RPC enabled!");
@@ -194,7 +194,7 @@ pub fn print_api_config(config: &NodeConfig) {
         config.full_node_networks[0].listen_address
     );
     println!();
-    if config.consensus.mempool_poll_count == u64::MAX {
+    if lazy {
         println!("\tLazy mode is enabled");
         println!();
     }

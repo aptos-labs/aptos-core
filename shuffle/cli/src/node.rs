@@ -10,6 +10,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+const LAZY_ENABLED: bool = true;
+
 pub fn handle(home: &Home, genesis: Option<String>) -> Result<()> {
     if !home.get_shuffle_path().is_dir() {
         println!(
@@ -43,7 +45,7 @@ fn create_node(home: &Home, genesis: Option<String>) -> Result<()> {
     diem_node::load_test_environment(
         Some(PathBuf::from(home.get_node_config_path())),
         false,
-        true,
+        LAZY_ENABLED,
         Some(publishing_option),
         genesis_modules,
         rand::rngs::OsRng,
@@ -58,7 +60,7 @@ fn start_node(home: &Home) -> Result<()> {
     println!("\tWaypoint: {}", home.read_genesis_waypoint()?);
     println!("\tChainId: {}", ChainId::test());
     let config = NodeConfig::load(home.get_validator_config_path()).unwrap();
-    diem_node::print_api_config(&config);
+    diem_node::print_api_config(&config, LAZY_ENABLED);
 
     println!("Diem is running, press ctrl-c to exit");
     println!();
