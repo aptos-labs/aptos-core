@@ -18,6 +18,7 @@ rand = "0.8.3"
 rayon = "1.5.0"
 serde = "1.0.124"
 structopt = "0.3.21"
+toml = "0.5.8"
 
 executor = { path = "../executor" }
 executor-types = { path = "../executor-types" }

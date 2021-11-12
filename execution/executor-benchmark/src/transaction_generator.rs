@@ -5,6 +5,7 @@ use diem_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     PrivateKey, SigningKey, Uniform,
 };
+use diem_logger::info;
 use diem_transaction_builder::stdlib::{
     encode_create_parent_vasp_account_script, encode_peer_to_peer_with_metadata_script,
 };
@@ -29,10 +30,23 @@ use std::{
     io::{Read, Write},
     path::Path,
     sync::mpsc,
+    time::Instant,
 };
 use storage_interface::DbReader;
 
-const META_FILENAME: &str = "TXN_GEN_META";
+const META_FILENAME: &str = "metadata.toml";
+const MAX_ACCOUNTS_INVOLVED_IN_P2P: usize = 100_000;
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type", content = "args")]
+enum TestCase {
+    P2p(P2pTestCase),
+}
+
+#[derive(Serialize, Deserialize)]
+struct P2pTestCase {
+    num_accounts: usize,
+}
 
 #[derive(Deserialize, Serialize)]
 struct AccountData {
@@ -50,30 +64,13 @@ impl AccountData {
     }
 }
 
-/// The base can be tranferred across different sessions to make sure the txns are consistent.
-#[derive(Deserialize, Serialize)]
-pub struct TransactionGeneratorBase {
-    /// The current state of the accounts. The main purpose is to keep track of the sequence number
-    /// so generated transactions are guaranteed to be successfully executed.
-    accounts: Vec<AccountData>,
-
-    /// Record the number of txns generated.
-    version: Version,
-}
-
-impl From<TransactionGenerator> for TransactionGeneratorBase {
-    fn from(gen: TransactionGenerator) -> Self {
-        Self {
-            accounts: gen.accounts,
-            version: gen.version,
-        }
-    }
-}
-
 pub struct TransactionGenerator {
     /// The current state of the accounts. The main purpose is to keep track of the sequence number
     /// so generated transactions are guaranteed to be successfully executed.
-    accounts: Vec<AccountData>,
+    accounts_cache: Vec<AccountData>,
+
+    /// Total number of accounts in the DB
+    num_accounts: usize,
 
     /// Used to mint accounts.
     genesis_key: Ed25519PrivateKey,
@@ -108,6 +105,20 @@ impl TransactionGenerator {
         block_sender: Option<mpsc::SyncSender<Vec<Transaction>>>,
     ) -> Self {
         let seed = [1u8; 32];
+        let rng = StdRng::from_seed(seed);
+        Self {
+            accounts_cache: Self::gen_account_cache(num_accounts),
+            num_accounts,
+            genesis_key,
+            version: 0,
+            rng,
+            block_sender,
+        }
+    }
+
+    fn gen_account_cache(num_accounts: usize) -> Vec<AccountData> {
+        let start = Instant::now();
+        let seed = [1u8; 32];
         let mut rng = StdRng::from_seed(seed);
 
         let mut accounts = Vec::with_capacity(num_accounts);
@@ -124,13 +135,12 @@ impl TransactionGenerator {
             accounts.push(account);
         }
 
-        Self {
-            accounts,
-            genesis_key,
-            version: 0,
-            rng,
-            block_sender,
-        }
+        info!(
+            num_accounts_generated = num_accounts,
+            time_ms = %start.elapsed().as_millis(),
+            "Account cache generation finished.",
+        );
+        accounts
     }
 
     pub fn new_with_metafile<P: AsRef<Path>>(
@@ -142,14 +152,21 @@ impl TransactionGenerator {
         let mut file = File::open(&path).unwrap();
         let mut contents = vec![];
         file.read_to_end(&mut contents).unwrap();
-        let txn_gen_base = bcs::from_bytes::<TransactionGeneratorBase>(&contents).unwrap();
+        let test_case: TestCase = toml::from_slice(&contents).expect("Must exist.");
+        let num_accounts = match test_case {
+            TestCase::P2p(P2pTestCase { num_accounts }) => num_accounts,
+        };
 
         let seed = [1u8; 32];
         let rng = StdRng::from_seed(seed);
         Self {
-            accounts: txn_gen_base.accounts,
+            accounts_cache: Self::gen_account_cache(std::cmp::min(
+                num_accounts,
+                MAX_ACCOUNTS_INVOLVED_IN_P2P,
+            )),
+            num_accounts,
             genesis_key,
-            version: txn_gen_base.version,
+            version: 2 * num_accounts as Version,
             rng,
             block_sender: Some(block_sender),
         }
@@ -157,10 +174,13 @@ impl TransactionGenerator {
 
     // Write metadata
     pub fn write_meta<P: AsRef<Path>>(self, path: &P) {
-        let metadata = bcs::to_bytes(&TransactionGeneratorBase::from(self)).unwrap();
+        let metadata = TestCase::P2p(P2pTestCase {
+            num_accounts: self.num_accounts,
+        });
+        let serialized = toml::to_vec(&metadata).unwrap();
         let meta_file = path.as_ref().join(META_FILENAME);
         let mut file = File::create(meta_file).unwrap();
-        file.write_all(&metadata).unwrap();
+        file.write_all(&serialized).unwrap();
     }
 
     pub fn version(&self) -> Version {
@@ -182,7 +202,7 @@ impl TransactionGenerator {
         let tc_account = treasury_compliance_account_address();
         let mut txn_block = vec![];
 
-        for (i, block) in self.accounts.chunks(block_size).enumerate() {
+        for (i, block) in self.accounts_cache.chunks(block_size).enumerate() {
             let mut transactions = Vec::with_capacity(block_size);
             for (j, account) in block.iter().enumerate() {
                 let txn = create_transaction(
@@ -220,7 +240,7 @@ impl TransactionGenerator {
         let testnet_dd_account = testnet_dd_account_address();
         let mut txn_block = vec![];
 
-        for (i, block) in self.accounts.chunks(block_size).enumerate() {
+        for (i, block) in self.accounts_cache.chunks(block_size).enumerate() {
             let mut transactions = Vec::with_capacity(block_size);
             for (j, account) in block.iter().enumerate() {
                 let txn = create_transaction(
@@ -256,15 +276,16 @@ impl TransactionGenerator {
         num_blocks: usize,
     ) -> Vec<Vec<Transaction>> {
         let mut txn_block = vec![];
+
         for _i in 0..num_blocks {
             let mut transactions = Vec::with_capacity(block_size);
             for _j in 0..block_size {
-                let indices = rand::seq::index::sample(&mut self.rng, self.accounts.len(), 2);
+                let indices = rand::seq::index::sample(&mut self.rng, self.accounts_cache.len(), 2);
                 let sender_idx = indices.index(0);
                 let receiver_idx = indices.index(1);
 
-                let sender = &self.accounts[sender_idx];
-                let receiver = &self.accounts[receiver_idx];
+                let sender = &self.accounts_cache[sender_idx];
+                let receiver = &self.accounts_cache[receiver_idx];
                 let txn = create_transaction(
                     sender.address,
                     sender.sequence_number,
@@ -279,8 +300,7 @@ impl TransactionGenerator {
                     ),
                 );
                 transactions.push(txn);
-
-                self.accounts[sender_idx].sequence_number += 1;
+                self.accounts_cache[sender_idx].sequence_number += 1;
             }
             self.version += transactions.len() as Version;
 
@@ -295,7 +315,7 @@ impl TransactionGenerator {
 
     /// Verifies the sequence numbers in storage match what we have locally.
     pub fn verify_sequence_number(&self, db: &dyn DbReader<DpnProto>) {
-        for account in &self.accounts {
+        for account in &self.accounts_cache {
             let address = account.address;
             let blob = db
                 .get_latest_account_state(address)

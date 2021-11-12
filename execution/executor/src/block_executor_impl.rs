@@ -202,8 +202,10 @@ impl<PS, V> Executor<PS, V> {
         if num_txns_in_li < num_persistent_txns {
             return Err(Error::InternalError {
                 error: format!(
-                    "Try to commit stale transactions with the last version as {}",
-                    version
+                    "Trying to commit stale transactions. version {}, num_txns_in_li {}, num_persistent_txns {}",
+                    version,
+                    num_txns_in_li,
+                    num_persistent_txns,
                 ),
             });
         }
