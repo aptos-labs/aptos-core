@@ -64,7 +64,8 @@ impl TransactionCommitter {
     }
 
     pub fn run(&mut self) {
-        info!("Start with version: {}", self.version);
+        let start_version = self.version;
+        info!("Start with version: {}", start_version);
 
         while let Ok((
             block_id,
@@ -83,6 +84,7 @@ impl TransactionCommitter {
                 .unwrap();
 
             report_block(
+                start_version,
                 self.version,
                 global_start_time,
                 execution_start_time,
@@ -95,6 +97,7 @@ impl TransactionCommitter {
 }
 
 fn report_block(
+    start_version: Version,
     version: Version,
     global_start_time: Instant,
     execution_start_time: Instant,
@@ -102,6 +105,7 @@ fn report_block(
     commit_time: Duration,
     block_size: usize,
 ) {
+    let total_versions = (version - start_version) as f64;
     info!(
         "Version: {}. latency: {} ms, execute time: {} ms. commit time: {} ms. TPS: {:.0}. Accumulative TPS: {:.0}",
         version,
@@ -109,7 +113,7 @@ fn report_block(
         execution_time.as_millis(),
         commit_time.as_millis(),
         block_size as f64 / (std::cmp::max(execution_time, commit_time)).as_secs_f64(),
-        version as f64 / global_start_time.elapsed().as_secs_f64(),
+        total_versions / global_start_time.elapsed().as_secs_f64(),
     );
     info!(
             "Accumulative total: VM time: {:.0} secs, executor time: {:.0} secs, commit time: {:.0} secs, DB commit time: {:.0} secs",
@@ -122,12 +126,12 @@ fn report_block(
     info!(
             "Accumulative per transaction: VM time: {:.0} ns, executor time: {:.0} ns, commit time: {:.0} ns, DB commit time: {:.0} ns",
             DIEM_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum() * NANOS_PER_SEC
-                / version as f64,
+                / total_versions,
             (DIEM_EXECUTOR_EXECUTE_BLOCK_SECONDS.get_sample_sum() - DIEM_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum()) * NANOS_PER_SEC
-                / version as f64,
+                / total_versions,
             DIEM_EXECUTOR_COMMIT_BLOCKS_SECONDS.get_sample_sum() * NANOS_PER_SEC
-                / version as f64,
+                / total_versions,
             DIEM_STORAGE_API_LATENCY_SECONDS.get_metric_with_label_values(&["save_transactions", "Ok"]).expect("must exist.").get_sample_sum() * NANOS_PER_SEC
-                / version as f64,
+                / total_versions,
         );
 }
