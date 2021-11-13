@@ -126,7 +126,7 @@ async fn test_get_storage_server_summary() {
             epoch_ending_ledger_infos: Some(CompleteDataRange::from_genesis(highest_epoch - 1)),
             transactions: Some(CompleteDataRange::new(10, highest_version).unwrap()),
             transaction_outputs: Some(CompleteDataRange::new(20, highest_version).unwrap()),
-            account_states: Some(CompleteDataRange::from_genesis(highest_version)),
+            account_states: Some(CompleteDataRange::new(51, highest_version).unwrap()),
         },
     };
     assert_eq!(
@@ -479,6 +479,10 @@ impl DbReader<DpnProto> for MockDbReader {
 
     fn get_first_txn_version(&self) -> Result<Option<Version>> {
         Ok(Some(10))
+    }
+
+    fn get_state_prune_window(&self) -> Option<usize> {
+        Some(50)
     }
 }
 

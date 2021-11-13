@@ -356,6 +356,85 @@ impl StorageReader {
     pub fn new(storage: Arc<dyn DbReader<DpnProto>>) -> Self {
         Self { storage }
     }
+
+    /// Returns the account states range held in the database (lowest to highest).
+    /// Note: it is currently assumed that if a node contains a transaction at a
+    /// version, V, the node also contains all account states at V.
+    fn fetch_account_states_range(
+        &self,
+        latest_version: Version,
+        transactions_range: &Option<CompleteDataRange<Version>>,
+    ) -> Result<Option<CompleteDataRange<Version>>, Error> {
+        let pruning_window = self
+            .storage
+            .get_state_prune_window()
+            .map(|window| window as u64);
+        if let Some(pruning_window) = pruning_window {
+            if latest_version > pruning_window {
+                // lowest_account_version = latest_version - pruning_window + 1;
+                let mut lowest_account_version =
+                    latest_version.checked_sub(pruning_window).ok_or_else(|| {
+                        Error::UnexpectedErrorEncountered(
+                            "Lowest account states version has overflown!".into(),
+                        )
+                    })?;
+                lowest_account_version =
+                    lowest_account_version.checked_add(1).ok_or_else(|| {
+                        Error::UnexpectedErrorEncountered(
+                            "Lowest account states version has overflown!".into(),
+                        )
+                    })?;
+
+                // Create the account range
+                let account_range = CompleteDataRange::new(lowest_account_version, latest_version)
+                    .map_err(|error| Error::UnexpectedErrorEncountered(error.to_string()))?;
+                Ok(Some(account_range))
+            } else {
+                // The pruner hasn't kicked in yet, so return the transactions range
+                Ok(*transactions_range)
+            }
+        } else {
+            // There is no pruning window, return the transactions range
+            Ok(*transactions_range)
+        }
+    }
+
+    /// Returns the transaction range held in the database (lowest to highest).
+    fn fetch_transaction_range(
+        &self,
+        latest_version: Version,
+    ) -> Result<Option<CompleteDataRange<Version>>, Error> {
+        let first_transaction_version = self
+            .storage
+            .get_first_txn_version()
+            .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
+        if let Some(first_transaction_version) = first_transaction_version {
+            let transaction_range =
+                CompleteDataRange::new(first_transaction_version, latest_version)
+                    .map_err(|error| Error::UnexpectedErrorEncountered(error.to_string()))?;
+            Ok(Some(transaction_range))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Returns the transaction output range held in the database (lowest to highest).
+    fn fetch_transaction_output_range(
+        &self,
+        latest_version: Version,
+    ) -> Result<Option<CompleteDataRange<Version>>, Error> {
+        let first_output_version = self
+            .storage
+            .get_first_write_set_version()
+            .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
+        if let Some(first_output_version) = first_output_version {
+            let output_range = CompleteDataRange::new(first_output_version, latest_version)
+                .map_err(|error| Error::UnexpectedErrorEncountered(error.to_string()))?;
+            Ok(Some(output_range))
+        } else {
+            Ok(None)
+        }
+    }
 }
 
 impl StorageReaderInterface for StorageReader {
@@ -365,44 +444,34 @@ impl StorageReaderInterface for StorageReader {
             .storage
             .get_latest_ledger_info()
             .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
+
+        // Fetch the epoch ending ledger info range
         let latest_ledger_info = latest_ledger_info_with_sigs.ledger_info();
         let latest_epoch = latest_ledger_info.epoch();
+        let epoch_ending_ledger_infos = if latest_epoch == 0 {
+            None // We haven't seen an epoch change yet
+        } else {
+            let highest_ending_epoch = latest_epoch.checked_sub(1).ok_or_else(|| {
+                Error::UnexpectedErrorEncountered("Highest ending epoch overflowed!".into())
+            })?;
+            Some(CompleteDataRange::from_genesis(highest_ending_epoch))
+        };
+
+        // Fetch the transaction and transaction output ranges
         let latest_version = latest_ledger_info.version();
+        let transactions = self.fetch_transaction_range(latest_version)?;
+        let transaction_outputs = self.fetch_transaction_output_range(latest_version)?;
 
-        // Fetch the transaction range
-        let smallest_transaction_version = self
-            .storage
-            .get_first_txn_version()
-            .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
-        let transactions = if let Some(version) = smallest_transaction_version {
-            let complete_data_range = CompleteDataRange::new(version, latest_version)
-                .map_err(|error| Error::UnexpectedErrorEncountered(error.to_string()))?;
-            Some(complete_data_range)
-        } else {
-            None
-        };
+        // Fetch the account states range
+        let account_states = self.fetch_account_states_range(latest_version, &transactions)?;
 
-        // Fetch the transaction output range
-        let smallest_output_version = self
-            .storage
-            .get_first_write_set_version()
-            .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
-        let transaction_outputs = if let Some(version) = smallest_output_version {
-            let complete_data_range = CompleteDataRange::new(version, latest_version)
-                .map_err(|error| Error::UnexpectedErrorEncountered(error.to_string()))?;
-            Some(complete_data_range)
-        } else {
-            None
-        };
-
-        // TODO(joshlind): Update the DiemDB to support fetching all of this data!
         // Return the relevant data summary
         let data_summary = DataSummary {
             synced_ledger_info: Some(latest_ledger_info_with_sigs),
-            epoch_ending_ledger_infos: Some(CompleteDataRange::from_genesis(latest_epoch - 1)),
+            epoch_ending_ledger_infos,
             transactions,
             transaction_outputs,
-            account_states: Some(CompleteDataRange::from_genesis(latest_version)),
+            account_states,
         };
 
         Ok(data_summary)
