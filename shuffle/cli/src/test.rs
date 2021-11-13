@@ -14,8 +14,9 @@ use diem_sdk::{
     types::LocalAccount,
 };
 use diem_types::{chain_id::ChainId, transaction::authenticator::AuthenticationKey};
-use move_cli::package::cli;
+use move_cli::package::cli::{self, UnitTestResult};
 use move_package::BuildConfig;
+use move_unit_test::UnitTestingConfig;
 use shared::Home;
 use std::{
     path::{Path, PathBuf},
@@ -132,26 +133,18 @@ fn host_and_port(url: &Url) -> Result<String> {
     ))
 }
 
-pub fn run_move_unit_tests(project_path: &Path) -> Result<()> {
-    let unit_test_cmd = cli::PackageCommand::UnitTest {
-        // Setting to default values with exception of report_storage_on_error
-        // to get more information about a failed test
-        instruction_execution_bound: 5000,
-        filter: None,
-        list: false,
-        num_threads: 8,
-        report_statistics: false,
+pub fn run_move_unit_tests(project_path: &Path) -> Result<UnitTestResult> {
+    let unit_test_config = UnitTestingConfig {
         report_storage_on_error: true,
-        check_stackless_vm: false,
-        verbose_mode: false,
-        compute_coverage: false,
+        ..UnitTestingConfig::default_with_bound(None)
     };
 
-    cli::handle_package_commands(
-        &Some(project_path.join(MAIN_PKG_PATH)),
+    cli::run_move_unit_tests(
+        &project_path.join(MAIN_PKG_PATH),
         generate_build_config_for_testing()?,
-        &unit_test_cmd,
+        unit_test_config,
         diem_vm::natives::diem_natives(),
+        false,
     )
 }
 
@@ -201,6 +194,7 @@ pub async fn handle(home: &Home, cmd: TestCommand) -> Result<()> {
             project_path,
             network,
         } => {
+            // TODO: std::process::exit with error code on any error
             run_e2e_tests(
                 home,
                 shared::normalized_project_path(project_path)?.as_path(),
@@ -209,13 +203,19 @@ pub async fn handle(home: &Home, cmd: TestCommand) -> Result<()> {
             .await
         }
         TestCommand::Unit { project_path } => {
-            run_move_unit_tests(shared::normalized_project_path(project_path)?.as_path())
+            let result =
+                run_move_unit_tests(shared::normalized_project_path(project_path)?.as_path())?;
+            match result {
+                UnitTestResult::Failure => std::process::exit(1),
+                _ => Ok(()),
+            }
         }
         TestCommand::All {
             project_path,
             network,
         } => {
             let normalized_path = shared::normalized_project_path(project_path)?;
+            // TODO: std::process::exit with error code on any error
             run_move_unit_tests(normalized_path.as_path())?;
             run_e2e_tests(
                 home,

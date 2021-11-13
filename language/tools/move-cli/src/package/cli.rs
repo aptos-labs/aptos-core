@@ -167,6 +167,12 @@ pub enum ProverOptions {
     Options(Vec<String>),
 }
 
+/// Encapsulates the possible returned states when running unit tests on a move package.
+pub enum UnitTestResult {
+    Success,
+    Failure,
+}
+
 impl CoverageSummaryOptions {
     pub fn handle_command(&self, config: move_package::BuildConfig, path: &Path) -> Result<()> {
         let coverage_map = CoverageMap::from_binary_file(path.join(".coverage_map.mvcov"));
@@ -230,7 +236,7 @@ impl CoverageSummaryOptions {
 
 pub fn handle_package_commands(
     path: &Option<PathBuf>,
-    mut config: move_package::BuildConfig,
+    config: move_package::BuildConfig,
     cmd: &PackageCommand,
     natives: Vec<NativeFunctionRecord>,
 ) -> Result<()> {
@@ -360,115 +366,126 @@ pub fn handle_package_commands(
                 verbose: *verbose_mode,
                 ..UnitTestingConfig::default_with_bound(None)
             };
+            let result = run_move_unit_tests(
+                &rooted_path?,
+                config,
+                unit_test_config,
+                natives,
+                *compute_coverage,
+            )?;
 
-            let mut test_plan = None;
-            config.test_mode = true;
-            config.dev_mode = true;
-
-            let rooted_path = rooted_path?;
-            let resolution_graph = config.resolution_graph_for_package(&rooted_path)?;
-            let dep_file_map: HashMap<_, _> = resolution_graph
-                .package_table
-                .iter()
-                .flat_map(|(_, rpkg)| {
-                    rpkg.get_sources(&resolution_graph.build_options)
-                        .unwrap()
-                        .iter()
-                        .map(|fname| {
-                            let contents = read_to_string(Path::new(fname.as_str())).unwrap();
-                            let fhash = FileHash::new(&contents);
-                            (fhash, (*fname, contents))
-                        })
-                        .collect::<HashMap<_, _>>()
-                })
-                .collect();
-            let build_plan = BuildPlan::create(resolution_graph)?;
-            let pkg =
-                build_plan.compile_with_driver(&mut std::io::stdout(), |compiler, is_root| {
-                    if !is_root {
-                        compiler.build_and_report()
-                    } else {
-                        let (files, comments_and_compiler_res) =
-                            compiler.run::<PASS_CFGIR>().unwrap();
-                        let (_, compiler) = diagnostics::unwrap_or_report_diagnostics(
-                            &files,
-                            comments_and_compiler_res,
-                        );
-                        let (mut compiler, cfgir) = compiler.into_ast();
-                        let compilation_env = compiler.compilation_env();
-                        let built_test_plan = construct_test_plan(compilation_env, &cfgir);
-
-                        if let Err(diags) =
-                            compilation_env.check_diags_at_or_above_severity(Severity::Warning)
-                        {
-                            diagnostics::report_diagnostics(&files, diags);
-                        }
-
-                        let compilation_result = compiler.at_cfgir(cfgir).build();
-
-                        let (units, _) =
-                            diagnostics::unwrap_or_report_diagnostics(&files, compilation_result);
-
-                        test_plan = Some((built_test_plan, files.clone(), units.clone()));
-                        Ok((files, units))
-                    }
-                })?;
-
-            let (test_plan, mut files, units) = test_plan.unwrap();
-            files.extend(dep_file_map);
-            let test_plan = test_plan.unwrap();
-            let no_tests = test_plan.is_empty();
-            let mut test_plan = TestPlan::new(test_plan, files, units);
-            for pkg in pkg.0.transitive_dependencies() {
-                for unit in &pkg.compiled_units {
-                    match &unit.unit {
-                        CompiledUnit::Script(_) => (),
-                        CompiledUnit::Module(module) => {
-                            test_plan
-                                .module_info
-                                .insert(module.module.self_id(), module.clone());
-                        }
-                    }
-                }
-            }
-
-            let trace_path = rooted_path.join(".trace");
-            let coverage_map_path = rooted_path
-                .join(".coverage_map")
-                .with_extension(MOVE_COVERAGE_MAP_EXTENSION);
-            let cleanup_trace = || {
-                if *compute_coverage && trace_path.exists() {
-                    std::fs::remove_file(&trace_path).unwrap();
-                }
-            };
-
-            cleanup_trace();
-
-            if *compute_coverage {
-                std::env::set_var("MOVE_VM_TRACE", &trace_path);
-            }
-
-            if !unit_test_config
-                .run_and_report_unit_tests(test_plan, Some(natives), std::io::stdout())
-                .unwrap()
-                .1
-            {
-                cleanup_trace();
+            if let UnitTestResult::Failure = result {
                 std::process::exit(1)
             }
-
-            if *compute_coverage && !no_tests {
-                let coverage_map = CoverageMap::from_trace_file(trace_path);
-                output_map_to_file(&coverage_map_path, &coverage_map).unwrap();
-            }
-
-            std::process::exit(0)
         }
         PackageCommand::CoverageReport { options } => {
             options.handle_command(config, &rooted_path?)?;
         }
     };
     Ok(())
+}
+
+pub fn run_move_unit_tests(
+    pkg_path: &Path,
+    mut build_config: move_package::BuildConfig,
+    unit_test_config: UnitTestingConfig,
+    natives: Vec<NativeFunctionRecord>,
+    compute_coverage: bool,
+) -> Result<UnitTestResult> {
+    let mut test_plan = None;
+    build_config.test_mode = true;
+    build_config.dev_mode = true;
+
+    let resolution_graph = build_config.resolution_graph_for_package(pkg_path)?;
+    let dep_file_map: HashMap<_, _> = resolution_graph
+        .package_table
+        .iter()
+        .flat_map(|(_, rpkg)| {
+            rpkg.get_sources(&resolution_graph.build_options)
+                .unwrap()
+                .iter()
+                .map(|fname| {
+                    let contents = read_to_string(Path::new(fname.as_str())).unwrap();
+                    let fhash = FileHash::new(&contents);
+                    (fhash, (*fname, contents))
+                })
+                .collect::<HashMap<_, _>>()
+        })
+        .collect();
+    let build_plan = BuildPlan::create(resolution_graph)?;
+    let pkg = build_plan.compile_with_driver(&mut std::io::stdout(), |compiler, is_root| {
+        if !is_root {
+            compiler.build_and_report()
+        } else {
+            let (files, comments_and_compiler_res) = compiler.run::<PASS_CFGIR>().unwrap();
+            let (_, compiler) =
+                diagnostics::unwrap_or_report_diagnostics(&files, comments_and_compiler_res);
+            let (mut compiler, cfgir) = compiler.into_ast();
+            let compilation_env = compiler.compilation_env();
+            let built_test_plan = construct_test_plan(compilation_env, &cfgir);
+
+            if let Err(diags) = compilation_env.check_diags_at_or_above_severity(Severity::Warning)
+            {
+                diagnostics::report_diagnostics(&files, diags);
+            }
+
+            let compilation_result = compiler.at_cfgir(cfgir).build();
+
+            let (units, _) = diagnostics::unwrap_or_report_diagnostics(&files, compilation_result);
+
+            test_plan = Some((built_test_plan, files.clone(), units.clone()));
+            Ok((files, units))
+        }
+    })?;
+
+    let (test_plan, mut files, units) = test_plan.unwrap();
+    files.extend(dep_file_map);
+    let test_plan = test_plan.unwrap();
+    let no_tests = test_plan.is_empty();
+    let mut test_plan = TestPlan::new(test_plan, files, units);
+    for pkg in pkg.0.transitive_dependencies() {
+        for unit in &pkg.compiled_units {
+            match &unit.unit {
+                CompiledUnit::Script(_) => (),
+                CompiledUnit::Module(module) => {
+                    test_plan
+                        .module_info
+                        .insert(module.module.self_id(), module.clone());
+                }
+            }
+        }
+    }
+
+    let trace_path = pkg_path.join(".trace");
+    let coverage_map_path = pkg_path
+        .join(".coverage_map")
+        .with_extension(MOVE_COVERAGE_MAP_EXTENSION);
+    let cleanup_trace = || {
+        if compute_coverage && trace_path.exists() {
+            std::fs::remove_file(&trace_path).unwrap();
+        }
+    };
+
+    cleanup_trace();
+
+    if compute_coverage {
+        std::env::set_var("MOVE_VM_TRACE", &trace_path);
+    }
+
+    if !unit_test_config
+        .run_and_report_unit_tests(test_plan, Some(natives), std::io::stdout())
+        .unwrap()
+        .1
+    {
+        cleanup_trace();
+        return Ok(UnitTestResult::Failure);
+    }
+
+    if compute_coverage && !no_tests {
+        let coverage_map = CoverageMap::from_trace_file(trace_path);
+        output_map_to_file(&coverage_map_path, &coverage_map).unwrap();
+    }
+    Ok(UnitTestResult::Success)
 }
 
 pub fn create_move_package<S: AsRef<str> + Display>(name: S, creation_path: &Path) -> Result<()> {

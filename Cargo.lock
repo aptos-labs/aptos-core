@@ -7762,6 +7762,7 @@ dependencies = [
  "move-core-types",
  "move-lang",
  "move-package",
+ "move-unit-test",
  "once_cell",
  "rand 0.8.4",
  "reqwest",

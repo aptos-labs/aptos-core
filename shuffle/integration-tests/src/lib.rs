@@ -34,11 +34,11 @@ impl AdminTest for SetMessageHelloBlockchain {
         let handle = rt.handle().clone();
         handle.block_on(helper.deploy_project(ctx.chain_info().rest_api()))?;
 
-        let json_rpc_url = Url::from_str(ctx.chain_info().json_rpc())?;
+        shuffle::test::run_move_unit_tests(&helper.project_path())?;
         shuffle::test::run_deno_test(
             helper.home(),
             &helper.project_path(),
-            &json_rpc_url,
+            &Url::from_str(ctx.chain_info().json_rpc())?,
             &Url::from_str(ctx.chain_info().rest_api())?,
             helper.home().get_test_key_path(),
             helper.home().get_test_address()?,
