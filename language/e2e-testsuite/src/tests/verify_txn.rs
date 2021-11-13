@@ -1008,7 +1008,7 @@ pub fn test_no_publishing_diem_root_sender() {
     let txn = sender
         .transaction()
         .module(random_module)
-        .sequence_number(1)
+        .sequence_number(0)
         .max_gas_amount(100_000)
         .sign();
     assert_eq!(executor.verify_transaction(txn.clone()).status(), None);
@@ -1552,7 +1552,7 @@ pub fn publish_and_register_new_currency() {
     let txn = sender
         .transaction()
         .module(module)
-        .sequence_number(1)
+        .sequence_number(0)
         .sign();
     assert_eq!(executor.verify_transaction(txn.clone()).status(), None);
     assert_eq!(
@@ -1581,7 +1581,7 @@ pub fn publish_and_register_new_currency() {
                 script: Script::new(program, vec![], vec![]),
                 execute_as: *tc_account.address(),
             })
-            .sequence_number(2)
+            .sequence_number(1)
             .sign();
         executor.new_block();
         executor.execute_and_apply(txn);

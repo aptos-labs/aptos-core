@@ -145,7 +145,7 @@ impl TestContext {
     }
 
     pub fn root_account(&self) -> LocalAccount {
-        LocalAccount::new(diem_root_address(), self.root_keys.root_key.clone(), 1)
+        LocalAccount::new(diem_root_address(), self.root_keys.root_key.clone(), 0)
     }
 
     pub fn gen_account(&mut self) -> LocalAccount {

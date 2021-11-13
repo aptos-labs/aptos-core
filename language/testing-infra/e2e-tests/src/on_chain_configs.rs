@@ -23,7 +23,7 @@ pub fn set_diem_version(executor: &mut FakeExecutor, version: DiemVersion) {
                 TransactionArgument::U64(version.major),
             ],
         ))
-        .sequence_number(1)
+        .sequence_number(0)
         .sign();
     executor.new_block();
     executor.execute_and_apply(txn);

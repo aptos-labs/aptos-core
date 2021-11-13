@@ -19,7 +19,7 @@ proptest! {
     ) {
         let executor = FakeExecutor::from_genesis_file();
         let accounts = vec![
-            (Account::new_diem_root(), 1),
+            (Account::new_diem_root(), 0),
             (Account::new_blessed_tc(), 0),
         ];
         let num_accounts = accounts.len();
@@ -59,7 +59,7 @@ proptest! {
                         vec![],
                         i % 2 == 0,
                 ))
-                .sequence_number(i as u64 + 1)
+                .sequence_number(i as u64)
                 .sign(),
             );
             accounts.push((account, 0));

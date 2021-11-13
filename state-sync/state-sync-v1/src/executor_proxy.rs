@@ -257,7 +257,7 @@ mod tests {
         // Create a dummy prologue transaction that will bump the timer, and update the validator set
         let validator_account = validators[0].data.address;
         let dummy_txn = create_dummy_transaction(1, validator_account);
-        let reconfig_txn = create_new_update_diem_version_transaction(1);
+        let reconfig_txn = create_new_update_diem_version_transaction(0);
 
         // Execute and commit the block
         let block = vec![dummy_txn, reconfig_txn];
@@ -281,7 +281,7 @@ mod tests {
         // Create a dummy prologue transaction that will bump the timer, and update the Diem version
         let validator_account = validators[0].data.address;
         let dummy_txn = create_dummy_transaction(1, validator_account);
-        let reconfig_txn = create_new_update_diem_version_transaction(1);
+        let reconfig_txn = create_new_update_diem_version_transaction(0);
 
         // Execute and commit the reconfig block
         let block = vec![dummy_txn, reconfig_txn];
@@ -302,10 +302,10 @@ mod tests {
         // Create a dummy prologue transaction that will bump the timer, and update the Diem version
         let validator_account = validators[0].data.address;
         let dummy_txn = create_dummy_transaction(1, validator_account);
-        let reconfig_txn = create_new_update_diem_version_transaction(1);
+        let reconfig_txn = create_new_update_diem_version_transaction(0);
 
         // Give the validator some money so it can send a rotation tx and rotate the validator's consensus key.
-        let money_txn = create_transfer_to_validator_transaction(validator_account, 2);
+        let money_txn = create_transfer_to_validator_transaction(validator_account, 1);
         let rotation_txn = create_consensus_key_rotation_transaction(&validators[0], 0);
 
         // Execute and commit the reconfig block
@@ -406,7 +406,7 @@ mod tests {
         // Create a dummy prologue transaction that will bump the timer, and update the Diem version
         let validator_account = validators[0].data.address;
         let dummy_txn = create_dummy_transaction(1, validator_account);
-        let allowlist_txn = create_new_update_diem_version_transaction(1);
+        let allowlist_txn = create_new_update_diem_version_transaction(0);
 
         // Execute and commit the reconfig block
         let block = vec![dummy_txn, allowlist_txn];
@@ -429,7 +429,7 @@ mod tests {
         // Create a dummy prologue transaction that will bump the timer and update the Diem version
         let validator_account = validators[0].data.address;
         let dummy_txn_1 = create_dummy_transaction(1, validator_account);
-        let reconfig_txn = create_new_update_diem_version_transaction(1);
+        let reconfig_txn = create_new_update_diem_version_transaction(0);
 
         // Execute and commit the reconfig block
         let block = vec![dummy_txn_1.clone(), reconfig_txn.clone()];
@@ -437,7 +437,7 @@ mod tests {
 
         // Give the validator some money so it can send a rotation tx, create another dummy prologue
         // to bump the timer and rotate the validator's consensus key.
-        let money_txn = create_transfer_to_validator_transaction(validator_account, 2);
+        let money_txn = create_transfer_to_validator_transaction(validator_account, 1);
         let dummy_txn_2 = create_dummy_transaction(2, validator_account);
         let rotation_txn = create_consensus_key_rotation_transaction(&validators[0], 0);
 
@@ -485,7 +485,7 @@ mod tests {
         // Create a dummy prologue transaction that will bump the timer and update the Diem version
         let validator_account = validators[0].data.address;
         let dummy_txn = create_dummy_transaction(1, validator_account);
-        let reconfig_txn = create_new_update_diem_version_transaction(1);
+        let reconfig_txn = create_new_update_diem_version_transaction(0);
 
         // Execute and commit the reconfig block
         let block = vec![dummy_txn, reconfig_txn];
@@ -499,7 +499,7 @@ mod tests {
 
         // Give the validator some money so it can send a rotation tx, create another dummy prologue
         // to bump the timer and rotate the validator's consensus key.
-        let money_txn = create_transfer_to_validator_transaction(validator_account, 2);
+        let money_txn = create_transfer_to_validator_transaction(validator_account, 1);
         let dummy_txn = create_dummy_transaction(2, validator_account);
         let rotation_txn = create_consensus_key_rotation_transaction(&validators[0], 0);
 
@@ -528,7 +528,7 @@ mod tests {
         // Create a dummy prologue transaction that will bump the timer, and update the Diem version
         let validator_account = validators[0].data.address;
         let dummy_txn = create_dummy_transaction(1, validator_account);
-        let update_txn = create_new_update_consensus_config_transaction(1);
+        let update_txn = create_new_update_consensus_config_transaction(0);
 
         // Execute and commit the reconfig block
         let block = vec![dummy_txn, update_txn];
@@ -595,7 +595,7 @@ mod tests {
         // Create a dummy prologue transaction that will bump the timer, and update the Diem version
         let validator_account = validators[0].data.address;
         let dummy_txn = create_dummy_transaction(1, validator_account);
-        let allowlist_txn = create_new_update_consensus_config_transaction(1);
+        let allowlist_txn = create_new_update_consensus_config_transaction(0);
 
         // Execute and commit the reconfig block
         let mut block_executor = Box::new(Executor::<DpnProto, DiemVM>::new(db_rw));

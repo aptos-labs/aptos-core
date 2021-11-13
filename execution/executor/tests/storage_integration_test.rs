@@ -307,7 +307,7 @@ fn test_change_publishing_option_to_custom() {
     };
     let txn5 = get_test_signed_transaction(
         genesis_account,
-        /* sequence_number = */ 1,
+        /* sequence_number = */ 0,
         genesis_key.clone(),
         genesis_key.public_key(),
         Some(TransactionPayload::Script(Script::new(

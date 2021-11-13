@@ -19,7 +19,7 @@ fn init(executor: &mut FakeExecutor) {
         }
     "#;
     let script = compile_script(program, vec![]);
-    let txn = dr.transaction().script(script).sequence_number(1).sign();
+    let txn = dr.transaction().script(script).sequence_number(0).sign();
     executor.execute_and_apply(txn);
 }
 

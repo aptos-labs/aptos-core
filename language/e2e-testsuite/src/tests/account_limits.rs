@@ -155,7 +155,7 @@ fn account_limits() {
     let diem_root = Account::new_diem_root();
     let blessed = Account::new_blessed_tc();
     let dd = Account::new_testing_dd();
-    let dr_sequence_number = 1;
+    let dr_sequence_number = 0;
     let tc_sequence_number = 0;
     let dd_sequence_number = 0;
 

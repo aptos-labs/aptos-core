@@ -319,7 +319,7 @@ pub fn test_publishing_no_modules_non_allowlist_script_proper_sender() {
     let txn = sender
         .transaction()
         .module(random_module)
-        .sequence_number(1)
+        .sequence_number(0)
         .sign();
     assert_eq!(executor.verify_transaction(txn.clone()).status(), None);
     assert_eq!(
@@ -348,7 +348,7 @@ pub fn test_publishing_no_modules_proper_sender() {
     let txn = sender
         .transaction()
         .module(random_script)
-        .sequence_number(1)
+        .sequence_number(0)
         .sign();
     assert_eq!(executor.verify_transaction(txn.clone()).status(), None);
     assert_eq!(

@@ -125,7 +125,7 @@ fn validator_add_max_number() {
 
     executor.set_golden_file(current_function_name!());
 
-    let output = try_add_validator(&mut executor, &Account::new_diem_root(), 1);
+    let output = try_add_validator(&mut executor, &Account::new_diem_root(), 0);
 
     assert_aborted_with(output, 1800);
 }

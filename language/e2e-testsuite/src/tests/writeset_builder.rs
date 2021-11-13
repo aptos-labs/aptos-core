@@ -52,7 +52,7 @@ fn build_upgrade_writeset() {
     let writeset_txn = genesis_account
         .transaction()
         .write_set(WriteSetPayload::Direct(change_set))
-        .sequence_number(1)
+        .sequence_number(0)
         .sign();
 
     let output = executor.execute_transaction(writeset_txn.clone());
@@ -89,7 +89,7 @@ main(lr_account: signer) {
     let txn = genesis_account
         .transaction()
         .script(Script::new(script_body, vec![], vec![]))
-        .sequence_number(2)
+        .sequence_number(1)
         .sign();
 
     let output = executor.execute_transaction(txn);

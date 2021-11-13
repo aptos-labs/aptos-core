@@ -1176,7 +1176,7 @@ fn add_child_currencies() {
     let dr_account = Account::new_diem_root();
     let tc_sequence_number = 0;
 
-    currencies::add_currency_to_system(&mut executor, "COIN", &dr_account, 1);
+    currencies::add_currency_to_system(&mut executor, "COIN", &dr_account, 0);
 
     executor.execute_and_apply(
         blessed

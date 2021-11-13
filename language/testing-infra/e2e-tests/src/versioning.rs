@@ -34,7 +34,7 @@ impl VersionedTestEnv {
             executor.execute_and_apply(
                 dr_account
                     .transaction()
-                    .sequence_number(1)
+                    .sequence_number(dr_sequence_number)
                     .payload(release_1_2_0_writeset())
                     .sign(),
             );
@@ -45,7 +45,7 @@ impl VersionedTestEnv {
             executor.execute_and_apply(
                 dr_account
                     .transaction()
-                    .sequence_number(2)
+                    .sequence_number(dr_sequence_number)
                     .payload(release_1_4_0_writeset())
                     .sign(),
             );

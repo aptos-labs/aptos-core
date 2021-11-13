@@ -53,7 +53,7 @@ main(dr_account: signer, account: signer, auth_key_prefix: vector<u8>) {
             ),
             execute_as: *new_account.address(),
         })
-        .sequence_number(1)
+        .sequence_number(0)
         .sign();
     executor.new_block();
     let output = executor.execute_and_apply(txn);
@@ -115,7 +115,7 @@ main(dr_account: signer, account: signer, auth_key_prefix: vector<u8>) {
             ),
             execute_as: *new_account.address(),
         })
-        .sequence_number(1)
+        .sequence_number(0)
         .sign();
     executor.new_block();
     let output = executor.execute_and_apply(txn);
@@ -175,7 +175,7 @@ main(account: signer, auth_key_prefix: vector<u8>) {
             ),
             execute_as: *new_account.address(),
         })
-        .sequence_number(1)
+        .sequence_number(0)
         .sign();
     executor.new_block();
     let output = executor.execute_transaction(txn);

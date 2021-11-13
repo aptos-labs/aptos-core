@@ -145,7 +145,7 @@ fn bad_writesets() {
                 write_set.clone(),
                 vec![],
             )))
-            .sequence_number(1)
+            .sequence_number(0)
             .sign();
         assert_prologue_parity!(
             executor.verify_transaction(writeset_txn.clone()).status(),

@@ -175,7 +175,7 @@ fn update_script_allow_list() {
     let txn = dr
         .transaction()
         .script(Script::new(random_script, vec![], vec![]))
-        .sequence_number(1)
+        .sequence_number(0)
         .sign();
 
     assert_eq!(

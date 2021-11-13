@@ -34,7 +34,7 @@ use move_bytecode_utils::Modules;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
-    language_storage::{ModuleId, StructTag, TypeTag},
+    language_storage::{ModuleId, TypeTag},
     value::{serialize_values, MoveValue},
 };
 use move_vm_runtime::{move_vm::MoveVM, session::Session};
@@ -98,20 +98,12 @@ pub fn encode_genesis_change_set(
     let move_vm = MoveVM::new(diem_vm::natives::diem_natives()).unwrap();
     let mut session = move_vm.new_session(&data_cache);
 
-    let xdx_ty = TypeTag::Struct(StructTag {
-        address: *account_config::XDX_MODULE.address(),
-        module: account_config::XDX_MODULE.name().to_owned(),
-        name: account_config::XDX_IDENTIFIER.to_owned(),
-        type_params: vec![],
-    });
-
     create_and_initialize_main_accounts(
         &mut session,
         diem_root_key,
         treasury_compliance_key,
         vm_publishing_option,
         consensus_config,
-        &xdx_ty,
         chain_id,
     );
     // generate the genesis WriteSet
@@ -196,7 +188,6 @@ fn create_and_initialize_main_accounts(
     treasury_compliance_key: &Ed25519PublicKey,
     publishing_option: VMPublishingOption,
     consensus_config: OnChainConsensusConfig,
-    xdx_ty: &TypeTag,
     chain_id: ChainId,
 ) {
     let diem_root_auth_key = AuthenticationKey::ed25519(diem_root_key);
@@ -239,24 +230,6 @@ fn create_and_initialize_main_accounts(
             MoveValue::U8(chain_id.id()),
             MoveValue::U64(DIEM_MAX_KNOWN_VERSION.major),
             MoveValue::vector_u8(consensus_config_bytes),
-        ]),
-    );
-
-    // Bump the sequence number for the Association account. If we don't do this and a
-    // subsequent transaction (e.g., minting) is sent from the Assocation account, a problem
-    // arises: both the genesis transaction and the subsequent transaction have sequence
-    // number 0
-    exec_function(
-        session,
-        "DiemAccount",
-        "epilogue",
-        vec![xdx_ty.clone()],
-        serialize_values(&vec![
-            MoveValue::Signer(root_diem_root_address),
-            MoveValue::U64(/* txn_sequence_number */ 0),
-            MoveValue::U64(/* txn_gas_price */ 0),
-            MoveValue::U64(/* txn_max_gas_units */ 0),
-            MoveValue::U64(/* gas_units_remaining */ 0),
         ]),
     );
 }
