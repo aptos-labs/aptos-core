@@ -1,5 +1,5 @@
-// separate_baseline: cvc4
-// TODO(cvc4): cvc4 generates a false positive.
+
+
 module 0x42::TestInvariants {
     spec module {
         pragma verify = true;

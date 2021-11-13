@@ -465,9 +465,9 @@ impl Options {
                      be non-deterministic, and may do other things to keep output stable.")
             )
             .arg(
-                Arg::with_name("use-cvc4")
-                    .long("use-cvc4")
-                    .help("uses cvc4 solver instead of z3")
+                Arg::with_name("use-cvc5")
+                    .long("use-cvc5")
+                    .help("uses cvc5 solver instead of z3")
             )
             .arg(
                 Arg::with_name("use-exp-boogie")
@@ -739,8 +739,8 @@ impl Options {
                 .unwrap()
                 .parse::<usize>()?;
         }
-        if matches.is_present("use-cvc4") {
-            options.backend.use_cvc4 = true;
+        if matches.is_present("use-cvc5") {
+            options.backend.use_cvc5 = true;
         }
         if matches.is_present("use-exp-boogie") {
             options.backend.use_exp_boogie = true;

@@ -2,7 +2,7 @@
 
 This lab is used to compare cvc5 and z3. The scope of the comparison is the full Diem framework.
 
-The configurations of the Move prover for cvc4/z3 are found in the `experiments/*.toml` files, which
+The configurations of the Move prover for cvc5/z3 are found in the `experiments/*.toml` files, which
 are in the standard format for Move prover options in files (see the user guide). Currently, only
 basic configurations, with the non-extensional, boogie-array based theory for vectors, are compared.
 

@@ -45,7 +45,7 @@ runs:
         # prepare move lang prover tooling.
         # By setting these values the dev-setup.sh script can detect already installed executables (and check versions).
         echo 'Z3_EXE='/opt/bin/z3 | tee -a $GITHUB_ENV
-        echo 'CVC4_EXE='/opt/bin/cvc4 | tee -a $GITHUB_ENV
+        echo 'CVC5_EXE='/opt/bin/cvc5 | tee -a $GITHUB_ENV
         echo 'DOTNET_ROOT='/opt/dotnet/ | tee -a $GITHUB_ENV
         echo 'BOOGIE_EXE='/opt/dotnet/tools/boogie | tee -a $GITHUB_ENV
         echo 'MVP_TEST_ON_CI'='1' | tee -a $GITHUB_ENV

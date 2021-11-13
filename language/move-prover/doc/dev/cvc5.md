@@ -1,9 +1,9 @@
-# CVC4 Integration
+# cvc5 Integration
 
-The [CVC4] integration is an experimental feature which is still evolving. This page documents,
-for tool developers, how to use CVC4 as a backend and extend the Move prover to use it right.
+The [cvc5] integration is an experimental feature which is still evolving. This page documents,
+for tool developers, how to use cvc5 as a backend and extend the Move prover to use it right.
 
-## Selecting CVC4
+## Selecting cvc5
 
 In the following we assume a command line for the move prover as in `mvp <arguments>`. See
 the [user documentation](../user/prover-guide.md) how to set this up. For development, it
@@ -11,36 +11,36 @@ is recommended to use a `~/.mvprc` file for configuring the prover; the user doc
 how. Specifically, this file can be used to point to the Move standard library and
 Diem framework as found in the local branch of the Diem repo.
 
-To choose CVC4 as a backend, call the prover as in:
+To choose cvc5 as a backend, call the prover as in:
 
 ```shell
-# mvp --use-cvc4 source.move
+# mvp --use-cvc5 source.move
 
 ```
 
-## Testing with CVC4
+## Testing with cvc5
 
 The provers testsuite supports multiple *feature groups* which constitute a particular
 set of tests which are run with a specific configuration. By default, when `cargo test`
 is executed in the prover crate, all groups are executed.
 
-There is one group called `cvc4` which contains the enabled tests for CVC4. This group
+There is one group called `cvc5` which contains the enabled tests for cvc5. This group
 is configured as follows at this point:
 
 - Only unit tests contained in `move-prover/tests` are included. Diem framework tests
   are skipped.
 - Those tests are only run locally and nightly, but not in CI.
-- By default, cvc4 tests share the same baseline (`.exp` file) with the `default` test group
+- By default, cvc5 tests share the same baseline (`.exp` file) with the `default` test group
   which uses [Z3].
-- Some cvc4 tests have their separate baseline, which is indicated by the
-  tag `// separate_baseline: cvc4` in the source. Those tests represent cases where
+- Some cvc5 tests have their separate baseline, which is indicated by the
+  tag `// separate_baseline: cvc5` in the source. Those tests represent cases where
   there is an issue (most of the time false positives); in some cases those are also legit
   differences resulting from different choices in the model.
 
 For the configuration logic, see the [testsuite.rs](../../tests/testsuite.rs) code.
 
 During development, it is often useful to focus on only running a specific test group.
-This is done using `MVP_TEST_FEATURE=cvc4 cargo test`. For documentation of all test parameters, see
+This is done using `MVP_TEST_FEATURE=cvc5 cargo test`. For documentation of all test parameters, see
 [here](../../tests/README.md).
 
 ## Obtaining the smtlib file
@@ -57,7 +57,7 @@ This will generate a file ending with `.smt` for each function in the Move sourc
 of those files is hermetic and contains all the settings which have been passed from upstream
 to the solver.
 
-## Specializing the Encoding for CVC4
+## Specializing the Encoding for cvc5
 
 There are multiple extension points which can be used to customize the prover. They are centered
 around the [Tera] template system which provides conditionals and macro expansion. Tera is
@@ -72,8 +72,8 @@ multisets, as well as implementations of native Move types found in
 ### Accessing Backend Options
 
 Inside of templates one has access to the backend options of the prover (`[backend]` section
-in the toml config). To test in a template whether CVC4 is selected as a backend, use `{{options.
-use_cvc4}}`. New options can be also added to `BoogieOptions` in Rust and will be accessible
+in the toml config). To test in a template whether cvc5 is selected as a backend, use `{{options.
+use_cvc5}}`. New options can be also added to `BoogieOptions` in Rust and will be accessible
 this way.
 
 ### Replacing Vector Theories
@@ -83,7 +83,7 @@ vector theories. There are multiple theories selectable via the option `--vector
 For a benchmark and description of the theories, see
 [here](../../lab/data/vector-theories/notebook.pdf).
 
-In order to add a new vector theory specific for CVC4, the following steps are needed:
+In order to add a new vector theory specific for cvc5, the following steps are needed:
 
 - Write the theory, starting e.g. from the
   [vector_array_theory](../../boogie-backend/src/prelude/vector-array-theory.bpl). A new theory
@@ -109,7 +109,7 @@ The Move prover comes with tool support and conventions to systematically perfor
 and other data-driven experiments. The crate which contains this support is found
 at [move-prover/lab](../../lab).
 
-> TODO: we should create a `lab/data/z3-cvc4` for a comparison test once the cvc4 integration
+> TODO: we should create a `lab/data/z3-cvc5` for a comparison test once the cvc5 integration
 > passes unit tests. The existing `lab/data/new-boogie` can be used as a starting point.
 
 For testing new vector theories, the existing [vector theory lab](../../lab/data/vector-theories)
@@ -117,6 +117,6 @@ can be extended, or a new lab created from it.
 
 
 [Boogie]: https://github.com/boogie-org/boogie
-[CVC4]: https://cvc4.github.io/
+[cvc5]: https://cvc5.github.io/
 [Z3]: https://github.com/Z3Prover/z3
 [Tera]: https://tera.netlify.app/docs

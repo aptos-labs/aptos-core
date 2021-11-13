@@ -1,5 +1,5 @@
-// separate_baseline: cvc4
-// TODO(cvc4): cvc4 produces a false positive
+
+
 module 0x42::TestBCS {
     use Std::BCS;
 

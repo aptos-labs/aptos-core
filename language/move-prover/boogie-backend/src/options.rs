@@ -20,7 +20,7 @@ const DEFAULT_BOOGIE_FLAGS: &[&str] = &[
 
 const MIN_BOOGIE_VERSION: &str = "2.9.0";
 const MIN_Z3_VERSION: &str = "4.8.9";
-const EXPECTED_CVC4_VERSION: &str = "aac53f51";
+const MIN_CVC5_VERSION: &str = "0.0.3";
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum VectorTheory {
@@ -50,10 +50,10 @@ pub struct BoogieOptions {
     pub use_exp_boogie: bool,
     /// Path to the z3 executable.
     pub z3_exe: String,
-    /// Whether to use cvc4.
-    pub use_cvc4: bool,
-    /// Path to the cvc4 executable.
-    pub cvc4_exe: String,
+    /// Whether to use cvc5.
+    pub use_cvc5: bool,
+    /// Path to the cvc5 executable.
+    pub cvc5_exe: String,
     /// Whether to generate debug trace code.
     pub debug_trace: bool,
     /// List of flags to pass on to boogie.
@@ -114,8 +114,8 @@ impl Default for BoogieOptions {
             boogie_exe: read_env_var("BOOGIE_EXE"),
             use_exp_boogie: false,
             z3_exe: read_env_var("Z3_EXE"),
-            use_cvc4: false,
-            cvc4_exe: read_env_var("CVC4_EXE"),
+            use_cvc5: false,
+            cvc5_exe: read_env_var("CVC5_EXE"),
             boogie_flags: vec![],
             debug_trace: false,
             use_array_theory: false,
@@ -169,10 +169,10 @@ impl BoogieOptions {
 
         let mut add = |sl: &[&str]| result.extend(sl.iter().map(|s| (*s).to_string()));
         add(DEFAULT_BOOGIE_FLAGS);
-        if self.use_cvc4 {
+        if self.use_cvc5 {
             add(&[
                 "-proverOpt:SOLVER=cvc5",
-                &format!("-proverOpt:PROVER_PATH={}", &self.cvc4_exe),
+                &format!("-proverOpt:PROVER_PATH={}", &self.cvc5_exe),
             ]);
         } else {
             add(&[&format!("-proverOpt:PROVER_PATH={}", &self.z3_exe)]);
@@ -252,26 +252,15 @@ impl BoogieOptions {
             )?;
             Self::check_version_is_greater("boogie", &version, MIN_BOOGIE_VERSION)?;
         }
-        if !self.z3_exe.is_empty() && !self.use_cvc4 {
+        if !self.z3_exe.is_empty() && !self.use_cvc5 {
             let version =
                 Self::get_version("z3", &self.z3_exe, &["--version"], r"version ([0-9.]*)")?;
             Self::check_version_is_greater("z3", &version, MIN_Z3_VERSION)?;
         }
-        if !self.cvc4_exe.is_empty() && self.use_cvc4 {
-            // Currently there is no metric version but a github hash we need to check
-            let version = Self::get_version(
-                "cvc4",
-                &self.cvc4_exe,
-                &["--version"],
-                r"git master ([0-9a-f]*)",
-            )?;
-            if version != EXPECTED_CVC4_VERSION {
-                return Err(anyhow!(
-                    "expected git hash {} but found {} for `cvc4`",
-                    EXPECTED_CVC4_VERSION,
-                    version
-                ));
-            }
+        if !self.cvc5_exe.is_empty() && self.use_cvc5 {
+            let version =
+                Self::get_version("cvc5", &self.cvc5_exe, &["--version"], r"version ([0-9.]*)")?;
+            Self::check_version_is_greater("cvc5", &version, MIN_CVC5_VERSION)?;
         }
         Ok(())
     }

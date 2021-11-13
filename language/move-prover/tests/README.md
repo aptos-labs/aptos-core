@@ -64,7 +64,7 @@ Currently, the following features are available:
 - `default`: runs tests with all default flags.
 - `no_opaque`: runs tests in a special mode where the `opaque` pragma is ignored. This increases the load on the prover,
   and functions as a stress test.
-- `cvc4`: runs tests configured to use the CVC4/5 solver as a backend.
+- `cvc5`: runs tests configured to use the cvc5 solver as a backend.
 
 ## Conventions
 

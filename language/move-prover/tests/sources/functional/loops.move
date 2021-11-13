@@ -1,5 +1,5 @@
-// separate_baseline: cvc4
-// The separate baseline is legit and caused by a different choice in the generated model.
+
+
 module 0x42::VerifyLoops {
 
 

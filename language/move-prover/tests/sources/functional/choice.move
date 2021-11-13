@@ -1,5 +1,5 @@
-// separate_baseline: cvc4
-// TODO(cvc4): this test requires a separate baseline because cvc4 produces false positives for some of choices
+// separate_baseline: cvc5
+// TODO(cvc5): this test requires a separate baseline because cvc5 produces false positives for some of choices
 // separate_baseline: simplify
 module 0x42::TestSome {
     use Std::Signer;

@@ -1,5 +1,5 @@
-// separate_baseline: cvc4
-// TODO(cvc4): cvc4 currently produces false positives for most of the verification problems here.
+
+
 module 0x42::TestEmits {
     use Std::Event::{Self, EventHandle};
 

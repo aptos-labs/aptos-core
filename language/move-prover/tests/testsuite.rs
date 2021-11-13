@@ -90,15 +90,15 @@ fn get_features() -> &'static [Feature] {
                 runner: |p| test_runner_for_feature(p, get_feature_by_name("simplify")),
                 enabling_condition: |_, _| true,
             },
-            // Tests with cvc4 as a backend for boogie.
+            // Tests with cvc5 as a backend for boogie.
             Feature {
-                name: "cvc4",
-                flags: &["--use-cvc4"],
+                name: "cvc5",
+                flags: &["--use-cvc5"],
                 inclusion_mode: InclusionMode::Implicit,
                 enable_in_ci: false, // Do not enable in CI until we have more data about stability
                 only_if_requested: false,
                 separate_baseline: false,
-                runner: |p| test_runner_for_feature(p, get_feature_by_name("cvc4")),
+                runner: |p| test_runner_for_feature(p, get_feature_by_name("cvc5")),
                 enabling_condition: |group, _| group == "unit",
             },
         ]
@@ -143,8 +143,8 @@ fn test_runner_for_feature(path: &Path, feature: &Feature) -> datatest_stable::R
     let mut options = Options::create_from_args(&args)?;
     options.setup_logging_for_test();
     let no_tools = read_env_var("BOOGIE_EXE").is_empty()
-        || !options.backend.use_cvc4 && read_env_var("Z3_EXE").is_empty()
-        || options.backend.use_cvc4 && read_env_var("CVC4_EXE").is_empty();
+        || !options.backend.use_cvc5 && read_env_var("Z3_EXE").is_empty()
+        || options.backend.use_cvc5 && read_env_var("CVC5_EXE").is_empty();
     let baseline_valid =
         !no_tools || !extract_test_directives(path, "// no-boogie-test")?.is_empty();
 

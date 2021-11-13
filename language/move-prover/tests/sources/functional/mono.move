@@ -1,5 +1,5 @@
-// separate_baseline: cvc4
-// TODO(cvc4): cvc4 produces false positives caused by emit specs (like the basic test `emits.move`)
+
+
 module 0x42::TestMonomorphization {
     use Std::Signer;
     use Std::BCS;

@@ -1,4 +1,4 @@
-// separate_baseline: cvc4
+
 
 // A module providing functionality to the script*.move tests
 address 0x1 {

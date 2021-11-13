@@ -1,5 +1,5 @@
-// separate_baseline: cvc4
-// TODO(cvc4): cvc4 produces multiple false positives for this source.
+
+
 
 // This file is created to verify the vector module in the standard library.
 // This file is basically a clone of `stdlib/modules/vector.move` with renaming the module and function names.

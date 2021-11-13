@@ -18,7 +18,7 @@ RUN apk add bash=5.1.4-r0 --no-cache && \
 
 ENV DOTNET_ROOT "/opt/dotnet"
 ENV Z3_EXE "/opt/bin/z3"
-ENV CVC4_EXE "/opt/bin/cvc4"
+ENV CVC5_EXE "/opt/bin/cvc5"
 ENV BOOGIE_EXE "/opt/dotnet/tools/boogie"
 ENV PATH "/opt/cargo/bin:/usr/lib/golang/bin:/opt/bin:${DOTNET_ROOT}:${DOTNET_ROOT}/tools:$PATH"
 

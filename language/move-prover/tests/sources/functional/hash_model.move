@@ -1,5 +1,5 @@
-// separate_baseline: cvc4
-// TODO(cvc4): cvc4 produces false positives.
+
+
 module 0x42::TestHash {
     use Std::Hash;
     spec module {
