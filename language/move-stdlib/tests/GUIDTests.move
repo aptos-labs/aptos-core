@@ -19,7 +19,7 @@ module Std::GUIDTests {
         assert!(GUID::get_next_creation_num(@0x0) == 0, 6);
     }
 
-     #[test(s = @0x42)]
+    #[test(s = @0x42)]
     fun test_id(s: signer) {
         let guid = GUID::create(&s);
         let id1 = GUID::id(&guid);
@@ -32,5 +32,12 @@ module Std::GUIDTests {
         assert!(&id1 == &id2, 0);
 
         let _ids_are_copyable = copy id1;
+    }
+
+    #[test(s = @0x42)]
+    fun test_delegation(s: signer) {
+        let create_cap = GUID::gen_create_capability(&s);
+        let guid = GUID::create_with_capability(@0x42, &create_cap);
+        assert!(GUID::creator_address(&guid) == @0x42, 1);
     }
 }
