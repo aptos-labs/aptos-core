@@ -93,10 +93,11 @@ async fn test_get_number_of_accounts_at_version() {
     let request = StorageServiceRequest::GetNumberOfAccountsAtVersion(10);
 
     // Process the request
-    let error = mock_client.send_request(request).await.unwrap_err();
+    let response = mock_client.send_request(request).await.unwrap();
 
-    // Verify the response is correct (the API call is currently unsupported)
-    assert_matches!(error, StorageServiceError::InternalError(_));
+    // Verify the response is correct
+    let expected_response = StorageServiceResponse::NumberOfAccountsAtVersion(1000);
+    assert_eq!(response, expected_response);
 }
 
 #[tokio::test]
@@ -483,6 +484,10 @@ impl DbReader<DpnProto> for MockDbReader {
 
     fn get_state_prune_window(&self) -> Option<usize> {
         Some(50)
+    }
+
+    fn get_account_count(&self, _version: Version) -> Result<usize> {
+        Ok(1000)
     }
 }
 

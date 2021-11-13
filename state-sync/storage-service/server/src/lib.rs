@@ -523,11 +523,12 @@ impl StorageReaderInterface for StorageReader {
         Ok(output_list_with_proof)
     }
 
-    fn get_number_of_accounts(&self, _version: u64) -> Result<u64, Error> {
-        // TODO(joshlind): implement this once DbReaderWriter supports these calls.
-        Err(Error::UnexpectedErrorEncountered(
-            "Unimplemented! This API call needs to be implemented!".into(),
-        ))
+    fn get_number_of_accounts(&self, version: u64) -> Result<u64, Error> {
+        let number_of_accounts = self
+            .storage
+            .get_account_count(version)
+            .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
+        Ok(number_of_accounts as u64)
     }
 
     fn get_account_states_chunk_with_proof(
