@@ -6,19 +6,20 @@
 use crate::{network::StorageServiceNetworkEvents, StorageReader, StorageServiceServer};
 use anyhow::Result;
 use channel::diem_channel;
-use claim::{assert_matches, assert_none, assert_some};
+use claim::{assert_none, assert_some};
 use diem_config::config::StorageServiceConfig;
 use diem_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use diem_logger::Level;
 use diem_types::{
     account_address::AccountAddress,
+    account_state_blob::AccountStatesChunkWithProof,
     block_info::BlockInfo,
     chain_id::ChainId,
     contract_event::ContractEvent,
     epoch_change::EpochChangeProof,
     event::EventKey,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    proof::TransactionInfoListWithProof,
+    proof::{SparseMerkleRangeProof, TransactionInfoListWithProof},
     protocol_spec::DpnProto,
     transaction::{
         default_protocol::{TransactionListWithProof, TransactionOutputListWithProof},
@@ -70,18 +71,34 @@ async fn test_get_account_states_chunk_with_proof() {
     tokio::spawn(service.start());
 
     // Create a request to fetch an account states chunk with a proof
+    let start_account_index = 100;
+    let end_account_index = 200;
     let request =
         StorageServiceRequest::GetAccountStatesChunkWithProof(AccountStatesChunkWithProofRequest {
             version: 0,
-            start_account_index: 0,
-            end_account_index: 0,
+            start_account_index,
+            end_account_index,
         });
 
     // Process the request
-    let error = mock_client.send_request(request).await.unwrap_err();
+    let response = mock_client.send_request(request).await.unwrap();
 
-    // Verify the response is correct (the API call is currently unsupported)
-    assert_matches!(error, StorageServiceError::InternalError(_));
+    // Verify the response is correct
+    let chunk_size = end_account_index - start_account_index + 1;
+    let mut account_blobs = vec![];
+    for _ in 0..chunk_size {
+        account_blobs.push((HashValue::zero(), vec![].into()));
+    }
+    let expected_response =
+        StorageServiceResponse::AccountStatesChunkWithProof(AccountStatesChunkWithProof {
+            first_index: 100,
+            last_index: 200,
+            first_key: HashValue::zero(),
+            last_key: HashValue::zero(),
+            account_blobs,
+            proof: SparseMerkleRangeProof::new(vec![]),
+        });
+    assert_eq!(response, expected_response);
 }
 
 #[tokio::test]
@@ -488,6 +505,30 @@ impl DbReader<DpnProto> for MockDbReader {
 
     fn get_account_count(&self, _version: Version) -> Result<usize> {
         Ok(1000)
+    }
+
+    fn get_account_chunk_with_proof(
+        &self,
+        _version: Version,
+        start_idx: usize,
+        chunk_size: usize,
+    ) -> Result<AccountStatesChunkWithProof> {
+        // Create empty account blobs
+        let mut account_blobs = vec![];
+        for _ in 0..chunk_size {
+            account_blobs.push((HashValue::zero(), vec![].into()));
+        }
+
+        // Create an account states chunk with proof
+        let account_states_chunk_with_proof = AccountStatesChunkWithProof {
+            first_index: start_idx as u64,
+            last_index: (start_idx + chunk_size - 1) as u64,
+            first_key: HashValue::zero(),
+            last_key: HashValue::zero(),
+            account_blobs,
+            proof: SparseMerkleRangeProof::new(vec![]),
+        };
+        Ok(account_states_chunk_with_proof)
     }
 }
 

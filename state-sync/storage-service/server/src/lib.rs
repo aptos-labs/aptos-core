@@ -533,14 +533,20 @@ impl StorageReaderInterface for StorageReader {
 
     fn get_account_states_chunk_with_proof(
         &self,
-        _version: u64,
-        _start_account_index: u64,
-        _end_account_index: u64,
+        version: u64,
+        start_account_index: u64,
+        end_account_index: u64,
     ) -> Result<AccountStatesChunkWithProof, Error> {
-        // TODO(joshlind): implement this once DbReaderWriter supports these calls.
-        Err(Error::UnexpectedErrorEncountered(
-            "Unimplemented! This API call needs to be implemented!".into(),
-        ))
+        let expected_num_accounts = inclusive_range_len(start_account_index, end_account_index)?;
+        let account_states_chunk_with_proof = self
+            .storage
+            .get_account_chunk_with_proof(
+                version,
+                start_account_index as usize,
+                expected_num_accounts as usize,
+            )
+            .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
+        Ok(account_states_chunk_with_proof)
     }
 }
 
