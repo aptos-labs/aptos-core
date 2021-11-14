@@ -173,5 +173,6 @@ compiled_package_info:
     generate_abis: true
     install_dir: DPN/releases/artifacts/current
     force_recompilation: false
+    additional_named_addresses: {}
 dependencies:
   - MoveStdlib
