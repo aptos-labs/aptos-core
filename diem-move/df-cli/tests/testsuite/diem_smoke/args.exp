@@ -641,42 +641,24 @@ Changed resource(s) under 2 address(es):
       }
   Changed 1 resource(s) under address 0000000000000000000000000A550C18:
     Changed type 0x1::DiemAccount::AccountOperationsCapability: [0, 3, 0, 0, 0, 0, 0, 0, 0, 24, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 85, 12, 24] (wrote 92 bytes)
-      Previous:
-        key 0x1::DiemAccount::AccountOperationsCapability {
-            limits_cap: store 0x1::AccountLimits::AccountLimitMutationCapability {
-                dummy_field: false
-            }
-            creation_events: store 0x1::Event::EventHandle<0x1::DiemAccount::CreateAccountEvent> {
-                counter: 2
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 0
-                            addr: a550c18
-                        }
-                    }
-                }
-            }
-        }
-      New:
-        key 0x1::DiemAccount::AccountOperationsCapability {
-            limits_cap: store 0x1::AccountLimits::AccountLimitMutationCapability {
-                dummy_field: false
-            }
-            creation_events: store 0x1::Event::EventHandle<0x1::DiemAccount::CreateAccountEvent> {
-                counter: 3
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 0
-                            addr: a550c18
-                        }
-                    }
-                }
-            }
-        }
+         key 0x1::DiemAccount::AccountOperationsCapability {
+             limits_cap: store 0x1::AccountLimits::AccountLimitMutationCapability {
+                 dummy_field: false
+             }
+             creation_events: store 0x1::Event::EventHandle<0x1::DiemAccount::CreateAccountEvent> {
+-                counter: 2
++                counter: 3
+                 guid: drop store 0x1::Event::GUIDWrapper {
+                     len_bytes: 24u8
+                     guid: drop store 0x1::GUID::GUID {
+                         id: copy drop store 0x1::GUID::ID {
+                             creation_num: 0
+                             addr: a550c18
+                         }
+                     }
+                 }
+             }
+         }
 Wrote 808 bytes of resource ID's and data
 Command `sandbox run scripts/create_parent_vasp_account.move --mode diem --type-args 0x1::XDX::XDX --signers 0xB1E55ED --args 0 0xA x"00000000000000000000000000000000" b"VASP_A" true -v`:
 Compiling transaction script...
@@ -793,42 +775,24 @@ Changed resource(s) under 2 address(es):
       }
   Changed 1 resource(s) under address 0000000000000000000000000A550C18:
     Changed type 0x1::DiemAccount::AccountOperationsCapability: [0, 4, 0, 0, 0, 0, 0, 0, 0, 24, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 85, 12, 24] (wrote 92 bytes)
-      Previous:
-        key 0x1::DiemAccount::AccountOperationsCapability {
-            limits_cap: store 0x1::AccountLimits::AccountLimitMutationCapability {
-                dummy_field: false
-            }
-            creation_events: store 0x1::Event::EventHandle<0x1::DiemAccount::CreateAccountEvent> {
-                counter: 3
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 0
-                            addr: a550c18
-                        }
-                    }
-                }
-            }
-        }
-      New:
-        key 0x1::DiemAccount::AccountOperationsCapability {
-            limits_cap: store 0x1::AccountLimits::AccountLimitMutationCapability {
-                dummy_field: false
-            }
-            creation_events: store 0x1::Event::EventHandle<0x1::DiemAccount::CreateAccountEvent> {
-                counter: 4
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 0
-                            addr: a550c18
-                        }
-                    }
-                }
-            }
-        }
+         key 0x1::DiemAccount::AccountOperationsCapability {
+             limits_cap: store 0x1::AccountLimits::AccountLimitMutationCapability {
+                 dummy_field: false
+             }
+             creation_events: store 0x1::Event::EventHandle<0x1::DiemAccount::CreateAccountEvent> {
+-                counter: 3
++                counter: 4
+                 guid: drop store 0x1::Event::GUIDWrapper {
+                     len_bytes: 24u8
+                     guid: drop store 0x1::GUID::GUID {
+                         id: copy drop store 0x1::GUID::ID {
+                             creation_num: 0
+                             addr: a550c18
+                         }
+                     }
+                 }
+             }
+         }
 Wrote 758 bytes of resource ID's and data
 Command `sandbox run scripts/create_parent_vasp_account.move --mode diem --type-args 0x1::XDX::XDX --signers 0xB1E55ED --args 0 0xB x"00000000000000000000000000000000" b"VASP_B" true -v`:
 Compiling transaction script...
@@ -945,42 +909,24 @@ Changed resource(s) under 2 address(es):
       }
   Changed 1 resource(s) under address 0000000000000000000000000A550C18:
     Changed type 0x1::DiemAccount::AccountOperationsCapability: [0, 5, 0, 0, 0, 0, 0, 0, 0, 24, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 85, 12, 24] (wrote 92 bytes)
-      Previous:
-        key 0x1::DiemAccount::AccountOperationsCapability {
-            limits_cap: store 0x1::AccountLimits::AccountLimitMutationCapability {
-                dummy_field: false
-            }
-            creation_events: store 0x1::Event::EventHandle<0x1::DiemAccount::CreateAccountEvent> {
-                counter: 4
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 0
-                            addr: a550c18
-                        }
-                    }
-                }
-            }
-        }
-      New:
-        key 0x1::DiemAccount::AccountOperationsCapability {
-            limits_cap: store 0x1::AccountLimits::AccountLimitMutationCapability {
-                dummy_field: false
-            }
-            creation_events: store 0x1::Event::EventHandle<0x1::DiemAccount::CreateAccountEvent> {
-                counter: 5
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 0
-                            addr: a550c18
-                        }
-                    }
-                }
-            }
-        }
+         key 0x1::DiemAccount::AccountOperationsCapability {
+             limits_cap: store 0x1::AccountLimits::AccountLimitMutationCapability {
+                 dummy_field: false
+             }
+             creation_events: store 0x1::Event::EventHandle<0x1::DiemAccount::CreateAccountEvent> {
+-                counter: 4
++                counter: 5
+                 guid: drop store 0x1::Event::GUIDWrapper {
+                     len_bytes: 24u8
+                     guid: drop store 0x1::GUID::GUID {
+                         id: copy drop store 0x1::GUID::ID {
+                             creation_num: 0
+                             addr: a550c18
+                         }
+                     }
+                 }
+             }
+         }
 Wrote 758 bytes of resource ID's and data
 Command `sandbox run scripts/tiered_mint.move --mode diem --type-args 0x1::XUS::XUS --signers 0xB1E55ED --args 0 0xDD 1000 0 -v`:
 Compiling transaction script...
@@ -991,284 +937,148 @@ Emitted [232, 3, 0, 0, 0, 0, 0, 0, 3, 88, 85, 83, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
 Changed resource(s) under 2 address(es):
   Changed 3 resource(s) under address 000000000000000000000000000000DD:
     Changed type 0x1::DesignatedDealer::Dealer: [1, 0, 0, 0, 0, 0, 0, 0, 24, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 221] (wrote 75 bytes)
-      Previous:
-        key 0x1::DesignatedDealer::Dealer {
-            mint_event_handle: store 0x1::Event::EventHandle<0x1::DesignatedDealer::ReceivedMintEvent> {
-                counter: 0
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 0
-                            addr: dd
-                        }
-                    }
-                }
-            }
-        }
-      New:
-        key 0x1::DesignatedDealer::Dealer {
-            mint_event_handle: store 0x1::Event::EventHandle<0x1::DesignatedDealer::ReceivedMintEvent> {
-                counter: 1
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 0
-                            addr: dd
-                        }
-                    }
-                }
-            }
-        }
+         key 0x1::DesignatedDealer::Dealer {
+             mint_event_handle: store 0x1::Event::EventHandle<0x1::DesignatedDealer::ReceivedMintEvent> {
+-                counter: 0
++                counter: 1
+                 guid: drop store 0x1::Event::GUIDWrapper {
+                     len_bytes: 24u8
+                     guid: drop store 0x1::GUID::GUID {
+                         id: copy drop store 0x1::GUID::ID {
+                             creation_num: 0
+                             addr: dd
+                         }
+                     }
+                 }
+             }
+         }
     Changed type 0x1::DiemAccount::Balance<0x1::XUS::XUS>: [232, 3, 0, 0, 0, 0, 0, 0] (wrote 72 bytes)
-      Previous:
-        key 0x1::DiemAccount::Balance<0x1::XUS::XUS> {
-            coin: store 0x1::Diem::Diem<0x1::XUS::XUS> {
-                value: 0
-            }
-        }
-      New:
-        key 0x1::DiemAccount::Balance<0x1::XUS::XUS> {
-            coin: store 0x1::Diem::Diem<0x1::XUS::XUS> {
-                value: 1000
-            }
-        }
+         key 0x1::DiemAccount::Balance<0x1::XUS::XUS> {
+             coin: store 0x1::Diem::Diem<0x1::XUS::XUS> {
+-                value: 0
++                value: 1000
+             }
+         }
     Changed type 0x1::DiemAccount::DiemAccount: [32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 221, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 221, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 221, 1, 0, 0, 0, 0, 0, 0, 0, 24, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 221, 0, 0, 0, 0, 0, 0, 0, 0, 24, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 221, 0, 0, 0, 0, 0, 0, 0, 0] (wrote 183 bytes)
-      Previous:
-        key 0x1::DiemAccount::DiemAccount {
-            authentication_key: 00000000000000000000000000000000000000000000000000000000000000dd
-            withdraw_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::WithdrawCapability> {
-                vec: [
-                    store 0x1::DiemAccount::WithdrawCapability {
-                        account_address: dd
-                    },
-                ]
-            }
-            key_rotation_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::KeyRotationCapability> {
-                vec: [
-                    store 0x1::DiemAccount::KeyRotationCapability {
-                        account_address: dd
-                    },
-                ]
-            }
-            received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
-                counter: 0
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 3
-                            addr: dd
-                        }
-                    }
-                }
-            }
-            sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
-                counter: 0
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 4
-                            addr: dd
-                        }
-                    }
-                }
-            }
-            sequence_number: 0
-        }
-      New:
-        key 0x1::DiemAccount::DiemAccount {
-            authentication_key: 00000000000000000000000000000000000000000000000000000000000000dd
-            withdraw_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::WithdrawCapability> {
-                vec: [
-                    store 0x1::DiemAccount::WithdrawCapability {
-                        account_address: dd
-                    },
-                ]
-            }
-            key_rotation_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::KeyRotationCapability> {
-                vec: [
-                    store 0x1::DiemAccount::KeyRotationCapability {
-                        account_address: dd
-                    },
-                ]
-            }
-            received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
-                counter: 1
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 3
-                            addr: dd
-                        }
-                    }
-                }
-            }
-            sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
-                counter: 0
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 4
-                            addr: dd
-                        }
-                    }
-                }
-            }
-            sequence_number: 0
-        }
+         key 0x1::DiemAccount::DiemAccount {
+             authentication_key: 00000000000000000000000000000000000000000000000000000000000000dd
+             withdraw_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::WithdrawCapability> {
+                 vec: [
+                     store 0x1::DiemAccount::WithdrawCapability {
+                         account_address: dd
+                     },
+                 ]
+             }
+             key_rotation_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::KeyRotationCapability> {
+                 vec: [
+                     store 0x1::DiemAccount::KeyRotationCapability {
+                         account_address: dd
+                     },
+                 ]
+             }
+             received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
+-                counter: 0
++                counter: 1
+                 guid: drop store 0x1::Event::GUIDWrapper {
+                     len_bytes: 24u8
+                     guid: drop store 0x1::GUID::GUID {
+                         id: copy drop store 0x1::GUID::ID {
+                             creation_num: 3
+                             addr: dd
+                         }
+                     }
+                 }
+             }
+             sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
+                 counter: 0
+                 guid: drop store 0x1::Event::GUIDWrapper {
+                     len_bytes: 24u8
+                     guid: drop store 0x1::GUID::GUID {
+                         id: copy drop store 0x1::GUID::ID {
+                             creation_num: 4
+                             addr: dd
+                         }
+                     }
+                 }
+             }
+             sequence_number: 0
+         }
   Changed 1 resource(s) under address 0000000000000000000000000A550C18:
     Changed type 0x1::Diem::CurrencyInfo<0x1::XUS::XUS>: [232, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 64, 66, 15, 0, 0, 0, 0, 0, 100, 0, 0, 0, 0, 0, 0, 0, 3, 88, 85, 83, 1, 1, 0, 0, 0, 0, 0, 0, 0, 24, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 85, 12, 24, 0, 0, 0, 0, 0, 0, 0, 0, 24, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 85, 12, 24, 0, 0, 0, 0, 0, 0, 0, 0, 24, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 85, 12, 24, 0, 0, 0, 0, 0, 0, 0, 0, 24, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 85, 12, 24, 0, 0, 0, 0, 0, 0, 0, 0, 24, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 85, 12, 24] (wrote 281 bytes)
-      Previous:
-        key 0x1::Diem::CurrencyInfo<0x1::XUS::XUS> {
-            total_value: 0u128
-            preburn_value: 0
-            to_xdx_exchange_rate: copy drop store 0x1::FixedPoint32::FixedPoint32 {
-                value: 4294967296
-            }
-            is_synthetic: false
-            scaling_factor: 1000000
-            fractional_part: 100
-            currency_code: 585553
-            can_mint: true
-            mint_events: store 0x1::Event::EventHandle<0x1::Diem::MintEvent> {
-                counter: 0
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 5
-                            addr: a550c18
-                        }
-                    }
-                }
-            }
-            burn_events: store 0x1::Event::EventHandle<0x1::Diem::BurnEvent> {
-                counter: 0
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 6
-                            addr: a550c18
-                        }
-                    }
-                }
-            }
-            preburn_events: store 0x1::Event::EventHandle<0x1::Diem::PreburnEvent> {
-                counter: 0
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 7
-                            addr: a550c18
-                        }
-                    }
-                }
-            }
-            cancel_burn_events: store 0x1::Event::EventHandle<0x1::Diem::CancelBurnEvent> {
-                counter: 0
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 8
-                            addr: a550c18
-                        }
-                    }
-                }
-            }
-            exchange_rate_update_events: store 0x1::Event::EventHandle<0x1::Diem::ToXDXExchangeRateUpdateEvent> {
-                counter: 0
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 9
-                            addr: a550c18
-                        }
-                    }
-                }
-            }
-        }
-      New:
-        key 0x1::Diem::CurrencyInfo<0x1::XUS::XUS> {
-            total_value: 1000u128
-            preburn_value: 0
-            to_xdx_exchange_rate: copy drop store 0x1::FixedPoint32::FixedPoint32 {
-                value: 4294967296
-            }
-            is_synthetic: false
-            scaling_factor: 1000000
-            fractional_part: 100
-            currency_code: 585553
-            can_mint: true
-            mint_events: store 0x1::Event::EventHandle<0x1::Diem::MintEvent> {
-                counter: 1
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 5
-                            addr: a550c18
-                        }
-                    }
-                }
-            }
-            burn_events: store 0x1::Event::EventHandle<0x1::Diem::BurnEvent> {
-                counter: 0
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 6
-                            addr: a550c18
-                        }
-                    }
-                }
-            }
-            preburn_events: store 0x1::Event::EventHandle<0x1::Diem::PreburnEvent> {
-                counter: 0
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 7
-                            addr: a550c18
-                        }
-                    }
-                }
-            }
-            cancel_burn_events: store 0x1::Event::EventHandle<0x1::Diem::CancelBurnEvent> {
-                counter: 0
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 8
-                            addr: a550c18
-                        }
-                    }
-                }
-            }
-            exchange_rate_update_events: store 0x1::Event::EventHandle<0x1::Diem::ToXDXExchangeRateUpdateEvent> {
-                counter: 0
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 9
-                            addr: a550c18
-                        }
-                    }
-                }
-            }
-        }
+         key 0x1::Diem::CurrencyInfo<0x1::XUS::XUS> {
+-            total_value: 0u128
++            total_value: 1000u128
+             preburn_value: 0
+             to_xdx_exchange_rate: copy drop store 0x1::FixedPoint32::FixedPoint32 {
+                 value: 4294967296
+             }
+             is_synthetic: false
+             scaling_factor: 1000000
+             fractional_part: 100
+             currency_code: 585553
+             can_mint: true
+             mint_events: store 0x1::Event::EventHandle<0x1::Diem::MintEvent> {
+-                counter: 0
++                counter: 1
+                 guid: drop store 0x1::Event::GUIDWrapper {
+                     len_bytes: 24u8
+                     guid: drop store 0x1::GUID::GUID {
+                         id: copy drop store 0x1::GUID::ID {
+                             creation_num: 5
+                             addr: a550c18
+                         }
+                     }
+                 }
+             }
+             burn_events: store 0x1::Event::EventHandle<0x1::Diem::BurnEvent> {
+                 counter: 0
+                 guid: drop store 0x1::Event::GUIDWrapper {
+                     len_bytes: 24u8
+                     guid: drop store 0x1::GUID::GUID {
+                         id: copy drop store 0x1::GUID::ID {
+                             creation_num: 6
+                             addr: a550c18
+                         }
+                     }
+                 }
+             }
+             preburn_events: store 0x1::Event::EventHandle<0x1::Diem::PreburnEvent> {
+                 counter: 0
+                 guid: drop store 0x1::Event::GUIDWrapper {
+                     len_bytes: 24u8
+                     guid: drop store 0x1::GUID::GUID {
+                         id: copy drop store 0x1::GUID::ID {
+                             creation_num: 7
+                             addr: a550c18
+                         }
+                     }
+                 }
+             }
+             cancel_burn_events: store 0x1::Event::EventHandle<0x1::Diem::CancelBurnEvent> {
+                 counter: 0
+                 guid: drop store 0x1::Event::GUIDWrapper {
+                     len_bytes: 24u8
+                     guid: drop store 0x1::GUID::GUID {
+                         id: copy drop store 0x1::GUID::ID {
+                             creation_num: 8
+                             addr: a550c18
+                         }
+                     }
+                 }
+             }
+             exchange_rate_update_events: store 0x1::Event::EventHandle<0x1::Diem::ToXDXExchangeRateUpdateEvent> {
+                 counter: 0
+                 guid: drop store 0x1::Event::GUIDWrapper {
+                     len_bytes: 24u8
+                     guid: drop store 0x1::GUID::GUID {
+                         id: copy drop store 0x1::GUID::ID {
+                             creation_num: 9
+                             addr: a550c18
+                         }
+                     }
+                 }
+             }
+         }
 Wrote 611 bytes of resource ID's and data
 Command `sandbox run scripts/peer_to_peer_with_metadata.move --mode diem --type-args 0x1::XUS::XUS --signers 0xDD --args 0xA 700 x"" x"" -v`:
 Compiling transaction script...
@@ -1278,206 +1088,108 @@ Emitted [188, 2, 0, 0, 0, 0, 0, 0, 3, 88, 85, 83, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
 Changed resource(s) under 2 address(es):
   Changed 2 resource(s) under address 0000000000000000000000000000000A:
     Changed type 0x1::DiemAccount::Balance<0x1::XUS::XUS>: [188, 2, 0, 0, 0, 0, 0, 0] (wrote 72 bytes)
-      Previous:
-        key 0x1::DiemAccount::Balance<0x1::XUS::XUS> {
-            coin: store 0x1::Diem::Diem<0x1::XUS::XUS> {
-                value: 0
-            }
-        }
-      New:
-        key 0x1::DiemAccount::Balance<0x1::XUS::XUS> {
-            coin: store 0x1::Diem::Diem<0x1::XUS::XUS> {
-                value: 700
-            }
-        }
+         key 0x1::DiemAccount::Balance<0x1::XUS::XUS> {
+             coin: store 0x1::Diem::Diem<0x1::XUS::XUS> {
+-                value: 0
++                value: 700
+             }
+         }
     Changed type 0x1::DiemAccount::DiemAccount: [32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 1, 0, 0, 0, 0, 0, 0, 0, 24, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 24, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0] (wrote 183 bytes)
-      Previous:
-        key 0x1::DiemAccount::DiemAccount {
-            authentication_key: 000000000000000000000000000000000000000000000000000000000000000a
-            withdraw_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::WithdrawCapability> {
-                vec: [
-                    store 0x1::DiemAccount::WithdrawCapability {
-                        account_address: a
-                    },
-                ]
-            }
-            key_rotation_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::KeyRotationCapability> {
-                vec: [
-                    store 0x1::DiemAccount::KeyRotationCapability {
-                        account_address: a
-                    },
-                ]
-            }
-            received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
-                counter: 0
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 2
-                            addr: a
-                        }
-                    }
-                }
-            }
-            sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
-                counter: 0
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 3
-                            addr: a
-                        }
-                    }
-                }
-            }
-            sequence_number: 0
-        }
-      New:
-        key 0x1::DiemAccount::DiemAccount {
-            authentication_key: 000000000000000000000000000000000000000000000000000000000000000a
-            withdraw_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::WithdrawCapability> {
-                vec: [
-                    store 0x1::DiemAccount::WithdrawCapability {
-                        account_address: a
-                    },
-                ]
-            }
-            key_rotation_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::KeyRotationCapability> {
-                vec: [
-                    store 0x1::DiemAccount::KeyRotationCapability {
-                        account_address: a
-                    },
-                ]
-            }
-            received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
-                counter: 1
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 2
-                            addr: a
-                        }
-                    }
-                }
-            }
-            sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
-                counter: 0
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 3
-                            addr: a
-                        }
-                    }
-                }
-            }
-            sequence_number: 0
-        }
+         key 0x1::DiemAccount::DiemAccount {
+             authentication_key: 000000000000000000000000000000000000000000000000000000000000000a
+             withdraw_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::WithdrawCapability> {
+                 vec: [
+                     store 0x1::DiemAccount::WithdrawCapability {
+                         account_address: a
+                     },
+                 ]
+             }
+             key_rotation_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::KeyRotationCapability> {
+                 vec: [
+                     store 0x1::DiemAccount::KeyRotationCapability {
+                         account_address: a
+                     },
+                 ]
+             }
+             received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
+-                counter: 0
++                counter: 1
+                 guid: drop store 0x1::Event::GUIDWrapper {
+                     len_bytes: 24u8
+                     guid: drop store 0x1::GUID::GUID {
+                         id: copy drop store 0x1::GUID::ID {
+                             creation_num: 2
+                             addr: a
+                         }
+                     }
+                 }
+             }
+             sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
+                 counter: 0
+                 guid: drop store 0x1::Event::GUIDWrapper {
+                     len_bytes: 24u8
+                     guid: drop store 0x1::GUID::GUID {
+                         id: copy drop store 0x1::GUID::ID {
+                             creation_num: 3
+                             addr: a
+                         }
+                     }
+                 }
+             }
+             sequence_number: 0
+         }
   Changed 2 resource(s) under address 000000000000000000000000000000DD:
     Changed type 0x1::DiemAccount::Balance<0x1::XUS::XUS>: [44, 1, 0, 0, 0, 0, 0, 0] (wrote 72 bytes)
-      Previous:
-        key 0x1::DiemAccount::Balance<0x1::XUS::XUS> {
-            coin: store 0x1::Diem::Diem<0x1::XUS::XUS> {
-                value: 1000
-            }
-        }
-      New:
-        key 0x1::DiemAccount::Balance<0x1::XUS::XUS> {
-            coin: store 0x1::Diem::Diem<0x1::XUS::XUS> {
-                value: 300
-            }
-        }
+         key 0x1::DiemAccount::Balance<0x1::XUS::XUS> {
+             coin: store 0x1::Diem::Diem<0x1::XUS::XUS> {
+-                value: 1000
++                value: 300
+             }
+         }
     Changed type 0x1::DiemAccount::DiemAccount: [32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 221, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 221, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 221, 1, 0, 0, 0, 0, 0, 0, 0, 24, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 221, 1, 0, 0, 0, 0, 0, 0, 0, 24, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 221, 0, 0, 0, 0, 0, 0, 0, 0] (wrote 183 bytes)
-      Previous:
-        key 0x1::DiemAccount::DiemAccount {
-            authentication_key: 00000000000000000000000000000000000000000000000000000000000000dd
-            withdraw_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::WithdrawCapability> {
-                vec: [
-                    store 0x1::DiemAccount::WithdrawCapability {
-                        account_address: dd
-                    },
-                ]
-            }
-            key_rotation_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::KeyRotationCapability> {
-                vec: [
-                    store 0x1::DiemAccount::KeyRotationCapability {
-                        account_address: dd
-                    },
-                ]
-            }
-            received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
-                counter: 1
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 3
-                            addr: dd
-                        }
-                    }
-                }
-            }
-            sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
-                counter: 0
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 4
-                            addr: dd
-                        }
-                    }
-                }
-            }
-            sequence_number: 0
-        }
-      New:
-        key 0x1::DiemAccount::DiemAccount {
-            authentication_key: 00000000000000000000000000000000000000000000000000000000000000dd
-            withdraw_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::WithdrawCapability> {
-                vec: [
-                    store 0x1::DiemAccount::WithdrawCapability {
-                        account_address: dd
-                    },
-                ]
-            }
-            key_rotation_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::KeyRotationCapability> {
-                vec: [
-                    store 0x1::DiemAccount::KeyRotationCapability {
-                        account_address: dd
-                    },
-                ]
-            }
-            received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
-                counter: 1
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 3
-                            addr: dd
-                        }
-                    }
-                }
-            }
-            sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
-                counter: 1
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 4
-                            addr: dd
-                        }
-                    }
-                }
-            }
-            sequence_number: 0
-        }
+         key 0x1::DiemAccount::DiemAccount {
+             authentication_key: 00000000000000000000000000000000000000000000000000000000000000dd
+             withdraw_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::WithdrawCapability> {
+                 vec: [
+                     store 0x1::DiemAccount::WithdrawCapability {
+                         account_address: dd
+                     },
+                 ]
+             }
+             key_rotation_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::KeyRotationCapability> {
+                 vec: [
+                     store 0x1::DiemAccount::KeyRotationCapability {
+                         account_address: dd
+                     },
+                 ]
+             }
+             received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
+                 counter: 1
+                 guid: drop store 0x1::Event::GUIDWrapper {
+                     len_bytes: 24u8
+                     guid: drop store 0x1::GUID::GUID {
+                         id: copy drop store 0x1::GUID::ID {
+                             creation_num: 3
+                             addr: dd
+                         }
+                     }
+                 }
+             }
+             sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
+-                counter: 0
++                counter: 1
+                 guid: drop store 0x1::Event::GUIDWrapper {
+                     len_bytes: 24u8
+                     guid: drop store 0x1::GUID::GUID {
+                         id: copy drop store 0x1::GUID::ID {
+                             creation_num: 4
+                             addr: dd
+                         }
+                     }
+                 }
+             }
+             sequence_number: 0
+         }
 Wrote 510 bytes of resource ID's and data
 Command `sandbox run scripts/peer_to_peer_with_metadata.move --mode diem --type-args 0x1::XUS::XUS --signers 0xA --args 0xB 500 x"" x"" -v`:
 Compiling transaction script...
@@ -1487,206 +1199,108 @@ Emitted [244, 1, 0, 0, 0, 0, 0, 0, 3, 88, 85, 83, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
 Changed resource(s) under 2 address(es):
   Changed 2 resource(s) under address 0000000000000000000000000000000A:
     Changed type 0x1::DiemAccount::Balance<0x1::XUS::XUS>: [200, 0, 0, 0, 0, 0, 0, 0] (wrote 72 bytes)
-      Previous:
-        key 0x1::DiemAccount::Balance<0x1::XUS::XUS> {
-            coin: store 0x1::Diem::Diem<0x1::XUS::XUS> {
-                value: 700
-            }
-        }
-      New:
-        key 0x1::DiemAccount::Balance<0x1::XUS::XUS> {
-            coin: store 0x1::Diem::Diem<0x1::XUS::XUS> {
-                value: 200
-            }
-        }
+         key 0x1::DiemAccount::Balance<0x1::XUS::XUS> {
+             coin: store 0x1::Diem::Diem<0x1::XUS::XUS> {
+-                value: 700
++                value: 200
+             }
+         }
     Changed type 0x1::DiemAccount::DiemAccount: [32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 1, 0, 0, 0, 0, 0, 0, 0, 24, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 1, 0, 0, 0, 0, 0, 0, 0, 24, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0] (wrote 183 bytes)
-      Previous:
-        key 0x1::DiemAccount::DiemAccount {
-            authentication_key: 000000000000000000000000000000000000000000000000000000000000000a
-            withdraw_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::WithdrawCapability> {
-                vec: [
-                    store 0x1::DiemAccount::WithdrawCapability {
-                        account_address: a
-                    },
-                ]
-            }
-            key_rotation_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::KeyRotationCapability> {
-                vec: [
-                    store 0x1::DiemAccount::KeyRotationCapability {
-                        account_address: a
-                    },
-                ]
-            }
-            received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
-                counter: 1
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 2
-                            addr: a
-                        }
-                    }
-                }
-            }
-            sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
-                counter: 0
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 3
-                            addr: a
-                        }
-                    }
-                }
-            }
-            sequence_number: 0
-        }
-      New:
-        key 0x1::DiemAccount::DiemAccount {
-            authentication_key: 000000000000000000000000000000000000000000000000000000000000000a
-            withdraw_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::WithdrawCapability> {
-                vec: [
-                    store 0x1::DiemAccount::WithdrawCapability {
-                        account_address: a
-                    },
-                ]
-            }
-            key_rotation_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::KeyRotationCapability> {
-                vec: [
-                    store 0x1::DiemAccount::KeyRotationCapability {
-                        account_address: a
-                    },
-                ]
-            }
-            received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
-                counter: 1
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 2
-                            addr: a
-                        }
-                    }
-                }
-            }
-            sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
-                counter: 1
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 3
-                            addr: a
-                        }
-                    }
-                }
-            }
-            sequence_number: 0
-        }
+         key 0x1::DiemAccount::DiemAccount {
+             authentication_key: 000000000000000000000000000000000000000000000000000000000000000a
+             withdraw_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::WithdrawCapability> {
+                 vec: [
+                     store 0x1::DiemAccount::WithdrawCapability {
+                         account_address: a
+                     },
+                 ]
+             }
+             key_rotation_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::KeyRotationCapability> {
+                 vec: [
+                     store 0x1::DiemAccount::KeyRotationCapability {
+                         account_address: a
+                     },
+                 ]
+             }
+             received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
+                 counter: 1
+                 guid: drop store 0x1::Event::GUIDWrapper {
+                     len_bytes: 24u8
+                     guid: drop store 0x1::GUID::GUID {
+                         id: copy drop store 0x1::GUID::ID {
+                             creation_num: 2
+                             addr: a
+                         }
+                     }
+                 }
+             }
+             sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
+-                counter: 0
++                counter: 1
+                 guid: drop store 0x1::Event::GUIDWrapper {
+                     len_bytes: 24u8
+                     guid: drop store 0x1::GUID::GUID {
+                         id: copy drop store 0x1::GUID::ID {
+                             creation_num: 3
+                             addr: a
+                         }
+                     }
+                 }
+             }
+             sequence_number: 0
+         }
   Changed 2 resource(s) under address 0000000000000000000000000000000B:
     Changed type 0x1::DiemAccount::Balance<0x1::XUS::XUS>: [244, 1, 0, 0, 0, 0, 0, 0] (wrote 72 bytes)
-      Previous:
-        key 0x1::DiemAccount::Balance<0x1::XUS::XUS> {
-            coin: store 0x1::Diem::Diem<0x1::XUS::XUS> {
-                value: 0
-            }
-        }
-      New:
-        key 0x1::DiemAccount::Balance<0x1::XUS::XUS> {
-            coin: store 0x1::Diem::Diem<0x1::XUS::XUS> {
-                value: 500
-            }
-        }
+         key 0x1::DiemAccount::Balance<0x1::XUS::XUS> {
+             coin: store 0x1::Diem::Diem<0x1::XUS::XUS> {
+-                value: 0
++                value: 500
+             }
+         }
     Changed type 0x1::DiemAccount::DiemAccount: [32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11, 1, 0, 0, 0, 0, 0, 0, 0, 24, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11, 0, 0, 0, 0, 0, 0, 0, 0, 24, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11, 0, 0, 0, 0, 0, 0, 0, 0] (wrote 183 bytes)
-      Previous:
-        key 0x1::DiemAccount::DiemAccount {
-            authentication_key: 000000000000000000000000000000000000000000000000000000000000000b
-            withdraw_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::WithdrawCapability> {
-                vec: [
-                    store 0x1::DiemAccount::WithdrawCapability {
-                        account_address: b
-                    },
-                ]
-            }
-            key_rotation_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::KeyRotationCapability> {
-                vec: [
-                    store 0x1::DiemAccount::KeyRotationCapability {
-                        account_address: b
-                    },
-                ]
-            }
-            received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
-                counter: 0
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 2
-                            addr: b
-                        }
-                    }
-                }
-            }
-            sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
-                counter: 0
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 3
-                            addr: b
-                        }
-                    }
-                }
-            }
-            sequence_number: 0
-        }
-      New:
-        key 0x1::DiemAccount::DiemAccount {
-            authentication_key: 000000000000000000000000000000000000000000000000000000000000000b
-            withdraw_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::WithdrawCapability> {
-                vec: [
-                    store 0x1::DiemAccount::WithdrawCapability {
-                        account_address: b
-                    },
-                ]
-            }
-            key_rotation_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::KeyRotationCapability> {
-                vec: [
-                    store 0x1::DiemAccount::KeyRotationCapability {
-                        account_address: b
-                    },
-                ]
-            }
-            received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
-                counter: 1
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 2
-                            addr: b
-                        }
-                    }
-                }
-            }
-            sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
-                counter: 0
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 3
-                            addr: b
-                        }
-                    }
-                }
-            }
-            sequence_number: 0
-        }
+         key 0x1::DiemAccount::DiemAccount {
+             authentication_key: 000000000000000000000000000000000000000000000000000000000000000b
+             withdraw_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::WithdrawCapability> {
+                 vec: [
+                     store 0x1::DiemAccount::WithdrawCapability {
+                         account_address: b
+                     },
+                 ]
+             }
+             key_rotation_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::KeyRotationCapability> {
+                 vec: [
+                     store 0x1::DiemAccount::KeyRotationCapability {
+                         account_address: b
+                     },
+                 ]
+             }
+             received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
+-                counter: 0
++                counter: 1
+                 guid: drop store 0x1::Event::GUIDWrapper {
+                     len_bytes: 24u8
+                     guid: drop store 0x1::GUID::GUID {
+                         id: copy drop store 0x1::GUID::ID {
+                             creation_num: 2
+                             addr: b
+                         }
+                     }
+                 }
+             }
+             sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
+                 counter: 0
+                 guid: drop store 0x1::Event::GUIDWrapper {
+                     len_bytes: 24u8
+                     guid: drop store 0x1::GUID::GUID {
+                         id: copy drop store 0x1::GUID::ID {
+                             creation_num: 3
+                             addr: b
+                         }
+                     }
+                 }
+             }
+             sequence_number: 0
+         }
 Wrote 510 bytes of resource ID's and data
 Command `sandbox run scripts/create_child_vasp_account.move --mode diem --type-args 0x1::XUS::XUS --signers 0xA --args 0xAA x"00000000000000000000000000000000" false 100 -v`:
 Compiling transaction script...
@@ -1697,114 +1311,61 @@ Emitted [100, 0, 0, 0, 0, 0, 0, 0, 3, 88, 85, 83, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
 Changed resource(s) under 3 address(es):
   Changed 3 resource(s) under address 0000000000000000000000000000000A:
     Changed type 0x1::DiemAccount::Balance<0x1::XUS::XUS>: [100, 0, 0, 0, 0, 0, 0, 0] (wrote 72 bytes)
-      Previous:
-        key 0x1::DiemAccount::Balance<0x1::XUS::XUS> {
-            coin: store 0x1::Diem::Diem<0x1::XUS::XUS> {
-                value: 200
-            }
-        }
-      New:
-        key 0x1::DiemAccount::Balance<0x1::XUS::XUS> {
-            coin: store 0x1::Diem::Diem<0x1::XUS::XUS> {
-                value: 100
-            }
-        }
+         key 0x1::DiemAccount::Balance<0x1::XUS::XUS> {
+             coin: store 0x1::Diem::Diem<0x1::XUS::XUS> {
+-                value: 200
++                value: 100
+             }
+         }
     Changed type 0x1::DiemAccount::DiemAccount: [32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 1, 0, 0, 0, 0, 0, 0, 0, 24, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 2, 0, 0, 0, 0, 0, 0, 0, 24, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0] (wrote 183 bytes)
-      Previous:
-        key 0x1::DiemAccount::DiemAccount {
-            authentication_key: 000000000000000000000000000000000000000000000000000000000000000a
-            withdraw_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::WithdrawCapability> {
-                vec: [
-                    store 0x1::DiemAccount::WithdrawCapability {
-                        account_address: a
-                    },
-                ]
-            }
-            key_rotation_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::KeyRotationCapability> {
-                vec: [
-                    store 0x1::DiemAccount::KeyRotationCapability {
-                        account_address: a
-                    },
-                ]
-            }
-            received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
-                counter: 1
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 2
-                            addr: a
-                        }
-                    }
-                }
-            }
-            sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
-                counter: 1
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 3
-                            addr: a
-                        }
-                    }
-                }
-            }
-            sequence_number: 0
-        }
-      New:
-        key 0x1::DiemAccount::DiemAccount {
-            authentication_key: 000000000000000000000000000000000000000000000000000000000000000a
-            withdraw_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::WithdrawCapability> {
-                vec: [
-                    store 0x1::DiemAccount::WithdrawCapability {
-                        account_address: a
-                    },
-                ]
-            }
-            key_rotation_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::KeyRotationCapability> {
-                vec: [
-                    store 0x1::DiemAccount::KeyRotationCapability {
-                        account_address: a
-                    },
-                ]
-            }
-            received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
-                counter: 1
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 2
-                            addr: a
-                        }
-                    }
-                }
-            }
-            sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
-                counter: 2
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 3
-                            addr: a
-                        }
-                    }
-                }
-            }
-            sequence_number: 0
-        }
+         key 0x1::DiemAccount::DiemAccount {
+             authentication_key: 000000000000000000000000000000000000000000000000000000000000000a
+             withdraw_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::WithdrawCapability> {
+                 vec: [
+                     store 0x1::DiemAccount::WithdrawCapability {
+                         account_address: a
+                     },
+                 ]
+             }
+             key_rotation_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::KeyRotationCapability> {
+                 vec: [
+                     store 0x1::DiemAccount::KeyRotationCapability {
+                         account_address: a
+                     },
+                 ]
+             }
+             received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
+                 counter: 1
+                 guid: drop store 0x1::Event::GUIDWrapper {
+                     len_bytes: 24u8
+                     guid: drop store 0x1::GUID::GUID {
+                         id: copy drop store 0x1::GUID::ID {
+                             creation_num: 2
+                             addr: a
+                         }
+                     }
+                 }
+             }
+             sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
+-                counter: 1
++                counter: 2
+                 guid: drop store 0x1::Event::GUIDWrapper {
+                     len_bytes: 24u8
+                     guid: drop store 0x1::GUID::GUID {
+                         id: copy drop store 0x1::GUID::ID {
+                             creation_num: 3
+                             addr: a
+                         }
+                     }
+                 }
+             }
+             sequence_number: 0
+         }
     Changed type 0x1::VASP::ParentVASP: [1, 0, 0, 0, 0, 0, 0, 0] (wrote 42 bytes)
-      Previous:
-        key 0x1::VASP::ParentVASP {
-            num_children: 0
-        }
-      New:
-        key 0x1::VASP::ParentVASP {
-            num_children: 1
-        }
+         key 0x1::VASP::ParentVASP {
+-            num_children: 0
++            num_children: 1
+         }
   Changed 6 resource(s) under address 000000000000000000000000000000AA:
     Added type 0x1::AccountFreezing::FreezingBit: [0] (wrote 47 bytes)
       key 0x1::AccountFreezing::FreezingBit {
@@ -1873,42 +1434,24 @@ Changed resource(s) under 3 address(es):
       }
   Changed 1 resource(s) under address 0000000000000000000000000A550C18:
     Changed type 0x1::DiemAccount::AccountOperationsCapability: [0, 6, 0, 0, 0, 0, 0, 0, 0, 24, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 85, 12, 24] (wrote 92 bytes)
-      Previous:
-        key 0x1::DiemAccount::AccountOperationsCapability {
-            limits_cap: store 0x1::AccountLimits::AccountLimitMutationCapability {
-                dummy_field: false
-            }
-            creation_events: store 0x1::Event::EventHandle<0x1::DiemAccount::CreateAccountEvent> {
-                counter: 5
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 0
-                            addr: a550c18
-                        }
-                    }
-                }
-            }
-        }
-      New:
-        key 0x1::DiemAccount::AccountOperationsCapability {
-            limits_cap: store 0x1::AccountLimits::AccountLimitMutationCapability {
-                dummy_field: false
-            }
-            creation_events: store 0x1::Event::EventHandle<0x1::DiemAccount::CreateAccountEvent> {
-                counter: 6
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 0
-                            addr: a550c18
-                        }
-                    }
-                }
-            }
-        }
+         key 0x1::DiemAccount::AccountOperationsCapability {
+             limits_cap: store 0x1::AccountLimits::AccountLimitMutationCapability {
+                 dummy_field: false
+             }
+             creation_events: store 0x1::Event::EventHandle<0x1::DiemAccount::CreateAccountEvent> {
+-                counter: 5
++                counter: 6
+                 guid: drop store 0x1::Event::GUIDWrapper {
+                     len_bytes: 24u8
+                     guid: drop store 0x1::GUID::GUID {
+                         id: copy drop store 0x1::GUID::ID {
+                             creation_num: 0
+                             addr: a550c18
+                         }
+                     }
+                 }
+             }
+         }
 Wrote 820 bytes of resource ID's and data
 Command `sandbox run scripts/create_child_vasp_account.move --mode diem --type-args 0x1::XUS::XUS --signers 0xB --args 0xBB x"00000000000000000000000000000000" false 0 -v`:
 Compiling transaction script...
@@ -1917,14 +1460,10 @@ Emitted [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 187, 6, 0, 0, 0, 0, 0, 0, 
 Changed resource(s) under 3 address(es):
   Changed 1 resource(s) under address 0000000000000000000000000000000B:
     Changed type 0x1::VASP::ParentVASP: [1, 0, 0, 0, 0, 0, 0, 0] (wrote 42 bytes)
-      Previous:
-        key 0x1::VASP::ParentVASP {
-            num_children: 0
-        }
-      New:
-        key 0x1::VASP::ParentVASP {
-            num_children: 1
-        }
+         key 0x1::VASP::ParentVASP {
+-            num_children: 0
++            num_children: 1
+         }
   Changed 6 resource(s) under address 000000000000000000000000000000BB:
     Added type 0x1::AccountFreezing::FreezingBit: [0] (wrote 47 bytes)
       key 0x1::AccountFreezing::FreezingBit {
@@ -1993,42 +1532,24 @@ Changed resource(s) under 3 address(es):
       }
   Changed 1 resource(s) under address 0000000000000000000000000A550C18:
     Changed type 0x1::DiemAccount::AccountOperationsCapability: [0, 7, 0, 0, 0, 0, 0, 0, 0, 24, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 85, 12, 24] (wrote 92 bytes)
-      Previous:
-        key 0x1::DiemAccount::AccountOperationsCapability {
-            limits_cap: store 0x1::AccountLimits::AccountLimitMutationCapability {
-                dummy_field: false
-            }
-            creation_events: store 0x1::Event::EventHandle<0x1::DiemAccount::CreateAccountEvent> {
-                counter: 6
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 0
-                            addr: a550c18
-                        }
-                    }
-                }
-            }
-        }
-      New:
-        key 0x1::DiemAccount::AccountOperationsCapability {
-            limits_cap: store 0x1::AccountLimits::AccountLimitMutationCapability {
-                dummy_field: false
-            }
-            creation_events: store 0x1::Event::EventHandle<0x1::DiemAccount::CreateAccountEvent> {
-                counter: 7
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 0
-                            addr: a550c18
-                        }
-                    }
-                }
-            }
-        }
+         key 0x1::DiemAccount::AccountOperationsCapability {
+             limits_cap: store 0x1::AccountLimits::AccountLimitMutationCapability {
+                 dummy_field: false
+             }
+             creation_events: store 0x1::Event::EventHandle<0x1::DiemAccount::CreateAccountEvent> {
+-                counter: 6
++                counter: 7
+                 guid: drop store 0x1::Event::GUIDWrapper {
+                     len_bytes: 24u8
+                     guid: drop store 0x1::GUID::GUID {
+                         id: copy drop store 0x1::GUID::ID {
+                             creation_num: 0
+                             addr: a550c18
+                         }
+                     }
+                 }
+             }
+         }
 Wrote 565 bytes of resource ID's and data
 Command `sandbox run scripts/peer_to_peer_with_metadata.move --mode diem --type-args 0x1::XUS::XUS --signers 0xAA --args 0xBB 100 x"" x"" -v`:
 Compiling transaction script...
@@ -2038,205 +1559,107 @@ Emitted [100, 0, 0, 0, 0, 0, 0, 0, 3, 88, 85, 83, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
 Changed resource(s) under 2 address(es):
   Changed 2 resource(s) under address 000000000000000000000000000000AA:
     Changed type 0x1::DiemAccount::Balance<0x1::XUS::XUS>: [0, 0, 0, 0, 0, 0, 0, 0] (wrote 72 bytes)
-      Previous:
-        key 0x1::DiemAccount::Balance<0x1::XUS::XUS> {
-            coin: store 0x1::Diem::Diem<0x1::XUS::XUS> {
-                value: 100
-            }
-        }
-      New:
-        key 0x1::DiemAccount::Balance<0x1::XUS::XUS> {
-            coin: store 0x1::Diem::Diem<0x1::XUS::XUS> {
-                value: 0
-            }
-        }
+         key 0x1::DiemAccount::Balance<0x1::XUS::XUS> {
+             coin: store 0x1::Diem::Diem<0x1::XUS::XUS> {
+-                value: 100
++                value: 0
+             }
+         }
     Changed type 0x1::DiemAccount::DiemAccount: [32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 170, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 170, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 170, 1, 0, 0, 0, 0, 0, 0, 0, 24, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 170, 1, 0, 0, 0, 0, 0, 0, 0, 24, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 170, 0, 0, 0, 0, 0, 0, 0, 0] (wrote 183 bytes)
-      Previous:
-        key 0x1::DiemAccount::DiemAccount {
-            authentication_key: 00000000000000000000000000000000000000000000000000000000000000aa
-            withdraw_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::WithdrawCapability> {
-                vec: [
-                    store 0x1::DiemAccount::WithdrawCapability {
-                        account_address: aa
-                    },
-                ]
-            }
-            key_rotation_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::KeyRotationCapability> {
-                vec: [
-                    store 0x1::DiemAccount::KeyRotationCapability {
-                        account_address: aa
-                    },
-                ]
-            }
-            received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
-                counter: 1
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 0
-                            addr: aa
-                        }
-                    }
-                }
-            }
-            sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
-                counter: 0
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 1
-                            addr: aa
-                        }
-                    }
-                }
-            }
-            sequence_number: 0
-        }
-      New:
-        key 0x1::DiemAccount::DiemAccount {
-            authentication_key: 00000000000000000000000000000000000000000000000000000000000000aa
-            withdraw_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::WithdrawCapability> {
-                vec: [
-                    store 0x1::DiemAccount::WithdrawCapability {
-                        account_address: aa
-                    },
-                ]
-            }
-            key_rotation_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::KeyRotationCapability> {
-                vec: [
-                    store 0x1::DiemAccount::KeyRotationCapability {
-                        account_address: aa
-                    },
-                ]
-            }
-            received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
-                counter: 1
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 0
-                            addr: aa
-                        }
-                    }
-                }
-            }
-            sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
-                counter: 1
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 1
-                            addr: aa
-                        }
-                    }
-                }
-            }
-            sequence_number: 0
-        }
+         key 0x1::DiemAccount::DiemAccount {
+             authentication_key: 00000000000000000000000000000000000000000000000000000000000000aa
+             withdraw_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::WithdrawCapability> {
+                 vec: [
+                     store 0x1::DiemAccount::WithdrawCapability {
+                         account_address: aa
+                     },
+                 ]
+             }
+             key_rotation_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::KeyRotationCapability> {
+                 vec: [
+                     store 0x1::DiemAccount::KeyRotationCapability {
+                         account_address: aa
+                     },
+                 ]
+             }
+             received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
+                 counter: 1
+                 guid: drop store 0x1::Event::GUIDWrapper {
+                     len_bytes: 24u8
+                     guid: drop store 0x1::GUID::GUID {
+                         id: copy drop store 0x1::GUID::ID {
+                             creation_num: 0
+                             addr: aa
+                         }
+                     }
+                 }
+             }
+             sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
+-                counter: 0
++                counter: 1
+                 guid: drop store 0x1::Event::GUIDWrapper {
+                     len_bytes: 24u8
+                     guid: drop store 0x1::GUID::GUID {
+                         id: copy drop store 0x1::GUID::ID {
+                             creation_num: 1
+                             addr: aa
+                         }
+                     }
+                 }
+             }
+             sequence_number: 0
+         }
   Changed 2 resource(s) under address 000000000000000000000000000000BB:
     Changed type 0x1::DiemAccount::Balance<0x1::XUS::XUS>: [100, 0, 0, 0, 0, 0, 0, 0] (wrote 72 bytes)
-      Previous:
-        key 0x1::DiemAccount::Balance<0x1::XUS::XUS> {
-            coin: store 0x1::Diem::Diem<0x1::XUS::XUS> {
-                value: 0
-            }
-        }
-      New:
-        key 0x1::DiemAccount::Balance<0x1::XUS::XUS> {
-            coin: store 0x1::Diem::Diem<0x1::XUS::XUS> {
-                value: 100
-            }
-        }
+         key 0x1::DiemAccount::Balance<0x1::XUS::XUS> {
+             coin: store 0x1::Diem::Diem<0x1::XUS::XUS> {
+-                value: 0
++                value: 100
+             }
+         }
     Changed type 0x1::DiemAccount::DiemAccount: [32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 187, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 187, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 187, 1, 0, 0, 0, 0, 0, 0, 0, 24, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 187, 0, 0, 0, 0, 0, 0, 0, 0, 24, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 187, 0, 0, 0, 0, 0, 0, 0, 0] (wrote 183 bytes)
-      Previous:
-        key 0x1::DiemAccount::DiemAccount {
-            authentication_key: 00000000000000000000000000000000000000000000000000000000000000bb
-            withdraw_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::WithdrawCapability> {
-                vec: [
-                    store 0x1::DiemAccount::WithdrawCapability {
-                        account_address: bb
-                    },
-                ]
-            }
-            key_rotation_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::KeyRotationCapability> {
-                vec: [
-                    store 0x1::DiemAccount::KeyRotationCapability {
-                        account_address: bb
-                    },
-                ]
-            }
-            received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
-                counter: 0
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 0
-                            addr: bb
-                        }
-                    }
-                }
-            }
-            sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
-                counter: 0
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 1
-                            addr: bb
-                        }
-                    }
-                }
-            }
-            sequence_number: 0
-        }
-      New:
-        key 0x1::DiemAccount::DiemAccount {
-            authentication_key: 00000000000000000000000000000000000000000000000000000000000000bb
-            withdraw_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::WithdrawCapability> {
-                vec: [
-                    store 0x1::DiemAccount::WithdrawCapability {
-                        account_address: bb
-                    },
-                ]
-            }
-            key_rotation_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::KeyRotationCapability> {
-                vec: [
-                    store 0x1::DiemAccount::KeyRotationCapability {
-                        account_address: bb
-                    },
-                ]
-            }
-            received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
-                counter: 1
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 0
-                            addr: bb
-                        }
-                    }
-                }
-            }
-            sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
-                counter: 0
-                guid: drop store 0x1::Event::GUIDWrapper {
-                    len_bytes: 24u8
-                    guid: drop store 0x1::GUID::GUID {
-                        id: copy drop store 0x1::GUID::ID {
-                            creation_num: 1
-                            addr: bb
-                        }
-                    }
-                }
-            }
-            sequence_number: 0
-        }
+         key 0x1::DiemAccount::DiemAccount {
+             authentication_key: 00000000000000000000000000000000000000000000000000000000000000bb
+             withdraw_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::WithdrawCapability> {
+                 vec: [
+                     store 0x1::DiemAccount::WithdrawCapability {
+                         account_address: bb
+                     },
+                 ]
+             }
+             key_rotation_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::KeyRotationCapability> {
+                 vec: [
+                     store 0x1::DiemAccount::KeyRotationCapability {
+                         account_address: bb
+                     },
+                 ]
+             }
+             received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
+-                counter: 0
++                counter: 1
+                 guid: drop store 0x1::Event::GUIDWrapper {
+                     len_bytes: 24u8
+                     guid: drop store 0x1::GUID::GUID {
+                         id: copy drop store 0x1::GUID::ID {
+                             creation_num: 0
+                             addr: bb
+                         }
+                     }
+                 }
+             }
+             sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
+                 counter: 0
+                 guid: drop store 0x1::Event::GUIDWrapper {
+                     len_bytes: 24u8
+                     guid: drop store 0x1::GUID::GUID {
+                         id: copy drop store 0x1::GUID::ID {
+                             creation_num: 1
+                             addr: bb
+                         }
+                     }
+                 }
+             }
+             sequence_number: 0
+         }
 Wrote 510 bytes of resource ID's and data
 Command `sandbox doctor`:

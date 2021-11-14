@@ -31,6 +31,9 @@ use move_lang::diagnostics::{self, report_diagnostics, Diagnostic, Diagnostics, 
 use anyhow::{bail, Result};
 use std::{collections::BTreeMap, fs, path::Path};
 
+use colored::Colorize;
+use difference::{Changeset, Difference};
+
 pub mod mode;
 pub mod on_disk_state_view;
 pub mod package;
@@ -98,6 +101,42 @@ fn print_struct_with_indent(value: &AnnotatedMoveStruct, indent: u64) {
     }
 }
 
+// Print struct diff with a specified outer indent
+fn print_struct_diff_with_indent(
+    value1: &AnnotatedMoveStruct,
+    value2: &AnnotatedMoveStruct,
+    indent: u64,
+) {
+    let indent_str: String = (0..indent).map(|_| " ").collect::<String>();
+    let prev_str = format!("{}", value1);
+    let new_str = format!("{}", value2);
+
+    let Changeset { diffs, .. } = Changeset::new(&prev_str, &new_str, "\n");
+
+    for diff in diffs {
+        match diff {
+            Difference::Same(ref x) => {
+                let lines = x.split('\n');
+                for line in lines {
+                    println!(" {}{}", indent_str, line);
+                }
+            }
+            Difference::Add(ref x) => {
+                let lines = x.split('\n');
+                for line in lines {
+                    println!("{}{}{}", "+".green(), indent_str, line.green());
+                }
+            }
+            Difference::Rem(ref x) => {
+                let lines = x.split('\n');
+                for line in lines {
+                    println!("{}{}{}", "-".red(), indent_str, line.red());
+                }
+            }
+        }
+    }
+}
+
 pub(crate) fn explain_execution_effects(
     changeset: &ChangeSet,
     events: &[Event],
@@ -153,12 +192,10 @@ pub(crate) fn explain_execution_effects(
                             .unwrap();
                         let resource_old = MoveValueAnnotator::new(state)
                             .view_resource(struct_tag, &resource_data)?;
-                        println!("      Previous:");
-                        print_struct_with_indent(&resource_old, 8);
                         let resource_new =
                             MoveValueAnnotator::new(state).view_resource(struct_tag, blob)?;
-                        println!("      New:");
-                        print_struct_with_indent(&resource_new, 8)
+
+                        print_struct_diff_with_indent(&resource_old, &resource_new, 8)
                     } else {
                         println!(
                             "Added type {}: {:?} (wrote {:?} bytes)",
