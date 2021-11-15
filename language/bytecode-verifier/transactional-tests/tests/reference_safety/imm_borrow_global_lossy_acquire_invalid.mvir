@@ -19,7 +19,7 @@ module 0x1.A {
         let u1: u64;
         let u2: u64;
         Coin { u1 } = move(c1);
-        assert(copy(u1) >= copy(amt), 42)
+        assert(copy(u1) >= copy(amt), 42);
         u1 = move(u1) - copy(amt);
         u2 = copy(amt);
         return Coin { u: move(u1) }, Coin { u: move(u2) };

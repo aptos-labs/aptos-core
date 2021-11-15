@@ -1008,7 +1008,6 @@ fn parse_cmd_(tokens: &mut Lexer) -> Result<Cmd_, ParseError<Loc, anyhow::Error>
 //     <IfStatement>,
 //     <WhileStatement>,
 //     <LoopStatement>,
-//     ";" => Statement::EmptyStatement,
 // }
 
 fn parse_statement(tokens: &mut Lexer) -> Result<Statement, ParseError<Loc, anyhow::Error>> {
@@ -1019,6 +1018,7 @@ fn parse_statement(tokens: &mut Lexer) -> Result<Statement, ParseError<Loc, anyh
             consume_token(tokens, Tok::Comma)?;
             let err = parse_exp(tokens)?;
             consume_token(tokens, Tok::RParen)?;
+            consume_token(tokens, Tok::Semicolon)?;
             let cond = {
                 let loc = e.loc;
                 sp(loc, Exp_::UnaryExp(UnaryOp::Not, Box::new(e)))
@@ -1033,10 +1033,6 @@ fn parse_statement(tokens: &mut Lexer) -> Result<Statement, ParseError<Loc, anyh
         Tok::If => parse_if_statement(tokens),
         Tok::While => parse_while_statement(tokens),
         Tok::Loop => parse_loop_statement(tokens),
-        Tok::Semicolon => {
-            tokens.advance()?;
-            Ok(Statement::EmptyStatement)
-        }
         _ => {
             // Anything else should be parsed as a Cmd...
             let start_loc = tokens.start_loc();

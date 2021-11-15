@@ -521,8 +521,6 @@ pub enum Statement {
     WhileStatement(While),
     /// `loop { s }`
     LoopStatement(Loop),
-    /// no-op that eases parsing in some places
-    EmptyStatement,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -1680,7 +1678,6 @@ impl fmt::Display for Statement {
             Statement::IfElseStatement(if_else) => write!(f, "{}", if_else),
             Statement::WhileStatement(while_) => write!(f, "{}", while_),
             Statement::LoopStatement(loop_) => write!(f, "{}", loop_),
-            Statement::EmptyStatement => write!(f, "<empty statement>"),
         }
     }
 }

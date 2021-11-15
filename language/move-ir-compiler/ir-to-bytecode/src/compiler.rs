@@ -859,7 +859,6 @@ fn compile_block(
             Statement::IfElseStatement(if_else) => {
                 compile_if_else(context, function_frame, code, if_else)?
             }
-            Statement::EmptyStatement => continue,
         };
         cf_info = ControlFlowInfo::successor(cf_info, stmt_info);
     }

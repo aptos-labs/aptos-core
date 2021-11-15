@@ -149,7 +149,7 @@ module 0x1.SortedLinkedList
         sender_address = Signer.address_of(move(account));
 
         //fail if the caller does not own a list
-        assert(Self.is_head_node(copy(sender_address)), 18)
+        assert(Self.is_head_node(copy(sender_address)), 18);
 
         assert(exists<Node>(copy(sender_address)), 8);
         current_node_ref = borrow_global<Node>(copy(sender_address));
