@@ -109,9 +109,6 @@ compiled_package_info:
       name: MultiTokenBalance
     : DiemFramework
     ? address: "00000000000000000000000000000001"
-      name: NFT
-    : DiemFramework
-    ? address: "00000000000000000000000000000001"
       name: NetworkIdentity
     : DiemFramework
     ? address: "00000000000000000000000000000001"
@@ -177,7 +174,7 @@ compiled_package_info:
     ? address: "00000000000000000000000000000001"
       name: XUS
     : DiemFramework
-  source_digest: D1CC658BBA61AA8670B36176B656A4EA045C3025A39FA1B7F736A4D23710748A
+  source_digest: 18E4D0B43B61DB742351A270B88A499C8F11B65EDA68D10AE139D1247F961B5D
   build_flags:
     dev_mode: false
     test_mode: false

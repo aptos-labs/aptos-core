@@ -2202,6 +2202,9 @@ pub enum ScriptFunctionCall {
     /// | `Errors::REQUIRES_ADDRESS` | `CoreAddresses::EDIEM_ROOT`                   | `account` is not the Diem Root account.                                                    |
     InitializeDiemConsensusConfig { sliding_nonce: u64 },
 
+    /// Initialize this module
+    NftInitialize {},
+
     /// # Summary
     /// Publishes a CRSN resource under `account` and opts the account in to
     /// concurrent transaction processing. Upon successful execution of this
@@ -2993,6 +2996,17 @@ pub enum ScriptFunctionCall {
         creation_num: u64,
     },
 
+    /// Transfer `amount` of token with id `GUID::id(creator, creation_num)` from `owner`'s
+    /// balance to `to`'s balance. This operation has to be done by either the owner or an
+    /// approved operator of the owner.
+    TransferTokenBetweenGalleries {
+        token_type: TypeTag,
+        to: AccountAddress,
+        amount: u64,
+        creator: AccountAddress,
+        creation_num: u64,
+    },
+
     /// # Summary
     /// Unfreezes the account at `address`. The sending account of this transaction must be the
     /// Treasury Compliance account. After the successful execution of this transaction transactions
@@ -3596,6 +3610,7 @@ impl ScriptFunctionCall {
             InitializeDiemConsensusConfig { sliding_nonce } => {
                 encode_initialize_diem_consensus_config_script_function(sliding_nonce)
             }
+            NftInitialize {} => encode_nft_initialize_script_function(),
             OptInToCrsn { crsn_size } => encode_opt_in_to_crsn_script_function(crsn_size),
             PeerToPeerBySigners {
                 currency,
@@ -3744,6 +3759,19 @@ impl ScriptFunctionCall {
                 creator,
                 creation_num,
             } => encode_transfer_multi_token_between_galleries_script_function(
+                token_type,
+                to,
+                amount,
+                creator,
+                creation_num,
+            ),
+            TransferTokenBetweenGalleries {
+                token_type,
+                to,
+                amount,
+                creator,
+                creation_num,
+            } => encode_transfer_token_between_galleries_script_function(
                 token_type,
                 to,
                 amount,
@@ -4803,6 +4831,19 @@ pub fn encode_initialize_diem_consensus_config_script_function(
         ident_str!("initialize_diem_consensus_config").to_owned(),
         vec![],
         vec![bcs::to_bytes(&sliding_nonce).unwrap()],
+    ))
+}
+
+/// Initialize this module
+pub fn encode_nft_initialize_script_function() -> TransactionPayload {
+    TransactionPayload::ScriptFunction(ScriptFunction::new(
+        ModuleId::new(
+            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            ident_str!("NFT").to_owned(),
+        ),
+        ident_str!("nft_initialize").to_owned(),
+        vec![],
+        vec![],
     ))
 }
 
@@ -5868,6 +5909,32 @@ pub fn encode_transfer_multi_token_between_galleries_script_function(
             ident_str!("MultiTokenBalance").to_owned(),
         ),
         ident_str!("transfer_multi_token_between_galleries").to_owned(),
+        vec![token_type],
+        vec![
+            bcs::to_bytes(&to).unwrap(),
+            bcs::to_bytes(&amount).unwrap(),
+            bcs::to_bytes(&creator).unwrap(),
+            bcs::to_bytes(&creation_num).unwrap(),
+        ],
+    ))
+}
+
+/// Transfer `amount` of token with id `GUID::id(creator, creation_num)` from `owner`'s
+/// balance to `to`'s balance. This operation has to be done by either the owner or an
+/// approved operator of the owner.
+pub fn encode_transfer_token_between_galleries_script_function(
+    token_type: TypeTag,
+    to: AccountAddress,
+    amount: u64,
+    creator: AccountAddress,
+    creation_num: u64,
+) -> TransactionPayload {
+    TransactionPayload::ScriptFunction(ScriptFunction::new(
+        ModuleId::new(
+            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            ident_str!("NFTGallery").to_owned(),
+        ),
+        ident_str!("transfer_token_between_galleries").to_owned(),
         vec![token_type],
         vec![
             bcs::to_bytes(&to).unwrap(),
@@ -8088,6 +8155,16 @@ fn decode_initialize_diem_consensus_config_script_function(
     }
 }
 
+fn decode_nft_initialize_script_function(
+    payload: &TransactionPayload,
+) -> Option<ScriptFunctionCall> {
+    if let TransactionPayload::ScriptFunction(_script) = payload {
+        Some(ScriptFunctionCall::NftInitialize {})
+    } else {
+        None
+    }
+}
+
 fn decode_opt_in_to_crsn_script_function(
     payload: &TransactionPayload,
 ) -> Option<ScriptFunctionCall> {
@@ -8358,6 +8435,22 @@ fn decode_transfer_multi_token_between_galleries_script_function(
 ) -> Option<ScriptFunctionCall> {
     if let TransactionPayload::ScriptFunction(script) = payload {
         Some(ScriptFunctionCall::TransferMultiTokenBetweenGalleries {
+            token_type: script.ty_args().get(0)?.clone(),
+            to: bcs::from_bytes(script.args().get(0)?).ok()?,
+            amount: bcs::from_bytes(script.args().get(1)?).ok()?,
+            creator: bcs::from_bytes(script.args().get(2)?).ok()?,
+            creation_num: bcs::from_bytes(script.args().get(3)?).ok()?,
+        })
+    } else {
+        None
+    }
+}
+
+fn decode_transfer_token_between_galleries_script_function(
+    payload: &TransactionPayload,
+) -> Option<ScriptFunctionCall> {
+    if let TransactionPayload::ScriptFunction(script) = payload {
+        Some(ScriptFunctionCall::TransferTokenBetweenGalleries {
             token_type: script.ty_args().get(0)?.clone(),
             to: bcs::from_bytes(script.args().get(0)?).ok()?,
             amount: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -8931,6 +9024,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<ScriptFunctionDecoderM
             Box::new(decode_initialize_diem_consensus_config_script_function),
         );
         map.insert(
+            "NFTnft_initialize".to_string(),
+            Box::new(decode_nft_initialize_script_function),
+        );
+        map.insert(
             "AccountAdministrationScriptsopt_in_to_crsn".to_string(),
             Box::new(decode_opt_in_to_crsn_script_function),
         );
@@ -9010,6 +9107,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<ScriptFunctionDecoderM
         map.insert(
             "MultiTokenBalancetransfer_multi_token_between_galleries".to_string(),
             Box::new(decode_transfer_multi_token_between_galleries_script_function),
+        );
+        map.insert(
+            "NFTGallerytransfer_token_between_galleries".to_string(),
+            Box::new(decode_transfer_token_between_galleries_script_function),
         );
         map.insert(
             "TreasuryComplianceScriptsunfreeze_account".to_string(),
