@@ -1,6 +1,7 @@
 module Sender::Message {
-    use Std::Signer;
+    use Std::Errors;
     use Std::Event;
+    use Std::Signer;
 
     struct MessageHolder has key {
         message: vector<u8>,
@@ -13,6 +14,11 @@ module Sender::Message {
 
     /// There is no message present
     const ENO_MESSAGE: u64 = 0;
+
+    public fun get_message(addr: address): vector<u8> acquires MessageHolder {
+        assert!(exists<MessageHolder>(addr), Errors::not_published(ENO_MESSAGE));
+        *&borrow_global<MessageHolder>(addr).message
+    }
 
     public(script) fun set_message(account: signer, message: vector<u8>)
     acquires MessageHolder {
