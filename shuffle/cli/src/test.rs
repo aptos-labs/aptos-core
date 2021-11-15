@@ -39,8 +39,18 @@ pub async fn run_e2e_tests(home: &Home, project_path: &Path, network: Url) -> Re
     let client = BlockingClient::new(network.as_str());
     let factory = TransactionFactory::new(ChainId::test());
 
-    let new_account = create_test_account(home, &client, &factory)?;
-    create_receiver_account(home, &client, &factory)?;
+    let test_account = create_account(
+        home.get_root_key_path(),
+        home.get_test_key_path(),
+        &client,
+        &factory,
+    )?;
+    let _receiver_account = create_account(
+        home.get_root_key_path(),
+        home.get_test_key_path(), // TODO: update to a different key to sender
+        &client,
+        &factory,
+    )?;
     deploy::handle(home, project_path, network.clone()).await?;
 
     run_deno_test(
@@ -49,40 +59,24 @@ pub async fn run_e2e_tests(home: &Home, project_path: &Path, network: Url) -> Re
         &Url::from_str(config.json_rpc.address.to_string().as_str())?,
         &network,
         home.get_test_key_path(),
-        new_account.address(),
+        test_account.address(),
     )
 }
 
-// Set up a new test account
-fn create_test_account(
-    home: &Home,
+fn create_account(
+    root_key_path: &Path,
+    account_key_path: &Path,
     client: &BlockingClient,
     factory: &TransactionFactory,
 ) -> Result<LocalAccount> {
-    let mut treasury_account = account::get_treasury_account(client, home.get_root_key_path());
-    // TODO: generate random key by using let new_account_key = generate_key::generate_key();
-    let new_account_key = generate_key::load_key(home.get_latest_key_path());
-    let public_key = new_account_key.public_key();
+    let mut treasury_account = account::get_treasury_account(client, root_key_path);
+    // TODO: generate random key by using let account_key = generate_key::generate_key();
+    let account_key = generate_key::load_key(account_key_path);
+    let public_key = account_key.public_key();
     let derived_address = AuthenticationKey::ed25519(&public_key).derived_address();
-    let new_account = LocalAccount::new(derived_address, new_account_key, 0);
+    let new_account = LocalAccount::new(derived_address, account_key, 0);
     account::create_account_onchain(&mut treasury_account, &new_account, factory, client)?;
     Ok(new_account)
-}
-
-// Set up a new test account
-fn create_receiver_account(
-    home: &Home,
-    client: &BlockingClient,
-    factory: &TransactionFactory,
-) -> Result<LocalAccount> {
-    let mut treasury_account = account::get_treasury_account(client, home.get_root_key_path());
-    let receiver_account_key = generate_key::load_key(home.get_test_key_path());
-    let public_key = receiver_account_key.public_key();
-    let address = AuthenticationKey::ed25519(&public_key).derived_address();
-    let receiver_account = LocalAccount::new(address, receiver_account_key, 0);
-    account::create_account_onchain(&mut treasury_account, &receiver_account, factory, client)?;
-
-    Ok(receiver_account)
 }
 
 // Run shuffle test using deno
