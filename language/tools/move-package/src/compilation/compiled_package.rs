@@ -151,9 +151,12 @@ impl OnDiskCompiledPackage {
             |path| extension_equals(path, SOURCE_MAP_EXTENSION),
         )
         .unwrap_or_else(|_| vec![]);
-        assert!(
-            compiled_units.len() == source_maps.len(),
-            "compiled units and source maps differ"
+        assert_eq!(
+            compiled_units.len(),
+            source_maps.len(),
+            "number of compiled units and source maps differ, {} != {}",
+            compiled_units.len(),
+            source_maps.len()
         );
         let compiled_units = compiled_units
             .iter()
@@ -629,6 +632,12 @@ impl CompiledPackage {
                     .collect(),
             },
         };
+
+        // Clear out the build dir for this package so we don't keep artifacts from previous
+        // compilations
+        if on_disk_package.root_path.is_dir() {
+            std::fs::remove_dir_all(&on_disk_package.root_path)?;
+        }
 
         std::fs::create_dir_all(&on_disk_package.root_path)?;
 

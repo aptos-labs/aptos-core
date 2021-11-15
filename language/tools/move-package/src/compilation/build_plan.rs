@@ -8,9 +8,13 @@ use crate::{
 use anyhow::Result;
 use move_lang::{compiled_unit::AnnotatedCompiledUnit, diagnostics::FilesSourceText, Compiler};
 use petgraph::algo::toposort;
-use std::{collections::BTreeMap, io::Write};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    io::Write,
+    path::Path,
+};
 
-use super::compiled_package::CompilationCachingStatus;
+use super::{compiled_package::CompilationCachingStatus, package_layout::CompiledPackageLayout};
 
 #[derive(Debug, Clone)]
 pub struct BuildPlan {
@@ -79,8 +83,25 @@ impl BuildPlan {
             )?;
             compiled.insert(*package_ident, compiled_package);
         }
+        let compiled_names = compiled.keys().collect::<BTreeSet<_>>();
+        Self::clean(
+            &project_root.join(CompiledPackageLayout::Root.path()),
+            compiled_names,
+        )?;
         Ok(compiled
             .remove(&package_root.source_package.package.name)
             .unwrap())
+    }
+
+    // Clean out old packages that are no longer used, or no longer used under the current
+    // compilation flags
+    fn clean(build_root: &Path, keep_paths: BTreeSet<&PackageName>) -> Result<()> {
+        for dir in std::fs::read_dir(build_root)? {
+            let path = dir?.path();
+            if !keep_paths.iter().any(|name| path.ends_with(name.as_str())) {
+                std::fs::remove_dir_all(&path)?;
+            }
+        }
+        Ok(())
     }
 }

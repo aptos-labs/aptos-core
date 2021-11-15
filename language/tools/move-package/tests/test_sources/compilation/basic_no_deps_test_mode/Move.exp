@@ -1,0 +1,93 @@
+CompiledPackageInfo {
+    package_name: "test",
+    address_alias_instantiation: {
+        "Std": 00000000000000000000000000000001,
+    },
+    module_resolution_metadata: {
+        ModuleId {
+            address: 00000000000000000000000000000001,
+            name: Identifier(
+                "ASCII",
+            ),
+        }: "Std",
+        ModuleId {
+            address: 00000000000000000000000000000001,
+            name: Identifier(
+                "BCS",
+            ),
+        }: "Std",
+        ModuleId {
+            address: 00000000000000000000000000000001,
+            name: Identifier(
+                "BitVector",
+            ),
+        }: "Std",
+        ModuleId {
+            address: 00000000000000000000000000000001,
+            name: Identifier(
+                "Capability",
+            ),
+        }: "Std",
+        ModuleId {
+            address: 00000000000000000000000000000001,
+            name: Identifier(
+                "Errors",
+            ),
+        }: "Std",
+        ModuleId {
+            address: 00000000000000000000000000000001,
+            name: Identifier(
+                "Event",
+            ),
+        }: "Std",
+        ModuleId {
+            address: 00000000000000000000000000000001,
+            name: Identifier(
+                "FixedPoint32",
+            ),
+        }: "Std",
+        ModuleId {
+            address: 00000000000000000000000000000001,
+            name: Identifier(
+                "GUID",
+            ),
+        }: "Std",
+        ModuleId {
+            address: 00000000000000000000000000000001,
+            name: Identifier(
+                "Hash",
+            ),
+        }: "Std",
+        ModuleId {
+            address: 00000000000000000000000000000001,
+            name: Identifier(
+                "Option",
+            ),
+        }: "Std",
+        ModuleId {
+            address: 00000000000000000000000000000001,
+            name: Identifier(
+                "Signer",
+            ),
+        }: "Std",
+        ModuleId {
+            address: 00000000000000000000000000000001,
+            name: Identifier(
+                "Vector",
+            ),
+        }: "Std",
+    },
+    source_digest: Some(
+        "ELIDED_FOR_TEST",
+    ),
+    build_flags: BuildConfig {
+        dev_mode: true,
+        test_mode: false,
+        generate_docs: false,
+        generate_abis: false,
+        install_dir: Some(
+            "ELIDED_FOR_TEST",
+        ),
+        force_recompilation: false,
+    },
+}
