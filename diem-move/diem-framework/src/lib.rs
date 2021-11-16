@@ -12,6 +12,7 @@ use move_lang::{
 use move_package::compilation::compiled_package::CompiledPackage;
 use once_cell::sync::Lazy;
 use std::{collections::BTreeMap, path::PathBuf};
+use tempfile::tempdir;
 
 pub mod natives;
 pub mod release;
@@ -67,12 +68,8 @@ pub fn diem_framework_named_addresses() -> BTreeMap<String, NumericalAddress> {
 
 static DPN_FRAMEWORK_PKG: Lazy<CompiledPackage> = Lazy::new(|| {
     let build_config = move_package::BuildConfig {
-        dev_mode: false,
-        test_mode: false,
-        generate_docs: true,
-        generate_abis: true,
-        install_dir: None,
-        force_recompilation: false,
+        install_dir: Some(tempdir().unwrap().path().to_path_buf()),
+        ..Default::default()
     };
     build_config
         .compile_package(&path_in_crate("DPN"), &mut Vec::new())

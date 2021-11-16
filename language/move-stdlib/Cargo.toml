@@ -34,6 +34,8 @@ move-unit-test = { path = "../tools/move-unit-test" }
 tempfile = "3.2.0"
 dir-diff = "0.3.2"
 file_diff = "1.0.0"
+move-cli = { path = "../tools/move-cli" }
+move-package = { path = "../tools/move-package" }
 
 [features]
 testing = []
