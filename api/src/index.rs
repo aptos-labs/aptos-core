@@ -51,7 +51,7 @@ pub fn openapi_spec() -> impl Filter<Extract = impl Reply, Error = Rejection> + 
         .with(metrics("openapi_yaml"));
     let html = warp::path!("spec.html")
         .and(warp::get())
-        .map(|| reply::html(OPEN_API_HTML))
+        .map(|| reply::html(open_api_html()))
         .with(metrics("spec_html"));
     spec.or(html)
 }
@@ -103,4 +103,8 @@ async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> {
         body = reply::json(&Error::new(code, format!("unexpected error: {:?}", err)));
     }
     Ok(reply::with_status(body, code))
+}
+
+fn open_api_html() -> String {
+    OPEN_API_HTML.replace("hideTryIt=\"true\"", "")
 }
