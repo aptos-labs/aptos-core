@@ -529,6 +529,50 @@ impl PackageLinter for OnlyPublishToCratesIo {
     }
 }
 
+/// Crates in the `/crates` directory have a flatten structure and their directory name is the same
+/// as the crate name
+#[derive(Debug)]
+pub struct CratesInCratesDirectory;
+
+impl Linter for CratesInCratesDirectory {
+    fn name(&self) -> &'static str {
+        "only-publish-to-crates-io"
+    }
+}
+
+impl PackageLinter for CratesInCratesDirectory {
+    fn run<'l>(
+        &self,
+        ctx: &PackageContext<'l>,
+        out: &mut LintFormatter<'l, '_>,
+    ) -> Result<RunStatus<'l>> {
+        let mut path_components = ctx.workspace_path().components();
+        match path_components.next().map(|p| p.as_str()) {
+            Some("crates") => {}
+            _ => return Ok(RunStatus::Executed),
+        }
+
+        match path_components.next().map(|p| p.as_str()) {
+            Some(directory) if directory == ctx.metadata().name() => {}
+            _ => {
+                out.write(
+                    LintLevel::Error,
+                    "crates in the `crates/` directory must be in a directory with the same name as the crate",
+                );
+            }
+        }
+
+        if path_components.next().is_some() {
+            out.write(
+                    LintLevel::Error,
+                    "crates in the `crates/` directory must be in a flat directory structure, no nesting",
+                );
+        }
+
+        Ok(RunStatus::Executed)
+    }
+}
+
 // Ensure that Move crates do not depend on Diem crates.
 #[derive(Debug)]
 pub struct MoveCratesDontDependOnDiemCrates<'cfg> {
