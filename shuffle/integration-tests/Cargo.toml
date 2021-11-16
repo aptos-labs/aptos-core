@@ -24,6 +24,7 @@ diem-sdk = { path = "../../sdk" }
 diem-types = { path = "../../types" }
 diem-workspace-hack = { path = "../../common/workspace-hack" }
 forge = { path = "../../testsuite/forge" }
+move-cli = { path = "../../language/tools/move-cli" }
 shuffle = { path = "../cli" }
 smoke-test = { path = "../../testsuite/smoke-test" }
 

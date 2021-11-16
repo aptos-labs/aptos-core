@@ -5,6 +5,7 @@ mod helper;
 
 use crate::helper::ShuffleTestHelper;
 use forge::{AdminContext, AdminTest, Result, Test};
+use move_cli::package::cli::UnitTestResult;
 use smoke_test::scripts_and_modules::enable_open_publishing;
 use std::str::FromStr;
 use tokio::runtime::Runtime;
@@ -21,15 +22,19 @@ impl Test for SamplePackageEndToEnd {
 impl AdminTest for SamplePackageEndToEnd {
     fn run<'t>(&self, ctx: &mut AdminContext<'t>) -> Result<()> {
         let helper = bootstrap_shuffle(ctx)?;
-        shuffle::test::run_move_unit_tests(&helper.project_path())?;
-        shuffle::test::run_deno_test(
+        let unit_test_result = shuffle::test::run_move_unit_tests(&helper.project_path())?;
+        let exit_status = shuffle::test::run_deno_test(
             helper.home(),
             &helper.project_path(),
             &Url::from_str(ctx.chain_info().json_rpc())?,
             &Url::from_str(ctx.chain_info().rest_api())?,
             helper.home().get_test_key_path(),
             helper.home().get_test_address()?,
-        )
+        )?;
+
+        assert!(matches!(unit_test_result, UnitTestResult::Success));
+        assert!(exit_status.success());
+        Ok(())
     }
 }
 
@@ -44,7 +49,7 @@ impl Test for TypescriptSdkIntegration {
 impl AdminTest for TypescriptSdkIntegration {
     fn run<'t>(&self, ctx: &mut AdminContext<'t>) -> Result<()> {
         let helper = bootstrap_shuffle(ctx)?;
-        shuffle::test::run_deno_test_at_path(
+        let exit_status = shuffle::test::run_deno_test_at_path(
             helper.home(),
             &helper.project_path(),
             &Url::from_str(ctx.chain_info().json_rpc())?,
@@ -52,7 +57,9 @@ impl AdminTest for TypescriptSdkIntegration {
             helper.home().get_test_key_path(),
             helper.home().get_test_address()?,
             &helper.project_path().join("integration"),
-        )
+        )?;
+        assert!(exit_status.success());
+        Ok(())
     }
 }
 

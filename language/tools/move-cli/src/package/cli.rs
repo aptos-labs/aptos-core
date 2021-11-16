@@ -6,7 +6,9 @@ use std::{
     fmt::Display,
     fs::{create_dir_all, read_to_string},
     io::Write,
+    os::unix::prelude::ExitStatusExt,
     path::{Path, PathBuf},
+    process::ExitStatus,
     time::Instant,
 };
 
@@ -168,9 +170,19 @@ pub enum ProverOptions {
 }
 
 /// Encapsulates the possible returned states when running unit tests on a move package.
+#[derive(PartialEq)]
 pub enum UnitTestResult {
     Success,
     Failure,
+}
+
+impl From<UnitTestResult> for ExitStatus {
+    fn from(result: UnitTestResult) -> Self {
+        match result {
+            UnitTestResult::Success => ExitStatus::from_raw(0),
+            UnitTestResult::Failure => ExitStatus::from_raw(1),
+        }
+    }
 }
 
 impl CoverageSummaryOptions {

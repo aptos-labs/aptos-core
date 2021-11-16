@@ -20,13 +20,13 @@ use move_unit_test::UnitTestingConfig;
 use shared::Home;
 use std::{
     path::{Path, PathBuf},
-    process::Command,
+    process::{Command, ExitStatus},
     str::FromStr,
 };
 use structopt::StructOpt;
 use url::Url;
 
-pub async fn run_e2e_tests(home: &Home, project_path: &Path, network: Url) -> Result<()> {
+pub async fn run_e2e_tests(home: &Home, project_path: &Path, network: Url) -> Result<ExitStatus> {
     let _config = shared::read_project_config(project_path)?;
     shared::generate_typescript_libraries(project_path)?;
 
@@ -89,7 +89,7 @@ pub fn run_deno_test(
     dev_api_url: &Url,
     key_path: &Path,
     sender_address: AccountAddress,
-) -> Result<()> {
+) -> Result<ExitStatus> {
     let test_path = project_path.join("e2e");
     run_deno_test_at_path(
         home,
@@ -110,7 +110,7 @@ pub fn run_deno_test_at_path(
     key_path: &Path,
     sender_address: AccountAddress,
     test_path: &Path,
-) -> Result<()> {
+) -> Result<ExitStatus> {
     let filtered_envs = shared::get_filtered_envs_for_deno(
         home,
         project_path,
@@ -118,7 +118,7 @@ pub fn run_deno_test_at_path(
         key_path,
         sender_address,
     );
-    Command::new("deno")
+    let status = Command::new("deno")
         .args([
             "test",
             "--unstable",
@@ -136,7 +136,7 @@ pub fn run_deno_test_at_path(
         .spawn()
         .expect("deno failed to start, is it installed? brew install deno")
         .wait()?;
-    Ok(())
+    Ok(status)
 }
 
 fn host_and_port(url: &Url) -> Result<String> {
@@ -205,40 +205,42 @@ pub enum TestCommand {
 }
 
 pub async fn handle(home: &Home, cmd: TestCommand) -> Result<()> {
-    match cmd {
+    let exit_status = match cmd {
         TestCommand::E2e {
             project_path,
             network,
         } => {
-            // TODO: std::process::exit with error code on any error
             run_e2e_tests(
                 home,
                 shared::normalized_project_path(project_path)?.as_path(),
                 shared::normalized_network(home, network)?,
             )
-            .await
+            .await?
         }
-        TestCommand::Unit { project_path } => {
-            let result =
-                run_move_unit_tests(shared::normalized_project_path(project_path)?.as_path())?;
-            match result {
-                UnitTestResult::Failure => std::process::exit(1),
-                _ => Ok(()),
-            }
-        }
+        TestCommand::Unit { project_path } => ExitStatus::from(run_move_unit_tests(
+            shared::normalized_project_path(project_path)?.as_path(),
+        )?),
         TestCommand::All {
             project_path,
             network,
         } => {
             let normalized_path = shared::normalized_project_path(project_path)?;
-            // TODO: std::process::exit with error code on any error
-            run_move_unit_tests(normalized_path.as_path())?;
-            run_e2e_tests(
+            let unit_status = ExitStatus::from(run_move_unit_tests(normalized_path.as_path())?);
+            let e2e_status = run_e2e_tests(
                 home,
                 normalized_path.as_path(),
                 shared::normalized_network(home, network)?,
             )
-            .await
+            .await?;
+
+            // prioritize returning failures
+            if !unit_status.success() {
+                unit_status
+            } else {
+                e2e_status
+            }
         }
-    }
+    };
+
+    std::process::exit(exit_status.code().unwrap_or(1));
 }

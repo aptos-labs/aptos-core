@@ -7809,6 +7809,7 @@ dependencies = [
  "forge",
  "generate-key",
  "hex",
+ "move-cli",
  "reqwest",
  "serde_json",
  "shuffle",
