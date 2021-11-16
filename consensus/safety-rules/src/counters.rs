@@ -7,6 +7,11 @@ use diem_secure_push_metrics::{
 };
 use once_cell::sync::Lazy;
 
+pub const EPOCH: &str = "epoch";
+pub const LAST_VOTED_ROUND: &str = "last_voted_round";
+pub const PREFERRED_ROUND: &str = "preferred_round";
+pub const WAYPOINT_VERSION: &str = "waypoint_version";
+
 pub static LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "diem_safety_rules_latency",
@@ -44,4 +49,9 @@ pub fn start_timer(source: &str, field: &str) -> HistogramTimer {
 
 pub fn set_state(field: &str, value: i64) {
     STATE_GAUGE.with_label_values(&[field]).set(value);
+}
+
+#[cfg(any(test))]
+pub fn get_state(field: &str) -> i64 {
+    STATE_GAUGE.with_label_values(&[field]).get()
 }

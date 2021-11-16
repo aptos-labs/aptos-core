@@ -42,30 +42,39 @@ impl PersistentSafetyStorage {
         waypoint: Waypoint,
         enable_cached_safety_data: bool,
     ) -> Self {
-        let safety_data = SafetyData::new(1, 0, 0, 0, None);
-        Self::initialize_(
+        // Initialize the keys and accounts
+        Self::initialize_keys_and_accounts(
             &mut internal_store,
-            safety_data.clone(),
             author,
             consensus_private_key,
             execution_private_key,
-            waypoint,
         )
-        .expect("Unable to initialize backend storage");
-        Self {
+        .expect("Unable to initialize keys and accounts in storage");
+
+        // Create the new persistent safety storage
+        let safety_data = SafetyData::new(1, 0, 0, 0, None);
+        let mut persisent_safety_storage = Self {
             enable_cached_safety_data,
-            cached_safety_data: Some(safety_data),
+            cached_safety_data: Some(safety_data.clone()),
             internal_store,
-        }
+        };
+
+        // Initialize the safety data and waypoint
+        persisent_safety_storage
+            .set_safety_data(safety_data)
+            .expect("Unable to initialize safety data");
+        persisent_safety_storage
+            .set_waypoint(&waypoint)
+            .expect("Unable to initialize waypoint");
+
+        persisent_safety_storage
     }
 
-    fn initialize_(
+    fn initialize_keys_and_accounts(
         internal_store: &mut Storage,
-        safety_data: SafetyData,
         author: Author,
         consensus_private_key: Ed25519PrivateKey,
         execution_private_key: Ed25519PrivateKey,
-        waypoint: Waypoint,
     ) -> Result<(), Error> {
         let result = internal_store.import_private_key(CONSENSUS_KEY, consensus_private_key);
         // Attempting to re-initialize existing storage. This can happen in environments like
@@ -79,9 +88,7 @@ impl PersistentSafetyStorage {
         }
 
         internal_store.import_private_key(EXECUTION_KEY, execution_private_key)?;
-        internal_store.set(SAFETY_DATA, safety_data)?;
         internal_store.set(OWNER_ACCOUNT, author)?;
-        internal_store.set(WAYPOINT, waypoint)?;
         Ok(())
     }
 
@@ -147,9 +154,9 @@ impl PersistentSafetyStorage {
 
     pub fn set_safety_data(&mut self, data: SafetyData) -> Result<(), Error> {
         let _timer = counters::start_timer("set", SAFETY_DATA);
-        counters::set_state("epoch", data.epoch as i64);
-        counters::set_state("last_voted_round", data.last_voted_round as i64);
-        counters::set_state("preferred_round", data.preferred_round as i64);
+        counters::set_state(counters::EPOCH, data.epoch as i64);
+        counters::set_state(counters::LAST_VOTED_ROUND, data.last_voted_round as i64);
+        counters::set_state(counters::PREFERRED_ROUND, data.preferred_round as i64);
 
         match self.internal_store.set(SAFETY_DATA, data.clone()) {
             Ok(_) => {
@@ -170,6 +177,7 @@ impl PersistentSafetyStorage {
 
     pub fn set_waypoint(&mut self, waypoint: &Waypoint) -> Result<(), Error> {
         let _timer = counters::start_timer("set", WAYPOINT);
+        counters::set_state(counters::WAYPOINT_VERSION, waypoint.version() as i64);
         self.internal_store.set(WAYPOINT, waypoint)?;
         info!(
             logging::SafetyLogSchema::new(LogEntry::Waypoint, LogEvent::Update).waypoint(*waypoint)
@@ -186,12 +194,16 @@ impl PersistentSafetyStorage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use diem_crypto::Uniform;
+    use crate::counters;
+    use diem_crypto::{hash::HashValue, Uniform};
     use diem_secure_storage::InMemoryStorage;
-    use diem_types::validator_signer::ValidatorSigner;
+    use diem_types::{
+        block_info::BlockInfo, epoch_state::EpochState, ledger_info::LedgerInfo,
+        transaction::Version, validator_signer::ValidatorSigner, waypoint::Waypoint,
+    };
 
     #[test]
-    fn test() {
+    fn test_safety_data_counters() {
         let consensus_private_key = ValidatorSigner::from_int(0).private_key().clone();
         let storage = Storage::from(InMemoryStorage::new());
         let mut safety_storage = PersistentSafetyStorage::initialize(
@@ -207,6 +219,9 @@ mod tests {
         assert_eq!(safety_data.epoch, 1);
         assert_eq!(safety_data.last_voted_round, 0);
         assert_eq!(safety_data.preferred_round, 0);
+        assert_eq!(counters::get_state(counters::EPOCH), 1);
+        assert_eq!(counters::get_state(counters::LAST_VOTED_ROUND), 0);
+        assert_eq!(counters::get_state(counters::PREFERRED_ROUND), 0);
 
         safety_storage
             .set_safety_data(SafetyData::new(9, 8, 1, 0, None))
@@ -216,5 +231,53 @@ mod tests {
         assert_eq!(safety_data.epoch, 9);
         assert_eq!(safety_data.last_voted_round, 8);
         assert_eq!(safety_data.preferred_round, 1);
+        assert_eq!(counters::get_state(counters::EPOCH), 9);
+        assert_eq!(counters::get_state(counters::LAST_VOTED_ROUND), 8);
+        assert_eq!(counters::get_state(counters::PREFERRED_ROUND), 1);
+    }
+
+    #[test]
+    fn test_waypoint_counters() {
+        let consensus_private_key = ValidatorSigner::from_int(0).private_key().clone();
+        let storage = Storage::from(InMemoryStorage::new());
+        let mut safety_storage = PersistentSafetyStorage::initialize(
+            storage,
+            Author::random(),
+            consensus_private_key,
+            Ed25519PrivateKey::generate_for_testing(),
+            Waypoint::default(),
+            true,
+        );
+
+        let waypoint = safety_storage.waypoint().unwrap();
+        assert_eq!(waypoint.version(), Version::default());
+        assert_eq!(
+            counters::get_state(counters::WAYPOINT_VERSION) as u64,
+            Version::default()
+        );
+
+        for expected_version in 1..=10u64 {
+            let li = LedgerInfo::new(
+                BlockInfo::new(
+                    1,
+                    10,
+                    HashValue::random(),
+                    HashValue::random(),
+                    expected_version,
+                    1000,
+                    Some(EpochState::empty()),
+                ),
+                HashValue::zero(),
+            );
+            let waypoint = &Waypoint::new_epoch_boundary(&li).unwrap();
+            safety_storage.set_waypoint(waypoint).unwrap();
+
+            let waypoint = safety_storage.waypoint().unwrap();
+            assert_eq!(waypoint.version(), expected_version);
+            assert_eq!(
+                counters::get_state(counters::WAYPOINT_VERSION) as u64,
+                expected_version
+            );
+        }
     }
 }
