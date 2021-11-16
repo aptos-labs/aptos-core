@@ -24,12 +24,29 @@ fn check_that_version_control_has_no_unstaged_changes() -> Result<()> {
 fn test_that_generated_file_are_up_to_date_in_git() {
     // Don't check if git isn't in a clean state
     if check_that_version_control_has_no_unstaged_changes().is_ok() {
+        // If this assertion fails, run the following command to re-generate DPN release:
+        // `cargo run --release -p diem-framework`
         assert!(Command::new("cargo")
             .current_dir(std::env!("CARGO_MANIFEST_DIR"))
             .arg("run")
             .arg("--release")
             .arg("-p")
             .arg("diem-framework")
+            .status()
+            .unwrap()
+            .success());
+
+        // If this assertion fails, run the following command to re-generate experimental release:
+        // `cargo run --release -p diem-framework -- --package experimental`
+        assert!(Command::new("cargo")
+            .current_dir(std::env!("CARGO_MANIFEST_DIR"))
+            .arg("run")
+            .arg("--release")
+            .arg("-p")
+            .arg("diem-framework")
+            .arg("--")
+            .arg("--package")
+            .arg("experimental")
             .status()
             .unwrap()
             .success());

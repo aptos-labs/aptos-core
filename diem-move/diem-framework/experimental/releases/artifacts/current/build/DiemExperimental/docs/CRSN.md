@@ -250,7 +250,7 @@ The size given to the CRSN at the time of publishing was zero, which is not supp
 
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="CRSN.md#0x1_CRSN_allow_crsns">allow_crsns</a>(account: &signer)
+<pre><code><b>public</b> <b>fun</b> <a href="CRSN.md#0x1_CRSN_allow_crsns">allow_crsns</a>(account: &signer)
 </code></pre>
 
 
@@ -259,7 +259,7 @@ The size given to the CRSN at the time of publishing was zero, which is not supp
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="CRSN.md#0x1_CRSN_allow_crsns">allow_crsns</a>(account: &signer) {
+<pre><code><b>public</b> <b>fun</b> <a href="CRSN.md#0x1_CRSN_allow_crsns">allow_crsns</a>(account: &signer) {
     <a href="Roles.md#0x1_Roles_assert_diem_root">Roles::assert_diem_root</a>(account);
     <b>assert</b>!(!<b>exists</b>&lt;<a href="CRSN.md#0x1_CRSN_CRSNsAllowed">CRSNsAllowed</a>&gt;(<a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account)), <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="CRSN.md#0x1_CRSN_EALREADY_INITIALIZED">EALREADY_INITIALIZED</a>));
     move_to(account, <a href="CRSN.md#0x1_CRSN_CRSNsAllowed">CRSNsAllowed</a> { })

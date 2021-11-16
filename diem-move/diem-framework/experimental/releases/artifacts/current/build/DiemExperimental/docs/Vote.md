@@ -932,7 +932,7 @@ If a ballot with <code>ballot_id</code> is not found, then it
 does nothing
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="Vote.md#0x1_Vote_remove_ballot">remove_ballot</a>&lt;Proposal: drop, store&gt;(account: signer, ballot_id: <a href="Vote.md#0x1_Vote_BallotID">Vote::BallotID</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="Vote.md#0x1_Vote_remove_ballot">remove_ballot</a>&lt;Proposal: drop, store&gt;(account: signer, ballot_id: <a href="Vote.md#0x1_Vote_BallotID">Vote::BallotID</a>)
 </code></pre>
 
 
@@ -941,7 +941,7 @@ does nothing
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="Vote.md#0x1_Vote_remove_ballot">remove_ballot</a>&lt;Proposal: store + drop&gt;(
+<pre><code><b>public</b> <b>fun</b> <a href="Vote.md#0x1_Vote_remove_ballot">remove_ballot</a>&lt;Proposal: store + drop&gt;(
     account: signer,
     ballot_id: <a href="Vote.md#0x1_Vote_BallotID">BallotID</a>,
 ) <b>acquires</b> <a href="Vote.md#0x1_Vote_Ballots">Ballots</a> {
