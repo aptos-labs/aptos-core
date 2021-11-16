@@ -10,15 +10,12 @@ a 32-bit fractional part.
 -  [Struct `FixedPoint32`](#0x1_FixedPoint32_FixedPoint32)
 -  [Constants](#@Constants_0)
 -  [Function `multiply_u64`](#0x1_FixedPoint32_multiply_u64)
-    -  [Abstract Semantics](#@Abstract_Semantics_1)
 -  [Function `divide_u64`](#0x1_FixedPoint32_divide_u64)
-    -  [Abstract Semantics](#@Abstract_Semantics_2)
 -  [Function `create_from_rational`](#0x1_FixedPoint32_create_from_rational)
-    -  [Abstract Semantics](#@Abstract_Semantics_3)
 -  [Function `create_from_raw_value`](#0x1_FixedPoint32_create_from_raw_value)
 -  [Function `get_raw_value`](#0x1_FixedPoint32_get_raw_value)
 -  [Function `is_zero`](#0x1_FixedPoint32_is_zero)
--  [Module Specification](#@Module_Specification_4)
+-  [Module Specification](#@Module_Specification_1)
 
 
 <pre><code><b>use</b> <a href="Errors.md#0x1_Errors">0x1::Errors</a>;
@@ -166,49 +163,13 @@ overflows.
 <details>
 <summary>Specification</summary>
 
-Because none of our SMT solvers supports non-linear arithmetic with reliable efficiency,
-we specify the concrete semantics of the implementation but use
-an abstracted, simplified semantics for verification of callers. For the verification outcome of
-callers, the actual result of this function is not relevant, as long as the abstraction behaves
-homomorphic. This does not guarantee that arithmetic functions using this code is correct.
 
 
 <pre><code><b>pragma</b> opaque;
-<b>include</b> [concrete] <a href="FixedPoint32.md#0x1_FixedPoint32_ConcreteMultiplyAbortsIf">ConcreteMultiplyAbortsIf</a>;
-<b>ensures</b> [concrete] result == <a href="FixedPoint32.md#0x1_FixedPoint32_spec_concrete_multiply_u64">spec_concrete_multiply_u64</a>(val, multiplier);
-<b>include</b> [abstract] <a href="FixedPoint32.md#0x1_FixedPoint32_MultiplyAbortsIf">MultiplyAbortsIf</a>;
-<b>ensures</b> [abstract] result == <a href="FixedPoint32.md#0x1_FixedPoint32_spec_multiply_u64">spec_multiply_u64</a>(val, multiplier);
+<b>include</b> <a href="FixedPoint32.md#0x1_FixedPoint32_MultiplyAbortsIf">MultiplyAbortsIf</a>;
+<b>ensures</b> result == <a href="FixedPoint32.md#0x1_FixedPoint32_spec_multiply_u64">spec_multiply_u64</a>(val, multiplier);
 </code></pre>
 
-
-
-
-<a name="0x1_FixedPoint32_ConcreteMultiplyAbortsIf"></a>
-
-
-<pre><code><b>schema</b> <a href="FixedPoint32.md#0x1_FixedPoint32_ConcreteMultiplyAbortsIf">ConcreteMultiplyAbortsIf</a> {
-    val: num;
-    multiplier: <a href="FixedPoint32.md#0x1_FixedPoint32">FixedPoint32</a>;
-    <b>aborts_if</b> <a href="FixedPoint32.md#0x1_FixedPoint32_spec_concrete_multiply_u64">spec_concrete_multiply_u64</a>(val, multiplier) &gt; <a href="FixedPoint32.md#0x1_FixedPoint32_MAX_U64">MAX_U64</a> <b>with</b> <a href="Errors.md#0x1_Errors_LIMIT_EXCEEDED">Errors::LIMIT_EXCEEDED</a>;
-}
-</code></pre>
-
-
-
-
-<a name="0x1_FixedPoint32_spec_concrete_multiply_u64"></a>
-
-
-<pre><code><b>fun</b> <a href="FixedPoint32.md#0x1_FixedPoint32_spec_concrete_multiply_u64">spec_concrete_multiply_u64</a>(val: num, multiplier: <a href="FixedPoint32.md#0x1_FixedPoint32">FixedPoint32</a>): num {
-   (val * multiplier.value) &gt;&gt; 32
-}
-</code></pre>
-
-
-
-<a name="@Abstract_Semantics_1"></a>
-
-### Abstract Semantics
 
 
 
@@ -229,18 +190,7 @@ homomorphic. This does not guarantee that arithmetic functions using this code i
 
 
 <pre><code><b>fun</b> <a href="FixedPoint32.md#0x1_FixedPoint32_spec_multiply_u64">spec_multiply_u64</a>(val: num, multiplier: <a href="FixedPoint32.md#0x1_FixedPoint32">FixedPoint32</a>): num {
-   <b>if</b> (multiplier.value == 0)
-       // Zero value
-       0
-   <b>else</b> <b>if</b> (multiplier.value == 1)
-       // 1.0
-       val
-   <b>else</b> <b>if</b> (multiplier.value == 2)
-       // 0.5
-       val / 2
-   <b>else</b>
-       // overflow
-       <a href="FixedPoint32.md#0x1_FixedPoint32_MAX_U64">MAX_U64</a> + 1
+   (val * multiplier.value) &gt;&gt; 32
 }
 </code></pre>
 
@@ -288,47 +238,13 @@ is zero or if the quotient overflows.
 <details>
 <summary>Specification</summary>
 
-We specify the concrete semantics of the implementation but use
-an abstracted, simplified semantics for verification of callers.
 
 
 <pre><code><b>pragma</b> opaque;
-<b>include</b> [concrete] <a href="FixedPoint32.md#0x1_FixedPoint32_ConcreteDivideAbortsIf">ConcreteDivideAbortsIf</a>;
-<b>ensures</b> [concrete] result == <a href="FixedPoint32.md#0x1_FixedPoint32_spec_concrete_divide_u64">spec_concrete_divide_u64</a>(val, divisor);
-<b>include</b> [abstract] <a href="FixedPoint32.md#0x1_FixedPoint32_DivideAbortsIf">DivideAbortsIf</a>;
-<b>ensures</b> [abstract] result == <a href="FixedPoint32.md#0x1_FixedPoint32_spec_divide_u64">spec_divide_u64</a>(val, divisor);
+<b>include</b> <a href="FixedPoint32.md#0x1_FixedPoint32_DivideAbortsIf">DivideAbortsIf</a>;
+<b>ensures</b> result == <a href="FixedPoint32.md#0x1_FixedPoint32_spec_divide_u64">spec_divide_u64</a>(val, divisor);
 </code></pre>
 
-
-
-
-<a name="0x1_FixedPoint32_ConcreteDivideAbortsIf"></a>
-
-
-<pre><code><b>schema</b> <a href="FixedPoint32.md#0x1_FixedPoint32_ConcreteDivideAbortsIf">ConcreteDivideAbortsIf</a> {
-    val: num;
-    divisor: <a href="FixedPoint32.md#0x1_FixedPoint32">FixedPoint32</a>;
-    <b>aborts_if</b> divisor.value == 0 <b>with</b> <a href="Errors.md#0x1_Errors_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>;
-    <b>aborts_if</b> <a href="FixedPoint32.md#0x1_FixedPoint32_spec_concrete_divide_u64">spec_concrete_divide_u64</a>(val, divisor) &gt; <a href="FixedPoint32.md#0x1_FixedPoint32_MAX_U64">MAX_U64</a> <b>with</b> <a href="Errors.md#0x1_Errors_LIMIT_EXCEEDED">Errors::LIMIT_EXCEEDED</a>;
-}
-</code></pre>
-
-
-
-
-<a name="0x1_FixedPoint32_spec_concrete_divide_u64"></a>
-
-
-<pre><code><b>fun</b> <a href="FixedPoint32.md#0x1_FixedPoint32_spec_concrete_divide_u64">spec_concrete_divide_u64</a>(val: num, divisor: <a href="FixedPoint32.md#0x1_FixedPoint32">FixedPoint32</a>): num {
-   (val &lt;&lt; 32) / divisor.value
-}
-</code></pre>
-
-
-
-<a name="@Abstract_Semantics_2"></a>
-
-### Abstract Semantics
 
 
 
@@ -350,14 +266,7 @@ an abstracted, simplified semantics for verification of callers.
 
 
 <pre><code><b>fun</b> <a href="FixedPoint32.md#0x1_FixedPoint32_spec_divide_u64">spec_divide_u64</a>(val: num, divisor: <a href="FixedPoint32.md#0x1_FixedPoint32">FixedPoint32</a>): num {
-   <b>if</b> (divisor.value == 1)
-       // 1.0
-       val
-   <b>else</b> <b>if</b> (divisor.value == 2)
-       // 0.5
-       val * 2
-   <b>else</b>
-       <a href="FixedPoint32.md#0x1_FixedPoint32_MAX_U64">MAX_U64</a> + 1
+   (val &lt;&lt; 32) / divisor.value
 }
 </code></pre>
 
@@ -417,19 +326,17 @@ rounding, e.g., 0.0125 will round down to 0.012 instead of up to 0.013.
 
 
 <pre><code><b>pragma</b> opaque;
-<b>include</b> [concrete] <a href="FixedPoint32.md#0x1_FixedPoint32_ConcreteCreateFromRationalAbortsIf">ConcreteCreateFromRationalAbortsIf</a>;
-<b>ensures</b> [concrete] result == <a href="FixedPoint32.md#0x1_FixedPoint32_spec_concrete_create_from_rational">spec_concrete_create_from_rational</a>(numerator, denominator);
-<b>include</b> [abstract] <a href="FixedPoint32.md#0x1_FixedPoint32_CreateFromRationalAbortsIf">CreateFromRationalAbortsIf</a>;
-<b>ensures</b> [abstract] result == <a href="FixedPoint32.md#0x1_FixedPoint32_spec_create_from_rational">spec_create_from_rational</a>(numerator, denominator);
+<b>include</b> <a href="FixedPoint32.md#0x1_FixedPoint32_CreateFromRationalAbortsIf">CreateFromRationalAbortsIf</a>;
+<b>ensures</b> result == <a href="FixedPoint32.md#0x1_FixedPoint32_spec_create_from_rational">spec_create_from_rational</a>(numerator, denominator);
 </code></pre>
 
 
 
 
-<a name="0x1_FixedPoint32_ConcreteCreateFromRationalAbortsIf"></a>
+<a name="0x1_FixedPoint32_CreateFromRationalAbortsIf"></a>
 
 
-<pre><code><b>schema</b> <a href="FixedPoint32.md#0x1_FixedPoint32_ConcreteCreateFromRationalAbortsIf">ConcreteCreateFromRationalAbortsIf</a> {
+<pre><code><b>schema</b> <a href="FixedPoint32.md#0x1_FixedPoint32_CreateFromRationalAbortsIf">CreateFromRationalAbortsIf</a> {
     numerator: u64;
     denominator: u64;
     <b>let</b> scaled_numerator = numerator &lt;&lt; 64;
@@ -444,47 +351,11 @@ rounding, e.g., 0.0125 will round down to 0.012 instead of up to 0.013.
 
 
 
-<a name="0x1_FixedPoint32_spec_concrete_create_from_rational"></a>
-
-
-<pre><code><b>fun</b> <a href="FixedPoint32.md#0x1_FixedPoint32_spec_concrete_create_from_rational">spec_concrete_create_from_rational</a>(numerator: num, denominator: num): <a href="FixedPoint32.md#0x1_FixedPoint32">FixedPoint32</a> {
-   <a href="FixedPoint32.md#0x1_FixedPoint32">FixedPoint32</a>{value: (numerator &lt;&lt; 64) / (denominator &lt;&lt; 32)}
-}
-</code></pre>
-
-
-
-<a name="@Abstract_Semantics_3"></a>
-
-### Abstract Semantics
-
-
-
-<a name="0x1_FixedPoint32_CreateFromRationalAbortsIf"></a>
-
-This is currently identical to the concrete semantics.
-
-
-<pre><code><b>schema</b> <a href="FixedPoint32.md#0x1_FixedPoint32_CreateFromRationalAbortsIf">CreateFromRationalAbortsIf</a> {
-    <b>include</b> <a href="FixedPoint32.md#0x1_FixedPoint32_ConcreteCreateFromRationalAbortsIf">ConcreteCreateFromRationalAbortsIf</a>;
-}
-</code></pre>
-
-
-Abstract to either 0.5 or 1. This assumes validation of numerator and denominator has
-succeeded.
-
-
 <a name="0x1_FixedPoint32_spec_create_from_rational"></a>
 
 
 <pre><code><b>fun</b> <a href="FixedPoint32.md#0x1_FixedPoint32_spec_create_from_rational">spec_create_from_rational</a>(numerator: num, denominator: num): <a href="FixedPoint32.md#0x1_FixedPoint32">FixedPoint32</a> {
-   <b>if</b> (numerator == denominator)
-       // 1.0
-       <a href="FixedPoint32.md#0x1_FixedPoint32">FixedPoint32</a>{value: 1}
-   <b>else</b>
-       // 0.5
-       <a href="FixedPoint32.md#0x1_FixedPoint32">FixedPoint32</a>{value: 2}
+   <a href="FixedPoint32.md#0x1_FixedPoint32">FixedPoint32</a>{value: (numerator &lt;&lt; 64) / (denominator &lt;&lt; 32)}
 }
 </code></pre>
 
@@ -524,8 +395,7 @@ Create a fixedpoint value from a raw value.
 
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> <b>false</b>;
-<b>ensures</b> [concrete] result.value == value;
-<b>ensures</b> [abstract] result.value == 2;
+<b>ensures</b> result.value == value;
 </code></pre>
 
 
@@ -584,7 +454,7 @@ Returns true if the ratio is zero.
 
 </details>
 
-<a name="@Module_Specification_4"></a>
+<a name="@Module_Specification_1"></a>
 
 ## Module Specification
 

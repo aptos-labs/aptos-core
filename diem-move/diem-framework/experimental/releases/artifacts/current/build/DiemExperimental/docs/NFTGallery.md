@@ -59,15 +59,6 @@ Gallery holding tokens of <code>TokenType</code> as well as information of appro
 ## Constants
 
 
-<a name="0x1_NFTGallery_MAX_U64"></a>
-
-
-
-<pre><code><b>const</b> <a href="NFTGallery.md#0x1_NFTGallery_MAX_U64">MAX_U64</a>: u128 = 18446744073709551615;
-</code></pre>
-
-
-
 <a name="0x1_NFTGallery_EALREADY_IS_OPERATOR"></a>
 
 

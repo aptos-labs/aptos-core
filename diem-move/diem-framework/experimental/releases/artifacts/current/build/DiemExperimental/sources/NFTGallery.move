@@ -11,7 +11,6 @@ module 0x1::NFTGallery {
         gallery: vector<Token<TokenType>>
     }
 
-    const MAX_U64: u128 = 18446744073709551615u128;
     // Error codes
     const EID_NOT_FOUND: u64 = 0;
     const EBALANCE_NOT_PUBLISHED: u64 = 1;
