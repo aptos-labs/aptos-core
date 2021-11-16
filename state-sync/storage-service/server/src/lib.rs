@@ -388,15 +388,12 @@ impl StorageReader {
                 // Create the account range
                 let account_range = CompleteDataRange::new(lowest_account_version, latest_version)
                     .map_err(|error| Error::UnexpectedErrorEncountered(error.to_string()))?;
-                Ok(Some(account_range))
-            } else {
-                // The pruner hasn't kicked in yet, so return the transactions range
-                Ok(*transactions_range)
+                return Ok(Some(account_range));
             }
-        } else {
-            // There is no pruning window, return the transactions range
-            Ok(*transactions_range)
         }
+
+        // No pruning has occurred. Return the transactions range.
+        Ok(*transactions_range)
     }
 
     /// Returns the transaction range held in the database (lowest to highest).

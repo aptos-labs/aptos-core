@@ -49,6 +49,15 @@ use storage_service_types::{
 // TODO(joshlind): Expand these test cases to better test storage interaction
 // and functionality. This will likely require a better mock db abstraction.
 
+/// Various test constants for storage
+const FIRST_TXN_OUTPUT_VERSION: u64 = 20;
+const FIRST_TXN_VERSION: u64 = 10;
+const LAST_EPOCH: u64 = 10;
+const LAST_TXN_VERSION: u64 = 100;
+const NUM_ACCOUNTS_AT_VERSION: u64 = 1000;
+const PROTOCOL_VERSION: u64 = 1;
+const STATE_PRUNE_WINDOW: u64 = 50;
+
 #[tokio::test]
 async fn test_get_server_protocol_version() {
     let (mut mock_client, service) = MockClient::new();
@@ -60,7 +69,7 @@ async fn test_get_server_protocol_version() {
 
     // Verify the response is correct
     let expected_response = StorageServiceResponse::ServerProtocolVersion(ServerProtocolVersion {
-        protocol_version: 1,
+        protocol_version: PROTOCOL_VERSION,
     });
     assert_eq!(response, expected_response);
 }
@@ -91,8 +100,8 @@ async fn test_get_account_states_chunk_with_proof() {
     }
     let expected_response =
         StorageServiceResponse::AccountStatesChunkWithProof(AccountStatesChunkWithProof {
-            first_index: 100,
-            last_index: 200,
+            first_index: start_account_index,
+            last_index: end_account_index,
             first_key: HashValue::zero(),
             last_key: HashValue::zero(),
             account_blobs,
@@ -107,13 +116,14 @@ async fn test_get_number_of_accounts_at_version() {
     tokio::spawn(service.start());
 
     // Create a request to fetch the number of accounts at the specified version
-    let request = StorageServiceRequest::GetNumberOfAccountsAtVersion(10);
+    let request = StorageServiceRequest::GetNumberOfAccountsAtVersion(0);
 
     // Process the request
     let response = mock_client.send_request(request).await.unwrap();
 
     // Verify the response is correct
-    let expected_response = StorageServiceResponse::NumberOfAccountsAtVersion(1000);
+    let expected_response =
+        StorageServiceResponse::NumberOfAccountsAtVersion(NUM_ACCOUNTS_AT_VERSION);
     assert_eq!(response, expected_response);
 }
 
@@ -127,8 +137,8 @@ async fn test_get_storage_server_summary() {
     let response = mock_client.send_request(request).await.unwrap();
 
     // Verify the response is correct
-    let highest_version = 100;
-    let highest_epoch = 10;
+    let highest_version = LAST_TXN_VERSION;
+    let highest_epoch = LAST_EPOCH;
     let expected_server_summary = StorageServerSummary {
         protocol_metadata: ProtocolMetadata {
             max_epoch_chunk_size: 100,
@@ -142,9 +152,14 @@ async fn test_get_storage_server_summary() {
                 highest_version,
             )),
             epoch_ending_ledger_infos: Some(CompleteDataRange::from_genesis(highest_epoch - 1)),
-            transactions: Some(CompleteDataRange::new(10, highest_version).unwrap()),
-            transaction_outputs: Some(CompleteDataRange::new(20, highest_version).unwrap()),
-            account_states: Some(CompleteDataRange::new(51, highest_version).unwrap()),
+            transactions: Some(CompleteDataRange::new(FIRST_TXN_VERSION, highest_version).unwrap()),
+            transaction_outputs: Some(
+                CompleteDataRange::new(FIRST_TXN_OUTPUT_VERSION, highest_version).unwrap(),
+            ),
+            account_states: Some(
+                CompleteDataRange::new(LAST_TXN_VERSION - STATE_PRUNE_WINDOW + 1, highest_version)
+                    .unwrap(),
+            ),
         },
     };
     assert_eq!(
@@ -162,7 +177,7 @@ async fn test_get_transactions_with_proof_events() {
     let start_version = 0;
     let end_version = 10;
     let request = StorageServiceRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
-        proof_version: 100,
+        proof_version: LAST_TXN_VERSION,
         start_version,
         end_version,
         include_events: true,
@@ -197,7 +212,7 @@ async fn test_get_transactions_with_proof_no_events() {
     let start_version = 10;
     let end_version = 30;
     let request = StorageServiceRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
-        proof_version: 1000,
+        proof_version: LAST_TXN_VERSION,
         start_version,
         end_version,
         include_events: false,
@@ -233,7 +248,7 @@ async fn test_get_transaction_outputs_with_proof() {
     let end_version = 47;
     let request =
         StorageServiceRequest::GetTransactionOutputsWithProof(TransactionOutputsWithProofRequest {
-            proof_version: 1000,
+            proof_version: LAST_TXN_VERSION,
             start_version,
             end_version,
         });
@@ -488,23 +503,26 @@ impl DbReader<DpnProto> for MockDbReader {
     }
 
     fn get_latest_ledger_info(&self) -> Result<LedgerInfoWithSignatures> {
-        Ok(create_test_ledger_info_with_sigs(10, 100))
+        Ok(create_test_ledger_info_with_sigs(
+            LAST_EPOCH,
+            LAST_TXN_VERSION,
+        ))
     }
 
     fn get_first_write_set_version(&self) -> Result<Option<Version>> {
-        Ok(Some(20))
+        Ok(Some(FIRST_TXN_OUTPUT_VERSION))
     }
 
     fn get_first_txn_version(&self) -> Result<Option<Version>> {
-        Ok(Some(10))
+        Ok(Some(FIRST_TXN_VERSION))
     }
 
     fn get_state_prune_window(&self) -> Option<usize> {
-        Some(50)
+        Some(STATE_PRUNE_WINDOW as usize)
     }
 
     fn get_account_count(&self, _version: Version) -> Result<usize> {
-        Ok(1000)
+        Ok(NUM_ACCOUNTS_AT_VERSION as usize)
     }
 
     fn get_account_chunk_with_proof(
