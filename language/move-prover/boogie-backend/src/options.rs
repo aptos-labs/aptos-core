@@ -170,7 +170,7 @@ impl BoogieOptions {
         add(DEFAULT_BOOGIE_FLAGS);
         if self.use_cvc4 {
             add(&[
-                "-proverOpt:SOLVER=cvc4",
+                "-proverOpt:SOLVER=cvc5",
                 &format!("-proverOpt:PROVER_PATH={}", &self.cvc4_exe),
             ]);
         } else {
