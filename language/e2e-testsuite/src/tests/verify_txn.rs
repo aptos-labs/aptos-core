@@ -1,7 +1,6 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use compiler::Compiler;
 use diem_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     multi_ed25519::{MultiEd25519PrivateKey, MultiEd25519PublicKey},
@@ -44,6 +43,7 @@ use move_core_types::{
     language_storage::{StructTag, TypeTag},
     value::{serialize_values, MoveValue},
 };
+use move_ir_compiler::Compiler;
 
 #[test]
 fn verify_signature() {

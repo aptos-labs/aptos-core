@@ -14,7 +14,7 @@ move-model = { path = "../../move-model" }
 move-binary-format = { path = "../../move-binary-format" }
 bytecode-verifier = { path = "../../bytecode-verifier" }
 borrow-graph = { path = "../../borrow-graph" }
-ir-to-bytecode = { path = "../../compiler/ir-to-bytecode" }
+ir-to-bytecode = { path = "../../move-ir-compiler/ir-to-bytecode" }
 diem-workspace-hack = { path = "../../../common/workspace-hack" }
 move-core-types = { path = "../../move-core/types" }
 move-command-line-common = { path = "../../move-command-line-common" }

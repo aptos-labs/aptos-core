@@ -406,7 +406,7 @@ fn compile_ir_module<'a>(
     deps: impl Iterator<Item = &'a CompiledModule>,
     file_name: &str,
 ) -> Result<CompiledModule> {
-    use compiler::Compiler as IRCompiler;
+    use move_ir_compiler::Compiler as IRCompiler;
     let code = std::fs::read_to_string(file_name).unwrap();
     IRCompiler::new(deps.collect()).into_compiled_module(&code)
 }
@@ -415,7 +415,7 @@ fn compile_ir_script<'a>(
     deps: impl Iterator<Item = &'a CompiledModule>,
     file_name: &str,
 ) -> Result<CompiledScript> {
-    use compiler::Compiler as IRCompiler;
+    use move_ir_compiler::Compiler as IRCompiler;
     let code = std::fs::read_to_string(file_name).unwrap();
     let (script, _) = IRCompiler::new(deps.collect()).into_compiled_script_and_source_map(&code)?;
     Ok(script)

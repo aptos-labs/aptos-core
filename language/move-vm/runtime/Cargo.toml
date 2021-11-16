@@ -31,7 +31,7 @@ hex = "0.4.3"
 proptest = "1.0.0"
 
 
-compiler = { path = "../../compiler" }
+move-ir-compiler = { path = "../../move-ir-compiler" }
 move-lang = { path = "../../move-lang" }
 
 [features]

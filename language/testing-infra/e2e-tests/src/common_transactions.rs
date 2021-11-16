@@ -4,7 +4,6 @@
 //! Support for encoding transactions for common situations.
 
 use crate::account::Account;
-use compiler::Compiler;
 use diem_framework_releases::legacy::transaction_scripts::LegacyStdlibScript;
 use diem_transaction_builder::stdlib::encode_peer_to_peer_by_signers_script_function;
 use diem_types::{
@@ -14,6 +13,7 @@ use diem_types::{
     },
 };
 use move_core_types::language_storage::TypeTag;
+use move_ir_compiler::Compiler;
 use once_cell::sync::Lazy;
 
 pub static CREATE_ACCOUNT_SCRIPT: Lazy<Vec<u8>> = Lazy::new(|| {

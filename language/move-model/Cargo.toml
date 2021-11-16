@@ -12,7 +12,7 @@ move-lang = { path = "../move-lang" }
 bytecode-verifier = { path = "../bytecode-verifier" }
 move-binary-format = { path = "../move-binary-format" }
 diem-workspace-hack = { path = "../../common/workspace-hack" }
-bytecode-source-map = { path = "../compiler/bytecode-source-map" }
+bytecode-source-map = { path = "../move-ir-compiler/bytecode-source-map" }
 move-ir-types = { path = "../move-ir/types" }
 move-core-types = { path = "../move-core/types" }
 disassembler = { path = "../tools/disassembler" }

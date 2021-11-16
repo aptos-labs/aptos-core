@@ -1,6 +1,5 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
-use compiler::Compiler;
 use diem_types::{
     access_path::AccessPath,
     on_chain_config::DiemVersion,
@@ -13,6 +12,7 @@ use diem_writeset_generator::build_changeset;
 use language_e2e_tests::{
     account::Account, compile::compile_module, current_function_name, executor::FakeExecutor,
 };
+use move_ir_compiler::Compiler;
 
 #[test]
 fn build_upgrade_writeset() {

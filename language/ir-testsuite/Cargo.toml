@@ -14,7 +14,7 @@ anyhow = "1.0.38"
 bytecode-verifier = { path = "../bytecode-verifier" }
 datatest-stable = "0.1.1"
 functional-tests = { path = "../testing-infra/functional-tests" }
-ir-to-bytecode = { path = "../compiler/ir-to-bytecode" }
+ir-to-bytecode = { path = "../move-ir-compiler/ir-to-bytecode" }
 diem-types = { path = "../../types" }
 diem-workspace-hack = { path = "../../common/workspace-hack" }
 move-ir-types = { path = "../move-ir/types" }

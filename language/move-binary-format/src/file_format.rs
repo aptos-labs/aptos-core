@@ -485,7 +485,7 @@ impl FunctionDefinition {
 #[cfg_attr(any(test, feature = "fuzzing"), proptest(no_params))]
 pub struct TypeSignature(pub SignatureToken);
 
-// TODO: remove at some point or move it in the front end (language/compiler)
+// TODO: remove at some point or move it in the front end (language/move-ir-compiler)
 /// A `FunctionSignature` in internally used to create a unique representation of the overall
 /// signature as need. Consider deprecated...
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]

@@ -24,9 +24,9 @@ move-bytecode-verifier = { path = "../bytecode-verifier", package = "bytecode-ve
 move-symbol-pool = { path = "../move-symbol-pool" }
 diem-workspace-hack = { path = "../../common/workspace-hack" }
 move-ir-types = { path = "../move-ir/types" }
-ir-to-bytecode = { path = "../compiler/ir-to-bytecode" }
+ir-to-bytecode = { path = "../move-ir-compiler/ir-to-bytecode" }
 borrow-graph = { path = "../borrow-graph" }
-bytecode-source-map = { path = "../compiler/bytecode-source-map" }
+bytecode-source-map = { path = "../move-ir-compiler/bytecode-source-map" }
 bcs = "0.1.2"
 move-command-line-common = { path = "../move-command-line-common" }
 

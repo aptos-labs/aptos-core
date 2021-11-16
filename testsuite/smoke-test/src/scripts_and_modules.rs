@@ -11,7 +11,6 @@ use std::{
     process::Command,
 };
 
-use compiler::Compiler;
 use diem_sdk::{
     client::{views::AmountView, BlockingClient, WaitForTransactionError},
     transaction_builder::{Currency, TransactionFactory},
@@ -22,6 +21,7 @@ use diem_sdk::{
     },
 };
 use forge::{AdminContext, AdminTest, Result, Test};
+use move_ir_compiler::Compiler;
 
 pub struct MalformedScript;
 

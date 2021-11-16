@@ -21,12 +21,12 @@ tempfile = "3.2.0"
 diem-workspace-hack = { path = "../../../common/workspace-hack" }
 
 bytecode-interpreter = { path = "../../move-prover/interpreter" }
-compiler = { path = "../../compiler" }
 move-binary-format = { path = "../../move-binary-format" }
 move-bytecode-utils = { path = "../../tools/move-bytecode-utils" }
 move-cli = { path = "../../tools/move-cli" }
 move-command-line-common = { path = "../../move-command-line-common" }
 move-core-types = { path = "../../move-core/types" }
+move-ir-compiler = { path = "../../move-ir-compiler" }
 move-lang = { path = "../../move-lang" }
 move-stdlib = { path = "../../move-stdlib", features = ["testing"] }
 move-symbol-pool = { path = "../../move-symbol-pool" }

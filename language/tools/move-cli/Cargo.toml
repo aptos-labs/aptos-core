@@ -45,7 +45,7 @@ move-package = { path = "../move-package" }
 move-prover = { path = "../../move-prover" }
 move-unit-test = { path = "../move-unit-test" }
 errmapgen = { path = "../../move-prover/errmapgen" }
-bytecode-source-map = { path = "../../compiler/bytecode-source-map" }
+bytecode-source-map = { path = "../../move-ir-compiler/bytecode-source-map" }
 move-bytecode-viewer = { path = "../move-bytecode-viewer" }
 
 [dev-dependencies]

@@ -17,7 +17,6 @@ tokio = { version = "1.8.1", features = ["full"] }
 walkdir = "2.3.1"
 reqwest = { version = "0.11.2", features = ["json"] }
 
-compiler = { path = "../../language/compiler" }
 diem-config = { path = "../../config" }
 diem-events-fetcher = { path = "../../diem-move/diem-events-fetcher" }
 diem-framework = { path = "../../diem-move/diem-framework" }
@@ -26,6 +25,7 @@ diem-sdk = { path = "../../sdk" }
 diem-temppath = { path = "../../common/temppath" }
 diem-transaction-replay = { path = "../../diem-move/transaction-replay" }
 move-command-line-common = { path = "../../language/move-command-line-common" }
+move-ir-compiler = { path = "../../language/move-ir-compiler" }
 move-stdlib = { path = "../../language/move-stdlib" }
 forge = { path = "../forge" }
 

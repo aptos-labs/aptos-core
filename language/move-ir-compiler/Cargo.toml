@@ -1,5 +1,5 @@
 [package]
-name = "compiler"
+name = "move-ir-compiler"
 version = "0.1.0"
 authors = ["Diem Association <opensource@diem.com>"]
 description = "Diem compiler"

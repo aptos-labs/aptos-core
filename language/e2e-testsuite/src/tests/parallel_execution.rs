@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::tests::peer_to_peer::{check_and_apply_transfer_output, create_cyclic_transfers};
-use compiler::Compiler;
 use diem_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, Uniform};
 use diem_framework_releases::current_modules;
 use diem_parallel_executor::errors::Error;
@@ -18,6 +17,7 @@ use diem_types::{
 use diem_vm::{parallel_executor::ParallelDiemVM, read_write_set_analysis::add_on_functions_list};
 use diem_writeset_generator::encode_initialize_parallel_execution;
 use language_e2e_tests::{account, common_transactions::rotate_key_txn, executor::FakeExecutor};
+use move_ir_compiler::Compiler;
 use read_write_set::analyze;
 
 #[test]

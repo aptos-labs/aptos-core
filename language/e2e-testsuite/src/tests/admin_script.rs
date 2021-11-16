@@ -9,8 +9,8 @@ use diem_types::{
     vm_status::StatusCode,
 };
 
-use compiler::Compiler;
 use diem_types::transaction::WriteSetPayload;
+use move_ir_compiler::Compiler;
 
 #[test]
 fn admin_script_rotate_key_single_signer_no_epoch() {

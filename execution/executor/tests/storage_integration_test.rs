@@ -1,7 +1,6 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use compiler::Compiler;
 use diem_crypto::{ed25519::*, PrivateKey, Uniform};
 use diem_transaction_builder::stdlib::{
     encode_peer_to_peer_with_metadata_script, encode_set_validator_config_and_reconfigure_script,
@@ -21,6 +20,7 @@ use executor_test_helpers::{
     },
 };
 use executor_types::BlockExecutor;
+use move_ir_compiler::Compiler;
 use std::convert::TryFrom;
 
 #[test]

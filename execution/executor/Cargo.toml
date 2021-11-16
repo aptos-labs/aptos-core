@@ -40,12 +40,12 @@ proptest = "1.0.0"
 rand = "0.8.3"
 
 diem-framework-releases = { path = "../../diem-move/diem-framework/DPN/releases" }
-compiler = { path = "../../language/compiler" }
 executor-test-helpers = { path = "../executor-test-helpers" }
 diem-config = { path = "../../config" }
 diem-genesis-tool = {path = "../../config/management/genesis", features = ["testing"] }
 diem-temppath = { path = "../../common/temppath" }
 diemdb = { path = "../../storage/diemdb" }
+move-ir-compiler = { path = "../../language/move-ir-compiler" }
 storage-interface = { path = "../../storage/storage-interface", features=["fuzzing"] }
 diem-transaction-builder = { path = "../../sdk/transaction-builder" }
 vm-genesis = { path = "../../diem-move/vm-genesis" }

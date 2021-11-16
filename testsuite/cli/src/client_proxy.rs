@@ -7,7 +7,6 @@ use crate::{
     AccountData, AccountStatus,
 };
 use anyhow::{bail, ensure, format_err, Error, Result};
-use compiler::Compiler;
 use diem_client::{
     stream::{StreamingClient, StreamingClientConfig},
     views, StreamResult, WaitForTransactionError,
@@ -40,6 +39,7 @@ use diem_types::{
     write_set::{WriteOp, WriteSetMut},
 };
 use diem_wallet::{io_utils, WalletLibrary};
+use move_ir_compiler::Compiler;
 use move_vm_test_utils::InMemoryStorage;
 use num_traits::{
     cast::{FromPrimitive, ToPrimitive},

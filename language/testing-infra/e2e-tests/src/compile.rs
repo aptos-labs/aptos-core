@@ -3,7 +3,7 @@
 
 //! Support for compiling scripts and modules in tests.
 
-use compiler::Compiler;
+use move_ir_compiler::Compiler;
 
 use diem_types::transaction::{Module, Script};
 use move_binary_format::CompiledModule;
