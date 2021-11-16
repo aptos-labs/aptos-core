@@ -57,7 +57,9 @@ pub async fn run_e2e_tests(home: &Home, project_path: &Path, network: Url) -> Re
     run_deno_test(
         home,
         project_path,
-        &Url::from_str(config.json_rpc.address.to_string().as_str())?,
+        &Url::from_str(
+            ("http://".to_owned() + config.json_rpc.address.to_string().as_str()).as_str(),
+        )?,
         &network,
         home.get_test_key_path(),
         test_account.address(),
