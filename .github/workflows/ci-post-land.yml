@@ -342,8 +342,8 @@ jobs:
           RUSTDOCFLAGS: "-Z unstable-options --enable-index-page"
           CARGO_INCREMENTAL: 0
           RUSTFLAGS: -D warnings
-      - name: Build API specification doc into target/doc/diem_api
-        run : npx redoc-cli bundle api/doc/openapi.yaml -o target/doc/diem_api/spec.html
+      - name: copy API specification doc into target/doc/diem_api
+        run : cp api/doc/openapi.yaml target/doc/diem_api/openapi.yaml && cp api/doc/spec.html target/doc/diem_api/spec.html
       - name: Deploy Docs
         uses: peaceiris/actions-gh-pages@v3.8.0
         with:

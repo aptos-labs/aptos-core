@@ -34,6 +34,6 @@ test-api-spec:
 
 
 serve:
-	npx redoc-cli serve --watch doc/openapi.yaml
+	cd doc && python -m http.server 8888
 
 .PHONY: test lint test-code-gen test-api-spec clean serve
