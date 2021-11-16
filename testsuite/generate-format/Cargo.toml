@@ -20,8 +20,8 @@ consensus = { path = "../../consensus", features=["fuzzing"] }
 consensus-types = { path = "../../consensus/consensus-types", features=["fuzzing"] }
 bcs = "0.1.2"
 diem-config = { path = "../../config" }
-diem-crypto = { path = "../../crypto/crypto", features=["fuzzing"] }
-diem-crypto-derive = { path = "../../crypto/crypto-derive"}
+diem-crypto = { path = "../../crates/diem-crypto", features=["fuzzing"] }
+diem-crypto-derive = { path = "../../crates/diem-crypto-derive"}
 diem-types = { path = "../../types", features=["fuzzing"] }
 diem-workspace-hack = { path = "../../common/workspace-hack" }
 network = { path = "../../network" }

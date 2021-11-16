@@ -31,7 +31,7 @@ executor = { path = "../execution/executor" }
 executor-types = { path = "../execution/executor-types" }
 diem-api = { path = "../api" }
 diem-config = { path = "../config" }
-diem-crypto = { path = "../crypto/crypto" }
+diem-crypto = { path = "../crates/diem-crypto" }
 diem-data-client = { path = "../state-sync/diem-data-client" }
 diem-framework-releases = { path = "../diem-move/diem-framework/DPN/releases" }
 diem-genesis-tool = {path = "../config/management/genesis", features = ["testing"] }

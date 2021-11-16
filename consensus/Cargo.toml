@@ -39,7 +39,7 @@ executor-types = { path = "../execution/executor-types" }
 fallible = { path = "../common/fallible" }
 bcs = "0.1.2"
 diem-config = { path = "../config" }
-diem-crypto = { path = "../crypto/crypto" }
+diem-crypto = { path = "../crates/diem-crypto" }
 diem-logger = { path = "../common/logger" }
 diem-mempool = { path = "../mempool" }
 diem-metrics = { path = "../common/metrics" }

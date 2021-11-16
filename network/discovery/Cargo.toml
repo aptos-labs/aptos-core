@@ -20,7 +20,7 @@ channel = {path = "../../common/channel"}
 bcs = "0.1.2"
 event-notifications = { path = "../../state-sync/inter-component/event-notifications" }
 diem-config = { path = "../../config"}
-diem-crypto = {path = "../../crypto/crypto"}
+diem-crypto = {path = "../../crates/diem-crypto"}
 diem-logger = {path = "../../common/logger"}
 diem-metrics = {path = "../../common/metrics"}
 diem-time-service = {path = "../../common/time-service"}

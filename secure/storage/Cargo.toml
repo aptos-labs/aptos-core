@@ -19,7 +19,7 @@ serde_json = "1.0.64"
 thiserror = "1.0.24"
 
 bcs = "0.1.2"
-diem-crypto = { path = "../../crypto/crypto" }
+diem-crypto = { path = "../../crates/diem-crypto" }
 diem-github-client = { path = "github" }
 diem-infallible = { path = "../../common/infallible" }
 diem-logger = { path = "../../common/logger" }
@@ -29,8 +29,8 @@ diem-vault-client = { path = "vault" }
 diem-workspace-hack = { path = "../../common/workspace-hack" }
 
 [dev-dependencies]
-diem-crypto = { path = "../../crypto/crypto", features = ["fuzzing"] }
-diem-crypto-derive = { path = "../../crypto/crypto-derive" }
+diem-crypto = { path = "../../crates/diem-crypto", features = ["fuzzing"] }
+diem-crypto-derive = { path = "../../crates/diem-crypto-derive" }
 rand = "0.8.3"
 
 [features]

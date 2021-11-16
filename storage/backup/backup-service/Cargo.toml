@@ -19,7 +19,7 @@ tokio = { version = "1.8.1", features = ["full"] }
 warp = "0.3.0"
 
 bcs = "0.1.2"
-diem-crypto = { path = "../../../crypto/crypto" }
+diem-crypto = { path = "../../../crates/diem-crypto" }
 diem-logger = { path = "../../../common/logger" }
 diem-metrics = { path = "../../../common/metrics" }
 diem-types = { path = "../../../types" }

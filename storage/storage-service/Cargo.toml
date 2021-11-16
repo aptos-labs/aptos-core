@@ -16,7 +16,7 @@ futures = "0.3.12"
 
 bcs = "0.1.2"
 diem-config = { path = "../../config" }
-diem-crypto = { path = "../../crypto/crypto" }
+diem-crypto = { path = "../../crates/diem-crypto" }
 diemdb = { path = "../diemdb" }
 diem-logger = { path = "../../common/logger" }
 diem-metrics = { path = "../../common/metrics" }

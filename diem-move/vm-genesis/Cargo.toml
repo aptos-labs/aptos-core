@@ -17,7 +17,7 @@ rand = "0.8.3"
 bytecode-verifier = { path = "../../language/bytecode-verifier" }
 bcs = "0.1.2"
 diem-config = { path = "../../config" }
-diem-crypto = { path = "../../crypto/crypto" }
+diem-crypto = { path = "../../crates/diem-crypto" }
 diem-state-view = { path = "../../storage/state-view" }
 diem-types = { path = "../../types" }
 diem-workspace-hack = { path = "../../common/workspace-hack" }

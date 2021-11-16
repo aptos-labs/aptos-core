@@ -17,7 +17,7 @@ serde = { version = "1.0.124", default-features = false }
 thiserror = "1.0.24"
 
 diem-config = { path = "../../config" }
-diem-crypto = { path = "../../crypto/crypto" }
+diem-crypto = { path = "../../crates/diem-crypto" }
 diem-id-generator = { path = "../../common/id-generator" }
 diem-infallible = { path = "../../common/infallible" }
 diem-logger = { path = "../../common/logger" }

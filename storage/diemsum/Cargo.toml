@@ -16,7 +16,7 @@ serde = "1.0.124"
 serde_json = "1.0.64"
 
 diemdb = { path = "../diemdb", features = ["diemsum"] }
-diem-crypto = { path = "../../crypto/crypto" }
+diem-crypto = { path = "../../crates/diem-crypto" }
 diem-types = { path = "../../types" }
 diem-workspace-hack = { path = "../../common/workspace-hack" }
 storage-interface = { path = "../storage-interface" }

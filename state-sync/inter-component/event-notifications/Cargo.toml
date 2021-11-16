@@ -29,7 +29,7 @@ storage-interface = { path = "../../../storage/storage-interface" }
 bcs = "0.1.2"
 claim = "0.5.0"
 
-diem-crypto = { path = "../../../crypto/crypto" }
+diem-crypto = { path = "../../../crates/diem-crypto" }
 diem-temppath = { path = "../../../common/temppath" }
 diem-vm = { path = "../../../diem-move/diem-vm" }
 diemdb = { path = "../../../storage/diemdb" }

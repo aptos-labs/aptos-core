@@ -14,7 +14,7 @@ prost = "0.8.0"
 serde = { version = "1.0.124", default-features = false }
 serde_json = "1.0.64"
 
-diem-crypto = { path = "../../../crypto/crypto" }
+diem-crypto = { path = "../../../crates/diem-crypto" }
 diem-types = { path = "../../../types" }
 diem-json-rpc-types = { path = ".." }
 diem-workspace-hack = { path = "../../../common/workspace-hack" }

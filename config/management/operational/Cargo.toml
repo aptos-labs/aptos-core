@@ -28,7 +28,7 @@ toml = { version = "0.5.8", default-features = false }
 bcs = "0.1.2"
 diem-client = { path = "../../../sdk/client", features = ["blocking"], default-features = false }
 diem-config = { path = "../.."}
-diem-crypto = { path = "../../../crypto/crypto" }
+diem-crypto = { path = "../../../crates/diem-crypto" }
 diem-global-constants = { path = "../../global-constants" }
 diem-infallible = { path = "../../../common/infallible" }
 diem-management = { path = ".." }

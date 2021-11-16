@@ -17,7 +17,7 @@ structopt = "0.3.21"
 
 bcs = "0.1.2"
 diem-client = { path = "../../sdk/client", features = ["blocking"], default-features = false }
-diem-crypto = { path = "../../crypto/crypto" }
+diem-crypto = { path = "../../crates/diem-crypto" }
 diem-types = { path = "../../types" }
 move-core-types = { path = "../../language/move-core/types" }
 

@@ -24,7 +24,7 @@ tokio = { version = "1.8.1", features = ["full"] }
 warp = { version = "0.3.0", features = ["default"] }
 
 diem-config = { path = "../config" }
-diem-crypto = { path = "../crypto/crypto" }
+diem-crypto = { path = "../crates/diem-crypto" }
 diem-json-rpc = { path = "../json-rpc" }
 diem-logger = { path = "../common/logger" }
 diem-mempool = { path = "../mempool"}
@@ -42,7 +42,7 @@ reqwest = { version = "0.11.2", features = ["blocking", "json"], default_feature
 
 mempool-notifications = { path = "../state-sync/inter-component/mempool-notifications" }
 diemdb = { path = "../storage/diemdb", features = ["fuzzing"] }
-diem-crypto = { path = "../crypto/crypto" }
+diem-crypto = { path = "../crates/diem-crypto" }
 diem-global-constants = { path = "../config/global-constants" }
 diem-mempool = { path = "../mempool", features = ["fuzzing"] }
 diem-secure-storage = { path = "../secure/storage" }

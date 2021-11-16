@@ -18,7 +18,7 @@ executor = { path = "../executor" }
 executor-types = { path = "../executor-types" }
 diemdb = { path = "../../storage/diemdb", features = ["fuzzing"] }
 diem-config = { path = "../../config" }
-diem-crypto = { path = "../../crypto/crypto" }
+diem-crypto = { path = "../../crates/diem-crypto" }
 diem-genesis-tool = {path = "../../config/management/genesis", features = ["testing"] }
 diem-temppath = { path = "../../common/temppath" }
 diem-types = { path = "../../types", features = ["fuzzing"] }

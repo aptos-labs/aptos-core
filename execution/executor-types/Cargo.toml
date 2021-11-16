@@ -15,7 +15,7 @@ serde = { version = "1.0.124", default-features = false }
 thiserror = "1.0.24"
 
 bcs = "0.1.2"
-diem-crypto = { path = "../../crypto/crypto" }
+diem-crypto = { path = "../../crates/diem-crypto" }
 diem-secure-net = { path = "../../secure/net" }
 diem-types = { path = "../../types" }
 diem-workspace-hack = { path = "../../common/workspace-hack" }

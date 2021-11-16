@@ -19,7 +19,7 @@ thiserror = "1.0.24"
 
 bcs = "0.1.2"
 diem-config = { path = ".." }
-diem-crypto = { path = "../../crypto/crypto" }
+diem-crypto = { path = "../../crates/diem-crypto" }
 diem-client = { path = "../../sdk/client", features = ["blocking"], default-features = false }
 diem-logger = { path = "../../common/logger" }
 diem-temppath = { path = "../../common/temppath" }

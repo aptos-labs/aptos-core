@@ -14,7 +14,7 @@ anyhow = "1.0.38"
 serde = "1.0.124"
 
 bcs = "0.1.2"
-diem-crypto = { path = "../../crypto/crypto" }
+diem-crypto = { path = "../../crates/diem-crypto" }
 diem-logger = { path = "../../common/logger" }
 diem-infallible = { path = "../../common/infallible" }
 diem-secure-net = { path = "../../secure/net" }

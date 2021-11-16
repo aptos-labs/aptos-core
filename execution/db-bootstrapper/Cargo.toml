@@ -17,7 +17,7 @@ executor = { path = "../executor" }
 bcs = "0.1.2"
 diemdb = { path = "../../storage/diemdb" }
 diem-config = { path = "../../config" }
-diem-crypto = { path = "../../crypto/crypto" }
+diem-crypto = { path = "../../crates/diem-crypto" }
 diem-temppath = { path = "../../common/temppath" }
 diem-types = { path = "../../types" }
 diem-vm = { path = "../../diem-move/diem-vm" }

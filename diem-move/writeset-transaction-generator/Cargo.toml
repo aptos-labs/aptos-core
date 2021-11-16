@@ -23,8 +23,8 @@ once_cell = "1.7.2"
 
 bytecode-verifier = { path = "../../language/bytecode-verifier" }
 diem-workspace-hack = { path = "../../common/workspace-hack" }
-diem-crypto-derive = { path = "../../crypto/crypto-derive" }
-diem-crypto = { path = "../../crypto/crypto" }
+diem-crypto-derive = { path = "../../crates/diem-crypto-derive" }
+diem-crypto = { path = "../../crates/diem-crypto" }
 diem-types = { path = "../../types" }
 diem-framework-releases = { path = "../../diem-move/diem-framework/DPN/releases" }
 diem-framework = { path = "../../diem-move/diem-framework" }

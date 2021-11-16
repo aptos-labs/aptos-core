@@ -33,7 +33,7 @@ storage-service-types = { path = "../types" }
 anyhow = "1.0.38"
 claim = "0.5.0"
 
-diem-crypto = { path = "../../../crypto/crypto" }
+diem-crypto = { path = "../../../crates/diem-crypto" }
 diem-types = { path = "../../../types" }
 move-core-types = { path = "../../../language/move-core/types" }
 storage-interface = { path = "../../../storage/storage-interface" }

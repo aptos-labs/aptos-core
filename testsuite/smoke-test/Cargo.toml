@@ -41,7 +41,7 @@ futures = "0.3.12"
 backup-cli = { path = "../../storage/backup/backup-cli" }
 debug-interface = { path = "../../common/debug-interface" }
 generate-key = { path = "../../config/generate-key" }
-diem-crypto = { path = "../../crypto/crypto" }
+diem-crypto = { path = "../../crates/diem-crypto" }
 diem-genesis-tool = {path = "../../config/management/genesis", features = ["testing"] }
 diem-global-constants = { path = "../../config/global-constants" }
 diem-infallible = { path = "../../common/infallible" }

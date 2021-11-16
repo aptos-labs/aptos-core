@@ -27,7 +27,7 @@ bounded-executor = { path = "../common/bounded-executor" }
 channel = { path = "../common/channel" }
 bcs = "0.1.2"
 diem-config = { path = "../config" }
-diem-crypto = { path = "../crypto/crypto" }
+diem-crypto = { path = "../crates/diem-crypto" }
 diem-logger = { path = "../common/logger" }
 diem-metrics = { path = "../common/metrics" }
 diem-infallible = { path = "../common/infallible" }

@@ -13,7 +13,7 @@ edition = "2018"
 futures = "0.3.12"
 rand = "0.8.3"
 
-diem-crypto = { path = "../../crypto/crypto" }
+diem-crypto = { path = "../../crates/diem-crypto" }
 diem-json-rpc-types  = { path = "../../json-rpc/types" }
 diem-types = { path = "../../types" }
 diem-workspace-hack = { path = "../../common/workspace-hack" }

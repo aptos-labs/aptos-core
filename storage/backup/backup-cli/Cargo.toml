@@ -36,7 +36,7 @@ executor-types = { path = "../../../execution/executor-types" }
 diem-jellyfish-merkle = { path = "../../jellyfish-merkle" }
 bcs = "0.1.2"
 diem-config = { path = "../../../config" }
-diem-crypto = { path = "../../../crypto/crypto" }
+diem-crypto = { path = "../../../crates/diem-crypto" }
 diem-infallible = { path = "../../../common/infallible" }
 diem-logger = { path = "../../../common/logger" }
 diem-secure-push-metrics = { path = "../../../secure/push-metrics" }

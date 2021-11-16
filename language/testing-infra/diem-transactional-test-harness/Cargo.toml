@@ -26,7 +26,7 @@ move-core-types = { path = "../../move-core/types" }
 diem-vm =  { path = "../../../diem-move/diem-vm" }
 diem-types = { path = "../../../types", features = ["fuzzing"] }
 diem-transaction-builder = { path = "../../../sdk/transaction-builder" }
-diem-crypto = { path = "../../../crypto/crypto" }
+diem-crypto = { path = "../../../crates/diem-crypto" }
 diem-framework = { path = "../../../diem-move/diem-framework" }
 diem-keygen = { path = "../../../diem-move/diem-keygen" }
 diem-state-view = { path = "../../../storage/state-view" }

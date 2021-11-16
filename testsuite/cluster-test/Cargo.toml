@@ -38,7 +38,7 @@ num_cpus = "1.13.0"
 consensus-types = { path = "../../consensus/consensus-types" }
 generate-key = { path = "../../config/generate-key" }
 bcs = "0.1.2"
-diem-crypto = { path = "../../crypto/crypto" }
+diem-crypto = { path = "../../crates/diem-crypto" }
 diem-config = { path = "../../config" }
 diem-framework-releases = { path = "../../diem-move/diem-framework/DPN/releases" }
 diem-genesis-tool = { path = "../../config/management/genesis", features = ["testing"] }

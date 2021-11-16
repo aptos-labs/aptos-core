@@ -15,7 +15,7 @@ executor = { path = "../executor" }
 executor-types = { path = "../executor-types" }
 bcs = "0.1.2"
 diem-config = { path = "../../config" }
-diem-crypto = { path = "../../crypto/crypto" }
+diem-crypto = { path = "../../crates/diem-crypto" }
 diem-global-constants = { path = "../../config/global-constants"}
 diem-logger = { path = "../../common/logger" }
 diem-infallible = { path = "../../common/infallible" }

@@ -17,7 +17,7 @@ bytecode-verifier = { path = "../bytecode-verifier" }
 bcs = "0.1.2"
 compiler = { path = "../compiler" }
 diem-keygen = { path = "../../diem-move/diem-keygen" }
-diem-crypto = { path = "../../crypto/crypto", features = ["fuzzing"] }
+diem-crypto = { path = "../../crates/diem-crypto", features = ["fuzzing"] }
 diem-types = { path = "../../types", features = ["fuzzing"] }
 move-core-types = { path = "../move-core/types" }
 move-vm-runtime = { path = "../move-vm/runtime" }

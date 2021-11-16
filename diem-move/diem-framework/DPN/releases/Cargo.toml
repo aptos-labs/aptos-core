@@ -12,7 +12,7 @@ publish = false
 
 [dependencies]
 move-command-line-common = { path = "../../../../language/move-command-line-common" }
-diem-crypto = { path = "../../../../crypto/crypto" }
+diem-crypto = { path = "../../../../crates/diem-crypto" }
 diem-types = { path = "../../../../types" }
 diem-workspace-hack = { path = "../../../../common/workspace-hack" }
 move-binary-format = { path = "../../../../language/move-binary-format" }
