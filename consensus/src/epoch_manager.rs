@@ -343,10 +343,19 @@ impl EpochManager {
     }
 
     async fn shutdown_current_processor(&mut self) {
-        // Release the previous RoundManager, especially the SafetyRule client
+        if self.round_manager_tx.is_some() {
+            // Release the previous RoundManager, especially the SafetyRule client
+            let (ack_tx, ack_rx) = oneshot::channel();
+            let event = VerifiedEvent::Shutdown(ack_tx);
+            self.forward_to_round_manager(self.author, event);
+            ack_rx
+                .await
+                .expect("[EpochManager] Fail to drop round manager");
+        }
         self.round_manager_tx = None;
-        self.buffer_manager_msg_tx = None;
+
         // Shutdown the previous buffer manager, to release the SafetyRule client
+        self.buffer_manager_msg_tx = None;
         if let Some(mut tx) = self.buffer_manager_reset_tx.take() {
             let (ack_tx, ack_rx) = oneshot::channel();
             tx.send(ResetRequest {

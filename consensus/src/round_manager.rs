@@ -43,7 +43,7 @@ use diem_types::{
     validator_verifier::ValidatorVerifier,
 };
 use fail::fail_point;
-use futures::{FutureExt, StreamExt};
+use futures::{channel::oneshot, FutureExt, StreamExt};
 #[cfg(test)]
 use safety_rules::ConsensusState;
 use safety_rules::TSafetyRules;
@@ -112,13 +112,16 @@ impl From<ConsensusMsg> for UnverifiedEvent {
 
 #[derive(Debug)]
 pub enum VerifiedEvent {
+    // network messages
     ProposalMsg(Box<ProposalMsg>),
     VoteMsg(Box<VoteMsg>),
     SyncInfo(Box<SyncInfo>),
     CommitVote(Box<CommitVote>),
     CommitDecision(Box<CommitDecision>),
     BlockRetrievalRequest(Box<IncomingBlockRetrievalRequest>),
+    // local messages
     LocalTimeout(Round),
+    Shutdown(oneshot::Sender<()>),
 }
 
 #[cfg(test)]
@@ -861,6 +864,12 @@ impl RoundManager {
                     "process_local_timeout",
                     self.process_local_timeout(round).await
                 ),
+                VerifiedEvent::Shutdown(ack_sender) => {
+                    ack_sender
+                        .send(())
+                        .expect("[RoundManager] Fail to ack shutdown");
+                    break;
+                }
                 unexpected_event => unreachable!("Unexpected event: {:?}", unexpected_event),
             }
             .with_context(|| format!("from peer {}", peer_id));
@@ -874,6 +883,7 @@ impl RoundManager {
                 }
             }
         }
+        info!(epoch = self.epoch_state().epoch, "RoundManager stopped");
     }
 
     /// Given R1 <- B2 if R1 has the reconfiguration txn, we inject error on B2 if R1.round + 1 = B2.round
