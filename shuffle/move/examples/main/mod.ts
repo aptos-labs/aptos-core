@@ -7,8 +7,27 @@ import * as codegen from "./generated/diemStdlib/mod.ts";
 import * as context from "./context.ts";
 import * as devapi from "./devapi.ts";
 import * as util from "https://deno.land/std@0.85.0/node/util.ts";
+import { green } from "https://deno.land/x/nanocolors@0.1.12/mod.ts";
 
 const textEncoder = new util.TextEncoder();
+
+await printWelcome();
+
+function highlight(content: string) {
+  return green(content);
+}
+
+export async function printWelcome() {
+  console.log(`Loading Project ${highlight(context.projectPath)}`);
+  console.log(`Sender Account Address ${highlight(context.senderAddress)}`);
+  console.log(
+    `"helpers", "devapi", "context", "main", "codegen", "help" top level objects available`,
+  );
+  console.log(`Run "help" for more information on top level objects`);
+  console.log(`Connecting to Node ${highlight(context.nodeUrl)}`);
+  console.log(await devapi.ledgerInfo());
+  console.log();
+}
 
 // ScriptFunction example; client side creation and signing of transactions.
 // https://github.com/diem/diem/blob/main/json-rpc/docs/method_submit.md#method-submit

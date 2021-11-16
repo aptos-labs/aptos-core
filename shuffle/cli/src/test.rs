@@ -82,7 +82,6 @@ fn create_account(
     Ok(new_account)
 }
 
-// Run shuffle test using deno
 pub fn run_deno_test(
     home: &Home,
     project_path: &Path,
@@ -91,12 +90,27 @@ pub fn run_deno_test(
     key_path: &Path,
     sender_address: AccountAddress,
 ) -> Result<()> {
-    let tests_path_string = project_path
-        .join("e2e")
-        .as_path()
-        .to_string_lossy()
-        .to_string();
+    let test_path = project_path.join("e2e");
+    run_deno_test_at_path(
+        home,
+        project_path,
+        json_rpc_url,
+        dev_api_url,
+        key_path,
+        sender_address,
+        &test_path,
+    )
+}
 
+pub fn run_deno_test_at_path(
+    home: &Home,
+    project_path: &Path,
+    json_rpc_url: &Url,
+    dev_api_url: &Url,
+    key_path: &Path,
+    sender_address: AccountAddress,
+    test_path: &Path,
+) -> Result<()> {
     let filtered_envs = shared::get_filtered_envs_for_deno(
         home,
         project_path,
@@ -108,7 +122,7 @@ pub fn run_deno_test(
         .args([
             "test",
             "--unstable",
-            tests_path_string.as_str(),
+            test_path.to_string_lossy().as_ref(),
             "--allow-env=PROJECT_PATH,SHUFFLE_HOME,SHUFFLE_NETWORK,PRIVATE_KEY_PATH,SENDER_ADDRESS",
             "--allow-read",
             format!(

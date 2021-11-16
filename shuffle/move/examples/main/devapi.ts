@@ -10,22 +10,41 @@
 // deno-lint-ignore-file no-explicit-any
 // deno-lint-ignore-file ban-types
 import * as context from "./context.ts";
+import { delay } from "https://deno.land/std@0.114.0/async/delay.ts";
 
-console.log(await ledgerInfo());
-
+// Retrieves the ledger information as defined by the root /
+// of the Developer API
 export async function ledgerInfo() {
   return await checkingFetch(context.relativeUrl("/"));
 }
 
-export async function transactions(versionOrHash?: string) {
-  if (versionOrHash) {
-    return await checkingFetch(
-      context.relativeUrl(`/transactions/${versionOrHash}`),
-    );
-  }
+// Returns a list of transactions, ascending from page 0.
+export async function transactions() {
+  // TODO: Have below return a list of transactions desc by sequence number
   return await checkingFetch(context.relativeUrl("/transactions"));
 }
 
+// Returns a specific transaction based on the version or hash.
+export async function transaction(versionOrHash: string) {
+  return await checkingFetch(
+    context.relativeUrl(`/transactions/${versionOrHash}`),
+  );
+}
+
+// Polls for a specific transaction to complete, returning the `success`
+// field when no longer pending.
+export async function transactionSuccess(versionOrHash: string): Promise<boolean> {
+  for (let i = 0; i < 20; i++) {
+    const txn = await transaction(versionOrHash);
+    if (txn.type !== "pending_transaction") {
+      return txn.success;
+    }
+    await delay(500);
+  }
+  throw `txn ${versionOrHash} never completed`;
+}
+
+// Returns transactions specific to a particular address.
 export async function accountTransactions(addr?: string) {
   addr = context.addressOrDefault(addr);
   return await checkingFetch(
@@ -33,6 +52,7 @@ export async function accountTransactions(addr?: string) {
   );
 }
 
+// Returns resources for a specific address.
 // deno-lint-ignore ban-types
 export async function resources(addr?: string): Promise<object[]> {
   addr = context.addressOrDefault(addr);
@@ -41,17 +61,13 @@ export async function resources(addr?: string): Promise<object[]> {
   );
 }
 
+// Returns modules for a specific address, or the default account.
 export async function modules(addr?: string) {
   addr = context.addressOrDefault(addr);
   return await checkingFetch(context.relativeUrl(`/accounts/${addr}/modules`));
 }
 
-// Gets the sender address's account resource from the developer API.
-// Example payload below:
-// {
-//   "type": "0x1::DiemAccount::DiemAccount",
-//   "value": {
-//     "sequence_number": "2",
+// Gets the account resource for a particular adress, or the default account.
 export async function account(addr?: string) {
   addr = context.addressOrDefault(addr);
   const res = await resources(addr);
@@ -61,6 +77,8 @@ export async function account(addr?: string) {
     );
 }
 
+// Returns the sequence number for a particular address, or the default account
+// for the console if no address is passed.
 export async function sequenceNumber(addr?: string): Promise<number> {
   const acc: any = await account(addr);
   if (acc) {
@@ -73,6 +91,7 @@ export async function accounts() {
   return [await account()];
 }
 
+// POSTs a BCS payload to the /transactions endpoint in the developer API.
 export async function postTransactionBcs(
   body: string | Uint8Array,
 ): Promise<any> {
@@ -86,6 +105,8 @@ export async function postTransactionBcs(
   return await checkingFetch(context.relativeUrl("/transactions"), settings);
 }
 
+// POSTs a JSON payload to the /transactions/signing_message endpoint in the
+// developer API to get the signing message for a payload.
 export async function postTransactionSigningMessage(
   body: string,
 ): Promise<any> {
@@ -101,6 +122,7 @@ export async function postTransactionSigningMessage(
   );
 }
 
+// POSTs a JSON payload to the /transactions endpoint in the developer API.
 export async function postTransactionJson(body: string): Promise<any> {
   return await checkingFetch(context.relativeUrl("/transactions"), {
     method: "POST",

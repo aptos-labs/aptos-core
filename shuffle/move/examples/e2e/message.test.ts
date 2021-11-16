@@ -5,10 +5,8 @@
 
 import {
   assert,
-  fail,
+  assertEquals,
 } from "https://deno.land/std@0.85.0/testing/asserts.ts";
-import * as DiemHelpers from "../main/helpers.ts";
-import * as context from "../main/context.ts";
 import * as devapi from "../main/devapi.ts";
 import * as main from "../main/mod.ts";
 
@@ -17,23 +15,21 @@ Deno.test("Test Assert", () => {
 });
 
 Deno.test("Ability to set message", async () => {
-  console.log("Test sender address: " + context.senderAddress);
-  console.log("Test receiver address: " + context.receiverAddress);
-  await main.setMessageScriptFunction(
-    "hello blockchain",
-  );
+  const txn = await main.setMessageScriptFunction("hello blockchain");
 
-  for (let i = 0; i < 10; i++) {
-    const messageResource = (await devapi.resourcesWithName("MessageHolder"))[0];
-    if (messageResource !== undefined) {
-      const result = DiemHelpers.hexToAscii(messageResource["value"]["message"])
-        .toString() === "\x00hello blockchain";
-      if (result) {
-        return;
-      }
-    }
-    await new Promise((r) => setTimeout(r, 1000));
-  }
+  assert(await devapi.transactionSuccess(txn.hash)); // wait for txn to succeed
 
-  fail("Message was not set properly");
+  const expected = "\x00hello blockchain"; // prefixed with \x00 bc of bcs encoding
+  const messages = await main.decodedMessages();
+  assertEquals(messages[0], expected);
+});
+
+Deno.test("Ability to set NFTs", async () => {
+  const contentUri = "https://placekitten.com/200/300";
+  const txn = await main.createTestNFTScriptFunction(contentUri);
+
+  assert(await devapi.transactionSuccess(txn.hash)); // wait for txn to succeed
+
+  const uris = await main.decodedNFTs();
+  assertEquals(uris[0], "\x00" + contentUri);
 });

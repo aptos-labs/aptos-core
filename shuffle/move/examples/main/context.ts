@@ -4,7 +4,6 @@
 import * as path from "https://deno.land/std@0.110.0/path/mod.ts";
 import urlcat from "https://deno.land/x/urlcat@v2.0.4/src/index.ts";
 import { BcsDeserializer } from "./generated/bcs/mod.ts";
-import { green } from "https://deno.land/x/nanocolors@0.1.12/mod.ts";
 import { isURL } from "https://deno.land/x/is_url@v1.0.1/mod.ts";
 
 export const shuffleDir = String(Deno.env.get("SHUFFLE_HOME"));
@@ -27,19 +26,6 @@ export const receiverAddressPath = path.join(
   "accounts/test/address",
 );
 export const receiverAddress = await Deno.readTextFile(receiverAddressPath);
-
-function highlight(content: string) {
-  return green(content);
-}
-
-console.log(`Loading Project ${highlight(projectPath)}`);
-console.log(`Sender Account Address ${highlight(senderAddress)}`);
-console.log(
-  `"helpers", "devapi", "context", "main", "codegen", "help" top level objects available`,
-);
-console.log(`Run "help" for more information on top level objects`);
-console.log(`Connecting to Node ${highlight(nodeUrl)}`);
-console.log();
 
 export function privateKey(): Uint8Array {
   return privateKeyBytes.slice(0);

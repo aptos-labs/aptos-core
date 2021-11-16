@@ -5,7 +5,8 @@ use forge::{forge_main, ForgeConfig, LocalFactory, Options, Result};
 use shuffle_integration_tests::*;
 
 fn main() -> Result<()> {
-    let tests = ForgeConfig::default().with_admin_tests(&[&SetMessageHelloBlockchain]);
+    let tests = ForgeConfig::default()
+        .with_admin_tests(&[&SamplePackageEndToEnd, &TypescriptSdkIntegration]);
     let options = Options::from_args();
     forge_main(tests, LocalFactory::from_workspace()?, &options)
 }
