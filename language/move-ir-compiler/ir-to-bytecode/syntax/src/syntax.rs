@@ -15,7 +15,7 @@ use move_symbol_pool::Symbol;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ParseError<L, E> {
-    InvalidToken { location: L },
+    InvalidToken { location: L, message: String },
     User { location: L, error: E },
 }
 
@@ -28,7 +28,10 @@ where
         use self::ParseError::*;
         match *self {
             User { ref error, .. } => write!(f, "{}", error),
-            InvalidToken { ref location } => write!(f, "Invalid token at {}", location),
+            InvalidToken {
+                ref location,
+                ref message,
+            } => write!(f, "Invalid token at {}: {}", location, message),
         }
     }
 }
@@ -68,6 +71,7 @@ fn consume_token(tokens: &mut Lexer, tok: Tok) -> Result<(), ParseError<Loc, any
     if tokens.peek() != tok {
         return Err(ParseError::InvalidToken {
             location: current_token_loc(tokens),
+            message: format!("expected {:?}, not {:?}", tok, tokens.peek()),
         });
     }
     tokens.advance()?;
@@ -134,6 +138,7 @@ fn parse_name(tokens: &mut Lexer) -> Result<Symbol, ParseError<Loc, anyhow::Erro
     if tokens.peek() != Tok::NameValue {
         return Err(ParseError::InvalidToken {
             location: current_token_loc(tokens),
+            message: "expected Tok::NameValue".to_string(),
         });
     }
     let name = tokens.content();
@@ -145,6 +150,7 @@ fn parse_name_begin_ty(tokens: &mut Lexer) -> Result<Symbol, ParseError<Loc, any
     if tokens.peek() != Tok::NameBeginTyValue {
         return Err(ParseError::InvalidToken {
             location: current_token_loc(tokens),
+            message: "expected Tok::NameBeginTyValue".to_string(),
         });
     }
     let s = tokens.content();
@@ -160,6 +166,7 @@ fn parse_dot_name<'input>(
     if tokens.peek() != Tok::DotNameValue {
         return Err(ParseError::InvalidToken {
             location: current_token_loc(tokens),
+            message: "expected Tok::DotNameValue".to_string(),
         });
     }
     let name = tokens.content();
@@ -177,6 +184,7 @@ fn parse_account_address(
     if tokens.peek() != Tok::AccountAddressValue {
         return Err(ParseError::InvalidToken {
             location: current_token_loc(tokens),
+            message: "expected Tok::AccountAddressValue".to_string(),
         });
     }
     let addr = AccountAddress::from_hex_literal(tokens.content())
@@ -297,9 +305,10 @@ fn parse_copyable_val(tokens: &mut Lexer) -> Result<CopyableVal, ParseError<Loc,
             tokens.advance()?;
             CopyableVal_::ByteArray(buf)
         }
-        _ => {
+        t => {
             return Err(ParseError::InvalidToken {
                 location: current_token_loc(tokens),
+                message: format!("unrecognized token kind {:?}", t),
             })
         }
     };
@@ -447,9 +456,13 @@ fn parse_qualified_function_name(
                 type_actuals,
             }
         }
-        _ => {
+        t => {
             return Err(ParseError::InvalidToken {
                 location: current_token_loc(tokens),
+                message: format!(
+                    "unrecognized token kind for qualified function name {:?}",
+                    t
+                ),
             })
         }
     };
@@ -665,8 +678,9 @@ fn parse_term_(tokens: &mut Lexer) -> Result<Exp_, ParseError<Loc, anyhow::Error
             consume_token(tokens, Tok::RParen)?;
             Ok(Exp_::ExprList(exps))
         }
-        _ => Err(ParseError::InvalidToken {
+        t => Err(ParseError::InvalidToken {
             location: current_token_loc(tokens),
+            message: format!("unrecognized token kind for term {:?}", t),
         }),
     }
 }
@@ -712,6 +726,7 @@ fn consume_end_of_generics(tokens: &mut Lexer) -> Result<(), ParseError<Loc, any
         }
         _ => Err(ParseError::InvalidToken {
             location: current_token_loc(tokens),
+            message: "expected Tok::Greater or Tok::GreaterGreater".to_string(),
         }),
     }
 }
@@ -814,8 +829,9 @@ fn parse_builtin(tokens: &mut Lexer) -> Result<Builtin, ParseError<Loc, anyhow::
             tokens.advance()?;
             Ok(Builtin::ToU128)
         }
-        _ => Err(ParseError::InvalidToken {
+        t => Err(ParseError::InvalidToken {
             location: current_token_loc(tokens),
+            message: format!("unrecognized token kind for builtin {:?}", t),
         }),
     }
 }
@@ -841,8 +857,9 @@ fn parse_lvalue_(tokens: &mut Lexer) -> Result<LValue_, ParseError<Loc, anyhow::
             tokens.advance()?;
             Ok(LValue_::Pop)
         }
-        _ => Err(ParseError::InvalidToken {
+        t => Err(ParseError::InvalidToken {
             location: current_token_loc(tokens),
+            message: format!("unrecognized token kind for lvalue {:?}", t),
         }),
     }
 }
@@ -894,6 +911,7 @@ fn parse_assign_(tokens: &mut Lexer) -> Result<Cmd_, ParseError<Loc, anyhow::Err
     if lvalues.is_empty() {
         return Err(ParseError::InvalidToken {
             location: current_token_loc(tokens),
+            message: "could not parse lvalues in assignment".to_string(),
         });
     }
     consume_token(tokens, Tok::Equal)?;
@@ -996,8 +1014,9 @@ fn parse_cmd_(tokens: &mut Lexer) -> Result<Cmd_, ParseError<Loc, anyhow::Error>
                 Exp_::ExprList(v),
             ))))
         }
-        _ => Err(ParseError::InvalidToken {
+        t => Err(ParseError::InvalidToken {
             location: current_token_loc(tokens),
+            message: format!("invalid token kind for cmd {:?}", t),
         }),
     }
 }
@@ -1187,6 +1206,7 @@ fn parse_ability(tokens: &mut Lexer) -> Result<(Ability, Loc), ParseError<Loc, a
         None => {
             return Err(ParseError::InvalidToken {
                 location: current_token_loc(tokens),
+                message: "could not parse ability".to_string(),
             })
         }
     };
@@ -1254,9 +1274,10 @@ fn parse_type(tokens: &mut Lexer) -> Result<Type, ParseError<Loc, anyhow::Error>
             Type::Reference(true, Box::new(parse_type(tokens)?))
         }
         Tok::NameValue => Type::TypeParameter(TypeVar_(parse_name(tokens)?)),
-        _ => {
+        t => {
             return Err(ParseError::InvalidToken {
                 location: current_token_loc(tokens),
+                message: format!("invalid token kind for type {:?}", t),
             })
         }
     };
@@ -1690,10 +1711,11 @@ fn parse_spec_condition(tokens: &mut Lexer) -> Result<Condition_, ParseError<Loc
             tokens.advance()?;
             Condition_::SucceedsIf(parse_spec_exp(tokens)?)
         }
-        _ => {
+        t => {
             tokens.spec_mode = false;
             return Err(ParseError::InvalidToken {
                 location: current_token_loc(tokens),
+                message: format!("invalid token kind for spec condition {:?}", t),
             });
         }
     });
@@ -1785,9 +1807,10 @@ fn parse_function_visibility(
             let sub_token = tokens.peek();
             match &sub_token {
                 Tok::Script | Tok::Friend => (),
-                _ => {
+                t => {
                     return Err(ParseError::InvalidToken {
                         location: current_token_loc(tokens),
+                        message: format!("expected Tok::Script or Tok::Friend, not {:?}", t),
                     });
                 }
             }

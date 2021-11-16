@@ -387,10 +387,13 @@ impl<'input> Lexer<'input> {
             '}' => (Tok::RBrace, 1),
             '[' => (Tok::LSquare, 1), // for vector specs
             ']' => (Tok::RSquare, 1), // for vector specs
-            _ => {
+            c => {
                 let idx = start_offset as u32;
                 let location = Loc::new(self.file_hash(), idx, idx);
-                return Err(ParseError::InvalidToken { location });
+                return Err(ParseError::InvalidToken {
+                    location,
+                    message: format!("unrecognized character for token {:?}", c),
+                });
             }
         };
 

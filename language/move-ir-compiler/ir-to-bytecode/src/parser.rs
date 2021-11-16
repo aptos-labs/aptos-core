@@ -56,15 +56,14 @@ pub fn parse_module(modules_str: &str) -> Result<ast::ModuleDefinition> {
 
 fn handle_error<T>(e: syntax::ParseError<Loc, anyhow::Error>, code_str: &str) -> Result<T> {
     let location = match &e {
-        ParseError::InvalidToken { location } => location,
+        ParseError::InvalidToken { location, .. } => location,
         ParseError::User { location, .. } => location,
     };
     let mut files = SimpleFiles::new();
     let id = files.add(location.file_hash(), code_str.to_string());
     let lbl = match &e {
-        ParseError::InvalidToken { .. } => {
-            Label::primary(id, location.usize_range()).with_message("Invalid Token")
-        }
+        ParseError::InvalidToken { message, .. } => Label::primary(id, location.usize_range())
+            .with_message(format!("Invalid Token: {}", message)),
         ParseError::User { error, .. } => {
             Label::primary(id, location.usize_range()).with_message(format!("{}", error))
         }
