@@ -12,8 +12,10 @@ test-code-gen:
 	cd /tmp/diem_api_client && cargo build
 
 clean:
+	- pkill diem-node
 	- rm -rf /tmp/diem_api_client
 	- rm -f openapitools.json
+	- rm -rf .hypothesis
 
 test-api-spec:
 	- pkill diem-node
