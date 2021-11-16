@@ -597,20 +597,19 @@ impl<T: ExecutorProxyTrait, M: MempoolNotificationSender> StateSyncCoordinator<T
         let mempool_notifier = self.mempool_notifier.clone();
         let mempool_commit_timeout_ms = self.config.mempool_commit_timeout_ms;
 
-        // Spawn new task to asynchronously notify mempool of committed transactions
-        tokio::spawn(async move {
-            let send_notification = mempool_notifier.notify_new_commit(
-                committed_transactions,
-                block_timestamp_usecs,
-                mempool_commit_timeout_ms,
-            );
-            if let Err(error) = send_notification.await {
-                counters::COMMIT_FLOW_FAIL
-                    .with_label_values(&[counters::MEMPOOL_LABEL])
-                    .inc();
-                error!(LogSchema::new(LogEntry::CommitFlow).error(&error.into()));
-            }
-        });
+        // TODO: we'd like to move the heavy part off the critical path (spawned future), but we'll need to have a lightweight
+        // notification just to update the cached state view
+        let send_notification = mempool_notifier.notify_new_commit(
+            committed_transactions,
+            block_timestamp_usecs,
+            mempool_commit_timeout_ms,
+        );
+        if let Err(error) = send_notification.await {
+            counters::COMMIT_FLOW_FAIL
+                .with_label_values(&[counters::MEMPOOL_LABEL])
+                .inc();
+            error!(LogSchema::new(LogEntry::CommitFlow).error(&error.into()));
+        }
     }
 
     /// Updates the metrics and logs based on the current (local) sync state.
