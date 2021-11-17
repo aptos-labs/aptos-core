@@ -5460,3 +5460,9 @@ Used in transaction script to specify properties checked by the prologue.
     <b>requires</b> <a href="DiemAccount.md#0x1_DiemAccount_prologue_guarantees">prologue_guarantees</a>(sender);
 }
 </code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
