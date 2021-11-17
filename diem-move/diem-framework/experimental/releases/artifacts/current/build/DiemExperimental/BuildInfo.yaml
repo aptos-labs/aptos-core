@@ -2,6 +2,7 @@
 compiled_package_info:
   package_name: DiemExperimental
   address_alias_instantiation:
+    BARS: 34cd440b72d03907100007d7bc0080a1
     CurrencyInfo: 0000000000000000000000000a550c18
     DiemFramework: "00000000000000000000000000000001"
     DiemRoot: 0000000000000000000000000a550c18
@@ -174,7 +175,7 @@ compiled_package_info:
     ? address: "00000000000000000000000000000001"
       name: XUS
     : DiemFramework
-  source_digest: AE081CABEE35CB12DA83AF487F8859E82E4A4D885E867DEC36C93A919C2ED83C
+  source_digest: C350F8F44273597A54929DE5986842CD966D996EDBF614C705E9D1D3FCE52D6D
   build_flags:
     dev_mode: false
     test_mode: false

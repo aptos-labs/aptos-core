@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-import * as path from "https://deno.land/std@0.110.0/path/mod.ts";
+import * as _path from "https://deno.land/std@0.110.0/path/mod.ts";
 import urlcat from "https://deno.land/x/urlcat@v2.0.4/src/index.ts";
 import { BcsDeserializer } from "./generated/bcs/mod.ts";
 import { isURL } from "https://deno.land/x/is_url@v1.0.1/mod.ts";

@@ -1523,6 +1523,7 @@ dependencies = [
  "bcs",
  "diem-json-rpc-types",
  "diem-sdk",
+ "diem-transaction-builder",
  "diem-types",
  "diem-workspace-hack",
  "generate-key",

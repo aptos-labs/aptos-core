@@ -11,6 +11,7 @@ edition = "2018"
 [dependencies]
 diem-json-rpc-types = { path = "../../../../json-rpc/types" }
 diem-sdk = { path = "../../../../sdk" }
+diem-transaction-builder = { path = "../../../../sdk/transaction-builder"}
 diem-types = { path = "../../../../types" }
 diem-workspace-hack = { path = "../../../../common/workspace-hack" }
 generate-key = { path = "../../../../config/generate-key" }

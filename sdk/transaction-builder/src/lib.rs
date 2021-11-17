@@ -4,4 +4,5 @@
 #![forbid(unsafe_code)]
 
 pub mod error_explain;
+pub mod experimental_stdlib;
 pub mod stdlib;

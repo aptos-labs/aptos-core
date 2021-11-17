@@ -343,12 +343,12 @@ fn main() {
                 feature,
                 "../../diem-move/diem-framework/DPN/sources",
             );
-            collect_enabled_tests(
-                &mut reqs,
-                "diem_exp",
-                feature,
-                "../../diem-move/diem-framework/experimental/sources",
-            );
+            // collect_enabled_tests(
+            //     &mut reqs,
+            //     "diem_exp",
+            //     feature,
+            //     "../../diem-move/diem-framework/experimental/sources",
+            // );
         }
     }
     datatest_stable::runner(&reqs);

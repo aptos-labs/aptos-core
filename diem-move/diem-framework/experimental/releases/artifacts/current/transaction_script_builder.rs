@@ -2202,6 +2202,14 @@ pub enum ScriptFunctionCall {
     /// | `Errors::REQUIRES_ADDRESS` | `CoreAddresses::EDIEM_ROOT`                   | `account` is not the Diem Root account.                                                    |
     InitializeDiemConsensusConfig { sliding_nonce: u64 },
 
+    /// BARS account mints `amount` copies of BARS tokens to the artist's account.
+    MintBars {
+        artist: AccountAddress,
+        artist_name: Bytes,
+        content_uri: Bytes,
+        amount: u64,
+    },
+
     /// Initialize this module
     NftInitialize {},
 
@@ -2417,6 +2425,12 @@ pub enum ScriptFunctionCall {
     /// # Related Scripts
     /// * `AccountAdministrationScripts::rotate_shared_ed25519_public_key`
     PublishSharedEd25519PublicKey { public_key: Bytes },
+
+    /// Call this function to set up relevant resources in order to
+    /// mint and receive tokens.
+    /// Note that this also gives BARS account a capability to mint BARS NFTs on behalf of the user.
+    /// (the NFTs of other types cannot be created by BARS account).
+    RegisterBarsUser {},
 
     /// # Summary
     /// Updates a validator's configuration. This does not reconfigure the system and will not update
@@ -3610,6 +3624,12 @@ impl ScriptFunctionCall {
             InitializeDiemConsensusConfig { sliding_nonce } => {
                 encode_initialize_diem_consensus_config_script_function(sliding_nonce)
             }
+            MintBars {
+                artist,
+                artist_name,
+                content_uri,
+                amount,
+            } => encode_mint_bars_script_function(artist, artist_name, content_uri, amount),
             NftInitialize {} => encode_nft_initialize_script_function(),
             OptInToCrsn { crsn_size } => encode_opt_in_to_crsn_script_function(crsn_size),
             PeerToPeerBySigners {
@@ -3634,6 +3654,7 @@ impl ScriptFunctionCall {
             PublishSharedEd25519PublicKey { public_key } => {
                 encode_publish_shared_ed25519_public_key_script_function(public_key)
             }
+            RegisterBarsUser {} => encode_register_bars_user_script_function(),
             RegisterValidatorConfig {
                 validator_account,
                 consensus_pubkey,
@@ -4834,6 +4855,29 @@ pub fn encode_initialize_diem_consensus_config_script_function(
     ))
 }
 
+/// BARS account mints `amount` copies of BARS tokens to the artist's account.
+pub fn encode_mint_bars_script_function(
+    artist: AccountAddress,
+    artist_name: Vec<u8>,
+    content_uri: Vec<u8>,
+    amount: u64,
+) -> TransactionPayload {
+    TransactionPayload::ScriptFunction(ScriptFunction::new(
+        ModuleId::new(
+            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            ident_str!("BARSToken").to_owned(),
+        ),
+        ident_str!("mint_bars").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&artist).unwrap(),
+            bcs::to_bytes(&artist_name).unwrap(),
+            bcs::to_bytes(&content_uri).unwrap(),
+            bcs::to_bytes(&amount).unwrap(),
+        ],
+    ))
+}
+
 /// Initialize this module
 pub fn encode_nft_initialize_script_function() -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
@@ -5117,6 +5161,22 @@ pub fn encode_publish_shared_ed25519_public_key_script_function(
         ident_str!("publish_shared_ed25519_public_key").to_owned(),
         vec![],
         vec![bcs::to_bytes(&public_key).unwrap()],
+    ))
+}
+
+/// Call this function to set up relevant resources in order to
+/// mint and receive tokens.
+/// Note that this also gives BARS account a capability to mint BARS NFTs on behalf of the user.
+/// (the NFTs of other types cannot be created by BARS account).
+pub fn encode_register_bars_user_script_function() -> TransactionPayload {
+    TransactionPayload::ScriptFunction(ScriptFunction::new(
+        ModuleId::new(
+            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            ident_str!("BARSToken").to_owned(),
+        ),
+        ident_str!("register_bars_user").to_owned(),
+        vec![],
+        vec![],
     ))
 }
 
@@ -8155,6 +8215,19 @@ fn decode_initialize_diem_consensus_config_script_function(
     }
 }
 
+fn decode_mint_bars_script_function(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
+    if let TransactionPayload::ScriptFunction(script) = payload {
+        Some(ScriptFunctionCall::MintBars {
+            artist: bcs::from_bytes(script.args().get(0)?).ok()?,
+            artist_name: bcs::from_bytes(script.args().get(1)?).ok()?,
+            content_uri: bcs::from_bytes(script.args().get(2)?).ok()?,
+            amount: bcs::from_bytes(script.args().get(3)?).ok()?,
+        })
+    } else {
+        None
+    }
+}
+
 fn decode_nft_initialize_script_function(
     payload: &TransactionPayload,
 ) -> Option<ScriptFunctionCall> {
@@ -8225,6 +8298,16 @@ fn decode_publish_shared_ed25519_public_key_script_function(
         Some(ScriptFunctionCall::PublishSharedEd25519PublicKey {
             public_key: bcs::from_bytes(script.args().get(0)?).ok()?,
         })
+    } else {
+        None
+    }
+}
+
+fn decode_register_bars_user_script_function(
+    payload: &TransactionPayload,
+) -> Option<ScriptFunctionCall> {
+    if let TransactionPayload::ScriptFunction(_script) = payload {
+        Some(ScriptFunctionCall::RegisterBarsUser {})
     } else {
         None
     }
@@ -9024,6 +9107,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<ScriptFunctionDecoderM
             Box::new(decode_initialize_diem_consensus_config_script_function),
         );
         map.insert(
+            "BARSTokenmint_bars".to_string(),
+            Box::new(decode_mint_bars_script_function),
+        );
+        map.insert(
             "NFTnft_initialize".to_string(),
             Box::new(decode_nft_initialize_script_function),
         );
@@ -9046,6 +9133,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<ScriptFunctionDecoderM
         map.insert(
             "AccountAdministrationScriptspublish_shared_ed25519_public_key".to_string(),
             Box::new(decode_publish_shared_ed25519_public_key_script_function),
+        );
+        map.insert(
+            "BARSTokenregister_bars_user".to_string(),
+            Box::new(decode_register_bars_user_script_function),
         );
         map.insert(
             "ValidatorAdministrationScriptsregister_validator_config".to_string(),
