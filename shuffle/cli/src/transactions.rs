@@ -10,6 +10,7 @@ use url::Url;
 
 // Will list the last 10 transactions and has the ability to block and stream future transactions.
 pub async fn handle(network: Url, tail: bool, address: AccountAddress, raw: bool) -> Result<()> {
+    println!("====================={}", address);
     let client = DevApiClient::new(reqwest::Client::new(), network)?;
     let account_seq_num = client.get_account_sequence_number(address).await?;
     let mut prev_seq_num = max(account_seq_num as i64 - 10, 0);
