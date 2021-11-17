@@ -8534,7 +8534,9 @@ name = "testcases"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "bcs",
  "diem-logger",
+ "diem-operational-tool",
  "diem-sdk",
  "diem-workspace-hack",
  "forge",

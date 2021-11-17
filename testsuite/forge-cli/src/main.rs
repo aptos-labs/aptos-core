@@ -10,8 +10,9 @@ use forge::{ForgeConfig, Options, Result, *};
 use std::{env, num::NonZeroUsize, process, time::Duration};
 use structopt::StructOpt;
 use testcases::{
-    compatibility_test::SimpleValidatorUpgrade, generate_traffic,
-    performance_test::PerformanceBenchmark,
+    compatibility_test::SimpleValidatorUpgrade, fixed_tps_test::FixedTpsTest,
+    gas_price_test::NonZeroGasPrice, generate_traffic, partial_nodes_down_test::PartialNodesDown,
+    performance_test::PerformanceBenchmark, reconfiguration_test::ReconfigurationTest,
 };
 use url::Url;
 
@@ -231,6 +232,7 @@ fn get_test_suite(suite_name: &str) -> ForgeConfig<'static> {
     match suite_name {
         "land_blocking_compat" => land_blocking_test_compat_suite(),
         "land_blocking" => land_blocking_test_suite(),
+        "pre_release" => pre_release_suite(),
         _ => k8s_test_suite(),
     }
 }
@@ -263,6 +265,20 @@ fn land_blocking_test_compat_suite() -> ForgeConfig<'static> {
         .with_initial_validator_count(NonZeroUsize::new(30).unwrap())
         .with_network_tests(&[&SimpleValidatorUpgrade, &PerformanceBenchmark])
         .with_initial_version(InitialVersion::Oldest)
+}
+
+fn pre_release_suite() -> ForgeConfig<'static> {
+    // please keep tests order in this suite
+    // since later tests node version rely on first test
+    ForgeConfig::default()
+        .with_initial_validator_count(NonZeroUsize::new(30).unwrap())
+        .with_network_tests(&[
+            &FixedTpsTest,
+            &PerformanceBenchmark,
+            &NonZeroGasPrice,
+            &PartialNodesDown,
+            &ReconfigurationTest,
+        ])
 }
 
 //TODO Make public test later

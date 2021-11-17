@@ -418,7 +418,8 @@ impl<'t, 'd> TxnEmitter<'t, 'd> {
         while i < seed_account_num {
             let client = self.pick_mint_client(json_rpc_clients).clone();
             let batch_size = min(MAX_TXN_BATCH_SIZE, seed_account_num - i);
-            let mut batch = gen_random_accounts(batch_size, self.rng());
+            let mut rng = self.from_rng();
+            let mut batch = gen_random_accounts(batch_size, &mut rng);
             let creation_account = &mut self.treasury_compliance_account;
             let txn_factory = &self.txn_factory;
             let create_requests = batch
