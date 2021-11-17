@@ -20,9 +20,9 @@ structopt = "0.3.21"
 termion = "1.5.6"
 tokio = { version = "1.8.1", features = ["full"] }
 
-diem-client = { path = "../../sdk/client"}
+diem-client = { path = "../diem-client"}
 diem-config = { path = "../../config" }
-diem-crypto = { path = "../../crates/diem-crypto" }
+diem-crypto = { path = "../diem-crypto" }
 diem-logger = { path = "../../common/logger" }
 diem-sdk = { path = "../../sdk" }
 diem-workspace-hack = { path = "../../common/workspace-hack" }

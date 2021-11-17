@@ -16,8 +16,8 @@ serde_json = "1.0.64"
 structopt = "0.3.21"
 
 bcs = "0.1.2"
-diem-client = { path = "../../sdk/client", features = ["blocking"], default-features = false }
-diem-crypto = { path = "../../crates/diem-crypto" }
+diem-client = { path = "../diem-client", features = ["blocking"], default-features = false }
+diem-crypto = { path = "../diem-crypto" }
 diem-types = { path = "../../types" }
 move-core-types = { path = "../../language/move-core/types" }
 

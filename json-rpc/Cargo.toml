@@ -30,7 +30,7 @@ regex = { version = "1.4.3", default-features = false, features = ["std", "perf"
 
 bcs = "0.1.2"
 diem-framework-releases= { path = "../diem-move/diem-framework/DPN/releases" }
-diem-client = { path = "../sdk/client", optional = true }
+diem-client = { path = "../crates/diem-client", optional = true }
 diem-config = { path = "../config" }
 diem-crypto = { path = "../crates/diem-crypto" }
 diemdb = { path = "../storage/diemdb", optional = true }
@@ -63,7 +63,7 @@ rand = { version = "0.8.3" }
 generate-key = { path = "../config/generate-key" }
 diemdb = { path = "../storage/diemdb", features = ["fuzzing"] }
 diem-genesis-tool = {path = "../config/management/genesis", features = ["testing"] }
-diem-client = { path = "../sdk/client" }
+diem-client = { path = "../crates/diem-client" }
 diem-mempool = { path = "../mempool", features = ["fuzzing"] }
 diem-proptest-helpers = { path = "../common/proptest-helpers" }
 diem-temppath = { path = "../common/temppath" }

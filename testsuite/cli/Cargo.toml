@@ -30,7 +30,7 @@ crash-handler = { path = "../../common/crash-handler" }
 diem-crypto = { path = "../../crates/diem-crypto" }
 bcs = "0.1.2"
 diem-wallet = { path = "diem-wallet" }
-diem-client = { path = "../../sdk/client" }
+diem-client = { path = "../../crates/diem-client" }
 diem-infallible = { path = "../../common/infallible" }
 diem-logger =  { path = "../../common/logger" }
 diem-metrics = { path = "../../common/metrics" }

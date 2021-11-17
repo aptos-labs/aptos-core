@@ -20,6 +20,6 @@ futures = "0.3.12"
 tokio = { version = "1.8.1", features = ["full"] }
 
 diem-workspace-hack = { path = "../../common/workspace-hack" }
-diem-client = { path = "../../sdk/client" }
+diem-client = { path = "../../crates/diem-client" }
 diem-types = { path = "../../types" }
 bcs = "0.1.2"

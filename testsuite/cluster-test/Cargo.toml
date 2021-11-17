@@ -31,7 +31,7 @@ chrono = "0.4.19"
 toml = { version = "0.5.8", default-features = false }
 
 debug-interface = { path = "../../common/debug-interface"}
-diem-client = { path = "../../sdk/client"}
+diem-client = { path = "../../crates/diem-client"}
 diem-retrier = { path = "../../common/retrier" }
 num_cpus = "1.13.0"
 

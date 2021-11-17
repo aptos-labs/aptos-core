@@ -26,7 +26,7 @@ tokio-util = { version = "0.6.4", features = ["compat"] }
 toml = { version = "0.5.8", default-features = false }
 
 bcs = "0.1.2"
-diem-client = { path = "../../../sdk/client", features = ["blocking"], default-features = false }
+diem-client = { path = "../../../crates/diem-client", features = ["blocking"], default-features = false }
 diem-config = { path = "../.."}
 diem-crypto = { path = "../../../crates/diem-crypto" }
 diem-global-constants = { path = "../../global-constants" }
