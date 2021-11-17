@@ -25,7 +25,7 @@ use std::{
     convert::{Infallible, TryFrom},
     sync::Arc,
 };
-use warp::{Filter, Rejection, Reply};
+use warp::{filters::BoxedFilter, Filter, Reply};
 
 // Context holds application scope context
 #[derive(Clone)]
@@ -228,13 +228,11 @@ impl Context {
             .collect::<Vec<_>>())
     }
 
-    pub fn health_check_route(
-        &self,
-    ) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+    pub fn health_check_route(&self) -> BoxedFilter<(impl Reply,)> {
         diem_json_rpc::runtime::health_check_route(self.db.clone())
     }
 
-    pub fn jsonrpc_routes(&self) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+    pub fn jsonrpc_routes(&self) -> BoxedFilter<(impl Reply,)> {
         diem_json_rpc::runtime::jsonrpc_routes(
             self.db.clone(),
             self.mp_sender.clone(),

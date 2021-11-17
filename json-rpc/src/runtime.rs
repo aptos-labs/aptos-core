@@ -28,9 +28,10 @@ use std::{
 use storage_interface::MoveDbReader;
 use tokio::runtime::{Builder, Runtime};
 use warp::{
+    filters::BoxedFilter,
     http::header,
     reject::{self, Reject},
-    Filter, Rejection, Reply,
+    Filter, Reply,
 };
 
 // Counter labels for runtime metrics
@@ -161,7 +162,7 @@ pub fn jsonrpc_routes(
     role: RoleType,
     chain_id: ChainId,
     config: &JsonRpcConfig,
-) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+) -> BoxedFilter<(impl Reply,)> {
     let service = JsonRpcService::new(
         diem_db.clone(),
         mp_sender,
@@ -208,11 +209,12 @@ pub fn jsonrpc_routes(
         );
 
     // For now we still allow user to use "/", but user should start to move to "/v1" soon
-    let route_root = warp::path::end().and(base_route.clone());
+    let route_root = warp::path::end().and(base_route.clone()).boxed();
 
     let route_v1 = warp::path::path("v1")
         .and(warp::path::end())
-        .and(base_route);
+        .and(base_route)
+        .boxed();
 
     route_root
         .or(route_v1)
@@ -221,17 +223,19 @@ pub fn jsonrpc_routes(
             config.content_length_limit as u64,
             diem_db,
         ))
+        .boxed()
 }
 
 pub fn health_check_route(
     health_diem_db: Arc<dyn MoveDbReader<DpnProto>>,
-) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+) -> BoxedFilter<(impl Reply,)> {
     warp::path!("-" / "healthy")
         .and(warp::path::end())
         .and(warp::query().map(move |params: HealthCheckParams| params))
         .and(warp::any().map(move || health_diem_db.clone()))
         .and(warp::any().map(SystemTime::now))
         .and_then(health_check)
+        .boxed()
 }
 
 async fn health_check(

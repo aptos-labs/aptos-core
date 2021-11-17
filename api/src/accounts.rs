@@ -16,19 +16,10 @@ use diem_types::{
 use anyhow::Result;
 use move_core_types::{identifier::Identifier, language_storage::StructTag, value::MoveValue};
 use std::convert::TryInto;
-use warp::{Filter, Rejection, Reply};
-
-pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
-    get_account_resources(context.clone())
-        .or(get_account_resources_by_ledger_version(context.clone()))
-        .or(get_account_modules(context.clone()))
-        .or(get_account_modules_by_ledger_version(context))
-}
+use warp::{filters::BoxedFilter, Filter, Rejection, Reply};
 
 // GET /accounts/<address>/resources
-pub fn get_account_resources(
-    context: Context,
-) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+pub fn get_account_resources(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path!("accounts" / AddressParam / "resources")
         .and(warp::get())
         .and(context.filter())
@@ -36,12 +27,11 @@ pub fn get_account_resources(
         .untuple_one()
         .and_then(handle_get_account_resources)
         .with(metrics("get_account_resources"))
+        .boxed()
 }
 
 // GET /ledger/<version>/accounts/<address>/resources
-pub fn get_account_resources_by_ledger_version(
-    context: Context,
-) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+pub fn get_account_resources_by_ledger_version(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path!("ledger" / LedgerVersionParam / "accounts" / AddressParam / "resources")
         .and(warp::get())
         .and(context.filter())
@@ -49,12 +39,11 @@ pub fn get_account_resources_by_ledger_version(
         .untuple_one()
         .and_then(handle_get_account_resources)
         .with(metrics("get_account_resources_by_ledger_version"))
+        .boxed()
 }
 
 // GET /accounts/<address>/modules
-pub fn get_account_modules(
-    context: Context,
-) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+pub fn get_account_modules(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path!("accounts" / AddressParam / "modules")
         .and(warp::get())
         .and(context.filter())
@@ -62,12 +51,11 @@ pub fn get_account_modules(
         .untuple_one()
         .and_then(handle_get_account_modules)
         .with(metrics("get_account_modules"))
+        .boxed()
 }
 
 // GET /ledger/<version>/accounts/<address>/modules
-pub fn get_account_modules_by_ledger_version(
-    context: Context,
-) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+pub fn get_account_modules_by_ledger_version(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path!("ledger" / LedgerVersionParam / "accounts" / AddressParam / "modules")
         .and(warp::get())
         .and(context.filter())
@@ -75,6 +63,7 @@ pub fn get_account_modules_by_ledger_version(
         .untuple_one()
         .and_then(handle_get_account_modules)
         .with(metrics("get_account_modules_by_ledger_version"))
+        .boxed()
 }
 
 async fn handle_get_account_resources(

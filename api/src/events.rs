@@ -13,34 +13,28 @@ use diem_api_types::{Error, LedgerInfo, Response};
 
 use anyhow::Result;
 use diem_types::event::EventKey;
-use warp::{Filter, Rejection, Reply};
-
-pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
-    get_events_by_event_key(context.clone()).or(get_events_by_event_handle(context))
-}
+use warp::{filters::BoxedFilter, Filter, Rejection, Reply};
 
 // GET /events/<event_key>
-pub fn get_events_by_event_key(
-    context: Context,
-) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+pub fn get_events_by_event_key(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path!("events" / EventKeyParam)
         .and(warp::get())
         .and(warp::query::<Page>())
         .and(context.filter())
         .and_then(handle_get_events_by_event_key)
         .with(metrics("get_events_by_event_key"))
+        .boxed()
 }
 
 // GET /accounts/<address>/events/<event_handle_struct>/<field_name>
-pub fn get_events_by_event_handle(
-    context: Context,
-) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+pub fn get_events_by_event_handle(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path!("accounts" / AddressParam / "events" / MoveStructTagParam / MoveIdentifierParam)
         .and(warp::get())
         .and(warp::query::<Page>())
         .and(context.filter())
         .and_then(handle_get_events_by_event_handle)
         .with(metrics("get_events_by_event_handle"))
+        .boxed()
 }
 
 async fn handle_get_events_by_event_key(

@@ -19,79 +19,45 @@ use diem_types::{
 
 use anyhow::Result;
 use warp::{
+    filters::BoxedFilter,
     http::{header::CONTENT_TYPE, StatusCode},
     reply, Filter, Rejection, Reply,
 };
 
-pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
-    get_transaction(context.clone())
-        .or(get_transactions(context.clone()))
-        .or(get_account_transactions(context.clone()))
-        .or(submit_bcs_transactions(context.clone()))
-        .or(submit_json_transactions(context.clone()))
-        .or(create_signing_message(context))
-}
-
 // GET /transactions/{txn-hash / version}
-pub fn get_transaction(
-    context: Context,
-) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+pub fn get_transaction(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path!("transactions" / TransactionIdParam)
         .and(warp::get())
         .and(context.filter())
         .and_then(handle_get_transaction)
         .with(metrics("get_transaction"))
-}
-
-async fn handle_get_transaction(
-    id: TransactionIdParam,
-    context: Context,
-) -> Result<impl Reply, Rejection> {
-    Ok(Transactions::new(context)?
-        .get_transaction(id.parse("transaction hash or version")?)
-        .await?)
+        .boxed()
 }
 
 // GET /transactions?start={u64}&limit={u16}
-pub fn get_transactions(
-    context: Context,
-) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+pub fn get_transactions(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path!("transactions")
         .and(warp::get())
         .and(warp::query::<Page>())
         .and(context.filter())
         .and_then(handle_get_transactions)
         .with(metrics("get_transactions"))
-}
-
-async fn handle_get_transactions(page: Page, context: Context) -> Result<impl Reply, Rejection> {
-    Ok(Transactions::new(context)?.list(page)?)
+        .boxed()
 }
 
 // GET /accounts/{address}/transactions?start={u64}&limit={u16}
-pub fn get_account_transactions(
-    context: Context,
-) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+pub fn get_account_transactions(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path!("accounts" / AddressParam / "transactions")
         .and(warp::get())
         .and(warp::query::<Page>())
         .and(context.filter())
         .and_then(handle_get_account_transactions)
         .with(metrics("get_account_transactions"))
-}
-
-async fn handle_get_account_transactions(
-    address: AddressParam,
-    page: Page,
-    context: Context,
-) -> Result<impl Reply, Rejection> {
-    Ok(Transactions::new(context)?.list_by_account(address, page)?)
+        .boxed()
 }
 
 // POST /transactions with JSON
-pub fn submit_json_transactions(
-    context: Context,
-) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+pub fn submit_json_transactions(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path!("transactions")
         .and(warp::post())
         .and(warp::body::content_length_limit(
@@ -101,12 +67,11 @@ pub fn submit_json_transactions(
         .and(context.filter())
         .and_then(handle_submit_json_transactions)
         .with(metrics("submit_json_transactions"))
+        .boxed()
 }
 
 // POST /transactions with BCS
-pub fn submit_bcs_transactions(
-    context: Context,
-) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+pub fn submit_bcs_transactions(context: Context) -> BoxedFilter<(impl Reply,)> {
     // The `warp::body::bytes` does not check content-type like `warp::body::json`,
     // so we used `warp::header::exact` to ensure only BCS signed txn matches this route.
     // When the content-type is invalid (not json / bcs signed txn), `submit_json_transactions`
@@ -125,6 +90,42 @@ pub fn submit_bcs_transactions(
         .and(context.filter())
         .and_then(handle_submit_bcs_transactions)
         .with(metrics("submit_bcs_transactions"))
+        .boxed()
+}
+
+// POST /transactions/signing_message
+pub fn create_signing_message(context: Context) -> BoxedFilter<(impl Reply,)> {
+    warp::path!("transactions" / "signing_message")
+        .and(warp::post())
+        .and(warp::body::content_length_limit(
+            context.content_length_limit(),
+        ))
+        .and(warp::body::json::<UserTransactionRequest>())
+        .and(context.filter())
+        .and_then(handle_create_signing_message)
+        .with(metrics("create_signing_message"))
+        .boxed()
+}
+
+async fn handle_get_transaction(
+    id: TransactionIdParam,
+    context: Context,
+) -> Result<impl Reply, Rejection> {
+    Ok(Transactions::new(context)?
+        .get_transaction(id.parse("transaction hash or version")?)
+        .await?)
+}
+
+async fn handle_get_transactions(page: Page, context: Context) -> Result<impl Reply, Rejection> {
+    Ok(Transactions::new(context)?.list(page)?)
+}
+
+async fn handle_get_account_transactions(
+    address: AddressParam,
+    page: Page,
+    context: Context,
+) -> Result<impl Reply, Rejection> {
+    Ok(Transactions::new(context)?.list_by_account(address, page)?)
 }
 
 async fn handle_submit_json_transactions(
@@ -143,21 +144,6 @@ async fn handle_submit_bcs_transactions(
     let txn = bcs::from_bytes(&body)
         .map_err(|err| Error::invalid_request_body(format!("deserialize error: {}", err)))?;
     Ok(Transactions::new(context)?.create(txn).await?)
-}
-
-// POST /transactions/signing_message
-pub fn create_signing_message(
-    context: Context,
-) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
-    warp::path!("transactions" / "signing_message")
-        .and(warp::post())
-        .and(warp::body::content_length_limit(
-            context.content_length_limit(),
-        ))
-        .and(warp::body::json::<UserTransactionRequest>())
-        .and(context.filter())
-        .and_then(handle_create_signing_message)
-        .with(metrics("create_signing_message"))
 }
 
 async fn handle_create_signing_message(

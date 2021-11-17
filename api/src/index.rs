@@ -14,6 +14,7 @@ use std::convert::Infallible;
 use warp::{
     body::BodyDeserializeError,
     cors::CorsForbidden,
+    filters::BoxedFilter,
     http::StatusCode,
     reject::{LengthRequired, MethodNotAllowed, PayloadTooLarge, UnsupportedMediaType},
     reply, Filter, Rejection, Reply,
@@ -25,9 +26,22 @@ const OPEN_API_SPEC: &str = include_str!("../doc/openapi.yaml");
 pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Infallible> + Clone {
     index(context.clone())
         .or(openapi_spec())
-        .or(accounts::routes(context.clone()))
-        .or(transactions::routes(context.clone()))
-        .or(events::routes(context.clone()))
+        .or(accounts::get_account_resources(context.clone()))
+        .or(accounts::get_account_resources_by_ledger_version(
+            context.clone(),
+        ))
+        .or(accounts::get_account_modules(context.clone()))
+        .or(accounts::get_account_modules_by_ledger_version(
+            context.clone(),
+        ))
+        .or(transactions::get_transaction(context.clone()))
+        .or(transactions::get_transactions(context.clone()))
+        .or(transactions::get_account_transactions(context.clone()))
+        .or(transactions::submit_bcs_transactions(context.clone()))
+        .or(transactions::submit_json_transactions(context.clone()))
+        .or(transactions::create_signing_message(context.clone()))
+        .or(events::get_events_by_event_key(context.clone()))
+        .or(events::get_events_by_event_handle(context.clone()))
         .or(context.health_check_route().with(metrics("health_check")))
         // jsonrpc routes must before `recover` and after `index`
         // so that POST '/' can be handled by jsonrpc routes instead of `index` route
@@ -44,25 +58,28 @@ pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Inf
 
 // GET /openapi.yaml
 // GET /spec.html
-pub fn openapi_spec() -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+pub fn openapi_spec() -> BoxedFilter<(impl Reply,)> {
     let spec = warp::path!("openapi.yaml")
         .and(warp::get())
         .map(|| OPEN_API_SPEC)
-        .with(metrics("openapi_yaml"));
+        .with(metrics("openapi_yaml"))
+        .boxed();
     let html = warp::path!("spec.html")
         .and(warp::get())
         .map(|| reply::html(open_api_html()))
-        .with(metrics("spec_html"));
-    spec.or(html)
+        .with(metrics("spec_html"))
+        .boxed();
+    spec.or(html).boxed()
 }
 
 // GET /
-pub fn index(context: Context) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+pub fn index(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path::end()
         .and(warp::get())
         .and(context.filter())
         .and_then(handle_index)
         .with(metrics("get_ledger_info"))
+        .boxed()
 }
 
 pub async fn handle_index(context: Context) -> Result<impl Reply, Rejection> {
