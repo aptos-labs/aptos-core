@@ -16,8 +16,8 @@ Deno.test("invokeScriptFunction", async () => {
     [],
     ["invoked script function"],
   );
-  assert(await devapi.transactionSuccess(txn.hash));
-  txn = await devapi.transaction(txn.hash);
+  txn = await devapi.waitForTransactionCompletion(txn.hash);
+  assert(txn.success);
 
   assertEquals(txn.vm_status, "Executed successfully");
   assertEquals(txn.payload.function, scriptFunction);

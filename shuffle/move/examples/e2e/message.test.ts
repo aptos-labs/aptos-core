@@ -15,20 +15,20 @@ Deno.test("Test Assert", () => {
 });
 
 Deno.test("Ability to set message", async () => {
-  const txn = await main.setMessageScriptFunction("hello blockchain");
+  let txn = await main.setMessageScriptFunction("hello blockchain");
+  txn = await devapi.waitForTransactionCompletion(txn.hash);
+  assert(txn.success);
 
-  assert(await devapi.transactionSuccess(txn.hash)); // wait for txn to succeed
-
-  const expected = "\x00hello blockchain"; // prefixed with \x00 bc of bcs encoding
+  const expected = "\x00hello blockchain"; // prefixed with \x00 bc of BCS encoding
   const messages = await main.decodedMessages();
   assertEquals(messages[0], expected);
 });
 
 Deno.test("Ability to set NFTs", async () => {
   const contentUri = "https://placekitten.com/200/300";
-  const txn = await main.createTestNFTScriptFunction(contentUri);
-
-  assert(await devapi.transactionSuccess(txn.hash)); // wait for txn to succeed
+  let txn = await main.createTestNFTScriptFunction(contentUri);
+  txn = await devapi.waitForTransactionCompletion(txn.hash);
+  assert(txn.success);
 
   const uris = await main.decodedNFTs();
   assertEquals(uris[0], "\x00" + contentUri);

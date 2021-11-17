@@ -31,13 +31,12 @@ export async function transaction(versionOrHash: string) {
   );
 }
 
-// Polls for a specific transaction to complete, returning the `success`
-// field when no longer pending.
-export async function transactionSuccess(versionOrHash: string): Promise<boolean> {
+// Polls for a specific transaction to complete, returning the txn object.
+export async function waitForTransactionCompletion(versionOrHash: string): Promise<any> {
   let txn = await transaction(versionOrHash);
   for (let i = 0; i < 20; i++) {
     if (txn.type !== "pending_transaction") {
-      return txn.success;
+      return txn;
     }
     await delay(500);
     txn = await transaction(versionOrHash);
