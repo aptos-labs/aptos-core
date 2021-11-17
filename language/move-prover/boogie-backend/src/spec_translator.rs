@@ -744,7 +744,7 @@ impl<'env> SpecTranslator<'env> {
             Operation::AbortCode => emit!(self.writer, "$abort_code"),
             Operation::AbortFlag => emit!(self.writer, "$abort_flag"),
             Operation::NoOp => { /* do nothing. */ }
-            Operation::Trace => {
+            Operation::Trace(_) => {
                 // An unreduced trace means it has been used in a spec fun or let.
                 // Create an error about this.
                 self.env.error(
@@ -1198,7 +1198,7 @@ impl<'env> SpecTranslator<'env> {
             .filter(|(s, _)| *s != some_var)
             .collect_vec();
         let used_temps = range_and_body
-            .temporaries(self.env)
+            .used_temporaries(self.env)
             .into_iter()
             .collect_vec();
         let used_memory = range_and_body

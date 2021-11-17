@@ -476,7 +476,8 @@ impl<'env> FunctionContext<'env> {
                 }
                 return Ok(());
             }
-            Operation::TraceExp(node_id) => {
+            Operation::TraceExp(_kind, node_id) => {
+                // Perhaps do something with kind?
                 if cfg!(debug_assertions) {
                     let env = self.target.global_env();
                     let node_ty =

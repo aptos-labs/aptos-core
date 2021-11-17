@@ -38,7 +38,7 @@ error: precondition does not hold at this call
 39 │         requires Signer::is_txn_signer_addr(@0x7); // f5 requires this to be true at its callers' sites
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
-   =     at tests/sources/functional/is_txn_signer.move:39
+   =     at tests/sources/functional/is_txn_signer.move:39: f5 (spec)
 
 error: unknown assertion failed
    ┌─ tests/sources/functional/is_txn_signer.move:66:13

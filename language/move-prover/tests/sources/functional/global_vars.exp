@@ -9,15 +9,15 @@ error: post-condition does not hold
    =     at tests/sources/functional/global_vars.move:38: call_add_sub_invalid
    =     at tests/sources/functional/global_vars.move:17: add
    =     at tests/sources/functional/global_vars.move:18: add
-   =     at tests/sources/functional/global_vars.move:20
+   =     at tests/sources/functional/global_vars.move:20: add (spec)
    =     at tests/sources/functional/global_vars.move:24: sub
    =     at tests/sources/functional/global_vars.move:25: sub
-   =     at tests/sources/functional/global_vars.move:27
+   =     at tests/sources/functional/global_vars.move:27: sub (spec)
    =     at tests/sources/functional/global_vars.move:17: add
    =     at tests/sources/functional/global_vars.move:18: add
-   =     at tests/sources/functional/global_vars.move:20
+   =     at tests/sources/functional/global_vars.move:20: add (spec)
    =     at tests/sources/functional/global_vars.move:39: call_add_sub_invalid
-   =     at tests/sources/functional/global_vars.move:41
+   =     at tests/sources/functional/global_vars.move:41: call_add_sub_invalid (spec)
 
 error: precondition does not hold at this call
     ┌─ tests/sources/functional/global_vars.move:101:9
@@ -27,7 +27,7 @@ error: precondition does not hold at this call
     │
     =     at tests/sources/functional/global_vars.move:109: do_privileged_invalid
     =         _s = <redacted>
-    =     at tests/sources/functional/global_vars.move:101
+    =     at tests/sources/functional/global_vars.move:101: requires_access (spec)
 
 error: post-condition does not hold
     ┌─ tests/sources/functional/global_vars.move:137:9
@@ -38,9 +38,9 @@ error: post-condition does not hold
     =     at tests/sources/functional/global_vars.move:133: expect_property_of_u64_invalid
     =     at tests/sources/functional/global_vars.move:134: expect_property_of_u64_invalid
     =     at tests/sources/functional/global_vars.move:121: give_property_to
-    =     at tests/sources/functional/global_vars.move:123
+    =     at tests/sources/functional/global_vars.move:123: give_property_to (spec)
     =     at tests/sources/functional/global_vars.move:135: expect_property_of_u64_invalid
-    =     at tests/sources/functional/global_vars.move:137
+    =     at tests/sources/functional/global_vars.move:137: expect_property_of_u64_invalid (spec)
 
 error: global memory invariant does not hold
     ┌─ tests/sources/functional/global_vars.move:174:5
@@ -56,7 +56,7 @@ error: global memory invariant does not hold
     =     at tests/sources/functional/global_vars.move:177: publish
     =     at tests/sources/functional/global_vars.move:178: publish
     =     at tests/sources/functional/global_vars.move:186: limit_change_invalid
-    =     at tests/sources/functional/global_vars.move:188
+    =     at tests/sources/functional/global_vars.move:188: limit_change_invalid (spec)
     =     at tests/sources/functional/global_vars.move:174
 
 error: post-condition does not hold
@@ -67,13 +67,13 @@ error: post-condition does not hold
    │
    =     at tests/sources/functional/global_vars.move:72: opaque_call_add_sub_invalid
    =     at tests/sources/functional/global_vars.move:73: opaque_call_add_sub_invalid
-   =     at tests/sources/functional/global_vars.move:53
+   =     at tests/sources/functional/global_vars.move:53: opaque_add (spec)
    =     at tests/sources/functional/global_vars.move:73: opaque_call_add_sub_invalid
-   =     at tests/sources/functional/global_vars.move:62
+   =     at tests/sources/functional/global_vars.move:62: opaque_sub (spec)
    =     at tests/sources/functional/global_vars.move:73: opaque_call_add_sub_invalid
-   =     at tests/sources/functional/global_vars.move:53
+   =     at tests/sources/functional/global_vars.move:53: opaque_add (spec)
    =     at tests/sources/functional/global_vars.move:74: opaque_call_add_sub_invalid
-   =     at tests/sources/functional/global_vars.move:76
+   =     at tests/sources/functional/global_vars.move:76: opaque_call_add_sub_invalid (spec)
 
 error: post-condition does not hold
     ┌─ tests/sources/functional/global_vars.move:161:9
@@ -83,9 +83,9 @@ error: post-condition does not hold
     │
     =     at tests/sources/functional/global_vars.move:157: opaque_expect_property_of_u64_invalid
     =     at tests/sources/functional/global_vars.move:158: opaque_expect_property_of_u64_invalid
-    =     at tests/sources/functional/global_vars.move:147
+    =     at tests/sources/functional/global_vars.move:147: opaque_give_property_to (spec)
     =     at tests/sources/functional/global_vars.move:159: opaque_expect_property_of_u64_invalid
-    =     at tests/sources/functional/global_vars.move:161
+    =     at tests/sources/functional/global_vars.move:161: opaque_expect_property_of_u64_invalid (spec)
 
 error: global memory invariant does not hold
     ┌─ tests/sources/functional/global_vars.move:174:5

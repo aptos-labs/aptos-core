@@ -41,7 +41,7 @@ use bytecode::{
 };
 use codespan::LineIndex;
 use move_model::{
-    ast::TempIndex,
+    ast::{TempIndex, TraceKind},
     model::{Loc, NodeId},
     ty::{TypeDisplayContext, BOOL_TYPE},
 };
@@ -1431,7 +1431,7 @@ impl<'env> FunctionTranslator<'env> {
                         self.track_return(*i, srcs[0]);
                     }
                     TraceAbort => self.track_abort(&str_local(srcs[0])),
-                    TraceExp(node_id) => self.track_exp(*node_id, srcs[0]),
+                    TraceExp(kind, node_id) => self.track_exp(*kind, *node_id, srcs[0]),
                     EmitEvent => {
                         let msg = srcs[0];
                         let handle = srcs[1];
@@ -1670,7 +1670,7 @@ impl<'env> FunctionTranslator<'env> {
     fn track_local(&self, origin_idx: TempIndex, idx: TempIndex) {
         emitln!(
             self.parent.writer,
-            &boogie_debug_track_local(self.fun_target, origin_idx, idx, &self.get_local_type(idx))
+            &boogie_debug_track_local(self.fun_target, origin_idx, idx, &self.get_local_type(idx),)
         );
     }
 
@@ -1682,7 +1682,7 @@ impl<'env> FunctionTranslator<'env> {
         );
     }
 
-    fn track_exp(&self, node_id: NodeId, temp: TempIndex) {
+    fn track_exp(&self, kind: TraceKind, node_id: NodeId, temp: TempIndex) {
         let env = self.parent.env;
         let writer = self.parent.writer;
         let ty = self.get_local_type(temp);
@@ -1693,9 +1693,15 @@ impl<'env> FunctionTranslator<'env> {
         } else {
             format!("$t{}", temp)
         };
+        let suffix = if kind == TraceKind::SubAuto {
+            "_sub"
+        } else {
+            ""
+        };
         emitln!(
             self.parent.writer,
-            "assume {{:print \"$track_exp({}):\", {}}} true;",
+            "assume {{:print \"$track_exp{}({}):\", {}}} true;",
+            suffix,
             node_id.as_usize(),
             temp_str,
         );
@@ -1726,7 +1732,7 @@ impl<'env> FunctionTranslator<'env> {
         for bc in &fun_target.data.code {
             match bc {
                 Call(_, _, oper, srcs, ..) => match oper {
-                    TraceExp(id) => need(&self.inst(&env.get_node_type(*id)), 1),
+                    TraceExp(_, id) => need(&self.inst(&env.get_node_type(*id)), 1),
                     TraceReturn(idx) => need(&self.inst(fun_target.get_return_type(*idx)), 1),
                     TraceLocal(_) => need(&self.get_local_type(srcs[0]), 1),
                     Havoc(HavocKind::MutationValue) => need(&self.get_local_type(srcs[0]), 1),

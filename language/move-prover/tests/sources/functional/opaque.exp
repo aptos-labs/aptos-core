@@ -8,4 +8,4 @@ error: post-condition does not hold
    =     at tests/sources/functional/opaque.move:10: opaque_incorrect
    =         result = <redacted>
    =     at tests/sources/functional/opaque.move:11: opaque_incorrect
-   =     at tests/sources/functional/opaque.move:14
+   =     at tests/sources/functional/opaque.move:14: opaque_incorrect (spec)

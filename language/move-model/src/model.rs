@@ -142,6 +142,11 @@ impl Loc {
         }
         Loc::new(loc.file_id(), Span::new(start, end))
     }
+
+    /// Returns true if the other location is enclosed by this location.
+    pub fn is_enclosing(&self, other: &Loc) -> bool {
+        self.file_id == other.file_id && GlobalEnv::enclosing_span(self.span, other.span)
+    }
 }
 
 impl Default for Loc {
@@ -1222,7 +1227,17 @@ impl GlobalEnv {
         // to be a bottleneck.
         let module_env = self.get_enclosing_module(loc)?;
         for func_env in module_env.into_functions() {
-            if Self::enclosing_span(func_env.get_loc().span(), loc.span()) {
+            if Self::enclosing_span(func_env.get_loc().span(), loc.span())
+                || Self::enclosing_span(
+                    func_env
+                        .get_spec()
+                        .loc
+                        .clone()
+                        .unwrap_or_else(|| self.unknown_loc.clone())
+                        .span(),
+                    loc.span(),
+                )
+            {
                 return Some(func_env.clone());
             }
         }
@@ -3081,6 +3096,13 @@ impl<'env> FunctionEnv<'env> {
     /// Return `true` if idx is a formal parameter index
     pub fn is_parameter(&self, idx: usize) -> bool {
         idx < self.get_parameter_count()
+    }
+
+    /// Return true if this is a named parameter of this function.
+    pub fn is_named_parameter(&self, name: &str) -> bool {
+        self.get_parameters()
+            .iter()
+            .any(|p| self.symbol_pool().string(p.0).as_ref() == name)
     }
 
     /// Returns the parameter types associated with this function

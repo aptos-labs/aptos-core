@@ -16,7 +16,6 @@ error: abort not covered by any of the `aborts_if` clauses
    =     at tests/sources/functional/schema_exp.move:25: bar_incorrect
    =         c = <redacted>
    =     at tests/sources/functional/schema_exp.move:26: bar_incorrect
-   =     at tests/sources/functional/schema_exp.move:26: bar_incorrect
    =         ABORTED
 
 error: post-condition does not hold

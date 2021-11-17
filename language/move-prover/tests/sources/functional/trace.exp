@@ -1,0 +1,63 @@
+Move prover returns: exiting with boogie verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/trace.move:17:9
+   │
+17 │         ensures result == a + b;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = Related Bindings:
+   =         a = <redacted>
+   =         b = <redacted>
+   =         result = <redacted>
+   = Execution Trace:
+   =     at tests/sources/functional/trace.move:13: add_invalid
+   =         a = <redacted>
+   =         b = <redacted>
+   =     at tests/sources/functional/trace.move:14: add_invalid
+   =         result = <redacted>
+   =     at tests/sources/functional/trace.move:15: add_invalid
+   =     at tests/sources/functional/trace.move:17: add_invalid (spec)
+   =         `ensures result == a + b;` = <redacted>
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/trace.move:32:9
+   │
+32 │         ensures exists<R>(addr) ==> global<R>(addr).x == x;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = Related Bindings:
+   =         addr = <redacted>
+   =         exists<R>(addr) = <redacted>
+   =         global<R>(addr) = <redacted>
+   =         x = <redacted>
+   = Execution Trace:
+   =     at tests/sources/functional/trace.move:27: publish_invalid
+   =     at tests/sources/functional/trace.move:31: publish_invalid (spec)
+   =         `let addr = Signer::address_of(s);` = <redacted>
+   =     at tests/sources/functional/trace.move:27: publish_invalid
+   =         s = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/functional/trace.move:28: publish_invalid
+   =     at tests/sources/functional/trace.move:29: publish_invalid
+   =     at tests/sources/functional/trace.move:32: publish_invalid (spec)
+   =         `ensures exists<R>(addr) ==> global<R>(addr).x == x;` = <redacted>
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/trace.move:24:9
+   │
+24 │         ensures a == old(a) + b;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = Related Bindings:
+   =         a = <redacted>
+   =         b = <redacted>
+   =         old(a) = <redacted>
+   = Execution Trace:
+   =     at tests/sources/functional/trace.move:20: update_invalid
+   =         a = <redacted>
+   =         b = <redacted>
+   =     at tests/sources/functional/trace.move:21: update_invalid
+   =         a = <redacted>
+   =     at tests/sources/functional/trace.move:22: update_invalid
+   =     at tests/sources/functional/trace.move:24: update_invalid (spec)
+   =         `ensures a == old(a) + b;` = <redacted>

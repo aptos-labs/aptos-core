@@ -19,7 +19,6 @@ error: abort not covered by any of the `aborts_if` clauses
    =         x = <redacted>
    =     at tests/sources/functional/type_dependent_code.move:7: test1
    =     at tests/sources/functional/type_dependent_code.move:8: test1
-   =     at tests/sources/functional/type_dependent_code.move:8: test1
    =         ABORTED
 
 error: abort not covered by any of the `aborts_if` clauses
@@ -43,7 +42,6 @@ error: abort not covered by any of the `aborts_if` clauses
    =         t2 = <redacted>
    =     at tests/sources/functional/type_dependent_code.move:23: test2
    =     at tests/sources/functional/type_dependent_code.move:24: test2
-   =     at tests/sources/functional/type_dependent_code.move:24: test2
    =         ABORTED
 
 error: post-condition does not hold
@@ -65,7 +63,7 @@ error: post-condition does not hold
    =         r = <redacted>
    =     at tests/sources/functional/type_dependent_code.move:47: test1
    =     at tests/sources/functional/type_dependent_code.move:48: test1
-   =     at tests/sources/functional/type_dependent_code.move:50
+   =     at tests/sources/functional/type_dependent_code.move:50: test1 (spec)
 
 error: post-condition does not hold
    ┌─ tests/sources/functional/type_dependent_code.move:66:9
@@ -87,4 +85,4 @@ error: post-condition does not hold
    =         r = <redacted>
    =     at tests/sources/functional/type_dependent_code.move:63: test2
    =     at tests/sources/functional/type_dependent_code.move:64: test2
-   =     at tests/sources/functional/type_dependent_code.move:66
+   =     at tests/sources/functional/type_dependent_code.move:66: test2 (spec)

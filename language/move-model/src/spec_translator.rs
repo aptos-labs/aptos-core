@@ -11,7 +11,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::{
     ast::{
         Condition, ConditionKind, Exp, ExpData, GlobalInvariant, LocalVarDecl, MemoryLabel,
-        Operation, Spec, TempIndex,
+        Operation, Spec, TempIndex, TraceKind,
     },
     exp_generator::ExpGenerator,
     exp_rewriter::ExpRewriterFunctions,
@@ -58,7 +58,7 @@ pub struct TranslatedSpec {
     pub saved_memory: BTreeMap<QualifiedInstId<StructId>, MemoryLabel>,
     pub saved_spec_vars: BTreeMap<QualifiedInstId<SpecVarId>, MemoryLabel>,
     pub saved_params: BTreeMap<TempIndex, TempIndex>,
-    pub debug_traces: Vec<(NodeId, Exp)>,
+    pub debug_traces: Vec<(NodeId, TraceKind, Exp)>,
     pub pre: Vec<(Loc, Exp)>,
     pub post: Vec<(Loc, Exp)>,
     pub aborts: Vec<(Loc, Exp, Option<Exp>)>,
@@ -465,15 +465,56 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
 
     fn auto_trace(&self, loc: &Loc, exp: &Exp) -> Exp {
         if self.auto_trace {
-            let env = self.builder.global_env();
-            let id = exp.node_id();
-            let ty = env.get_node_type(id);
-            let new_id = env.new_node(loc.clone(), ty.clone());
-            env.set_node_instantiation(new_id, vec![ty]);
-            ExpData::Call(new_id, Operation::Trace, vec![exp.to_owned()]).into_exp()
+            self.auto_trace_exp(loc, self.auto_trace_sub(exp), TraceKind::Auto)
         } else {
             exp.to_owned()
         }
+    }
+
+    fn auto_trace_sub(&self, exp: &Exp) -> Exp {
+        ExpData::rewrite(exp.to_owned(), &mut |e| {
+            let (trace_this, e) = match e.as_ref() {
+                ExpData::Temporary(..)
+                | ExpData::Call(_, Operation::Old, ..)
+                | ExpData::Call(_, Operation::Result(_), ..) => (true, e),
+                ExpData::LocalVar(_, sym) => (self.let_locals.contains_key(sym), e),
+                ExpData::Call(id, Operation::Global(None), args) => (
+                    true,
+                    ExpData::Call(
+                        *id,
+                        Operation::Global(None),
+                        vec![self.auto_trace_sub(&args[0])],
+                    )
+                    .into_exp(),
+                ),
+                ExpData::Call(id, Operation::Exists(None), args) => (
+                    true,
+                    ExpData::Call(
+                        *id,
+                        Operation::Exists(None),
+                        vec![self.auto_trace_sub(&args[0])],
+                    )
+                    .into_exp(),
+                ),
+                _ => (false, e),
+            };
+            if trace_this {
+                let l = self.builder.global_env().get_node_loc(e.node_id());
+                Ok(self.auto_trace_exp(&l, e, TraceKind::SubAuto))
+            } else {
+                // descent
+                Err(e)
+            }
+        })
+    }
+
+    fn auto_trace_exp(&self, loc: &Loc, exp: Exp, kind: TraceKind) -> Exp {
+        let env = self.builder.global_env();
+        let id = exp.node_id();
+        let ty = env.get_node_type(id);
+        let new_id = env.new_node(loc.clone(), ty.clone());
+        env.set_node_instantiation(new_id, vec![ty]);
+        ExpData::Call(new_id, Operation::Trace(kind), vec![exp]).into_exp()
     }
 
     fn auto_trace_no_loc(&self, exp: &Exp) -> Exp {
@@ -561,7 +602,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, 'b
                     )
                 }
             }
-            ExpData::Call(id, Operation::Trace, args) => {
+            ExpData::Call(id, Operation::Trace(_), args) => {
                 // Generate an error if a TRACE is applied to an expression where it is not
                 // allowed, i.e. if there are free LocalVar terms, excluding locals from lets.
                 let loc = env.get_node_loc(*id);
@@ -668,12 +709,14 @@ impl<'a, 'b, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, 'b
                 self.builder.set_loc_from_node(id);
                 Some(self.builder.mk_temporary(self.ret_locals[*n]))
             }
-            Trace => {
+            Trace(kind) => {
                 let exp = args[0].to_owned();
                 let env = self.builder.global_env();
                 let loc = env.get_node_loc(id);
                 let trace_id = env.new_node(loc, env.get_node_type(exp.node_id()));
-                self.result.debug_traces.push((trace_id, exp.clone()));
+                self.result
+                    .debug_traces
+                    .push((trace_id, *kind, exp.clone()));
                 Some(exp)
             }
             _ => None,

@@ -5,7 +5,7 @@ use crate::function_target::FunctionTarget;
 use itertools::Itertools;
 use move_binary_format::file_format::CodeOffset;
 use move_model::{
-    ast::{Exp, ExpData, MemoryLabel, TempIndex},
+    ast::{Exp, ExpData, MemoryLabel, TempIndex, TraceKind},
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     model::{FunId, GlobalEnv, ModuleId, NodeId, QualifiedInstId, SpecVarId, StructId},
     ty::{Type, TypeDisplayContext},
@@ -170,7 +170,7 @@ pub enum Operation {
     TraceLocal(TempIndex),
     TraceReturn(usize),
     TraceAbort,
-    TraceExp(NodeId),
+    TraceExp(TraceKind, NodeId),
 
     // Event
     EmitEvent,
@@ -1052,11 +1052,12 @@ impl<'env> fmt::Display for OperationDisplay<'env> {
             }
             TraceAbort => write!(f, "trace_abort")?,
             TraceReturn(r) => write!(f, "trace_return[{}]", r)?,
-            TraceExp(node_id) => {
+            TraceExp(kind, node_id) => {
                 let loc = self.func_target.global_env().get_node_loc(*node_id);
                 write!(
                     f,
-                    "trace_exp[{}]",
+                    "trace_exp[{}, {}]",
+                    kind,
                     loc.display(self.func_target.global_env())
                 )?
             }

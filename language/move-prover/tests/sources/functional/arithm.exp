@@ -13,7 +13,7 @@ error: post-condition does not hold
     =     at tests/sources/functional/arithm.move:284: distribution_law_incorrect
     =         result = <redacted>
     =     at tests/sources/functional/arithm.move:285: distribution_law_incorrect
-    =     at tests/sources/functional/arithm.move:287
+    =     at tests/sources/functional/arithm.move:287: distribution_law_incorrect (spec)
 
 error: abort not covered by any of the `aborts_if` clauses
     ┌─ tests/sources/functional/arithm.move:128:5
@@ -51,7 +51,7 @@ error: post-condition does not hold
     =     at tests/sources/functional/arithm.move:269: mul5_incorrect
     =         result = <redacted>
     =     at tests/sources/functional/arithm.move:270: mul5_incorrect
-    =     at tests/sources/functional/arithm.move:273
+    =     at tests/sources/functional/arithm.move:273: mul5_incorrect (spec)
 
 error: abort not covered by any of the `aborts_if` clauses
     ┌─ tests/sources/functional/arithm.move:180:5

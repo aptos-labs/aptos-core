@@ -774,8 +774,8 @@ impl<'a> Instrumenter<'a> {
         let traces = spec
             .debug_traces
             .iter()
-            .filter(|(_, exp)| node_ids.contains(&exp.node_id()));
-        for (node_id, exp) in traces {
+            .filter(|(_, _, exp)| node_ids.contains(&exp.node_id()));
+        for (node_id, kind, exp) in traces {
             let loc = self.builder.global_env().get_node_loc(*node_id);
             self.builder.set_loc(loc);
             let temp = if let ExpData::Temporary(_, temp) = exp.as_ref() {
@@ -783,8 +783,15 @@ impl<'a> Instrumenter<'a> {
             } else {
                 self.builder.emit_let(exp.clone()).0
             };
-            self.builder
-                .emit_with(|id| Call(id, vec![], Operation::TraceExp(*node_id), vec![temp], None));
+            self.builder.emit_with(|id| {
+                Call(
+                    id,
+                    vec![],
+                    Operation::TraceExp(*kind, *node_id),
+                    vec![temp],
+                    None,
+                )
+            });
         }
     }
 

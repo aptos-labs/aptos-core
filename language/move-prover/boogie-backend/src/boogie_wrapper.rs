@@ -88,6 +88,7 @@ pub enum TraceEntry {
     Result(QualifiedId<FunId>, usize, ModelValue),
     Abort(QualifiedId<FunId>, ModelValue),
     Exp(NodeId, ModelValue),
+    SubExp(NodeId, ModelValue),
 }
 
 // Error message matching
@@ -243,14 +244,34 @@ impl<'env> BoogieWrapper<'env> {
             let mut abort_in_progress = None;
             let print_loc = |loc: &Loc, last_loc: &mut Loc, display: &mut Vec<String>| {
                 let info = if let Some(fun) = self.env.get_enclosing_function(loc) {
-                    format!(": {}", fun.get_name().display(self.env.symbol_pool()))
+                    let spec_suffix = if let Some(spec_loc) = &fun.get_spec().loc {
+                        if spec_loc.is_enclosing(loc) {
+                            " (spec)"
+                        } else {
+                            ""
+                        }
+                    } else {
+                        ""
+                    };
+                    format!(
+                        ": {}{}",
+                        fun.get_name().display(self.env.symbol_pool()),
+                        spec_suffix
+                    )
                 } else {
                     "".to_string()
                 };
-                display.push(format!("    {}{}", loc.display_line_only(self.env), info));
+                // Brute-force filter out "at" entries which look alike. This is cheaper than
+                // avoiding producing them, because of the step of converting locations to line
+                // numbers.
+                let display_str = format!("    {}{}", loc.display_line_only(self.env), info);
+                if display.is_empty() || display[display.len() - 1] != display_str {
+                    display.push(display_str);
+                }
                 *last_loc = loc.clone();
             };
 
+            let mut subexp_map = BTreeMap::new();
             for entry in &error.execution_trace {
                 use TraceEntry::*;
                 if abort_in_progress.is_some() && !matches!(entry, Exp(..)) {
@@ -285,10 +306,9 @@ impl<'env> BoogieWrapper<'env> {
                                     var_name
                                 };
                             let ty = fun_target.get_local_type(*idx);
-                            display.extend(self.make_trace_entry(
-                                var_name,
-                                value.pretty_or_raw(self, error.model.as_ref().unwrap(), ty),
-                            ));
+                            let pretty =
+                                value.pretty_or_raw(self, error.model.as_ref().unwrap(), ty);
+                            display.extend(self.make_trace_entry(var_name, pretty));
                         }
                     }
                     Result(fun, idx, value) if error.model.is_some() => {
@@ -304,10 +324,9 @@ impl<'env> BoogieWrapper<'env> {
                                 "result".to_string()
                             };
                             let ty = fun_target.get_return_type(*idx);
-                            display.extend(self.make_trace_entry(
-                                var_name,
-                                value.pretty_or_raw(self, error.model.as_ref().unwrap(), ty),
-                            ));
+                            let pretty =
+                                value.pretty_or_raw(self, error.model.as_ref().unwrap(), ty);
+                            display.extend(self.make_trace_entry(var_name, pretty));
                         }
                     }
                     Abort(_, value) => {
@@ -320,9 +339,23 @@ impl<'env> BoogieWrapper<'env> {
                             print_loc(&loc, &mut last_loc, &mut display);
                         }
                         let ty = self.env.get_node_type(*node_id);
-                        let exp_str = self.get_abbreviated_source(*node_id);
                         let value = value.pretty_or_raw(self, error.model.as_ref().unwrap(), &ty);
+                        let exp_str = self.get_abbreviated_source(*node_id);
                         display.extend(self.make_trace_entry(exp_str, value));
+                    }
+                    SubExp(node_id, value) => {
+                        let exp_loc = self.env.get_node_loc(*node_id);
+                        if error.loc.is_enclosing(&exp_loc) {
+                            // This sub-expression trace is related to the error, remember it.
+                            // Notice that if a sub-expression with the same denotation appears
+                            // twice we take the latest one. This treatment depends on that the
+                            // sub-exp instrumentation in model/spec_translator does not decent
+                            // in old expressions; rather it displays the old as an atomic value.
+                            // Hence we can assume denotational and semantic equivalence.
+                            let loc = self.env.get_node_loc(*node_id);
+                            let denotation = self.env.get_source(&loc).unwrap_or("??");
+                            subexp_map.insert(denotation.to_string(), (*node_id, value.clone()));
+                        }
                     }
                     _ => {}
                 }
@@ -342,6 +375,19 @@ impl<'env> BoogieWrapper<'env> {
                     abort_loc.span(),
                 )
                 .with_message(&format!("abort happened here{}", code))]);
+            }
+
+            // Inject information about sub-expressions of this failure
+            if !subexp_map.is_empty() {
+                let mut trace_display = std::mem::take(&mut display);
+                display.push("Related Bindings: ".to_string());
+                for (denotation, (id, value)) in subexp_map {
+                    let ty = self.env.get_node_type(id);
+                    let pretty = value.pretty_or_raw(self, error.model.as_ref().unwrap(), &ty);
+                    display.extend(self.make_trace_entry(denotation, pretty));
+                }
+                display.push("Execution Trace:".to_string());
+                display.append(&mut trace_display)
             }
             diag = diag.with_notes(display);
         }
@@ -527,6 +573,11 @@ impl<'env> BoogieWrapper<'env> {
                 let node_id = self.extract_node_id(args)?;
                 let value = self.extract_value(value)?;
                 Ok(TraceEntry::Exp(node_id, value))
+            }
+            "track_exp_sub" => {
+                let node_id = self.extract_node_id(args)?;
+                let value = self.extract_value(value)?;
+                Ok(TraceEntry::SubExp(node_id, value))
             }
             _ => Err(ModelParseError::new(&format!(
                 "unrecognized augmented trace entry `{}`",

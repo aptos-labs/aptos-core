@@ -6,17 +6,17 @@ error: post-condition does not hold
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
    =     at tests/sources/functional/choice.move:44: populate_R
-   =     at tests/sources/functional/choice.move:49
-   =     at tests/sources/functional/choice.move:50
-   =     at tests/sources/functional/choice.move:53
-   =     at tests/sources/functional/choice.move:52
+   =     at tests/sources/functional/choice.move:49: populate_R (spec)
+   =     at tests/sources/functional/choice.move:50: populate_R (spec)
+   =     at tests/sources/functional/choice.move:53: populate_R (spec)
+   =     at tests/sources/functional/choice.move:52: populate_R (spec)
    =     at tests/sources/functional/choice.move:44: populate_R
    =         s1 = <redacted>
    =         s2 = <redacted>
    =     at tests/sources/functional/choice.move:45: populate_R
    =     at tests/sources/functional/choice.move:46: populate_R
    =     at tests/sources/functional/choice.move:47: populate_R
-   =     at tests/sources/functional/choice.move:54
+   =     at tests/sources/functional/choice.move:54: populate_R (spec)
 
 error: post-condition does not hold
    ┌─ tests/sources/functional/choice.move:21:9
@@ -30,7 +30,7 @@ error: post-condition does not hold
    =         <redacted> = <redacted>
    =         result = <redacted>
    =     at tests/sources/functional/choice.move:17: simple_incorrect
-   =     at tests/sources/functional/choice.move:21
+   =     at tests/sources/functional/choice.move:21: simple_incorrect (spec)
    =         `TRACE(choose x: u64 where x >= 4 && x <= 5)` = <redacted>
 
 error: post-condition does not hold
@@ -44,7 +44,7 @@ error: post-condition does not hold
    =     at tests/sources/functional/choice.move:94: test_choice_dup_expected_fail
    =         result = <redacted>
    =     at tests/sources/functional/choice.move:95: test_choice_dup_expected_fail
-   =     at tests/sources/functional/choice.move:98
+   =     at tests/sources/functional/choice.move:98: test_choice_dup_expected_fail (spec)
    =         `TRACE(choose y: u64 where y > x)` = <redacted>
 
 error: post-condition does not hold
@@ -53,10 +53,10 @@ error: post-condition does not hold
 156 │         ensures evidence1 == evidence2;
     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/choice.move:154
-    =     at tests/sources/functional/choice.move:155
+    =     at tests/sources/functional/choice.move:154: test_different_choice_via_let (spec)
+    =     at tests/sources/functional/choice.move:155: test_different_choice_via_let (spec)
     =     at tests/sources/functional/choice.move:152: test_different_choice_via_let
-    =     at tests/sources/functional/choice.move:156
+    =     at tests/sources/functional/choice.move:156: test_different_choice_via_let (spec)
 
 error: post-condition does not hold
     ┌─ tests/sources/functional/choice.move:180:9
@@ -65,7 +65,7 @@ error: post-condition does not hold
     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
     =     at tests/sources/functional/choice.move:178: test_different_choice_via_spec_fun
-    =     at tests/sources/functional/choice.move:180
+    =     at tests/sources/functional/choice.move:180: test_different_choice_via_spec_fun (spec)
 
 error: post-condition does not hold
    ┌─ tests/sources/functional/choice.move:70:9
@@ -84,7 +84,7 @@ error: post-condition does not hold
    =     at tests/sources/functional/choice.move:67: test_min
    =         result = <redacted>
    =     at tests/sources/functional/choice.move:68: test_min
-   =     at tests/sources/functional/choice.move:70
+   =     at tests/sources/functional/choice.move:70: test_min (spec)
 
 error: post-condition does not hold
    ┌─ tests/sources/functional/choice.move:85:9
@@ -104,7 +104,7 @@ error: post-condition does not hold
    =     at tests/sources/functional/choice.move:81: test_not_using_min_incorrect
    =         result = <redacted>
    =     at tests/sources/functional/choice.move:82: test_not_using_min_incorrect
-   =     at tests/sources/functional/choice.move:85
+   =     at tests/sources/functional/choice.move:85: test_not_using_min_incorrect (spec)
    =         `TRACE(choose i in 0..len(result) where result[i] == 2)` = <redacted>
 
 error: post-condition does not hold
@@ -125,10 +125,10 @@ error: post-condition does not hold
     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
     =     at tests/sources/functional/choice.move:204: test_same_choice_different_args_via_spec_fun
-    =     at tests/sources/functional/choice.move:206
-    =     at tests/sources/functional/choice.move:207
+    =     at tests/sources/functional/choice.move:206: test_same_choice_different_args_via_spec_fun (spec)
+    =     at tests/sources/functional/choice.move:207: test_same_choice_different_args_via_spec_fun (spec)
     =     at tests/sources/functional/choice.move:204: test_same_choice_different_args_via_spec_fun
     =         x = <redacted>
     =         y = <redacted>
     =         result = <redacted>
-    =     at tests/sources/functional/choice.move:208
+    =     at tests/sources/functional/choice.move:208: test_same_choice_different_args_via_spec_fun (spec)

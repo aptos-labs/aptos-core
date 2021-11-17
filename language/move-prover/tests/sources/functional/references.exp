@@ -19,4 +19,4 @@ error: function does not abort under this condition
    =         b = <redacted>
    =     at tests/sources/functional/references.move:73: mut_ref_incorrect
    =     at tests/sources/functional/references.move:74: mut_ref_incorrect
-   =     at tests/sources/functional/references.move:76
+   =     at tests/sources/functional/references.move:76: mut_ref_incorrect (spec)

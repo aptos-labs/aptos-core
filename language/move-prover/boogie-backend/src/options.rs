@@ -15,6 +15,7 @@ const DEFAULT_BOOGIE_FLAGS: &[&str] = &[
     "-printModel:1",
     "-enhancedErrorMessages:1",
     "-monomorphize",
+    "-proverOpt:O:model_validate=true",
 ];
 
 const MIN_BOOGIE_VERSION: &str = "2.9.0";

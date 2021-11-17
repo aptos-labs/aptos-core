@@ -549,7 +549,7 @@ impl ExpData {
     }
 
     /// Returns the temporaries used in this expression. Result is ordered by occurrence.
-    pub fn temporaries(&self, env: &GlobalEnv) -> Vec<(TempIndex, Type)> {
+    pub fn used_temporaries(&self, env: &GlobalEnv) -> Vec<(TempIndex, Type)> {
         let mut temps = vec![];
         let mut visitor = |e: &ExpData| {
             if let ExpData::Temporary(id, idx) = e {
@@ -651,7 +651,7 @@ impl ExpData {
     /// Rewrites this expression and sub-expression based on the rewriter function. The
     /// function returns `Ok(e)` if the expression is rewritten, and passes back ownership
     /// using `Err(e)` if the expression stays unchanged. This function stops traversing
-    ///on `Ok(e)` and descents into sub-expressions on `Err(e)`.
+    /// on `Ok(e)` and descents into sub-expressions on `Err(e)`.
     pub fn rewrite<F>(exp: Exp, exp_rewriter: &mut F) -> Exp
     where
         F: FnMut(Exp) -> Result<Exp, Exp>,
@@ -869,7 +869,7 @@ pub enum Operation {
     Exists(Option<MemoryLabel>),
     CanModify,
     Old,
-    Trace,
+    Trace(TraceKind),
     EmptyVec,
     SingleVec,
     UpdateVec,
@@ -906,6 +906,29 @@ pub struct LocalVarDecl {
     pub id: NodeId,
     pub name: Symbol,
     pub binding: Option<Exp>,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+pub enum TraceKind {
+    /// A user level TRACE(..) in the source.
+    User,
+    /// An automatically generated trace
+    Auto,
+    /// A trace for a sub-expression of an assert or assume. The location of a
+    /// Call(.., Trace(SubAuto)) expression identifies the context of the assume or assert.
+    /// A backend may print those traces only if the assertion failed.
+    SubAuto,
+}
+
+impl fmt::Display for TraceKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        use TraceKind::*;
+        match self {
+            User => f.write_str("user"),
+            Auto => f.write_str("auto"),
+            SubAuto => f.write_str("subauto"),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]

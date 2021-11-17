@@ -6,7 +6,7 @@ error: caller does not have permission to modify `B::T` at given address
    │                 ^^^^^^^^^
    │
    =     at tests/sources/functional/ModifiesErrorTest.move:63: move_from_test_incorrect
-   =     at tests/sources/functional/ModifiesErrorTest.move:74
+   =     at tests/sources/functional/ModifiesErrorTest.move:74: move_from_test_incorrect (spec)
    =     at tests/sources/functional/ModifiesErrorTest.move:63: move_from_test_incorrect
    =         addr1 = <redacted>
    =         addr2 = <redacted>
@@ -21,7 +21,7 @@ error: caller does not have permission to modify `B::T` at given address
    │         ^^^^^^^
    │
    =     at tests/sources/functional/ModifiesErrorTest.move:50: move_to_test_incorrect
-   =     at tests/sources/functional/ModifiesErrorTest.move:60
+   =     at tests/sources/functional/ModifiesErrorTest.move:60: move_to_test_incorrect (spec)
    =     at tests/sources/functional/ModifiesErrorTest.move:50: move_to_test_incorrect
    =         account = <redacted>
    =         addr2 = <redacted>
@@ -36,8 +36,8 @@ error: caller does not have permission to modify `A::S` at given address
    │         ^^^^^^^^^^^^^^^^^^^
    │
    =     at tests/sources/functional/ModifiesErrorTest.move:77: mutate_S_test1_incorrect
-   =     at tests/sources/functional/ModifiesErrorTest.move:86
-   =     at tests/sources/functional/ModifiesErrorTest.move:87
+   =     at tests/sources/functional/ModifiesErrorTest.move:86: mutate_S_test1_incorrect (spec)
+   =     at tests/sources/functional/ModifiesErrorTest.move:87: mutate_S_test1_incorrect (spec)
    =     at tests/sources/functional/ModifiesErrorTest.move:77: mutate_S_test1_incorrect
    =         addr1 = <redacted>
    =         addr2 = <redacted>
@@ -52,7 +52,7 @@ error: unknown assertion failed
    │             ^^^^^^^^^^^^^^^^
    │
    =     at tests/sources/functional/ModifiesErrorTest.move:90: mutate_S_test2_incorrect
-   =     at tests/sources/functional/ModifiesErrorTest.move:99
+   =     at tests/sources/functional/ModifiesErrorTest.move:99: mutate_S_test2_incorrect (spec)
    =     at tests/sources/functional/ModifiesErrorTest.move:90: mutate_S_test2_incorrect
    =         addr = <redacted>
    =     at tests/sources/functional/ModifiesErrorTest.move:91: mutate_S_test2_incorrect
@@ -69,7 +69,7 @@ error: caller does not have permission to modify `B::T` at given address
    │                 ^^^^^^^^^^^^^^^^^
    │
    =     at tests/sources/functional/ModifiesErrorTest.move:36: mutate_at_test_incorrect
-   =     at tests/sources/functional/ModifiesErrorTest.move:47
+   =     at tests/sources/functional/ModifiesErrorTest.move:47: mutate_at_test_incorrect (spec)
    =     at tests/sources/functional/ModifiesErrorTest.move:36: mutate_at_test_incorrect
    =         addr1 = <redacted>
    =         addr2 = <redacted>

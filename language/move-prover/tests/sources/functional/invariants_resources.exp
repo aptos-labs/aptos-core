@@ -10,4 +10,4 @@ error: post-condition does not hold
    =     at tests/sources/functional/invariants_resources.move:28: get_invalid
    =         result = <redacted>
    =     at tests/sources/functional/invariants_resources.move:29: get_invalid
-   =     at tests/sources/functional/invariants_resources.move:31
+   =     at tests/sources/functional/invariants_resources.move:31: get_invalid (spec)

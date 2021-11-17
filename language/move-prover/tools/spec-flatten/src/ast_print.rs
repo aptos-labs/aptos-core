@@ -306,7 +306,7 @@ impl SpecPrinter<'_> {
                     // built-in functions
                     Len => print_call_fun("len"),
                     Old => print_call_fun("old"),
-                    Trace => print_call_fun("TRACE"),
+                    Trace(_) => print_call_fun("TRACE"),
                     Global(_label_opt) => print_call_fun_inst("global"),
                     Exists(_label_opt) => print_call_fun_inst("exists"),
                     EmptyVec => print_call_fun_inst("vec"),

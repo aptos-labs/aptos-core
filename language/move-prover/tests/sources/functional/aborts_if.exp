@@ -9,7 +9,7 @@ error: function does not abort under this condition
    =         _x = <redacted>
    =         _y = <redacted>
    =     at tests/sources/functional/aborts_if.move:33: abort2_incorrect
-   =     at tests/sources/functional/aborts_if.move:35
+   =     at tests/sources/functional/aborts_if.move:35: abort2_incorrect (spec)
 
 error: function does not abort under this condition
    ┌─ tests/sources/functional/aborts_if.move:52:9
@@ -22,7 +22,7 @@ error: function does not abort under this condition
    =         y = <redacted>
    =     at tests/sources/functional/aborts_if.move:48: abort4_incorrect
    =     at tests/sources/functional/aborts_if.move:49: abort4_incorrect
-   =     at tests/sources/functional/aborts_if.move:52
+   =     at tests/sources/functional/aborts_if.move:52: abort4_incorrect (spec)
 
 error: abort not covered by any of the `aborts_if` clauses
    ┌─ tests/sources/functional/aborts_if.move:59:5
@@ -39,7 +39,6 @@ error: abort not covered by any of the `aborts_if` clauses
    =         x = <redacted>
    =         y = <redacted>
    =     at tests/sources/functional/aborts_if.move:57: abort5_incorrect
-   =     at tests/sources/functional/aborts_if.move:57: abort5_incorrect
    =         ABORTED
 
 error: function does not abort under this condition
@@ -53,7 +52,7 @@ error: function does not abort under this condition
    =         y = <redacted>
    =     at tests/sources/functional/aborts_if.move:65: abort6_incorrect
    =     at tests/sources/functional/aborts_if.move:66: abort6_incorrect
-   =     at tests/sources/functional/aborts_if.move:68
+   =     at tests/sources/functional/aborts_if.move:68: abort6_incorrect (spec)
 
 error: function does not abort under this condition
     ┌─ tests/sources/functional/aborts_if.move:151:9
@@ -66,7 +65,7 @@ error: function does not abort under this condition
     =     at tests/sources/functional/aborts_if.move:146: abort_at_2_or_3_spec_incorrect
     =         <redacted> = <redacted>
     =     at tests/sources/functional/aborts_if.move:147: abort_at_2_or_3_spec_incorrect
-    =     at tests/sources/functional/aborts_if.move:151
+    =     at tests/sources/functional/aborts_if.move:151: abort_at_2_or_3_spec_incorrect (spec)
 
 error: abort not covered by any of the `aborts_if` clauses
     ┌─ tests/sources/functional/aborts_if.move:157:5
@@ -118,8 +117,8 @@ error: function does not abort under this condition
    =         y = <redacted>
    =     at tests/sources/functional/aborts_if.move:87: multi_abort2_incorrect
    =     at tests/sources/functional/aborts_if.move:88: multi_abort2_incorrect
-   =     at tests/sources/functional/aborts_if.move:90
-   =     at tests/sources/functional/aborts_if.move:91
+   =     at tests/sources/functional/aborts_if.move:90: multi_abort2_incorrect (spec)
+   =     at tests/sources/functional/aborts_if.move:91: multi_abort2_incorrect (spec)
 
 error: abort not covered by any of the `aborts_if` clauses
     ┌─ tests/sources/functional/aborts_if.move:98:5
@@ -137,7 +136,6 @@ error: abort not covered by any of the `aborts_if` clauses
     =         _x = <redacted>
     =         _y = <redacted>
     =     at tests/sources/functional/aborts_if.move:96: multi_abort3_incorrect
-    =     at tests/sources/functional/aborts_if.move:96: multi_abort3_incorrect
     =         ABORTED
 
 error: function does not abort under this condition
@@ -150,4 +148,4 @@ error: function does not abort under this condition
     =         x = <redacted>
     =     at tests/sources/functional/aborts_if.move:114: multi_abort5_incorrect
     =     at tests/sources/functional/aborts_if.move:117: multi_abort5_incorrect
-    =     at tests/sources/functional/aborts_if.move:119
+    =     at tests/sources/functional/aborts_if.move:119: multi_abort5_incorrect (spec)

@@ -14,5 +14,4 @@ error: abort not covered by any of the `aborts_if` clauses
    =     at tests/sources/functional/pragma.move:10: always_aborts_with_verify_incorrect
    =         _c = <redacted>
    =     at tests/sources/functional/pragma.move:11: always_aborts_with_verify_incorrect
-   =     at tests/sources/functional/pragma.move:11: always_aborts_with_verify_incorrect
    =         ABORTED

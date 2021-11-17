@@ -4,7 +4,7 @@
 //! Defines builtin functions for specifications, adding them to the build
 
 use crate::{
-    ast::{Operation, Value},
+    ast::{Operation, TraceKind, Value},
     builder::model_builder::{ConstEntry, ModelBuilder, SpecFunEntry},
     ty::{PrimitiveType, Type},
 };
@@ -335,7 +335,7 @@ pub(crate) fn declare_spec_builtins(trans: &mut ModelBuilder<'_>) {
             trans.builtin_qualified_symbol("TRACE"),
             SpecFunEntry {
                 loc,
-                oper: Operation::Trace,
+                oper: Operation::Trace(TraceKind::User),
                 type_params: vec![param_t.clone()],
                 arg_types: vec![param_t.clone()],
                 result_type: param_t.clone(),

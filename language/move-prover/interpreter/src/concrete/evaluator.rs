@@ -508,7 +508,7 @@ impl<'env> Evaluator<'env> {
             Operation::NoOp
             | Operation::Identical
             | Operation::Old
-            | Operation::Trace
+            | Operation::Trace(_)
             | Operation::Tuple
             | Operation::Result(_)
             | Operation::AbortCode
