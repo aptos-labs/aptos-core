@@ -18,18 +18,6 @@ const privateKeyBytes = bcsToBytes(
   await Deno.readFile(privateKeyPath)
 );
 
-export const receiverPrivateKeyPath = path.join(
-    shuffleBaseNetworksPath,
-    networkName,
-    "accounts/test/dev.key",
-);
-export const receiverAddressPath = path.join(
-    shuffleBaseNetworksPath,
-    networkName,
-    "accounts/test/address",
-);
-export const receiverAddress = await Deno.readTextFile(receiverAddressPath);
-
 export function privateKey(): Uint8Array {
   return privateKeyBytes.slice(0);
 }

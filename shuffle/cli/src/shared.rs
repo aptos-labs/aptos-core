@@ -125,26 +125,24 @@ pub fn get_filtered_envs_for_deno(
     filtered_envs.insert(String::from("SHUFFLE_NETWORK_NAME"), network.get_name());
     filtered_envs.insert(
         String::from("SHUFFLE_NETWORK_DEV_API_URL"),
-        network.get_dev_api_url()?.to_string(),
+        network.get_dev_api_url().to_string(),
     );
     Ok(filtered_envs)
 }
 
 pub struct DevApiClient {
     client: Client,
-    network: Url,
+    url: Url,
 }
 
 // Client that will make GET and POST requests based off of Dev API
 impl DevApiClient {
-    pub fn new(client: Client, network: Url) -> Result<Self> {
-        Ok(Self { client, network })
+    pub fn new(client: Client, url: Url) -> Result<Self> {
+        Ok(Self { client, url })
     }
 
     pub async fn get_transactions_by_hash(&self, hash: &str) -> Result<Value> {
-        let path = self
-            .network
-            .join(format!("transactions/{}", hash).as_str())?;
+        let path = self.url.join(format!("transactions/{}", hash).as_str())?;
 
         DevApiClient::check_response(
             self.client.get(path.as_str()).send().await?,
@@ -154,7 +152,7 @@ impl DevApiClient {
     }
 
     pub async fn post_transactions(&self, txn_bytes: Vec<u8>) -> Result<Value> {
-        let path = self.network.join("transactions")?;
+        let path = self.url.join("transactions")?;
 
         DevApiClient::check_response(
             self.client
@@ -170,7 +168,7 @@ impl DevApiClient {
 
     async fn get_account_resources(&self, address: AccountAddress) -> Result<Value> {
         let path = self
-            .network
+            .url
             .join(format!("accounts/{}/resources", address.to_hex_literal()).as_str())?;
 
         DevApiClient::check_response(
@@ -187,7 +185,7 @@ impl DevApiClient {
         limit: u64,
     ) -> Result<Value> {
         let path = self
-            .network
+            .url
             .join(format!("accounts/{}/transactions", address).as_str())?;
 
         DevApiClient::check_response(
@@ -251,7 +249,6 @@ impl DevApiClient {
 }
 
 pub struct NetworkHome {
-    network_base_path: PathBuf,
     accounts_path: PathBuf,
     latest_account_path: PathBuf,
     latest_account_key_path: PathBuf,
@@ -264,7 +261,6 @@ pub struct NetworkHome {
 impl NetworkHome {
     pub fn new(network_base_path: &Path) -> Self {
         NetworkHome {
-            network_base_path: network_base_path.to_path_buf(),
             accounts_path: network_base_path.join("accounts"),
             latest_account_path: network_base_path.join("accounts/latest"),
             latest_account_key_path: network_base_path.join("accounts/latest/dev.key"),
@@ -287,18 +283,18 @@ impl NetworkHome {
         &self.latest_account_address_path
     }
 
+    #[allow(dead_code)]
+    pub fn get_latest_address(&self) -> Result<AccountAddress> {
+        let address_str = std::fs::read_to_string(&self.latest_account_address_path)?;
+        AccountAddress::from_str(address_str.as_str()).map_err(anyhow::Error::new)
+    }
+
     pub fn get_accounts_path(&self) -> &Path {
         &self.accounts_path
     }
 
     pub fn get_test_key_path(&self) -> &Path {
         &self.test_key_path
-    }
-
-    #[allow(dead_code)]
-    pub fn get_test_address(&self) -> Result<AccountAddress> {
-        let address_str = std::fs::read_to_string(&self.test_key_address_path)?;
-        AccountAddress::from_str(address_str.as_str()).map_err(anyhow::Error::new)
     }
 
     pub fn create_archive_dir(&self, time: Duration) -> Result<PathBuf> {
@@ -321,24 +317,9 @@ impl NetworkHome {
         Ok(())
     }
 
-    pub fn generate_network_accounts_path_if_nonexistent(&self) -> Result<()> {
-        if !self.accounts_path.is_dir() {
-            fs::create_dir(self.accounts_path.as_path())?;
-        }
-        Ok(())
-    }
-
-    pub fn generate_network_latest_account_path_if_nonexistent(&self) -> Result<()> {
-        if !self.latest_account_path.is_dir() {
-            fs::create_dir(self.latest_account_path.as_path())?;
-        }
-        Ok(())
-    }
-
-    pub fn generate_network_base_path_if_nonexistent(&self) -> Result<()> {
-        if !self.network_base_path.is_dir() {
-            fs::create_dir_all(self.network_base_path.as_path())?;
-        }
+    pub fn generate_paths_if_nonexistent(&self) -> Result<()> {
+        fs::create_dir_all(self.latest_account_path.as_path())?;
+        fs::create_dir_all(self.test_path.as_path())?;
         Ok(())
     }
 
@@ -351,18 +332,11 @@ impl NetworkHome {
         ))
     }
 
-    pub fn generate_address_file(&self, public_key: &Ed25519PublicKey) -> Result<()> {
+    pub fn generate_latest_address_file(&self, public_key: &Ed25519PublicKey) -> Result<()> {
         let address = AuthenticationKey::ed25519(public_key).derived_address();
         let address_filepath = self.latest_account_address_path.as_path();
         let mut file = File::create(address_filepath)?;
         file.write_all(address.to_string().as_ref())?;
-        Ok(())
-    }
-
-    pub fn generate_shuffle_test_path_if_nonexistent(&self) -> Result<()> {
-        if !self.test_path.is_dir() {
-            fs::create_dir_all(self.test_path.as_path())?;
-        }
         Ok(())
     }
 
@@ -380,9 +354,13 @@ impl NetworkHome {
         Ok(())
     }
 
-    pub fn save_root_key(&self, root_key_path: &Path) -> Result<()> {
-        let new_root_key = generate_key::load_key(root_key_path);
-        generate_key::save_key(new_root_key, self.latest_account_key_path.as_path());
+    pub fn copy_key_to_latest(&self, key_path: &Path) -> Result<()> {
+        let key = generate_key::load_key(key_path);
+        self.save_key_as_latest(key)
+    }
+
+    pub fn save_key_as_latest(&self, key: Ed25519PrivateKey) -> Result<()> {
+        generate_key::save_key(key, self.latest_account_key_path.as_path());
         Ok(())
     }
 
@@ -444,7 +422,7 @@ impl Home {
         &self.validator_log_path
     }
 
-    pub fn get_network_home(&self, network_name: &str) -> NetworkHome {
+    pub fn new_network_home(&self, network_name: &str) -> NetworkHome {
         NetworkHome::new(self.networks_path.join(network_name).as_path())
     }
 
@@ -538,27 +516,41 @@ pub struct Network {
 }
 
 impl Network {
+    pub fn new(
+        name: String,
+        json_rpc_url: Url,
+        dev_api_url: Url,
+        faucet_url: Option<Url>,
+    ) -> Network {
+        Network {
+            name,
+            json_rpc_url,
+            dev_api_url,
+            faucet_url,
+        }
+    }
+
     pub fn get_name(&self) -> String {
         String::from(&self.name)
     }
 
-    pub fn get_json_rpc_url(&self) -> Result<Url> {
-        Ok(Url::from_str(self.json_rpc_url.as_str())?)
+    pub fn get_json_rpc_url(&self) -> Url {
+        self.json_rpc_url.clone()
     }
 
-    pub fn get_dev_api_url(&self) -> Result<Url> {
-        Ok(Url::from_str(self.dev_api_url.as_str())?)
+    pub fn get_dev_api_url(&self) -> Url {
+        self.dev_api_url.clone()
     }
 }
 
 impl Default for Network {
     fn default() -> Self {
-        Network {
-            name: String::from(LOCALHOST_NAME),
-            json_rpc_url: Url::from_str("http://127.0.0.1:8080").unwrap(),
-            dev_api_url: Url::from_str("http://127.0.0.1:8080").unwrap(),
-            faucet_url: None,
-        }
+        Network::new(
+            String::from(LOCALHOST_NAME),
+            Url::from_str("http://127.0.0.1:8080").unwrap(),
+            Url::from_str("http://127.0.0.1:8080").unwrap(),
+            None,
+        )
     }
 }
 
@@ -697,7 +689,7 @@ mod test {
         let network_home = NetworkHome::new(dir.path().join("localhost").as_path());
         let private_key = network_home.generate_key_file().unwrap();
         network_home
-            .generate_address_file(&private_key.public_key())
+            .generate_latest_address_file(&private_key.public_key())
             .unwrap();
         let address_path = dir.path().join("localhost/accounts/latest/address");
 
@@ -717,27 +709,13 @@ mod test {
     }
 
     #[test]
-    fn test_network_generate_network_accounts_path_if_nonexistent() {
+    fn test_network_generate_paths_if_nonexistent() {
         let dir = tempdir().unwrap();
         fs::create_dir_all(dir.path().join("localhost")).unwrap();
 
         let network_home = NetworkHome::new(dir.path().join("localhost").as_path());
-        network_home
-            .generate_network_accounts_path_if_nonexistent()
-            .unwrap();
+        network_home.generate_paths_if_nonexistent().unwrap();
         assert_eq!(dir.path().join("localhost/accounts").is_dir(), true);
-    }
-
-    #[test]
-    fn test_network_home_generate_network_latest_account_path_if_nonexistent() {
-        let dir = tempdir().unwrap();
-        fs::create_dir_all(dir.path().join("localhost/accounts")).unwrap();
-
-        let network_home = NetworkHome::new(dir.path().join("localhost").as_path());
-        network_home
-            .generate_network_latest_account_path_if_nonexistent()
-            .unwrap();
-        assert_eq!(dir.path().join("localhost/accounts/latest").is_dir(), true);
     }
 
     #[test]
@@ -762,7 +740,9 @@ mod test {
 
         let network_home = NetworkHome::new(dir.path().join("localhost").as_path());
         let public_key = network_home.generate_key_file().unwrap().public_key();
-        network_home.generate_address_file(&public_key).unwrap();
+        network_home
+            .generate_latest_address_file(&public_key)
+            .unwrap();
         assert_eq!(
             dir.path()
                 .join("localhost/accounts/latest/address")
@@ -859,7 +839,9 @@ mod test {
         let user_root_key = generate_key::generate_and_save_key(&user_root_key_path);
 
         let network_home = NetworkHome::new(dir.path().join("localhost").as_path());
-        network_home.save_root_key(&user_root_key_path).unwrap();
+        network_home
+            .copy_key_to_latest(&user_root_key_path)
+            .unwrap();
         let new_root_key = generate_key::load_key(network_home.get_latest_account_key_path());
 
         assert_eq!(new_root_key, user_root_key);
@@ -906,12 +888,12 @@ mod test {
     }
 
     fn get_test_localhost_network() -> Network {
-        Network {
-            name: "localhost".to_string(),
-            json_rpc_url: Url::from_str("http://127.0.0.1:8080").unwrap(),
-            dev_api_url: Url::from_str("http://127.0.0.1:8080").unwrap(),
-            faucet_url: None,
-        }
+        Network::new(
+            "localhost".to_string(),
+            Url::from_str("http://127.0.0.1:8080").unwrap(),
+            Url::from_str("http://127.0.0.1:8080").unwrap(),
+            None,
+        )
     }
 
     fn get_test_networks_config() -> NetworksConfig {

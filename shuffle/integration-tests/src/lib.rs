@@ -24,11 +24,9 @@ impl AdminTest for SamplePackageEndToEnd {
         let exit_status = shuffle::test::run_deno_test(
             helper.home(),
             &helper.project_path(),
-            &helper
-                .home()
-                .get_network_struct_from_toml(shuffle::shared::LOCALHOST_NAME)?,
-            helper.network_home().get_test_key_path(),
-            helper.network_home().get_test_address()?,
+            helper.network(),
+            helper.network_home().get_latest_account_key_path(),
+            helper.network_home().get_latest_address()?,
         )?;
 
         assert!(matches!(unit_test_result, UnitTestResult::Success));
@@ -51,11 +49,9 @@ impl AdminTest for TypescriptSdkIntegration {
         let exit_status = shuffle::test::run_deno_test_at_path(
             helper.home(),
             &helper.project_path(),
-            &helper
-                .home()
-                .get_network_struct_from_toml(shuffle::shared::LOCALHOST_NAME)?,
-            helper.network_home().get_test_key_path(),
-            helper.network_home().get_test_address()?,
+            helper.network(),
+            helper.network_home().get_latest_account_key_path(),
+            helper.network_home().get_latest_address()?,
             &helper.project_path().join("integration"),
         )?;
         assert!(exit_status.success());
@@ -68,15 +64,16 @@ fn bootstrap_shuffle(ctx: &mut AdminContext<'_>) -> Result<ShuffleTestHelper> {
     let factory = ctx.chain_info().transaction_factory();
     enable_open_publishing(&client, &factory, ctx.chain_info().root_account())?;
 
-    let helper = ShuffleTestHelper::new()?;
+    let helper = ShuffleTestHelper::new(ctx.chain_info())?;
     helper.create_project()?;
 
-    let new_account = ctx.random_account();
+    let mut account = ctx.random_account();
     let tc = ctx.chain_info().treasury_compliance_account();
-    helper.create_accounts(tc, new_account, factory, client)?;
+    helper.create_account(tc, &account, factory, client)?;
 
     let rt = Runtime::new().unwrap();
     let handle = rt.handle().clone();
-    handle.block_on(helper.deploy_project(ctx.chain_info().rest_api()))?;
+    handle.block_on(helper.deploy_project(&mut account, ctx.chain_info().rest_api()))?;
+
     Ok(helper)
 }

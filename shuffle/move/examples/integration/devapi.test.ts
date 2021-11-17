@@ -14,7 +14,7 @@ Deno.test("ledgerInfo", async () => {
 
 Deno.test("sequenceNumber", async () => {
   const actual = await devapi.sequenceNumber();
-  assertEquals(actual, 0);
+  assert(Number.isInteger(actual));
 });
 
 Deno.test("transactions", async () => {
@@ -25,7 +25,7 @@ Deno.test("transactions", async () => {
 
 Deno.test("accountTransactions", async () => {
   const actual = await devapi.accountTransactions();
-  assertEquals(actual.length, 0);
+  assert(Array.isArray(actual));
 });
 
 Deno.test("resources", async () => {

@@ -34,14 +34,15 @@ export async function transaction(versionOrHash: string) {
 // Polls for a specific transaction to complete, returning the `success`
 // field when no longer pending.
 export async function transactionSuccess(versionOrHash: string): Promise<boolean> {
+  let txn = await transaction(versionOrHash);
   for (let i = 0; i < 20; i++) {
-    const txn = await transaction(versionOrHash);
     if (txn.type !== "pending_transaction") {
       return txn.success;
     }
     await delay(500);
+    txn = await transaction(versionOrHash);
   }
-  throw `txn ${versionOrHash} never completed`;
+  throw `txn ${versionOrHash} never completed: ${txn && txn.vm_status}`;
 }
 
 // Returns transactions specific to a particular address.

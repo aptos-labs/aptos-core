@@ -24,25 +24,29 @@ use std::{
 use url::Url;
 
 /// Deploys shuffle's main Move Package to the sender's address.
-pub async fn handle(network_home: &NetworkHome, project_path: &Path, network: Url) -> Result<()> {
-    let client = DevApiClient::new(reqwest::Client::new(), network)?;
+pub async fn handle(network_home: &NetworkHome, project_path: &Path, url: Url) -> Result<()> {
     if !network_home.get_latest_account_key_path().exists() {
         return Err(anyhow!(
             "An account hasn't been created yet! Run shuffle account first."
         ));
     }
-    let new_account_key = load_key(network_home.get_latest_account_key_path());
-    println!("Using Public Key {}", &new_account_key.public_key());
-    let derived_address =
-        AuthenticationKey::ed25519(&new_account_key.public_key()).derived_address();
-    println!(
-        "Sending txn from address {}",
-        derived_address.to_hex_literal()
-    );
+    let account_key = load_key(network_home.get_latest_account_key_path());
+    println!("Using Public Key {}", &account_key.public_key());
+    let address = AuthenticationKey::ed25519(&account_key.public_key()).derived_address();
+    println!("Sending txn from address {}", address.to_hex_literal());
 
-    let account_seq_number = client.get_account_sequence_number(derived_address).await?;
-    let mut new_account = LocalAccount::new(derived_address, new_account_key, account_seq_number);
+    let client = DevApiClient::new(reqwest::Client::new(), url)?;
+    let seq_number = client.get_account_sequence_number(address).await?;
+    let mut account = LocalAccount::new(address, account_key, seq_number);
 
+    deploy(client, &mut account, project_path).await
+}
+
+pub async fn deploy(
+    client: DevApiClient,
+    account: &mut LocalAccount,
+    project_path: &Path,
+) -> Result<()> {
     let compiled_package = build_move_package(project_path.join(MAIN_PKG_PATH).as_ref())?;
     for module in compiled_package
         .transitive_compiled_modules()
@@ -50,7 +54,7 @@ pub async fn handle(network_home: &NetworkHome, project_path: &Path, network: Ur
         .compute_topological_order()?
     {
         let module_id = module.self_id();
-        if module_id.address() != &new_account.address() {
+        if module_id.address() != &account.address() {
             println!("Skipping Module: {}", module_id);
             continue;
         }
@@ -58,7 +62,7 @@ pub async fn handle(network_home: &NetworkHome, project_path: &Path, network: Ur
         let mut binary = vec![];
         module.serialize(&mut binary)?;
 
-        let hash = send_module_transaction(&client, &mut new_account, binary).await?;
+        let hash = send_module_transaction(&client, account, binary).await?;
         check_txn_executed_from_hash(&client, hash.as_str()).await?;
     }
 

@@ -35,7 +35,7 @@ pub async fn main() -> Result<()> {
             network,
         } => {
             deploy::handle(
-                &home.get_network_home(normalized_network_name(network.clone()).as_str()),
+                &home.new_network_home(normalized_network_name(network.clone()).as_str()),
                 &shared::normalized_project_path(project_path)?,
                 shared::normalized_network_url(&home, network)?,
             )
@@ -59,11 +59,11 @@ pub async fn main() -> Result<()> {
             &shared::normalized_project_path(project_path)?,
             home.get_network_struct_from_toml(normalized_network_name(network.clone()).as_str())?,
             &normalized_key_path(
-                home.get_network_home(normalized_network_name(network.clone()).as_str()),
+                home.new_network_home(normalized_network_name(network.clone()).as_str()),
                 key_path,
             )?,
             normalized_address(
-                home.get_network_home(normalized_network_name(network).as_str()),
+                home.new_network_home(normalized_network_name(network).as_str()),
                 address,
             )?,
         ),
@@ -77,7 +77,7 @@ pub async fn main() -> Result<()> {
                 shared::normalized_network_url(&home, network.clone())?,
                 unwrap_nested_boolean_option(tail),
                 normalized_address(
-                    home.get_network_home(normalized_network_name(network.clone()).as_str()),
+                    home.new_network_home(normalized_network_name(network.clone()).as_str()),
                     address,
                 )?,
                 unwrap_nested_boolean_option(raw),

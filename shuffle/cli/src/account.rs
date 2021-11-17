@@ -29,8 +29,8 @@ use std::{
 
 // Creates new account from randomly generated private/public key pair.
 pub fn handle(home: &Home, root: Option<PathBuf>, network: Network) -> Result<()> {
-    let network_home =
-        NetworkHome::new(home.get_networks_path().join(network.get_name()).as_path());
+    let network_home = home.new_network_home(&network.get_name());
+    network_home.generate_paths_if_nonexistent()?;
     check_nodeconfig_exists_if_localhost_used(home, &network)?;
 
     if network_home.get_latest_account_path().exists() {
@@ -40,26 +40,20 @@ pub fn handle(home: &Home, root: Option<PathBuf>, network: Network) -> Result<()
         }
     }
 
-    network_home.generate_network_base_path_if_nonexistent()?;
-
-    println!("Connecting to {}...", network.get_json_rpc_url()?);
-    let client = BlockingClient::new(network.get_json_rpc_url()?);
+    println!("Connecting to {}...", network.get_json_rpc_url());
+    let client = BlockingClient::new(network.get_json_rpc_url());
     let factory = TransactionFactory::new(ChainId::test());
 
     if let Some(input_root_key) = root {
-        network_home.save_root_key(input_root_key.as_path())?
+        network_home.copy_key_to_latest(input_root_key.as_path())?
     }
-
-    network_home.generate_network_accounts_path_if_nonexistent()?;
-    network_home.generate_network_latest_account_path_if_nonexistent()?;
 
     let mut treasury_account = get_treasury_account(&client, home.get_root_key_path())?;
     let new_account = generate_new_account(&network_home)?;
-    create_local_account(&mut treasury_account, &new_account, &factory, &client)?;
+    create_account_onchain(&mut treasury_account, &new_account, &factory, &client)?;
 
-    network_home.generate_shuffle_test_path_if_nonexistent()?;
     let test_account = generate_test_account(&network_home)?;
-    create_local_account(&mut treasury_account, &test_account, &factory, &client)
+    create_account_onchain(&mut treasury_account, &test_account, &factory, &client)
 }
 
 fn check_nodeconfig_exists_if_localhost_used(home: &Home, network: &Network) -> Result<()> {
@@ -115,7 +109,7 @@ fn archive_current_files_in_latest(network_home: &NetworkHome) -> Result<()> {
 fn generate_new_account(network_home: &NetworkHome) -> Result<LocalAccount> {
     let new_account_key = network_home.generate_key_file()?;
     let public_key = new_account_key.public_key();
-    network_home.generate_address_file(&public_key)?;
+    network_home.generate_latest_address_file(&public_key)?;
     Ok(LocalAccount::new(
         AuthenticationKey::ed25519(&public_key).derived_address(),
         new_account_key,
@@ -148,7 +142,7 @@ pub fn get_treasury_account(client: &BlockingClient, root_key_path: &Path) -> Re
     ))
 }
 
-pub fn create_local_account(
+pub fn create_account_onchain(
     treasury_account: &mut LocalAccount,
     new_account: &LocalAccount,
     factory: &TransactionFactory,
@@ -233,13 +227,5 @@ mod test {
         assert_eq!(delegate_user_response("a"), false);
         assert_eq!(delegate_user_response("n"), false);
         assert_eq!(delegate_user_response("y"), true);
-    }
-
-    #[test]
-    fn test_ask_user_if_they_want_key() {
-        assert_eq!(ask_user_if_they_want_key("y".to_string()), "y".to_string());
-        assert_eq!(ask_user_if_they_want_key("y ".to_string()), "y".to_string());
-        assert_eq!(ask_user_if_they_want_key("n".to_string()), "n".to_string());
-        assert_eq!(ask_user_if_they_want_key("n ".to_string()), "n".to_string());
     }
 }

@@ -36,8 +36,8 @@ pub async fn run_e2e_tests(
     let _config = shared::read_project_config(project_path)?;
     shared::generate_typescript_libraries(project_path)?;
 
-    println!("Connecting to {}...", network.get_json_rpc_url()?);
-    let client = BlockingClient::new(network.get_json_rpc_url()?.as_str());
+    println!("Connecting to {}...", network.get_json_rpc_url());
+    let client = BlockingClient::new(network.get_json_rpc_url().as_str());
     let factory = TransactionFactory::new(ChainId::test());
 
     let test_account = create_account(
@@ -52,7 +52,7 @@ pub async fn run_e2e_tests(
         &client,
         &factory,
     )?;
-    deploy::handle(&network_home, project_path, network.get_dev_api_url()?).await?;
+    deploy::handle(&network_home, project_path, network.get_dev_api_url()).await?;
 
     run_deno_test(
         home,
@@ -75,7 +75,7 @@ fn create_account(
     let public_key = account_key.public_key();
     let derived_address = AuthenticationKey::ed25519(&public_key).derived_address();
     let new_account = LocalAccount::new(derived_address, account_key, 0);
-    account::create_local_account(&mut treasury_account, &new_account, factory, client)?;
+    account::create_account_onchain(&mut treasury_account, &new_account, factory, client)?;
     Ok(new_account)
 }
 
@@ -116,8 +116,8 @@ pub fn run_deno_test_at_path(
             "--allow-read",
             format!(
                 "--allow-net={},{}",
-                host_and_port(&network.get_dev_api_url()?)?,
-                host_and_port(&network.get_json_rpc_url()?)?,
+                host_and_port(&network.get_dev_api_url())?,
+                host_and_port(&network.get_json_rpc_url())?,
             )
             .as_str(),
         ])

@@ -3,29 +3,42 @@
 
 use anyhow::Result;
 use diem_sdk::{
-    client::BlockingClient, transaction_builder::TransactionFactory, types::LocalAccount,
+    client::BlockingClient, crypto::ed25519::Ed25519PrivateKey,
+    transaction_builder::TransactionFactory, types::LocalAccount,
 };
+use forge::ChainInfo;
 use shuffle::{
     account, deploy, new,
-    shared::{Home, NetworkHome, LOCALHOST_NAME},
+    shared::{DevApiClient, Home, Network, NetworkHome},
 };
-use std::{path::PathBuf, str::FromStr};
+use std::{convert::TryFrom, path::PathBuf, str::FromStr};
 use tempfile::TempDir;
 use url::Url;
 
 pub struct ShuffleTestHelper {
     home: Home,
+    network: Network,
     network_home: NetworkHome,
     tmp_dir: TempDir,
 }
 
+const FORGE_NETWORK_NAME: &str = "forge";
+
 impl ShuffleTestHelper {
-    pub fn new() -> Result<Self> {
+    pub fn new(chain_info: &mut ChainInfo<'_>) -> Result<Self> {
         let tmp_dir = TempDir::new()?;
         let home = Home::new(tmp_dir.path())?;
-        let network_home = home.get_network_home(LOCALHOST_NAME);
+        let network_home = home.new_network_home(FORGE_NETWORK_NAME);
+        network_home.generate_paths_if_nonexistent()?;
+        let network = Network::new(
+            String::from(FORGE_NETWORK_NAME),
+            Url::from_str(chain_info.json_rpc())?,
+            Url::from_str(chain_info.rest_api())?,
+            None,
+        );
         Ok(Self {
             home,
+            network,
             network_home,
             tmp_dir,
         })
@@ -35,22 +48,31 @@ impl ShuffleTestHelper {
         &self.home
     }
 
-    pub fn network_home(&self) -> NetworkHome {
-        self.home.get_network_home(LOCALHOST_NAME)
+    pub fn network(&self) -> &Network {
+        &self.network
+    }
+
+    pub fn network_home(&self) -> &NetworkHome {
+        &self.network_home
     }
 
     pub fn project_path(&self) -> PathBuf {
         self.tmp_dir.path().join("project")
     }
 
-    pub fn create_accounts(
+    pub fn create_account(
         &self,
         treasury_account: &mut LocalAccount,
-        new_account: LocalAccount,
+        new_account: &LocalAccount,
         factory: TransactionFactory,
         client: BlockingClient,
     ) -> Result<()> {
-        account::create_local_account(treasury_account, &new_account, &factory, &client)
+        let bytes: &[u8] = &new_account.private_key().to_bytes();
+        let private_key = Ed25519PrivateKey::try_from(bytes).map_err(anyhow::Error::new)?;
+        self.network_home().save_key_as_latest(private_key)?;
+        self.network_home()
+            .generate_latest_address_file(new_account.public_key())?;
+        account::create_account_onchain(treasury_account, new_account, &factory, &client)
     }
 
     pub fn create_project(&self) -> Result<()> {
@@ -61,8 +83,13 @@ impl ShuffleTestHelper {
         )
     }
 
-    pub async fn deploy_project(&self, dev_api_url: &str) -> Result<()> {
+    pub async fn deploy_project(
+        &self,
+        account: &mut LocalAccount,
+        dev_api_url: &str,
+    ) -> Result<()> {
         let url = Url::from_str(dev_api_url)?;
-        deploy::handle(&self.network_home, &self.project_path(), url).await
+        let client = DevApiClient::new(reqwest::Client::new(), url)?;
+        deploy::deploy(client, account, &self.project_path()).await
     }
 }
