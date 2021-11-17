@@ -18,7 +18,7 @@ backtrace = { version = "0.3.56", features = ["addr2line", "default", "gimli-sym
 bitvec = { version = "0.19.5", features = ["alloc", "atomic", "default", "std"] }
 block-buffer = { version = "0.9.0", default-features = false, features = ["block-padding"] }
 bstr = { version = "0.2.15", features = ["default", "lazy_static", "regex-automata", "serde", "serde1", "serde1-nostd", "std", "unicode"] }
-byteorder = { version = "1.4.3", features = ["default", "i128", "std"] }
+byteorder = { version = "1.4.3", features = ["default", "std"] }
 bytes = { version = "1.0.1", features = ["default", "serde", "std"] }
 chrono = { version = "0.4.19", features = ["clock", "default", "libc", "oldtime", "serde", "std", "time", "winapi"] }
 clap = { version = "2.33.3", features = ["ansi_term", "atty", "color", "default", "strsim", "suggestions", "vec_map"] }
@@ -57,7 +57,6 @@ rusty-fork = { version = "0.3.0", features = ["default", "timeout", "wait-timeou
 serde = { version = "1.0.130", features = ["alloc", "default", "derive", "rc", "serde_derive", "std"] }
 serde_json = { version = "1.0.68", features = ["default", "indexmap", "preserve_order", "std"] }
 standback = { version = "0.2.15", default-features = false, features = ["std"] }
-subtle = { version = "2.4.0", default-features = false, features = ["std"] }
 tiny-keccak = { version = "2.0.2", features = ["default", "sha3"] }
 tokio = { version = "1.9.0", features = ["bytes", "default", "fs", "full", "io-std", "io-util", "libc", "macros", "memchr", "mio", "net", "num_cpus", "once_cell", "parking_lot", "process", "rt", "rt-multi-thread", "signal", "signal-hook-registry", "sync", "test-util", "time", "tokio-macros", "winapi"] }
 tokio-util = { version = "0.6.7", features = ["codec", "compat", "default", "futures-io", "io"] }
@@ -66,7 +65,6 @@ tracing = { version = "0.1.26", features = ["attributes", "default", "log", "std
 tracing-core = { version = "0.1.18", features = ["default", "lazy_static", "std"] }
 url = { version = "2.2.2", default-features = false, features = ["serde"] }
 warp = { version = "0.3.0", features = ["default", "multipart", "tls", "tokio-rustls", "tokio-tungstenite", "websocket"] }
-zeroize = { version = "1.2.0", features = ["alloc", "default", "zeroize_derive"] }
 
 [target.x86_64-unknown-linux-gnu.build-dependencies]
 Inflector = { version = "0.11.4", features = ["default", "heavyweight", "lazy_static", "regex"] }
@@ -76,7 +74,7 @@ backtrace = { version = "0.3.56", features = ["addr2line", "default", "gimli-sym
 bitvec = { version = "0.19.5", features = ["alloc", "atomic", "default", "std"] }
 block-buffer = { version = "0.9.0", default-features = false, features = ["block-padding"] }
 bstr = { version = "0.2.15", features = ["default", "lazy_static", "regex-automata", "serde", "serde1", "serde1-nostd", "std", "unicode"] }
-byteorder = { version = "1.4.3", features = ["default", "i128", "std"] }
+byteorder = { version = "1.4.3", features = ["default", "std"] }
 bytes = { version = "1.0.1", features = ["default", "serde", "std"] }
 cc = { version = "1.0.67", default-features = false, features = ["jobserver", "parallel"] }
 chrono = { version = "0.4.19", features = ["clock", "default", "libc", "oldtime", "serde", "std", "time", "winapi"] }
@@ -118,7 +116,6 @@ rusty-fork = { version = "0.3.0", features = ["default", "timeout", "wait-timeou
 serde = { version = "1.0.130", features = ["alloc", "default", "derive", "rc", "serde_derive", "std"] }
 serde_json = { version = "1.0.68", features = ["default", "indexmap", "preserve_order", "std"] }
 standback = { version = "0.2.15", default-features = false, features = ["std"] }
-subtle = { version = "2.4.0", default-features = false, features = ["std"] }
 syn-3575ec1268b04181 = { package = "syn", version = "0.15.44", features = ["clone-impls", "default", "derive", "extra-traits", "full", "parsing", "printing", "proc-macro", "quote", "visit"] }
 syn-dff4ba8e3ae991db = { package = "syn", version = "1.0.74", features = ["clone-impls", "default", "derive", "extra-traits", "full", "parsing", "printing", "proc-macro", "quote", "visit", "visit-mut"] }
 tiny-keccak = { version = "2.0.2", features = ["default", "sha3"] }
@@ -129,7 +126,6 @@ tracing = { version = "0.1.26", features = ["attributes", "default", "log", "std
 tracing-core = { version = "0.1.18", features = ["default", "lazy_static", "std"] }
 url = { version = "2.2.2", default-features = false, features = ["serde"] }
 warp = { version = "0.3.0", features = ["default", "multipart", "tls", "tokio-rustls", "tokio-tungstenite", "websocket"] }
-zeroize = { version = "1.2.0", features = ["alloc", "default", "zeroize_derive"] }
 
 [target.x86_64-apple-darwin.dependencies]
 Inflector = { version = "0.11.4", features = ["default", "heavyweight", "lazy_static", "regex"] }
@@ -139,7 +135,7 @@ backtrace = { version = "0.3.56", features = ["addr2line", "default", "gimli-sym
 bitvec = { version = "0.19.5", features = ["alloc", "atomic", "default", "std"] }
 block-buffer = { version = "0.9.0", default-features = false, features = ["block-padding"] }
 bstr = { version = "0.2.15", features = ["default", "lazy_static", "regex-automata", "serde", "serde1", "serde1-nostd", "std", "unicode"] }
-byteorder = { version = "1.4.3", features = ["default", "i128", "std"] }
+byteorder = { version = "1.4.3", features = ["default", "std"] }
 bytes = { version = "1.0.1", features = ["default", "serde", "std"] }
 chrono = { version = "0.4.19", features = ["clock", "default", "libc", "oldtime", "serde", "std", "time", "winapi"] }
 clap = { version = "2.33.3", features = ["ansi_term", "atty", "color", "default", "strsim", "suggestions", "vec_map"] }
@@ -178,7 +174,6 @@ rusty-fork = { version = "0.3.0", features = ["default", "timeout", "wait-timeou
 serde = { version = "1.0.130", features = ["alloc", "default", "derive", "rc", "serde_derive", "std"] }
 serde_json = { version = "1.0.68", features = ["default", "indexmap", "preserve_order", "std"] }
 standback = { version = "0.2.15", default-features = false, features = ["std"] }
-subtle = { version = "2.4.0", default-features = false, features = ["std"] }
 tiny-keccak = { version = "2.0.2", features = ["default", "sha3"] }
 tokio = { version = "1.9.0", features = ["bytes", "default", "fs", "full", "io-std", "io-util", "libc", "macros", "memchr", "mio", "net", "num_cpus", "once_cell", "parking_lot", "process", "rt", "rt-multi-thread", "signal", "signal-hook-registry", "sync", "test-util", "time", "tokio-macros", "winapi"] }
 tokio-util = { version = "0.6.7", features = ["codec", "compat", "default", "futures-io", "io"] }
@@ -187,7 +182,6 @@ tracing = { version = "0.1.26", features = ["attributes", "default", "log", "std
 tracing-core = { version = "0.1.18", features = ["default", "lazy_static", "std"] }
 url = { version = "2.2.2", default-features = false, features = ["serde"] }
 warp = { version = "0.3.0", features = ["default", "multipart", "tls", "tokio-rustls", "tokio-tungstenite", "websocket"] }
-zeroize = { version = "1.2.0", features = ["alloc", "default", "zeroize_derive"] }
 
 [target.x86_64-apple-darwin.build-dependencies]
 Inflector = { version = "0.11.4", features = ["default", "heavyweight", "lazy_static", "regex"] }
@@ -197,7 +191,7 @@ backtrace = { version = "0.3.56", features = ["addr2line", "default", "gimli-sym
 bitvec = { version = "0.19.5", features = ["alloc", "atomic", "default", "std"] }
 block-buffer = { version = "0.9.0", default-features = false, features = ["block-padding"] }
 bstr = { version = "0.2.15", features = ["default", "lazy_static", "regex-automata", "serde", "serde1", "serde1-nostd", "std", "unicode"] }
-byteorder = { version = "1.4.3", features = ["default", "i128", "std"] }
+byteorder = { version = "1.4.3", features = ["default", "std"] }
 bytes = { version = "1.0.1", features = ["default", "serde", "std"] }
 cc = { version = "1.0.67", default-features = false, features = ["jobserver", "parallel"] }
 chrono = { version = "0.4.19", features = ["clock", "default", "libc", "oldtime", "serde", "std", "time", "winapi"] }
@@ -239,7 +233,6 @@ rusty-fork = { version = "0.3.0", features = ["default", "timeout", "wait-timeou
 serde = { version = "1.0.130", features = ["alloc", "default", "derive", "rc", "serde_derive", "std"] }
 serde_json = { version = "1.0.68", features = ["default", "indexmap", "preserve_order", "std"] }
 standback = { version = "0.2.15", default-features = false, features = ["std"] }
-subtle = { version = "2.4.0", default-features = false, features = ["std"] }
 syn-3575ec1268b04181 = { package = "syn", version = "0.15.44", features = ["clone-impls", "default", "derive", "extra-traits", "full", "parsing", "printing", "proc-macro", "quote", "visit"] }
 syn-dff4ba8e3ae991db = { package = "syn", version = "1.0.74", features = ["clone-impls", "default", "derive", "extra-traits", "full", "parsing", "printing", "proc-macro", "quote", "visit", "visit-mut"] }
 tiny-keccak = { version = "2.0.2", features = ["default", "sha3"] }
@@ -250,6 +243,5 @@ tracing = { version = "0.1.26", features = ["attributes", "default", "log", "std
 tracing-core = { version = "0.1.18", features = ["default", "lazy_static", "std"] }
 url = { version = "2.2.2", default-features = false, features = ["serde"] }
 warp = { version = "0.3.0", features = ["default", "multipart", "tls", "tokio-rustls", "tokio-tungstenite", "websocket"] }
-zeroize = { version = "1.2.0", features = ["alloc", "default", "zeroize_derive"] }
 
 ### END HAKARI SECTION

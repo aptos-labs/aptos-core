@@ -2854,7 +2854,6 @@ dependencies = [
  "diem-temppath",
  "diem-types",
  "diem-workspace-hack",
- "ed25519-dalek-fiat",
  "hex",
  "hmac",
  "mirai-annotations",
@@ -2918,7 +2917,6 @@ dependencies = [
  "serde 1.0.130",
  "serde_json",
  "standback",
- "subtle",
  "syn 0.15.44",
  "syn 1.0.74",
  "tiny-keccak",
@@ -2929,7 +2927,6 @@ dependencies = [
  "tracing-core",
  "url",
  "warp",
- "zeroize",
 ]
 
 [[package]]

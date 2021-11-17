@@ -23,4 +23,4 @@ mod mnemonic;
 mod wallet_library;
 
 /// Default imports
-pub use crate::{mnemonic::Mnemonic, wallet_library::WalletLibrary};
+pub use crate::{key_factory::ChildNumber, mnemonic::Mnemonic, wallet_library::WalletLibrary};
