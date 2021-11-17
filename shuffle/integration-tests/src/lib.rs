@@ -67,7 +67,8 @@ fn bootstrap_shuffle(ctx: &mut AdminContext<'_>) -> Result<ShuffleTestHelper> {
     let helper = ShuffleTestHelper::new(ctx.chain_info())?;
     helper.create_project()?;
 
-    let mut account = ctx.random_account();
+    // let mut account = ctx.random_account(); // TODO: Support arbitrary addresses
+    let mut account = ShuffleTestHelper::hardcoded_0x2416_account(&client)?;
     let tc = ctx.chain_info().treasury_compliance_account();
     helper.create_account(tc, &account, factory, client)?;
 

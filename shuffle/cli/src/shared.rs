@@ -27,7 +27,7 @@ use transaction_builder_generator::SourceInstaller as BuildgenSourceInstaller;
 use url::Url;
 
 pub const MAIN_PKG_PATH: &str = "main";
-const NEW_KEY_FILE_CONTENT: &[u8] = include_bytes!("../new_account.key");
+pub const NEW_KEY_FILE_CONTENT: &[u8] = include_bytes!("../new_account.key");
 const DIEM_ACCOUNT_TYPE: &str = "0x1::DiemAccount::DiemAccount";
 
 pub const LOCALHOST_NAME: &str = "localhost";
