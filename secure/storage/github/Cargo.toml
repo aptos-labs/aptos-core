@@ -16,7 +16,7 @@ thiserror = "1.0.24"
 ureq = { version = "1.5.4", features = ["json", "native-tls"], default-features = false }
 
 diem-workspace-hack = { path = "../../../common/workspace-hack" }
-proxy = { path = "../../../common/proxy" }
+proxy = { path = "../../../crates/proxy" }
 
 [dev-dependencies]
 base64 = "0.13.0"

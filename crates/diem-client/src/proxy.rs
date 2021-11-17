@@ -1,1 +1,1 @@
-../../../common/proxy/src/lib.rs
+../../proxy/src/lib.rs
