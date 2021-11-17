@@ -96,6 +96,7 @@ pub enum InitialVersion {
 
 pub struct ForgeConfig<'cfg> {
     public_usage_tests: &'cfg [&'cfg dyn PublicUsageTest],
+    nft_public_usage_tests: &'cfg [&'cfg dyn NFTPublicUsageTest],
     admin_tests: &'cfg [&'cfg dyn AdminTest],
     network_tests: &'cfg [&'cfg dyn NetworkTest],
 
@@ -119,6 +120,14 @@ impl<'cfg> ForgeConfig<'cfg> {
         public_usage_tests: &'cfg [&'cfg dyn PublicUsageTest],
     ) -> Self {
         self.public_usage_tests = public_usage_tests;
+        self
+    }
+
+    pub fn with_nft_public_usage_tests(
+        mut self,
+        nft_public_usage_tests: &'cfg [&'cfg dyn NFTPublicUsageTest],
+    ) -> Self {
+        self.nft_public_usage_tests = nft_public_usage_tests;
         self
     }
 
@@ -169,6 +178,7 @@ impl<'cfg> Default for ForgeConfig<'cfg> {
     fn default() -> Self {
         Self {
             public_usage_tests: &[],
+            nft_public_usage_tests: &[],
             admin_tests: &[],
             network_tests: &[],
             initial_validator_count: NonZeroUsize::new(1).unwrap(),
@@ -268,6 +278,23 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                 );
                 let result = run_test(|| test.run(&mut public_ctx));
                 summary.handle_result(test.name().to_owned(), result)?;
+            }
+
+            // Run NFTPublicUsageTests
+            if !self.tests.nft_public_usage_tests.is_empty() {
+                swarm
+                    .chain_info()
+                    .into_nft_public_info()
+                    .init_nft_environment()?;
+                for test in self.filter_tests(self.tests.nft_public_usage_tests.iter()) {
+                    let mut nft_public_ctx = NFTPublicUsageContext::new(
+                        CoreContext::from_rng(&mut rng),
+                        swarm.chain_info().into_nft_public_info(),
+                        &mut report,
+                    );
+                    let result = run_test(|| test.run(&mut nft_public_ctx));
+                    summary.handle_result(test.name().to_owned(), result)?;
+                }
             }
 
             // Run AdminTests

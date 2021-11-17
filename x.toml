@@ -163,6 +163,7 @@ members = [
     "testcases",
     "diem-documentation-tool",
     "diem-e2e-tests-replay",
+    "diem-experimental-framework-releases",
     "diem-fuzz",
     "diem-fuzzer",
     "diem-json-rpc-client",

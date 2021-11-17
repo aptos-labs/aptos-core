@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{Coffer, PublicInfo, Result};
+use crate::{Coffer, NFTPublicInfo, PublicInfo, Result};
 use diem_sdk::{
     client::BlockingClient,
     transaction_builder::{Currency, TransactionFactory},
@@ -140,6 +140,15 @@ impl<'t> ChainInfo<'t> {
                 designated_dealer_account: self.designated_dealer_account,
             },
             self.rest_api_url.clone(),
+        )
+    }
+
+    pub fn into_nft_public_info(self) -> NFTPublicInfo<'t> {
+        NFTPublicInfo::new(
+            self.json_rpc_url.clone(),
+            self.chain_id,
+            self.rest_api_url.clone(),
+            self.root_account,
         )
     }
 }

@@ -12,7 +12,7 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-pub use diem_transaction_builder::stdlib;
+pub use diem_transaction_builder::{experimental_stdlib, stdlib};
 use diem_types::transaction::{ChangeSet, ModuleBundle, Script, ScriptFunction, WriteSetPayload};
 
 pub struct TransactionBuilder {

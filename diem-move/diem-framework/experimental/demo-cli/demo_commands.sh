@@ -4,17 +4,18 @@
 # local setup
 export ROOT_KEY="local_root.key"
 export TC_KEY="local_root.key"
+export BARS_ADDRESS="0x06505CCD81E562B524D8F656ABD92A15"
 export JSON_RPC_ENDPOINT="http://0.0.0.0:8080"
 export REST_API_ENDPOINT="localhost:8080"
 # run a local node
 cargo run --bin diem-node -- --lazy --test --open-publishing --genesis-modules diem-move/diem-framework/experimental/releases/artifacts/current --seed 0000000000000000000000000000000000000000000000000000000000000000
 
-cargo run -- --jsonrpc-endpoint $JSON_RPC_ENDPOINT --account-key-path $TC_KEY --account-address 0xB1E55ED create-basic-account 0x34CD440B72D03907100007D7BC0080A1 44f0d42a415212a4ab59749efb6ac9a9
-cargo run -- --jsonrpc-endpoint $JSON_RPC_ENDPOINT --account-key-path bars_account.key --account-address 0x34CD440B72D03907100007D7BC0080A1 create-basic-account 0x3132E2B5216A46DFCF8154079954C129 45ecaf56addd68aa8be08e2763c09857
-cargo run -- --jsonrpc-endpoint $JSON_RPC_ENDPOINT --account-key-path bars_account.key --account-address 0x34CD440B72D03907100007D7BC0080A1 create-basic-account 0x1A08E8165BB9225702495E8CB6E57E61 5839ada2d75b6c43f194123337a11c5e
+cargo run -- --jsonrpc-endpoint $JSON_RPC_ENDPOINT --account-key-path $TC_KEY --account-address 0xB1E55ED create-basic-account $BARS_ADDRESS 8bf3d7c0b381385c06bdfe37e1230cc8
+cargo run -- --jsonrpc-endpoint $JSON_RPC_ENDPOINT --account-key-path bars_account.key --account-address $BARS_ADDRESS create-basic-account 0x3132E2B5216A46DFCF8154079954C129 45ecaf56addd68aa8be08e2763c09857
+cargo run -- --jsonrpc-endpoint $JSON_RPC_ENDPOINT --account-key-path bars_account.key --account-address $BARS_ADDRESS create-basic-account 0x1A08E8165BB9225702495E8CB6E57E61 5839ada2d75b6c43f194123337a11c5e
 
 # get all the resource types of the newly created account
-curl ${REST_API_ENDPOINT}/accounts/0x34CD440B72D03907100007D7BC0080A1/resources | jq '.[] | .type'
+curl ${REST_API_ENDPOINT}/accounts/${BARS_ADDRESS}/resources | jq '.[] | .type'
 # look at the event
 curl "${REST_API_ENDPOINT}/accounts/0xB1E55ED/transactions?start=0&limit=1" | jq
 
@@ -32,7 +33,7 @@ curl ${REST_API_ENDPOINT}/accounts/0x3132E2B5216A46DFCF8154079954C129/resources 
 
 # register another user
 cargo run -- --jsonrpc-endpoint $JSON_RPC_ENDPOINT --account-key-path user_account2.key --account-address 0x1A08E8165BB9225702495E8CB6E57E61 register-bars-user
-cargo run -- --jsonrpc-endpoint $JSON_RPC_ENDPOINT --account-key-path bars_account.key --account-address 0x34CD440B72D03907100007D7BC0080A1 mint-bars-nft --creator-addr 0x3132E2B5216A46DFCF8154079954C129 --creator-name "Some Name" --content-uri "www.diem.com" --amount 100
+cargo run -- --jsonrpc-endpoint $JSON_RPC_ENDPOINT --account-key-path bars_account.key --account-address $BARS_ADDRESS mint-bars-nft --creator-addr 0x3132E2B5216A46DFCF8154079954C129 --creator-name "Some Name" --content-uri "www.diem.com" --amount 100
 # Token data collection
 curl ${REST_API_ENDPOINT}/accounts/0x3132E2B5216A46DFCF8154079954C129/resources | jq '.[] | select(.type | contains("TokenDataCollection"))'
 # Token gallery

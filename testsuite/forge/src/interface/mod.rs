@@ -17,6 +17,8 @@ mod node;
 pub use node::*;
 mod chain_info;
 pub use chain_info::*;
+mod nft;
+pub use nft::*;
 
 /// A wrapper around a usize in order to represent an opaque version of a Node.
 ///
