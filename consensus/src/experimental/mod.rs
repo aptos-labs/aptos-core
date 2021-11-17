@@ -21,7 +21,6 @@
  *  └──────────┘
  */
 
-#![allow(dead_code)]
 pub mod buffer;
 pub mod buffer_item;
 pub mod buffer_manager;

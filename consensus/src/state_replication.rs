@@ -12,10 +12,6 @@ use std::sync::Arc;
 
 pub type StateComputerCommitCallBackType =
     Box<dyn FnOnce(&[Arc<ExecutedBlock>], LedgerInfoWithSignatures) + Send + Sync>;
-#[cfg(test)]
-pub fn empty_state_computer_call_back() -> StateComputerCommitCallBackType {
-    Box::new(|_, _| {})
-}
 
 /// Retrieves and updates the status of transactions on demand (e.g., via talking with Mempool)
 #[async_trait::async_trait]
