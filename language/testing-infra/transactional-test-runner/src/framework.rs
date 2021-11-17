@@ -8,7 +8,12 @@ use crate::tasks::{
     TaskInput, ViewCommand,
 };
 use anyhow::*;
-use move_binary_format::file_format::{CompiledModule, CompiledScript};
+use bytecode_source_map::mapping::SourceMapping;
+use disassembler::disassembler::{Disassembler, DisassemblerOptions};
+use move_binary_format::{
+    binary_views::BinaryIndexedView,
+    file_format::{CompiledModule, CompiledScript},
+};
 use move_command_line_common::{
     env::read_bool_env_var,
     files::{MOVE_EXTENSION, MOVE_IR_EXTENSION},
@@ -20,6 +25,7 @@ use move_core_types::{
     language_storage::{ModuleId, TypeTag},
     transaction_argument::TransactionArgument,
 };
+use move_ir_types::location::Spanned;
 use move_lang::{
     compiled_unit::AnnotatedCompiledUnit,
     diagnostics::{Diagnostics, FilesSourceText},
@@ -139,6 +145,26 @@ pub trait MoveTestAdapter<'a> {
         match command {
             TaskCommand::Init { .. } => {
                 panic!("The 'init' command is optional. But if used, it must be the first command")
+            }
+            TaskCommand::PrintBytecode { .. } => {
+                let state = self.compiled_state();
+                let data = match data {
+                    Some(f) => f,
+                    None => panic!(
+                        "Expected a Move IR module text block following 'print-bytecode' starting on lines {}-{}",
+                        start_line, command_lines_stop
+                    ),
+                };
+                let data_path = data.path().to_str().unwrap();
+                let script = compile_ir_module(state.dep_modules(), data_path)?;
+
+                let source_mapping = SourceMapping::new_from_view(
+                    BinaryIndexedView::Module(&script),
+                    Spanned::unsafe_no_loc(()).loc,
+                )
+                .expect("Unable to build dummy source mapping");
+                let disassembler = Disassembler::new(source_mapping, DisassemblerOptions::new());
+                Ok(Some(disassembler.disassemble()?))
             }
             TaskCommand::Publish(PublishCommand { gas_budget, syntax }, extra_args) => {
                 let syntax = syntax.unwrap_or_else(|| self.default_syntax());

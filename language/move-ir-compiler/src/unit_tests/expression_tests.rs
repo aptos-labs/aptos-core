@@ -11,33 +11,6 @@ use move_binary_format::{
 };
 
 #[test]
-fn compile_script_expr_addition() {
-    let code = String::from(
-        "
-        main() {
-            let x: u64;
-            let y: u64;
-            let z: u64;
-            x = 3;
-            y = 5;
-            z = move(x) + move(y);
-            return;
-        }
-        ",
-    );
-    let compiled_script_res = compile_script_string(&code);
-    let compiled_script = compiled_script_res.unwrap();
-    assert_eq!(count_locals(&compiled_script), 3);
-    assert_eq!(compiled_script.code().code.len(), 9);
-    assert!(compiled_script.struct_handles().is_empty());
-    assert_eq!(compiled_script.function_handles().len(), 0);
-    assert_eq!(compiled_script.signatures().len(), 2);
-    assert_eq!(compiled_script.module_handles().len(), 0);
-    assert_eq!(compiled_script.identifiers().len(), 0);
-    assert_eq!(compiled_script.address_identifiers().len(), 0);
-}
-
-#[test]
 fn compile_script_expr_combined() {
     let code = String::from(
         "

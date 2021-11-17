@@ -99,6 +99,7 @@ members = [
     "language/move-ir-compiler/bytecode-source-map",
     "language/move-ir-compiler/ir-to-bytecode",
     "language/move-ir-compiler/ir-to-bytecode/syntax",
+    "language/move-ir-compiler/transactional-tests",
     "language/move-lang",
     "language/move-lang/functional-tests",
     "language/move-lang/transactional-tests",

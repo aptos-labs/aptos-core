@@ -218,6 +218,11 @@ pub enum SyntaxChoice {
     IR,
 }
 
+/// Translates the given Move IR module into bytecode, then prints a textual representation of that
+/// bytecode.
+#[derive(Debug, StructOpt)]
+pub struct PrintBytecodeCommand {}
+
 #[derive(Debug, StructOpt)]
 pub struct InitCommand {
     #[structopt(
@@ -262,6 +267,7 @@ pub struct ViewCommand {
 #[derive(Debug)]
 pub enum TaskCommand<ExtraInitArgs, ExtraPublishArgs, ExtraRunArgs, SubCommands> {
     Init(InitCommand, ExtraInitArgs),
+    PrintBytecode(PrintBytecodeCommand),
     Publish(PublishCommand, ExtraPublishArgs),
     Run(RunCommand, ExtraRunArgs),
     View(ViewCommand),
@@ -299,6 +305,8 @@ where
             ExtraInitArgs::augment_clap(subcommand)
         });
 
+        let app = app.subcommand(PrintBytecodeCommand::clap().name("print-bytecode"));
+
         let app = app.subcommand({
             let subcommand = PublishCommand::clap().name("publish");
             ExtraPublishArgs::augment_clap(subcommand)
@@ -317,6 +325,9 @@ where
         match matches.subcommand() {
             ("init", Some(matches)) => {
                 TaskCommand::Init(StructOpt::from_clap(matches), StructOpt::from_clap(matches))
+            }
+            ("print-bytecode", Some(matches)) => {
+                TaskCommand::PrintBytecode(StructOpt::from_clap(matches))
             }
             ("publish", Some(matches)) => {
                 TaskCommand::Publish(StructOpt::from_clap(matches), StructOpt::from_clap(matches))

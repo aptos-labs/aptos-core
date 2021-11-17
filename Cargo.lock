@@ -5204,6 +5204,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "move-ir-compiler-transactional-tests"
+version = "0.1.0"
+dependencies = [
+ "datatest-stable",
+ "diem-workspace-hack",
+ "move-transactional-test-runner",
+]
+
+[[package]]
 name = "move-ir-types"
 version = "0.1.0"
 dependencies = [
@@ -5463,16 +5472,19 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bytecode-interpreter",
+ "bytecode-source-map",
  "colored",
  "datatest-stable",
  "diem-workspace-hack",
  "difference",
+ "disassembler",
  "move-binary-format",
  "move-bytecode-utils",
  "move-cli",
  "move-command-line-common",
  "move-core-types",
  "move-ir-compiler",
+ "move-ir-types",
  "move-lang",
  "move-stdlib",
  "move-symbol-pool",

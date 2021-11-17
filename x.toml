@@ -215,6 +215,7 @@ members = [
     "memsocket",
     "mirai-dataflow-analysis",
     "module-generation",
+    "move-ir-compiler-transactional-tests",
     "move-lang-functional-tests",
     "move-lang-transactional-tests",
     "move-oncall-trainer",
