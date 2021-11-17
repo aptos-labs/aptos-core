@@ -1,5 +1,5 @@
 // flag: --check-inconsistency
-// separate_baseline: no_opaque
+// separate_baseline: simplify
 module 0x42::Inconsistency {
 
 

@@ -1,5 +1,5 @@
 // separate_baseline: cvc4
-// separate_baseline: no_opaque
+// separate_baseline: simplify
 // The separate baseline is legit and caused by a different choice in the generated model.
 module 0x42::SimpleIsTxnSigner {
     use Std::Signer;

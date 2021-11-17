@@ -79,21 +79,14 @@ fn get_features() -> &'static [Feature] {
                 runner: |p| test_runner_for_feature(p, get_feature_by_name("default")),
                 enabling_condition: |_, _| true,
             },
-            // Tests with pragma opaque ignored for internal functions
-            Feature {
-                name: "no_opaque",
-                flags: &["--ignore-pragma-opaque-internal-only"],
-                inclusion_mode: InclusionMode::Implicit,
-                enable_in_ci: true,
-                only_if_requested: false,
-                separate_baseline: false,
-                runner: |p| test_runner_for_feature(p, get_feature_by_name("no_opaque")),
-                enabling_condition: |_, _| true,
-            },
             // Tests with spec simplification pipeline enabled
             Feature {
                 name: "simplify",
-                flags: &["--simplify", "inline"],
+                flags: &[
+                    "--ignore-pragma-opaque-internal-only",
+                    "--simplify",
+                    "inline",
+                ],
                 inclusion_mode: InclusionMode::Implicit,
                 enable_in_ci: true,
                 only_if_requested: false,

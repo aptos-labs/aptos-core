@@ -26,19 +26,18 @@ error: post-condition does not hold
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
    = Related Bindings:
-   =         addr = <redacted>
    =         exists<R>(addr) = <redacted>
    =         global<R>(addr) = <redacted>
    =         x = <redacted>
    = Execution Trace:
    =     at tests/sources/functional/trace.move:28: publish_invalid
-   =     at tests/sources/functional/trace.move:32: publish_invalid (spec)
-   =         `let addr = Signer::address_of(s);` = <redacted>
-   =     at tests/sources/functional/trace.move:28: publish_invalid
    =         s = <redacted>
    =         x = <redacted>
    =     at tests/sources/functional/trace.move:29: publish_invalid
    =     at tests/sources/functional/trace.move:30: publish_invalid
+   =     at tests/sources/functional/trace.move:32: publish_invalid (spec)
+   =     at tests/sources/functional/trace.move:33: publish_invalid (spec)
+   =     at tests/sources/functional/trace.move:32: publish_invalid (spec)
    =     at tests/sources/functional/trace.move:33: publish_invalid (spec)
    =         `ensures exists<R>(addr) ==> global<R>(addr).x == x;` = <redacted>
 

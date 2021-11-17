@@ -1,4 +1,4 @@
-// separate_baseline: no_opaque
+// separate_baseline: simplify
 address 0x1 {
 
 module M1 {
