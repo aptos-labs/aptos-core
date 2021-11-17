@@ -2,9 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use criterion::{measurement::Measurement, BatchSize, Bencher};
-use diem_framework_releases::current_modules;
-use diem_types::transaction::{SignedTransaction, Transaction};
-use diem_vm::{parallel_executor::ParallelDiemVM, read_write_set_analysis::add_on_functions_list};
+use diem_types::transaction::Transaction;
+use diem_vm::{DiemVM, VMExecutor};
 use language_e2e_tests::{
     account_universe::{log_balance_strategy, AUTransactionGen, AccountUniverseGen},
     executor::FakeExecutor,
@@ -15,8 +14,6 @@ use proptest::{
     strategy::{Strategy, ValueTree},
     test_runner::TestRunner,
 };
-use read_write_set::analyze;
-use read_write_set_dynamic::NormalizedReadWriteSetAnalysis;
 
 /// Benchmarking support for transactions.
 #[derive(Clone, Debug)]
@@ -78,7 +75,7 @@ where
     pub fn bench_parallel<M: Measurement>(&self, b: &mut Bencher<M>) {
         b.iter_batched(
             || {
-                ParallelBenchState::with_size(
+                TransactionBenchState::with_size_parallel(
                     &self.strategy,
                     self.num_accounts,
                     self.num_transactions,
@@ -103,7 +100,7 @@ struct TransactionBenchState {
     // 6. Add an enum to TransactionBencher that lets callers choose between the fake and real
     //    executors.
     executor: FakeExecutor,
-    transactions: Vec<SignedTransaction>,
+    transactions: Vec<Transaction>,
 }
 
 impl TransactionBenchState {
@@ -149,7 +146,7 @@ impl TransactionBenchState {
             .current();
         let transactions = transaction_gens
             .into_iter()
-            .map(|txn_gen| txn_gen.apply(&mut universe).0)
+            .map(|txn_gen| Transaction::UserTransaction(txn_gen.apply(&mut universe).0))
             .collect();
 
         Self {
@@ -162,9 +159,23 @@ impl TransactionBenchState {
     fn execute(self) {
         // The output is ignored here since we're just testing transaction performance, not trying
         // to assert correctness.
-        self.executor
-            .execute_block(self.transactions)
+        DiemVM::execute_block(self.transactions, self.executor.get_state_view())
             .expect("VM should not fail to start");
+    }
+
+    fn with_size_parallel<S>(strategy: S, num_accounts: usize, num_transactions: usize) -> Self
+    where
+        S: Strategy,
+        S::Value: AUTransactionGen,
+    {
+        let mut state = Self::with_universe(
+            strategy,
+            universe_strategy(num_accounts, num_transactions),
+            num_transactions,
+        );
+        state.executor.enable_parallel_execution();
+
+        state
     }
 }
 
@@ -177,42 +188,4 @@ fn universe_strategy(
     let max_balance = TXN_RESERVED * num_transactions as u64 * 5;
     let balance_strategy = log_balance_strategy(max_balance);
     AccountUniverseGen::strategy(num_accounts, balance_strategy)
-}
-
-struct ParallelBenchState {
-    bench_state: TransactionBenchState,
-    infer_results: NormalizedReadWriteSetAnalysis,
-}
-
-impl ParallelBenchState {
-    /// Creates a new benchmark state with the given number of accounts and transactions.
-    fn with_size<S>(strategy: S, num_accounts: usize, num_transactions: usize) -> Self
-    where
-        S: Strategy,
-        S::Value: AUTransactionGen,
-    {
-        Self {
-            bench_state: TransactionBenchState::with_universe(
-                strategy,
-                universe_strategy(num_accounts, num_transactions),
-                num_transactions,
-            ),
-            infer_results: analyze(current_modules().iter())
-                .unwrap()
-                .normalize_all_scripts(add_on_functions_list()),
-        }
-    }
-
-    fn execute(self) {
-        ParallelDiemVM::execute_block(
-            &self.infer_results,
-            self.bench_state
-                .transactions
-                .into_iter()
-                .map(Transaction::UserTransaction)
-                .collect(),
-            self.bench_state.executor.get_state_view(),
-        )
-        .expect("VM should not fail to start");
-    }
 }
