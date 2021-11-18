@@ -64,6 +64,8 @@ named `diem_api_requests` and labelled by:
 This metrics covers all requests responses served the API handlers.
 Some errors like invalid route path are not covered, because no handlers are used for processing the request.
 
+Note: this metrics also includes route not found count/latency cases, which ends with 404 when `warp` tries to match the request with all routes. So to get accurate endpoint latency & count metrics, you need specify response status code, e.g. `status="200"` for all success requests.
+
 ### All Requests by Status
 
 The latency and counts of requests regardless errors or hit any handlers are recorded by a histogram
