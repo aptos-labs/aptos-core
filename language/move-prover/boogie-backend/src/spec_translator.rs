@@ -358,13 +358,13 @@ impl<'env> SpecTranslator<'env> {
                 .map(|(s, ty)| {
                     (
                         s.display(env.symbol_pool()).to_string(),
-                        boogie_type(env, ty),
+                        boogie_type(env, ty.skip_reference()),
                     )
                 })
                 .chain(
                     info.used_temps
                         .iter()
-                        .map(|(t, ty)| (format!("$t{}", t), boogie_type(env, ty))),
+                        .map(|(t, ty)| (format!("$t{}", t), boogie_type(env, ty.skip_reference()))),
                 )
                 .chain(info.used_memory.iter().map(|(m, l)| {
                     let struct_env = &env.get_struct(m.to_qualified_id());
@@ -381,7 +381,7 @@ impl<'env> SpecTranslator<'env> {
             let mk_decl = |(n, t): &(String, String)| format!("{}: {}", n, t);
             let mk_arg = |(n, _): &(String, String)| n.to_owned();
             let emit_valid = |n: &str, ty: &Type| {
-                let suffix = boogie_type_suffix(env, ty);
+                let suffix = boogie_type_suffix(env, ty.skip_reference());
                 emit!(self.writer, "$IsValid'{}'({})", suffix, n);
             };
             let mk_temp = |t: TempIndex| format!("$t{}", t);

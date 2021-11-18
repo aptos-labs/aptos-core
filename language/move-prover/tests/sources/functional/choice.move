@@ -238,4 +238,11 @@ module 0x42::TestSome {
         include ResultLessThanK { k: 10 };
         // expect to fail
     }
+
+    // A simple test for checking whether the reference has been removed in generated boogie code
+    fun remove_ref<TokenType: store>(_id: &u64) {}
+
+    spec remove_ref {
+        let min_token_id = choose min i: u64 where _id == _id;
+    }
 }
