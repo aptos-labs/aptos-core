@@ -91,11 +91,15 @@ ARTIFACT_CRATES="\
   $BASE/diem-move/diem-framework\
 "
 
+BUILD_EXPERIMENTAL="$BASE/diem-move/diem-framework"
+
 MOVE_TEST_CRATES="\
   $BASE/language/move-lang/functional-tests\
   $BASE/language/e2e-testsuite\
   $BASE/language/tools/move-cli\
   $BASE/diem-move/df-cli\
+  $BASE/language/move-stdlib\
+  $BASE/diem-move/diem-framework\
 "
 
 
@@ -120,6 +124,13 @@ if [ ! -z "$GEN_ARTIFACTS" ]; then
       cd $dir
       cargo run
     )
+    if [[  $BUILD_EXPERIMENTAL == "$dir"  ]]; then
+        echo "Building additional experimental artifact in $dir"
+        (
+            cd $dir
+            cargo run -- --package experimental
+        )
+    fi
   done
 fi
 
