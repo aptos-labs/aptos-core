@@ -21,7 +21,6 @@ use cluster_test::{
     cluster_builder::{ClusterBuilder, ClusterBuilderParams},
     cluster_swarm::{cluster_swarm_kube::ClusterSwarmKube, ClusterSwarm},
     experiments::{get_experiment, Context, Experiment},
-    github::GitHub,
     health::{DebugPortLogWorker, HealthCheckRunner, LogTail, PrintFailures},
     instance::Instance,
     prometheus::Prometheus,
@@ -30,7 +29,9 @@ use cluster_test::{
 };
 use diem_config::config::DEFAULT_JSON_RPC_PORT;
 use diem_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
-use forge::{query_sequence_numbers, EmitJobRequest, EmitThreadParams, SlackClient, TxnEmitter};
+use forge::{
+    query_sequence_numbers, EmitJobRequest, EmitThreadParams, GitHub, SlackClient, TxnEmitter,
+};
 use futures::{
     future::{join_all, FutureExt},
     select,

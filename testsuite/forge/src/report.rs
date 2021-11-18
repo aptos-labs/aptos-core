@@ -65,7 +65,8 @@ impl TestReport {
     }
 
     pub fn print_report(&self) {
-        println!("Test Statistics: {}", self);
+        println!("Test Statistics: ");
+        println!("{}", self);
         let json_report =
             serde_json::to_string_pretty(&self).expect("Failed to serialize report to json");
         println!(

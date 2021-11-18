@@ -10,7 +10,7 @@ pub struct PartialNodesDown;
 
 impl Test for PartialNodesDown {
     fn name(&self) -> &'static str {
-        "partialNodesDown::10%-down"
+        "10%-down"
     }
 }
 

@@ -19,5 +19,8 @@ pub use transaction_emitter::*;
 mod report;
 pub use report::*;
 
+mod github;
+pub use github::*;
+
 mod slack;
 pub use slack::*;

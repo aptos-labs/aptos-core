@@ -27,6 +27,8 @@ struct Args {
     options: Options,
     #[structopt(long, help = "Specify a test suite to run")]
     suite: Option<String>,
+    #[structopt(long, multiple = true)]
+    changelog: Option<Vec<String>>,
 
     // subcommand groups
     #[structopt(flatten)]
@@ -150,6 +152,7 @@ fn main() -> Result<()> {
                 local_test_suite(),
                 LocalFactory::from_workspace()?,
                 &args.options,
+                args.changelog,
             ),
             TestCommand::K8sSwarm(k8s) => {
                 let mut test_suite = k8s_test_suite();
@@ -166,6 +169,7 @@ fn main() -> Result<()> {
                     )
                     .unwrap(),
                     &args.options,
+                    args.changelog,
                 )
             }
         },
@@ -199,7 +203,12 @@ fn main() -> Result<()> {
     }
 }
 
-pub fn run_forge<F: Factory>(tests: ForgeConfig<'_>, factory: F, options: &Options) -> Result<()> {
+pub fn run_forge<F: Factory>(
+    tests: ForgeConfig<'_>,
+    factory: F,
+    options: &Options,
+    logs: Option<Vec<String>>,
+) -> Result<()> {
     let forge = Forge::new(options, tests, factory);
 
     if options.list {
@@ -210,20 +219,68 @@ pub fn run_forge<F: Factory>(tests: ForgeConfig<'_>, factory: F, options: &Optio
 
     match forge.run() {
         Ok(report) => {
-            let slack_url: Option<Url> = env::var("SLACK_URL")
-                .map(|u| u.parse().expect("Failed to parse SLACK_URL"))
-                .ok();
-            if let Some(ref slack_url) = slack_url {
-                let slack_client = SlackClient::new();
-                if let Err(e) = slack_client.send_message(slack_url, &report.to_string()) {
-                    println!("Failed to send slack message: {}", e);
+            if let Some(mut changelog) = logs {
+                if changelog.len() != 2 {
+                    println!("Use: changelog <from> <to>");
+                    process::exit(1);
                 }
+                let to_commit = changelog.remove(1);
+                let from_commit = Some(changelog.remove(0));
+                send_changelog_message(&report.to_string(), &from_commit, &to_commit);
             }
             Ok(())
         }
         Err(e) => {
             eprintln!("Failed to run tests:\n{}", e);
             process::exit(101); // Exit with a non-zero exit code if tests failed
+        }
+    }
+}
+
+pub fn send_changelog_message(perf_msg: &str, from_commit: &Option<String>, to_commit: &str) {
+    println!(
+        "Generating changelog from {:?} to {}",
+        from_commit, to_commit
+    );
+    let changelog = get_changelog(from_commit.as_ref(), to_commit);
+    let msg = format!("{}\n\n{}", changelog, perf_msg);
+    let slack_url: Option<Url> = env::var("SLACK_URL")
+        .map(|u| u.parse().expect("Failed to parse SLACK_URL"))
+        .ok();
+    if let Some(ref slack_url) = slack_url {
+        let slack_client = SlackClient::new();
+        if let Err(e) = slack_client.send_message(slack_url, &msg) {
+            println!("Failed to send slack message: {}", e);
+        }
+    }
+}
+
+fn get_changelog(prev_commit: Option<&String>, upstream_commit: &str) -> String {
+    let github_client = GitHub::new();
+    let commits = github_client.get_commits("diem/diem", upstream_commit);
+    match commits {
+        Err(e) => {
+            println!("Failed to get github commits: {:?}", e);
+            format!("*Revision upstream_{}*", upstream_commit)
+        }
+        Ok(commits) => {
+            let mut msg = format!("*Revision {}*", upstream_commit);
+            for commit in commits {
+                if let Some(prev_commit) = prev_commit {
+                    if commit.sha.starts_with(prev_commit) {
+                        break;
+                    }
+                }
+                let commit_lines: Vec<_> = commit.commit.message.split('\n').collect();
+                let commit_head = commit_lines[0];
+                let commit_head = commit_head.replace("[breaking]", "*[breaking]*");
+                let short_sha = &commit.sha[..6];
+                let email_parts: Vec<_> = commit.commit.author.email.split('@').collect();
+                let author = email_parts[0];
+                let line = format!("\n>\u{2022} {} _{}_ {}", short_sha, author, commit_head);
+                msg.push_str(&line);
+            }
+            msg
         }
     }
 }
