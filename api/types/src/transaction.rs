@@ -94,7 +94,7 @@ impl<T: TransactionInfoTrait>
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Transaction {
     PendingTransaction(PendingTransaction),
@@ -179,7 +179,7 @@ impl From<(&SignedTransaction, TransactionPayload)> for UserTransactionRequest {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct TransactionInfo {
     pub version: U64,
     pub hash: HashValue,
@@ -190,14 +190,14 @@ pub struct TransactionInfo {
     pub vm_status: String,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct PendingTransaction {
     pub hash: HashValue,
     #[serde(flatten)]
     pub request: UserTransactionRequest,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct UserTransaction {
     #[serde(flatten)]
     pub info: TransactionInfo,
@@ -219,7 +219,7 @@ pub struct UserTransactionRequest {
     pub signature: Option<TransactionSignature>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct GenesisTransaction {
     #[serde(flatten)]
     pub info: TransactionInfo,
@@ -227,7 +227,7 @@ pub struct GenesisTransaction {
     pub events: Vec<Event>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct BlockMetadataTransaction {
     #[serde(flatten)]
     pub info: TransactionInfo,
@@ -260,7 +260,7 @@ impl From<(&ContractEvent, serde_json::Value)> for Event {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum GenesisPayload {
     WriteSetPayload(WriteSetPayload),

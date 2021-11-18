@@ -1688,6 +1688,7 @@ dependencies = [
  "tokio-tungstenite 0.14.0",
  "tracing",
  "ureq",
+ "url",
  "winapi 0.3.9",
 ]
 
@@ -2475,6 +2476,27 @@ dependencies = [
  "move-binary-format",
  "move-core-types",
  "resource-viewer",
+]
+
+[[package]]
+name = "diem-rest-client"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "bcs",
+ "diem-api-types",
+ "diem-client",
+ "diem-crypto",
+ "diem-json-rpc-types",
+ "diem-types",
+ "diem-workspace-hack",
+ "hex",
+ "move-core-types",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+ "url",
 ]
 
 [[package]]
@@ -7917,6 +7939,7 @@ dependencies = [
  "diem-logger",
  "diem-management",
  "diem-operational-tool",
+ "diem-rest-client",
  "diem-sdk",
  "diem-secure-storage",
  "diem-swarm",

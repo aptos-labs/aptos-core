@@ -43,6 +43,7 @@ members = [
     "crates/diem-crypto-derive",
     "crates/diem-faucet",
     "crates/diem-json-rpc-client",
+    "crates/diem-rest-client",
     "crates/proxy",
     "crates/swiss-knife",
     "crates/transaction-emitter",

@@ -18,15 +18,18 @@ walkdir = "2.3.1"
 reqwest = { version = "0.11.2", features = ["json"] }
 
 diem-config = { path = "../../config" }
+diem-crypto = { path = "../../crates/diem-crypto" }
 diem-events-fetcher = { path = "../../diem-move/diem-events-fetcher" }
 diem-framework = { path = "../../diem-move/diem-framework" }
 diem-framework-releases = { path = "../../diem-move/diem-framework/DPN/releases" }
 diem-sdk = { path = "../../sdk" }
+diem-rest-client = { path = "../../crates/diem-rest-client" }
 diem-temppath = { path = "../../common/temppath" }
 diem-transaction-replay = { path = "../../diem-move/transaction-replay" }
 move-command-line-common = { path = "../../language/move-command-line-common" }
 move-ir-compiler = { path = "../../language/move-ir-compiler" }
 move-stdlib = { path = "../../language/move-stdlib" }
+diem-types = { path = "../../types" }
 forge = { path = "../forge" }
 
 [dev-dependencies]
@@ -41,7 +44,6 @@ futures = "0.3.12"
 backup-cli = { path = "../../storage/backup/backup-cli" }
 debug-interface = { path = "../../common/debug-interface" }
 generate-key = { path = "../../config/generate-key" }
-diem-crypto = { path = "../../crates/diem-crypto" }
 diem-genesis-tool = {path = "../../config/management/genesis", features = ["testing"] }
 diem-global-constants = { path = "../../config/global-constants" }
 diem-infallible = { path = "../../common/infallible" }
@@ -54,7 +56,6 @@ diem-operational-tool = {path = "../../config/management/operational", features 
 diem-secure-storage = { path = "../../secure/storage", features = ["testing"] }
 diem-swarm = { path = "../diem-swarm"}
 diem-time-service = { path = "../../common/time-service", features = ["testing"] }
-diem-types = { path = "../../types" }
 diem-vault-client = { path = "../../secure/storage/vault", features = ["fuzzing"] }
 diem-validator-interface = { path = "../../diem-move/diem-validator-interface" }
 diem-workspace-hack = { path = "../../common/workspace-hack" }

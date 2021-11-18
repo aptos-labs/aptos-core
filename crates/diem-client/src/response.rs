@@ -51,6 +51,14 @@ impl<T> Response<T> {
             Err(err) => Err(err),
         }
     }
+
+    pub fn map<U, F>(self, f: F) -> Response<U>
+    where
+        F: FnOnce(T) -> U,
+    {
+        let (inner, state) = self.into_parts();
+        Response::new(f(inner), state)
+    }
 }
 
 #[allow(clippy::large_enum_variant)]

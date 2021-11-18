@@ -1,0 +1,28 @@
+[package]
+name = "diem-rest-client"
+version = "0.0.0"
+authors = ["Diem Association <opensource@diem.com>"]
+description = "Diem Rest client"
+repository = "https://github.com/diem/diem"
+homepage = "https://diem.com"
+license = "Apache-2.0"
+publish = false
+edition = "2018"
+
+[dependencies]
+anyhow = "1.0.38"
+bcs = "0.1.2"
+hex = "0.4.3"
+reqwest = { version = "0.11.2", features = ["json"] }
+serde = { version = "1.0.124", features = ["derive"] }
+serde_json = "1.0.64"
+tokio = { version = "1.8.1", features = ["full"] }
+url = "2.2.2"
+
+diem-api-types = { path = "../../api/types" }
+diem-client = { path = "../diem-client" }
+diem-crypto = { path = "../diem-crypto" }
+diem-json-rpc-types = { path = "../../json-rpc/types" }
+diem-types = { path = "../../types" }
+diem-workspace-hack = { path = "../../common/workspace-hack" }
+move-core-types = { path = "../../language/move-core/types" }

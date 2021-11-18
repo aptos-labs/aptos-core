@@ -6,7 +6,7 @@ use smoke_test::{
     event_fetcher::EventFetcher,
     fullnode::LaunchFullnode,
     replay_tooling::ReplayTooling,
-    rest_api::GetIndex,
+    rest_api::{self, GetIndex},
     scripts_and_modules::{ExecuteCustomModuleAndScript, MalformedScript},
     transaction::ExternalTransactionSigner,
     verifying_client::{VerifyingClientEquivalence, VerifyingGetLatestMetadata, VerifyingSubmit},
@@ -22,6 +22,7 @@ fn main() -> Result<()> {
             &VerifyingClientEquivalence,
             &VerifyingGetLatestMetadata,
             &GetIndex,
+            &rest_api::BasicClient,
         ])
         .with_admin_tests(&[&MalformedScript, &ExecuteCustomModuleAndScript])
         .with_network_tests(&[&LaunchFullnode]);

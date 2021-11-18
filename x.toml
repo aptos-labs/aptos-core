@@ -192,6 +192,7 @@ members = [
     "diem-json-rpc-client",
     "diem-keygen",
     "diem-proptest-helpers",
+    "diem-rest-client",
     "diem-retrier",
     "data-streaming-service", # Will be removed once state sync v2 is plugged into diem-node.
     "diem-swarm",
