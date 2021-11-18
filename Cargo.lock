@@ -9313,6 +9313,7 @@ dependencies = [
  "proptest",
  "proptest-derive",
  "rand 0.8.4",
+ "read-write-set",
 ]
 
 [[package]]

@@ -159,6 +159,39 @@ fn parallel_execution_config() {
 }
 
 #[test]
+fn parallel_execution_genesis() {
+    let mut executor = FakeExecutor::parallel_genesis();
+    let account_size = 1000usize;
+    let initial_balance = 2_000_000u64;
+    let initial_seq_num = 10u64;
+    let accounts = executor.create_accounts(account_size, initial_balance, initial_seq_num);
+
+    // set up the transactions
+    let transfer_amount = 1_000;
+
+    assert!(
+        ParallelExecutionConfig::fetch_config(executor.get_state_view())
+            .unwrap()
+            .read_write_analysis_result
+            .is_some()
+    );
+
+    // insert a block prologue transaction
+    let (txns_info, transfer_txns) = create_cyclic_transfers(&executor, &accounts, transfer_amount);
+    let outputs = executor.execute_block(transfer_txns).unwrap();
+
+    check_and_apply_transfer_output(&mut executor, &txns_info, &outputs);
+
+    executor.disable_parallel_execution();
+
+    assert_eq!(
+        ParallelExecutionConfig::fetch_config(executor.get_state_view()),
+        Some(ParallelExecutionConfig {
+            read_write_analysis_result: None,
+        })
+    );
+}
+#[test]
 fn parallel_config_sequential_check() {
     let mut executor = FakeExecutor::from_fresh_genesis();
 

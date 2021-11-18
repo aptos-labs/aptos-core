@@ -30,6 +30,7 @@ diem-framework-releases = { path = "../../diem-move/diem-framework/DPN/releases"
 diem-transaction-builder = { path = "../../sdk/transaction-builder"}
 move-binary-format = { path = "../../language/move-binary-format" }
 diem-vm = { path = "../diem-vm" }
+read-write-set = { path = "../../language/tools/read-write-set" }
 
 [dev-dependencies]
 proptest = "1.0.0"

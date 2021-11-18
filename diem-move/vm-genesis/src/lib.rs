@@ -22,7 +22,8 @@ use diem_types::{
     chain_id::{ChainId, NamedChain},
     contract_event::ContractEvent,
     on_chain_config::{
-        ConsensusConfigV1, OnChainConsensusConfig, VMPublishingOption, DIEM_MAX_KNOWN_VERSION,
+        ConsensusConfigV1, OnChainConsensusConfig, ReadWriteSetAnalysis, VMPublishingOption,
+        DIEM_MAX_KNOWN_VERSION,
     },
     transaction::{
         authenticator::AuthenticationKey, ChangeSet, ScriptFunction, Transaction, WriteSetPayload,
@@ -63,6 +64,7 @@ pub fn encode_genesis_transaction(
     vm_publishing_option: Option<VMPublishingOption>,
     consensus_config: OnChainConsensusConfig,
     chain_id: ChainId,
+    enable_parallel_execution: bool,
 ) -> Transaction {
     Transaction::GenesisTransaction(WriteSetPayload::Direct(encode_genesis_change_set(
         &diem_root_key,
@@ -73,6 +75,7 @@ pub fn encode_genesis_transaction(
             .unwrap_or_else(|| VMPublishingOption::locked(LegacyStdlibScript::allowlist())),
         consensus_config,
         chain_id,
+        enable_parallel_execution,
     )))
 }
 
@@ -84,6 +87,7 @@ pub fn encode_genesis_change_set(
     vm_publishing_option: VMPublishingOption,
     consensus_config: OnChainConsensusConfig,
     chain_id: ChainId,
+    enable_parallel_execution: bool,
 ) -> ChangeSet {
     let mut stdlib_modules = Vec::new();
     // create a data view for move_vm
@@ -115,6 +119,27 @@ pub fn encode_genesis_change_set(
         .any(|test_chain_id| test_chain_id.id() == chain_id.id())
     {
         create_and_initialize_testnet_minting(&mut session, treasury_compliance_key);
+    }
+
+    if enable_parallel_execution {
+        let payload = bcs::to_bytes(&ReadWriteSetAnalysis::V1(
+            read_write_set::analyze(&stdlib_modules)
+                .expect("Failed to get ReadWriteSet for current Diem Framework")
+                .normalize_all_scripts(diem_vm::read_write_set_analysis::add_on_functions_list())
+                .into_inner(),
+        ))
+        .expect("Failed to serialize analyze result");
+
+        exec_function(
+            &mut session,
+            "ParallelExecutionConfig",
+            "enable_parallel_execution_with_config",
+            vec![],
+            serialize_values(&vec![
+                MoveValue::Signer(account_config::diem_root_address()),
+                MoveValue::vector_u8(payload),
+            ]),
+        )
     }
 
     let (mut changeset1, mut events1) = session.finish().unwrap();
@@ -416,7 +441,7 @@ pub fn generate_genesis_change_set_for_testing(genesis_options: GenesisOptions) 
         GenesisOptions::Fresh => diem_framework::module_blobs(),
     };
 
-    generate_test_genesis(&modules, VMPublishingOption::open(), None).0
+    generate_test_genesis(&modules, VMPublishingOption::open(), None, false).0
 }
 
 pub fn test_genesis_transaction() -> Transaction {
@@ -431,6 +456,7 @@ pub fn test_genesis_change_set_and_validators(
         current_module_blobs(),
         VMPublishingOption::locked(LegacyStdlibScript::allowlist()),
         count,
+        false,
     )
 }
 
@@ -501,6 +527,7 @@ pub fn generate_test_genesis(
     stdlib_modules: &[Vec<u8>],
     vm_publishing_option: VMPublishingOption,
     count: Option<usize>,
+    enable_parallel_execution: bool,
 ) -> (ChangeSet, Vec<TestValidator>) {
     let test_validators = TestValidator::new_test_set(count);
     let validators_: Vec<Validator> = test_validators.iter().map(|t| t.data.clone()).collect();
@@ -514,6 +541,7 @@ pub fn generate_test_genesis(
         vm_publishing_option,
         OnChainConsensusConfig::V1(ConsensusConfigV1 { two_chain: true }),
         ChainId::test(),
+        enable_parallel_execution,
     );
     (genesis, test_validators)
 }
