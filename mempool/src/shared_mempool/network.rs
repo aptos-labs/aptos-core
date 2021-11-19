@@ -40,7 +40,6 @@ use network::{
     ProtocolId,
 };
 use serde::{Deserialize, Serialize};
-use short_hex_str::AsShortHexStr;
 use std::{
     cmp::Ordering,
     collections::{BTreeMap, HashMap},
@@ -270,7 +269,7 @@ impl MempoolNetworkInterface {
         let batch_id = if let Ok(id) = bcs::from_bytes::<BatchId>(&request_id_bytes) {
             id
         } else {
-            counters::invalid_ack_inc(&peer, counters::INVALID_REQUEST_ID);
+            counters::invalid_ack_inc(peer.network_id(), counters::INVALID_REQUEST_ID);
             return;
         };
 
@@ -279,7 +278,7 @@ impl MempoolNetworkInterface {
         let sync_state = if let Some(state) = sync_states.get_mut(&peer) {
             state
         } else {
-            counters::invalid_ack_inc(&peer, counters::UNKNOWN_PEER);
+            counters::invalid_ack_inc(peer.network_id(), counters::UNKNOWN_PEER);
             return;
         };
 
@@ -289,9 +288,8 @@ impl MempoolNetworkInterface {
                 .expect("failed to calculate mempool broadcast RTT");
 
             let network_id = peer.network_id();
-            let peer_id = peer.peer_id().short_str();
             counters::SHARED_MEMPOOL_BROADCAST_RTT
-                .with_label_values(&[network_id.as_str(), peer_id.as_str()])
+                .with_label_values(&[network_id.as_str()])
                 .observe(rtt.as_secs_f64());
 
             counters::shared_mempool_pending_broadcasts(&peer).dec();
@@ -523,28 +521,19 @@ impl MempoolNetworkInterface {
                 .batch_id(&batch_id)
                 .backpressure(scheduled_backoff)
         );
-        let peer_id = peer.peer_id().short_str();
         let network_id = peer.network_id();
-        counters::SHARED_MEMPOOL_TRANSACTION_BROADCAST_SIZE
-            .with_label_values(&[network_id.as_str(), peer_id.as_str()])
-            .observe(num_txns as f64);
+        counters::shared_mempool_broadcast_size(network_id, num_txns);
+        // TODO: Rethink if this metric is useful
         counters::shared_mempool_pending_broadcasts(&peer).set(num_pending_broadcasts as i64);
-        counters::SHARED_MEMPOOL_BROADCAST_LATENCY
-            .with_label_values(&[network_id.as_str(), peer_id.as_str()])
-            .observe(latency.as_secs_f64());
+        counters::shared_mempool_broadcast_latency(network_id, latency);
         if let Some(label) = metric_label {
-            counters::SHARED_MEMPOOL_BROADCAST_TYPE_COUNT
-                .with_label_values(&[network_id.as_str(), peer_id.as_str(), label])
-                .inc();
+            counters::shared_mempool_broadcast_type_inc(network_id, label);
         }
         if scheduled_backoff {
-            counters::SHARED_MEMPOOL_BROADCAST_TYPE_COUNT
-                .with_label_values(&[
-                    network_id.as_str(),
-                    peer_id.as_str(),
-                    counters::BACKPRESSURE_BROADCAST_LABEL,
-                ])
-                .inc();
+            counters::shared_mempool_broadcast_type_inc(
+                network_id,
+                counters::BACKPRESSURE_BROADCAST_LABEL,
+            );
         }
         Ok(())
     }

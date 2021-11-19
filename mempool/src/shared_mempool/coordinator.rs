@@ -315,7 +315,7 @@ async fn handle_network_event<V>(
             }
         }
         Event::RpcRequest(peer_id, _msg, _, _res_tx) => {
-            counters::unexpected_msg_count_inc(&network_id, &peer_id);
+            counters::unexpected_msg_count_inc(&network_id);
             sample!(
                 SampleRate::Duration(Duration::from_secs(60)),
                 warn!(LogSchema::new(LogEntry::UnexpectedNetworkMsg)

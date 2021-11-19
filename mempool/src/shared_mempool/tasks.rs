@@ -28,7 +28,6 @@ use diem_types::{
 use futures::{channel::oneshot, stream::FuturesUnordered};
 use network::application::interface::NetworkInterface;
 use rayon::prelude::*;
-use short_hex_str::AsShortHexStr;
 use std::{
     cmp,
     collections::HashSet,
@@ -105,8 +104,7 @@ pub(crate) async fn process_client_transaction_submission<V>(
     V: TransactionValidation,
 {
     timer.stop_and_record();
-    let _timer =
-        counters::process_txn_submit_latency_timer(counters::CLIENT_LABEL, counters::CLIENT_LABEL);
+    let _timer = counters::process_txn_submit_latency_timer_client();
     let statuses = process_incoming_transactions(&smp, vec![transaction], TimelineState::NotReady);
     log_txn_process_results(&statuses, None);
 
@@ -131,8 +129,7 @@ pub(crate) async fn process_client_get_transaction<V>(
     V: TransactionValidation,
 {
     timer.stop_and_record();
-    let _timer =
-        counters::process_get_txn_latency_timer(counters::CLIENT_LABEL, counters::CLIENT_LABEL);
+    let _timer = counters::process_get_txn_latency_timer_client();
     let txn = smp.mempool.lock().get_by_hash(hash);
 
     if callback.send(txn).is_err() {
@@ -156,10 +153,7 @@ pub(crate) async fn process_transaction_broadcast<V>(
     V: TransactionValidation,
 {
     timer.stop_and_record();
-    let _timer = counters::process_txn_submit_latency_timer(
-        peer.network_id().as_str(),
-        peer.peer_id().short_str().as_str(),
-    );
+    let _timer = counters::process_txn_submit_latency_timer(peer.network_id());
     let results = process_incoming_transactions(&smp, transactions, timeline_state);
     log_txn_process_results(&results, Some(peer));
 
@@ -211,11 +205,15 @@ pub(crate) fn update_ack_counter(
     backoff: bool,
 ) {
     if retry {
-        counters::shared_mempool_ack_inc(peer, direction_label, counters::RETRY_BROADCAST_LABEL);
+        counters::shared_mempool_ack_inc(
+            peer.network_id(),
+            direction_label,
+            counters::RETRY_BROADCAST_LABEL,
+        );
     }
     if backoff {
         counters::shared_mempool_ack_inc(
-            peer,
+            peer.network_id(),
             direction_label,
             counters::BACKPRESSURE_BROADCAST_LABEL,
         );
@@ -329,15 +327,9 @@ where
 }
 
 fn log_txn_process_results(results: &[SubmissionStatusBundle], sender: Option<PeerNetworkId>) {
-    let (network, sender) = match sender {
-        Some(peer) => (
-            peer.network_id().to_string(),
-            peer.peer_id().short_str().to_string(),
-        ),
-        None => (
-            counters::CLIENT_LABEL.to_string(),
-            counters::CLIENT_LABEL.to_string(),
-        ),
+    let network = match sender {
+        Some(peer) => peer.network_id().to_string(),
+        None => counters::CLIENT_LABEL.to_string(),
     };
     for (txn, (mempool_status, maybe_vm_status)) in results.iter() {
         if let Some(vm_status) = maybe_vm_status {
@@ -350,7 +342,6 @@ fn log_txn_process_results(results: &[SubmissionStatusBundle], sender: Option<Pe
             counters::shared_mempool_transactions_processed_inc(
                 counters::VM_VALIDATION_LABEL,
                 &network,
-                &sender,
             );
             continue;
         }
@@ -358,12 +349,10 @@ fn log_txn_process_results(results: &[SubmissionStatusBundle], sender: Option<Pe
             MempoolStatusCode::Accepted => counters::shared_mempool_transactions_processed_inc(
                 counters::SUCCESS_LABEL,
                 &network,
-                &sender,
             ),
             _ => counters::shared_mempool_transactions_processed_inc(
                 &mempool_status.code.to_string(),
                 &network,
-                &sender,
             ),
         }
     }
