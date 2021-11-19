@@ -15,16 +15,12 @@ use once_cell::sync::OnceCell;
 use tempfile::TempDir;
 use walkdir::WalkDir;
 
-use move_command_line_common::{
-    env::{read_bool_env_var, read_env_var},
-    testing::EXP_EXT,
-};
+use move_command_line_common::{env::read_env_var, testing::EXP_EXT};
 use move_prover::{cli::Options, run_move_prover};
 use move_prover_test_utils::{baseline_test::verify_or_update_baseline, extract_test_directives};
 
 const ENV_FLAGS: &str = "MVP_TEST_FLAGS";
 const ENV_TEST_EXTENDED: &str = "MVP_TEST_X";
-const ENV_TEST_INCONSISTENCY: &str = "MVP_TEST_INCONSISTENCY";
 const ENV_TEST_FEATURE: &str = "MVP_TEST_FEATURE";
 const ENV_TEST_ON_CI: &str = "MVP_TEST_ON_CI";
 
@@ -217,11 +213,6 @@ fn get_flags_and_baseline(
             )
         };
     let mut flags = base_flags.iter().map(|s| (*s).to_string()).collect_vec();
-
-    // Add inconsistency checking flags
-    if read_bool_env_var(ENV_TEST_INCONSISTENCY) {
-        flags.push("--check-inconsistency".to_string());
-    }
 
     // Add flag assigning an address to the stdlib.
     flags.push("--named-addresses=Std=0x1".to_string());
