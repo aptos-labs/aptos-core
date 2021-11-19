@@ -8050,14 +8050,21 @@ dependencies = [
 name = "state-sync-driver"
 version = "0.1.0"
 dependencies = [
+ "channel",
+ "claim",
  "consensus-notifications",
  "data-streaming-service",
  "diem-config",
+ "diem-crypto",
  "diem-infallible",
+ "diem-temppath",
  "diem-types",
+ "diem-vm",
  "diem-workspace-hack",
+ "diemdb",
  "event-notifications",
  "executor",
+ "executor-test-helpers",
  "executor-types",
  "futures",
  "mempool-notifications",
@@ -8066,6 +8073,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-stream",
+ "vm-genesis",
 ]
 
 [[package]]

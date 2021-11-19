@@ -66,7 +66,7 @@ pub fn new_consensus_notifier_listener_pair(
 ///
 /// Note: When a ConsensusNotifier instance is created, state sync must take and
 /// listen to the receiver in the corresponding ConsensusNotificationListener.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ConsensusNotifier {
     notification_sender: mpsc::UnboundedSender<ConsensusNotification>,
 

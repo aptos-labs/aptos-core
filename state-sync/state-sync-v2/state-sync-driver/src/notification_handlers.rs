@@ -51,10 +51,7 @@ impl BootstrapNotificationHandler {
     }
 
     /// Notifies the channel once the node has completed bootstrapping
-    pub fn add_bootstrap_notifier(
-        &mut self,
-        notifier_channel: oneshot::Sender<Result<(), Error>>,
-    ) {
+    pub fn add_bootstrap_notifier(&mut self, notifier_channel: oneshot::Sender<Result<(), Error>>) {
         self.notifier_channel = Some(notifier_channel);
     }
 
