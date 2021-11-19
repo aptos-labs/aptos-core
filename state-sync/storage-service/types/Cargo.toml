@@ -19,3 +19,5 @@ diem-types = { path = "../../../types" }
 diem-workspace-hack = { path = "../../../common/workspace-hack" }
 
 [dev-dependencies]
+claim = "0.5.0"
+proptest = "1.0.0"

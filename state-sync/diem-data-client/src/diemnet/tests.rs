@@ -5,13 +5,19 @@ use super::{
     DataSummaryPoller, DiemDataClient, DiemNetDataClient, Error, DATA_SUMMARY_POLL_INTERVAL,
 };
 use channel::{diem_channel, message_queues::QueueStyle};
-use claim::assert_matches;
+use claim::{assert_err, assert_matches};
 use diem_config::{
     config::StorageServiceConfig,
     network_id::{NetworkId, PeerNetworkId},
 };
+use diem_crypto::HashValue;
 use diem_time_service::{MockTimeService, TimeService};
-use diem_types::{transaction::TransactionListWithProof, PeerId};
+use diem_types::{
+    block_info::BlockInfo,
+    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    transaction::{TransactionListWithProof, Version},
+    PeerId,
+};
 use futures::StreamExt;
 use maplit::hashmap;
 use network::{
@@ -20,13 +26,42 @@ use network::{
     protocols::{network::NewNetworkSender, wire::handshake::v1::ProtocolId},
     transport::ConnectionMetadata,
 };
-use std::sync::Arc;
+use std::{collections::BTreeMap, sync::Arc};
 use storage_service_client::{StorageServiceClient, StorageServiceNetworkSender};
 use storage_service_server::network::{NetworkRequest, ResponseSender};
 use storage_service_types::{
-    CompleteDataRange, DataSummary, ProtocolMetadata, StorageServerSummary, StorageServiceMessage,
-    StorageServiceRequest, StorageServiceResponse, TransactionsWithProofRequest,
+    CompleteDataRange, DataSummary, ProtocolMetadata, StorageServerSummary, StorageServiceError,
+    StorageServiceMessage, StorageServiceRequest, StorageServiceResponse,
+    TransactionsWithProofRequest,
 };
+
+fn mock_ledger_info(version: Version) -> LedgerInfoWithSignatures {
+    LedgerInfoWithSignatures::new(
+        LedgerInfo::new(
+            BlockInfo::new(0, 0, HashValue::zero(), HashValue::zero(), version, 0, None),
+            HashValue::zero(),
+        ),
+        BTreeMap::new(),
+    )
+}
+
+fn mock_storage_summary(version: Version) -> StorageServerSummary {
+    StorageServerSummary {
+        protocol_metadata: ProtocolMetadata {
+            max_epoch_chunk_size: 1000,
+            max_transaction_chunk_size: 1000,
+            max_transaction_output_chunk_size: 1000,
+            max_account_states_chunk_size: 1000,
+        },
+        data_summary: DataSummary {
+            synced_ledger_info: Some(mock_ledger_info(version)),
+            epoch_ending_ledger_infos: None,
+            transactions: Some(CompleteDataRange::new(0, version).unwrap()),
+            transaction_outputs: None,
+            account_states: None,
+        },
+    }
+}
 
 struct MockNetwork {
     peer_mgr_reqs_rx: diem_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
@@ -135,21 +170,7 @@ async fn test_request_works_only_when_data_available() {
     assert_eq!(protocol, ProtocolId::StorageServiceRpc);
     assert_matches!(request, StorageServiceRequest::GetStorageServerSummary);
 
-    let summary = StorageServerSummary {
-        protocol_metadata: ProtocolMetadata {
-            max_epoch_chunk_size: 1000,
-            max_transaction_chunk_size: 1000,
-            max_transaction_output_chunk_size: 1000,
-            max_account_states_chunk_size: 1000,
-        },
-        data_summary: DataSummary {
-            synced_ledger_info: None,
-            epoch_ending_ledger_infos: None,
-            transactions: Some(CompleteDataRange::from_genesis(200)),
-            transaction_outputs: None,
-            account_states: None,
-        },
-    };
+    let summary = mock_storage_summary(200);
     response_sender.send(Ok(StorageServiceResponse::StorageServerSummary(summary)));
 
     // let the poller finish processing the response
@@ -182,6 +203,171 @@ async fn test_request_works_only_when_data_available() {
         .get_transactions_with_proof(100, 50, 100, false)
         .await
         .unwrap();
+    assert_eq!(response.payload, TransactionListWithProof::new_empty());
+}
 
-    assert_eq!(response.payload, TransactionListWithProof::new_empty(),);
+// 1. 2 peers
+// 2. one advertises bad range, one advertises honest range
+// 3. sending a bunch of requests to the bad range (which will always go to the
+//    bad peer) should lower bad peer's score
+// 4. eventually bad peer score should hit threshold and we err with no available
+
+#[tokio::test]
+async fn bad_peer_is_eventually_banned_internal() {
+    ::diem_logger::Logger::init_for_testing();
+    let (mut mock_network, _mock_time, client, _poller) = MockNetwork::new();
+
+    let good_peer = mock_network.add_connected_peer();
+    let bad_peer = mock_network.add_connected_peer();
+
+    // bypass poller and just add the storage summaries directly
+
+    // good peer advertises txns 0 -> 100
+    client.update_summary(good_peer, mock_storage_summary(100));
+    // bad peer advertises txns 0 -> 200 (but can't actually service)
+    client.update_summary(bad_peer, mock_storage_summary(200));
+    client.update_global_summary_cache();
+
+    // the global summary should contain the bad peer's advertisement
+    let global_summary = client.get_global_data_summary();
+    assert!(global_summary
+        .advertised_data
+        .transactions
+        .contains(&CompleteDataRange::new(0, 200).unwrap()));
+
+    // spawn a handler for both peers
+    tokio::spawn(async move {
+        while let Some((peer, _, _, response_sender)) = mock_network.next_request().await {
+            if peer == good_peer.peer_id() {
+                // good peer responds with good response
+                response_sender.send(Ok(StorageServiceResponse::TransactionsWithProof(
+                    TransactionListWithProof::new_empty(),
+                )));
+            } else if peer == bad_peer.peer_id() {
+                // bad peer responds with error
+                response_sender.send(Err(StorageServiceError::InternalError("".to_string())));
+            }
+        }
+    });
+
+    let mut seen_data_unavailable_err = false;
+
+    // sending a bunch of requests to the bad peer's upper range will fail
+    for _ in 0..20 {
+        let result = client
+            .get_transactions_with_proof(200, 200, 200, false)
+            .await;
+
+        // while the score is still decreasing, we should see a bunch of
+        // InternalError's. once we see a `DataIsUnavailable` error, we should
+        // only see that error.
+        if !seen_data_unavailable_err {
+            assert_err!(&result);
+            if let Err(Error::DataIsUnavailable(_)) = result {
+                seen_data_unavailable_err = true;
+            }
+        } else {
+            assert_matches!(result, Err(Error::DataIsUnavailable(_)));
+        }
+    }
+
+    // peer should eventually get ignored and we should consider this request
+    // range unserviceable.
+    assert!(seen_data_unavailable_err);
+
+    // the global summary should no longer contain the bad peer's advertisement
+    client.update_global_summary_cache();
+    let global_summary = client.get_global_data_summary();
+    assert!(!global_summary
+        .advertised_data
+        .transactions
+        .contains(&CompleteDataRange::new(0, 200).unwrap()));
+
+    // we should still be able to send the good peer a request
+    let response = client
+        .get_transactions_with_proof(100, 50, 100, false)
+        .await
+        .unwrap();
+    assert_eq!(response.payload, TransactionListWithProof::new_empty());
+}
+
+#[tokio::test]
+async fn bad_peer_is_eventually_banned_callback() {
+    ::diem_logger::Logger::init_for_testing();
+    let (mut mock_network, _mock_time, client, _poller) = MockNetwork::new();
+
+    let good_peer = mock_network.add_connected_peer();
+    let bad_peer = mock_network.add_connected_peer();
+
+    // bypass poller and just add the storage summaries directly
+
+    // good peer advertises txns 0 -> 100
+    client.update_summary(good_peer, mock_storage_summary(100));
+    // bad peer advertises txns 0 -> 200 (but can't actually service)
+    client.update_summary(bad_peer, mock_storage_summary(200));
+    client.update_global_summary_cache();
+
+    // the global summary should contain the bad peer's advertisement
+    let global_summary = client.get_global_data_summary();
+    assert!(global_summary
+        .advertised_data
+        .transactions
+        .contains(&CompleteDataRange::new(0, 200).unwrap()));
+
+    // spawn a handler for both peers
+    tokio::spawn(async move {
+        while let Some((_, _, _, response_sender)) = mock_network.next_request().await {
+            response_sender.send(Ok(StorageServiceResponse::TransactionsWithProof(
+                TransactionListWithProof::new_empty(),
+            )));
+        }
+    });
+
+    let mut seen_data_unavailable_err = false;
+
+    // sending a bunch of requests to the bad peer (that we later decide are bad)
+    for _ in 0..20 {
+        let result = client
+            .get_transactions_with_proof(200, 200, 200, false)
+            .await;
+
+        // while the score is still decreasing, we should see a bunch of
+        // InternalError's. once we see a `DataIsUnavailable` error, we should
+        // only see that error.
+        if !seen_data_unavailable_err {
+            match result {
+                Ok(response) => {
+                    response
+                        .context
+                        .response_callback
+                        .notify_bad_response(crate::ResponseError::ProofVerificationError);
+                }
+                Err(Error::DataIsUnavailable(_)) => {
+                    seen_data_unavailable_err = true;
+                }
+                Err(_) => panic!("unexpected result: {:?}", result),
+            }
+        } else {
+            assert_matches!(result, Err(Error::DataIsUnavailable(_)));
+        }
+    }
+
+    // peer should eventually get ignored and we should consider this request
+    // range unserviceable.
+    assert!(seen_data_unavailable_err);
+
+    // the global summary should no longer contain the bad peer's advertisement
+    client.update_global_summary_cache();
+    let global_summary = client.get_global_data_summary();
+    assert!(!global_summary
+        .advertised_data
+        .transactions
+        .contains(&CompleteDataRange::new(0, 200).unwrap()));
+
+    // we should still be able to send the good peer a request
+    let response = client
+        .get_transactions_with_proof(100, 50, 100, false)
+        .await
+        .unwrap();
+    assert_eq!(response.payload, TransactionListWithProof::new_empty());
 }

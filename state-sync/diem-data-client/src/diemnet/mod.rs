@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    AdvertisedData, DiemDataClient, Error, GlobalDataSummary, OptimalChunkSizes, Response,
-    ResponseCallback, ResponseContext, ResponseError, ResponseId, Result,
+    diemnet::state::{ErrorType, PeerStates},
+    DiemDataClient, Error, GlobalDataSummary, Response, ResponseCallback, ResponseContext,
+    ResponseError, ResponseId, Result,
 };
 use async_trait::async_trait;
 use diem_config::{config::StorageServiceConfig, network_id::PeerNetworkId};
@@ -26,7 +27,7 @@ use network::{
     protocols::{rpc::error::RpcError, wire::handshake::v1::ProtocolId},
 };
 use rand::seq::SliceRandom;
-use std::{collections::HashMap, convert::TryFrom, fmt, sync::Arc, time::Duration};
+use std::{convert::TryFrom, fmt, sync::Arc, time::Duration};
 use storage_service_client::StorageServiceClient;
 use storage_service_types::{
     AccountStatesChunkWithProofRequest, Epoch, EpochEndingLedgerInfoRequest, StorageServerSummary,
@@ -34,6 +35,7 @@ use storage_service_types::{
     TransactionsWithProofRequest,
 };
 
+mod state;
 #[cfg(test)]
 mod tests;
 
@@ -196,26 +198,20 @@ impl DiemNetDataClient {
             .send_request(peer, request.clone(), DEFAULT_TIMEOUT)
             .await;
 
-        // convert network error and storage service error types into data client
-        // errors.
-        let result = result.map_err(|err| match err {
-            storage_service_client::Error::RpcError(err) => match err {
-                RpcError::NotConnected(_) => Error::DataIsUnavailable(err.to_string()),
-                RpcError::TimedOut => Error::TimeoutWaitingForResponse(err.to_string()),
-                _ => Error::UnexpectedErrorEncountered(err.to_string()),
-            },
-            storage_service_client::Error::StorageServiceError(err) => {
-                Error::UnexpectedErrorEncountered(err.to_string())
-            }
-        });
-
         match result {
             Ok(response) => {
-                let data_client = self.clone();
+                // For now, record all responses that at least pass the data
+                // client layer successfully. An alternative might also have the
+                // consumer notify both success and failure via the callback.
+                // On the one hand, scoring dynamics are simpler when each request
+                // is successful or failed but not both; on the other hand, this
+                // feels simpler for the consumer.
+                self.peer_states.write().update_score_success(peer);
+
                 // package up all of the context needed to fully report an error
                 // with this RPC.
                 let response_callback = DiemNetResponseCallback {
-                    data_client,
+                    data_client: self.clone(),
                     id,
                     peer,
                     request,
@@ -227,10 +223,22 @@ impl DiemNetDataClient {
                 Ok(Response::new(context, response))
             }
             Err(err) => {
-                // TODO(philiphayes): convert `err` into `ResponseError`
-                let error_type = ResponseError::InvalidData;
-                self.notify_bad_response(id, peer, &request, error_type);
-                Err(err)
+                // convert network error and storage service error types into
+                // data client errors. also categorize the error type for scoring
+                // purposes.
+                let client_err = match err {
+                    storage_service_client::Error::RpcError(err) => match err {
+                        RpcError::NotConnected(_) => Error::DataIsUnavailable(err.to_string()),
+                        RpcError::TimedOut => Error::TimeoutWaitingForResponse(err.to_string()),
+                        _ => Error::UnexpectedErrorEncountered(err.to_string()),
+                    },
+                    storage_service_client::Error::StorageServiceError(err) => {
+                        Error::UnexpectedErrorEncountered(err.to_string())
+                    }
+                };
+
+                self.notify_bad_response(id, peer, &request, ErrorType::NotUseful);
+                Err(client_err)
             }
         }
     }
@@ -238,11 +246,13 @@ impl DiemNetDataClient {
     fn notify_bad_response(
         &self,
         _id: ResponseId,
-        _peer: PeerNetworkId,
+        peer: PeerNetworkId,
         _request: &StorageServiceRequest,
-        _error: ResponseError,
+        error_type: ErrorType,
     ) {
-        // TODO(philiphayes): update peer score
+        self.peer_states
+            .write()
+            .update_score_error(peer, error_type);
     }
 }
 
@@ -331,8 +341,9 @@ struct DiemNetResponseCallback {
 
 impl ResponseCallback for DiemNetResponseCallback {
     fn notify_bad_response(&self, error: ResponseError) {
+        let error_type = ErrorType::from(error);
         self.data_client
-            .notify_bad_response(self.id, self.peer, &self.request, error);
+            .notify_bad_response(self.id, self.peer, &self.request, error_type);
     }
 }
 
@@ -421,122 +432,4 @@ impl DataSummaryPoller {
             self.data_client.update_global_summary_cache();
         }
     }
-}
-
-#[derive(Debug, Default)]
-struct PeerState {
-    storage_summary: Option<StorageServerSummary>,
-    // TODO(philiphayes): imagine storing some scoring info here.
-    metadata: (),
-}
-
-/// Contains all of the unbanned peers' most recent [`StorageServerSummary`] data
-/// advertisements and data-client internal metadata for scoring.
-#[derive(Debug)]
-struct PeerStates {
-    config: StorageServiceConfig,
-    inner: HashMap<PeerNetworkId, PeerState>,
-}
-
-impl PeerStates {
-    fn new(config: StorageServiceConfig) -> Self {
-        Self {
-            config,
-            inner: HashMap::new(),
-        }
-    }
-
-    /// Returns true if a connected storage service peer can actually fulfill a
-    /// request, given our current view of their advertised data summary.
-    fn can_service_request(&self, peer: &PeerNetworkId, request: &StorageServiceRequest) -> bool {
-        // Storage services can always respond to data advertisement requests.
-        // We need this outer check, since we need to be able to send data summary
-        // requests to new peers (who don't have a peer state yet).
-        if request.is_get_storage_server_summary() {
-            return true;
-        }
-
-        self.inner
-            .get(peer)
-            .and_then(|peer_state| peer_state.storage_summary.as_ref())
-            .map(|summary| summary.can_service(request))
-            .unwrap_or(false)
-    }
-
-    fn update_summary(&mut self, peer: PeerNetworkId, summary: StorageServerSummary) {
-        self.inner.entry(peer).or_default().storage_summary = Some(summary);
-    }
-
-    fn aggregate_summary(&self) -> GlobalDataSummary {
-        let mut aggregate_data = AdvertisedData::empty();
-
-        let mut max_epoch_chunk_sizes = vec![];
-        let mut max_transaction_chunk_sizes = vec![];
-        let mut max_transaction_output_chunk_sizes = vec![];
-        let mut max_account_states_chunk_sizes = vec![];
-
-        let summaries = self
-            .inner
-            .values()
-            .filter_map(|state| state.storage_summary.as_ref());
-
-        // collect each peer's protocol and data advertisements
-        for summary in summaries {
-            // collect aggregate data advertisements
-            if let Some(account_states) = summary.data_summary.account_states {
-                aggregate_data.account_states.push(account_states);
-            }
-            if let Some(epoch_ending_ledger_infos) = summary.data_summary.epoch_ending_ledger_infos
-            {
-                aggregate_data
-                    .epoch_ending_ledger_infos
-                    .push(epoch_ending_ledger_infos);
-            }
-            if let Some(synced_ledger_info) = summary.data_summary.synced_ledger_info.as_ref() {
-                aggregate_data
-                    .synced_ledger_infos
-                    .push(synced_ledger_info.clone());
-            }
-            if let Some(transactions) = summary.data_summary.transactions {
-                aggregate_data.transactions.push(transactions);
-            }
-            if let Some(transaction_outputs) = summary.data_summary.transaction_outputs {
-                aggregate_data.transaction_outputs.push(transaction_outputs);
-            }
-
-            // collect preferred max chunk sizes
-            max_epoch_chunk_sizes.push(summary.protocol_metadata.max_epoch_chunk_size);
-            max_transaction_chunk_sizes.push(summary.protocol_metadata.max_transaction_chunk_size);
-            max_transaction_output_chunk_sizes
-                .push(summary.protocol_metadata.max_transaction_output_chunk_size);
-            max_account_states_chunk_sizes
-                .push(summary.protocol_metadata.max_account_states_chunk_size);
-        }
-
-        // take the median for each max chunk size parameter.
-        // this works well when we have an honest majority that mostly agrees on
-        // the same chunk sizes.
-        // TODO(philiphayes): move these constants somewhere?
-        let aggregate_chunk_sizes = OptimalChunkSizes {
-            account_states_chunk_size: median(&mut max_account_states_chunk_sizes)
-                .unwrap_or(self.config.max_account_states_chunk_sizes),
-            epoch_chunk_size: median(&mut max_epoch_chunk_sizes)
-                .unwrap_or(self.config.max_epoch_chunk_size),
-            transaction_chunk_size: median(&mut max_transaction_chunk_sizes)
-                .unwrap_or(self.config.max_transaction_chunk_size),
-            transaction_output_chunk_size: median(&mut max_transaction_output_chunk_sizes)
-                .unwrap_or(self.config.max_transaction_output_chunk_size),
-        };
-
-        GlobalDataSummary {
-            advertised_data: aggregate_data,
-            optimal_chunk_sizes: aggregate_chunk_sizes,
-        }
-    }
-}
-
-fn median<T: Ord + Copy>(values: &mut [T]) -> Option<T> {
-    values.sort_unstable();
-    let idx = values.len() / 2;
-    values.get(idx).copied()
 }

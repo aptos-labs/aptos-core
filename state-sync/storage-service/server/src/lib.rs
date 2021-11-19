@@ -440,7 +440,7 @@ impl StorageReaderInterface for StorageReader {
         let latest_ledger_info_with_sigs = self
             .storage
             .get_latest_ledger_info()
-            .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
+            .map_err(|err| Error::StorageErrorEncountered(err.to_string()))?;
 
         // Fetch the epoch ending ledger info range
         let latest_ledger_info = latest_ledger_info_with_sigs.ledger_info();
