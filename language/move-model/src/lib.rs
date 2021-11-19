@@ -39,6 +39,7 @@ use crate::{
     builder::model_builder::ModelBuilder,
     model::{FunId, FunctionData, GlobalEnv, Loc, ModuleData, ModuleId, StructId},
     options::ModelBuilderOptions,
+    simplifier::{SpecRewriter, SpecRewriterPipeline},
 };
 
 pub mod ast;
@@ -581,10 +582,10 @@ fn run_spec_simplifier(env: &mut GlobalEnv) {
     let options = env
         .get_extension::<ModelBuilderOptions>()
         .expect("options for model builder");
-    for pass in &options.simplification_pipeline {
-        pass.run(env)
-            .unwrap_or_else(|e| panic!("Failed to run simplification pass {}: {}", pass, e))
-    }
+    let mut rewriter = SpecRewriterPipeline::new(&options.simplification_pipeline);
+    rewriter
+        .override_with_rewrite(env)
+        .unwrap_or_else(|e| panic!("Failed to run spec simplification: {}", e))
 }
 
 // =================================================================================================

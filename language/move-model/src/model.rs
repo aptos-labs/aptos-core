@@ -70,6 +70,7 @@ use crate::{
 };
 
 // import and re-expose symbols
+use move_binary_format::file_format::CodeOffset;
 pub use move_binary_format::file_format::{AbilitySet, Visibility as FunctionVisibility};
 
 // =================================================================================================
@@ -1518,6 +1519,19 @@ impl GlobalEnv {
         total
     }
 
+    /// Override the specification for a given module
+    pub fn override_module_spec(&mut self, mid: ModuleId, spec: Spec) {
+        let module_data = self
+            .module_data
+            .iter_mut()
+            .filter(|m| m.id == mid)
+            .exactly_one()
+            .unwrap_or_else(|_| {
+                panic!("Expect one and only one module for {:?}", mid);
+            });
+        module_data.module_spec = spec;
+    }
+
     /// Override the specification for a given function
     pub fn override_function_spec(&mut self, fid: QualifiedId<FunId>, spec: Spec) {
         let func_data = self
@@ -1536,6 +1550,31 @@ impl GlobalEnv {
                 panic!("Expect one and only one function for {:?}", fid);
             });
         func_data.spec = spec;
+    }
+
+    /// Override the specification for a given code location
+    pub fn override_inline_spec(
+        &mut self,
+        fid: QualifiedId<FunId>,
+        code_offset: CodeOffset,
+        spec: Spec,
+    ) {
+        let func_data = self
+            .module_data
+            .iter_mut()
+            .filter(|m| m.id == fid.module_id)
+            .map(|m| {
+                m.function_data
+                    .iter_mut()
+                    .filter(|(k, _)| **k == fid.id)
+                    .map(|(_, v)| v)
+            })
+            .flatten()
+            .exactly_one()
+            .unwrap_or_else(|_| {
+                panic!("Expect one and only one function for {:?}", fid);
+            });
+        func_data.spec.on_impl.insert(code_offset, spec);
     }
 }
 

@@ -6,111 +6,104 @@ use std::collections::BTreeMap;
 
 use crate::{
     ast::{Condition, ConditionKind, Exp, ExpData, Operation, Spec, TempIndex},
-    model::GlobalEnv,
+    model::{FunId, GlobalEnv, QualifiedId},
+    simplifier::pass::SpecRewriter,
     symbol::Symbol,
 };
 
-/// Entrypoint of the inline pass
-pub(crate) fn run_pass_inline(env: &mut GlobalEnv) -> Result<()> {
-    // convert all function specs
-    let mut new_specs = BTreeMap::new();
-    for menv in env.get_modules() {
-        for fenv in menv.get_functions() {
-            let spec = inline_all_exp_in_spec(env, fenv.get_spec().clone())?;
-            new_specs.insert(fenv.get_qualified_id(), spec);
-        }
-    }
+/// A spec rewriter that produces a new spec by inlining all expressions in the given spec
+#[derive(Default)]
+pub struct SpecPassInline {}
 
-    // replace all function specs
-    for (fid, spec) in new_specs {
-        env.override_function_spec(fid, spec);
-    }
-    Ok(())
-}
+impl SpecRewriter for SpecPassInline {
+    fn rewrite_function_spec(
+        &mut self,
+        env: &GlobalEnv,
+        _fun_id: QualifiedId<FunId>,
+        spec: &Spec,
+    ) -> Result<Option<Spec>> {
+        let inliner = ExpInliner { env };
 
-/// Construct a new spec by inlining all expressions in the given spec
-fn inline_all_exp_in_spec(env: &GlobalEnv, spec: Spec) -> Result<Spec> {
-    let inliner = ExpInliner { env };
-
-    let Spec {
-        loc,
-        conditions,
-        properties,
-        on_impl,
-    } = spec;
-
-    // expressions to be substituted when evaluated in a pre-context
-    let mut local_vars_pre = BTreeMap::new();
-    // expressions to be substituted when evaluated in a post-context
-    let mut local_vars_post = BTreeMap::new();
-
-    let mut new_conditions = vec![];
-    for cond in conditions {
-        let Condition {
+        let Spec {
             loc,
-            kind,
+            conditions,
             properties,
-            exp,
-            additional_exps,
-        } = cond;
+            on_impl,
+        } = spec.clone();
 
-        match &kind {
-            ConditionKind::LetPre(sym) => {
-                let var_exp_pre = inliner.inline_exp(&exp, None, Some(&local_vars_pre));
-                local_vars_pre.insert(*sym, var_exp_pre);
+        // expressions to be substituted when evaluated in a pre-context
+        let mut local_vars_pre = BTreeMap::new();
+        // expressions to be substituted when evaluated in a post-context
+        let mut local_vars_post = BTreeMap::new();
 
-                let var_exp_post = inliner.inline_exp(&exp, None, Some(&local_vars_post));
-                let var_exp_post = if var_exp_post.is_pure(env) {
-                    var_exp_post
-                } else {
-                    let exp_ty = env.get_node_type(var_exp_post.node_id());
-                    let node_id = env.new_node(loc, exp_ty);
-                    ExpData::Call(node_id, Operation::Old, vec![var_exp_post]).into_exp()
-                };
-                local_vars_post.insert(*sym, var_exp_post);
-            }
-            ConditionKind::LetPost(sym) => {
-                let var_exp = inliner.inline_exp(&exp, None, Some(&local_vars_post));
-                local_vars_post.insert(*sym, var_exp);
-            }
-            _ => {
-                let local_vars = match kind {
-                    ConditionKind::AbortsIf
-                    | ConditionKind::AbortsWith
-                    | ConditionKind::SucceedsIf
-                    | ConditionKind::Requires => Some(&local_vars_pre),
-                    ConditionKind::Ensures | ConditionKind::Modifies | ConditionKind::Emits => {
-                        Some(&local_vars_post)
-                    }
-                    _ => None,
-                };
-                let new_exp = inliner.inline_exp(&exp, None, local_vars);
-                let new_additional_exps = additional_exps
-                    .into_iter()
-                    .map(|e| inliner.inline_exp(&e, None, local_vars))
-                    .collect();
-                let new_cond = Condition {
-                    loc,
-                    kind,
-                    properties,
-                    exp: new_exp,
-                    additional_exps: new_additional_exps,
-                };
-                new_conditions.push(new_cond);
+        let mut new_conditions = vec![];
+        for cond in conditions {
+            let Condition {
+                loc,
+                kind,
+                properties,
+                exp,
+                additional_exps,
+            } = cond;
+
+            match &kind {
+                ConditionKind::LetPre(sym) => {
+                    let var_exp_pre = inliner.inline_exp(&exp, None, Some(&local_vars_pre));
+                    local_vars_pre.insert(*sym, var_exp_pre);
+
+                    let var_exp_post = inliner.inline_exp(&exp, None, Some(&local_vars_post));
+                    let var_exp_post = if var_exp_post.is_pure(env) {
+                        var_exp_post
+                    } else {
+                        let exp_ty = env.get_node_type(var_exp_post.node_id());
+                        let node_id = env.new_node(loc, exp_ty);
+                        ExpData::Call(node_id, Operation::Old, vec![var_exp_post]).into_exp()
+                    };
+                    local_vars_post.insert(*sym, var_exp_post);
+                }
+                ConditionKind::LetPost(sym) => {
+                    let var_exp = inliner.inline_exp(&exp, None, Some(&local_vars_post));
+                    local_vars_post.insert(*sym, var_exp);
+                }
+                _ => {
+                    let local_vars = match kind {
+                        ConditionKind::AbortsIf
+                        | ConditionKind::AbortsWith
+                        | ConditionKind::SucceedsIf
+                        | ConditionKind::Requires => Some(&local_vars_pre),
+                        ConditionKind::Ensures | ConditionKind::Modifies | ConditionKind::Emits => {
+                            Some(&local_vars_post)
+                        }
+                        _ => None,
+                    };
+                    let new_exp = inliner.inline_exp(&exp, None, local_vars);
+                    let new_additional_exps = additional_exps
+                        .into_iter()
+                        .map(|e| inliner.inline_exp(&e, None, local_vars))
+                        .collect();
+                    let new_cond = Condition {
+                        loc,
+                        kind,
+                        properties,
+                        exp: new_exp,
+                        additional_exps: new_additional_exps,
+                    };
+                    new_conditions.push(new_cond);
+                }
             }
         }
-    }
 
-    let new_spec = Spec {
-        loc,
-        conditions: new_conditions,
-        properties,
-        on_impl,
-    };
-    Ok(new_spec)
+        let new_spec = Spec {
+            loc,
+            conditions: new_conditions,
+            properties,
+            on_impl,
+        };
+        Ok(Some(new_spec))
+    }
 }
 
-/// A struct that capture the inlining logic
+/// A struct that capture the inlining logic for expressions
 struct ExpInliner<'env> {
     env: &'env GlobalEnv,
 }
