@@ -134,6 +134,17 @@ jobs:
           webhook: ${{ secrets.WEBHOOK_BREAKING_CHANGE }}
           payload-file: ${{ env.MESSAGE_PAYLOAD_FILE }}
         if: ${{ failure() }}
+      - name: Run test diag on devnet
+        run: |
+          RUST_BACKTRACE=full cargo run -p transaction-emitter -- --diag --mint-file=/tmp/mint_test.key --peers=dev.testnet.diem.com:80:80 --chain-id=DEVNET > ${MESSAGE_PAYLOAD_FILE}
+      - name: Run test to submit random txn to devnet
+        run: |
+          RUST_BACKTRACE=full cargo run -p transaction-emitter -- --emit-tx --mint-file=/tmp/mint_test.key --peers=dev.testnet.diem.com:80:80 --chain-id=DEVNET --accounts-per-client=2 --workers-per-ac=2 --duration=30 >> ${MESSAGE_PAYLOAD_FILE}
+      - uses: ./.github/actions/slack-file
+        with:
+          webhook: ${{ secrets.WEBHOOK_FORGE }}
+          payload-file: ${{ env.MESSAGE_PAYLOAD_FILE }}
+        if: ${{ failure() }}
       - uses: ./.github/actions/build-teardown
 
   prover-inconsistency-test:
