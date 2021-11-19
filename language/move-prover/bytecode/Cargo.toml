@@ -32,7 +32,7 @@ paste = "1.0.5"
 petgraph = "0.5.1"
 
 [dev-dependencies]
-diem-workspace-hack = { path = "../../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }
 move-stdlib = { path = "../../move-stdlib" }
 datatest-stable = "0.1.1"
 move-prover-test-utils = { path = "../test-utils" }

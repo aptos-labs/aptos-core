@@ -30,4 +30,4 @@ name = "vm_benches"
 harness = false
 
 [dev-dependencies]
-diem-workspace-hack = { path = "../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }

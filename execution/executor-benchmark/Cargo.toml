@@ -32,7 +32,7 @@ diem-jellyfish-merkle = { path = "../../storage/jellyfish-merkle" }
 diem-logger = { path = "../../common/logger" }
 diem-types = { path = "../../types" }
 diem-vm= { path = "../../diem-move/diem-vm" }
-diem-workspace-hack = { path = "../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 schemadb = { path = "../../storage/schemadb" }
 storage-client = { path = "../../storage/storage-client" }
 storage-interface = { path = "../../storage/storage-interface" }

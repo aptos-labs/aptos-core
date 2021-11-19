@@ -11,7 +11,7 @@ edition = "2018"
 
 [dependencies]
 diem-infallible = { path= "../infallible" }
-diem-workspace-hack = { path = "../workspace-hack" }
+diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 diem-logger = { path = "../logger" }
 diem-metrics = { path = "../metrics" }
 futures = "0.3.12"

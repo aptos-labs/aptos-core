@@ -15,4 +15,4 @@ rand = "0.8.3"
 bcs = "0.1.2"
 diem-crypto = { path = "../../crates/diem-crypto/"}
 diem-temppath = { path = "../../common/temppath" }
-diem-workspace-hack = { path = "../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }

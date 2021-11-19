@@ -14,7 +14,7 @@ anyhow = "1.0.38"
 bcs = "0.1.2"
 structopt = "0.3.21"
 
-diem-workspace-hack = { path = "../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 move-core-types = { path = "../../language/move-core/types" }
 move-cli = { path = "../../language/tools/move-cli" }
 diem-vm = { path = "../diem-vm" }

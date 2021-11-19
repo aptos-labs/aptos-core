@@ -21,4 +21,4 @@ move-read-write-set-types = { path = "types" }
 read-write-set-dynamic = { path = "dynamic" }
 
 [dev-dependencies]
-diem-workspace-hack = { path = "../../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }

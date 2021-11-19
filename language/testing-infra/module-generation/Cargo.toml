@@ -23,4 +23,4 @@ move-symbol-pool = { path = "../../move-symbol-pool" }
 default = []
 
 [dev-dependencies]
-diem-workspace-hack = { path = "../../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }

@@ -10,7 +10,7 @@ publish = false
 edition = "2018"
 
 [dev-dependencies]
-diem-workspace-hack = { path = "../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 anyhow = "1.0.38"
 bytecode-verifier = { path = "../bytecode-verifier" }
 datatest-stable = "0.1.1"

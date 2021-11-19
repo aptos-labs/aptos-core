@@ -15,7 +15,7 @@ serde = { version = "1.0.124", features = ["derive"] }
 
 
 [dev-dependencies]
-diem-workspace-hack = { path = "../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 serde_json = { version = "1.0.64" }
 
 [features]

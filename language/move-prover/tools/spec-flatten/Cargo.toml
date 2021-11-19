@@ -21,4 +21,4 @@ pretty = "0.10.0"
 structopt = "0.3.21"
 
 [dev-dependencies]
-diem-workspace-hack = { path = "../../../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../../../crates/diem-workspace-hack" }

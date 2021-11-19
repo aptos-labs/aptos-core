@@ -14,7 +14,7 @@ publish = false
 move-command-line-common = { path = "../../../../language/move-command-line-common" }
 diem-crypto = { path = "../../../../crates/diem-crypto" }
 diem-types = { path = "../../../../types" }
-diem-workspace-hack = { path = "../../../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../../../crates/diem-workspace-hack" }
 move-binary-format = { path = "../../../../language/move-binary-format" }
 framework-releases = { path = "../../releases" }
 

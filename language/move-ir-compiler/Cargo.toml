@@ -27,4 +27,4 @@ serde_json = "1.0.64"
 default = []
 
 [dev-dependencies]
-diem-workspace-hack = { path = "../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }

@@ -30,7 +30,7 @@ bcs = "0.1.2"
 move-command-line-common = { path = "../move-command-line-common" }
 
 [dev-dependencies]
-diem-workspace-hack = { path = "../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 move-stdlib = { path = "../move-stdlib" }
 datatest-stable = "0.1.1"
 

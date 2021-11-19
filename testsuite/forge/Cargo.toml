@@ -44,5 +44,5 @@ diem-logger = { path = "../../common/logger" }
 diem-retrier = { path = "../../common/retrier" }
 diem-sdk = { path = "../../sdk" }
 diem-secure-storage = { path = "../../secure/storage" }
-diem-workspace-hack = { path = "../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 transaction-emitter = { path = "../../crates/transaction-emitter" }

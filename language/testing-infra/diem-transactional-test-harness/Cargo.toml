@@ -34,7 +34,7 @@ move-command-line-common = { path = "../../move-command-line-common" }
 vm-genesis= { path = "../../../diem-move/vm-genesis" }
 
 [dev-dependencies]
-diem-workspace-hack = { path = "../../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }
 datatest-stable = "0.1.1"
 
 [[test]]

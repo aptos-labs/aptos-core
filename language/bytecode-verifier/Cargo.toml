@@ -19,7 +19,7 @@ move-binary-format = { path = "../move-binary-format" }
 move-core-types = { path = "../move-core/types" }
 
 [dev-dependencies]
-diem-workspace-hack = { path = "../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 invalid-mutations = { path = "invalid-mutations" }
 
 [features]

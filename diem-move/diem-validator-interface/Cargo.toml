@@ -15,7 +15,7 @@ diem-config = { path = "../../config" }
 diem-client = { path = "../../crates/diem-client" }
 diem-types = { path = "../../types" }
 diemdb = { path = "../../storage/diemdb" }
-diem-workspace-hack = { path = "../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 storage-interface = { path = "../../storage/storage-interface" }
 scratchpad = { path = "../../storage/scratchpad" }
 diem-state-view = { path = "../../storage/state-view" }

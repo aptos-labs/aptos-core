@@ -24,7 +24,7 @@ diem-config = { path = "../../../config" }
 diem-logger = { path = "../../../common/logger" }
 diem-metrics = { path = "../../../common/metrics" }
 diem-types = { path = "../../../types" }
-diem-workspace-hack = { path = "../../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }
 network = { path = "../../../network" }
 storage-interface = { path = "../../../storage/storage-interface" }
 storage-service-types = { path = "../types" }

@@ -19,4 +19,4 @@ move-core-types = {path = "../../move-core/types" }
 move-binary-format = { path = "../../move-binary-format" }
 
 [dev-dependencies]
-diem-workspace-hack = { path = "../../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }

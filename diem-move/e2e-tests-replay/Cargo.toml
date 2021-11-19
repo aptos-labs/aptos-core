@@ -13,7 +13,7 @@ bcs = "0.1.2"
 structopt = "0.3.21"
 walkdir = "2.3.1"
 
-diem-workspace-hack = { path = "../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 bytecode-interpreter = { path = "../../language/move-prover/interpreter" }
 diem-types = { path = "../../types", features = ["fuzzing"] }
 diem-framework = { path = "../../diem-move/diem-framework" }

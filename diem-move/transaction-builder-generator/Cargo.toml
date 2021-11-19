@@ -20,7 +20,7 @@ serde-generate = "0.20.2"
 serde_yaml = "0.8.17"
 
 diem-types = { path = "../../types" }
-diem-workspace-hack = { path = "../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 move-core-types = { path = "../../language/move-core/types" }
 bcs = "0.1.2"
 

@@ -24,7 +24,7 @@ diem-infallible = { path = "../../common/infallible" }
 diem-logger = { path = "../../common/logger" }
 diem-time-service = { path = "../../common/time-service", features = ["async"] }
 diem-types = { path = "../../types" }
-diem-workspace-hack = { path = "../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 network = { path = "../../network" }
 storage-service-client = { path = "../storage-service/client" }
 storage-service-types = { path = "../storage-service/types" }

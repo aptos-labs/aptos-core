@@ -10,6 +10,6 @@ publish = false
 edition = "2018"
 
 [dependencies]
-diem-workspace-hack = { path = "../workspace-hack" }
+diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 tokio = { version = "1.8.1", features = ["time"] }
 diem-logger = { path = "../logger"}

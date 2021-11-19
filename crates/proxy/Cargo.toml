@@ -12,4 +12,4 @@ edition = "2018"
 [dependencies]
 ipnet = "2.3"
 
-diem-workspace-hack = { path = "../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }

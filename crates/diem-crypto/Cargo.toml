@@ -46,7 +46,7 @@ sha3 = "0.9.1"
 serde_json = "1.0.64"
 trybuild = "1.0.41"
 
-diem-workspace-hack = { path = "../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 
 [features]
 default = ["fiat"]

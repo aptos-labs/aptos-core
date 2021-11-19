@@ -38,7 +38,7 @@ move-vm-runtime = { path = "../../move-vm/runtime" }
 resource-viewer = { path = "../../tools/resource-viewer" }
 
 [dev-dependencies]
-diem-workspace-hack = { path = "../../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }
 datatest-stable = "0.1.1"
 difference = "2.0.0"
 

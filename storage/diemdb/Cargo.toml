@@ -33,7 +33,7 @@ diem-infallible = { path = "../../common/infallible" }
 diem-proptest-helpers = { path = "../../common/proptest-helpers", optional = true }
 diem-temppath = { path = "../../common/temppath", optional = true }
 diem-types = { path = "../../types" }
-diem-workspace-hack = { path = "../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 move-core-types = {path = "../../language/move-core/types"}
 
 num-variants = { path = "../../common/num-variants" }

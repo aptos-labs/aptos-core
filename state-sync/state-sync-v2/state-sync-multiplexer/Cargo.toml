@@ -18,7 +18,7 @@ data-streaming-service = { path = "../data-streaming-service" }
 diem-config = { path = "../../../config" }
 diem-data-client = { path = "../../diem-data-client" }
 diem-types = { path = "../../../types" }
-diem-workspace-hack = { path = "../../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }
 event-notifications = { path = "../../../state-sync/inter-component/event-notifications" }
 executor-types = { path = "../../../execution/executor-types" }
 mempool-notifications = { path = "../../../state-sync/inter-component/mempool-notifications" }

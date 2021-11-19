@@ -12,7 +12,7 @@ edition = "2018"
 [dependencies]
 bcs = "0.1.2"
 diem-types = { path = "../../types" }
-diem-workspace-hack = { path = "../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 move-binary-format = { path = "../../language/move-binary-format" }
 move-core-types = { path = "../../language/move-core/types" }
 diem-resource-viewer = { path = "../diem-resource-viewer"}

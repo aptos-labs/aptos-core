@@ -41,7 +41,7 @@ serde_json = "1.0.64"
 
 diem-crypto = { path = "../crates/diem-crypto", features = ["fuzzing"] }
 move-core-types = { path = "../language/move-core/types", features = ["fuzzing"]  }
-diem-workspace-hack = { path = "../common/workspace-hack" }
+diem-workspace-hack = { path = "../crates/diem-workspace-hack" }
 
 [features]
 default = []

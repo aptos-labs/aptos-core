@@ -20,7 +20,7 @@ tokio = { version = "1.8.1", features = ["full"] }
 testcases = { path = "../testcases" }
 url = "2.2.2"
 
-diem-workspace-hack = { path = "../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 
 [[bin]]
 name = "forge"

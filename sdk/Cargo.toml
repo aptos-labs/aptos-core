@@ -27,4 +27,4 @@ diem-transaction-builder = { path = "./transaction-builder", version = "0.0.3" }
 diem-client = { path = "../crates/diem-client", version = "0.0.3", optional = true }
 
 [dev-dependencies]
-diem-workspace-hack = { path = "../common/workspace-hack" }
+diem-workspace-hack = { path = "../crates/diem-workspace-hack" }

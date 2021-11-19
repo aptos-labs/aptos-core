@@ -28,4 +28,4 @@ diem-sdk = { path = ".." }
 rand_core = "0.6"
 rstest = "0.10.0"
 
-diem-workspace-hack = { path = "../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }

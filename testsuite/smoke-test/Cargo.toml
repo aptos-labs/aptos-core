@@ -58,7 +58,7 @@ diem-swarm = { path = "../diem-swarm"}
 diem-time-service = { path = "../../common/time-service", features = ["testing"] }
 diem-vault-client = { path = "../../secure/storage/vault", features = ["fuzzing"] }
 diem-validator-interface = { path = "../../diem-move/diem-validator-interface" }
-diem-workspace-hack = { path = "../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 diem-writeset-generator = { path = "../../diem-move/writeset-transaction-generator" }
 diem-transaction-builder = { path = "../../sdk/transaction-builder" }
 

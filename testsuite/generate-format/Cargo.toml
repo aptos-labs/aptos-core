@@ -23,7 +23,7 @@ diem-config = { path = "../../config" }
 diem-crypto = { path = "../../crates/diem-crypto", features=["fuzzing"] }
 diem-crypto-derive = { path = "../../crates/diem-crypto-derive"}
 diem-types = { path = "../../types", features=["fuzzing"] }
-diem-workspace-hack = { path = "../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 network = { path = "../../network" }
 move-core-types = { path = "../../language/move-core/types", features=["fuzzing"] }
 

@@ -23,7 +23,7 @@ diem-logger = { path = "../../common/logger" }
 diem-metrics = { path = "../../common/metrics" }
 diem-state-view = { path = "../../storage/state-view" }
 diem-types = { path = "../../types" }
-diem-workspace-hack = { path = "../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 move-core-types = { path = "../../language/move-core/types" }
 move-vm-runtime = { path = "../../language/move-vm/runtime" }
 move-vm-types = { path = "../../language/move-vm/types" }

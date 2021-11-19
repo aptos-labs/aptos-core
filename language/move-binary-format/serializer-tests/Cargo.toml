@@ -10,7 +10,7 @@ publish = false
 edition = "2018"
 
 [dev-dependencies]
-diem-workspace-hack = { path = "../../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }
 proptest = "1.0.0"
 proptest-derive = "0.3.0"
 move-binary-format = { path = "../", features = ["fuzzing"] }

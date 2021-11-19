@@ -23,7 +23,7 @@ diem-crypto = { path = "../../../crates/diem-crypto" }
 diem-logger = { path = "../../../common/logger" }
 diem-metrics = { path = "../../../common/metrics" }
 diem-types = { path = "../../../types" }
-diem-workspace-hack = { path = "../../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }
 diemdb = { path = "../../diemdb" }
 storage-interface = { path = "../../storage-interface" }
 

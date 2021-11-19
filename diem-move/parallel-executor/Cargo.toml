@@ -13,7 +13,7 @@ edition = "2018"
 
 [dependencies]
 mvhashmap = { path = "../mvhashmap" }
-diem-workspace-hack = { path = "../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 
 anyhow = "1.0.38"
 crossbeam-queue = "0.3.1"

@@ -18,7 +18,7 @@ diem-state-view = { path = "../storage/state-view" }
 storage-interface = { path = "../storage/storage-interface" }
 diem-types = { path = "../types" }
 diem-vm = { path = "../diem-move/diem-vm" }
-diem-workspace-hack = { path = "../common/workspace-hack" }
+diem-workspace-hack = { path = "../crates/diem-workspace-hack" }
 
 [dev-dependencies]
 rand = "0.8.3"

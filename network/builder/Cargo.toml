@@ -28,7 +28,7 @@ diem-network-address-encryption = {path = "../../config/management/network-addre
 diem-secure-storage = { path = "../../secure/storage" }
 diem-time-service = { path = "../../common/time-service", features = ["async"] }
 diem-types = { path = "../../types" }
-diem-workspace-hack = { path = "../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 event-notifications = { path = "../../state-sync/inter-component/event-notifications" }
 netcore = { path = "../netcore" }
 network = { path = "../." }

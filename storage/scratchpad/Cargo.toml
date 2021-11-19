@@ -19,7 +19,7 @@ rayon = "1.5.0"
 diem-crypto = { path = "../../crates/diem-crypto" }
 diem-infallible = { path = "../../common/infallible" }
 diem-types = { path = "../../types" }
-diem-workspace-hack = { path = "../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 
 
 [dev-dependencies]

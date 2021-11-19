@@ -14,7 +14,7 @@ anyhow = "1.0.38"
 diem-crypto = { path = "../../crates/diem-crypto" }
 mirai-annotations = "1.10.1"
 diem-types = { path = "../../types" }
-diem-workspace-hack = { path = "../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 proptest = { version = "1.0.0", optional = true }
 
 [dev-dependencies]

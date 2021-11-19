@@ -21,7 +21,7 @@ channel = { path = "../../../common/channel" }
 diem-id-generator = { path = "../../../common/id-generator" }
 diem-infallible = { path = "../../../common/infallible" }
 diem-types = { path = "../../../types" }
-diem-workspace-hack = { path = "../../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }
 storage-interface = { path = "../../../storage/storage-interface" }
 
 

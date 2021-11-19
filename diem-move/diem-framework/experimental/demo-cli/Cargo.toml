@@ -13,7 +13,7 @@ diem-json-rpc-types = { path = "../../../../json-rpc/types" }
 diem-sdk = { path = "../../../../sdk" }
 diem-transaction-builder = { path = "../../../../sdk/transaction-builder"}
 diem-types = { path = "../../../../types" }
-diem-workspace-hack = { path = "../../../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../../../crates/diem-workspace-hack" }
 generate-key = { path = "../../../../config/generate-key" }
 move-core-types = { path = "../../../../language/move-core/types" }
 tokio = { version = "1", features = ["full"] }

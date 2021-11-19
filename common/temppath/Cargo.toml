@@ -11,5 +11,5 @@ edition = "2018"
 
 [dependencies]
 hex = "0.4.3"
-diem-workspace-hack = { path = "../workspace-hack" }
+diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 rand = "0.8.3"

@@ -49,7 +49,7 @@ bytecode-source-map = { path = "../../move-ir-compiler/bytecode-source-map" }
 move-bytecode-viewer = { path = "../move-bytecode-viewer" }
 
 [dev-dependencies]
-diem-workspace-hack = { path = "../../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }
 datatest-stable = "0.1.1"
 
 [[bin]]

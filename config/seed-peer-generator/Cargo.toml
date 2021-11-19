@@ -24,7 +24,7 @@ diem-client = { path = "../../crates/diem-client", features = ["blocking"], defa
 diem-logger = { path = "../../common/logger" }
 diem-temppath = { path = "../../common/temppath" }
 diem-types = { path = "../../types" }
-diem-workspace-hack = { path = "../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 
 [dev-dependencies]
 diem-types = {path = "../../types", features = ["fuzzing"]}

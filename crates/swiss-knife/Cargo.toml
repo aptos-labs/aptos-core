@@ -19,6 +19,6 @@ serde = { version = "1.0.124", features = ["derive"] }
 bcs = "0.1.2"
 diem-types = { path = "../../types" }
 diem-crypto = { path = "../../crates/diem-crypto" }
-diem-workspace-hack = { path = "../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 move-core-types = { path = "../../language/move-core/types" }
 diem-transaction-builder = { path = "../../sdk/transaction-builder" }

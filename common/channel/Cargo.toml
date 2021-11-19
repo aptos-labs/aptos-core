@@ -14,7 +14,7 @@ anyhow = "1.0.38"
 futures = "0.3.12"
 diem-metrics = { path = "../metrics" }
 diem-infallible = { path = "../infallible" }
-diem-workspace-hack = { path = "../workspace-hack" }
+diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 
 [dev-dependencies]
 diem-types = { path = "../../types"  }

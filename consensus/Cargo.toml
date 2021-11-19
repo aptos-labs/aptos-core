@@ -48,7 +48,7 @@ diem-secure-storage = { path = "../secure/storage" }
 diem-temppath = { path = "../common/temppath" }
 diem-types = { path = "../types" }
 diem-vm = { path = "../diem-move/diem-vm" }
-diem-workspace-hack = { path = "../common/workspace-hack" }
+diem-workspace-hack = { path = "../crates/diem-workspace-hack" }
 network = { path = "../network" }
 safety-rules = { path = "safety-rules" }
 short-hex-str = { path = "../common/short-hex-str" }

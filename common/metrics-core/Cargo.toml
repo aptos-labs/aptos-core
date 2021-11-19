@@ -10,5 +10,5 @@ publish = false
 edition = "2018"
 
 [dependencies]
-diem-workspace-hack = { path = "../workspace-hack" }
+diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 prometheus = { version = "0.12.0", default-features = false }

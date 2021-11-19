@@ -122,7 +122,7 @@ target-features = "all"
 [[summaries.default.omitted-packages]]
 name = "diem-workspace-hack"
 version = "0.1.0"
-workspace-path = "common/workspace-hack"
+workspace-path = "crates/diem-workspace-hack"
 
 [summaries.full]
 version = "v2"

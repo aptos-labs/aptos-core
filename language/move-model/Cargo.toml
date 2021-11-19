@@ -31,7 +31,7 @@ anyhow = "1.0.38"
 serde = { version = "1.0.124", features = ["derive"] }
 
 [dev-dependencies]
-diem-workspace-hack = { path = "../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 datatest-stable = "0.1.1"
 move-prover-test-utils = { path = "../move-prover/test-utils" }
 

@@ -17,7 +17,7 @@ thiserror = "1.0.24"
 tokio = { version = "1.8.1" }
 
 diem-types = { path = "../../../types" }
-diem-workspace-hack = { path = "../../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }
 
 [dev-dependencies]
 claim = "0.5.0"

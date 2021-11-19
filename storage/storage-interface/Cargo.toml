@@ -21,7 +21,7 @@ diem-crypto = { path = "../../crates/diem-crypto" }
 diem-secure-net = { path = "../../secure/net" }
 diem-state-view = { path = "../state-view" }
 diem-types = { path = "../../types" }
-diem-workspace-hack = { path = "../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 scratchpad = { path = "../scratchpad" }
 move-core-types = { path = "../../language/move-core/types" }
 

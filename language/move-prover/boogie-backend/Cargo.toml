@@ -31,4 +31,4 @@ codespan = "0.11.1"
 codespan-reporting = "0.11.1"
 
 [dev-dependencies]
-diem-workspace-hack = { path = "../../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }

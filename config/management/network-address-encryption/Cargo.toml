@@ -20,7 +20,7 @@ diem-infallible = { path = "../../../common/infallible" }
 diem-logger = { path = "../../../common/logger" }
 diem-secure-storage = { path = "../../../secure/storage" }
 diem-types = { path = "../../../types" }
-diem-workspace-hack = { path = "../../../common/workspace-hack" }
+diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }
 
 [dev-dependencies]
 rand = "0.8.3"
