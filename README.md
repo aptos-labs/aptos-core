@@ -28,13 +28,13 @@ To begin contributing, [sign the CLA](https://diem.com/en-US/cla-sign/). You can
 
 ### Learn About Diem
 * [Welcome](https://developers.diem.com/docs/welcome-to-diem)
-* [Diem Protocol: Key Concepts](https://developers.diem.com/docs/core/diem-protocol)
-* [Life of a Transaction](https://developers.diem.com/docs/core/life-of-a-transaction)
+* [Basic Concepts](https://developers.diem.com/docs/basics/basics-txns-states)
+* [Life of a Transaction](https://developers.diem.com/docs/transactions/basics-life-of-txn)
 * [JSON-RPC SPEC](json-rpc/json-rpc-spec.md)
 
 ### Try Diem Core
-* [My First Transaction](https://developers.diem.com/docs/core/my-first-transaction)
-* [Getting Started With Move](https://developers.diem.com/docs/move/move-introduction)
+* [My First Transaction](https://developers.diem.com/docs/tutorials/tutorial-my-first-transaction)
+* [Getting Started With Move](https://diem.github.io/move/introduction.html)
 
 ### Technical Papers
 * [The Diem Blockchain](https://developers.diem.com/docs/technical-papers/the-diem-blockchain-paper)
