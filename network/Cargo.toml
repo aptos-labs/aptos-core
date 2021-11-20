@@ -32,7 +32,7 @@ tokio-retry = "0.3.0"
 tokio-stream = "0.1.4"
 tokio-util = { version = "0.6.4", features = ["compat", "codec"] }
 
-bitvec = { path = "../common/bitvec", package = "diem-bitvec" }
+bitvec = { path = "../crates/diem-bitvec", package = "diem-bitvec" }
 channel = { path = "../common/channel" }
 bcs = "0.1.2"
 diem-config = { path = "../config" }
