@@ -103,13 +103,13 @@ Enter the REPL inside your project folder and try running the below commands:
 await main.setMessageScriptFunction("hello blockchain");
 
 // Get the latest account transactions to see if your transaction was executed successfully
-await Shuffle.accountTransactions()
+await devapi.accountTransactions()
 
 // Get account resources
-await Shuffle.resources()
+await devapi.resources()
 
 // Use decodedMessages to check that message was set to "hello blockchain"
-main.decodedMessages(await Shuffle.resources())
+main.decodedMessages()
 ```
 
 ## Write E2E Tests

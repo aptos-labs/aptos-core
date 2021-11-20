@@ -46,3 +46,9 @@ If you are a genesis move module developer, follow [Genesis Tutorial](https://gi
 ```
 RUST_BACKTRACE=1 cargo xtest -p shuffle-integration-tests
 ```
+
+## Removing Cache
+
+You can reset your environment variable by:
+- Removing you project directory
+- `rm ~/.shuffle`
