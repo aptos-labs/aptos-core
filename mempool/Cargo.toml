@@ -23,7 +23,7 @@ thiserror = "1.0.24"
 tokio = { version = "1.8.1", features = ["full"] }
 tokio-stream = "0.1.4"
 
-bounded-executor = { path = "../common/bounded-executor" }
+bounded-executor = { path = "../crates/bounded-executor" }
 channel = { path = "../common/channel" }
 bcs = "0.1.2"
 diem-config = { path = "../config" }
