@@ -14,7 +14,7 @@ cargo run -- --jsonrpc-endpoint $JSON_RPC_ENDPOINT --account-key-path bars_accou
 cargo run -- --jsonrpc-endpoint $JSON_RPC_ENDPOINT --account-key-path bars_account.key --account-address 0x34CD440B72D03907100007D7BC0080A1 create-basic-account 0x1A08E8165BB9225702495E8CB6E57E61 5839ada2d75b6c43f194123337a11c5e
 
 # get all the resource types of the newly created account
-curl ${REST_API_ENDPOINT}/accounts/0xF351399F57CA26FA57C967A5448C3700/resources | jq '.[] | .type'
+curl ${REST_API_ENDPOINT}/accounts/0x34CD440B72D03907100007D7BC0080A1/resources | jq '.[] | .type'
 # look at the event
 curl "${REST_API_ENDPOINT}/accounts/0xB1E55ED/transactions?start=0&limit=1" | jq
 
