@@ -74,19 +74,19 @@ impl ShuffleTestHelper {
         self.tmp_dir.path().join("project")
     }
 
-    pub fn create_account(
+    pub async fn create_account(
         &self,
         treasury_account: &mut LocalAccount,
         new_account: &LocalAccount,
         factory: TransactionFactory,
-        client: BlockingClient,
+        client: &DevApiClient,
     ) -> Result<()> {
         let bytes: &[u8] = &new_account.private_key().to_bytes();
         let private_key = Ed25519PrivateKey::try_from(bytes).map_err(anyhow::Error::new)?;
         self.network_home().save_key_as_latest(private_key)?;
         self.network_home()
             .generate_latest_address_file(new_account.public_key())?;
-        account::create_account_via_dev_api(treasury_account, new_account, &factory, &client)
+        account::create_account_via_dev_api(treasury_account, new_account, &factory, client).await
     }
 
     pub fn create_project(&self) -> Result<()> {

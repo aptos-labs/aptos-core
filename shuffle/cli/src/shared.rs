@@ -3,7 +3,7 @@
 use anyhow::{anyhow, Result};
 use diem_api_types::mime_types;
 use diem_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
-use diem_sdk::client::{AccountAddress, BlockingClient};
+use diem_sdk::client::AccountAddress;
 use diem_types::transaction::authenticator::AuthenticationKey;
 use directories::BaseDirs;
 use move_package::compilation::compiled_package::CompiledPackage;
@@ -17,10 +17,12 @@ use std::{
     collections::{BTreeMap, HashMap},
     fs,
     fs::File,
+    io,
     io::Write,
     path::{Path, PathBuf},
     str::FromStr,
-    time::Duration,
+    thread, time,
+    time::{Duration, Instant},
 };
 use transaction_builder_generator as buildgen;
 use transaction_builder_generator::SourceInstaller as BuildgenSourceInstaller;
@@ -55,24 +57,6 @@ pub fn read_project_config(project_path: &Path) -> Result<ProjectConfig> {
     let config_string = fs::read_to_string(project_path.join("Shuffle").with_extension("toml"))?;
     let read_config: ProjectConfig = toml::from_str(config_string.as_str())?;
     Ok(read_config)
-}
-
-/// Send a transaction to the blockchain through the blocking client.
-pub fn send_transaction(
-    client: &BlockingClient,
-    tx: diem_types::transaction::SignedTransaction,
-) -> Result<()> {
-    use diem_json_rpc_types::views::VMStatusView;
-
-    client.submit(&tx)?;
-    let status = client
-        .wait_for_signed_transaction(&tx, Some(std::time::Duration::from_secs(60)), None)?
-        .into_inner()
-        .vm_status;
-    if status != VMStatusView::Executed {
-        return Err(anyhow::anyhow!("transaction execution failed: {}", status));
-    }
-    Ok(())
 }
 
 /// Checks the current directory, and then parent directories for a Shuffle.toml
@@ -166,7 +150,7 @@ impl DevApiClient {
         .await
     }
 
-    async fn get_account_resources(&self, address: AccountAddress) -> Result<Value> {
+    pub async fn get_account_resources(&self, address: AccountAddress) -> Result<Value> {
         let path = self
             .url
             .join(format!("accounts/{}/resources", address.to_hex_literal()).as_str())?;
@@ -245,6 +229,44 @@ impl DevApiClient {
         }
         let seq_number: u64 = seq_number_string.parse()?;
         Ok(seq_number)
+    }
+
+    pub async fn check_txn_executed_from_hash(&self, hash: &str) -> Result<()> {
+        let mut json = self.get_transactions_by_hash(hash).await?;
+        let start = Instant::now();
+        while json["type"] == "pending_transaction" {
+            thread::sleep(time::Duration::from_secs(1));
+            json = self.get_transactions_by_hash(hash).await?;
+            let duration = start.elapsed();
+            if duration > Duration::from_secs(15) {
+                break;
+            }
+        }
+        DevApiClient::confirm_successful_execution(&mut io::stdout(), &json, hash)
+    }
+
+    fn confirm_successful_execution<W>(writer: &mut W, json: &Value, hash: &str) -> Result<()>
+    where
+        W: Write,
+    {
+        if DevApiClient::is_execution_successful(json)? {
+            return Ok(());
+        }
+        writeln!(writer, "{:#?}", json)?;
+        Err(anyhow!(format!(
+            "Transaction with hash {} didn't execute successfully",
+            hash
+        )))
+    }
+
+    fn is_execution_successful(json: &Value) -> Result<bool> {
+        json["success"]
+            .as_bool()
+            .ok_or_else(|| anyhow!("Unable to access success key"))
+    }
+
+    pub fn get_hash_from_post_txn(json: Value) -> Result<String> {
+        Ok(json["hash"].as_str().unwrap().to_string())
     }
 }
 
@@ -1030,5 +1052,106 @@ mod test {
         home.write_default_networks_config_into_toml_if_nonexistent()
             .unwrap();
         assert_eq!(home.check_networks_toml_exists().is_err(), false);
+    }
+
+    fn post_txn_json_output() -> Value {
+        json!({
+        "type":"pending_transaction",
+        "hash":"0xbca2738726dc456f23762372ab0dd2f450ec3ec20271e5318ae37e9d42ee2bb8",
+        "sender":"0x24163afcc6e33b0a9473852e18327fa9",
+        "sequence_number":"10",
+        "max_gas_amount":"1000000",
+        "gas_unit_price":"0",
+        "gas_currency_code":"XUS",
+        "expiration_timestamp_secs":"1635872777",
+        "payload":{}
+        })
+    }
+
+    fn get_transactions_by_hash_json_output_success() -> Value {
+        json!({
+            "type":"user_transaction",
+            "version":"3997",
+            "hash":"0x89e59bb50521334a69c06a315b6dd191a8da4c1c7a40ce27a8f96f12959496eb",
+            "state_root_hash":"0x7a0b81379ab8786f34fcff804e5fb413255467c28f09672e8d22bfaa4e029102",
+            "event_root_hash":"0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
+            "gas_used":"8",
+            "success":true,
+            "vm_status":"Executed successfully",
+            "sender":"0x24163afcc6e33b0a9473852e18327fa9",
+            "sequence_number":"14",
+            "max_gas_amount":"1000000",
+            "gas_unit_price":"0",
+            "gas_currency_code":"XUS",
+            "expiration_timestamp_secs":"1635873470",
+            "payload":{}
+        })
+    }
+
+    fn get_transactions_by_hash_json_output_fail() -> Value {
+        json!({
+            "type":"user_transaction",
+            "version":"3997",
+            "hash":"0xbad59bb50521334a69c06a315b6dd191a8da4c1c7a40ce27a8f96f12959496eb",
+            "state_root_hash":"0x7a0b81379ab8786f34fcff804e5fb413255467c28f09672e8d22bfaa4e029102",
+            "event_root_hash":"0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
+            "gas_used":"8",
+            "success":false,
+            "vm_status":"miscellaneous error",
+            "sender":"0x24163afcc6e33b0a9473852e18327fa9",
+            "sequence_number":"14",
+            "max_gas_amount":"1000000",
+            "gas_unit_price":"0",
+            "gas_currency_code":"XUS",
+            "expiration_timestamp_secs":"1635873470",
+            "payload":{}
+        })
+    }
+
+    #[test]
+    fn test_confirm_is_execution_successful() {
+        let successful_txn = get_transactions_by_hash_json_output_success();
+        assert_eq!(
+            DevApiClient::is_execution_successful(&successful_txn).unwrap(),
+            true
+        );
+
+        let failed_txn = get_transactions_by_hash_json_output_fail();
+        assert_eq!(
+            DevApiClient::is_execution_successful(&failed_txn).unwrap(),
+            false
+        );
+    }
+
+    #[test]
+    fn test_get_hash_from_post_txn() {
+        let txn = post_txn_json_output();
+        let hash = DevApiClient::get_hash_from_post_txn(txn).unwrap();
+        assert_eq!(
+            hash,
+            "0xbca2738726dc456f23762372ab0dd2f450ec3ec20271e5318ae37e9d42ee2bb8"
+        );
+    }
+
+    #[test]
+    fn test_print_confirmation_with_success_value() {
+        let successful_txn = get_transactions_by_hash_json_output_success();
+        let mut stdout = Vec::new();
+        let good_hash = "0xbca2738726dc456f23762372ab0dd2f450ec3ec20271e5318ae37e9d42ee2bb8";
+
+        DevApiClient::confirm_successful_execution(&mut stdout, &successful_txn, good_hash)
+            .unwrap();
+        assert_eq!(String::from_utf8(stdout).unwrap().as_str(), "".to_string());
+
+        let failed_txn = get_transactions_by_hash_json_output_fail();
+        let mut stdout = Vec::new();
+        let bad_hash = "0xbad59bb50521334a69c06a315b6dd191a8da4c1c7a40ce27a8f96f12959496eb";
+        assert_eq!(
+            DevApiClient::confirm_successful_execution(&mut stdout, &failed_txn, bad_hash).is_err(),
+            true
+        );
+
+        let fail_string = format!("{:#?}\n", &failed_txn);
+        assert_eq!(String::from_utf8(stdout).unwrap().as_str(), fail_string)
     }
 }
