@@ -1,4 +1,4 @@
-Move prover returns: exiting with boogie verification errors
+Move prover returns: exiting with verification errors
 error: there is an inconsistent assumption in the function, which may allow any post-condition (including false) to be proven
   ┌─ tests/sources/functional/inconsistency_always_abort.move:6:5
   │

@@ -138,7 +138,7 @@ pub fn run_move_prover_with_model<W: WriteColor>(
         env,
         &options,
         error_writer,
-        "exiting with boogie generation errors",
+        "exiting with condition generation errors",
     )?;
 
     // Verify boogie code.
@@ -148,24 +148,21 @@ pub fn run_move_prover_with_model<W: WriteColor>(
 
     // Report durations.
     info!(
-        "{:.3}s build, {:.3}s trafo, {:.3}s gen, {:.3}s verify",
+        "{:.3}s build, {:.3}s trafo, {:.3}s gen, {:.3}s verify, total {:.3}s",
         build_duration.as_secs_f64(),
         trafo_duration.as_secs_f64(),
         gen_duration.as_secs_f64(),
-        verify_duration.as_secs_f64()
-    );
-    info!(
-        "Total prover time in ms: {}",
-        build_duration.as_millis()
-            + trafo_duration.as_millis()
-            + gen_duration.as_millis()
-            + verify_duration.as_millis()
+        verify_duration.as_secs_f64(),
+        build_duration.as_secs_f64()
+            + trafo_duration.as_secs_f64()
+            + gen_duration.as_secs_f64()
+            + verify_duration.as_secs_f64()
     );
     check_errors(
         env,
         &options,
         error_writer,
-        "exiting with boogie verification errors",
+        "exiting with verification errors",
     )
 }
 
@@ -231,6 +228,9 @@ pub fn create_and_process_bytecode(options: &Options, env: &GlobalEnv) -> Functi
 
     // Add function targets for all functions in the environment.
     for module_env in env.get_modules() {
+        if module_env.is_target() {
+            info!("preparing module {}", module_env.get_full_name_str());
+        }
         if options.prover.dump_bytecode {
             let dump_file = output_dir.join(format!("{}.mv.disas", output_prefix));
             fs::write(&dump_file, &module_env.disassemble()).expect("dumping disassembled module");

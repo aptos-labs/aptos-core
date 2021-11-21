@@ -1,31 +1,31 @@
-Move prover returns: exiting with boogie verification errors
+Move prover returns: exiting with verification errors
 error: unknown assertion failed
-   ┌─ tests/sources/functional/is_txn_signer.move:18:16
+   ┌─ tests/sources/functional/is_txn_signer.move:17:16
    │
-18 │         spec { assert Signer::is_txn_signer_addr(@0x7); } // This is unprovable because it is not true in general.
+17 │         spec { assert Signer::is_txn_signer_addr(@0x7); } // This is unprovable because it is not true in general.
    │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
-   =     at tests/sources/functional/is_txn_signer.move:18: f1_incorrect
+   =     at tests/sources/functional/is_txn_signer.move:17: f1_incorrect
 
 error: unknown assertion failed
-   ┌─ tests/sources/functional/is_txn_signer.move:22:16
+   ┌─ tests/sources/functional/is_txn_signer.move:21:16
    │
-22 │         spec { assert Signer::is_txn_signer_addr(@0x7); } // This is unprovable because it is not true in general.
+21 │         spec { assert Signer::is_txn_signer_addr(@0x7); } // This is unprovable because it is not true in general.
    │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
-   =     at tests/sources/functional/is_txn_signer.move:21: f2_incorrect
+   =     at tests/sources/functional/is_txn_signer.move:20: f2_incorrect
    =         _account = <redacted>
-   =     at tests/sources/functional/is_txn_signer.move:22: f2_incorrect
+   =     at tests/sources/functional/is_txn_signer.move:21: f2_incorrect
 
 error: unknown assertion failed
-   ┌─ tests/sources/functional/is_txn_signer.move:32:16
+   ┌─ tests/sources/functional/is_txn_signer.move:31:16
    │
-32 │         spec { assert Signer::is_txn_signer_addr(@0x7); } // This is unprovable because it is not true in general.
+31 │         spec { assert Signer::is_txn_signer_addr(@0x7); } // This is unprovable because it is not true in general.
    │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
-   =     at tests/sources/functional/is_txn_signer.move:30: f4_incorrect
+   =     at tests/sources/functional/is_txn_signer.move:29: f4_incorrect
    =         account = <redacted>
-   =     at tests/sources/functional/is_txn_signer.move:31: f4_incorrect
+   =     at tests/sources/functional/is_txn_signer.move:30: f4_incorrect
    =     at ../move-stdlib/sources/Signer.move:12: address_of
    =         s = <redacted>
    =     at ../move-stdlib/sources/Signer.move:13: address_of
@@ -33,39 +33,28 @@ error: unknown assertion failed
    =     at ../move-stdlib/sources/Signer.move:14: address_of
 
 error: precondition does not hold at this call
-   ┌─ tests/sources/functional/is_txn_signer.move:39:9
+   ┌─ tests/sources/functional/is_txn_signer.move:38:9
    │
-39 │         requires Signer::is_txn_signer_addr(@0x7); // f5 requires this to be true at its callers' sites
+38 │         requires Signer::is_txn_signer_addr(@0x7); // f5 requires this to be true at its callers' sites
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
-   =     at tests/sources/functional/is_txn_signer.move:39
-
-error: unknown assertion failed
-   ┌─ tests/sources/functional/is_txn_signer.move:66:13
-   │
-66 │             assert exists addr:address: hasPermissionAddr(addr);
-   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   │
-   =     at tests/sources/functional/is_txn_signer.move:64: g_incorrect
-   =         _a = <redacted>
-   =         _b = <redacted>
-   =     at tests/sources/functional/is_txn_signer.move:66: g_incorrect
+   =     at tests/sources/functional/is_txn_signer.move:38: f5 (spec)
 
 error: global memory invariant does not hold
-    ┌─ tests/sources/functional/is_txn_signer.move:142:9
-    │
-142 │ ╭         invariant update (old(exists<Counter>(ADMIN_ADDRESS())) && global<Counter>(ADMIN_ADDRESS()).i != old(global<Counter>(ADMIN_ADDRESS()).i))
-143 │ │             ==> Signer::is_txn_signer_addr(ADMIN_ADDRESS());
-    │ ╰────────────────────────────────────────────────────────────^
-    │
-    =     at tests/sources/functional/is_txn_signer.move:135: increment_incorrect
-    =         _account = <redacted>
-    =     at tests/sources/functional/is_txn_signer.move:136: increment_incorrect
-    =     at tests/sources/functional/is_txn_signer.move:112: ADMIN_ADDRESS
-    =         result = <redacted>
-    =     at tests/sources/functional/is_txn_signer.move:113: ADMIN_ADDRESS
-    =         c_ref = <redacted>
-    =     at tests/sources/functional/is_txn_signer.move:137: increment_incorrect
-    =     at tests/sources/functional/is_txn_signer.move:135: increment_incorrect
-    =     at tests/sources/functional/is_txn_signer.move:137: increment_incorrect
-    =     at tests/sources/functional/is_txn_signer.move:142
+   ┌─ tests/sources/functional/is_txn_signer.move:90:9
+   │
+90 │ ╭         invariant update (old(exists<Counter>(ADMIN_ADDRESS())) && global<Counter>(ADMIN_ADDRESS()).i != old(global<Counter>(ADMIN_ADDRESS()).i))
+91 │ │             ==> Signer::is_txn_signer_addr(ADMIN_ADDRESS());
+   │ ╰────────────────────────────────────────────────────────────^
+   │
+   =     at tests/sources/functional/is_txn_signer.move:83: increment_incorrect
+   =         _account = <redacted>
+   =     at tests/sources/functional/is_txn_signer.move:84: increment_incorrect
+   =     at tests/sources/functional/is_txn_signer.move:60: ADMIN_ADDRESS
+   =         result = <redacted>
+   =     at tests/sources/functional/is_txn_signer.move:61: ADMIN_ADDRESS
+   =         c_ref = <redacted>
+   =     at tests/sources/functional/is_txn_signer.move:85: increment_incorrect
+   =     at tests/sources/functional/is_txn_signer.move:83: increment_incorrect
+   =     at tests/sources/functional/is_txn_signer.move:85: increment_incorrect
+   =     at tests/sources/functional/is_txn_signer.move:90

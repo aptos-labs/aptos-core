@@ -1,4 +1,4 @@
-Move prover returns: exiting with boogie verification errors
+Move prover returns: exiting with verification errors
 error: abort code not covered by any of the `aborts_if` or `aborts_with` clauses
    ┌─ tests/sources/functional/aborts_if_with_code.move:77:5
    │

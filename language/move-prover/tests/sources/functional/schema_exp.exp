@@ -1,4 +1,4 @@
-Move prover returns: exiting with boogie verification errors
+Move prover returns: exiting with verification errors
 error: abort not covered by any of the `aborts_if` clauses
    ┌─ tests/sources/functional/schema_exp.move:29:5
    │

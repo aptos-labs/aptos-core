@@ -191,23 +191,10 @@ fn get_flags_and_baseline(
     // Determine the way how to configure tests based on directory of the path.
     let path_str = path.to_string_lossy();
 
-    let mut dep_flags = vec![
+    let dep_flags = vec![
         // stdlib is commonly required
         "--dependency=../move-stdlib/sources",
     ];
-    if path_str.contains("/move-stdlib/") {
-        // stdlib depends on nothing else
-    } else if path_str.contains("/diem-framework/core/") {
-        dep_flags.push("--dependency=../../diem-move/diem-framework/core/sources");
-    } else if path_str.contains("/diem-framework/DPN/") {
-        dep_flags.push("--dependency=../../diem-move/diem-framework/core/sources");
-        dep_flags.push("--dependency=../../diem-move/diem-framework/DPN/sources");
-    } else if path_str.contains("/diem-framework/experimental/") {
-        dep_flags.push("--dependency=../../diem-move/diem-framework/experimental/sources");
-    } else {
-        // unit tests also depends on diem-framework core
-        dep_flags.push("--dependency=../../diem-move/diem-framework/core/sources");
-    }
 
     let (base_flags, baseline_path) =
         if path_str.contains("diem-framework/") || path_str.contains("move-stdlib/") {
@@ -231,6 +218,9 @@ fn get_flags_and_baseline(
     if read_bool_env_var(ENV_TEST_INCONSISTENCY) {
         flags.push("--check-inconsistency".to_string());
     }
+
+    // Add flag assigning an address to the stdlib.
+    flags.push("--named-addresses=Std=0x1".to_string());
 
     // Add flags specific to the feature.
     flags.extend(feature.flags.iter().map(|f| f.to_string()));
@@ -268,19 +258,7 @@ fn collect_enabled_tests(reqs: &mut Vec<Requirements>, group: &str, feature: &Fe
             continue;
         }
 
-        // TODO: this is to handle the awkwardness in the experimental folder in diem-framework
-        // where many symlinks are introduced. To be honest, both introducing symlinks (instead of
-        // using packages) and the hack here are bad designs. Hopefully this can be revisited soon.
         let path = entry.path();
-        if path
-            .symlink_metadata()
-            .expect("metadata")
-            .file_type()
-            .is_symlink()
-        {
-            continue;
-        }
-
         let mut included = match feature.inclusion_mode {
             InclusionMode::Implicit => !extract_test_directives(path, "// exclude_for: ")
                 .unwrap_or_default()
@@ -330,25 +308,6 @@ fn main() {
             collect_enabled_tests(&mut reqs, "extended", feature, "tests/xsources");
         } else {
             collect_enabled_tests(&mut reqs, "unit", feature, "tests/sources");
-            collect_enabled_tests(&mut reqs, "stdlib", feature, "../move-stdlib/sources");
-            collect_enabled_tests(
-                &mut reqs,
-                "diem_core",
-                feature,
-                "../../diem-move/diem-framework/core/sources",
-            );
-            collect_enabled_tests(
-                &mut reqs,
-                "diem_dpn",
-                feature,
-                "../../diem-move/diem-framework/DPN/sources",
-            );
-            // collect_enabled_tests(
-            //     &mut reqs,
-            //     "diem_exp",
-            //     feature,
-            //     "../../diem-move/diem-framework/experimental/sources",
-            // );
         }
     }
     datatest_stable::runner(&reqs);

@@ -3,7 +3,6 @@
 // The separate baseline is legit and caused by a different choice in the generated model.
 module 0x42::SimpleIsTxnSigner {
     use Std::Signer;
-    use DiemFramework::Roles;
 
     // ----------------------------------------
     // Simple examples for `is_txn_signer`
@@ -49,57 +48,6 @@ module 0x42::SimpleIsTxnSigner {
         f5();
     }
 
-
-    // ------------------------------
-    // Simple access control examples
-    // ------------------------------
-
-    spec fun hasPermissionAddr(addr: address): bool {
-        Roles::spec_has_diem_root_role_addr(addr)
-    }
-    fun hasPermission(account: &signer): bool {
-        Roles::has_diem_root_role(account)
-    }
-
-    public fun g_incorrect(_a: &signer, _b: &signer) {
-        spec {
-            assert exists addr:address: hasPermissionAddr(addr);
-        };
-        // privileged operation
-    }
-
-    public fun g1(a: &signer, _b: &signer) {
-        if(hasPermission(a))
-        {
-            spec {
-                assert exists addr:address: (Signer::is_txn_signer_addr(addr) && hasPermissionAddr(addr));
-            };
-            // privileged operation
-        }
-    }
-
-    public fun g2(a: &signer, _b: &signer) {
-        assert!(hasPermission(a), 1);
-        spec {
-            assert exists addr:address: (Signer::is_txn_signer_addr(addr) && hasPermissionAddr(addr));
-        };
-        // privileged operation
-    }
-
-    public fun g3(a: &signer, _b: &signer) {
-        assert!(hasPermission(a), 1);
-        helper()
-    }
-
-    public fun helper() {
-        spec {
-            assert exists addr:address: (Signer::is_txn_signer_addr(addr) && hasPermissionAddr(addr));
-        };
-        // privileged operation
-    }
-    spec helper {
-        requires exists addr:address: (Signer::is_txn_signer_addr(addr) && hasPermissionAddr(addr));
-    }
 
 
     // -----------------------------------

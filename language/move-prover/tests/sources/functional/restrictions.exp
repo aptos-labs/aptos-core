@@ -1,4 +1,4 @@
-Move prover returns: exiting with boogie generation errors
+Move prover returns: exiting with condition generation errors
 error: [boogie translator] function or tuple result type not yet supported
   ┌─ tests/sources/functional/restrictions.move:8:9
   │

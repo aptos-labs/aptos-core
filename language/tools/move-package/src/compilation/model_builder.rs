@@ -61,12 +61,17 @@ impl ModelBuilder {
             .map(|symbol| symbol.to_string())
             .collect::<Vec<String>>();
 
-        let (targets, deps) = if self.model_config.all_files_as_targets {
+        let (mut targets, mut deps) = if self.model_config.all_files_as_targets {
             targets.extend(deps.into_iter());
             (targets, vec![])
         } else {
             (targets, deps)
         };
+        if let Some(filter) = &self.model_config.target_filter {
+            // Filtering targets moves them into the deps
+            deps.extend(targets.iter().filter(|t| !t.contains(filter)).cloned());
+            targets = targets.into_iter().filter(|t| t.contains(filter)).collect();
+        }
 
         run_model_builder_with_options(
             &targets,

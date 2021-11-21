@@ -80,7 +80,11 @@ impl Default for BuildConfig {
 
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd)]
 pub struct ModelConfig {
+    /// If set, also files which are in dependent packages are considered as targets.
     pub all_files_as_targets: bool,
+    /// If set, a string how targets are filtered. A target is included if its file name
+    /// contains this string. This is similar as the `cargo test <string>` idiom.
+    pub target_filter: Option<String>,
 }
 
 impl BuildConfig {
@@ -100,7 +104,7 @@ impl BuildConfig {
         BuildPlan::create(resolved_graph)?.compile(writer)
     }
 
-    // NOTE: If there are now renamings, then the root package has the global resolution of all named
+    // NOTE: If there are no renamings, then the root package has the global resolution of all named
     // addresses in the package graph in scope. So we can simply grab all of the source files
     // across all packages and build the Move model from that.
     // TODO: In the future we will need a better way to do this to support renaming in packages

@@ -75,6 +75,7 @@ pub fn run_test(path: &Path) -> datatest_stable::Result<()> {
                 resolved_package,
                 ModelConfig {
                     all_files_as_targets: false,
+                    target_filter: None,
                 },
             )
             .build_model()

@@ -1,4 +1,4 @@
-Move prover returns: exiting with boogie verification errors
+Move prover returns: exiting with verification errors
 error: post-condition does not hold
     ┌─ tests/sources/functional/fixed_point_arithm.move:140:9
     │
@@ -12,7 +12,7 @@ error: post-condition does not hold
     =     at tests/sources/functional/fixed_point_arithm.move:136: mul_2_times_incorrect
     =         result = <redacted>
     =     at tests/sources/functional/fixed_point_arithm.move:137: mul_2_times_incorrect
-    =     at tests/sources/functional/fixed_point_arithm.move:140
+    =     at tests/sources/functional/fixed_point_arithm.move:140: mul_2_times_incorrect (spec)
 
 error: post-condition does not hold
     ┌─ tests/sources/functional/fixed_point_arithm.move:148:9
@@ -28,7 +28,7 @@ error: post-condition does not hold
     =     at tests/sources/functional/fixed_point_arithm.move:144: mul_3_times_incorrect
     =         result = <redacted>
     =     at tests/sources/functional/fixed_point_arithm.move:145: mul_3_times_incorrect
-    =     at tests/sources/functional/fixed_point_arithm.move:148
+    =     at tests/sources/functional/fixed_point_arithm.move:148: mul_3_times_incorrect (spec)
 
 error: post-condition does not hold
     ┌─ tests/sources/functional/fixed_point_arithm.move:106:9
@@ -51,7 +51,7 @@ error: post-condition does not hold
     =     at tests/sources/functional/fixed_point_arithm.move:103: mul_div_incorrect
     =         result = <redacted>
     =     at tests/sources/functional/fixed_point_arithm.move:104: mul_div_incorrect
-    =     at tests/sources/functional/fixed_point_arithm.move:106
+    =     at tests/sources/functional/fixed_point_arithm.move:106: mul_div_incorrect (spec)
 
 error: post-condition does not hold
     ┌─ tests/sources/functional/fixed_point_arithm.move:108:9
@@ -74,9 +74,9 @@ error: post-condition does not hold
     =     at tests/sources/functional/fixed_point_arithm.move:103: mul_div_incorrect
     =         result = <redacted>
     =     at tests/sources/functional/fixed_point_arithm.move:104: mul_div_incorrect
-    =     at tests/sources/functional/fixed_point_arithm.move:106
-    =     at tests/sources/functional/fixed_point_arithm.move:107
-    =     at tests/sources/functional/fixed_point_arithm.move:108
+    =     at tests/sources/functional/fixed_point_arithm.move:106: mul_div_incorrect (spec)
+    =     at tests/sources/functional/fixed_point_arithm.move:107: mul_div_incorrect (spec)
+    =     at tests/sources/functional/fixed_point_arithm.move:108: mul_div_incorrect (spec)
 
 error: post-condition does not hold
    ┌─ tests/sources/functional/fixed_point_arithm.move:27:9
@@ -89,8 +89,8 @@ error: post-condition does not hold
    =     at tests/sources/functional/fixed_point_arithm.move:23: multiply_0_x_incorrect
    =         result = <redacted>
    =     at tests/sources/functional/fixed_point_arithm.move:24: multiply_0_x_incorrect
-   =     at tests/sources/functional/fixed_point_arithm.move:26
-   =     at tests/sources/functional/fixed_point_arithm.move:27
+   =     at tests/sources/functional/fixed_point_arithm.move:26: multiply_0_x_incorrect (spec)
+   =     at tests/sources/functional/fixed_point_arithm.move:27: multiply_0_x_incorrect (spec)
 
 error: post-condition does not hold
    ┌─ tests/sources/functional/fixed_point_arithm.move:66:9
@@ -103,8 +103,8 @@ error: post-condition does not hold
    =     at tests/sources/functional/fixed_point_arithm.move:61: multiply_1_x_incorrect
    =         result = <redacted>
    =     at tests/sources/functional/fixed_point_arithm.move:62: multiply_1_x_incorrect
-   =     at tests/sources/functional/fixed_point_arithm.move:64
-   =     at tests/sources/functional/fixed_point_arithm.move:66
+   =     at tests/sources/functional/fixed_point_arithm.move:64: multiply_1_x_incorrect (spec)
+   =     at tests/sources/functional/fixed_point_arithm.move:66: multiply_1_x_incorrect (spec)
 
 error: post-condition does not hold
    ┌─ tests/sources/functional/fixed_point_arithm.move:43:9
@@ -117,8 +117,8 @@ error: post-condition does not hold
    =     at tests/sources/functional/fixed_point_arithm.move:39: multiply_x_0_incorrect
    =         result = <redacted>
    =     at tests/sources/functional/fixed_point_arithm.move:40: multiply_x_0_incorrect
-   =     at tests/sources/functional/fixed_point_arithm.move:42
-   =     at tests/sources/functional/fixed_point_arithm.move:43
+   =     at tests/sources/functional/fixed_point_arithm.move:42: multiply_x_0_incorrect (spec)
+   =     at tests/sources/functional/fixed_point_arithm.move:43: multiply_x_0_incorrect (spec)
 
 error: post-condition does not hold
    ┌─ tests/sources/functional/fixed_point_arithm.move:74:9
@@ -135,8 +135,8 @@ error: post-condition does not hold
    =     at tests/sources/functional/fixed_point_arithm.move:70: multiply_x_1
    =         result = <redacted>
    =     at tests/sources/functional/fixed_point_arithm.move:71: multiply_x_1
-   =     at tests/sources/functional/fixed_point_arithm.move:73
-   =     at tests/sources/functional/fixed_point_arithm.move:74
+   =     at tests/sources/functional/fixed_point_arithm.move:73: multiply_x_1 (spec)
+   =     at tests/sources/functional/fixed_point_arithm.move:74: multiply_x_1 (spec)
 
 error: post-condition does not hold
    ┌─ tests/sources/functional/fixed_point_arithm.move:82:9
@@ -153,5 +153,5 @@ error: post-condition does not hold
    =     at tests/sources/functional/fixed_point_arithm.move:78: multiply_x_1_incorrect
    =         result = <redacted>
    =     at tests/sources/functional/fixed_point_arithm.move:79: multiply_x_1_incorrect
-   =     at tests/sources/functional/fixed_point_arithm.move:81
-   =     at tests/sources/functional/fixed_point_arithm.move:82
+   =     at tests/sources/functional/fixed_point_arithm.move:81: multiply_x_1_incorrect (spec)
+   =     at tests/sources/functional/fixed_point_arithm.move:82: multiply_x_1_incorrect (spec)

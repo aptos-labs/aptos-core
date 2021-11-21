@@ -1,4 +1,4 @@
-Move prover returns: exiting with boogie verification errors
+Move prover returns: exiting with verification errors
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:270:9
     │
@@ -11,8 +11,8 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:265: callee
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:266: callee
-    =     at tests/sources/functional/emits.move:269
-    =     at tests/sources/functional/emits.move:270
+    =     at tests/sources/functional/emits.move:269: callee (spec)
+    =     at tests/sources/functional/emits.move:270: callee (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:271:9
@@ -26,9 +26,9 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:265: callee
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:266: callee
-    =     at tests/sources/functional/emits.move:269
-    =     at tests/sources/functional/emits.move:270
-    =     at tests/sources/functional/emits.move:271
+    =     at tests/sources/functional/emits.move:269: callee (spec)
+    =     at tests/sources/functional/emits.move:270: callee (spec)
+    =     at tests/sources/functional/emits.move:271: callee (spec)
 
 error: emitted event not covered by any of the `emits` clauses
     ┌─ tests/sources/functional/emits.move:267:5
@@ -47,10 +47,10 @@ error: emitted event not covered by any of the `emits` clauses
     =     at tests/sources/functional/emits.move:265: callee
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:266: callee
-    =     at tests/sources/functional/emits.move:269
-    =     at tests/sources/functional/emits.move:270
-    =     at tests/sources/functional/emits.move:271
-    =     at tests/sources/functional/emits.move:267
+    =     at tests/sources/functional/emits.move:269: callee (spec)
+    =     at tests/sources/functional/emits.move:270: callee (spec)
+    =     at tests/sources/functional/emits.move:271: callee (spec)
+    =     at tests/sources/functional/emits.move:267: callee (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:332:9
@@ -64,8 +64,8 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:327: callee_partial
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:328: callee_partial
-    =     at tests/sources/functional/emits.move:331
-    =     at tests/sources/functional/emits.move:332
+    =     at tests/sources/functional/emits.move:331: callee_partial (spec)
+    =     at tests/sources/functional/emits.move:332: callee_partial (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:333:9
@@ -79,9 +79,9 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:327: callee_partial
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:328: callee_partial
-    =     at tests/sources/functional/emits.move:331
-    =     at tests/sources/functional/emits.move:332
-    =     at tests/sources/functional/emits.move:333
+    =     at tests/sources/functional/emits.move:331: callee_partial (spec)
+    =     at tests/sources/functional/emits.move:332: callee_partial (spec)
+    =     at tests/sources/functional/emits.move:333: callee_partial (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:102:9
@@ -95,7 +95,7 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:97: conditional
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:100: conditional
-    =     at tests/sources/functional/emits.move:102
+    =     at tests/sources/functional/emits.move:102: conditional (spec)
 
 error: emitted event not covered by any of the `emits` clauses
     ┌─ tests/sources/functional/emits.move:101:5
@@ -111,8 +111,8 @@ error: emitted event not covered by any of the `emits` clauses
     =     at tests/sources/functional/emits.move:97: conditional
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:100: conditional
-    =     at tests/sources/functional/emits.move:102
-    =     at tests/sources/functional/emits.move:101
+    =     at tests/sources/functional/emits.move:102: conditional (spec)
+    =     at tests/sources/functional/emits.move:101: conditional (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:129:9
@@ -126,7 +126,7 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:124: conditional_bool
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:127: conditional_bool
-    =     at tests/sources/functional/emits.move:129
+    =     at tests/sources/functional/emits.move:129: conditional_bool (spec)
 
 error: emitted event not covered by any of the `emits` clauses
     ┌─ tests/sources/functional/emits.move:128:5
@@ -142,8 +142,8 @@ error: emitted event not covered by any of the `emits` clauses
     =     at tests/sources/functional/emits.move:124: conditional_bool
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:127: conditional_bool
-    =     at tests/sources/functional/emits.move:129
-    =     at tests/sources/functional/emits.move:128
+    =     at tests/sources/functional/emits.move:129: conditional_bool (spec)
+    =     at tests/sources/functional/emits.move:128: conditional_bool (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:120:9
@@ -157,7 +157,7 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:115: conditional_missing_condition_incorrect
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:118: conditional_missing_condition_incorrect
-    =     at tests/sources/functional/emits.move:120
+    =     at tests/sources/functional/emits.move:120: conditional_missing_condition_incorrect (spec)
 
 error: emitted event not covered by any of the `emits` clauses
     ┌─ tests/sources/functional/emits.move:119:5
@@ -171,11 +171,10 @@ error: emitted event not covered by any of the `emits` clauses
     =         x = <redacted>
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:115: conditional_missing_condition_incorrect
-    =     at tests/sources/functional/emits.move:115: conditional_missing_condition_incorrect
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:118: conditional_missing_condition_incorrect
-    =     at tests/sources/functional/emits.move:120
-    =     at tests/sources/functional/emits.move:119
+    =     at tests/sources/functional/emits.move:120: conditional_missing_condition_incorrect (spec)
+    =     at tests/sources/functional/emits.move:119: conditional_missing_condition_incorrect (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:144:9
@@ -191,10 +190,9 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:133: conditional_multiple
     =     at tests/sources/functional/emits.move:136: conditional_multiple
     =     at tests/sources/functional/emits.move:139: conditional_multiple
-    =     at tests/sources/functional/emits.move:139: conditional_multiple
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:142: conditional_multiple
-    =     at tests/sources/functional/emits.move:144
+    =     at tests/sources/functional/emits.move:144: conditional_multiple (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:145:9
@@ -210,11 +208,10 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:133: conditional_multiple
     =     at tests/sources/functional/emits.move:136: conditional_multiple
     =     at tests/sources/functional/emits.move:139: conditional_multiple
-    =     at tests/sources/functional/emits.move:139: conditional_multiple
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:142: conditional_multiple
-    =     at tests/sources/functional/emits.move:144
-    =     at tests/sources/functional/emits.move:145
+    =     at tests/sources/functional/emits.move:144: conditional_multiple (spec)
+    =     at tests/sources/functional/emits.move:145: conditional_multiple (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:146:9
@@ -230,12 +227,11 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:133: conditional_multiple
     =     at tests/sources/functional/emits.move:136: conditional_multiple
     =     at tests/sources/functional/emits.move:139: conditional_multiple
-    =     at tests/sources/functional/emits.move:139: conditional_multiple
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:142: conditional_multiple
-    =     at tests/sources/functional/emits.move:144
-    =     at tests/sources/functional/emits.move:145
-    =     at tests/sources/functional/emits.move:146
+    =     at tests/sources/functional/emits.move:144: conditional_multiple (spec)
+    =     at tests/sources/functional/emits.move:145: conditional_multiple (spec)
+    =     at tests/sources/functional/emits.move:146: conditional_multiple (spec)
 
 error: emitted event not covered by any of the `emits` clauses
     ┌─ tests/sources/functional/emits.move:143:5
@@ -255,13 +251,12 @@ error: emitted event not covered by any of the `emits` clauses
     =     at tests/sources/functional/emits.move:133: conditional_multiple
     =     at tests/sources/functional/emits.move:136: conditional_multiple
     =     at tests/sources/functional/emits.move:139: conditional_multiple
-    =     at tests/sources/functional/emits.move:139: conditional_multiple
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:142: conditional_multiple
-    =     at tests/sources/functional/emits.move:144
-    =     at tests/sources/functional/emits.move:145
-    =     at tests/sources/functional/emits.move:146
-    =     at tests/sources/functional/emits.move:143
+    =     at tests/sources/functional/emits.move:144: conditional_multiple (spec)
+    =     at tests/sources/functional/emits.move:145: conditional_multiple (spec)
+    =     at tests/sources/functional/emits.move:146: conditional_multiple (spec)
+    =     at tests/sources/functional/emits.move:143: conditional_multiple (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:157:9
@@ -277,7 +272,7 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:152: conditional_multiple_incorrect
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:155: conditional_multiple_incorrect
-    =     at tests/sources/functional/emits.move:157
+    =     at tests/sources/functional/emits.move:157: conditional_multiple_incorrect (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:158:9
@@ -293,8 +288,8 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:152: conditional_multiple_incorrect
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:155: conditional_multiple_incorrect
-    =     at tests/sources/functional/emits.move:157
-    =     at tests/sources/functional/emits.move:158
+    =     at tests/sources/functional/emits.move:157: conditional_multiple_incorrect (spec)
+    =     at tests/sources/functional/emits.move:158: conditional_multiple_incorrect (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:159:9
@@ -310,9 +305,9 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:152: conditional_multiple_incorrect
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:155: conditional_multiple_incorrect
-    =     at tests/sources/functional/emits.move:157
-    =     at tests/sources/functional/emits.move:158
-    =     at tests/sources/functional/emits.move:159
+    =     at tests/sources/functional/emits.move:157: conditional_multiple_incorrect (spec)
+    =     at tests/sources/functional/emits.move:158: conditional_multiple_incorrect (spec)
+    =     at tests/sources/functional/emits.move:159: conditional_multiple_incorrect (spec)
 
 error: emitted event not covered by any of the `emits` clauses
     ┌─ tests/sources/functional/emits.move:156:5
@@ -332,10 +327,10 @@ error: emitted event not covered by any of the `emits` clauses
     =     at tests/sources/functional/emits.move:152: conditional_multiple_incorrect
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:155: conditional_multiple_incorrect
-    =     at tests/sources/functional/emits.move:157
-    =     at tests/sources/functional/emits.move:158
-    =     at tests/sources/functional/emits.move:159
-    =     at tests/sources/functional/emits.move:156
+    =     at tests/sources/functional/emits.move:157: conditional_multiple_incorrect (spec)
+    =     at tests/sources/functional/emits.move:158: conditional_multiple_incorrect (spec)
+    =     at tests/sources/functional/emits.move:159: conditional_multiple_incorrect (spec)
+    =     at tests/sources/functional/emits.move:156: conditional_multiple_incorrect (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:174:9
@@ -351,10 +346,9 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:163: conditional_multiple_same
     =     at tests/sources/functional/emits.move:166: conditional_multiple_same
     =     at tests/sources/functional/emits.move:169: conditional_multiple_same
-    =     at tests/sources/functional/emits.move:169: conditional_multiple_same
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:172: conditional_multiple_same
-    =     at tests/sources/functional/emits.move:174
+    =     at tests/sources/functional/emits.move:174: conditional_multiple_same (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:175:9
@@ -370,11 +364,10 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:163: conditional_multiple_same
     =     at tests/sources/functional/emits.move:166: conditional_multiple_same
     =     at tests/sources/functional/emits.move:169: conditional_multiple_same
-    =     at tests/sources/functional/emits.move:169: conditional_multiple_same
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:172: conditional_multiple_same
-    =     at tests/sources/functional/emits.move:174
-    =     at tests/sources/functional/emits.move:175
+    =     at tests/sources/functional/emits.move:174: conditional_multiple_same (spec)
+    =     at tests/sources/functional/emits.move:175: conditional_multiple_same (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:176:9
@@ -390,12 +383,11 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:163: conditional_multiple_same
     =     at tests/sources/functional/emits.move:166: conditional_multiple_same
     =     at tests/sources/functional/emits.move:169: conditional_multiple_same
-    =     at tests/sources/functional/emits.move:169: conditional_multiple_same
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:172: conditional_multiple_same
-    =     at tests/sources/functional/emits.move:174
-    =     at tests/sources/functional/emits.move:175
-    =     at tests/sources/functional/emits.move:176
+    =     at tests/sources/functional/emits.move:174: conditional_multiple_same (spec)
+    =     at tests/sources/functional/emits.move:175: conditional_multiple_same (spec)
+    =     at tests/sources/functional/emits.move:176: conditional_multiple_same (spec)
 
 error: emitted event not covered by any of the `emits` clauses
     ┌─ tests/sources/functional/emits.move:173:5
@@ -415,13 +407,12 @@ error: emitted event not covered by any of the `emits` clauses
     =     at tests/sources/functional/emits.move:163: conditional_multiple_same
     =     at tests/sources/functional/emits.move:166: conditional_multiple_same
     =     at tests/sources/functional/emits.move:169: conditional_multiple_same
-    =     at tests/sources/functional/emits.move:169: conditional_multiple_same
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:172: conditional_multiple_same
-    =     at tests/sources/functional/emits.move:174
-    =     at tests/sources/functional/emits.move:175
-    =     at tests/sources/functional/emits.move:176
-    =     at tests/sources/functional/emits.move:173
+    =     at tests/sources/functional/emits.move:174: conditional_multiple_same (spec)
+    =     at tests/sources/functional/emits.move:175: conditional_multiple_same (spec)
+    =     at tests/sources/functional/emits.move:176: conditional_multiple_same (spec)
+    =     at tests/sources/functional/emits.move:173: conditional_multiple_same (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:187:9
@@ -437,7 +428,7 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:182: conditional_multiple_same_incorrect
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:185: conditional_multiple_same_incorrect
-    =     at tests/sources/functional/emits.move:187
+    =     at tests/sources/functional/emits.move:187: conditional_multiple_same_incorrect (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:188:9
@@ -453,8 +444,8 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:182: conditional_multiple_same_incorrect
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:185: conditional_multiple_same_incorrect
-    =     at tests/sources/functional/emits.move:187
-    =     at tests/sources/functional/emits.move:188
+    =     at tests/sources/functional/emits.move:187: conditional_multiple_same_incorrect (spec)
+    =     at tests/sources/functional/emits.move:188: conditional_multiple_same_incorrect (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:189:9
@@ -470,9 +461,9 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:182: conditional_multiple_same_incorrect
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:185: conditional_multiple_same_incorrect
-    =     at tests/sources/functional/emits.move:187
-    =     at tests/sources/functional/emits.move:188
-    =     at tests/sources/functional/emits.move:189
+    =     at tests/sources/functional/emits.move:187: conditional_multiple_same_incorrect (spec)
+    =     at tests/sources/functional/emits.move:188: conditional_multiple_same_incorrect (spec)
+    =     at tests/sources/functional/emits.move:189: conditional_multiple_same_incorrect (spec)
 
 error: emitted event not covered by any of the `emits` clauses
     ┌─ tests/sources/functional/emits.move:186:5
@@ -492,10 +483,10 @@ error: emitted event not covered by any of the `emits` clauses
     =     at tests/sources/functional/emits.move:182: conditional_multiple_same_incorrect
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:185: conditional_multiple_same_incorrect
-    =     at tests/sources/functional/emits.move:187
-    =     at tests/sources/functional/emits.move:188
-    =     at tests/sources/functional/emits.move:189
-    =     at tests/sources/functional/emits.move:186
+    =     at tests/sources/functional/emits.move:187: conditional_multiple_same_incorrect (spec)
+    =     at tests/sources/functional/emits.move:188: conditional_multiple_same_incorrect (spec)
+    =     at tests/sources/functional/emits.move:189: conditional_multiple_same_incorrect (spec)
+    =     at tests/sources/functional/emits.move:186: conditional_multiple_same_incorrect (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:111:9
@@ -509,7 +500,7 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:106: conditional_wrong_condition_incorrect
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:109: conditional_wrong_condition_incorrect
-    =     at tests/sources/functional/emits.move:111
+    =     at tests/sources/functional/emits.move:111: conditional_wrong_condition_incorrect (spec)
 
 error: emitted event not covered by any of the `emits` clauses
     ┌─ tests/sources/functional/emits.move:110:5
@@ -525,8 +516,8 @@ error: emitted event not covered by any of the `emits` clauses
     =     at tests/sources/functional/emits.move:106: conditional_wrong_condition_incorrect
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:109: conditional_wrong_condition_incorrect
-    =     at tests/sources/functional/emits.move:111
-    =     at tests/sources/functional/emits.move:110
+    =     at tests/sources/functional/emits.move:111: conditional_wrong_condition_incorrect (spec)
+    =     at tests/sources/functional/emits.move:110: conditional_wrong_condition_incorrect (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:205:9
@@ -555,7 +546,7 @@ error: emitted event not covered by any of the `emits` clauses
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:199: emits_in_schema
     =     at tests/sources/functional/emits.move:205
-    =     at tests/sources/functional/emits.move:200
+    =     at tests/sources/functional/emits.move:200: emits_in_schema (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:205:9
@@ -588,7 +579,7 @@ error: emitted event not covered by any of the `emits` clauses
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:212: emits_in_schema_condition
     =     at tests/sources/functional/emits.move:205
-    =     at tests/sources/functional/emits.move:213
+    =     at tests/sources/functional/emits.move:213: emits_in_schema_condition (spec)
 
 error: function does not emit the expected event
    ┌─ tests/sources/functional/emits.move:43:9
@@ -602,7 +593,7 @@ error: function does not emit the expected event
    =     at tests/sources/functional/emits.move:40: multiple
    =         handle = <redacted>
    =     at tests/sources/functional/emits.move:41: multiple
-   =     at tests/sources/functional/emits.move:43
+   =     at tests/sources/functional/emits.move:43: multiple (spec)
 
 error: function does not emit the expected event
    ┌─ tests/sources/functional/emits.move:44:9
@@ -616,8 +607,8 @@ error: function does not emit the expected event
    =     at tests/sources/functional/emits.move:40: multiple
    =         handle = <redacted>
    =     at tests/sources/functional/emits.move:41: multiple
-   =     at tests/sources/functional/emits.move:43
-   =     at tests/sources/functional/emits.move:44
+   =     at tests/sources/functional/emits.move:43: multiple (spec)
+   =     at tests/sources/functional/emits.move:44: multiple (spec)
 
 error: emitted event not covered by any of the `emits` clauses
    ┌─ tests/sources/functional/emits.move:42:5
@@ -634,9 +625,9 @@ error: emitted event not covered by any of the `emits` clauses
    =     at tests/sources/functional/emits.move:40: multiple
    =         handle = <redacted>
    =     at tests/sources/functional/emits.move:41: multiple
-   =     at tests/sources/functional/emits.move:43
-   =     at tests/sources/functional/emits.move:44
-   =     at tests/sources/functional/emits.move:42
+   =     at tests/sources/functional/emits.move:43: multiple (spec)
+   =     at tests/sources/functional/emits.move:44: multiple (spec)
+   =     at tests/sources/functional/emits.move:42: multiple (spec)
 
 error: function does not emit the expected event
    ┌─ tests/sources/functional/emits.move:83:9
@@ -656,7 +647,7 @@ error: function does not emit the expected event
    =         handle = <redacted>
    =         handle2 = <redacted>
    =     at tests/sources/functional/emits.move:81: multiple_different_handle
-   =     at tests/sources/functional/emits.move:83
+   =     at tests/sources/functional/emits.move:83: multiple_different_handle (spec)
 
 error: function does not emit the expected event
    ┌─ tests/sources/functional/emits.move:84:9
@@ -676,8 +667,8 @@ error: function does not emit the expected event
    =         handle = <redacted>
    =         handle2 = <redacted>
    =     at tests/sources/functional/emits.move:81: multiple_different_handle
-   =     at tests/sources/functional/emits.move:83
-   =     at tests/sources/functional/emits.move:84
+   =     at tests/sources/functional/emits.move:83: multiple_different_handle (spec)
+   =     at tests/sources/functional/emits.move:84: multiple_different_handle (spec)
 
 error: function does not emit the expected event
    ┌─ tests/sources/functional/emits.move:85:9
@@ -697,9 +688,9 @@ error: function does not emit the expected event
    =         handle = <redacted>
    =         handle2 = <redacted>
    =     at tests/sources/functional/emits.move:81: multiple_different_handle
-   =     at tests/sources/functional/emits.move:83
-   =     at tests/sources/functional/emits.move:84
-   =     at tests/sources/functional/emits.move:85
+   =     at tests/sources/functional/emits.move:83: multiple_different_handle (spec)
+   =     at tests/sources/functional/emits.move:84: multiple_different_handle (spec)
+   =     at tests/sources/functional/emits.move:85: multiple_different_handle (spec)
 
 error: function does not emit the expected event
    ┌─ tests/sources/functional/emits.move:86:9
@@ -719,10 +710,10 @@ error: function does not emit the expected event
    =         handle = <redacted>
    =         handle2 = <redacted>
    =     at tests/sources/functional/emits.move:81: multiple_different_handle
-   =     at tests/sources/functional/emits.move:83
-   =     at tests/sources/functional/emits.move:84
-   =     at tests/sources/functional/emits.move:85
-   =     at tests/sources/functional/emits.move:86
+   =     at tests/sources/functional/emits.move:83: multiple_different_handle (spec)
+   =     at tests/sources/functional/emits.move:84: multiple_different_handle (spec)
+   =     at tests/sources/functional/emits.move:85: multiple_different_handle (spec)
+   =     at tests/sources/functional/emits.move:86: multiple_different_handle (spec)
 
 error: function does not emit the expected event
    ┌─ tests/sources/functional/emits.move:87:9
@@ -742,11 +733,11 @@ error: function does not emit the expected event
    =         handle = <redacted>
    =         handle2 = <redacted>
    =     at tests/sources/functional/emits.move:81: multiple_different_handle
-   =     at tests/sources/functional/emits.move:83
-   =     at tests/sources/functional/emits.move:84
-   =     at tests/sources/functional/emits.move:85
-   =     at tests/sources/functional/emits.move:86
-   =     at tests/sources/functional/emits.move:87
+   =     at tests/sources/functional/emits.move:83: multiple_different_handle (spec)
+   =     at tests/sources/functional/emits.move:84: multiple_different_handle (spec)
+   =     at tests/sources/functional/emits.move:85: multiple_different_handle (spec)
+   =     at tests/sources/functional/emits.move:86: multiple_different_handle (spec)
+   =     at tests/sources/functional/emits.move:87: multiple_different_handle (spec)
 
 error: function does not emit the expected event
    ┌─ tests/sources/functional/emits.move:52:9
@@ -760,7 +751,7 @@ error: function does not emit the expected event
    =     at tests/sources/functional/emits.move:49: multiple_incorrect
    =         handle = <redacted>
    =     at tests/sources/functional/emits.move:50: multiple_incorrect
-   =     at tests/sources/functional/emits.move:52
+   =     at tests/sources/functional/emits.move:52: multiple_incorrect (spec)
 
 error: function does not emit the expected event
    ┌─ tests/sources/functional/emits.move:53:9
@@ -774,8 +765,8 @@ error: function does not emit the expected event
    =     at tests/sources/functional/emits.move:49: multiple_incorrect
    =         handle = <redacted>
    =     at tests/sources/functional/emits.move:50: multiple_incorrect
-   =     at tests/sources/functional/emits.move:52
-   =     at tests/sources/functional/emits.move:53
+   =     at tests/sources/functional/emits.move:52: multiple_incorrect (spec)
+   =     at tests/sources/functional/emits.move:53: multiple_incorrect (spec)
 
 error: function does not emit the expected event
    ┌─ tests/sources/functional/emits.move:54:9
@@ -789,9 +780,9 @@ error: function does not emit the expected event
    =     at tests/sources/functional/emits.move:49: multiple_incorrect
    =         handle = <redacted>
    =     at tests/sources/functional/emits.move:50: multiple_incorrect
-   =     at tests/sources/functional/emits.move:52
-   =     at tests/sources/functional/emits.move:53
-   =     at tests/sources/functional/emits.move:54
+   =     at tests/sources/functional/emits.move:52: multiple_incorrect (spec)
+   =     at tests/sources/functional/emits.move:53: multiple_incorrect (spec)
+   =     at tests/sources/functional/emits.move:54: multiple_incorrect (spec)
 
 error: function does not emit the expected event
    ┌─ tests/sources/functional/emits.move:62:9
@@ -805,7 +796,7 @@ error: function does not emit the expected event
    =     at tests/sources/functional/emits.move:59: multiple_same
    =         handle = <redacted>
    =     at tests/sources/functional/emits.move:60: multiple_same
-   =     at tests/sources/functional/emits.move:62
+   =     at tests/sources/functional/emits.move:62: multiple_same (spec)
 
 error: function does not emit the expected event
    ┌─ tests/sources/functional/emits.move:63:9
@@ -819,8 +810,8 @@ error: function does not emit the expected event
    =     at tests/sources/functional/emits.move:59: multiple_same
    =         handle = <redacted>
    =     at tests/sources/functional/emits.move:60: multiple_same
-   =     at tests/sources/functional/emits.move:62
-   =     at tests/sources/functional/emits.move:63
+   =     at tests/sources/functional/emits.move:62: multiple_same (spec)
+   =     at tests/sources/functional/emits.move:63: multiple_same (spec)
 
 error: emitted event not covered by any of the `emits` clauses
    ┌─ tests/sources/functional/emits.move:61:5
@@ -837,9 +828,9 @@ error: emitted event not covered by any of the `emits` clauses
    =     at tests/sources/functional/emits.move:59: multiple_same
    =         handle = <redacted>
    =     at tests/sources/functional/emits.move:60: multiple_same
-   =     at tests/sources/functional/emits.move:62
-   =     at tests/sources/functional/emits.move:63
-   =     at tests/sources/functional/emits.move:61
+   =     at tests/sources/functional/emits.move:62: multiple_same (spec)
+   =     at tests/sources/functional/emits.move:63: multiple_same (spec)
+   =     at tests/sources/functional/emits.move:61: multiple_same (spec)
 
 error: function does not emit the expected event
    ┌─ tests/sources/functional/emits.move:70:9
@@ -852,7 +843,7 @@ error: function does not emit the expected event
    =     at tests/sources/functional/emits.move:67: multiple_same_incorrect
    =         handle = <redacted>
    =     at tests/sources/functional/emits.move:68: multiple_same_incorrect
-   =     at tests/sources/functional/emits.move:70
+   =     at tests/sources/functional/emits.move:70: multiple_same_incorrect (spec)
 
 error: function does not emit the expected event
    ┌─ tests/sources/functional/emits.move:71:9
@@ -865,8 +856,8 @@ error: function does not emit the expected event
    =     at tests/sources/functional/emits.move:67: multiple_same_incorrect
    =         handle = <redacted>
    =     at tests/sources/functional/emits.move:68: multiple_same_incorrect
-   =     at tests/sources/functional/emits.move:70
-   =     at tests/sources/functional/emits.move:71
+   =     at tests/sources/functional/emits.move:70: multiple_same_incorrect (spec)
+   =     at tests/sources/functional/emits.move:71: multiple_same_incorrect (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:280:9
@@ -881,7 +872,7 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:277: opaque
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:278: opaque
-    =     at tests/sources/functional/emits.move:280
+    =     at tests/sources/functional/emits.move:280: opaque (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:281:9
@@ -896,8 +887,8 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:277: opaque
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:278: opaque
-    =     at tests/sources/functional/emits.move:280
-    =     at tests/sources/functional/emits.move:281
+    =     at tests/sources/functional/emits.move:280: opaque (spec)
+    =     at tests/sources/functional/emits.move:281: opaque (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:282:9
@@ -912,9 +903,9 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:277: opaque
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:278: opaque
-    =     at tests/sources/functional/emits.move:280
-    =     at tests/sources/functional/emits.move:281
-    =     at tests/sources/functional/emits.move:282
+    =     at tests/sources/functional/emits.move:280: opaque (spec)
+    =     at tests/sources/functional/emits.move:281: opaque (spec)
+    =     at tests/sources/functional/emits.move:282: opaque (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:283:9
@@ -929,10 +920,10 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:277: opaque
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:278: opaque
-    =     at tests/sources/functional/emits.move:280
-    =     at tests/sources/functional/emits.move:281
-    =     at tests/sources/functional/emits.move:282
-    =     at tests/sources/functional/emits.move:283
+    =     at tests/sources/functional/emits.move:280: opaque (spec)
+    =     at tests/sources/functional/emits.move:281: opaque (spec)
+    =     at tests/sources/functional/emits.move:282: opaque (spec)
+    =     at tests/sources/functional/emits.move:283: opaque (spec)
 
 error: emitted event not covered by any of the `emits` clauses
     ┌─ tests/sources/functional/emits.move:279:5
@@ -952,11 +943,11 @@ error: emitted event not covered by any of the `emits` clauses
     =     at tests/sources/functional/emits.move:277: opaque
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:278: opaque
-    =     at tests/sources/functional/emits.move:280
-    =     at tests/sources/functional/emits.move:281
-    =     at tests/sources/functional/emits.move:282
-    =     at tests/sources/functional/emits.move:283
-    =     at tests/sources/functional/emits.move:279
+    =     at tests/sources/functional/emits.move:280: opaque (spec)
+    =     at tests/sources/functional/emits.move:281: opaque (spec)
+    =     at tests/sources/functional/emits.move:282: opaque (spec)
+    =     at tests/sources/functional/emits.move:283: opaque (spec)
+    =     at tests/sources/functional/emits.move:279: opaque (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:315:9
@@ -971,7 +962,7 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:312: opaque_completeness_incorrect
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:313: opaque_completeness_incorrect
-    =     at tests/sources/functional/emits.move:315
+    =     at tests/sources/functional/emits.move:315: opaque_completeness_incorrect (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:316:9
@@ -986,8 +977,8 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:312: opaque_completeness_incorrect
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:313: opaque_completeness_incorrect
-    =     at tests/sources/functional/emits.move:315
-    =     at tests/sources/functional/emits.move:316
+    =     at tests/sources/functional/emits.move:315: opaque_completeness_incorrect (spec)
+    =     at tests/sources/functional/emits.move:316: opaque_completeness_incorrect (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:317:9
@@ -1002,9 +993,9 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:312: opaque_completeness_incorrect
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:313: opaque_completeness_incorrect
-    =     at tests/sources/functional/emits.move:315
-    =     at tests/sources/functional/emits.move:316
-    =     at tests/sources/functional/emits.move:317
+    =     at tests/sources/functional/emits.move:315: opaque_completeness_incorrect (spec)
+    =     at tests/sources/functional/emits.move:316: opaque_completeness_incorrect (spec)
+    =     at tests/sources/functional/emits.move:317: opaque_completeness_incorrect (spec)
 
 error: emitted event not covered by any of the `emits` clauses
     ┌─ tests/sources/functional/emits.move:314:5
@@ -1023,10 +1014,10 @@ error: emitted event not covered by any of the `emits` clauses
     =     at tests/sources/functional/emits.move:312: opaque_completeness_incorrect
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:313: opaque_completeness_incorrect
-    =     at tests/sources/functional/emits.move:315
-    =     at tests/sources/functional/emits.move:316
-    =     at tests/sources/functional/emits.move:317
-    =     at tests/sources/functional/emits.move:314
+    =     at tests/sources/functional/emits.move:315: opaque_completeness_incorrect (spec)
+    =     at tests/sources/functional/emits.move:316: opaque_completeness_incorrect (spec)
+    =     at tests/sources/functional/emits.move:317: opaque_completeness_incorrect (spec)
+    =     at tests/sources/functional/emits.move:314: opaque_completeness_incorrect (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:303:9
@@ -1046,7 +1037,7 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:278: opaque
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:301: opaque_in_call_chain
-    =     at tests/sources/functional/emits.move:303
+    =     at tests/sources/functional/emits.move:303: opaque_in_call_chain (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:304:9
@@ -1066,8 +1057,8 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:278: opaque
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:301: opaque_in_call_chain
-    =     at tests/sources/functional/emits.move:303
-    =     at tests/sources/functional/emits.move:304
+    =     at tests/sources/functional/emits.move:303: opaque_in_call_chain (spec)
+    =     at tests/sources/functional/emits.move:304: opaque_in_call_chain (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:305:9
@@ -1087,9 +1078,9 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:278: opaque
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:301: opaque_in_call_chain
-    =     at tests/sources/functional/emits.move:303
-    =     at tests/sources/functional/emits.move:304
-    =     at tests/sources/functional/emits.move:305
+    =     at tests/sources/functional/emits.move:303: opaque_in_call_chain (spec)
+    =     at tests/sources/functional/emits.move:304: opaque_in_call_chain (spec)
+    =     at tests/sources/functional/emits.move:305: opaque_in_call_chain (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:306:9
@@ -1109,10 +1100,10 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:278: opaque
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:301: opaque_in_call_chain
-    =     at tests/sources/functional/emits.move:303
-    =     at tests/sources/functional/emits.move:304
-    =     at tests/sources/functional/emits.move:305
-    =     at tests/sources/functional/emits.move:306
+    =     at tests/sources/functional/emits.move:303: opaque_in_call_chain (spec)
+    =     at tests/sources/functional/emits.move:304: opaque_in_call_chain (spec)
+    =     at tests/sources/functional/emits.move:305: opaque_in_call_chain (spec)
+    =     at tests/sources/functional/emits.move:306: opaque_in_call_chain (spec)
 
 error: emitted event not covered by any of the `emits` clauses
     ┌─ tests/sources/functional/emits.move:302:5
@@ -1137,11 +1128,11 @@ error: emitted event not covered by any of the `emits` clauses
     =     at tests/sources/functional/emits.move:278: opaque
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:301: opaque_in_call_chain
-    =     at tests/sources/functional/emits.move:303
-    =     at tests/sources/functional/emits.move:304
-    =     at tests/sources/functional/emits.move:305
-    =     at tests/sources/functional/emits.move:306
-    =     at tests/sources/functional/emits.move:302
+    =     at tests/sources/functional/emits.move:303: opaque_in_call_chain (spec)
+    =     at tests/sources/functional/emits.move:304: opaque_in_call_chain (spec)
+    =     at tests/sources/functional/emits.move:305: opaque_in_call_chain (spec)
+    =     at tests/sources/functional/emits.move:306: opaque_in_call_chain (spec)
+    =     at tests/sources/functional/emits.move:302: opaque_in_call_chain (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:292:9
@@ -1156,7 +1147,7 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:289: opaque_incorrect
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:290: opaque_incorrect
-    =     at tests/sources/functional/emits.move:292
+    =     at tests/sources/functional/emits.move:292: opaque_incorrect (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:293:9
@@ -1171,8 +1162,8 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:289: opaque_incorrect
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:290: opaque_incorrect
-    =     at tests/sources/functional/emits.move:292
-    =     at tests/sources/functional/emits.move:293
+    =     at tests/sources/functional/emits.move:292: opaque_incorrect (spec)
+    =     at tests/sources/functional/emits.move:293: opaque_incorrect (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:294:9
@@ -1187,9 +1178,9 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:289: opaque_incorrect
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:290: opaque_incorrect
-    =     at tests/sources/functional/emits.move:292
-    =     at tests/sources/functional/emits.move:293
-    =     at tests/sources/functional/emits.move:294
+    =     at tests/sources/functional/emits.move:292: opaque_incorrect (spec)
+    =     at tests/sources/functional/emits.move:293: opaque_incorrect (spec)
+    =     at tests/sources/functional/emits.move:294: opaque_incorrect (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:295:9
@@ -1204,10 +1195,10 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:289: opaque_incorrect
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:290: opaque_incorrect
-    =     at tests/sources/functional/emits.move:292
-    =     at tests/sources/functional/emits.move:293
-    =     at tests/sources/functional/emits.move:294
-    =     at tests/sources/functional/emits.move:295
+    =     at tests/sources/functional/emits.move:292: opaque_incorrect (spec)
+    =     at tests/sources/functional/emits.move:293: opaque_incorrect (spec)
+    =     at tests/sources/functional/emits.move:294: opaque_incorrect (spec)
+    =     at tests/sources/functional/emits.move:295: opaque_incorrect (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:296:9
@@ -1222,11 +1213,11 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:289: opaque_incorrect
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:290: opaque_incorrect
-    =     at tests/sources/functional/emits.move:292
-    =     at tests/sources/functional/emits.move:293
-    =     at tests/sources/functional/emits.move:294
-    =     at tests/sources/functional/emits.move:295
-    =     at tests/sources/functional/emits.move:296
+    =     at tests/sources/functional/emits.move:292: opaque_incorrect (spec)
+    =     at tests/sources/functional/emits.move:293: opaque_incorrect (spec)
+    =     at tests/sources/functional/emits.move:294: opaque_incorrect (spec)
+    =     at tests/sources/functional/emits.move:295: opaque_incorrect (spec)
+    =     at tests/sources/functional/emits.move:296: opaque_incorrect (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:343:9
@@ -1241,7 +1232,7 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:340: opaque_partial
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:341: opaque_partial
-    =     at tests/sources/functional/emits.move:343
+    =     at tests/sources/functional/emits.move:343: opaque_partial (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:344:9
@@ -1256,8 +1247,8 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:340: opaque_partial
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:341: opaque_partial
-    =     at tests/sources/functional/emits.move:343
-    =     at tests/sources/functional/emits.move:344
+    =     at tests/sources/functional/emits.move:343: opaque_partial (spec)
+    =     at tests/sources/functional/emits.move:344: opaque_partial (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:345:9
@@ -1272,9 +1263,9 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:340: opaque_partial
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:341: opaque_partial
-    =     at tests/sources/functional/emits.move:343
-    =     at tests/sources/functional/emits.move:344
-    =     at tests/sources/functional/emits.move:345
+    =     at tests/sources/functional/emits.move:343: opaque_partial (spec)
+    =     at tests/sources/functional/emits.move:344: opaque_partial (spec)
+    =     at tests/sources/functional/emits.move:345: opaque_partial (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:346:9
@@ -1289,10 +1280,10 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:340: opaque_partial
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:341: opaque_partial
-    =     at tests/sources/functional/emits.move:343
-    =     at tests/sources/functional/emits.move:344
-    =     at tests/sources/functional/emits.move:345
-    =     at tests/sources/functional/emits.move:346
+    =     at tests/sources/functional/emits.move:343: opaque_partial (spec)
+    =     at tests/sources/functional/emits.move:344: opaque_partial (spec)
+    =     at tests/sources/functional/emits.move:345: opaque_partial (spec)
+    =     at tests/sources/functional/emits.move:346: opaque_partial (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:356:9
@@ -1307,7 +1298,7 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:353: opaque_partial_incorrect
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:354: opaque_partial_incorrect
-    =     at tests/sources/functional/emits.move:356
+    =     at tests/sources/functional/emits.move:356: opaque_partial_incorrect (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:357:9
@@ -1322,8 +1313,8 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:353: opaque_partial_incorrect
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:354: opaque_partial_incorrect
-    =     at tests/sources/functional/emits.move:356
-    =     at tests/sources/functional/emits.move:357
+    =     at tests/sources/functional/emits.move:356: opaque_partial_incorrect (spec)
+    =     at tests/sources/functional/emits.move:357: opaque_partial_incorrect (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:358:9
@@ -1338,9 +1329,9 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:353: opaque_partial_incorrect
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:354: opaque_partial_incorrect
-    =     at tests/sources/functional/emits.move:356
-    =     at tests/sources/functional/emits.move:357
-    =     at tests/sources/functional/emits.move:358
+    =     at tests/sources/functional/emits.move:356: opaque_partial_incorrect (spec)
+    =     at tests/sources/functional/emits.move:357: opaque_partial_incorrect (spec)
+    =     at tests/sources/functional/emits.move:358: opaque_partial_incorrect (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:359:9
@@ -1355,10 +1346,10 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:353: opaque_partial_incorrect
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:354: opaque_partial_incorrect
-    =     at tests/sources/functional/emits.move:356
-    =     at tests/sources/functional/emits.move:357
-    =     at tests/sources/functional/emits.move:358
-    =     at tests/sources/functional/emits.move:359
+    =     at tests/sources/functional/emits.move:356: opaque_partial_incorrect (spec)
+    =     at tests/sources/functional/emits.move:357: opaque_partial_incorrect (spec)
+    =     at tests/sources/functional/emits.move:358: opaque_partial_incorrect (spec)
+    =     at tests/sources/functional/emits.move:359: opaque_partial_incorrect (spec)
 
 error: emitted event not covered by any of the `emits` clauses
     ┌─ tests/sources/functional/emits.move:355:5
@@ -1379,11 +1370,11 @@ error: emitted event not covered by any of the `emits` clauses
     =     at tests/sources/functional/emits.move:353: opaque_partial_incorrect
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:354: opaque_partial_incorrect
-    =     at tests/sources/functional/emits.move:356
-    =     at tests/sources/functional/emits.move:357
-    =     at tests/sources/functional/emits.move:358
-    =     at tests/sources/functional/emits.move:359
-    =     at tests/sources/functional/emits.move:355
+    =     at tests/sources/functional/emits.move:356: opaque_partial_incorrect (spec)
+    =     at tests/sources/functional/emits.move:357: opaque_partial_incorrect (spec)
+    =     at tests/sources/functional/emits.move:358: opaque_partial_incorrect (spec)
+    =     at tests/sources/functional/emits.move:359: opaque_partial_incorrect (spec)
+    =     at tests/sources/functional/emits.move:355: opaque_partial_incorrect (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:228:9
@@ -1397,7 +1388,7 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:224: partial
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:225: partial
-    =     at tests/sources/functional/emits.move:228
+    =     at tests/sources/functional/emits.move:228: partial (spec)
 
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:236:9
@@ -1411,7 +1402,7 @@ error: function does not emit the expected event
     =     at tests/sources/functional/emits.move:233: partial_incorrect
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:234: partial_incorrect
-    =     at tests/sources/functional/emits.move:236
+    =     at tests/sources/functional/emits.move:236: partial_incorrect (spec)
 
 error: emitted event not covered by any of the `emits` clauses
     ┌─ tests/sources/functional/emits.move:235:5
@@ -1427,8 +1418,8 @@ error: emitted event not covered by any of the `emits` clauses
     =     at tests/sources/functional/emits.move:233: partial_incorrect
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:234: partial_incorrect
-    =     at tests/sources/functional/emits.move:236
-    =     at tests/sources/functional/emits.move:235
+    =     at tests/sources/functional/emits.move:236: partial_incorrect (spec)
+    =     at tests/sources/functional/emits.move:235: partial_incorrect (spec)
 
 error: function does not emit the expected event
    ┌─ tests/sources/functional/emits.move:16:9
@@ -1441,7 +1432,7 @@ error: function does not emit the expected event
    =     at tests/sources/functional/emits.move:13: simple
    =         handle = <redacted>
    =     at tests/sources/functional/emits.move:14: simple
-   =     at tests/sources/functional/emits.move:16
+   =     at tests/sources/functional/emits.move:16: simple (spec)
 
 error: emitted event not covered by any of the `emits` clauses
    ┌─ tests/sources/functional/emits.move:15:5
@@ -1456,8 +1447,8 @@ error: emitted event not covered by any of the `emits` clauses
    =     at tests/sources/functional/emits.move:13: simple
    =         handle = <redacted>
    =     at tests/sources/functional/emits.move:14: simple
-   =     at tests/sources/functional/emits.move:16
-   =     at tests/sources/functional/emits.move:15
+   =     at tests/sources/functional/emits.move:16: simple (spec)
+   =     at tests/sources/functional/emits.move:15: simple (spec)
 
 error: function does not emit the expected event
    ┌─ tests/sources/functional/emits.move:30:9
@@ -1472,7 +1463,7 @@ error: function does not emit the expected event
    =         handle = <redacted>
    =         _handle2 = <redacted>
    =     at tests/sources/functional/emits.move:28: simple_wrong_handle_incorrect
-   =     at tests/sources/functional/emits.move:30
+   =     at tests/sources/functional/emits.move:30: simple_wrong_handle_incorrect (spec)
 
 error: emitted event not covered by any of the `emits` clauses
    ┌─ tests/sources/functional/emits.move:29:5
@@ -1489,8 +1480,8 @@ error: emitted event not covered by any of the `emits` clauses
    =         handle = <redacted>
    =         _handle2 = <redacted>
    =     at tests/sources/functional/emits.move:28: simple_wrong_handle_incorrect
-   =     at tests/sources/functional/emits.move:30
-   =     at tests/sources/functional/emits.move:29
+   =     at tests/sources/functional/emits.move:30: simple_wrong_handle_incorrect (spec)
+   =     at tests/sources/functional/emits.move:29: simple_wrong_handle_incorrect (spec)
 
 error: function does not emit the expected event
    ┌─ tests/sources/functional/emits.move:23:9
@@ -1503,7 +1494,7 @@ error: function does not emit the expected event
    =     at tests/sources/functional/emits.move:20: simple_wrong_msg_incorrect
    =         handle = <redacted>
    =     at tests/sources/functional/emits.move:21: simple_wrong_msg_incorrect
-   =     at tests/sources/functional/emits.move:23
+   =     at tests/sources/functional/emits.move:23: simple_wrong_msg_incorrect (spec)
 
 error: emitted event not covered by any of the `emits` clauses
    ┌─ tests/sources/functional/emits.move:22:5
@@ -1518,8 +1509,8 @@ error: emitted event not covered by any of the `emits` clauses
    =     at tests/sources/functional/emits.move:20: simple_wrong_msg_incorrect
    =         handle = <redacted>
    =     at tests/sources/functional/emits.move:21: simple_wrong_msg_incorrect
-   =     at tests/sources/functional/emits.move:23
-   =     at tests/sources/functional/emits.move:22
+   =     at tests/sources/functional/emits.move:23: simple_wrong_msg_incorrect (spec)
+   =     at tests/sources/functional/emits.move:22: simple_wrong_msg_incorrect (spec)
 
 error: emitted event not covered by any of the `emits` clauses
     ┌─ tests/sources/functional/emits.move:255:5
@@ -1535,4 +1526,4 @@ error: emitted event not covered by any of the `emits` clauses
     =     at tests/sources/functional/emits.move:253: strict_incorrect
     =         handle = <redacted>
     =     at tests/sources/functional/emits.move:254: strict_incorrect
-    =     at tests/sources/functional/emits.move:255
+    =     at tests/sources/functional/emits.move:255: strict_incorrect (spec)

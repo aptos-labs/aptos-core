@@ -9,11 +9,9 @@ use std::{
     os::unix::prelude::ExitStatusExt,
     path::{Path, PathBuf},
     process::ExitStatus,
-    time::Instant,
 };
 
 use anyhow::{bail, Result};
-use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 
 use disassembler::disassembler::Disassembler;
 use move_command_line_common::files::{FileHash, MOVE_COVERAGE_MAP_EXTENSION};
@@ -34,11 +32,10 @@ use move_package::{
     source_package::layout::SourcePackageLayout,
     ModelConfig,
 };
-use move_prover::run_move_prover_with_model;
 use move_unit_test::UnitTestingConfig;
 use structopt::StructOpt;
 
-use crate::NativeFunctionRecord;
+use crate::{package::prover::run_move_prover, NativeFunctionRecord};
 
 #[derive(StructOpt)]
 pub enum CoverageSummaryOptions {
@@ -90,11 +87,19 @@ pub enum PackageCommand {
         output_file: PathBuf,
     },
     /// Run the Move Prover on the package at `path`. If no path is provided defaults to current
-    /// directory.
+    /// directory. Use `.. prove .. -- <options>` to pass on options to the prover.
     #[structopt(name = "prove")]
     Prove {
+        /// The target filter used to prune the modules to verify. Modules with a name that contains
+        /// this string will be part of verification.
+        #[structopt(short = "t", long = "target")]
+        target_filter: Option<String>,
+        /// Internal field indicating that this prover run is for a test.
+        #[structopt(skip)]
+        for_test: bool,
+        /// Any options passed to the prover.
         #[structopt(subcommand)]
-        cmd: Option<ProverOptions>,
+        options: Option<ProverOptions>,
     },
     #[structopt(name = "coverage")]
     CoverageReport {
@@ -162,7 +167,7 @@ pub enum PackageCommand {
     },
 }
 
-#[derive(StructOpt)]
+#[derive(StructOpt, Debug)]
 pub enum ProverOptions {
     // Pass through unknown commands to the prover Clap parser
     #[structopt(external_subcommand)]
@@ -312,27 +317,16 @@ pub fn handle_package_commands(
             let creation_path = Path::new(&path).join(name);
             create_move_package(name, &creation_path)?;
         }
-        PackageCommand::Prove { cmd } => {
-            let options = match cmd {
-                None => move_prover::cli::Options::default(),
-                Some(ProverOptions::Options(options)) => {
-                    move_prover::cli::Options::create_from_args(options)?
-                }
-            };
-            println!("Starting verification ...");
-            let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
-            let now = Instant::now();
-            let model = config.move_model_for_package(
-                &path,
-                ModelConfig {
-                    all_files_as_targets: false,
-                },
-            )?;
-            run_move_prover_with_model(&model, &mut error_writer, options, Some(now))?;
-            println!(
-                "Verification successful in {:.3}s",
-                now.elapsed().as_secs_f64()
-            );
+        PackageCommand::Prove {
+            target_filter,
+            for_test,
+            options,
+        } => {
+            if let Some(ProverOptions::Options(opts)) = options {
+                run_move_prover(config, &path, target_filter, *for_test, opts)?
+            } else {
+                run_move_prover(config, &path, target_filter, *for_test, &[])?
+            }
         }
         PackageCommand::ErrMapGen {
             error_prefix,
@@ -350,6 +344,7 @@ pub fn handle_package_commands(
                 &path,
                 ModelConfig {
                     all_files_as_targets: true,
+                    target_filter: None,
                 },
             )?;
             let mut errmap_gen = errmapgen::ErrmapGen::new(&model, &errmap_options);

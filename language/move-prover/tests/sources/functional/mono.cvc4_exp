@@ -1,4 +1,4 @@
-Move prover returns: exiting with boogie verification errors
+Move prover returns: exiting with verification errors
 error: function does not emit the expected event
    ┌─ tests/sources/functional/mono.move:62:9
    │
@@ -10,7 +10,7 @@ error: function does not emit the expected event
    =     at tests/sources/functional/mono.move:59: use_event
    =         handle = <redacted>
    =     at tests/sources/functional/mono.move:60: use_event
-   =     at tests/sources/functional/mono.move:62
+   =     at tests/sources/functional/mono.move:62: use_event (spec)
 
 error: emitted event not covered by any of the `emits` clauses
    ┌─ tests/sources/functional/mono.move:61:5
@@ -25,8 +25,8 @@ error: emitted event not covered by any of the `emits` clauses
    =     at tests/sources/functional/mono.move:59: use_event
    =         handle = <redacted>
    =     at tests/sources/functional/mono.move:60: use_event
-   =     at tests/sources/functional/mono.move:62
-   =     at tests/sources/functional/mono.move:61
+   =     at tests/sources/functional/mono.move:62: use_event (spec)
+   =     at tests/sources/functional/mono.move:61: use_event (spec)
 
 error: post-condition does not hold
    ┌─ tests/sources/functional/mono.move:71:21
@@ -37,7 +37,7 @@ error: post-condition does not hold
    =     at tests/sources/functional/mono.move:70: vec_addr
    =         x = <redacted>
    =         result = <redacted>
-   =     at tests/sources/functional/mono.move:71
+   =     at tests/sources/functional/mono.move:71: vec_addr (spec)
 
 error: post-condition does not hold
    ┌─ tests/sources/functional/mono.move:73:21
@@ -48,7 +48,7 @@ error: post-condition does not hold
    =     at tests/sources/functional/mono.move:72: vec_bool
    =         x = <redacted>
    =         result = <redacted>
-   =     at tests/sources/functional/mono.move:73
+   =     at tests/sources/functional/mono.move:73: vec_bool (spec)
 
 error: post-condition does not hold
    ┌─ tests/sources/functional/mono.move:69:20
@@ -59,7 +59,7 @@ error: post-condition does not hold
    =     at tests/sources/functional/mono.move:68: vec_int
    =         x = <redacted>
    =         result = <redacted>
-   =     at tests/sources/functional/mono.move:69
+   =     at tests/sources/functional/mono.move:69: vec_int (spec)
 
 error: post-condition does not hold
    ┌─ tests/sources/functional/mono.move:77:28
@@ -70,7 +70,7 @@ error: post-condition does not hold
    =     at tests/sources/functional/mono.move:76: vec_struct_addr
    =         x = <redacted>
    =         result = <redacted>
-   =     at tests/sources/functional/mono.move:77
+   =     at tests/sources/functional/mono.move:77: vec_struct_addr (spec)
 
 error: post-condition does not hold
    ┌─ tests/sources/functional/mono.move:75:27
@@ -81,7 +81,7 @@ error: post-condition does not hold
    =     at tests/sources/functional/mono.move:74: vec_struct_int
    =         x = <redacted>
    =         result = <redacted>
-   =     at tests/sources/functional/mono.move:75
+   =     at tests/sources/functional/mono.move:75: vec_struct_int (spec)
 
 error: post-condition does not hold
    ┌─ tests/sources/functional/mono.move:82:20
@@ -94,4 +94,4 @@ error: post-condition does not hold
    =     at tests/sources/functional/mono.move:80: vec_vec
    =         result = <redacted>
    =     at tests/sources/functional/mono.move:81: vec_vec
-   =     at tests/sources/functional/mono.move:82
+   =     at tests/sources/functional/mono.move:82: vec_vec (spec)

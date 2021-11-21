@@ -63,7 +63,7 @@ module 0x42::TestPureFun {
         }
 
         fun dr_x(): u64 {
-            get_x(@DiemRoot)
+            get_x(@0xA550C18)
         }
     }
 

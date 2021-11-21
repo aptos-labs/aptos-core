@@ -1,4 +1,4 @@
-Move prover returns: exiting with boogie verification errors
+Move prover returns: exiting with verification errors
 error: post-condition does not hold
    ┌─ tests/sources/functional/hash_model_invalid.move:22:9
    │

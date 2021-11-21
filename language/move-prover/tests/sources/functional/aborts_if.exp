@@ -1,4 +1,4 @@
-Move prover returns: exiting with boogie verification errors
+Move prover returns: exiting with verification errors
 error: function does not abort under this condition
    ┌─ tests/sources/functional/aborts_if.move:35:9
    │

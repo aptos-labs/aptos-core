@@ -1,4 +1,4 @@
-Move prover returns: exiting with boogie verification errors
+Move prover returns: exiting with verification errors
 error: unknown assertion failed
    ┌─ tests/sources/functional/loops_with_memory_ops.move:93:13
    │

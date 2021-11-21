@@ -1,4 +1,4 @@
-Move prover returns: exiting with boogie verification errors
+Move prover returns: exiting with verification errors
 error: induction case of the loop invariant does not hold
     ┌─ tests/sources/functional/verify_vector.move:143:17
     │
@@ -126,8 +126,8 @@ error: post-condition does not hold
     =     at tests/sources/functional/verify_vector.move:147: verify_append
     =     at tests/sources/functional/verify_vector.move:138: verify_append
     =         v = <redacted>
-    =     at tests/sources/functional/verify_vector.move:154
-    =     at tests/sources/functional/verify_vector.move:155
+    =     at tests/sources/functional/verify_vector.move:154: verify_append (spec)
+    =     at tests/sources/functional/verify_vector.move:155: verify_append (spec)
 
 error: post-condition does not hold
     ┌─ tests/sources/functional/verify_vector.move:156:9
@@ -157,9 +157,9 @@ error: post-condition does not hold
     =     at tests/sources/functional/verify_vector.move:147: verify_append
     =     at tests/sources/functional/verify_vector.move:138: verify_append
     =         v = <redacted>
-    =     at tests/sources/functional/verify_vector.move:154
-    =     at tests/sources/functional/verify_vector.move:155
-    =     at tests/sources/functional/verify_vector.move:156
+    =     at tests/sources/functional/verify_vector.move:154: verify_append (spec)
+    =     at tests/sources/functional/verify_vector.move:155: verify_append (spec)
+    =     at tests/sources/functional/verify_vector.move:156: verify_append (spec)
 
 error: unknown assertion failed
     ┌─ tests/sources/functional/verify_vector.move:234:12
@@ -239,8 +239,8 @@ error: post-condition does not hold
     =     at tests/sources/functional/verify_vector.move:190: verify_index_of
     =         result_1 = <redacted>
     =         result_2 = <redacted>
-    =     at tests/sources/functional/verify_vector.move:202
-    =     at tests/sources/functional/verify_vector.move:203
+    =     at tests/sources/functional/verify_vector.move:202: verify_index_of (spec)
+    =     at tests/sources/functional/verify_vector.move:203: verify_index_of (spec)
 
 error: post-condition does not hold
     ┌─ tests/sources/functional/verify_vector.move:205:9
@@ -261,10 +261,10 @@ error: post-condition does not hold
     =     at tests/sources/functional/verify_vector.move:190: verify_index_of
     =         result_1 = <redacted>
     =         result_2 = <redacted>
-    =     at tests/sources/functional/verify_vector.move:202
-    =     at tests/sources/functional/verify_vector.move:203
-    =     at tests/sources/functional/verify_vector.move:204
-    =     at tests/sources/functional/verify_vector.move:205
+    =     at tests/sources/functional/verify_vector.move:202: verify_index_of (spec)
+    =     at tests/sources/functional/verify_vector.move:203: verify_index_of (spec)
+    =     at tests/sources/functional/verify_vector.move:204: verify_index_of (spec)
+    =     at tests/sources/functional/verify_vector.move:205: verify_index_of (spec)
 
 error: post-condition does not hold
     ┌─ tests/sources/functional/verify_vector.move:216:9
@@ -279,10 +279,10 @@ error: post-condition does not hold
     =         result_1 = <redacted>
     =         result_2 = <redacted>
     =     at tests/sources/functional/verify_vector.move:211: verify_model_index_of
-    =     at tests/sources/functional/verify_vector.move:213
-    =     at tests/sources/functional/verify_vector.move:214
-    =     at tests/sources/functional/verify_vector.move:215
-    =     at tests/sources/functional/verify_vector.move:216
+    =     at tests/sources/functional/verify_vector.move:213: verify_model_index_of (spec)
+    =     at tests/sources/functional/verify_vector.move:214: verify_model_index_of (spec)
+    =     at tests/sources/functional/verify_vector.move:215: verify_model_index_of (spec)
+    =     at tests/sources/functional/verify_vector.move:216: verify_model_index_of (spec)
 
 error: induction case of the loop invariant does not hold
     ┌─ tests/sources/functional/verify_vector.move:266:17
@@ -492,5 +492,5 @@ error: post-condition does not hold
     =     at tests/sources/functional/verify_vector.move:113: verify_reverse
     =     at tests/sources/functional/verify_vector.move:105: verify_reverse
     =         v = <redacted>
-    =     at tests/sources/functional/verify_vector.move:121
-    =     at tests/sources/functional/verify_vector.move:122
+    =     at tests/sources/functional/verify_vector.move:121: verify_reverse (spec)
+    =     at tests/sources/functional/verify_vector.move:122: verify_reverse (spec)

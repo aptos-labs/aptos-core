@@ -1,9 +1,0 @@
-Move prover returns: exiting with model building errors
-error: unexpected token
-  ┌─ tests/sources/functional/parse_error.move:3:25
-  │
-3 │     fun foo(x: u64) { 1 )
-  │                         ^
-  │                         │
-  │                         Unexpected ')'
-  │                         Expected ';'

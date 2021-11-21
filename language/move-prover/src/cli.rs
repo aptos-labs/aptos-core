@@ -66,7 +66,10 @@ pub struct Options {
     pub move_named_address_values: Vec<String>,
     /// Whether to run experimental pipeline
     pub experimental_pipeline: bool,
-    /// BEGIN OF STRUCTURED OPTIONS
+    /// Options for printing out modules and functions reachable by script functions
+    pub script_reach: bool,
+
+    /// BEGIN OF STRUCTURED OPTIONS. DO NOT ADD VALUE FIELDS AFTER THIS
     /// Options for the model builder.
     pub model_builder: ModelBuilderOptions,
     /// Options for the documentation generator.
@@ -81,8 +84,6 @@ pub struct Options {
     /// TODO: this currently create errors during deserialization, so skip them for this.
     #[serde(skip_serializing)]
     pub errmapgen: ErrmapOptions,
-    /// Options for printing out modules and functions reachable by script functions
-    pub script_reach: bool,
 }
 
 impl Default for Options {
@@ -97,15 +98,7 @@ impl Default for Options {
             verbosity_level: LevelFilter::Info,
             move_sources: vec![],
             move_deps: vec![],
-            move_named_address_values: vec![
-                // TODO: Remove this and this field when package support has landed
-                "Std=0x1".into(),
-                "DiemFramework=0x1".into(),
-                "DiemRoot=0xA550C18".into(),
-                "CurrencyInfo=0xA550C18".into(),
-                "TreasuryCompliance=0xB1E55ED".into(),
-                "VMReserved=0x0".into(),
-            ],
+            move_named_address_values: vec![],
             model_builder: ModelBuilderOptions::default(),
             prover: ProverOptions::default(),
             backend: BoogieOptions::default(),
@@ -151,7 +144,6 @@ impl Options {
                     .long("config")
                     .takes_value(true)
                     .value_name("TOML_FILE")
-                    .env("MOVE_PROVER_CONFIG")
                     .help("path to a configuration file. \
                      Values in this file will be overridden by command line flags"),
             )
@@ -549,7 +541,12 @@ impl Options {
                        configuration file instead."
                 ));
             }
-            Self::create_from_toml_file(matches.value_of("config").unwrap())?
+            let value = matches.value_of("config").unwrap();
+            if value.is_empty() {
+                Self::default()
+            } else {
+                Self::create_from_toml_file(matches.value_of("config").unwrap())?
+            }
         } else if matches.is_present("config-str") {
             Self::create_from_toml(matches.value_of("config-str").unwrap())?
         } else {
@@ -771,6 +768,12 @@ impl Options {
     /// Sets up logging based on provided options. This should be called as early as possible
     /// and before any use of info!, warn! etc.
     pub fn setup_logging(&self) {
+        if LOGGER_CONFIGURED
+            .compare_exchange(false, true, Ordering::Relaxed, Ordering::Relaxed)
+            .is_err()
+        {
+            return;
+        }
         let config = ConfigBuilder::new()
             .set_time_level(LevelFilter::Debug)
             .set_level_padding(LevelPadding::Off)
@@ -788,7 +791,6 @@ impl Options {
     }
 
     pub fn setup_logging_for_test(&self) {
-        // Loggers are global static, so we have to protect against reinitializing.
         if LOGGER_CONFIGURED
             .compare_exchange(false, true, Ordering::Relaxed, Ordering::Relaxed)
             .is_err()
@@ -803,6 +805,11 @@ impl Options {
     /// Convenience function to enable debugging (like high verbosity) on this instance.
     pub fn enable_debug(&mut self) {
         self.verbosity_level = LevelFilter::Debug;
+    }
+
+    /// Convenience function to set verbosity level to only show errors and warnings.
+    pub fn set_quiet(&mut self) {
+        self.verbosity_level = LevelFilter::Warn
     }
 }
 

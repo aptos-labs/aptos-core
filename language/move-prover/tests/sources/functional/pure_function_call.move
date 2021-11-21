@@ -13,7 +13,7 @@ module 0x42::TestPureFun {
     }
 
     spec init {
-        aborts_if Signer::address_of(dr_account) != @DiemRoot;
+        aborts_if Signer::address_of(dr_account) != @0xA550C18;
         aborts_if exists<T>(Signer::address_of(dr_account));
         ensures dr_x() == pure_f_2();
     }
@@ -61,7 +61,7 @@ module 0x42::TestPureFun {
 
     spec module {
         fun dr_x(): u64 {
-            get_x(@DiemRoot)
+            get_x(@0xA550C18)
         }
     }
 

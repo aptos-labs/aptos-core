@@ -5053,6 +5053,7 @@ dependencies = [
  "disassembler",
  "errmapgen",
  "include_dir",
+ "itertools 0.10.1",
  "move-binary-format",
  "move-bytecode-utils",
  "move-bytecode-viewer",

@@ -1,4 +1,4 @@
-Move prover returns: exiting with boogie verification errors
+Move prover returns: exiting with verification errors
 error: caller does not have permission to modify `B::T` at given address
    ┌─ tests/sources/functional/ModifiesErrorTest.move:65:17
    │

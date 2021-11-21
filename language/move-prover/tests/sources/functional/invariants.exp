@@ -1,4 +1,4 @@
-Move prover returns: exiting with boogie verification errors
+Move prover returns: exiting with verification errors
 error: data invariant does not hold
    ┌─ tests/sources/functional/invariants.move:16:9
    │

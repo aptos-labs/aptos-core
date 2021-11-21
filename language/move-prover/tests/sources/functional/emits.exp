@@ -1,4 +1,4 @@
-Move prover returns: exiting with boogie verification errors
+Move prover returns: exiting with verification errors
 error: function does not emit the expected event
     ┌─ tests/sources/functional/emits.move:120:9
     │

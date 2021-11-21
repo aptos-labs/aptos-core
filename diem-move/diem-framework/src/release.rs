@@ -142,6 +142,7 @@ fn generate_error_map(package_path: &Path, output_path: &Path, build_config: Bui
         .move_model_for_package(
             package_path,
             ModelConfig {
+                target_filter: None,
                 all_files_as_targets: true,
             },
         )

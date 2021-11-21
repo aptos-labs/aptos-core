@@ -1,4 +1,4 @@
-Move prover returns: exiting with boogie verification errors
+Move prover returns: exiting with verification errors
 error: post-condition does not hold
    ┌─ tests/sources/functional/hash_model.move:25:9
    │
@@ -16,11 +16,11 @@ error: post-condition does not hold
    =         result_1 = <redacted>
    =         result_2 = <redacted>
    =     at tests/sources/functional/hash_model.move:18: hash_test1
-   =     at tests/sources/functional/hash_model.move:20
-   =     at tests/sources/functional/hash_model.move:21
-   =     at tests/sources/functional/hash_model.move:22
-   =     at tests/sources/functional/hash_model.move:23
-   =     at tests/sources/functional/hash_model.move:25
+   =     at tests/sources/functional/hash_model.move:20: hash_test1 (spec)
+   =     at tests/sources/functional/hash_model.move:21: hash_test1 (spec)
+   =     at tests/sources/functional/hash_model.move:22: hash_test1 (spec)
+   =     at tests/sources/functional/hash_model.move:23: hash_test1 (spec)
+   =     at tests/sources/functional/hash_model.move:25: hash_test1 (spec)
 
 error: post-condition does not hold
    ┌─ tests/sources/functional/hash_model.move:48:9
@@ -39,8 +39,8 @@ error: post-condition does not hold
    =         result_1 = <redacted>
    =         result_2 = <redacted>
    =     at tests/sources/functional/hash_model.move:44: hash_test1_incorrect
-   =     at tests/sources/functional/hash_model.move:46
-   =     at tests/sources/functional/hash_model.move:48
+   =     at tests/sources/functional/hash_model.move:46: hash_test1_incorrect (spec)
+   =     at tests/sources/functional/hash_model.move:48: hash_test1_incorrect (spec)
 
 error: post-condition does not hold
    ┌─ tests/sources/functional/hash_model.move:91:9
@@ -59,8 +59,8 @@ error: post-condition does not hold
    =         result_1 = <redacted>
    =         result_2 = <redacted>
    =     at tests/sources/functional/hash_model.move:87: hash_test2_incorrect
-   =     at tests/sources/functional/hash_model.move:89
-   =     at tests/sources/functional/hash_model.move:91
+   =     at tests/sources/functional/hash_model.move:89: hash_test2_incorrect (spec)
+   =     at tests/sources/functional/hash_model.move:91: hash_test2_incorrect (spec)
 
 error: post-condition does not hold
    ┌─ tests/sources/functional/hash_model.move:68:9
@@ -79,8 +79,8 @@ error: post-condition does not hold
    =         result_1 = <redacted>
    =         result_2 = <redacted>
    =     at tests/sources/functional/hash_model.move:61: hash_test3
-   =     at tests/sources/functional/hash_model.move:63
-   =     at tests/sources/functional/hash_model.move:64
-   =     at tests/sources/functional/hash_model.move:65
-   =     at tests/sources/functional/hash_model.move:66
-   =     at tests/sources/functional/hash_model.move:68
+   =     at tests/sources/functional/hash_model.move:63: hash_test3 (spec)
+   =     at tests/sources/functional/hash_model.move:64: hash_test3 (spec)
+   =     at tests/sources/functional/hash_model.move:65: hash_test3 (spec)
+   =     at tests/sources/functional/hash_model.move:66: hash_test3 (spec)
+   =     at tests/sources/functional/hash_model.move:68: hash_test3 (spec)
