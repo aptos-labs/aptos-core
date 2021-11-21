@@ -100,6 +100,25 @@ cargo test --test "forge" "api::"
 * Run `scripts/dev_setup.sh -a` to setup tools.
 * Run `make test` inside the `api` directory.
 
+### [Failpoint](https://docs.rs/fail/latest/fail/) setup
+
+Failpoint configuration example:
+
+```
+failpoints
+  api::endpoint_index: 1%return
+  api::endpoint_get_account_resources: 1%return
+  api::endpoint_get_account_modules: 1%return
+  api::endpoint_get_transaction: 1%return
+  api::endpoint_get_transactions: 1%return
+  api::endpoint_get_account_transactions: 1%return
+  api::endpoint_submit_json_transactions: 1%return
+  api::endpoint_submit_bcs_transactions: 1%return
+  api::endpoint_create_signing_message: 1%return
+  api::endpoint_get_events_by_event_key: 1%return
+  api::endpoint_get_events_by_event_handle: 1%return
+```
+
 ## Diem Node Operation
 
 Please refer to [Operation](Operation.md) document for details, including configuration, logging, metrics etc.

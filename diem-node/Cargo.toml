@@ -59,4 +59,4 @@ storage-service-server = { path = "../state-sync/storage-service/server" }
 [features]
 default = []
 assert-private-keys-not-cloneable = ["diem-crypto/assert-private-keys-not-cloneable"]
-failpoints = ["fail/failpoints", "consensus/failpoints", "executor/failpoints", "diem-json-rpc/failpoints", "diem-mempool/failpoints"]
+failpoints = ["fail/failpoints", "consensus/failpoints", "executor/failpoints", "diem-json-rpc/failpoints", "diem-mempool/failpoints", "diem-api/failpoints"]

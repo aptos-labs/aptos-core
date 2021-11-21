@@ -1616,6 +1616,7 @@ dependencies = [
  "diemdb",
  "executor",
  "executor-types",
+ "fail",
  "futures",
  "hex",
  "hyper",

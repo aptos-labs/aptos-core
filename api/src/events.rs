@@ -4,6 +4,7 @@
 use crate::{
     accounts::Account,
     context::Context,
+    failpoint::fail_point,
     metrics::metrics,
     page::Page,
     param::{AddressParam, EventKeyParam, MoveIdentifierParam, MoveStructTagParam},
@@ -42,6 +43,7 @@ async fn handle_get_events_by_event_key(
     page: Page,
     context: Context,
 ) -> Result<impl Reply, Rejection> {
+    fail_point("endpoint_get_events_by_event_key")?;
     Ok(Events::new(event_key.parse("event key")?.into(), context)?.list(page)?)
 }
 
@@ -52,6 +54,7 @@ async fn handle_get_events_by_event_handle(
     page: Page,
     context: Context,
 ) -> Result<impl Reply, Rejection> {
+    fail_point("endpoint_get_events_by_event_handle")?;
     let key =
         Account::new(None, address, context.clone())?.find_event_key(struct_tag, field_name)?;
     Ok(Events::new(key, context)?.list(page)?)

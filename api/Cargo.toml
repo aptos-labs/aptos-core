@@ -13,6 +13,7 @@ edition = "2018"
 anyhow = "1.0.38"
 bcs = "0.1.2"
 bytes = "1.0.1"
+fail = "0.4.0"
 futures = "0.3.12"
 hex = "0.4.3"
 hyper = "0.14.4"
@@ -54,3 +55,6 @@ vm-validator = { path = "../vm-validator" }
 diem-vm = { path = "../diem-move/diem-vm" }
 executor = { path = "../execution/executor" }
 executor-types = { path = "../execution/executor-types" }
+
+[features]
+failpoints = ["fail/failpoints"]

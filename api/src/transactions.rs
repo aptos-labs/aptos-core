@@ -3,6 +3,7 @@
 
 use crate::{
     context::Context,
+    failpoint::fail_point,
     metrics::metrics,
     page::Page,
     param::{AddressParam, TransactionIdParam},
@@ -111,12 +112,14 @@ async fn handle_get_transaction(
     id: TransactionIdParam,
     context: Context,
 ) -> Result<impl Reply, Rejection> {
+    fail_point("endpoint_get_transaction")?;
     Ok(Transactions::new(context)?
         .get_transaction(id.parse("transaction hash or version")?)
         .await?)
 }
 
 async fn handle_get_transactions(page: Page, context: Context) -> Result<impl Reply, Rejection> {
+    fail_point("endpoint_get_transactions")?;
     Ok(Transactions::new(context)?.list(page)?)
 }
 
@@ -125,6 +128,7 @@ async fn handle_get_account_transactions(
     page: Page,
     context: Context,
 ) -> Result<impl Reply, Rejection> {
+    fail_point("endpoint_get_account_transactions")?;
     Ok(Transactions::new(context)?.list_by_account(address, page)?)
 }
 
@@ -132,6 +136,7 @@ async fn handle_submit_json_transactions(
     body: UserTransactionRequest,
     context: Context,
 ) -> Result<impl Reply, Rejection> {
+    fail_point("endpoint_submit_json_transactions")?;
     Ok(Transactions::new(context)?
         .create_from_request(body)
         .await?)
@@ -141,6 +146,7 @@ async fn handle_submit_bcs_transactions(
     body: bytes::Bytes,
     context: Context,
 ) -> Result<impl Reply, Rejection> {
+    fail_point("endpoint_submit_bcs_transactions")?;
     let txn = bcs::from_bytes(&body)
         .map_err(|err| Error::invalid_request_body(format!("deserialize error: {}", err)))?;
     Ok(Transactions::new(context)?.create(txn).await?)
@@ -150,6 +156,7 @@ async fn handle_create_signing_message(
     body: UserTransactionRequest,
     context: Context,
 ) -> Result<impl Reply, Rejection> {
+    fail_point("endpoint_create_signing_message")?;
     Ok(Transactions::new(context)?.signing_message(body)?)
 }
 

@@ -12,5 +12,6 @@ pub(crate) mod param;
 pub mod runtime;
 mod transactions;
 
+mod failpoint;
 #[cfg(any(test))]
 pub(crate) mod tests;

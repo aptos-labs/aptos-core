@@ -4,7 +4,9 @@
 use crate::{
     accounts,
     context::Context,
-    events, log,
+    events,
+    failpoint::fail_point,
+    log,
     metrics::{metrics, status_metrics},
     transactions,
 };
@@ -83,6 +85,7 @@ pub fn index(context: Context) -> BoxedFilter<(impl Reply,)> {
 }
 
 pub async fn handle_index(context: Context) -> Result<impl Reply, Rejection> {
+    fail_point("endpoint_index")?;
     let info = context.get_latest_ledger_info()?;
     Ok(Response::new(info.clone(), &info)?)
 }

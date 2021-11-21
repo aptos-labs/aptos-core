@@ -3,6 +3,7 @@
 
 use crate::{
     context::Context,
+    failpoint::fail_point,
     metrics::metrics,
     param::{AddressParam, LedgerVersionParam, MoveIdentifierParam, MoveStructTagParam},
 };
@@ -71,6 +72,7 @@ async fn handle_get_account_resources(
     address: AddressParam,
     context: Context,
 ) -> Result<impl Reply, Rejection> {
+    fail_point("endpoint_get_account_resources")?;
     Ok(Account::new(ledger_version, address, context)?.resources()?)
 }
 
@@ -79,6 +81,7 @@ async fn handle_get_account_modules(
     address: AddressParam,
     context: Context,
 ) -> Result<impl Reply, Rejection> {
+    fail_point("endpoint_get_account_modules")?;
     Ok(Account::new(ledger_version, address, context)?.modules()?)
 }
 
