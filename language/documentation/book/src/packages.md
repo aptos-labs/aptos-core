@@ -60,7 +60,8 @@ authors* = [<string>]            # e.g., ["Joe Smith (joesmith@noemail.com)", "J
 
 [dependencies] # (Optional section) Paths to dependencies and instantiations or renamings of named addresses from each dependency
 # One or more lines declaring dependencies in the following format
-<string> = { local = <string>, addr_subst* = { (<string> = (<string> | "<hex_address>"))+ } }
+<string> = { local = <string>, addr_subst* = { (<string> = (<string> | "<hex_address>"))+ } } # local dependencies
+<string> = { git = <URL ending in .git>, subdir=<path to dir containing Move.toml inside git repo>, rev=<git commit hash>, addr_subst* = { (<string> = (<string> | "<hex_address>"))+ } } # git dependencies
 
 [dev-addresses] # (Optional section) Same as [addresses] section, but only included in "dev" and "test" modes
 # One or more lines declaring dev named addresses in the following format
@@ -71,7 +72,7 @@ authors* = [<string>]            # e.g., ["Joe Smith (joesmith@noemail.com)", "J
 <string> = { local = <string>, addr_subst* = { (<string> = (<string> | <address>))+ } }
 ```
 
-An example of the most minimal package manifest:
+An example of a minimal package manifest with one local dependency and one git dependency:
 
 ```
 [package]
@@ -94,7 +95,10 @@ AddressToBeFilledIn = "_"
 SpecifiedAddress = "0xB0B"
 
 [dependencies]
-MoveStdlib = { local = "<some_path>/move-stdlib", addr_subst = { "Std" = "0x1" } }
+# Local dependency
+LocalDep = { local = "projects/move-awesomeness", addr_subst = { "Std" = "0x1" } }
+# Git dependency
+MoveStdlib = { git = "https://github.com/diem/diem.git", subdir="language/move-stdlib", rev = "56ab033cc403b489e891424a629e76f643d4fb6b" }
 
 [dev-addresses] # For use when developing this module
 AddressToBeFilledIn = "0x101010101"
