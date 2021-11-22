@@ -54,7 +54,6 @@ use structopt::StructOpt;
 
 /// Config for diem management tools
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct Config {
     #[serde(deserialize_with = "chain_id::deserialize_config_chain_id")]
     pub chain_id: ChainId,

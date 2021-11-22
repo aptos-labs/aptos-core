@@ -12,7 +12,6 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 
 #[derive(Debug, Default, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct TestConfig {
     pub auth_key: Option<AuthenticationKey>,
     pub operator_key: Option<ConfigKey<Ed25519PrivateKey>>,

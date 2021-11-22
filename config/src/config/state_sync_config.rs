@@ -4,7 +4,7 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(default, deny_unknown_fields)]
+#[serde(default)]
 pub struct StateSyncConfig {
     // Size of chunk to request for state synchronization
     pub chunk_limit: u64,
@@ -50,7 +50,7 @@ impl Default for StateSyncConfig {
 }
 
 #[derive(Copy, Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(default, deny_unknown_fields)]
+#[serde(default)]
 pub struct StorageServiceConfig {
     pub max_account_states_chunk_sizes: u64, // Max num of accounts per chunk
     pub max_concurrent_requests: u64,        // Max num of concurrent storage server tasks
@@ -72,7 +72,7 @@ impl Default for StorageServiceConfig {
 }
 
 #[derive(Copy, Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(default, deny_unknown_fields)]
+#[serde(default)]
 pub struct DataStreamingServiceConfig {
     // The interval (milliseconds) at which to refresh the global data summary.
     pub global_summary_refresh_interval_ms: u64,

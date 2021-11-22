@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(default, deny_unknown_fields)]
+#[serde(default)]
 pub struct JsonRpcConfig {
     pub address: SocketAddr,
     pub batch_size_limit: u16,
@@ -49,7 +49,7 @@ impl JsonRpcConfig {
 /// This API is experimental and subject to change
 /// Documentation is in /json-rpc/src/stream_rpc/README.md
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(default, deny_unknown_fields)]
+#[serde(default)]
 pub struct StreamConfig {
     pub enabled: bool,
     pub subscription_fetch_size: u64,

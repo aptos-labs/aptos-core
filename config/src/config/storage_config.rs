@@ -12,7 +12,7 @@ use std::{
 /// see https://github.com/facebook/rocksdb/blob/master/include/rocksdb/options.h
 /// for detailed explanations.
 #[derive(Copy, Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(default, deny_unknown_fields)]
+#[serde(default)]
 pub struct RocksdbConfig {
     pub max_open_files: i32,
     pub max_total_wal_size: u64,
@@ -33,7 +33,7 @@ impl Default for RocksdbConfig {
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(default, deny_unknown_fields)]
+#[serde(default)]
 pub struct StorageConfig {
     pub address: SocketAddr,
     pub backup_service_address: SocketAddr,

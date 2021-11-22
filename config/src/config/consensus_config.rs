@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::PathBuf};
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(default, deny_unknown_fields)]
+#[serde(default)]
 pub struct ConsensusConfig {
     pub contiguous_rounds: u32,
     pub max_block_size: u64,
@@ -77,7 +77,6 @@ pub enum ConsensusProposerType {
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct LeaderReputationConfig {
     pub active_weights: u64,
     pub inactive_weights: u64,

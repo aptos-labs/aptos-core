@@ -56,7 +56,6 @@ pub struct DeprecatedConfig {}
 /// The config file is broken up into sections for each module
 /// so that only that module can be passed around
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct NodeConfig {
     #[serde(default)]
     pub base: BaseConfig,
@@ -91,7 +90,7 @@ pub struct NodeConfig {
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(default, deny_unknown_fields)]
+#[serde(default)]
 pub struct BaseConfig {
     data_dir: PathBuf,
     pub role: RoleType,

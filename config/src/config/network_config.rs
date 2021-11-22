@@ -47,7 +47,7 @@ pub const IP_BYTE_BUCKET_RATE: usize = 102400 /* 100 KiB */;
 pub const IP_BYTE_BUCKET_SIZE: usize = IP_BYTE_BUCKET_RATE;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(default, deny_unknown_fields)]
+#[serde(default)]
 pub struct NetworkConfig {
     // Maximum backoff delay for connecting outbound to peers
     pub max_connection_delay_ms: u64,
@@ -332,7 +332,6 @@ impl Identity {
 
 /// The identity is stored within the config.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct IdentityFromConfig {
     #[serde(flatten)]
     pub key: ConfigKey<x25519::PrivateKey>,
@@ -341,7 +340,6 @@ pub struct IdentityFromConfig {
 
 /// This represents an identity in a secure-storage as defined in NodeConfig::secure.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct IdentityFromStorage {
     pub backend: SecureBackend,
     pub key_name: String,
