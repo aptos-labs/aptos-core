@@ -5,3 +5,4 @@ package coverage source --module AModule
 package coverage bytecode --module AModule
 package disassemble --package MoveStdlib --name Errors
 package errmap
+package info

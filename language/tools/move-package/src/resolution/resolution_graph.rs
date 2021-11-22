@@ -17,7 +17,8 @@ use anyhow::{bail, Context, Result};
 use move_command_line_common::files::find_move_filenames;
 use move_core_types::account_address::AccountAddress;
 use move_symbol_pool::Symbol;
-use petgraph::{algo, graphmap::DiGraphMap};
+use petgraph::{algo, graphmap::DiGraphMap, Outgoing};
+use ptree::{print_tree, TreeBuilder};
 use std::{
     cell::RefCell,
     collections::{BTreeMap, BTreeSet},
@@ -630,6 +631,30 @@ impl ResolvingNamedAddress {
 impl ResolvedGraph {
     pub fn get_package(&self, package_ident: &PackageName) -> &ResolvedPackage {
         self.package_table.get(package_ident).unwrap()
+    }
+
+    fn print_info_dfs(&self, current_node: &PackageName, tree: &mut TreeBuilder) -> Result<()> {
+        let pkg = self.package_table.get(current_node).unwrap();
+
+        for (name, addr) in &pkg.resolution_table {
+            tree.add_empty_child(format!("{}:0x{}", name, addr.short_str_lossless()));
+        }
+
+        for node in self.graph.neighbors_directed(*current_node, Outgoing) {
+            tree.begin_child(node.to_string());
+            self.print_info_dfs(&node, tree)?;
+            tree.end_child();
+        }
+        Ok(())
+    }
+
+    pub fn print_info(&self) -> Result<()> {
+        let root = self.root_package.package.name;
+        let mut tree = TreeBuilder::new(root.to_string());
+        self.print_info_dfs(&root, &mut tree)?;
+        let tree = tree.build();
+        print_tree(&tree)?;
+        Ok(())
     }
 }
 

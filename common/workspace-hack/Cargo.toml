@@ -13,6 +13,7 @@ edition = "2018"
 [target.x86_64-unknown-linux-gnu.dependencies]
 Inflector = { version = "0.11.4", features = ["default", "heavyweight", "lazy_static", "regex"] }
 anyhow = { version = "1.0.40", features = ["backtrace", "default", "std"] }
+arrayvec = { version = "0.5.2", features = ["array-sizes-33-128", "default", "std"] }
 backtrace = { version = "0.3.56", features = ["addr2line", "default", "gimli-symbolize", "miniz_oxide", "object", "serde", "std"] }
 bitvec = { version = "0.19.5", features = ["alloc", "atomic", "default", "std"] }
 block-buffer = { version = "0.9.0", default-features = false, features = ["block-padding"] }
@@ -70,6 +71,7 @@ zeroize = { version = "1.2.0", features = ["alloc", "default", "zeroize_derive"]
 [target.x86_64-unknown-linux-gnu.build-dependencies]
 Inflector = { version = "0.11.4", features = ["default", "heavyweight", "lazy_static", "regex"] }
 anyhow = { version = "1.0.40", features = ["backtrace", "default", "std"] }
+arrayvec = { version = "0.5.2", features = ["array-sizes-33-128", "default", "std"] }
 backtrace = { version = "0.3.56", features = ["addr2line", "default", "gimli-symbolize", "miniz_oxide", "object", "serde", "std"] }
 bitvec = { version = "0.19.5", features = ["alloc", "atomic", "default", "std"] }
 block-buffer = { version = "0.9.0", default-features = false, features = ["block-padding"] }
@@ -132,6 +134,7 @@ zeroize = { version = "1.2.0", features = ["alloc", "default", "zeroize_derive"]
 [target.x86_64-apple-darwin.dependencies]
 Inflector = { version = "0.11.4", features = ["default", "heavyweight", "lazy_static", "regex"] }
 anyhow = { version = "1.0.40", features = ["backtrace", "default", "std"] }
+arrayvec = { version = "0.5.2", features = ["array-sizes-33-128", "default", "std"] }
 backtrace = { version = "0.3.56", features = ["addr2line", "default", "gimli-symbolize", "miniz_oxide", "object", "serde", "std"] }
 bitvec = { version = "0.19.5", features = ["alloc", "atomic", "default", "std"] }
 block-buffer = { version = "0.9.0", default-features = false, features = ["block-padding"] }
@@ -189,6 +192,7 @@ zeroize = { version = "1.2.0", features = ["alloc", "default", "zeroize_derive"]
 [target.x86_64-apple-darwin.build-dependencies]
 Inflector = { version = "0.11.4", features = ["default", "heavyweight", "lazy_static", "regex"] }
 anyhow = { version = "1.0.40", features = ["backtrace", "default", "std"] }
+arrayvec = { version = "0.5.2", features = ["array-sizes-33-128", "default", "std"] }
 backtrace = { version = "0.3.56", features = ["addr2line", "default", "gimli-symbolize", "miniz_oxide", "object", "serde", "std"] }
 bitvec = { version = "0.19.5", features = ["alloc", "atomic", "default", "std"] }
 block-buffer = { version = "0.9.0", default-features = false, features = ["block-padding"] }

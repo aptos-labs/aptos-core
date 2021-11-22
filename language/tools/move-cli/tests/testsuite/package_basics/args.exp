@@ -157,3 +157,8 @@ B0:
 }
 }
 Command `package errmap`:
+Command `package info`:
+PackageBasics
+├─ Std:0x1
+└─ MoveStdlib
+   └─ Std:0x1

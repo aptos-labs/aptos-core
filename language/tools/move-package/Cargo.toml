@@ -19,6 +19,7 @@ serde_yaml = "0.8.17"
 tempfile = "3.2.0"
 sha2 = "0.9.3"
 regex = "1.1.9"
+ptree = "0.4.0"
 
 diem-workspace-hack = { path = "../../../common/workspace-hack" }
 move-binary-format = { path = "../../move-binary-format" }

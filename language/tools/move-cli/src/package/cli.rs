@@ -75,6 +75,9 @@ pub enum PackageCommand {
     /// Build the package at `path`. If no path is provided defaults to current directory.
     #[structopt(name = "build")]
     Build,
+    /// Print address information.
+    #[structopt(name = "info")]
+    Info,
     /// Generate error map for the package and its dependencies at `path` for use by the Move
     /// explanation tool.
     #[structopt(name = "errmap")]
@@ -265,6 +268,9 @@ pub fn handle_package_commands(
     match cmd {
         PackageCommand::Build => {
             config.compile_package(&rooted_path?, &mut std::io::stdout())?;
+        }
+        PackageCommand::Info => {
+            config.resolution_graph_for_package(&path)?.print_info()?;
         }
         PackageCommand::BytecodeView {
             interactive,
