@@ -3,6 +3,7 @@
 
 use super::*;
 use crate::{
+    chunk_executor::ChunkExecutor,
     db_bootstrapper::{generate_waypoint, maybe_bootstrap},
     mock_vm::{
         encode_mint_transaction, encode_reconfiguration_transaction, encode_transfer_transaction,
@@ -16,15 +17,15 @@ use diem_types::{
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     transaction::{
-        default_protocol::{TransactionListWithProof, TransactionOutputListWithProof},
-        Transaction, TransactionStatus, Version,
+        default_protocol::TransactionListWithProof, Transaction, TransactionStatus, Version,
     },
 };
 use diemdb::DiemDB;
-use executor_types::{BlockExecutor, ChunkExecutor, TransactionReplayer};
+use executor_types::{BlockExecutor, ChunkExecutorTrait, TransactionReplayer};
 use proptest::prelude::*;
-use rand::Rng;
 use std::collections::BTreeMap;
+
+mod chunk_executor_tests;
 
 fn execute_and_commit_block(
     executor: &TestExecutor,
@@ -304,231 +305,6 @@ fn create_transaction_chunks(
     (batches, ledger_info)
 }
 
-fn execute_and_commit_chunk(
-    chunks: Vec<TransactionListWithProof>,
-    ledger_info: LedgerInfoWithSignatures,
-    db: &DbReaderWriter,
-    executor: &Executor<DpnProto, MockVM>,
-) {
-    // Execute the first chunk. After that we should still get the genesis ledger info from DB.
-    executor
-        .execute_and_commit_chunk(chunks[0].clone(), ledger_info.clone(), None)
-        .unwrap();
-    let li = db.reader.get_latest_ledger_info().unwrap();
-    assert_eq!(li.ledger_info().version(), 0);
-    assert_eq!(li.ledger_info().consensus_block_id(), HashValue::zero());
-
-    // Execute the second chunk. After that we should still get the genesis ledger info from DB.
-    executor
-        .execute_and_commit_chunk(chunks[1].clone(), ledger_info.clone(), None)
-        .unwrap();
-    let li = db.reader.get_latest_ledger_info().unwrap();
-    assert_eq!(li.ledger_info().version(), 0);
-    assert_eq!(li.ledger_info().consensus_block_id(), HashValue::zero());
-
-    // Execute an empty chunk. After that we should still get the genesis ledger info from DB.
-    executor
-        .execute_and_commit_chunk(
-            TransactionListWithProof::new_empty(),
-            ledger_info.clone(),
-            None,
-        )
-        .unwrap();
-    let li = db.reader.get_latest_ledger_info().unwrap();
-    assert_eq!(li.ledger_info().version(), 0);
-    assert_eq!(li.ledger_info().consensus_block_id(), HashValue::zero());
-
-    // Execute the second chunk again. After that we should still get the same thing.
-    executor
-        .execute_and_commit_chunk(chunks[1].clone(), ledger_info.clone(), None)
-        .unwrap();
-    let li = db.reader.get_latest_ledger_info().unwrap();
-    assert_eq!(li.ledger_info().version(), 0);
-    assert_eq!(li.ledger_info().consensus_block_id(), HashValue::zero());
-
-    // Execute the third chunk. After that we should get the new ledger info.
-    executor
-        .execute_and_commit_chunk(chunks[2].clone(), ledger_info.clone(), None)
-        .unwrap();
-    let li = db.reader.get_latest_ledger_info().unwrap();
-    assert_eq!(li, ledger_info);
-}
-
-#[test]
-fn test_executor_execute_or_apply_and_commit_chunk() {
-    let first_batch_size = 30;
-    let second_batch_size = 40;
-    let third_batch_size = 20;
-    let overlapping_size = 5;
-
-    let first_batch_start = 1;
-    let second_batch_start = first_batch_start + first_batch_size;
-    let third_batch_start = second_batch_start + second_batch_size - overlapping_size;
-
-    let (chunks, ledger_info) = {
-        create_transaction_chunks(vec![
-            first_batch_start..first_batch_start + first_batch_size,
-            second_batch_start..second_batch_start + second_batch_size,
-            third_batch_start..third_batch_start + third_batch_size,
-        ])
-    };
-    // First test with transactions only and reset chunks to be `Vec<TransactionOutputListWithProof>`.
-    let chunks = {
-        let TestExecutor {
-            _path,
-            db,
-            executor,
-        } = TestExecutor::new();
-        execute_and_commit_chunk(chunks, ledger_info.clone(), &db, &executor);
-
-        let ledger_version = db.reader.get_latest_version().unwrap();
-        let output1 = db
-            .reader
-            .get_transaction_outputs(first_batch_start, first_batch_size, ledger_version)
-            .unwrap();
-        let output2 = db
-            .reader
-            .get_transaction_outputs(second_batch_start, second_batch_size, ledger_version)
-            .unwrap();
-        let output3 = db
-            .reader
-            .get_transaction_outputs(third_batch_start, third_batch_size, ledger_version)
-            .unwrap();
-        vec![output1, output2, output3]
-    };
-
-    // Test with transaction outputs.
-    let TestExecutor {
-        _path,
-        db,
-        executor,
-    } = TestExecutor::new();
-    // Execute the first chunk. After that we should still get the genesis ledger info from DB.
-    executor
-        .apply_and_commit_chunk(chunks[0].clone(), ledger_info.clone(), None)
-        .unwrap();
-    let li = db.reader.get_latest_ledger_info().unwrap();
-    assert_eq!(li.ledger_info().version(), 0);
-    assert_eq!(li.ledger_info().consensus_block_id(), HashValue::zero());
-
-    // Execute the second chunk. After that we should still get the genesis ledger info from DB.
-    executor
-        .apply_and_commit_chunk(chunks[1].clone(), ledger_info.clone(), None)
-        .unwrap();
-    let li = db.reader.get_latest_ledger_info().unwrap();
-    assert_eq!(li.ledger_info().version(), 0);
-    assert_eq!(li.ledger_info().consensus_block_id(), HashValue::zero());
-
-    // Execute an empty chunk. After that we should still get the genesis ledger info from DB.
-    executor
-        .apply_and_commit_chunk(
-            TransactionOutputListWithProof::new_empty(),
-            ledger_info.clone(),
-            None,
-        )
-        .unwrap();
-    let li = db.reader.get_latest_ledger_info().unwrap();
-    assert_eq!(li.ledger_info().version(), 0);
-    assert_eq!(li.ledger_info().consensus_block_id(), HashValue::zero());
-
-    // Execute the second chunk again. After that we should still get the same thing.
-    executor
-        .apply_and_commit_chunk(chunks[1].clone(), ledger_info.clone(), None)
-        .unwrap();
-    let li = db.reader.get_latest_ledger_info().unwrap();
-    assert_eq!(li.ledger_info().version(), 0);
-    assert_eq!(li.ledger_info().consensus_block_id(), HashValue::zero());
-
-    // Execute the third chunk. After that we should get the new ledger info.
-    executor
-        .apply_and_commit_chunk(chunks[2].clone(), ledger_info.clone(), None)
-        .unwrap();
-    let li = db.reader.get_latest_ledger_info().unwrap();
-    assert_eq!(li, ledger_info);
-}
-
-#[test]
-fn test_executor_execute_and_commit_chunk_restart() {
-    let first_batch_size = 30;
-    let second_batch_size = 40;
-
-    let (chunks, ledger_info) = {
-        let first_batch_start = 1;
-        let second_batch_start = first_batch_start + first_batch_size;
-        create_transaction_chunks(vec![
-            first_batch_start..first_batch_start + first_batch_size,
-            second_batch_start..second_batch_start + second_batch_size,
-        ])
-    };
-
-    let TestExecutor {
-        _path,
-        db,
-        executor,
-    } = TestExecutor::new();
-
-    // First we simulate syncing the first chunk of transactions.
-    {
-        executor
-            .execute_and_commit_chunk(chunks[0].clone(), ledger_info.clone(), None)
-            .unwrap();
-        let li = db.reader.get_latest_ledger_info().unwrap();
-        assert_eq!(li.ledger_info().version(), 0);
-        assert_eq!(li.ledger_info().consensus_block_id(), HashValue::zero());
-    }
-
-    // Then we restart executor and resume to the next chunk.
-    {
-        let executor = Executor::<DpnProto, MockVM>::new(db.clone());
-
-        executor
-            .execute_and_commit_chunk(chunks[1].clone(), ledger_info.clone(), None)
-            .unwrap();
-        let li = db.reader.get_latest_ledger_info().unwrap();
-        assert_eq!(li, ledger_info);
-    }
-}
-
-#[test]
-fn test_executor_execute_and_commit_chunk_local_result_mismatch() {
-    let first_batch_size = 10;
-    let second_batch_size = 10;
-
-    let (chunks, ledger_info) = {
-        let first_batch_start = 1;
-        let second_batch_start = first_batch_start + first_batch_size;
-        create_transaction_chunks(vec![
-            first_batch_start..first_batch_start + first_batch_size,
-            second_batch_start..second_batch_start + second_batch_size,
-        ])
-    };
-
-    let TestExecutor {
-        _path,
-        db: _,
-        executor,
-    } = TestExecutor::new();
-    // commit 5 txns first.
-    {
-        let parent_block_id = executor.committed_block_id();
-        let block_id = gen_block_id(1);
-        let version = 5;
-        let mut rng = rand::thread_rng();
-        let txns = (0..version)
-            .map(|_| encode_mint_transaction(gen_address(rng.gen::<u64>()), 100))
-            .collect::<Vec<_>>();
-        let output = executor
-            .execute_block((block_id, txns), parent_block_id)
-            .unwrap();
-        let ledger_info = gen_ledger_info(version, output.root_hash(), block_id, 1);
-        executor.commit_blocks(vec![block_id], ledger_info).unwrap();
-    }
-    // Fork starts. Should fail.
-    assert!(executor
-        .execute_and_commit_chunk(chunks[0].clone(), ledger_info, None)
-        .is_err());
-}
-
 #[test]
 fn test_noop_block_after_reconfiguration() {
     let executor = TestExecutor::new();
@@ -758,21 +534,21 @@ proptest! {
                 overlap_start..overlap_end
             ]);
 
-        let TestExecutor { _path, db: _, executor } = TestExecutor::new();
-        let parent_block_id = executor.committed_block_id();
-
         let overlap_txn_list_with_proof = chunks.pop().unwrap();
         let txn_list_with_proof_to_commit = chunks.pop().unwrap();
         let mut first_block_txns = txn_list_with_proof_to_commit.transactions.clone();
 
         // Commit the first chunk without committing the ledger info.
-        executor.
-            execute_and_commit_chunk(txn_list_with_proof_to_commit, ledger_info, None).unwrap();
+        let TestExecutor { _path, db, executor } = TestExecutor::new();
+        ChunkExecutor::<MockVM>::new(db).unwrap()
+            .execute_and_commit_chunk(txn_list_with_proof_to_commit, &ledger_info, None).unwrap();
 
         first_block_txns.extend(overlap_txn_list_with_proof.transactions);
         let second_block_txns = ((chunk_size + overlap_size + 1..=chunk_size + overlap_size + num_new_txns)
                              .map(|i| encode_mint_transaction(gen_address(i), 100))).collect::<Vec<_>>();
 
+        executor.reset().unwrap();
+        let parent_block_id = executor.committed_block_id();
         let first_block_id = gen_block_id(1);
         let _output1 = executor.execute_block(
             (first_block_id, first_block_txns),

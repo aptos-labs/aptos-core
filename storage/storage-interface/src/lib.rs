@@ -97,6 +97,10 @@ impl StartupInfo {
                     .expect("EpochState must exist")
             })
     }
+
+    pub fn into_latest_tree_state(self) -> TreeState {
+        self.synced_tree_state.unwrap_or(self.committed_tree_state)
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]

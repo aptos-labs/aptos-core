@@ -38,7 +38,7 @@ use diemdb::DiemDB;
 use event_notifications::{
     EventNotificationSender, EventSubscriptionService, ReconfigNotificationListener,
 };
-use executor::Executor;
+use executor::chunk_executor::ChunkExecutor;
 use executor_test_helpers::bootstrap_genesis;
 use futures::channel::{mpsc, oneshot};
 use mempool_notifications::{
@@ -127,7 +127,7 @@ fn create_driver_for_tests(
         mempool_notifications::new_mempool_notifier_listener_pair();
 
     // Create the chunk executor
-    let chunk_executor = Box::new(Executor::<DpnProto, DiemVM>::new(db_rw.clone()));
+    let chunk_executor = Box::new(ChunkExecutor::<DiemVM>::new(db_rw.clone()).unwrap());
 
     // Create a streaming service client
     let (streaming_service_client, _) = new_streaming_service_client_listener_pair();

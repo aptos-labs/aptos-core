@@ -30,14 +30,13 @@ use diem_types::{
     chain_id::ChainId,
     move_resource::MoveStorage,
     on_chain_config::{VMPublishingOption, ON_CHAIN_CONFIG_REGISTRY},
-    protocol_spec::DpnProto,
     waypoint::Waypoint,
 };
 use diem_vm::DiemVM;
 use diemdb::DiemDB;
 use event_notifications::EventSubscriptionService;
-use executor::{db_bootstrapper::maybe_bootstrap, Executor};
-use executor_types::ChunkExecutor;
+use executor::{chunk_executor::ChunkExecutor, db_bootstrapper::maybe_bootstrap};
+use executor_types::ChunkExecutorTrait;
 use futures::channel::mpsc::channel;
 use mempool_notifications::MempoolNotificationSender;
 use network::application::storage::PeerMetadataStorage;
@@ -233,8 +232,8 @@ fn fetch_chain_id(db: &DbReaderWriter) -> ChainId {
         .chain_id()
 }
 
-fn setup_chunk_executor(db: DbReaderWriter) -> Box<dyn ChunkExecutor> {
-    Box::new(Executor::<DpnProto, DiemVM>::new(db))
+fn setup_chunk_executor(db: DbReaderWriter) -> Box<dyn ChunkExecutorTrait> {
+    Box::new(ChunkExecutor::<DiemVM>::new(db).unwrap())
 }
 
 fn setup_debug_interface(config: &NodeConfig, logger: Option<Arc<Logger>>) -> NodeDebugService {
@@ -261,7 +260,7 @@ fn create_state_sync_runtimes<M: MempoolNotificationSender + 'static>(
     peer_metadata_storage: Arc<PeerMetadataStorage>,
     mempool_notifier: M,
     consensus_listener: ConsensusNotificationListener,
-    chunk_executor: Box<dyn ChunkExecutor>,
+    chunk_executor: Box<dyn ChunkExecutorTrait>,
     waypoint: Waypoint,
     event_subscription_service: EventSubscriptionService,
     db_rw: DbReaderWriter,

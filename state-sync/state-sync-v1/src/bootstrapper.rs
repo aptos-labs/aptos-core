@@ -10,7 +10,7 @@ use consensus_notifications::ConsensusNotificationListener;
 use diem_config::{config::NodeConfig, network_id::NetworkId};
 use diem_types::{protocol_spec::DpnProto, waypoint::Waypoint};
 use event_notifications::EventSubscriptionService;
-use executor_types::ChunkExecutor;
+use executor_types::ChunkExecutorTrait;
 use futures::channel::mpsc;
 use mempool_notifications::MempoolNotificationSender;
 use std::{boxed::Box, collections::HashMap, sync::Arc};
@@ -30,7 +30,7 @@ impl StateSyncBootstrapper {
         mempool_notifier: M,
         consensus_listener: ConsensusNotificationListener,
         storage: Arc<dyn DbReader<DpnProto>>,
-        executor: Box<dyn ChunkExecutor>,
+        executor: Box<dyn ChunkExecutorTrait>,
         node_config: &NodeConfig,
         waypoint: Waypoint,
         event_subscription_service: EventSubscriptionService,

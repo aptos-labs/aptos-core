@@ -862,6 +862,59 @@ impl<T: TransactionInfoTrait> TransactionInfoListWithProof<T> {
             &txn_info_hashes,
         )
     }
+
+    pub fn verify_extends_ledger(
+        &self,
+        num_txns_in_ledger: LeafCount,
+        root_hash: HashValue,
+        first_transaction_info_version: Option<Version>,
+    ) -> Result<usize> {
+        if let Some(first_version) = first_transaction_info_version {
+            ensure!(
+                first_version <= num_txns_in_ledger,
+                "Transaction list too new. Expected version: {}. First transaction version: {}.",
+                num_txns_in_ledger,
+                first_version
+            );
+            let num_overlap_txns = (num_txns_in_ledger - first_version) as usize;
+            if num_overlap_txns > self.transaction_infos.len() {
+                // Entire chunk is in the past, hard to verify if there's a fork.
+                // A fork will need to be detected later.
+                return Ok(self.transaction_infos.len());
+            }
+            let overlap_txn_infos = &self.transaction_infos[..num_overlap_txns];
+
+            // Left side of the proof happens to be the frozen subtree roots of the accumulator
+            // right before the list of txns are applied.
+            let frozen_subtree_roots_from_proof = self
+                .ledger_info_to_transaction_infos_proof
+                .left_siblings()
+                .iter()
+                .rev()
+                .cloned()
+                .collect::<Vec<_>>();
+            let accu_from_proof = InMemoryAccumulator::<TransactionAccumulatorHasher>::new(
+                frozen_subtree_roots_from_proof,
+                first_version,
+            )?
+            .append(
+                &overlap_txn_infos
+                    .iter()
+                    .map(CryptoHash::hash)
+                    .collect::<Vec<_>>()[..],
+            );
+            // The two accumulator root hashes should be identical.
+            ensure!(
+                accu_from_proof.root_hash() == root_hash,
+                "Fork happens because the current synced_trees doesn't match the txn list provided."
+            );
+            Ok(num_overlap_txns)
+        } else {
+            // Assuming input is empty
+            ensure!(self.transaction_infos.is_empty());
+            Ok(0)
+        }
+    }
 }
 
 /// A proof that first verifies that establishes correct computation of the root and then

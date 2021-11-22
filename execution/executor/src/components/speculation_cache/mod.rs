@@ -195,11 +195,6 @@ impl SpeculationCache {
         self.synced_trees = new_trees;
     }
 
-    pub fn reset(&mut self) {
-        self.heads = vec![];
-        *self.block_map.lock() = HashMap::new();
-    }
-
     pub fn add_block(
         &mut self,
         parent_block_id: HashValue,

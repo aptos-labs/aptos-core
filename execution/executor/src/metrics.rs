@@ -53,7 +53,17 @@ pub static DIEM_EXECUTOR_EXECUTE_BLOCK_SECONDS: Lazy<Histogram> = Lazy::new(|| {
         // metric name
         "diem_executor_execute_block_seconds",
         // metric description
-        "The total time spent in seconds of block execution in Diem executor "
+        "The total time spent in seconds of block execution in the block executor."
+    )
+    .unwrap()
+});
+
+pub static DIEM_EXECUTOR_VM_EXECUTE_CHUNK_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "diem_executor_vm_execute_chunk_seconds",
+        // metric description
+        "The total time spent in seconds of chunk execution in the chunk executor."
     )
     .unwrap()
 });

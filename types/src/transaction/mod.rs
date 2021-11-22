@@ -793,6 +793,13 @@ impl TransactionStatus {
             TransactionStatus::Retry => true,
         }
     }
+
+    pub fn as_kept_status(&self) -> Result<KeptVMStatus> {
+        match self {
+            TransactionStatus::Keep(s) => Ok(s.clone()),
+            _ => Err(format_err!("Not Keep.")),
+        }
+    }
 }
 
 impl From<VMStatus> for TransactionStatus {

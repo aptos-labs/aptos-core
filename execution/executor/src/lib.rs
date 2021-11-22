@@ -11,6 +11,7 @@ use std::{
 };
 
 use anyhow::{bail, ensure, format_err, Result};
+use components::speculation_cache::SpeculationCache;
 use fail::fail_point;
 
 use diem_crypto::{
@@ -26,13 +27,12 @@ use diem_types::{
     account_state_blob::AccountStateBlob,
     contract_event::ContractEvent,
     epoch_state::EpochState,
-    ledger_info::LedgerInfoWithSignatures,
     on_chain_config,
-    proof::{accumulator::InMemoryAccumulator, TransactionInfoListWithProof},
+    proof::accumulator::InMemoryAccumulator,
     protocol_spec::{DpnProto, ProtocolSpec},
     transaction::{
         Transaction, TransactionInfoTrait, TransactionOutput, TransactionPayload,
-        TransactionStatus, TransactionToCommit, Version,
+        TransactionStatus, TransactionToCommit,
     },
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
@@ -43,24 +43,20 @@ use storage_interface::{
     default_protocol::DbReaderWriter, state_view::VerifiedStateView, TreeState,
 };
 
-use crate::{
-    logging::{LogEntry, LogSchema},
-    metrics::DIEM_EXECUTOR_ERRORS,
-    speculation_cache::SpeculationCache,
-};
+use crate::metrics::DIEM_EXECUTOR_ERRORS;
 
-#[cfg(test)]
-mod executor_test;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod fuzzing;
 mod logging;
 pub mod metrics;
 #[cfg(test)]
 mod mock_vm;
-mod speculation_cache;
+#[cfg(test)]
+mod tests;
 
-mod block_executor_impl;
-mod chunk_executor_impl;
+pub mod block_executor_impl;
+pub mod chunk_executor;
+mod components;
 pub mod db_bootstrapper;
 mod transaction_replayer_impl;
 
@@ -111,152 +107,6 @@ where
             cache: RwLock::new(SpeculationCache::new_for_db_bootstrapping(tree_state)),
             phantom: PhantomData,
         }
-    }
-
-    /// In case there is a new LI to be added to a LedgerStore, verify and return it.
-    fn find_chunk_li(
-        verified_target_li: LedgerInfoWithSignatures,
-        epoch_change_li: Option<LedgerInfoWithSignatures>,
-        new_output: &ProcessedVMOutput,
-    ) -> Result<Option<LedgerInfoWithSignatures>> {
-        // If the chunk corresponds to the target LI, the target LI can be added to storage.
-        if verified_target_li.ledger_info().version() == new_output.version().unwrap_or(0) {
-            ensure!(
-                verified_target_li
-                    .ledger_info()
-                    .transaction_accumulator_hash()
-                    == new_output.accu_root(),
-                "Root hash in target ledger info does not match local computation."
-            );
-            return Ok(Some(verified_target_li));
-        }
-        // If the epoch change LI is present, it must match the version of the chunk:
-        // verify the version and the root hash.
-        if let Some(epoch_change_li) = epoch_change_li {
-            // Verify that the given ledger info corresponds to the new accumulator.
-            ensure!(
-                epoch_change_li.ledger_info().transaction_accumulator_hash()
-                    == new_output.accu_root(),
-                "Root hash of a given epoch LI does not match local computation."
-            );
-            ensure!(
-                epoch_change_li.ledger_info().version() == new_output.version().unwrap_or(0),
-                "Version of a given epoch LI does not match local computation."
-            );
-            ensure!(
-                epoch_change_li.ledger_info().ends_epoch(),
-                "Epoch change LI does not carry validator set"
-            );
-            ensure!(
-                epoch_change_li.ledger_info().next_epoch_state()
-                    == new_output.epoch_state().as_ref(),
-                "New validator set of a given epoch LI does not match local computation"
-            );
-            return Ok(Some(epoch_change_li));
-        }
-        ensure!(
-            new_output.epoch_state().is_none(),
-            "End of epoch chunk based on local computation but no EoE LedgerInfo provided."
-        );
-        Ok(None)
-    }
-
-    /// Skip the already-persisted chunk and return transactions and optional outputs to be applied.
-    /// Specifically:
-    ///  1. Verify that transactions to skip match what's already persisted (no fork).
-    ///  2. Return transactions, outputs and txn_infos to be applied.
-    fn filter_chunk(
-        &self,
-        mut transactions: Vec<Transaction>,
-        mut txn_outputs: Option<Vec<TransactionOutput>>,
-        first_version: Option<Version>,
-        proof: TransactionInfoListWithProof<PS::TransactionInfo>,
-    ) -> Result<(
-        Vec<Transaction>,
-        Option<Vec<TransactionOutput>>,
-        Vec<PS::TransactionInfo>,
-    )> {
-        if let Some(ref outputs) = txn_outputs {
-            ensure!(
-                outputs.len() == transactions.len(),
-                "the number of transactions {} doesn't \
-                 match the number of transactions outputs {}.",
-                transactions.len(),
-                outputs.len()
-            );
-        }
-
-        // Return empty if there's no work to do.
-        if transactions.is_empty() {
-            return Ok((vec![], None, vec![]));
-        }
-
-        let first_txn_version = match first_version {
-            Some(tx) => tx as Version,
-            None => {
-                bail!("first_txn_version doesn't exist",);
-            }
-        };
-        let read_lock = self.cache.read();
-
-        let num_committed_txns = read_lock.synced_trees().txn_accumulator().num_leaves();
-        ensure!(
-            first_txn_version <= num_committed_txns,
-            "Transaction list too new. Expected version: {}. First transaction version: {}.",
-            num_committed_txns,
-            first_txn_version
-        );
-        let versions_between_first_and_committed = num_committed_txns - first_txn_version;
-        if transactions.len() <= versions_between_first_and_committed as usize {
-            // All already in DB, nothing to do.
-            return Ok((vec![], None, vec![]));
-        }
-
-        // 2. Verify that skipped transactions match what's already persisted (no fork):
-        let num_txns_to_skip = num_committed_txns - first_txn_version;
-
-        debug!(
-            LogSchema::new(LogEntry::ChunkExecutor).num(num_txns_to_skip),
-            "skipping_chunk_txns(outputs)"
-        );
-
-        // If the proof is verified, then the length of txn_infos and txns must be the same.
-        let skipped_transaction_infos = &proof.transaction_infos[..num_txns_to_skip as usize];
-
-        // Left side of the proof happens to be the frozen subtree roots of the accumulator
-        // right before the list of txns are applied.
-        let frozen_subtree_roots_from_proof = proof
-            .ledger_info_to_transaction_infos_proof
-            .left_siblings()
-            .iter()
-            .rev()
-            .cloned()
-            .collect::<Vec<_>>();
-        let accu_from_proof = InMemoryAccumulator::<TransactionAccumulatorHasher>::new(
-            frozen_subtree_roots_from_proof,
-            first_txn_version,
-        )?
-        .append(
-            &skipped_transaction_infos
-                .iter()
-                .map(CryptoHash::hash)
-                .collect::<Vec<_>>()[..],
-        );
-        // The two accumulator root hashes should be identical.
-        ensure!(
-            read_lock.synced_trees().state_id() == accu_from_proof.root_hash(),
-            "Fork happens because the current synced_trees doesn't match the txn list provided."
-        );
-
-        // 3. Return verified transactions to be applied.
-        transactions.drain(0..num_txns_to_skip as usize);
-        if let Some(ref mut outputs) = txn_outputs {
-            outputs.drain(0..num_txns_to_skip as usize);
-        }
-        let mut txn_infos = proof.transaction_infos;
-        txn_infos.drain(0..num_txns_to_skip as usize);
-
-        Ok((transactions, txn_outputs, txn_infos))
     }
 
     /// Post-processing of what the VM outputs. Returns the entire block's output.
@@ -335,8 +185,7 @@ where
                 InMemoryAccumulator::<EventAccumulatorHasher>::from_leaves(&event_hashes)
             };
 
-            let mut txn_info_hash = None;
-            match vm_output.status() {
+            let txn_info_hash = match vm_output.status() {
                 TransactionStatus::Keep(status) => {
                     ensure!(
                         !vm_output.write_set().is_empty(),
@@ -344,17 +193,16 @@ where
                     );
                     // Compute hash for the PS::TransactionInfo object. We need the hash of the
                     // transaction itself, the state root hash as well as the event root hash.
-                    let txn_info = PS::TransactionInfo::new(
+                    let txn_info_hash = PS::TransactionInfo::new(
                         txn.hash(),
                         state_tree_hash,
                         event_tree.root_hash(),
                         vm_output.gas_used(),
                         status.clone(),
-                    );
-
-                    let real_txn_info_hash = txn_info.hash();
-                    txn_info_hashes.push(real_txn_info_hash);
-                    txn_info_hash = Some(real_txn_info_hash);
+                    )
+                    .hash();
+                    txn_info_hashes.push(txn_info_hash);
+                    Some(txn_info_hash)
                 }
                 TransactionStatus::Discard(status) => {
                     if !vm_output.write_set().is_empty() || !vm_output.events().is_empty() {
@@ -365,9 +213,10 @@ where
                         );
                         DIEM_EXECUTOR_ERRORS.inc();
                     }
+                    None
                 }
-                TransactionStatus::Retry => (),
-            }
+                TransactionStatus::Retry => None,
+            };
 
             txn_data.push(TransactionData::new(
                 blobs,

@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::Executor;
+use crate::{chunk_executor::ChunkExecutor, Executor};
 use anyhow::Result;
 use diem_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
 use diem_state_view::StateView;
@@ -15,7 +15,7 @@ use diem_types::{
     vm_status::VMStatus,
 };
 use diem_vm::VMExecutor;
-use executor_types::{BlockExecutor, ChunkExecutor};
+use executor_types::{BlockExecutor, ChunkExecutorTrait};
 use storage_interface::{default_protocol::DbReaderWriter, DbReader, DbWriter, StartupInfo};
 
 fn create_test_executor() -> Executor<DpnProto, FakeVM> {
@@ -29,8 +29,10 @@ pub fn fuzz_execute_and_commit_chunk(
     txn_list_with_proof: TransactionListWithProof,
     verified_target_li: LedgerInfoWithSignatures,
 ) {
-    let executor = create_test_executor();
-    let _events = executor.execute_and_commit_chunk(txn_list_with_proof, verified_target_li, None);
+    let db = DbReaderWriter::new(FakeDb {});
+    let executor = ChunkExecutor::<FakeVM>::new(db).unwrap();
+
+    let _events = executor.execute_and_commit_chunk(txn_list_with_proof, &verified_target_li, None);
 }
 
 pub fn fuzz_execute_and_commit_blocks(

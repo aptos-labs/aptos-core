@@ -15,7 +15,7 @@ use diem_config::config::NodeConfig;
 use diem_infallible::RwLock;
 use diem_types::waypoint::Waypoint;
 use event_notifications::EventSubscriptionService;
-use executor_types::ChunkExecutor;
+use executor_types::ChunkExecutorTrait;
 use futures::channel::mpsc;
 use mempool_notifications::MempoolNotificationSender;
 use std::{boxed::Box, sync::Arc};
@@ -35,7 +35,7 @@ impl DriverFactory {
         node_config: &NodeConfig,
         waypoint: Waypoint,
         storage: DbReaderWriter,
-        chunk_executor: Box<dyn ChunkExecutor>,
+        chunk_executor: Box<dyn ChunkExecutorTrait>,
         mempool_notification_sender: M,
         consensus_listener: ConsensusNotificationListener,
         event_subscription_service: EventSubscriptionService,

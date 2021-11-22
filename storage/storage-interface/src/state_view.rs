@@ -139,6 +139,24 @@ impl<PS: ProtocolSpec> From<VerifiedStateView<PS>>
     }
 }
 
+pub struct StateCache {
+    pub frozen_base: FrozenSparseMerkleTree<AccountStateBlob>,
+    pub accounts: HashMap<AccountAddress, AccountState>,
+    pub proofs: HashMap<HashValue, SparseMerkleProof<AccountStateBlob>>,
+}
+
+impl<PS: ProtocolSpec> From<VerifiedStateView<PS>> for StateCache {
+    fn from(view: VerifiedStateView<PS>) -> Self {
+        let (accounts, proofs, frozen_base) = view.unpack_after_execution();
+
+        Self {
+            frozen_base,
+            accounts,
+            proofs,
+        }
+    }
+}
+
 impl<PS: ProtocolSpec> StateView for VerifiedStateView<PS> {
     fn id(&self) -> StateViewId {
         self.id

@@ -9,7 +9,7 @@ use diem_config::{config::NodeConfig, network_id::NetworkId};
 use diem_data_client::diemnet::DiemNetDataClient;
 use diem_types::{move_resource::MoveStorage, waypoint::Waypoint};
 use event_notifications::{EventNotificationSender, EventSubscriptionService};
-use executor_types::ChunkExecutor;
+use executor_types::ChunkExecutorTrait;
 use futures::executor::block_on;
 use mempool_notifications::MempoolNotificationSender;
 use network::protocols::network::AppConfig;
@@ -65,7 +65,7 @@ impl StateSyncMultiplexer {
         mempool_notifier: M,
         consensus_listener: ConsensusNotificationListener,
         storage: DbReaderWriter,
-        executor: Box<dyn ChunkExecutor>,
+        executor: Box<dyn ChunkExecutorTrait>,
         node_config: &NodeConfig,
         waypoint: Waypoint,
         mut event_subscription_service: EventSubscriptionService,
@@ -170,12 +170,12 @@ mod tests {
     use diem_time_service::TimeService;
     use diem_types::{
         block_info::BlockInfo, ledger_info::LedgerInfo, on_chain_config::ON_CHAIN_CONFIG_REGISTRY,
-        protocol_spec::DpnProto, waypoint::Waypoint,
+        waypoint::Waypoint,
     };
     use diem_vm::DiemVM;
     use diemdb::DiemDB;
     use event_notifications::EventSubscriptionService;
-    use executor::Executor;
+    use executor::chunk_executor::ChunkExecutor;
     use executor_test_helpers::bootstrap_genesis;
     use futures::{FutureExt, StreamExt};
     use mempool_notifications::new_mempool_notifier_listener_pair;
@@ -228,7 +228,7 @@ mod tests {
             mempool_notifier,
             consensus_listener,
             db_rw.clone(),
-            Box::new(Executor::<DpnProto, DiemVM>::new(db_rw)),
+            Box::new(ChunkExecutor::<DiemVM>::new(db_rw).unwrap()),
             &node_config,
             Waypoint::new_any(&LedgerInfo::new(BlockInfo::empty(), HashValue::random())),
             event_subscription_service,

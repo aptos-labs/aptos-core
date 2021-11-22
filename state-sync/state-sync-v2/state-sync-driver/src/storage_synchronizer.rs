@@ -8,7 +8,7 @@ use diem_types::{
     ledger_info::LedgerInfoWithSignatures,
     transaction::{default_protocol::TransactionListWithProof, Version},
 };
-use executor_types::{ChunkExecutor, ExecutedTrees};
+use executor_types::{ChunkExecutorTrait, ExecutedTrees};
 use std::sync::Arc;
 use storage_interface::default_protocol::DbReaderWriter;
 
@@ -38,13 +38,13 @@ pub trait StorageSynchronizerInterface {
 
 /// The implementation of the `StorageSynchronizerInterface` used by state sync
 pub struct StorageSynchronizer {
-    chunk_executor: Box<dyn ChunkExecutor>,
+    chunk_executor: Box<dyn ChunkExecutorTrait>,
     storage: Arc<RwLock<DbReaderWriter>>,
 }
 
 impl StorageSynchronizer {
     pub fn new(
-        chunk_executor: Box<dyn ChunkExecutor>,
+        chunk_executor: Box<dyn ChunkExecutorTrait>,
         storage: Arc<RwLock<DbReaderWriter>>,
     ) -> Self {
         Self {
