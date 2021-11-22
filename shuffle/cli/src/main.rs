@@ -14,6 +14,7 @@ mod account;
 mod build;
 mod console;
 mod deploy;
+mod dev_api_client;
 mod new;
 mod node;
 mod shared;

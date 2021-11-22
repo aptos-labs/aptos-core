@@ -6,7 +6,7 @@ mod helper;
 use crate::helper::ShuffleTestHelper;
 use forge::{AdminContext, AdminTest, Result, Test};
 use move_cli::package::cli::UnitTestResult;
-use shuffle::shared::DevApiClient;
+use shuffle::dev_api_client::DevApiClient;
 use smoke_test::scripts_and_modules::enable_open_publishing;
 use std::str::FromStr;
 use tokio::runtime::Runtime;

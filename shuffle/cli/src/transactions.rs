@@ -1,6 +1,6 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
-use crate::shared::DevApiClient;
+use crate::dev_api_client::DevApiClient;
 use anyhow::{anyhow, Result};
 use diem_types::account_address::AccountAddress;
 use serde_json::Value;

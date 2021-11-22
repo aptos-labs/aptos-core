@@ -1,7 +1,11 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::shared::{DevApiClient, Home, Network, NetworkHome, LOCALHOST_NAME};
+use crate::{
+    dev_api_client::DevApiClient,
+    shared::{Home, Network, NetworkHome, LOCALHOST_NAME},
+};
+
 use anyhow::{anyhow, Result};
 use diem_crypto::PrivateKey;
 

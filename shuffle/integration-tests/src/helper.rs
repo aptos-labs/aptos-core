@@ -10,8 +10,10 @@ use diem_sdk::{
 };
 use forge::ChainInfo;
 use shuffle::{
-    account, deploy, new, shared,
-    shared::{DevApiClient, Home, Network, NetworkHome},
+    account, deploy,
+    dev_api_client::DevApiClient,
+    new, shared,
+    shared::{Home, Network, NetworkHome},
 };
 use std::{convert::TryFrom, path::PathBuf, str::FromStr};
 use tempfile::TempDir;

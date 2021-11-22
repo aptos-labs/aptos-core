@@ -3,9 +3,8 @@
 
 use crate::{
     account, deploy,
-    shared::{
-        self, normalized_network_name, DevApiClient, Home, Network, NetworkHome, MAIN_PKG_PATH,
-    },
+    dev_api_client::DevApiClient,
+    shared::{self, normalized_network_name, Home, Network, NetworkHome, MAIN_PKG_PATH},
 };
 use anyhow::{anyhow, Result};
 use diem_crypto::PrivateKey;
