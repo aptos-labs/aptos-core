@@ -59,7 +59,7 @@ impl ExperimentSuite {
                 .enable_db_backup()
                 .build(cluster),
         ));
-        experiments.push(Box::new(StateSyncPerformanceParams::new(60).build(cluster)));
+        experiments.push(Box::new(StateSyncPerformanceParams::new(30).build(cluster)));
         experiments.push(Box::new(TwinValidatorsParams { pair: 1 }.build(cluster)));
         // This can't be run before any experiment that requires clean_data.
         experiments.push(Box::new(
@@ -149,7 +149,7 @@ impl ExperimentSuite {
 
     fn new_state_sync_suite(cluster: &Cluster) -> Self {
         let experiments: Vec<Box<dyn Experiment>> =
-            vec![Box::new(StateSyncPerformanceParams::new(60).build(cluster))];
+            vec![Box::new(StateSyncPerformanceParams::new(30).build(cluster))];
         Self { experiments }
     }
 
