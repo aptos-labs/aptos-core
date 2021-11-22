@@ -74,13 +74,13 @@ fn bootstrap_shuffle(ctx: &mut AdminContext<'_>) -> Result<ShuffleTestHelper> {
     let helper = ShuffleTestHelper::new(ctx.chain_info())?;
     helper.create_project()?;
 
-    // let mut account = ctx.random_account(); // TODO: Support arbitrary addresses
-    let mut account = ShuffleTestHelper::hardcoded_0x2416_account(&client)?;
+    let mut account = ctx.random_account();
     let tc = ctx.chain_info().treasury_compliance_account();
     let rt = Runtime::new().unwrap();
     let handle = rt.handle().clone();
 
     handle.block_on(helper.create_account(tc, &account, factory, &dev_api_client))?;
     handle.block_on(helper.deploy_project(&mut account, ctx.chain_info().rest_api()))?;
+    helper.codegen_project(&account)?;
     Ok(helper)
 }

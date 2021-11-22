@@ -15,7 +15,7 @@ pub fn handle(
     key_path: &Path,
     sender_address: AccountAddress,
 ) -> Result<()> {
-    shared::generate_typescript_libraries(project_path)?;
+    shared::codegen_typescript_libraries(project_path, &sender_address)?;
     let deno_bootstrap = format!(
         r#"import * as context from "{context}";
         import * as devapi from "{devapi}";

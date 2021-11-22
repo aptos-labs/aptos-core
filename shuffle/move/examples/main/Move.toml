@@ -3,7 +3,7 @@ name = "Message"
 version = "0.0.0"
 
 [addresses]
-Sender = "0x24163afcc6e33b0a9473852e18327fa9" # TODO: Hardcoded to sender addr
+Sender = "_"
 
 [dependencies]
 MoveStdlib = { local = "../stdlib", addr_subst = { "Std" = "0x1" }}

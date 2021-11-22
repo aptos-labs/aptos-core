@@ -1,5 +1,6 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
+
 use anyhow::{anyhow, Result};
 use diem_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 use diem_sdk::client::AccountAddress;
@@ -24,9 +25,14 @@ use transaction_builder_generator::SourceInstaller as BuildgenSourceInstaller;
 use url::Url;
 
 pub const MAIN_PKG_PATH: &str = "main";
-pub const NEW_KEY_FILE_CONTENT: &[u8] = include_bytes!("../new_account.key");
 
 pub const LOCALHOST_NAME: &str = "localhost";
+
+pub const SENDER_ADDRESS_NAME: &str = "Sender";
+
+/// Temporary address for initial codegen, replaced on subsequent commands
+/// when accounts are available.
+pub const PLACEHOLDER_ADDRESS: &str = "0xdeadbeef";
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "kebab-case")]
@@ -149,10 +155,6 @@ impl NetworkHome {
         &self.accounts_path
     }
 
-    pub fn get_test_key_path(&self) -> &Path {
-        &self.test_key_path
-    }
-
     pub fn create_archive_dir(&self, time: Duration) -> Result<PathBuf> {
         let archived_dir = self.accounts_path.join(time.as_secs().to_string());
         fs::create_dir(&archived_dir)?;
@@ -180,10 +182,7 @@ impl NetworkHome {
     }
 
     pub fn generate_key_file(&self) -> Result<Ed25519PrivateKey> {
-        // Using NEW_KEY_FILE for now due to hard coded address in
-        // /diem/shuffle/move/examples/main/sources/move.toml
-        fs::write(self.latest_account_key_path.as_path(), NEW_KEY_FILE_CONTENT)?;
-        Ok(generate_key::load_key(
+        Ok(generate_key::generate_and_save_key(
             self.latest_account_key_path.as_path(),
         ))
     }
@@ -302,7 +301,7 @@ impl Home {
 
     pub fn write_default_networks_config_into_toml_if_nonexistent(&self) -> Result<()> {
         if !&self.networks_config_path.exists() {
-            std::fs::create_dir_all(&self.shuffle_path)?;
+            fs::create_dir_all(&self.shuffle_path)?;
             let networks_config_string = toml::to_string_pretty(&NetworksConfig::default())?;
             fs::write(&self.networks_config_path, networks_config_string)?;
         }
@@ -427,9 +426,16 @@ impl Default for Network {
 /// Generates the typescript bindings for the main Move package based on the embedded
 /// diem types and Move stdlib. Mimics much of the transaction_builder_generator's CLI
 /// except with typescript defaults and embedded content, as opposed to repo directory paths.
-pub fn generate_typescript_libraries(project_path: &Path) -> Result<()> {
+pub fn codegen_typescript_libraries(
+    project_path: &Path,
+    publishing_address: &AccountAddress,
+) -> Result<()> {
+    println!(
+        "Generating Typescript Libraries for {}",
+        publishing_address.to_string()
+    );
     let pkg_path = project_path.join(MAIN_PKG_PATH);
-    let _compiled_package = build_move_package(&pkg_path)?;
+    build_move_package(&pkg_path, publishing_address)?;
     let target_dir = pkg_path.join("generated");
     let installer = serdegen::typescript::Installer::new(target_dir.clone());
     generate_runtime(&installer)?;
@@ -461,11 +467,17 @@ fn generate_runtime(installer: &serdegen::typescript::Installer) -> Result<()> {
 }
 
 /// Builds a package using the move package system.
-pub fn build_move_package(pkg_path: &Path) -> Result<CompiledPackage> {
+pub fn build_move_package(
+    pkg_path: &Path,
+    publishing_address: &AccountAddress,
+) -> Result<CompiledPackage> {
     println!("Building {}...", pkg_path.display());
+    let mut additional_named_addresses = BTreeMap::new();
+    additional_named_addresses.insert(SENDER_ADDRESS_NAME.to_string(), *publishing_address);
     let config = move_package::BuildConfig {
         dev_mode: true,
         generate_abis: true,
+        additional_named_addresses,
         ..Default::default()
     };
 
@@ -637,7 +649,9 @@ mod test {
         let tmpdir = tempdir().unwrap();
         let dir_path = tmpdir.path();
         new::write_example_move_packages(dir_path).expect("unable to create move main pkg");
-        generate_typescript_libraries(dir_path).expect("unable to generate TS libraries");
+        let address =
+            AccountAddress::from_hex_literal("0x1").expect("unable to create address 0x1");
+        codegen_typescript_libraries(dir_path, &address).expect("unable to generate TS libraries");
 
         let script_path = dir_path.join("main/generated/diemStdlib/mod.ts");
         let output = std::process::Command::new("deno")
@@ -824,10 +838,7 @@ mod test {
     fn test_home_check_networks_toml_exists() {
         let dir = tempdir().unwrap();
         let home = Home::new(dir.path()).unwrap();
-        assert_eq!(home.ensure_networks_toml_exists().is_err(), true);
-        fs::create_dir_all(dir.path().join(".shuffle")).unwrap();
-        home.write_default_networks_config_into_toml_if_nonexistent()
-            .unwrap();
         assert_eq!(home.ensure_networks_toml_exists().is_err(), false);
+        assert_eq!(home.networks_config_path.exists(), true);
     }
 }

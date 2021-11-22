@@ -28,9 +28,17 @@ pub async fn main() -> Result<()> {
     match subcommand {
         Subcommand::New { blockchain, path } => new::handle(&home, blockchain, path),
         Subcommand::Node { genesis } => node::handle(&home, genesis),
-        Subcommand::Build { project_path } => {
-            build::handle(&shared::normalized_project_path(project_path)?)
-        }
+        Subcommand::Build {
+            project_path,
+            network,
+            address,
+        } => build::handle(
+            &shared::normalized_project_path(project_path)?,
+            normalized_address(
+                home.new_network_home(normalized_network_name(network).as_str()),
+                address,
+            )?,
+        ),
         Subcommand::Deploy {
             project_path,
             network,
@@ -110,6 +118,16 @@ pub enum Subcommand {
     Build {
         #[structopt(short, long)]
         project_path: Option<PathBuf>,
+
+        #[structopt(short, long)]
+        network: Option<String>,
+
+        #[structopt(
+            short,
+            long,
+            help = "Network specific address to be used for publishing with Named Address Sender"
+        )]
+        address: Option<String>,
     },
     #[structopt(about = "Publishes the main move package using the account as publisher")]
     Deploy {

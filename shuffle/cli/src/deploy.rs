@@ -1,10 +1,10 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
+
 use crate::{
     dev_api_client::DevApiClient,
-    shared::{build_move_package, NetworkHome, MAIN_PKG_PATH},
+    shared::{self, build_move_package, NetworkHome},
 };
-
 use anyhow::{anyhow, Result};
 use diem_crypto::PrivateKey;
 use diem_sdk::{
@@ -43,7 +43,10 @@ pub async fn deploy(
     account: &mut LocalAccount,
     project_path: &Path,
 ) -> Result<()> {
-    let compiled_package = build_move_package(project_path.join(MAIN_PKG_PATH).as_ref())?;
+    let compiled_package = build_move_package(
+        project_path.join(shared::MAIN_PKG_PATH).as_ref(),
+        &account.address(),
+    )?;
     for module in compiled_package
         .transitive_compiled_modules()
         .compute_dependency_graph()

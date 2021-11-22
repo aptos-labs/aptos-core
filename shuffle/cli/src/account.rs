@@ -5,10 +5,8 @@ use crate::{
     dev_api_client::DevApiClient,
     shared::{Home, Network, NetworkHome, LOCALHOST_NAME},
 };
-
 use anyhow::{anyhow, Result};
 use diem_crypto::PrivateKey;
-
 use diem_infallible::duration_since_epoch;
 use diem_sdk::{
     client::FaucetClient,
@@ -120,12 +118,12 @@ fn archive_current_files_in_latest(network_home: &NetworkHome) -> Result<()> {
 }
 
 fn generate_new_account(network_home: &NetworkHome) -> Result<LocalAccount> {
-    let new_account_key = network_home.generate_key_file()?;
-    let public_key = new_account_key.public_key();
+    let private_key = network_home.generate_key_file()?;
+    let public_key = private_key.public_key();
     network_home.generate_latest_address_file(&public_key)?;
     Ok(LocalAccount::new(
         AuthenticationKey::ed25519(&public_key).derived_address(),
-        new_account_key,
+        private_key,
         0,
     ))
 }
@@ -201,7 +199,6 @@ async fn create_account_via_faucet(network: &Network, account: &LocalAccount) ->
         account.address(),
         network.get_name()
     );
-    println!("Public key: {}", account.public_key());
     Ok(())
 }
 

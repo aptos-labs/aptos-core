@@ -3,6 +3,7 @@
 
 use crate::{shared, shared::Home};
 use anyhow::Result;
+use diem_types::account_address::AccountAddress;
 use include_dir::{include_dir, Dir};
 use std::{
     fs,
@@ -23,12 +24,14 @@ pub fn handle(home: &Home, blockchain: String, pathbuf: PathBuf) -> Result<()> {
     let config = shared::ProjectConfig::new(blockchain);
     write_project_files(project_path, &config)?;
     write_example_move_packages(project_path)?;
+
     home.generate_shuffle_path_if_nonexistent()?;
-    // Writing default localhost network into Networks.toml
     home.write_default_networks_config_into_toml_if_nonexistent()?;
 
-    println!("Generating Typescript Libraries...");
-    shared::generate_typescript_libraries(project_path)?;
+    shared::codegen_typescript_libraries(
+        project_path,
+        &AccountAddress::from_hex_literal(shared::PLACEHOLDER_ADDRESS)?,
+    )?;
     Ok(())
 }
 

@@ -3,17 +3,15 @@
 
 use anyhow::Result;
 use diem_sdk::{
-    client::BlockingClient,
-    crypto::ed25519::Ed25519PrivateKey,
-    transaction_builder::TransactionFactory,
-    types::{AccountKey, LocalAccount},
+    crypto::ed25519::Ed25519PrivateKey, transaction_builder::TransactionFactory,
+    types::LocalAccount,
 };
 use forge::ChainInfo;
 use shuffle::{
     account, deploy,
     dev_api_client::DevApiClient,
-    new, shared,
-    shared::{Home, Network, NetworkHome},
+    new,
+    shared::{self, Home, Network, NetworkHome},
 };
 use std::{convert::TryFrom, path::PathBuf, str::FromStr};
 use tempfile::TempDir;
@@ -46,18 +44,6 @@ impl ShuffleTestHelper {
             network_home,
             tmp_dir,
         })
-    }
-
-    pub fn hardcoded_0x2416_account(client: &BlockingClient) -> Result<LocalAccount> {
-        let private_key: Ed25519PrivateKey = bcs::from_bytes(shared::NEW_KEY_FILE_CONTENT)?;
-        let key = AccountKey::from_private_key(private_key);
-        let address = key.authentication_key().derived_address();
-        let account_view = client.get_account(address)?.into_inner();
-        let seq_num = match account_view {
-            Some(account_view) => account_view.sequence_number,
-            None => 0,
-        };
-        Ok(LocalAccount::new(address, key, seq_num))
     }
 
     pub fn home(&self) -> &Home {
@@ -107,5 +93,9 @@ impl ShuffleTestHelper {
         let url = Url::from_str(dev_api_url)?;
         let client = DevApiClient::new(reqwest::Client::new(), url)?;
         deploy::deploy(client, account, &self.project_path()).await
+    }
+
+    pub fn codegen_project(&self, account: &LocalAccount) -> Result<()> {
+        shared::codegen_typescript_libraries(&self.project_path(), &account.address())
     }
 }

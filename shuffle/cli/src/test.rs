@@ -4,10 +4,11 @@
 use crate::{
     account, deploy,
     dev_api_client::DevApiClient,
-    shared::{self, normalized_network_name, Home, Network, NetworkHome, MAIN_PKG_PATH},
+    shared::{self, normalized_network_name, Home, Network},
 };
 use anyhow::{anyhow, Result};
-use diem_crypto::PrivateKey;
+use core::convert::TryFrom;
+use diem_crypto::{ed25519::Ed25519PrivateKey, PrivateKey};
 use diem_sdk::{
     client::AccountAddress, transaction_builder::TransactionFactory, types::LocalAccount,
 };
@@ -16,10 +17,12 @@ use move_cli::package::cli::{self, UnitTestResult};
 use move_package::BuildConfig;
 use move_unit_test::UnitTestingConfig;
 use std::{
+    collections::BTreeMap,
     path::{Path, PathBuf},
     process::{Command, ExitStatus},
 };
 use structopt::StructOpt;
+use tempfile::TempDir;
 use url::Url;
 
 pub async fn run_e2e_tests(
@@ -27,58 +30,52 @@ pub async fn run_e2e_tests(
     project_path: &Path,
     network: Network,
 ) -> Result<ExitStatus> {
-    let network_home = NetworkHome::new(
-        home.get_networks_path()
-            .join(shared::LOCALHOST_NAME)
-            .as_path(),
-    );
     let _config = shared::read_project_config(project_path)?;
-    shared::generate_typescript_libraries(project_path)?;
 
     println!("Connecting to {}...", network.get_json_rpc_url());
     let client = DevApiClient::new(reqwest::Client::new(), network.get_dev_api_url())?;
     let factory = TransactionFactory::new(ChainId::test());
 
-    let test_account = create_account(
-        home.get_root_key_path(),
-        network_home.get_test_key_path(),
-        &client,
-        &factory,
-    )
-    .await?;
-    let _receiver_account = create_account(
-        home.get_root_key_path(),
-        network_home.get_test_key_path(), // TODO: update to a different key to sender
-        &client,
-        &factory,
-    )
-    .await?;
-    deploy::handle(&network_home, project_path, network.get_dev_api_url()).await?;
+    let (private_key, mut test_account) =
+        create_account(home.get_root_key_path(), &client, &factory).await?;
 
+    // TODO: Because we both codegen and deploy::deploy, this code path results
+    // in two move package compilation steps. Ideally, compilation would only
+    // happen once, and the second redundant build would be skipped. At least
+    // it's cached atm.
+    shared::codegen_typescript_libraries(project_path, &test_account.address())?;
+    deploy::deploy(client, &mut test_account, project_path).await?;
+
+    let tmp_dir = TempDir::new()?;
+    let tmp_key_path = tmp_dir.path().join("private.key");
+    generate_key::save_key(private_key, &tmp_key_path);
     run_deno_test(
         home,
         project_path,
         &network,
-        network_home.get_test_key_path(),
+        &tmp_key_path,
         test_account.address(),
     )
 }
 
 async fn create_account(
     root_key_path: &Path,
-    account_key_path: &Path,
     client: &DevApiClient,
     factory: &TransactionFactory,
-) -> Result<LocalAccount> {
+) -> Result<(Ed25519PrivateKey, LocalAccount)> {
     let mut treasury_account = account::get_treasury_account(client, root_key_path).await?;
-    // TODO: generate random key by using let account_key = generate_key::generate_key();
-    let account_key = generate_key::load_key(account_key_path);
+    let account_key = generate_key::generate_key();
     let public_key = account_key.public_key();
     let derived_address = AuthenticationKey::ed25519(&public_key).derived_address();
-    let new_account = LocalAccount::new(derived_address, account_key, 0);
+    let seq_num = client
+        .get_account_sequence_number(derived_address)
+        .await
+        .unwrap_or(0);
+    let dupe_key = Ed25519PrivateKey::try_from(account_key.to_bytes().as_ref())?;
+    let new_account = LocalAccount::new(derived_address, dupe_key, seq_num);
     account::create_account_via_dev_api(&mut treasury_account, &new_account, factory, client)
         .await?;
-    Ok(new_account)
+    Ok((account_key, new_account))
 }
 
 pub fn run_deno_test(
@@ -146,20 +143,26 @@ pub fn run_move_unit_tests(project_path: &Path) -> Result<UnitTestResult> {
         ..UnitTestingConfig::default_with_bound(None)
     };
 
+    // Default publishing address to a placeholder address for Move unit tests,
+    // which do not run against a Node, but solely in the Move VM.
+    let publishing_address = AccountAddress::from_hex_literal(shared::PLACEHOLDER_ADDRESS)?;
     cli::run_move_unit_tests(
-        &project_path.join(MAIN_PKG_PATH),
-        generate_build_config_for_testing()?,
+        &project_path.join(shared::MAIN_PKG_PATH),
+        generate_build_config_for_testing(&publishing_address)?,
         unit_test_config,
         diem_vm::natives::diem_natives(),
         false,
     )
 }
 
-fn generate_build_config_for_testing() -> Result<BuildConfig> {
+fn generate_build_config_for_testing(publishing_address: &AccountAddress) -> Result<BuildConfig> {
+    let mut additional_named_addresses = BTreeMap::new();
+    additional_named_addresses.insert(shared::SENDER_ADDRESS_NAME.to_string(), *publishing_address);
     Ok(BuildConfig {
         dev_mode: true,
         test_mode: true,
         generate_abis: true,
+        additional_named_addresses,
         ..Default::default()
     })
 }
@@ -216,15 +219,12 @@ pub async fn handle(home: &Home, cmd: TestCommand) -> Result<()> {
             network,
         } => {
             let normalized_path = shared::normalized_project_path(project_path)?;
+            let normalized_network = home
+                .get_network_struct_from_toml(normalized_network_name(network.clone()).as_str())?;
+
             let unit_status = ExitStatus::from(run_move_unit_tests(normalized_path.as_path())?);
-            let e2e_status = run_e2e_tests(
-                home,
-                normalized_path.as_path(),
-                home.get_network_struct_from_toml(
-                    normalized_network_name(network.clone()).as_str(),
-                )?,
-            )
-            .await?;
+            let e2e_status =
+                run_e2e_tests(home, normalized_path.as_path(), normalized_network).await?;
 
             // prioritize returning failures
             if !unit_status.success() {
