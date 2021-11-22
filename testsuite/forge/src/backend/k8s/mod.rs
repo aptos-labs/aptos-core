@@ -117,6 +117,7 @@ impl Factory for K8sFactory {
             format!("{}", init_version),
             format!("{}", genesis_version),
             false,
+            None,
         )?;
         let rt = Runtime::new().unwrap();
         let swarm = rt

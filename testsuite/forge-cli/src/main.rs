@@ -140,6 +140,11 @@ struct Resize {
     helm_repo: String,
     #[structopt(long, help = "Name of the EKS cluster")]
     cluster_name: String,
+    #[structopt(
+        long,
+        help = "Path to flattened directory containing compiled Move modules"
+    )]
+    move_modules_dir: Option<String>,
 }
 
 fn main() -> Result<()> {
@@ -197,6 +202,7 @@ fn main() -> Result<()> {
                     resize.validator_image_tag,
                     resize.testnet_image_tag,
                     resize.require_validator_healthcheck,
+                    resize.move_modules_dir,
                 )
             }
         },

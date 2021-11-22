@@ -38,6 +38,7 @@ const HEALTH_CHECK_URL: &str = "http://127.0.0.1:8001";
 const VALIDATOR_SCALING_FACTOR: i64 = 3;
 const UTILITIES_SCALING_FACTOR: i64 = 3;
 const TRUSTED_SCALING_FACTOR: i64 = 1;
+const GENESIS_MODULES_DIR: &str = "/diem/move/modules";
 
 async fn wait_genesis_job(kube_client: &K8sClient, era: &str) -> Result<()> {
     diem_retrier::retry_async(k8s_retry_strategy(), || {
@@ -227,6 +228,7 @@ pub fn clean_k8s_cluster(
     base_validator_image_tag: String,
     base_genesis_image_tag: String,
     require_validator_healthcheck: bool,
+    genesis_modules_path: Option<String>,
 ) -> Result<()> {
     assert!(base_num_validators <= MAX_NUM_VALIDATORS);
 
@@ -300,6 +302,13 @@ pub fn clean_k8s_cluster(
         .join("diem_status.json")
         .display()
         .to_string();
+
+    // run genesis from the directory in diem/init image
+    let move_modules_dir = if let Some(genesis_modules_path) = genesis_modules_path {
+        genesis_modules_path;
+    } else {
+        GENESIS_MODULES_DIR.to_string();
+    }
     let testnet_upgrade_options = [
         "-f",
         &file_path_str,
@@ -314,6 +323,8 @@ pub fn clean_k8s_cluster(
         &format!("imageTag={}", &base_genesis_image_tag),
         "--set",
         "monitoring.prometheus.useHttps=false",
+        "--set",
+        &format!("genesis.moveModuleDir={}", &move_modules_dir),
     ];
 
     // upgrade testnet
