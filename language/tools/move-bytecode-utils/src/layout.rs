@@ -13,7 +13,7 @@ use move_core_types::{
     language_storage::{ModuleId, StructTag, TypeTag},
     value::{MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
 };
-use std::fmt::Debug;
+use std::{borrow::Borrow, fmt::Debug};
 
 pub enum TypeLayoutBuilder {}
 pub enum StructLayoutBuilder {}
@@ -199,10 +199,11 @@ impl StructLayoutBuilder {
         resolver: &impl GetModule,
         layout_type: LayoutType,
     ) -> Result<MoveStructLayout> {
-        let m = resolver
+        let module = resolver
             .get_module_by_id(declaring_module)
             .map_err(|_| anyhow!("Error while resolving module {}", declaring_module))?
             .ok_or_else(|| anyhow!("Failed to get module {}", declaring_module))?;
+        let m = module.borrow();
         let def = m
             .struct_defs
             .iter()
@@ -217,7 +218,7 @@ impl StructLayoutBuilder {
                     declaring_module
                 )
             })?;
-        Self::build_from_definition(&m, def, type_arguments, resolver, layout_type)
+        Self::build_from_definition(m, def, type_arguments, resolver, layout_type)
     }
 
     fn build_from_handle_idx(

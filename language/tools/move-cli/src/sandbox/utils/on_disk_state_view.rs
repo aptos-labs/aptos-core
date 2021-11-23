@@ -554,6 +554,7 @@ impl ResourceResolver for OnDiskStateView {
 
 impl GetModule for OnDiskStateView {
     type Error = anyhow::Error;
+    type Item = CompiledModule;
 
     fn get_module_by_id(&self, id: &ModuleId) -> Result<Option<CompiledModule>, Self::Error> {
         if let Some(bytes) = self.get_module_bytes(id)? {

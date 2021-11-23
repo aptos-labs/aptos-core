@@ -16,6 +16,7 @@ use move_core_types::{
 };
 use move_read_write_set_types::{Access, AccessPath, Offset, ReadWriteSet, RootAddress};
 use std::{
+    borrow::Borrow,
     fmt::{self, Formatter},
     ops::Deref,
 };
@@ -263,7 +264,7 @@ pub fn bind_formals<R: GetModule>(
         .map_err(|_| anyhow!("Failed to get module from storage"))?
         .ok_or_else(|| anyhow!("Failed to get module"))?;
 
-    let func_sig = Function::new_from_name(&compiled_module, fun)
+    let func_sig = Function::new_from_name(compiled_module.borrow(), fun)
         .ok_or_else(|| anyhow!("Failed to find function"))?;
 
     // Check arity before binding. Otherwise we might get out-of-bound errors.
