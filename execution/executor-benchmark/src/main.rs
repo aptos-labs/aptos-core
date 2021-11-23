@@ -4,6 +4,9 @@
 use std::path::PathBuf;
 use structopt::StructOpt;
 
+#[global_allocator]
+static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
+
 #[derive(Debug, StructOpt)]
 struct Opt {
     #[structopt(long, default_value = "500")]

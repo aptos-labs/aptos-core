@@ -14,6 +14,7 @@ bcs = "0.1.2"
 criterion = "0.3.4"
 indicatif = "0.15.0"
 itertools = { version = "0.10.0", default-features = false }
+jemallocator = { version = "0.3.2", features = ["profiling", "unprefixed_malloc_on_supported_platforms"] }
 rand = "0.8.3"
 rayon = "1.5.0"
 serde = "1.0.124"

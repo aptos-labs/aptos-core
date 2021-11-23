@@ -3413,6 +3413,7 @@ dependencies = [
  "executor-types",
  "indicatif",
  "itertools 0.10.1",
+ "jemallocator",
  "rand 0.8.4",
  "rayon",
  "schemadb",
