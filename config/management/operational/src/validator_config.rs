@@ -7,7 +7,7 @@ use diem_global_constants::{
     CONSENSUS_KEY, FULLNODE_NETWORK_KEY, OPERATOR_ACCOUNT, OWNER_ACCOUNT, VALIDATOR_NETWORK_KEY,
 };
 use diem_management::{error::Error, secure_backend::ValidatorBackend, storage::to_x25519};
-use diem_network_address_encryption::Encryptor;
+use diem_network_address_encryption::{Encryptor, Error as NetworkAddressError};
 use diem_secure_storage::Storage;
 use diem_types::{
     account_address::AccountAddress,
@@ -358,14 +358,18 @@ pub fn fullnode_addresses(
 pub fn validator_addresses(
     config: &diem_types::validator_config::ValidatorConfig,
     account_address: AccountAddress,
-    encryptor: &Encryptor<Storage>,
+    _encryptor: &Encryptor<Storage>,
 ) -> Result<Vec<NetworkAddress>, Error> {
-    encryptor
-        .decrypt(&config.validator_network_addresses, account_address)
+    let network_addrs: Vec<NetworkAddress> = bcs::from_bytes(&config.validator_network_addresses)
         .map_err(|error| {
-            Error::CommandArgumentError(format!(
-                "Unable to decode network address for account {}: {}",
-                account_address, error
-            ))
+            NetworkAddressError::AddressDeserialization(account_address, error.to_string())
         })
+        .map_err(anyhow::Error::from)
+        .unwrap_or_default();
+    Ok(network_addrs).map_err(|error: anyhow::Error| {
+        Error::CommandArgumentError(format!(
+            "Unable to decode network address for account {}: {}",
+            account_address, error
+        ))
+    })
 }

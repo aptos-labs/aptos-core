@@ -14,7 +14,6 @@ use diem_global_constants::{
     CONSENSUS_KEY, FULLNODE_NETWORK_KEY, OPERATOR_ACCOUNT, OPERATOR_KEY, OWNER_ACCOUNT,
     VALIDATOR_NETWORK_KEY,
 };
-use diem_network_address_encryption::Encryptor;
 use diem_secure_storage::{CryptoStorage, KVStorage, Storage};
 use diem_transaction_builder::stdlib as transaction_builder;
 use diem_types::{
@@ -83,7 +82,7 @@ impl ValidatorConfig {
 /// * OPERATOR_ACCOUNT
 /// * OPERATOR_KEY
 pub fn build_validator_config_transaction<S: KVStorage + CryptoStorage>(
-    mut validator_storage: S,
+    validator_storage: S,
     chain_id: ChainId,
     sequence_number: u64,
     fullnode_address: NetworkAddress,
@@ -123,16 +122,6 @@ pub fn build_validator_config_transaction<S: KVStorage + CryptoStorage>(
     // and encrypt the validator address.
     let validator_address =
         validator_address.append_prod_protos(validator_network_key, HANDSHAKE_VERSION);
-    let encryptor = Encryptor::new(&mut validator_storage);
-    let validator_addresses = encryptor
-        .encrypt(
-            &[validator_address],
-            owner_account,
-            sequence_number + if reconfigure { 1 } else { 0 },
-        )
-        .map_err(|e| {
-            Error::UnexpectedError(format!("Error encrypting validator address: {}", e))
-        })?;
 
     // Build Fullnode address including protocols
     let fullnode_address =
@@ -147,7 +136,7 @@ pub fn build_validator_config_transaction<S: KVStorage + CryptoStorage>(
     let validator_config_script = transaction_callback(
         owner_account,
         consensus_key.to_bytes().to_vec(),
-        validator_addresses,
+        bcs::to_bytes(&vec![validator_address]).unwrap(),
         bcs::to_bytes(&vec![fullnode_address]).unwrap(),
     )
     .into_script_function();

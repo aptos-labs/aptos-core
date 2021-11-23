@@ -10,6 +10,7 @@ use diem_management::{
     config::ConfigPath, error::Error, secure_backend::ValidatorBackend,
     storage::StorageWrapper as Storage,
 };
+use diem_network_address_encryption::Error as NetworkAddressError;
 use diem_temppath::TempPath;
 use diem_types::{
     account_address::AccountAddress, account_config, account_state::AccountState,
@@ -177,19 +178,17 @@ fn compare_genesis(
 
     let actual_validator_key = storage.x25519_public_from_private(VALIDATOR_NETWORK_KEY)?;
     let actual_fullnode_key = storage.x25519_public_from_private(FULLNODE_NETWORK_KEY)?;
-    let encryptor = storage.encryptor();
 
-    let expected_validator_key = encryptor
-        .decrypt(
-            &validator_config.validator_network_addresses,
-            validator_account,
-        )
-        .ok()
-        .and_then(|addrs| {
-            addrs
-                .get(0)
-                .and_then(|addr: &NetworkAddress| addr.find_noise_proto())
-        });
+    let network_addrs: Vec<NetworkAddress> =
+        bcs::from_bytes(&validator_config.validator_network_addresses)
+            .map_err(|e| {
+                NetworkAddressError::AddressDeserialization(validator_account, e.to_string())
+            })
+            .unwrap_or_default();
+
+    let expected_validator_key = network_addrs
+        .get(0)
+        .and_then(|addr: &NetworkAddress| addr.find_noise_proto());
     write_assert(
         buffer,
         VALIDATOR_NETWORK_KEY,

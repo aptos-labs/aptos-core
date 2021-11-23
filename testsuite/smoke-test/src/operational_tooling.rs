@@ -936,12 +936,9 @@ fn test_validator_decryption() {
         .unwrap();
     assert_eq!(1, validator_set_infos.len());
 
-    // Ensure the validator network addresses were decrypted successfully
-    let failed_decryption_address = NetworkAddress::from_str("/dns4/could-not-decrypt").unwrap();
     let config_network_address = validator_config.validator_network_address;
     let info_network_address = validator_set_infos[0].validator_network_address.clone();
     assert_eq!(config_network_address, info_network_address,);
-    assert_ne!(failed_decryption_address, config_network_address);
 
     // Corrupt the network address encryption key in storage
     storage
@@ -960,7 +957,6 @@ fn test_validator_decryption() {
         let config_network_address = validator_config.validator_network_address;
         let info_network_address = validator_set_infos[0].validator_network_address.clone();
         assert_eq!(config_network_address, info_network_address);
-        assert_eq!(failed_decryption_address, config_network_address);
     }
 }
 
@@ -1021,7 +1017,7 @@ fn test_validator_set() {
         validator_info.fullnode_network_address,
         validator_config.fullnode_network_address
     );
-    assert_ne!(
+    assert_eq!(
         validator_info.validator_network_address,
         validator_config.validator_network_address
     );
