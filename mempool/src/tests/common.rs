@@ -42,7 +42,7 @@ pub struct TestTransaction {
 }
 
 impl TestTransaction {
-    pub(crate) fn new(address: usize, sequence_number: u64, gas_price: u64) -> Self {
+    pub(crate) const fn new(address: usize, sequence_number: u64, gas_price: u64) -> Self {
         Self {
             address,
             sequence_number,

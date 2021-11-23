@@ -147,8 +147,6 @@ impl MempoolNode {
             let status = receiver.await.unwrap().unwrap();
             assert_eq!(status.0.code, MempoolStatusCode::Accepted)
         }
-
-        self.assert_txns_in_mempool(txns);
     }
 
     /// Asynchronously waits for up to 1 second for txns to appear in mempool
@@ -225,7 +223,7 @@ impl MempoolNode {
         }
     }
 
-    pub async fn send_message(
+    pub async fn receive_message(
         &mut self,
         protocol_id: ProtocolId,
         remote_peer_network_id: PeerNetworkId,
@@ -298,10 +296,42 @@ impl MempoolNode {
         }
     }
 
-    pub async fn verify_broadcast_and_ack(
+    pub async fn send_broadcast_and_receive_ack(
         &mut self,
         expected_peer_network_id: PeerNetworkId,
         expected_txns: &[TestTransaction],
+    ) {
+        self.send_broadcast_and_receive_response(
+            expected_peer_network_id,
+            expected_txns,
+            false,
+            false,
+        )
+        .await
+    }
+
+    pub async fn send_broadcast_and_receive_retry(
+        &mut self,
+        expected_peer_network_id: PeerNetworkId,
+        expected_txns: &[TestTransaction],
+    ) {
+        // Don't backoff so the test is faster
+        self.send_broadcast_and_receive_response(
+            expected_peer_network_id,
+            expected_txns,
+            true,
+            false,
+        )
+        .await
+    }
+
+    /// Send a broadcast and receive a response
+    async fn send_broadcast_and_receive_response(
+        &mut self,
+        expected_peer_network_id: PeerNetworkId,
+        expected_txns: &[TestTransaction],
+        retry: bool,
+        backoff: bool,
     ) {
         let network_id = expected_peer_network_id.network_id();
         let expected_peer_id = expected_peer_network_id.peer_id();
@@ -349,8 +379,8 @@ impl MempoolNode {
         };
         let response = MempoolSyncMsg::BroadcastTransactionsResponse {
             request_id,
-            retry: false,
-            backoff: false,
+            retry,
+            backoff,
         };
         let bytes = protocol_id.to_bytes(&response).unwrap();
 
@@ -489,17 +519,8 @@ fn mpsc_channel<T>() -> (
 }
 
 /// Creates a single [`TestTransaction`] with the given `seq_num`.
-pub fn test_transaction(seq_num: u64) -> TestTransaction {
+pub const fn test_transaction(seq_num: u64) -> TestTransaction {
     TestTransaction::new(1, seq_num, 1)
-}
-
-/// Create test transactions from `start`(inclusive) to `end` (exclusive)
-pub fn test_transactions(start: u64, end: u64) -> Vec<TestTransaction> {
-    let mut txns = vec![];
-    for seq_num in start..end {
-        txns.push(test_transaction(seq_num))
-    }
-    txns
 }
 
 /// Tells us if a [`SignedTransaction`] block contains only the [`TestTransaction`]s
@@ -536,6 +557,7 @@ fn block_contains_transaction(block: &[SignedTransaction], txn: &TestTransaction
     block.iter().any(|signed_txn| {
         signed_txn.sequence_number() == txn.sequence_number
             && signed_txn.sender() == TestTransaction::get_address(txn.address)
+            && signed_txn.gas_unit_price() == txn.gas_price
     })
 }
 

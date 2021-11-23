@@ -19,7 +19,7 @@ use diem_config::{
 use diem_types::PeerId;
 use futures::StreamExt;
 use netcore::transport::ConnectionOrigin;
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 /// A sender to a node to mock an inbound network message from [`PeerManager`]
 pub type InboundMessageSender =
@@ -307,6 +307,19 @@ pub trait TestNode: ApplicationNode + Sync {
             .next()
             .await
             .expect("Expecting a message")
+    }
+
+    /// Confirms no message is sent in the period of time
+    async fn wait_for_no_msg(&mut self, network_id: NetworkId, timeout: Duration) {
+        let waiter = self.get_outbound_handle(network_id).next();
+        if let Ok(msg) = tokio::time::timeout(timeout, waiter).await {
+            panic!(
+                "A message was sent during wait {:?}:{:?} - {:?}",
+                self.node_id(),
+                network_id,
+                msg
+            )
+        }
     }
 
     /// Drop a network message.  This is required over [`TestNode::get_network_msg`] because the
