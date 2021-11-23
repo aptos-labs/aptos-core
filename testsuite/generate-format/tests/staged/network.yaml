@@ -9,11 +9,6 @@ DirectSendMsg:
     - raw_msg: BYTES
 DnsName:
   NEWTYPESTRUCT: STR
-EncNetworkAddress:
-  STRUCT:
-    - key_version: U32
-    - seq_num: U64
-    - enc_addr: BYTES
 ErrorCode:
   ENUM:
     0:

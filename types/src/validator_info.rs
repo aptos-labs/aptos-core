@@ -2,10 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[cfg(any(test, feature = "fuzzing"))]
-use crate::network_address::{
-    encrypted::{TEST_SHARED_VAL_NETADDR_KEY, TEST_SHARED_VAL_NETADDR_KEY_VERSION},
-    NetworkAddress,
-};
+use crate::network_address::NetworkAddress;
 use crate::{account_address::AccountAddress, validator_config::ValidatorConfig};
 use diem_crypto::ed25519::Ed25519PublicKey;
 #[cfg(any(test, feature = "fuzzing"))]
@@ -65,16 +62,9 @@ impl ValidatorInfo {
         consensus_voting_power: u64,
     ) -> Self {
         let addr = NetworkAddress::mock();
-        let enc_addr = addr.clone().encrypt(
-            &TEST_SHARED_VAL_NETADDR_KEY,
-            TEST_SHARED_VAL_NETADDR_KEY_VERSION,
-            &account_address,
-            0,
-            0,
-        );
         let config = ValidatorConfig::new(
             consensus_public_key,
-            bcs::to_bytes(&vec![enc_addr.unwrap()]).unwrap(),
+            bcs::to_bytes(&vec![addr.clone()]).unwrap(),
             bcs::to_bytes(&vec![addr]).unwrap(),
         );
 

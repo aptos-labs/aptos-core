@@ -23,10 +23,7 @@ use diem_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    network_address::{
-        encrypted::{TEST_SHARED_VAL_NETADDR_KEY, TEST_SHARED_VAL_NETADDR_KEY_VERSION},
-        parse_memory, NetworkAddress, Protocol,
-    },
+    network_address::{parse_memory, NetworkAddress, Protocol},
     on_chain_config::ValidatorSet,
     proof::TransactionInfoListWithProof,
     test_helpers::transaction_test_helpers::get_test_signed_txn,
@@ -518,19 +515,11 @@ fn initial_setup(
         let addr = NetworkAddress::from(Protocol::Memory(port));
         let addr = addr.append_prod_protos(network_keys[idx].public_key(), HANDSHAKE_VERSION);
 
-        let enc_addr = addr.clone().encrypt(
-            &TEST_SHARED_VAL_NETADDR_KEY,
-            TEST_SHARED_VAL_NETADDR_KEY_VERSION,
-            &peer_id,
-            0, /* seq_num */
-            0, /* addr_idx */
-        );
-
         // The voting power of peer 0 is enough to generate an LI that passes validation.
         let voting_power = if idx == 0 { 1000 } else { 1 };
         let validator_config = ValidatorConfig::new(
             signer.public_key(),
-            bcs::to_bytes(&vec![enc_addr.unwrap()]).unwrap(),
+            bcs::to_bytes(&vec![addr.clone()]).unwrap(),
             bcs::to_bytes(&vec![addr.clone()]).unwrap(),
         );
         let validator_info = ValidatorInfo::new(peer_id, voting_power, validator_config);

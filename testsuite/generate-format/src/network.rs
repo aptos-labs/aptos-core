@@ -43,7 +43,6 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<messaging::v1::NetworkMessage>(&samples)?;
     tracer.trace_type::<handshake::v1::HandshakeMsg>(&samples)?;
     tracer.trace_type::<address::NetworkAddress>(&samples)?;
-    tracer.trace_type::<address::encrypted::EncNetworkAddress>(&samples)?;
 
     tracer.trace_type::<messaging::v1::ErrorCode>(&samples)?;
     tracer.trace_type::<messaging::v1::ParsingErrorType>(&samples)?;

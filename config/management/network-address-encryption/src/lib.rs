@@ -11,8 +11,7 @@ use diem_types::{
     network_address::{
         self,
         encrypted::{
-            EncNetworkAddress, Key, KeyVersion, TEST_SHARED_VAL_NETADDR_KEY,
-            TEST_SHARED_VAL_NETADDR_KEY_VERSION,
+            Key, KeyVersion, TEST_SHARED_VAL_NETADDR_KEY, TEST_SHARED_VAL_NETADDR_KEY_VERSION,
         },
         NetworkAddress,
     },
@@ -78,39 +77,26 @@ where
     pub fn encrypt(
         &self,
         network_addresses: &[NetworkAddress],
-        account: AccountAddress,
-        seq_num: u64,
+        _account: AccountAddress,
+        _seq_num: u64,
     ) -> Result<Vec<u8>, Error> {
-        let keys = self.read()?;
-        let key = keys
-            .keys
-            .get(&keys.current)
-            .ok_or(Error::VersionNotFound(keys.current))?;
-        let mut enc_addrs = Vec::new();
-        for (idx, addr) in network_addresses.iter().cloned().enumerate() {
-            enc_addrs.push(addr.encrypt(&key.0, keys.current, &account, seq_num, idx as u32)?);
+        let mut addrs = Vec::new();
+        for (_idx, addr) in network_addresses.iter().cloned().enumerate() {
+            addrs.push(addr);
         }
-        bcs::to_bytes(&enc_addrs).map_err(|e| e.into())
+        bcs::to_bytes(&addrs).map_err(|e| e.into())
     }
 
     pub fn decrypt(
         &self,
-        encrypted_network_addresses: &[u8],
+        network_addresses: &[u8],
         account: AccountAddress,
     ) -> Result<Vec<NetworkAddress>, Error> {
-        let keys = self.read()?;
-        let enc_addrs: Vec<EncNetworkAddress> = bcs::from_bytes(encrypted_network_addresses)
+        let network_addrs: Vec<NetworkAddress> = bcs::from_bytes(network_addresses)
             .map_err(|e| Error::AddressDeserialization(account, e.to_string()))?;
         let mut addrs = Vec::new();
-        for (idx, enc_addr) in enc_addrs.iter().enumerate() {
-            let key = keys
-                .keys
-                .get(&enc_addr.key_version())
-                .ok_or_else(|| Error::VersionNotFound(enc_addr.key_version()))?;
-            let addr = enc_addr
-                .clone()
-                .decrypt(&key.0, &account, idx as u32)
-                .map_err(|e| Error::DecryptionError(account, e.to_string()))?;
+        for (_idx, iter_addr) in network_addrs.iter().enumerate() {
+            let addr = iter_addr.clone();
             addrs.push(addr);
         }
         Ok(addrs)

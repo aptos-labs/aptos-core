@@ -1,10 +1,6 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    account_address::AccountAddress,
-    network_address::encrypted::{EncNetworkAddress, Key, KeyVersion},
-};
 use diem_crypto::{
     traits::{CryptoMaterialError, ValidCryptoMaterialStringExt},
     x25519,
@@ -216,25 +212,6 @@ impl NetworkAddress {
     pub fn extend_from_slice(mut self, protos: &[Protocol]) -> Self {
         self.0.extend_from_slice(protos);
         self
-    }
-
-    /// See [`EncNetworkAddress::encrypt`].
-    pub fn encrypt(
-        self,
-        shared_val_netaddr_key: &Key,
-        key_version: KeyVersion,
-        account: &AccountAddress,
-        seq_num: u64,
-        addr_idx: u32,
-    ) -> Result<EncNetworkAddress, ParseError> {
-        EncNetworkAddress::encrypt(
-            self,
-            shared_val_netaddr_key,
-            key_version,
-            account,
-            seq_num,
-            addr_idx,
-        )
     }
 
     /// Given a base `NetworkAddress`, append production protocols and
