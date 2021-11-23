@@ -283,18 +283,16 @@ impl Home {
     }
 
     pub fn read_networks_toml(&self) -> Result<NetworksConfig> {
-        self.check_networks_toml_exists()?;
+        self.ensure_networks_toml_exists()?;
         let network_toml_contents = fs::read_to_string(self.networks_config_path.as_path())?;
         let network_toml: NetworksConfig = toml::from_str(network_toml_contents.as_str())?;
         Ok(network_toml)
     }
 
-    fn check_networks_toml_exists(&self) -> Result<()> {
+    fn ensure_networks_toml_exists(&self) -> Result<()> {
         match self.networks_config_path.exists() {
             true => Ok(()),
-            false => Err(anyhow!(
-                "A project hasn't been created yet. Run shuffle new first"
-            )),
+            false => self.write_default_networks_config_into_toml_if_nonexistent(),
         }
     }
 
@@ -304,6 +302,7 @@ impl Home {
 
     pub fn write_default_networks_config_into_toml_if_nonexistent(&self) -> Result<()> {
         if !&self.networks_config_path.exists() {
+            std::fs::create_dir_all(&self.shuffle_path)?;
             let networks_config_string = toml::to_string_pretty(&NetworksConfig::default())?;
             fs::write(&self.networks_config_path, networks_config_string)?;
         }
@@ -825,10 +824,10 @@ mod test {
     fn test_home_check_networks_toml_exists() {
         let dir = tempdir().unwrap();
         let home = Home::new(dir.path()).unwrap();
-        assert_eq!(home.check_networks_toml_exists().is_err(), true);
+        assert_eq!(home.ensure_networks_toml_exists().is_err(), true);
         fs::create_dir_all(dir.path().join(".shuffle")).unwrap();
         home.write_default_networks_config_into_toml_if_nonexistent()
             .unwrap();
-        assert_eq!(home.check_networks_toml_exists().is_err(), false);
+        assert_eq!(home.ensure_networks_toml_exists().is_err(), false);
     }
 }

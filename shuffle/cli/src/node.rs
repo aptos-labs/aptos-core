@@ -10,6 +10,8 @@ use std::path::{Path, PathBuf};
 const LAZY_ENABLED: bool = true;
 
 pub fn handle(home: &Home, genesis: Option<String>) -> Result<()> {
+    home.generate_shuffle_path_if_nonexistent()?;
+    home.write_default_networks_config_into_toml_if_nonexistent()?;
     if !home.get_node_config_path().is_dir() {
         println!(
             "Creating node config in {}",
