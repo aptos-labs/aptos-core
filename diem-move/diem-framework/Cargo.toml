@@ -46,6 +46,7 @@ tempfile = "3.2.0"
 datatest-stable = "0.1.1"
 diem-vm = { path = "../../diem-move/diem-vm" }
 move-cli = { path = "../../language/tools/move-cli" }
+move-unit-test = { path = "../../language/tools/move-unit-test" }
 
 dir-diff = "0.3.2"
 

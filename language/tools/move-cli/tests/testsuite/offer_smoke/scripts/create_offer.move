@@ -5,7 +5,7 @@ use Std::Offer;
 use Std::Signer;
 
 // Alice creates an offer for Bob that contains an M::T resource
-fun main(account: signer) {
+fun create_offer(account: signer) {
     let sender = Signer::address_of(&account);
     Offer::create(&account, M::create(), @0xB0B);
     assert!(Offer::exists_at<M::T>(sender), 77);

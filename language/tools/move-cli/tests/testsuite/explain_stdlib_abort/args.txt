@@ -1,1 +1,1 @@
-sandbox run script.move
+sandbox run sources/bad_borrow.move

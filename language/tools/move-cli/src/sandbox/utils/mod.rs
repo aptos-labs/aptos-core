@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::sandbox::utils::on_disk_state_view::OnDiskStateView;
+use anyhow::{bail, Result};
+use colored::Colorize;
+use difference::{Changeset, Difference};
 use move_binary_format::{
     access::ModuleAccess,
     compatibility::Compatibility,
@@ -10,7 +13,7 @@ use move_binary_format::{
     normalized, IndexKind,
 };
 use move_bytecode_utils::Modules;
-use move_command_line_common::files::MOVE_COMPILED_EXTENSION;
+use move_command_line_common::files::{FileHash, MOVE_COMPILED_EXTENSION};
 use move_core_types::{
     account_address::AccountAddress,
     effects::{ChangeSet, Event},
@@ -21,27 +24,25 @@ use move_core_types::{
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
 use move_ir_types::location::Loc;
-use resource_viewer::{AnnotatedMoveStruct, MoveValueAnnotator};
-
+use move_lang::{
+    compiled_unit::{CompiledUnit, NamedCompiledModule},
+    diagnostics::{self, report_diagnostics, Diagnostic, Diagnostics, FileName},
+};
+use move_package::compilation::compiled_package::CompiledUnitWithSource;
 use move_vm_types::gas_schedule::GasStatus;
+use resource_viewer::{AnnotatedMoveStruct, MoveValueAnnotator};
+use std::{
+    collections::{BTreeMap, HashMap},
+    fs,
+    path::Path,
+};
 
-use bytecode_source_map::source_map::SourceMap;
-use move_lang::diagnostics::{self, report_diagnostics, Diagnostic, Diagnostics, FilesSourceText};
-
-use anyhow::{bail, Result};
-use std::{collections::BTreeMap, fs, path::Path};
-
-use colored::Colorize;
-use difference::{Changeset, Difference};
-
-pub mod mode;
 pub mod on_disk_state_view;
-pub mod package;
+pub mod package_context;
 
-pub use mode::*;
 use move_bytecode_utils::module_cache::GetModule;
 pub use on_disk_state_view::*;
-pub use package::*;
+pub use package_context::*;
 
 pub fn get_gas_status(gas_budget: Option<u64>) -> Result<GasStatus<'static>> {
     let gas_status = if let Some(gas_budget) = gas_budget {
@@ -58,6 +59,13 @@ pub fn get_gas_status(gas_budget: Option<u64>) -> Result<GasStatus<'static>> {
         GasStatus::new_unmetered()
     };
     Ok(gas_status)
+}
+
+pub(crate) fn module(unit: &CompiledUnit) -> Result<&CompiledModule> {
+    match unit {
+        CompiledUnit::Module(NamedCompiledModule { module, .. }) => Ok(module),
+        _ => bail!("Found script in modules -- this shouldn't happen"),
+    }
 }
 
 pub(crate) fn explain_publish_changeset(changeset: &ChangeSet, state: &OnDiskStateView) {
@@ -306,12 +314,21 @@ pub(crate) fn explain_type_error(
 pub(crate) fn explain_publish_error(
     error: VMError,
     state: &OnDiskStateView,
-    module: &CompiledModule,
-    src_map: &SourceMap,
-    files: &FilesSourceText,
+    unit: &CompiledUnitWithSource,
 ) -> Result<()> {
     use StatusCode::*;
+    let mut files = HashMap::new();
+    let file_contents = std::fs::read_to_string(&unit.source_path)?;
+    let file_hash = FileHash::new(&file_contents);
+    files.insert(
+        file_hash,
+        (
+            FileName::from(unit.source_path.to_string_lossy()),
+            file_contents,
+        ),
+    );
 
+    let module = module(&unit.unit)?;
     let module_id = module.self_id();
     let error_clone = error.clone();
     match error.into_vm_status() {
@@ -396,8 +413,10 @@ pub(crate) fn explain_publish_error(
                     let native_function = &(module.function_defs())[*table_ind as usize];
                     let fh = module.function_handle_at(native_function.function);
                     let mh = module.module_handle_at(fh.module);
-                    let function_source_map =
-                        src_map.get_function_source_map(FunctionDefinitionIndex(*table_ind));
+                    let function_source_map = unit
+                        .unit
+                        .source_map()
+                        .get_function_source_map(FunctionDefinitionIndex(*table_ind));
                     if let Ok(map) = function_source_map {
                         let err_string = format!(
                             "Missing implementation for the native function {}::{}",
@@ -413,7 +432,7 @@ pub(crate) fn explain_publish_error(
                     }
                 }
             }
-            report_diagnostics(files, diags)
+            report_diagnostics(&files, diags)
         }
         VMStatus::Error(status_code) => {
             println!("Publishing failed with unexpected error {:?}", status_code)

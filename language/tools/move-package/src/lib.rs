@@ -51,7 +51,7 @@ pub struct BuildConfig {
     #[structopt(name = "generate-abis", long = "abi")]
     pub generate_abis: bool,
 
-    /// Optional installation directory for this after it has been generated.
+    /// Installation directory for compiled artifacts. Defaults to current directory.
     #[structopt(long = "install-dir", parse(from_os_str))]
     pub install_dir: Option<PathBuf>,
 

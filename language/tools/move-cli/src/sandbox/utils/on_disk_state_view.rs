@@ -20,12 +20,8 @@ use move_core_types::{
     value::MoveStructLayout,
 };
 use move_ir_types::location::Spanned;
-use move_lang::{shared::NumericalAddress, MOVE_COMPILED_INTERFACES_DIR};
-use move_symbol_pool::Symbol;
 use resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue, MoveValueAnnotator};
-use serde::{Deserialize, Serialize};
 use std::{
-    collections::BTreeMap,
     convert::{TryFrom, TryInto},
     fs,
     path::{Path, PathBuf},
@@ -41,14 +37,6 @@ pub const MODULES_DIR: &str = "modules";
 pub const EVENTS_DIR: &str = "events";
 /// subdirectory of `DEFAULT_BUILD_DIR`/<addr> where generated struct layouts are stored
 pub const STRUCT_LAYOUTS_DIR: &str = "struct_layouts";
-
-pub type ModuleIdWithNamedAddress = (ModuleId, Option<Symbol>);
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub(crate) struct InterfaceFilesMetadata {
-    named_address_mapping: BTreeMap<ModuleId, String>,
-    named_address_values: BTreeMap<String, String>,
-}
 
 #[derive(Debug)]
 pub struct OnDiskStateView {
@@ -75,87 +63,6 @@ impl OnDiskStateView {
             // fact that storage_dir is canonicalized.
             storage_dir: storage_dir.canonicalize()?,
         })
-    }
-
-    pub fn interface_files_dir(&self) -> Result<String> {
-        let path = self.build_dir.join(MOVE_COMPILED_INTERFACES_DIR);
-        if !path.exists() {
-            fs::create_dir_all(&path)?;
-        }
-        Ok(path.into_os_string().into_string().unwrap())
-    }
-
-    pub(crate) fn interface_files_metadata_file(&self) -> PathBuf {
-        // File containing interface file metadata, specifically named address mapping
-        const INTERFACE_FILES_METADATA: &str = "metadata";
-        let mut path = self.build_dir.join(MOVE_COMPILED_INTERFACES_DIR);
-        path = path.join(INTERFACE_FILES_METADATA);
-        path.set_extension("yaml");
-        path
-    }
-
-    pub(crate) fn read_interface_files_metadata(&self) -> Result<InterfaceFilesMetadata> {
-        let bytes_opt = Self::get_bytes(&self.interface_files_metadata_file())?;
-        Ok(match bytes_opt {
-            None => InterfaceFilesMetadata {
-                named_address_mapping: BTreeMap::new(),
-                named_address_values: BTreeMap::new(),
-            },
-            Some(bytes) => serde_yaml::from_slice::<InterfaceFilesMetadata>(&bytes)?,
-        })
-    }
-
-    pub fn get_named_addresses(
-        &self,
-        additional_named_address_values: BTreeMap<String, NumericalAddress>,
-    ) -> Result<BTreeMap<String, NumericalAddress>> {
-        let mut save_named_addrs: BTreeMap<_, _> = self
-            .read_interface_files_metadata()?
-            .named_address_values
-            .iter()
-            .map(|(name, addr_str)| (name.clone(), NumericalAddress::parse_str(addr_str).unwrap()))
-            .collect();
-        save_named_addrs.extend(additional_named_address_values);
-        Ok(save_named_addrs)
-    }
-
-    fn update_interface_files_metadata(
-        &self,
-        additional_named_address_mapping: BTreeMap<ModuleId, Option<String>>,
-        additional_named_address_values: BTreeMap<String, NumericalAddress>,
-    ) -> Result<()> {
-        let InterfaceFilesMetadata {
-            mut named_address_mapping,
-            mut named_address_values,
-        } = self.read_interface_files_metadata()?;
-        for (id, address_name_opt) in additional_named_address_mapping {
-            match address_name_opt {
-                None => {
-                    named_address_mapping.remove(&id);
-                }
-                Some(address_name) => {
-                    named_address_mapping.insert(id, address_name);
-                }
-            }
-        }
-        named_address_values.extend(
-            additional_named_address_values
-                .into_iter()
-                .map(|(name, addr)| (name, format!("{:#X}", addr))),
-        );
-        self.write_interface_files_metadata(InterfaceFilesMetadata {
-            named_address_mapping,
-            named_address_values,
-        })
-    }
-
-    fn write_interface_files_metadata(&self, metadata: InterfaceFilesMetadata) -> Result<()> {
-        let yaml_string = serde_yaml::to_string(&metadata).unwrap();
-        let path = self.interface_files_metadata_file();
-        if !path.exists() {
-            fs::create_dir_all(path.parent().unwrap())?;
-        }
-        Ok(fs::write(path, yaml_string.as_bytes())?)
     }
 
     pub fn build_dir(&self) -> &PathBuf {
@@ -434,54 +341,14 @@ impl OnDiskStateView {
         Ok(fs::write(layouts_dir, serde_yaml::to_string(layout)?)?)
     }
 
-    // keep the mv_interfaces generated in the build_dir in-sync with the modules on storage. The
-    // mv_interfaces will be used for compilation and the modules will be used for linking.
-    fn sync_interface_files(
-        &self,
-        named_address_mapping_changes: BTreeMap<ModuleId, Option<String>>,
-        named_address_values: BTreeMap<String, NumericalAddress>,
-    ) -> Result<()> {
-        self.update_interface_files_metadata(named_address_mapping_changes, named_address_values)?;
-        move_lang::generate_interface_files(
-            &[self
-                .storage_dir
-                .clone()
-                .into_os_string()
-                .into_string()
-                .unwrap()],
-            Some(
-                self.build_dir
-                    .clone()
-                    .into_os_string()
-                    .into_string()
-                    .unwrap(),
-            ),
-            &self.read_interface_files_metadata()?.named_address_mapping,
-            false,
-        )?;
-        Ok(())
-    }
-
     /// Save all the modules in the local cache, re-generate mv_interfaces if required.
     pub fn save_modules<'a>(
         &self,
-        modules: impl IntoIterator<Item = &'a (ModuleIdWithNamedAddress, Vec<u8>)>,
-        named_address_values: BTreeMap<String, NumericalAddress>,
+        modules: impl IntoIterator<Item = &'a (ModuleId, Vec<u8>)>,
     ) -> Result<()> {
-        let mut named_address_mapping_changes = BTreeMap::new();
-        let mut is_empty = true;
-        for ((module_id, address_name_opt), module_bytes) in modules {
+        for (module_id, module_bytes) in modules {
             self.save_module(module_id, module_bytes)?;
-            named_address_mapping_changes
-                .insert(module_id.clone(), address_name_opt.map(|n| n.to_string()));
-            is_empty = false;
         }
-
-        // sync with build_dir for updates of mv_interfaces if new modules are added
-        if !is_empty {
-            self.sync_interface_files(named_address_mapping_changes, named_address_values)?;
-        }
-
         Ok(())
     }
 

@@ -35,6 +35,11 @@ impl<'a> Modules<'a> {
         self.0.values().copied().collect()
     }
 
+    /// Return all modules in this set
+    pub fn iter_modules_owned(&self) -> Vec<CompiledModule> {
+        self.iter_modules().into_iter().cloned().collect()
+    }
+
     /// Compute a dependency graph for `self`
     pub fn compute_dependency_graph(&self) -> DependencyGraph {
         DependencyGraph::new(self.0.values().copied())

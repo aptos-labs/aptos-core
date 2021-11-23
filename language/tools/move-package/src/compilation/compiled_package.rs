@@ -372,6 +372,17 @@ impl CompiledPackage {
         self.dependencies.iter().chain(vec![self])
     }
 
+    pub fn compiled_modules(&self) -> Modules {
+        Modules::new(
+            self.compiled_units
+                .iter()
+                .filter_map(|unit| match &unit.unit {
+                    CompiledUnit::Module(NamedCompiledModule { module, .. }) => Some(module),
+                    CompiledUnit::Script(_) => None,
+                }),
+        )
+    }
+
     pub fn modules(&self) -> impl Iterator<Item = &CompiledUnitWithSource> {
         self.compiled_units
             .iter()

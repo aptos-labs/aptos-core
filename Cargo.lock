@@ -1915,6 +1915,7 @@ dependencies = [
  "move-prover",
  "move-stdlib",
  "move-symbol-pool",
+ "move-unit-test",
  "move-vm-runtime",
  "move-vm-types",
  "once_cell",

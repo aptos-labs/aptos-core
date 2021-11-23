@@ -1,4 +1,4 @@
-Command `sandbox publish modules`:
+Command `sandbox publish`:
 Command `sandbox run scripts/create_offer.move --signers 0xA11CE`:
 Command `sandbox run scripts/redeem_offer.move --signers 0xCA21`:
 Execution aborted with code 7 in module 00000000000000000000000000000001::Offer.

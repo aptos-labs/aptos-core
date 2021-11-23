@@ -1,2 +1,2 @@
-sandbox publish src/modules --mode bare
-sandbox run src/scripts/test.move --mode bare --dry-run
+sandbox publish
+sandbox run scripts/test.move --dry-run

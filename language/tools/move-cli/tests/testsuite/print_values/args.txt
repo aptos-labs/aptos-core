@@ -1,3 +1,2 @@
-sandbox publish src/modules
-
-sandbox run src/scripts/print_values.move --dry-run
+sandbox publish
+sandbox run scripts/print_values.move --dry-run

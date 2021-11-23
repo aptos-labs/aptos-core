@@ -2,33 +2,30 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    base, sandbox, sandbox::utils::Mode, shared, Move, NativeFunctionRecord, DEFAULT_SOURCE_DIR,
+    sandbox::{
+        self,
+        utils::{on_disk_state_view::OnDiskStateView, PackageContext},
+    },
+    Move, NativeFunctionRecord, DEFAULT_BUILD_DIR,
 };
 use anyhow::Result;
 use move_core_types::{
     errmap::ErrorMapping, language_storage::TypeTag, parser,
     transaction_argument::TransactionArgument,
 };
+use move_package::compilation::package_layout::CompiledPackageLayout;
 use std::{
     fs,
     path::{Path, PathBuf},
 };
 use structopt::StructOpt;
 
-use super::utils::on_disk_state_view::OnDiskStateView;
-
 #[derive(StructOpt)]
 pub enum SandboxCommand {
     /// Compile the specified modules and publish the resulting bytecodes in global storage.
     #[structopt(name = "publish")]
     Publish {
-        /// The source files containing modules to publish.
-        #[structopt(
-            name = "PATH_TO_SOURCE_FILE",
-            default_value = DEFAULT_SOURCE_DIR,
-        )]
-        source_files: Vec<String>,
-        /// If set, fail during compilation when attempting to publish a module that already
+        /// If set, fail when attempting to publish a module that already
         /// exists in global storage.
         #[structopt(long = "no-republish")]
         no_republish: bool,
@@ -42,7 +39,7 @@ pub enum SandboxCommand {
         override_ordering: Option<Vec<String>>,
     },
     /// Compile/run a Move script that reads/writes resources stored on disk in `storage`.
-    /// This command compiles the script first before running it.
+    /// The script must already be compiled and defined in the package.
     #[structopt(name = "run")]
     Run {
         /// Path to .mv file containing either script or module bytecodes. If the file is a module, the
@@ -82,11 +79,8 @@ pub enum SandboxCommand {
         dry_run: bool,
     },
     /// Run expected value tests using the given batch file.
-    #[structopt(name = "test")]
+    #[structopt(name = "exp-test")]
     Test {
-        /// a directory path in which all the tests will be executed.
-        #[structopt(name = "path", parse(from_os_str))]
-        path: PathBuf,
         /// Use an ephemeral directory to serve as the testing workspace.
         /// By default, the directory containing the `args.txt` will be the workspace.
         #[structopt(long = "use-temp-dir")]
@@ -95,9 +89,6 @@ pub enum SandboxCommand {
         /// By default, coverage will not be tracked nor shown.
         #[structopt(long = "track-cov")]
         track_cov: bool,
-        /// Create a new test directory scaffold with the specified <path>.
-        #[structopt(long = "create")]
-        create: bool,
     },
     /// View Move resources, events files, and modules stored on disk.
     #[structopt(name = "view")]
@@ -112,20 +103,6 @@ pub enum SandboxCommand {
     /// Run well-formedness checks on the `storage` and `build` directories.
     #[structopt(name = "doctor")]
     Doctor {},
-    /// Typecheck and verify the scripts and/or modules under `src`.
-    #[structopt(name = "link")]
-    Link {
-        /// The source files containing modules to publish.
-        #[structopt(
-            name = "PATH_TO_SOURCE_FILE",
-            default_value = DEFAULT_SOURCE_DIR,
-        )]
-        source_files: Vec<String>,
-
-        /// If set, fail when attempting to typecheck a module that already exists in global storage.
-        #[structopt(long = "no-republish")]
-        no_republish: bool,
-    },
     /// Generate struct layout bindings for the modules stored on disk under `storage`
     // TODO: expand this to generate script bindings, docs, errmaps, etc.?.
     #[structopt(name = "generate")]
@@ -165,39 +142,23 @@ impl SandboxCommand {
         natives: Vec<NativeFunctionRecord>,
         error_descriptions: &ErrorMapping,
         move_args: &Move,
-        mode: &Mode,
     ) -> Result<()> {
-        let additional_named_addresses =
-            shared::verify_and_create_named_address_mapping(move_args.named_addresses.clone())?;
         match self {
-            SandboxCommand::Link {
-                source_files,
-                no_republish,
-            } => {
-                let state = mode.prepare_state(&move_args.build_dir, &move_args.storage_dir)?;
-                base::commands::check(
-                    &[state.interface_files_dir()?],
-                    !*no_republish,
-                    source_files,
-                    state.get_named_addresses(additional_named_addresses)?,
-                    move_args.verbose,
-                )
-            }
             SandboxCommand::Publish {
-                source_files,
                 no_republish,
                 ignore_breaking_changes,
                 override_ordering,
             } => {
-                let state = mode.prepare_state(&move_args.build_dir, &move_args.storage_dir)?;
+                let context =
+                    PackageContext::new(&move_args.package_path, &move_args.build_config)?;
+                let state = context.prepare_state(&move_args.storage_dir)?;
                 sandbox::commands::publish(
                     natives,
                     &state,
-                    source_files,
-                    !*no_republish,
+                    context.package(),
+                    *no_republish,
                     *ignore_breaking_changes,
                     override_ordering.as_ref().map(|o| o.as_slice()),
-                    state.get_named_addresses(additional_named_addresses)?,
                     move_args.verbose,
                 )
             }
@@ -210,41 +171,36 @@ impl SandboxCommand {
                 gas_budget,
                 dry_run,
             } => {
-                let state = mode.prepare_state(&move_args.build_dir, &move_args.storage_dir)?;
+                let context =
+                    PackageContext::new(&move_args.package_path, &move_args.build_config)?;
+                let state = context.prepare_state(&move_args.storage_dir)?;
                 sandbox::commands::run(
                     natives,
                     error_descriptions,
                     &state,
+                    context.package(),
                     script_file,
                     script_name,
                     signers,
                     args,
                     type_args.to_vec(),
-                    state.get_named_addresses(additional_named_addresses)?,
                     *gas_budget,
                     *dry_run,
                     move_args.verbose,
                 )
             }
             SandboxCommand::Test {
-                path,
-                use_temp_dir: _,
-                track_cov: _,
-                create: true,
-            } => sandbox::commands::create_test_scaffold(path),
-            SandboxCommand::Test {
-                path,
                 use_temp_dir,
                 track_cov,
-                create: false,
             } => sandbox::commands::run_all(
-                path,
+                &move_args.package_path,
                 &std::env::current_exe()?,
                 *use_temp_dir,
                 *track_cov,
             ),
             SandboxCommand::View { file } => {
-                let state = mode.prepare_state(&move_args.build_dir, &move_args.storage_dir)?;
+                let state = PackageContext::new(&move_args.package_path, &move_args.build_config)?
+                    .prepare_state(&move_args.storage_dir)?;
                 sandbox::commands::view(&state, file)
             }
             SandboxCommand::Clean {} => {
@@ -255,18 +211,27 @@ impl SandboxCommand {
                 }
 
                 // delete build
-                let build_dir = Path::new(&move_args.build_dir);
+                let build_dir = Path::new(
+                    &move_args
+                        .build_config
+                        .install_dir
+                        .as_ref()
+                        .unwrap_or(&PathBuf::from(DEFAULT_BUILD_DIR)),
+                )
+                .join(CompiledPackageLayout::Root.path());
                 if build_dir.exists() {
                     fs::remove_dir_all(&build_dir)?;
                 }
                 Ok(())
             }
             SandboxCommand::Doctor {} => {
-                let state = mode.prepare_state(&move_args.build_dir, &move_args.storage_dir)?;
+                let state = PackageContext::new(&move_args.package_path, &move_args.build_config)?
+                    .prepare_state(&move_args.storage_dir)?;
                 sandbox::commands::doctor(&state)
             }
             SandboxCommand::Generate { cmd } => {
-                let state = mode.prepare_state(&move_args.build_dir, &move_args.storage_dir)?;
+                let state = PackageContext::new(&move_args.package_path, &move_args.build_config)?
+                    .prepare_state(&move_args.storage_dir)?;
                 handle_generate_commands(cmd, &state)
             }
         }

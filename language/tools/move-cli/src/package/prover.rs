@@ -61,7 +61,7 @@ impl ProverTest {
         }
         let pkg_path = path_in_crate(std::mem::take(&mut self.path));
         cli::handle_package_commands(
-            &Some(pkg_path),
+            &pkg_path,
             move_package::BuildConfig::default(),
             &cli::PackageCommand::Prove {
                 target_filter: None,

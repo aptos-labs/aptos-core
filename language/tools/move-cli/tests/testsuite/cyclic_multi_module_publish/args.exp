@@ -1,0 +1,25 @@
+Command `sandbox publish --override-ordering A --override-ordering B -v`:
+error[E02004]: invalid 'module' declaration
+  ┌─ ./sources/CyclicFriendsPart2.move:8:24
+  │
+7 │     friend 0x3::A;
+  │     -------------- '0x3::A' is a friend of '0x3::C'
+8 │     public fun foo() { 0x3::B::foo() }
+  │                        ^^^^^^^^^^^ '0x3::B' uses '0x3::C'. This 'use' relationship creates a dependency cycle.
+  │
+  ┌─ ./sources/CyclicFriendsPart1.move:6:24
+  │
+6 │     public fun foo() { 0x3::A::foo() }
+  │                        ----------- '0x3::A' uses '0x3::B'
+
+error[E02001]: duplicate declaration, item, or annotation
+  ┌─ ./sources/CyclicFriendsPart1.move:1:13
+  │
+1 │ module 0x3::A {
+  │             ^ Duplicate definition for module '0x3::A'
+  │
+  ┌─ ./sources/CyclicFriendsPart2.move:1:13
+  │
+1 │ module 0x3::A {
+  │             - Module previously defined here
+

@@ -1,5 +1,5 @@
-Command `sandbox publish src/modules`:
-Command `sandbox run src/scripts/script.move --dry-run`:
+Command `sandbox publish`:
+Command `sandbox run scripts/print_stack_trace.move --dry-run`:
 Call Stack:
     [0] main
 

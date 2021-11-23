@@ -1,18 +1,23 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{DEFAULT_BUILD_DIR, DEFAULT_PACKAGE_DIR, DEFAULT_SOURCE_DIR, DEFAULT_STORAGE_DIR};
-use anyhow::anyhow;
-use move_binary_format::file_format::CompiledModule;
+use crate::{sandbox::utils::module, DEFAULT_BUILD_DIR, DEFAULT_STORAGE_DIR};
+
 use move_command_line_common::{
     env::read_bool_env_var,
-    files::{extension_equals, find_filenames, path_to_string, MOVE_COMPILED_EXTENSION},
+    files::{find_filenames, path_to_string},
     testing::{format_diff, read_env_update_baseline, EXP_EXT},
 };
 use move_coverage::coverage_map::{CoverageMap, ExecCoverageMapWithModules};
 use move_lang::command_line::COLOR_MODE_ENV_VAR;
+use move_package::{
+    compilation::{compiled_package::OnDiskCompiledPackage, package_layout::CompiledPackageLayout},
+    resolution::resolution_graph::ResolvedGraph,
+    source_package::{layout::SourcePackageLayout, manifest_parser::parse_move_manifest_from_file},
+    BuildConfig,
+};
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, HashMap},
     env,
     fs::{self, File},
     io::{self, BufRead, Write},
@@ -49,40 +54,26 @@ const DEFAULT_TRACE_FILE: &str = "trace";
 fn collect_coverage(
     trace_file: &Path,
     build_dir: &Path,
-    storage_dir: &Path,
 ) -> anyhow::Result<ExecCoverageMapWithModules> {
-    fn find_compiled_move_filenames(path: &Path) -> anyhow::Result<Vec<String>> {
-        if path.exists() {
-            find_filenames(&[path_to_string(path)?], |fpath| {
-                extension_equals(fpath, MOVE_COMPILED_EXTENSION)
-            })
-        } else {
-            Ok(vec![])
-        }
-    }
-
-    // collect modules compiled for packages (to be filtered out)
-    let pkg_modules: HashSet<_> =
-        find_compiled_move_filenames(&build_dir.join(DEFAULT_PACKAGE_DIR))?
-            .into_iter()
-            .map(|entry| PathBuf::from(entry).file_name().unwrap().to_owned())
-            .collect();
-
-    // collect modules published minus modules compiled for packages
-    let src_module_files = find_filenames(&[path_to_string(storage_dir)?], |fpath| {
-        extension_equals(fpath, MOVE_COMPILED_EXTENSION)
-            && !pkg_modules.contains(fpath.file_name().unwrap())
-    })?;
-    let src_modules = src_module_files
-        .iter()
-        .map(|entry| {
-            let bytecode_bytes = fs::read(entry)?;
-            let compiled_module = CompiledModule::deserialize(&bytecode_bytes)
-                .map_err(|e| anyhow!("Failure deserializing module {:?}: {:?}", entry, e))?;
-
-            // use absolute path to the compiled module file
-            let module_absolute_path = path_to_string(&PathBuf::from(entry).canonicalize()?)?;
-            Ok((module_absolute_path, compiled_module))
+    let canonical_build = build_dir.canonicalize().unwrap();
+    let package_name = parse_move_manifest_from_file(
+        &SourcePackageLayout::try_find_root(&canonical_build).unwrap(),
+    )?
+    .package
+    .name
+    .to_string();
+    let pkg = OnDiskCompiledPackage::from_path(
+        &build_dir
+            .join(package_name)
+            .join(CompiledPackageLayout::BuildInfo.path()),
+    )?
+    .into_compiled_package()?;
+    let src_modules = pkg
+        .modules()
+        .into_iter()
+        .map(|unit| {
+            let absolute_path = path_to_string(&unit.source_path.canonicalize()?)?;
+            Ok((absolute_path, module(&unit.unit)?.clone()))
         })
         .collect::<anyhow::Result<HashMap<_, _>>>()?;
 
@@ -104,6 +95,74 @@ fn collect_coverage(
     Ok(coverage_map)
 }
 
+fn determine_package_nest_depth(
+    resolution_graph: &ResolvedGraph,
+    pkg_dir: &Path,
+) -> anyhow::Result<usize> {
+    let mut depth = 0;
+    for (_, dep) in resolution_graph.package_table.iter() {
+        depth = std::cmp::max(
+            depth,
+            dep.package_path.strip_prefix(pkg_dir)?.components().count() + 1,
+        );
+    }
+    Ok(depth)
+}
+
+fn pad_tmp_path(tmp_dir: &Path, pad_amount: usize) -> anyhow::Result<PathBuf> {
+    let mut tmp_dir = tmp_dir.to_path_buf();
+    for i in 0..pad_amount {
+        tmp_dir.push(format!("{}", i));
+    }
+    std::fs::create_dir_all(&tmp_dir)?;
+    Ok(tmp_dir)
+}
+
+// We need to copy dependencies over (transitively) and at the same time keep the paths valid in
+// the package. To do this we compute the resolution graph for all possible dependencies (so in dev
+// mode) and then calculate the nesting under `tmp_dir` the we need to copy the root package so
+// that it, and all its dependencies reside under `tmp_dir` with the same paths as in the original
+// package manifest.
+fn copy_deps(tmp_dir: &Path, pkg_dir: &Path) -> anyhow::Result<PathBuf> {
+    // Sometimes we run a test that isn't a package for metatests so if there isn't a package we
+    // don't need to nest at all.
+    let package_resolution = match (BuildConfig {
+        dev_mode: true,
+        ..Default::default()
+    })
+    .resolution_graph_for_package(pkg_dir)
+    {
+        Ok(pkg) => pkg,
+        Err(_) => return Ok(tmp_dir.to_path_buf()),
+    };
+    let package_nest_depth = determine_package_nest_depth(&package_resolution, pkg_dir)?;
+    let tmp_dir = pad_tmp_path(tmp_dir, package_nest_depth)?;
+    for (_, dep) in package_resolution.package_table.iter() {
+        let source_dep_path = &dep.package_path;
+        let dest_dep_path = tmp_dir.join(&dep.package_path.strip_prefix(pkg_dir).unwrap());
+        if !dest_dep_path.exists() {
+            fs::create_dir_all(&dest_dep_path)?;
+        }
+        simple_copy_dir(&dest_dep_path, source_dep_path)?;
+    }
+    Ok(tmp_dir)
+}
+
+fn simple_copy_dir(dst: &Path, src: &Path) -> io::Result<()> {
+    for entry in fs::read_dir(src)? {
+        let src_entry = entry?;
+        let src_entry_path = src_entry.path();
+        let dst_entry_path = dst.join(src_entry.file_name());
+        if src_entry_path.is_dir() {
+            fs::create_dir_all(&dst_entry_path)?;
+            simple_copy_dir(&dst_entry_path, &src_entry_path)?;
+        } else {
+            fs::copy(&src_entry_path, &dst_entry_path)?;
+        }
+    }
+    Ok(())
+}
+
 /// Run the `args_path` batch file with`cli_binary`
 pub fn run_one(
     args_path: &Path,
@@ -111,21 +170,6 @@ pub fn run_one(
     use_temp_dir: bool,
     track_cov: bool,
 ) -> anyhow::Result<Option<ExecCoverageMapWithModules>> {
-    fn simple_copy_dir(dst: &Path, src: &Path) -> io::Result<()> {
-        for entry in fs::read_dir(src)? {
-            let src_entry = entry?;
-            let src_entry_path = src_entry.path();
-            let dst_entry_path = dst.join(src_entry.file_name());
-            if src_entry_path.is_dir() {
-                fs::create_dir(&dst_entry_path)?;
-                simple_copy_dir(&dst_entry_path, &src_entry_path)?;
-            } else {
-                fs::copy(&src_entry_path, &dst_entry_path)?;
-            }
-        }
-        Ok(())
-    }
-
     let args_file = io::BufReader::new(File::open(args_path)?).lines();
     let cli_binary_path = cli_binary.canonicalize()?;
 
@@ -134,21 +178,24 @@ pub fn run_one(
     let temp_dir = if use_temp_dir {
         // symlink everything in the exe_dir into the temp_dir
         let dir = tempdir()?;
-        simple_copy_dir(dir.path(), exe_dir)?;
-        Some(dir)
+        let padded_dir = copy_deps(dir.path(), exe_dir)?;
+        simple_copy_dir(&padded_dir, exe_dir)?;
+        Some((dir, padded_dir))
     } else {
         None
     };
-    let wks_dir = temp_dir.as_ref().map_or(exe_dir, |t| t.path());
+    let wks_dir = temp_dir.as_ref().map_or(exe_dir, |t| &t.1);
 
     let storage_dir = wks_dir.join(DEFAULT_STORAGE_DIR);
-    let build_output = wks_dir.join(DEFAULT_BUILD_DIR);
+    let build_output = wks_dir
+        .join(DEFAULT_BUILD_DIR)
+        .join(CompiledPackageLayout::Root.path());
 
     // template for preparing a cli command
     let cli_command_template = || {
         let mut command = Command::new(cli_binary_path.clone());
         if let Some(work_dir) = temp_dir.as_ref() {
-            command.current_dir(work_dir.path());
+            command.current_dir(&work_dir.1);
         } else {
             command.current_dir(exe_dir);
         }
@@ -209,7 +256,7 @@ pub fn run_one(
         None => None,
         Some(trace_path) => {
             if trace_path.exists() {
-                Some(collect_coverage(trace_path, &build_output, &storage_dir)?)
+                Some(collect_coverage(trace_path, &build_output)?)
             } else {
                 eprintln!(
                     "Trace file {:?} not found: coverage is only available with at least one `run` \
@@ -252,7 +299,7 @@ pub fn run_one(
     }
 
     // release the temporary workspace explicitly
-    if let Some(t) = temp_dir {
+    if let Some((t, _)) = temp_dir {
         t.close()?;
     }
 
@@ -313,38 +360,6 @@ pub fn run_all(
         let mut summary_writer: Box<dyn Write> = Box::new(io::stdout());
         for (_, module_summary) in cov_info.into_module_summaries() {
             module_summary.summarize_human(&mut summary_writer, true)?;
-        }
-    }
-
-    Ok(())
-}
-
-/// Create a directory scaffold for writing a Move CLI test.
-pub fn create_test_scaffold(path: &Path) -> anyhow::Result<()> {
-    if path.exists() {
-        anyhow::bail!("{:#?} already exists. Remove {:#?} and re-run this command if creating it as a test directory was intentional.", path, path);
-    }
-
-    let dirs = [DEFAULT_SOURCE_DIR, "scripts"];
-    let files = [(
-        TEST_ARGS_FILENAME,
-        Some("# This is a batch file. To write an expected value test that runs `move <command1> <args1>;move <command2> <args2>`, write\n\
-            # `<command1> <args1>`\n\
-            # `<command2> <args2>`\n\
-            # '#' is a comment.",
-            ),
-    )];
-
-    fs::create_dir_all(&path)?;
-
-    for dir in &dirs {
-        fs::create_dir_all(&path.canonicalize()?.join(dir))?;
-    }
-
-    for (file, possible_contents) in &files {
-        let mut file_handle = fs::File::create(path.canonicalize()?.join(file))?;
-        if let Some(contents) = possible_contents {
-            write!(file_handle, "{}", contents)?;
         }
     }
 

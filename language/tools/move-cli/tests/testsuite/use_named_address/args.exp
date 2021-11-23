@@ -1,23 +1,12 @@
-Command `sandbox publish src/modules/M_no_named.move`:
-Command `sandbox publish src/modules/N.move`:
-error[E03001]: address with no value
-  ┌─ src/modules/N.move:2:8
+Command `sandbox publish`:
+error[E02001]: duplicate declaration, item, or annotation
+  ┌─ ./sources/M_no_named.move:1:14
   │
-2 │ module A::N {
-  │        ^ address 'A' is not assigned a value. Try assigning it a value when calling the compiler
-
-error[E03001]: address with no value
-  ┌─ src/modules/N.move:4:9
+1 │ module 0x42::M {
+  │              ^ Duplicate definition of '0x42::M'
   │
-4 │         A::M::useless()
-  │         ^ address 'A' is not assigned a value
-
-error[E03002]: unbound module
-  ┌─ src/modules/N.move:4:9
+  ┌─ ./sources/M.move:1:11
   │
-4 │         A::M::useless()
-  │         ^^^^ Unbound module 'A::M'
+1 │ module A::M {
+  │           - Module previously defined here as 'A::M', with 'A' = 0x42
 
-Command `sandbox clean`:
-Command `sandbox publish src/modules/M.move -a A=0x42`:
-Command `sandbox publish src/modules/N.move`:

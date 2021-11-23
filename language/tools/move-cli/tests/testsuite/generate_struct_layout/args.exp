@@ -1,4 +1,4 @@
-Command `sandbox publish --mode bare`:
+Command `sandbox publish`:
 Command `sandbox generate struct-layouts --module storage/0x00000000000000000000000000000001/modules/M2.mv --struct C --type-args u64`:
 { t: u64, b: bool, }
 Command `sandbox generate struct-layouts --module storage/0x00000000000000000000000000000001/modules/M2.mv --struct C --type-args address`:

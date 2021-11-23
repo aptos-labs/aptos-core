@@ -1,4 +1,4 @@
-sandbox publish --mode bare
+sandbox publish
 
 # basics
 sandbox generate struct-layouts --module storage/0x00000000000000000000000000000001/modules/M2.mv --struct C --type-args u64

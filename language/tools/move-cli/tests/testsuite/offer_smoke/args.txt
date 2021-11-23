@@ -1,4 +1,4 @@
-sandbox publish modules
+sandbox publish
 sandbox run scripts/create_offer.move --signers 0xA11CE
 sandbox run scripts/redeem_offer.move --signers 0xCA21
 sandbox run scripts/redeem_offer_bob.move --signers 0xB0B

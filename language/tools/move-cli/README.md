@@ -1,11 +1,14 @@
 # Move CLI
 
-This is a tool that provides an easy way to interact with Move, to
-experiment writing and running Move code, and to experiment developing new
-tools useful for Move development. To reflect this, the Move CLI commands are grouped into three main subcommands:
-* **base commands**: are basic Move commands such as compiling or checking a set of modules. These do not rely on a Move Adapter implementation nor implementation of storage.
+The Move command-line interface (Move CLI) is a tool that provides an easy way to interact with Move, to experiment
+with writing and running Move code, and to experiment with developing new tools useful
+for Move development. To reflect this, the Move CLI commands are grouped into
+three main subcommands:
+* **package commands**: are commands to create, compile, and test Move packages, as well as perform other operations related to packages. These do not rely on a Move Adapter implementation nor an implementation of storage.
 * **sandbox commands**: are commands that allow you to write Move modules and scripts, write and run scripts and tests, and view the resulting state of execution in a local sandboxed environment.
 * **experimental commands**: are experimental commands that are currently in development.
+
+Every Move CLI command, with the exception of `package create`, is expected to be run within the context of a [Move package](https://diem.github.io/move/packages.html).
 
 ## Installation
 ```shell
@@ -38,35 +41,50 @@ you can find the complete list of commands available by calling `move
 for each Move CLI command can be found by passing the `--help` flag to it,
 i.e., `move <command> --help`.
 
-## Base Commands
+## Package Commands
 
-The base commands provide wrappers with sane defaults around other commands
+Package commands provide wrappers with sane defaults around other commands
 that are provided either by various Move tools, compiler, or prover.
 
-The `move compile` command will compile either a specific set of modules, or all modules under the passed-in directory:
-
+The `move package new` command will create a new empty Move package:
 ```shell
-$ move compile <move_file_1> ... <move_file_n>
-$ move compile <dir_1> ... <dir_n>
+$ move package new <package_name> # Create a Move package <package_name> under the current dir
+$ move package new <package_name> -p <path> # Create a Move package <package_name> under path <path>
 ```
 
-compiled modules will by default be stored in the `build` directory. You can
-change where the output bytecode is saved by passing the the optional
-`--build-dir` flag:
-
+From within a package's root directory, you can build the modules and/or scripts that you have written in the package with:
 ```shell
-$ move --build-dir <path_to_save_to> compile <move_file_1> ... <move_file_n>
-$ move --build-dir <path_to_save_to> compile <dir_1> ... <dir_n>
+$ move package build # Builds the Move package you are currently in
+$ move package build -p <path> # Builds the Move package at <path>
 ```
 
-You can pass the `--check` flag to the `move compile` command to only compile and typecheck either a specific set of
-modules, or all modules under the passed-in directory without emitting any compiled bytecode:
+The compiled artifacts will by default be stored in the `build` directory. You
+can change where the build artifacts are saved by passing the optional `--build-dir` flag:
 
 ```shell
-$ move compile --check <move_file_1> ... <move_file_n>
-$ move compile --check <dir_1> ... <dir_n>
+$ move package build --build-dir <path_to_save_to> # Build current Move package and save artifacts under <path_to_save_to>
 ```
 
+You can verify the specifications in a Move package using the Move Prover with the `prove` command:
+
+```shell
+$ move package prove # Verify the specifications in the current package
+$ move package prove -p <path> # Verify the specifications in the package at <path>
+```
+
+In order to run the Move Prover [additional tools need to be
+installed](https://github.com/diem/diem/blob/main/language/move-prover/doc/user/install.md).
+Information on the Move Prover and its configuration options can be found
+[here](https://github.com/diem/diem/blob/main/language/move-prover/doc/user/prover-guide.md)
+and
+[here](https://github.com/diem/diem/blob/main/language/move-prover/doc/user/spec-lang.md).
+
+You can also run unit tests in a package using the `test` command
+
+```shell
+$ move package test # Run Move unit tests in the current package
+$ move package test -p <path> # Run Move unit tests in the package at <path>
+```
 ## Sandbox Commands
 
 The sandbox allows you to experiment with writing and running Move code without
@@ -75,45 +93,50 @@ a directory structure that mimics the Move memory model
 
 ### Project structure
 
-Each Move CLI project with a given `name` should have the following structure to
-it:
-
-```
-name/
-├── src # Directory containing all Move source modules
-│   ├ ...
-│   └── Module.move
-└── scripts # Directory containing all Move scripts
-    ├ ...
-    └── script.move
-```
-
-Let's now create a Move project that we'll use for the code in this README and `cd` into it:
+Each sandbox command is run in the context of a Move package. So let's create a
+Move package that we'll use for the code in this README and `cd` into it:
 
 ```shell
-$ mkdir readme
+$ move package new readme
 $ cd readme
-$ mkdir src
-$ mkdir scripts
 ```
 
 ### Compiling and running scripts
 
-Let's first start out with a simple script that prints its `signer`:
+Let's first start out with a simple script that prints its [`signer`](https://diem.github.io/move/signer.html).
+Create a file named `sources/debug_script.move` and type the following into it:
 
 ```rust
+// sources/debug_script.move
 script {
 use Std::Debug;
-fun main(account: signer) {
+fun debug_script(account: signer) {
     Debug::print(&account)
 }
 }
 ```
 
-Place this in a file named `debug_script.move` under `scripts` and try
+Before we can run this however, we need to import the Move standard library
+nursery in order to have access to the `Debug` module and `Std` [named
+address](https://diem.github.io/move/address.html#named-addresses).
+You can specify dependencies locally, or using a Git URL. Here, we will specify
+it using Git, so add the following to the `Move.toml` file in the `readme`
+directory:
+
+```toml
+[addresses]
+Std = "0x1" # Specify and assign 0x1 to the named address "Std"
+
+[dependencies]
+MoveNursery = { git = "https://github.com/diem/diem.git", subdir = "language/move-stdlib/nursery", rev = "d45f20a" }
+#                ^                    ^                     ^                                       ^
+#            Git dependency       Git clone URL       Subdir under git repo (optional)           Git revision to use
+```
+
+Now let's try running the script -- the very first time may take some time since the package command will clone the repository at the given URL, but subsequent calls should be fast:
 
 ```shell
-$ move sandbox run scripts/debug_script.move --signers 0xf
+$ move sandbox run sources/debug_script.move --signers 0xf
 [debug] (&) { 0000000000000000000000000000000F }
 ```
 
@@ -132,19 +155,19 @@ The CLI supports passing non-`signer` arguments to `move sandbox run` via `--arg
 
 ### Publishing new modules
 
-When executing a transaction script you'll often want to call into different Move
-modules like in the example above with the `Debug` module. New modules can be added to the `src`
-directory in the directory where the CLI is being invoked (or a directory
-of your choosing specified via the `--source-dir` flag). The `move sandbox run`
-command will compile and publish each module source file in this directory
-before running the given script. You can also compile and publish modules
-separately if you want as well.
+When executing a transaction script you'll often want to call into different
+Move modules, like in the example above with the `Debug` module. New modules can
+be added to the `sources` directory in the package where the CLI is being
+invoked. You can also add dependencies on other packages to have access to the
+modules that they define (just like we did with the `Debug` module above). The
+`move sandbox run` command will compile and publish each module in the package, and
+in each of the package's transitive dependencies, before running the given script.
 
-Try saving this code in `src/Test.move`:
+Try saving this code in `sources/Test.move`:
 
 ```rust
-address 0x2 {
-module Test {
+// sources/Test.move
+module 0x2::Test {
     use Std::Signer;
 
     struct Resource has key { i: u64 }
@@ -161,25 +184,23 @@ module Test {
         let Resource { i: _ } = move_from(Signer::address_of(account));
   }
 }
-}
 ```
 
 Now, try
 
 ```shell
-$ move sandbox link
+$ move package build
 ```
 
 This will cause the CLI to compile and typecheck the modules under
-`src`, but it won't publish the module bytecode under `storage`. You can
+`sources`, but it won't publish the module bytecode under `storage`. You can
 compile and publish the module by running the `move sandbox publish` command
 (here we pass the `-v` or verbose flag to get a better understanding of what's
 happening):
 
 ```shell
 $ move sandbox publish -v
-Compiling Move modules...
-Found and compiled 1 modules
+Found 1 modules
 Publishing a new module 00000000000000000000000000000002::Test (wrote 253 bytes)
 Wrote 253 bytes of module ID's and code
 ```
@@ -192,7 +213,7 @@ $ ls storage/0x00000000000000000000000000000002/modules
 Test.mv
 ```
 
-We can also inspect the compiled bytecode using `move sandbox view`:
+We can also inspect the compiled bytecode in storage using `move sandbox view`:
 
 ```shell
 $ move sandbox view storage/0x00000000000000000000000000000002/modules/Test.mv
@@ -228,19 +249,59 @@ public write() {
 }
 ```
 
-You can also run the Move CLI with certain predefined modules or in
-different [_modes_](#using-the-cli-with-modes-and-genesis-state) (such as
-the `Debug` module above), in addition to defining your own Move modules,
-we'll touch on this at the end of the README.
+You can also look at the compiled bytecode before publishing to `storage` by
+running either `move package disassemble --name <module_name>` or `move package
+disassemble --name <module_name> --interactive` to interactively inspect the
+bytecode and how it relates to the Move source code:
+
+```shell
+$ move package disassemble --name Test --interactive # You can quit by pressing "q"
+$ move package disassemble --name Test
+// Move bytecode v4
+module 2.Test {
+struct Resource has key {
+        i: u64
+}
+
+public publish() {
+B0:
+        0: MoveLoc[0](account: &signer)
+        1: LdU64(10)
+        2: Pack[0](Resource)
+        3: MoveTo[0](Resource)
+        4: Ret
+}
+public unpublish() {
+B0:
+        0: MoveLoc[0](account: &signer)
+        1: Call[3](address_of(&signer): address)
+        2: MoveFrom[0](Resource)
+        3: Unpack[0](Resource)
+        4: Pop
+        5: Ret
+}
+public write() {
+B0:
+        0: CopyLoc[1](i: u64)
+        1: MoveLoc[0](account: &signer)
+        2: Call[3](address_of(&signer): address)
+        3: MutBorrowGlobal[0](Resource)
+        4: MutBorrowField[0](Resource.i: u64)
+        5: WriteRef
+        6: Ret
+}
+}
+```
 
 ### Updating state
 
 Let's exercise our new `Test` module by running the following script:
 
 ```rust
+// sources/test_script.move
 script {
 use 0x2::Test;
-fun main(account: signer) {
+fun test_script(account: signer) {
     Test::publish(&account)
 }
 }
@@ -252,7 +313,7 @@ Let's first see what this script will change without committing those
 changes first. We can do this by passing the `--dry-run` flag:
 
 ```shell
-$ move sandbox run scripts/test_script.move --signers 0xf -v --dry-run
+$ move sandbox run sources/test_script.move --signers 0xf -v --dry-run
 Compiling transaction script...
 Changed resource(s) under 1 address(es):
   Changed 1 resource(s) under address 0000000000000000000000000000000F:
@@ -268,7 +329,7 @@ Everything looks good, so we can run this again, but this time commit the
 changes by removing the `--dry-run` flag:
 
 ```shell
-$ move sandbox run scripts/test_script.move --signers 0xf -v
+$ move sandbox run sources/test_script.move --signers 0xf -v
 Compiling transaction script...
 Changed resource(s) under 1 address(es):
   Changed 1 resource(s) under address 0000000000000000000000000000000F:
@@ -296,7 +357,7 @@ key 0x2::Test::Resource {
 Since state persists from one call to the Move CLI to another, there will
 frequently be times where you want to start again at a clean state.  This
 can be done using the `move sandbox clean` command which will remove the
-`storage` directory:
+`storage` and `build` directories:
 
 ```shell
 $ move sandbox view storage/0x0000000000000000000000000000000F/resources/0x00000000000000000000000000000002::Test::Resource.bcs
@@ -308,15 +369,18 @@ $ move sandbox view storage/0x0000000000000000000000000000000F/resources/0x00000
 Error: `move sandbox view <file>` must point to a valid file under storage
 ```
 
-### Testing with the Move CLI
+### Expected Value Testing with the Move CLI
 
-The Move CLI also has a built-in testing framework. Each test is run
-independently in its own sandbox so state does not persist from one test to
-another.
+As mentioned previously, Move has a unit testing framework. However, unit tests
+cannot test everything -- in particular testing for events cannot be easily
+done. To help with writing tests that need to check for events, and expect
+specific states, the Move CLI also has a built-in expected-value testing
+framework. Each test is run independently in its own sandbox so state does not
+persist from one test to another.
 
-Each test is structured as a directory consisting of an `args.txt` file that
+Each test is structured as a Move package along with an additional `args.txt` file that
 specifies a sequence of Move CLI commands that should be run in that
-directory, and whose structure piggybacks on the Move CLI project structure defined above.
+directory.
 Additionally, there must be an `args.exp` file that contain the expected
 output from running the sequence of Move CLI commands specified in the
 `args.txt` file for that test.
@@ -329,11 +393,11 @@ adding scripts and modules to:
 ```
 readme/
 ├── args.txt
-├── scripts
-│   ├── debug_script.move
-│   └── test_script.move
-└── src
-    └── Test.move
+├── Move.toml
+└── sources
+    ├── debug_script.move
+    ├── Test.move
+    └── test_script.move
 ```
 
 And, where the `args.txt` file contains the following Move CLI commands:
@@ -342,12 +406,12 @@ And, where the `args.txt` file contains the following Move CLI commands:
 $ cd ..
 $ cat readme/args.txt
 ## Arg files can have comments!
-sandbox run scripts/debug_script.move --signers 0xf
-sandbox run scripts/debug_script.move --signers 0xf --mode bare
-sandbox link
+sandbox run sources/debug_script.move --signers 0xf
+sandbox run sources/debug_script.move --signers 0xf
+package build
 sandbox publish
 sandbox view storage/0x00000000000000000000000000000002/modules/Test.mv
-sandbox run scripts/test_script.move --signers 0xf -v --mode bare
+sandbox run sources/test_script.move --signers 0xf -v
 sandbox view storage/0x0000000000000000000000000000000F/resources/0x00000000000000000000000000000002::Test::Resource.bcs
 ```
 
@@ -355,7 +419,7 @@ We can then use the `move sandbox test` command and point it at the `readme` dir
 Move CLI commands for us in sequence:
 
 ```shell
-$ move sandbox test readme
+$ move sandbox exp-test readme
 ...<snipped output>
 0 / 1 test(s) passed.
 Error: 1 / 1 test(s) failed.
@@ -363,10 +427,10 @@ Error: 1 / 1 test(s) failed.
 
 However, as we see this test will fail since there is no `args.exp` file for the test
 yet. We can generate this expectation file by setting the `UPDATE_BASELINE`
-(or `UB` for short) environment variable when running the test:
+environment variable when running the test:
 
 ```shell
-$ UPDATE_BASELINE=1 move sandbox test readme
+$ UPDATE_BASELINE=1 move sandbox exp-test readme
 1 / 1 test(s) passed.
 ```
 
@@ -376,29 +440,17 @@ in the `args.txt` file:
 
 ```shell
 $ cat readme/args.exp
-Command `sandbox run scripts/debug_script.move --signers 0xf`:
+Command `sandbox run sources/debug_script.move --signers 0xf`:
 [debug] (&) { 0000000000000000000000000000000F }
-Command `sandbox run scripts/debug_script.move --signers 0xf --mode bare`:
+Command `sandbox run sources/debug_script.move --signers 0xf --mode bare`:
 ...
-```
-
-The scaffolding for a new test that follows the above structure for tests can be created
-by passing the `--create` flag to `move sandbox test` along with the name of the test that you wish to create:
-
-```
-$ move sandbox test new_test_name --create
-$ tree new_test_name
-new_test_name
-├── args.txt
-├── scripts
-└── src
 ```
 
 #### Testing with code coverage tracking
 
-Code coverage has been an important metric in software testing. In Move CLI, we
+Code coverage has been an important metric in software testing. In Move CLI expected value tests, we
 address the need for code coverage information with an additional flag,
-`--track-cov`, that can be passed to the `move sandbox test` command.
+`--track-cov`, that can be passed to the `move sandbox exp-test` command.
 
 Note: To view coverage information, the Move CLI must be installed with the `--debug` flag;
 i.e., `cargo install --debug --path diem/language/tools/move-cli`.
@@ -437,13 +489,13 @@ tracking tools.
 
 Note that the coverage information is aggregated across multiple `run` commands
 in `args.txt`. To illustrate this, suppose that we have another test script,
-`test_unpublish_script.move`, under `readme/scripts` with the following
+`test_unpublish_script.move`, under `readme/sources` with the following
 content:
 
 ```rust
 script {
 use 0x2::Test;
-fun main(account: signer) {
+fun test_unpublish_script(account: signer) {
     Test::unpublish(&account)
 }
 }
@@ -452,12 +504,12 @@ fun main(account: signer) {
 We further add a new command to the end of `args.txt`
 (`args.exp` needs to be updated too).
 ```shell
-sandbox run scripts/test_unpublish_script.move --signers 0xf -v --mode bare
+sandbox run sources/test_unpublish_script.move --signers 0xf -v
 ```
 
 Now we can re-test the `readme` again
 ```shell
-$ move sandbox test readme --track-cov
+$ move sandbox exp-test readme --track-cov
 1 / 1 test(s) passed.
 Module 00000000000000000000000000000002::Test
         fun publish
@@ -477,73 +529,6 @@ Module 00000000000000000000000000000002::Test
 
 This time, note that the `unpublish` function is 100% covered too and the
 overall module coverage is boosted to 61.11%.
-
-### Using the CLI with modes and genesis state
-
-The CLI offers a couple of different _modes_ that it can be run with---each
-mode specifies a set of predefined modules that will be used during
-compilation and execution. The mode to be used during a CLI action is specified
-by passing the `--mode <mode>` flag to the Move CLI. The modes that can be used
-are the following:
-
-* **bare:** No predefined modules will be included during the compilation and
-  execution of a script or module (but user-defined modules will). E.g., using
-  the `debug_script.move` example above:
-
-	```shell
-	$ move sandbox run scripts/debug_script.move --signers 0xf --mode bare
-	error:
-
-	   ┌── scripts/debug_script.move:2:5 ───
-	   │
-	 2 │ use Std::Debug;
-	   │     ^^^^^^^^^^ Invalid 'use'. Unbound module: '0x1::Debug'
-	   │
-
-  error:
-
-    ┌── scripts/debug_script.move:4:5 ───
-    │
-  4 │     Debug::print(&account)
-    │     ^^^^^ Unbound module alias 'Debug'
-    │
-	```
-
-* **stdlib:** This includes a small set of utility modules published under the
-  `0x1` address. **This is the default mode if no mode is supplied**. The set of
-  Move modules that are included in this mode are the following:
-  [`Debug`](https://github.com/diem/diem/blob/main/diem-move/diem-framework/nursery/Debug.move),
-  [`Errors`](https://github.com/diem/diem/blob/main/diem-move/diem-framework/modules/Errors.move),
-  [`Event`](https://github.com/diem/diem/blob/main/diem-move/diem-framework/modules/Event.move),
-  [`FixedPoint32`](https://github.com/diem/diem/blob/main/diem-move/diem-framework/modules/FixedPoint32.move),
-  [`Hash`](https://github.com/diem/diem/blob/main/diem-move/diem-framework/modules/Hash.move),
-  [`BCS`](https://github.com/diem/diem/blob/main/diem-move/diem-framework/modules/BCS.move),
-  [`Option`](https://github.com/diem/diem/blob/main/diem-move/diem-framework/modules/Option.move),
-  [`Vector`](https://github.com/diem/diem/blob/main/diem-move/diem-framework/modules/Vector.move), and
-  [`Signer`](https://github.com/diem/diem/blob/main/diem-move/diem-framework/modules/Signer.move).
-
-* **diem:** This includes all of the modules in the `stdlib` mode, along with
-  all of the other modules that comprise the Diem Framework as defined
-  [here](https://github.com/diem/diem/blob/main/diem-move/diem-framework/modules/doc/overview.md).
-
-#### Running with genesis state
-
-You can run the Move CLI using the modules from the Diem Framework by using
-the `--mode diem` mode flag in your commands. However, a number of the Diem
-Framework modules require a specific initialization sequence to be run in
-genesis in order to function properly.
-
-The `tests/testsuite/liba_smoke` test uses the CLI to run a fairly
-realistic Diem genesis setup to initialize these modules, and also contains a
-few basic transactions. If you want to experiment with running
-different transactions with the Diem semantics, you can use this test as a
-starting point, and add your scripts/modules as you wish. You'll need to update
-the `args.txt` file as well to exercise these new scripts as well, and then
-you can run them just like any other Move CLI test:
-
-```shell
-$ move sandbox test ./tests/testsuite/diem_smoke
-```
 
 ### Detecting breaking changes
 

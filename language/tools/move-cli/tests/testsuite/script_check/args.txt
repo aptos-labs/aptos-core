@@ -1,1 +1,0 @@
-compile --check script.move -v

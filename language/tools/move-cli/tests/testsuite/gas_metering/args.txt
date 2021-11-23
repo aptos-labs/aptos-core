@@ -1,1 +1,1 @@
-sandbox run loop.move --mode bare --gas-budget 100
+sandbox run sources/looper.move --gas-budget 100

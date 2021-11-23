@@ -3,7 +3,7 @@
 
 use std::path::PathBuf;
 
-use crate::{experimental, sandbox::utils::mode::Mode, Move};
+use crate::{experimental, sandbox::utils::PackageContext, Move};
 use anyhow::Result;
 use move_core_types::{
     language_storage::TypeTag, parser, transaction_argument::TransactionArgument,
@@ -51,7 +51,7 @@ arg_enum! {
 }
 
 impl ExperimentalCommand {
-    pub fn handle_command(&self, move_args: &Move, mode: &Mode) -> Result<()> {
+    pub fn handle_command(&self, move_args: &Move) -> Result<()> {
         match self {
             ExperimentalCommand::ReadWriteSet {
                 module_file,
@@ -61,7 +61,8 @@ impl ExperimentalCommand {
                 type_args,
                 concretize,
             } => {
-                let state = mode.prepare_state(&move_args.build_dir, &move_args.storage_dir)?;
+                let state = PackageContext::new(&move_args.package_path, &move_args.build_config)?
+                    .prepare_state(&move_args.storage_dir)?;
                 experimental::commands::analyze_read_write_set(
                     &state,
                     module_file,

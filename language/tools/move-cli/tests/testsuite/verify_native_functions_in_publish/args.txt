@@ -1,1 +1,1 @@
-sandbox publish src/example.move
+sandbox publish

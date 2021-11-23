@@ -255,29 +255,40 @@ impl CoverageSummaryOptions {
 }
 
 pub fn handle_package_commands(
-    path: &Option<PathBuf>,
+    path: &Path,
     config: move_package::BuildConfig,
     cmd: &PackageCommand,
     natives: Vec<NativeFunctionRecord>,
 ) -> Result<()> {
-    let path = path
-        .as_ref()
-        .map(PathBuf::from)
-        .unwrap_or_else(|| std::env::current_dir().unwrap());
-    let rooted_path = SourcePackageLayout::try_find_root(&path);
+    // This is the exceptional command as it doesn't need a package to run, so we can't count on
+    // being able to root ourselves.
+    if let PackageCommand::New { name } = cmd {
+        let creation_path = Path::new(&path).join(name);
+        create_move_package(name, &creation_path)?;
+        return Ok(());
+    }
+
+    // Always root ourselves to the package root, and then compile relative to that.
+    let rooted_path = SourcePackageLayout::try_find_root(&path.canonicalize()?)?;
+    std::env::set_current_dir(&rooted_path).unwrap();
+
+    let rerooted_path = PathBuf::from(".");
+
     match cmd {
         PackageCommand::Build => {
-            config.compile_package(&rooted_path?, &mut std::io::stdout())?;
+            config.compile_package(&rerooted_path, &mut std::io::stdout())?;
         }
         PackageCommand::Info => {
-            config.resolution_graph_for_package(&path)?.print_info()?;
+            config
+                .resolution_graph_for_package(&rerooted_path)?
+                .print_info()?;
         }
         PackageCommand::BytecodeView {
             interactive,
             package_name,
             module_or_script_name,
         } => {
-            let package = config.compile_package(&rooted_path?, &mut Vec::new())?;
+            let package = config.compile_package(&rerooted_path, &mut Vec::new())?;
             let needle_package = match package_name {
                 Some(package_name) => {
                     if package_name == package.compiled_package_info.package_name.as_str() {
@@ -319,19 +330,15 @@ pub fn handle_package_commands(
                 }
             }
         }
-        PackageCommand::New { name } => {
-            let creation_path = Path::new(&path).join(name);
-            create_move_package(name, &creation_path)?;
-        }
         PackageCommand::Prove {
             target_filter,
             for_test,
             options,
         } => {
             if let Some(ProverOptions::Options(opts)) = options {
-                run_move_prover(config, &path, target_filter, *for_test, opts)?
+                run_move_prover(config, &rerooted_path, target_filter, *for_test, opts)?
             } else {
-                run_move_prover(config, &path, target_filter, *for_test, &[])?
+                run_move_prover(config, &rerooted_path, target_filter, *for_test, &[])?
             }
         }
         PackageCommand::ErrMapGen {
@@ -347,7 +354,7 @@ pub fn handle_package_commands(
                 .to_string_lossy()
                 .to_string();
             let model = config.move_model_for_package(
-                &path,
+                &rerooted_path,
                 ModelConfig {
                     all_files_as_targets: true,
                     target_filter: None,
@@ -380,7 +387,7 @@ pub fn handle_package_commands(
                 ..UnitTestingConfig::default_with_bound(None)
             };
             let result = run_move_unit_tests(
-                &rooted_path?,
+                &rerooted_path,
                 config,
                 unit_test_config,
                 natives,
@@ -392,7 +399,10 @@ pub fn handle_package_commands(
             }
         }
         PackageCommand::CoverageReport { options } => {
-            options.handle_command(config, &rooted_path?)?;
+            options.handle_command(config, &rerooted_path)?;
+        }
+        PackageCommand::New { .. } => {
+            panic!("Hit a package new command after it should have been handled -- this should never happen")
         }
     };
     Ok(())

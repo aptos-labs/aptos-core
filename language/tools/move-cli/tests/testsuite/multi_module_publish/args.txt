@@ -1,22 +1,14 @@
 # expect failure as A friends B and B is missing in the bundle
-sandbox publish src/GoodFriends.move --override-ordering A -v
+sandbox publish --override-ordering A -v
 
 # expect failure as B depends on A and A is missing in the bundle
-sandbox publish src/GoodFriends.move --override-ordering B -v
+sandbox publish --override-ordering B -v
 
 # expect failure as B depends on A but A appears after B in the bundle
-sandbox publish src/GoodFriends.move --override-ordering B --override-ordering A -v
+sandbox publish --override-ordering B --override-ordering A -v
 
 # expect success: this is the correct order of publishing A and B
 # with friend relationship
-sandbox publish src/GoodFriends.move --override-ordering A --override-ordering B -v
+sandbox publish --override-ordering A --override-ordering B -v
 sandbox view storage/0x00000000000000000000000000000002/modules/A.mv
 sandbox view storage/0x00000000000000000000000000000002/modules/B.mv
-
-# expect success in first step and failure in the sescond step
-# After step 1: A, B are published and B depends on A
-# After step 2:
-#  A is updated to A', B depends on A', C depends on B, C friends A'
-#  A cyclic dependency is found in A' <- B <- C <- A'
-sandbox publish src/CyclicFriendsPart1.move --override-ordering A --override-ordering B -v
-sandbox publish src/CyclicFriendsPart2.move --override-ordering A --override-ordering C -v

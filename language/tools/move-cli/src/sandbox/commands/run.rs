@@ -8,7 +8,8 @@ use crate::{
     },
     NativeFunctionRecord,
 };
-use move_binary_format::file_format::{CompiledModule, CompiledScript};
+use anyhow::{anyhow, bail, Result};
+use move_binary_format::file_format::CompiledModule;
 use move_core_types::{
     account_address::AccountAddress,
     errmap::ErrorMapping,
@@ -16,72 +17,28 @@ use move_core_types::{
     language_storage::TypeTag,
     transaction_argument::{convert_txn_args, TransactionArgument},
 };
-use move_lang::{
-    self, compiled_unit::AnnotatedCompiledUnit, shared::NumericalAddress, Compiler, Flags,
-};
+use move_package::compilation::compiled_package::CompiledPackage;
 use move_vm_runtime::move_vm::MoveVM;
-
-use anyhow::{anyhow, bail, Result};
-use std::{collections::BTreeMap, fs, path::Path};
+use std::{fs, path::Path};
 
 pub fn run(
     natives: impl IntoIterator<Item = NativeFunctionRecord>,
     error_descriptions: &ErrorMapping,
     state: &OnDiskStateView,
+    package: &CompiledPackage,
     script_path: &Path,
     script_name_opt: &Option<String>,
     signers: &[String],
     txn_args: &[TransactionArgument],
     vm_type_args: Vec<TypeTag>,
-    named_address_mapping: BTreeMap<String, NumericalAddress>,
     gas_budget: Option<u64>,
     dry_run: bool,
     verbose: bool,
 ) -> Result<()> {
-    fn compile_script(
-        state: &OnDiskStateView,
-        script_path: &Path,
-        named_address_mapping: BTreeMap<String, NumericalAddress>,
-        verbose: bool,
-    ) -> Result<Option<CompiledScript>> {
-        if verbose {
-            println!("Compiling transaction script...")
-        }
-        let (_files, compiled_units) = Compiler::new(
-            &[script_path.to_string_lossy().to_string()],
-            &[state.interface_files_dir()?],
-        )
-        .set_flags(Flags::empty().set_sources_shadow_deps(false))
-        .set_named_address_values(named_address_mapping)
-        .build_and_report()?;
-
-        let mut script_opt = None;
-        for c in compiled_units {
-            match c {
-                AnnotatedCompiledUnit::Script(annot_script) => {
-                    if script_opt.is_some() {
-                        bail!("Error: Found more than one script")
-                    }
-                    script_opt = Some(annot_script.named_script.script)
-                }
-                AnnotatedCompiledUnit::Module(annot_module) => {
-                    if verbose {
-                        println!(
-                            "Warning: Found module '{}' in file specified for the script. This \
-                             module will not be published.",
-                            annot_module.module_ident()
-                        )
-                    }
-                }
-            }
-        }
-
-        Ok(script_opt)
-    }
-
     if !script_path.exists() {
         bail!("Script file {:?} does not exist", script_path)
     };
+
     let bytecode = if is_bytecode_file(script_path) {
         assert!(
             state.is_module_path(script_path) || !contains_module(script_path),
@@ -92,14 +49,13 @@ move run` must be applied to a module inside `storage/`",
         // script bytecode; read directly from file
         fs::read(script_path)?
     } else {
-        // script source file; compile first and then extract bytecode
-        let script_opt = compile_script(state, script_path, named_address_mapping, verbose)?;
+        // TODO(tzakian): support calling scripts in transitive deps
+        let script_opt = package
+            .scripts()
+            .find(|unit| unit.source_path.file_stem() == script_path.file_stem());
+        // script source file; package is already compiled so load it up
         match script_opt {
-            Some(script) => {
-                let mut script_bytes = vec![];
-                script.serialize(&mut script_bytes)?;
-                script_bytes
-            }
+            Some(unit) => unit.unit.serialize(),
             None => bail!("Unable to find script in file {:?}", script_path),
         }
     };

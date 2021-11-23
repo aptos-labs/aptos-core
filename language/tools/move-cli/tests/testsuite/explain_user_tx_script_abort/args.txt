@@ -1,1 +1,1 @@
-sandbox run script.move --mode bare
+sandbox run sources/abort_script.move

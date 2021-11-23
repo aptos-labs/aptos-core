@@ -1,5 +1,4 @@
-Command `sandbox run genesis.move --mode diem --signers 0xA550C18 0xB1E55ED -v`:
-Compiling transaction script...
+Command `sandbox run sources/genesis.move  --signers 0xA550C18 0xB1E55ED -v`:
 Emitted 2 events:
 Emitted [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 85, 12, 24, 0, 0, 0, 0, 0, 0, 0, 0] as the 0th event to stream [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 85, 12, 24]
 Emitted [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11, 30, 85, 237, 1, 0, 0, 0, 0, 0, 0, 0] as the 1th event to stream [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 85, 12, 24]
@@ -515,8 +514,7 @@ Changed resource(s) under 2 address(es):
           }
       }
 Wrote 3554 bytes of resource ID's and data
-Command `sandbox run scripts/create_designated_dealer.move --mode diem --type-args 0x1::XDX::XDX --signers 0xB1E55ED --args 0 0xDD x"00000000000000000000000000000000" b"DD" true -v`:
-Compiling transaction script...
+Command `sandbox run sources/create_designated_dealer.move  --type-args 0x1::XDX::XDX --signers 0xB1E55ED --args 0 0xDD x"00000000000000000000000000000000" b"DD" true -v`:
 Emitted 1 events:
 Emitted [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 221, 2, 0, 0, 0, 0, 0, 0, 0] as the 2th event to stream [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 85, 12, 24]
 Changed resource(s) under 2 address(es):
@@ -660,8 +658,7 @@ Changed resource(s) under 2 address(es):
              }
          }
 Wrote 808 bytes of resource ID's and data
-Command `sandbox run scripts/create_parent_vasp_account.move --mode diem --type-args 0x1::XDX::XDX --signers 0xB1E55ED --args 0 0xA x"00000000000000000000000000000000" b"VASP_A" true -v`:
-Compiling transaction script...
+Command `sandbox run sources/create_parent_vasp_account.move  --type-args 0x1::XDX::XDX --signers 0xB1E55ED --args 0 0xA x"00000000000000000000000000000000" b"VASP_A" true -v`:
 Emitted 1 events:
 Emitted [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 5, 0, 0, 0, 0, 0, 0, 0] as the 3th event to stream [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 85, 12, 24]
 Changed resource(s) under 2 address(es):
@@ -794,8 +791,7 @@ Changed resource(s) under 2 address(es):
              }
          }
 Wrote 758 bytes of resource ID's and data
-Command `sandbox run scripts/create_parent_vasp_account.move --mode diem --type-args 0x1::XDX::XDX --signers 0xB1E55ED --args 0 0xB x"00000000000000000000000000000000" b"VASP_B" true -v`:
-Compiling transaction script...
+Command `sandbox run sources/create_parent_vasp_account.move  --type-args 0x1::XDX::XDX --signers 0xB1E55ED --args 0 0xB x"00000000000000000000000000000000" b"VASP_B" true -v`:
 Emitted 1 events:
 Emitted [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11, 5, 0, 0, 0, 0, 0, 0, 0] as the 4th event to stream [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 85, 12, 24]
 Changed resource(s) under 2 address(es):
@@ -928,8 +924,7 @@ Changed resource(s) under 2 address(es):
              }
          }
 Wrote 758 bytes of resource ID's and data
-Command `sandbox run scripts/tiered_mint.move --mode diem --type-args 0x1::XUS::XUS --signers 0xB1E55ED --args 0 0xDD 1000 0 -v`:
-Compiling transaction script...
+Command `sandbox run sources/tiered_mint.move  --type-args 0x1::XUS::XUS --signers 0xB1E55ED --args 0 0xDD 1000 0 -v`:
 Emitted 3 events:
 Emitted [3, 88, 85, 83, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 221, 232, 3, 0, 0, 0, 0, 0, 0] as the 0th event to stream [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 221]
 Emitted [232, 3, 0, 0, 0, 0, 0, 0, 3, 88, 85, 83] as the 0th event to stream [5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 85, 12, 24]
@@ -1080,8 +1075,7 @@ Changed resource(s) under 2 address(es):
              }
          }
 Wrote 611 bytes of resource ID's and data
-Command `sandbox run scripts/peer_to_peer_with_metadata.move --mode diem --type-args 0x1::XUS::XUS --signers 0xDD --args 0xA 700 x"" x"" -v`:
-Compiling transaction script...
+Command `sandbox run sources/peer_to_peer_with_metadata.move  --type-args 0x1::XUS::XUS --signers 0xDD --args 0xA 700 x"" x"" -v`:
 Emitted 2 events:
 Emitted [188, 2, 0, 0, 0, 0, 0, 0, 3, 88, 85, 83, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0] as the 0th event to stream [4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 221]
 Emitted [188, 2, 0, 0, 0, 0, 0, 0, 3, 88, 85, 83, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 221, 0] as the 0th event to stream [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10]
@@ -1191,8 +1185,7 @@ Changed resource(s) under 2 address(es):
              sequence_number: 0
          }
 Wrote 510 bytes of resource ID's and data
-Command `sandbox run scripts/peer_to_peer_with_metadata.move --mode diem --type-args 0x1::XUS::XUS --signers 0xA --args 0xB 500 x"" x"" -v`:
-Compiling transaction script...
+Command `sandbox run sources/peer_to_peer_with_metadata.move  --type-args 0x1::XUS::XUS --signers 0xA --args 0xB 500 x"" x"" -v`:
 Emitted 2 events:
 Emitted [244, 1, 0, 0, 0, 0, 0, 0, 3, 88, 85, 83, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11, 0] as the 0th event to stream [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10]
 Emitted [244, 1, 0, 0, 0, 0, 0, 0, 3, 88, 85, 83, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0] as the 0th event to stream [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11]
@@ -1302,8 +1295,7 @@ Changed resource(s) under 2 address(es):
              sequence_number: 0
          }
 Wrote 510 bytes of resource ID's and data
-Command `sandbox run scripts/create_child_vasp_account.move --mode diem --type-args 0x1::XUS::XUS --signers 0xA --args 0xAA x"00000000000000000000000000000000" false 100 -v`:
-Compiling transaction script...
+Command `sandbox run sources/create_child_vasp_account.move  --type-args 0x1::XUS::XUS --signers 0xA --args 0xAA x"00000000000000000000000000000000" false 100 -v`:
 Emitted 3 events:
 Emitted [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 170, 6, 0, 0, 0, 0, 0, 0, 0] as the 5th event to stream [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 85, 12, 24]
 Emitted [100, 0, 0, 0, 0, 0, 0, 0, 3, 88, 85, 83, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 170, 0] as the 1th event to stream [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10]
@@ -1453,8 +1445,7 @@ Changed resource(s) under 3 address(es):
              }
          }
 Wrote 820 bytes of resource ID's and data
-Command `sandbox run scripts/create_child_vasp_account.move --mode diem --type-args 0x1::XUS::XUS --signers 0xB --args 0xBB x"00000000000000000000000000000000" false 0 -v`:
-Compiling transaction script...
+Command `sandbox run sources/create_child_vasp_account.move  --type-args 0x1::XUS::XUS --signers 0xB --args 0xBB x"00000000000000000000000000000000" false 0 -v`:
 Emitted 1 events:
 Emitted [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 187, 6, 0, 0, 0, 0, 0, 0, 0] as the 6th event to stream [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 85, 12, 24]
 Changed resource(s) under 3 address(es):
@@ -1551,8 +1542,7 @@ Changed resource(s) under 3 address(es):
              }
          }
 Wrote 565 bytes of resource ID's and data
-Command `sandbox run scripts/peer_to_peer_with_metadata.move --mode diem --type-args 0x1::XUS::XUS --signers 0xAA --args 0xBB 100 x"" x"" -v`:
-Compiling transaction script...
+Command `sandbox run sources/peer_to_peer_with_metadata.move  --type-args 0x1::XUS::XUS --signers 0xAA --args 0xBB 100 x"" x"" -v`:
 Emitted 2 events:
 Emitted [100, 0, 0, 0, 0, 0, 0, 0, 3, 88, 85, 83, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 187, 0] as the 0th event to stream [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 170]
 Emitted [100, 0, 0, 0, 0, 0, 0, 0, 3, 88, 85, 83, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 170, 0] as the 0th event to stream [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 187]

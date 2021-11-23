@@ -4,7 +4,7 @@ use 0x1::M;
 use Std::Offer;
 
 // Bob should be able to claim Alice's offer for him
-fun main(account: signer) {
+fun redeem_offer_bob(account: signer) {
     // claimed successfully
     let redeemed: M::T = Offer::redeem(&account, @0xA11CE);
 

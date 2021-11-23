@@ -1,2 +1,2 @@
-sandbox publish src/modules
-sandbox run src/scripts/main.move
+sandbox publish
+sandbox run scripts/main.move
