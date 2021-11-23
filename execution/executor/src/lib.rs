@@ -38,6 +38,7 @@ use diem_types::{
 };
 use diem_vm::VMExecutor;
 use executor_types::{Error, ExecutedTrees, ProcessedVMOutput, ProofReader, TransactionData};
+use rayon::prelude::*;
 use storage_interface::{
     default_protocol::DbReaderWriter, state_view::VerifiedStateView, TreeState,
 };
@@ -293,10 +294,20 @@ where
             .map(|(idx, _)| idx + 1);
         let transaction_count = new_epoch_marker.unwrap_or(vm_outputs.len());
 
-        let txn_blobs = itertools::zip_eq(vm_outputs.iter(), transactions.iter())
+        let txn_states = itertools::zip_eq(vm_outputs.iter(), transactions.iter())
             .take(transaction_count)
             .map(|(vm_output, txn)| {
                 process_write_set(txn, &mut account_to_state, vm_output.write_set().clone())
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let txn_blobs = txn_states
+            .par_iter()
+            .with_min_len(100)
+            .map(|account_to_state| {
+                account_to_state
+                    .iter()
+                    .map(|(addr, state)| Ok((*addr, AccountStateBlob::try_from(state)?)))
+                    .collect::<Result<HashMap<_, _>>>()
             })
             .collect::<Result<Vec<_>>>()?;
 
@@ -614,7 +625,7 @@ pub fn process_write_set(
     transaction: &Transaction,
     account_to_state: &mut HashMap<AccountAddress, AccountState>,
     write_set: WriteSet,
-) -> Result<HashMap<AccountAddress, AccountStateBlob>> {
+) -> Result<HashMap<AccountAddress, AccountState>> {
     let mut updated_blobs = HashMap::new();
 
     // Find all addresses this transaction touches while processing each write op.
@@ -655,8 +666,7 @@ pub fn process_write_set(
 
     for addr in addrs {
         let account_state = account_to_state.get(&addr).expect("Address should exist.");
-        let account_blob = AccountStateBlob::try_from(account_state)?;
-        updated_blobs.insert(addr, account_blob);
+        updated_blobs.insert(addr, account_state.clone());
     }
 
     Ok(updated_blobs)

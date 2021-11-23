@@ -9,7 +9,7 @@ use diem_types::{
 use executor::process_write_set;
 use executor_types::ProofReader;
 use scratchpad::SparseMerkleTree;
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, convert::TryFrom, sync::Arc};
 use vm_genesis::{generate_genesis_change_set_for_testing, GenesisOptions};
 
 // generate genesis state blob
@@ -23,8 +23,12 @@ pub fn generate_genesis_state() -> (
     let tree = SparseMerkleTree::default();
     let mut account_states = HashMap::new();
 
-    let blobs =
+    let states =
         process_write_set(&txn, &mut account_states, change_set.write_set().clone()).unwrap();
+    let blobs = states
+        .into_iter()
+        .map(|(addr, state)| (addr, AccountStateBlob::try_from(&state).unwrap()))
+        .collect::<HashMap<_, _>>();
     let new_tree = Arc::new(
         tree.batch_update(
             blobs
