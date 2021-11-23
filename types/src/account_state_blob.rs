@@ -19,12 +19,39 @@ use diem_crypto_derive::CryptoHasher;
 use proptest::{arbitrary::Arbitrary, prelude::*};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::{convert::TryFrom, fmt};
 
-#[derive(Clone, Eq, PartialEq, Serialize, Deserialize, CryptoHasher)]
+#[derive(Clone, Eq, PartialEq, Serialize, CryptoHasher)]
 pub struct AccountStateBlob {
     blob: Vec<u8>,
+    #[serde(skip)]
+    hash: HashValue,
+}
+
+impl<'de> Deserialize<'de> for AccountStateBlob {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(rename = "AccountStateBlob")]
+        struct RawBlob {
+            blob: Vec<u8>,
+        }
+        let blob = RawBlob::deserialize(deserializer)?;
+
+        Ok(Self::new(blob.blob))
+    }
+}
+
+impl AccountStateBlob {
+    fn new(blob: Vec<u8>) -> Self {
+        let mut hasher = AccountStateBlobHasher::default();
+        hasher.update(&blob);
+        let hash = hasher.finish();
+        Self { blob, hash }
+    }
 }
 
 impl fmt::Debug for AccountStateBlob {
@@ -65,7 +92,7 @@ impl From<AccountStateBlob> for Vec<u8> {
 
 impl From<Vec<u8>> for AccountStateBlob {
     fn from(blob: Vec<u8>) -> AccountStateBlob {
-        AccountStateBlob { blob }
+        AccountStateBlob::new(blob)
     }
 }
 
@@ -73,9 +100,7 @@ impl TryFrom<&AccountState> for AccountStateBlob {
     type Error = Error;
 
     fn try_from(account_state: &AccountState) -> Result<Self> {
-        Ok(Self {
-            blob: bcs::to_bytes(account_state)?,
-        })
+        Ok(Self::new(bcs::to_bytes(account_state)?))
     }
 }
 
@@ -114,9 +139,7 @@ impl CryptoHash for AccountStateBlob {
     type Hasher = AccountStateBlobHasher;
 
     fn hash(&self) -> HashValue {
-        let mut hasher = Self::Hasher::default();
-        hasher.update(&self.blob);
-        hasher.finish()
+        self.hash
     }
 }
 
