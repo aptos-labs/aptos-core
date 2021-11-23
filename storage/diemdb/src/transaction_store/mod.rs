@@ -128,8 +128,8 @@ impl TransactionStore {
     /// Returns None if there's no such transaction at or preceding `version` (it's likely the genesis
     /// version 0).
     pub fn get_block_metadata(&self, version: Version) -> Result<Option<(Version, BlockMetadata)>> {
-        // Maximum TPS from benchmark is around 1000.
-        const MAX_VERSIONS_TO_SEARCH: usize = 1000 * 3;
+        // Must be larger than a block size, otherwise a NotFound error will be raised wrongly.
+        const MAX_VERSIONS_TO_SEARCH: usize = 1000 * 100;
 
         // Linear search via `DB::rev_iter()` here, NOT expecting performance hit, due to the fact
         // that the iterator caches data block and that there are limited number of transactions in
