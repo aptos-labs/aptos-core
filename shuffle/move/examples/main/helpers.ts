@@ -12,6 +12,7 @@ import { bytes, ListTuple, uint8 } from "./generated/serde/types.ts";
 import { createHash } from "https://deno.land/std@0.77.0/hash/mod.ts";
 
 const textEncoder = new util.TextEncoder();
+const textDecoder = new util.TextDecoder();
 
 export async function buildAndSubmitTransaction(
   addressStr: string,
@@ -214,11 +215,7 @@ function hexToBytes(hex: string): Uint8Array {
   return bytes;
 }
 
-export function hexToAscii(hexx: string) {
-  const hex = hexx.toString(); // normalize
-  let str = "";
-  for (let i = 0; i < hex.length; i += 2) {
-    str += String.fromCharCode(parseInt(hex.substr(i, 2), 16));
-  }
-  return str;
+export function hexToAscii(hex: string) {
+  const bytes = hexToBytes(hex);
+  return textDecoder.decode(bytes);
 }

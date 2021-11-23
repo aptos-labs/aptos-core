@@ -19,7 +19,7 @@ Deno.test("Ability to set message", async () => {
   txn = await devapi.waitForTransactionCompletion(txn.hash);
   assert(txn.success);
 
-  const expected = "\x00hello blockchain"; // prefixed with \x00 bc of BCS encoding
+  const expected = "hello blockchain";
   const messages = await main.decodedMessages();
   assertEquals(messages[0], expected);
 });
@@ -31,5 +31,5 @@ Deno.test("Ability to set NFTs", async () => {
   assert(txn.success);
 
   const uris = await main.decodedNFTs();
-  assertEquals(uris[0], "\x00" + contentUri);
+  assertEquals(uris[0], contentUri);
 });

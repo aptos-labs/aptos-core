@@ -24,6 +24,6 @@ Deno.test("invokeScriptFunction", async () => {
   assertEquals(txn.payload.function, scriptFunction);
   assertEquals(
     helpers.hexToAscii(txn.payload.arguments[0]),
-    "\x00invoked script function",
+    "invoked script function",
   );
 });
