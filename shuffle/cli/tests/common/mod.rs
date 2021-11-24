@@ -6,29 +6,40 @@ use diem_sdk::{
     crypto::ed25519::Ed25519PrivateKey, transaction_builder::TransactionFactory,
     types::LocalAccount,
 };
-use forge::ChainInfo;
+use forge::{AdminContext, ChainInfo};
 use shuffle::{
     account, deploy,
     dev_api_client::DevApiClient,
-    new,
-    shared::{self, Home, Network, NetworkHome},
+    new, shared,
+    shared::{Home, Network, NetworkHome, NetworksConfig},
 };
-use std::{convert::TryFrom, path::PathBuf, str::FromStr};
+use smoke_test::scripts_and_modules::enable_open_publishing;
+use std::{
+    collections::BTreeMap,
+    convert::TryFrom,
+    fs,
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 use tempfile::TempDir;
+use tokio::runtime::Runtime;
 use url::Url;
 
+const FORGE_NETWORK_NAME: &str = "forge";
+
+#[allow(dead_code)]
 pub struct ShuffleTestHelper {
     home: Home,
     network: Network,
+    networks_config: NetworksConfig,
     network_home: NetworkHome,
     tmp_dir: TempDir,
 }
 
-const FORGE_NETWORK_NAME: &str = "forge";
-
 impl ShuffleTestHelper {
     pub fn new(chain_info: &mut ChainInfo<'_>) -> Result<Self> {
         let tmp_dir = TempDir::new()?;
+
         let home = Home::new(tmp_dir.path())?;
         let network_home = home.new_network_home(FORGE_NETWORK_NAME);
         network_home.generate_paths_if_nonexistent()?;
@@ -38,24 +49,41 @@ impl ShuffleTestHelper {
             Url::from_str(chain_info.rest_api())?,
             None,
         );
+        let mut mapping: BTreeMap<String, Network> = BTreeMap::new();
+        mapping.insert(FORGE_NETWORK_NAME.to_string(), network.clone());
+        let networks_config = NetworksConfig::new(mapping);
+        write_forge_networks_config_into_toml(&home, &networks_config)?;
         Ok(Self {
             home,
             network,
+            networks_config,
             network_home,
             tmp_dir,
         })
     }
 
+    #[allow(dead_code)]
     pub fn home(&self) -> &Home {
         &self.home
     }
 
+    #[allow(dead_code)]
     pub fn network(&self) -> &Network {
         &self.network
     }
 
     pub fn network_home(&self) -> &NetworkHome {
         &self.network_home
+    }
+
+    #[allow(dead_code)]
+    pub fn home_path(&self) -> &Path {
+        self.tmp_dir.path()
+    }
+
+    #[allow(dead_code)]
+    pub fn networks_config(&self) -> &NetworksConfig {
+        &self.networks_config
     }
 
     pub fn project_path(&self) -> PathBuf {
@@ -98,4 +126,38 @@ impl ShuffleTestHelper {
     pub fn codegen_project(&self, account: &LocalAccount) -> Result<()> {
         shared::codegen_typescript_libraries(&self.project_path(), &account.address())
     }
+}
+
+fn write_forge_networks_config_into_toml(
+    home: &Home,
+    networks_config: &NetworksConfig,
+) -> Result<()> {
+    let network_toml_path = home.get_shuffle_path().join("Networks.toml");
+    let networks_config_string = toml::to_string_pretty(networks_config)?;
+    fs::write(network_toml_path, networks_config_string)?;
+    Ok(())
+}
+
+pub fn bootstrap_shuffle_project(ctx: &mut AdminContext<'_>) -> Result<ShuffleTestHelper> {
+    let client = ctx.client();
+    let dev_client = DevApiClient::new(
+        reqwest::Client::new(),
+        Url::from_str(ctx.chain_info().rest_api())?,
+    )?;
+    let factory = ctx.chain_info().transaction_factory();
+    enable_open_publishing(&client, &factory, ctx.chain_info().root_account())?;
+
+    let helper = ShuffleTestHelper::new(ctx.chain_info())?;
+    helper.create_project()?;
+
+    let rt = Runtime::new().unwrap();
+    let handle = rt.handle().clone();
+
+    let mut account = ctx.random_account();
+    let tc = ctx.chain_info().treasury_compliance_account();
+
+    handle.block_on(helper.create_account(tc, &account, factory, &dev_client))?;
+    handle.block_on(helper.deploy_project(&mut account, ctx.chain_info().rest_api()))?;
+    helper.codegen_project(&account)?;
+    Ok(helper)
 }

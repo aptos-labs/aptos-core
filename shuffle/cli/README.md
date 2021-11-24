@@ -41,10 +41,10 @@ To start, follow the [Hello Blockchain](https://github.com/diem/diem/tree/main/s
 
 If you are a genesis move module developer, follow [Genesis Tutorial](https://github.com/diem/diem/tree/main/shuffle/cli/tutorials/Genesis.md).
 
-## Forge Testing
+## Testing
 
 ```
-RUST_BACKTRACE=1 cargo xtest -p shuffle-integration-tests
+RUST_BACKTRACE=1 cargo nextest -p shuffle
 ```
 
 ## Removing Cache

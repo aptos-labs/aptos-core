@@ -1,16 +1,20 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-mod helper;
+mod common;
 
-use crate::helper::ShuffleTestHelper;
-use forge::{AdminContext, AdminTest, Result, Test};
+use common::bootstrap_shuffle_project;
+use forge::{AdminContext, AdminTest, Test};
 use move_cli::package::cli::UnitTestResult;
-use shuffle::dev_api_client::DevApiClient;
-use smoke_test::scripts_and_modules::enable_open_publishing;
-use std::str::FromStr;
-use tokio::runtime::Runtime;
-use url::Url;
+
+use forge::{forge_main, ForgeConfig, LocalFactory, Options, Result};
+
+fn main() -> Result<()> {
+    let tests = ForgeConfig::default()
+        .with_admin_tests(&[&SamplePackageEndToEnd, &TypescriptSdkIntegration]);
+    let options = Options::from_args();
+    forge_main(tests, LocalFactory::from_workspace()?, &options)
+}
 
 pub struct SamplePackageEndToEnd;
 
@@ -22,7 +26,7 @@ impl Test for SamplePackageEndToEnd {
 
 impl AdminTest for SamplePackageEndToEnd {
     fn run<'t>(&self, ctx: &mut AdminContext<'t>) -> Result<()> {
-        let helper = bootstrap_shuffle(ctx)?;
+        let helper = bootstrap_shuffle_project(ctx)?;
         let unit_test_result = shuffle::test::run_move_unit_tests(&helper.project_path())?;
         let exit_status = shuffle::test::run_deno_test(
             helper.home(),
@@ -48,7 +52,7 @@ impl Test for TypescriptSdkIntegration {
 
 impl AdminTest for TypescriptSdkIntegration {
     fn run<'t>(&self, ctx: &mut AdminContext<'t>) -> Result<()> {
-        let helper = bootstrap_shuffle(ctx)?;
+        let helper = bootstrap_shuffle_project(ctx)?;
         let exit_status = shuffle::test::run_deno_test_at_path(
             helper.home(),
             &helper.project_path(),
@@ -60,27 +64,4 @@ impl AdminTest for TypescriptSdkIntegration {
         assert!(exit_status.success());
         Ok(())
     }
-}
-
-fn bootstrap_shuffle(ctx: &mut AdminContext<'_>) -> Result<ShuffleTestHelper> {
-    let client = ctx.client();
-    let dev_api_client = DevApiClient::new(
-        reqwest::Client::new(),
-        Url::from_str(ctx.chain_info().rest_api())?,
-    )?;
-    let factory = ctx.chain_info().transaction_factory();
-    enable_open_publishing(&client, &factory, ctx.chain_info().root_account())?;
-
-    let helper = ShuffleTestHelper::new(ctx.chain_info())?;
-    helper.create_project()?;
-
-    let mut account = ctx.random_account();
-    let tc = ctx.chain_info().treasury_compliance_account();
-    let rt = Runtime::new().unwrap();
-    let handle = rt.handle().clone();
-
-    handle.block_on(helper.create_account(tc, &account, factory, &dev_api_client))?;
-    handle.block_on(helper.deploy_project(&mut account, ctx.chain_info().rest_api()))?;
-    helper.codegen_project(&account)?;
-    Ok(helper)
 }

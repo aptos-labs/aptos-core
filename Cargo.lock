@@ -7885,6 +7885,7 @@ dependencies = [
  "diem-workspace-hack",
  "diemdb",
  "directories",
+ "forge",
  "generate-key",
  "hex",
  "include_dir",
@@ -7902,6 +7903,7 @@ dependencies = [
  "serde-reflection",
  "serde_json",
  "serde_yaml",
+ "smoke-test",
  "structopt 0.3.21",
  "tempfile",
  "tokio",
@@ -7919,29 +7921,6 @@ dependencies = [
  "diem-workspace-hack",
  "move-stdlib",
  "move-unit-test",
-]
-
-[[package]]
-name = "shuffle-integration-tests"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "bcs",
- "diem-json-rpc-types",
- "diem-sdk",
- "diem-types",
- "diem-workspace-hack",
- "forge",
- "generate-key",
- "hex",
- "move-cli",
- "reqwest",
- "serde_json",
- "shuffle",
- "smoke-test",
- "tempfile",
- "tokio",
- "url",
 ]
 
 [[package]]

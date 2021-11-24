@@ -160,7 +160,6 @@ members = [
     "secure/storage/github",
     "secure/storage/vault",
     "shuffle/cli",
-    "shuffle/integration-tests",
     "shuffle/move",
     "state-sync/diem-data-client",
     "state-sync/inter-component/consensus-notifications",

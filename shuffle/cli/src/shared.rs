@@ -219,8 +219,8 @@ impl NetworkHome {
         Ok(())
     }
 
-    pub fn check_account_path_exists(&self) -> Result<()> {
-        match self.accounts_path.is_dir() {
+    pub fn check_latest_account_address_path_exists(&self) -> Result<()> {
+        match self.latest_account_address_path.exists() {
             true => Ok(()),
             false => Err(anyhow!(
                 "An account hasn't been created yet! Run shuffle account first"
@@ -342,6 +342,11 @@ pub struct NetworksConfig {
 }
 
 impl NetworksConfig {
+    #[allow(dead_code)]
+    pub fn new(networks: BTreeMap<String, Network>) -> NetworksConfig {
+        NetworksConfig { networks }
+    }
+
     pub fn get(&self, network_name: &str) -> Result<Network> {
         Ok(self
             .networks
@@ -740,15 +745,22 @@ mod test {
     }
 
     #[test]
-    fn test_network_home_check_account_dir_exists() {
+    fn test_network_home_check_latest_account_address_exists() {
         let bad_dir = tempdir().unwrap();
         let network_home = NetworkHome::new(bad_dir.path().join("localhost").as_path());
-        assert_eq!(network_home.check_account_path_exists().is_err(), true);
+        assert!(network_home
+            .check_latest_account_address_path_exists()
+            .is_err());
 
         let good_dir = tempdir().unwrap();
-        fs::create_dir_all(good_dir.path().join("localhost/accounts")).unwrap();
+        fs::create_dir_all(good_dir.path().join("localhost/accounts/latest")).unwrap();
         let network_home = NetworkHome::new(good_dir.path().join("localhost").as_path());
-        assert_eq!(network_home.check_account_path_exists().is_err(), false);
+        network_home
+            .generate_latest_address_file(&generate_key::generate_key().public_key())
+            .unwrap();
+        assert!(!network_home
+            .check_latest_account_address_path_exists()
+            .is_err());
     }
 
     #[test]
