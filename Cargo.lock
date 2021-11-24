@@ -2663,6 +2663,7 @@ version = "0.1.0"
 dependencies = [
  "criterion",
  "criterion-cpu-time",
+ "diem-crypto",
  "diem-framework-releases",
  "diem-types",
  "diem-vm",

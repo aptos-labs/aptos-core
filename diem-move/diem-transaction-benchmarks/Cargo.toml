@@ -17,6 +17,7 @@ criterion-cpu-time = "0.1.0"
 diem-types = { path = "../../types", features = ["fuzzing"] }
 language-e2e-tests = { path = "../../language/testing-infra/e2e-tests" }
 diem-workspace-hack = { path = "../../common/workspace-hack" }
+diem-crypto = { path = "../../crates/diem-crypto" }
 
 read-write-set = { path = "../../language/tools/read-write-set" }
 read-write-set-dynamic = { path = "../../language/tools/read-write-set/dynamic" }

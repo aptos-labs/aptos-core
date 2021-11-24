@@ -2,7 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use criterion::{measurement::Measurement, BatchSize, Bencher};
-use diem_types::transaction::Transaction;
+use diem_crypto::HashValue;
+use diem_types::{
+    block_metadata::BlockMetadata,
+    on_chain_config::{OnChainConfig, ValidatorSet},
+    transaction::Transaction,
+};
 use diem_vm::{DiemVM, VMExecutor};
 use language_e2e_tests::{
     account_universe::{log_balance_strategy, AUTransactionGen, AccountUniverseGen},
@@ -174,6 +179,22 @@ impl TransactionBenchState {
             num_transactions,
         );
         state.executor.enable_parallel_execution();
+
+        // Insert a blockmetadata transaction at the beginning to better simulate the real life traffic.
+        let validator_set = ValidatorSet::fetch_config(state.executor.get_state_view())
+            .expect("Unable to retrieve the validator set from storage");
+
+        let new_block = BlockMetadata::new(
+            HashValue::zero(),
+            0,
+            1,
+            vec![],
+            *validator_set.payload()[0].account_address(),
+        );
+
+        state
+            .transactions
+            .insert(0, Transaction::BlockMetadata(new_block));
 
         state
     }
