@@ -39,10 +39,12 @@ use diem_types::{
     write_set::{WriteSet, WriteSetMut},
 };
 use fail::fail_point;
+use move_binary_format::errors::VMResult;
 use move_core_types::{
     account_address::AccountAddress,
     gas_schedule::GasAlgebra,
     identifier::IdentStr,
+    language_storage::ModuleId,
     resolver::MoveResolver,
     transaction_argument::convert_txn_args,
     value::{serialize_values, MoveValue},
@@ -85,6 +87,11 @@ impl DiemVM {
     }
     pub fn internals(&self) -> DiemVMInternals {
         DiemVMInternals::new(&self.0)
+    }
+
+    /// Load a module into its internal MoveVM's code cache.
+    pub fn load_module<S: MoveResolver>(&self, module_id: &ModuleId, state: &S) -> VMResult<()> {
+        self.0.load_module(module_id, state)
     }
 
     /// Generates a transaction output for a transaction that encountered errors during the

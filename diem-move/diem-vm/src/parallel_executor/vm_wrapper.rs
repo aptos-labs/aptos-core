@@ -3,6 +3,7 @@
 
 use crate::{
     adapter_common::{PreprocessedTransaction, VMAdapter},
+    data_cache::RemoteStorage,
     diem_vm::DiemVM,
     logging::AdapterLogSchema,
     parallel_executor::{storage_wrapper::VersionedView, DiemTransactionOutput},
@@ -13,7 +14,7 @@ use diem_parallel_executor::{
     task::{ExecutionStatus, ExecutorTask},
 };
 use diem_state_view::StateView;
-use diem_types::{access_path::AccessPath, write_set::WriteOp};
+use diem_types::{access_path::AccessPath, account_config::ACCOUNT_MODULE, write_set::WriteOp};
 use move_core_types::vm_status::VMStatus;
 
 pub(crate) struct DiemVMWrapper<'a, S> {
@@ -28,8 +29,20 @@ impl<'a, S: 'a + StateView> ExecutorTask for DiemVMWrapper<'a, S> {
     type Argument = &'a S;
 
     fn init(argument: &'a S) -> Self {
+        let vm = DiemVM::new(argument);
+
+        // Loading `0x1::DiemAccount` and its transitive dependency into the code cache.
+        //
+        // This should give us a warm VM to avoid the overhead of VM cold start.
+        // Result of this load could be omitted as this is a best effort approach and won't hurt if that fails.
+        //
+        // Loading up `0x1::DiemAccount` should be sufficient as this is the most common module
+        // used for prologue, epilogue and transfer functionality.
+
+        let _ = vm.load_module(&ACCOUNT_MODULE, &RemoteStorage::new(argument));
+
         Self {
-            vm: DiemVM::new(argument),
+            vm,
             base_view: argument,
         }
     }

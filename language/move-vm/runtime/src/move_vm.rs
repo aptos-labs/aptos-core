@@ -1,10 +1,14 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{native_functions::NativeFunction, runtime::VMRuntime, session::Session};
+use crate::{
+    data_cache::TransactionDataCache, native_functions::NativeFunction, runtime::VMRuntime,
+    session::Session,
+};
 use move_binary_format::errors::{Location, VMResult};
 use move_core_types::{
-    account_address::AccountAddress, identifier::Identifier, resolver::MoveResolver,
+    account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
+    resolver::MoveResolver,
 };
 
 pub struct MoveVM {
@@ -37,5 +41,20 @@ impl MoveVM {
     ///     and apply the effects to the storage when the Session ends.
     pub fn new_session<'r, S: MoveResolver>(&self, remote: &'r S) -> Session<'r, '_, S> {
         self.runtime.new_session(remote)
+    }
+
+    /// Load a module into VM's code cache
+    pub fn load_module<'r, S: MoveResolver>(
+        &self,
+        module_id: &ModuleId,
+        remote: &'r S,
+    ) -> VMResult<()> {
+        self.runtime
+            .loader()
+            .load_module(
+                module_id,
+                &TransactionDataCache::new(remote, self.runtime.loader()),
+            )
+            .map(|_| ())
     }
 }

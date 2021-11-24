@@ -27,7 +27,7 @@ use diem_types::{
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use fail::fail_point;
-use move_binary_format::errors::Location;
+use move_binary_format::errors::{Location, VMResult};
 use move_core_types::{
     account_address::AccountAddress,
     effects::{ChangeSet as MoveChangeSet, Event as MoveEvent},
@@ -456,6 +456,14 @@ impl DiemVMImpl {
 
     pub fn new_session<'r, R: MoveResolver>(&self, r: &'r R) -> Session<'r, '_, R> {
         self.move_vm.new_session(r)
+    }
+
+    pub fn load_module<'r, R: MoveResolver>(
+        &self,
+        module_id: &ModuleId,
+        remote: &'r R,
+    ) -> VMResult<()> {
+        self.move_vm.load_module(module_id, remote)
     }
 }
 
