@@ -35,7 +35,7 @@ use network::{
     },
     protocols::network::{NetworkEvents, NewNetworkEvents, NewNetworkSender},
     transport::ConnectionMetadata,
-    DisconnectReason, ProtocolId,
+    ProtocolId,
 };
 use rand::rngs::StdRng;
 use std::{
@@ -384,22 +384,6 @@ impl Node {
         }
     }
 
-    /// Commits transactions and removes them from the local mempool, stops them from being broadcasted later
-    pub fn commit_txns(&self, txns: Vec<TestTransaction>) {
-        if let NodeInfo::Validator(_) = self.node_info {
-            let mut mempool = self.mempool();
-            for txn in txns {
-                mempool.remove_transaction(
-                    &TestTransaction::get_address(txn.address),
-                    txn.sequence_number,
-                    false,
-                );
-            }
-        } else {
-            panic!("Can't commit transactions on anything but a validator");
-        }
-    }
-
     /// Notifies the `Node` of a `new_peer`
     pub fn send_new_peer_event(
         &mut self,
@@ -416,17 +400,6 @@ impl Node {
         self.peer_metadata_storage
             .insert_connection(new_peer.network_id(), metadata);
         self.send_connection_event(new_peer.network_id(), notif);
-    }
-
-    /// Notifies the `Node` of a `lost_peer`
-    pub fn send_lost_peer_event(&mut self, lost_peer: PeerNetworkId) {
-        let notif = ConnectionNotification::LostPeer(
-            ConnectionMetadata::mock(lost_peer.peer_id()),
-            NetworkContext::mock(),
-            DisconnectReason::ConnectionLost,
-        );
-        self.peer_metadata_storage.remove(&lost_peer);
-        self.send_connection_event(lost_peer.network_id(), notif)
     }
 
     /// Sends a connection event, and waits for the notification to arrive
