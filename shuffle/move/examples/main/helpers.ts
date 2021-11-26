@@ -3,7 +3,7 @@
 
 // deno-lint-ignore-file no-explicit-any
 import * as DiemTypes from "./generated/diemTypes/mod.ts";
-import * as context from "./context.ts";
+import { defaultUserContext } from "./context.ts";
 import * as devapi from "./devapi.ts";
 import * as ed from "https://deno.land/x/ed25519@1.0.1/mod.ts";
 import * as util from "https://deno.land/std@0.85.0/node/util.ts";
@@ -65,9 +65,9 @@ export async function invokeScriptFunction(
   args: any[],
 ): Promise<any> {
   return await invokeScriptFunctionWithoutContext(
-    context.senderAddress,
+    defaultUserContext.address,
     await devapi.sequenceNumber(),
-    context.privateKey(),
+    await defaultUserContext.readPrivateKey(),
     scriptFunction,
     typeArguments,
     args,

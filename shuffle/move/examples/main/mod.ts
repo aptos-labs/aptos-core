@@ -4,7 +4,7 @@
 import * as DiemHelpers from "./helpers.ts";
 import * as DiemTypes from "./generated/diemTypes/mod.ts";
 import * as codegen from "./generated/diemStdlib/mod.ts";
-import * as context from "./context.ts";
+import { consoleContext, defaultUserContext } from "./context.ts";
 import * as devapi from "./devapi.ts";
 import * as util from "https://deno.land/std@0.85.0/node/util.ts";
 import { green } from "https://deno.land/x/nanocolors@0.1.12/mod.ts";
@@ -18,13 +18,19 @@ function highlight(content: string) {
 }
 
 export async function printWelcome() {
-  console.log(`Loading Project ${highlight(context.projectPath)}`);
-  console.log(`Sender Account Address ${highlight(context.senderAddress)}`);
+  console.log(`Loading Project ${highlight(consoleContext.projectPath)}`);
+  console.log(
+    `Default Account Address ${highlight(defaultUserContext.address)}`,
+  );
   console.log(
     `"helpers", "devapi", "context", "main", "codegen", "help" top level objects available`,
   );
   console.log(`Run "help" for more information on top level objects`);
-  console.log(`Connecting to Node ${highlight(context.nodeUrl)}`);
+  console.log(
+    `Connecting to ${consoleContext.networkName} at ${
+      highlight(consoleContext.nodeUrl)
+    }`,
+  );
   console.log(await devapi.ledgerInfo());
   console.log();
 }
@@ -38,9 +44,9 @@ export async function setMessageScriptFunction(
     textEncoder.encode(message),
   );
   return await DiemHelpers.buildAndSubmitTransaction(
-    context.senderAddress,
+    defaultUserContext.address,
     await devapi.sequenceNumber(),
-    context.privateKey(),
+    await defaultUserContext.readPrivateKey(),
     payload,
   );
 }
@@ -55,9 +61,9 @@ export async function setMessageScript(
   );
   const payload = new DiemTypes.TransactionPayloadVariantScript(script);
   return await DiemHelpers.buildAndSubmitTransaction(
-    context.senderAddress,
+    defaultUserContext.address,
     await devapi.sequenceNumber(),
-    context.privateKey(),
+    await defaultUserContext.readPrivateKey(),
     payload,
   );
 }
@@ -67,7 +73,9 @@ export async function setMessageScript(
 // but with a different address. See main/sources/NFT.move
 // This is optional, as createTestNFTScriptFunction handles init.
 export async function initializeTestNFT() {
-  const nftAddress = DiemHelpers.hexToAccountAddress(context.senderAddress);
+  const nftAddress = DiemHelpers.hexToAccountAddress(
+    defaultUserContext.address,
+  );
 
   // Create the type tag representing TestNFT to pass to the generic
   // script `initialize_nft`
@@ -83,9 +91,9 @@ export async function initializeTestNFT() {
   const script = codegen.Stdlib.encodeInitializeNftScript(testNftType);
   const payload = new DiemTypes.TransactionPayloadVariantScript(script);
   return await DiemHelpers.buildAndSubmitTransaction(
-    context.senderAddress,
+    defaultUserContext.address,
     await devapi.sequenceNumber(),
-    context.privateKey(),
+    await defaultUserContext.readPrivateKey(),
     payload,
   );
 }
@@ -99,9 +107,9 @@ export async function createTestNFTScriptFunction(
     textEncoder.encode(contentUri),
   );
   return await DiemHelpers.buildAndSubmitTransaction(
-    context.senderAddress,
+    defaultUserContext.address,
     await devapi.sequenceNumber(),
-    context.privateKey(),
+    await defaultUserContext.readPrivateKey(),
     payload,
   );
 }

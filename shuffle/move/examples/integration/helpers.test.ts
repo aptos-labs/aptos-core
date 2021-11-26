@@ -5,13 +5,12 @@ import {
   assert,
   assertEquals,
 } from "https://deno.land/std@0.85.0/testing/asserts.ts";
-import * as context from "../main/context.ts";
+import { defaultUserContext } from "../main/context.ts";
 import * as devapi from "../main/devapi.ts";
 import * as helpers from "../main/helpers.ts";
 
 Deno.test("invokeScriptFunction", async () => {
-  const scriptFunction =
-    context.senderAddress + "::Message::set_message";
+  const scriptFunction = defaultUserContext.address + "::Message::set_message";
   let txn = await helpers.invokeScriptFunction(
     scriptFunction,
     [],
