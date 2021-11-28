@@ -10,17 +10,7 @@ use diem_types::account_address::AccountAddress;
 use std::{fs, path::PathBuf};
 use structopt::StructOpt;
 
-mod account;
-mod build;
-mod console;
-mod context;
-mod deploy;
-mod dev_api_client;
-mod new;
-mod node;
-mod shared;
-mod test;
-mod transactions;
+use shuffle::{account, build, console, deploy, new, node, shared, test, transactions};
 
 #[tokio::main]
 pub async fn main() -> Result<()> {
