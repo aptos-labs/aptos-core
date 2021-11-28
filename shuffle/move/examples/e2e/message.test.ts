@@ -8,7 +8,9 @@ import {
   assertEquals,
 } from "https://deno.land/std@0.85.0/testing/asserts.ts";
 import * as devapi from "../main/devapi.ts";
+import * as helpers from "../main/helpers.ts";
 import * as main from "../main/mod.ts";
+import { defaultUserContext, UserContext } from "../main/context.ts";
 
 Deno.test("Test Assert", () => {
   assert("Hello");
@@ -32,4 +34,26 @@ Deno.test("Ability to set NFTs", async () => {
 
   const uris = await main.decodedNFTs();
   assertEquals(uris[0], contentUri);
+});
+
+Deno.test("Advanced: Ability to set message from nonpublishing account", async () => {
+  const publishingAddress = defaultUserContext.address;
+  const scriptFunction = publishingAddress + "::Message::set_message";
+
+  const secondUserContext = await UserContext.fromDisk("test");
+
+  let txn = await helpers.invokeScriptFunctionForContext(
+    secondUserContext,
+    scriptFunction,
+    [],
+    ["invoked script function from nonpublishing account"],
+  );
+  txn = await devapi.waitForTransactionCompletion(txn.hash);
+  assert(txn.success);
+
+  const messages = await main.decodedMessages(secondUserContext.address);
+  assertEquals(
+    messages[0],
+    "invoked script function from nonpublishing account",
+  );
 });

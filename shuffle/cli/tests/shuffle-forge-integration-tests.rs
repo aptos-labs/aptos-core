@@ -32,7 +32,7 @@ impl AdminTest for SamplePackageEndToEnd {
             helper.home(),
             &helper.project_path(),
             helper.network(),
-            helper.network_home().get_latest_account_key_path(),
+            &helper.network_home().get_latest_account_key_path(),
             helper.network_home().get_latest_address()?,
         )?;
 
@@ -57,7 +57,7 @@ impl AdminTest for TypescriptSdkIntegration {
             helper.home(),
             &helper.project_path(),
             helper.network(),
-            helper.network_home().get_latest_account_key_path(),
+            &helper.network_home().get_latest_account_key_path(),
             helper.network_home().get_latest_address()?,
             &helper.project_path().join("integration"),
         )?;

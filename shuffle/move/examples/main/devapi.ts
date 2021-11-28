@@ -135,15 +135,18 @@ export async function postTransactionJson(body: string): Promise<any> {
   });
 }
 
-export async function resourceNames(): Promise<string[]> {
-  return (await resources())
+export async function resourceNames(addr?: string): Promise<string[]> {
+  return (await resources(addr))
     .map(
       (entry: any) => entry["type"],
     );
 }
 
-export async function resourcesWithName(resourceName: string): Promise<any[]> {
-  return (await resources())
+export async function resourcesWithName(
+  resourceName: string,
+  addr?: string,
+): Promise<any[]> {
+  return (await resources(addr))
     .filter(
       (entry: any) => entry["type"].split("::").includes(resourceName),
     );

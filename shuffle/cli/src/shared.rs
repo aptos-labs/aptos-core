@@ -116,38 +116,34 @@ pub fn get_filtered_envs_for_deno(
 
 pub struct NetworkHome {
     accounts_path: PathBuf,
-    latest_account_path: PathBuf,
-    latest_account_key_path: PathBuf,
-    latest_account_address_path: PathBuf,
-    test_path: PathBuf,
-    test_key_path: PathBuf,
-    test_key_address_path: PathBuf,
 }
 
 impl NetworkHome {
     pub fn new(network_base_path: &Path) -> Self {
         NetworkHome {
             accounts_path: network_base_path.join("accounts"),
-            latest_account_path: network_base_path.join("accounts/latest"),
-            latest_account_key_path: network_base_path.join("accounts/latest/dev.key"),
-            latest_account_address_path: network_base_path.join("accounts/latest/address"),
-            test_path: network_base_path.join("accounts/test"),
-            test_key_path: network_base_path.join("accounts/test/dev.key"),
-            test_key_address_path: network_base_path.join("accounts/test/address"),
         }
     }
 
-    pub fn get_latest_account_key_path(&self) -> &Path {
-        &self.latest_account_key_path
+    pub fn key_path_for(&self, username: &str) -> PathBuf {
+        self.accounts_path.join(username).join("dev.key")
     }
 
-    pub fn get_latest_account_address_path(&self) -> &Path {
-        &self.latest_account_address_path
+    pub fn address_path_for(&self, username: &str) -> PathBuf {
+        self.accounts_path.join(username).join("address")
+    }
+
+    pub fn get_latest_account_key_path(&self) -> PathBuf {
+        self.key_path_for("latest")
+    }
+
+    pub fn get_latest_account_address_path(&self) -> PathBuf {
+        self.address_path_for("latest")
     }
 
     #[allow(dead_code)]
     pub fn get_latest_address(&self) -> Result<AccountAddress> {
-        let address_str = std::fs::read_to_string(&self.latest_account_address_path)?;
+        let address_str = std::fs::read_to_string(&self.address_path_for("latest"))?;
         AccountAddress::from_str(address_str.as_str()).map_err(anyhow::Error::new)
     }
 
@@ -162,34 +158,38 @@ impl NetworkHome {
     }
 
     pub fn archive_old_key(&self, archived_dir: &Path) -> Result<()> {
-        let old_key_path = self.latest_account_key_path.as_path();
+        let old_key_path = self.key_path_for("latest");
         let archived_key_path = archived_dir.join("dev.key");
         fs::copy(old_key_path, archived_key_path)?;
         Ok(())
     }
 
     pub fn archive_old_address(&self, archived_dir: &Path) -> Result<()> {
-        let old_address_path = self.latest_account_address_path.as_path();
+        let old_address_path = self.address_path_for("latest");
         let archived_address_path = archived_dir.join("address");
         fs::copy(old_address_path, archived_address_path)?;
         Ok(())
     }
 
     pub fn generate_paths_if_nonexistent(&self) -> Result<()> {
-        fs::create_dir_all(self.latest_account_path.as_path())?;
-        fs::create_dir_all(self.test_path.as_path())?;
+        fs::create_dir_all(self.accounts_path.join("latest"))?;
+        fs::create_dir_all(self.accounts_path.join("test"))?;
         Ok(())
     }
 
     pub fn generate_key_file(&self) -> Result<Ed25519PrivateKey> {
         Ok(generate_key::generate_and_save_key(
-            self.latest_account_key_path.as_path(),
+            self.key_path_for("latest").as_path(),
         ))
     }
 
-    pub fn generate_latest_address_file(&self, public_key: &Ed25519PublicKey) -> Result<()> {
+    pub fn generate_address_file(
+        &self,
+        username: &str,
+        public_key: &Ed25519PublicKey,
+    ) -> Result<()> {
         let address = AuthenticationKey::ed25519(public_key).derived_address();
-        let address_filepath = self.latest_account_address_path.as_path();
+        let address_filepath = self.address_path_for(username);
         let mut file = File::create(address_filepath)?;
         file.write_all(address.to_string().as_ref())?;
         Ok(())
@@ -197,13 +197,13 @@ impl NetworkHome {
 
     pub fn generate_testkey_file(&self) -> Result<Ed25519PrivateKey> {
         Ok(generate_key::generate_and_save_key(
-            self.test_key_path.as_path(),
+            self.key_path_for("test").as_path(),
         ))
     }
 
     pub fn generate_testkey_address_file(&self, public_key: &Ed25519PublicKey) -> Result<()> {
         let address = AuthenticationKey::ed25519(public_key).derived_address();
-        let address_filepath = self.test_key_address_path.as_path();
+        let address_filepath = self.address_path_for("test");
         let mut file = File::create(address_filepath)?;
         file.write_all(address.to_string().as_ref())?;
         Ok(())
@@ -211,16 +211,16 @@ impl NetworkHome {
 
     pub fn copy_key_to_latest(&self, key_path: &Path) -> Result<()> {
         let key = generate_key::load_key(key_path);
-        self.save_key_as_latest(key)
+        self.save_key("latest", key)
     }
 
-    pub fn save_key_as_latest(&self, key: Ed25519PrivateKey) -> Result<()> {
-        generate_key::save_key(key, self.latest_account_key_path.as_path());
+    pub fn save_key(&self, username: &str, key: Ed25519PrivateKey) -> Result<()> {
+        generate_key::save_key(key, self.key_path_for(username));
         Ok(())
     }
 
     pub fn check_latest_account_address_path_exists(&self) -> Result<()> {
-        match self.latest_account_address_path.exists() {
+        match self.address_path_for("latest").exists() {
             true => Ok(()),
             false => Err(anyhow!(
                 "An account hasn't been created yet! Run shuffle account first"
@@ -428,9 +428,10 @@ impl Default for Network {
     }
 }
 
-/// Generates the typescript bindings for the main Move package based on the embedded
-/// diem types and Move stdlib. Mimics much of the transaction_builder_generator's CLI
-/// except with typescript defaults and embedded content, as opposed to repo directory paths.
+/// Generates the typescript bindings for the main Move package.
+/// Requires a publishing address for the code generation of script functions
+/// that need the address as part of the Module Id.
+/// ie: 0x1::MyModule::script_function
 pub fn codegen_typescript_libraries(
     project_path: &Path,
     publishing_address: &AccountAddress,
@@ -575,7 +576,7 @@ mod test {
         let network_home = NetworkHome::new(dir.path().join("localhost").as_path());
         let private_key = network_home.generate_key_file().unwrap();
         network_home
-            .generate_latest_address_file(&private_key.public_key())
+            .generate_address_file("latest", &private_key.public_key())
             .unwrap();
         let address_path = dir.path().join("localhost/accounts/latest/address");
 
@@ -627,7 +628,7 @@ mod test {
         let network_home = NetworkHome::new(dir.path().join("localhost").as_path());
         let public_key = network_home.generate_key_file().unwrap().public_key();
         network_home
-            .generate_latest_address_file(&public_key)
+            .generate_address_file("latest", &public_key)
             .unwrap();
         assert_eq!(
             dir.path()
@@ -756,7 +757,7 @@ mod test {
         fs::create_dir_all(good_dir.path().join("localhost/accounts/latest")).unwrap();
         let network_home = NetworkHome::new(good_dir.path().join("localhost").as_path());
         network_home
-            .generate_latest_address_file(&generate_key::generate_key().public_key())
+            .generate_address_file("latest", &generate_key::generate_key().public_key())
             .unwrap();
         assert!(!network_home
             .check_latest_account_address_path_exists()

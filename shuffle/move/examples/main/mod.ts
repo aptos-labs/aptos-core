@@ -4,7 +4,11 @@
 import * as DiemHelpers from "./helpers.ts";
 import * as DiemTypes from "./generated/diemTypes/mod.ts";
 import * as codegen from "./generated/diemStdlib/mod.ts";
-import { consoleContext, defaultUserContext } from "./context.ts";
+import {
+  addressOrDefault,
+  consoleContext,
+  defaultUserContext,
+} from "./context.ts";
 import * as devapi from "./devapi.ts";
 import * as util from "https://deno.land/std@0.85.0/node/util.ts";
 import { green } from "https://deno.land/x/nanocolors@0.1.12/mod.ts";
@@ -114,13 +118,15 @@ export async function createTestNFTScriptFunction(
   );
 }
 
-export async function decodedMessages() {
-  return (await devapi.resourcesWithName("MessageHolder"))
+export async function decodedMessages(addr?: string) {
+  addr = addressOrDefault(addr);
+  return (await devapi.resourcesWithName("MessageHolder", addr))
     .map((entry) => DiemHelpers.hexToAscii(entry.data.message));
 }
 
-export async function decodedNFTs() {
-  return (await devapi.resourcesWithName("NFT"))
+export async function decodedNFTs(addr?: string) {
+  addr = addressOrDefault(addr);
+  return (await devapi.resourcesWithName("NFT", addr))
     .filter((entry) => entry.data && entry.data.content_uri)
     .map((entry) => DiemHelpers.hexToAscii(entry.data.content_uri));
 }

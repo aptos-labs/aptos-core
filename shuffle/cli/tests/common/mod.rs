@@ -92,17 +92,18 @@ impl ShuffleTestHelper {
 
     pub async fn create_account(
         &self,
+        username: &str,
         treasury_account: &mut LocalAccount,
         new_account: &LocalAccount,
-        factory: TransactionFactory,
+        factory: &TransactionFactory,
         client: &DevApiClient,
     ) -> Result<()> {
         let bytes: &[u8] = &new_account.private_key().to_bytes();
         let private_key = Ed25519PrivateKey::try_from(bytes).map_err(anyhow::Error::new)?;
-        self.network_home().save_key_as_latest(private_key)?;
+        self.network_home().save_key(username, private_key)?;
         self.network_home()
-            .generate_latest_address_file(new_account.public_key())?;
-        account::create_account_via_dev_api(treasury_account, new_account, &factory, client).await
+            .generate_address_file(username, new_account.public_key())?;
+        account::create_account_via_dev_api(treasury_account, new_account, factory, client).await
     }
 
     pub fn create_project(&self) -> Result<()> {
@@ -153,11 +154,13 @@ pub fn bootstrap_shuffle_project(ctx: &mut AdminContext<'_>) -> Result<ShuffleTe
     let rt = Runtime::new().unwrap();
     let handle = rt.handle().clone();
 
-    let mut account = ctx.random_account();
+    let mut account_1 = ctx.random_account();
+    let account_2 = ctx.random_account();
     let tc = ctx.chain_info().treasury_compliance_account();
 
-    handle.block_on(helper.create_account(tc, &account, factory, &dev_client))?;
-    handle.block_on(helper.deploy_project(&mut account, ctx.chain_info().rest_api()))?;
-    helper.codegen_project(&account)?;
+    handle.block_on(helper.create_account("latest", tc, &account_1, &factory, &dev_client))?;
+    handle.block_on(helper.create_account("test", tc, &account_2, &factory, &dev_client))?;
+    handle.block_on(helper.deploy_project(&mut account_1, ctx.chain_info().rest_api()))?;
+    helper.codegen_project(&account_1)?;
     Ok(helper)
 }

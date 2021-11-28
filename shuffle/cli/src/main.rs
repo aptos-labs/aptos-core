@@ -237,7 +237,7 @@ fn normalized_key_path(
                     "An account hasn't been created yet! Run shuffle account first"
                 ));
             }
-            Ok(PathBuf::from(network_home.get_latest_account_key_path()))
+            Ok(network_home.get_latest_account_key_path())
         }
     }
 }

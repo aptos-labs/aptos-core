@@ -120,7 +120,7 @@ fn archive_current_files_in_latest(network_home: &NetworkHome) -> Result<()> {
 fn generate_new_account(network_home: &NetworkHome) -> Result<LocalAccount> {
     let private_key = network_home.generate_key_file()?;
     let public_key = private_key.public_key();
-    network_home.generate_latest_address_file(&public_key)?;
+    network_home.generate_address_file("latest", &public_key)?;
     Ok(LocalAccount::new(
         AuthenticationKey::ed25519(&public_key).derived_address(),
         private_key,

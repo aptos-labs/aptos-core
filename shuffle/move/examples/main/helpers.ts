@@ -3,7 +3,7 @@
 
 // deno-lint-ignore-file no-explicit-any
 import * as DiemTypes from "./generated/diemTypes/mod.ts";
-import { defaultUserContext } from "./context.ts";
+import { defaultUserContext, UserContext } from "./context.ts";
 import * as devapi from "./devapi.ts";
 import * as ed from "https://deno.land/x/ed25519@1.0.1/mod.ts";
 import * as util from "https://deno.land/std@0.85.0/node/util.ts";
@@ -64,19 +64,32 @@ export async function invokeScriptFunction(
   typeArguments: string[],
   args: any[],
 ): Promise<any> {
-  return await invokeScriptFunctionWithoutContext(
-    defaultUserContext.address,
-    await devapi.sequenceNumber(),
-    await defaultUserContext.readPrivateKey(),
+  return await invokeScriptFunctionForContext(
+    defaultUserContext,
     scriptFunction,
     typeArguments,
     args,
   );
 }
 
+export async function invokeScriptFunctionForContext(
+  userContext: UserContext,
+  scriptFunction: string,
+  typeArguments: string[],
+  args: any[],
+): Promise<any> {
+  return await invokeScriptFunctionForAddress(
+    userContext.address,
+    await devapi.sequenceNumber(userContext.address),
+    await userContext.readPrivateKey(),
+    scriptFunction,
+    typeArguments,
+    args,
+  );
+}
 // Invokes a script function using the Dev API's signing_message/ JSON endpoint.
-export async function invokeScriptFunctionWithoutContext(
-  addressStr: string,
+export async function invokeScriptFunctionForAddress(
+  senderAddressStr: string,
   sequenceNumber: number,
   privateKeyBytes: Uint8Array,
   scriptFunction: string,
@@ -84,7 +97,7 @@ export async function invokeScriptFunctionWithoutContext(
   args: any[],
 ): Promise<any> {
   const request: any = {
-    "sender": addressStr,
+    "sender": senderAddressStr,
     "sequence_number": `${sequenceNumber}`,
     "max_gas_amount": "1000000",
     "gas_unit_price": "0",
