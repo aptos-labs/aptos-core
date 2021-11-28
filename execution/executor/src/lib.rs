@@ -12,7 +12,6 @@ use std::{
 
 use anyhow::{bail, ensure, format_err, Result};
 use components::speculation_cache::SpeculationCache;
-use fail::fail_point;
 
 use diem_crypto::{
     hash::{CryptoHash, EventAccumulatorHasher, TransactionAccumulatorHasher},
@@ -20,19 +19,17 @@ use diem_crypto::{
 };
 use diem_infallible::{RwLock, RwLockReadGuard};
 use diem_logger::prelude::*;
-use diem_state_view::{StateView, StateViewId};
+use diem_state_view::StateViewId;
 use diem_types::{
     account_address::{AccountAddress, HashAccountAddress},
     account_state::AccountState,
     account_state_blob::AccountStateBlob,
-    contract_event::ContractEvent,
     epoch_state::EpochState,
     on_chain_config,
     proof::accumulator::InMemoryAccumulator,
     protocol_spec::{DpnProto, ProtocolSpec},
     transaction::{
-        Transaction, TransactionInfoTrait, TransactionOutput, TransactionPayload,
-        TransactionStatus, TransactionToCommit,
+        Transaction, TransactionInfoTrait, TransactionOutput, TransactionPayload, TransactionStatus,
     },
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
@@ -56,9 +53,8 @@ mod tests;
 
 pub mod block_executor_impl;
 pub mod chunk_executor;
-mod components;
+pub mod components;
 pub mod db_bootstrapper;
-mod transaction_replayer_impl;
 
 /// `Executor` implements all functionalities the execution module needs to provide.
 pub struct Executor<PS, V> {
@@ -333,134 +329,6 @@ where
     ) -> VerifiedStateView<DpnProto> {
         let read_lock = self.cache.read();
         self.get_executed_state_view_from_lock(&read_lock, id, executed_trees)
-    }
-
-    fn replay_transactions_impl(
-        &self,
-        first_version: u64,
-        transactions: Vec<Transaction>,
-        transaction_outputs: Option<Vec<TransactionOutput>>,
-        transaction_infos: Vec<PS::TransactionInfo>,
-    ) -> Result<(
-        ProcessedVMOutput,
-        Vec<TransactionToCommit>,
-        Vec<ContractEvent>,
-        Vec<Transaction>,
-        Vec<PS::TransactionInfo>,
-    )> {
-        let read_lock = self.cache.read();
-        // Construct a StateView and pass the transactions to VM.
-        let state_view = VerifiedStateView::new(
-            StateViewId::ChunkExecution { first_version },
-            Arc::clone(&self.db.reader),
-            read_lock.synced_trees().version(),
-            read_lock.synced_trees().state_root(),
-            read_lock.synced_trees().state_tree().clone(),
-        );
-
-        fail_point!("executor::vm_execute_chunk", |_| {
-            Err(anyhow::anyhow!("Injected error in execute_chunk"))
-        });
-
-        let transactions_executed = transaction_outputs.is_none();
-        let vm_outputs = if let Some(outputs) = transaction_outputs {
-            ensure!(
-                transactions.len() == outputs.len(),
-                "the number of transactions {} doesn't \
-                 match the number of transactions outputs {}.",
-                transactions.len(),
-                outputs.len()
-            );
-            for (access_path, _) in outputs.iter().map(|o| o.write_set()).flatten() {
-                state_view.get(access_path)?;
-            }
-            outputs
-        } else {
-            V::execute_block(transactions.clone(), &state_view)?
-        };
-
-        // Since other validators have committed these transactions, their status should all be
-        // TransactionStatus::Keep.
-        for (index, output) in vm_outputs.iter().enumerate() {
-            if let TransactionStatus::Discard(status_code) = output.status() {
-                let bail_error_message = format!(
-                    "Syncing a transaction that should be discarded! Transaction version: {:?}, status code: {:?}.",
-                    first_version + index as u64, status_code
-                );
-                error!("{}", bail_error_message);
-                info!("Discarded transaction: {:?}", transactions[index]);
-                info!("Discarded transaction output: {:?}", output);
-                info!("Transactions were executed: {:?}", transactions_executed);
-                bail!(bail_error_message);
-            }
-        }
-
-        let output = Self::process_vm_outputs(
-            &transactions,
-            vm_outputs,
-            state_view,
-            read_lock.synced_trees().txn_accumulator(),
-        )?;
-
-        // Since we have verified the proofs, we just need to verify that each PS::TransactionInfo
-        // object matches what we have computed locally.
-        let mut txns_to_commit = vec![];
-        let mut events = vec![];
-        let mut seen_retry = false;
-        let mut txns_to_retry = vec![];
-        let mut txn_infos_to_retry = vec![];
-        for ((txn, txn_data), (i, txn_info)) in itertools::zip_eq(
-            itertools::zip_eq(transactions, output.transaction_data()),
-            transaction_infos.into_iter().enumerate(),
-        ) {
-            let recorded_status = match txn_data.status() {
-                TransactionStatus::Keep(recorded_status) => recorded_status.clone(),
-                status @ TransactionStatus::Discard(_) => bail!(
-                    "The transaction at version {}, got the status of 'Discard': {:?}",
-                    first_version
-                        .checked_add(i as u64)
-                        .ok_or_else(|| format_err!("version + i overflows"))?,
-                    status
-                ),
-                TransactionStatus::Retry => {
-                    seen_retry = true;
-                    txns_to_retry.push(txn);
-                    txn_infos_to_retry.push(txn_info);
-                    continue;
-                }
-            };
-            assert!(!seen_retry);
-            let generated_txn_info = PS::TransactionInfo::new(
-                txn.hash(),
-                txn_data.state_root_hash(),
-                txn_data.event_root_hash(),
-                txn_data.gas_used(),
-                recorded_status.clone(),
-            );
-            ensure!(
-                txn_info == generated_txn_info,
-                "txn_info do not match for {}-th transaction in chunk.\nChunk txn_info: {}\nProof txn_info: {}",
-                i, generated_txn_info, txn_info
-            );
-            txns_to_commit.push(TransactionToCommit::new(
-                txn,
-                txn_data.account_blobs().clone(),
-                Some(txn_data.jf_node_hashes().clone()),
-                txn_data.write_set().clone(),
-                txn_data.events().to_vec(),
-                txn_data.gas_used(),
-                recorded_status,
-            ));
-            events.append(&mut txn_data.events().to_vec());
-        }
-
-        Ok((
-            output,
-            txns_to_commit,
-            events,
-            txns_to_retry,
-            txn_infos_to_retry,
-        ))
     }
 }
 

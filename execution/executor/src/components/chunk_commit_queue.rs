@@ -3,10 +3,9 @@
 
 #![forbid(unsafe_code)]
 
-use crate::components::executed_chunk::ExecutedChunk;
 use anyhow::{anyhow, Result};
 use diem_types::protocol_spec::DpnProto;
-use executor_types::ExecutedTrees;
+use executor_types::{ExecutedChunk, ExecutedTrees};
 use std::{collections::VecDeque, sync::Arc};
 use storage_interface::DbReader;
 
@@ -22,10 +21,14 @@ impl ChunkCommitQueue {
             .ok_or_else(|| anyhow!("DB not bootstrapped."))?
             .into_latest_tree_state()
             .into();
-        Ok(Self {
+        Ok(Self::new(persisted_view))
+    }
+
+    pub fn new(persisted_view: ExecutedTrees) -> Self {
+        Self {
             persisted_view,
             chunks_to_commit: VecDeque::new(),
-        })
+        }
     }
 
     pub fn persisted_and_latest_view(&self) -> (ExecutedTrees, ExecutedTrees) {

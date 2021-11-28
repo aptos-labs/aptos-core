@@ -474,8 +474,9 @@ proptest! {
 
             // replay txns in one batch across epoch boundary,
             // and the replayer should deal with `Retry`s automatically
-            let replayer = TestExecutor::new();
-            replayer.replay_chunk(1 /* first version */, block.txns, txn_infos).unwrap();
+            let replayer = chunk_executor_tests::TestExecutor::new();
+            replayer.executor.replay(block.txns, txn_infos).unwrap();
+            replayer.executor.commit().unwrap();
             let replayed_db = replayer.db.reader.clone();
             prop_assert_eq!(replayed_db.get_latest_state_root().unwrap(), db.get_latest_state_root().unwrap())
         }

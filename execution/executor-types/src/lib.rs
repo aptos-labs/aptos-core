@@ -4,6 +4,8 @@
 #![forbid(unsafe_code)]
 
 mod error;
+mod executed_chunk;
+
 pub use error::Error;
 
 use anyhow::Result;
@@ -34,6 +36,8 @@ use scratchpad::ProofRead;
 use serde::{Deserialize, Serialize};
 use std::{cmp::max, collections::HashMap, sync::Arc};
 use storage_interface::TreeState;
+
+pub use executed_chunk::ExecutedChunk;
 
 type SparseMerkleProof = diem_types::proof::SparseMerkleProof<AccountStateBlob>;
 type SparseMerkleTree = scratchpad::SparseMerkleTree<AccountStateBlob>;
@@ -108,14 +112,13 @@ pub trait BlockExecutor: Send + Sync {
 }
 
 pub trait TransactionReplayer: Send {
-    fn replay_chunk(
+    fn replay(
         &self,
-        first_version: Version,
-        txns: Vec<Transaction>,
-        txn_infos: Vec<TransactionInfo>,
+        transactions: Vec<Transaction>,
+        transaction_infos: Vec<TransactionInfo>,
     ) -> Result<()>;
 
-    fn expecting_version(&self) -> Version;
+    fn commit(&self) -> Result<Arc<ExecutedChunk>>;
 }
 
 /// A structure that summarizes the result of the execution needed for consensus to agree on.
@@ -350,6 +353,12 @@ impl ExecutedTrees {
 
     pub fn new_empty() -> ExecutedTrees {
         Self::new(*SPARSE_MERKLE_PLACEHOLDER_HASH, vec![], 0)
+    }
+}
+
+impl Default for ExecutedTrees {
+    fn default() -> Self {
+        Self::new_empty()
     }
 }
 

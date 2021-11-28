@@ -3,6 +3,7 @@
 
 #![forbid(unsafe_code)]
 
+use crate::{ExecutedTrees, TransactionData};
 use anyhow::{ensure, Result};
 use diem_crypto::hash::CryptoHash;
 use diem_types::{
@@ -11,8 +12,8 @@ use diem_types::{
     ledger_info::LedgerInfoWithSignatures,
     transaction::{Transaction, TransactionInfo, TransactionToCommit},
 };
-use executor_types::{ExecutedTrees, TransactionData};
 
+#[derive(Default)]
 pub struct ExecutedChunk {
     pub to_commit: Vec<(Transaction, TransactionData)>,
     pub to_discard: Vec<Transaction>,
@@ -132,5 +133,26 @@ impl ExecutedChunk {
             );
             Ok(None)
         }
+    }
+
+    pub fn strip_transactions_to_retry(&mut self) -> Vec<Transaction> {
+        self.next_epoch_state.take();
+        self.to_retry.drain(..).collect()
+    }
+
+    pub fn combine(self, rhs: Self) -> Result<Self> {
+        self.ensure_no_discard()?;
+        self.ensure_no_retry()?;
+        let mut to_commit = self.to_commit;
+        to_commit.extend(rhs.to_commit.into_iter());
+
+        Ok(Self {
+            to_commit,
+            to_discard: rhs.to_discard,
+            to_retry: rhs.to_retry,
+            result_view: rhs.result_view,
+            next_epoch_state: rhs.next_epoch_state,
+            ledger_info: rhs.ledger_info,
+        })
     }
 }

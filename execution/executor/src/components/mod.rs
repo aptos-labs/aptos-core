@@ -6,5 +6,4 @@
 pub mod apply_chunk_output;
 pub mod chunk_commit_queue;
 pub mod chunk_output;
-pub mod executed_chunk;
 pub mod speculation_cache;

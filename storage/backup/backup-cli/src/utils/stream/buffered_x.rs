@@ -1,9 +1,9 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-/// This is a copy of `futures::stream::buffered` from `futures 0.3.6`, except that it uses
-/// `FuturesOrderedX` which provides concurrency control. So we can buffer more results without
-/// too many futures driven at the same time.
+///! This is a copy of `futures::stream::buffered` from `futures 0.3.6`, except that it uses
+///! `FuturesOrderedX` which provides concurrency control. So we can buffer more results without
+///! too many futures driven at the same time.
 use crate::utils::stream::futures_ordered_x::FuturesOrderedX;
 use futures::{
     ready,

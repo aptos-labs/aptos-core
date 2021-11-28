@@ -4,9 +4,7 @@
 #![forbid(unsafe_code)]
 
 use crate::{
-    components::{chunk_output::ChunkOutput, executed_chunk::ExecutedChunk},
-    metrics::DIEM_EXECUTOR_ERRORS,
-    process_write_set,
+    components::chunk_output::ChunkOutput, metrics::DIEM_EXECUTOR_ERRORS, process_write_set,
 };
 use anyhow::{anyhow, Result};
 use diem_crypto::{
@@ -26,7 +24,7 @@ use diem_types::{
         Transaction, TransactionInfo, TransactionInfoTrait, TransactionOutput, TransactionStatus,
     },
 };
-use executor_types::{ExecutedTrees, ProofReader, TransactionData};
+use executor_types::{ExecutedChunk, ExecutedTrees, ProofReader, TransactionData};
 use rayon::prelude::*;
 use scratchpad::SparseMerkleTree;
 use std::{collections::HashMap, convert::TryFrom, sync::Arc};

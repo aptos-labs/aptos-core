@@ -12,32 +12,41 @@ use crate::{
     },
     storage::{BackupStorage, FileHandle},
     utils::{
-        read_record_bytes::ReadRecordBytes, storage_ext::BackupStorageExt, stream::StreamX,
-        GlobalRestoreOptions, RestoreRunMode,
+        error_notes::ErrorNotes, read_record_bytes::ReadRecordBytes, storage_ext::BackupStorageExt,
+        stream::StreamX, GlobalRestoreOptions, RestoreRunMode,
     },
 };
-use anyhow::{anyhow, bail, ensure, Result};
+use anyhow::{anyhow, ensure, Result};
 use diem_logger::prelude::*;
 use diem_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
     proof::{TransactionAccumulatorRangeProof, TransactionInfoListWithProof},
-    protocol_spec::DpnProto,
     transaction::{
         default_protocol::TransactionListWithProof, Transaction, TransactionInfo, Version,
     },
 };
 use diem_vm::DiemVM;
-use executor::Executor;
+use diemdb::backup::restore_handler::RestoreHandler;
+use executor::chunk_executor::ChunkExecutor;
 use executor_types::TransactionReplayer;
-use futures::StreamExt;
-use std::{
-    cmp::{max, min},
-    sync::Arc,
+use futures::{
+    future,
+    future::TryFutureExt,
+    stream,
+    stream::{Peekable, Stream, TryStreamExt},
+    StreamExt,
 };
+use itertools::zip_eq;
+use std::{cmp::min, pin::Pin, sync::Arc, time::Instant};
 use storage_interface::DbReaderWriter;
 use structopt::StructOpt;
 use tokio::io::BufReader;
+
+#[cfg(not(test))]
+const BATCH_SIZE: usize = 10000;
+#[cfg(test)]
+const BATCH_SIZE: usize = 2;
 
 #[derive(StructOpt)]
 pub struct TransactionRestoreOpt {
@@ -59,13 +68,7 @@ impl TransactionRestoreOpt {
 }
 
 pub struct TransactionRestoreController {
-    storage: Arc<dyn BackupStorage>,
-    run_mode: Arc<RestoreRunMode>,
-    manifest_handle: FileHandle,
-    target_version: Version,
-    replay_from_version: Version,
-    epoch_history: Option<Arc<EpochHistory>>,
-    state: State,
+    inner: TransactionRestoreBatchController,
 }
 
 #[allow(dead_code)]
@@ -147,234 +150,23 @@ impl TransactionRestoreController {
         storage: Arc<dyn BackupStorage>,
         epoch_history: Option<Arc<EpochHistory>>,
     ) -> Self {
-        Self {
+        let inner = TransactionRestoreBatchController::new(
+            global_opt,
             storage,
-            run_mode: global_opt.run_mode,
-            replay_from_version: opt.replay_from_version(),
-            manifest_handle: opt.manifest_handle,
-            target_version: global_opt.target_version,
+            vec![opt.manifest_handle],
+            opt.replay_from_version,
             epoch_history,
-            state: State::default(),
-        }
-    }
-
-    pub async fn preheat(mut self) -> PreheatedTransactionRestore {
-        PreheatedTransactionRestore {
-            preheat_result: self.preheat_impl().await,
-            controller: self,
-        }
-    }
-
-    pub async fn run(self) -> Result<()> {
-        self.preheat().await.run().await
-    }
-}
-
-impl TransactionRestoreController {
-    fn name(&self) -> String {
-        format!("transaction {}", self.run_mode.name())
-    }
-
-    async fn preheat_impl(&mut self) -> Result<TransactionRestorePreheatData> {
-        let manifest: TransactionBackup =
-            self.storage.load_json_file(&self.manifest_handle).await?;
-        manifest.verify()?;
-
-        let mut loaded_chunks = Vec::new();
-        for chunk_manifest in &manifest.chunks {
-            if chunk_manifest.first_version > self.target_version {
-                break;
-            }
-
-            loaded_chunks.push(
-                LoadedChunk::load(
-                    chunk_manifest.clone(),
-                    &self.storage,
-                    self.epoch_history.as_ref(),
-                )
-                .await?,
-            )
-        }
-
-        Ok(TransactionRestorePreheatData {
-            manifest,
-            loaded_chunks,
-        })
-    }
-
-    fn maybe_restore_transactions(
-        &mut self,
-        mut chunk: LoadedChunk,
-        last: u64,
-        first_to_replay: u64,
-    ) -> Result<()> {
-        if let RestoreRunMode::Restore { restore_handler } = self.run_mode.as_ref() {
-            // Transactions to save without replaying:
-            if first_to_replay > chunk.manifest.first_version {
-                let last_to_save = min(last, first_to_replay - 1);
-                let num_txns_to_save = (last_to_save - chunk.manifest.first_version + 1) as usize;
-                restore_handler.save_transactions(
-                    chunk.manifest.first_version,
-                    &chunk.txns[..num_txns_to_save],
-                    &chunk.txn_infos[..num_txns_to_save],
-                    &chunk.event_vecs[..num_txns_to_save],
-                )?;
-                chunk.txns.drain(0..num_txns_to_save);
-                chunk.txn_infos.drain(0..num_txns_to_save);
-                chunk.event_vecs.drain(0..num_txns_to_save);
-                TRANSACTION_SAVE_VERSION.set(last_to_save as i64);
-            }
-            // Those to replay:
-            if first_to_replay <= last {
-                // ditch those beyond the target version
-                let num_to_replay = (last - first_to_replay + 1) as usize;
-                chunk.txns.truncate(num_to_replay);
-                chunk.txn_infos.truncate(num_to_replay);
-
-                // replay in batches
-                info!("Replaying transactions {} to {}.", first_to_replay, last);
-                #[cfg(not(test))]
-                const BATCH_SIZE: usize = 10000;
-                #[cfg(test)]
-                const BATCH_SIZE: usize = 2;
-
-                let mut current_version = first_to_replay;
-                while !chunk.txns.is_empty() {
-                    let this_batch_size = min(BATCH_SIZE, chunk.txns.len());
-                    self.transaction_replayer(current_version)?.replay_chunk(
-                        current_version,
-                        chunk.txns.drain(0..this_batch_size).collect::<Vec<_>>(),
-                        chunk
-                            .txn_infos
-                            .drain(0..this_batch_size)
-                            .collect::<Vec<_>>(),
-                    )?;
-                    current_version += this_batch_size as u64;
-                    TRANSACTION_REPLAY_VERSION.set(current_version as i64 - 1);
-                }
-            }
-        } else {
-            VERIFY_TRANSACTION_VERSION.set(last as i64);
-        }
-
-        Ok(())
-    }
-
-    fn maybe_save_frozen_subtrees(&mut self, chunk: &LoadedChunk) -> Result<()> {
-        if let RestoreRunMode::Restore { restore_handler } = self.run_mode.as_ref() {
-            if !self.state.frozen_subtree_confirmed {
-                restore_handler.confirm_or_save_frozen_subtrees(
-                    chunk.manifest.first_version,
-                    chunk.range_proof.left_siblings(),
-                )?;
-                self.state.frozen_subtree_confirmed = true;
-            }
-        }
-
-        Ok(())
-    }
-
-    fn transaction_replayer(
-        &mut self,
-        first_version: Version,
-    ) -> Result<&mut Executor<DpnProto, DiemVM>> {
-        if self.state.transaction_replayer.is_none() {
-            if let RestoreRunMode::Restore { restore_handler } = self.run_mode.as_ref() {
-                let replayer = Executor::new_on_unbootstrapped_db(
-                    DbReaderWriter::from_arc(Arc::clone(&restore_handler.diemdb)),
-                    restore_handler.get_tree_state(first_version)?,
-                );
-                self.state.transaction_replayer = Some(replayer);
-            } else {
-                bail!("Trying to construct TransactionReplayer under Verify mode.");
-            }
-        } else {
-            assert_eq!(
-                self.state
-                    .transaction_replayer
-                    .as_ref()
-                    .unwrap()
-                    .expecting_version(),
-                first_version
-            );
-        }
-
-        Ok(self.state.transaction_replayer.as_mut().unwrap())
-    }
-}
-
-#[derive(Default)]
-struct State {
-    frozen_subtree_confirmed: bool,
-    transaction_replayer: Option<Executor<DpnProto, DiemVM>>,
-}
-
-struct TransactionRestorePreheatData {
-    manifest: TransactionBackup,
-    loaded_chunks: Vec<LoadedChunk>,
-}
-
-pub struct PreheatedTransactionRestore {
-    controller: TransactionRestoreController,
-    preheat_result: Result<TransactionRestorePreheatData>,
-}
-
-impl PreheatedTransactionRestore {
-    pub async fn run(self) -> Result<()> {
-        let name = self.controller.name();
-        info!(
-            "{} started. Manifest: {}",
-            name, self.controller.manifest_handle
         );
-        let res = self
-            .run_impl()
-            .await
-            .map_err(|e| anyhow!("{} failed: {}", name, e))?;
-        info!("{} succeeded.", name);
-        Ok(res)
+
+        Self { inner }
     }
 
-    pub fn get_last_version(&self) -> Result<Version> {
-        Ok(min(
-            self.preheat_result
-                .as_ref()
-                .map_err(|e| anyhow!("Preheat failed: {}", e))?
-                .manifest
-                .last_version,
-            self.controller.target_version,
-        ))
+    pub async fn run(self) -> Result<()> {
+        self.inner.run().await
     }
 }
 
-impl PreheatedTransactionRestore {
-    async fn run_impl(mut self) -> Result<()> {
-        let preheat_data = self
-            .preheat_result
-            .map_err(|e| anyhow!("Preheat failed: {}", e))?;
-
-        for chunk in preheat_data.loaded_chunks {
-            self.controller.maybe_save_frozen_subtrees(&chunk)?;
-
-            let last = min(self.controller.target_version, chunk.manifest.last_version);
-            let first_to_replay = max(
-                chunk.manifest.first_version,
-                self.controller.replay_from_version,
-            );
-
-            self.controller
-                .maybe_restore_transactions(chunk, last, first_to_replay)?;
-        }
-
-        if self.controller.target_version < preheat_data.manifest.last_version {
-            warn!(
-                "Transactions newer than target version {} ignored.",
-                self.controller.target_version,
-            )
-        }
-
-        Ok(())
-    }
-}
+impl TransactionRestoreController {}
 
 /// Takes a series of transaction backup manifests, preheat in parallel, then execute in order.
 pub struct TransactionRestoreBatchController {
@@ -403,49 +195,278 @@ impl TransactionRestoreBatchController {
     }
 
     pub async fn run(self) -> Result<()> {
-        let timer = std::time::Instant::now();
+        let name = self.name();
+        info!("{} started.", name);
+        let res = self
+            .run_impl()
+            .await
+            .map_err(|e| anyhow!("{} failed: {}", name, e))?;
+        info!("{} succeeded.", name);
+        Ok(res)
+    }
 
-        let futs_iter = self.manifest_handles.clone().into_iter().map(|hdl| {
-            let _global_opt = self.global_opt.clone();
-            let _epoch_history = self.epoch_history.clone();
-            let _storage = self.storage.clone();
-            let _replay_from_version = self.replay_from_version;
-            async move {
-                // Use `spawn()` so it's (most likely) off the main thread.
-                // There's a lot of deserialization / verification happening that's CPU
-                // intensive, hence the `spawn()`
-                tokio::spawn(
-                    TransactionRestoreController::new(
-                        TransactionRestoreOpt {
-                            manifest_handle: hdl,
-                            replay_from_version: _replay_from_version,
-                        },
-                        _global_opt,
-                        _storage,
-                        _epoch_history,
-                    )
-                    .preheat(),
-                )
-                .await
-                .expect("Failed to spawn task.")
-            }
-        });
+    fn name(&self) -> String {
+        format!("transaction {}", self.global_opt.run_mode.name())
+    }
 
-        let mut futs_stream = futures::stream::iter(futs_iter).buffered_x(
-            // more buffer here because the preheat of txns is heavy and variates more in execution
-            // time
-            self.global_opt.concurrent_downloads * 3,
-            self.global_opt.concurrent_downloads, /* concurrency */
-        );
-        while let Some(preheated_txn_restore) = futs_stream.next().await {
-            let v = preheated_txn_restore.get_last_version();
-            preheated_txn_restore.run().await?;
-            debug!(
-                "Accumulative TPS: {:.0}",
-                (v? + 1) as f64 / timer.elapsed().as_secs_f64()
-            );
+    async fn run_impl(self) -> Result<()> {
+        if self.manifest_handles.is_empty() {
+            return Ok(());
         }
 
+        let mut loaded_chunk_stream = self.loaded_chunk_stream();
+        let first_version = self
+            .confirm_or_save_frozen_subtrees(&mut loaded_chunk_stream)
+            .await?;
+
+        if let RestoreRunMode::Restore { restore_handler } = self.global_opt.run_mode.as_ref() {
+            let txns_to_execute_stream = self
+                .save_before_replay_version(first_version, loaded_chunk_stream, restore_handler)
+                .await?;
+
+            if let Some(txns_to_execute_stream) = txns_to_execute_stream {
+                self.replay_transactions(restore_handler, txns_to_execute_stream)
+                    .await?;
+            }
+        } else {
+            Self::go_through_verified_chunks(loaded_chunk_stream, first_version).await?;
+        }
         Ok(())
+    }
+
+    fn loaded_chunk_stream(&self) -> Peekable<impl Stream<Item = Result<LoadedChunk>>> {
+        let con = self.global_opt.concurrent_downloads;
+
+        let manifest_handle_stream = stream::iter(self.manifest_handles.clone().into_iter());
+
+        let storage = self.storage.clone();
+        let manifest_stream = manifest_handle_stream
+            .map(move |hdl| {
+                let storage = storage.clone();
+                async move { storage.load_json_file(&hdl).await.err_notes(&hdl) }
+            })
+            .buffered_x(con * 3, con)
+            .and_then(|m: TransactionBackup| future::ready(m.verify().map(|_| m)));
+
+        let target_version = self.global_opt.target_version;
+        let chunk_manifest_stream = manifest_stream
+            .map_ok(|m| stream::iter(m.chunks.into_iter().map(Result::<_>::Ok)))
+            .try_flatten()
+            .try_take_while(move |c| future::ready(Ok(c.first_version <= target_version)))
+            .scan(0, |last_chunk_last_version, chunk_res| {
+                let res = match &chunk_res {
+                    Ok(chunk) => {
+                        if *last_chunk_last_version != 0
+                            && chunk.first_version != *last_chunk_last_version + 1
+                        {
+                            Some(Err(anyhow!(
+                                "Chunk range not consecutive. expecting {}, got {}",
+                                *last_chunk_last_version + 1,
+                                chunk.first_version
+                            )))
+                        } else {
+                            *last_chunk_last_version = chunk.last_version;
+                            Some(chunk_res)
+                        }
+                    }
+                    Err(_) => Some(chunk_res),
+                };
+                future::ready(res)
+            });
+
+        let storage = self.storage.clone();
+        let epoch_history = self.epoch_history.clone();
+        chunk_manifest_stream
+            .and_then(move |chunk| {
+                let storage = storage.clone();
+                let epoch_history = epoch_history.clone();
+                future::ok(async move {
+                    tokio::task::spawn(async move {
+                        LoadedChunk::load(chunk, &storage, epoch_history.as_ref()).await
+                    })
+                    .err_into::<anyhow::Error>()
+                    .await
+                })
+            })
+            .try_buffered(con)
+            .and_then(future::ready)
+            .peekable()
+    }
+
+    async fn confirm_or_save_frozen_subtrees(
+        &self,
+        loaded_chunk_stream: &mut Peekable<impl Unpin + Stream<Item = Result<LoadedChunk>>>,
+    ) -> Result<Version> {
+        let first_chunk = Pin::new(loaded_chunk_stream)
+            .peek()
+            .await
+            .ok_or_else(|| anyhow!("LoadedChunk stream is empty."))?
+            .as_ref()
+            .map_err(|e| anyhow!("Error: {}", e))?;
+
+        if let RestoreRunMode::Restore { restore_handler } = self.global_opt.run_mode.as_ref() {
+            restore_handler.confirm_or_save_frozen_subtrees(
+                first_chunk.manifest.first_version,
+                first_chunk.range_proof.left_siblings(),
+            )?;
+        }
+
+        Ok(first_chunk.manifest.first_version)
+    }
+
+    async fn save_before_replay_version(
+        &self,
+        global_first_version: Version,
+        loaded_chunk_stream: impl Stream<Item = Result<LoadedChunk>> + Unpin,
+        restore_handler: &RestoreHandler,
+    ) -> Result<Option<impl Stream<Item = Result<(Transaction, TransactionInfo)>>>> {
+        let start = Instant::now();
+
+        let restore_handler_clone = restore_handler.clone();
+        let first_to_replay = self.replay_from_version.unwrap_or(Version::MAX);
+        let target_version = self.global_opt.target_version;
+
+        let mut txns_to_execute_stream = loaded_chunk_stream
+            .and_then(move |chunk| {
+                let restore_handler = restore_handler_clone.clone();
+                future::ok(async move {
+                    let LoadedChunk {
+                        manifest:
+                            TransactionChunk {
+                                first_version,
+                                mut last_version,
+                                transactions: _,
+                                proof: _,
+                            },
+                        mut txns,
+                        mut txn_infos,
+                        mut event_vecs,
+                        range_proof: _,
+                        ledger_info: _,
+                    } = chunk;
+
+                    if target_version < last_version {
+                        let num_to_keep = (target_version - first_version + 1) as usize;
+                        txns.drain(num_to_keep..);
+                        txn_infos.drain(num_to_keep..);
+                        event_vecs.drain(num_to_keep..);
+                        last_version = target_version;
+                    }
+
+                    if first_version < first_to_replay {
+                        let num_to_save =
+                            (min(first_to_replay, last_version + 1) - first_version) as usize;
+                        let txns_to_save: Vec<_> = txns.drain(..num_to_save).collect();
+                        let txn_infos_to_save: Vec<_> = txn_infos.drain(..num_to_save).collect();
+                        let event_vecs_to_save: Vec<_> = event_vecs.drain(..num_to_save).collect();
+
+                        tokio::task::spawn_blocking(move || {
+                            restore_handler.save_transactions(
+                                first_version,
+                                &txns_to_save,
+                                &txn_infos_to_save,
+                                &event_vecs_to_save,
+                            )
+                        })
+                        .await??;
+                        let last_saved = first_version + num_to_save as u64 - 1;
+                        TRANSACTION_SAVE_VERSION.set(last_saved as i64);
+                        info!(
+                            version = last_saved,
+                            accumulative_tps = (last_saved - global_first_version + 1) as f64
+                                / start.elapsed().as_secs_f64(),
+                            "Transactions saved."
+                        );
+                    }
+
+                    Ok(stream::iter(
+                        zip_eq(txns, txn_infos).into_iter().map(Result::<_>::Ok),
+                    ))
+                })
+            })
+            .try_buffered(1)
+            .try_flatten()
+            .peekable();
+
+        // Finish saving transactions that are not to be replayed.
+        let first_txn_to_replay = {
+            Pin::new(&mut txns_to_execute_stream)
+                .peek()
+                .await
+                .map(|res| res.as_ref().map_err(|e| anyhow!("Error: {}", e)))
+                .transpose()?
+                .map(|_| ())
+        };
+
+        Ok(first_txn_to_replay.map(|_| txns_to_execute_stream))
+    }
+
+    async fn replay_transactions(
+        &self,
+        restore_handler: &RestoreHandler,
+        txns_to_execute_stream: impl Stream<Item = Result<(Transaction, TransactionInfo)>>,
+    ) -> Result<()> {
+        let replay_start = Instant::now();
+        let first_version = self.replay_from_version.unwrap();
+        let db = DbReaderWriter::from_arc(Arc::clone(&restore_handler.diemdb));
+        let persisted_view = restore_handler.get_tree_state(first_version)?.into();
+        let chunk_replayer = Arc::new(ChunkExecutor::<DiemVM>::new_with_view(db, persisted_view));
+
+        let db_commit_stream = txns_to_execute_stream
+            .try_chunks(BATCH_SIZE)
+            .err_into::<anyhow::Error>()
+            .map_ok(|chunk| {
+                let (txns, txn_infos): (Vec<_>, Vec<_>) = chunk.into_iter().unzip();
+                let chunk_replayer = chunk_replayer.clone();
+                async move {
+                    tokio::task::spawn_blocking(move || chunk_replayer.replay(txns, txn_infos))
+                        .err_into::<anyhow::Error>()
+                        .await
+                }
+            })
+            .try_buffered(1)
+            .and_then(future::ready);
+
+        db_commit_stream
+            .and_then(|()| {
+                let chunk_replayer = chunk_replayer.clone();
+                async move {
+                    tokio::task::spawn_blocking(move || {
+                        let committed_chunk = chunk_replayer.commit()?;
+                        let v = committed_chunk.result_view.version().unwrap_or(0);
+                        TRANSACTION_REPLAY_VERSION.set(v as i64);
+                        info!(
+                            version = v,
+                            accumulative_tps = (v - first_version + 1) as f64
+                                / replay_start.elapsed().as_secs_f64(),
+                            "Transactions replayed."
+                        );
+                        Ok(())
+                    })
+                    .await?
+                }
+            })
+            .try_fold((), |(), ()| future::ok(()))
+            .await
+    }
+
+    async fn go_through_verified_chunks(
+        loaded_chunk_stream: impl Stream<Item = Result<LoadedChunk>>,
+        first_version: Version,
+    ) -> Result<()> {
+        let start = Instant::now();
+        loaded_chunk_stream
+            .try_fold((), |(), chunk| {
+                let v = chunk.manifest.last_version;
+                VERIFY_TRANSACTION_VERSION.set(v as i64);
+                info!(
+                    version = v,
+                    accumulative_tps =
+                        (v - first_version + 1) as f64 / start.elapsed().as_secs_f64(),
+                    "Transactions verified."
+                );
+                future::ok(())
+            })
+            .await
     }
 }

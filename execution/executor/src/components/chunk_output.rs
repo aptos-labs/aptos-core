@@ -3,7 +3,7 @@
 
 #![forbid(unsafe_code)]
 
-use crate::components::{apply_chunk_output::ApplyChunkOutput, executed_chunk::ExecutedChunk};
+use crate::components::apply_chunk_output::ApplyChunkOutput;
 use anyhow::Result;
 use diem_crypto::hash::TransactionAccumulatorHasher;
 use diem_state_view::StateView;
@@ -13,6 +13,7 @@ use diem_types::{
     transaction::{Transaction, TransactionOutput},
 };
 use diem_vm::VMExecutor;
+use executor_types::ExecutedChunk;
 use fail::fail_point;
 use std::{collections::HashSet, sync::Arc};
 use storage_interface::state_view::{StateCache, VerifiedStateView};

@@ -4,10 +4,7 @@
 #![forbid(unsafe_code)]
 
 use crate::{
-    components::{
-        chunk_commit_queue::ChunkCommitQueue, chunk_output::ChunkOutput,
-        executed_chunk::ExecutedChunk,
-    },
+    components::{chunk_commit_queue::ChunkCommitQueue, chunk_output::ChunkOutput},
     logging::{LogEntry, LogSchema},
     metrics::{
         DIEM_EXECUTOR_APPLY_CHUNK_SECONDS, DIEM_EXECUTOR_COMMIT_CHUNK_SECONDS,
@@ -24,11 +21,11 @@ use diem_types::{
     protocol_spec::DpnProto,
     transaction::{
         default_protocol::{TransactionListWithProof, TransactionOutputListWithProof},
-        TransactionInfo,
+        Transaction, TransactionInfo,
     },
 };
 use diem_vm::VMExecutor;
-use executor_types::{ChunkExecutorTrait, ExecutedTrees};
+use executor_types::{ChunkExecutorTrait, ExecutedChunk, ExecutedTrees, TransactionReplayer};
 use fail::fail_point;
 use std::{marker::PhantomData, sync::Arc};
 use storage_interface::{default_protocol::DbReaderWriter, state_view::VerifiedStateView};
@@ -47,6 +44,15 @@ impl<V> ChunkExecutor<V> {
             commit_queue,
             _phantom: PhantomData,
         })
+    }
+
+    pub fn new_with_view(db: DbReaderWriter, persisted_view: ExecutedTrees) -> Self {
+        let commit_queue = Mutex::new(ChunkCommitQueue::new(persisted_view));
+        Self {
+            db,
+            commit_queue,
+            _phantom: PhantomData,
+        }
     }
 
     pub fn reset(&self) -> Result<()> {
@@ -244,5 +250,47 @@ impl<V: VMExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
             epoch_change_li,
         )?;
         self.commit_chunk()
+    }
+}
+
+impl<V: VMExecutor> ChunkExecutor<V> {}
+
+impl<V: VMExecutor> TransactionReplayer for ChunkExecutor<V> {
+    fn replay(
+        &self,
+        transactions: Vec<Transaction>,
+        mut transaction_infos: Vec<TransactionInfo>,
+    ) -> Result<()> {
+        let (persisted_view, mut latest_view) =
+            self.commit_queue.lock().persisted_and_latest_view();
+
+        let mut executed_chunk = ExecutedChunk::default();
+        let mut to_run = Some(transactions);
+        while !to_run.as_ref().unwrap().is_empty() {
+            // Execute transactions.
+            let state_view = self.state_view(&latest_view, &persisted_view);
+            let txns = to_run.take().unwrap();
+            let mut executed = ChunkOutput::by_transaction_execution::<V>(txns, state_view)?
+                .apply_to_ledger(latest_view.txn_accumulator())?;
+
+            // Accumulate result and deal with retry
+            executed.ensure_no_discard()?;
+            let n = executed.to_commit.len();
+            executed.ensure_transaction_infos_match(&transaction_infos[..n])?;
+            transaction_infos.drain(..n);
+
+            to_run = Some(executed.strip_transactions_to_retry());
+            executed_chunk = executed_chunk.combine(executed)?;
+            latest_view = executed_chunk.result_view.clone();
+        }
+
+        // Add result to commit queue.
+        self.commit_queue.lock().enqueue(executed_chunk);
+
+        Ok(())
+    }
+
+    fn commit(&self) -> Result<Arc<ExecutedChunk>> {
+        self.commit_chunk_impl()
     }
 }

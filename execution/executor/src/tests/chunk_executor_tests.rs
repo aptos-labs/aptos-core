@@ -20,14 +20,14 @@ use executor_types::{BlockExecutor, ChunkExecutorTrait};
 use proptest::prelude::Rng;
 use storage_interface::default_protocol::DbReaderWriter;
 
-struct TestExecutor {
+pub struct TestExecutor {
     _path: diem_temppath::TempPath,
-    db: DbReaderWriter,
-    executor: ChunkExecutor<MockVM>,
+    pub db: DbReaderWriter,
+    pub executor: ChunkExecutor<MockVM>,
 }
 
 impl TestExecutor {
-    fn new() -> TestExecutor {
+    pub fn new() -> TestExecutor {
         let path = diem_temppath::TempPath::new();
         path.create_as_dir().unwrap();
         let db = DbReaderWriter::new(DiemDB::new_for_test(path.path()));
