@@ -1,6 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::context::UserContext;
 use anyhow::{anyhow, Result};
 use diem_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 use diem_sdk::client::AccountAddress;
@@ -85,8 +86,7 @@ pub fn get_filtered_envs_for_deno(
     home: &Home,
     project_path: &Path,
     network: &Network,
-    key_path: &Path,
-    sender_address: AccountAddress,
+    users: &[&UserContext],
 ) -> Result<HashMap<String, String>> {
     let mut filtered_envs: HashMap<String, String> = HashMap::new();
     filtered_envs.insert(
@@ -97,14 +97,10 @@ pub fn get_filtered_envs_for_deno(
         String::from("SHUFFLE_BASE_NETWORKS_PATH"),
         home.get_networks_path().to_string_lossy().to_string(),
     );
-    filtered_envs.insert(
-        String::from("SENDER_ADDRESS"),
-        sender_address.to_hex_literal(),
-    );
-    filtered_envs.insert(
-        String::from("PRIVATE_KEY_PATH"),
-        key_path.to_string_lossy().to_string(),
-    );
+
+    for u in users {
+        filtered_envs.extend(u.to_envs());
+    }
 
     filtered_envs.insert(String::from("SHUFFLE_NETWORK_NAME"), network.get_name());
     filtered_envs.insert(
@@ -816,10 +812,15 @@ mod test {
         let home = Home::new(dir.path()).unwrap();
         let project_path = Path::new("/Users/project_path");
         let network = get_test_localhost_network();
-        let key_path = Path::new("/Users/private_key_path/dev.key");
-        let address = AccountAddress::random();
+
+        let user = UserContext::new(
+            "test",
+            AccountAddress::random(),
+            &PathBuf::from("/Users/private_key_path/dev.key"),
+        );
+
         let filtered_envs =
-            get_filtered_envs_for_deno(&home, project_path, &network, key_path, address).unwrap();
+            get_filtered_envs_for_deno(&home, project_path, &network, &[&user]).unwrap();
 
         assert_eq!(
             filtered_envs.get("PROJECT_PATH").unwrap(),
@@ -830,12 +831,12 @@ mod test {
             home.get_networks_path().to_string_lossy().as_ref(),
         );
         assert_eq!(
-            filtered_envs.get("SENDER_ADDRESS").unwrap(),
-            &address.to_hex_literal()
+            filtered_envs.get("ADDRESS_TEST").unwrap(),
+            &user.address().to_hex_literal()
         );
         assert_eq!(
-            filtered_envs.get("PRIVATE_KEY_PATH").unwrap(),
-            &key_path.to_string_lossy().to_string()
+            filtered_envs.get("PRIVATE_KEY_PATH_TEST").unwrap(),
+            &user.private_key_path().to_string_lossy().to_string()
         );
         assert_eq!(
             filtered_envs.get("SHUFFLE_NETWORK_NAME").unwrap(),

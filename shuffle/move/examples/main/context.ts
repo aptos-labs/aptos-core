@@ -66,8 +66,8 @@ export class UserContext {
   static fromEnv(username: string): UserContext {
     return new UserContext(
       username,
-      String(Deno.env.get("SENDER_ADDRESS")),
-      String(Deno.env.get("PRIVATE_KEY_PATH")),
+      String(Deno.env.get(`ADDRESS_${username.toUpperCase()}`)),
+      String(Deno.env.get(`PRIVATE_KEY_PATH_${username.toUpperCase()}`)),
     );
   }
 
@@ -91,7 +91,7 @@ export class UserContext {
   }
 }
 
-export const defaultUserContext = UserContext.fromEnv("default");
+export const defaultUserContext = UserContext.fromEnv("latest");
 
 export function addressOrDefault(addr: string | undefined): string {
   if (addr) {

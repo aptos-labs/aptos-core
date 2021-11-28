@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{shared, shared::Network};
+use crate::{context::UserContext, shared, shared::Network};
 use anyhow::Result;
 use diem_types::account_address::AccountAddress;
 use std::{path::Path, process::Command};
@@ -48,8 +48,8 @@ pub fn handle(
             .join("repl_help.ts")
             .to_string_lossy()
     );
-    let filtered_envs =
-        shared::get_filtered_envs_for_deno(home, project_path, &network, key_path, sender_address)?;
+    let user = UserContext::new("latest", sender_address, key_path);
+    let filtered_envs = shared::get_filtered_envs_for_deno(home, project_path, &network, &[&user])?;
     Command::new("deno")
         .args(["repl", "--unstable", "--eval", deno_bootstrap.as_str()])
         .envs(&filtered_envs)

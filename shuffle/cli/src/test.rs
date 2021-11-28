@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    account, deploy,
+    account,
+    context::UserContext,
+    deploy,
     dev_api_client::DevApiClient,
     shared::{self, normalized_network_name, Home, Network},
 };
@@ -49,13 +51,8 @@ pub async fn run_e2e_tests(
     let tmp_dir = TempDir::new()?;
     let tmp_key_path = tmp_dir.path().join("private.key");
     generate_key::save_key(private_key, &tmp_key_path);
-    run_deno_test(
-        home,
-        project_path,
-        &network,
-        &tmp_key_path,
-        test_account.address(),
-    )
+    let tmp_user = UserContext::new("latest", test_account.address(), &tmp_key_path);
+    run_deno_test(home, project_path, &network, &[&tmp_user])
 }
 
 async fn create_account(
@@ -82,36 +79,31 @@ pub fn run_deno_test(
     home: &Home,
     project_path: &Path,
     network: &Network,
-    key_path: &Path,
-    sender_address: AccountAddress,
+    users: &[&UserContext],
 ) -> Result<ExitStatus> {
     let test_path = project_path.join("e2e");
-    run_deno_test_at_path(
-        home,
-        project_path,
-        network,
-        key_path,
-        sender_address,
-        &test_path,
-    )
+    run_deno_test_at_path(home, project_path, network, users, &test_path)
 }
 
 pub fn run_deno_test_at_path(
     home: &Home,
     project_path: &Path,
     network: &Network,
-    key_path: &Path,
-    sender_address: AccountAddress,
+    users: &[&UserContext],
     test_path: &Path,
 ) -> Result<ExitStatus> {
-    let filtered_envs =
-        shared::get_filtered_envs_for_deno(home, project_path, network, key_path, sender_address)?;
+    let filtered_envs = shared::get_filtered_envs_for_deno(home, project_path, network, users)?;
+    let env_names: String = filtered_envs
+        .keys()
+        .cloned()
+        .collect::<Vec<String>>()
+        .join(",");
     let status = Command::new("deno")
         .args([
             "test",
             "--unstable",
             test_path.to_string_lossy().as_ref(),
-            "--allow-env=PROJECT_PATH,SHUFFLE_BASE_NETWORKS_PATH,SHUFFLE_NETWORK_NAME,SHUFFLE_NETWORK_DEV_API_URL,PRIVATE_KEY_PATH,SENDER_ADDRESS",
+            format!("--allow-env={}", env_names).as_str(),
             "--allow-read",
             format!(
                 "--allow-net={},{}",

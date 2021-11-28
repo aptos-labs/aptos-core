@@ -13,6 +13,7 @@ use structopt::StructOpt;
 mod account;
 mod build;
 mod console;
+mod context;
 mod deploy;
 mod dev_api_client;
 mod new;
