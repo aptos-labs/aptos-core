@@ -7,8 +7,6 @@ use crate::{
 };
 use diem_crypto::ed25519::Ed25519PublicKey;
 use diem_management::{config::ConfigPath, error::Error, secure_backend::ValidatorBackend};
-use diem_network_address_encryption::Encryptor;
-use diem_secure_storage::Storage;
 use diem_types::{
     account_address::AccountAddress, network_address::NetworkAddress, validator_info::ValidatorInfo,
 };
@@ -33,22 +31,13 @@ pub struct ValidatorSet {
 
 impl ValidatorSet {
     pub fn execute(self) -> Result<Vec<DecryptedValidatorInfo>, Error> {
-        let mut config = self.config.load()?.override_json_server(&self.json_server);
-        let client = JsonRpcClientWrapper::new(config.clone().json_server);
-
-        let encryptor = if let Some(backend) = &self.validator_backend {
-            config = config.override_validator_backend(&backend.validator_backend)?;
-            config.validator_backend().encryptor()
-        } else {
-            Encryptor::empty()
-        };
-
-        decode_validator_set(encryptor, client, self.account_address)
+        let config = self.config.load()?.override_json_server(&self.json_server);
+        let client = JsonRpcClientWrapper::new(config.json_server);
+        decode_validator_set(client, self.account_address)
     }
 }
 
 pub fn decode_validator_set(
-    encryptor: Encryptor<Storage>,
     client: JsonRpcClientWrapper,
     account_address: Option<AccountAddress>,
 ) -> Result<Vec<DecryptedValidatorInfo>, Error> {
@@ -56,12 +45,9 @@ pub fn decode_validator_set(
 
     let mut decoded_set = Vec::new();
     for info in set {
-        let config = DecryptedValidatorConfig::from_validator_config(
-            info.config(),
-            *info.account_address(),
-            &encryptor,
-        )
-        .map_err(|e| Error::NetworkAddressDecodeError(e.to_string()))?;
+        let config =
+            DecryptedValidatorConfig::from_validator_config(info.config(), *info.account_address())
+                .map_err(|e| Error::NetworkAddressDecodeError(e.to_string()))?;
 
         let config_resource = client.validator_config(*info.account_address())?;
         let name = DecryptedValidatorConfig::human_name(&config_resource.human_name);
@@ -90,11 +76,10 @@ pub fn validator_set_full_node_addresses(
 
 pub fn validator_set_validator_addresses(
     client: JsonRpcClientWrapper,
-    encryptor: &Encryptor<Storage>,
     account_address: Option<AccountAddress>,
 ) -> Result<Vec<(String, AccountAddress, Vec<NetworkAddress>)>, Error> {
     validator_set_addresses(client, account_address, |info| {
-        validator_addresses(info.config(), *info.account_address(), encryptor)
+        validator_addresses(info.config(), *info.account_address())
     })
 }
 

@@ -5,8 +5,6 @@ use crate::{counters::DISCOVERY_COUNTS, file::FileStream, validator_set::Validat
 use diem_config::{config::PeerSet, network_id::NetworkContext};
 use diem_crypto::x25519;
 use diem_logger::prelude::*;
-use diem_network_address_encryption::Encryptor;
-use diem_secure_storage::Storage;
 use diem_time_service::TimeService;
 use event_notifications::ReconfigNotificationListener;
 use futures::{Stream, StreamExt};
@@ -62,13 +60,11 @@ impl DiscoveryChangeListener {
         network_context: NetworkContext,
         update_channel: channel::Sender<ConnectivityRequest>,
         expected_pubkey: x25519::PublicKey,
-        encryptor: Encryptor<Storage>,
         reconfig_events: ReconfigNotificationListener,
     ) -> Self {
         let source_stream = DiscoveryChangeStream::ValidatorSet(ValidatorSetStream::new(
             network_context,
             expected_pubkey,
-            encryptor,
             reconfig_events,
         ));
         DiscoveryChangeListener {

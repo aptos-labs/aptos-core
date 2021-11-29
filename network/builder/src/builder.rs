@@ -21,8 +21,6 @@ use diem_config::{
 use diem_crypto::x25519::PublicKey;
 use diem_infallible::RwLock;
 use diem_logger::prelude::*;
-use diem_network_address_encryption::Encryptor;
-use diem_secure_storage::Storage;
 use diem_time_service::TimeService;
 use diem_types::{chain_id::ChainId, network_address::NetworkAddress};
 use event_notifications::{EventSubscriptionService, ReconfigNotificationListener};
@@ -243,7 +241,6 @@ impl NetworkBuilder {
             network_builder.add_discovery_change_listener(
                 discovery_method,
                 pubkey,
-                config.encryptor(),
                 reconfig_listener,
             );
         }
@@ -373,7 +370,6 @@ impl NetworkBuilder {
         &mut self,
         discovery_method: &DiscoveryMethod,
         pubkey: PublicKey,
-        encryptor: Encryptor<Storage>,
         reconfig_events: Option<ReconfigNotificationListener>,
     ) {
         let conn_mgr_reqs_tx = self
@@ -388,7 +384,6 @@ impl NetworkBuilder {
                     self.network_context,
                     conn_mgr_reqs_tx,
                     pubkey,
-                    encryptor,
                     reconfig_events,
                 )
             }

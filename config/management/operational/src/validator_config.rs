@@ -7,8 +7,7 @@ use diem_global_constants::{
     CONSENSUS_KEY, FULLNODE_NETWORK_KEY, OPERATOR_ACCOUNT, OWNER_ACCOUNT, VALIDATOR_NETWORK_KEY,
 };
 use diem_management::{error::Error, secure_backend::ValidatorBackend, storage::to_x25519};
-use diem_network_address_encryption::{Encryptor, Error as NetworkAddressError};
-use diem_secure_storage::Storage;
+use diem_network_address_encryption::Error as NetworkAddressError;
 use diem_types::{
     account_address::AccountAddress,
     network_address::{NetworkAddress, Protocol},
@@ -58,7 +57,6 @@ impl SetValidatorConfig {
 
         let operator_account = storage.account_address(OPERATOR_ACCOUNT)?;
         let owner_account = storage.account_address(OWNER_ACCOUNT)?;
-        let encryptor = config.validator_backend().encryptor();
         let client = JsonRpcClientWrapper::new(config.json_server.clone());
         let sequence_number = client.sequence_number(operator_account)?;
 
@@ -71,7 +69,7 @@ impl SetValidatorConfig {
         let validator_config = if in_set {
             // Retrieve the current validator / fullnode addresses and update accordingly
             let vc = client.validator_config(owner_account)?;
-            DecryptedValidatorConfig::from_validator_config_resource(&vc, owner_account, &encryptor)
+            DecryptedValidatorConfig::from_validator_config_resource(&vc, owner_account)
                 .map(Some)
                 .map_err(|e| {
                     Error::UnexpectedError(format!("Error parsing validator config: {}", e))
@@ -141,13 +139,12 @@ impl RotateKey {
             .config()?
             .override_json_server(&self.json_server);
         let mut storage = config.validator_backend();
-        let encryptor = config.validator_backend().encryptor();
         let client = JsonRpcClientWrapper::new(config.json_server.clone());
 
         // Fetch the current on-chain validator config for the node
         let owner_account = storage.account_address(OWNER_ACCOUNT)?;
         let validator_config = client.validator_config(owner_account).and_then(|vc| {
-            DecryptedValidatorConfig::from_validator_config_resource(&vc, owner_account, &encryptor)
+            DecryptedValidatorConfig::from_validator_config_resource(&vc, owner_account)
         })?;
 
         // Check that the key held in storage matches the key registered on-chain in the validator
@@ -275,24 +272,13 @@ pub struct ValidatorConfig {
 
 impl ValidatorConfig {
     pub fn execute(self) -> Result<DecryptedValidatorConfig, Error> {
-        let mut config = self.config.load()?.override_json_server(&self.json_server);
-        let client = JsonRpcClientWrapper::new(config.clone().json_server);
-
-        let encryptor = if let Some(backend) = &self.validator_backend {
-            config = config.override_validator_backend(&backend.validator_backend)?;
-            config.validator_backend().encryptor()
-        } else {
-            Encryptor::empty()
-        };
+        let config = self.config.load()?.override_json_server(&self.json_server);
+        let client = JsonRpcClientWrapper::new(config.json_server);
 
         client
             .validator_config(self.account_address)
             .and_then(|vc| {
-                DecryptedValidatorConfig::from_validator_config_resource(
-                    &vc,
-                    self.account_address,
-                    &encryptor,
-                )
+                DecryptedValidatorConfig::from_validator_config_resource(&vc, self.account_address)
             })
     }
 }
@@ -309,13 +295,12 @@ impl DecryptedValidatorConfig {
     pub fn from_validator_config_resource(
         config_resource: &diem_types::validator_config::ValidatorConfigResource,
         account_address: AccountAddress,
-        encryptor: &Encryptor<Storage>,
     ) -> Result<Self, Error> {
         let config = config_resource.validator_config.as_ref().ok_or_else(|| {
             Error::JsonRpcReadError("validator-config", "not present".to_string())
         })?;
 
-        let mut value = Self::from_validator_config(config, account_address, encryptor)?;
+        let mut value = Self::from_validator_config(config, account_address)?;
         value.name = Self::human_name(&config_resource.human_name);
         Ok(value)
     }
@@ -323,10 +308,9 @@ impl DecryptedValidatorConfig {
     pub fn from_validator_config(
         config: &diem_types::validator_config::ValidatorConfig,
         account_address: AccountAddress,
-        encryptor: &Encryptor<Storage>,
     ) -> Result<Self, Error> {
         let fullnode_network_addresses = fullnode_addresses(config)?;
-        let validator_network_addresses = validator_addresses(config, account_address, encryptor)
+        let validator_network_addresses = validator_addresses(config, account_address)
             .unwrap_or_else(|error| {
                 println!("{}: Using a dummy validator network address!", error);
                 vec![NetworkAddress::from_str("/dns4/could-not-decrypt").unwrap()]
@@ -358,7 +342,6 @@ pub fn fullnode_addresses(
 pub fn validator_addresses(
     config: &diem_types::validator_config::ValidatorConfig,
     account_address: AccountAddress,
-    _encryptor: &Encryptor<Storage>,
 ) -> Result<Vec<NetworkAddress>, Error> {
     let network_addrs: Vec<NetworkAddress> = bcs::from_bytes(&config.validator_network_addresses)
         .map_err(|error| {

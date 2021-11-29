@@ -168,7 +168,7 @@ impl CheckValidatorSetEndpoints {
             encryptor.add_key(version, address_encryption_key).unwrap();
             encryptor.set_current_version(version).unwrap();
 
-            validator_set_validator_addresses(client, &encryptor, None)?
+            validator_set_validator_addresses(client, None)?
         } else {
             validator_set_full_node_addresses(client, None)?
         };
