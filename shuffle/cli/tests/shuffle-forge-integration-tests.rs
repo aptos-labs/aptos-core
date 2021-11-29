@@ -28,8 +28,8 @@ impl AdminTest for SamplePackageEndToEnd {
     fn run<'t>(&self, ctx: &mut AdminContext<'t>) -> Result<()> {
         let helper = bootstrap_shuffle_project(ctx)?;
         let unit_test_result = shuffle::test::run_move_unit_tests(&helper.project_path())?;
-        let latest = helper.user_context_for("latest")?;
-        let test = helper.user_context_for("test")?;
+        let latest = helper.network_home().user_context_for("latest")?;
+        let test = helper.network_home().user_context_for("test")?;
         let exit_status = shuffle::test::run_deno_test(
             helper.home(),
             &helper.project_path(),
@@ -54,8 +54,8 @@ impl Test for TypescriptSdkIntegration {
 impl AdminTest for TypescriptSdkIntegration {
     fn run<'t>(&self, ctx: &mut AdminContext<'t>) -> Result<()> {
         let helper = bootstrap_shuffle_project(ctx)?;
-        let latest = helper.user_context_for("latest")?;
-        let test = helper.user_context_for("test")?;
+        let latest = helper.network_home().user_context_for("latest")?;
+        let test = helper.network_home().user_context_for("test")?;
         let exit_status = shuffle::test::run_deno_test_at_path(
             helper.home(),
             &helper.project_path(),

@@ -129,6 +129,14 @@ impl NetworkHome {
         self.accounts_path.join(username).join("address")
     }
 
+    pub fn user_context_for(&self, username: &str) -> Result<UserContext> {
+        Ok(UserContext::new(
+            username,
+            self.address_for(username)?,
+            &self.key_path_for(username),
+        ))
+    }
+
     pub fn get_latest_account_key_path(&self) -> PathBuf {
         self.key_path_for("latest")
     }

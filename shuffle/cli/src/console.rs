@@ -48,8 +48,17 @@ pub fn handle(
             .join("repl_help.ts")
             .to_string_lossy()
     );
-    let user = UserContext::new("latest", sender_address, key_path);
-    let filtered_envs = shared::get_filtered_envs_for_deno(home, project_path, &network, &[&user])?;
+
+    let network_home = home.new_network_home(&network.get_name());
+
+    let latest_user = UserContext::new("latest", sender_address, key_path);
+    let test_user = network_home.user_context_for("test")?;
+    let filtered_envs = shared::get_filtered_envs_for_deno(
+        home,
+        project_path,
+        &network,
+        &[&latest_user, &test_user],
+    )?;
     Command::new("deno")
         .args(["repl", "--unstable", "--eval", deno_bootstrap.as_str()])
         .envs(&filtered_envs)
