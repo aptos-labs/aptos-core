@@ -86,6 +86,11 @@ struct K8sSwarm {
     base_image_tag: String,
     #[structopt(long, help = "Name of the EKS cluster")]
     cluster_name: String,
+    #[structopt(
+        long,
+        help = "Path to flattened directory containing compiled Move modules"
+    )]
+    move_modules_dir: Option<String>,
 }
 
 #[derive(StructOpt, Debug)]
@@ -163,6 +168,9 @@ fn main() -> Result<()> {
                 let mut test_suite = k8s_test_suite();
                 if let Some(suite) = args.suite.as_ref() {
                     test_suite = get_test_suite(suite);
+                }
+                if let Some(move_modules_dir) = k8s.move_modules_dir {
+                    test_suite = test_suite.with_genesis_modules_path(move_modules_dir);
                 }
                 run_forge(
                     test_suite,

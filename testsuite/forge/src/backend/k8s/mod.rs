@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{Factory, Result, Swarm, Version};
+use crate::{Factory, GenesisConfig, Result, Swarm, Version};
 use anyhow::{bail, format_err};
 use rand::rngs::StdRng;
 use std::{env, fs::File, io::Read, num::NonZeroUsize, path::PathBuf};
@@ -103,11 +103,17 @@ impl Factory for K8sFactory {
         node_num: NonZeroUsize,
         init_version: &Version,
         genesis_version: &Version,
-        genesis_modules: Option<&[Vec<u8>]>,
+        genesis_config: Option<&GenesisConfig>,
     ) -> Result<Box<dyn Swarm>> {
-        if genesis_modules.is_some() {
-            bail!("k8s forge backend does not support custom genesis modules");
-        }
+        let genesis_modules_path = match genesis_config {
+            Some(config) => match config {
+                GenesisConfig::Bytes(_) => {
+                    bail!("k8s forge backend does not support raw bytes as genesis modules. please specify a path instead")
+                }
+                GenesisConfig::Path(path) => Some(path.clone()),
+            },
+            None => None,
+        };
 
         set_eks_nodegroup_size(self.cluster_name.clone(), node_num.get(), true)?;
         uninstall_from_k8s_cluster()?;
@@ -117,7 +123,7 @@ impl Factory for K8sFactory {
             format!("{}", init_version),
             format!("{}", genesis_version),
             false,
-            None,
+            genesis_modules_path,
         )?;
         let rt = Runtime::new().unwrap();
         let swarm = rt

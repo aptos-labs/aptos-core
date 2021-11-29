@@ -1,8 +1,8 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{Factory, Result, Swarm, Version};
-use anyhow::Context;
+use crate::{Factory, GenesisConfig, Result, Swarm, Version};
+use anyhow::{bail, Context};
 use rand::rngs::StdRng;
 use std::{
     collections::HashMap,
@@ -169,14 +169,18 @@ impl Factory for LocalFactory {
         node_num: NonZeroUsize,
         version: &Version,
         _genesis_version: &Version,
-        genesis_modules: Option<&[Vec<u8>]>,
+        genesis_config: Option<&GenesisConfig>,
     ) -> Result<Box<dyn Swarm>> {
-        let swarm = self.new_swarm_with_version(
-            rng,
-            node_num,
-            version,
-            genesis_modules.map(|m| m.to_owned()),
-        )?;
+        let genesis_modules = match genesis_config {
+            Some(config) => match config {
+                GenesisConfig::Bytes(bytes) => Some(bytes.clone()),
+                GenesisConfig::Path(_) => {
+                    bail!("local forge backend does not support flattened dir for genesis")
+                }
+            },
+            None => None,
+        };
+        let swarm = self.new_swarm_with_version(rng, node_num, version, genesis_modules)?;
 
         Ok(Box::new(swarm))
     }

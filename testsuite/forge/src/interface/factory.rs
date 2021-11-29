@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{Swarm, Version};
+use super::{GenesisConfig, Swarm, Version};
 use crate::Result;
 use rand::rngs::StdRng;
 use std::num::NonZeroUsize;
@@ -16,6 +16,6 @@ pub trait Factory {
         node_num: NonZeroUsize,
         version: &Version,
         genesis_version: &Version,
-        genesis_modules: Option<&[Vec<u8>]>,
+        genesis_modules: Option<&GenesisConfig>,
     ) -> Result<Box<dyn Swarm>>;
 }

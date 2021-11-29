@@ -305,10 +305,10 @@ pub fn clean_k8s_cluster(
 
     // run genesis from the directory in diem/init image
     let move_modules_dir = if let Some(genesis_modules_path) = genesis_modules_path {
-        genesis_modules_path;
+        genesis_modules_path
     } else {
-        GENESIS_MODULES_DIR.to_string();
-    }
+        GENESIS_MODULES_DIR.to_string()
+    };
     let testnet_upgrade_options = [
         "-f",
         &file_path_str,

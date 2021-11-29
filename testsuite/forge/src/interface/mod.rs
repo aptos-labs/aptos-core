@@ -40,3 +40,9 @@ impl std::fmt::Display for Version {
         f.write_str(&self.1)
     }
 }
+
+#[derive(Clone)]
+pub enum GenesisConfig {
+    Bytes(Vec<Vec<u8>>),
+    Path(String),
+}

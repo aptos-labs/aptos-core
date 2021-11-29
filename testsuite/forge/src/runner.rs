@@ -106,7 +106,7 @@ pub struct ForgeConfig<'cfg> {
     initial_version: InitialVersion,
 
     /// The initial genesis modules to use when starting a network
-    genesis_modules: Option<Vec<Vec<u8>>>,
+    genesis_config: Option<GenesisConfig>,
 }
 
 impl<'cfg> ForgeConfig<'cfg> {
@@ -142,8 +142,13 @@ impl<'cfg> ForgeConfig<'cfg> {
         self
     }
 
-    pub fn with_genesis_modules(mut self, genesis_modules: Vec<Vec<u8>>) -> Self {
-        self.genesis_modules = Some(genesis_modules);
+    pub fn with_genesis_modules_bytes(mut self, genesis_modules: Vec<Vec<u8>>) -> Self {
+        self.genesis_config = Some(GenesisConfig::Bytes(genesis_modules));
+        self
+    }
+
+    pub fn with_genesis_modules_path(mut self, genesis_modules: String) -> Self {
+        self.genesis_config = Some(GenesisConfig::Path(genesis_modules));
         self
     }
 
@@ -168,7 +173,7 @@ impl<'cfg> Default for ForgeConfig<'cfg> {
             network_tests: &[],
             initial_validator_count: NonZeroUsize::new(1).unwrap(),
             initial_version: InitialVersion::Newest,
-            genesis_modules: None,
+            genesis_config: None,
         }
     }
 }
@@ -244,7 +249,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                 self.tests.initial_validator_count,
                 &initial_version,
                 &genesis_version,
-                self.tests.genesis_modules.as_deref(),
+                self.tests.genesis_config.as_ref(),
             )?;
 
             // Run PublicUsageTests
