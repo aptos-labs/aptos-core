@@ -53,7 +53,7 @@ export async function main(): Promise<any> {
     `This will submit a transaction interacting directly with the`,
     `Message move module which has been deployed.`,
     `To see what your message is onchain, run "await main.decodedMessages()"`,
-    `You should get an array with the String "\x00hello blockchain"`,
+    `You should get an array with the String "hello blockchain"`,
   ]);
 }
 
@@ -93,7 +93,7 @@ export async function helpers(): Promise<any> {
     `This argument "0x68656c6c6f20626c6f636b636861696e" represents the`,
     `hex value of the message that was set`,
     `Run helpers.hexToAscii("0x68656c6c6f20626c6f636b636861696e")`,
-    `You should get the output "\x00hello blockchain"`,
+    `You should get the output "hello blockchain"`,
   ]);
 }
 
