@@ -63,7 +63,8 @@ tokio = { version = "1.9.0", features = ["bytes", "fs", "full", "io-std", "io-ut
 tokio-util = { version = "0.6.7", features = ["codec", "compat", "futures-io", "io"] }
 toml = { version = "0.5.8" }
 tracing = { version = "0.1.26", features = ["attributes", "log", "std", "tracing-attributes"] }
-tracing-core = { version = "0.1.18", features = ["lazy_static", "std"] }
+tracing-core = { version = "0.1.21", features = ["lazy_static", "std"] }
+tracing-subscriber = { version = "0.3.3", features = ["alloc", "ansi", "ansi_term", "env-filter", "fmt", "lazy_static", "matchers", "regex", "registry", "sharded-slab", "smallvec", "std", "thread_local", "tracing", "tracing-log"] }
 url = { version = "2.2.2", default-features = false, features = ["serde"] }
 warp = { version = "0.3.0", features = ["multipart", "tls", "tokio-rustls", "tokio-tungstenite", "websocket"] }
 
@@ -125,7 +126,8 @@ tokio = { version = "1.9.0", features = ["bytes", "fs", "full", "io-std", "io-ut
 tokio-util = { version = "0.6.7", features = ["codec", "compat", "futures-io", "io"] }
 toml = { version = "0.5.8" }
 tracing = { version = "0.1.26", features = ["attributes", "log", "std", "tracing-attributes"] }
-tracing-core = { version = "0.1.18", features = ["lazy_static", "std"] }
+tracing-core = { version = "0.1.21", features = ["lazy_static", "std"] }
+tracing-subscriber = { version = "0.3.3", features = ["alloc", "ansi", "ansi_term", "env-filter", "fmt", "lazy_static", "matchers", "regex", "registry", "sharded-slab", "smallvec", "std", "thread_local", "tracing", "tracing-log"] }
 url = { version = "2.2.2", default-features = false, features = ["serde"] }
 warp = { version = "0.3.0", features = ["multipart", "tls", "tokio-rustls", "tokio-tungstenite", "websocket"] }
 

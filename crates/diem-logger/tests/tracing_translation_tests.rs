@@ -4,15 +4,29 @@
 use diem_infallible::RwLock;
 use diem_logger::{DiemLogger, Writer};
 use std::sync::Arc;
+use tracing::Level;
 
 #[derive(Default)]
 struct VecWriter {
     logs: Arc<RwLock<Vec<String>>>,
+    write_to_stderr: bool,
+}
+
+impl VecWriter {
+    fn write_to_stderr(self, write_to_stderr: bool) -> Self {
+        Self {
+            write_to_stderr,
+            ..self
+        }
+    }
 }
 
 impl Writer for VecWriter {
     fn write(&self, log: String) {
-        self.logs.write().push(log)
+        if self.write_to_stderr {
+            eprintln!("{}", log);
+        }
+        self.logs.write().push(log);
     }
 }
 
@@ -23,16 +37,25 @@ fn verify_tracing_kvs() {
     let logs = writer.logs.clone();
     DiemLogger::builder()
         .is_async(false)
-        .printer(Box::new(writer))
+        .printer(Box::new(writer.write_to_stderr(false)))
         .build();
 
     assert_eq!(logs.read().len(), 0);
 
     // log some messages
-    tracing::error!("hello world");
+    let span = tracing::span!(Level::ERROR, "outer", one = "hello", two = "two");
+    let _entered_one = span.enter();
+    let span2 = tracing::span!(Level::ERROR, "inner", one = "hello", two = "two");
+    let _entered_two = span2.enter();
+
+    tracing::error!(another_value = "hello", "hello world");
     let s = logs.write().pop().unwrap();
     assert!(s.contains("ERROR"));
     assert!(s.contains("hello world"));
+    // have the top-level span...
+    assert!(s.contains("outer"));
+    // ...and the nested spans
+    assert!(s.contains("outer.inner"));
 
     tracing::info!("foo {} bar", 42);
     let s = logs.write().pop().unwrap();

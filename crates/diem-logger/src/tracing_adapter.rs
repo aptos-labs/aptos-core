@@ -1,34 +1,82 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate as dl;
-use std::fmt;
-use tracing as tr;
-use tracing_subscriber::{layer::Context, Layer};
+use crate::{self as dl};
+use std::{collections::BTreeMap, fmt};
+use tracing::{
+    field::Field,
+    span::{Attributes, Id},
+    Event, Level, Metadata,
+};
+use tracing_subscriber::{layer::Context, registry::LookupSpan, Layer};
 
 /// A layer that translates tracing events into diem-logger events.
 pub struct TracingToDiemLoggerLayer;
 
-fn translate_level(level: &tr::Level) -> Option<dl::Level> {
-    if *level == tr::Level::ERROR {
+fn translate_level(level: &Level) -> Option<dl::Level> {
+    if *level == Level::ERROR {
         return Some(dl::Level::Error);
     }
-    if *level == tr::Level::INFO {
+    if *level == Level::INFO {
         return Some(dl::Level::Info);
     }
-    if *level == tr::Level::DEBUG {
+    if *level == Level::DEBUG {
         return Some(dl::Level::Debug);
     }
-    if *level == tr::Level::TRACE {
+    if *level == Level::TRACE {
         return Some(dl::Level::Trace);
     }
-    if *level == tr::Level::WARN {
+    if *level == Level::WARN {
         return Some(dl::Level::Warn);
     }
     None
 }
 
-fn translate_metadata(metadata: &tr::Metadata<'static>) -> Option<dl::Metadata> {
+struct SpanData {
+    data: BTreeMap<String, String>,
+    prefix: String,
+}
+
+impl SpanData {
+    fn new(attrs: &Attributes<'_>, name: String) -> Self {
+        let mut span = Self {
+            data: BTreeMap::new(),
+            prefix: name,
+        };
+        attrs.record(&mut span);
+        span
+    }
+}
+
+impl tracing::field::Visit for SpanData {
+    fn record_str(&mut self, field: &Field, value: &str) {
+        let name = format!("{}.{}", self.prefix, &field.name());
+        self.data.insert(name, value.to_string());
+    }
+
+    fn record_debug(&mut self, field: &Field, value: &dyn fmt::Debug) {
+        let name = format!("{}.{}", self.prefix, &field.name());
+        self.data.insert(name, format!("{:?}", value));
+    }
+}
+
+struct KeyValueVisitorAdapter<'a> {
+    visitor: &'a mut dyn dl::Visitor,
+}
+
+impl<'a> tracing::field::Visit for KeyValueVisitorAdapter<'a> {
+    fn record_str(&mut self, field: &Field, value: &str) {
+        self.visitor
+            .visit_pair(dl::Key::new(field.name()), dl::Value::Display(&value))
+    }
+
+    fn record_debug(&mut self, field: &Field, value: &dyn fmt::Debug) {
+        self.visitor
+            .visit_pair(dl::Key::new(field.name()), dl::Value::Debug(value))
+    }
+}
+
+fn translate_metadata(metadata: &Metadata<'static>) -> Option<dl::Metadata> {
     let level = translate_level(metadata.level())?;
 
     Some(dl::Metadata::new(
@@ -41,19 +89,23 @@ fn translate_metadata(metadata: &tr::Metadata<'static>) -> Option<dl::Metadata> 
     ))
 }
 
-struct KeyValueVisitorAdapter<'a> {
-    visitor: &'a mut dyn dl::Visitor,
+struct SpanValues {
+    pairs: BTreeMap<String, String>,
 }
 
-impl<'a> tr::field::Visit for KeyValueVisitorAdapter<'a> {
-    fn record_debug(&mut self, field: &tr::field::Field, value: &dyn fmt::Debug) {
-        self.visitor
-            .visit_pair(dl::Key::new(field.name()), dl::Value::Debug(value))
+impl dl::Schema for SpanValues {
+    fn visit(&self, visitor: &mut dyn dl::Visitor) {
+        for (key, value) in &self.pairs {
+            visitor.visit_pair(
+                dl::Key::new_owned(key.to_string()),
+                dl::Value::from_display(&value),
+            )
+        }
     }
 }
 
 struct EventKeyValueAdapter<'a, 'b> {
-    event: &'a tr::Event<'b>,
+    event: &'a Event<'b>,
 }
 
 impl<'a, 'b> dl::Schema for EventKeyValueAdapter<'a, 'b> {
@@ -62,8 +114,39 @@ impl<'a, 'b> dl::Schema for EventKeyValueAdapter<'a, 'b> {
     }
 }
 
-impl<S: tr::Subscriber> Layer<S> for TracingToDiemLoggerLayer {
-    fn on_event(&self, event: &tr::Event, _ctx: Context<S>) {
+impl<S> Layer<S> for TracingToDiemLoggerLayer
+where
+    S: tracing::Subscriber + for<'span> LookupSpan<'span>,
+{
+    fn on_new_span(&self, attrs: &Attributes<'_>, id: &Id, ctx: Context<'_, S>) {
+        let span = ctx.span(id).expect("Unable to load span; this is a bug");
+
+        let prefix = {
+            if let Some(parent) = span.parent() {
+                // first, load the parent's span's, if present, to avoid
+                // clobbering key/value pairs in the output.
+                let parent_ext = parent.extensions();
+
+                let data = parent_ext
+                    .get::<SpanData>()
+                    .expect("Parent does not have scuba data; this is a bug");
+
+                // an unfortunate clone.
+                Some(data.prefix.clone())
+            } else {
+                None
+            }
+        };
+
+        let prefix = match prefix {
+            Some(prefix) => format!("{}.{}", prefix, attrs.metadata().name()),
+            None => attrs.metadata().name().to_string(),
+        };
+        let data = SpanData::new(attrs, prefix);
+        span.extensions_mut().insert(data);
+    }
+
+    fn on_event(&self, event: &Event, ctx: Context<S>) {
         let metadata = match translate_metadata(event.metadata()) {
             Some(metadata) => metadata,
             None => {
@@ -75,12 +158,26 @@ impl<S: tr::Subscriber> Layer<S> for TracingToDiemLoggerLayer {
             }
         };
 
+        let mut acc = BTreeMap::new();
+        if let Some(scope) = ctx.event_scope(event) {
+            for data in scope {
+                let ext = data.extensions();
+                let data = ext
+                    .get::<SpanData>()
+                    .expect("span does not have data; this is a bug");
+
+                acc.extend(data.data.clone())
+            }
+        }
+        let values = acc;
+        let data = SpanValues { pairs: values };
+
         // `tracing::Event` contains an implicit field named "message".
         // However I couldn't figure out a way to convert it to `fmt::Arguments` due to lifetime issues.
         // Therefore I'm omitting message argument to `Event::dispatch`.
         // This should generally be fine since the message will be translated as a normal record.
         if dl::logger::enabled(&metadata) {
-            dl::Event::dispatch(&metadata, None, &[&EventKeyValueAdapter { event }]);
+            dl::Event::dispatch(&metadata, None, &[&EventKeyValueAdapter { event }, &data]);
         }
     }
 }

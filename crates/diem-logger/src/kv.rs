@@ -12,19 +12,26 @@
 //! ```
 
 use serde::Serialize;
-use std::fmt;
+use std::{
+    borrow::{Borrow, Cow},
+    fmt,
+};
 
 /// The key part of a logging key value pair e.g. `info!(key = value)`
-#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize)]
-pub struct Key(&'static str);
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize)]
+pub struct Key(Cow<'static, str>);
 
 impl Key {
     pub fn new(s: &'static str) -> Self {
-        Self(s)
+        Self(Cow::Borrowed(s))
     }
 
-    pub fn as_str(&self) -> &'static str {
-        self.0
+    pub fn new_owned(s: String) -> Self {
+        Self(Cow::Owned(s))
+    }
+
+    pub fn as_str(&self) -> &'_ Self {
+        self.borrow()
     }
 }
 
@@ -83,7 +90,7 @@ impl<'v> KeyValue<'v> {
 
 impl<'v> Schema for KeyValue<'v> {
     fn visit(&self, visitor: &mut dyn Visitor) {
-        visitor.visit_pair(self.key, self.value)
+        visitor.visit_pair(self.key.clone(), self.value)
     }
 }
 

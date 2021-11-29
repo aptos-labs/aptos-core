@@ -11,7 +11,7 @@ use crate::{
     },
     logger::Logger,
     struct_log::TcpWriter,
-    Event, Filter, Level, LevelFilter, Metadata,
+    Event, Filter, Key, Level, LevelFilter, Metadata,
 };
 use backtrace::Backtrace;
 use chrono::{SecondsFormat, Utc};
@@ -50,16 +50,16 @@ pub struct LogEntry {
     hostname: Option<&'static str>,
     timestamp: String,
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
-    data: BTreeMap<&'static str, serde_json::Value>,
+    data: BTreeMap<Key, serde_json::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     message: Option<String>,
 }
 
 impl LogEntry {
     fn new(event: &Event, thread_name: Option<&str>) -> Self {
-        use crate::{Key, Value, Visitor};
+        use crate::{Value, Visitor};
 
-        struct JsonVisitor<'a>(&'a mut BTreeMap<&'static str, serde_json::Value>);
+        struct JsonVisitor<'a>(&'a mut BTreeMap<Key, serde_json::Value>);
 
         impl<'a> Visitor for JsonVisitor<'a> {
             fn visit_pair(&mut self, key: Key, value: Value<'_>) {
@@ -75,7 +75,7 @@ impl LogEntry {
                     },
                 };
 
-                self.0.insert(key.as_str(), v);
+                self.0.insert(key, v);
             }
         }
 
@@ -140,7 +140,7 @@ impl LogEntry {
         self.timestamp.as_str()
     }
 
-    pub fn data(&self) -> &BTreeMap<&'static str, serde_json::Value> {
+    pub fn data(&self) -> &BTreeMap<Key, serde_json::Value> {
         &self.data
     }
 
@@ -657,21 +657,33 @@ mod tests {
         assert!(before <= timestamp && timestamp <= after);
 
         // Ensure data stored is the right type
-        assert_eq!(entry.data.get("foo").and_then(JsonValue::as_u64), Some(5));
         assert_eq!(
-            entry.data.get("bar").and_then(JsonValue::as_str),
+            entry.data.get(&Key::new("foo")).and_then(JsonValue::as_u64),
+            Some(5)
+        );
+        assert_eq!(
+            entry.data.get(&Key::new("bar")).and_then(JsonValue::as_str),
             Some("foo_bar")
         );
         assert_eq!(
-            entry.data.get("display").and_then(JsonValue::as_str),
+            entry
+                .data
+                .get(&Key::new("display"))
+                .and_then(JsonValue::as_str),
             Some(format!("{}", number)).as_deref(),
         );
         assert_eq!(
-            entry.data.get("test").and_then(JsonValue::as_bool),
+            entry
+                .data
+                .get(&Key::new("test"))
+                .and_then(JsonValue::as_bool),
             Some(true),
         );
         assert_eq!(
-            entry.data.get("category").and_then(JsonValue::as_str),
+            entry
+                .data
+                .get(&Key::new("category"))
+                .and_then(JsonValue::as_str),
             Some("name"),
         );
 
