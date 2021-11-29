@@ -170,9 +170,16 @@ impl FromStr for HexEncodedBytes {
     }
 }
 
+impl fmt::Display for HexEncodedBytes {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "0x{}", hex::encode(&self.0))?;
+        Ok(())
+    }
+}
+
 impl Serialize for HexEncodedBytes {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        format!("0x{}", &hex::encode(&self.0)).serialize(serializer)
+        self.to_string().serialize(serializer)
     }
 }
 

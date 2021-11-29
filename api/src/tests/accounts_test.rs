@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::tests::{assert_json, find_value, new_test_context};
+use diem_api_types::HexEncodedBytes;
 use serde_json::json;
 
 #[tokio::test]
@@ -563,6 +564,34 @@ async fn test_get_account_modules_by_ledger_version() {
         ))
         .await;
     assert_eq!(modules, json!([]));
+}
+
+#[tokio::test]
+async fn test_get_core_account_data() {
+    let context = new_test_context();
+    let auth_key = context.dd_account().authentication_key();
+    let resp = context.get("/accounts/0xdd").await;
+    assert_eq!(
+        json!({
+            "sequence_number": "0",
+            "authentication_key": HexEncodedBytes::from(auth_key.to_vec()).to_string(),
+        }),
+        resp
+    );
+}
+
+#[tokio::test]
+async fn test_get_core_account_data_not_found() {
+    let context = new_test_context();
+    let resp = context.expect_status_code(404).get("/accounts/0xf").await;
+    assert_eq!(
+        json!({
+            "code": 404,
+            "message": "account not found by address(0xf) and ledger version(0)",
+            "diem_ledger_version": "0"
+        }),
+        resp
+    );
 }
 
 fn account_resources(address: &str) -> String {

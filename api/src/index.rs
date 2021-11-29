@@ -28,6 +28,7 @@ const OPEN_API_SPEC: &str = include_str!("../doc/openapi.yaml");
 pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Infallible> + Clone {
     index(context.clone())
         .or(openapi_spec())
+        .or(accounts::get_account(context.clone()))
         .or(accounts::get_account_resources(context.clone()))
         .or(accounts::get_account_resources_by_ledger_version(
             context.clone(),

@@ -107,6 +107,7 @@ Failpoint configuration example:
 ```
 failpoints
   api::endpoint_index: 1%return
+  api::endpoint_get_account: 1%return
   api::endpoint_get_account_resources: 1%return
   api::endpoint_get_account_modules: 1%return
   api::endpoint_get_transaction: 1%return

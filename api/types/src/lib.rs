@@ -1,6 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+mod account;
 mod address;
 mod bytecode;
 mod convert;
@@ -13,6 +14,7 @@ mod move_types;
 mod response;
 mod transaction;
 
+pub use account::AccountData;
 pub use address::Address;
 pub use bytecode::Bytecode;
 pub use convert::MoveConverter;
