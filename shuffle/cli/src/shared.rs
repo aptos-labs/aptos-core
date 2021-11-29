@@ -138,8 +138,8 @@ impl NetworkHome {
     }
 
     #[allow(dead_code)]
-    pub fn get_latest_address(&self) -> Result<AccountAddress> {
-        let address_str = std::fs::read_to_string(&self.address_path_for("latest"))?;
+    pub fn address_for(&self, username: &str) -> Result<AccountAddress> {
+        let address_str = std::fs::read_to_string(&self.address_path_for(username))?;
         AccountAddress::from_str(address_str.as_str()).map_err(anyhow::Error::new)
     }
 

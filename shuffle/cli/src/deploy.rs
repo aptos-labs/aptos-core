@@ -35,11 +35,11 @@ pub async fn handle(network_home: &NetworkHome, project_path: &Path, url: Url) -
     let seq_number = client.get_account_sequence_number(address).await?;
     let mut account = LocalAccount::new(address, account_key, seq_number);
 
-    deploy(client, &mut account, project_path).await
+    deploy(&client, &mut account, project_path).await
 }
 
 pub async fn deploy(
-    client: DevApiClient,
+    client: &DevApiClient,
     account: &mut LocalAccount,
     project_path: &Path,
 ) -> Result<()> {
@@ -61,7 +61,7 @@ pub async fn deploy(
         let mut binary = vec![];
         module.serialize(&mut binary)?;
 
-        let hash = send_module_transaction(&client, account, binary).await?;
+        let hash = send_module_transaction(client, account, binary).await?;
         client.check_txn_executed_from_hash(hash.as_str()).await?;
     }
 

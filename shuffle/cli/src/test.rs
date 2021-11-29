@@ -38,21 +38,28 @@ pub async fn run_e2e_tests(
     let client = DevApiClient::new(reqwest::Client::new(), network.get_dev_api_url())?;
     let factory = TransactionFactory::new(ChainId::test());
 
-    let (private_key, mut test_account) =
+    let (private_key1, mut account1) =
         create_account(home.get_root_key_path(), &client, &factory).await?;
 
     // TODO: Because we both codegen and deploy::deploy, this code path results
     // in two move package compilation steps. Ideally, compilation would only
     // happen once, and the second redundant build would be skipped. At least
     // it's cached atm.
-    shared::codegen_typescript_libraries(project_path, &test_account.address())?;
-    deploy::deploy(client, &mut test_account, project_path).await?;
+    shared::codegen_typescript_libraries(project_path, &account1.address())?;
+    deploy::deploy(&client, &mut account1, project_path).await?;
 
     let tmp_dir = TempDir::new()?;
-    let tmp_key_path = tmp_dir.path().join("private.key");
-    generate_key::save_key(private_key, &tmp_key_path);
-    let tmp_user = UserContext::new("latest", test_account.address(), &tmp_key_path);
-    run_deno_test(home, project_path, &network, &[&tmp_user])
+    let key1_path = tmp_dir.path().join("private1.key");
+    generate_key::save_key(private_key1, &key1_path);
+    let latest_user = UserContext::new("latest", account1.address(), &key1_path);
+
+    let (private_key2, account2) =
+        create_account(home.get_root_key_path(), &client, &factory).await?;
+    let key2_path = tmp_dir.path().join("private2.key");
+    let test_user = UserContext::new("test", account2.address(), &key2_path);
+    generate_key::save_key(private_key2, &key2_path);
+
+    run_deno_test(home, project_path, &network, &[&latest_user, &test_user])
 }
 
 async fn create_account(

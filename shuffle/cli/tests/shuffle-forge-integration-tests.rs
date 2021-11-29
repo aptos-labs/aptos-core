@@ -8,7 +8,6 @@ use forge::{
     forge_main, AdminContext, AdminTest, ForgeConfig, LocalFactory, Options, Result, Test,
 };
 use move_cli::package::cli::UnitTestResult;
-use shuffle::context::UserContext;
 
 fn main() -> Result<()> {
     let tests = ForgeConfig::default()
@@ -29,16 +28,13 @@ impl AdminTest for SamplePackageEndToEnd {
     fn run<'t>(&self, ctx: &mut AdminContext<'t>) -> Result<()> {
         let helper = bootstrap_shuffle_project(ctx)?;
         let unit_test_result = shuffle::test::run_move_unit_tests(&helper.project_path())?;
-        let user = UserContext::new(
-            "latest",
-            helper.network_home().get_latest_address()?,
-            &helper.network_home().get_latest_account_key_path(),
-        );
+        let latest = helper.user_context_for("latest")?;
+        let test = helper.user_context_for("test")?;
         let exit_status = shuffle::test::run_deno_test(
             helper.home(),
             &helper.project_path(),
             helper.network(),
-            &[&user],
+            &[&latest, &test],
         )?;
 
         assert!(matches!(unit_test_result, UnitTestResult::Success));
@@ -58,16 +54,13 @@ impl Test for TypescriptSdkIntegration {
 impl AdminTest for TypescriptSdkIntegration {
     fn run<'t>(&self, ctx: &mut AdminContext<'t>) -> Result<()> {
         let helper = bootstrap_shuffle_project(ctx)?;
-        let user = UserContext::new(
-            "latest",
-            helper.network_home().get_latest_address()?,
-            &helper.network_home().get_latest_account_key_path(),
-        );
+        let latest = helper.user_context_for("latest")?;
+        let test = helper.user_context_for("test")?;
         let exit_status = shuffle::test::run_deno_test_at_path(
             helper.home(),
             &helper.project_path(),
             helper.network(),
-            &[&user],
+            &[&latest, &test],
             &helper.project_path().join("integration"),
         )?;
         assert!(exit_status.success());

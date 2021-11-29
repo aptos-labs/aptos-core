@@ -8,7 +8,9 @@ use diem_sdk::{
 };
 use forge::{AdminContext, ChainInfo};
 use shuffle::{
-    account, deploy,
+    account,
+    context::UserContext,
+    deploy,
     dev_api_client::DevApiClient,
     new, shared,
     shared::{Home, Network, NetworkHome, NetworksConfig},
@@ -106,6 +108,15 @@ impl ShuffleTestHelper {
         account::create_account_via_dev_api(treasury_account, new_account, factory, client).await
     }
 
+    #[allow(dead_code)]
+    pub fn user_context_for(&self, username: &str) -> Result<UserContext> {
+        Ok(UserContext::new(
+            username,
+            self.network_home().address_for(username)?,
+            &self.network_home().key_path_for(username),
+        ))
+    }
+
     pub fn create_project(&self) -> Result<()> {
         new::handle(
             &self.home,
@@ -121,7 +132,7 @@ impl ShuffleTestHelper {
     ) -> Result<()> {
         let url = Url::from_str(dev_api_url)?;
         let client = DevApiClient::new(reqwest::Client::new(), url)?;
-        deploy::deploy(client, account, &self.project_path()).await
+        deploy::deploy(&client, account, &self.project_path()).await
     }
 
     pub fn codegen_project(&self, account: &LocalAccount) -> Result<()> {

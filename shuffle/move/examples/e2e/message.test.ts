@@ -40,7 +40,7 @@ Deno.test("Advanced: Ability to set message from nonpublishing account", async (
   const publishingAddress = defaultUserContext.address;
   const scriptFunction = publishingAddress + "::Message::set_message";
 
-  const secondUserContext = await UserContext.fromDisk("test");
+  const secondUserContext = UserContext.fromEnv("test");
 
   let txn = await helpers.invokeScriptFunctionForContext(
     secondUserContext,

@@ -79,7 +79,7 @@ impl AdminTest for TransactionsWithNetworkRawAddressFlags {
                 "--address",
                 helper
                     .network_home()
-                    .get_latest_address()?
+                    .address_for("latest")?
                     .to_hex_literal()
                     .as_str(),
             ])
