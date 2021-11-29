@@ -1,7 +1,8 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-export let overview = {
+// deno-lint-ignore-file no-explicit-any
+export const overview = {
   "Intro": [
     "This is a Typescript/Javascript repl.",
     'There are 3 top level objects you can use: "main", "devapi", and "helpers".',
@@ -46,7 +47,7 @@ export async function main(): Promise<any> {
     `Feel free to add more methods in the mod.ts file and use them when running "main"`,
   ]);
 
-  return await ask_for_example([
+  return await askForExample([
     `Run "main" in the repl`,
     `Run "await main.setMessageScriptFunction("hello blockchain")"`,
     `This will submit a transaction interacting directly with the`,
@@ -65,7 +66,7 @@ export async function devapi(): Promise<any> {
     `of the account used in the repl.`,
   ]);
 
-  return await ask_for_example([
+  return await askForExample([
     `Run "devapi" in the repl`,
     `Run shuffle deploy -p project_path if you haven't already`,
     `This will deploy 3 move modules onchain, specifically "Message", "NFT", and "TestNFT"`,
@@ -82,7 +83,7 @@ export async function helpers(): Promise<any> {
     `buildAndSubmitTransaction, invokeScriptFunction, etc.`,
   ]);
 
-  return await ask_for_example([
+  return await askForExample([
     `Run "helpers" in the repl`,
     `Run "await main.setMessageScriptFunction("hello blockchain")"`,
     `This will submit a transaction interacting directly with the Message`,
@@ -96,7 +97,7 @@ export async function helpers(): Promise<any> {
   ]);
 }
 
-async function ask_for_example(
+async function askForExample(
   example: string[],
   stdin = Deno.stdin,
   stdout = Deno.stdout,
@@ -112,10 +113,10 @@ async function ask_for_example(
   const n = <number> await stdin.read(buf);
   const answer = new TextDecoder().decode(buf.subarray(0, n));
 
-  return delegate_answer(answer.trim(), example);
+  return delegateAnswer(answer.trim(), example);
 }
 
-function delegate_answer(answer: String, context: string[]) {
+function delegateAnswer(answer: string, context: string[]) {
   if (answer != "y" && answer != "n") {
     console.log(`Please enter either "y" or "n"`);
   } else if (answer == "y") {
