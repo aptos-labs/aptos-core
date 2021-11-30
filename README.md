@@ -11,6 +11,7 @@
 [![grcov](https://img.shields.io/badge/Coverage-grcov-green)](https://ci-artifacts.diem.com/coverage/unit-coverage/latest/index.html)
 [![test history](https://img.shields.io/badge/Test-History-green)](https://ci-artifacts.diem.com/testhistory/diem/diem/auto/ci-test.yml/index.html)
 [![Automated Issues](https://img.shields.io/github/issues-search?color=orange&label=Automated%20Issues&query=repo%3Adiem%2Fdiem%20is%3Aopen%20author%3Aapp%2Fgithub-actions)](https://github.com/diem/diem/issues/created_by/app/github-actions)
+[![Discord chat](https://img.shields.io/discord/903339070925721652.svg?logo=discord&style=flat-square)](https://discord.gg/epNwRT2wcd)
 
 
 Diem Core implements a decentralized, programmable database which provides a financial infrastructure that can empower billions of people.
@@ -46,7 +47,7 @@ To begin contributing, [sign the CLA](https://diem.com/en-US/cla-sign/). You can
 
 ## Community
 
-* Join us on the [Diem Discourse](https://community.diem.com).
+* Join us on the [Diem Discord](https://discord.gg/epNwRT2wcd) or [Discourse](https://community.diem.com).
 * Ask a question on [Stack Overflow](https://stackoverflow.com/questions/tagged/diem).
 * Get the latest updates to our project by signing up for our [newsletter](https://developers.diem.com/newsletter_form).
 
