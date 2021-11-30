@@ -32,7 +32,7 @@ export async function printWelcome() {
   console.log(`Run "help" for more information on top level objects`);
   console.log(
     `Connecting to ${consoleContext.networkName} at ${
-      highlight(consoleContext.nodeUrl)
+      highlight(consoleContext.client.baseUrl)
     }`,
   );
   console.log(await devapi.ledgerInfo());

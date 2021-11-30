@@ -5,13 +5,14 @@ import * as path from "https://deno.land/std@0.116.0/path/mod.ts";
 import urlcat from "https://deno.land/x/urlcat@v2.0.4/src/index.ts";
 import { BcsDeserializer } from "./generated/bcs/mod.ts";
 import { isURL } from "https://deno.land/x/is_url@v1.0.1/mod.ts";
+import { Client } from "./client.ts";
 
 class ConsoleContext {
   constructor(
     readonly projectPath: string,
     readonly networkName: string,
     readonly networksPath: string,
-    readonly nodeUrl: string,
+    readonly client: Client
   ) {}
 
   static fromEnv(): ConsoleContext {
@@ -19,9 +20,9 @@ class ConsoleContext {
       String(Deno.env.get("PROJECT_PATH")),
       String(Deno.env.get("SHUFFLE_NETWORK_NAME")),
       String(Deno.env.get("SHUFFLE_BASE_NETWORKS_PATH")),
-      getNetworkEndpoint(
+      new Client(getNetworkEndpoint(
         String(Deno.env.get("SHUFFLE_NETWORK_DEV_API_URL")),
-      ),
+      )),
     );
   }
 
@@ -119,5 +120,9 @@ function bcsToBytes(bcsBytes: Uint8Array): Uint8Array {
 }
 
 export function relativeUrl(tail: string) {
-  return new URL(tail, consoleContext.nodeUrl).href;
+  return new URL(tail, consoleContext.client.baseUrl).href;
+}
+
+export function client(): Client {
+  return consoleContext.client
 }
