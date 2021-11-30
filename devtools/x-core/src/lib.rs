@@ -3,19 +3,18 @@
 
 use crate::{core_config::XCoreConfig, git::GitCli};
 use camino::{Utf8Path, Utf8PathBuf};
+use debug_ignore::DebugIgnore;
 use graph::PackageGraphPlus;
 use guppy::graph::PackageGraph;
 use hakari::{HakariBuilder, HakariOutputOptions};
 use once_cell::sync::OnceCell;
 
 pub mod core_config;
-mod debug_ignore;
 mod errors;
 pub mod git;
 mod graph;
 mod workspace_subset;
 
-pub use debug_ignore::*;
 pub use errors::*;
 pub use workspace_subset::*;
 

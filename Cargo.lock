@@ -9856,6 +9856,7 @@ name = "x-core"
 version = "0.1.0"
 dependencies = [
  "camino",
+ "debug-ignore",
  "determinator",
  "guppy",
  "hakari",
