@@ -31,7 +31,7 @@ impl ProjectLinter for GenerateWorkspaceHack {
                 SystemError::hakari_cargo_toml("while reading workspace-hack Cargo.toml", err)
             })?;
         let new_toml = hakari
-            .to_toml_string(&ctx.core().hakari_toml_options())
+            .to_toml_string(&ctx.core().hakari_output_options())
             .map_err(|err| {
                 SystemError::hakari_toml_out("while generating expected Cargo.toml", err)
             })?;
@@ -102,7 +102,7 @@ impl<'cfg> PackageLinter for WorkspaceHackDep<'cfg> {
         // Exclude omitted packages (including the workspace-hack package itself) from consideration.
         if self
             .hakari_builder
-            .omits_package(package.id())
+            .is_excluded(package.id())
             .expect("valid package ID")
         {
             return Ok(RunStatus::Executed);

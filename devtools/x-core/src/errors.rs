@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use camino::{Utf8Path, Utf8PathBuf};
-use guppy::TargetSpecError;
 use hex::FromHexError;
 use serde::{de, ser};
 use std::{borrow::Cow, error, fmt, io, process::ExitStatus, result, str::Utf8Error};
@@ -50,10 +49,6 @@ pub enum SystemError {
     Serde {
         context: Cow<'static, str>,
         err: Box<dyn error::Error + Send + Sync>,
-    },
-    TargetSpec {
-        context: Cow<'static, str>,
-        err: TargetSpecError,
     },
 }
 
@@ -122,13 +117,6 @@ impl SystemError {
             err: Box::new(err),
         }
     }
-
-    pub fn target_spec(context: impl Into<Cow<'static, str>>, err: TargetSpecError) -> Self {
-        SystemError::TargetSpec {
-            context: context.into(),
-            err,
-        }
-    }
 }
 
 impl fmt::Display for SystemError {
@@ -155,8 +143,7 @@ impl fmt::Display for SystemError {
             | SystemError::Serde { context, .. }
             | SystemError::Guppy { context, .. }
             | SystemError::HakariCargoToml { context, .. }
-            | SystemError::HakariTomlOut { context, .. }
-            | SystemError::TargetSpec { context, .. } => write!(f, "while {}", context),
+            | SystemError::HakariTomlOut { context, .. } => write!(f, "while {}", context),
         }
     }
 }
@@ -173,7 +160,6 @@ impl error::Error for SystemError {
             SystemError::HakariCargoToml { err, .. } => Some(err),
             SystemError::HakariTomlOut { err, .. } => Some(err),
             SystemError::NonUtf8Path { err, .. } => Some(err),
-            SystemError::TargetSpec { err, .. } => Some(err),
             SystemError::Serde { err, .. } => Some(err.as_ref()),
         }
     }

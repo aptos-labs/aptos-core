@@ -25,7 +25,23 @@ impl PackageGraphPlus {
                 cmd.build_graph()
                     .map_err(|err| SystemError::guppy("building package graph", err))?,
             ),
-            move |graph| WorkspaceSubsets::new(graph, project_root, &ctx.config().subsets),
+            move |graph: &PackageGraph| {
+                // Skip over the hakari package because it is not included in release or other builds.
+                // (Can't use ctx.hakari_builder() because we're in the middle of constructing it.)
+                let hakari_name = ctx
+                    .config
+                    .hakari
+                    .builder
+                    .hakari_package
+                    .as_deref()
+                    .expect("hakari package is specified");
+                let hakari_package = graph
+                    .workspace()
+                    .member_by_name(hakari_name)
+                    .expect("hakari package exists in workspace");
+
+                WorkspaceSubsets::new(graph, project_root, &ctx.config().subsets, &hakari_package)
+            },
         )
     }
 

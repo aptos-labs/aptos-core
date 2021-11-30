@@ -7,12 +7,10 @@ use crate::config::{
     BannedDepsConfig, DirectDepDupsConfig, EnforcedAttributesConfig, MoveToDiemDepsConfig,
     OverlayConfig,
 };
-use anyhow::anyhow;
 use guppy::{
     graph::{feature::FeatureFilterFn, PackagePublish},
     Version, VersionReq,
 };
-use hakari::summaries::HakariBuilderSummary;
 use std::{
     collections::{BTreeMap, HashMap},
     iter,
@@ -225,22 +223,11 @@ impl PackageLinter for IrrelevantBuildDeps {
 #[derive(Debug)]
 pub struct DirectDepDups<'cfg> {
     config: &'cfg DirectDepDupsConfig,
-    hakari_package: &'cfg str,
 }
 
 impl<'cfg> DirectDepDups<'cfg> {
-    pub fn new(
-        config: &'cfg DirectDepDupsConfig,
-        hakari_config: &'cfg HakariBuilderSummary,
-    ) -> crate::Result<Self> {
-        let hakari_package = hakari_config
-            .hakari_package
-            .as_deref()
-            .ok_or_else(|| anyhow!("hakari.hakari-package not defined in x.toml"))?;
-        Ok(Self {
-            config,
-            hakari_package,
-        })
+    pub fn new(config: &'cfg DirectDepDupsConfig) -> crate::Result<Self> {
+        Ok(Self { config })
     }
 }
 
@@ -263,7 +250,7 @@ impl<'cfg> ProjectLinter for DirectDepDups<'cfg> {
         package_graph.query_workspace().resolve_with_fn(|_, link| {
             // Collect direct dependencies of workspace packages.
             let (from, to) = link.endpoints();
-            if from.name() == self.hakari_package {
+            if from.name() == ctx.workspace_hack_name() {
                 // Skip the workspace hack package.
                 return false;
             }

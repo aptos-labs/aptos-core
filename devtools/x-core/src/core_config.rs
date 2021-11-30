@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use hakari::summaries::HakariBuilderSummary;
+use hakari::summaries::HakariConfig;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -13,7 +13,7 @@ pub struct XCoreConfig {
     pub subsets: BTreeMap<String, SubsetConfig>,
 
     /// Config for Hakari (workspace-hack management).
-    pub hakari: HakariBuilderSummary,
+    pub hakari: HakariConfig,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]

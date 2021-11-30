@@ -61,6 +61,17 @@ impl<'l> ProjectContext<'l> {
         Ok(self.core.subsets()?.default_members())
     }
 
+    /// Returns the name of the workspace-hack package.
+    pub fn workspace_hack_name(&self) -> &'l str {
+        self.core
+            .config()
+            .hakari
+            .builder
+            .hakari_package
+            .as_deref()
+            .expect("hakari package is specified")
+    }
+
     /// Returns Hakari information.
     pub fn hakari(&self) -> Result<Hakari<'l>> {
         Ok(self.core.hakari_builder()?.compute())

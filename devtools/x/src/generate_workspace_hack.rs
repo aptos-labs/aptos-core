@@ -3,7 +3,7 @@
 
 use crate::{cargo::Cargo, context::XContext, Result};
 use anyhow::bail;
-use log::{info, warn};
+use log::info;
 use structopt::{clap::arg_enum, StructOpt};
 
 #[derive(Debug, StructOpt)]
@@ -26,36 +26,21 @@ arg_enum! {
 }
 
 pub fn run(args: Args, xctx: XContext) -> Result<()> {
-    let mut hakari_builder = xctx.core().hakari_builder()?;
+    let hakari_builder = xctx.core().hakari_builder()?;
     let &hakari_package = hakari_builder
         .hakari_package()
         .expect("hakari package specified by builder");
 
     let update_cargo_lock = match args.mode {
         WorkspaceHackMode::Verify => {
-            hakari_builder.set_verify_mode(true);
-            let hakari = hakari_builder.compute();
-            if hakari.output_map.is_empty() {
-                info!("workspace-hack is valid");
-            } else {
-                for ((platform_idx, package_id), v) in &hakari.computed_map {
-                    for &(build_platform, inner_map) in v.inner_maps().iter() {
-                        if inner_map.len() > 1 {
-                            println!(
-                                "platform idx {:?} on {:?}, package ID: {}",
-                                platform_idx, build_platform, package_id
-                            );
-                            for (feature_set, packages) in inner_map {
-                                let features: Vec<_> = feature_set.iter().copied().collect();
-                                println!("  for features {}:", features.join(", "));
-                                for (package, f) in packages {
-                                    println!("    * {} ({:?})", package.name(), f);
-                                }
-                            }
-                        }
-                    }
+            match hakari_builder.verify() {
+                Ok(()) => {
+                    info!("workspace-hack is valid");
                 }
-                warn!("workspace-hack doesn't unify everything successfully");
+                Err(errors) => {
+                    println!("{}", errors.display());
+                    bail!("workspace-hack doesn't unify everything successfully");
+                }
             }
 
             false
@@ -75,7 +60,7 @@ pub fn run(args: Args, xctx: XContext) -> Result<()> {
             let existing_toml = hakari
                 .read_toml()
                 .expect("hakari package specified by builder")?;
-            let new_toml = hakari.to_toml_string(&xctx.core().hakari_toml_options())?;
+            let new_toml = hakari.to_toml_string(&xctx.core().hakari_output_options())?;
 
             match args.mode {
                 WorkspaceHackMode::Write => {

@@ -22,12 +22,11 @@ pub struct Args {
 }
 
 pub fn run(args: Args, xctx: XContext) -> crate::Result<()> {
-    let core_config = xctx.core().config();
     let workspace_config = xctx.config().workspace_config();
 
     let project_linters: &[&dyn ProjectLinter] = &[
         &guppy::BannedDeps::new(&workspace_config.banned_deps),
-        &guppy::DirectDepDups::new(&workspace_config.direct_dep_dups, &core_config.hakari)?,
+        &guppy::DirectDepDups::new(&workspace_config.direct_dep_dups)?,
         &workspace_hack::GenerateWorkspaceHack,
     ];
 
