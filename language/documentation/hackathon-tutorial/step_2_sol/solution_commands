@@ -1,0 +1,8 @@
+mpm test -g
+
+mpm test --coverage
+
+Followed by:
+mpm coverage summary
+mpm coverage summary --summarize-functions
+mpm coverage source --module Coin
