@@ -21,7 +21,7 @@ Deno.test("Ability to set message", async () => {
   txn = await devapi.waitForTransactionCompletion(txn.hash);
   assert(txn.success);
 
-  const expected = "hello blockchain"; // prefixed with \x00 bc of BCS encoding
+  const expected = "hello blockchain";
   const messages = await main.decodedMessages();
   assertEquals(messages[0], expected);
 });
@@ -36,7 +36,8 @@ Deno.test("Ability to set NFTs", async () => {
   txn = await devapi.waitForTransactionCompletion(txn.hash);
   assert(txn.success);
 
-  let resource = await devapi.resourcesWithName("NFT");
+  let resource = await devapi.resourcesWithName("NFTStandard");
+  console.log(await devapi.resourceNames());
   console.log(resource);
 
   const nfts = await main.decodedNFTs();
@@ -47,7 +48,7 @@ Deno.test("Ability to set NFTs", async () => {
   const creator = nfts[0].id.id.addr;
   const creation_num = nfts[0].id.id.creation_num;
 
-  let transfer_txn = await main.transferNFTScriptFunction(context.senderAddress, creator, creation_num);
+  let transfer_txn = await main.transferNFTScriptFunction(context.defaultUserContext.address, creator, creation_num);
   transfer_txn = await devapi.waitForTransactionCompletion(transfer_txn.hash);
   console.log(transfer_txn);
   assert(transfer_txn.success);
@@ -62,17 +63,17 @@ Deno.test("Advanced: Ability to set message from nonpublishing account", async (
   const secondUserContext = context.UserContext.fromEnv("test");
 
   let txn = await helpers.invokeScriptFunctionForContext(
-    secondUserContext,
-    scriptFunction,
-    [],
-    ["invoked script function from nonpublishing account"],
+      secondUserContext,
+      scriptFunction,
+      [],
+      ["invoked script function from nonpublishing account"],
   );
   txn = await devapi.waitForTransactionCompletion(txn.hash);
   assert(txn.success);
 
   const messages = await main.decodedMessages(secondUserContext.address);
   assertEquals(
-    messages[0],
-    "invoked script function from nonpublishing account",
+      messages[0],
+      "invoked script function from nonpublishing account",
   );
 });

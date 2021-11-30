@@ -1,4 +1,4 @@
-module Sender::NFT {
+module Sender::NFTStandard {
     use Std::GUID::{Self, GUID};
     use Std::Signer;
     use Std::Vector;
@@ -31,22 +31,6 @@ module Sender::NFT {
         nfts: vector<NFT<NFTType>>,
     }
 
-    //    struct MintEvent has copy, drop, store {
-    //        id: GUID::ID,
-    //        creator: address,
-    //        content_uri: vector<u8>,
-    //    }
-
-    //    struct TransferEvent has copy, drop, store {
-    //        id: GUID::ID,
-    //        from: address,
-    //        to: address,
-    //    }
-
-    //    struct Admin has key {
-    //        mint_events: Event::EventHandle<MintEvent>,
-    //    }
-
     public fun initialize<NFTType: store + drop>(account: &signer) {
         if (!exists<NFTCollection<NFTType>>(Signer::address_of(account))) {
             move_to(account, NFTCollection { nfts: Vector::empty<NFT<NFTType>>() });
@@ -54,9 +38,6 @@ module Sender::NFT {
     }
 
     public(script) fun initialize_nft_collection<NFTType: store + drop>(account: signer) {
-        //        if (!exists<NFTCollection<NFTType>>(Signer::address_of(&account))) {
-        //            move_to(&account, NFTCollection { nfts: Vector::empty<NFT<NFTType>>() });
-        //        };
         initialize<NFTType>(&account);
     }
 

@@ -7,7 +7,7 @@ import * as codegen from "./generated/diemStdlib/mod.ts";
 import {
   addressOrDefault,
   consoleContext,
-  defaultUserContext,
+  defaultUserContext, UserContext,
 } from "./context.ts";
 import * as devapi from "./devapi.ts";
 import * as util from "https://deno.land/std@0.85.0/node/util.ts";
@@ -24,7 +24,7 @@ function highlight(content: string) {
 export async function printWelcome() {
   console.log(`Loading Project ${highlight(consoleContext.projectPath)}`);
   console.log(
-    `Default Account Address ${highlight(defaultUserContext.address)}`,
+      `Default Account Address ${highlight(defaultUserContext.address)}`,
   );
   console.log(
       `"helpers", "devapi", "context", "main", "codegen", "help" top level objects available`,
@@ -48,10 +48,10 @@ export async function setMessageScriptFunction(
       textEncoder.encode(message),
   );
   return await DiemHelpers.buildAndSubmitTransaction(
-    defaultUserContext.address,
-    await devapi.sequenceNumber(),
-    await defaultUserContext.readPrivateKey(),
-    payload,
+      defaultUserContext.address,
+      await devapi.sequenceNumber(),
+      await defaultUserContext.readPrivateKey(),
+      payload,
   );
 }
 
@@ -65,10 +65,10 @@ export async function setMessageScript(
   );
   const payload = new DiemTypes.TransactionPayloadVariantScript(script);
   return await DiemHelpers.buildAndSubmitTransaction(
-    defaultUserContext.address,
-    await devapi.sequenceNumber(),
-    await defaultUserContext.readPrivateKey(),
-    payload,
+      defaultUserContext.address,
+      await devapi.sequenceNumber(),
+      await defaultUserContext.readPrivateKey(),
+      payload,
   );
 }
 
@@ -92,8 +92,7 @@ export async function initializeTestNFT() {
       ),
   );
 
-  const script = codegen.Stdlib.encodeInitializeNftScript(testNftType);
-  const payload = new DiemTypes.TransactionPayloadVariantScript(script);
+  const payload = codegen.Stdlib.encodeInitializeNftCollectionScriptFunction(testNftType);
   return await DiemHelpers.buildAndSubmitTransaction(
       defaultUserContext.address,
       await devapi.sequenceNumber(),
@@ -107,7 +106,7 @@ export async function initializeTestNFT() {
 export async function createTestNFTScriptFunction(
     contentUri: string,
 ) {
-  let scriptFunction: string = context.senderAddress + "::TestNFT::create_nft";
+  let scriptFunction: string = defaultUserContext.address + "::TestNFT::create_nft";
   let typeArguments: string[] = [];
   let args: any[] = [contentUri];
   return await DiemHelpers.invokeScriptFunction(scriptFunction, typeArguments, args);
@@ -120,52 +119,36 @@ export async function transferNFTScriptFunction(
     creator: string,
     creation_num: number,
 ) {
-  const payload = codegen.Stdlib.encodeCreateNftScriptFunction(
-    textEncoder.encode(contentUri),
-  );
-  return await DiemHelpers.buildAndSubmitTransaction(
-    defaultUserContext.address,
-    await devapi.sequenceNumber(),
-    await defaultUserContext.readPrivateKey(),
-    payload,
-  );
-}
+  let scriptFunction: string = defaultUserContext.address + "::NFTStandard::transfer";
 
-
-export async function initializeNFTScriptFunction() {
-  let scriptFunction: string = context.senderAddress + "::NFT::initialize_nft_collection";
-
-  let typeArgument = context.senderAddress + "::TestNFT::TestNFT";
-  let typeArguments: string[] = [typeArgument];
-
-  let args: any[] = [];
-  return await DiemHelpers.invokeScriptFunction(scriptFunction, typeArguments, args);
-}
-
-
-export async function decodedMessages(addr?: string) {
-  addr = addressOrDefault(addr);
-  return (await devapi.resourcesWithName("MessageHolder", addr))
-    .map((entry) => DiemHelpers.hexToAscii(entry.data.message));
-}
-
-export async function decodedNFTs(addr?: string) {
-  addr = addressOrDefault(addr);
-  return (await devapi.resourcesWithName("NFT", addr))
-    .filter((entry) => entry.data && entry.data.content_uri)
-    .map((entry) => DiemHelpers.hexToAscii(entry.data.content_uri));
-  let scriptFunction: string = context.senderAddress + "::NFT::transfer";
-
-  let typeArgument = context.senderAddress + "::TestNFT::TestNFT";
+  let typeArgument = defaultUserContext.address + "::TestNFT::TestNFT";
   let typeArguments: string[] = [typeArgument];
 
   let args: any[] = [to, creator, creation_num];
   return await DiemHelpers.invokeScriptFunction(scriptFunction, typeArguments, args);
 }
 
-export async function decodedNFTs() {
+export async function initializeNFTScriptFunction(userContext: UserContext) {
+  let scriptFunction: string = defaultUserContext.address + "::NFTStandard::initialize_nft_collection";
+
+  let typeArgument = defaultUserContext.address + "::TestNFT::TestNFT";
+  let typeArguments: string[] = [typeArgument];
+
+  let args: any[] = [];
+  return await DiemHelpers.invokeScriptFunctionForContext(userContext, scriptFunction, typeArguments, args);
+}
+
+
+export async function decodedMessages(addr?: string) {
+  addr = addressOrDefault(addr);
+  return (await devapi.resourcesWithName("MessageHolder", addr))
+      .map((entry) => DiemHelpers.hexToAscii(entry.data.message));
+}
+
+export async function decodedNFTs(addr?: string) {
+  addr = addressOrDefault(addr);
   let decoded_nfts: any[] = [];
-  const nfts = (await devapi.resourcesWithName("NFT"))
+  const nfts = (await devapi.resourcesWithName("NFTStandard", addr))
       .filter((entry) => entry.data && entry.data.nfts)
       .map((entry) => {
         return entry.data.nfts;
