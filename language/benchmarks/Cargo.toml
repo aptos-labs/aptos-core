@@ -17,7 +17,6 @@ proptest = "1.0.0"
 criterion-cpu-time = "0.1.0"
 
 bytecode-verifier = { path = "../bytecode-verifier" }
-diem-workspace-hack = { path = "../../common/workspace-hack" }
 move-core-types = { path = "../move-core/types" }
 move-lang = { path = "../move-lang" }
 move-vm-runtime = { path = "../move-vm/runtime" }
@@ -29,3 +28,6 @@ move-stdlib = { path = "../move-stdlib" }
 [[bench]]
 name = "vm_benches"
 harness = false
+
+[dev-dependencies]
+diem-workspace-hack = { path = "../../common/workspace-hack" }

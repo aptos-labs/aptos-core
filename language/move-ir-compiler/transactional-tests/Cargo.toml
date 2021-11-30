@@ -7,9 +7,9 @@ edition = "2018"
 license = "Apache-2.0"
 
 [dependencies]
-diem-workspace-hack = { path = "../../../common/workspace-hack" }
 
 [dev-dependencies]
+diem-workspace-hack = { path = "../../../common/workspace-hack" }
 datatest-stable = "0.1.1"
 move-transactional-test-runner = { path = "../../testing-infra/transactional-test-runner" }
 

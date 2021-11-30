@@ -28,7 +28,6 @@ diem-vm = { path = "../../diem-move/diem-vm" }
 proptest = "1.0.0"
 diem-logger = { path = "../../common/logger" }
 diem-framework-releases = { path = "../../diem-move/diem-framework/DPN/releases" }
-diem-workspace-hack = { path = "../../common/workspace-hack" }
 diem-writeset-generator = { path = "../../diem-move/writeset-transaction-generator"}
 diem-state-view = { path = "../../storage/state-view" }
 read-write-set = { path = "../tools/read-write-set" }
@@ -36,3 +35,6 @@ diem-parallel-executor = { path = "../../diem-move/parallel-executor" }
 
 [features]
 default = ["diem-transaction-builder/fuzzing"]
+
+[dev-dependencies]
+diem-workspace-hack = { path = "../../common/workspace-hack" }

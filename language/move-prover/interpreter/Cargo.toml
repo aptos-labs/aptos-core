@@ -10,7 +10,6 @@ license = "Apache-2.0"
 # diem dependencies
 bytecode = { path = "../bytecode" }
 bytecode-interpreter-crypto = { path = "crypto" }
-diem-workspace-hack = { path = "../../../common/workspace-hack" }
 move-binary-format = { path = "../../move-binary-format" }
 move-core-types = { path = "../../move-core/types" }
 move-model = { path = "../../move-model" }
@@ -25,5 +24,6 @@ serde = { version = "1.0.124", features = ["derive"] }
 structopt = "0.3.21"
 
 [dev-dependencies]
+diem-workspace-hack = { path = "../../../common/workspace-hack" }
 datatest-stable = "0.1.1"
 move-prover-test-utils = { path = "../test-utils" }

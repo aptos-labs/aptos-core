@@ -21,7 +21,6 @@ sha2 = "0.9.3"
 regex = "1.1.9"
 ptree = "0.4.0"
 
-diem-workspace-hack = { path = "../../../common/workspace-hack" }
 move-binary-format = { path = "../../move-binary-format" }
 move-lang = { path = "../../move-lang" }
 bytecode-source-map = { path = "../../move-ir-compiler/bytecode-source-map" }
@@ -35,6 +34,7 @@ move-model = { path = "../../move-model" }
 move-bytecode-utils = { path = "../move-bytecode-utils" }
 
 [dev-dependencies]
+diem-workspace-hack = { path = "../../../common/workspace-hack" }
 datatest-stable = "0.1.1"
 
 [[test]]

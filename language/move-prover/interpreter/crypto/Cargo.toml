@@ -7,7 +7,6 @@ edition = "2018"
 license = "Apache-2.0"
 
 [dependencies]
-diem-workspace-hack = { path = "../../../../common/workspace-hack" }
 
 # external dependencies
 anyhow = "1.0.38"
@@ -21,3 +20,6 @@ default = ["fiat"]
 fiat = ["curve25519-dalek/fiat_u64_backend", "ed25519-dalek/fiat_u64_backend"]
 u64 = ["curve25519-dalek/u64_backend", "ed25519-dalek/u64_backend"]
 u32 = ["curve25519-dalek/u32_backend", "ed25519-dalek/u32_backend"]
+
+[dev-dependencies]
+diem-workspace-hack = { path = "../../../../common/workspace-hack" }

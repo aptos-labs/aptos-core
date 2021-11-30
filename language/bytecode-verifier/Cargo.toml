@@ -16,10 +16,10 @@ petgraph = "0.5.1"
 
 borrow-graph = { path = "../borrow-graph" }
 move-binary-format = { path = "../move-binary-format" }
-diem-workspace-hack = { path = "../../common/workspace-hack" }
 move-core-types = { path = "../move-core/types" }
 
 [dev-dependencies]
+diem-workspace-hack = { path = "../../common/workspace-hack" }
 invalid-mutations = { path = "invalid-mutations" }
 
 [features]

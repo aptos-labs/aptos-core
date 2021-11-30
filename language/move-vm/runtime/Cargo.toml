@@ -20,12 +20,12 @@ sha3 = "0.9.1"
 tracing = "0.1.26"
 
 bytecode-verifier = { path = "../../bytecode-verifier" }
-diem-workspace-hack = { path = "../../../common/workspace-hack" }
 move-core-types = { path = "../../move-core/types" }
 move-vm-types = { path = "../types" }
 move-binary-format = { path = "../../move-binary-format" }
 
 [dev-dependencies]
+diem-workspace-hack = { path = "../../../common/workspace-hack" }
 anyhow = "1.0.38"
 hex = "0.4.3"
 proptest = "1.0.0"

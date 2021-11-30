@@ -15,7 +15,6 @@ move-binary-format = { path = "../../move-binary-format" }
 bytecode-verifier = { path = "../../bytecode-verifier" }
 borrow-graph = { path = "../../borrow-graph" }
 ir-to-bytecode = { path = "../../move-ir-compiler/ir-to-bytecode" }
-diem-workspace-hack = { path = "../../../common/workspace-hack" }
 move-core-types = { path = "../../move-core/types" }
 move-command-line-common = { path = "../../move-command-line-common" }
 move-read-write-set-types = { path = "../../tools/read-write-set/types" }
@@ -33,6 +32,7 @@ paste = "1.0.5"
 petgraph = "0.5.1"
 
 [dev-dependencies]
+diem-workspace-hack = { path = "../../../common/workspace-hack" }
 move-stdlib = { path = "../../move-stdlib" }
 datatest-stable = "0.1.1"
 move-prover-test-utils = { path = "../test-utils" }

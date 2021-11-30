@@ -13,7 +13,6 @@ bytecode = { path = "../bytecode" }
 move-command-line-common = { path = "../../move-command-line-common" }
 move-model = { path = "../../move-model" }
 move-binary-format = { path = "../../move-binary-format" }
-diem-workspace-hack = { path = "../../../common/workspace-hack" }
 num = "0.4.0"
 itertools = "0.10.0"
 move-core-types = { path = "../../move-core/types" }
@@ -30,3 +29,6 @@ tera = "1.7.1"
 tokio = { version = "1.8.1", features = ["full"] }
 codespan = "0.11.1"
 codespan-reporting = "0.11.1"
+
+[dev-dependencies]
+diem-workspace-hack = { path = "../../../common/workspace-hack" }

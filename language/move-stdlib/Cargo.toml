@@ -16,7 +16,6 @@ errmapgen = { path = "../move-prover/errmapgen" }
 docgen = { path = "../move-prover/docgen" }
 move-command-line-common = { path = "../move-command-line-common" }
 move-prover = { path = "../move-prover" }
-diem-workspace-hack = { path = "../../common/workspace-hack" }
 move-vm-types = { path = "../move-vm/types" }
 move-binary-format = { path = "../move-binary-format" }
 move-core-types = { path = "../move-core/types" }
@@ -30,6 +29,7 @@ sha2 = "0.9.3"
 sha3 = "0.9.1"
 
 [dev-dependencies]
+diem-workspace-hack = { path = "../../common/workspace-hack" }
 move-unit-test = { path = "../tools/move-unit-test" }
 tempfile = "3.2.0"
 dir-diff = "0.3.2"

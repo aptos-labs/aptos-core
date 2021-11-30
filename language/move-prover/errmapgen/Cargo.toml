@@ -10,7 +10,6 @@ license = "Apache-2.0"
 # diem dependencies
 move-command-line-common = { path = "../../move-command-line-common" }
 move-model = { path = "../../move-model" }
-diem-workspace-hack = { path = "../../../common/workspace-hack" }
 move-core-types = { path = "../../move-core/types" }
 bcs = "0.1.2"
 
@@ -20,6 +19,7 @@ anyhow = "1.0.38"
 serde = { version = "1.0.124", features = ["derive"] }
 
 [dev-dependencies]
+diem-workspace-hack = { path = "../../../common/workspace-hack" }
 codespan-reporting = "0.11.1"
 move-prover = { path = ".." }
 datatest-stable = "0.1.1"

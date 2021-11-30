@@ -14,7 +14,9 @@ edition = "2018"
 [dependencies]
 anyhow = "1.0.38"
 
-diem-workspace-hack = { path = "../../../common/workspace-hack" }
 move-vm-runtime = { path = "../runtime" }
 move-core-types = {path = "../../move-core/types" }
 move-binary-format = { path = "../../move-binary-format" }
+
+[dev-dependencies]
+diem-workspace-hack = { path = "../../../common/workspace-hack" }

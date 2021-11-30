@@ -7,7 +7,6 @@ edition = "2018"
 license = "Apache-2.0"
 
 [dependencies]
-diem-workspace-hack = { path = "../../../../common/workspace-hack" }
 
 # move dependencies
 bytecode = { path = "../../bytecode" }
@@ -20,3 +19,6 @@ anyhow = "1.0.38"
 itertools = "0.10.1"
 pretty = "0.10.0"
 structopt = "0.3.21"
+
+[dev-dependencies]
+diem-workspace-hack = { path = "../../../../common/workspace-hack" }

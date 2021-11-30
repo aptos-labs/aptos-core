@@ -13,7 +13,6 @@ colored = "2.0.0"
 bytecode-verifier = { path = "../../bytecode-verifier" }
 bytecode-source-map = { path = "../../move-ir-compiler/bytecode-source-map" }
 move-command-line-common = { path = "../../move-command-line-common" }
-diem-workspace-hack = { path = "../../../common/workspace-hack" }
 move-core-types = { path = "../../move-core/types" }
 move-ir-types = { path = "../../move-ir/types" }
 move-binary-format = { path = "../../move-binary-format" }
@@ -24,3 +23,6 @@ structopt = "0.3.21"
 
 [features]
 default = []
+
+[dev-dependencies]
+diem-workspace-hack = { path = "../../../common/workspace-hack" }

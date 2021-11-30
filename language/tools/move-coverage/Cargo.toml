@@ -22,10 +22,12 @@ bcs = "0.1.2"
 move-command-line-common = { path = "../../move-command-line-common" }
 move-core-types = { path = "../../move-core/types" }
 move-ir-types = { path = "../../move-ir/types" }
-diem-workspace-hack = { path = "../../../common/workspace-hack" }
 move-binary-format = { path = "../../move-binary-format" }
 bytecode-source-map = { path = "../../move-ir-compiler/bytecode-source-map" }
 bytecode-verifier = { path = "../../bytecode-verifier" }
 
 [features]
 default = []
+
+[dev-dependencies]
+diem-workspace-hack = { path = "../../../common/workspace-hack" }
