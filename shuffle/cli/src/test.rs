@@ -39,7 +39,7 @@ pub async fn run_e2e_tests(
     let factory = TransactionFactory::new(ChainId::test());
 
     let (private_key1, mut account1) =
-        create_account(home.get_root_key_path(), &client, &factory).await?;
+        create_account(home.get_root_key_path(), &client, &factory, &network).await?;
 
     // TODO: Because we both codegen and deploy::deploy, this code path results
     // in two move package compilation steps. Ideally, compilation would only
@@ -54,7 +54,7 @@ pub async fn run_e2e_tests(
     let latest_user = UserContext::new(LATEST_USERNAME, account1.address(), &key1_path);
 
     let (private_key2, account2) =
-        create_account(home.get_root_key_path(), &client, &factory).await?;
+        create_account(home.get_root_key_path(), &client, &factory, &network).await?;
     let key2_path = tmp_dir.path().join("private2.key");
     let test_user = UserContext::new(TEST_USERNAME, account2.address(), &key2_path);
     generate_key::save_key(private_key2, &key2_path);
@@ -66,9 +66,30 @@ async fn create_account(
     root_key_path: &Path,
     client: &DevApiClient,
     factory: &TransactionFactory,
+    network: &Network,
 ) -> Result<(Ed25519PrivateKey, LocalAccount)> {
-    let mut treasury_account = account::get_treasury_account(client, root_key_path).await?;
     let account_key = generate_key::generate_key();
+    let new_account = generate_new_account(&account_key, client).await?;
+    match network.get_faucet_url() {
+        Some(_) => account::create_account_via_faucet(network, &new_account).await?,
+        None => {
+            let mut treasury_account = account::get_treasury_account(client, root_key_path).await?;
+            account::create_account_via_dev_api(
+                &mut treasury_account,
+                &new_account,
+                factory,
+                client,
+            )
+            .await?;
+        }
+    };
+    Ok((account_key, new_account))
+}
+
+async fn generate_new_account(
+    account_key: &Ed25519PrivateKey,
+    client: &DevApiClient,
+) -> Result<LocalAccount> {
     let public_key = account_key.public_key();
     let derived_address = AuthenticationKey::ed25519(&public_key).derived_address();
     let seq_num = client
@@ -76,10 +97,7 @@ async fn create_account(
         .await
         .unwrap_or(0);
     let dupe_key = Ed25519PrivateKey::try_from(account_key.to_bytes().as_ref())?;
-    let new_account = LocalAccount::new(derived_address, dupe_key, seq_num);
-    account::create_account_via_dev_api(&mut treasury_account, &new_account, factory, client)
-        .await?;
-    Ok((account_key, new_account))
+    Ok(LocalAccount::new(derived_address, dupe_key, seq_num))
 }
 
 pub fn run_deno_test(

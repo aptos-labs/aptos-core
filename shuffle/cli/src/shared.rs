@@ -400,15 +400,11 @@ impl Network {
         self.dev_api_url.clone()
     }
 
-    pub fn get_optional_faucet_url(&self) -> Option<Url> {
+    pub fn get_faucet_url(&self) -> Option<Url> {
         self.faucet_url.clone()
     }
 
-    pub fn get_faucet_url(&self) -> Url {
-        Network::normalize_faucet_url(self).unwrap()
-    }
-
-    fn normalize_faucet_url(&self) -> Result<Url> {
+    pub fn normalized_faucet_url(&self) -> Result<Url> {
         match &self.faucet_url {
             Some(faucet) => Ok(faucet.clone()),
             None => Err(anyhow!("This network doesn't have a faucet url")),

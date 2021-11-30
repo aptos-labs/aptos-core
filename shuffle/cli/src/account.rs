@@ -44,7 +44,7 @@ pub async fn handle(home: &Home, root: Option<PathBuf>, network: Network) -> Res
     let new_account = generate_new_account(&network_home)?;
     let test_account = generate_test_account(&network_home)?;
 
-    match network.get_optional_faucet_url() {
+    match network.get_faucet_url() {
         Some(_) => {
             create_account_via_faucet(&network, &new_account).await?;
             create_account_via_faucet(&network, &test_account).await
@@ -143,7 +143,13 @@ pub async fn get_treasury_account(
     client: &DevApiClient,
     root_key_path: &Path,
 ) -> Result<LocalAccount> {
-    let treasury_account_key = load_key(root_key_path);
+    let treasury_account_key = if root_key_path.exists() {
+        load_key(root_key_path)
+    } else {
+        return Err(anyhow!(
+            "A node hasn't been created yet! Run shuffle node first"
+        ));
+    };
     let treasury_seq_num = client
         .get_account_sequence_number(account_config::treasury_compliance_account_address())
         .await?;
@@ -185,8 +191,8 @@ pub async fn create_account_via_dev_api(
     Ok(())
 }
 
-async fn create_account_via_faucet(network: &Network, account: &LocalAccount) -> Result<()> {
-    let faucet_account_creation_url = network.get_faucet_url().join("accounts")?;
+pub async fn create_account_via_faucet(network: &Network, account: &LocalAccount) -> Result<()> {
+    let faucet_account_creation_url = network.normalized_faucet_url()?.join("accounts")?;
     let faucet_client = FaucetClient::new(
         faucet_account_creation_url.to_string(),
         network.get_json_rpc_url().to_string(),
@@ -195,7 +201,7 @@ async fn create_account_via_faucet(network: &Network, account: &LocalAccount) ->
     let auth_key = account.authentication_key();
     tokio::task::spawn_blocking(move || faucet_client.create_account(auth_key, "XUS")).await??;
     println!(
-        "Successfully created account {} onto {}",
+        "Successfully created account {} on {}",
         account.address(),
         network.get_name()
     );

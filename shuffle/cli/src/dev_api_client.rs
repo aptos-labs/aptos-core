@@ -29,12 +29,26 @@ impl DevApiClient {
 
     pub async fn get_transactions_by_hash(&self, hash: &str) -> Result<Value> {
         let path = self.url.join(format!("transactions/{}", hash).as_str())?;
-
-        DevApiClient::check_response(
-            self.client.get(path.as_str()).send().await?,
-            "GET /transactions failed",
-        )
-        .await
+        for _ in 1..20 {
+            let resp = self.client.get(path.as_str()).send().await?;
+            let status = resp.status();
+            let json: serde_json::Value = resp.json().await?;
+            if status == StatusCode::from_u16(200)? {
+                if json["type"] != "pending_transaction" {
+                    return Ok(json);
+                }
+            } else if status != StatusCode::from_u16(404)? {
+                return Err(anyhow!(DevApiClient::response_context(
+                    "GET /transactions failed",
+                    &json
+                )?));
+            }
+            thread::sleep(time::Duration::from_secs(2));
+        }
+        Err(anyhow!(format!(
+            "GET /transactions by hash {} execution timeout",
+            hash
+        )))
     }
 
     pub async fn post_transactions(&self, txn_bytes: Vec<u8>) -> Result<Value> {
