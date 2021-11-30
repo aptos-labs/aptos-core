@@ -177,6 +177,23 @@ impl ReadWriteSet {
         Self(BTreeMap::new())
     }
 
+    pub fn trim(&self) -> Self {
+        Self(
+            self.0
+                .iter()
+                .map(|(root, node)| {
+                    (
+                        root.clone(),
+                        TrieNode {
+                            data: node.get_access(),
+                            children: BTreeMap::new(),
+                        },
+                    )
+                })
+                .collect(),
+        )
+    }
+
     pub fn add_access_path(&mut self, access_path: AccessPath, access: Access) {
         let mut node = self.0.entry(access_path.root).or_insert_with(TrieNode::new);
         for offset in access_path.offsets {

@@ -139,6 +139,7 @@ pub fn encode_enable_parallel_execution_with_config() -> WriteSetPayload {
         analyze(diem_framework_releases::current_modules())
             .expect("Failed to get ReadWriteSet for current Diem Framework")
             .normalize_all_scripts(diem_vm::read_write_set_analysis::add_on_functions_list())
+            .trim()
             .into_inner(),
     ))
     .expect("Failed to serialize analyze result");

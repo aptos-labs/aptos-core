@@ -36,7 +36,8 @@ fn peer_to_peer_with_prologue_parallel() {
 
     let analyze_result = analyze(current_modules().iter())
         .unwrap()
-        .normalize_all_scripts(add_on_functions_list());
+        .normalize_all_scripts(add_on_functions_list())
+        .trim();
 
     let mut txns = transfer_txns
         .into_iter()

@@ -126,6 +126,7 @@ pub fn encode_genesis_change_set(
             read_write_set::analyze(&stdlib_modules)
                 .expect("Failed to get ReadWriteSet for current Diem Framework")
                 .normalize_all_scripts(diem_vm::read_write_set_analysis::add_on_functions_list())
+                .trim()
                 .into_inner(),
         ))
         .expect("Failed to serialize analyze result");

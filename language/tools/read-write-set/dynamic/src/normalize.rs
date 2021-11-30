@@ -22,6 +22,28 @@ impl NormalizedReadWriteSetAnalysis {
         Self(inner)
     }
 
+    /// Trim the analysis result by dropping all the results in the trie. This should not affect the
+    /// correctness for those non secondary index access as all relevant info should be stored in
+    /// the root node already. Trimming the result will yield a higher inference speed at runtime.
+    pub fn trim(&self) -> Self {
+        Self(
+            self.0
+                .iter()
+                .map(|(module_id, func_map)| {
+                    (
+                        module_id.clone(),
+                        func_map
+                            .iter()
+                            .map(|(func_name, analysis_result)| {
+                                (func_name.clone(), analysis_result.trim())
+                            })
+                            .collect(),
+                    )
+                })
+                .collect(),
+        )
+    }
+
     fn get_summary(&self, module: &ModuleId, fun: &IdentStr) -> Option<&ReadWriteSet> {
         self.0.get(module)?.get(fun)
     }
