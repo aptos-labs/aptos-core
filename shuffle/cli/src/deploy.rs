@@ -3,7 +3,7 @@
 
 use crate::{
     dev_api_client::DevApiClient,
-    shared::{self, build_move_package, NetworkHome},
+    shared::{self, build_move_package, NetworkHome, LATEST_USERNAME},
 };
 use anyhow::{anyhow, Result};
 use diem_crypto::PrivateKey;
@@ -21,12 +21,12 @@ use url::Url;
 
 /// Deploys shuffle's main Move Package to the sender's address.
 pub async fn handle(network_home: &NetworkHome, project_path: &Path, url: Url) -> Result<()> {
-    if !network_home.get_latest_account_key_path().exists() {
+    if !network_home.key_path_for(LATEST_USERNAME).exists() {
         return Err(anyhow!(
             "An account hasn't been created yet! Run shuffle account first."
         ));
     }
-    let account_key = load_key(network_home.get_latest_account_key_path());
+    let account_key = load_key(network_home.key_path_for(LATEST_USERNAME));
     println!("Using Public Key {}", &account_key.public_key());
     let address = AuthenticationKey::ed25519(&account_key.public_key()).derived_address();
     println!("Sending txn from address {}", address.to_hex_literal());

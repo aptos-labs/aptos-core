@@ -1,7 +1,11 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{context::UserContext, shared, shared::Network};
+use crate::{
+    context::UserContext,
+    shared,
+    shared::{Network, LATEST_USERNAME, TEST_USERNAME},
+};
 use anyhow::Result;
 use diem_types::account_address::AccountAddress;
 use std::{path::Path, process::Command};
@@ -51,8 +55,8 @@ pub fn handle(
 
     let network_home = home.new_network_home(&network.get_name());
 
-    let latest_user = UserContext::new("latest", sender_address, key_path);
-    let test_user = network_home.user_context_for("test")?;
+    let latest_user = UserContext::new(LATEST_USERNAME, sender_address, key_path);
+    let test_user = network_home.user_context_for(TEST_USERNAME)?;
     let filtered_envs = shared::get_filtered_envs_for_deno(
         home,
         project_path,

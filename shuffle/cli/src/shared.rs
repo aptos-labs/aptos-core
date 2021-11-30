@@ -35,6 +35,9 @@ pub const SENDER_ADDRESS_NAME: &str = "Sender";
 /// when accounts are available.
 pub const PLACEHOLDER_ADDRESS: &str = "0xdeadbeef";
 
+pub const LATEST_USERNAME: &str = "latest";
+pub const TEST_USERNAME: &str = "test";
+
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "kebab-case")]
 pub struct ProjectConfig {
@@ -137,16 +140,8 @@ impl NetworkHome {
         ))
     }
 
-    pub fn get_latest_account_key_path(&self) -> PathBuf {
-        self.key_path_for("latest")
-    }
-
-    pub fn get_latest_account_address_path(&self) -> PathBuf {
-        self.address_path_for("latest")
-    }
-
-    #[allow(dead_code)]
     pub fn address_for(&self, username: &str) -> Result<AccountAddress> {
+        self.check_address_path_for_user_exists(username)?;
         let address_str = std::fs::read_to_string(&self.address_path_for(username))?;
         AccountAddress::from_str(address_str.as_str()).map_err(anyhow::Error::new)
     }
@@ -161,29 +156,29 @@ impl NetworkHome {
         Ok(archived_dir)
     }
 
-    pub fn archive_old_key(&self, archived_dir: &Path) -> Result<()> {
-        let old_key_path = self.key_path_for("latest");
+    pub fn archive_old_key_for(&self, username: &str, archived_dir: &Path) -> Result<()> {
+        let old_key_path = self.key_path_for(username);
         let archived_key_path = archived_dir.join("dev.key");
         fs::copy(old_key_path, archived_key_path)?;
         Ok(())
     }
 
-    pub fn archive_old_address(&self, archived_dir: &Path) -> Result<()> {
-        let old_address_path = self.address_path_for("latest");
+    pub fn archive_old_address_for(&self, username: &str, archived_dir: &Path) -> Result<()> {
+        let old_address_path = self.address_path_for(username);
         let archived_address_path = archived_dir.join("address");
         fs::copy(old_address_path, archived_address_path)?;
         Ok(())
     }
 
     pub fn generate_paths_if_nonexistent(&self) -> Result<()> {
-        fs::create_dir_all(self.accounts_path.join("latest"))?;
-        fs::create_dir_all(self.accounts_path.join("test"))?;
+        fs::create_dir_all(self.accounts_path.join(LATEST_USERNAME))?;
+        fs::create_dir_all(self.accounts_path.join(TEST_USERNAME))?;
         Ok(())
     }
 
     pub fn generate_key_file(&self) -> Result<Ed25519PrivateKey> {
         Ok(generate_key::generate_and_save_key(
-            self.key_path_for("latest").as_path(),
+            self.key_path_for(LATEST_USERNAME).as_path(),
         ))
     }
 
@@ -201,21 +196,21 @@ impl NetworkHome {
 
     pub fn generate_testkey_file(&self) -> Result<Ed25519PrivateKey> {
         Ok(generate_key::generate_and_save_key(
-            self.key_path_for("test").as_path(),
+            self.key_path_for(TEST_USERNAME).as_path(),
         ))
     }
 
     pub fn generate_testkey_address_file(&self, public_key: &Ed25519PublicKey) -> Result<()> {
         let address = AuthenticationKey::ed25519(public_key).derived_address();
-        let address_filepath = self.address_path_for("test");
+        let address_filepath = self.address_path_for(TEST_USERNAME);
         let mut file = File::create(address_filepath)?;
         file.write_all(address.to_string().as_ref())?;
         Ok(())
     }
 
-    pub fn copy_key_to_latest(&self, key_path: &Path) -> Result<()> {
+    pub fn copy_key_to(&self, username: &str, key_path: &Path) -> Result<()> {
         let key = generate_key::load_key(key_path);
-        self.save_key("latest", key)
+        self.save_key(username, key)
     }
 
     pub fn save_key(&self, username: &str, key: Ed25519PrivateKey) -> Result<()> {
@@ -223,8 +218,8 @@ impl NetworkHome {
         Ok(())
     }
 
-    pub fn check_latest_account_address_path_exists(&self) -> Result<()> {
-        match self.address_path_for("latest").exists() {
+    pub fn check_address_path_for_user_exists(&self, username: &str) -> Result<()> {
+        match self.address_path_for(username).exists() {
             true => Ok(()),
             false => Err(anyhow!(
                 "An account hasn't been created yet! Run shuffle account first"
@@ -552,7 +547,7 @@ mod test {
     }
 
     #[test]
-    fn test_network_home_archive_old_key() {
+    fn test_network_home_archive_old_key_for() {
         let dir = tempdir().unwrap();
         fs::create_dir_all(dir.path().join("localhost/accounts/latest")).unwrap();
 
@@ -561,7 +556,9 @@ mod test {
 
         let time = duration_since_epoch();
         let archived_dir = network_home.create_archive_dir(time).unwrap();
-        network_home.archive_old_key(&archived_dir).unwrap();
+        network_home
+            .archive_old_key_for("latest", &archived_dir)
+            .unwrap();
         let test_archive_key_path = dir
             .path()
             .join("localhost/accounts")
@@ -573,20 +570,22 @@ mod test {
     }
 
     #[test]
-    fn test_network_home_archive_old_address() {
+    fn test_network_home_archive_old_address_for() {
         let dir = tempdir().unwrap();
         fs::create_dir_all(dir.path().join("localhost/accounts/latest")).unwrap();
 
         let network_home = NetworkHome::new(dir.path().join("localhost").as_path());
         let private_key = network_home.generate_key_file().unwrap();
         network_home
-            .generate_address_file("latest", &private_key.public_key())
+            .generate_address_file(LATEST_USERNAME, &private_key.public_key())
             .unwrap();
         let address_path = dir.path().join("localhost/accounts/latest/address");
 
         let time = duration_since_epoch();
         let archived_dir = network_home.create_archive_dir(time).unwrap();
-        network_home.archive_old_address(&archived_dir).unwrap();
+        network_home
+            .archive_old_address_for("latest", &archived_dir)
+            .unwrap();
         let test_archive_address_path = dir
             .path()
             .join("localhost/accounts")
@@ -632,7 +631,7 @@ mod test {
         let network_home = NetworkHome::new(dir.path().join("localhost").as_path());
         let public_key = network_home.generate_key_file().unwrap().public_key();
         network_home
-            .generate_address_file("latest", &public_key)
+            .generate_address_file(LATEST_USERNAME, &public_key)
             .unwrap();
         assert_eq!(
             dir.path()
@@ -709,14 +708,6 @@ mod test {
     }
 
     #[test]
-    fn test_network_home_get_latest_key_path() {
-        let dir = tempdir().unwrap();
-        let network_home = NetworkHome::new(dir.path().join("localhost").as_path());
-        let correct_dir = dir.path().join("localhost/accounts/latest/dev.key");
-        assert_eq!(correct_dir, network_home.get_latest_account_key_path());
-    }
-
-    #[test]
     fn test_network_home_save_root_key() {
         let dir = tempdir().unwrap();
         fs::create_dir_all(dir.path().join("localhost/accounts/latest")).unwrap();
@@ -725,9 +716,9 @@ mod test {
 
         let network_home = NetworkHome::new(dir.path().join("localhost").as_path());
         network_home
-            .copy_key_to_latest(&user_root_key_path)
+            .copy_key_to(LATEST_USERNAME, &user_root_key_path)
             .unwrap();
-        let new_root_key = generate_key::load_key(network_home.get_latest_account_key_path());
+        let new_root_key = generate_key::load_key(network_home.key_path_for(LATEST_USERNAME));
 
         assert_eq!(new_root_key, user_root_key);
     }
@@ -750,22 +741,55 @@ mod test {
     }
 
     #[test]
-    fn test_network_home_check_latest_account_address_exists() {
+    fn test_network_home_check_address_path_for_user_exists() {
         let bad_dir = tempdir().unwrap();
         let network_home = NetworkHome::new(bad_dir.path().join("localhost").as_path());
         assert!(network_home
-            .check_latest_account_address_path_exists()
+            .check_address_path_for_user_exists(LATEST_USERNAME)
             .is_err());
 
         let good_dir = tempdir().unwrap();
         fs::create_dir_all(good_dir.path().join("localhost/accounts/latest")).unwrap();
         let network_home = NetworkHome::new(good_dir.path().join("localhost").as_path());
         network_home
-            .generate_address_file("latest", &generate_key::generate_key().public_key())
+            .generate_address_file(LATEST_USERNAME, &generate_key::generate_key().public_key())
             .unwrap();
         assert!(!network_home
-            .check_latest_account_address_path_exists()
+            .check_address_path_for_user_exists(LATEST_USERNAME)
             .is_err());
+    }
+
+    #[test]
+    fn test_key_path_for() {
+        let dir = tempdir().unwrap();
+        let network_home = NetworkHome::new(dir.path().join("localhost").as_path());
+        let correct_dir = dir.path().join("localhost/accounts/latest/dev.key");
+        assert_eq!(correct_dir, network_home.key_path_for("latest"));
+    }
+
+    #[test]
+    fn test_address_path_for() {
+        let dir = tempdir().unwrap();
+        let network_home = NetworkHome::new(dir.path().join("localhost").as_path());
+        let correct_dir = dir.path().join("localhost/accounts/latest/address");
+        assert_eq!(correct_dir, network_home.address_path_for("latest"));
+    }
+
+    #[test]
+    fn test_address_for() {
+        let dir = tempdir().unwrap();
+        let network_home = NetworkHome::new(dir.path().join("localhost").as_path());
+        assert!(network_home.address_for("latest").is_err());
+
+        fs::create_dir_all(dir.path().join("localhost/accounts/latest")).unwrap();
+
+        let public_key = generate_key::generate_key().public_key();
+        network_home
+            .generate_address_file("latest", &public_key)
+            .unwrap();
+        let address = network_home.address_for("latest").unwrap();
+        let correct_address = AuthenticationKey::ed25519(&public_key).derived_address();
+        assert_eq!(address, correct_address);
     }
 
     #[test]
@@ -822,7 +846,7 @@ mod test {
         let network = get_test_localhost_network();
 
         let user = UserContext::new(
-            "test",
+            TEST_USERNAME,
             AccountAddress::random(),
             &PathBuf::from("/Users/private_key_path/dev.key"),
         );

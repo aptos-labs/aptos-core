@@ -3,7 +3,7 @@
 
 use crate::{
     dev_api_client::DevApiClient,
-    shared::{Home, Network, NetworkHome, LOCALHOST_NAME},
+    shared::{Home, Network, NetworkHome, LATEST_USERNAME, LOCALHOST_NAME},
 };
 use anyhow::{anyhow, Result};
 use diem_crypto::PrivateKey;
@@ -35,9 +35,9 @@ pub async fn handle(home: &Home, root: Option<PathBuf>, network: Network) -> Res
     network_home.generate_paths_if_nonexistent()?;
     check_nodeconfig_exists_if_localhost_used(home, &network)?;
 
-    if network_home.get_latest_account_key_path().exists() {
+    if network_home.key_path_for(LATEST_USERNAME).exists() {
         match user_wants_another_key(&network_home) {
-            true => archive_current_files_in_latest(&network_home)?,
+            true => archive_current_files(&network_home)?,
             false => return Ok(()),
         }
     }
@@ -55,7 +55,7 @@ pub async fn handle(home: &Home, root: Option<PathBuf>, network: Network) -> Res
             let factory = TransactionFactory::new(ChainId::test());
 
             if let Some(input_root_key) = root {
-                network_home.copy_key_to_latest(input_root_key.as_path())?
+                network_home.copy_key_to(LATEST_USERNAME, input_root_key.as_path())?
             }
             let mut treasury_account =
                 get_treasury_account(&client, home.get_root_key_path()).await?;
@@ -80,7 +80,7 @@ fn check_nodeconfig_exists_if_localhost_used(home: &Home, network: &Network) -> 
 }
 
 fn user_wants_another_key(network_home: &NetworkHome) -> bool {
-    let key_path = network_home.get_latest_account_key_path();
+    let key_path = network_home.key_path_for(LATEST_USERNAME);
     let prev_public_key = generate_key::load_key(&key_path).public_key();
     println!(
         "Public Key already exists: {}",
@@ -110,17 +110,17 @@ fn delegate_user_response(user_response: &str) -> bool {
     }
 }
 
-fn archive_current_files_in_latest(network_home: &NetworkHome) -> Result<()> {
+fn archive_current_files(network_home: &NetworkHome) -> Result<()> {
     let time = duration_since_epoch();
     let archive_dir = network_home.create_archive_dir(time)?;
-    network_home.archive_old_key(&archive_dir)?;
-    network_home.archive_old_address(&archive_dir)
+    network_home.archive_old_key_for(LATEST_USERNAME, &archive_dir)?;
+    network_home.archive_old_address_for(LATEST_USERNAME, &archive_dir)
 }
 
 fn generate_new_account(network_home: &NetworkHome) -> Result<LocalAccount> {
     let private_key = network_home.generate_key_file()?;
     let public_key = private_key.public_key();
-    network_home.generate_address_file("latest", &public_key)?;
+    network_home.generate_address_file(LATEST_USERNAME, &public_key)?;
     Ok(LocalAccount::new(
         AuthenticationKey::ed25519(&public_key).derived_address(),
         private_key,

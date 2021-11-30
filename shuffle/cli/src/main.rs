@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    shared::{get_home_path, normalized_network_name, Home, NetworkHome},
+    shared::{get_home_path, normalized_network_name, Home, NetworkHome, LATEST_USERNAME},
     test::TestCommand,
 };
 use anyhow::{anyhow, Result};
 use diem_types::account_address::AccountAddress;
-use std::{fs, path::PathBuf};
+use std::path::PathBuf;
 use structopt::StructOpt;
 
 use shuffle::{account, build, console, deploy, new, node, shared, test, transactions};
@@ -201,19 +201,11 @@ fn normalized_address(
                 input_address
             }
         }
-        None => get_latest_address(&network_home)?,
+        None => network_home.address_for(LATEST_USERNAME)?.to_hex_literal(),
     };
     Ok(AccountAddress::from_hex_literal(
         normalized_string.as_str(),
     )?)
-}
-
-fn get_latest_address(network_home: &NetworkHome) -> Result<String> {
-    network_home.check_latest_account_address_path_exists()?;
-    Ok(AccountAddress::from_hex(fs::read_to_string(
-        network_home.get_latest_account_address_path(),
-    )?)?
-    .to_hex_literal())
 }
 
 fn normalized_key_path(
@@ -228,7 +220,7 @@ fn normalized_key_path(
                     "An account hasn't been created yet! Run shuffle account first"
                 ));
             }
-            Ok(network_home.get_latest_account_key_path())
+            Ok(network_home.key_path_for(LATEST_USERNAME))
         }
     }
 }

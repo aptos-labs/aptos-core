@@ -6,7 +6,7 @@ use crate::{
     context::UserContext,
     deploy,
     dev_api_client::DevApiClient,
-    shared::{self, normalized_network_name, Home, Network},
+    shared::{self, normalized_network_name, Home, Network, LATEST_USERNAME, TEST_USERNAME},
 };
 use anyhow::{anyhow, Result};
 use core::convert::TryFrom;
@@ -51,12 +51,12 @@ pub async fn run_e2e_tests(
     let tmp_dir = TempDir::new()?;
     let key1_path = tmp_dir.path().join("private1.key");
     generate_key::save_key(private_key1, &key1_path);
-    let latest_user = UserContext::new("latest", account1.address(), &key1_path);
+    let latest_user = UserContext::new(LATEST_USERNAME, account1.address(), &key1_path);
 
     let (private_key2, account2) =
         create_account(home.get_root_key_path(), &client, &factory).await?;
     let key2_path = tmp_dir.path().join("private2.key");
-    let test_user = UserContext::new("test", account2.address(), &key2_path);
+    let test_user = UserContext::new(TEST_USERNAME, account2.address(), &key2_path);
     generate_key::save_key(private_key2, &key2_path);
 
     run_deno_test(home, project_path, &network, &[&latest_user, &test_user])
