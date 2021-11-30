@@ -229,7 +229,7 @@ pub fn clean_k8s_cluster(
     base_genesis_image_tag: String,
     require_validator_healthcheck: bool,
     genesis_modules_path: Option<String>,
-) -> Result<()> {
+) -> Result<String> {
     assert!(base_num_validators <= MAX_NUM_VALIDATORS);
 
     let new_era = get_new_era().unwrap();
@@ -350,7 +350,7 @@ pub fn clean_k8s_cluster(
         }
     }
 
-    Ok(())
+    Ok(new_era)
 }
 
 fn get_new_era() -> Result<String> {

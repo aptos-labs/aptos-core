@@ -117,7 +117,7 @@ impl Factory for K8sFactory {
 
         set_eks_nodegroup_size(self.cluster_name.clone(), node_num.get(), true)?;
         uninstall_from_k8s_cluster()?;
-        clean_k8s_cluster(
+        let era = clean_k8s_cluster(
             self.helm_repo.clone(),
             node_num.get(),
             format!("{}", init_version),
@@ -135,6 +135,7 @@ impl Factory for K8sFactory {
                 &self.image_tag,
                 &self.base_image_tag,
                 format!("{}", init_version).as_str(),
+                &era,
             ))
             .unwrap();
         Ok(Box::new(swarm))

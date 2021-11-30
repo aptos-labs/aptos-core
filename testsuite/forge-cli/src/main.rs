@@ -211,7 +211,8 @@ fn main() -> Result<()> {
                     resize.testnet_image_tag,
                     resize.require_validator_healthcheck,
                     resize.move_modules_dir,
-                )
+                )?;
+                Ok(())
             }
         },
     }

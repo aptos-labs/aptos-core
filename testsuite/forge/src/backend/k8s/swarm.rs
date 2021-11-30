@@ -25,7 +25,8 @@ use tokio::time::Duration;
 
 const JSON_RPC_PORT: u32 = 80;
 const REST_API_PORT: u32 = 80;
-const VALIDATOR_LB: &str = "validator-fullnode-lb";
+const VALIDATOR_LB: &str = "validator-validator-lb";
+const FULLNODES_LB: &str = "validator-fullnode-lb";
 
 pub struct K8sSwarm {
     validators: HashMap<PeerId, K8sNode>,
@@ -49,10 +50,11 @@ impl K8sSwarm {
         image_tag: &str,
         base_image_tag: &str,
         init_image_tag: &str,
+        era: &str,
     ) -> Result<Self> {
         let kube_client = create_k8s_client().await;
-        let fullnodes = HashMap::new();
         let validators = get_validators(kube_client.clone(), init_image_tag).await?;
+        let fullnodes = get_fullnodes(kube_client.clone(), init_image_tag, era).await?;
 
         let client = validators.values().next().unwrap().json_rpc_client();
         let key = load_root_key(root_key);
@@ -330,6 +332,36 @@ pub(crate) async fn get_validators(
     }
 
     Ok(health_nodes)
+}
+
+pub(crate) async fn get_fullnodes(
+    client: K8sClient,
+    image_tag: &str,
+    era: &str,
+) -> Result<HashMap<PeerId, K8sNode>> {
+    let services = list_services(client).await?;
+    let fullnodes = services
+        .into_iter()
+        .filter(|s| s.name.contains(FULLNODES_LB))
+        .map(|s| {
+            let node_id = parse_node_id(&s.name).expect("error to parse node id");
+            let node = K8sNode {
+                name: format!("val{}", node_id),
+                sts_name: format!("val{}-diem-validator-fullnode-e{}", node_id, era),
+                // TODO: fetch this from running node
+                peer_id: PeerId::random(),
+                node_id,
+                ip: s.host_ip.clone(),
+                port: JSON_RPC_PORT,
+                rest_api_port: REST_API_PORT,
+                dns: s.name,
+                version: Version::new(0, image_tag.to_string()),
+            };
+            (node.peer_id(), node)
+        })
+        .collect::<HashMap<_, _>>();
+
+    Ok(fullnodes)
 }
 
 fn parse_node_id(s: &str) -> Result<usize> {
