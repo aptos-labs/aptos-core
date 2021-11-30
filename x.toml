@@ -137,7 +137,7 @@ allow = [
 ]
 
 [workspace.overlay]
-features = ["fuzzing"]
+features = ["failpoints", "fuzzing"]
 
 # This is a list of test-only members. These are workspace members that do not form part of the main
 # Diem production codebase, and are only used to verify correctness and/or performance.
