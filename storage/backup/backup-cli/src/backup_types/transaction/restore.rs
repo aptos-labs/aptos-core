@@ -12,8 +12,11 @@ use crate::{
     },
     storage::{BackupStorage, FileHandle},
     utils::{
-        error_notes::ErrorNotes, read_record_bytes::ReadRecordBytes, storage_ext::BackupStorageExt,
-        stream::StreamX, GlobalRestoreOptions, RestoreRunMode,
+        error_notes::ErrorNotes,
+        read_record_bytes::ReadRecordBytes,
+        storage_ext::BackupStorageExt,
+        stream::{StreamX, TryStreamX},
+        GlobalRestoreOptions, RestoreRunMode,
     },
 };
 use anyhow::{anyhow, ensure, Result};
@@ -288,7 +291,7 @@ impl TransactionRestoreBatchController {
                     .await
                 })
             })
-            .try_buffered(con)
+            .try_buffered_x(con * 2, con)
             .and_then(future::ready)
             .peekable()
     }
@@ -384,7 +387,7 @@ impl TransactionRestoreBatchController {
                     ))
                 })
             })
-            .try_buffered(1)
+            .try_buffered_x(self.global_opt.concurrent_downloads, 1)
             .try_flatten()
             .peekable();
 
@@ -424,7 +427,7 @@ impl TransactionRestoreBatchController {
                         .await
                 }
             })
-            .try_buffered(1)
+            .try_buffered_x(self.global_opt.concurrent_downloads, 1)
             .and_then(future::ready);
 
         db_commit_stream
