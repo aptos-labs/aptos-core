@@ -324,7 +324,7 @@ For the sake of example, we'll consider you are defining a test-only helper func
     ```
 3. (optional) Use `cfg_attr` to make test-only trait derivations conditional:
     ```rust
-    #[cfg_attr(any(test, feature = "testing"), derive(FooTrait))]
+    #[cfg_attr(any(test, feature = "fuzzing"), derive(FooTrait))]
     #[derive(Debug, Display, ...)] // inconditional derivations
     struct Foo { ... }
     ```
@@ -335,18 +335,6 @@ For the sake of example, we'll consider you are defining a test-only helper func
     fuzzing = ["foo_crate/fuzzing"]
     ```
 5. Update `x.toml` to run the unit tests passing in the features if needed.
-
-**Special case:** If a test-only crate (see below) is a dev-dependency of a production crate listed in the root
-`Cargo.toml`'s `default-members`, it needs to be marked optional for feature resolution to work properly. Do this by
-marking the dependency as optional and moving it to the `[dependencies]` section.
-
-```toml
-[dependencies]
-foo_crate = { path = "...", optional = true }
-```
-
-(This is a temporary workaround for a Cargo issue and is expected to be addressed with Cargo's [new feature
-resolver](https://github.com/rust-lang/cargo/pull/7820)).
 
 **For test-only crates:**
 
