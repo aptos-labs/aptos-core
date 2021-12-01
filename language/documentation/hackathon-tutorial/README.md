@@ -4,7 +4,7 @@ Move tutorial for the hackathon happening on Dec 7-8
 ### Step 0
 ## TODO: use binaries instead
 
-First set $DIEM_HOME environment variable to the path to your diem repo:
+First, set the `DIEM_HOME` environment variable to the path to your diem repo:
 ```bash
 $ export DIEM_HOME=<path_to_diem_repo>
 ```
@@ -18,15 +18,21 @@ $ sh step_0/setup.sh
 $ . ~/.profile
 ```
 
-Once this is done, you can alias the `move` package command to `mpm`:
+Once this is done, you can alias the `move` command to point the `df-cli`
+binary:
 
 ```bash
-$ alias mpm="${DIEM_HOME}/target/debug/df-cli package"
+$ alias move="${DIEM_HOME}/target/debug/df-cli"
 ```
 
-You can check that it is working by running `mpm -h`. You should see
-something like this along with a list and description of a number of
-commands:
+You can check that it is working by running
+
+```bash
+$ move package -h
+```
+
+You should see something like this along with a list and description of a
+number of commands:
 
 ```
 move-package 0.1.0
@@ -39,7 +45,7 @@ USAGE:
 
 There is official Move support for VSCode, you can install this extension
 by opening VSCode and searching for the "move-analyzer" package and
-installing it. Detailed instructions can be found
+installing it. More detailed instructions can be found
 [here](https://github.com/diem/diem/tree/main/language/move-analyzer/editors/code).
 
 ### Step 1: Write my first Move module
@@ -48,7 +54,7 @@ To create your first Move module, we first need to create a Move package by
 calling
 
 ```bash
-$ mpm new <pkg_name>
+$ move package new <pkg_name>
 ```
 
 Now change directory into the package you just created
@@ -57,53 +63,56 @@ Now change directory into the package you just created
 $ cd <pkg_name>
 ```
 
-and look around. You should see a directory called `sources` -- this is the
-place where all the Move code for this package will live[1]. You should
-also see a `Move.toml` file which specifies dependencies and other
-information about this package, we'll explore this in a bit. If you're
-familiar with Rust and Cargo, the `Move.toml` file is similar to the
-`Cargo.toml` file, and the `sources` directory similar to the `src`
-directory.
+You should see a directory called `sources` -- this is the place where all
+the Move code for this package will live[1]. You should also see a
+`Move.toml` file as well. This file specifies dependencies and other information about
+the package; if you're familiar with Rust and Cargo, the `Move.toml` file
+is similar to the `Cargo.toml` file, and the `sources` directory similar to
+the `src` directory. More information on the `Move.toml` file can be found
+[here](https://diem.github.io/move/packages.html#movetoml).
 
-Let's write some code! Open up `sources/FirstModule.move` in your
+Let's write some Move code! Open up `sources/FirstModule.move` in your
 editor of choice.
 
-Modules are the building block of Move code, and they always are defined
-relative to a specific address -- the address that they can be published
-under. So let's start out by defining our first module, and look at the
-different parts:
+[Modules](https://diem.github.io/move/modules-and-scripts.html) are the
+building block of Move code, and they are always defined relative to a
+specific address -- the address that they can be published under. So let's
+start out by defining our first module, and look at the different parts:
 
 ```rust
-module NamedAddr::Coin {
+// sources/FirstModule.move
+module NamedAddr::BasicCoin {
 }
 ```
 
-This is defining the module `Coin` that can be published under the [named
-address](https://diem.github.io/move/address.html#named-addresses)
-`NamedAddr`. Named addresses are a way to parametrize the source
-code, so that we can compile this module using different values for
-`NamedAddr` to get different bytecode.
+This is defining the module `BasicCoin` that can be published under the
+[named address](https://diem.github.io/move/address.html#named-addresses)
+`NamedAddr`. Named addresses are a way to parametrize Move source code so
+that you can compile the module using different values for `NamedAddr` to
+get different bytecode that you can deploy, depending on what address(es)
+you control.
 
-Let's now define and assign the named address `NamedAddr` the value `0xDEADBEEF`.
-We can do this by opening the `Move.toml` in your favorite editor and adding the
-following:
+Define and assign the named address `NamedAddr` the value `0xDEADBEEF`.
+You can do this by opening the `Move.toml` in your favorite editor and adding the
+following to the bottom of it:
 
 ```
 [addresses]
 NamedAddr = "0xDEADBEEF"
 ```
 
-Let's now see if it works!
+Let's now see if it works by building it!
 
 ```bash
-$ mpm build
+$ move package build
 ```
 
-Let's now define a structure in this module to represent a `Coin` with a
-given `value`:
+We're now now going to define a
+[structure](https://diem.github.io/move/structs-and-resources.html) in this
+module to represent a `Coin` with a given `value`:
 
 ```
-module NamedAddr::Coin {
+module NamedAddr::BasicCoin {
     struct Coin has key {
         value: u64,
     }
@@ -112,33 +121,34 @@ module NamedAddr::Coin {
 
 Structures in Move can be given different
 [abilities](https://diem.github.io/move/abilities.html) that describe what
-can be done with that type. There are four different abilities in Move:
+can be done with that type. There are four different abilities:
 * `copy`: Allows values of types with this ability to be copied.
 * `drop`: Allows values of types with this ability to be popped/dropped.
 * `store`: Allows values of types with this ability to exist inside a struct in global storage.
 * `key`: Allows the type to serve as a key for global storage operations.
 
 So in this module we are saying that the `Coin` struct can be used as a key
-in global storage, and because it has no other abilites, it cannot be
-copied, dropped, or stored as a non-key value in storage.
+in global storage and, because it has no other abilities, it cannot be
+copied, dropped, or stored as a non-key value in storage. So you can't copy
+coins, and you also can't lose coins by accident!
 
-We can then add some functions to this module, functions are default
-private, and can also be `public`, or `public(script)`. The latter states
-that this function can be called from a transaction script.
-`public(script)` functions can also be called by other `public(script)`
-functions.
-
-Let's check that it can build again
+Check that it can build again:
 
 ```bash
-$ mpm build
+$ move package build
 ```
 
-Let's now add a function that mints coins and stores them under an
-account:
+Let's now add a function to this module that mints a `Coin` and stores it
+under an account.
+[Functions](https://diem.github.io/move/functions.html) are default
+private, and can also be `public`,
+[`public(friend)`](https://diem.github.io/move/friends.html), or
+`public(script)`. The last of these states that this function can be
+called from a transaction script.  `public(script)` functions can also be
+called by other `public(script)` functions.
 
 ```
-module NamedAddr::Coin {
+module NamedAddr::BasicCoin {
     struct Coin has key {
         value: u64,
     }
@@ -156,42 +166,46 @@ Let's take a look at this function and what it's saying:
 * It creates a `Coin` with the given value and stores it under the
   `account` using one of the [five different global storage
   operators](https://diem.github.io/move/global-storage-operators.html)
-  `move_to`. This is where the `key` ability is imporant -- we couldn't
+  `move_to`. This is where the `key` ability is important -- we couldn't
   call `move_to` on `Coin` unless it had the `key` ability!
 
-Let's make sure it compiles now:
+Let's make sure it compiles again:
 
 ```bash
-$ mpm build
+$ move package build
 ```
 
 ### Step 2: Add unit tests to my first Move module
 
-Now that we've written our first Move module, lets write a test to
+Now that we've written our first Move module, we'll write a test to
 make sure minting works the way we expect it to.
 
 Unit tests in Move are similar to unit tests in Rust if you're familiar with
 them. There are a number of [test-related
 annotations that are worth exploring](https://github.com/diem/diem/blob/main/language/changes/4-unit-testing.md#testing-annotations-their-meaning-and-usage).
-Unit tests can be run with the `mpm package test` command. We'll see how
-they're used shortly.
+Unit tests can be run with the `move package test` command. We'll see how
+they're used shortly, but we first need to bring in a dependency.
 
 #### Adding dependencies
 
 Before running unit tests, we need to add a dependency on the Move standard
 library. This can be done by adding an entry to the `[dependencies]`
-section of the `Move.toml`:
+section of the `Move.toml`. Add the following to the bottom of the
+`Move.toml` file:
 
 ```toml
 [dependencies]
 MoveStdlib = { local = "../../../../move-stdlib/", addr_subst = { "Std" = "0x1" } }
 ```
 
+Note that you may need to alter the path to point to the `move-stdlib` directory under
+`$DIEM_HOME/language`.
+
 You can read more on Move package dependencies
 [here](https://diem.github.io/move/packages.html#movetoml).
 
 Once you've added this to the `Move.toml` file you should be able to run
-`mpm test`. You'll see something like this:
+`move package test`. You'll see something like this:
 
 ```
 BUILDING MoveStdlib
@@ -202,12 +216,11 @@ Test result: OK. Total tests: 0; passed: 0; failed: 0
 
 Let's now add a test to make sure that `BasicCoin::mint(account, 10)`
 stores a `Coin` resource with a value of `10` under `account`. We can do
-this by adding the following to our `Coin` module:
+this by adding the following to our `BasicCoin` module:
 
 ```
-module NamedAddr::Coin {
-    // Only included in compilation for testing. Similar to #[cfg(testing)]
-    // in Rust.
+module NamedAddr::BasicCoin {
+    // Only included in compilation for testing. Similar to #[cfg(test)] in Rust.
     #[test_only]
     use Std::Signer;
     ...
@@ -224,8 +237,8 @@ module NamedAddr::Coin {
 ```
 
 #### Exercise
-* Change the assertion to `11` so that it fails and the test fails. Find a flag that you can
-  pass to the `mpm test` command that will show you the global state when
+* Change the assertion to `11` so that the test fails. Find a flag that you can
+  pass to the `move package test` command that will show you the global state when
   the test fails. It should look something like this:
   ```
     ┌── test_mint_10 ──────
@@ -233,7 +246,7 @@ module NamedAddr::Coin {
     │    ┌─ step_2/BasicCoin/sources/FirstModule.move:22:9
     │    │
     │ 18 │     fun test_mint_10(account: signer) acquires Coin {
-    │    │         ------------ In this function in 0xdeadbeef::Coin
+    │    │         ------------ In this function in 0xdeadbeef::BasicCoin
     │    ·
     │ 22 │         assert!(borrow_global<Coin>(addr).value == 11, 0);
     │    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Test was not expected to abort but it aborted with 0 here
@@ -241,20 +254,20 @@ module NamedAddr::Coin {
     │
     │ ────── Storage state at point of failure ──────
     │ 0xcafe:
-    │       => key 0xdeadbeef::Coin::Coin {
+    │       => key 0xdeadbeef::BasicCoin::Coin {
     │           value: 10
     │       }
     │
     └──────────────────
   ```
 * [Bonus] Find a flag that allows you to gather test coverage information, and
-  then play around with using the `mpm coverage` command to look at
+  then play around with using the `move package coverage` command to look at
   coverage statistics and source coverage.
 
-### Step 3: Design my BasicCoin module
+### Step 3: Design my `BasicCoin` module
 
 In this section, we are going to design a module implementing a basic coin and balance interface, where coins can
-be minted and transferred between balances under different addresses.
+be minted and transferred between balances held under different addresses.
 
 The signatures of the public Move function are the following:
 
@@ -299,7 +312,7 @@ struct GlobalStorage {
 
 The Move resource storage under each address is a map from types to values. (An observant reader might observe that
 this means each address can only have one value of each type.) This conveniently provides us a native mapping indexed
-by addresses. In our BasicCoin module, we define the following `Balance` resource representing the number of coins
+by addresses. In our `BasicCoin` module, we define the following `Balance` resource representing the number of coins
 each address holds:
 
 ```
@@ -316,13 +329,14 @@ Roughly the Move blockchain state should look like this:
 In comparison, a Solidity blockchain state might look like this:
 
 ![](diagrams/solidity_state.png)
-### Step 4: Implement my BasicCoin module
 
-We have created a Move package for you in folder `step_4` called `BasicCoin`. `sources` folder contains source code for
+### Step 4: Implement my `BasicCoin` module
+
+We have created a Move package for you in folder `step_4` called `BasicCoin`. The `sources` folder contains source code for
 all your Move modules. `BasicCoin.move` lives inside this folder. In this section, we will take a closer look at the
 implementation of the methods inside `BasicCoin.move`.
 
-#### Method `public_balance`
+#### Method `publish_balance`
 
 This method publishes a `Balance` resource to a given address. Since this resource is needed to receive coins through
 minting or transferring, `publish_balance` method must be called by a user before they can receive money, including the
@@ -345,6 +359,9 @@ assert!(Signer::address_of(&module_owner) == MODULE_OWNER, Errors::requires_addr
 Assert statements in Move can be used in this way: `assert!(<predicate>, <abort_code>);`. This means that if the `<predicate>`
 is false, then abort the transaction with `<abort_code>`. Here `MODULE_OWNER` and `ENOT_MODULE_OWNER` are both constants
 defined at the beginning of the module. And `Errors` module defines common error categories we can use.
+It is important to note that Move is transactional in its execution -- so
+if an [abort](https://diem.github.io/move/abort-and-assert.html) is raised no unwinding of state
+needs to be performed, as no changes from that transaction will be persisted to the blockchain.
 
 We then perform deposit a coin with value `amount` to the balance of `mint_addr`.
 ```
@@ -379,10 +396,10 @@ struct. We then modify the balance through this mutable reference and return a n
 
 ### Compiling our code
 
-Now that we have implemented our BasicCoin contract, let's try building it using Move package by running the following command
+Now that we have implemented our `BasicCoin` module, let's try building it using Move package by running the following command
 in `step_4/BasicCoin` folder:
 ```bash
-$ mpm build
+$ move package build
 ```
 
 ### Exercises
@@ -396,17 +413,17 @@ The solution to this exercise can be found in `step_4_sol` folder.
 - What would happen if we deposit too many tokens to a balance?
 - Does the solution code provided in `step_4_sol` have any bugs?
 
-### Step 5: Adding and using unit tests with the BasicCoin module
+### Step 5: Adding and using unit tests with the `BasicCoin` module
 
 In this step we're going to take a look at all the different unit tests
 we've written to cover the code we wrote in step 4. We're also going to
 take a look at some tools we can use to help us write tests.
 
-To get started, run `mpm test` in [`step_5`](./step_5). You should see
+To get started, run `move package test` in the [`step_5`](./step_5) folder. You should see
 something like this:
 
 ```
-CACHED MoveStdlib
+BUILDING MoveStdlib
 BUILDING BasicCoin
 Running Move unit tests
 [ PASS    ] 0xdeadbeef::BasicCoin::can_withdraw_amount
@@ -423,19 +440,20 @@ Taking a look at the tests in the
 [`BasicCoin` module](./step_5/BasicCoin/sources/BasicCoin.move) we've tried
 to keep each unit test to testing one particular behavior.
 
-TODO: Explore some tests look at some of the annotations
+After taking a look at the tests, try and complete the following exercise, it
+should only be a couple lines!
 
-### Exercises
-* Write a unit test called `balance_of_dne` in the BasicCoin module that tests
+### Exercise
+* Write a unit test called `balance_of_dne` in the `BasicCoin` module that tests
   the case where a `Balance` resource doesn't exist under the address that
   `balance_of` is being called on.
 
 The solution to this exercise can be found in [`step_5_sol`](./step_5_sol)
 
-### Step 6: Make my BasicCoin module generic
+### Step 6: Make my `BasicCoin` module generic
 
 In Move, we can use generics to define functions and structs over different input data types. Generics are a great
-building block for library code. In this section, we are going to make our simple Coin module generic so that it can
+building block for library code. In this section, we are going to make our simple `BasicCoin` module generic so that it can
 serve as a library module that can be used by other user modules.
 
 First, we add type parameters to our data structs:
@@ -449,10 +467,12 @@ struct Balance<phantom CoinType> has key {
 }
 ```
 
-Here we declare the type parameter `CoinType` to be _phantom_ because `CoinType` is not used in the struct definition
-or is only used as a phantom type parameter. There are ability constraints you can add to a type parameter to require
+Here we declare the type parameter `CoinType` to be _phantom_ because
+`CoinType` is not used in the struct definition or is only used as a
+phantom type parameter.
+There are ability constraints you can add to a type parameter to require
 that the type parameter has certain abilities, like `T: copy + drop`. Read more about
-[generic](https://diem.github.io/move/generics.html) here.
+[generics](https://diem.github.io/move/generics.html) here.
 
 We also add type parameters to our methods in the same manner. For example, `withdraw` becomes the following:
 ```
@@ -469,14 +489,13 @@ Take a look at `step_6/BasicCoin/sources/BasicCoin.move` to see the full impleme
 At this point, readers who are familiar with Ethereum might notice that this module serves a similar purpose as
 the [ERC20 token standard](https://ethereum.org/en/developers/docs/standards/tokens/erc-20/), which provides an
 interface for implementing fungible tokens in smart contracts. One key advantage of using generics is the ability
-to reuse code since the generic library module already provides a standard implementation and the instantiation module
-can provide customizations by wrapping the standard implementation. We provide a little module that instantiates
-the Coin type and customizes its transfer policy: only odd number of coins can be transferred.
-
+to reuse code since the generic library module already provides a standard implementation and the instantiating module
+can provide customizations by wrapping the standard implementation. We provide a little module call [`MyOddCoin`](./step_6/BasicCoin/sources/MyOddCoin.move) that instantiates
+the `Coin` type and customizes its transfer policy: only odd number of coins can be transferred.
 
 ## Advanced steps
 
-### Step 7: Write formal specifications for my BasicCoin module
+### Step 7: Write formal specifications for my `BasicCoin` module
 
 The blockchain requires high assurance. Smart contracts deployed on the blockchain may maniputate high-value assets, which are targets of highly-motivated and well-resourced adversaries. Hundreds of millions of dollars have been lost from bugs on other blockchains. As a technique that uses strict mathematical methods to describe behavior and reason correctness of computer systems, formal verification has been used in blockchains to prevent bugs in smart contracts. [The Move prover](https://github.com/diem/diem/tree/main/language/move-prover) is an evolving formal verification tool for smart contracts written in the Move language. It supports complete specification of functional properties of smart contracts. Properties can be verified automatically efficiently (only slightly slower than a linter). Moreover, it can be integrated in the CI system for re-verification after every change to the code base. In this step, we will define the formal specification of the `BasicCoin` module.
 
@@ -581,18 +600,16 @@ The function `Signer::address_of` is called to obtain the address of `from`. The
 
 
 ### Exercises
-- Implement the aborts_if conditions for the `transfer` method.
+- Implement the `aborts_if` conditions for the `transfer` method.
 - Implement the specification for the `mint` and `publish_balance` method.
 
-The solution to this exercise can be found in `step_7_sol`.
+The solution to this exercise can be found in [`step_7_sol`](./step_7_sol).
 
-### Step 8: Formally verify my BasicCoin module using Move Prover
+### Step 8: Formally verify the `BasicCoin` module using the Move Prover
 
+We can use the command `move package -p <path/to/BasicCoin> prove` to prove properties for the BasicCoin module. More prover options can be found [here](https://github.com/diem/diem/blob/main/language/move-prover/doc/user/prover-guide.md).
 
-We can use the command `mpm -p <path/to/BasicCoin> prove` to prove properties for the BasicCoin module. More prover options can be found [here](https://github.com/diem/diem/blob/main/language/move-prover/doc/user/prover-guide.md).
-
-
-Footnotes
+## Footnotes
 ---------------------------------------------------------------------------
 [1] Move code can also live a number of other places, but for more
 information on that see the [documentation on Move

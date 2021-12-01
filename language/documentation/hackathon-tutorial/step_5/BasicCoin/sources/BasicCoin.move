@@ -24,7 +24,6 @@ module NamedAddr::BasicCoin {
     /// minting or transferring to the account.
     public fun publish_balance(account: &signer) {
         let empty_coin = Coin { value: 0 };
-        // TODO: Remove this ! and have them fix it
         assert!(!exists<Balance>(Signer::address_of(account)), Errors::already_published(EALREADY_HAS_BALANCE));
         move_to(account, Balance { coin:  empty_coin });
     }
@@ -67,7 +66,7 @@ module NamedAddr::BasicCoin {
         *balance_ref = balance + value;
     }
 
-    #[test(account = @0x1)]
+    #[test(account = @0x1)] // Creates a signer for the `account` argument with address `@0x1`
     #[expected_failure] // This test should abort
     public(script) fun mint_non_owner(account: signer) acquires Balance {
         // Make sure the address we've chosen doesn't match the module
@@ -77,7 +76,7 @@ module NamedAddr::BasicCoin {
         mint(account, @0x1, 10);
     }
 
-    #[test(account = @NamedAddr)]
+    #[test(account = @NamedAddr)] // Creates a signer for the `account` argument with the value of the named address `NamedAddr`
     public(script) fun mint_check_balance(account: signer) acquires Balance {
         let addr = Signer::address_of(&account);
         publish_balance(&account);
@@ -98,6 +97,8 @@ module NamedAddr::BasicCoin {
         publish_balance(&account);
         publish_balance(&account);
     }
+
+    // EXERCISE: Write `balance_dne` test here!
 
     #[test]
     #[expected_failure]

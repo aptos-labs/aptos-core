@@ -24,7 +24,6 @@ module NamedAddr::BasicCoin {
     /// minting or transferring to the account.
     public fun publish_balance(account: &signer) {
         let empty_coin = Coin { value: 0 };
-        // TODO: Remove this ! and have them fix it
         assert!(!exists<Balance>(Signer::address_of(account)), Errors::already_published(EALREADY_HAS_BALANCE));
         move_to(account, Balance { coin:  empty_coin });
     }
