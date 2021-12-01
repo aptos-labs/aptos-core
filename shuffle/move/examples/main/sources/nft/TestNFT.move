@@ -5,7 +5,7 @@ module Sender::TestNFT {
     struct TestNFT has drop, store {}
 
     public(script) fun create_nft(account: signer, content_uri: vector<u8>) {
-        NFTStandard::initialize<TestNFT>(&account); // assumes account is sender/creator/ADMIN
+        NFTStandard::initialize<TestNFT>(&account);
         let token = TestNFT{};
         let instance = NFTStandard::create<TestNFT>(
             &account,

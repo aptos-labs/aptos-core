@@ -27,7 +27,7 @@ Deno.test("Ability to set message", async () => {
 });
 
 Deno.test("Ability to set NFTs", async () => {
-  let initialize_txn = await main.initializeNFTScriptFunction();
+  let initialize_txn = await main.initializeNFTScriptFunction(context.defaultUserContext);
   initialize_txn = await devapi.waitForTransactionCompletion(initialize_txn.hash);
   assert(initialize_txn.success);
 
@@ -37,23 +37,22 @@ Deno.test("Ability to set NFTs", async () => {
   assert(txn.success);
 
   let resource = await devapi.resourcesWithName("NFTStandard");
-  console.log(await devapi.resourceNames());
   console.log(resource);
 
   const nfts = await main.decodedNFTs();
   assertEquals(helpers.hexToAscii(nfts[0].content_uri), contentUri);
 
-  console.log(nfts[0].id.id.addr);
-  console.log(nfts[0].id.id.creation_num);
-  const creator = nfts[0].id.id.addr;
-  const creation_num = nfts[0].id.id.creation_num;
-
-  let transfer_txn = await main.transferNFTScriptFunction(context.defaultUserContext.address, creator, creation_num);
-  transfer_txn = await devapi.waitForTransactionCompletion(transfer_txn.hash);
-  console.log(transfer_txn);
-  assert(transfer_txn.success);
-  const result = await main.decodedNFTs();
-  assertEquals(result[0], contentUri);
+  // console.log(nfts[0].id.id.addr);
+  // console.log(nfts[0].id.id.creation_num);
+  // const creator = nfts[0].id.id.addr;
+  // const creation_num = nfts[0].id.id.creation_num;
+  //
+  // let transfer_txn = await main.transferNFTScriptFunction(context.defaultUserContext.address, creator, creation_num);
+  // transfer_txn = await devapi.waitForTransactionCompletion(transfer_txn.hash);
+  // console.log(transfer_txn);
+  // assert(transfer_txn.success);
+  // const result = await main.decodedNFTs();
+  // assertEquals(result[0], contentUri);
 });
 
 Deno.test("Advanced: Ability to set message from nonpublishing account", async () => {
