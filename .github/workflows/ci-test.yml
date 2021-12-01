@@ -114,7 +114,7 @@ jobs:
         name: find shell/dockerfile changes
         uses: diem/actions/matches@faadd16607b77dfa2231a8f366883e01717b3225
         with:
-          pattern: 'Dockerfile$\|.*.sh$\|^developers.diem.com'
+          pattern: 'Dockerfile$\|.*.sh$\|^developers.diem.com\|^shuffle'
       - id: helm-changes
         name: find helm changes
         uses: diem/actions/matches@faadd16607b77dfa2231a8f366883e01717b3225
