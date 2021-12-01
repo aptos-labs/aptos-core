@@ -284,11 +284,6 @@ impl<M: MempoolNotificationSender, S: StorageSynchronizerInterface> StateSyncDri
             return Ok(()); // No need to check progress or issue any requests
         }
 
-        // Check if the sync request has timed out (i.e., if we aren't committing fast enough)
-        self.consensus_notification_handler
-            .check_sync_request_timeout()
-            .await?;
-
         // TODO(joshlind): check the data streaming service for messages and
         // identify how to make progress going forward.
 

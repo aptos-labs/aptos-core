@@ -24,7 +24,7 @@ use std::{
 };
 
 // TODO(joshlind): make these configurable!
-const CONSENSUS_SYNC_REQUEST_TIMEOUT_MS: u64 = 120000; // 2 minutes
+const CONSENSUS_SYNC_REQUEST_TIMEOUT_MS: u64 = 60000; // 1 minute
 const MEMPOOL_COMMIT_ACK_TIMEOUT_MS: u64 = 5000; // 5 seconds
 
 /// A simple handler for sending bootstrap notifications to client listeners
@@ -142,7 +142,7 @@ impl ConsensusNotificationHandler {
         // Save the request so we can notify consensus once we've hit the target
         let consensus_sync_request = ConsensusSyncRequest {
             consensus_sync_notification: sync_notification,
-            sync_request_received: SystemTime::now(),
+            last_commit_timestamp: SystemTime::now(),
         };
         self.sync_request = Some(consensus_sync_request);
 
@@ -159,7 +159,7 @@ impl ConsensusNotificationHandler {
         &mut self,
         latest_storage_summary: &StorageStateSummary,
     ) -> Result<(), Error> {
-        if let Some(sync_request) = self.sync_request.as_ref() {
+        if let Some(sync_request) = self.sync_request.as_mut() {
             // Fetch the latest committed version and the target sync version
             let sync_target_version = sync_request
                 .consensus_sync_notification
@@ -181,7 +181,6 @@ impl ConsensusNotificationHandler {
 
             // Check if we've hit the target
             if latest_committed_version == sync_target_version {
-                // Remove the sync request
                 if let Some(sync_request) = self.sync_request.take() {
                     self.respond_to_sync_notification(
                         sync_request.consensus_sync_notification,
@@ -189,31 +188,30 @@ impl ConsensusNotificationHandler {
                     )
                     .await;
                 }
+                return Ok(());
             }
-        }
 
-        Ok(())
-    }
-
-    /// Checks to see that the node is making syncing progress and is not
-    /// blocking consensus indefinitely.
-    pub async fn check_sync_request_timeout(&mut self) -> Result<(), Error> {
-        if let Some(sync_request) = self.sync_request.as_ref() {
-            let timeout_for_sync_request = Duration::from_millis(CONSENSUS_SYNC_REQUEST_TIMEOUT_MS);
-            let sync_deadlined = sync_request
-                .sync_request_received
-                .checked_add(timeout_for_sync_request)
-                .ok_or_else(|| Error::IntegerOverflow("The sync deadline has overflown!".into()))?;
-
-            // Check if the sync deadline has been exceeded
-            if SystemTime::now().duration_since(sync_deadlined).is_ok() {
+            // Check if the sync deadline has been exceeded (timed out since the last commit)
+            let max_time_between_commits = Duration::from_millis(CONSENSUS_SYNC_REQUEST_TIMEOUT_MS);
+            let next_commit_deadline = sync_request
+                .last_commit_timestamp
+                .checked_add(max_time_between_commits)
+                .ok_or_else(|| {
+                    Error::IntegerOverflow("The new commit deadline has overflown!".into())
+                })?;
+            if SystemTime::now()
+                .duration_since(next_commit_deadline)
+                .is_ok()
+            {
                 // TODO(joshlind): log this!
 
                 // Remove the sync request and notify consensus that the request timed out
                 if let Some(sync_request) = self.sync_request.take() {
                     self.respond_to_sync_notification(
                         sync_request.consensus_sync_notification,
-                        Err(Error::UnexpectedError("Sync request timed out!".into())),
+                        Err(Error::UnexpectedError(
+                            "Sync request timed out! Hit the max commit time!".into(),
+                        )),
                     )
                     .await;
                 }
@@ -286,7 +284,7 @@ impl FusedStream for ConsensusNotificationHandler {
 /// A consensus sync request for a specified target ledger info
 pub struct ConsensusSyncRequest {
     pub consensus_sync_notification: ConsensusSyncNotification,
-    pub sync_request_received: SystemTime,
+    pub last_commit_timestamp: SystemTime,
 }
 
 /// A simple handler for sending notifications to mempool
