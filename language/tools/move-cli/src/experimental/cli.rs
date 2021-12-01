@@ -8,6 +8,7 @@ use anyhow::Result;
 use move_core_types::{
     language_storage::TypeTag, parser, transaction_argument::TransactionArgument,
 };
+use std::path::Path;
 
 use structopt::{clap::arg_enum, StructOpt};
 
@@ -51,7 +52,7 @@ arg_enum! {
 }
 
 impl ExperimentalCommand {
-    pub fn handle_command(&self, move_args: &Move) -> Result<()> {
+    pub fn handle_command(&self, move_args: &Move, storage_dir: &Path) -> Result<()> {
         match self {
             ExperimentalCommand::ReadWriteSet {
                 module_file,
@@ -62,7 +63,7 @@ impl ExperimentalCommand {
                 concretize,
             } => {
                 let state = PackageContext::new(&move_args.package_path, &move_args.build_config)?
-                    .prepare_state(&move_args.storage_dir)?;
+                    .prepare_state(storage_dir)?;
                 experimental::commands::analyze_read_write_set(
                     &state,
                     module_file,

@@ -34,8 +34,7 @@ type NativeFunctionRecord = (AccountAddress, Identifier, Identifier, NativeFunct
     rename_all = "kebab-case"
 )]
 pub struct Move {
-    /// Path to a package which the command should be run with respect to. Defaults to current
-    /// directory.
+    /// Path to a package which the command should be run with respect to.
     #[structopt(
         long = "path",
         short = "p",
@@ -44,12 +43,8 @@ pub struct Move {
         default_value = "."
     )]
     package_path: PathBuf,
-    /// Directory storing Move resources, events, and module bytecodes produced by module publishing
-    /// and script execution.
-    #[structopt(long, default_value = DEFAULT_STORAGE_DIR, parse(from_os_str), global = true)]
-    storage_dir: PathBuf,
 
-    /// Print additional diagnostics.
+    /// Print additional diagnostics if available.
     #[structopt(short = "v", global = true)]
     verbose: bool,
 
@@ -72,6 +67,8 @@ pub struct MoveCLI {
 
 #[derive(StructOpt)]
 pub enum Command {
+    /// Execute a package command. Executed in the current directory or the closest containing Move
+    /// package.
     #[structopt(name = "package")]
     Package {
         #[structopt(subcommand)]
@@ -80,12 +77,20 @@ pub enum Command {
     /// Execute a sandbox command.
     #[structopt(name = "sandbox")]
     Sandbox {
+        /// Directory storing Move resources, events, and module bytecodes produced by module publishing
+        /// and script execution.
+        #[structopt(long, default_value = DEFAULT_STORAGE_DIR, parse(from_os_str))]
+        storage_dir: PathBuf,
         #[structopt(subcommand)]
         cmd: sandbox::cli::SandboxCommand,
     },
     /// (Experimental) Run static analyses on Move source or bytecode.
     #[structopt(name = "experimental")]
     Experimental {
+        /// Directory storing Move resources, events, and module bytecodes produced by module publishing
+        /// and script execution.
+        #[structopt(long, default_value = DEFAULT_STORAGE_DIR, parse(from_os_str))]
+        storage_dir: PathBuf,
         #[structopt(subcommand)]
         cmd: experimental::cli::ExperimentalCommand,
     },
@@ -98,8 +103,10 @@ pub fn run_cli(
     cmd: &Command,
 ) -> Result<()> {
     match cmd {
-        Command::Sandbox { cmd } => cmd.handle_command(natives, error_descriptions, move_args),
-        Command::Experimental { cmd } => cmd.handle_command(move_args),
+        Command::Sandbox { storage_dir, cmd } => {
+            cmd.handle_command(natives, error_descriptions, move_args, storage_dir)
+        }
+        Command::Experimental { storage_dir, cmd } => cmd.handle_command(move_args, storage_dir),
         Command::Package { cmd } => package::cli::handle_package_commands(
             &move_args.package_path,
             move_args.build_config.clone(),

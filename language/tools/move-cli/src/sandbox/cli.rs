@@ -22,7 +22,7 @@ use structopt::StructOpt;
 
 #[derive(StructOpt)]
 pub enum SandboxCommand {
-    /// Compile the specified modules and publish the resulting bytecodes in global storage.
+    /// Compile the modules in this package and its dependencies and publish the resulting bytecodes in global storage.
     #[structopt(name = "publish")]
     Publish {
         /// If set, fail when attempting to publish a module that already
@@ -38,8 +38,8 @@ pub enum SandboxCommand {
         #[structopt(long = "override-ordering")]
         override_ordering: Option<Vec<String>>,
     },
-    /// Compile/run a Move script that reads/writes resources stored on disk in `storage`.
-    /// The script must already be compiled and defined in the package.
+    /// Run a Move script that reads/writes resources stored on disk in `storage-dir`.
+    /// The script must be defined in the package.
     #[structopt(name = "run")]
     Run {
         /// Path to .mv file containing either script or module bytecodes. If the file is a module, the
@@ -97,14 +97,14 @@ pub enum SandboxCommand {
         #[structopt(name = "file", parse(from_os_str))]
         file: PathBuf,
     },
-    /// Delete all resources, events, and modules stored on disk under `storage`.
+    /// Delete all resources, events, and modules stored on disk under `storage-dir`.
     /// Does *not* delete anything in `src`.
     Clean {},
-    /// Run well-formedness checks on the `storage` and `build` directories.
+    /// Run well-formedness checks on the `storage-dir` and `install-dir` directories.
     #[structopt(name = "doctor")]
     Doctor {},
-    /// Generate struct layout bindings for the modules stored on disk under `storage`
-    // TODO: expand this to generate script bindings, docs, errmaps, etc.?.
+    /// Generate struct layout bindings for the modules stored on disk under `storage-dir`
+    // TODO: expand this to generate script bindings, etc.?.
     #[structopt(name = "generate")]
     Generate {
         #[structopt(subcommand)]
@@ -114,7 +114,7 @@ pub enum SandboxCommand {
 
 #[derive(StructOpt)]
 pub enum GenerateCommand {
-    /// Generate struct layout bindings for the modules stored on disk under `storage`.
+    /// Generate struct layout bindings for the modules stored on disk under `storage-dir`.
     #[structopt(name = "struct-layouts")]
     StructLayouts {
         /// Path to a module stored on disk.
@@ -142,6 +142,7 @@ impl SandboxCommand {
         natives: Vec<NativeFunctionRecord>,
         error_descriptions: &ErrorMapping,
         move_args: &Move,
+        storage_dir: &Path,
     ) -> Result<()> {
         match self {
             SandboxCommand::Publish {
@@ -151,7 +152,7 @@ impl SandboxCommand {
             } => {
                 let context =
                     PackageContext::new(&move_args.package_path, &move_args.build_config)?;
-                let state = context.prepare_state(&move_args.storage_dir)?;
+                let state = context.prepare_state(storage_dir)?;
                 sandbox::commands::publish(
                     natives,
                     &state,
@@ -173,7 +174,7 @@ impl SandboxCommand {
             } => {
                 let context =
                     PackageContext::new(&move_args.package_path, &move_args.build_config)?;
-                let state = context.prepare_state(&move_args.storage_dir)?;
+                let state = context.prepare_state(storage_dir)?;
                 sandbox::commands::run(
                     natives,
                     error_descriptions,
@@ -200,12 +201,12 @@ impl SandboxCommand {
             ),
             SandboxCommand::View { file } => {
                 let state = PackageContext::new(&move_args.package_path, &move_args.build_config)?
-                    .prepare_state(&move_args.storage_dir)?;
+                    .prepare_state(storage_dir)?;
                 sandbox::commands::view(&state, file)
             }
             SandboxCommand::Clean {} => {
                 // delete storage
-                let storage_dir = Path::new(&move_args.storage_dir);
+                let storage_dir = Path::new(storage_dir);
                 if storage_dir.exists() {
                     fs::remove_dir_all(&storage_dir)?;
                 }
@@ -226,12 +227,12 @@ impl SandboxCommand {
             }
             SandboxCommand::Doctor {} => {
                 let state = PackageContext::new(&move_args.package_path, &move_args.build_config)?
-                    .prepare_state(&move_args.storage_dir)?;
+                    .prepare_state(storage_dir)?;
                 sandbox::commands::doctor(&state)
             }
             SandboxCommand::Generate { cmd } => {
                 let state = PackageContext::new(&move_args.package_path, &move_args.build_config)?
-                    .prepare_state(&move_args.storage_dir)?;
+                    .prepare_state(storage_dir)?;
                 handle_generate_commands(cmd, &state)
             }
         }

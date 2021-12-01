@@ -39,6 +39,7 @@ use crate::{package::prover::run_move_prover, NativeFunctionRecord};
 
 #[derive(StructOpt)]
 pub enum CoverageSummaryOptions {
+    /// Display a coverage summary for all modules in this package
     #[structopt(name = "summary")]
     Summary {
         /// Whether function coverage summaries should be displayed
@@ -47,15 +48,14 @@ pub enum CoverageSummaryOptions {
         /// Output CSV data of coverage
         #[structopt(long = "csv")]
         output_csv: bool,
-        /// Whether path coverage should be derived (default is instruction coverage)
-        #[structopt(long = "derive-path-coverage")]
-        derive_path_coverage: bool,
     },
+    /// Display coverage information about the module against source code
     #[structopt(name = "source")]
     Source {
         #[structopt(long = "module")]
         module_name: String,
     },
+    /// Display coverage information about the module against disassembled bytecode
     #[structopt(name = "bytecode")]
     Bytecode {
         #[structopt(long = "module")]
@@ -84,9 +84,10 @@ pub enum PackageCommand {
     ErrMapGen {
         /// The prefix that all error reasons within modules will be prefixed with, e.g., "E" if
         /// all error reasons are "E_CANNOT_PERFORM_OPERATION", "E_CANNOT_ACCESS", etc.
+        #[structopt(long)]
         error_prefix: Option<String>,
         /// The file to serialize the generated error map to.
-        #[structopt(default_value = "error_map", parse(from_os_str))]
+        #[structopt(long, default_value = "error_map", parse(from_os_str))]
         output_file: PathBuf,
     },
     /// Run the Move Prover on the package at `path`. If no path is provided defaults to current
@@ -104,11 +105,14 @@ pub enum PackageCommand {
         #[structopt(subcommand)]
         options: Option<ProverOptions>,
     },
+    /// Inspect test coverage for this package. A previous test run with the `--coverage` flag must
+    /// have previously been run.
     #[structopt(name = "coverage")]
     CoverageReport {
         #[structopt(subcommand)]
         options: CoverageSummaryOptions,
     },
+    /// Run Move unit tests in this package.
     #[structopt(name = "test")]
     UnitTest {
         /// Bound the number of instructions that can be executed by any one test.
@@ -119,14 +123,13 @@ pub enum PackageCommand {
             long = "instructions"
         )]
         instruction_execution_bound: u64,
-        /// A filter string to determine which unit tests to run
+        /// A filter string to determine which unit tests to run. A unit test will be run only if it
+        /// contains this string in its fully qualified (<addr>::<module_name>::<fn_name>) name.
         #[structopt(name = "filter", short = "f", long = "filter")]
         filter: Option<String>,
-
         /// List all tests
         #[structopt(name = "list", short = "l", long = "list")]
         list: bool,
-
         /// Number of threads to use for running tests.
         #[structopt(
             name = "num_threads",
@@ -138,27 +141,24 @@ pub enum PackageCommand {
         /// Report test statistics at the end of testing
         #[structopt(name = "report_statistics", short = "s", long = "statistics")]
         report_statistics: bool,
-
         /// Show the storage state at the end of execution of a failing test
         #[structopt(name = "global_state_on_error", short = "g", long = "state_on_error")]
         report_storage_on_error: bool,
-
         /// Use the stackless bytecode interpreter to run the tests and cross check its results with
         /// the execution result from Move VM.
         #[structopt(long = "stackless")]
         check_stackless_vm: bool,
-
         /// Verbose mode
         #[structopt(long = "verbose")]
         verbose_mode: bool,
-
+        /// Collect coverage information for later use with the various `package coverage` subcommands
         #[structopt(long = "coverage")]
         compute_coverage: bool,
     },
-
+    /// Disassemble the Move bytecode pointed to
     #[structopt(name = "disassemble")]
     BytecodeView {
-        /// If set will start a disassembled bytecode-to-source explorer
+        /// Start a disassembled bytecode-to-source explorer
         #[structopt(long = "interactive")]
         interactive: bool,
         /// The package name. If not provided defaults to current package modules only

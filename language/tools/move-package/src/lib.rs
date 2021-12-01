@@ -35,28 +35,28 @@ pub struct BuildConfig {
     /// Compile in 'dev' mode. The 'dev-addresses' and 'dev-dependencies' fields will be used if
     /// this flag is set. This flag is useful for development of packages that expose named
     /// addresses that are not set to a specific value.
-    #[structopt(name = "dev-mode", short = "d", long = "dev")]
+    #[structopt(name = "dev-mode", short = "d", long = "dev", global = true)]
     pub dev_mode: bool,
 
     /// Compile in 'test' mode. The 'dev-addresses' and 'dev-dependencies' fields will be used
     /// along with any code in the 'test' directory.
-    #[structopt(name = "test-mode", short = "t", long = "test")]
+    #[structopt(name = "test-mode", long = "test", global = true)]
     pub test_mode: bool,
 
     /// Generate documentation for packages
-    #[structopt(name = "generate-docs", long = "doc")]
+    #[structopt(name = "generate-docs", long = "doc", global = true)]
     pub generate_docs: bool,
 
     /// Generate ABIs for packages
-    #[structopt(name = "generate-abis", long = "abi")]
+    #[structopt(name = "generate-abis", long = "abi", global = true)]
     pub generate_abis: bool,
 
     /// Installation directory for compiled artifacts. Defaults to current directory.
-    #[structopt(long = "install-dir", parse(from_os_str))]
+    #[structopt(long = "install-dir", parse(from_os_str), global = true)]
     pub install_dir: Option<PathBuf>,
 
     /// Force recompilation of all packages
-    #[structopt(name = "force-recompilation", long = "force", short = "f")]
+    #[structopt(name = "force-recompilation", long = "force", global = true)]
     pub force_recompilation: bool,
 
     /// Additional named address mapping. Useful for tools in rust
