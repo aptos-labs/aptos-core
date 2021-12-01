@@ -36,7 +36,7 @@ export async function buildAndSubmitTransaction(
     signingMsg,
   );
 
-  return await devapi.postTransactionBcs(signedTxnBytes);
+  return await devapi.submitBcsTransaction(signedTxnBytes);
 }
 
 export function buildScriptFunctionTransaction(
@@ -111,7 +111,7 @@ export async function invokeScriptFunctionForAddress(
     },
   };
 
-  const signingMsgPayload = await devapi.postTransactionSigningMessage(
+  const signingMsgPayload = await devapi.createSigningMessage(
     request,
   );
   const signingMsg = signingMsgPayload.message.slice(2); // remove 0x prefix
@@ -124,7 +124,7 @@ export async function invokeScriptFunctionForAddress(
     "signature": signature,
   };
 
-  return await devapi.postTransactionJson(request);
+  return await devapi.submitTransaction(request);
 }
 
 export function newRawTransaction(

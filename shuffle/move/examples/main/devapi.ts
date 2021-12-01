@@ -80,7 +80,7 @@ export async function accounts() {
 }
 
 // POSTs a BCS payload to the /transactions endpoint in the developer API.
-export async function postTransactionBcs(
+export async function submitBcsTransaction(
   body: string | Uint8Array,
 ): Promise<any> {
   return await context.client().submitBcsTransaction(body);
@@ -88,14 +88,12 @@ export async function postTransactionBcs(
 
 // POSTs a JSON payload to the /transactions/signing_message endpoint in the
 // developer API to get the signing message for a payload.
-export async function postTransactionSigningMessage(
-  body: SigningMessageRequest,
-): Promise<SigningMessage> {
+export async function createSigningMessage(body: SigningMessageRequest): Promise<SigningMessage> {
   return await context.client().createSigningMessage(body);
 }
 
 // POSTs a JSON payload to the /transactions endpoint in the developer API.
-export async function postTransactionJson(body: UserTransactionRequest): Promise<PendingTransaction> {
+export async function submitTransaction(body: UserTransactionRequest): Promise<PendingTransaction> {
   return await context.client().submitTransaction(body);
 }
 
