@@ -8,7 +8,15 @@
 // deno-lint-ignore-file no-explicit-any
 // deno-lint-ignore-file ban-types
 import * as context from "./context.ts";
-import { SigningMessageRequest, UserTransactionRequest, Transaction, OnChainTransaction, PendingTransaction, SigningMessage } from "./client.ts";
+import {
+  SigningMessageRequest,
+  UserTransactionRequest,
+  Transaction,
+  OnChainTransaction,
+  PendingTransaction,
+  SigningMessage,
+  Account
+} from "./client.ts";
 
 // Retrieves the ledger information as defined by the root /
 // of the Developer API
@@ -55,23 +63,16 @@ export async function modules(addr?: string) {
 }
 
 // Gets the account resource for a particular adress, or the default account.
-export async function account(addr?: string) {
+export async function account(addr?: string): Promise<Account> {
   addr = context.addressOrDefault(addr);
-  const res = await resources(addr);
-  return res
-    .find(
-      (entry: any) => entry["type"] == "0x1::DiemAccount::DiemAccount",
-    );
+  return await context.client().getAccount(addr);
 }
 
 // Returns the sequence number for a particular address, or the default account
 // for the console if no address is passed.
 export async function sequenceNumber(addr?: string): Promise<number> {
-  const acc: any = await account(addr);
-  if (acc) {
-    return parseInt(acc["data"]["sequence_number"]);
-  }
-  throw "unable to find account";
+  const acc = await account(addr);
+  return parseInt(acc.sequence_number);
 }
 
 export async function accounts() {

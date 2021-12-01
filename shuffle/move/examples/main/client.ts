@@ -48,6 +48,10 @@ export class Client {
     throw new Error(`wait for transaction(${versionOrHash}) execution timeout`);
   }
 
+  async getAccount(addr: string): Promise<Account> {
+    return await this.fetch(this.url(`/accounts/${addr}`));
+  }
+
   async getAccountTransactions(addr: string): Promise<OnChainTransaction[]> {
     return await this.fetch(this.url(`/accounts/${addr}/transactions`));
   }
@@ -202,4 +206,9 @@ export interface LedgerInfo {
   chain_id: number
   ledger_version: string
   ledger_timestamp: string
+}
+
+export interface Account {
+  sequence_number: string
+  authentication_key: string
 }
