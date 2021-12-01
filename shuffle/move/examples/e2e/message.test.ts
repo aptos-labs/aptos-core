@@ -27,32 +27,13 @@ Deno.test("Ability to set message", async () => {
 });
 
 Deno.test("Ability to set NFTs", async () => {
-  let initialize_txn = await main.initializeNFTScriptFunction(context.defaultUserContext);
-  initialize_txn = await devapi.waitForTransactionCompletion(initialize_txn.hash);
-  assert(initialize_txn.success);
-
   const contentUri = "https://placekitten.com/200/300";
   let txn = await main.createTestNFTScriptFunction(contentUri);
   txn = await devapi.waitForTransactionCompletion(txn.hash);
   assert(txn.success);
 
-  let resource = await devapi.resourcesWithName("NFTStandard");
-  console.log(resource);
-
   const nfts = await main.decodedNFTs();
   assertEquals(helpers.hexToAscii(nfts[0].content_uri), contentUri);
-
-  // console.log(nfts[0].id.id.addr);
-  // console.log(nfts[0].id.id.creation_num);
-  // const creator = nfts[0].id.id.addr;
-  // const creation_num = nfts[0].id.id.creation_num;
-  //
-  // let transfer_txn = await main.transferNFTScriptFunction(context.defaultUserContext.address, creator, creation_num);
-  // transfer_txn = await devapi.waitForTransactionCompletion(transfer_txn.hash);
-  // console.log(transfer_txn);
-  // assert(transfer_txn.success);
-  // const result = await main.decodedNFTs();
-  // assertEquals(result[0], contentUri);
 });
 
 Deno.test("Advanced: Ability to set message from nonpublishing account", async () => {
@@ -62,17 +43,17 @@ Deno.test("Advanced: Ability to set message from nonpublishing account", async (
   const secondUserContext = context.UserContext.fromEnv("test");
 
   let txn = await helpers.invokeScriptFunctionForContext(
-      secondUserContext,
-      scriptFunction,
-      [],
-      ["invoked script function from nonpublishing account"],
+    secondUserContext,
+    scriptFunction,
+    [],
+    ["invoked script function from nonpublishing account"],
   );
   txn = await devapi.waitForTransactionCompletion(txn.hash);
   assert(txn.success);
 
   const messages = await main.decodedMessages(secondUserContext.address);
   assertEquals(
-      messages[0],
-      "invoked script function from nonpublishing account",
+    messages[0],
+    "invoked script function from nonpublishing account",
   );
 });

@@ -12,7 +12,7 @@ class ConsoleContext {
     readonly projectPath: string,
     readonly networkName: string,
     readonly networksPath: string,
-    readonly client: Client
+    readonly client: Client,
   ) {}
 
   static fromEnv(): ConsoleContext {
@@ -124,5 +124,5 @@ export function relativeUrl(tail: string) {
 }
 
 export function client(): Client {
-  return consoleContext.client
+  return consoleContext.client;
 }

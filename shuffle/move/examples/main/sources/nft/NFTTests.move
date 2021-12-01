@@ -29,9 +29,5 @@ module Sender::NFTTests {
         );
         let nft_id = &GUID::id(NFTStandard::id(&instance));
         let nft_creation_id = GUID::creation_num(NFTStandard::id(&instance));
-        //        NFTStandard::add(Signer::address_of(&account1), instance);
-        //
-        //        assert!(NFTStandard::has_token<TestNFT>(addr1, nft_id), 0);
-        //        NFTStandard::transfer<TestNFT>(account1, addr2, addr1, nft_creation_id);
     }
 }

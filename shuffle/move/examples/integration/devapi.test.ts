@@ -31,7 +31,7 @@ Deno.test("transaction", async () => {
       assert(actual.success);
       break;
     default:
-      throw "expect genesis_transaction for version 0"
+      throw "expect genesis_transaction for version 0";
   }
 });
 
@@ -43,12 +43,19 @@ Deno.test("wait for txn complete", async () => {
   const txn = await devapi.waitForTransactionCompletion(0);
   assert(txn.success);
 
-  await assertThrowsAsync(async () => await devapi.waitForTransactionCompletion("invalid-hash"));
+  await assertThrowsAsync(async () =>
+    await devapi.waitForTransactionCompletion("invalid-hash")
+  );
 });
 
 Deno.test("wait for txn timeout", async () => {
-  const txnHash = "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1"
-  await assertThrowsAsync(async () => await devapi.waitForTransactionCompletion(txnHash, 300), Error, "timeout");
+  const txnHash =
+    "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1";
+  await assertThrowsAsync(
+    async () => await devapi.waitForTransactionCompletion(txnHash, 300),
+    Error,
+    "timeout",
+  );
 });
 
 Deno.test("accountTransactions", async () => {

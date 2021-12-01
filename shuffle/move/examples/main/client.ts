@@ -9,7 +9,7 @@
 import { delay } from "https://deno.land/std@0.114.0/async/delay.ts";
 
 export class Client {
-  baseUrl: string
+  baseUrl: string;
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
@@ -27,7 +27,10 @@ export class Client {
     return await this.fetch(this.url(`/transactions/${versionOrHash}`));
   }
 
-  async waitForTransaction(versionOrHash: number | string, timeout?: number): Promise<OnChainTransaction> {
+  async waitForTransaction(
+    versionOrHash: number | string,
+    timeout?: number,
+  ): Promise<OnChainTransaction> {
     const delayMs = 100;
     const count = (timeout || 5000) / delayMs;
 
@@ -39,7 +42,7 @@ export class Client {
           return body;
         }
       } else if (res.status !== 404) {
-        throw new Error(JSON.stringify(body))
+        throw new Error(JSON.stringify(body));
       }
       if (i > 0) {
         await delay(delayMs);
@@ -64,21 +67,27 @@ export class Client {
     return await this.fetch(this.url(`/accounts/${addr}/modules`));
   }
 
-  async submitTransaction(txn: UserTransactionRequest): Promise<PendingTransaction> {
+  async submitTransaction(
+    txn: UserTransactionRequest,
+  ): Promise<PendingTransaction> {
     return await this.post(this.url("/transactions"), txn);
   }
 
-  async createSigningMessage(txn: SigningMessageRequest): Promise<SigningMessage> {
+  async createSigningMessage(
+    txn: SigningMessageRequest,
+  ): Promise<SigningMessage> {
     return await this.post(this.url("/transactions/signing_message"), txn);
   }
 
-  async submitBcsTransaction(txn: string | Uint8Array): Promise<PendingTransaction> {
+  async submitBcsTransaction(
+    txn: string | Uint8Array,
+  ): Promise<PendingTransaction> {
     return await this.fetch(this.url("/transactions"), {
       method: "POST",
       body: txn,
       headers: {
-        "Content-Type": "application/x.diem.signed_transaction+bcs"
-      }
+        "Content-Type": "application/x.diem.signed_transaction+bcs",
+      },
     });
   }
 
@@ -88,7 +97,7 @@ export class Client {
       body: JSON.stringify(body),
       headers: {
         "Content-Type": "application/json",
-      }
+      },
     });
   }
 
@@ -106,109 +115,112 @@ export class Client {
 }
 
 export interface ScriptFunctionPayload {
-  type: "script_function_payload"
-  function: string
-  type_arguments: string[]
-  arguments: any[]
+  type: "script_function_payload";
+  function: string;
+  type_arguments: string[];
+  arguments: any[];
 }
 
 export interface WriteSetPayload {
-  type: "write_set_payload"
-  write_set: any
+  type: "write_set_payload";
+  write_set: any;
 }
 
-export type TransactionPayload = ScriptFunctionPayload | WriteSetPayload
+export type TransactionPayload = ScriptFunctionPayload | WriteSetPayload;
 
 export interface Ed25519Signature {
-  type: "ed25519_signature"
-  public_key: string
-  signature: string
+  type: "ed25519_signature";
+  public_key: string;
+  signature: string;
 }
 
-export type TransactionSignature = Ed25519Signature
+export type TransactionSignature = Ed25519Signature;
 
 export interface Event {
-  key: string
-  sequence_number: string
-  type: string
-  data: any
+  key: string;
+  sequence_number: string;
+  type: string;
+  data: any;
 }
 
 export interface SigningMessageRequest {
-  sender: string
-  sequence_number: string
-  max_gas_amount: string
-  gas_unit_price: string
-  gas_currency_code: string
-  expiration_timestamp_secs: string
-  payload: TransactionPayload,
+  sender: string;
+  sequence_number: string;
+  max_gas_amount: string;
+  gas_unit_price: string;
+  gas_currency_code: string;
+  expiration_timestamp_secs: string;
+  payload: TransactionPayload;
 }
 
 export interface UserTransactionRequest extends SigningMessageRequest {
-  signature: TransactionSignature,
+  signature: TransactionSignature;
 }
 
 export interface PendingTransaction extends UserTransactionRequest {
-  type: "pending_transaction"
-  hash: string
+  type: "pending_transaction";
+  hash: string;
 }
 
 export interface UserTransaction extends UserTransactionRequest {
-  type: "user_transaction"
-  hash: string
-  version: string
-  events: Event[]
-  state_root_hash: string
-  event_root_hash: string
-  gas_used: string
-  success: boolean
-  vm_status: string
+  type: "user_transaction";
+  hash: string;
+  version: string;
+  events: Event[];
+  state_root_hash: string;
+  event_root_hash: string;
+  gas_used: string;
+  success: boolean;
+  vm_status: string;
 }
 
 export interface GenesisTransaction {
-  type: "genesis_transaction"
-  hash: string
-  version: string
-  events: Event[]
-  state_root_hash: string
-  event_root_hash: string
-  gas_used: string
-  success: boolean
-  vm_status: string
-  payload: WriteSetPayload
+  type: "genesis_transaction";
+  hash: string;
+  version: string;
+  events: Event[];
+  state_root_hash: string;
+  event_root_hash: string;
+  gas_used: string;
+  success: boolean;
+  vm_status: string;
+  payload: WriteSetPayload;
 }
 
 export interface BlockMetadataTransaction {
-  type: "block_metadata_transaction"
-  hash: string
-  version: string
-  events: Event[]
-  state_root_hash: string
-  event_root_hash: string
-  gas_used: string
-  success: boolean
-  vm_status: string
-  id: string
-  round: string
-  previous_block_votes: string[]
-  proposer: string
-  timestamp: string
+  type: "block_metadata_transaction";
+  hash: string;
+  version: string;
+  events: Event[];
+  state_root_hash: string;
+  event_root_hash: string;
+  gas_used: string;
+  success: boolean;
+  vm_status: string;
+  id: string;
+  round: string;
+  previous_block_votes: string[];
+  proposer: string;
+  timestamp: string;
 }
 
-export type OnChainTransaction = UserTransaction | GenesisTransaction | BlockMetadataTransaction
-export type Transaction = PendingTransaction | OnChainTransaction
+export type OnChainTransaction =
+  | UserTransaction
+  | GenesisTransaction
+  | BlockMetadataTransaction;
+export type Transaction = PendingTransaction | OnChainTransaction;
 
 export interface SigningMessage {
-  message: string
+  message: string;
 }
 
 export interface LedgerInfo {
-  chain_id: number
-  ledger_version: string
-  ledger_timestamp: string
+  chain_id: number;
+  ledger_version: string;
+  ledger_timestamp: string;
 }
 
 export interface Account {
-  sequence_number: string
-  authentication_key: string
+  sequence_number: string;
+  authentication_key: string;
 }

@@ -9,13 +9,13 @@
 // deno-lint-ignore-file ban-types
 import * as context from "./context.ts";
 import {
-  SigningMessageRequest,
-  UserTransactionRequest,
-  Transaction,
+  Account,
   OnChainTransaction,
   PendingTransaction,
   SigningMessage,
-  Account
+  SigningMessageRequest,
+  Transaction,
+  UserTransactionRequest,
 } from "./client.ts";
 
 // Retrieves the ledger information as defined by the root /
@@ -31,7 +31,9 @@ export async function transactions(): Promise<OnChainTransaction[]> {
 }
 
 // Returns a specific transaction based on the version or hash.
-export async function transaction(versionOrHash: number | string): Promise<Transaction> {
+export async function transaction(
+  versionOrHash: number | string,
+): Promise<Transaction> {
   return await context.client().getTransaction(versionOrHash);
 }
 
@@ -44,7 +46,9 @@ export async function waitForTransactionCompletion(
 }
 
 // Returns transactions specific to a particular address.
-export async function accountTransactions(addr?: string): Promise<OnChainTransaction[]> {
+export async function accountTransactions(
+  addr?: string,
+): Promise<OnChainTransaction[]> {
   addr = context.addressOrDefault(addr);
   return await context.client().getAccountTransactions(addr);
 }
@@ -88,12 +92,16 @@ export async function submitBcsTransaction(
 
 // POSTs a JSON payload to the /transactions/signing_message endpoint in the
 // developer API to get the signing message for a payload.
-export async function createSigningMessage(body: SigningMessageRequest): Promise<SigningMessage> {
+export async function createSigningMessage(
+  body: SigningMessageRequest,
+): Promise<SigningMessage> {
   return await context.client().createSigningMessage(body);
 }
 
 // POSTs a JSON payload to the /transactions endpoint in the developer API.
-export async function submitTransaction(body: UserTransactionRequest): Promise<PendingTransaction> {
+export async function submitTransaction(
+  body: UserTransactionRequest,
+): Promise<PendingTransaction> {
   return await context.client().submitTransaction(body);
 }
 

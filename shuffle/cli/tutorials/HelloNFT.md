@@ -1,18 +1,23 @@
-#Hello NFT Tutorial
+# Hello NFT Tutorial
 
 Welcome to Hello NFT tutorial!
 
-The goal of this tutorial is to 1) create your own NFT, 2) mint one into your account, and 3) transfer your NFT to another account.
+The goal of this tutorial is to 1) create your own NFT, 2) mint one into your
+account, and 3) transfer your NFT to another account.
 
 ## Create a New Project
 
-To start a new Move project, run `shuffle new nft`, which will create a project directory with the given path name and a template to start Move development.
+To start a new Move project, run `shuffle new nft`, which will create a project
+directory with the given path name and a template to start Move development.
 
-Inside `nft/main/sources/nft` there should be three move modules: `NFTStandard.move`, `NFTTests.move`, and `TestNFT.move`.
+Inside `nft/main/sources/nft` there should be three move modules:
+`NFTStandard.move`, `NFTTests.move`, and `TestNFT.move`.
 
-We have provided `NFTStandard.move` as a generic NFT class that can be inherited to create your own NFT class.
+We have provided `NFTStandard.move` as a generic NFT class that can be extended
+to create your own NFT class.
 
 ## Create Your Own NFT Class
+
 Inside `nft/main/sources/nft`, create a new move file `MyNFT.move`.
 
 ```
@@ -27,7 +32,8 @@ use Std::Signer;
 
 ## Add Minting Functionality
 
-Here we have imported `NFTStandard` and created a new NFT type `MyNFT`, which will be the `NFTType` we use when calling `NFTStandard` methods.
+Here we have imported `NFTStandard` and created a new NFT type `MyNFT`, which
+will be the `NFTType` we use when calling `NFTStandard` methods.
 
 ```
 module Sender::MyNFT {
@@ -48,15 +54,21 @@ use Std::Signer;
     }
 }
 ```
-Now we add a wrapper for minting MyNFT, which 1) initializes the nft collection of type type `MyNFT`, 2) creates a `MyNFT` and 3) adds the created nft into the nft collection resource.
+
+Now we add a wrapper for minting MyNFT, which 1) initializes the nft collection
+of type `MyNFT`, 2) creates a `MyNFT` and 3) adds the created nft into the nft
+collection resource.
 
 ## Publish
-Now that you have a very simple NFT module, you can publish it to your network:
-- Spin up your local node: `cargo run -p shuffle -- node`
-- Create an account for publishing: `cargo run -p shuffle -- account`
-- Deploy your module: `cd nft && cargo run -p shuffle -- deploy`
 
-If deployed successfully, you should MyNFT included in the list of published modules:
+Now that you have a very simple NFT module, you can publish it to your network:
+
+- Spin up your local node: `shuffle node`
+- Create an account for publishing: `shuffle account`
+- Deploy your module: `cd nft && shuffle deploy`
+
+If deployed successfully, you should see MyNFT included in the list of published
+modules:
 
 ```
 Skipping Module: 00000000000000000000000000000001::Hash
@@ -77,9 +89,12 @@ Deploying Module: 6215BB1C111E8943794F21EB7E559656::TestNFT
 ```
 
 ## Explore MyNFT with Console
-You can now use shuffle console to interact with your MyNFT module! Start up your console within your project folder: `cargo run -p shuffle -- console`
+
+You can now use shuffle console to interact with your MyNFT module! Start up
+your console within your project folder: `shuffle console`
 
 Let's try calling the `mint_nft` script function within the console.
+
 ```
 > const contentUri = "https://placekitten.com/200/300"
 
@@ -91,7 +106,7 @@ Let's try calling the `mint_nft` script function within the console.
 
 > let txn = await helpers.invokeScriptFunction(scriptFunction, typeArguments, args);
 
-> txn = await devapi.waitForTransactionCompletion(txn.hash);
+> txn = await devapi.waitForTransaction(txn.hash);
 {
   type: "user_transaction",
   version: "264",
@@ -146,9 +161,9 @@ Let's try calling the `mint_nft` script function within the console.
     type: { dummy_field: false }
   }
 ]
-
 ```
 
 ## Transfer MyNFT
 
-We will use e2e testing to try transferring MyNFT from one account to another. In `nft/e2e`, create a new file `nft.test.ts`.
+We will use e2e testing to try transferring MyNFT from one account to another.
+In `nft/e2e`, create a new file `nft.test.ts`.
