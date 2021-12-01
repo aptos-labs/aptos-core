@@ -6,7 +6,7 @@
 
 mod driver;
 mod driver_client;
-mod driver_factory;
+pub mod driver_factory;
 mod error;
 mod notification_handlers;
 mod storage_synchronizer;

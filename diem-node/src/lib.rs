@@ -3,10 +3,18 @@
 
 use backup_service::start_backup_service;
 use consensus::consensus_provider::start_consensus;
+use consensus_notifications::ConsensusNotificationListener;
+use data_streaming_service::{
+    streaming_client::{new_streaming_service_client_listener_pair, StreamingServiceClient},
+    streaming_service::DataStreamingService,
+};
 use debug_interface::node_debug_service::NodeDebugService;
 use diem_api::runtime::bootstrap as bootstrap_api;
 use diem_config::{
-    config::{NetworkConfig, NodeConfig, PersistableConfig, StorageServiceConfig},
+    config::{
+        DataStreamingServiceConfig, NetworkConfig, NodeConfig, PersistableConfig,
+        StorageServiceConfig,
+    },
     network_id::NetworkId,
     utils::get_genesis_txn,
 };
@@ -23,6 +31,7 @@ use diem_types::{
     move_resource::MoveStorage,
     on_chain_config::{VMPublishingOption, ON_CHAIN_CONFIG_REGISTRY},
     protocol_spec::DpnProto,
+    waypoint::Waypoint,
 };
 use diem_vm::DiemVM;
 use diemdb::DiemDB;
@@ -30,9 +39,13 @@ use event_notifications::EventSubscriptionService;
 use executor::{db_bootstrapper::maybe_bootstrap, Executor};
 use executor_types::ChunkExecutor;
 use futures::channel::mpsc::channel;
+use mempool_notifications::MempoolNotificationSender;
 use network::application::storage::PeerMetadataStorage;
 use network_builder::builder::NetworkBuilder;
-use state_sync_multiplexer::{state_sync_v1_network_config, StateSyncMultiplexer};
+use state_sync_multiplexer::{
+    state_sync_v1_network_config, StateSyncMultiplexer, StateSyncRuntimes,
+};
+use state_sync_v1::network::{StateSyncEvents, StateSyncSender};
 use std::{
     boxed::Box,
     collections::{HashMap, HashSet},
@@ -53,7 +66,7 @@ use storage_service_client::{StorageServiceClient, StorageServiceMultiSender};
 use storage_service_server::{
     network::StorageServiceNetworkEvents, StorageReader, StorageServiceServer,
 };
-use tokio::runtime::{Builder, Handle, Runtime};
+use tokio::runtime::{Builder, Runtime};
 use tokio_stream::wrappers::IntervalStream;
 
 const AC_SMP_CHANNEL_BUFFER_SIZE: usize = 1_024;
@@ -67,8 +80,7 @@ pub struct DiemHandle {
     _debug: NodeDebugService,
     _mempool: Runtime,
     _network_runtimes: Vec<Runtime>,
-    _state_sync: StateSyncMultiplexer,
-    _storage_service: Runtime,
+    _state_sync_runtimes: StateSyncRuntimes,
 }
 
 pub fn start(config: &NodeConfig, log_file: Option<PathBuf>) {
@@ -238,42 +250,137 @@ fn setup_debug_interface(config: &NodeConfig, logger: Option<Arc<Logger>>) -> No
     NodeDebugService::new(addr, logger, config)
 }
 
-fn setup_storage_service_servers(
-    config: StorageServiceConfig,
-    network_handles: Vec<StorageServiceNetworkEvents>,
-    db_rw: &DbReaderWriter,
-) -> Runtime {
-    // For now, spawn all of the storage-service servers on the same runtime.
-    let rt = Builder::new_multi_thread()
-        .thread_name("storage-service-servers")
-        .enable_all()
-        .build()
-        .expect("Failed to start the DiemNet storage-service runtime.");
-    let storage_reader = StorageReader::new(Arc::clone(&db_rw.reader));
-    for events in network_handles {
-        let service =
-            StorageServiceServer::new(config, rt.handle().clone(), storage_reader.clone(), events);
-        rt.spawn(service.start());
-    }
-    rt
+fn create_state_sync_runtimes<M: MempoolNotificationSender + 'static>(
+    node_config: &NodeConfig,
+    storage_service_server_network_handles: Vec<StorageServiceNetworkEvents>,
+    storage_service_client_network_handles: HashMap<
+        NetworkId,
+        storage_service_client::StorageServiceNetworkSender,
+    >,
+    state_sync_network_handles: Vec<(NetworkId, StateSyncSender, StateSyncEvents)>,
+    peer_metadata_storage: Arc<PeerMetadataStorage>,
+    mempool_notifier: M,
+    consensus_listener: ConsensusNotificationListener,
+    chunk_executor: Box<dyn ChunkExecutor>,
+    waypoint: Waypoint,
+    event_subscription_service: EventSubscriptionService,
+    db_rw: DbReaderWriter,
+) -> StateSyncRuntimes {
+    // Start the state sync storage service
+    let storage_service_runtime = setup_state_sync_storage_service(
+        node_config.state_sync.storage_service,
+        storage_service_server_network_handles,
+        &db_rw,
+    );
+
+    // Start the diem data client
+    let (diem_data_client, diem_data_client_runtime) = setup_diem_data_client(
+        node_config.state_sync.storage_service,
+        storage_service_client_network_handles,
+        peer_metadata_storage,
+    );
+
+    // Start the data streaming service
+    let (streaming_service_client, streaming_service_runtime) = setup_data_streaming_service(
+        node_config.state_sync.data_streaming_service,
+        diem_data_client.clone(),
+    );
+
+    // Create the state sync multiplexer
+    let state_sync_multiplexer = StateSyncMultiplexer::new(
+        state_sync_network_handles,
+        mempool_notifier,
+        consensus_listener,
+        db_rw,
+        chunk_executor,
+        node_config,
+        waypoint,
+        event_subscription_service,
+        diem_data_client,
+        streaming_service_client,
+    );
+
+    // Create and return the new state sync handle
+    StateSyncRuntimes::new(
+        diem_data_client_runtime,
+        state_sync_multiplexer,
+        storage_service_runtime,
+        streaming_service_runtime,
+    )
 }
 
-fn setup_diemnet_data_client(
-    _runtime_handle: &Handle,
+fn setup_data_streaming_service(
+    config: DataStreamingServiceConfig,
+    diem_data_client: DiemNetDataClient,
+) -> (StreamingServiceClient, Runtime) {
+    // Create the data streaming service
+    let (streaming_service_client, streaming_service_listener) =
+        new_streaming_service_client_listener_pair();
+    let data_streaming_service =
+        DataStreamingService::new(config, diem_data_client, streaming_service_listener);
+
+    // Start the data streaming service
+    let streaming_service_runtime = Builder::new_multi_thread()
+        .thread_name("data-streaming-service")
+        .enable_all()
+        .build()
+        .expect("Failed to create data streaming service!");
+    streaming_service_runtime.spawn(data_streaming_service.start_service());
+
+    (streaming_service_client, streaming_service_runtime)
+}
+
+fn setup_diem_data_client(
     config: StorageServiceConfig,
     network_handles: HashMap<NetworkId, storage_service_client::StorageServiceNetworkSender>,
     peer_metadata_storage: Arc<PeerMetadataStorage>,
-) -> DiemNetDataClient {
+) -> (DiemNetDataClient, Runtime) {
     // Combine all storage service client handles
     let network_client = StorageServiceClient::new(
         StorageServiceMultiSender::new(network_handles),
         peer_metadata_storage,
     );
-    let (diemnet_data_client, _data_summary_poller) =
+
+    // Create the diem data client
+    let (diem_data_client, data_summary_poller) =
         DiemNetDataClient::new(config, TimeService::real(), network_client);
-    // TODO(philiphayes): uncomment this when we're ready to start doing e2e tests
-    // runtime_handle.spawn(data_summary_poller);
-    diemnet_data_client
+
+    // Create a new runtime for the diem data client and spawn the data poller
+    let diem_data_client_runtime = Builder::new_multi_thread()
+        .thread_name("diem-data-client")
+        .enable_all()
+        .build()
+        .expect("Failed to create diem data client!");
+    diem_data_client_runtime.spawn(data_summary_poller.start());
+
+    (diem_data_client, diem_data_client_runtime)
+}
+
+fn setup_state_sync_storage_service(
+    config: StorageServiceConfig,
+    network_handles: Vec<StorageServiceNetworkEvents>,
+    db_rw: &DbReaderWriter,
+) -> Runtime {
+    // Create a new state sync storage service runtime
+    let storage_service_runtime = Builder::new_multi_thread()
+        .thread_name("storage-service-server")
+        .enable_all()
+        .build()
+        .expect("Failed to start the DiemNet storage-service runtime.");
+
+    // Spawn all state sync storage service servers on the same runtime
+    let storage_reader = StorageReader::new(Arc::clone(&db_rw.reader));
+    for events in network_handles {
+        let service = StorageServiceServer::new(
+            config,
+            storage_service_runtime.handle().clone(),
+            storage_reader.clone(),
+            events,
+        );
+        storage_service_runtime.spawn(service.start());
+    }
+
+    storage_service_runtime
 }
 
 async fn periodic_state_dump(node_config: NodeConfig, db: DbReaderWriter) {
@@ -490,20 +597,6 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
     // TODO set up on-chain discovery network based on UpstreamConfig.fallback_network
     // and pass network handles to mempool/state sync
 
-    let storage_service_rt = setup_storage_service_servers(
-        StorageServiceConfig::default(),
-        storage_service_server_network_handles,
-        &db_rw,
-    );
-
-    let _diemnet_data_client = setup_diemnet_data_client(
-        // TODO(philiphayes): probably use state-sync-v2 handle here?
-        storage_service_rt.handle(),
-        StorageServiceConfig::default(),
-        storage_service_client_network_handles,
-        peer_metadata_storage.clone(),
-    );
-
     // For state sync to send notifications to mempool and receive notifications from consensus.
     let (mempool_notifier, mempool_listener) =
         mempool_notifications::new_mempool_notifier_listener_pair();
@@ -512,17 +605,21 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
             node_config.state_sync.client_commit_timeout_ms,
         );
 
-    // Create the state sync multiplexer
-    let state_sync = StateSyncMultiplexer::new(
+    // Create the state sync runtimes
+    let state_sync_runtimes = create_state_sync_runtimes(
+        node_config,
+        storage_service_server_network_handles,
+        storage_service_client_network_handles,
         state_sync_network_handles,
+        peer_metadata_storage.clone(),
         mempool_notifier,
         consensus_listener,
-        Arc::clone(&db_rw.reader),
         chunk_executor,
-        node_config,
         genesis_waypoint,
         event_subscription_service,
+        db_rw.clone(),
     );
+
     let (mp_client_sender, mp_client_events) = channel(AC_SMP_CHANNEL_BUFFER_SIZE);
 
     let api_runtime = if node_config.api.enabled {
@@ -557,7 +654,7 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
         // TODO: Note that we need the networking layer to be able to discover & connect to the
         // peers with potentially outdated network identity public keys.
         debug!("Wait until state sync is initialized");
-        state_sync.block_until_initialized();
+        state_sync_runtimes.block_until_initialized();
         debug!("State sync initialization complete.");
 
         // Initialize and start consensus.
@@ -589,7 +686,6 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
         _debug: debug_if,
         _mempool: mempool,
         _network_runtimes: network_runtimes,
-        _state_sync: state_sync,
-        _storage_service: storage_service_rt,
+        _state_sync_runtimes: state_sync_runtimes,
     }
 }

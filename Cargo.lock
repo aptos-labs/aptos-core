@@ -2366,6 +2366,7 @@ dependencies = [
  "consensus",
  "consensus-notifications",
  "crash-handler",
+ "data-streaming-service",
  "debug-interface",
  "diem-api",
  "diem-config",
@@ -2397,6 +2398,7 @@ dependencies = [
  "network-builder",
  "rand 0.8.4",
  "state-sync-multiplexer",
+ "state-sync-v1",
  "storage-client",
  "storage-interface",
  "storage-service",
@@ -8175,11 +8177,14 @@ name = "state-sync-multiplexer"
 version = "0.1.0"
 dependencies = [
  "consensus-notifications",
+ "data-streaming-service",
  "diem-config",
  "diem-crypto",
+ "diem-data-client",
  "diem-genesis-tool",
  "diem-infallible",
  "diem-temppath",
+ "diem-time-service",
  "diem-types",
  "diem-vm",
  "diem-workspace-hack",
@@ -8191,8 +8196,11 @@ dependencies = [
  "futures",
  "mempool-notifications",
  "network",
+ "state-sync-driver",
  "state-sync-v1",
  "storage-interface",
+ "storage-service-client",
+ "tokio",
 ]
 
 [[package]]

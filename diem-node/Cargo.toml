@@ -24,6 +24,7 @@ backup-service = { path = "../storage/backup/backup-service" }
 consensus = { path = "../consensus" }
 consensus-notifications = { path = "../state-sync/inter-component/consensus-notifications" }
 crash-handler = { path = "../common/crash-handler" }
+data-streaming-service = { path = "../state-sync/state-sync-v2/data-streaming-service" }
 diem-infallible = { path = "../common/infallible" }
 debug-interface = { path = "../common/debug-interface" }
 event-notifications = { path = "../state-sync/inter-component/event-notifications" }
@@ -50,6 +51,7 @@ mempool-notifications = { path = "../state-sync/inter-component/mempool-notifica
 network = { path = "../network" }
 network-builder = { path = "../network/builder" }
 state-sync-multiplexer = { path = "../state-sync/state-sync-v2/state-sync-multiplexer" }
+state-sync-v1 = { path = "../state-sync/state-sync-v1" }
 storage-client = { path = "../storage/storage-client" }
 storage-interface= { path = "../storage/storage-interface" }
 storage-service = { path = "../storage/storage-service" }

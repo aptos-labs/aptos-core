@@ -193,7 +193,6 @@ members = [
     "diem-proptest-helpers",
     "diem-rest-client",
     "diem-retrier",
-    "data-streaming-service", # Will be removed once state sync v2 is plugged into diem-node.
     "diem-swarm",
     "diem-transactional-test-harness",
     "diem-transaction-benchmarks",
@@ -231,7 +230,6 @@ members = [
     "shuffle-custom-move-code",
     "smoke-test",
     "socket-bench-server",
-    "state-sync-driver", # Will be removed once state sync v2 is plugged into diem-node.
     "test-generation",
     "transaction-emitter",
     "x",
