@@ -6,9 +6,9 @@ use diem_crypto::hash::{CryptoHash, HashValue};
 use diem_transaction_builder::{error_explain, stdlib::ScriptCall};
 use diem_types::{
     account_config::{
-        AccountResource, AccountRole, AdminTransactionEvent, BalanceResource, BaseUrlRotationEvent,
-        BurnEvent, CancelBurnEvent, ComplianceKeyRotationEvent, CreateAccountEvent,
-        CurrencyInfoResource, DesignatedDealerPreburns, FreezingBit, Limit, MintEvent,
+        AccountRole, AdminTransactionEvent, BalanceResource, BaseUrlRotationEvent, BurnEvent,
+        CancelBurnEvent, ComplianceKeyRotationEvent, CreateAccountEvent, CurrencyInfoResource,
+        DesignatedDealerPreburns, DiemAccountResource, FreezingBit, Limit, MintEvent,
         NewBlockEvent, NewEpochEvent, PreburnEvent, ReceivedMintEvent, ReceivedPaymentEvent,
         SentPaymentEvent, ToXDXExchangeRateUpdateEvent, VASPDomainEvent,
     },
@@ -182,7 +182,7 @@ pub struct AccountView {
 impl AccountView {
     pub fn new(
         address: AccountAddress,
-        account: &AccountResource,
+        account: &DiemAccountResource,
         balances: BTreeMap<Identifier, BalanceResource>,
         account_role: AccountRole,
         freezing_bit: FreezingBit,
@@ -214,7 +214,7 @@ impl AccountView {
         version: u64,
     ) -> Result<Self> {
         let account_resource = account_state
-            .get_account_resource()?
+            .get_diem_account_resource()?
             .ok_or_else(|| format_err!("invalid account state: no account resource"))?;
         let freezing_bit = account_state
             .get_freezing_bit()?

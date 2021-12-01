@@ -7,7 +7,7 @@ use diem_sdk::{
     client::BlockingClient,
     move_types::{identifier::Identifier, language_storage::StructTag},
     transaction_builder::TransactionFactory,
-    types::{account_config::xus_tag, LocalAccount},
+    types::LocalAccount,
 };
 use diem_transaction_builder::experimental_stdlib as stdlib;
 use diem_types::{
@@ -129,7 +129,6 @@ fn create_basic_account(
     let txn =
         account.sign_with_transaction_builder(TransactionFactory::new(ChainId::test()).payload(
             stdlib::encode_create_account_script_function(
-                xus_tag(),
                 AccountAddress::from_hex_literal(&new_address).unwrap(),
                 hex::decode(&new_auth_key_prefix).unwrap(),
             ),

@@ -66,7 +66,7 @@ impl NFTPublicUsageTest for NFTTransaction {
                     receiver_address,
                     transfer_amount,
                     sender_address,
-                    2,
+                    0,
                 ),
             )
             .sender(sender_address)

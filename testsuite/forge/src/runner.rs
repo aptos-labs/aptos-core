@@ -163,7 +163,10 @@ impl<'cfg> ForgeConfig<'cfg> {
     }
 
     pub fn number_of_tests(&self) -> usize {
-        self.public_usage_tests.len() + self.admin_tests.len() + self.network_tests.len()
+        self.public_usage_tests.len()
+            + self.admin_tests.len()
+            + self.network_tests.len()
+            + self.nft_public_usage_tests.len()
     }
 
     pub fn all_tests(&self) -> impl Iterator<Item = &'cfg dyn Test> + 'cfg {
@@ -172,6 +175,7 @@ impl<'cfg> ForgeConfig<'cfg> {
             .map(|t| t as &dyn Test)
             .chain(self.admin_tests.iter().map(|t| t as &dyn Test))
             .chain(self.network_tests.iter().map(|t| t as &dyn Test))
+            .chain(self.nft_public_usage_tests.iter().map(|t| t as &dyn Test))
     }
 }
 

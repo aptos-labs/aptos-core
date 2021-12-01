@@ -11,8 +11,8 @@ use diem_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
     account_config::{
-        self, from_currency_code_string, type_tag_for_currency_code, AccountResource,
-        BalanceResource, RoleId, XDX_NAME, XUS_NAME,
+        self, from_currency_code_string, type_tag_for_currency_code, BalanceResource,
+        DiemAccountResource, RoleId, XDX_NAME, XUS_NAME,
     },
     chain_id::ChainId,
     event::EventHandle,
@@ -150,7 +150,7 @@ impl Account {
     ///
     /// Use this to retrieve or publish the Account blob.
     pub fn make_account_access_path(&self) -> AccessPath {
-        self.make_access_path(AccountResource::struct_tag())
+        self.make_access_path(DiemAccountResource::struct_tag())
     }
 
     /// Returns the AccessPath that describes the Account balance resource instance.

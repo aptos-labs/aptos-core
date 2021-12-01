@@ -8,7 +8,6 @@ use crate::{
     errors::{convert_epilogue_error, convert_prologue_error, expect_only_successful_execution},
     logging::AdapterLogSchema,
     natives::diem_natives,
-    system_module_names::*,
     transaction_metadata::TransactionMetadata,
 };
 use diem_crypto::HashValue;
@@ -16,7 +15,7 @@ use diem_logger::prelude::*;
 use diem_state_view::StateView;
 use diem_types::{
     account_config,
-    account_config::CurrencyInfoResource,
+    account_config::{ChainSpecificAccountInfo, CurrencyInfoResource},
     contract_event::ContractEvent,
     event::EventKey,
     on_chain_config::{
@@ -33,8 +32,9 @@ use move_core_types::{
     effects::{ChangeSet as MoveChangeSet, Event as MoveEvent},
     gas_schedule::{CostTable, GasAlgebra, GasCarrier, GasUnits, InternalGasUnits},
     identifier::{IdentStr, Identifier},
-    language_storage::ModuleId,
-    resolver::MoveResolver,
+    language_storage::{ModuleId, TypeTag},
+    move_resource::MoveStructType,
+    resolver::{MoveResolver, ResourceResolver},
     value::{serialize_values, MoveValue},
 };
 use move_vm_runtime::{logging::expect_no_verification_errors, move_vm::MoveVM, session::Session};
@@ -48,6 +48,7 @@ pub struct DiemVMImpl {
     on_chain_config: Option<VMConfig>,
     version: Option<DiemVersion>,
     publishing_option: Option<VMPublishingOption>,
+    chain_account_info: Option<ChainSpecificAccountInfo>,
 }
 
 impl DiemVMImpl {
@@ -60,8 +61,10 @@ impl DiemVMImpl {
             on_chain_config: None,
             version: None,
             publishing_option: None,
+            chain_account_info: None,
         };
         vm.load_configs_impl(&RemoteStorage::new(state));
+        vm.chain_account_info = Self::get_chain_specific_account_info(&RemoteStorage::new(state));
         vm
     }
 
@@ -77,12 +80,19 @@ impl DiemVMImpl {
             on_chain_config: Some(on_chain_config),
             version: Some(version),
             publishing_option: Some(publishing_option),
+            chain_account_info: None,
         }
     }
 
     /// Provides access to some internal APIs of the Diem VM.
     pub fn internals(&self) -> DiemVMInternals {
         DiemVMInternals(self)
+    }
+
+    pub(crate) fn chain_info(&self) -> &ChainSpecificAccountInfo {
+        self.chain_account_info
+            .as_ref()
+            .unwrap_or(&account_config::DPN_CHAIN_INFO)
     }
 
     pub(crate) fn publishing_option(
@@ -103,6 +113,22 @@ impl DiemVMImpl {
         self.on_chain_config = VMConfig::fetch_config(data_cache);
         self.version = DiemVersion::fetch_config(data_cache);
         self.publishing_option = VMPublishingOption::fetch_config(data_cache);
+    }
+
+    // TODO: Move this to an on-chain config once those are a part of the core framework
+    fn get_chain_specific_account_info<S: ResourceResolver>(
+        remote_cache: &S,
+    ) -> Option<ChainSpecificAccountInfo> {
+        match remote_cache
+            .get_resource(
+                &account_config::diem_root_address(),
+                &account_config::ChainSpecificAccountInfo::struct_tag(),
+            )
+            .ok()?
+        {
+            Some(blob) => bcs::from_bytes::<ChainSpecificAccountInfo>(&blob).ok(),
+            _ => None,
+        }
     }
 
     pub fn get_gas_schedule(&self, log_context: &AdapterLogSchema) -> Result<&CostTable, VMStatus> {
@@ -207,6 +233,16 @@ impl DiemVMImpl {
         Ok(())
     }
 
+    fn get_gas_currency_args(&self, account_currency_symbol: &IdentStr) -> Vec<TypeTag> {
+        if self.chain_info().currency_code_required {
+            vec![account_config::type_tag_for_currency_code(
+                account_currency_symbol.to_owned(),
+            )]
+        } else {
+            vec![]
+        }
+    }
+
     /// Run the prologue of a transaction by calling into either `SCRIPT_PROLOGUE_NAME` function
     /// or `MULTI_AGENT_SCRIPT_PROLOGUE_NAME` function stored in the `ACCOUNT_MODULE` on chain.
     pub(crate) fn run_script_prologue<S: MoveResolver>(
@@ -216,8 +252,8 @@ impl DiemVMImpl {
         account_currency_symbol: &IdentStr,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
-        let gas_currency_ty =
-            account_config::type_tag_for_currency_code(account_currency_symbol.to_owned());
+        let chain_specific_info = self.chain_info();
+        let gas_currency = self.get_gas_currency_args(account_currency_symbol);
         let txn_sequence_number = txn_data.sequence_number();
         let txn_public_key = txn_data.authentication_key_preimage().to_vec();
         let txn_gas_price = txn_data.gas_unit_price().get();
@@ -258,21 +294,21 @@ impl DiemVMImpl {
         };
         let prologue_function_name =
             if self.get_diem_version()? >= DIEM_VERSION_3 && txn_data.is_multi_agent() {
-                &MULTI_AGENT_SCRIPT_PROLOGUE_NAME
+                &chain_specific_info.multi_agent_prologue_name
             } else {
-                &SCRIPT_PROLOGUE_NAME
+                &chain_specific_info.script_prologue_name
             };
         session
             .execute_function(
-                &account_config::ACCOUNT_MODULE,
+                &chain_specific_info.module_id(),
                 prologue_function_name,
-                vec![gas_currency_ty],
+                gas_currency,
                 serialize_values(&args),
                 &mut gas_status,
             )
             .map(|_return_vals| ())
             .map_err(expect_no_verification_errors)
-            .or_else(|err| convert_prologue_error(err, log_context))
+            .or_else(|err| convert_prologue_error(chain_specific_info, err, log_context))
     }
 
     /// Run the prologue of a transaction by calling into `MODULE_PROLOGUE_NAME` function stored
@@ -284,8 +320,8 @@ impl DiemVMImpl {
         account_currency_symbol: &IdentStr,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
-        let gas_currency_ty =
-            account_config::type_tag_for_currency_code(account_currency_symbol.to_owned());
+        let chain_specific_info = self.chain_info();
+        let gas_currency = self.get_gas_currency_args(account_currency_symbol);
         let txn_sequence_number = txn_data.sequence_number();
         let txn_public_key = txn_data.authentication_key_preimage().to_vec();
         let txn_gas_price = txn_data.gas_unit_price().get();
@@ -295,9 +331,9 @@ impl DiemVMImpl {
         let mut gas_status = GasStatus::new_unmetered();
         session
             .execute_function(
-                &account_config::ACCOUNT_MODULE,
-                MODULE_PROLOGUE_NAME,
-                vec![gas_currency_ty],
+                &chain_specific_info.module_id(),
+                &chain_specific_info.module_prologue_name,
+                gas_currency,
                 serialize_values(&vec![
                     MoveValue::Signer(txn_data.sender),
                     MoveValue::U64(txn_sequence_number),
@@ -311,7 +347,7 @@ impl DiemVMImpl {
             )
             .map(|_return_vals| ())
             .map_err(expect_no_verification_errors)
-            .or_else(|err| convert_prologue_error(err, log_context))
+            .or_else(|err| convert_prologue_error(chain_specific_info, err, log_context))
     }
 
     /// Run the epilogue of a transaction by calling into `EPILOGUE_NAME` function stored
@@ -330,17 +366,17 @@ impl DiemVMImpl {
             ))
         });
 
-        let gas_currency_ty =
-            account_config::type_tag_for_currency_code(account_currency_symbol.to_owned());
+        let gas_currency = self.get_gas_currency_args(account_currency_symbol);
+        let chain_specific_info = self.chain_info();
         let txn_sequence_number = txn_data.sequence_number();
         let txn_gas_price = txn_data.gas_unit_price().get();
         let txn_max_gas_units = txn_data.max_gas_amount().get();
         let gas_remaining = gas_status.remaining_gas().get();
         session
             .execute_function(
-                &account_config::ACCOUNT_MODULE,
-                USER_EPILOGUE_NAME,
-                vec![gas_currency_ty],
+                &chain_specific_info.module_id(),
+                &chain_specific_info.user_epilogue_name,
+                gas_currency,
                 serialize_values(&vec![
                     MoveValue::Signer(txn_data.sender),
                     MoveValue::U64(txn_sequence_number),
@@ -352,7 +388,7 @@ impl DiemVMImpl {
             )
             .map(|_return_vals| ())
             .map_err(expect_no_verification_errors)
-            .or_else(|err| convert_epilogue_error(err, log_context))
+            .or_else(|err| convert_epilogue_error(chain_specific_info, err, log_context))
     }
 
     /// Run the failure epilogue of a transaction by calling into `USER_EPILOGUE_NAME` function
@@ -365,17 +401,17 @@ impl DiemVMImpl {
         account_currency_symbol: &IdentStr,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
-        let gas_currency_ty =
-            account_config::type_tag_for_currency_code(account_currency_symbol.to_owned());
+        let gas_currency = self.get_gas_currency_args(account_currency_symbol);
+        let chain_specific_info = self.chain_info();
         let txn_sequence_number = txn_data.sequence_number();
         let txn_gas_price = txn_data.gas_unit_price().get();
         let txn_max_gas_units = txn_data.max_gas_amount().get();
         let gas_remaining = gas_status.remaining_gas().get();
         session
             .execute_function(
-                &account_config::ACCOUNT_MODULE,
-                USER_EPILOGUE_NAME,
-                vec![gas_currency_ty],
+                &chain_specific_info.module_id(),
+                &chain_specific_info.user_epilogue_name,
+                gas_currency,
                 serialize_values(&vec![
                     MoveValue::Signer(txn_data.sender),
                     MoveValue::U64(txn_sequence_number),
@@ -388,7 +424,11 @@ impl DiemVMImpl {
             .map(|_return_vals| ())
             .map_err(expect_no_verification_errors)
             .or_else(|e| {
-                expect_only_successful_execution(e, USER_EPILOGUE_NAME.as_str(), log_context)
+                expect_only_successful_execution(
+                    e,
+                    chain_specific_info.user_epilogue_name.as_str(),
+                    log_context,
+                )
             })
     }
 
@@ -404,12 +444,13 @@ impl DiemVMImpl {
         let txn_public_key = txn_data.authentication_key_preimage().to_vec();
         let txn_expiration_timestamp_secs = txn_data.expiration_timestamp_secs();
         let chain_id = txn_data.chain_id();
+        let chain_specific_info = self.chain_info();
 
         let mut gas_status = GasStatus::new_unmetered();
         session
             .execute_function(
-                &account_config::ACCOUNT_MODULE,
-                WRITESET_PROLOGUE_NAME,
+                &chain_specific_info.module_id(),
+                &chain_specific_info.writeset_prologue_name,
                 vec![],
                 serialize_values(&vec![
                     MoveValue::Signer(txn_data.sender),
@@ -422,7 +463,7 @@ impl DiemVMImpl {
             )
             .map(|_return_vals| ())
             .map_err(expect_no_verification_errors)
-            .or_else(|err| convert_prologue_error(err, log_context))
+            .or_else(|err| convert_prologue_error(chain_specific_info, err, log_context))
     }
 
     /// Run the epilogue of a transaction by calling into `WRITESET_EPILOGUE_NAME` function stored
@@ -435,10 +476,11 @@ impl DiemVMImpl {
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
         let mut gas_status = GasStatus::new_unmetered();
+        let chain_specific_info = self.chain_info();
         session
             .execute_function(
-                &account_config::ACCOUNT_MODULE,
-                WRITESET_EPILOGUE_NAME,
+                &chain_specific_info.module_id(),
+                &chain_specific_info.writeset_epilogue_name,
                 vec![],
                 serialize_values(&vec![
                     MoveValue::Signer(txn_data.sender),
@@ -450,7 +492,11 @@ impl DiemVMImpl {
             .map(|_return_vals| ())
             .map_err(expect_no_verification_errors)
             .or_else(|e| {
-                expect_only_successful_execution(e, WRITESET_EPILOGUE_NAME.as_str(), log_context)
+                expect_only_successful_execution(
+                    e,
+                    chain_specific_info.writeset_epilogue_name.as_str(),
+                    log_context,
+                )
             })
     }
 

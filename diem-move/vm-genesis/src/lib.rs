@@ -18,6 +18,7 @@ use diem_types::{
     account_config::{
         self,
         events::{CreateAccountEvent, NewEpochEvent},
+        DESIGNATED_DEALER_MODULE,
     },
     chain_id::{ChainId, NamedChain},
     contract_event::ContractEvent,
@@ -92,8 +93,12 @@ pub fn encode_genesis_change_set(
     let mut stdlib_modules = Vec::new();
     // create a data view for move_vm
     let mut state_view = GenesisStateView::new();
+    let mut has_dd_module = false;
     for module_bytes in stdlib_module_bytes {
         let module = CompiledModule::deserialize(module_bytes).unwrap();
+        if module.self_id() == *DESIGNATED_DEALER_MODULE {
+            has_dd_module = true;
+        }
         state_view.add_module(&module.self_id(), module_bytes);
         stdlib_modules.push(module)
     }
@@ -114,9 +119,10 @@ pub fn encode_genesis_change_set(
     create_and_initialize_owners_operators(&mut session, validators);
     reconfigure(&mut session);
 
-    if [NamedChain::TESTNET, NamedChain::DEVNET, NamedChain::TESTING]
-        .iter()
-        .any(|test_chain_id| test_chain_id.id() == chain_id.id())
+    if has_dd_module
+        && [NamedChain::TESTNET, NamedChain::DEVNET, NamedChain::TESTING]
+            .iter()
+            .any(|test_chain_id| test_chain_id.id() == chain_id.id())
     {
         create_and_initialize_testnet_minting(&mut session, treasury_compliance_key);
     }
@@ -157,7 +163,10 @@ pub fn encode_genesis_change_set(
     let (write_set, events) = convert_changeset_and_events(changeset1, events1).unwrap();
 
     assert!(!write_set.iter().any(|(_, op)| op.is_deletion()));
-    verify_genesis_write_set(&events);
+    // Perform DPN genesis verification
+    if has_dd_module {
+        verify_genesis_write_set(&events);
+    }
     ChangeSet::new(write_set, events)
 }
 
@@ -433,6 +442,7 @@ fn verify_genesis_write_set(events: &[ContractEvent]) {
 pub enum GenesisOptions {
     Compiled,
     Fresh,
+    Experimental,
 }
 
 /// Generate an artificial genesis `ChangeSet` for testing
@@ -440,6 +450,7 @@ pub fn generate_genesis_change_set_for_testing(genesis_options: GenesisOptions) 
     let modules = match genesis_options {
         GenesisOptions::Compiled => diem_framework_releases::current_module_blobs().to_vec(),
         GenesisOptions::Fresh => diem_framework::module_blobs(),
+        GenesisOptions::Experimental => diem_framework::experimental_module_blobs(),
     };
 
     generate_test_genesis(&modules, VMPublishingOption::open(), None, false).0

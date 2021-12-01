@@ -39,7 +39,7 @@ A typical workflow would look like the following
 
 
 <pre><code><b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/BCS.md#0x1_BCS">0x1::BCS</a>;
-<b>use</b> <a href="DiemTimestamp.md#0x1_DiemTimestamp">0x1::DiemTimestamp</a>;
+<b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/DiemTimestamp.md#0x1_DiemTimestamp">0x1::DiemTimestamp</a>;
 <b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors">0x1::Errors</a>;
 <b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event">0x1::Event</a>;
 <b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer">0x1::Signer</a>;
@@ -632,7 +632,7 @@ Create a ballot under the signer's address and return the <code><a href="Vote.md
 ): <a href="Vote.md#0x1_Vote_BallotID">BallotID</a> <b>acquires</b> <a href="Vote.md#0x1_Vote_Ballots">Ballots</a>, <a href="Vote.md#0x1_Vote_BallotCounter">BallotCounter</a> {
     <b>let</b> ballot_address = <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(ballot_account);
 
-    <b>assert</b>!(<a href="DiemTimestamp.md#0x1_DiemTimestamp_now_seconds">DiemTimestamp::now_seconds</a>() &lt; expiration_timestamp_secs, <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="Vote.md#0x1_Vote_EINVALID_TIMESTAMP">EINVALID_TIMESTAMP</a>));
+    <b>assert</b>!(<a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/DiemTimestamp.md#0x1_DiemTimestamp_now_seconds">DiemTimestamp::now_seconds</a>() &lt; expiration_timestamp_secs, <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="Vote.md#0x1_Vote_EINVALID_TIMESTAMP">EINVALID_TIMESTAMP</a>));
     <b>assert</b>!(num_votes_required &gt; 0, <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="Vote.md#0x1_Vote_EINVALID_NUM_VOTES">EINVALID_NUM_VOTES</a>));
 
     <b>if</b> (!<b>exists</b>&lt;<a href="Vote.md#0x1_Vote_BallotCounter">BallotCounter</a>&gt;(ballot_address)) {
@@ -755,7 +755,7 @@ All expired ballots are removed
 
 
 <pre><code><b>schema</b> <a href="Vote.md#0x1_Vote_GcEnsures">GcEnsures</a>&lt;Proposal&gt; {
-    <b>ensures</b> <a href="Vote.md#0x1_Vote_no_expired_ballots">no_expired_ballots</a>&lt;Proposal&gt;(post_ballots, <a href="DiemTimestamp.md#0x1_DiemTimestamp_spec_now_seconds">DiemTimestamp::spec_now_seconds</a>(), len(post_ballots));
+    <b>ensures</b> <a href="Vote.md#0x1_Vote_no_expired_ballots">no_expired_ballots</a>&lt;Proposal&gt;(post_ballots, DiemTimestamp::spec_now_seconds(), len(post_ballots));
 }
 </code></pre>
 
@@ -850,7 +850,7 @@ approved after this vote
     <b>let</b> allowed_voters = &ballot.allowed_voters;
 
     <b>assert</b>!(<a href="Vote.md#0x1_Vote_check_voter_present">check_voter_present</a>(allowed_voters, &voter_address_bcs), <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="Vote.md#0x1_Vote_EINVALID_VOTER">EINVALID_VOTER</a>));
-    <b>assert</b>!(<a href="DiemTimestamp.md#0x1_DiemTimestamp_now_seconds">DiemTimestamp::now_seconds</a>() &lt;= ballot.expiration_timestamp_secs, <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="Vote.md#0x1_Vote_EBALLOT_EXPIRED">EBALLOT_EXPIRED</a>));
+    <b>assert</b>!(<a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/DiemTimestamp.md#0x1_DiemTimestamp_now_seconds">DiemTimestamp::now_seconds</a>() &lt;= ballot.expiration_timestamp_secs, <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="Vote.md#0x1_Vote_EBALLOT_EXPIRED">EBALLOT_EXPIRED</a>));
 
     <b>assert</b>!(!<a href="Vote.md#0x1_Vote_check_voter_present">check_voter_present</a>(&ballot.votes_received, &voter_address_bcs), <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="Vote.md#0x1_Vote_EALREADY_VOTED">EALREADY_VOTED</a>));
 
@@ -1091,7 +1091,7 @@ There are no duplicate Ballot IDs in the Ballots<Proposer>.ballots vector
     <b>let</b> removed_ballots = <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_empty">Vector::empty</a>();
     <b>while</b> ({
         <b>spec</b> {
-            <b>invariant</b> <a href="Vote.md#0x1_Vote_no_expired_ballots">no_expired_ballots</a>(ballots, <a href="DiemTimestamp.md#0x1_DiemTimestamp_spec_now_seconds">DiemTimestamp::spec_now_seconds</a>(), i);
+            <b>invariant</b> <a href="Vote.md#0x1_Vote_no_expired_ballots">no_expired_ballots</a>(ballots, DiemTimestamp::spec_now_seconds(), i);
             <b>invariant</b> <a href="Vote.md#0x1_Vote_vector_subset">vector_subset</a>(ballots, <b>old</b>(ballot_data).ballots);
             <b>invariant</b> i &lt;= len(ballots);
             <b>invariant</b> 0 &lt;= i;
@@ -1099,7 +1099,7 @@ There are no duplicate Ballot IDs in the Ballots<Proposer>.ballots vector
         i &lt; <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_length">Vector::length</a>(ballots)
     }) {
         <b>let</b> ballot = <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_borrow">Vector::borrow</a>(ballots, i);
-        <b>if</b> (ballot.expiration_timestamp_secs &lt; <a href="DiemTimestamp.md#0x1_DiemTimestamp_now_seconds">DiemTimestamp::now_seconds</a>()) {
+        <b>if</b> (ballot.expiration_timestamp_secs &lt; <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/DiemTimestamp.md#0x1_DiemTimestamp_now_seconds">DiemTimestamp::now_seconds</a>()) {
             <b>let</b> ballot_id = *(&ballot.ballot_id);
             <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_swap_remove">Vector::swap_remove</a>(ballots, i);
             <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_push_back">Vector::push_back</a>(&<b>mut</b> removed_ballots, *&ballot_id);
@@ -1372,7 +1372,7 @@ NOTE: Maybe this should be "<=" not "<"
 
 <pre><code><b>fun</b> <a href="Vote.md#0x1_Vote_is_expired_if_exists">is_expired_if_exists</a>&lt;Proposal&gt;(ballot_address: <b>address</b>, ballot_id: <a href="Vote.md#0x1_Vote_BallotID">BallotID</a>): bool {
    <a href="Vote.md#0x1_Vote_get_ballot">get_ballot</a>&lt;Proposal&gt;(ballot_address, ballot_id).expiration_timestamp_secs
-       &lt;= <a href="DiemTimestamp.md#0x1_DiemTimestamp_spec_now_seconds">DiemTimestamp::spec_now_seconds</a>()
+       &lt;= DiemTimestamp::spec_now_seconds()
 }
 </code></pre>
 

@@ -1,5 +1,4 @@
-address DiemFramework {
-module MultiToken {
+module ExperimentalFramework::MultiToken {
     use Std::Errors;
     use Std::Event;
     use Std::GUID;
@@ -267,5 +266,4 @@ module MultiToken {
                 TokenData<TokenType> {metadata: Option::spec_some(metadata), token_id: GUID::GUID {id: result.id}, content_uri, supply:amount};
     }
 
-}
 }

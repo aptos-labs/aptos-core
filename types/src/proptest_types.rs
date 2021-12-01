@@ -5,7 +5,8 @@ use crate::{
     access_path::AccessPath,
     account_address::{self, AccountAddress},
     account_config::{
-        AccountResource, BalanceResource, KeyRotationCapabilityResource, WithdrawCapabilityResource,
+        AccountResource, BalanceResource, DiemAccountResource, KeyRotationCapabilityResource,
+        WithdrawCapabilityResource,
     },
     account_state_blob::AccountStateBlob,
     block_info::{BlockInfo, Round},
@@ -664,10 +665,32 @@ impl ContractEventGen {
 }
 
 #[derive(Arbitrary, Debug)]
-pub struct AccountResourceGen {
+pub struct DiemAccountResourceGen {
     withdrawal_capability: Option<WithdrawCapabilityResource>,
     key_rotation_capability: Option<KeyRotationCapabilityResource>,
 }
+
+impl DiemAccountResourceGen {
+    pub fn materialize(
+        self,
+        account_index: Index,
+        universe: &AccountInfoUniverse,
+    ) -> DiemAccountResource {
+        let account_info = universe.get_account_info(account_index);
+
+        DiemAccountResource::new(
+            account_info.sequence_number,
+            account_info.public_key.to_bytes().to_vec(),
+            self.withdrawal_capability,
+            self.key_rotation_capability,
+            account_info.sent_event_handle.clone(),
+            account_info.received_event_handle.clone(),
+        )
+    }
+}
+
+#[derive(Arbitrary, Debug)]
+pub struct AccountResourceGen;
 
 impl AccountResourceGen {
     pub fn materialize(
@@ -676,14 +699,10 @@ impl AccountResourceGen {
         universe: &AccountInfoUniverse,
     ) -> AccountResource {
         let account_info = universe.get_account_info(account_index);
-
         AccountResource::new(
             account_info.sequence_number,
             account_info.public_key.to_bytes().to_vec(),
-            self.withdrawal_capability,
-            self.key_rotation_capability,
-            account_info.sent_event_handle.clone(),
-            account_info.received_event_handle.clone(),
+            account_info.address,
         )
     }
 }
@@ -701,8 +720,9 @@ impl BalanceResourceGen {
 
 #[derive(Arbitrary, Debug)]
 pub struct AccountStateBlobGen {
-    account_resource_gen: AccountResourceGen,
+    diem_account_resource_gen: DiemAccountResourceGen,
     balance_resource_gen: BalanceResourceGen,
+    account_resource_gen: AccountResourceGen,
 }
 
 impl AccountStateBlobGen {
@@ -711,11 +731,15 @@ impl AccountStateBlobGen {
         account_index: Index,
         universe: &AccountInfoUniverse,
     ) -> AccountStateBlob {
+        let diem_account_resource = self
+            .diem_account_resource_gen
+            .materialize(account_index, universe);
         let account_resource = self
             .account_resource_gen
             .materialize(account_index, universe);
         let balance_resource = self.balance_resource_gen.materialize();
-        AccountStateBlob::try_from((&account_resource, &balance_resource)).unwrap()
+        AccountStateBlob::try_from((&account_resource, &diem_account_resource, &balance_resource))
+            .unwrap()
     }
 }
 

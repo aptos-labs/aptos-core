@@ -37,11 +37,11 @@ pub fn add_on_functions_list() -> Vec<(ModuleId, Identifier)> {
     vec![
         (DIEM_BLOCK_MODULE.clone(), BLOCK_PROLOGUE.to_owned()),
         (
-            account_config::constants::ACCOUNT_MODULE.clone(),
+            account_config::constants::DIEM_ACCOUNT_MODULE.clone(),
             SCRIPT_PROLOGUE_NAME.to_owned(),
         ),
         (
-            account_config::constants::ACCOUNT_MODULE.clone(),
+            account_config::constants::DIEM_ACCOUNT_MODULE.clone(),
             USER_EPILOGUE_NAME.to_owned(),
         ),
     ]
@@ -216,7 +216,7 @@ impl<'a, R: MoveResolver> ReadWriteSetAnalysis<'a, R> {
             account_config::from_currency_code_string(tx.gas_currency_code())?,
         );
         let prologue_accesses = self.get_partially_concretized_summary(
-            &account_config::constants::ACCOUNT_MODULE,
+            &account_config::constants::DIEM_ACCOUNT_MODULE,
             SCRIPT_PROLOGUE_NAME,
             &signers,
             &serialize_values(&vec![
@@ -233,7 +233,7 @@ impl<'a, R: MoveResolver> ReadWriteSetAnalysis<'a, R> {
         )?;
 
         let epilogue_accesses = self.get_partially_concretized_summary(
-            &account_config::constants::ACCOUNT_MODULE,
+            &account_config::constants::DIEM_ACCOUNT_MODULE,
             USER_EPILOGUE_NAME,
             &signers,
             &serialize_values(&vec![

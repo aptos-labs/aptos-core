@@ -80,7 +80,7 @@ impl AUTransactionGen for P2PTransferGen {
                 // epilogue.
                 // TODO: define these values in a central location
                 status = TransactionStatus::Keep(KeptVMStatus::MoveAbort(
-                    known_locations::account_module_abort(),
+                    known_locations::diem_account_module_abort(),
                     6,
                 ));
             }
@@ -92,7 +92,7 @@ impl AUTransactionGen for P2PTransferGen {
                 sender.balance -= gas_used * txn.gas_unit_price();
                 // 10 means the balance was insufficient while trying to transfer.
                 status = TransactionStatus::Keep(KeptVMStatus::MoveAbort(
-                    known_locations::account_module_abort(),
+                    known_locations::diem_account_module_abort(),
                     1288,
                 ));
             }

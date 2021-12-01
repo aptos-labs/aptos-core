@@ -340,8 +340,10 @@ impl DiemVM {
             }
         };
 
-        if let Err(err) = get_currency_info(&account_currency_symbol, storage) {
-            return discard_error_vm_status(err);
+        if self.0.chain_info().currency_code_required {
+            if let Err(err) = get_currency_info(&account_currency_symbol, storage) {
+                return discard_error_vm_status(err);
+            }
         }
 
         // Revalidate the transaction.
@@ -571,8 +573,10 @@ impl DiemVM {
             }
         };
 
-        if let Err(err) = get_currency_info(&account_currency_symbol, storage) {
-            return Ok(discard_error_vm_status(err));
+        if self.0.chain_info().currency_code_required {
+            if let Err(err) = get_currency_info(&account_currency_symbol, storage) {
+                return Ok(discard_error_vm_status(err));
+            }
         }
 
         // Revalidate the transaction.
@@ -805,11 +809,15 @@ impl VMAdapter for DiemVM {
         let gas_price = txn.gas_unit_price();
         let currency_code = get_gas_currency_code(txn)?;
 
-        let normalized_gas_price = match get_currency_info(&currency_code, remote_cache) {
-            Ok(info) => info.convert_to_xdx(gas_price),
-            Err(err) => {
-                return Err(err);
+        let normalized_gas_price = if self.0.chain_info().currency_code_required {
+            match get_currency_info(&currency_code, remote_cache) {
+                Ok(info) => info.convert_to_xdx(gas_price),
+                Err(err) => {
+                    return Err(err);
+                }
             }
+        } else {
+            gas_price
         };
 
         Ok(normalized_gas_price)
@@ -823,6 +831,7 @@ impl VMAdapter for DiemVM {
     ) -> Result<(), VMStatus> {
         let currency_code = get_gas_currency_code(transaction)?;
         let txn_data = TransactionMetadata::new(transaction);
+        //let account_blob = session.data_cache.get_resource
         match transaction.payload() {
             TransactionPayload::Script(_) => {
                 self.0.check_gas(&txn_data, log_context)?;

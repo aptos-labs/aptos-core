@@ -665,6 +665,13 @@ fn call_native_function(
                 state.record_access(args[0], Access::Read, func_env); // reads the length + contents
             }
         }
+        ("Account", "create_signer") => {
+            if state.locals.local_exists(args[0], func_env) {
+                state.record_access(args[0], Access::Read, func_env); // reads the input address
+                                                                      // treat as assignment
+                state.assign_local(rets[0], args[0], func_env)
+            }
+        }
         ("DiemAccount", "create_signer") => {
             if state.locals.local_exists(args[0], func_env) {
                 state.record_access(args[0], Access::Read, func_env); // reads the input address

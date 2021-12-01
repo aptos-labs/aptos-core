@@ -16,3 +16,4 @@ VMReserved = "0x0"
 
 [dependencies]
 MoveStdlib = { local = "../../../language/move-stdlib" }
+DiemCoreFramework = { local = "../core" }

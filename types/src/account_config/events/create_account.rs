@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    account_address::AccountAddress, account_config, account_config::ACCOUNT_MODULE_IDENTIFIER,
-    event::EventKey,
+    account_address::AccountAddress, account_config,
+    account_config::DIEM_ACCOUNT_MODULE_IDENTIFIER, event::EventKey,
 };
 use anyhow::Result;
 use move_core_types::{ident_str, identifier::IdentStr, move_resource::MoveStructType};
@@ -34,6 +34,6 @@ impl CreateAccountEvent {
 }
 
 impl MoveStructType for CreateAccountEvent {
-    const MODULE_NAME: &'static IdentStr = ACCOUNT_MODULE_IDENTIFIER;
+    const MODULE_NAME: &'static IdentStr = DIEM_ACCOUNT_MODULE_IDENTIFIER;
     const STRUCT_NAME: &'static IdentStr = ident_str!("CreateAccountEvent");
 }

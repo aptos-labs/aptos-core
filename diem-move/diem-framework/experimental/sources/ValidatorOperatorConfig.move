@@ -1,1 +1,0 @@
-../../core/sources/ValidatorOperatorConfig.move

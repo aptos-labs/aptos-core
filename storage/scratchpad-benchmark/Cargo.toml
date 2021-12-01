@@ -26,5 +26,5 @@ diem-logger = { path = "../../crates/diem-logger" }
 diem-types = { path = "../../types" }
 diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
 executor-types = { path = "../../execution/executor-types" }
-scratchpad = { path = "..//scratchpad" }
+scratchpad = { path = "../scratchpad" }
 storage-interface = { path = "../storage-interface" }

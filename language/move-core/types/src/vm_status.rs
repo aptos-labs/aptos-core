@@ -325,13 +325,23 @@ pub mod known_locations {
     use once_cell::sync::Lazy;
 
     /// The Identifier for the Account module.
-    pub const ACCOUNT_MODULE_IDENTIFIER: &IdentStr = ident_str!("DiemAccount");
+    pub const CORE_ACCOUNT_MODULE_IDENTIFIER: &IdentStr = ident_str!("Account");
     /// The ModuleId for the Account module.
-    pub static ACCOUNT_MODULE: Lazy<ModuleId> =
-        Lazy::new(|| ModuleId::new(CORE_CODE_ADDRESS, ACCOUNT_MODULE_IDENTIFIER.to_owned()));
+    pub static CORE_ACCOUNT_MODULE: Lazy<ModuleId> =
+        Lazy::new(|| ModuleId::new(CORE_CODE_ADDRESS, CORE_ACCOUNT_MODULE_IDENTIFIER.to_owned()));
     /// Location for an abort in the Account module
-    pub fn account_module_abort() -> AbortLocation {
-        AbortLocation::Module(ACCOUNT_MODULE.clone())
+    pub fn core_account_module_abort() -> AbortLocation {
+        AbortLocation::Module(CORE_ACCOUNT_MODULE.clone())
+    }
+
+    /// The Identifier for the Account module.
+    pub const DIEM_ACCOUNT_MODULE_IDENTIFIER: &IdentStr = ident_str!("DiemAccount");
+    /// The ModuleId for the Account module.
+    pub static DIEM_ACCOUNT_MODULE: Lazy<ModuleId> =
+        Lazy::new(|| ModuleId::new(CORE_CODE_ADDRESS, DIEM_ACCOUNT_MODULE_IDENTIFIER.to_owned()));
+    /// Location for an abort in the Account module
+    pub fn diem_account_module_abort() -> AbortLocation {
+        AbortLocation::Module(DIEM_ACCOUNT_MODULE.clone())
     }
 
     /// The Identifier for the Diem module.
@@ -472,6 +482,8 @@ pub enum StatusCode {
     SIGNERS_CONTAIN_DUPLICATES = 28,
     // The sequence nonce in the transaction is invalid (too new, too old, or already used).
     SEQUENCE_NONCE_INVALID = 29,
+    // There was an error when accessing chain-specific account information
+    CHAIN_ACCOUNT_INFO_DOES_NOT_EXIST = 30,
 
     // When a code module/script is published it is verified. These are the
     // possible errors that can arise from the verification process.

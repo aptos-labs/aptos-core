@@ -38,9 +38,8 @@ pub fn diem_payment_modules_full_path() -> String {
 }
 
 pub fn diem_stdlib_files_no_dependencies() -> Vec<String> {
-    let diem_core_modules_path = path_in_crate(CORE_MODULES_DIR);
     let diem_payment_modules_path = path_in_crate(DPN_MODULES_DIR);
-    find_filenames(&[diem_core_modules_path, diem_payment_modules_path], |p| {
+    find_filenames(&[diem_payment_modules_path], |p| {
         extension_equals(p, MOVE_EXTENSION)
     })
     .unwrap()
@@ -76,6 +75,16 @@ static DPN_FRAMEWORK_PKG: Lazy<CompiledPackage> = Lazy::new(|| {
         .unwrap()
 });
 
+static EXPERIMENTAL_FRAMEWORK_PKG: Lazy<CompiledPackage> = Lazy::new(|| {
+    let build_config = move_package::BuildConfig {
+        install_dir: Some(tempdir().unwrap().path().to_path_buf()),
+        ..Default::default()
+    };
+    build_config
+        .compile_package(&path_in_crate("experimental"), &mut Vec::new())
+        .unwrap()
+});
+
 pub fn modules() -> Vec<CompiledModule> {
     DPN_FRAMEWORK_PKG
         .transitive_compiled_units()
@@ -89,6 +98,21 @@ pub fn modules() -> Vec<CompiledModule> {
 
 pub fn module_blobs() -> Vec<Vec<u8>> {
     DPN_FRAMEWORK_PKG
+        .transitive_compiled_units()
+        .iter()
+        .filter_map(|unit| match unit {
+            CompiledUnit::Module(NamedCompiledModule { module, .. }) => {
+                let mut bytes = vec![];
+                module.serialize(&mut bytes).unwrap();
+                Some(bytes)
+            }
+            CompiledUnit::Script(_) => None,
+        })
+        .collect()
+}
+
+pub fn experimental_module_blobs() -> Vec<Vec<u8>> {
+    EXPERIMENTAL_FRAMEWORK_PKG
         .transitive_compiled_units()
         .iter()
         .filter_map(|unit| match unit {

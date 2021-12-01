@@ -7,8 +7,8 @@ use crate::{
     account_config::{
         currency_code_from_type_tag, AccountResource, AccountRole, BalanceResource, CRSNResource,
         ChainIdResource, ChildVASP, Credential, CurrencyInfoResource, DesignatedDealer,
-        DesignatedDealerPreburns, FreezingBit, ParentVASP, PreburnQueueResource, PreburnResource,
-        VASPDomainManager, VASPDomains,
+        DesignatedDealerPreburns, DiemAccountResource, FreezingBit, ParentVASP,
+        PreburnQueueResource, PreburnResource, VASPDomainManager, VASPDomains,
     },
     block_metadata::DiemBlockResource,
     diem_timestamp::DiemTimestampResource,
@@ -32,11 +32,28 @@ impl AccountState {
     // By design and do not remove
     pub fn get_account_address(&self) -> Result<Option<AccountAddress>> {
         self.get_account_resource()
-            .map(|opt_ar| opt_ar.map(|ar| ar.sent_events().key().get_creator_address()))
+            .map(|opt_ar| opt_ar.map(|ar| ar.address()))
     }
 
+    pub fn get_diem_account_resource(&self) -> Result<Option<DiemAccountResource>> {
+        self.get_resource::<DiemAccountResource>()
+    }
+
+    // Return the `AccountResource` for this blob. If the blob doesn't have an `AccountResource`
+    // then it must have a `DiemAccountResource` in which case we convert that to an
+    // `AccountResource`.
     pub fn get_account_resource(&self) -> Result<Option<AccountResource>> {
-        self.get_resource::<AccountResource>()
+        match self.get_resource::<AccountResource>()? {
+            x @ Some(_) => Ok(x),
+            None => match self.get_resource::<DiemAccountResource>()? {
+                Some(diem_ar) => Ok(Some(AccountResource::new(
+                    diem_ar.sequence_number(),
+                    diem_ar.authentication_key().to_vec(),
+                    diem_ar.address(),
+                ))),
+                None => Ok(None),
+            },
+        }
     }
 
     pub fn get_crsn_resource(&self) -> Result<Option<CRSNResource>> {
@@ -322,7 +339,7 @@ impl fmt::Debug for AccountState {
         write!(
             f,
             "{{ \n \
-             AccountResource {{ {} }} \n \
+             DiemAccountResource {{ {} }} \n \
              DiemTimestamp {{ {} }} \n \
              ValidatorConfig {{ {} }} \n \
              ValidatorSet {{ {} }} \n \
@@ -332,16 +349,24 @@ impl fmt::Debug for AccountState {
     }
 }
 
-impl TryFrom<(&AccountResource, &BalanceResource)> for AccountState {
+impl TryFrom<(&AccountResource, &DiemAccountResource, &BalanceResource)> for AccountState {
     type Error = Error;
 
     fn try_from(
-        (account_resource, balance_resource): (&AccountResource, &BalanceResource),
+        (account_resource, diem_account_resource, balance_resource): (
+            &AccountResource,
+            &DiemAccountResource,
+            &BalanceResource,
+        ),
     ) -> Result<Self> {
         let mut btree_map: BTreeMap<Vec<u8>, Vec<u8>> = BTreeMap::new();
         btree_map.insert(
             AccountResource::resource_path(),
             bcs::to_bytes(account_resource)?,
+        );
+        btree_map.insert(
+            DiemAccountResource::resource_path(),
+            bcs::to_bytes(diem_account_resource)?,
         );
         btree_map.insert(
             BalanceResource::resource_path(),

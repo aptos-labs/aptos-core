@@ -3,7 +3,7 @@
 
 use crate::{
     access_path::AccessPath,
-    account_config::constants::{xus_tag, ACCOUNT_MODULE_IDENTIFIER, CORE_CODE_ADDRESS},
+    account_config::constants::{xus_tag, CORE_CODE_ADDRESS, DIEM_ACCOUNT_MODULE_IDENTIFIER},
 };
 use move_core_types::{
     ident_str,
@@ -48,7 +48,7 @@ impl BalanceResource {
 }
 
 impl MoveStructType for BalanceResource {
-    const MODULE_NAME: &'static IdentStr = ACCOUNT_MODULE_IDENTIFIER;
+    const MODULE_NAME: &'static IdentStr = DIEM_ACCOUNT_MODULE_IDENTIFIER;
     const STRUCT_NAME: &'static IdentStr = ident_str!("Balance");
 
     fn type_params() -> Vec<TypeTag> {

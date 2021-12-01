@@ -275,7 +275,7 @@ pub fn txn_one_account_result(
             sender.balance -= gas_used * gas_price;
             (
                 TransactionStatus::Keep(KeptVMStatus::MoveAbort(
-                    known_locations::account_module_abort(),
+                    known_locations::diem_account_module_abort(),
                     6,
                 )),
                 false,
@@ -289,7 +289,7 @@ pub fn txn_one_account_result(
             sender.balance -= low_gas_used * gas_price;
             (
                 TransactionStatus::Keep(KeptVMStatus::MoveAbort(
-                    known_locations::account_module_abort(),
+                    known_locations::diem_account_module_abort(),
                     10,
                 )),
                 false,

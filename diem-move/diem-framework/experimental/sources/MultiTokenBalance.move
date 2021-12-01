@@ -1,7 +1,7 @@
-module DiemFramework::MultiTokenBalance {
+module ExperimentalFramework::MultiTokenBalance {
     use Std::Errors;
     use Std::GUID;
-    use DiemFramework::MultiToken::{Self, Token};
+    use ExperimentalFramework::MultiToken::{Self, Token};
     use Std::Option::{Self, Option};
     use Std::Signer;
     use Std::Vector;

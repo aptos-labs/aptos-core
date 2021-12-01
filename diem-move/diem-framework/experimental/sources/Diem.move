@@ -1,1 +1,0 @@
-../../core/sources/Diem.move

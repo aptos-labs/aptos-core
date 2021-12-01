@@ -5,7 +5,7 @@ use crate::{unit_tests::TestInterface, DiemDebugger};
 use anyhow::bail;
 use diem_types::{
     account_address::AccountAddress,
-    account_config::AccountResource,
+    account_config::DiemAccountResource,
     event::{EventHandle, EventKey},
 };
 use move_core_types::{effects::ChangeSet, move_resource::MoveStructType};
@@ -46,8 +46,8 @@ fn test_changeset_override() {
     override_changeset
         .publish_resource(
             address,
-            AccountResource::struct_tag(),
-            bcs::to_bytes(&AccountResource::new(
+            DiemAccountResource::struct_tag(),
+            bcs::to_bytes(&DiemAccountResource::new(
                 0,
                 vec![],
                 None,

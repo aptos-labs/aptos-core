@@ -13,7 +13,7 @@ use diem_types::{
     access_path::AccessPath,
     account_config::{
         self, diem_root_address, testnet_dd_account_address, treasury_compliance_account_address,
-        type_tag_for_currency_code, AccountResource, BalanceResource, XUS_IDENTIFIER, XUS_NAME,
+        type_tag_for_currency_code, BalanceResource, DiemAccountResource, XUS_IDENTIFIER, XUS_NAME,
     },
     block_metadata::BlockMetadata,
     chain_id::ChainId,
@@ -434,10 +434,10 @@ impl<'a> DiemTestAdapter<'a> {
 
     /// Obtain a Rust representation of the account resource from storage, which is used to derive
     /// a few default transaction parameters.
-    fn fetch_account_resource(&self, signer_addr: &AccountAddress) -> Result<AccountResource> {
+    fn fetch_account_resource(&self, signer_addr: &AccountAddress) -> Result<DiemAccountResource> {
         let account_access_path = AccessPath::resource_access_path(ResourceKey::new(
             *signer_addr,
-            AccountResource::struct_tag(),
+            DiemAccountResource::struct_tag(),
         ));
         let account_blob = self
             .storage
@@ -578,7 +578,7 @@ impl<'a> DiemTestAdapter<'a> {
         let txn = RawTransaction::new(
             diem_root_address(),
             parameters.sequence_number,
-            diem_transaction_builder::experimental_stdlib::encode_create_validator_account_script_function(
+            diem_transaction_builder::stdlib::encode_create_validator_account_script_function(
                 0,
                 validator_account_addr,
                 validator_auth_key_prefix,
@@ -603,7 +603,7 @@ impl<'a> DiemTestAdapter<'a> {
         let txn = RawTransaction::new(
             diem_root_address(),
             parameters.sequence_number,
-            diem_transaction_builder::experimental_stdlib::encode_create_validator_operator_account_script_function(
+            diem_transaction_builder::stdlib::encode_create_validator_operator_account_script_function(
                 0,
                 operator_account_addr,
                 operator_auth_key_prefix,
@@ -628,7 +628,7 @@ impl<'a> DiemTestAdapter<'a> {
         let txn = RawTransaction::new(
             validator_account_addr,
             parameters.sequence_number,
-            diem_transaction_builder::experimental_stdlib::encode_set_validator_operator_script_function(
+            diem_transaction_builder::stdlib::encode_set_validator_operator_script_function(
                 validator_name.as_bytes().into(),
                 operator_account_addr,
             ),
@@ -638,10 +638,7 @@ impl<'a> DiemTestAdapter<'a> {
             parameters.expiration_timestamp_secs,
             ChainId::test(),
         )
-        .sign(
-            &validator_private_key,
-            validator_private_key.public_key(),
-        )
+        .sign(&validator_private_key, validator_private_key.public_key())
         .unwrap()
         .into_inner();
         self.run_transaction(Transaction::UserTransaction(txn))
@@ -654,17 +651,19 @@ impl<'a> DiemTestAdapter<'a> {
         let txn = RawTransaction::new(
             operator_account_addr,
             parameters.sequence_number,
-            diem_transaction_builder::experimental_stdlib::encode_register_validator_config_script_function(validator_account_addr, validator_private_key.public_key().to_bytes().to_vec(), vec![], vec![]),
+            diem_transaction_builder::stdlib::encode_register_validator_config_script_function(
+                validator_account_addr,
+                validator_private_key.public_key().to_bytes().to_vec(),
+                vec![],
+                vec![],
+            ),
             parameters.max_gas_amount,
             parameters.gas_unit_price,
             parameters.gas_currency_code,
             parameters.expiration_timestamp_secs,
             ChainId::test(),
         )
-        .sign(
-            &operator_private_key,
-            operator_private_key.public_key(),
-        )
+        .sign(&operator_private_key, operator_private_key.public_key())
         .unwrap()
         .into_inner();
         self.run_transaction(Transaction::UserTransaction(txn))
@@ -675,22 +674,22 @@ impl<'a> DiemTestAdapter<'a> {
             .fetch_transaction_parameters(&diem_root_address(), None, None, None, None, None)
             .unwrap();
         let txn = RawTransaction::new(
-                diem_root_address(),
-                parameters.sequence_number,
-                diem_transaction_builder::experimental_stdlib::encode_add_validator_and_reconfigure_script_function(
-                    0,
-                    validator_name.as_bytes().into(),
-                    validator_account_addr,
-                ),
-                parameters.max_gas_amount,
-                parameters.gas_unit_price,
-                parameters.gas_currency_code,
-                parameters.expiration_timestamp_secs,
-                ChainId::test(),
-            )
-            .sign(&GENESIS_KEYPAIR.0, GENESIS_KEYPAIR.1.clone())
-            .unwrap()
-            .into_inner();
+            diem_root_address(),
+            parameters.sequence_number,
+            diem_transaction_builder::stdlib::encode_add_validator_and_reconfigure_script_function(
+                0,
+                validator_name.as_bytes().into(),
+                validator_account_addr,
+            ),
+            parameters.max_gas_amount,
+            parameters.gas_unit_price,
+            parameters.gas_currency_code,
+            parameters.expiration_timestamp_secs,
+            ChainId::test(),
+        )
+        .sign(&GENESIS_KEYPAIR.0, GENESIS_KEYPAIR.1.clone())
+        .unwrap()
+        .into_inner();
         self.run_transaction(Transaction::UserTransaction(txn))
             .expect("Failed to add validator to validator set. This should not happen.");
     }

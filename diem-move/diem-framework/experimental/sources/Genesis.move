@@ -1,132 +1,87 @@
-/// The `Genesis` module defines the Move initialization entry point of the Diem framework
-/// when executing from a fresh state.
-///
-/// > TODO: Currently there are a few additional functions called from Rust during genesis.
-/// > Document which these are and in which order they are called.
-module DiemFramework::Genesis {
-    use DiemFramework::AccountFreezing;
-    use DiemFramework::ChainId;
-    use DiemFramework::XUS;
-    use DiemFramework::DualAttestation;
-    use DiemFramework::XDX;
-    use DiemFramework::Diem;
-    use DiemFramework::DiemAccount;
-    use DiemFramework::DiemBlock;
-    use DiemFramework::DiemConfig;
-    use DiemFramework::DiemConsensusConfig;
-    use DiemFramework::DiemSystem;
-    use DiemFramework::DiemTimestamp;
-    use DiemFramework::DiemTransactionPublishingOption;
-    use ExperimentalFramework::ExperimentalVersion;
-    use DiemFramework::TransactionFee;
-    use DiemFramework::DiemVMConfig;
-    use DiemFramework::ParallelExecutionConfig;
-    use DiemFramework::ValidatorConfig;
-    use DiemFramework::ValidatorOperatorConfig;
-    use Std::Signer;
-    use Std::Vector;
+module ExperimentalFramework::Genesis {
+     use Std::Vector;
+     use Std::Signer;
+     use Std::Event;
+     use CoreFramework::CoreGenesis;
 
-    /// Initializes the Diem framework.
-    fun initialize(
-        dr_account: signer,
-        tc_account: signer,
-        dr_auth_key: vector<u8>,
-        tc_auth_key: vector<u8>,
-        initial_script_allow_list: vector<vector<u8>>,
-        is_open_module: bool,
-        instruction_schedule: vector<u8>,
-        native_schedule: vector<u8>,
-        chain_id: u8,
-        initial_diem_version: u64,
-        consensus_config: vector<u8>,
-    ) {
-        initialize_internal(
-            &dr_account,
-            &tc_account,
-            dr_auth_key,
-            tc_auth_key,
-            initial_script_allow_list,
-            is_open_module,
-            instruction_schedule,
-            native_schedule,
-            chain_id,
-            initial_diem_version,
-            consensus_config,
-        )
-    }
+     use ExperimentalFramework::ExperimentalAccount;
+     use ExperimentalFramework::ExperimentalVersion;
 
-    /// Initializes the Diem Framework. Internal so it can be used by both genesis code, and for testing purposes
-    fun initialize_internal(
-        dr_account: &signer,
-        tc_account: &signer,
-        dr_auth_key: vector<u8>,
-        tc_auth_key: vector<u8>,
-        initial_script_allow_list: vector<vector<u8>>,
-        is_open_module: bool,
-        instruction_schedule: vector<u8>,
-        native_schedule: vector<u8>,
-        chain_id: u8,
-        initial_diem_version: u64,
-        consensus_config: vector<u8>,
-    ) {
-        DiemAccount::initialize(dr_account, x"00000000000000000000000000000000");
+     // Config imports
+     use ExperimentalFramework::DiemConfig;
+     use ExperimentalFramework::DiemConsensusConfig;
+     use ExperimentalFramework::DiemSystem;
+     use ExperimentalFramework::DiemBlock;
+     use ExperimentalFramework::DiemVMConfig;
+     use ExperimentalFramework::ValidatorOperatorConfig;
+     use ExperimentalFramework::ValidatorConfig;
 
-        ChainId::initialize(dr_account, chain_id);
+     // This function needs the same signature as the DPN genesis
+     fun initialize(
+         dr_account: signer,
+         _tc_account: signer,
+         dr_auth_key: vector<u8>,
+         _tc_auth_key: vector<u8>,
+         _initial_script_allow_list: vector<vector<u8>>,
+         _is_open_module: bool,
+         instruction_schedule: vector<u8>,
+         native_schedule: vector<u8>,
+         chain_id: u8,
+         initial_diem_version: u64,
+         consensus_config: vector<u8>,
+     ) {
+         initialize_internal(
+             &dr_account,
+             dr_auth_key,
+             instruction_schedule,
+             native_schedule,
+             chain_id,
+             initial_diem_version,
+             consensus_config,
+         )
+     }
 
-        // On-chain config setup
-        DiemConfig::initialize(dr_account);
+     fun initialize_internal(
+         dr_account: &signer,
+         dr_auth_key: vector<u8>,
+         instruction_schedule: vector<u8>,
+         native_schedule: vector<u8>,
+         chain_id: u8,
+         initial_diem_version: u64,
+         consensus_config: vector<u8>,
+     ) {
+         ExperimentalAccount::initialize(dr_account, x"00000000000000000000000000000000");
 
-        // Consensus config setup
-        DiemConsensusConfig::initialize(dr_account);
+         // Pad the event counter for the Diem Root account to match DPN. This
+         // _MUST_ match the new epoch event counter otherwise all manner of
+         // things start to break.
+         Event::destroy_handle(Event::new_event_handle<u64>(dr_account));
+         Event::destroy_handle(Event::new_event_handle<u64>(dr_account));
+         Event::destroy_handle(Event::new_event_handle<u64>(dr_account));
 
-        // Parallel execution config setup
-        ParallelExecutionConfig::initialize_parallel_execution(dr_account);
+         // On-chain config setup
+         DiemConfig::initialize(dr_account);
 
-        // Currency setup
-        Diem::initialize(dr_account);
+         // Consensus config setup
+         DiemConsensusConfig::initialize(dr_account);
+         DiemSystem::initialize_validator_set(dr_account);
+         ExperimentalVersion::initialize(dr_account, initial_diem_version);
+         DiemBlock::initialize_block_metadata(dr_account);
 
-        // Currency setup
-        XUS::initialize(dr_account, tc_account);
+         // Rotate auth keys for DiemRoot and TreasuryCompliance accounts to the given
+         // values
+         ExperimentalAccount::rotate_authentication_key(dr_account, dr_auth_key);
+         DiemVMConfig::initialize(
+             dr_account,
+             instruction_schedule,
+             native_schedule,
+         );
 
-        XDX::initialize(dr_account, tc_account);
+         DiemConsensusConfig::set(dr_account, consensus_config);
 
-        AccountFreezing::initialize(dr_account);
-        TransactionFee::initialize(tc_account);
-
-        DiemSystem::initialize_validator_set(dr_account);
-        ExperimentalVersion::initialize(dr_account, initial_diem_version);
-        DualAttestation::initialize(dr_account);
-        DiemBlock::initialize_block_metadata(dr_account);
-
-        // Rotate auth keys for DiemRoot and TreasuryCompliance accounts to the given
-        // values
-        let dr_rotate_key_cap = DiemAccount::extract_key_rotation_capability(dr_account);
-        DiemAccount::rotate_authentication_key(&dr_rotate_key_cap, dr_auth_key);
-        DiemAccount::restore_key_rotation_capability(dr_rotate_key_cap);
-
-        let tc_rotate_key_cap = DiemAccount::extract_key_rotation_capability(tc_account);
-        DiemAccount::rotate_authentication_key(&tc_rotate_key_cap, tc_auth_key);
-        DiemAccount::restore_key_rotation_capability(tc_rotate_key_cap);
-
-        DiemTransactionPublishingOption::initialize(
-            dr_account,
-            initial_script_allow_list,
-            is_open_module,
-        );
-
-        DiemVMConfig::initialize(
-            dr_account,
-            instruction_schedule,
-            native_schedule,
-        );
-
-        DiemConsensusConfig::set(dr_account, consensus_config);
-
-        // After we have called this function, all invariants which are guarded by
-        // `DiemTimestamp::is_operating() ==> ...` will become active and a verification condition.
-        // See also discussion at function specification.
-        DiemTimestamp::set_time_has_started(dr_account);
-    }
+         // this needs to be called at the very end
+         CoreGenesis::init(dr_account, chain_id);
+     }
 
     /// Sets up the initial validator set for the Diem network.
     /// The validator "owner" accounts, their UTF-8 names, and their authentication
@@ -173,27 +128,23 @@ module DiemFramework::Genesis {
             let owner_address = Signer::address_of(owner);
             let owner_name = *Vector::borrow(&owner_names, i);
             // create each validator account and rotate its auth key to the correct value
-            DiemAccount::create_validator_account(
+            ExperimentalAccount::create_validator_account(
                 &dr_account, owner_address, copy dummy_auth_key_prefix, owner_name
             );
 
             let owner_auth_key = *Vector::borrow(&owner_auth_keys, i);
-            let rotation_cap = DiemAccount::extract_key_rotation_capability(owner);
-            DiemAccount::rotate_authentication_key(&rotation_cap, owner_auth_key);
-            DiemAccount::restore_key_rotation_capability(rotation_cap);
+            ExperimentalAccount::rotate_authentication_key(owner, owner_auth_key);
 
             let operator = Vector::borrow(&operators, i);
             let operator_address = Signer::address_of(operator);
             let operator_name = *Vector::borrow(&operator_names, i);
             // create the operator account + rotate its auth key if it does not already exist
-            if (!DiemAccount::exists_at(operator_address)) {
-                DiemAccount::create_validator_operator_account(
+            if (!ExperimentalAccount::exists_at(operator_address)) {
+                ExperimentalAccount::create_validator_operator_account(
                     &dr_account, operator_address, copy dummy_auth_key_prefix, copy operator_name
                 );
                 let operator_auth_key = *Vector::borrow(&operator_auth_keys, i);
-                let rotation_cap = DiemAccount::extract_key_rotation_capability(operator);
-                DiemAccount::rotate_authentication_key(&rotation_cap, operator_auth_key);
-                DiemAccount::restore_key_rotation_capability(rotation_cap);
+                ExperimentalAccount::rotate_authentication_key(operator, operator_auth_key);
             };
             // assign the operator to its validator
             assert!(ValidatorOperatorConfig::get_human_name(operator_address) == operator_name, 0);
@@ -218,34 +169,21 @@ module DiemFramework::Genesis {
         }
     }
 
-    /// For verification of genesis, the goal is to prove that all the invariants which
-    /// become active after the end of this function hold. This cannot be achieved with
-    /// modular verification as we do in regular continuous testing. Rather, this module must
-    /// be verified **together** with the module(s) which provides the invariant.
-    ///
-    /// > TODO: currently verifying this module together with modules providing invariants
-    /// > (see above) times out. This can likely be solved by making more of the initialize
-    /// > functions called by this function opaque, and prove the according invariants locally to
-    /// > each module.
-    spec initialize {
-        /// Assume that this is called in genesis state (no timestamp).
-        requires DiemTimestamp::is_genesis();
-    }
-
     #[test_only]
-    public fun setup(dr_account: &signer, tc_account: &signer) {
+    public fun setup(dr_account: &signer) {
         initialize_internal(
             dr_account,
-            tc_account,
             x"0000000000000000000000000000000000000000000000000000000000000000",
-            x"0000000000000000000000000000000000000000000000000000000000000000",
-            Vector::empty(), // not needed for unit tests
-            false, // not needed for unit tests
             x"", // instruction_schedule not needed for unit tests
             x"", // native schedule not needed for unit tests
             4u8, // TESTING chain ID
             0,
-            Vector::empty(),
+            x""
         )
+    }
+
+    #[test(account = @CoreResources)]
+    fun test_setup(account: signer) {
+        setup(&account);
     }
 }

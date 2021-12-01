@@ -40,7 +40,7 @@ impl DiemEventsFetcher {
         account: AccountAddress,
     ) -> Result<Option<(EventHandle, EventHandle)>> {
         match self.get_account_state(account).await? {
-            Some(account_state) => Ok(account_state.get_account_resource()?.map(|resource| {
+            Some(account_state) => Ok(account_state.get_diem_account_resource()?.map(|resource| {
                 (
                     resource.sent_events().clone(),
                     resource.received_events().clone(),

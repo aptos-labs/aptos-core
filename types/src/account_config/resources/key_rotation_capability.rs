@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    account_address::AccountAddress, account_config::constants::ACCOUNT_MODULE_IDENTIFIER,
+    account_address::AccountAddress, account_config::constants::DIEM_ACCOUNT_MODULE_IDENTIFIER,
 };
 use move_core_types::{
     ident_str,
@@ -20,7 +20,7 @@ pub struct KeyRotationCapabilityResource {
 }
 
 impl MoveStructType for KeyRotationCapabilityResource {
-    const MODULE_NAME: &'static IdentStr = ACCOUNT_MODULE_IDENTIFIER;
+    const MODULE_NAME: &'static IdentStr = DIEM_ACCOUNT_MODULE_IDENTIFIER;
     const STRUCT_NAME: &'static IdentStr = ident_str!("KeyRotationCapability");
 }
 

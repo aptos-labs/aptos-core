@@ -528,6 +528,16 @@ procedure {:inline 1} $1_DiemAccount_destroy_signer(
 }
 
 // ==================================================================================
+// Native account
+
+procedure {:inline 1} $1_Account_create_signer(
+  addr: int
+) returns (signer: $signer) {
+    // A signer is currently identical to an address.
+    signer := $signer(addr);
+}
+
+// ==================================================================================
 // Native Signer
 
 type {:datatype} $signer;

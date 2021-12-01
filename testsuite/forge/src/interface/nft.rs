@@ -8,10 +8,7 @@ use diem_sdk::{
     crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform},
     move_types::account_address::AccountAddress,
     transaction_builder::TransactionFactory,
-    types::{
-        account_config::xus_tag, chain_id::ChainId, transaction::authenticator::AuthenticationKey,
-        LocalAccount,
-    },
+    types::{chain_id::ChainId, transaction::authenticator::AuthenticationKey, LocalAccount},
 };
 use diem_transaction_builder::experimental_stdlib;
 use rand::{rngs::StdRng, SeedableRng};
@@ -95,7 +92,6 @@ impl<'t> NFTPublicUsageContext<'t> {
         let create_account_txn = self.public_info.bars_account.sign_with_transaction_builder(
             self.transaction_factory().payload(
                 experimental_stdlib::encode_create_account_script_function(
-                    xus_tag(),
                     auth_key.derived_address(),
                     auth_key.prefix().to_vec(),
                 ),
@@ -147,7 +143,6 @@ impl<'t> NFTPublicInfo<'t> {
         let bars_account_creation_txn = self.root_account.sign_with_transaction_builder(
             TransactionFactory::new(self.chain_id).payload(
                 experimental_stdlib::encode_create_account_script_function(
-                    xus_tag(),
                     self.bars_account.address(),
                     self.bars_account.authentication_key().prefix().to_vec(),
                 ),

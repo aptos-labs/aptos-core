@@ -32,7 +32,6 @@ network outside of validators and validator operators.
 <pre><code><b>use</b> <a href="DiemConsensusConfig.md#0x1_DiemConsensusConfig">0x1::DiemConsensusConfig</a>;
 <b>use</b> <a href="DiemVMConfig.md#0x1_DiemVMConfig">0x1::DiemVMConfig</a>;
 <b>use</b> <a href="ExperimentalVersion.md#0x1_ExperimentalVersion">0x1::ExperimentalVersion</a>;
-<b>use</b> <a href="SlidingNonce.md#0x1_SlidingNonce">0x1::SlidingNonce</a>;
 </code></pre>
 
 
@@ -54,7 +53,7 @@ transaction can only be sent from the Diem Root account.
 
 ### Technical Description
 
-Updates the <code><a href="DiemVersion.md#0x1_DiemVersion">DiemVersion</a></code> on-chain config and emits a <code><a href="DiemConfig.md#0x1_DiemConfig_NewEpochEvent">DiemConfig::NewEpochEvent</a></code> to trigger
+Updates the <code><a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/DiemVersion.md#0x1_DiemVersion">DiemVersion</a></code> on-chain config and emits a <code><a href="DiemConfig.md#0x1_DiemConfig_NewEpochEvent">DiemConfig::NewEpochEvent</a></code> to trigger
 a reconfiguration of the system. The <code>major</code> version that is passed in must be strictly greater
 than the current major version held on-chain. The VM reads this information and can use it to
 preserve backwards compatibility with previous major versions of the VM.
@@ -67,7 +66,7 @@ preserve backwards compatibility with previous major versions of the VM.
 | Name            | Type     | Description                                                                |
 | ------          | ------   | -------------                                                              |
 | <code>account</code>       | <code>signer</code> | Signer of the sending account. Must be the Diem Root account.              |
-| <code>sliding_nonce</code> | <code>u64</code>    | The <code>sliding_nonce</code> (see: <code><a href="SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction. |
+| <code>_sliding_nonce</code> | <code>u64</code>    | The <code>sliding_nonce</code> (see: <code>SlidingNonce</code>) to be used for this transaction. |
 | <code>major</code>         | <code>u64</code>    | The <code>major</code> version of the VM to be used from this transaction on.         |
 
 
@@ -77,15 +76,11 @@ preserve backwards compatibility with previous major versions of the VM.
 
 | Error Category             | Error Reason                                  | Description                                                                                |
 | ----------------           | --------------                                | -------------                                                                              |
-| <code>Errors::NOT_PUBLISHED</code>    | <code><a href="SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>                | A <code><a href="SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code> resource is not published under <code>account</code>.                                |
-| <code>Errors::INVALID_ARGUMENT</code> | <code><a href="SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_OLD">SlidingNonce::ENONCE_TOO_OLD</a></code>                | The <code>sliding_nonce</code> is too old and it's impossible to determine if it's duplicated or not. |
-| <code>Errors::INVALID_ARGUMENT</code> | <code><a href="SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_NEW">SlidingNonce::ENONCE_TOO_NEW</a></code>                | The <code>sliding_nonce</code> is too far in the future.                                              |
-| <code>Errors::INVALID_ARGUMENT</code> | <code><a href="SlidingNonce.md#0x1_SlidingNonce_ENONCE_ALREADY_RECORDED">SlidingNonce::ENONCE_ALREADY_RECORDED</a></code>       | The <code>sliding_nonce</code> has been previously recorded.                                          |
-| <code>Errors::REQUIRES_ADDRESS</code> | <code><a href="CoreAddresses.md#0x1_CoreAddresses_EDIEM_ROOT">CoreAddresses::EDIEM_ROOT</a></code>                   | <code>account</code> is not the Diem Root account.                                                    |
-| <code>Errors::INVALID_ARGUMENT</code> | <code><a href="DiemVersion.md#0x1_DiemVersion_EINVALID_MAJOR_VERSION_NUMBER">DiemVersion::EINVALID_MAJOR_VERSION_NUMBER</a></code>  | <code>major</code> is less-than or equal to the current major version stored on-chain.                |
+| <code>Errors::REQUIRES_ADDRESS</code> | <code>CoreAddresses::EDIEM_ROOT</code>                   | <code>account</code> is not the Diem Root account.                                                    |
+| <code>Errors::INVALID_ARGUMENT</code> | <code>DiemVersion::EINVALID_MAJOR_VERSION_NUMBER</code>  | <code>major</code> is less-than or equal to the current major version stored on-chain.                |
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="SystemAdministrationScripts.md#0x1_SystemAdministrationScripts_update_diem_version">update_diem_version</a>(account: signer, sliding_nonce: u64, major: u64)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="SystemAdministrationScripts.md#0x1_SystemAdministrationScripts_update_diem_version">update_diem_version</a>(account: signer, _sliding_nonce: u64, major: u64)
 </code></pre>
 
 
@@ -94,8 +89,7 @@ preserve backwards compatibility with previous major versions of the VM.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="SystemAdministrationScripts.md#0x1_SystemAdministrationScripts_update_diem_version">update_diem_version</a>(account: signer, sliding_nonce: u64, major: u64) {
-    <a href="SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&account, sliding_nonce);
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="SystemAdministrationScripts.md#0x1_SystemAdministrationScripts_update_diem_version">update_diem_version</a>(account: signer, _sliding_nonce: u64, major: u64) {
     <a href="ExperimentalVersion.md#0x1_ExperimentalVersion_set">ExperimentalVersion::set</a>(&account, major)
 }
 </code></pre>
@@ -132,7 +126,7 @@ Updates the on-chain config holding the <code><a href="DiemVMConfig.md#0x1_DiemV
 | Name                                | Type     | Description                                                                                            |
 | ------                              | ------   | -------------                                                                                          |
 | <code>account</code>                           | <code>signer</code> | Signer of the sending account. Must be the Diem Root account.                                          |
-| <code>sliding_nonce</code>                     | <code>u64</code>    | The <code>sliding_nonce</code> (see: <code><a href="SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction.                             |
+| <code>_sliding_nonce</code>                     | <code>u64</code>    | The <code>sliding_nonce</code> (see: <code>SlidingNonce</code>) to be used for this transaction.                             |
 | <code>global_memory_per_byte_cost</code>       | <code>u64</code>    | The new cost to read global memory per-byte to be used for gas metering.                               |
 | <code>global_memory_per_byte_write_cost</code> | <code>u64</code>    | The new cost to write global memory per-byte to be used for gas metering.                              |
 | <code>min_transaction_gas_units</code>         | <code>u64</code>    | The new flat minimum amount of gas required for any transaction.                                       |
@@ -153,14 +147,10 @@ Updates the on-chain config holding the <code><a href="DiemVMConfig.md#0x1_DiemV
 | Error Category             | Error Reason                                | Description                                                                                |
 | ----------------           | --------------                              | -------------                                                                              |
 | <code>Errors::INVALID_ARGUMENT</code> | <code><a href="DiemVMConfig.md#0x1_DiemVMConfig_EGAS_CONSTANT_INCONSISTENCY">DiemVMConfig::EGAS_CONSTANT_INCONSISTENCY</a></code> | The provided gas constants are inconsistent.                                               |
-| <code>Errors::NOT_PUBLISHED</code>    | <code><a href="SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>              | A <code><a href="SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code> resource is not published under <code>account</code>.                                |
-| <code>Errors::INVALID_ARGUMENT</code> | <code><a href="SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_OLD">SlidingNonce::ENONCE_TOO_OLD</a></code>              | The <code>sliding_nonce</code> is too old and it's impossible to determine if it's duplicated or not. |
-| <code>Errors::INVALID_ARGUMENT</code> | <code><a href="SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_NEW">SlidingNonce::ENONCE_TOO_NEW</a></code>              | The <code>sliding_nonce</code> is too far in the future.                                              |
-| <code>Errors::INVALID_ARGUMENT</code> | <code><a href="SlidingNonce.md#0x1_SlidingNonce_ENONCE_ALREADY_RECORDED">SlidingNonce::ENONCE_ALREADY_RECORDED</a></code>     | The <code>sliding_nonce</code> has been previously recorded.                                          |
-| <code>Errors::REQUIRES_ADDRESS</code> | <code><a href="CoreAddresses.md#0x1_CoreAddresses_EDIEM_ROOT">CoreAddresses::EDIEM_ROOT</a></code>                 | <code>account</code> is not the Diem Root account.                                                    |
+| <code>Errors::REQUIRES_ADDRESS</code> | <code>CoreAddresses::EDIEM_ROOT</code>                 | <code>account</code> is not the Diem Root account.                                                    |
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="SystemAdministrationScripts.md#0x1_SystemAdministrationScripts_set_gas_constants">set_gas_constants</a>(dr_account: signer, sliding_nonce: u64, global_memory_per_byte_cost: u64, global_memory_per_byte_write_cost: u64, min_transaction_gas_units: u64, large_transaction_cutoff: u64, intrinsic_gas_per_byte: u64, maximum_number_of_gas_units: u64, min_price_per_gas_unit: u64, max_price_per_gas_unit: u64, max_transaction_size_in_bytes: u64, gas_unit_scaling_factor: u64, default_account_size: u64)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="SystemAdministrationScripts.md#0x1_SystemAdministrationScripts_set_gas_constants">set_gas_constants</a>(dr_account: signer, _sliding_nonce: u64, global_memory_per_byte_cost: u64, global_memory_per_byte_write_cost: u64, min_transaction_gas_units: u64, large_transaction_cutoff: u64, intrinsic_gas_per_byte: u64, maximum_number_of_gas_units: u64, min_price_per_gas_unit: u64, max_price_per_gas_unit: u64, max_transaction_size_in_bytes: u64, gas_unit_scaling_factor: u64, default_account_size: u64)
 </code></pre>
 
 
@@ -171,7 +161,7 @@ Updates the on-chain config holding the <code><a href="DiemVMConfig.md#0x1_DiemV
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="SystemAdministrationScripts.md#0x1_SystemAdministrationScripts_set_gas_constants">set_gas_constants</a>(
     dr_account: signer,
-    sliding_nonce: u64,
+    _sliding_nonce: u64,
     global_memory_per_byte_cost: u64,
     global_memory_per_byte_write_cost: u64,
     min_transaction_gas_units: u64,
@@ -184,7 +174,6 @@ Updates the on-chain config holding the <code><a href="DiemVMConfig.md#0x1_DiemV
     gas_unit_scaling_factor: u64,
     default_account_size: u64,
 ) {
-    <a href="SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&dr_account, sliding_nonce);
     <a href="DiemVMConfig.md#0x1_DiemVMConfig_set_gas_constants">DiemVMConfig::set_gas_constants</a>(
             &dr_account,
             global_memory_per_byte_cost,
@@ -234,7 +223,7 @@ Initializes the <code><a href="DiemConsensusConfig.md#0x1_DiemConsensusConfig">D
 | Name            | Type      | Description                                                                |
 | ------          | ------    | -------------                                                              |
 | <code>account</code>       | <code>signer</code> | Signer of the sending account. Must be the Diem Root account.               |
-| <code>sliding_nonce</code> | <code>u64</code>     | The <code>sliding_nonce</code> (see: <code><a href="SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction. |
+| <code>_sliding_nonce</code> | <code>u64</code>     | The <code>sliding_nonce</code> (see: <code>SlidingNonce</code>) to be used for this transaction. |
 
 
 <a name="@Common_Abort_Conditions_11"></a>
@@ -243,14 +232,10 @@ Initializes the <code><a href="DiemConsensusConfig.md#0x1_DiemConsensusConfig">D
 
 | Error Category             | Error Reason                                  | Description                                                                                |
 | ----------------           | --------------                                | -------------                                                                              |
-| <code>Errors::NOT_PUBLISHED</code>    | <code><a href="SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>                | A <code><a href="SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code> resource is not published under <code>account</code>.                                |
-| <code>Errors::INVALID_ARGUMENT</code> | <code><a href="SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_OLD">SlidingNonce::ENONCE_TOO_OLD</a></code>                | The <code>sliding_nonce</code> is too old and it's impossible to determine if it's duplicated or not. |
-| <code>Errors::INVALID_ARGUMENT</code> | <code><a href="SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_NEW">SlidingNonce::ENONCE_TOO_NEW</a></code>                | The <code>sliding_nonce</code> is too far in the future.                                              |
-| <code>Errors::INVALID_ARGUMENT</code> | <code><a href="SlidingNonce.md#0x1_SlidingNonce_ENONCE_ALREADY_RECORDED">SlidingNonce::ENONCE_ALREADY_RECORDED</a></code>       | The <code>sliding_nonce</code> has been previously recorded.                                          |
-| <code>Errors::REQUIRES_ADDRESS</code> | <code><a href="CoreAddresses.md#0x1_CoreAddresses_EDIEM_ROOT">CoreAddresses::EDIEM_ROOT</a></code>                   | <code>account</code> is not the Diem Root account.                                                    |
+| <code>Errors::REQUIRES_ADDRESS</code> | <code>CoreAddresses::EDIEM_ROOT</code>                   | <code>account</code> is not the Diem Root account.                                                    |
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="SystemAdministrationScripts.md#0x1_SystemAdministrationScripts_initialize_diem_consensus_config">initialize_diem_consensus_config</a>(account: signer, sliding_nonce: u64)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="SystemAdministrationScripts.md#0x1_SystemAdministrationScripts_initialize_diem_consensus_config">initialize_diem_consensus_config</a>(account: signer, _sliding_nonce: u64)
 </code></pre>
 
 
@@ -259,8 +244,7 @@ Initializes the <code><a href="DiemConsensusConfig.md#0x1_DiemConsensusConfig">D
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="SystemAdministrationScripts.md#0x1_SystemAdministrationScripts_initialize_diem_consensus_config">initialize_diem_consensus_config</a>(account: signer, sliding_nonce: u64) {
-    <a href="SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&account, sliding_nonce);
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="SystemAdministrationScripts.md#0x1_SystemAdministrationScripts_initialize_diem_consensus_config">initialize_diem_consensus_config</a>(account: signer, _sliding_nonce: u64) {
     <a href="DiemConsensusConfig.md#0x1_DiemConsensusConfig_initialize">DiemConsensusConfig::initialize</a>(&account);
 }
 </code></pre>
@@ -297,7 +281,7 @@ a reconfiguration of the system.
 | Name            | Type          | Description                                                                |
 | ------          | ------        | -------------                                                              |
 | <code>account</code>       | <code>signer</code>      | Signer of the sending account. Must be the Diem Root account.              |
-| <code>sliding_nonce</code> | <code>u64</code>         | The <code>sliding_nonce</code> (see: <code><a href="SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code>) to be used for this transaction. |
+| <code>_sliding_nonce</code> | <code>u64</code>         | The <code>sliding_nonce</code> (see: <code>SlidingNonce</code>) to be used for this transaction. |
 | <code>config</code>        | <code>vector&lt;u8&gt;</code>  | The serialized bytes of consensus config.                                  |
 
 
@@ -307,14 +291,10 @@ a reconfiguration of the system.
 
 | Error Category             | Error Reason                                  | Description                                                                                |
 | ----------------           | --------------                                | -------------                                                                              |
-| <code>Errors::NOT_PUBLISHED</code>    | <code><a href="SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>                | A <code><a href="SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code> resource is not published under <code>account</code>.                                |
-| <code>Errors::INVALID_ARGUMENT</code> | <code><a href="SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_OLD">SlidingNonce::ENONCE_TOO_OLD</a></code>                | The <code>sliding_nonce</code> is too old and it's impossible to determine if it's duplicated or not. |
-| <code>Errors::INVALID_ARGUMENT</code> | <code><a href="SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_NEW">SlidingNonce::ENONCE_TOO_NEW</a></code>                | The <code>sliding_nonce</code> is too far in the future.                                              |
-| <code>Errors::INVALID_ARGUMENT</code> | <code><a href="SlidingNonce.md#0x1_SlidingNonce_ENONCE_ALREADY_RECORDED">SlidingNonce::ENONCE_ALREADY_RECORDED</a></code>       | The <code>sliding_nonce</code> has been previously recorded.                                          |
-| <code>Errors::REQUIRES_ADDRESS</code> | <code><a href="CoreAddresses.md#0x1_CoreAddresses_EDIEM_ROOT">CoreAddresses::EDIEM_ROOT</a></code>                   | <code>account</code> is not the Diem Root account.                                                    |
+| <code>Errors::REQUIRES_ADDRESS</code> | <code>CoreAddresses::EDIEM_ROOT</code>                   | <code>account</code> is not the Diem Root account.                                                    |
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="SystemAdministrationScripts.md#0x1_SystemAdministrationScripts_update_diem_consensus_config">update_diem_consensus_config</a>(account: signer, sliding_nonce: u64, config: vector&lt;u8&gt;)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="SystemAdministrationScripts.md#0x1_SystemAdministrationScripts_update_diem_consensus_config">update_diem_consensus_config</a>(account: signer, _sliding_nonce: u64, config: vector&lt;u8&gt;)
 </code></pre>
 
 
@@ -323,8 +303,7 @@ a reconfiguration of the system.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="SystemAdministrationScripts.md#0x1_SystemAdministrationScripts_update_diem_consensus_config">update_diem_consensus_config</a>(account: signer, sliding_nonce: u64, config: vector&lt;u8&gt;) {
-    <a href="SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&account, sliding_nonce);
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="SystemAdministrationScripts.md#0x1_SystemAdministrationScripts_update_diem_consensus_config">update_diem_consensus_config</a>(account: signer, _sliding_nonce: u64, config: vector&lt;u8&gt;) {
     <a href="DiemConsensusConfig.md#0x1_DiemConsensusConfig_set">DiemConsensusConfig::set</a>(&account, config)
 }
 </code></pre>

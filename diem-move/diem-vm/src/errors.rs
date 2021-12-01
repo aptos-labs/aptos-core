@@ -3,12 +3,13 @@
 
 use crate::logging::AdapterLogSchema;
 use diem_logger::prelude::*;
+use diem_types::account_config::ChainSpecificAccountInfo;
 use move_binary_format::errors::VMError;
-use move_core_types::vm_status::{known_locations, StatusCode, VMStatus};
+use move_core_types::vm_status::{StatusCode, VMStatus};
 
 /// Error codes that can be emitted by the prologue. These have special significance to the VM when
 /// they are raised during the prologue.
-/// These errors are only expected from the `known_locations::account_module_abort()` module
+/// These errors are only expected from the module that is registered as the account module for the system.
 /// The prologue should not emit any other error codes or fail for any reason, doing so will result
 /// in the VM throwing an invariant violation
 pub const EACCOUNT_FROZEN: u64 = 1000; // sending account is frozen
@@ -41,6 +42,7 @@ fn error_split(code: u64) -> (u8, u64) {
 /// Any non-abort non-execution code is considered an invariant violation, specifically
 /// `UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION`
 pub fn convert_prologue_error(
+    chain_specific_info: &ChainSpecificAccountInfo,
     error: VMError,
     log_context: &AdapterLogSchema,
 ) -> Result<(), VMStatus> {
@@ -48,7 +50,7 @@ pub fn convert_prologue_error(
     Err(match status {
         VMStatus::Executed => VMStatus::Executed,
         VMStatus::MoveAbort(location, code)
-            if location != known_locations::account_module_abort() =>
+            if !chain_specific_info.is_account_module_abort(&location) =>
         {
             let (category, reason) = error_split(code);
             log_context.alert();
@@ -120,6 +122,7 @@ pub fn convert_prologue_error(
 /// Any other errors are mapped to the invariant violation
 /// `UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION`
 pub fn convert_epilogue_error(
+    chain_specific_info: &ChainSpecificAccountInfo,
     error: VMError,
     log_context: &AdapterLogSchema,
 ) -> Result<(), VMStatus> {
@@ -127,7 +130,7 @@ pub fn convert_epilogue_error(
     Err(match status {
         VMStatus::Executed => VMStatus::Executed,
         VMStatus::MoveAbort(location, code)
-            if location != known_locations::account_module_abort() =>
+            if !chain_specific_info.is_account_module_abort(&location) =>
         {
             let (category, reason) = error_split(code);
             log_context.alert();

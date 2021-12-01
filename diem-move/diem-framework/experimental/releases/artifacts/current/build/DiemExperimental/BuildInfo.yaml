@@ -17,20 +17,11 @@ compiled_package_info:
       name: ASCII
     : Std
     ? address: "00000000000000000000000000000001"
-      name: AccountAdministrationScripts
-    : DiemFramework
+      name: Account
+    : CoreFramework
     ? address: "00000000000000000000000000000001"
       name: AccountCreationScripts
-    : DiemFramework
-    ? address: "00000000000000000000000000000001"
-      name: AccountFreezing
-    : DiemFramework
-    ? address: "00000000000000000000000000000001"
-      name: AccountLimits
-    : DiemFramework
-    ? address: "00000000000000000000000000000001"
-      name: Authenticator
-    : DiemFramework
+    : ExperimentalFramework
     ? address: "00000000000000000000000000000001"
       name: BCS
     : Std
@@ -38,62 +29,44 @@ compiled_package_info:
       name: BitVector
     : Std
     ? address: "00000000000000000000000000000001"
-      name: CRSN
-    : DiemFramework
-    ? address: "00000000000000000000000000000001"
       name: Capability
     : Std
     ? address: "00000000000000000000000000000001"
       name: ChainId
-    : DiemFramework
+    : CoreFramework
     ? address: "00000000000000000000000000000001"
-      name: CoreAddresses
-    : DiemFramework
-    ? address: "00000000000000000000000000000001"
-      name: DesignatedDealer
-    : DiemFramework
-    ? address: "00000000000000000000000000000001"
-      name: Diem
-    : DiemFramework
-    ? address: "00000000000000000000000000000001"
-      name: DiemAccount
-    : DiemFramework
+      name: CoreGenesis
+    : CoreFramework
     ? address: "00000000000000000000000000000001"
       name: DiemBlock
-    : DiemFramework
+    : ExperimentalFramework
     ? address: "00000000000000000000000000000001"
       name: DiemConfig
-    : DiemFramework
+    : ExperimentalFramework
     ? address: "00000000000000000000000000000001"
       name: DiemConsensusConfig
-    : DiemFramework
-    ? address: "00000000000000000000000000000001"
-      name: DiemId
-    : DiemFramework
+    : ExperimentalFramework
     ? address: "00000000000000000000000000000001"
       name: DiemSystem
-    : DiemFramework
+    : ExperimentalFramework
     ? address: "00000000000000000000000000000001"
       name: DiemTimestamp
-    : DiemFramework
-    ? address: "00000000000000000000000000000001"
-      name: DiemTransactionPublishingOption
-    : DiemFramework
+    : CoreFramework
     ? address: "00000000000000000000000000000001"
       name: DiemVMConfig
-    : DiemFramework
+    : ExperimentalFramework
     ? address: "00000000000000000000000000000001"
       name: DiemVersion
     : CoreFramework
-    ? address: "00000000000000000000000000000001"
-      name: DualAttestation
-    : DiemFramework
     ? address: "00000000000000000000000000000001"
       name: Errors
     : Std
     ? address: "00000000000000000000000000000001"
       name: Event
     : Std
+    ? address: "00000000000000000000000000000001"
+      name: ExperimentalAccount
+    : ExperimentalFramework
     ? address: "00000000000000000000000000000001"
       name: ExperimentalVersion
     : ExperimentalFramework
@@ -105,40 +78,25 @@ compiled_package_info:
     : Std
     ? address: "00000000000000000000000000000001"
       name: Genesis
-    : DiemFramework
+    : ExperimentalFramework
     ? address: "00000000000000000000000000000001"
       name: Hash
     : Std
     ? address: "00000000000000000000000000000001"
       name: MultiToken
-    : DiemFramework
+    : ExperimentalFramework
     ? address: "00000000000000000000000000000001"
       name: MultiTokenBalance
-    : DiemFramework
-    ? address: "00000000000000000000000000000001"
-      name: NetworkIdentity
-    : DiemFramework
+    : ExperimentalFramework
     ? address: "00000000000000000000000000000001"
       name: Option
     : Std
     ? address: "00000000000000000000000000000001"
       name: ParallelExecutionConfig
-    : DiemFramework
-    ? address: "00000000000000000000000000000001"
-      name: PaymentScripts
-    : DiemFramework
-    ? address: "00000000000000000000000000000001"
-      name: RecoveryAddress
-    : DiemFramework
-    ? address: "00000000000000000000000000000001"
-      name: RegisteredCurrencies
-    : DiemFramework
+    : ExperimentalFramework
     ? address: "00000000000000000000000000000001"
       name: Roles
-    : DiemFramework
-    ? address: "00000000000000000000000000000001"
-      name: SharedEd25519PublicKey
-    : DiemFramework
+    : ExperimentalFramework
     ? address: "00000000000000000000000000000001"
       name: Signature
     : DiemFramework
@@ -146,42 +104,24 @@ compiled_package_info:
       name: Signer
     : Std
     ? address: "00000000000000000000000000000001"
-      name: SlidingNonce
-    : DiemFramework
+      name: SystemAddresses
+    : CoreFramework
     ? address: "00000000000000000000000000000001"
       name: SystemAdministrationScripts
-    : DiemFramework
-    ? address: "00000000000000000000000000000001"
-      name: TransactionFee
-    : DiemFramework
-    ? address: "00000000000000000000000000000001"
-      name: TreasuryComplianceScripts
-    : DiemFramework
-    ? address: "00000000000000000000000000000001"
-      name: VASP
-    : DiemFramework
-    ? address: "00000000000000000000000000000001"
-      name: VASPDomain
-    : DiemFramework
+    : ExperimentalFramework
     ? address: "00000000000000000000000000000001"
       name: ValidatorConfig
-    : DiemFramework
+    : ExperimentalFramework
     ? address: "00000000000000000000000000000001"
       name: ValidatorOperatorConfig
-    : DiemFramework
+    : ExperimentalFramework
     ? address: "00000000000000000000000000000001"
       name: Vector
     : Std
     ? address: "00000000000000000000000000000001"
       name: Vote
-    : DiemFramework
-    ? address: "00000000000000000000000000000001"
-      name: XDX
-    : DiemFramework
-    ? address: "00000000000000000000000000000001"
-      name: XUS
-    : DiemFramework
-  source_digest: 93DAD44CD57084E472A305A6B6A2380E48B9C1B374F4D2DEFC8772C3F97E9CC5
+    : ExperimentalFramework
+  source_digest: 82A3D42A13A21907D37FCBFC155734A63852AD6862A21EFB1F2AF10FBB1A6B3D
   build_flags:
     dev_mode: false
     test_mode: false
@@ -192,3 +132,4 @@ compiled_package_info:
     additional_named_addresses: {}
 dependencies:
   - MoveStdlib
+  - DiemCoreFramework

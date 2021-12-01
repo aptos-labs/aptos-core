@@ -13,7 +13,10 @@ use std::{
 
 use crate::{
     account::{Account, AccountData},
-    data_store::{FakeDataStore, GENESIS_CHANGE_SET, GENESIS_CHANGE_SET_FRESH},
+    data_store::{
+        FakeDataStore, GENESIS_CHANGE_SET, GENESIS_CHANGE_SET_EXPERIMENTAL,
+        GENESIS_CHANGE_SET_FRESH,
+    },
     golden_outputs::GoldenOutputs,
 };
 use diem_crypto::HashValue;
@@ -25,7 +28,7 @@ use diem_state_view::StateView;
 use diem_types::{
     access_path::AccessPath,
     account_config::{
-        type_tag_for_currency_code, AccountResource, BalanceResource, CORE_CODE_ADDRESS,
+        type_tag_for_currency_code, BalanceResource, DiemAccountResource, CORE_CODE_ADDRESS,
     },
     block_metadata::{new_block_event_key, BlockMetadata, NewBlockEvent},
     on_chain_config::{
@@ -117,6 +120,11 @@ impl FakeExecutor {
     /// Creates an executor using the standard genesis.
     pub fn from_fresh_genesis() -> Self {
         Self::from_genesis(GENESIS_CHANGE_SET_FRESH.clone().write_set())
+    }
+
+    /// Creates an executor using the experimental genesis.
+    pub fn from_experimental_genesis() -> Self {
+        Self::from_genesis(GENESIS_CHANGE_SET_EXPERIMENTAL.clone().write_set())
     }
 
     pub fn allowlist_genesis() -> Self {
@@ -271,7 +279,7 @@ impl FakeExecutor {
     }
 
     /// Reads the resource [`Value`] for an account from this executor's data store.
-    pub fn read_account_resource(&self, account: &Account) -> Option<AccountResource> {
+    pub fn read_account_resource(&self, account: &Account) -> Option<DiemAccountResource> {
         self.read_account_resource_at_address(account.address())
     }
 
@@ -280,10 +288,10 @@ impl FakeExecutor {
     pub fn read_account_resource_at_address(
         &self,
         addr: &AccountAddress,
-    ) -> Option<AccountResource> {
+    ) -> Option<DiemAccountResource> {
         let ap = AccessPath::resource_access_path(ResourceKey::new(
             *addr,
-            AccountResource::struct_tag(),
+            DiemAccountResource::struct_tag(),
         ));
         let data_blob = StateView::get(&self.data_store, &ap)
             .expect("account must exist in data store")

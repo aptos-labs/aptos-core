@@ -13,7 +13,8 @@ use diem_types::{
     access_path::Path as AP,
     account_address::AccountAddress,
     account_config::{
-        from_currency_code_string, reserved_vm_address, type_tag_for_currency_code, ACCOUNT_MODULE,
+        from_currency_code_string, reserved_vm_address, type_tag_for_currency_code,
+        DIEM_ACCOUNT_MODULE,
     },
     block_metadata::BlockMetadata,
     on_chain_config::DiemVersion,
@@ -735,7 +736,7 @@ fn execute_txn_user_script_prologue(
     let rets = execute_function_via_session_and_xrunner(
         session,
         xrunner,
-        &*ACCOUNT_MODULE,
+        &*DIEM_ACCOUNT_MODULE,
         &*SCRIPT_PROLOGUE_NAME,
         vec![gas_currency_ty.clone()],
         args,
@@ -773,7 +774,7 @@ fn execute_txn_user_script_epilogue(
     let rets = execute_function_via_session_and_xrunner(
         session,
         xrunner,
-        &*ACCOUNT_MODULE,
+        &*DIEM_ACCOUNT_MODULE,
         &*USER_EPILOGUE_NAME,
         vec![gas_currency_ty.clone()],
         args,
@@ -809,7 +810,7 @@ fn execute_txn_admin_script_prologue(
     let rets = execute_function_via_session_and_xrunner(
         session,
         xrunner,
-        &*ACCOUNT_MODULE,
+        &*DIEM_ACCOUNT_MODULE,
         &*WRITESET_PROLOGUE_NAME,
         vec![],
         args,
@@ -840,7 +841,7 @@ fn execute_txn_admin_script_epilogue(
     let rets = execute_function_via_session_and_xrunner(
         session,
         xrunner,
-        &*ACCOUNT_MODULE,
+        &*DIEM_ACCOUNT_MODULE,
         &*WRITESET_EPILOGUE_NAME,
         vec![],
         args,

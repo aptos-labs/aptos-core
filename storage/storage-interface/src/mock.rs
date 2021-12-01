@@ -7,7 +7,7 @@ use crate::{DbReader, DbWriter};
 use anyhow::Result;
 use diem_types::{
     account_address::AccountAddress, account_config::AccountResource, account_state::AccountState,
-    account_state_blob::AccountStateBlob, event::EventHandle,
+    account_state_blob::AccountStateBlob,
 };
 use move_core_types::move_resource::MoveResource;
 use std::convert::TryFrom;
@@ -25,14 +25,7 @@ impl DbReader for MockDbReaderWriter {
 }
 
 fn get_mock_account_state_blob() -> AccountStateBlob {
-    let account_resource = AccountResource::new(
-        0,
-        vec![],
-        None,
-        None,
-        EventHandle::random_handle(0),
-        EventHandle::random_handle(0),
-    );
+    let account_resource = AccountResource::new(0, vec![], AccountAddress::random());
 
     let mut account_state = AccountState::default();
     account_state.insert(

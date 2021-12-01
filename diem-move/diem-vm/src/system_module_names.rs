@@ -16,6 +16,7 @@ pub static DIEM_BLOCK_MODULE: Lazy<ModuleId> = Lazy::new(|| {
     )
 });
 
+// TZ: TODO: remove these except for the block-related names
 // Names for special functions and structs
 pub const SCRIPT_PROLOGUE_NAME: &IdentStr = ident_str!("script_prologue");
 pub const MULTI_AGENT_SCRIPT_PROLOGUE_NAME: &IdentStr = ident_str!("multi_agent_script_prologue");

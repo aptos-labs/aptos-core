@@ -259,11 +259,9 @@ async fn test_state_sync_multichunk_epoch() {
         .canonicalize()
         .unwrap();
     let move_stdlib_dir = move_stdlib::move_stdlib_modules_full_path();
-    let diem_core_framework_dir = diem_framework::diem_core_modules_full_path();
     let diem_payment_framework_dir = diem_framework::diem_payment_modules_full_path();
     let dependencies = &[
         move_stdlib_dir.as_str(),
-        diem_core_framework_dir.as_str(),
         diem_payment_framework_dir.as_str(),
     ];
     let compiled_script = compile_program(script_path.to_str().unwrap(), dependencies).unwrap();

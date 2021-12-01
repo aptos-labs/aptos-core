@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    account_address::AccountAddress, account_config::constants::ACCOUNT_MODULE_IDENTIFIER,
+    account_address::AccountAddress, account_config::constants::DIEM_ACCOUNT_MODULE_IDENTIFIER,
 };
 use anyhow::Result;
 use move_core_types::{
@@ -63,6 +63,6 @@ impl SentPaymentEvent {
 }
 
 impl MoveStructType for SentPaymentEvent {
-    const MODULE_NAME: &'static IdentStr = ACCOUNT_MODULE_IDENTIFIER;
+    const MODULE_NAME: &'static IdentStr = DIEM_ACCOUNT_MODULE_IDENTIFIER;
     const STRUCT_NAME: &'static IdentStr = ident_str!("SentPaymentEvent");
 }

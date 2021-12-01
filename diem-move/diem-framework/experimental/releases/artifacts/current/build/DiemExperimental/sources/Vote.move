@@ -7,16 +7,16 @@
 /// * It receives the BallotID corresponding to the ballot
 /// * It submits votes using the `vote` function from the voters
 /// * If a vote causes a ballot to be approved, `vote` returns `true` and Module M can proceed with the operation requested by the `Proposal`
-module DiemFramework::Vote {
+module ExperimentalFramework::Vote {
 
     use Std::BCS;
     use Std::Errors;
     use Std::Event;
     use Std::Signer;
     use Std::Vector;
-    use DiemFramework::DiemTimestamp;
+    use CoreFramework::DiemTimestamp;
     #[test_only]
-    friend DiemFramework::VoteTests;
+    friend ExperimentalFramework::VoteTests;
 
     /// An unique identifier for a ballot. A counter is stored
     /// under each proposers address which is incremented

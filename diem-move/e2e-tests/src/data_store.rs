@@ -31,6 +31,9 @@ pub static GENESIS_CHANGE_SET: Lazy<ChangeSet> =
 pub static GENESIS_CHANGE_SET_FRESH: Lazy<ChangeSet> =
     Lazy::new(|| generate_genesis_change_set_for_testing(GenesisOptions::Fresh));
 
+pub static GENESIS_CHANGE_SET_EXPERIMENTAL: Lazy<ChangeSet> =
+    Lazy::new(|| generate_genesis_change_set_for_testing(GenesisOptions::Experimental));
+
 /// An in-memory implementation of [`StateView`] and [`RemoteCache`] for the VM.
 ///
 /// Tests use this to set up state, and pass in a reference to the cache whenever a `StateView` or

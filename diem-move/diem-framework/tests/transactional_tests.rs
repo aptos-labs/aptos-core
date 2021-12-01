@@ -3,4 +3,4 @@
 
 use diem_transactional_test_harness::run_test;
 
-datatest_stable::harness!(run_test, "core/transactional-tests", r".*\.(mvir|move)$");
+datatest_stable::harness!(run_test, "DPN/transactional-tests", r".*\.(mvir|move)$");

@@ -1,8 +1,7 @@
 /// Maintains the version number for the blockchain.
 module ExperimentalFramework::ExperimentalVersion {
     use CoreFramework::DiemVersion;
-    // TODO: remove dependency on DPN framework
-    use DiemFramework::DiemConfig;
+    use ExperimentalFramework::DiemConfig;
     use Std::Capability;
 
     struct ExperimentalVersion has drop {}

@@ -144,11 +144,12 @@ impl Account {
     }
 
     pub fn account(self) -> Result<impl Reply, Error> {
-        let account: AccountData = self
-            .account_state()?
+        let account_state = self.account_state()?;
+        let account: AccountData = account_state
             .get_account_resource()?
             .ok_or_else(|| self.resource_not_found(&AccountResource::struct_tag()))?
             .into();
+
         Response::new(self.latest_ledger_info, &account)
     }
 

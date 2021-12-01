@@ -17,6 +17,7 @@ mod crsn;
 mod data_store;
 mod emergency_admin_script;
 mod execution_strategies;
+mod experimental;
 mod failed_transaction_tests;
 mod genesis;
 mod genesis_initializations;

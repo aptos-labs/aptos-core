@@ -1,0 +1,74 @@
+---
+compiled_package_info:
+  package_name: DiemCoreFramework
+  address_alias_instantiation:
+    CoreFramework: "00000000000000000000000000000001"
+    CoreResources: 0000000000000000000000000a550c18
+    Std: "00000000000000000000000000000001"
+    VMReserved: "00000000000000000000000000000000"
+  module_resolution_metadata:
+    ? address: "00000000000000000000000000000001"
+      name: ASCII
+    : Std
+    ? address: "00000000000000000000000000000001"
+      name: Account
+    : CoreFramework
+    ? address: "00000000000000000000000000000001"
+      name: BCS
+    : Std
+    ? address: "00000000000000000000000000000001"
+      name: BitVector
+    : Std
+    ? address: "00000000000000000000000000000001"
+      name: Capability
+    : Std
+    ? address: "00000000000000000000000000000001"
+      name: ChainId
+    : CoreFramework
+    ? address: "00000000000000000000000000000001"
+      name: CoreGenesis
+    : CoreFramework
+    ? address: "00000000000000000000000000000001"
+      name: DiemTimestamp
+    : CoreFramework
+    ? address: "00000000000000000000000000000001"
+      name: DiemVersion
+    : CoreFramework
+    ? address: "00000000000000000000000000000001"
+      name: Errors
+    : Std
+    ? address: "00000000000000000000000000000001"
+      name: Event
+    : Std
+    ? address: "00000000000000000000000000000001"
+      name: FixedPoint32
+    : Std
+    ? address: "00000000000000000000000000000001"
+      name: GUID
+    : Std
+    ? address: "00000000000000000000000000000001"
+      name: Hash
+    : Std
+    ? address: "00000000000000000000000000000001"
+      name: Option
+    : Std
+    ? address: "00000000000000000000000000000001"
+      name: Signer
+    : Std
+    ? address: "00000000000000000000000000000001"
+      name: SystemAddresses
+    : CoreFramework
+    ? address: "00000000000000000000000000000001"
+      name: Vector
+    : Std
+  source_digest: 241E4B1517822E366D14DE1EB9030FB015DD63713F05305A962B5548DC560ADC
+  build_flags:
+    dev_mode: false
+    test_mode: false
+    generate_docs: true
+    generate_abis: true
+    install_dir: experimental/releases/artifacts/current
+    force_recompilation: false
+    additional_named_addresses: {}
+dependencies:
+  - MoveStdlib

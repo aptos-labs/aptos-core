@@ -9,6 +9,7 @@ use move_vm_runtime::native_functions::{NativeFunction, NativeFunctionTable};
 
 pub fn all_natives(diem_framework_addr: AccountAddress) -> NativeFunctionTable {
     const NATIVES: &[(&str, &str, NativeFunction)] = &[
+        // TODO: Remove once/if DPN is moved over to use the core framework
         (
             "DiemAccount",
             "create_signer",
@@ -29,6 +30,7 @@ pub fn all_natives(diem_framework_addr: AccountAddress) -> NativeFunctionTable {
             "ed25519_verify",
             signature::native_ed25519_signature_verification,
         ),
+        ("Account", "create_signer", account::native_create_signer),
     ];
     NATIVES
         .iter()

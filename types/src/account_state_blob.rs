@@ -3,7 +3,7 @@
 
 use crate::{
     account_address::{AccountAddress, HashAccountAddress},
-    account_config::{AccountResource, BalanceResource},
+    account_config::{AccountResource, BalanceResource, DiemAccountResource},
     account_state::AccountState,
     ledger_info::LedgerInfo,
     proof::{AccountStateProof, SparseMerkleRangeProof},
@@ -112,16 +112,31 @@ impl TryFrom<&AccountStateBlob> for AccountState {
     }
 }
 
-impl TryFrom<(&AccountResource, &BalanceResource)> for AccountStateBlob {
+impl TryFrom<(&AccountResource, &DiemAccountResource, &BalanceResource)> for AccountStateBlob {
     type Error = Error;
 
     fn try_from(
-        (account_resource, balance_resource): (&AccountResource, &BalanceResource),
+        (account_resource, diem_account_resource, balance_resource): (
+            &AccountResource,
+            &DiemAccountResource,
+            &BalanceResource,
+        ),
     ) -> Result<Self> {
         Self::try_from(&AccountState::try_from((
             account_resource,
+            diem_account_resource,
             balance_resource,
         ))?)
+    }
+}
+
+impl TryFrom<&AccountStateBlob> for DiemAccountResource {
+    type Error = Error;
+
+    fn try_from(account_state_blob: &AccountStateBlob) -> Result<Self> {
+        AccountState::try_from(account_state_blob)?
+            .get_diem_account_resource()?
+            .ok_or_else(|| anyhow!("DiemAccountResource not found."))
     }
 }
 
@@ -145,8 +160,8 @@ impl CryptoHash for AccountStateBlob {
 
 #[cfg(any(test, feature = "fuzzing"))]
 prop_compose! {
-    fn account_state_blob_strategy()(account_resource in any::<AccountResource>(), balance_resource in any::<BalanceResource>()) -> AccountStateBlob {
-        AccountStateBlob::try_from((&account_resource, &balance_resource)).unwrap()
+    fn account_state_blob_strategy()(account_resource in any::<AccountResource>(), diem_account_resource in any::<DiemAccountResource>(), balance_resource in any::<BalanceResource>()) -> AccountStateBlob {
+        AccountStateBlob::try_from((&account_resource, &diem_account_resource, &balance_resource)).unwrap()
     }
 }
 

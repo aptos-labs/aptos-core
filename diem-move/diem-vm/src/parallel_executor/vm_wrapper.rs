@@ -14,7 +14,9 @@ use diem_parallel_executor::{
     task::{ExecutionStatus, ExecutorTask},
 };
 use diem_state_view::StateView;
-use diem_types::{access_path::AccessPath, account_config::ACCOUNT_MODULE, write_set::WriteOp};
+use diem_types::{
+    access_path::AccessPath, account_config::DIEM_ACCOUNT_MODULE, write_set::WriteOp,
+};
 use move_core_types::vm_status::VMStatus;
 
 pub(crate) struct DiemVMWrapper<'a, S> {
@@ -39,7 +41,7 @@ impl<'a, S: 'a + StateView> ExecutorTask for DiemVMWrapper<'a, S> {
         // Loading up `0x1::DiemAccount` should be sufficient as this is the most common module
         // used for prologue, epilogue and transfer functionality.
 
-        let _ = vm.load_module(&ACCOUNT_MODULE, &RemoteStorage::new(argument));
+        let _ = vm.load_module(&DIEM_ACCOUNT_MODULE, &RemoteStorage::new(argument));
 
         Self {
             vm,

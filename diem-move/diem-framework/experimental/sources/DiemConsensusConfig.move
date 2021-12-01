@@ -1,1 +1,0 @@
-../../core/sources/DiemConsensusConfig.move

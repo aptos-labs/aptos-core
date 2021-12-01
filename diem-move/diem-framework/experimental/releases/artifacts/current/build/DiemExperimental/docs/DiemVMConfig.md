@@ -13,15 +13,12 @@ including different costs of running the VM.
 -  [Constants](#@Constants_0)
 -  [Function `initialize`](#0x1_DiemVMConfig_initialize)
 -  [Function `set_gas_constants`](#0x1_DiemVMConfig_set_gas_constants)
--  [Module Specification](#@Module_Specification_1)
-    -  [Initialization](#@Initialization_2)
-    -  [Access Control](#@Access_Control_3)
 
 
 <pre><code><b>use</b> <a href="DiemConfig.md#0x1_DiemConfig">0x1::DiemConfig</a>;
-<b>use</b> <a href="DiemTimestamp.md#0x1_DiemTimestamp">0x1::DiemTimestamp</a>;
+<b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/DiemTimestamp.md#0x1_DiemTimestamp">0x1::DiemTimestamp</a>;
 <b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors">0x1::Errors</a>;
-<b>use</b> <a href="Roles.md#0x1_Roles">0x1::Roles</a>;
+<b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/SystemAddresses.md#0x1_SystemAddresses">0x1::SystemAddresses</a>;
 </code></pre>
 
 
@@ -234,10 +231,10 @@ Initialize the table under the diem root account
     instruction_schedule: vector&lt;u8&gt;,
     native_schedule: vector&lt;u8&gt;,
 ) {
-    <a href="DiemTimestamp.md#0x1_DiemTimestamp_assert_genesis">DiemTimestamp::assert_genesis</a>();
+    <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/DiemTimestamp.md#0x1_DiemTimestamp_assert_genesis">DiemTimestamp::assert_genesis</a>();
 
     // The permission "UpdateVMConfig" is granted <b>to</b> DiemRoot [[H11]][PERMISSION].
-    <a href="Roles.md#0x1_Roles_assert_diem_root">Roles::assert_diem_root</a>(dr_account);
+    <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/SystemAddresses.md#0x1_SystemAddresses_assert_core_resource">SystemAddresses::assert_core_resource</a>(dr_account);
 
     <b>let</b> gas_constants = <a href="DiemVMConfig.md#0x1_DiemVMConfig_GasConstants">GasConstants</a> {
         global_memory_per_byte_cost: 4,
@@ -264,47 +261,6 @@ Initialize the table under the diem root account
         },
     );
 }
-</code></pre>
-
-
-
-</details>
-
-<details>
-<summary>Specification</summary>
-
-
-
-<pre><code><b>let</b> gas_constants = <a href="DiemVMConfig.md#0x1_DiemVMConfig_GasConstants">GasConstants</a> {
-    global_memory_per_byte_cost: 4,
-    global_memory_per_byte_write_cost: 9,
-    min_transaction_gas_units: 600,
-    large_transaction_cutoff: 600,
-    intrinsic_gas_per_byte: 8,
-    maximum_number_of_gas_units: 4000000,
-    min_price_per_gas_unit: 0,
-    max_price_per_gas_unit: 10000,
-    max_transaction_size_in_bytes: 4096,
-    gas_unit_scaling_factor: 1000,
-    default_account_size: 800,
-};
-</code></pre>
-
-
-Must abort if the signer does not have the DiemRoot role [[H11]][PERMISSION].
-
-
-<pre><code><b>include</b> <a href="Roles.md#0x1_Roles_AbortsIfNotDiemRoot">Roles::AbortsIfNotDiemRoot</a>{account: dr_account};
-<b>include</b> <a href="DiemTimestamp.md#0x1_DiemTimestamp_AbortsIfNotGenesis">DiemTimestamp::AbortsIfNotGenesis</a>;
-<b>include</b> <a href="DiemConfig.md#0x1_DiemConfig_PublishNewConfigAbortsIf">DiemConfig::PublishNewConfigAbortsIf</a>&lt;<a href="DiemVMConfig.md#0x1_DiemVMConfig">DiemVMConfig</a>&gt;;
-<b>include</b> <a href="DiemConfig.md#0x1_DiemConfig_PublishNewConfigEnsures">DiemConfig::PublishNewConfigEnsures</a>&lt;<a href="DiemVMConfig.md#0x1_DiemVMConfig">DiemVMConfig</a>&gt; {
-    payload: <a href="DiemVMConfig.md#0x1_DiemVMConfig">DiemVMConfig</a> {
-        gas_schedule: <a href="DiemVMConfig.md#0x1_DiemVMConfig_GasSchedule">GasSchedule</a> {
-            instruction_schedule,
-            native_schedule,
-            gas_constants,
-        }
-    }};
 </code></pre>
 
 
@@ -340,8 +296,8 @@ Must abort if the signer does not have the DiemRoot role [[H11]][PERMISSION].
     gas_unit_scaling_factor: u64,
     default_account_size: u64,
 ) {
-    <a href="DiemTimestamp.md#0x1_DiemTimestamp_assert_operating">DiemTimestamp::assert_operating</a>();
-    <a href="Roles.md#0x1_Roles_assert_diem_root">Roles::assert_diem_root</a>(dr_account);
+    <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/DiemTimestamp.md#0x1_DiemTimestamp_assert_operating">DiemTimestamp::assert_operating</a>();
+    <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/SystemAddresses.md#0x1_SystemAddresses_assert_core_resource">SystemAddresses::assert_core_resource</a>(dr_account);
     <b>assert</b>!(
         min_price_per_gas_unit &lt;= max_price_per_gas_unit,
         <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="DiemVMConfig.md#0x1_DiemVMConfig_EGAS_CONSTANT_INCONSISTENCY">EGAS_CONSTANT_INCONSISTENCY</a>)
@@ -373,99 +329,3 @@ Must abort if the signer does not have the DiemRoot role [[H11]][PERMISSION].
 
 
 </details>
-
-<details>
-<summary>Specification</summary>
-
-
-
-<pre><code><b>include</b> <a href="DiemTimestamp.md#0x1_DiemTimestamp_AbortsIfNotOperating">DiemTimestamp::AbortsIfNotOperating</a>;
-</code></pre>
-
-
-No one can update DiemVMConfig except for the Diem Root account [[H11]][PERMISSION].
-
-
-<pre><code><b>include</b> <a href="Roles.md#0x1_Roles_AbortsIfNotDiemRoot">Roles::AbortsIfNotDiemRoot</a>{account: dr_account};
-<b>include</b> <a href="DiemConfig.md#0x1_DiemConfig_SetAbortsIf">DiemConfig::SetAbortsIf</a>&lt;<a href="DiemVMConfig.md#0x1_DiemVMConfig">DiemVMConfig</a>&gt;{account: dr_account };
-<b>aborts_if</b> min_price_per_gas_unit &gt; max_price_per_gas_unit <b>with</b> Errors::INVALID_ARGUMENT;
-<b>aborts_if</b> min_transaction_gas_units &gt; maximum_number_of_gas_units <b>with</b> Errors::INVALID_ARGUMENT;
-<b>let</b> config = <a href="DiemConfig.md#0x1_DiemConfig_spec_get_config">DiemConfig::spec_get_config</a>&lt;<a href="DiemVMConfig.md#0x1_DiemVMConfig">DiemVMConfig</a>&gt;();
-<b>ensures</b> <a href="DiemConfig.md#0x1_DiemConfig_spec_is_published">DiemConfig::spec_is_published</a>&lt;<a href="DiemVMConfig.md#0x1_DiemVMConfig">DiemVMConfig</a>&gt;();
-<b>ensures</b> <a href="DiemConfig.md#0x1_DiemConfig_get">DiemConfig::get</a>&lt;<a href="DiemVMConfig.md#0x1_DiemVMConfig">DiemVMConfig</a>&gt;() == <a href="DiemVMConfig.md#0x1_DiemVMConfig">DiemVMConfig</a> {
-    gas_schedule: <a href="DiemVMConfig.md#0x1_DiemVMConfig_GasSchedule">GasSchedule</a> {
-        instruction_schedule: config.gas_schedule.instruction_schedule,
-        native_schedule: config.gas_schedule.native_schedule,
-        gas_constants: <a href="DiemVMConfig.md#0x1_DiemVMConfig_GasConstants">GasConstants</a> {
-                global_memory_per_byte_cost,
-                global_memory_per_byte_write_cost,
-                min_transaction_gas_units,
-                large_transaction_cutoff,
-                intrinsic_gas_per_byte,
-                maximum_number_of_gas_units,
-                min_price_per_gas_unit,
-                max_price_per_gas_unit,
-                max_transaction_size_in_bytes,
-                gas_unit_scaling_factor,
-                default_account_size,
-            },
-        }
-    };
-<b>ensures</b> <b>old</b>(<a href="DiemConfig.md#0x1_DiemConfig_spec_has_config">DiemConfig::spec_has_config</a>()) == <a href="DiemConfig.md#0x1_DiemConfig_spec_has_config">DiemConfig::spec_has_config</a>();
-</code></pre>
-
-
-
-</details>
-
-<a name="@Module_Specification_1"></a>
-
-## Module Specification
-
-
-
-<a name="@Initialization_2"></a>
-
-### Initialization
-
-
-
-<pre><code><b>invariant</b> [suspendable] <a href="DiemTimestamp.md#0x1_DiemTimestamp_is_operating">DiemTimestamp::is_operating</a>() ==&gt; <a href="DiemConfig.md#0x1_DiemConfig_spec_is_published">DiemConfig::spec_is_published</a>&lt;<a href="DiemVMConfig.md#0x1_DiemVMConfig">DiemVMConfig</a>&gt;();
-</code></pre>
-
-
-
-<a name="@Access_Control_3"></a>
-
-### Access Control
-
-The permission "UpdateVMConfig" is granted to DiemRoot [[H11]][PERMISSION].
-
-
-<pre><code><b>invariant</b> [suspendable] <b>forall</b> addr: <b>address</b>
-    <b>where</b> <b>exists</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig">DiemConfig</a>&lt;<a href="DiemVMConfig.md#0x1_DiemVMConfig">DiemVMConfig</a>&gt;&gt;(addr): addr == @DiemRoot;
-<b>invariant</b> <b>update</b> [suspendable] <b>old</b>(<a href="DiemConfig.md#0x1_DiemConfig_spec_is_published">DiemConfig::spec_is_published</a>&lt;<a href="DiemVMConfig.md#0x1_DiemVMConfig">DiemVMConfig</a>&gt;())
-    && <a href="DiemConfig.md#0x1_DiemConfig_spec_is_published">DiemConfig::spec_is_published</a>&lt;<a href="DiemVMConfig.md#0x1_DiemVMConfig">DiemVMConfig</a>&gt;()
-    && <b>old</b>(<a href="DiemConfig.md#0x1_DiemConfig_get">DiemConfig::get</a>&lt;<a href="DiemVMConfig.md#0x1_DiemVMConfig">DiemVMConfig</a>&gt;()) != <a href="DiemConfig.md#0x1_DiemConfig_get">DiemConfig::get</a>&lt;<a href="DiemVMConfig.md#0x1_DiemVMConfig">DiemVMConfig</a>&gt;()
-        ==&gt; <a href="Roles.md#0x1_Roles_spec_signed_by_diem_root_role">Roles::spec_signed_by_diem_root_role</a>();
-</code></pre>
-
-
-No one can update DiemVMConfig except for the Diem Root account [[H11]][PERMISSION].
-
-
-<a name="0x1_DiemVMConfig_DiemVMConfigRemainsSame"></a>
-
-
-<pre><code><b>schema</b> <a href="DiemVMConfig.md#0x1_DiemVMConfig_DiemVMConfigRemainsSame">DiemVMConfigRemainsSame</a> {
-    <b>ensures</b> <b>old</b>(<a href="DiemConfig.md#0x1_DiemConfig_spec_is_published">DiemConfig::spec_is_published</a>&lt;<a href="DiemVMConfig.md#0x1_DiemVMConfig">DiemVMConfig</a>&gt;()) ==&gt;
-        <b>global</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig">DiemConfig</a>&lt;<a href="DiemVMConfig.md#0x1_DiemVMConfig">DiemVMConfig</a>&gt;&gt;(@DiemRoot) ==
-            <b>old</b>(<b>global</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig">DiemConfig</a>&lt;<a href="DiemVMConfig.md#0x1_DiemVMConfig">DiemVMConfig</a>&gt;&gt;(@DiemRoot));
-}
-</code></pre>
-
-
-
-
-<pre><code><b>apply</b> <a href="DiemVMConfig.md#0x1_DiemVMConfig_DiemVMConfigRemainsSame">DiemVMConfigRemainsSame</a> <b>to</b> * <b>except</b> set_gas_constants;
-</code></pre>
