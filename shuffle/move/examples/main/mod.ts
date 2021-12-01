@@ -1,6 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+// deno-lint-ignore-file no-explicit-any
 import * as DiemHelpers from "./helpers.ts";
 import * as DiemTypes from "./generated/diemTypes/mod.ts";
 import * as codegen from "./generated/diemStdlib/mod.ts";
@@ -109,10 +110,10 @@ export async function initializeTestNFT() {
 export async function createTestNFTScriptFunction(
   contentUri: string,
 ) {
-  let scriptFunction: string = defaultUserContext.address +
+  const scriptFunction: string = defaultUserContext.address +
     "::TestNFT::create_nft";
-  let typeArguments: string[] = [];
-  let args: any[] = [contentUri];
+  const typeArguments: string[] = [];
+  const args: any[] = [contentUri];
   return await DiemHelpers.invokeScriptFunction(
     scriptFunction,
     typeArguments,
@@ -125,15 +126,15 @@ export async function createTestNFTScriptFunction(
 export async function transferNFTScriptFunction(
   to: string,
   creator: string,
-  creation_num: number,
+  creationNum: number,
 ) {
-  let scriptFunction: string = defaultUserContext.address +
+  const scriptFunction: string = defaultUserContext.address +
     "::NFTStandard::transfer";
 
-  let typeArgument = defaultUserContext.address + "::TestNFT::TestNFT";
-  let typeArguments: string[] = [typeArgument];
+  const typeArgument = defaultUserContext.address + "::TestNFT::TestNFT";
+  const typeArguments: string[] = [typeArgument];
 
-  let args: any[] = [to, creator, creation_num];
+  const args: any[] = [to, creator, creationNum];
   return await DiemHelpers.invokeScriptFunction(
     scriptFunction,
     typeArguments,
@@ -142,13 +143,13 @@ export async function transferNFTScriptFunction(
 }
 
 export async function initializeNFTScriptFunction(userContext: UserContext) {
-  let scriptFunction: string = defaultUserContext.address +
+  const scriptFunction: string = defaultUserContext.address +
     "::NFTStandard::initialize_nft_collection";
 
-  let typeArgument = defaultUserContext.address + "::TestNFT::TestNFT";
-  let typeArguments: string[] = [typeArgument];
+  const typeArgument = defaultUserContext.address + "::TestNFT::TestNFT";
+  const typeArguments: string[] = [typeArgument];
 
-  let args: any[] = [];
+  const args: any[] = [];
   return await DiemHelpers.invokeScriptFunctionForContext(
     userContext,
     scriptFunction,
@@ -165,16 +166,16 @@ export async function decodedMessages(addr?: string) {
 
 export async function decodedNFTs(addr?: string) {
   addr = addressOrDefault(addr);
-  let decoded_nfts: any[] = [];
+  const decodedNfts: any[] = [];
   const nfts = (await devapi.resourcesWithName("NFTStandard", addr))
     .filter((entry) => entry.data && entry.data.nfts)
     .map((entry) => {
       return entry.data.nfts;
     });
-  nfts.forEach((nft_type: any) => {
-    nft_type.forEach((nft: any) => {
-      decoded_nfts.push(nft);
+  nfts.forEach((nftType: any) => {
+    nftType.forEach((nft: any) => {
+      decodedNfts.push(nft);
     });
   });
-  return decoded_nfts;
+  return decodedNfts;
 }
