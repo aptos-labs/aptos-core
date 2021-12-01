@@ -2,13 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use diem_api_types::U64;
-use diem_types::{
-    account_config::ACCOUNT_MODULE_IDENTIFIER, transaction::authenticator::AuthenticationKey,
-};
-use move_core_types::{
-    identifier::IdentStr, language_storage::StructTag, move_resource::MoveStructType,
-    parser::parse_struct_tag,
-};
+use diem_types::transaction::authenticator::AuthenticationKey;
+use move_core_types::{language_storage::StructTag, parser::parse_struct_tag};
 use serde::{Deserialize, Deserializer};
 use std::str::FromStr;
 
@@ -68,9 +63,4 @@ pub struct DiemAccount {
     pub authentication_key: AuthenticationKey,
     #[serde(deserialize_with = "deserialize_from_string")]
     pub sequence_number: u64,
-}
-
-impl MoveStructType for DiemAccount {
-    const MODULE_NAME: &'static IdentStr = ACCOUNT_MODULE_IDENTIFIER;
-    const STRUCT_NAME: &'static IdentStr = ACCOUNT_MODULE_IDENTIFIER;
 }

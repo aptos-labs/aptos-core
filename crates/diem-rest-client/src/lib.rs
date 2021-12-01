@@ -6,7 +6,7 @@ use diem_api_types::{MoveModuleBytecode, PendingTransaction, Transaction};
 use diem_client::{Response, State};
 use diem_crypto::HashValue;
 use diem_types::{account_address::AccountAddress, transaction::SignedTransaction};
-use move_core_types::{language_storage::StructTag, move_resource::MoveStructType};
+use move_core_types::language_storage::StructTag;
 use reqwest::{header::CONTENT_TYPE, Client as ReqwestClient};
 use serde::Deserialize;
 use std::time::Duration;
@@ -203,14 +203,9 @@ impl Client {
     }
 
     pub async fn get_account(&self, address: AccountAddress) -> Result<Response<DiemAccount>> {
-        let (value, state) = self
-            .get_account_resource(address, &DiemAccount::struct_tag())
-            .await?
-            .into_parts();
-
-        let account =
-            serde_json::from_value(value.ok_or_else(|| anyhow!("missing DiemAccount resource"))?)?;
-        Ok(Response::new(account, state))
+        let url = self.base_url.join(&format!("accounts/{}", address))?;
+        let response = self.inner.get(url).send().await?;
+        self.json(response).await
     }
 
     async fn check_response(
