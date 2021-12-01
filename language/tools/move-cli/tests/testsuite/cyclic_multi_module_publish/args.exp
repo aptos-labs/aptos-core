@@ -1,4 +1,15 @@
 Command `sandbox publish --override-ordering A --override-ordering B -v`:
+error[E02001]: duplicate declaration, item, or annotation
+  ┌─ ./sources/CyclicFriendsPart2.move:1:13
+  │
+1 │ module 0x3::A {
+  │             ^ Duplicate definition for module '0x3::A'
+  │
+  ┌─ ./sources/CyclicFriendsPart1.move:1:13
+  │
+1 │ module 0x3::A {
+  │             - Module previously defined here
+
 error[E02004]: invalid 'module' declaration
   ┌─ ./sources/CyclicFriendsPart2.move:8:24
   │
@@ -11,15 +22,4 @@ error[E02004]: invalid 'module' declaration
   │
 6 │     public fun foo() { 0x3::A::foo() }
   │                        ----------- '0x3::A' uses '0x3::B'
-
-error[E02001]: duplicate declaration, item, or annotation
-  ┌─ ./sources/CyclicFriendsPart1.move:1:13
-  │
-1 │ module 0x3::A {
-  │             ^ Duplicate definition for module '0x3::A'
-  │
-  ┌─ ./sources/CyclicFriendsPart2.move:1:13
-  │
-1 │ module 0x3::A {
-  │             - Module previously defined here
 

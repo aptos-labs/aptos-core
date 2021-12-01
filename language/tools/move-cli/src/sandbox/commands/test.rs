@@ -69,7 +69,7 @@ fn collect_coverage(
     )?
     .into_compiled_package()?;
     let src_modules = pkg
-        .modules()
+        .modules()?
         .into_iter()
         .map(|unit| {
             let absolute_path = path_to_string(&unit.source_path.canonicalize()?)?;

@@ -38,4 +38,4 @@ module 43.N {
 }
 Command `sandbox publish -v --no-republish`:
 Found 2 modules
-Failed to republish modules since the --no-republish flag is set. Tried to republish the following modules: 00000000000000000000000000000042::M, 00000000000000000000000000000043::N
+Failed to republish modules since the --no-republish flag is set. Tried to republish the following modules: 00000000000000000000000000000043::N, 00000000000000000000000000000042::M

@@ -17,7 +17,7 @@ module Sender::NFTTests {
         let account1 = Vector::pop_back(&mut UnitTest::create_signers_for_testing(1));
         let addr1 = Signer::address_of(&account1);
         let account2 = Vector::pop_back(&mut UnitTest::create_signers_for_testing(2));
-        let addr2 = Signer::address_of(&account2);
+        let _addr2 = Signer::address_of(&account2);
         let content_uri = b"https://placekitten.com/200/300";
 
         NFTStandard::initialize<TestNFT>(&account1);
@@ -27,7 +27,8 @@ module Sender::NFTTests {
             token,
             content_uri,
         );
-        let nft_id = &GUID::id(NFTStandard::id(&instance));
-        let nft_creation_id = GUID::creation_num(NFTStandard::id(&instance));
+        let _nft_id = &GUID::id(NFTStandard::id(&instance));
+        let _nft_creation_id = GUID::creation_num(NFTStandard::id(&instance));
+        NFTStandard::add(addr1, instance);
     }
 }

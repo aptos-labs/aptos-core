@@ -198,7 +198,7 @@ impl CoverageSummaryOptions {
         let coverage_map = CoverageMap::from_binary_file(path.join(".coverage_map.mvcov"));
         let package = config.compile_package(path, &mut Vec::new())?;
         let modules: Vec<_> = package
-            .modules()
+            .modules()?
             .filter_map(|unit| match &unit.unit {
                 CompiledUnit::Module(NamedCompiledModule { module, .. }) => Some(module.clone()),
                 _ => None,

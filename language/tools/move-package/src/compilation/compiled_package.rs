@@ -383,14 +383,33 @@ impl CompiledPackage {
         )
     }
 
-    pub fn modules(&self) -> impl Iterator<Item = &CompiledUnitWithSource> {
-        self.compiled_units
+    pub fn modules(&self) -> Result<impl Iterator<Item = &CompiledUnitWithSource>> {
+        let mut lookup_modules: BTreeMap<_, _> = self
+            .compiled_units
             .iter()
-            .filter(|unit| matches!(unit.unit, CompiledUnit::Module(_)))
+            .filter_map(|unit| match &unit.unit {
+                CompiledUnit::Module(NamedCompiledModule { module, .. }) => {
+                    Some((module.self_id(), unit))
+                }
+                CompiledUnit::Script(_) => None,
+            })
+            .collect();
+
+        let dep_graph: Vec<_> = self
+            .transitive_compiled_modules()
+            .compute_dependency_graph()
+            .compute_topological_order()?
+            .cloned()
+            .collect();
+
+        Ok(dep_graph
+            .into_iter()
+            .map(|module| module.self_id())
+            .flat_map(move |module_id| lookup_modules.remove(&module_id)))
     }
 
     pub fn get_module_by_name(&self, module_name: &str) -> Result<&CompiledUnitWithSource> {
-        self.modules()
+        self.modules()?
             .find(|unit| unit.unit.name().as_str() == module_name)
             .ok_or_else(|| {
                 anyhow::format_err!(
