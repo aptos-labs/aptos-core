@@ -26,8 +26,13 @@ Deno.test("transactions", async () => {
 
 Deno.test("transaction", async () => {
   const actual = await devapi.transaction(0);
-  assertEquals(actual.type, "genesis_transaction");
-  assert(actual.success);
+  switch (actual.type) {
+    case "genesis_transaction":
+      assert(actual.success);
+      break;
+    default:
+      throw "expect genesis_transaction for version 0"
+  }
 });
 
 Deno.test("transaction not found", async () => {

@@ -8,6 +8,7 @@
 // deno-lint-ignore-file no-explicit-any
 // deno-lint-ignore-file ban-types
 import * as context from "./context.ts";
+import { SigningMessageRequest, UserTransactionRequest, Transaction, OnChainTransaction, PendingTransaction, SigningMessage } from "./client.ts";
 
 // Retrieves the ledger information as defined by the root /
 // of the Developer API
@@ -16,13 +17,13 @@ export async function ledgerInfo() {
 }
 
 // Returns a list of transactions, ascending from page 0.
-export async function transactions() {
+export async function transactions(): Promise<OnChainTransaction[]> {
   // TODO: Have below return a list of transactions desc by sequence number
   return await context.client().getTransactions();
 }
 
 // Returns a specific transaction based on the version or hash.
-export async function transaction(versionOrHash: number | string) {
+export async function transaction(versionOrHash: number | string): Promise<Transaction> {
   return await context.client().getTransaction(versionOrHash);
 }
 
@@ -30,12 +31,12 @@ export async function transaction(versionOrHash: number | string) {
 export async function waitForTransactionCompletion(
   versionOrHash: number | string,
   timeout?: number,
-): Promise<any> {
+): Promise<OnChainTransaction> {
   return await context.client().waitForTransaction(versionOrHash, timeout);
 }
 
 // Returns transactions specific to a particular address.
-export async function accountTransactions(addr?: string) {
+export async function accountTransactions(addr?: string): Promise<OnChainTransaction[]> {
   addr = context.addressOrDefault(addr);
   return await context.client().getAccountTransactions(addr);
 }
@@ -87,13 +88,13 @@ export async function postTransactionBcs(
 // POSTs a JSON payload to the /transactions/signing_message endpoint in the
 // developer API to get the signing message for a payload.
 export async function postTransactionSigningMessage(
-  body: string,
-): Promise<any> {
+  body: SigningMessageRequest,
+): Promise<SigningMessage> {
   return await context.client().createSigningMessage(body);
 }
 
 // POSTs a JSON payload to the /transactions endpoint in the developer API.
-export async function postTransactionJson(body: string): Promise<any> {
+export async function postTransactionJson(body: UserTransactionRequest): Promise<PendingTransaction> {
   return await context.client().submitTransaction(body);
 }
 

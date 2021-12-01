@@ -112,7 +112,7 @@ export async function invokeScriptFunctionForAddress(
   };
 
   const signingMsgPayload = await devapi.postTransactionSigningMessage(
-    JSON.stringify(request),
+    request,
   );
   const signingMsg = signingMsgPayload.message.slice(2); // remove 0x prefix
 
@@ -124,7 +124,7 @@ export async function invokeScriptFunctionForAddress(
     "signature": signature,
   };
 
-  return await devapi.postTransactionJson(JSON.stringify(request));
+  return await devapi.postTransactionJson(request);
 }
 
 export function newRawTransaction(
