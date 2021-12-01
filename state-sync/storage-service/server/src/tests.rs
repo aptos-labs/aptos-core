@@ -277,7 +277,6 @@ async fn test_get_epoch_ending_ledger_infos() {
     let (mut mock_client, service) = MockClient::new();
     tokio::spawn(service.start());
 
-    // Create a request to fetch transactions with a proof (excluding events)
     let start_epoch = 11;
     let expected_end_epoch = 21;
     let request = StorageServiceRequest::GetEpochEndingLedgerInfos(EpochEndingLedgerInfoRequest {
@@ -439,7 +438,9 @@ impl DbReader<DpnProto> for MockDbReader {
         end_epoch: u64,
     ) -> Result<EpochChangeProof> {
         let mut ledger_info_with_sigs = vec![];
-        for epoch in start_epoch..end_epoch + 1 {
+        // `get_epoch_ending_ledger_infos` only returns the epoch changes from
+        // `start_epoch` up to `end_epoch - 1`.
+        for epoch in start_epoch..end_epoch {
             ledger_info_with_sigs.push(create_test_ledger_info_with_sigs(epoch, 0));
         }
 
@@ -481,6 +482,14 @@ impl DbReader<DpnProto> for MockDbReader {
         })
     }
 
+    fn get_first_txn_version(&self) -> Result<Option<Version>> {
+        Ok(Some(FIRST_TXN_VERSION))
+    }
+
+    fn get_first_write_set_version(&self) -> Result<Option<Version>> {
+        Ok(Some(FIRST_TXN_OUTPUT_VERSION))
+    }
+
     fn get_transaction_outputs(
         &self,
         start_version: Version,
@@ -509,18 +518,6 @@ impl DbReader<DpnProto> for MockDbReader {
         ))
     }
 
-    fn get_first_write_set_version(&self) -> Result<Option<Version>> {
-        Ok(Some(FIRST_TXN_OUTPUT_VERSION))
-    }
-
-    fn get_first_txn_version(&self) -> Result<Option<Version>> {
-        Ok(Some(FIRST_TXN_VERSION))
-    }
-
-    fn get_state_prune_window(&self) -> Option<usize> {
-        Some(STATE_PRUNE_WINDOW as usize)
-    }
-
     fn get_account_count(&self, _version: Version) -> Result<usize> {
         Ok(NUM_ACCOUNTS_AT_VERSION as usize)
     }
@@ -547,6 +544,10 @@ impl DbReader<DpnProto> for MockDbReader {
             proof: SparseMerkleRangeProof::new(vec![]),
         };
         Ok(account_states_chunk_with_proof)
+    }
+
+    fn get_state_prune_window(&self) -> Option<usize> {
+        Some(STATE_PRUNE_WINDOW as usize)
     }
 }
 
