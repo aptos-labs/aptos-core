@@ -11,8 +11,8 @@ use crate::{
     streaming_service::DataStreamingService,
     tests::utils::{
         create_ledger_info, get_data_notification, initialize_logger, MockDiemDataClient,
-        MAX_ADVERTISED_ACCOUNTS, MAX_ADVERTISED_EPOCH, MAX_ADVERTISED_TRANSACTION,
-        MAX_ADVERTISED_TRANSACTION_OUTPUT, MIN_ADVERTISED_ACCOUNTS, MIN_ADVERTISED_EPOCH,
+        MAX_ADVERTISED_ACCOUNTS, MAX_ADVERTISED_EPOCH_END, MAX_ADVERTISED_TRANSACTION,
+        MAX_ADVERTISED_TRANSACTION_OUTPUT, MIN_ADVERTISED_ACCOUNTS, MIN_ADVERTISED_EPOCH_END,
         MIN_ADVERTISED_TRANSACTION, MIN_ADVERTISED_TRANSACTION_OUTPUT, TOTAL_NUM_ACCOUNTS,
     },
 };
@@ -116,14 +116,14 @@ async fn test_notifications_continuous_outputs() {
     let mut stream_listener = streaming_client
         .continuously_stream_transaction_outputs(
             MIN_ADVERTISED_TRANSACTION_OUTPUT,
-            MIN_ADVERTISED_EPOCH,
+            MIN_ADVERTISED_EPOCH_END,
             None,
         )
         .await
         .unwrap();
 
     // Read the data notifications from the stream and verify the payloads
-    let mut next_expected_epoch = MIN_ADVERTISED_EPOCH;
+    let mut next_expected_epoch = MIN_ADVERTISED_EPOCH_END;
     let mut next_expected_version = MIN_ADVERTISED_TRANSACTION_OUTPUT;
     loop {
         if let Ok(data_notification) = get_data_notification(&mut stream_listener).await {
@@ -152,7 +152,7 @@ async fn test_notifications_continuous_outputs() {
                 data_payload => unexpected_payload_type!(data_payload),
             }
         } else {
-            assert_eq!(next_expected_epoch, MAX_ADVERTISED_EPOCH);
+            assert_eq!(next_expected_epoch, MAX_ADVERTISED_EPOCH_END);
             return assert_eq!(next_expected_version, MAX_ADVERTISED_TRANSACTION_OUTPUT + 1);
         }
     }
@@ -165,18 +165,18 @@ async fn test_notifications_continuous_outputs_target() {
 
     // Request a continuous output stream and get a data stream listener
     let target_version = MAX_ADVERTISED_TRANSACTION_OUTPUT - 551;
-    let target = create_ledger_info(target_version, MAX_ADVERTISED_EPOCH, false);
+    let target = create_ledger_info(target_version, MAX_ADVERTISED_EPOCH_END, false);
     let mut stream_listener = streaming_client
         .continuously_stream_transaction_outputs(
             MIN_ADVERTISED_TRANSACTION_OUTPUT,
-            MIN_ADVERTISED_EPOCH,
+            MIN_ADVERTISED_EPOCH_END,
             Some(target),
         )
         .await
         .unwrap();
 
     // Read the data notifications from the stream and verify the payloads
-    let mut next_expected_epoch = MIN_ADVERTISED_EPOCH;
+    let mut next_expected_epoch = MIN_ADVERTISED_EPOCH_END;
     let mut next_expected_version = MIN_ADVERTISED_TRANSACTION_OUTPUT;
     loop {
         let data_notification = get_data_notification(&mut stream_listener).await.unwrap();
@@ -214,11 +214,11 @@ async fn test_notifications_continuous_outputs_target() {
 async fn test_notifications_continuous_outputs_multiple_streams() {
     // Create a new streaming client and service
     let streaming_client = create_new_streaming_client_and_service();
-    let end_epoch = MIN_ADVERTISED_EPOCH + 5;
+    let end_epoch = MIN_ADVERTISED_EPOCH_END + 5;
 
     // Request a continuous output stream starting at the next expected version
     let mut next_expected_version = MIN_ADVERTISED_TRANSACTION_OUTPUT;
-    let mut next_expected_epoch = MIN_ADVERTISED_EPOCH;
+    let mut next_expected_epoch = MIN_ADVERTISED_EPOCH_END;
     let mut stream_listener = streaming_client
         .continuously_stream_transaction_outputs(next_expected_version, next_expected_epoch, None)
         .await
@@ -281,7 +281,7 @@ async fn test_notifications_continuous_transactions() {
     let mut stream_listener = streaming_client
         .continuously_stream_transactions(
             MIN_ADVERTISED_TRANSACTION,
-            MIN_ADVERTISED_EPOCH,
+            MIN_ADVERTISED_EPOCH_END,
             true,
             None,
         )
@@ -289,7 +289,7 @@ async fn test_notifications_continuous_transactions() {
         .unwrap();
 
     // Read the data notifications from the stream and verify the payloads
-    let mut next_expected_epoch = MIN_ADVERTISED_EPOCH;
+    let mut next_expected_epoch = MIN_ADVERTISED_EPOCH_END;
     let mut next_expected_version = MIN_ADVERTISED_TRANSACTION;
     loop {
         if let Ok(data_notification) = get_data_notification(&mut stream_listener).await {
@@ -324,7 +324,7 @@ async fn test_notifications_continuous_transactions() {
                 data_payload => unexpected_payload_type!(data_payload),
             }
         } else {
-            assert_eq!(next_expected_epoch, MAX_ADVERTISED_EPOCH);
+            assert_eq!(next_expected_epoch, MAX_ADVERTISED_EPOCH_END);
             return assert_eq!(next_expected_version, MAX_ADVERTISED_TRANSACTION + 1);
         }
     }
@@ -337,11 +337,11 @@ async fn test_notifications_continuous_transactions_target() {
 
     // Request a continuous transaction stream and get a data stream listener
     let target_version = MAX_ADVERTISED_TRANSACTION - 101;
-    let target = create_ledger_info(target_version, MAX_ADVERTISED_EPOCH, true);
+    let target = create_ledger_info(target_version, MAX_ADVERTISED_EPOCH_END, true);
     let mut stream_listener = streaming_client
         .continuously_stream_transactions(
             MIN_ADVERTISED_TRANSACTION,
-            MIN_ADVERTISED_EPOCH,
+            MIN_ADVERTISED_EPOCH_END,
             true,
             Some(target),
         )
@@ -349,7 +349,7 @@ async fn test_notifications_continuous_transactions_target() {
         .unwrap();
 
     // Read the data notifications from the stream and verify the payloads
-    let mut next_expected_epoch = MIN_ADVERTISED_EPOCH;
+    let mut next_expected_epoch = MIN_ADVERTISED_EPOCH_END;
     let mut next_expected_version = MIN_ADVERTISED_TRANSACTION;
     loop {
         let data_notification = get_data_notification(&mut stream_listener).await.unwrap();
@@ -394,12 +394,12 @@ async fn test_notifications_epoch_ending() {
 
     // Request an epoch ending stream and get a data stream listener
     let mut stream_listener = streaming_client
-        .get_all_epoch_ending_ledger_infos(MIN_ADVERTISED_EPOCH)
+        .get_all_epoch_ending_ledger_infos(MIN_ADVERTISED_EPOCH_END)
         .await
         .unwrap();
 
     // Read the data notifications from the stream and verify epoch ordering
-    let mut next_expected_epoch = MIN_ADVERTISED_EPOCH;
+    let mut next_expected_epoch = MIN_ADVERTISED_EPOCH_END;
     loop {
         let data_notification = get_data_notification(&mut stream_listener).await.unwrap();
         match data_notification.data_payload {
@@ -408,12 +408,12 @@ async fn test_notifications_epoch_ending() {
                 for ledger_info_with_sigs in ledger_infos_with_sigs {
                     let epoch = ledger_info_with_sigs.ledger_info().commit_info().epoch();
                     assert_eq!(next_expected_epoch, epoch);
-                    assert_le!(epoch, MAX_ADVERTISED_EPOCH - 1);
+                    assert_le!(epoch, MAX_ADVERTISED_EPOCH_END);
                     next_expected_epoch += 1;
                 }
             }
             DataPayload::EndOfStream => {
-                return assert_eq!(next_expected_epoch, MAX_ADVERTISED_EPOCH)
+                return assert_eq!(next_expected_epoch, MAX_ADVERTISED_EPOCH_END + 1)
             }
             data_payload => unexpected_payload_type!(data_payload),
         }
@@ -426,7 +426,7 @@ async fn test_notifications_epoch_ending_multiple_streams() {
     let streaming_client = create_new_streaming_client_and_service();
 
     // Request a new epoch ending stream starting at the next expected index.
-    let mut next_expected_epoch = MIN_ADVERTISED_EPOCH;
+    let mut next_expected_epoch = MIN_ADVERTISED_EPOCH_END;
     let mut stream_listener = streaming_client
         .get_all_epoch_ending_ledger_infos(next_expected_epoch)
         .await
@@ -438,7 +438,7 @@ async fn test_notifications_epoch_ending_multiple_streams() {
         match data_notification.data_payload {
             DataPayload::EpochEndingLedgerInfos(ledger_infos_with_sigs) => {
                 next_expected_epoch += ledger_infos_with_sigs.len() as u64;
-                if next_expected_epoch < MAX_ADVERTISED_EPOCH - 1 {
+                if next_expected_epoch < MAX_ADVERTISED_EPOCH_END {
                     // Terminate the stream
                     streaming_client
                         .terminate_stream_with_feedback(
@@ -456,7 +456,7 @@ async fn test_notifications_epoch_ending_multiple_streams() {
                 }
             }
             DataPayload::EndOfStream => {
-                return assert_eq!(next_expected_epoch, MAX_ADVERTISED_EPOCH)
+                return assert_eq!(next_expected_epoch, MAX_ADVERTISED_EPOCH_END + 1)
             }
             data_payload => unexpected_payload_type!(data_payload),
         }
@@ -614,7 +614,7 @@ async fn test_stream_accounts() {
 
     // Request a stream where accounts are missing (we are lower than advertised)
     let result = streaming_client
-        .get_all_accounts(MAX_ADVERTISED_EPOCH + 1, None)
+        .get_all_accounts(MAX_ADVERTISED_EPOCH_END + 1, None)
         .await;
     assert_matches!(result, Err(Error::DataIsUnavailable(_)));
 }
@@ -628,7 +628,7 @@ async fn test_stream_continuous_outputs() {
     let result = streaming_client
         .continuously_stream_transaction_outputs(
             MIN_ADVERTISED_TRANSACTION_OUTPUT,
-            MIN_ADVERTISED_EPOCH,
+            MIN_ADVERTISED_EPOCH_END,
             None,
         )
         .await;
@@ -638,7 +638,7 @@ async fn test_stream_continuous_outputs() {
     let result = streaming_client
         .continuously_stream_transaction_outputs(
             MIN_ADVERTISED_TRANSACTION_OUTPUT - 1,
-            MIN_ADVERTISED_EPOCH,
+            MIN_ADVERTISED_EPOCH_END,
             None,
         )
         .await;
@@ -648,7 +648,7 @@ async fn test_stream_continuous_outputs() {
     let result = streaming_client
         .continuously_stream_transaction_outputs(
             MAX_ADVERTISED_TRANSACTION_OUTPUT + 1,
-            MIN_ADVERTISED_EPOCH,
+            MIN_ADVERTISED_EPOCH_END,
             None,
         )
         .await;
@@ -664,10 +664,10 @@ async fn test_stream_continuous_outputs_target() {
     let result = streaming_client
         .continuously_stream_transaction_outputs(
             MIN_ADVERTISED_TRANSACTION_OUTPUT,
-            MIN_ADVERTISED_EPOCH,
+            MIN_ADVERTISED_EPOCH_END,
             Some(create_ledger_info(
                 MAX_ADVERTISED_TRANSACTION_OUTPUT,
-                MAX_ADVERTISED_EPOCH,
+                MAX_ADVERTISED_EPOCH_END,
                 true,
             )),
         )
@@ -678,10 +678,10 @@ async fn test_stream_continuous_outputs_target() {
     let result = streaming_client
         .continuously_stream_transaction_outputs(
             MIN_ADVERTISED_TRANSACTION_OUTPUT,
-            MIN_ADVERTISED_EPOCH,
+            MIN_ADVERTISED_EPOCH_END,
             Some(create_ledger_info(
                 MAX_ADVERTISED_TRANSACTION_OUTPUT + 1,
-                MAX_ADVERTISED_EPOCH,
+                MAX_ADVERTISED_EPOCH_END,
                 true,
             )),
         )
@@ -698,7 +698,7 @@ async fn test_stream_continuous_transactions() {
     let result = streaming_client
         .continuously_stream_transactions(
             MIN_ADVERTISED_TRANSACTION,
-            MIN_ADVERTISED_EPOCH,
+            MIN_ADVERTISED_EPOCH_END,
             true,
             None,
         )
@@ -709,7 +709,7 @@ async fn test_stream_continuous_transactions() {
     let result = streaming_client
         .continuously_stream_transactions(
             MIN_ADVERTISED_TRANSACTION - 1,
-            MIN_ADVERTISED_EPOCH,
+            MIN_ADVERTISED_EPOCH_END,
             true,
             None,
         )
@@ -720,7 +720,7 @@ async fn test_stream_continuous_transactions() {
     let result = streaming_client
         .continuously_stream_transactions(
             MAX_ADVERTISED_TRANSACTION + 1,
-            MIN_ADVERTISED_EPOCH,
+            MIN_ADVERTISED_EPOCH_END,
             true,
             None,
         )
@@ -737,11 +737,11 @@ async fn test_stream_continuous_transactions_target() {
     let result = streaming_client
         .continuously_stream_transactions(
             MIN_ADVERTISED_TRANSACTION,
-            MIN_ADVERTISED_EPOCH,
+            MIN_ADVERTISED_EPOCH_END,
             true,
             Some(create_ledger_info(
                 MAX_ADVERTISED_TRANSACTION,
-                MAX_ADVERTISED_EPOCH,
+                MAX_ADVERTISED_EPOCH_END,
                 true,
             )),
         )
@@ -752,11 +752,11 @@ async fn test_stream_continuous_transactions_target() {
     let result = streaming_client
         .continuously_stream_transactions(
             MIN_ADVERTISED_TRANSACTION,
-            MIN_ADVERTISED_EPOCH,
+            MIN_ADVERTISED_EPOCH_END,
             true,
             Some(create_ledger_info(
                 MAX_ADVERTISED_TRANSACTION + 1,
-                MAX_ADVERTISED_EPOCH,
+                MAX_ADVERTISED_EPOCH_END,
                 false,
             )),
         )
@@ -771,19 +771,19 @@ async fn test_stream_epoch_ending() {
 
     // Request an epoch ending stream and verify we get a data stream listener
     let result = streaming_client
-        .get_all_epoch_ending_ledger_infos(MIN_ADVERTISED_EPOCH)
+        .get_all_epoch_ending_ledger_infos(MIN_ADVERTISED_EPOCH_END)
         .await;
     assert_ok!(result);
 
     // Request a stream where epoch data is missing (we are lower than advertised)
     let result = streaming_client
-        .get_all_epoch_ending_ledger_infos(MIN_ADVERTISED_EPOCH - 1)
+        .get_all_epoch_ending_ledger_infos(MIN_ADVERTISED_EPOCH_END - 1)
         .await;
     assert_matches!(result, Err(Error::DataIsUnavailable(_)));
 
     // Request a stream where epoch data is missing (we are higher than advertised)
     let result = streaming_client
-        .get_all_epoch_ending_ledger_infos(MAX_ADVERTISED_EPOCH + 1)
+        .get_all_epoch_ending_ledger_infos(MAX_ADVERTISED_EPOCH_END + 1)
         .await;
     assert_matches!(result, Err(Error::DataIsUnavailable(_)));
 }

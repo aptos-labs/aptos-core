@@ -41,8 +41,8 @@ pub const TOTAL_NUM_ACCOUNTS: u64 = 2000;
 pub const MAX_RESPONSE_ID: u64 = 100000;
 pub const MIN_ADVERTISED_ACCOUNTS: u64 = 9500;
 pub const MAX_ADVERTISED_ACCOUNTS: u64 = 10000;
-pub const MIN_ADVERTISED_EPOCH: u64 = 100;
-pub const MAX_ADVERTISED_EPOCH: u64 = 150;
+pub const MIN_ADVERTISED_EPOCH_END: u64 = 100;
+pub const MAX_ADVERTISED_EPOCH_END: u64 = 150;
 pub const MIN_ADVERTISED_TRANSACTION: u64 = 1000;
 pub const MAX_ADVERTISED_TRANSACTION: u64 = 10000;
 pub const MIN_ADVERTISED_TRANSACTION_OUTPUT: u64 = 1000;
@@ -77,6 +77,45 @@ impl MockDiemDataClient {
 
 #[async_trait]
 impl DiemDataClient for MockDiemDataClient {
+    fn get_global_data_summary(&self) -> GlobalDataSummary {
+        // Create a random set of optimal chunk sizes to emulate changing environments
+        let optimal_chunk_sizes = OptimalChunkSizes {
+            account_states_chunk_size: create_non_zero_random_u64(100),
+            epoch_chunk_size: create_non_zero_random_u64(10),
+            transaction_chunk_size: create_non_zero_random_u64(2000),
+            transaction_output_chunk_size: create_non_zero_random_u64(100),
+        };
+
+        // Create a global data summary with a fixed set of data
+        let advertised_data = AdvertisedData {
+            account_states: vec![CompleteDataRange::new(
+                MIN_ADVERTISED_ACCOUNTS,
+                MAX_ADVERTISED_ACCOUNTS,
+            )
+            .unwrap()],
+            epoch_ending_ledger_infos: vec![CompleteDataRange::new(
+                MIN_ADVERTISED_EPOCH_END,
+                MAX_ADVERTISED_EPOCH_END,
+            )
+            .unwrap()],
+            synced_ledger_infos: self.synced_ledger_infos.clone(),
+            transactions: vec![CompleteDataRange::new(
+                MIN_ADVERTISED_TRANSACTION,
+                MAX_ADVERTISED_TRANSACTION,
+            )
+            .unwrap()],
+            transaction_outputs: vec![CompleteDataRange::new(
+                MIN_ADVERTISED_TRANSACTION_OUTPUT,
+                MAX_ADVERTISED_TRANSACTION_OUTPUT,
+            )
+            .unwrap()],
+        };
+        GlobalDataSummary {
+            advertised_data,
+            optimal_chunk_sizes,
+        }
+    }
+
     async fn get_account_states_with_proof(
         &self,
         _version: Version,
@@ -117,45 +156,6 @@ impl DiemDataClient for MockDiemDataClient {
             epoch_ending_ledger_infos.push(ledger_info.clone());
         }
         Ok(create_data_client_response(epoch_ending_ledger_infos))
-    }
-
-    fn get_global_data_summary(&self) -> GlobalDataSummary {
-        // Create a random set of optimal chunk sizes to emulate changing environments
-        let optimal_chunk_sizes = OptimalChunkSizes {
-            account_states_chunk_size: create_non_zero_random_u64(100),
-            epoch_chunk_size: create_non_zero_random_u64(10),
-            transaction_chunk_size: create_non_zero_random_u64(2000),
-            transaction_output_chunk_size: create_non_zero_random_u64(100),
-        };
-
-        // Create a global data summary with a fixed set of data
-        let advertised_data = AdvertisedData {
-            account_states: vec![CompleteDataRange::new(
-                MIN_ADVERTISED_ACCOUNTS,
-                MAX_ADVERTISED_ACCOUNTS,
-            )
-            .unwrap()],
-            epoch_ending_ledger_infos: vec![CompleteDataRange::new(
-                MIN_ADVERTISED_EPOCH,
-                MAX_ADVERTISED_EPOCH,
-            )
-            .unwrap()],
-            synced_ledger_infos: self.synced_ledger_infos.clone(),
-            transactions: vec![CompleteDataRange::new(
-                MIN_ADVERTISED_TRANSACTION,
-                MAX_ADVERTISED_TRANSACTION,
-            )
-            .unwrap()],
-            transaction_outputs: vec![CompleteDataRange::new(
-                MIN_ADVERTISED_TRANSACTION_OUTPUT,
-                MAX_ADVERTISED_TRANSACTION_OUTPUT,
-            )
-            .unwrap()],
-        };
-        GlobalDataSummary {
-            advertised_data,
-            optimal_chunk_sizes,
-        }
     }
 
     async fn get_number_of_account_states(
@@ -255,14 +255,14 @@ pub fn create_ledger_info(
 
 /// Creates a epoch ending ledger infos for all epochs
 fn create_epoch_ending_ledger_infos() -> HashMap<Epoch, LedgerInfoWithSignatures> {
-    let mut current_epoch = MIN_ADVERTISED_EPOCH;
+    let mut current_epoch = MIN_ADVERTISED_EPOCH_END;
     let mut current_version = MIN_ADVERTISED_TRANSACTION;
 
     // Populate the epoch ending ledger infos using random intervals
     let max_num_versions_in_epoch = (MAX_ADVERTISED_TRANSACTION - MIN_ADVERTISED_TRANSACTION)
-        / (MAX_ADVERTISED_EPOCH - MIN_ADVERTISED_EPOCH);
+        / ((MAX_ADVERTISED_EPOCH_END + 1) - MIN_ADVERTISED_EPOCH_END);
     let mut epoch_ending_ledger_infos = HashMap::new();
-    while current_epoch < MAX_ADVERTISED_EPOCH {
+    while current_epoch < MAX_ADVERTISED_EPOCH_END + 1 {
         let num_versions_in_epoch = create_non_zero_random_u64(max_num_versions_in_epoch);
         current_version += num_versions_in_epoch;
 
@@ -285,12 +285,12 @@ fn create_epoch_ending_ledger_infos() -> HashMap<Epoch, LedgerInfoWithSignatures
 fn create_synced_ledger_infos(
     epoch_ending_ledger_infos: &HashMap<Epoch, LedgerInfoWithSignatures>,
 ) -> Vec<LedgerInfoWithSignatures> {
-    let mut current_epoch = MIN_ADVERTISED_EPOCH;
+    let mut current_epoch = MIN_ADVERTISED_EPOCH_END;
     let mut current_version = MIN_ADVERTISED_TRANSACTION;
 
     // Populate the synced ledger infos
     let mut synced_ledger_infos = vec![];
-    while current_version < MAX_ADVERTISED_TRANSACTION && current_epoch < MAX_ADVERTISED_EPOCH {
+    while current_version < MAX_ADVERTISED_TRANSACTION && current_epoch < MAX_ADVERTISED_EPOCH_END {
         let random_num_versions = create_non_zero_random_u64(10);
         current_version += random_num_versions;
 
@@ -315,7 +315,7 @@ fn create_synced_ledger_infos(
     // to ensure we can sync right up to the end.
     synced_ledger_infos.push(create_ledger_info(
         MAX_ADVERTISED_TRANSACTION,
-        MAX_ADVERTISED_EPOCH,
+        MAX_ADVERTISED_EPOCH_END,
         false,
     ));
 

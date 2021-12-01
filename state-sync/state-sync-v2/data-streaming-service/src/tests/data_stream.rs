@@ -13,9 +13,9 @@ use crate::{
     tests::utils::{
         create_data_client_response, create_ledger_info, create_random_u64,
         create_transaction_list_with_proof, get_data_notification, initialize_logger,
-        MockDiemDataClient, NoopResponseCallback, MAX_ADVERTISED_ACCOUNTS, MAX_ADVERTISED_EPOCH,
-        MAX_ADVERTISED_TRANSACTION_OUTPUT, MAX_NOTIFICATION_TIMEOUT_SECS, MIN_ADVERTISED_ACCOUNTS,
-        MIN_ADVERTISED_EPOCH, MIN_ADVERTISED_TRANSACTION_OUTPUT,
+        MockDiemDataClient, NoopResponseCallback, MAX_ADVERTISED_ACCOUNTS,
+        MAX_ADVERTISED_EPOCH_END, MAX_ADVERTISED_TRANSACTION_OUTPUT, MAX_NOTIFICATION_TIMEOUT_SECS,
+        MIN_ADVERTISED_ACCOUNTS, MIN_ADVERTISED_EPOCH_END, MIN_ADVERTISED_TRANSACTION_OUTPUT,
     },
 };
 use claim::{assert_err, assert_ge, assert_none, assert_ok};
@@ -150,7 +150,7 @@ async fn test_stream_initialization() {
     // Create an epoch ending data stream
     let streaming_service_config = DataStreamingServiceConfig::default();
     let (mut data_stream, _) =
-        create_epoch_ending_stream(streaming_service_config, MIN_ADVERTISED_EPOCH);
+        create_epoch_ending_stream(streaming_service_config, MIN_ADVERTISED_EPOCH_END);
 
     // Verify the data stream is not initialized
     assert!(!data_stream.data_requests_initialized());
@@ -173,7 +173,7 @@ async fn test_stream_data_error() {
     // Create an epoch ending data stream
     let streaming_service_config = DataStreamingServiceConfig::default();
     let (mut data_stream, mut stream_listener) =
-        create_epoch_ending_stream(streaming_service_config, MIN_ADVERTISED_EPOCH);
+        create_epoch_ending_stream(streaming_service_config, MIN_ADVERTISED_EPOCH_END);
 
     // Initialize the data stream
     let global_data_summary = create_global_data_summary(100);
@@ -183,8 +183,8 @@ async fn test_stream_data_error() {
 
     // Clear the pending queue and insert an error response
     let client_request = DataClientRequest::EpochEndingLedgerInfos(EpochEndingLedgerInfosRequest {
-        start_epoch: MIN_ADVERTISED_EPOCH,
-        end_epoch: MIN_ADVERTISED_EPOCH + 1,
+        start_epoch: MIN_ADVERTISED_EPOCH_END,
+        end_epoch: MIN_ADVERTISED_EPOCH_END + 1,
     });
     let pending_response = PendingClientResponse {
         client_request: client_request.clone(),
@@ -207,7 +207,7 @@ async fn test_stream_invalid_response() {
     // Create an epoch ending data stream
     let streaming_service_config = DataStreamingServiceConfig::default();
     let (mut data_stream, mut stream_listener) =
-        create_epoch_ending_stream(streaming_service_config, MIN_ADVERTISED_EPOCH);
+        create_epoch_ending_stream(streaming_service_config, MIN_ADVERTISED_EPOCH_END);
 
     // Initialize the data stream
     let global_data_summary = create_global_data_summary(100);
@@ -217,8 +217,8 @@ async fn test_stream_invalid_response() {
 
     // Clear the pending queue and insert a response with an invalid type
     let client_request = DataClientRequest::EpochEndingLedgerInfos(EpochEndingLedgerInfosRequest {
-        start_epoch: MIN_ADVERTISED_EPOCH,
-        end_epoch: MIN_ADVERTISED_EPOCH + 1,
+        start_epoch: MIN_ADVERTISED_EPOCH_END,
+        end_epoch: MIN_ADVERTISED_EPOCH_END + 1,
     });
     let context = ResponseContext {
         id: 0,
@@ -244,7 +244,7 @@ async fn test_stream_out_of_order_responses() {
     // Create an epoch ending data stream
     let streaming_service_config = DataStreamingServiceConfig::default();
     let (mut data_stream, mut stream_listener) =
-        create_epoch_ending_stream(streaming_service_config, MIN_ADVERTISED_EPOCH);
+        create_epoch_ending_stream(streaming_service_config, MIN_ADVERTISED_EPOCH_END);
 
     // Initialize the data stream
     let global_data_summary = create_global_data_summary(1);
@@ -271,7 +271,7 @@ async fn test_stream_out_of_order_responses() {
     for _ in 0..2 {
         verify_epoch_ending_notification(
             &mut stream_listener,
-            create_ledger_info(0, MIN_ADVERTISED_EPOCH, true),
+            create_ledger_info(0, MIN_ADVERTISED_EPOCH_END, true),
         )
         .await;
     }
@@ -285,7 +285,7 @@ async fn test_stream_out_of_order_responses() {
         .unwrap();
     verify_epoch_ending_notification(
         &mut stream_listener,
-        create_ledger_info(0, MIN_ADVERTISED_EPOCH, true),
+        create_ledger_info(0, MIN_ADVERTISED_EPOCH_END, true),
     )
     .await;
     assert_none!(stream_listener.select_next_some().now_or_never());
@@ -299,7 +299,7 @@ async fn test_stream_out_of_order_responses() {
     for _ in 0..3 {
         verify_epoch_ending_notification(
             &mut stream_listener,
-            create_ledger_info(0, MIN_ADVERTISED_EPOCH, true),
+            create_ledger_info(0, MIN_ADVERTISED_EPOCH_END, true),
         )
         .await;
     }
@@ -362,8 +362,8 @@ fn create_data_stream(
         )
         .unwrap()],
         epoch_ending_ledger_infos: vec![CompleteDataRange::new(
-            MIN_ADVERTISED_EPOCH,
-            MAX_ADVERTISED_EPOCH,
+            MIN_ADVERTISED_EPOCH_END,
+            MAX_ADVERTISED_EPOCH_END,
         )
         .unwrap()],
         synced_ledger_infos: vec![],
@@ -418,7 +418,7 @@ fn set_epoch_ending_response_in_queue(
     let client_response = Some(Ok(create_data_client_response(
         ResponsePayload::EpochEndingLedgerInfos(vec![create_ledger_info(
             0,
-            MIN_ADVERTISED_EPOCH,
+            MIN_ADVERTISED_EPOCH_END,
             true,
         )]),
     )));
