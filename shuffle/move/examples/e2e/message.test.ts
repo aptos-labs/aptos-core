@@ -28,9 +28,7 @@ Deno.test("Ability to set message", async () => {
 
 Deno.test("Ability to set NFTs", async () => {
   // Initialize nft_collection resource for both sender and receiver
-  let senderInitializeTxn = await main.initializeNFTScriptFunction(
-    context.defaultUserContext,
-  );
+  let senderInitializeTxn = await main.initializeNFTScriptFunction();
   senderInitializeTxn = await devapi.waitForTransactionCompletion(
     senderInitializeTxn.hash,
   );
@@ -46,10 +44,8 @@ Deno.test("Ability to set NFTs", async () => {
 
   // Mint TestNFT into sender address
   const contentUri = "https://placekitten.com/200/300";
-  let txn = await main.createTestNFTScriptFunction(
-    context.defaultUserContext,
-    contentUri,
-  );
+
+  let txn = await main.createTestNFTScriptFunction(contentUri);
   txn = await devapi.waitForTransactionCompletion(txn.hash);
   assert(txn.success);
 
@@ -61,7 +57,6 @@ Deno.test("Ability to set NFTs", async () => {
   const creationNum = new helpers.StringLiteral(nfts[0].id.id.creation_num);
 
   let transferTxn = await main.transferNFTScriptFunction(
-    context.defaultUserContext,
     secondUserContext.address,
     creator,
     creationNum,
@@ -73,23 +68,15 @@ Deno.test("Ability to set NFTs", async () => {
   const receiverNFTs = await main.decodedNFTs(secondUserContext.address);
   assertEquals(receiverNFTs[0].content_uri, contentUri);
   // Check sender nft_collection is empty
-  const senderNFTs = await main.decodedNFTs(
-    context.defaultUserContext.address,
-  );
+  const senderNFTs = await main.decodedNFTs();
   assert(senderNFTs.length === 0);
 });
 
 Deno.test("Advanced: Ability to set message from nonpublishing account", async () => {
-  const publishingAddress = context.defaultUserContext.address;
-  const scriptFunction = publishingAddress + "::Message::set_message";
-
   const secondUserContext = context.UserContext.fromEnv("test");
-
-  let txn = await helpers.invokeScriptFunctionForContext(
+  let txn = await main.setMessageScriptFunction(
+    "invoked script function from nonpublishing account",
     secondUserContext,
-    scriptFunction,
-    [],
-    ["invoked script function from nonpublishing account"],
   );
   txn = await devapi.waitForTransactionCompletion(txn.hash);
   assert(txn.success);

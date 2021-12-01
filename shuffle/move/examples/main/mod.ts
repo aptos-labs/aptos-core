@@ -5,8 +5,6 @@
 // deno-lint-ignore-file ban-types
 
 import * as DiemHelpers from "./helpers.ts";
-import * as DiemTypes from "./generated/diemTypes/mod.ts";
-import * as codegen from "./generated/diemStdlib/mod.ts";
 import {
   addressOrDefault,
   consoleContext,
@@ -14,11 +12,8 @@ import {
   UserContext,
 } from "./context.ts";
 import * as devapi from "./devapi.ts";
-import * as util from "https://deno.land/std@0.85.0/node/util.ts";
 import { green } from "https://deno.land/x/nanocolors@0.1.12/mod.ts";
 import { StringLiteral } from "./helpers.ts";
-
-const textEncoder = new util.TextEncoder();
 
 await printWelcome();
 
@@ -44,123 +39,93 @@ export async function printWelcome() {
   console.log();
 }
 
-// ScriptFunction example; client side creation and signing of transactions.
-// https://github.com/diem/diem/blob/main/json-rpc/docs/method_submit.md#method-submit
+// Invoke SetMessage script function by creating and executing transaction
+// with set_message script function payload.
+// See main/source/Message.move
 export async function setMessageScriptFunction(
   message: string,
+  sender?: UserContext,
+  moduleAddress?: string,
 ) {
-  const payload = codegen.Stdlib.encodeSetMessageScriptFunction(
-    textEncoder.encode(message),
-  );
-  return await DiemHelpers.buildAndSubmitTransaction(
-    defaultUserContext.address,
-    await devapi.sequenceNumber(),
-    await defaultUserContext.readPrivateKey(),
-    payload,
-  );
-}
-
-// Script example; client side creation and signing of transactions.
-// https://github.com/diem/diem/blob/main/json-rpc/docs/method_submit.md#method-submit
-export async function setMessageScript(
-  message: string,
-) {
-  const script = codegen.Stdlib.encodeSetMessageScript(
-    textEncoder.encode(message),
-  );
-  const payload = new DiemTypes.TransactionPayloadVariantScript(script);
-  return await DiemHelpers.buildAndSubmitTransaction(
-    defaultUserContext.address,
-    await devapi.sequenceNumber(),
-    await defaultUserContext.readPrivateKey(),
-    payload,
-  );
-}
-
-// Script example; initializes TestNFT utilizing the NFT<Type>
-// generic methods. This example replaces the genesis initialize functionality
-// but with a different address. See main/sources/NFT.move
-// This is optional, as createTestNFTScriptFunction handles init.
-export async function initializeTestNFT() {
-  const nftAddress = DiemHelpers.hexToAccountAddress(
-    defaultUserContext.address,
-  );
-
-  // Create the type tag representing TestNFT to pass to the generic
-  // script `initialize_nft`
-  const testNftType = new DiemTypes.TypeTagVariantStruct(
-    new DiemTypes.StructTag(
-      nftAddress,
-      new DiemTypes.Identifier("TestNFT"),
-      new DiemTypes.Identifier("TestNFT"),
-      [],
-    ),
-  );
-
-  const payload = codegen.Stdlib.encodeInitializeNftCollectionScriptFunction(
-    testNftType,
-  );
-  return await DiemHelpers.buildAndSubmitTransaction(
-    defaultUserContext.address,
-    await devapi.sequenceNumber(),
-    await defaultUserContext.readPrivateKey(),
-    payload,
+  return await invokeScriptFunction(
+    "Message::set_message",
+    [],
+    [message],
+    sender,
+    moduleAddress
   );
 }
 
 // ScriptFunction example; creation of NFT.
-// See main/source/TestNFT.move
+// See main/source/nft/TestNFT.move
 export async function createTestNFTScriptFunction(
-  userContext: UserContext,
   contentUri: string,
+  sender?: UserContext,
+  moduleAddress?: string,
 ) {
-  const scriptFunction: string = userContext.address +
-    "::TestNFT::create_nft";
-  const typeArguments: string[] = [];
-  const args: any[] = [contentUri];
-  return await DiemHelpers.invokeScriptFunctionForContext(
-    userContext,
-    scriptFunction,
-    typeArguments,
-    args,
+  return await invokeScriptFunction(
+    "TestNFT::create_nft",
+    [],
+    [contentUri],
+    sender,
+    moduleAddress
   );
 }
 
 // ScriptFunction example; creation of NFT.
 // See main/source/TestNFT.move
 export async function transferNFTScriptFunction(
-  userContext: UserContext,
   to: string,
   creator: string,
   creationNum: StringLiteral,
+  sender?: UserContext,
+  moduleAddress?: string,
 ) {
-  const scriptFunction: string = userContext.address +
-    "::NFTStandard::transfer";
-  const typeArgument = userContext.address + "::TestNFT::TestNFT";
-  const typeArguments: string[] = [typeArgument];
-  const args: any[] = [to, creator, creationNum];
-  return await DiemHelpers.invokeScriptFunctionForContext(
-    userContext,
-    scriptFunction,
-    typeArguments,
-    args,
+  moduleAddress = moduleAddress || defaultUserContext.address;
+
+  return await invokeScriptFunction(
+    "NFTStandard::transfer",
+    [`${moduleAddress}::TestNFT::TestNFT`],
+    [to, creator, creationNum],
+    sender,
+    moduleAddress
   );
 }
 
-export async function initializeNFTScriptFunction(userContext: UserContext) {
-  const scriptFunction: string = defaultUserContext.address +
-    "::NFTStandard::initialize_nft_collection";
+// Initialize NFT
+// See main/source/nft/NFTStandard.move
+// See main/source/nft/TestNFT.move
+export async function initializeNFTScriptFunction(
+  sender?: UserContext,
+  moduleAddress?: string,
+) {
+  moduleAddress = moduleAddress || defaultUserContext.address;
 
-  const typeArgument = defaultUserContext.address + "::TestNFT::TestNFT";
-  const typeArguments: string[] = [typeArgument];
-
-  const args: any[] = [];
-  return await DiemHelpers.invokeScriptFunctionForContext(
-    userContext,
-    scriptFunction,
-    typeArguments,
-    args,
+  return await invokeScriptFunction(
+    "NFTStandard::initialize_nft_collection",
+    [`${moduleAddress}::TestNFT::TestNFT`],
+    [],
+    sender,
+    moduleAddress
   );
+}
+
+async function invokeScriptFunction(
+  funcName: string,
+  typeArgs: string[],
+  args: any[],
+  sender?: UserContext,
+  moduleAddress?: string,
+) {
+  sender = sender || defaultUserContext;
+  moduleAddress = moduleAddress || defaultUserContext.address;
+
+  return await DiemHelpers.invokeScriptFunctionForContext(
+    sender,
+    `${moduleAddress}::${funcName}`,
+    typeArgs,
+    args,
+  )
 }
 
 export async function decodedMessages(addr?: string) {
