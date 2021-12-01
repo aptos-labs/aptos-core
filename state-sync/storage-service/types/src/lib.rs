@@ -3,8 +3,7 @@
 
 #![forbid(unsafe_code)]
 
-use std::convert::TryFrom;
-
+use diem_config::config::StorageServiceConfig;
 use diem_types::{
     account_state_blob::AccountStatesChunkWithProof,
     epoch_change::EpochChangeProof,
@@ -21,6 +20,7 @@ use proptest::{
     strategy::{BoxedStrategy, Strategy},
 };
 use serde::{de, Deserialize, Serialize};
+use std::convert::TryFrom;
 use thiserror::Error;
 
 /// A type alias for different epochs.
@@ -282,51 +282,52 @@ impl ProtocolMetadata {
             | GetStorageServerSummary
             | GetNumberOfAccountsAtVersion(_) => true,
             GetAccountStatesChunkWithProof(request) => {
-                let chunk_size = match CompleteDataRange::new(
-                    request.start_account_index,
-                    request.end_account_index,
-                ) {
-                    Ok(range) => range.len(),
-                    Err(_) => return false,
-                };
-                self.max_account_states_chunk_size >= chunk_size
+                CompleteDataRange::new(request.start_account_index, request.end_account_index)
+                    .map_or(false, |range| {
+                        range.len().map_or(false, |chunk_size| {
+                            self.max_account_states_chunk_size >= chunk_size
+                        })
+                    })
             }
-            GetEpochEndingLedgerInfos(request) => {
-                let chunk_size =
-                    match CompleteDataRange::new(request.start_epoch, request.expected_end_epoch) {
-                        Ok(range) => range.len(),
-                        Err(_) => return false,
-                    };
-                self.max_epoch_chunk_size >= chunk_size
-            }
-            GetTransactionOutputsWithProof(request) => {
-                let chunk_size =
-                    match CompleteDataRange::new(request.start_version, request.end_version) {
-                        Ok(range) => range.len(),
-                        Err(_) => return false,
-                    };
-                self.max_transaction_output_chunk_size >= chunk_size
-            }
-            GetTransactionsWithProof(request) => {
-                let chunk_size =
-                    match CompleteDataRange::new(request.start_version, request.end_version) {
-                        Ok(range) => range.len(),
-                        Err(_) => return false,
-                    };
-                self.max_transaction_chunk_size >= chunk_size
-            }
+            GetEpochEndingLedgerInfos(request) => CompleteDataRange::new(
+                request.start_epoch,
+                request.expected_end_epoch,
+            )
+            .map_or(false, |range| {
+                range
+                    .len()
+                    .map_or(false, |chunk_size| self.max_epoch_chunk_size >= chunk_size)
+            }),
+            GetTransactionOutputsWithProof(request) => CompleteDataRange::new(
+                request.start_version,
+                request.end_version,
+            )
+            .map_or(false, |range| {
+                range.len().map_or(false, |chunk_size| {
+                    self.max_transaction_output_chunk_size >= chunk_size
+                })
+            }),
+            GetTransactionsWithProof(request) => CompleteDataRange::new(
+                request.start_version,
+                request.end_version,
+            )
+            .map_or(false, |range| {
+                range.len().map_or(false, |chunk_size| {
+                    self.max_transaction_chunk_size >= chunk_size
+                })
+            }),
         }
     }
 }
 
-// TODO(philiphayes): default constants in diem-config?
 impl Default for ProtocolMetadata {
     fn default() -> Self {
+        let config = StorageServiceConfig::default();
         Self {
-            max_epoch_chunk_size: 1000,
-            max_transaction_chunk_size: 1000,
-            max_transaction_output_chunk_size: 1000,
-            max_account_states_chunk_size: 1000,
+            max_epoch_chunk_size: config.max_epoch_chunk_size,
+            max_transaction_chunk_size: config.max_transaction_chunk_size,
+            max_transaction_output_chunk_size: config.max_transaction_output_chunk_size,
+            max_account_states_chunk_size: config.max_account_states_chunk_sizes,
         }
     }
 }
@@ -495,14 +496,12 @@ impl<T: PrimInt> CompleteDataRange<T> {
     }
 
     /// Returns the length of the data range.
-    ///
-    /// Note that `CompleteDataRange` maintains the invariant that the range
-    /// length is always expressible without overflow, so this method is
-    /// infallible.
     #[inline]
-    pub fn len(&self) -> T {
-        debug_assert!(range_length_checked(self.lowest, self.highest).is_ok());
-        (self.highest - self.lowest) + T::one()
+    pub fn len(&self) -> Result<T, DegenerateRangeError> {
+        self.highest
+            .checked_sub(&self.lowest)
+            .and_then(|value| value.checked_add(&T::one()))
+            .ok_or(DegenerateRangeError)
     }
 
     /// Returns true iff the given item is within this range
@@ -603,6 +602,34 @@ mod tests {
         })
     }
 
+    fn get_txn_outputs_request(
+        proof_version: Version,
+        start_version: Version,
+        end_version: Version,
+    ) -> StorageServiceRequest {
+        StorageServiceRequest::GetTransactionOutputsWithProof(TransactionOutputsWithProofRequest {
+            proof_version,
+            start_version,
+            end_version,
+        })
+    }
+
+    fn get_account_state_chunks_request(
+        version: Version,
+        start_account_index: u64,
+        end_account_index: u64,
+    ) -> StorageServiceRequest {
+        StorageServiceRequest::GetAccountStatesChunkWithProof(AccountStatesChunkWithProofRequest {
+            version,
+            start_account_index,
+            end_account_index,
+        })
+    }
+
+    fn get_account_states_request(version: Version) -> StorageServiceRequest {
+        get_account_state_chunks_request(version, 0, 1000)
+    }
+
     #[test]
     fn test_complete_data_range() {
         // good ranges
@@ -685,11 +712,69 @@ mod tests {
     }
 
     #[test]
+    fn test_data_summary_can_service_txn_outputs_request() {
+        let summary = DataSummary {
+            synced_ledger_info: Some(mock_ledger_info(250)),
+            transaction_outputs: Some(range(100, 200)),
+            ..Default::default()
+        };
+
+        // in range and can provide proof => can service
+        assert!(summary.can_service(&get_txn_outputs_request(225, 100, 200)));
+        assert!(summary.can_service(&get_txn_outputs_request(225, 125, 175)));
+        assert!(summary.can_service(&get_txn_outputs_request(225, 100, 100)));
+        assert!(summary.can_service(&get_txn_outputs_request(225, 150, 150)));
+        assert!(summary.can_service(&get_txn_outputs_request(225, 200, 200)));
+        assert!(summary.can_service(&get_txn_outputs_request(250, 200, 200)));
+
+        // can provide proof, but out of range => cannot service
+        assert!(!summary.can_service(&get_txn_outputs_request(225, 99, 200)));
+        assert!(!summary.can_service(&get_txn_outputs_request(225, 100, 201)));
+        assert!(!summary.can_service(&get_txn_outputs_request(225, 50, 250)));
+        assert!(!summary.can_service(&get_txn_outputs_request(225, 50, 150)));
+        assert!(!summary.can_service(&get_txn_outputs_request(225, 150, 250)));
+
+        // in range, but cannot provide proof => cannot service
+        assert!(!summary.can_service(&get_txn_outputs_request(300, 100, 200)));
+        assert!(!summary.can_service(&get_txn_outputs_request(300, 125, 175)));
+        assert!(!summary.can_service(&get_txn_outputs_request(300, 100, 100)));
+        assert!(!summary.can_service(&get_txn_outputs_request(300, 150, 150)));
+        assert!(!summary.can_service(&get_txn_outputs_request(300, 200, 200)));
+        assert!(!summary.can_service(&get_txn_outputs_request(251, 200, 200)));
+
+        // invalid range
+        assert!(!summary.can_service(&get_txn_outputs_request(225, 175, 125)));
+    }
+
+    #[test]
+    fn test_data_summary_can_service_account_states_chunk_request() {
+        let summary = DataSummary {
+            synced_ledger_info: Some(mock_ledger_info(250)),
+            account_states: Some(range(100, 300)),
+            ..Default::default()
+        };
+
+        // in range and can provide proof => can service
+        assert!(summary.can_service(&get_account_states_request(100)));
+        assert!(summary.can_service(&get_account_states_request(200)));
+        assert!(summary.can_service(&get_account_states_request(250)));
+
+        // in range, but cannot provide proof => cannot service
+        assert!(!summary.can_service(&get_account_states_request(251)));
+        assert!(!summary.can_service(&get_account_states_request(300)));
+
+        // can provide proof, but out of range ==> cannot service
+        assert!(!summary.can_service(&get_account_states_request(50)));
+        assert!(!summary.can_service(&get_account_states_request(99)));
+    }
+
+    #[test]
     fn test_protocol_metadata_can_service() {
         let metadata = ProtocolMetadata {
             max_transaction_chunk_size: 100,
             max_epoch_chunk_size: 100,
-            ..Default::default()
+            max_transaction_output_chunk_size: 100,
+            max_account_states_chunk_size: 100,
         };
 
         assert!(metadata.can_service(&get_txns_request(200, 100, 199)));
@@ -697,6 +782,12 @@ mod tests {
 
         assert!(metadata.can_service(&get_epochs_request(100, 199)));
         assert!(!metadata.can_service(&get_epochs_request(100, 200)));
+
+        assert!(metadata.can_service(&get_txn_outputs_request(200, 100, 199)));
+        assert!(!metadata.can_service(&get_txn_outputs_request(200, 100, 200)));
+
+        assert!(metadata.can_service(&get_account_state_chunks_request(200, 100, 199)));
+        assert!(!metadata.can_service(&get_account_state_chunks_request(200, 100, 200)));
     }
 
     proptest! {
