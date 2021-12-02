@@ -36,6 +36,6 @@ maplit = "1.0.2"
 tokio = { version = "1.8.1", features = ["rt", "macros"], default-features = false }
 
 bcs = "0.1.2"
-channel = { path = "../../common/channel" }
+channel = { path = "../../crates/channel" }
 diem-time-service = { path = "../../common/time-service", features = ["async", "testing"] }
 network = { path = "../../network", features = ["fuzzing"] }

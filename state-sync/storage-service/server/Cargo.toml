@@ -19,7 +19,7 @@ thiserror = "1.0.24"
 tokio = { version = "1.8.1", features = ["rt", "macros"], default-features = false }
 
 bounded-executor = { path = "../../../crates/bounded-executor" }
-channel = { path = "../../../common/channel" }
+channel = { path = "../../../crates/channel" }
 diem-config = { path = "../../../config" }
 diem-logger = { path = "../../../common/logger" }
 diem-metrics = { path = "../../../common/metrics" }

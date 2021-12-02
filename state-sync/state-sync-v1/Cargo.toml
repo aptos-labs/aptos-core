@@ -24,7 +24,7 @@ tokio = { version = "1.8.1", features = ["full"] }
 tokio-stream = "0.1.4"
 
 consensus-notifications = { path = "../inter-component/consensus-notifications" }
-channel = { path = "../../common/channel" }
+channel = { path = "../../crates/channel" }
 diem-config = { path = "../../config" }
 diem-crypto = { path = "../../crates/diem-crypto" }
 diem-infallible = { path = "../../common/infallible" }
@@ -54,7 +54,7 @@ bytes = "1.0.1"
 claim = "0.5.0"
 proptest = "1.0.0"
 
-channel = { path = "../../common/channel" }
+channel = { path = "../../crates/channel" }
 diem-framework-releases= { path = "../../diem-move/diem-framework/DPN/releases" }
 diem-crypto = { path = "../../crates/diem-crypto" }
 diem-genesis-tool = {path = "../../config/management/genesis", features = ["testing"] }

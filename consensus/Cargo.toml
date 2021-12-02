@@ -29,7 +29,7 @@ termion = { version = "1.5.6", default-features = false }
 thiserror = "1.0.24"
 tokio = { version = "1.8.1", features = ["full"] }
 
-channel = { path = "../common/channel" }
+channel = { path = "../crates/channel" }
 consensus-notifications = { path = "../state-sync/inter-component/consensus-notifications" }
 consensus-types = { path = "consensus-types", default-features = false }
 event-notifications = { path = "../state-sync/inter-component/event-notifications" }

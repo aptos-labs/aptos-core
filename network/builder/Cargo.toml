@@ -18,7 +18,7 @@ rand = "0.8.3"
 serde = { version = "1.0.124", default-features = false }
 tokio = { version = "1.8.1", features = ["full"] }
 
-channel = { path = "../../common/channel" }
+channel = { path = "../../crates/channel" }
 bcs = "0.1.2"
 diem-config = { path = "../../config" }
 diem-crypto = { path = "../../crates/diem-crypto" }

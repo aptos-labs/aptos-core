@@ -24,7 +24,7 @@ tokio = { version = "1.8.1", features = ["full"] }
 tokio-stream = "0.1.4"
 
 bounded-executor = { path = "../crates/bounded-executor" }
-channel = { path = "../common/channel" }
+channel = { path = "../crates/channel" }
 bcs = "0.1.2"
 diem-config = { path = "../config" }
 diem-crypto = { path = "../crates/diem-crypto" }

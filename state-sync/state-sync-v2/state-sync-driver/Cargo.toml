@@ -31,7 +31,7 @@ storage-interface = { path = "../../../storage/storage-interface" }
 [dev-dependencies]
 claim = "0.5.0"
 
-channel = { path = "../../../common/channel" }
+channel = { path = "../../../crates/channel" }
 diemdb = { path = "../../../storage/diemdb" }
 diem-crypto = { path = "../../../crates/diem-crypto" }
 diem-temppath = { path = "../../../common/temppath" }
