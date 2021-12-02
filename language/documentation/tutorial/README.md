@@ -1,28 +1,55 @@
-# move-hackathon-tutorial
-Move tutorial for the hackathon happening on Dec 7-8
+# Move Tutorial
 
-### Step 0
-## TODO: use binaries instead
+Welcome to the Move Tutorial! In this tutorial, we are going to go through some steps of developing Move code
+including design, implementation, unit testing and formal verification of Move modules.
 
-First, set the `DIEM_HOME` environment variable to the path to your diem repo:
+There are eight steps in total:
+
+- [Step 0: Installation](#Step0)
+- [Step 1: Writing my first Move module](#Step1)
+- [Step 2: Adding unit tests to my first Move module](#Step2)
+- [Step 3: Designing my `BasicCoin` module](#Step3)
+- [Step 4: Implementing my `BasicCoin` module](#Step4)
+- [Step 5: Adding and using unit tests with the `BasicCoin` module](#Step5)
+- [Step 6: Making my `BasicCoin` module generic](#Step6)
+- [Step 7: Writing formal specifications for my `BasicCoin` module](#Step7)
+
+Each step is designed to be self-contained in the corresponding `step_x` folder. For example, if you would
+like to skip the contents in step 1 through 4, feel free to jump to step 5 since all the code we have written
+before step 5 will be in `step_5` folder. At the end of some steps, we also include
+additional material on more advanced topics.
+
+Now let's get started!
+
+## Step 0: Installation<span id="Step0"><span>
+
+
+- Open up your terminal of choice and clone [`diem`](https://github.com/diem/diem) repo if you don't already have it:
 ```bash
-$ export DIEM_HOME=<path_to_diem_repo>
+$ git clone https://github.com/diem/diem.git
 ```
-- Run the setup script to install Move CLI, Shuffle and dependencies:
 
+- Go to `diem` folder and run the `dev_setup.sh` script:
 ```bash
-$ sh step_0/setup.sh
+$ cd diem && sh scripts/dev_setup.sh -ypt
 ```
+
+Follow the prompt to install all the necessary dependencies.
+
 - Include environment variable definitions in `~/.profile` by running this command:
 ```bash
 $ . ~/.profile
+````
+- Install Move CLI by running this command in diem repo:
+```bash
+$ cargo build -p df-cli
 ```
 
 Once this is done, you can alias the `move` command to point the `df-cli`
 binary:
 
 ```bash
-$ alias move="${DIEM_HOME}/target/debug/df-cli"
+$ alias move="<path_to_diem_repo>/target/debug/df-cli"
 ```
 
 You can check that it is working by running
@@ -48,7 +75,12 @@ by opening VSCode and searching for the "move-analyzer" package and
 installing it. More detailed instructions can be found
 [here](https://github.com/diem/diem/tree/main/language/move-analyzer/editors/code).
 
-### Step 1: Write my first Move module
+Before running the next steps, `cd` to the tutorial directory:
+```bash
+$ cd <path_to_diem_repo>/language/documentation/tutorial/
+```
+
+## Step 1: Writing my first Move module<span id="Step1"><span>
 
 To create your first Move module, we first need to create a Move package by
 calling
@@ -140,12 +172,6 @@ $ move package build
 
 Let's now add a function to this module that mints a `Coin` and stores it
 under an account.
-[Functions](https://diem.github.io/move/functions.html) are default
-private, and can also be `public`,
-[`public(friend)`](https://diem.github.io/move/friends.html), or
-`public(script)`. The last of these states that this function can be
-called from a transaction script.  `public(script)` functions can also be
-called by other `public(script)` functions.
 
 ```
 module NamedAddr::BasicCoin {
@@ -175,7 +201,7 @@ Let's make sure it compiles again:
 $ move package build
 ```
 
-### Step 2: Add unit tests to my first Move module
+## Step 2: Adding unit tests to my first Move module<span id="Step2"><span>
 
 Now that we've written our first Move module, we'll write a test to
 make sure minting works the way we expect it to.
@@ -264,7 +290,7 @@ module NamedAddr::BasicCoin {
   then play around with using the `move package coverage` command to look at
   coverage statistics and source coverage.
 
-### Step 3: Design my `BasicCoin` module
+## Step 3: Designing my `BasicCoin` module<span id="Step3"><span>
 
 In this section, we are going to design a module implementing a basic coin and balance interface, where coins can
 be minted and transferred between balances held under different addresses.
@@ -274,36 +300,26 @@ The signatures of the public Move function are the following:
 ```
 /// Publish an empty balance resource under `account`'s address. This function must be called before
 /// minting or transferring to the account.
-public fun publish_balance(account: &signer);
+public fun publish_balance(account: &signer) { ... }
 
 /// Mint `amount` tokens to `mint_addr`. Mint must be approved by the module owner.
-public(script) fun mint(module_owner: signer, mint_addr: address, amount: u64) acquires Balance;
+public fun mint(module_owner: &signer, mint_addr: address, amount: u64) acquires Balance { ... }
 
 /// Returns the balance of `owner`.
-public fun balance_of(owner: address): u64 acquires Balance;
+public fun balance_of(owner: address): u64 acquires Balance { ... }
 
 /// Transfers `amount` of tokens from `from` to `to`.
-public(script) fun transfer(from: signer, to: address, amount: u64) acquires Balance;
+public fun transfer(from: &signer, to: address, amount: u64) acquires Balance { ... }
 ```
-At the end of each function signature is an `acquires` list containing all the resources defined in this module accessed by the function.
-
-Notice that `balance_of` is a public function while `transfer` is a _public script_ function.
-Similar to Ethereum, users submit signed transactions to Move-powered blockchains to update the blockchain state.
-We can invoke `transfer` method in a transaction script to modify the blockchain state. As mentioned in Step 1, only public script
-functions can be called from a transaction script. Therefore, we declare `transfer` as a public script function.
-And by requiring the `from` argument be a `signer` instead of an `address`, we require that the transfer transaction
-must be approved by the `from` account.
 
 Next we look at the data structs we need for this module.
 
-If you are familiar with Ethereum contracts, in most Ethereum contracts, the balance of each address is stored in a _state variable_ of type
-`mapping(address => uint256)`. This state variable is stored in the storage of a particular smart contract. In Move, however, storage
-works differently. A Move module doesn't have its own storage. Instead, Move "global storage" (what we call our
+A Move module doesn't have its own storage. Instead, Move "global storage" (what we call our
 blockchain state) is indexed by addresses. Under each address there are Move modules (code) and Move resources (values).
 
-The global storage looks roughly like
+The global storage looks roughly like this in Rust syntax:
 
-```
+```rust
 struct GlobalStorage {
     resources: Map<address, Map<ResourceType, ResourceValue>>
     modules: Map<address, Map<ModuleName, ModuleBytecode>>
@@ -326,17 +342,47 @@ Roughly the Move blockchain state should look like this:
 
 ![](diagrams/move_state.png)
 
-In comparison, a Solidity blockchain state might look like this:
+#### Advanced topics:
+<details>
+<summary><code>public(script)</code> functions</summary>
+
+Only functions with `public(script)` can be invoked directly in transactions. So if you would like to call the `transfer`
+method directly from a transaction, you'll want to change its signature to:
+```
+public(script) fun transfer(from: signer, to: address, amount: u64) acquires Balance { ... }
+```
+Read more on Move function visibilities [here](https://diem.github.io/move/functions.html#visibility).
+</details>
+<details>
+<summary>Comparison with Ethereum/Solidity</summary>
+
+In most Ethereum [ERC-20]((https://ethereum.org/en/developers/docs/standards/tokens/erc-20/)) contracts, the balance of each address is stored in a _state variable_ of type
+<code>mapping(address => uint256)</code>. This state variable is stored in the storage of a particular smart contract.
+
+The Ethereum blockchain state might look like this:
 
 ![](diagrams/solidity_state.png)
+</details>
 
-### Step 4: Implement my `BasicCoin` module
+## Step 4: Implementing my `BasicCoin` module<span id="Step4"><span>
 
 We have created a Move package for you in folder `step_4` called `BasicCoin`. The `sources` folder contains source code for
 all your Move modules. `BasicCoin.move` lives inside this folder. In this section, we will take a closer look at the
-implementation of the methods inside `BasicCoin.move`.
+implementation of the methods inside [`BasicCoin.move`](./step_4/BasicCoin/sources/BasicCoin.move).
 
-#### Method `publish_balance`
+### Compiling our code
+
+Let's first try building the code using Move package by running the following command
+in [`step_4/BasicCoin`](./step_4/BasicCoin) folder:
+```bash
+$ move package build
+```
+
+### Implementation of methods
+Now let's take a closer look at the implementation of the methods inside `BasicCoin.move`.
+
+<details>
+<summary>Method <code>publish_balance</code></summary>
 
 This method publishes a `Balance` resource to a given address. Since this resource is needed to receive coins through
 minting or transferring, `publish_balance` method must be called by a user before they can receive money, including the
@@ -348,8 +394,9 @@ This method uses a `move_to` operation to publish the resource:
 let empty_coin = Coin { value: 0 };
 move_to(account, Balance { coin:  empty_coin });
 ```
-
-#### Method `mint`
+</details>
+<details>
+<summary>Method <code>mint</code></summary>
 
 `mint` method mints coins to a given account. Here we require that `mint` must be approved
 by the module owner. We enforce this using the assert statement:
@@ -363,12 +410,14 @@ It is important to note that Move is transactional in its execution -- so
 if an [abort](https://diem.github.io/move/abort-and-assert.html) is raised no unwinding of state
 needs to be performed, as no changes from that transaction will be persisted to the blockchain.
 
-We then perform deposit a coin with value `amount` to the balance of `mint_addr`.
+We then deposit a coin with value `amount` to the balance of `mint_addr`.
 ```
 deposit(mint_addr, Coin { value: amount });
 ```
+</details>
 
-#### Method `balance_of`
+<details>
+<summary>Method <code>balance_of</code></summary>
 
 We use `borrow_global`, one of the global storage operators, to read from the global storage.
 ```
@@ -376,8 +425,10 @@ borrow_global<Balance>(owner).coin.value
                  |       |       \    /
         resource type  address  field names
 ```
+</details>
 
-#### Method `transfer`
+<details>
+<summary>Method <code>transfer</code></summary>
 This function withdraws tokens from `from`'s balance and deposits the tokens into `to`s balance. We take a closer look
 at `withdraw` helper function:
 ```
@@ -392,34 +443,25 @@ fun withdraw(addr: address, amount: u64) : Coin acquires Balance {
 At the beginning of the method, we assert that the withdrawing account has enough balance. We then use `borrow_global_mut`
 to get a mutable reference to the global storage, and `&mut` is used to create a [mutable reference](https://diem.github.io/move/references.html) to a field of a
 struct. We then modify the balance through this mutable reference and return a new coin with the withdrawn amount.
-
-
-### Compiling our code
-
-Now that we have implemented our `BasicCoin` module, let's try building it using Move package by running the following command
-in `step_4/BasicCoin` folder:
-```bash
-$ move package build
-```
+</details>
 
 ### Exercises
 There are two `TODO`s in our module, left as exercises for the reader:
-- Finish implementing `publish_balance` method.
-- Implement `deposit` method.
+- Finish implementing the `publish_balance` method.
+- Implement the `deposit` method.
 
-The solution to this exercise can be found in `step_4_sol` folder.
+The solution to this exercise can be found in [`step_4_sol`](./step_4_sol) folder.
 
-**Bonus exercises**
+**Bonus exercise**
 - What would happen if we deposit too many tokens to a balance?
-- Does the solution code provided in `step_4_sol` have any bugs?
 
-### Step 5: Adding and using unit tests with the `BasicCoin` module
+## Step 5: Adding and using unit tests with the `BasicCoin` module<span id="Step5"><span>
 
 In this step we're going to take a look at all the different unit tests
 we've written to cover the code we wrote in step 4. We're also going to
 take a look at some tools we can use to help us write tests.
 
-To get started, run `move package test` in the [`step_5`](./step_5) folder. You should see
+To get started, run `move package test` in the [`step_5/BasicCoin`](./step_5/BasicCoin) folder. You should see
 something like this:
 
 ```
@@ -450,7 +492,7 @@ should only be a couple lines!
 
 The solution to this exercise can be found in [`step_5_sol`](./step_5_sol)
 
-### Step 6: Make my `BasicCoin` module generic
+## Step 6: Making my `BasicCoin` module generic<span id="Step6"><span>
 
 In Move, we can use generics to define functions and structs over different input data types. Generics are a great
 building block for library code. In this section, we are going to make our simple `BasicCoin` module generic so that it can
@@ -467,13 +509,6 @@ struct Balance<phantom CoinType> has key {
 }
 ```
 
-Here we declare the type parameter `CoinType` to be _phantom_ because
-`CoinType` is not used in the struct definition or is only used as a
-phantom type parameter.
-There are ability constraints you can add to a type parameter to require
-that the type parameter has certain abilities, like `T: copy + drop`. Read more about
-[generics](https://diem.github.io/move/generics.html) here.
-
 We also add type parameters to our methods in the same manner. For example, `withdraw` becomes the following:
 ```
 fun withdraw<CoinType>(addr: address, amount: u64) : Coin<CoinType> acquires Balance {
@@ -484,18 +519,31 @@ fun withdraw<CoinType>(addr: address, amount: u64) : Coin<CoinType> acquires Bal
     Coin<CoinType> { value: amount }
 }
 ```
-Take a look at `step_6/BasicCoin/sources/BasicCoin.move` to see the full implementation.
+Take a look at [`step_6/BasicCoin/sources/BasicCoin.move`](./step_6/BasicCoin/sources/BasicCoin.move) to see the full implementation.
 
 At this point, readers who are familiar with Ethereum might notice that this module serves a similar purpose as
 the [ERC20 token standard](https://ethereum.org/en/developers/docs/standards/tokens/erc-20/), which provides an
 interface for implementing fungible tokens in smart contracts. One key advantage of using generics is the ability
 to reuse code since the generic library module already provides a standard implementation and the instantiating module
-can provide customizations by wrapping the standard implementation. We provide a little module call [`MyOddCoin`](./step_6/BasicCoin/sources/MyOddCoin.move) that instantiates
+can provide customizations by wrapping the standard implementation.
+
+We provide a little module called [`MyOddCoin`](./step_6/BasicCoin/sources/MyOddCoin.move) that instantiates
 the `Coin` type and customizes its transfer policy: only odd number of coins can be transferred.
+
+#### Advanced topics:
+<details>
+<summary><code>phantom</code> type parameters</summary>
+
+In definitions of both `Coin` and `Balance`, we declare the type parameter `CoinType`
+to be phantom because `CoinType` is not used in the struct definition or is only used as a phantom type
+parameter.
+
+Read more about phantom type parameters <a href="https://diem.github.io/move/generics.html#phantom-type-parameters">here</a>.
+</details>
 
 ## Advanced steps
 
-### Step 7: Write formal specifications for my `BasicCoin` module
+## Step 7: Writing formal specifications for my `BasicCoin` module<span id="Step7"><span>
 
 The blockchain requires high assurance. Smart contracts deployed on the blockchain may maniputate high-value assets, which are targets of highly-motivated and well-resourced adversaries. Hundreds of millions of dollars have been lost from bugs on other blockchains. As a technique that uses strict mathematical methods to describe behavior and reason correctness of computer systems, formal verification has been used in blockchains to prevent bugs in smart contracts. [The Move prover](https://github.com/diem/diem/tree/main/language/move-prover) is an evolving formal verification tool for smart contracts written in the Move language. It supports complete specification of functional properties of smart contracts. Properties can be verified automatically efficiently (only slightly slower than a linter). Moreover, it can be integrated in the CI system for re-verification after every change to the code base. In this step, we will define the formal specification of the `BasicCoin` module.
 

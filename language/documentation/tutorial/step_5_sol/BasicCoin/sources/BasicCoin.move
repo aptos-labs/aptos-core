@@ -29,9 +29,9 @@ module NamedAddr::BasicCoin {
     }
 
     /// Mint `amount` tokens to `mint_addr`. Mint must be approved by the module owner.
-    public(script) fun mint(module_owner: signer, mint_addr: address, amount: u64) acquires Balance {
+    public fun mint(module_owner: &signer, mint_addr: address, amount: u64) acquires Balance {
         // Only the owner of the module can initialize this module
-        assert!(Signer::address_of(&module_owner) == MODULE_OWNER, Errors::requires_address(ENOT_MODULE_OWNER));
+        assert!(Signer::address_of(module_owner) == MODULE_OWNER, Errors::requires_address(ENOT_MODULE_OWNER));
 
         // Deposit `amount` of tokens to `mint_addr`'s balance
         deposit(mint_addr, Coin { value: amount });
@@ -43,8 +43,8 @@ module NamedAddr::BasicCoin {
     }
 
     /// Transfers `amount` of tokens from `from` to `to`.
-    public(script) fun transfer(from: signer, to: address, amount: u64) acquires Balance {
-        let check = withdraw(Signer::address_of(&from), amount);
+    public fun transfer(from: &signer, to: address, amount: u64) acquires Balance {
+        let check = withdraw(Signer::address_of(from), amount);
         deposit(to, check);
     }
 
@@ -68,19 +68,19 @@ module NamedAddr::BasicCoin {
 
     #[test(account = @0x1)]
     #[expected_failure] // This test should abort
-    public(script) fun mint_non_owner(account: signer) acquires Balance {
+    fun mint_non_owner(account: signer) acquires Balance {
         // Make sure the address we've chosen doesn't match the module
         // owner address
         publish_balance(&account);
         assert!(Signer::address_of(&account) != MODULE_OWNER, 0);
-        mint(account, @0x1, 10);
+        mint(&account, @0x1, 10);
     }
 
     #[test(account = @NamedAddr)]
-    public(script) fun mint_check_balance(account: signer) acquires Balance {
+    fun mint_check_balance(account: signer) acquires Balance {
         let addr = Signer::address_of(&account);
         publish_balance(&account);
-        mint(account, @NamedAddr, 42);
+        mint(&account, @NamedAddr, 42);
         assert!(balance_of(addr) == 42, 0);
     }
 
@@ -120,11 +120,11 @@ module NamedAddr::BasicCoin {
     }
 
     #[test(account = @NamedAddr)]
-    public(script) fun can_withdraw_amount(account: signer) acquires Balance {
+    fun can_withdraw_amount(account: signer) acquires Balance {
         publish_balance(&account);
         let amount = 1000;
         let addr = Signer::address_of(&account);
-        mint(account, addr, amount);
+        mint(&account, addr, amount);
         let Coin { value } = withdraw(addr, amount);
         assert!(value == amount, 0);
     }

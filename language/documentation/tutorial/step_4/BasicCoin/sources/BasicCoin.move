@@ -29,9 +29,9 @@ module NamedAddr::BasicCoin {
     }
 
     /// Initialize this module.
-    public(script) fun mint(module_owner: signer, mint_addr: address, amount: u64) {
+    public fun mint(module_owner: &signer, mint_addr: address, amount: u64) {
         // Only the owner of the module can initialize this module
-        assert!(Signer::address_of(&module_owner) == MODULE_OWNER, Errors::requires_address(ENOT_MODULE_OWNER));
+        assert!(Signer::address_of(module_owner) == MODULE_OWNER, Errors::requires_address(ENOT_MODULE_OWNER));
 
         // Deposit `amount` of tokens to `mint_addr`'s balance
         deposit(mint_addr, Coin { value: amount });
@@ -43,8 +43,8 @@ module NamedAddr::BasicCoin {
     }
 
     /// Transfers `amount` of tokens from `from` to `to`.
-    public(script) fun transfer(from: signer, to: address, amount: u64) acquires Balance {
-        let check = withdraw(Signer::address_of(&from), amount);
+    public fun transfer(from: &signer, to: address, amount: u64) acquires Balance {
+        let check = withdraw(Signer::address_of(from), amount);
         deposit(to, check);
     }
 
