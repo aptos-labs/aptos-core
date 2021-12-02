@@ -51,7 +51,7 @@ diem-vm = { path = "../diem-move/diem-vm" }
 diem-workspace-hack = { path = "../crates/diem-workspace-hack" }
 network = { path = "../network" }
 safety-rules = { path = "safety-rules" }
-short-hex-str = { path = "../common/short-hex-str" }
+short-hex-str = { path = "../crates/short-hex-str" }
 schemadb = { path = "../storage/schemadb" }
 storage-interface = { path = "../storage/storage-interface" }
 

@@ -30,7 +30,7 @@ diem-metrics = { path = "../../../common/metrics" }
 diem-types = { path = "../../../types" }
 diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }
 network = { path = "../../../network" }
-short-hex-str = { path = "../../../common/short-hex-str" }
+short-hex-str = { path = "../../../crates/short-hex-str" }
 
 [dev-dependencies]
 claim = "0.5.0"

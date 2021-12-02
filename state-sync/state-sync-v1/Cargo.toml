@@ -45,7 +45,7 @@ memsocket = { path = "../../network/memsocket", optional = true }
 mempool-notifications = { path = "../inter-component/mempool-notifications" }
 netcore = { path = "../../network/netcore" }
 network = { path = "../../network" }
-short-hex-str = { path = "../../common/short-hex-str" }
+short-hex-str = { path = "../../crates/short-hex-str" }
 storage-interface = { path = "../../storage/storage-interface" }
 vm-genesis = { path = "../../diem-move/vm-genesis", optional = true }
 

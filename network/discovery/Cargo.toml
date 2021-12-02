@@ -30,7 +30,7 @@ diem-types = {path = "../../types"}
 diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 move-core-types = { path = "../../language/move-core/types" }
 network = {path = "../../network"}
-short-hex-str = { path = "../../common/short-hex-str" }
+short-hex-str = { path = "../../crates/short-hex-str" }
 
 [dev-dependencies]
 diem-config = { path = "../../config", features = ["testing"]}
