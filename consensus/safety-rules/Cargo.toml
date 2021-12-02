@@ -12,7 +12,7 @@ rand = { version = "0.8.3", default-features = false }
 proptest = { version = "1.0.0", optional = true }
 rand_core = "0.6.2"
 
-crash-handler = { path = "../../common/crash-handler" }
+crash-handler = { path = "../../crates/crash-handler" }
 consensus-types = { path = "../consensus-types" }
 diem-config = { path = "../../config" }
 diem-crypto = { path = "../../crates/diem-crypto" }

@@ -13,6 +13,6 @@ edition = "2018"
 backtrace = "0.3.56"
 toml = "0.5.8"
 
-diem-logger = { path = "../logger" }
+diem-logger = { path = "../../common/logger" }
 diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 serde = { version = "1.0.124", features = ["derive"] }
