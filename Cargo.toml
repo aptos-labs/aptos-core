@@ -4,7 +4,6 @@ resolver = "2"
 members = [
     "api",
     "api/types",
-    "common/debug-interface",
     "common/diemdoc",
     "common/id-generator",
     "common/logger",
@@ -32,6 +31,7 @@ members = [
     "crates/bounded-executor",
     "crates/channel",
     "crates/crash-handler",
+    "crates/debug-interface",
     "crates/diem-assets-proof",
     "crates/diem-bitvec",
     "crates/diem-client",

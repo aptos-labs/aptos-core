@@ -26,7 +26,7 @@ consensus-notifications = { path = "../state-sync/inter-component/consensus-noti
 crash-handler = { path = "../crates/crash-handler" }
 data-streaming-service = { path = "../state-sync/state-sync-v2/data-streaming-service" }
 diem-infallible = { path = "../crates/diem-infallible" }
-debug-interface = { path = "../common/debug-interface" }
+debug-interface = { path = "../crates/debug-interface" }
 event-notifications = { path = "../state-sync/inter-component/event-notifications" }
 executor = { path = "../execution/executor" }
 executor-types = { path = "../execution/executor-types" }

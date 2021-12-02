@@ -30,7 +30,7 @@ rusoto_s3 = "0.46.0"
 chrono = "0.4.19"
 toml = { version = "0.5.8", default-features = false }
 
-debug-interface = { path = "../../common/debug-interface"}
+debug-interface = { path = "../../crates/debug-interface"}
 diem-client = { path = "../../crates/diem-client"}
 diem-retrier = { path = "../../common/retrier" }
 num_cpus = "1.13.0"

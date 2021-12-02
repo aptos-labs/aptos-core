@@ -42,7 +42,7 @@ serde_yaml = "0.8.17"
 futures = "0.3.12"
 
 backup-cli = { path = "../../storage/backup/backup-cli" }
-debug-interface = { path = "../../common/debug-interface" }
+debug-interface = { path = "../../crates/debug-interface" }
 generate-key = { path = "../../config/generate-key" }
 diem-genesis-tool = {path = "../../config/management/genesis", features = ["testing"] }
 diem-global-constants = { path = "../../config/global-constants" }

@@ -36,7 +36,7 @@ termcolor = "1.1.2"
 tokio = { version = "1.8.1", features = ["full"] }
 url = "2.2.2"
 
-debug-interface = { path = "../../common/debug-interface" }
+debug-interface = { path = "../../crates/debug-interface" }
 diem-config = { path = "../../config" }
 diem-framework-releases = { path = "../../diem-move/diem-framework/DPN/releases" }
 diem-genesis-tool = { path = "../../config/management/genesis" }
