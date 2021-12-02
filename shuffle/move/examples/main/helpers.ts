@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // deno-lint-ignore-file no-explicit-any
+// deno-lint-ignore-file ban-types
 import * as DiemTypes from "./generated/diemTypes/mod.ts";
 import { defaultUserContext, UserContext } from "./context.ts";
 import * as devapi from "./devapi.ts";
@@ -191,8 +192,16 @@ export function hexToAccountAddress(hex: string): DiemTypes.AccountAddress {
   return new DiemTypes.AccountAddress(senderListTuple);
 }
 
+export class StringLiteral {
+  constructor(readonly value: string) {
+  }
+}
+
 function normalizeScriptFunctionArgs(args: any[]) {
   return args.map((a) => {
+    if (a instanceof StringLiteral) {
+      return a.value;
+    }
     if (isString(a) && !a.startsWith("0x")) {
       return bufferToHex(textEncoder.encode(a));
     }

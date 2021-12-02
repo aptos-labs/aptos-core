@@ -27,13 +27,56 @@ Deno.test("Ability to set message", async () => {
 });
 
 Deno.test("Ability to set NFTs", async () => {
+  // Initialize nft_collection resource for both sender and receiver
+  let senderInitializeTxn = await main.initializeNFTScriptFunction(
+    context.defaultUserContext,
+  );
+  senderInitializeTxn = await devapi.waitForTransactionCompletion(
+    senderInitializeTxn.hash,
+  );
+  const secondUserContext = context.UserContext.fromEnv("test");
+  let receiverInitializeTxn = await main.initializeNFTScriptFunction(
+    secondUserContext,
+  );
+  receiverInitializeTxn = await devapi.waitForTransactionCompletion(
+    receiverInitializeTxn.hash,
+  );
+  assert(senderInitializeTxn.success);
+  assert(receiverInitializeTxn.success);
+
+  // Mint TestNFT into sender address
   const contentUri = "https://placekitten.com/200/300";
-  let txn = await main.createTestNFTScriptFunction(contentUri);
+  let txn = await main.createTestNFTScriptFunction(
+    context.defaultUserContext,
+    contentUri,
+  );
   txn = await devapi.waitForTransactionCompletion(txn.hash);
   assert(txn.success);
 
-  const nfts = await main.decodedNFTs();
-  assertEquals(helpers.hexToAscii(nfts[0].content_uri), contentUri);
+  const nfts = await main.decodedNFTs(context.defaultUserContext.address);
+  assertEquals(nfts[0].content_uri, contentUri);
+
+  // Transfer TestNFT from sender to receiver
+  const creator = nfts[0].id.id.addr;
+  const creationNum = new helpers.StringLiteral(nfts[0].id.id.creation_num);
+
+  let transferTxn = await main.transferNFTScriptFunction(
+    context.defaultUserContext,
+    secondUserContext.address,
+    creator,
+    creationNum,
+  );
+  transferTxn = await devapi.waitForTransactionCompletion(transferTxn.hash);
+  assert(transferTxn.success);
+
+  // Check receiver has the nft
+  const receiverNFTs = await main.decodedNFTs(secondUserContext.address);
+  assertEquals(receiverNFTs[0].content_uri, contentUri);
+  // Check sender nft_collection is empty
+  const senderNFTs = await main.decodedNFTs(
+    context.defaultUserContext.address,
+  );
+  assert(senderNFTs.length === 0);
 });
 
 Deno.test("Advanced: Ability to set message from nonpublishing account", async () => {

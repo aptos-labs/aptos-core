@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // deno-lint-ignore-file no-explicit-any
+// deno-lint-ignore-file ban-types
+
 import * as DiemHelpers from "./helpers.ts";
 import * as DiemTypes from "./generated/diemTypes/mod.ts";
 import * as codegen from "./generated/diemStdlib/mod.ts";
@@ -14,6 +16,7 @@ import {
 import * as devapi from "./devapi.ts";
 import * as util from "https://deno.land/std@0.85.0/node/util.ts";
 import { green } from "https://deno.land/x/nanocolors@0.1.12/mod.ts";
+import { StringLiteral } from "./helpers.ts";
 
 const textEncoder = new util.TextEncoder();
 
@@ -108,13 +111,15 @@ export async function initializeTestNFT() {
 // ScriptFunction example; creation of NFT.
 // See main/source/TestNFT.move
 export async function createTestNFTScriptFunction(
+  userContext: UserContext,
   contentUri: string,
 ) {
-  const scriptFunction: string = defaultUserContext.address +
+  const scriptFunction: string = userContext.address +
     "::TestNFT::create_nft";
   const typeArguments: string[] = [];
   const args: any[] = [contentUri];
-  return await DiemHelpers.invokeScriptFunction(
+  return await DiemHelpers.invokeScriptFunctionForContext(
+    userContext,
     scriptFunction,
     typeArguments,
     args,
@@ -124,18 +129,18 @@ export async function createTestNFTScriptFunction(
 // ScriptFunction example; creation of NFT.
 // See main/source/TestNFT.move
 export async function transferNFTScriptFunction(
+  userContext: UserContext,
   to: string,
   creator: string,
-  creationNum: number,
+  creationNum: StringLiteral,
 ) {
-  const scriptFunction: string = defaultUserContext.address +
+  const scriptFunction: string = userContext.address +
     "::NFTStandard::transfer";
-
-  const typeArgument = defaultUserContext.address + "::TestNFT::TestNFT";
+  const typeArgument = userContext.address + "::TestNFT::TestNFT";
   const typeArguments: string[] = [typeArgument];
-
   const args: any[] = [to, creator, creationNum];
-  return await DiemHelpers.invokeScriptFunction(
+  return await DiemHelpers.invokeScriptFunctionForContext(
+    userContext,
     scriptFunction,
     typeArguments,
     args,
@@ -172,9 +177,12 @@ export async function decodedNFTs(addr?: string) {
     .map((entry) => {
       return entry.data.nfts;
     });
-  nfts.forEach((nftType: any) => {
-    nftType.forEach((nft: any) => {
-      decodedNfts.push(nft);
+  nfts.forEach((nft_type: any) => {
+    nft_type.forEach((nft: any) => {
+      decodedNfts.push({
+        id: nft.id,
+        content_uri: DiemHelpers.hexToAscii(nft.content_uri),
+      });
     });
   });
   return decodedNfts;
