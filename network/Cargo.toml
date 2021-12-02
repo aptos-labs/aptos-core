@@ -44,7 +44,7 @@ diem-logger = { path = "../common/logger" }
 diem-metrics = { path = "../common/metrics" }
 diem-proptest-helpers = { path = "../common/proptest-helpers", optional = true }
 diem-rate-limiter = { path = "../common/rate-limiter"}
-diem-time-service = { path = "../common/time-service", features = ["async"] }
+diem-time-service = { path = "../crates/diem-time-service", features = ["async"] }
 diem-types = { path = "../types" }
 diem-workspace-hack = { path = "../crates/diem-workspace-hack" }
 memsocket = { path = "./memsocket", optional = true }

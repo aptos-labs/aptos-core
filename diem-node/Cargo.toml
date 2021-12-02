@@ -42,7 +42,7 @@ diem-mempool = { path = "../mempool" }
 diem-metrics = { path = "../common/metrics" }
 diem-secure-storage = { path = "../secure/storage" }
 diem-temppath = { path = "../common/temppath" }
-diem-time-service = { path = "../common/time-service" }
+diem-time-service = { path = "../crates/diem-time-service" }
 diem-types = { path = "../types" }
 diem-vm = { path = "../diem-move/diem-vm" }
 diem-workspace-hack = { path = "../crates/diem-workspace-hack" }

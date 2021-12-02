@@ -22,7 +22,7 @@ diem-crypto = { path = "../../crates/diem-crypto" }
 diem-id-generator = { path = "../../crates/diem-id-generator" }
 diem-infallible = { path = "../../crates/diem-infallible" }
 diem-logger = { path = "../../common/logger" }
-diem-time-service = { path = "../../common/time-service", features = ["async"] }
+diem-time-service = { path = "../../crates/diem-time-service", features = ["async"] }
 diem-types = { path = "../../types" }
 diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 network = { path = "../../network" }
@@ -37,5 +37,5 @@ tokio = { version = "1.8.1", features = ["rt", "macros"], default-features = fal
 
 bcs = "0.1.2"
 channel = { path = "../../crates/channel" }
-diem-time-service = { path = "../../common/time-service", features = ["async", "testing"] }
+diem-time-service = { path = "../../crates/diem-time-service", features = ["async", "testing"] }
 network = { path = "../../network", features = ["fuzzing"] }

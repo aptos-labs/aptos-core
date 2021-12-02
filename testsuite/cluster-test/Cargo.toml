@@ -53,7 +53,7 @@ diem-operational-tool = {path = "../../config/management/operational", features 
 diem-secure-storage = { path = "../../secure/storage", features = ["testing"] }
 diem-swarm = { path = "../diem-swarm" }
 diem-temppath = { path = "../../common/temppath" }
-diem-time-service = { path = "../../common/time-service" }
+diem-time-service = { path = "../../crates/diem-time-service" }
 diem-types = { path = "../../types", features = ["fuzzing"] }
 diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 forge = { path = "../forge" }

@@ -23,7 +23,7 @@ diem-config = { path = "../../config"}
 diem-crypto = {path = "../../crates/diem-crypto"}
 diem-logger = {path = "../../common/logger"}
 diem-metrics = {path = "../../common/metrics"}
-diem-time-service = {path = "../../common/time-service"}
+diem-time-service = {path = "../../crates/diem-time-service"}
 diem-secure-storage = { path = "../../secure/storage" }
 diem-network-address-encryption = {path = "../../config/management/network-address-encryption"}
 diem-types = {path = "../../types"}

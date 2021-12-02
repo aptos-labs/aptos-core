@@ -68,7 +68,7 @@ network = { path = "../../network", features = ["fuzzing", "testing"] }
 network-builder = { path  = "../../network/builder" }
 storage-service = { path = "../../storage/storage-service" }
 diem-transaction-builder = { path = "../../sdk/transaction-builder" }
-diem-time-service = { path = "../../common/time-service", features = ["testing"] }
+diem-time-service = { path = "../../crates/diem-time-service", features = ["testing"] }
 vm-genesis = { path = "../../diem-move/vm-genesis", features = ["fuzzing"] }
 
 [features]

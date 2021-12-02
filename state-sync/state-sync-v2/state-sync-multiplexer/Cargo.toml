@@ -32,7 +32,7 @@ diem-crypto = { path = "../../../crates/diem-crypto" }
 diem-genesis-tool = {path = "../../../config/management/genesis", features = ["testing"] }
 diem-infallible = { path = "../../../crates/diem-infallible" }
 diem-temppath = { path = "../../../common/temppath" }
-diem-time-service = { path = "../../../common/time-service" }
+diem-time-service = { path = "../../../crates/diem-time-service" }
 diem-vm = { path = "../../../diem-move/diem-vm" }
 diemdb = { path = "../../../storage/diemdb" }
 executor = { path = "../../../execution/executor" }

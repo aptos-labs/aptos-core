@@ -26,7 +26,7 @@ diem-infallible = { path = "../../crates/diem-infallible" }
 diem-logger = { path = "../../common/logger" }
 diem-network-address-encryption = {path = "../../config/management/network-address-encryption"}
 diem-secure-storage = { path = "../../secure/storage" }
-diem-time-service = { path = "../../common/time-service", features = ["async"] }
+diem-time-service = { path = "../../crates/diem-time-service", features = ["async"] }
 diem-types = { path = "../../types" }
 diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 event-notifications = { path = "../../state-sync/inter-component/event-notifications" }
