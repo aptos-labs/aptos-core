@@ -25,7 +25,7 @@ rand = "0.8.3"
 ureq = { version = "1.5.4", features = ["json", "native-tls"], default-features = false }
 
 bcs = "0.1.2"
-diem-proptest-helpers = { path = "../../common/proptest-helpers" }
+diem-proptest-helpers = { path = "../../crates/diem-proptest-helpers" }
 diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 
 # List out modules with data structures being fuzzed here.

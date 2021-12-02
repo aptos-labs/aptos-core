@@ -19,7 +19,7 @@ diem-crypto = { path = "../../crates/diem-crypto" }
 diem-global-constants = { path = "../../config/global-constants"}
 diem-infallible = { path = "../../crates/diem-infallible" }
 diem-logger = { path = "../../common/logger" }
-diem-proptest-helpers = { path = "../../common/proptest-helpers", optional = true }
+diem-proptest-helpers = { path = "../../crates/diem-proptest-helpers", optional = true }
 diem-secure-net = { path = "../../secure/net" }
 diem-secure-push-metrics = { path = "../../secure/push-metrics" }
 diem-secure-storage = { path = "../../secure/storage" }
@@ -38,7 +38,7 @@ proptest = "1.0.0"
 
 consensus-types = { path = "../consensus-types", features = ["fuzzing"] }
 diem-config = { path = "../../config", features = ["fuzzing"] }
-diem-proptest-helpers = { path = "../../common/proptest-helpers" }
+diem-proptest-helpers = { path = "../../crates/diem-proptest-helpers" }
 diem-secure-storage = { path = "../../secure/storage", features = ["testing"] }
 
 [[bench]]

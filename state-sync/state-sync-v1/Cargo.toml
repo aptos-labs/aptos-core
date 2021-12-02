@@ -31,7 +31,7 @@ diem-infallible = { path = "../../crates/diem-infallible" }
 diem-logger = { path = "../../common/logger" }
 diem-mempool = { path = "../../mempool"}
 diem-metrics = { path = "../../crates/diem-metrics" }
-diem-proptest-helpers = { path = "../../common/proptest-helpers", optional = true }
+diem-proptest-helpers = { path = "../../crates/diem-proptest-helpers", optional = true }
 diem-temppath = { path = "../../crates/diem-temppath" }
 diem-types = { path = "../../types" }
 diem-vm = { path = "../../diem-move/diem-vm" }
@@ -59,7 +59,7 @@ diem-framework-releases= { path = "../../diem-move/diem-framework/DPN/releases" 
 diem-crypto = { path = "../../crates/diem-crypto" }
 diem-genesis-tool = {path = "../../config/management/genesis", features = ["testing"] }
 diem-mempool = { path = "../../mempool", features = ["fuzzing"] }
-diem-proptest-helpers = { path = "../../common/proptest-helpers" }
+diem-proptest-helpers = { path = "../../crates/diem-proptest-helpers" }
 diemdb = { path = "../../storage/diemdb" }
 executor-test-helpers = { path = "../../execution/executor-test-helpers" }
 memsocket = { path = "../../network/memsocket" }

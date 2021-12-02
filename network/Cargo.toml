@@ -42,7 +42,7 @@ diem-id-generator = { path = "../crates/diem-id-generator" }
 diem-infallible = { path = "../crates/diem-infallible" }
 diem-logger = { path = "../common/logger" }
 diem-metrics = { path = "../crates/diem-metrics" }
-diem-proptest-helpers = { path = "../common/proptest-helpers", optional = true }
+diem-proptest-helpers = { path = "../crates/diem-proptest-helpers", optional = true }
 diem-rate-limiter = { path = "../crates/diem-rate-limiter"}
 diem-time-service = { path = "../crates/diem-time-service", features = ["async"] }
 diem-types = { path = "../types" }
@@ -54,7 +54,7 @@ short-hex-str = { path = "../crates/short-hex-str" }
 
 [dev-dependencies]
 criterion = "0.3.4"
-diem-proptest-helpers = { path = "../common/proptest-helpers" }
+diem-proptest-helpers = { path = "../crates/diem-proptest-helpers" }
 diem-types = { path = "../types", features = ["fuzzing"] }
 maplit = "1.0.2"
 memsocket = { path = "./memsocket" }

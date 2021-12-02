@@ -55,7 +55,7 @@ backup-service = { path = "../backup-service" }
 executor-test-helpers = { path = "../../../execution/executor-test-helpers" }
 diemdb = { path = "../../diemdb", features = ["fuzzing"] }
 diem-config = { path = "../../../config" }
-diem-proptest-helpers = { path = "../../../common/proptest-helpers" }
+diem-proptest-helpers = { path = "../../../crates/diem-proptest-helpers" }
 storage-interface = { path = "../../storage-interface" }
 
 [features]

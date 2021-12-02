@@ -31,7 +31,7 @@ diem-crypto = { path = "../crates/diem-crypto" }
 diem-logger = { path = "../common/logger" }
 diem-metrics = { path = "../crates/diem-metrics" }
 diem-infallible = { path = "../crates/diem-infallible" }
-diem-proptest-helpers = { path = "../common/proptest-helpers", optional = true }
+diem-proptest-helpers = { path = "../crates/diem-proptest-helpers", optional = true }
 diem-types = { path = "../types" }
 diem-workspace-hack = { path = "../crates/diem-workspace-hack" }
 event-notifications = { path = "../state-sync/inter-component/event-notifications" }

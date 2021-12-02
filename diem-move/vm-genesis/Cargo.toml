@@ -35,7 +35,7 @@ read-write-set = { path = "../../language/tools/read-write-set" }
 [dev-dependencies]
 proptest = "1.0.0"
 proptest-derive = "0.3.0"
-diem-proptest-helpers = { path = "../../common/proptest-helpers" }
+diem-proptest-helpers = { path = "../../crates/diem-proptest-helpers" }
 
 [features]
 default = []

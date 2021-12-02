@@ -30,7 +30,7 @@ diem-vm = { path = "../../../diem-move/diem-vm" }
 proptest = "1.0.0"
 proptest-derive = "0.3.0"
 diem-keygen = { path = "../../../diem-move/diem-keygen" }
-diem-proptest-helpers = { path = "../../../common/proptest-helpers" }
+diem-proptest-helpers = { path = "../../../crates/diem-proptest-helpers" }
 diem-config = { path = "../../../config" }
 diem-framework-releases = { path = "../../../diem-move/diem-framework/DPN/releases" }
 diem-transaction-builder = { path = "../../../sdk/transaction-builder" }
