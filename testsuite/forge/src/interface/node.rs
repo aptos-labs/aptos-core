@@ -67,6 +67,10 @@ pub trait Node {
 
     /// Performs a Health Check on the Node
     fn health_check(&mut self) -> Result<(), HealthCheckError>;
+
+    fn counter(&self, counter: &str, port: u64) -> Result<f64>;
+
+    fn expose_metric(&self) -> Result<u64>;
 }
 
 /// Trait used to represent a running Validator

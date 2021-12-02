@@ -7,6 +7,7 @@ pub mod gas_price_test;
 pub mod partial_nodes_down_test;
 pub mod performance_test;
 pub mod reconfiguration_test;
+pub mod state_sync_performance;
 
 use diem_sdk::{
     client::Client as JsonRpcClient, transaction_builder::TransactionFactory, types::PeerId,

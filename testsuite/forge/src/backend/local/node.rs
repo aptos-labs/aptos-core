@@ -230,6 +230,15 @@ impl Node for LocalNode {
     fn health_check(&mut self) -> Result<(), HealthCheckError> {
         self.health_check()
     }
+
+    fn counter(&self, _counter: &str, _port: u64) -> Result<f64> {
+        todo!()
+    }
+
+    // local node does not need to expose metric end point
+    fn expose_metric(&self) -> Result<u64> {
+        Ok(0)
+    }
 }
 
 impl Validator for LocalNode {}

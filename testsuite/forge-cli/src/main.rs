@@ -13,6 +13,7 @@ use testcases::{
     compatibility_test::SimpleValidatorUpgrade, fixed_tps_test::FixedTpsTest,
     gas_price_test::NonZeroGasPrice, generate_traffic, partial_nodes_down_test::PartialNodesDown,
     performance_test::PerformanceBenchmark, reconfiguration_test::ReconfigurationTest,
+    state_sync_performance::StateSyncPerformance,
 };
 use url::Url;
 
@@ -350,6 +351,7 @@ fn pre_release_suite() -> ForgeConfig<'static> {
             &NonZeroGasPrice,
             &PartialNodesDown,
             &ReconfigurationTest,
+            &StateSyncPerformance,
         ])
 }
 
