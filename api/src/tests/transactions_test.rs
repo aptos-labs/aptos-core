@@ -29,6 +29,13 @@ use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use serde_json::json;
 
 #[tokio::test]
+async fn test_deserialize_genesis_transaction() {
+    let context = new_test_context();
+    let resp = context.get("/transactions/0").await;
+    serde_json::from_value::<diem_api_types::Transaction>(resp).unwrap();
+}
+
+#[tokio::test]
 async fn test_get_transactions_output_genesis_transaction() {
     let context = new_test_context();
     let ledger_info = context.get_latest_ledger_info();
@@ -146,6 +153,24 @@ async fn test_get_transactions_output_genesis_transaction() {
             }
         }),
     );
+}
+
+#[tokio::test]
+async fn test_get_transactions_returns_last_page_when_start_version_is_not_specified() {
+    let mut context = new_test_context();
+
+    let mut tc = context.tc_account();
+    for _i in 0..20 {
+        let account = context.gen_account();
+        let txn = context.create_parent_vasp_by_account(&mut tc, &account);
+        context.commit_block(&vec![txn.clone()]).await;
+    }
+
+    let resp = context.get("/transactions").await;
+    let txns = resp.as_array().unwrap();
+    assert_eq!(25, txns.len());
+    assert_eq!("15", txns[0]["version"]);
+    assert_eq!("39", txns[24]["version"]);
 }
 
 #[tokio::test]
@@ -786,7 +811,7 @@ async fn test_get_transaction_by_invalid_hash() {
 
     let resp = context
         .expect_status_code(400)
-        .get(&format!("/transactions/{}", "0x1",))
+        .get("/transactions/0x1")
         .await;
     assert_json(
         resp,

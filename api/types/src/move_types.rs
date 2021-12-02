@@ -436,6 +436,8 @@ impl fmt::Display for MoveType {
     }
 }
 
+// Implementation is imperfect, only parses type tags,
+// can't parse generic type params and references.
 impl FromStr for MoveType {
     type Err = anyhow::Error;
 
@@ -450,6 +452,8 @@ impl Serialize for MoveType {
     }
 }
 
+// Implementation is imperfect, only parses type tags,
+// can't parse generic type params and references.
 impl<'de> Deserialize<'de> for MoveType {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -781,6 +785,9 @@ impl From<&AbilitySet> for MoveFunctionGenericTypeParam {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct MoveModuleBytecode {
     pub bytecode: HexEncodedBytes,
+    // We don't need deserialize MoveModule as it should be serialized
+    // from `bytecode`.
+    #[serde(skip_deserializing)]
     pub abi: Option<MoveModule>,
 }
 
@@ -814,6 +821,9 @@ impl From<Module> for MoveModuleBytecode {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct MoveScriptBytecode {
     pub bytecode: HexEncodedBytes,
+    // We don't need deserialize MoveModule as it should be serialized
+    // from `bytecode`.
+    #[serde(skip_deserializing)]
     pub abi: Option<MoveFunction>,
 }
 

@@ -20,7 +20,7 @@ Deno.test("sequenceNumber", async () => {
 
 Deno.test("transactions", async () => {
   const actual = await devapi.transactions();
-  assertEquals(actual.length, 1);
+  assert(actual.length > 0);
   assert(actual[0].success);
 });
 
