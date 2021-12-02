@@ -26,7 +26,8 @@ pub fn handle(
         import * as helpers from "{helpers}";
         import * as main from "{main}";
         import * as codegen from "{codegen}";
-        import * as help from "{repl_help}";"#,
+        import * as help from "{repl_help}";
+        import * as move from "{mv}";"#,
         context = project_path
             .join(shared::MAIN_PKG_PATH)
             .join("context.ts")
@@ -50,6 +51,10 @@ pub fn handle(
         repl_help = project_path
             .join(shared::MAIN_PKG_PATH)
             .join("repl_help.ts")
+            .to_string_lossy(),
+        mv = project_path
+            .join(shared::MAIN_PKG_PATH)
+            .join("move.ts")
             .to_string_lossy()
     );
 

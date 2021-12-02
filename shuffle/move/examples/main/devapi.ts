@@ -38,7 +38,7 @@ export async function transaction(
 }
 
 // Polls for a specific transaction to complete, returning the txn object.
-export async function waitForTransactionCompletion(
+export async function waitForTransaction(
   versionOrHash: number | string,
   timeout?: number,
 ): Promise<OnChainTransaction> {

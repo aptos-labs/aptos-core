@@ -22,8 +22,8 @@ Inside `nft/main/sources/nft`, create a new move file `MyNFT.move`.
 
 ```
 module Sender::MyNFT {
-use Sender::NFTStandard;
-use Std::Signer;
+    use Sender::NFTStandard;
+    use Std::Signer;
 
     struct MyNFT has drop, store {}
 
@@ -37,8 +37,8 @@ will be the `NFTType` we use when calling `NFTStandard` methods.
 
 ```
 module Sender::MyNFT {
-use Sender::NFTStandard;
-use Std::Signer;
+    use Sender::NFTStandard;
+    use Std::Signer;
 
     struct MyNFT has drop, store {}
 
@@ -102,38 +102,39 @@ Let's try calling the `mint_nft` script function within the console.
 
 > let typeArguments: string[] = [];
 
-> let args: any[] = [contentUri];
+> let args: any[] = [move.Ascii(contentUri)];
 
 > let txn = await helpers.invokeScriptFunction(scriptFunction, typeArguments, args);
 
 > txn = await devapi.waitForTransaction(txn.hash);
 {
   type: "user_transaction",
-  version: "264",
-  hash: "0x55cbf81f080018a8a1f6a572cf75ddc64ad57d414791ddcef1dc803675b12996",
-  state_root_hash: "0xf9b9a4f2a0d05988e91b11e4f8bc3d870ec64f333ec836dbd726ed60c04b5ee4",
+  version: "71",
+  hash: "0x53996c3579ff6cd2d8f1b5599a32bbf812c262d19da3c97ea20237a3c69d14f6",
+  state_root_hash: "0x41b4cb644efefaff1c52ec9b91823fbb59e5501222d82999825b0bed5463ab99",
   event_root_hash: "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
   gas_used: "78",
   success: true,
   vm_status: "Executed successfully",
-  sender: "0x6215bb1c111e8943794f21eb7e559656",
-  sequence_number: "5",
+  sender: "0xe8eb92a7a924d5b16d012603a2294241",
+  sequence_number: "4",
   max_gas_amount: "1000000",
   gas_unit_price: "0",
   gas_currency_code: "XUS",
   expiration_timestamp_secs: "99999999999",
   payload: {
     type: "script_function_payload",
-    function: "0x6215bb1c111e8943794f21eb7e559656::MyNFT::mint_nft",
+    function: "0xe8eb92a7a924d5b16d012603a2294241::MyNFT::mint_nft",
     type_arguments: [],
     arguments: [ "0x68747470733a2f2f706c6163656b697474656e2e636f6d2f3230302f333030" ]
   },
   signature: {
     type: "ed25519_signature",
-    public_key: "0x1fc99baab80ddc62a30cc4a780198be946d4fe1c5ef0320e2d665e88aebcddb0",
-    signature: "0x41f578f7d9f3f05c9b4064f017d86ae08b479112cb7ebc6c7d9163fbd36cd7c2d5ae711a0f0d74b24069c70e80fc15c017..."
+    public_key: "0xeb18d016abc18ffacd529c31401b2fec240c1c76b7fd95627f37d743f2ccf78c",
+    signature: "0xf842733d9591f47948b0790d67bec19eac3621c05560c7a83382f9d60264c68d0597b7495d76250a57d2cb4dc37762099b..."
   },
-  events: []
+  events: [],
+  timestamp: "1638499244177902"
 }
 
 > let resource = await devapi.resourcesWithName("NFTStandard");
@@ -141,29 +142,157 @@ Let's try calling the `mint_nft` script function within the console.
 > console.log(resource);
 [
   {
-    type: "0x6215bb1c111e8943794f21eb7e559656::NFTStandard::NFTCollection<0x6215bb1c111e8943794f21eb7e559656::M...",
-    data: { nfts: [ [Object] ] }
-  },
-  {
-    type: "0x6215bb1c111e8943794f21eb7e559656::NFTStandard::NFTCollection<0x6215bb1c111e8943794f21eb7e559656::T...",
+    type: "0xe8eb92a7a924d5b16d012603a2294241::NFTStandard::NFTCollection<0xe8eb92a7a924d5b16d012603a2294241::M...",
     data: { nfts: [ [Object] ] }
   }
 ]
 
 > resource[0].type
-"0x6215bb1c111e8943794f21eb7e559656::NFTStandard::NFTCollection<0x6215bb1c111e8943794f21eb7e559656::MyNFT::MyNFT>"
+"0xe8eb92a7a924d5b16d012603a2294241::NFTStandard::NFTCollection<0xe8eb92a7a924d5b16d012603a2294241::MyNFT::MyNFT>"
 
 > resource[0].data.nfts
 [
   {
     content_uri: "0x68747470733a2f2f706c6163656b697474656e2e636f6d2f3230302f333030",
-    id: { id: { addr: "0x6215bb1c111e8943794f21eb7e559656", creation_num: "5" } },
+    id: { id: { addr: "0xe8eb92a7a924d5b16d012603a2294241", creation_num: "4" } },
     type: { dummy_field: false }
+  }
+]
+
+> await main.decodedNFTs()
+[
+  {
+    id: { id: { addr: "0xe8eb92a7a924d5b16d012603a2294241", creation_num: "4" } },
+    content_uri: "https://placekitten.com/200/300"
   }
 ]
 ```
 
 ## Transfer MyNFT
 
-We will use e2e testing to try transferring MyNFT from one account to another.
-In `nft/e2e`, create a new file `nft.test.ts`.
+Now we want to use `NFTStandard::transfer` to transfer your minted NFT into
+another account. We will use e2e testing framework this time, so that you can
+test the entire flow.
+
+In `nft/e2e`, create a new file `nft.test.ts`. Set up your imports and a test
+function.
+
+```
+import {
+  assert,
+  assertEquals,
+} from "https://deno.land/std@0.85.0/testing/asserts.ts";
+import * as devapi from "../main/devapi.ts";
+import * as main from "../main/mod.ts";
+import * as context from "../main/context.ts";
+import * as helpers from "../main/helpers.ts";
+import * as mv from "../main/move.ts";
+
+Deno.test("Test NFTs", async () => {
+
+});
+```
+
+Next you want to initialize the `nft_collection` resource of type MyNFT in both
+sender and receiver accounts.
+
+```
+Deno.test("Test NFTs", async () => {
+    // First user is initialized by default, but second account must be initialized within the test
+    const secondUserContext = context.UserContext.fromEnv("test");
+
+    // Initialize nft_collection resource for sender
+    let senderInitializeTxn = await main.initializeNFTScriptFunction(
+        "MyNFT", context.defaultUserContext, context.defaultUserContext.address
+    );
+    senderInitializeTxn = await devapi.waitForTransaction(
+        senderInitializeTxn.hash,
+    );
+
+    // Initialize nft_collection resource for receiver
+    let receiverInitializeTxn = await main.initializeNFTScriptFunction(
+        "MyNFT", secondUserContext, context.defaultUserContext.address
+    );
+    receiverInitializeTxn = await devapi.waitForTransaction(
+        receiverInitializeTxn.hash,
+    );
+    assert(senderInitializeTxn.success);
+    assert(receiverInitializeTxn.success);
+});
+```
+
+Let's try running `shuffle test e2e` to test the above code. This will run all
+tests inside the `/nft/e2e` directory. You should see a test passed output:
+
+```
+running 1 test from file:///Users/sunmilee/diem/nft/e2e/nft.test.ts
+test Test NFTs ... ok (4s)
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out (12s)
+```
+
+Now you can mint a NFT into the sender account resource similar to how we did it
+in console above:
+
+```
+Deno.test("Test NFTs", async () => {
+    ...
+
+    // Choose a contentUri that the NFT will point to
+    const contentUri = "https://placekitten.com/200/300";
+
+    const mintScriptFunction: string = context.defaultUserContext.address + "::MyNFT::mint_nft";
+    const mintTypeArguments: string[] = [];
+    const mintArgs: any[] = [mv.Ascii(contentUri)];
+    let txn = await helpers.invokeScriptFunctionForContext(
+        context.defaultUserContext,
+        mintScriptFunction,
+        mintTypeArguments,
+        mintArgs,
+    );
+    txn = await devapi.waitForTransaction(txn.hash);
+    assert(txn.success);
+
+    // main.decodedNFTs will fetch all NFTs of the address, decode its metadata, and display in json
+    const nfts = await main.decodedNFTs(context.defaultUserContext.address);
+
+    // Check the minted nft's content uri matches the one declared above
+    assertEquals(nfts[0].content_uri, contentUri);
+});
+```
+
+We can now transfer the minted NFT to the receiver we instantiated above:
+
+```
+Deno.test("Test NFTs", async () => {
+    ...
+
+    // Get the creator address and creation number of the NFT
+    const creator = nfts[0].id.id.addr;
+    const creationNum = nfts[0].id.id.creation_num;
+
+    // Similar to mint, use invokeScriptFunctionForContext to call NFTStandard::transfer
+    const transferScriptFunction: string = context.defaultUserContext.address + "::NFTStandard::transfer";
+    const transferTypeArgument: string[] = [context.defaultUserContext.address + "::MyNFT::MyNFT"];
+    const transferArgs: any[] = [mv.Address(secondUserContext.address), mv.Address(creator), mv.U64(creationNum)];
+    let transferTxn = await helpers.invokeScriptFunctionForContext(
+        context.defaultUserContext,
+        transferScriptFunction,
+        transferTypeArgument,
+        transferArgs,
+    );
+    transferTxn = await devapi.waitForTransaction(transferTxn.hash);
+    assert(transferTxn.success);
+
+    // Check receiver has the nft
+    const receiverNFTs = await main.decodedNFTs(secondUserContext.address);
+    assertEquals(receiverNFTs[0].content_uri, contentUri);
+    // Check sender nft_collection is empty
+    const senderNFTs = await main.decodedNFTs(
+        context.defaultUserContext.address,
+    );
+    assert(senderNFTs.length === 0);
+});
+```
+
+Run `shuffle test e2e` to try the full transfer test!

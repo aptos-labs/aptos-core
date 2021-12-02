@@ -120,7 +120,7 @@ await devapi.accountTransactions()
 await devapi.resources()
 
 // Use decodedMessages to check that message was set to "hello blockchain"
-main.decodedMessages()
+await main.decodedMessages()
 ```
 
 ## Write E2E Tests

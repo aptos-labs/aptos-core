@@ -19,7 +19,7 @@ Deno.test("invokeScriptFunction", async () => {
     [],
     [mv.Ascii("invoked script function")],
   );
-  txn = await devapi.waitForTransactionCompletion(txn.hash);
+  txn = await devapi.waitForTransaction(txn.hash);
   assert(txn.success);
 
   assertEquals(txn.vm_status, "Executed successfully");
@@ -42,7 +42,7 @@ Deno.test("buildAndSubmitTransaction with generated code", async () => {
     payload,
   );
 
-  txn = await devapi.waitForTransactionCompletion(txn.hash);
+  txn = await devapi.waitForTransaction(txn.hash);
   assert(txn.success);
 
   assertEquals(

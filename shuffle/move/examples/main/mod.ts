@@ -60,11 +60,12 @@ export async function setMessageScriptFunction(
 // See main/source/nft/TestNFT.move
 export async function createTestNFTScriptFunction(
   contentUri: string,
+  nftType: string,
   sender?: UserContext,
   moduleAddress?: string,
 ) {
   return await invokeScriptFunction(
-    "TestNFT::create_nft",
+    nftType + "::create_nft",
     [],
     [mv.Ascii(contentUri)],
     sender,
@@ -78,6 +79,7 @@ export async function transferNFTScriptFunction(
   to: string,
   creator: string,
   creationNum: string,
+  nftType: string,
   sender?: UserContext,
   moduleAddress?: string,
 ) {
@@ -85,7 +87,7 @@ export async function transferNFTScriptFunction(
 
   return await invokeScriptFunction(
     "NFTStandard::transfer",
-    [`${moduleAddress}::TestNFT::TestNFT`],
+    [`${moduleAddress}::${nftType}::${nftType}`],
     [mv.Address(to), mv.Address(creator), mv.U64(creationNum)],
     sender,
     moduleAddress,
@@ -96,6 +98,7 @@ export async function transferNFTScriptFunction(
 // See main/source/nft/NFTStandard.move
 // See main/source/nft/TestNFT.move
 export async function initializeNFTScriptFunction(
+  nftType: string,
   sender?: UserContext,
   moduleAddress?: string,
 ) {
@@ -103,7 +106,7 @@ export async function initializeNFTScriptFunction(
 
   return await invokeScriptFunction(
     "NFTStandard::initialize_nft_collection",
-    [`${moduleAddress}::TestNFT::TestNFT`],
+    [`${moduleAddress}::${nftType}::${nftType}`],
     [],
     sender,
     moduleAddress,

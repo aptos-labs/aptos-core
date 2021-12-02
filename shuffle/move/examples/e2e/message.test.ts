@@ -17,7 +17,7 @@ Deno.test("Test Assert", () => {
 
 Deno.test("Ability to set message", async () => {
   let txn = await main.setMessageScriptFunction("hello blockchain");
-  txn = await devapi.waitForTransactionCompletion(txn.hash);
+  txn = await devapi.waitForTransaction(txn.hash);
   assert(txn.success);
 
   const expected = "hello blockchain";
@@ -27,15 +27,21 @@ Deno.test("Ability to set message", async () => {
 
 Deno.test("Ability to set NFTs", async () => {
   // Initialize nft_collection resource for both sender and receiver
-  let senderInitializeTxn = await main.initializeNFTScriptFunction();
-  senderInitializeTxn = await devapi.waitForTransactionCompletion(
+  let senderInitializeTxn = await main.initializeNFTScriptFunction(
+    "TestNFT",
+    context.defaultUserContext,
+    context.defaultUserContext.address,
+  );
+  senderInitializeTxn = await devapi.waitForTransaction(
     senderInitializeTxn.hash,
   );
   const secondUserContext = context.UserContext.fromEnv("test");
   let receiverInitializeTxn = await main.initializeNFTScriptFunction(
+    "TestNFT",
     secondUserContext,
+    context.defaultUserContext.address,
   );
-  receiverInitializeTxn = await devapi.waitForTransactionCompletion(
+  receiverInitializeTxn = await devapi.waitForTransaction(
     receiverInitializeTxn.hash,
   );
   assert(senderInitializeTxn.success);
@@ -43,9 +49,13 @@ Deno.test("Ability to set NFTs", async () => {
 
   // Mint TestNFT into sender address
   const contentUri = "https://placekitten.com/200/300";
-
-  let txn = await main.createTestNFTScriptFunction(contentUri);
-  txn = await devapi.waitForTransactionCompletion(txn.hash);
+  let txn = await main.createTestNFTScriptFunction(
+    contentUri,
+    "TestNFT",
+    context.defaultUserContext,
+    context.defaultUserContext.address,
+  );
+  txn = await devapi.waitForTransaction(txn.hash);
   assert(txn.success);
 
   const nfts = await main.decodedNFTs(context.defaultUserContext.address);
@@ -59,15 +69,20 @@ Deno.test("Ability to set NFTs", async () => {
     secondUserContext.address,
     creator,
     creationNum,
+    "TestNFT",
+    context.defaultUserContext,
+    context.defaultUserContext.address,
   );
-  transferTxn = await devapi.waitForTransactionCompletion(transferTxn.hash);
+  transferTxn = await devapi.waitForTransaction(transferTxn.hash);
   assert(transferTxn.success);
 
   // Check receiver has the nft
   const receiverNFTs = await main.decodedNFTs(secondUserContext.address);
   assertEquals(receiverNFTs[0].content_uri, contentUri);
   // Check sender nft_collection is empty
-  const senderNFTs = await main.decodedNFTs();
+  const senderNFTs = await main.decodedNFTs(
+    context.defaultUserContext.address,
+  );
   assert(senderNFTs.length === 0);
 });
 
@@ -77,7 +92,7 @@ Deno.test("Advanced: Ability to set message from nonpublishing account", async (
     "invoked script function from nonpublishing account",
     secondUserContext,
   );
-  txn = await devapi.waitForTransactionCompletion(txn.hash);
+  txn = await devapi.waitForTransaction(txn.hash);
   assert(txn.success);
 
   const messages = await main.decodedMessages(secondUserContext.address);
