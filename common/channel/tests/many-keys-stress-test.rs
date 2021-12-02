@@ -9,27 +9,16 @@ use std::{
     thread,
     time::Duration,
 };
-use structopt::StructOpt;
 
 /// A small benchmark/stress test that sends `num_msgs` for each `num_keys`. The
 /// default arguments simulate many transient keys that just push a single message
 /// and then never more. Without garbage collecting empty per-key-queues, the
 /// program will eventually OOM.
-#[derive(Debug, StructOpt)]
+#[derive(Debug)]
 pub struct Args {
-    #[structopt(default_value = "2000000")]
     num_keys: usize,
-
-    #[structopt(default_value = "1")]
     num_msgs: usize,
-
-    #[structopt(default_value = "10")]
     max_queue_size: usize,
-}
-
-fn main() {
-    let args = Args::from_args();
-    run(args);
 }
 
 pub fn run(args: Args) {

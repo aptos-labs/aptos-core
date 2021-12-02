@@ -5,7 +5,6 @@ members = [
     "api",
     "api/types",
     "common/channel",
-    "common/channel/many-keys-stress-test",
     "common/crash-handler",
     "common/debug-interface",
     "common/diemdoc",

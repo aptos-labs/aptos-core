@@ -4858,16 +4858,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "many-keys-stress-test"
-version = "0.1.0"
-dependencies = [
- "channel",
- "diem-workspace-hack",
- "futures",
- "structopt 0.3.21",
-]
-
-[[package]]
 name = "maplit"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
