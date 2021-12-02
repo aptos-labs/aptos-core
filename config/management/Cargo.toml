@@ -27,7 +27,7 @@ diem-secure-storage = { path = "../../secure/storage" }
 diem-time-service = { path = "../../crates/diem-time-service" }
 diem-types = { path = "../../types" }
 diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
-diem-temppath = { path = "../../common/temppath" }
+diem-temppath = { path = "../../crates/diem-temppath" }
 diem-transaction-builder = { path = "../../sdk/transaction-builder" }
 
 [dev-dependencies]

@@ -42,7 +42,7 @@ diem-mempool = { path = "../mempool" }
 diem-metrics = { path = "../common/metrics" }
 diem-proptest-helpers = { path = "../common/proptest-helpers", optional = true }
 diem-types = { path = "../types" }
-diem-temppath = { path = "../common/temppath", optional = true }
+diem-temppath = { path = "../crates/diem-temppath", optional = true }
 diem-workspace-hack = { path = "../crates/diem-workspace-hack" }
 executor = { path = "../execution/executor" , optional = true}
 executor-types = { path = "../execution/executor-types" , optional = true}
@@ -66,7 +66,7 @@ diem-genesis-tool = {path = "../config/management/genesis", features = ["testing
 diem-client = { path = "../crates/diem-client" }
 diem-mempool = { path = "../mempool", features = ["fuzzing"] }
 diem-proptest-helpers = { path = "../common/proptest-helpers" }
-diem-temppath = { path = "../common/temppath" }
+diem-temppath = { path = "../crates/diem-temppath" }
 diem-types = { path = "../types", features = ["fuzzing"] }
 vm-validator = { path = "../vm-validator" }
 diem-framework-releases= { path = "../diem-move/diem-framework/DPN/releases" }

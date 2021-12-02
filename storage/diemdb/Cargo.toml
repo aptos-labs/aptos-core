@@ -31,7 +31,7 @@ diem-logger = { path = "../../common/logger" }
 diem-metrics = { path = "../../common/metrics" }
 diem-infallible = { path = "../../crates/diem-infallible" }
 diem-proptest-helpers = { path = "../../common/proptest-helpers", optional = true }
-diem-temppath = { path = "../../common/temppath", optional = true }
+diem-temppath = { path = "../../crates/diem-temppath", optional = true }
 diem-types = { path = "../../types" }
 diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 move-core-types = {path = "../../language/move-core/types"}
@@ -47,7 +47,7 @@ rand = "0.8.3"
 
 diem-jellyfish-merkle = { path = "../jellyfish-merkle", features = ["fuzzing"] }
 diem-proptest-helpers = { path = "../../common/proptest-helpers" }
-diem-temppath = { path = "../../common/temppath" }
+diem-temppath = { path = "../../crates/diem-temppath" }
 diem-types = { path = "../../types", features = ["fuzzing"] }
 schemadb = { path = "../schemadb", features = ["fuzzing"] }
 

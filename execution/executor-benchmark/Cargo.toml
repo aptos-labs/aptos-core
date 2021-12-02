@@ -39,7 +39,7 @@ storage-interface = { path = "../../storage/storage-interface" }
 diem-transaction-builder = { path = "../../sdk/transaction-builder" }
 
 [dev-dependencies]
-diem-temppath = { path = "../../common/temppath" }
+diem-temppath = { path = "../../crates/diem-temppath" }
 
 [features]
 default = []

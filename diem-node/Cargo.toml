@@ -41,7 +41,7 @@ diem-logger = { path = "../common/logger" }
 diem-mempool = { path = "../mempool" }
 diem-metrics = { path = "../common/metrics" }
 diem-secure-storage = { path = "../secure/storage" }
-diem-temppath = { path = "../common/temppath" }
+diem-temppath = { path = "../crates/diem-temppath" }
 diem-time-service = { path = "../crates/diem-time-service" }
 diem-types = { path = "../types" }
 diem-vm = { path = "../diem-move/diem-vm" }

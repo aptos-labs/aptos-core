@@ -24,7 +24,7 @@ diem-framework = { path = "../../diem-move/diem-framework" }
 diem-framework-releases = { path = "../../diem-move/diem-framework/DPN/releases" }
 diem-sdk = { path = "../../sdk" }
 diem-rest-client = { path = "../../crates/diem-rest-client" }
-diem-temppath = { path = "../../common/temppath" }
+diem-temppath = { path = "../../crates/diem-temppath" }
 diem-transaction-replay = { path = "../../diem-move/transaction-replay" }
 move-command-line-common = { path = "../../language/move-command-line-common" }
 move-ir-compiler = { path = "../../language/move-ir-compiler" }

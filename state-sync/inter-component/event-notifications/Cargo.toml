@@ -30,7 +30,7 @@ bcs = "0.1.2"
 claim = "0.5.0"
 
 diem-crypto = { path = "../../../crates/diem-crypto" }
-diem-temppath = { path = "../../../common/temppath" }
+diem-temppath = { path = "../../../crates/diem-temppath" }
 diem-vm = { path = "../../../diem-move/diem-vm" }
 diemdb = { path = "../../../storage/diemdb" }
 executor-test-helpers = { path = "../../../execution/executor-test-helpers" }

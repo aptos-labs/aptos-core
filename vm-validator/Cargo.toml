@@ -26,7 +26,7 @@ rand = "0.8.3"
 executor = { path = "../execution/executor" }
 executor-test-helpers = { path = "../execution/executor-test-helpers" }
 diem-crypto = { path = "../crates/diem-crypto", features = ["fuzzing"] }
-diem-temppath = { path = "../common/temppath" }
+diem-temppath = { path = "../crates/diem-temppath" }
 diem-types = { path = "../types", features = ["fuzzing"] }
 diem-vm = { path = "../diem-move/diem-vm" }
 diemdb = { path = "../storage/diemdb", features = ["fuzzing"] }

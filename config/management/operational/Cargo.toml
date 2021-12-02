@@ -36,7 +36,7 @@ diem-network-address-encryption = {path = "../network-address-encryption"}
 diem-secure-storage = { path = "../../../secure/storage" }
 diem-types = { path = "../../../types" }
 diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }
-diem-temppath = { path = "../../../common/temppath" }
+diem-temppath = { path = "../../../crates/diem-temppath" }
 fallible = { path = "../../../crates/fallible" }
 netcore = { path = "../../../network/netcore" }
 network = { path = "../../../network" }

@@ -34,7 +34,7 @@ claim = "0.5.0"
 channel = { path = "../../../crates/channel" }
 diemdb = { path = "../../../storage/diemdb" }
 diem-crypto = { path = "../../../crates/diem-crypto" }
-diem-temppath = { path = "../../../common/temppath" }
+diem-temppath = { path = "../../../crates/diem-temppath" }
 diem-vm = { path = "../../../diem-move/diem-vm" }
 executor-test-helpers = { path = "../../../execution/executor-test-helpers" }
 vm-genesis = { path = "../../../diem-move/vm-genesis", features = ["fuzzing"] }

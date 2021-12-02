@@ -27,7 +27,7 @@ features = ["lz4"]
 [dev-dependencies]
 byteorder = "1.4.3"
 proptest = "1.0.0"
-diem-temppath = { path = "../../common/temppath" }
+diem-temppath = { path = "../../crates/diem-temppath" }
 
 [features]
 fuzzing = ["proptest"]

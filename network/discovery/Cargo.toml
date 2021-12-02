@@ -34,6 +34,6 @@ short-hex-str = { path = "../../common/short-hex-str" }
 
 [dev-dependencies]
 diem-config = { path = "../../config", features = ["testing"]}
-diem-temppath = { path = "../../common/temppath" }
+diem-temppath = { path = "../../crates/diem-temppath" }
 netcore = { path = "../netcore", features = ["fuzzing"] }
 rand = "0.8.3"
