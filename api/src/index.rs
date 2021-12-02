@@ -17,7 +17,7 @@ use warp::{
     body::BodyDeserializeError,
     cors::CorsForbidden,
     filters::BoxedFilter,
-    http::StatusCode,
+    http::{header, StatusCode},
     reject::{LengthRequired, MethodNotAllowed, PayloadTooLarge, UnsupportedMediaType},
     reply, Filter, Rejection, Reply,
 };
@@ -52,7 +52,8 @@ pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Inf
         .with(
             warp::cors()
                 .allow_any_origin()
-                .allow_methods(vec!["POST", "GET"]),
+                .allow_methods(vec!["POST", "GET"])
+                .allow_headers(vec![header::CONTENT_TYPE]),
         )
         .recover(handle_rejection)
         .with(log::logger())

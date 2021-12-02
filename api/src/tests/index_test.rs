@@ -81,8 +81,8 @@ async fn test_cors() {
     for path in paths {
         let req = warp::test::request()
             .header("origin", "test")
-            .header("access-control-headers", "any-header")
-            .header("access-control-request-method", "POST")
+            .header("Access-Control-Request-Headers", "Content-Type")
+            .header("Access-Control-Request-Method", "POST")
             .method("OPTIONS")
             .path(path);
         let resp = context.reply(req).await;
@@ -99,8 +99,8 @@ async fn test_cors_forbidden() {
     for path in paths {
         let req = warp::test::request()
             .header("origin", "test")
-            .header("access-control-headers", "any-header")
-            .header("access-control-request-method", "PUT")
+            .header("Access-Control-Request-Headers", "Content-Type")
+            .header("Access-Control-Request-Method", "PUT")
             .method("OPTIONS")
             .path(path);
         let resp = context.reply(req).await;
