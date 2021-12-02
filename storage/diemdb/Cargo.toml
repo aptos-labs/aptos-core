@@ -36,7 +36,7 @@ diem-types = { path = "../../types" }
 diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 move-core-types = {path = "../../language/move-core/types"}
 
-num-variants = { path = "../../common/num-variants" }
+num-variants = { path = "../../crates/num-variants" }
 schemadb = { path = "../schemadb" }
 storage-interface = { path = "../storage-interface" }
 

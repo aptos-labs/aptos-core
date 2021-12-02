@@ -49,7 +49,7 @@ diem-types = { path = "../types" }
 diem-workspace-hack = { path = "../crates/diem-workspace-hack" }
 memsocket = { path = "./memsocket", optional = true }
 netcore = { path = "./netcore" }
-num-variants = { path = "../common/num-variants" }
+num-variants = { path = "../crates/num-variants" }
 short-hex-str = { path = "../crates/short-hex-str" }
 
 [dev-dependencies]
