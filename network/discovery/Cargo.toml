@@ -21,7 +21,7 @@ bcs = "0.1.2"
 event-notifications = { path = "../../state-sync/inter-component/event-notifications" }
 diem-config = { path = "../../config"}
 diem-crypto = {path = "../../crates/diem-crypto"}
-diem-logger = {path = "../../common/logger"}
+diem-logger = {path = "../../crates/diem-logger"}
 diem-metrics = {path = "../../crates/diem-metrics"}
 diem-time-service = {path = "../../crates/diem-time-service"}
 diem-secure-storage = { path = "../../secure/storage" }

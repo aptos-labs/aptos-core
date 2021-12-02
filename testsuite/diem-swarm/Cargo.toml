@@ -19,7 +19,7 @@ thiserror = "1.0.24"
 diem-config = { path = "../../config", features = ["fuzzing"] }
 diem-framework-releases = { path = "../../diem-move/diem-framework/DPN/releases"}
 debug-interface = { path = "../../crates/debug-interface" }
-diem-logger = { path = "../../common/logger" }
+diem-logger = { path = "../../crates/diem-logger" }
 diem-genesis-tool = {path = "../../config/management/genesis", features = ["testing"] }
 diem-temppath = { path = "../../crates/diem-temppath" }
 diem-types = { path = "../../types" }

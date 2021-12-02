@@ -27,7 +27,7 @@ warp = { version = "0.3.0", features = ["default"] }
 diem-config = { path = "../config" }
 diem-crypto = { path = "../crates/diem-crypto" }
 diem-json-rpc = { path = "../json-rpc" }
-diem-logger = { path = "../common/logger" }
+diem-logger = { path = "../crates/diem-logger" }
 diem-mempool = { path = "../mempool"}
 diem-metrics = { path = "../crates/diem-metrics" }
 diem-types = { path = "../types" }

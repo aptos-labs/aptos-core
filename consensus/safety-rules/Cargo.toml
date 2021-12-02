@@ -18,7 +18,7 @@ diem-config = { path = "../../config" }
 diem-crypto = { path = "../../crates/diem-crypto" }
 diem-global-constants = { path = "../../config/global-constants"}
 diem-infallible = { path = "../../crates/diem-infallible" }
-diem-logger = { path = "../../common/logger" }
+diem-logger = { path = "../../crates/diem-logger" }
 diem-proptest-helpers = { path = "../../crates/diem-proptest-helpers", optional = true }
 diem-secure-net = { path = "../../secure/net" }
 diem-secure-push-metrics = { path = "../../secure/push-metrics" }

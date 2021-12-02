@@ -11,6 +11,6 @@ edition = "2018"
 
 [dependencies]
 ureq = { version = "1.5.4", features = ["json", "native-tls"], default-features = false }
-diem-logger = { path = "../../common/logger" }
+diem-logger = { path = "../../crates/diem-logger" }
 diem-metrics-core = { path = "../../crates/diem-metrics-core" }
 diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }

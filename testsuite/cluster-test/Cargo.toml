@@ -43,7 +43,7 @@ diem-config = { path = "../../config" }
 diem-framework-releases = { path = "../../diem-move/diem-framework/DPN/releases" }
 diem-genesis-tool = { path = "../../config/management/genesis", features = ["testing"] }
 diem-global-constants = { path = "../../config/global-constants" }
-diem-logger = { path = "../../common/logger" }
+diem-logger = { path = "../../crates/diem-logger" }
 diem-management = { path = "../../config/management", features = ["testing"] }
 diem-mempool = { path = "../../mempool" }
 diem-infallible = { path = "../../crates/diem-infallible" }

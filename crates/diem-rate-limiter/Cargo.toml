@@ -12,7 +12,7 @@ edition = "2018"
 [dependencies]
 diem-infallible = { path= "../../crates/diem-infallible" }
 diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
-diem-logger = { path = "../../common/logger" }
+diem-logger = { path = "../../crates/diem-logger" }
 diem-metrics = { path = "../../crates/diem-metrics" }
 futures = "0.3.12"
 pin-project = "1.0.5"

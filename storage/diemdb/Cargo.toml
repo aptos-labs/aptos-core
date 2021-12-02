@@ -27,7 +27,7 @@ bcs = "0.1.2"
 diem-config = { path = "../../config" }
 diem-crypto = { path = "../../crates/diem-crypto" }
 diem-jellyfish-merkle = { path = "../jellyfish-merkle" }
-diem-logger = { path = "../../common/logger" }
+diem-logger = { path = "../../crates/diem-logger" }
 diem-metrics = { path = "../../crates/diem-metrics" }
 diem-infallible = { path = "../../crates/diem-infallible" }
 diem-proptest-helpers = { path = "../../crates/diem-proptest-helpers", optional = true }

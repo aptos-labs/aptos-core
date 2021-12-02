@@ -21,7 +21,7 @@ bcs = "0.1.2"
 diem-config = { path = ".." }
 diem-crypto = { path = "../../crates/diem-crypto" }
 diem-client = { path = "../../crates/diem-client", features = ["blocking"], default-features = false }
-diem-logger = { path = "../../common/logger" }
+diem-logger = { path = "../../crates/diem-logger" }
 diem-temppath = { path = "../../crates/diem-temppath" }
 diem-types = { path = "../../types" }
 diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }

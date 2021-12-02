@@ -21,7 +21,7 @@ tokio = { version = "1.8.1", features = ["full"] }
 warp = "0.3.0"
 
 generate-key = { path = "../../config/generate-key" }
-diem-logger = { path = "../../common/logger" }
+diem-logger = { path = "../../crates/diem-logger" }
 diem-sdk = { path = "../../sdk" }
 
 diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }

@@ -12,7 +12,7 @@ edition = "2018"
 proc-macro = true
 
 [dependencies]
-diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }
+diem-workspace-hack = { path = "../diem-workspace-hack" }
 syn = { version = "1.0.64", features = ["extra-traits"] }
 quote = "1.0.9"
 proc-macro2 = "1.0.24"

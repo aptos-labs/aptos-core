@@ -18,6 +18,6 @@ diemdb = { path = "../diemdb" }
 diem-config = { path = "../../config" }
 diem-crypto = { path = "../../crates/diem-crypto" }
 diem-types = { path = "../../types" }
-diem-logger = { path = "../../common/logger" }
+diem-logger = { path = "../../crates/diem-logger" }
 diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 storage-interface = { path = "../storage-interface" }

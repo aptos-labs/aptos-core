@@ -23,7 +23,7 @@ bcs = "0.1.2"
 diem-config = { path = "../../config" }
 diem-crypto = { path = "../../crates/diem-crypto" }
 diem-infallible = { path = "../../crates/diem-infallible" }
-diem-logger = { path = "../../common/logger" }
+diem-logger = { path = "../../crates/diem-logger" }
 diem-network-address-encryption = {path = "../../config/management/network-address-encryption"}
 diem-secure-storage = { path = "../../secure/storage" }
 diem-time-service = { path = "../../crates/diem-time-service", features = ["async"] }

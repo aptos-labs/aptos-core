@@ -28,7 +28,7 @@ channel = { path = "../../crates/channel" }
 diem-config = { path = "../../config" }
 diem-crypto = { path = "../../crates/diem-crypto" }
 diem-infallible = { path = "../../crates/diem-infallible" }
-diem-logger = { path = "../../common/logger" }
+diem-logger = { path = "../../crates/diem-logger" }
 diem-mempool = { path = "../../mempool"}
 diem-metrics = { path = "../../crates/diem-metrics" }
 diem-proptest-helpers = { path = "../../crates/diem-proptest-helpers", optional = true }

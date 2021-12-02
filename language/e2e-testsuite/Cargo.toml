@@ -26,7 +26,7 @@ diem-transaction-builder = { path = "../../sdk/transaction-builder"}
 move-binary-format = { path = "../move-binary-format" }
 diem-vm = { path = "../../diem-move/diem-vm" }
 proptest = "1.0.0"
-diem-logger = { path = "../../common/logger" }
+diem-logger = { path = "../../crates/diem-logger" }
 diem-framework-releases = { path = "../../diem-move/diem-framework/DPN/releases" }
 diem-writeset-generator = { path = "../../diem-move/writeset-transaction-generator"}
 diem-state-view = { path = "../../storage/state-view" }

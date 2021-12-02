@@ -24,7 +24,7 @@ memsocket = { path = "../memsocket", optional = true }
 proxy = { path = "../../crates/proxy" }
 
 [dev-dependencies]
-diem-logger = { path = "../../common/logger" }
+diem-logger = { path = "../../crates/diem-logger" }
 memsocket = { path = "../memsocket" }
 
 [features]

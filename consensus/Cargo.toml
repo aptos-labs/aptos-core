@@ -40,7 +40,7 @@ fallible = { path = "../crates/fallible" }
 bcs = "0.1.2"
 diem-config = { path = "../config" }
 diem-crypto = { path = "../crates/diem-crypto" }
-diem-logger = { path = "../common/logger" }
+diem-logger = { path = "../crates/diem-logger" }
 diem-mempool = { path = "../mempool" }
 diem-metrics = { path = "../crates/diem-metrics" }
 diem-infallible = { path = "../crates/diem-infallible" }

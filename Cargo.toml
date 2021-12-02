@@ -4,8 +4,6 @@ resolver = "2"
 members = [
     "api",
     "api/types",
-    "common/logger",
-    "common/logger/derive",
     "config",
     "config/generate-key",
     "config/global-constants",
@@ -31,6 +29,8 @@ members = [
     "crates/diem-id-generator",
     "crates/diem-infallible",
     "crates/diem-json-rpc-client",
+    "crates/diem-log-derive",
+    "crates/diem-logger",
     "crates/diem-metrics",
     "crates/diem-metrics-core",
     "crates/diem-proptest-helpers",

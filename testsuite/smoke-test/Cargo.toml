@@ -50,7 +50,7 @@ diem-infallible = { path = "../../crates/diem-infallible" }
 diem-json-rpc = { path = "../../json-rpc" }
 diem-json-rpc-types = { path = "../../json-rpc/types" }
 diem-key-manager = { path = "../../secure/key-manager" }
-diem-logger = { path = "../../common/logger" }
+diem-logger = { path = "../../crates/diem-logger" }
 diem-management = { path = "../../config/management", features = ["testing"] }
 diem-operational-tool = {path = "../../config/management/operational", features = ["testing"] }
 diem-secure-storage = { path = "../../secure/storage", features = ["testing"] }
