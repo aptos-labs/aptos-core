@@ -8,6 +8,7 @@ import {
 import * as util from "https://deno.land/std@0.85.0/node/util.ts";
 import { defaultUserContext } from "../main/context.ts";
 import * as devapi from "../main/devapi.ts";
+import * as mv from "../main/move.ts";
 import * as helpers from "../main/helpers.ts";
 import * as codegen from "../main/generated/diemStdlib/mod.ts";
 
@@ -16,7 +17,7 @@ Deno.test("invokeScriptFunction", async () => {
   let txn = await helpers.invokeScriptFunction(
     scriptFunction,
     [],
-    ["invoked script function"],
+    [mv.Ascii("invoked script function")],
   );
   txn = await devapi.waitForTransactionCompletion(txn.hash);
   assert(txn.success);
@@ -28,7 +29,6 @@ Deno.test("invokeScriptFunction", async () => {
     "invoked script function",
   );
 });
-
 
 Deno.test("buildAndSubmitTransaction with generated code", async () => {
   const textEncoder = new util.TextEncoder();

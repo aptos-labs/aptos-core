@@ -4,15 +4,17 @@
 // deno-lint-ignore-file no-explicit-any
 // deno-lint-ignore-file ban-types
 import * as DiemTypes from "./generated/diemTypes/mod.ts";
-import { defaultUserContext, UserContext } from "./context.ts";
 import * as devapi from "./devapi.ts";
 import * as ed from "https://deno.land/x/ed25519@1.0.1/mod.ts";
+import * as mv from "./move.ts";
 import * as util from "https://deno.land/std@0.85.0/node/util.ts";
 import { BcsSerializer } from "./generated/bcs/mod.ts";
 import { bytes, ListTuple, uint8 } from "./generated/serde/types.ts";
 import { createHash } from "https://deno.land/std@0.77.0/hash/mod.ts";
+import { defaultUserContext, UserContext } from "./context.ts";
 
-const textEncoder = new util.TextEncoder();
+export { asciiToHex } from "./move.ts";
+
 const textDecoder = new util.TextDecoder();
 
 export async function buildAndSubmitTransaction(
@@ -63,7 +65,7 @@ export function buildScriptFunctionTransaction(
 export async function invokeScriptFunction(
   scriptFunction: string,
   typeArguments: string[],
-  args: any[],
+  args: mv.MoveType[],
 ): Promise<any> {
   return await invokeScriptFunctionForContext(
     defaultUserContext,
@@ -77,7 +79,7 @@ export async function invokeScriptFunctionForContext(
   userContext: UserContext,
   scriptFunction: string,
   typeArguments: string[],
-  args: any[],
+  args: mv.MoveType[],
 ): Promise<any> {
   return await invokeScriptFunctionForAddress(
     userContext.address,
@@ -95,7 +97,7 @@ export async function invokeScriptFunctionForAddress(
   privateKeyBytes: Uint8Array,
   scriptFunction: string,
   typeArguments: string[],
-  args: any[],
+  args: mv.MoveType[],
 ): Promise<any> {
   const request: any = {
     "sender": senderAddressStr,
@@ -108,7 +110,7 @@ export async function invokeScriptFunctionForAddress(
       "type": "script_function_payload",
       "function": scriptFunction,
       "type_arguments": typeArguments,
-      "arguments": normalizeScriptFunctionArgs(args),
+      "arguments": args.map((a) => a.encode()),
     },
   };
 
@@ -190,27 +192,6 @@ export function hexToAccountAddress(hex: string): DiemTypes.AccountAddress {
     senderListTuple.push([entry]);
   }
   return new DiemTypes.AccountAddress(senderListTuple);
-}
-
-export class StringLiteral {
-  constructor(readonly value: string) {
-  }
-}
-
-function normalizeScriptFunctionArgs(args: any[]) {
-  return args.map((a) => {
-    if (a instanceof StringLiteral) {
-      return a.value;
-    }
-    if (isString(a) && !a.startsWith("0x")) {
-      return bufferToHex(textEncoder.encode(a));
-    }
-    return a;
-  });
-}
-
-function isString(value: any) {
-  return typeof value === "string" || value instanceof String;
 }
 
 export function bufferToHex(buffer: any) {

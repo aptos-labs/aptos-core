@@ -10,7 +10,6 @@ import {
 import * as devapi from "../main/devapi.ts";
 import * as main from "../main/mod.ts";
 import * as context from "../main/context.ts";
-import * as helpers from "../main/helpers.ts";
 
 Deno.test("Test Assert", () => {
   assert("Hello");
@@ -54,7 +53,7 @@ Deno.test("Ability to set NFTs", async () => {
 
   // Transfer TestNFT from sender to receiver
   const creator = nfts[0].id.id.addr;
-  const creationNum = new helpers.StringLiteral(nfts[0].id.id.creation_num);
+  const creationNum = nfts[0].id.id.creation_num;
 
   let transferTxn = await main.transferNFTScriptFunction(
     secondUserContext.address,

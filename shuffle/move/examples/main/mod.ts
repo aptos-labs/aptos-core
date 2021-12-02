@@ -12,8 +12,8 @@ import {
   UserContext,
 } from "./context.ts";
 import * as devapi from "./devapi.ts";
+import * as mv from "./move.ts";
 import { green } from "https://deno.land/x/nanocolors@0.1.12/mod.ts";
-import { StringLiteral } from "./helpers.ts";
 
 await printWelcome();
 
@@ -50,9 +50,9 @@ export async function setMessageScriptFunction(
   return await invokeScriptFunction(
     "Message::set_message",
     [],
-    [message],
+    [mv.Ascii(message)],
     sender,
-    moduleAddress
+    moduleAddress,
   );
 }
 
@@ -66,9 +66,9 @@ export async function createTestNFTScriptFunction(
   return await invokeScriptFunction(
     "TestNFT::create_nft",
     [],
-    [contentUri],
+    [mv.Ascii(contentUri)],
     sender,
-    moduleAddress
+    moduleAddress,
   );
 }
 
@@ -77,7 +77,7 @@ export async function createTestNFTScriptFunction(
 export async function transferNFTScriptFunction(
   to: string,
   creator: string,
-  creationNum: StringLiteral,
+  creationNum: string,
   sender?: UserContext,
   moduleAddress?: string,
 ) {
@@ -86,9 +86,9 @@ export async function transferNFTScriptFunction(
   return await invokeScriptFunction(
     "NFTStandard::transfer",
     [`${moduleAddress}::TestNFT::TestNFT`],
-    [to, creator, creationNum],
+    [mv.Address(to), mv.Address(creator), mv.U64(creationNum)],
     sender,
-    moduleAddress
+    moduleAddress,
   );
 }
 
@@ -106,14 +106,14 @@ export async function initializeNFTScriptFunction(
     [`${moduleAddress}::TestNFT::TestNFT`],
     [],
     sender,
-    moduleAddress
+    moduleAddress,
   );
 }
 
 async function invokeScriptFunction(
   funcName: string,
   typeArgs: string[],
-  args: any[],
+  args: mv.MoveType[],
   sender?: UserContext,
   moduleAddress?: string,
 ) {
@@ -125,7 +125,7 @@ async function invokeScriptFunction(
     `${moduleAddress}::${funcName}`,
     typeArgs,
     args,
-  )
+  );
 }
 
 export async function decodedMessages(addr?: string) {
