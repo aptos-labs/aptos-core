@@ -41,7 +41,7 @@ diem-crypto-derive = { path = "../crates/diem-crypto-derive" }
 diem-id-generator = { path = "../crates/diem-id-generator" }
 diem-infallible = { path = "../crates/diem-infallible" }
 diem-logger = { path = "../common/logger" }
-diem-metrics = { path = "../common/metrics" }
+diem-metrics = { path = "../crates/diem-metrics" }
 diem-proptest-helpers = { path = "../common/proptest-helpers", optional = true }
 diem-rate-limiter = { path = "../common/rate-limiter"}
 diem-time-service = { path = "../crates/diem-time-service", features = ["async"] }

@@ -26,7 +26,7 @@ diem-data-client = { path = "../../diem-data-client" }
 diem-id-generator = { path = "../../../crates/diem-id-generator" }
 diem-infallible = { path = "../../../crates/diem-infallible" }
 diem-logger = { path = "../../../common/logger" }
-diem-metrics = { path = "../../../common/metrics" }
+diem-metrics = { path = "../../../crates/diem-metrics" }
 diem-types = { path = "../../../types" }
 diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }
 network = { path = "../../../network" }

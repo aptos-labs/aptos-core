@@ -39,7 +39,7 @@ diem-genesis-tool = {path = "../config/management/genesis", features = ["testing
 diem-json-rpc = { path = "../json-rpc" }
 diem-logger = { path = "../common/logger" }
 diem-mempool = { path = "../mempool" }
-diem-metrics = { path = "../common/metrics" }
+diem-metrics = { path = "../crates/diem-metrics" }
 diem-secure-storage = { path = "../secure/storage" }
 diem-temppath = { path = "../crates/diem-temppath" }
 diem-time-service = { path = "../crates/diem-time-service" }

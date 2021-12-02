@@ -33,7 +33,7 @@ diem-wallet = { path = "diem-wallet" }
 diem-client = { path = "../../crates/diem-client" }
 diem-infallible = { path = "../../crates/diem-infallible" }
 diem-logger =  { path = "../../common/logger" }
-diem-metrics = { path = "../../common/metrics" }
+diem-metrics = { path = "../../crates/diem-metrics" }
 diem-types = { path = "../../types" }
 diem-temppath = { path = "../../crates/diem-temppath/" }
 diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }

@@ -21,7 +21,7 @@ warp = "0.3.0"
 bcs = "0.1.2"
 diem-crypto = { path = "../../../crates/diem-crypto" }
 diem-logger = { path = "../../../common/logger" }
-diem-metrics = { path = "../../../common/metrics" }
+diem-metrics = { path = "../../../crates/diem-metrics" }
 diem-types = { path = "../../../types" }
 diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }
 diemdb = { path = "../../diemdb" }

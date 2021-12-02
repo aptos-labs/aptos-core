@@ -29,7 +29,7 @@ diem-crypto = { path = "../crates/diem-crypto" }
 diem-json-rpc = { path = "../json-rpc" }
 diem-logger = { path = "../common/logger" }
 diem-mempool = { path = "../mempool"}
-diem-metrics = { path = "../common/metrics" }
+diem-metrics = { path = "../crates/diem-metrics" }
 diem-types = { path = "../types" }
 diem-workspace-hack = { path = "../crates/diem-workspace-hack" }
 diem-api-types = { path = "./types", package = "diem-api-types" }

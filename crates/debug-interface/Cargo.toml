@@ -20,5 +20,5 @@ warp = "0.3.0"
 
 diem-config = { path = "../../config" }
 diem-logger = { path = "../../common/logger" }
-diem-metrics = { path = "../../common/metrics" }
+diem-metrics = { path = "../../crates/diem-metrics" }
 diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }

@@ -20,7 +20,7 @@ tracing = "0.1.16"
 bcs = "0.1.2"
 diem-crypto = { path = "../../crates/diem-crypto" }
 diem-logger = { path = "../../common/logger" }
-diem-metrics = { path = "../../common/metrics" }
+diem-metrics = { path = "../../crates/diem-metrics" }
 diem-state-view = { path = "../../storage/state-view" }
 diem-types = { path = "../../types" }
 diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }

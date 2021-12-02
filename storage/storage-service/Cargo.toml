@@ -19,7 +19,7 @@ diem-config = { path = "../../config" }
 diem-crypto = { path = "../../crates/diem-crypto" }
 diemdb = { path = "../diemdb" }
 diem-logger = { path = "../../common/logger" }
-diem-metrics = { path = "../../common/metrics" }
+diem-metrics = { path = "../../crates/diem-metrics" }
 diem-secure-net = { path = "../../secure/net" }
 storage-interface = { path = "../storage-interface" }
 diem-types = { path = "../../types" }

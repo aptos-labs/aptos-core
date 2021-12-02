@@ -39,7 +39,7 @@ diem-json-rpc-types = { path = "./types", package = "diem-json-rpc-types" }
 diem-infallible = { path = "../crates/diem-infallible" }
 diem-logger = { path = "../common/logger" }
 diem-mempool = { path = "../mempool" }
-diem-metrics = { path = "../common/metrics" }
+diem-metrics = { path = "../crates/diem-metrics" }
 diem-proptest-helpers = { path = "../common/proptest-helpers", optional = true }
 diem-types = { path = "../types" }
 diem-temppath = { path = "../crates/diem-temppath", optional = true }

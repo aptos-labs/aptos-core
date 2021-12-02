@@ -18,8 +18,8 @@ prometheus = { version = "0.12.0", default-features = false }
 serde_json = "1.0.64"
 tokio = { version = "1.8.1", features = ["full"] }
 
-diem-logger = { path = "../logger" }
-diem-metrics-core = { path = "../metrics-core" }
+diem-logger = { path = "../../common/logger" }
+diem-metrics-core = { path = "../diem-metrics-core" }
 diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 
 [dev-dependencies]
