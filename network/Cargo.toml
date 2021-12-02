@@ -39,7 +39,7 @@ diem-config = { path = "../config" }
 diem-crypto = { path = "../crates/diem-crypto" }
 diem-crypto-derive = { path = "../crates/diem-crypto-derive" }
 diem-id-generator = { path = "../common/id-generator" }
-diem-infallible = { path = "../common/infallible" }
+diem-infallible = { path = "../crates/diem-infallible" }
 diem-logger = { path = "../common/logger" }
 diem-metrics = { path = "../common/metrics" }
 diem-proptest-helpers = { path = "../common/proptest-helpers", optional = true }

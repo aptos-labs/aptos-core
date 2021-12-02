@@ -30,7 +30,7 @@ storage-interface = { path = "../../../storage/storage-interface" }
 [dev-dependencies]
 diem-crypto = { path = "../../../crates/diem-crypto" }
 diem-genesis-tool = {path = "../../../config/management/genesis", features = ["testing"] }
-diem-infallible = { path = "../../../common/infallible" }
+diem-infallible = { path = "../../../crates/diem-infallible" }
 diem-temppath = { path = "../../../common/temppath" }
 diem-time-service = { path = "../../../common/time-service" }
 diem-vm = { path = "../../../diem-move/diem-vm" }

@@ -17,7 +17,7 @@ executor-types = { path = "../../execution/executor-types" }
 bcs = "0.1.2"
 diem-crypto = { path = "../../crates/diem-crypto" }
 diem-crypto-derive = { path = "../../crates/diem-crypto-derive" }
-diem-infallible = { path = "../../common/infallible" }
+diem-infallible = { path = "../../crates/diem-infallible" }
 diem-types = { path = "../../types" }
 diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 short-hex-str = { path = "../../common/short-hex-str" }

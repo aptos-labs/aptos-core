@@ -46,7 +46,7 @@ debug-interface = { path = "../../common/debug-interface" }
 generate-key = { path = "../../config/generate-key" }
 diem-genesis-tool = {path = "../../config/management/genesis", features = ["testing"] }
 diem-global-constants = { path = "../../config/global-constants" }
-diem-infallible = { path = "../../common/infallible" }
+diem-infallible = { path = "../../crates/diem-infallible" }
 diem-json-rpc = { path = "../../json-rpc" }
 diem-json-rpc-types = { path = "../../json-rpc/types" }
 diem-key-manager = { path = "../../secure/key-manager" }

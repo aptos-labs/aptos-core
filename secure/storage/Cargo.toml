@@ -21,7 +21,7 @@ thiserror = "1.0.24"
 bcs = "0.1.2"
 diem-crypto = { path = "../../crates/diem-crypto" }
 diem-github-client = { path = "github" }
-diem-infallible = { path = "../../common/infallible" }
+diem-infallible = { path = "../../crates/diem-infallible" }
 diem-logger = { path = "../../common/logger" }
 diem-temppath = { path = "../../common/temppath" }
 diem-time-service = { path = "../../common/time-service" }

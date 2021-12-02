@@ -27,7 +27,7 @@ consensus-notifications = { path = "../inter-component/consensus-notifications" 
 channel = { path = "../../crates/channel" }
 diem-config = { path = "../../config" }
 diem-crypto = { path = "../../crates/diem-crypto" }
-diem-infallible = { path = "../../common/infallible" }
+diem-infallible = { path = "../../crates/diem-infallible" }
 diem-logger = { path = "../../common/logger" }
 diem-mempool = { path = "../../mempool"}
 diem-metrics = { path = "../../common/metrics" }

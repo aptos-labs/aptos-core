@@ -36,7 +36,7 @@ diem-crypto = { path = "../crates/diem-crypto" }
 diemdb = { path = "../storage/diemdb", optional = true }
 diem-id-generator = { path = "../common/id-generator" }
 diem-json-rpc-types = { path = "./types", package = "diem-json-rpc-types" }
-diem-infallible = { path = "../common/infallible" }
+diem-infallible = { path = "../crates/diem-infallible" }
 diem-logger = { path = "../common/logger" }
 diem-mempool = { path = "../mempool" }
 diem-metrics = { path = "../common/metrics" }

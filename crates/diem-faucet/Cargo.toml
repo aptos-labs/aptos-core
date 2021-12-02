@@ -31,4 +31,4 @@ serde_json = "1.0.64"
 tempfile = "3.2.0"
 
 diem-config = { path = "../../config" }
-diem-infallible = { path = "../../common/infallible" }
+diem-infallible = { path = "../../crates/diem-infallible" }

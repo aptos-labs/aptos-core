@@ -10,7 +10,7 @@ publish = false
 edition = "2018"
 
 [dependencies]
-diem-infallible = { path= "../infallible" }
+diem-infallible = { path= "../../crates/diem-infallible" }
 diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 diem-logger = { path = "../logger" }
 diem-metrics = { path = "../metrics" }

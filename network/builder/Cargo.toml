@@ -22,7 +22,7 @@ channel = { path = "../../crates/channel" }
 bcs = "0.1.2"
 diem-config = { path = "../../config" }
 diem-crypto = { path = "../../crates/diem-crypto" }
-diem-infallible = { path = "../../common/infallible" }
+diem-infallible = { path = "../../crates/diem-infallible" }
 diem-logger = { path = "../../common/logger" }
 diem-network-address-encryption = {path = "../../config/management/network-address-encryption"}
 diem-secure-storage = { path = "../../secure/storage" }

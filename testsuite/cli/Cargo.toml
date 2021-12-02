@@ -31,7 +31,7 @@ diem-crypto = { path = "../../crates/diem-crypto" }
 bcs = "0.1.2"
 diem-wallet = { path = "diem-wallet" }
 diem-client = { path = "../../crates/diem-client" }
-diem-infallible = { path = "../../common/infallible" }
+diem-infallible = { path = "../../crates/diem-infallible" }
 diem-logger =  { path = "../../common/logger" }
 diem-metrics = { path = "../../common/metrics" }
 diem-types = { path = "../../types" }
