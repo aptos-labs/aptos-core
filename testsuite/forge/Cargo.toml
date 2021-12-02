@@ -41,7 +41,7 @@ diem-config = { path = "../../config" }
 diem-framework-releases = { path = "../../diem-move/diem-framework/DPN/releases" }
 diem-genesis-tool = { path = "../../config/management/genesis" }
 diem-logger = { path = "../../common/logger" }
-diem-retrier = { path = "../../common/retrier" }
+diem-retrier = { path = "../../crates/diem-retrier" }
 diem-sdk = { path = "../../sdk" }
 diem-secure-storage = { path = "../../secure/storage" }
 diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }

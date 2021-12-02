@@ -32,7 +32,7 @@ toml = { version = "0.5.8", default-features = false }
 
 debug-interface = { path = "../../crates/debug-interface"}
 diem-client = { path = "../../crates/diem-client"}
-diem-retrier = { path = "../../common/retrier" }
+diem-retrier = { path = "../../crates/diem-retrier" }
 num_cpus = "1.13.0"
 
 consensus-types = { path = "../../consensus/consensus-types" }
