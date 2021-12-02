@@ -36,7 +36,7 @@ event-notifications = { path = "../state-sync/inter-component/event-notification
 execution-correctness = { path = "../execution/execution-correctness" }
 executor = { path = "../execution/executor" }
 executor-types = { path = "../execution/executor-types" }
-fallible = { path = "../common/fallible" }
+fallible = { path = "../crates/fallible" }
 bcs = "0.1.2"
 diem-config = { path = "../config" }
 diem-crypto = { path = "../crates/diem-crypto" }
