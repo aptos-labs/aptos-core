@@ -4,7 +4,6 @@ resolver = "2"
 members = [
     "api",
     "api/types",
-    "common/id-generator",
     "common/logger",
     "common/logger/derive",
     "common/metrics",
@@ -38,6 +37,7 @@ members = [
     "crates/diem-crypto-derive",
     "crates/diem-documentation-tool",
     "crates/diem-faucet",
+    "crates/diem-id-generator",
     "crates/diem-infallible",
     "crates/diem-json-rpc-client",
     "crates/diem-rest-client",

@@ -18,7 +18,7 @@ thiserror = "1.0.24"
 tokio = { version = "1.8.1" }
 
 channel = { path = "../../../crates/channel" }
-diem-id-generator = { path = "../../../common/id-generator" }
+diem-id-generator = { path = "../../../crates/diem-id-generator" }
 diem-infallible = { path = "../../../crates/diem-infallible" }
 diem-types = { path = "../../../types" }
 diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }

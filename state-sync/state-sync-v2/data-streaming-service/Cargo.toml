@@ -23,7 +23,7 @@ channel = { path = "../../../crates/channel" }
 diem-config = { path = "../../../config" }
 diem-crypto = { path = "../../../crates/diem-crypto" }
 diem-data-client = { path = "../../diem-data-client" }
-diem-id-generator = { path = "../../../common/id-generator" }
+diem-id-generator = { path = "../../../crates/diem-id-generator" }
 diem-infallible = { path = "../../../crates/diem-infallible" }
 diem-logger = { path = "../../../common/logger" }
 diem-metrics = { path = "../../../common/metrics" }
