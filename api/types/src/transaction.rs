@@ -103,6 +103,17 @@ pub enum Transaction {
     BlockMetadataTransaction(BlockMetadataTransaction),
 }
 
+impl Transaction {
+    pub fn timestamp(&self) -> u64 {
+        match self {
+            Transaction::UserTransaction(txn) => txn.timestamp.0,
+            Transaction::BlockMetadataTransaction(txn) => txn.timestamp.0,
+            Transaction::PendingTransaction(_) => 0,
+            Transaction::GenesisTransaction(_) => 0,
+        }
+    }
+}
+
 impl From<(SignedTransaction, TransactionPayload)> for Transaction {
     fn from((txn, payload): (SignedTransaction, TransactionPayload)) -> Self {
         Transaction::PendingTransaction(PendingTransaction {
@@ -118,20 +129,23 @@ impl
         TransactionInfo,
         TransactionPayload,
         Vec<Event>,
+        u64,
     )> for Transaction
 {
     fn from(
-        (txn, info, payload, events): (
+        (txn, info, payload, events, timestamp): (
             &SignedTransaction,
             TransactionInfo,
             TransactionPayload,
             Vec<Event>,
+            u64,
         ),
     ) -> Self {
         Transaction::UserTransaction(Box::new(UserTransaction {
             info,
             request: (txn, payload).into(),
             events,
+            timestamp: timestamp.into(),
         }))
     }
 }
@@ -204,6 +218,7 @@ pub struct UserTransaction {
     #[serde(flatten)]
     pub request: UserTransactionRequest,
     pub events: Vec<Event>,
+    pub timestamp: U64,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

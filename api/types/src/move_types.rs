@@ -48,7 +48,7 @@ impl TryFrom<AnnotatedMoveStruct> for MoveResource {
 }
 
 #[derive(Clone, Debug, PartialEq, Copy)]
-pub struct U64(u64);
+pub struct U64(pub u64);
 
 impl U64 {
     pub fn inner(&self) -> &u64 {

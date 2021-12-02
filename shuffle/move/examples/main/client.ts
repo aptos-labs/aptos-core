@@ -172,6 +172,7 @@ export interface UserTransaction extends UserTransactionRequest {
   gas_used: string;
   success: boolean;
   vm_status: string;
+  timestamp: string;
 }
 
 export interface GenesisTransaction {

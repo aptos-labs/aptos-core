@@ -1088,6 +1088,7 @@ components:
         - required:
             - type
             - events
+            - timestamp
           properties:
             type:
               type: string
@@ -1096,6 +1097,8 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/Event'
+            timestamp:
+              $ref: '#/components/schemas/TimestampUsec'
         - $ref: '#/components/schemas/UserTransactionRequest'
         - $ref: '#/components/schemas/UserTransactionSignature'
         - $ref: '#/components/schemas/OnChainTransactionInfo'

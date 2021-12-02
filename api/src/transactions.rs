@@ -239,10 +239,22 @@ impl Transactions {
         self,
         data: Vec<TransactionOnChainData<TransactionInfo>>,
     ) -> Result<impl Reply, Error> {
+        if data.is_empty() {
+            let txns: Vec<Transaction> = vec![];
+            return Response::new(self.ledger_info, &txns);
+        }
+        let first_version = data[0].version;
+        let mut timestamp = self.context.get_block_timestamp(first_version)?;
         let converter = self.context.move_converter();
         let txns: Vec<Transaction> = data
             .into_iter()
-            .map(|t| converter.try_into_onchain_transaction(t))
+            .map(|t| {
+                let txn = converter.try_into_onchain_transaction(timestamp, t)?;
+                // update timestamp, when txn is metadata block transaction
+                // new timestamp is used for the following transactions
+                timestamp = txn.timestamp();
+                Ok(txn)
+            })
             .collect::<Result<_>>()?;
         Response::new(self.ledger_info, &txns)
     }
@@ -255,9 +267,15 @@ impl Transactions {
         .ok_or_else(|| self.transaction_not_found(id))?;
 
         let converter = self.context.move_converter();
-        let ret = converter.try_into_transaction(txn_data)?;
+        let txn = match txn_data {
+            TransactionData::OnChain(txn) => {
+                let timestamp = self.context.get_block_timestamp(txn.version)?;
+                converter.try_into_onchain_transaction(timestamp, txn)?
+            }
+            TransactionData::Pending(txn) => converter.try_into_pending_transaction(*txn)?,
+        };
 
-        Response::new(self.ledger_info, &ret)
+        Response::new(self.ledger_info, &txn)
     }
 
     pub fn signing_message(self, txn: UserTransactionRequest) -> Result<impl Reply, Error> {

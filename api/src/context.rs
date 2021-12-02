@@ -117,6 +117,10 @@ impl Context {
         Ok(account_state_blob)
     }
 
+    pub fn get_block_timestamp(&self, version: u64) -> Result<u64> {
+        self.db.get_block_timestamp(version)
+    }
+
     pub fn get_transactions(
         &self,
         start_version: u64,

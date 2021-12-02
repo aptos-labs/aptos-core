@@ -327,6 +327,7 @@ async fn test_get_transactions_output_user_transaction_with_script_function_payl
                 "public_key": format!("0x{}", hex::encode(public_key.unvalidated().to_bytes())),
                 "signature": format!("0x{}", hex::encode(sig.to_bytes())),
             },
+            "timestamp": metadata_txn.timestamp_usec().to_string(),
         }),
     )
 }

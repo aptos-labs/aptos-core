@@ -4,9 +4,8 @@
 use crate::{
     Bytecode, DirectWriteSet, Event, HexEncodedBytes, MoveFunction, MoveModuleBytecode,
     MoveResource, MoveScriptBytecode, MoveType, MoveValue, ScriptFunctionId, ScriptFunctionPayload,
-    ScriptPayload, ScriptWriteSet, Transaction, TransactionData, TransactionInfo,
-    TransactionOnChainData, TransactionPayload, UserTransactionRequest, WriteSet, WriteSetChange,
-    WriteSetPayload,
+    ScriptPayload, ScriptWriteSet, Transaction, TransactionInfo, TransactionOnChainData,
+    TransactionPayload, UserTransactionRequest, WriteSet, WriteSetChange, WriteSetPayload,
 };
 use diem_transaction_builder::error_explain;
 use diem_types::{
@@ -72,18 +71,9 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
         Ok((txn, payload).into())
     }
 
-    pub fn try_into_transaction<T: TransactionInfoTrait>(
-        &self,
-        data: TransactionData<T>,
-    ) -> Result<Transaction> {
-        match data {
-            TransactionData::OnChain(txn) => self.try_into_onchain_transaction(txn),
-            TransactionData::Pending(txn) => self.try_into_pending_transaction(*txn),
-        }
-    }
-
     pub fn try_into_onchain_transaction<T: TransactionInfoTrait>(
         &self,
+        timestamp: u64,
         data: TransactionOnChainData<T>,
     ) -> Result<Transaction> {
         use diem_types::transaction::Transaction::*;
@@ -92,7 +82,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
         Ok(match data.transaction {
             UserTransaction(txn) => {
                 let payload = self.try_into_transaction_payload(txn.payload().clone())?;
-                (&txn, info, payload, events).into()
+                (&txn, info, payload, events, timestamp).into()
             }
             GenesisTransaction(write_set) => {
                 let payload = self.try_into_write_set_payload(write_set)?;
