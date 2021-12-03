@@ -8,6 +8,7 @@ module NamedAddr::BasicCoin {
     const EINSUFFICIENT_BALANCE: u64 = 1;
     const EALREADY_HAS_BALANCE: u64 = 2;
     const EALREADY_INITIALIZED: u64 = 3;
+    const EEQUAL_ADDR: u64 = 4;
 
     struct Coin<phantom CoinType> has store {
         value: u64
@@ -54,10 +55,17 @@ module NamedAddr::BasicCoin {
         borrow_global<Balance<CoinType>>(owner).coin.value
     }
 
+    spec balance_of {
+        pragma aborts_if_is_strict;
+        aborts_if !exists<Balance<CoinType>>(owner);
+    }
+
     /// Transfers `amount` of tokens from `from` to `to`. This method requires a witness with `CoinType` so that the
     /// module that owns `CoinType` can decide the transferring policy.
     public fun transfer<CoinType: drop>(from: &signer, to: address, amount: u64, _witness: CoinType) acquires Balance {
-        let check = withdraw<CoinType>(Signer::address_of(from), amount);
+        let from_addr = Signer::address_of(from);
+        assert!(from_addr != to, EEQUAL_ADDR);
+        let check = withdraw<CoinType>(from_addr, amount);
         deposit<CoinType>(to, check);
     }
 
@@ -72,11 +80,11 @@ module NamedAddr::BasicCoin {
         aborts_if !exists<Balance<CoinType>>(addr_from);
         aborts_if !exists<Balance<CoinType>>(to);
         aborts_if balance_from < amount;
-        aborts_if addr_from != to && balance_to + amount > MAX_U64;
+        aborts_if balance_to + amount > MAX_U64;
+        aborts_if addr_from == to;
 
-        ensures addr_from != to ==> balance_from_post == balance_from - amount;
-        ensures addr_from != to ==> balance_to_post == balance_to + amount;
-        ensures addr_from == to ==> balance_from_post == balance_from;
+        ensures balance_from_post == balance_from - amount;
+        ensures balance_to_post == balance_to + amount;
     }
 
     fun withdraw<CoinType>(addr: address, amount: u64) : Coin<CoinType> acquires Balance {

@@ -12,7 +12,8 @@ There are eight steps in total:
 - [Step 4: Implementing my `BasicCoin` module](#Step4)
 - [Step 5: Adding and using unit tests with the `BasicCoin` module](#Step5)
 - [Step 6: Making my `BasicCoin` module generic](#Step6)
-- [Step 7: Writing formal specifications for my `BasicCoin` module](#Step7)
+- [Step 7: Use the Move prover](#Step7)
+- [Step 8: Writing formal specifications for the `BasicCoin` module](#Step8)
 
 Each step is designed to be self-contained in the corresponding `step_x` folder. For example, if you would
 like to skip the contents in step 1 through 4, feel free to jump to step 5 since all the code we have written
@@ -542,29 +543,64 @@ Read more about phantom type parameters <a href="https://diem.github.io/move/gen
 </details>
 
 ## Advanced steps
+## Step 7:  Use the Move prover<span id="Step7"><span>
 
-## Step 7: Writing formal specifications for my `BasicCoin` module<span id="Step7"><span>
+Smart contracts deployed on the blockchain may maniputate high-value assets. As a technique that uses strict mathematical methods to describe behavior and reason correctness of computer systems, formal verification has been used in blockchains to prevent bugs in smart contracts. [The Move prover](https://github.com/diem/diem/tree/main/language/move-prover) is an evolving formal verification tool for smart contracts written in the Move language. The user can specify functional properties of smart contracts using the [Move Specification Language (MSL)](https://github.com/diem/diem/blob/main/language/move-prover/doc/user/spec-lang.md) and then use the prover to automatically check them statically. To illustrate how the prover is used, we add the following code snippet to the BasicCoin.move:
 
-The blockchain requires high assurance. Smart contracts deployed on the blockchain may maniputate high-value assets, which are targets of highly-motivated and well-resourced adversaries. Hundreds of millions of dollars have been lost from bugs on other blockchains. As a technique that uses strict mathematical methods to describe behavior and reason correctness of computer systems, formal verification has been used in blockchains to prevent bugs in smart contracts. [The Move prover](https://github.com/diem/diem/tree/main/language/move-prover) is an evolving formal verification tool for smart contracts written in the Move language. It supports complete specification of functional properties of smart contracts. Properties can be verified automatically efficiently (only slightly slower than a linter). Moreover, it can be integrated in the CI system for re-verification after every change to the code base. In this step, we will define the formal specification of the `BasicCoin` module.
+```
+    spec balance_of {
+        pragma aborts_if_is_strict;
+    }
+```
 
-The property specification is written in the [Move Specification Language (MSL)](https://github.com/diem/diem/blob/main/language/move-prover/doc/user/spec-lang.md). Developers can provide pre and post conditions for functions, which include conditions over (mutable) parameters and global memory. Developers can also provide invariants over data structures, as well as the (state-dependent) content of the global memory. Universal and existential quantification both over bounded domains (like the indices of a vector) as well of unbounded domains (like all memory addresses, all integers, etc.) are supported. In this tutorial, we will learn how to define functional properties for methods.
+Informally speaking, the block `spec balance_of {...}` contains the property specification of the method `balance_of`. Let's first run the prover using the command `move package prove` inside the `sources` directory, which outputs the following error information:
 
-#### Method `withdraw`
+```
+error: abort not covered by any of the `aborts_if` clauses
+   ┌─ diem/language/documentation/hackathon-tutorial/step_7/BasicCoin/sources/BasicCoin.move:38:5
+   │
+35 │           borrow_global<Balance<CoinType>>(owner).coin.value
+   │           ------------- abort happened here with execution failure
+   ·
+38 │ ╭     spec balance_of {
+39 │ │         pragma aborts_if_is_strict;
+40 │ │     }
+   │ ╰─────^
+   │
+   =     at /diem/language/documentation/hackathon-tutorial/step_7/BasicCoin/sources/BasicCoin.move:34: balance_of
+   =         owner = 0x29
+   =     at /diem/language/documentation/hackathon-tutorial/step_7/BasicCoin/sources/BasicCoin.move:35: balance_of
+   =         ABORTED
+
+Error: exiting with verification errors
+```
+
+The prover basically tells us that we need to explicitly specify the condition under which the function `balance_of` will abort, which is caused by calling the function `borrow_global` when `owner` does not own the resource `Balance<CoinType>`. To remove this error information, we add an `aborts_if` condition as follows:
+
+```
+    spec balance_of {
+        pragma aborts_if_is_strict;
+        aborts_if !exists<Balance<CoinType>>(owner);
+    }
+```
+
+Apart from the abort condition, we also want to define the functional properties. In Step 8, we will give more detailed introduction to the prover by specifying properties for the methods defined the `BasicCoin` module.
+
+
+## Advanced steps
+
+### Step 8: Write formal specifications for the `BasicCoin` module<span id="Step8"><span>
+
+<details>
+
+<summary> Method withdraw </summary>
 
 The signature of the method `withdraw` is given below:
 ```
 fun withdraw<CoinType>(addr: address, amount: u64) : Coin<CoinType> acquires Balance
 ```
 
-The method withdraws tokens with value `amount` from the address `addr` and returns a created Coin of value `amount`. The specification is defined in the `spec withdraw` block:
-
-```
-   spec withdraw {
-        // The property of the method withdraw is defined here.
-    }
-```
-
-For a function, we usually want to define when it aborts, the expected effect on the global memory, and its return value. MSL provides `aborts_if` to define conditions under which the function aborts. The method `withdraw` aborts when 1) `addr` does not have the resource `Balance<CoinType>` or 2) the number of tokens in `addr` is smaller than `amount`. We can define conditions like this:
+The method withdraws tokens with value `amount` from the address `addr` and returns a created Coin of value `amount`.  The method `withdraw` aborts when 1) `addr` does not have the resource `Balance<CoinType>` or 2) the number of tokens in `addr` is smaller than `amount`. We can define conditions like this:
 
 ```
    spec withdraw {
@@ -589,9 +625,11 @@ The next step is to define functional properties, which are described in the two
         ensures result == Coin<CoinType> { value: amount };
     }
 ```
+</details>
 
+<details>
+<summary> Method deposit </summary>
 
-#### Method `deposit`
 
 
 The signature of the method `deposit` is given below:
@@ -617,8 +655,12 @@ The method deposits the `check` into `addr`. The specification is defined below:
 
 `balance` represents the number of tokens in `addr` before execution and `check_value` represents the number of tokens to be deposited. The method would abort if 1) `addr` does not have the resource `Balance<CoinType>` or 2) the sum of `balance` and `check_value` is greater than the maxium value of the type `u64`. The functional property checks that the balance is correctly updated after the execution.
 
+</details>
 
-#### Method `transfer`
+<details>
+
+<summary> Method transfer </summary>
+
 
 The signature of the method `transfer` is given below:
 
@@ -626,7 +668,7 @@ The signature of the method `transfer` is given below:
 public fun transfer<CoinType: drop>(from: &signer, to: address, amount: u64, _witness: CoinType) acquires Balance
 ```
 
-The method transfers the `amount` of coin from the account of `from` to the address `to`.
+The method transfers the `amount` of coin from the account of `from` to the address `to`. The specification is given below:
 
 ```
 spec transfer {
@@ -634,25 +676,36 @@ spec transfer {
 
         let balance_from = global<Balance<CoinType>>(addr_from).coin.value;
         let balance_to = global<Balance<CoinType>>(to).coin.value;
-
         let post balance_from_post = global<Balance<CoinType>>(addr_from).coin.value;
         let post balance_to_post = global<Balance<CoinType>>(to).coin.value;
 
-        ensures addr_from != to ==> balance_from_post == balance_from - amount;
-        ensures addr_from != to ==> balance_to_post == balance_to + amount;
-        ensures addr_from == to ==> balance_from_post == balance_from;
+        ensures balance_from_post == balance_from - amount;
+        ensures balance_to_post == balance_to + amount;
     }
 ```
 
-The function `Signer::address_of` is called to obtain the address of `from`. Then the balances of `addr_from` and `to` before and after the execution are obtained. In the three `ensures` clauses, `p ==> q` is used to represented the logical implication between p and q. If the source and the target addresses are the same, the balance remains the same. Otherwise, `amount` is deducted from `addr_from` and added to `to`. The aborts conditions are left as an exercise.
+`addr_from` is the address of `from`. Then the balances of `addr_from` and `to` before and after the execution are obtained.
+The `ensures` clauses specify that the `amount` number of tokens is deducted from `addr_from` and added to `to`. However, the prover will generate the error information as below:
+
+```
+   ┌─ diem/language/documentation/hackathon-tutorial/step_7/BasicCoin/sources/BasicCoin.move:62:9
+   │
+62 │         ensures balance_from_post == balance_from - amount;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   ...
+```
+
+The property is not held when `addr_from` is equal to `to`. As a result, we could add an assertion `assert!(from_addr != to)` in the method to make sure that `addr_from` is not equal to `to`.
+
+</details>
 
 
-### Exercises
+<details>
+
+<summary> Exercises </summary>
+
 - Implement the `aborts_if` conditions for the `transfer` method.
 - Implement the specification for the `mint` and `publish_balance` method.
 
-The solution to this exercise can be found in [`step_7_sol`](./step_7_sol).
-
-### Step 8: Formally verify the `BasicCoin` module using the Move Prover
-
-We can use the command `move package -p <path/to/BasicCoin> prove` to prove properties for the BasicCoin module. More prover options can be found [here](https://github.com/diem/diem/blob/main/language/move-prover/doc/user/prover-guide.md).
+The solution to this exercise can be found in [`step_8_sol`](./step_8_sol).
