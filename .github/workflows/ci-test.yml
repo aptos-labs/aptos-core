@@ -74,7 +74,7 @@ jobs:
         name: build extra images if it is needed by LBT
         if: ${{ github.event_name == 'push' && steps.need-land-blocking-test.outputs.need-lbt == 'true' }}
         run: |
-          res=true
+          res=false
           branches="${{ secrets.BRANCHES_TO_ENABLE_LBT_COMPAT_SUITE }}"
           if ! [[ -z "${branches}" ]] && [[ "${branches}" =~ .*"${{ steps.changes.outputs.changes-target-branch }}".* ]];  then
             echo "LBT compatibility suite is enabled. Will use land_blocking_compat suite."
@@ -87,7 +87,7 @@ jobs:
       - id: need-compat-tests
         name: determine if compat tests should run
         run: |
-          res=true
+          res=false
           branches="${{ secrets.BRANCHES_TO_DISABLE_COMPAT_TESTS }}"
           if ! [[ -z "${branches}" ]] && [[ "${branches}" =~ .*"${{ steps.changes.outputs.changes-target-branch }}".* ]];  then
             echo "compatibility suite is NOT enabled."
@@ -785,14 +785,6 @@ jobs:
         env:
           JSON_RPC_URL: "http://127.0.0.1:8080"
           FAUCET_URL: "http://127.0.0.1:8000"
-      - uses: actions/checkout@v2.4.0
-        with:
-          ref: diem-core-v1.4.1
-      - name: run sdk-compatibility tests from release
-        run: cd sdk/compatibility && cargo test -- --include-ignored
-        env:
-          JSON_RPC_URL: "http://127.0.0.1:8080"
-          FAUCET_URL: "http://127.0.0.1:8000"
       - uses: ./.github/actions/build-teardown
       - name: Early terminate workflow
         if: ${{ failure() }}
@@ -1155,7 +1147,7 @@ jobs:
           echo "FGI_OUTPUT_LOG=$FGI_OUTPUT_LOG" >> $GITHUB_ENV
           cmd=""
           if ${{ needs.need-base-images.result!='success' }}; then
-            cmd="./scripts/fgi/run --tag ${{ needs.build-images.outputs.head-tag }} --suite land_blocking"
+            cmd="./scripts/fgi/run --tag ${{ needs.build-images.outputs.head-tag }} --suite land_blocking --report forge_report.json"
           else
             cmd="./scripts/fgi/run --tag ${{ needs.build-images.outputs.head-tag }} --base-image-tag ${{ needs.need-base-images.outputs.prev-tag }} --suite land_blocking_compat --report forge_report.json"
           fi
