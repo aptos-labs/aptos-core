@@ -54,6 +54,8 @@ Diem is running, press ctrl-c to exit
 In order to deploy your modules, you must have an account on-chain. Run
 `shuffle account` to create accounts on the default localhost network.
 
+Note: `shuffle account` creates 2 accounts on-chain. The first account is the default account you will use in all your shuffle commands. All the modules you write will be published by this first account. The second account allows you to test transfer/p2p scenarios.
+
 Output:
 
 ```
