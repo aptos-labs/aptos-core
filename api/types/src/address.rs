@@ -29,7 +29,7 @@ impl FromStr for Address {
             ret = AccountAddress::from_hex(s)
         }
         Ok(Self(ret.map_err(|_| {
-            anyhow::format_err!("invalid account address: {}", s)
+            anyhow::format_err!("invalid account address {:?}", s)
         })?))
     }
 }
@@ -92,7 +92,7 @@ mod tests {
         let invalid_addresses = vec!["invalid", "00x1", "x1", "01", "1"];
         for address in invalid_addresses {
             assert_eq!(
-                format!("invalid account address: {}", address),
+                format!("invalid account address {:?}", address),
                 address.parse::<Address>().unwrap_err().to_string()
             );
         }

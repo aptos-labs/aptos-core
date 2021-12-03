@@ -283,6 +283,13 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                 let func = code
                     .find_script_function(function.name.as_ident_str())
                     .ok_or_else(|| format_err!("could not find script function by {}", function))?;
+                ensure!(
+                    func.generic_type_params.len() == type_arguments.len(),
+                    "expect {} type arguments for script function {}, but got {}",
+                    func.generic_type_params.len(),
+                    function,
+                    type_arguments.len()
+                );
                 let args = self
                     .try_into_move_values(func, arguments)?
                     .iter()
@@ -354,17 +361,29 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
             .collect::<Vec<_>>();
         ensure!(
             arg_types.len() == args.len(),
-            "invalid arguments: expected arguments {:?}, but got {:?}",
-            arg_types,
-            args
+            "expected {} arguments [{}], but got {} ({:?})",
+            arg_types.len(),
+            arg_types
+                .into_iter()
+                .map(|t| t.json_type_name())
+                .collect::<Vec<String>>()
+                .join(", "),
+            args.len(),
+            args,
         );
         arg_types
             .into_iter()
             .zip(args.into_iter())
             .enumerate()
             .map(|(i, (arg_type, arg))| {
-                self.try_into_move_value(&arg_type, arg)
-                    .map_err(|e| format_err!("parse #{} argument failed: {:?}", i + 1, e))
+                self.try_into_move_value(&arg_type, arg).map_err(|e| {
+                    format_err!(
+                        "parse arguments[{}] failed, expect {}, caused by error: {}",
+                        i,
+                        arg_type.json_type_name(),
+                        e,
+                    )
+                })
             })
             .collect::<Result<_>>()
     }

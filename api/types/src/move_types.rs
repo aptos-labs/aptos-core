@@ -62,6 +62,18 @@ impl From<u64> for U64 {
     }
 }
 
+impl FromStr for U64 {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let data = s
+            .parse::<u64>()
+            .map_err(|e| format_err!("parse u64 string {:?} failed, caused by error: {}", s, e))?;
+
+        Ok(U64(data))
+    }
+}
+
 impl From<U64> for warp::http::header::HeaderValue {
     fn from(d: U64) -> Self {
         d.0.into()
@@ -98,9 +110,7 @@ impl<'de> Deserialize<'de> for U64 {
         D: Deserializer<'de>,
     {
         let s = <String>::deserialize(deserializer)?;
-        let data = s.parse::<u64>().map_err(D::Error::custom)?;
-
-        Ok(U64(data))
+        s.parse().map_err(D::Error::custom)
     }
 }
 
@@ -162,11 +172,18 @@ impl FromStr for HexEncodedBytes {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> anyhow::Result<Self, anyhow::Error> {
-        if let Some(hex) = s.strip_prefix("0x") {
-            Ok(Self(hex::decode(&hex)?))
+        let hex_str = if let Some(hex) = s.strip_prefix("0x") {
+            hex
         } else {
-            Ok(Self(hex::decode(&s)?))
-        }
+            s
+        };
+        Ok(Self(hex::decode(hex_str).map_err(|e| {
+            format_err!(
+                "decode hex-encoded string({:?}) failed, caused by error: {}",
+                s,
+                e
+            )
+        })?))
     }
 }
 
@@ -413,6 +430,30 @@ pub enum MoveType {
     Reference { mutable: bool, to: Box<MoveType> },
 }
 
+impl MoveType {
+    // Returns corresponding JSON data type for the value of `MoveType`
+    pub fn json_type_name(&self) -> String {
+        match self {
+            MoveType::U8 => "integer".to_owned(),
+            MoveType::U64 => "string<u64>".to_owned(),
+            MoveType::U128 => "string<u128>".to_owned(),
+            MoveType::Signer | MoveType::Address => "string<address>".to_owned(),
+            MoveType::Bool => "boolean".to_owned(),
+            MoveType::Vector { items } => {
+                if matches!(**items, MoveType::U8) {
+                    "string<hex>".to_owned()
+                } else {
+                    format!("array<{}>", items.json_type_name())
+                }
+            }
+            MoveType::Struct(_) | MoveType::GenericTypeParam { index: _ } => {
+                "string<move_struct_tag_id>".to_owned()
+            }
+            MoveType::Reference { mutable: _, to } => to.json_type_name(),
+        }
+    }
+}
+
 impl fmt::Display for MoveType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -442,7 +483,9 @@ impl FromStr for MoveType {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(parse_type_tag(s)?.into())
+        Ok(parse_type_tag(s)
+            .map_err(|e| format_err!("parse Move type {:?} failed, caused by error: {}", s, e))?
+            .into())
     }
 }
 
@@ -459,7 +502,8 @@ impl<'de> Deserialize<'de> for MoveType {
     where
         D: Deserializer<'de>,
     {
-        let data = <String>::deserialize(deserializer)?;
+        let data = <String>::deserialize(deserializer)
+            .map_err(|e| D::Error::custom(format_err!("deserialize Move type failed, {}", e)))?;
         data.parse().map_err(D::Error::custom)
     }
 }
@@ -870,7 +914,7 @@ impl FromStr for ScriptFunctionId {
 
 #[inline]
 fn invalid_script_function_id(s: &str) -> anyhow::Error {
-    format_err!("invalid script function id: {}", s)
+    format_err!("invalid script function id {:?}", s)
 }
 
 impl Serialize for ScriptFunctionId {
@@ -1096,11 +1140,11 @@ mod tests {
     #[test]
     fn test_parse_invalid_move_script_function_id_string() {
         assert_eq!(
-            "invalid script function id: 0x1",
+            "invalid script function id \"0x1\"",
             "0x1".parse::<ScriptFunctionId>().err().unwrap().to_string()
         );
         assert_eq!(
-            "invalid script function id: 0x1:",
+            "invalid script function id \"0x1:\"",
             "0x1:"
                 .parse::<ScriptFunctionId>()
                 .err()
@@ -1108,7 +1152,7 @@ mod tests {
                 .to_string()
         );
         assert_eq!(
-            "invalid script function id: 0x1:::",
+            "invalid script function id \"0x1:::\"",
             "0x1:::"
                 .parse::<ScriptFunctionId>()
                 .err()
@@ -1116,7 +1160,7 @@ mod tests {
                 .to_string()
         );
         assert_eq!(
-            "invalid script function id: 0x1::???",
+            "invalid script function id \"0x1::???\"",
             "0x1::???"
                 .parse::<ScriptFunctionId>()
                 .err()
@@ -1124,7 +1168,7 @@ mod tests {
                 .to_string()
         );
         assert_eq!(
-            "invalid script function id: Diem::Diem",
+            "invalid script function id \"Diem::Diem\"",
             "Diem::Diem"
                 .parse::<ScriptFunctionId>()
                 .err()
@@ -1132,7 +1176,7 @@ mod tests {
                 .to_string()
         );
         assert_eq!(
-            "invalid script function id: Diem::Diem::??",
+            "invalid script function id \"Diem::Diem::??\"",
             "Diem::Diem::??"
                 .parse::<ScriptFunctionId>()
                 .err()
@@ -1140,7 +1184,7 @@ mod tests {
                 .to_string()
         );
         assert_eq!(
-            "invalid script function id: 0x1::Diem::Diem::Diem",
+            "invalid script function id \"0x1::Diem::Diem::Diem\"",
             "0x1::Diem::Diem::Diem"
                 .parse::<ScriptFunctionId>()
                 .err()
