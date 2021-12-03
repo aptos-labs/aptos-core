@@ -23,7 +23,7 @@ structopt = "0.3.21"
 tempfile = "3.2.0"
 tokio = { version = "1.8.1", features = ["full"] }
 toml = "0.5.8"
-url = { version = "2.2.2" }
+url = { version = "2.2.2", features = ["serde"] }
 
 abigen = { path = "../../language/move-prover/abigen" }
 diem-api-types = { path = "../../api/types" }
