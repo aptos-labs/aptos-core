@@ -1,4 +1,4 @@
-//# print-bytecode
+//# print-bytecode --input=module
 module 0x1.M {
     // "signer" is a keyword so it cannot be used as a parameter name
     foo(signer: address) {

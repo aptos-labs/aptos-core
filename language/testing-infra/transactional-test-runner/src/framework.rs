@@ -4,8 +4,8 @@
 #![forbid(unsafe_code)]
 
 use crate::tasks::{
-    taskify, InitCommand, PrintBytecodeInputChoice, PublishCommand, RawAddress, RunCommand,
-    SyntaxChoice, TaskCommand, TaskInput, ViewCommand, PrintBytecodeCommand,
+    taskify, InitCommand, PrintBytecodeCommand, PrintBytecodeInputChoice, PublishCommand,
+    RawAddress, RunCommand, SyntaxChoice, TaskCommand, TaskInput, ViewCommand,
 };
 use anyhow::{anyhow, Result};
 use move_binary_format::{
@@ -158,8 +158,12 @@ pub trait MoveTestAdapter<'a> {
                 };
                 let data_path = data.path().to_str().unwrap();
                 let compiled = match input {
-                    PrintBytecodeInputChoice::Script => Either::Left(compile_ir_script(state.dep_modules(), data_path)?),
-                    PrintBytecodeInputChoice::Module => Either::Right(compile_ir_module(state.dep_modules(), data_path)?),
+                    PrintBytecodeInputChoice::Script => {
+                        Either::Left(compile_ir_script(state.dep_modules(), data_path)?)
+                    }
+                    PrintBytecodeInputChoice::Module => {
+                        Either::Right(compile_ir_module(state.dep_modules(), data_path)?)
+                    }
                 };
                 let source_mapping = SourceMapping::new_from_view(
                     match &compiled {

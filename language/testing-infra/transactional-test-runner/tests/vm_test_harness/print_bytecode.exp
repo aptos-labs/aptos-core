@@ -5,7 +5,10 @@ task 0 'print-bytecode'. lines 1-5:
 script {
 
 
-
+main<Ty0, Ty1>() {
+B0:
+	0: Ret
+}
 }
 
 task 1 'print-bytecode'. lines 7-13:
@@ -13,7 +16,7 @@ task 1 'print-bytecode'. lines 7-13:
 module 42.M {
 
 
-f() {
+f<Ty0, Ty1>() {
 B0:
 	0: Ret
 }

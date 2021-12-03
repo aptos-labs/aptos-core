@@ -7,10 +7,10 @@ use move_binary_format::{
     binary_views::BinaryIndexedView,
     control_flow_graph::{ControlFlowGraph, VMControlFlowGraph},
     file_format::{
-        Ability, AbilitySet, Bytecode, FieldHandleIndex, FunctionDefinition,
-        FunctionDefinitionIndex, Signature, SignatureIndex, SignatureToken, StructDefinition,
-        StructDefinitionIndex, StructFieldInformation, StructTypeParameter, TableIndex,
-        TypeSignature, Visibility,
+        Ability, AbilitySet, Bytecode, CodeUnit, FieldHandleIndex, FunctionDefinition,
+        FunctionDefinitionIndex, FunctionHandle, Signature, SignatureIndex, SignatureToken,
+        StructDefinition, StructDefinitionIndex, StructFieldInformation, StructTypeParameter,
+        TableIndex, TypeSignature, Visibility,
     },
 };
 use move_bytecode_source_map::{
@@ -789,36 +789,18 @@ impl<'a> Disassembler<'a> {
 
     fn disassemble_bytecode(
         &self,
-        function_definition_index: FunctionDefinitionIndex,
+        function_source_map: &FunctionSourceMap,
+        function_name: &IdentStr,
+        parameters: SignatureIndex,
+        code: &CodeUnit,
     ) -> Result<Vec<String>> {
         if !self.options.print_code {
             return Ok(vec!["".to_string()]);
         }
 
-        let function_def = self.get_function_def(function_definition_index)?;
-        let function_handle = self
-            .source_mapper
-            .bytecode
-            .function_handle_at(function_def.function);
-        let code = match &function_def.code {
-            Some(code) => code,
-            None => return Ok(vec!["".to_string()]),
-        };
-
-        let parameters = self
-            .source_mapper
-            .bytecode
-            .signature_at(function_handle.parameters);
+        let parameters = self.source_mapper.bytecode.signature_at(parameters);
         let locals_sigs = self.source_mapper.bytecode.signature_at(code.locals);
-        let function_source_map = self
-            .source_mapper
-            .source_map
-            .get_function_source_map(function_definition_index)?;
 
-        let function_name = self
-            .source_mapper
-            .bytecode
-            .identifier_at(function_handle.name);
         let function_code_coverage_map = self.get_function_coverage(function_name);
 
         let decl_location = &function_source_map.definition_location;
@@ -935,67 +917,50 @@ impl<'a> Disassembler<'a> {
         Ok(locals_names_tys)
     }
 
+    /// Translates a compiled "function definition" into a disassembled bytecode string.
+    ///
+    /// Because a "function definition" can refer to either a function defined in a module or to a
+    /// script's "main" function (which is not represented by a function definition in the binary
+    /// format), this method takes a function definition and handle as optional arguments. These are
+    /// `None` when disassembling a script's "main" function.
     pub fn disassemble_function_def(
         &self,
-        function_definition_index: FunctionDefinitionIndex,
+        function_source_map: &FunctionSourceMap,
+        function: Option<(&FunctionDefinition, &FunctionHandle)>,
+        name: &IdentStr,
+        type_parameters: &[AbilitySet],
+        parameters: SignatureIndex,
+        code: Option<&CodeUnit>,
     ) -> Result<String> {
-        let function_definition = self.get_function_def(function_definition_index)?;
-        let function_handle = self
-            .source_mapper
-            .bytecode
-            .function_handle_at(function_definition.function);
-
-        let function_source_map = self
-            .source_mapper
-            .source_map
-            .get_function_source_map(function_definition_index)?;
-
-        if match function_definition.visibility {
-            Visibility::Script | Visibility::Friend | Visibility::Public => false,
-            Visibility::Private => self.options.only_externally_visible,
-        } {
-            return Ok("".to_string());
-        }
-
-        let visibility_modifier = match function_definition.visibility {
-            Visibility::Private => "",
-            Visibility::Script => "public(script) ",
-            Visibility::Friend => "public(friend) ",
-            Visibility::Public => "public ",
+        let visibility_modifier = match function {
+            Some(function) => match function.0.visibility {
+                Visibility::Private => {
+                    if self.options.only_externally_visible {
+                        return Ok("".to_string());
+                    } else {
+                        ""
+                    }
+                }
+                Visibility::Script => "public(script) ",
+                Visibility::Friend => "public(friend) ",
+                Visibility::Public => "public ",
+            },
+            None => "",
         };
-        let native_modifier = if function_definition.is_native() {
-            "native "
-        } else {
-            ""
+
+        let native_modifier = match function {
+            Some(function) if function.0.is_native() => "native ",
+            _ => "",
         };
 
         let ty_params = Self::disassemble_fun_type_formals(
             &function_source_map.type_parameters,
-            &function_handle.type_parameters,
+            type_parameters,
         );
-        let name = self
+        let params = &self
             .source_mapper
             .bytecode
-            .identifier_at(function_handle.name);
-        let return_ = self
-            .source_mapper
-            .bytecode
-            .signature_at(function_handle.return_);
-        let ret_type: Vec<String> = return_
-            .0
-            .iter()
-            .cloned()
-            .map(|sig_token| {
-                let sig_tok_str =
-                    self.disassemble_sig_tok(sig_token, &function_source_map.type_parameters)?;
-                Ok(sig_tok_str)
-            })
-            .collect::<Result<Vec<String>>>()?;
-        let parameters_sig = &self
-            .source_mapper
-            .bytecode
-            .signature_at(function_handle.parameters);
-        let parameters = parameters_sig
+            .signature_at(parameters)
             .0
             .iter()
             .zip(function_source_map.locals.iter())
@@ -1008,11 +973,29 @@ impl<'a> Disassembler<'a> {
             })
             .collect::<Result<Vec<_>>>()?;
 
-        let body = match &function_definition.code {
+        let ret_type = match function {
+            Some(function) => self
+                .source_mapper
+                .bytecode
+                .signature_at(function.1.return_)
+                .0
+                .iter()
+                .cloned()
+                .map(|sig_token| {
+                    let sig_tok_str =
+                        self.disassemble_sig_tok(sig_token, &function_source_map.type_parameters)?;
+                    Ok(sig_tok_str)
+                })
+                .collect::<Result<Vec<String>>>()?,
+            None => vec![],
+        };
+
+        let body = match code {
             Some(code) => {
                 let locals =
-                    self.disassemble_locals(function_source_map, code.locals, parameters.len())?;
-                let bytecode = self.disassemble_bytecode(function_definition_index)?;
+                    self.disassemble_locals(function_source_map, code.locals, params.len())?;
+                let bytecode =
+                    self.disassemble_bytecode(function_source_map, name, parameters, code)?;
                 Self::format_function_body(locals, bytecode)
             }
             None => "".to_string(),
@@ -1025,7 +1008,7 @@ impl<'a> Disassembler<'a> {
                 visibility_modifier = visibility_modifier,
                 name = name,
                 ty_params = ty_params,
-                params = &parameters.join(", "),
+                params = &params.join(", "),
                 ret_type = Self::format_ret_type(&ret_type),
                 body = body,
             ),
@@ -1134,13 +1117,42 @@ impl<'a> Disassembler<'a> {
             .map(|i| self.disassemble_struct_def(StructDefinitionIndex(i as TableIndex)))
             .collect::<Result<Vec<String>>>()?;
 
-        let function_defs: Vec<String> = (0..self
-            .source_mapper
-            .bytecode
-            .function_defs()
-            .map_or(0, |f| f.len()))
-            .map(|i| self.disassemble_function_def(FunctionDefinitionIndex(i as TableIndex)))
-            .collect::<Result<Vec<String>>>()?;
+        let function_defs: Vec<String> = match self.source_mapper.bytecode {
+            BinaryIndexedView::Script(script) => {
+                vec![self.disassemble_function_def(
+                    self.source_mapper
+                        .source_map
+                        .get_function_source_map(FunctionDefinitionIndex(0_u16))?,
+                    None,
+                    IdentStr::new("main")?,
+                    &script.type_parameters,
+                    script.parameters,
+                    Some(&script.code),
+                )?]
+            }
+            BinaryIndexedView::Module(module) => (0..module.function_defs.len())
+                .map(|i| {
+                    let function_definition_index = FunctionDefinitionIndex(i as TableIndex);
+                    let function_definition = self.get_function_def(function_definition_index)?;
+                    let function_handle = self
+                        .source_mapper
+                        .bytecode
+                        .function_handle_at(function_definition.function);
+                    self.disassemble_function_def(
+                        self.source_mapper
+                            .source_map
+                            .get_function_source_map(function_definition_index)?,
+                        Some((function_definition, function_handle)),
+                        self.source_mapper
+                            .bytecode
+                            .identifier_at(function_handle.name),
+                        &function_handle.type_parameters,
+                        function_handle.parameters,
+                        function_definition.code.as_ref(),
+                    )
+                })
+                .collect::<Result<Vec<String>>>()?,
+        };
 
         Ok(format!(
             "// Move bytecode v{version}\n{header} {{\n{struct_defs}\n\n{function_defs}\n}}",

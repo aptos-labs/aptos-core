@@ -9,7 +9,7 @@ module 0x1.Test {
 }
 
 
-//# print-bytecode
+//# print-bytecode --input=module
 module 0x1.M {
     import 0x1.Test;
 
