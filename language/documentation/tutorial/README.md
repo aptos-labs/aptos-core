@@ -41,9 +41,9 @@ Follow the prompt to install all the necessary dependencies.
 ```bash
 $ . ~/.profile
 ````
-- Install Move CLI by running this command in diem repo:
+- Install Move's CLIs by running this command in diem repo:
 ```bash
-$ cargo build -p df-cli
+$ cargo build -p df-cli -p move-analyzer
 ```
 
 Once this is done, you can alias the `move` command to point the `df-cli`
@@ -74,10 +74,11 @@ USAGE:
 If you want to find what commands are available and what they do, running
 a command or subcommand with the `-h` flag will print documentation.
 
-There is official Move support for VSCode, you can install this extension
-by opening VSCode and searching for the "move-analyzer" package and
-installing it. More detailed instructions can be found
-[here](https://github.com/diem/diem/tree/main/language/move-analyzer/editors/code).
+There is official Move support for Visual Studio Code. You can install this
+extension by opening VS Code, searching for the "move-analyzer" package and
+installing it. After installing, open your VS Code settings, search for
+`move-analyzer.server.path`, and set it to `<path_to_diem_repo>/target/debug/move-analyzer`.
+More detailed instructions can be found [here](https://github.com/diem/diem/tree/main/language/move-analyzer/editors/code).
 
 Before running the next steps, `cd` to the tutorial directory:
 ```bash

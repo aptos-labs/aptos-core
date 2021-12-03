@@ -19,7 +19,12 @@ export class Context {
         configuration: Readonly<Configuration>,
     ): Context | Error {
         if (!fs.existsSync(configuration.serverPath)) {
-            return new Error(`command '${configuration.serverPath}' could not be found.`);
+            return new Error(
+                `language server executable '${configuration.serverPath}' could not be found, so ` +
+                'most extension features will be unavailable to you. Follow the instructions in ' +
+                'the move-analyzer Visual Studio Code extension README to install the language ' +
+                'server.',
+            );
         }
         return new Context(extensionContext, configuration);
     }

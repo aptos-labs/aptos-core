@@ -24,7 +24,14 @@ export class Configuration {
 
     /** The path to the move-analyzer executable. */
     get serverPath(): string {
-        const path = this.configuration.get<string>('server.path', 'move-analyzer');
+        const defaultName = 'move-analyzer';
+        const path = this.configuration.get<string>('server.path', defaultName);
+        if (path.length === 0) {
+            // The default value of the `server.path` setting is 'move-analyzer'.
+            // A user may have over-written this default with an empty string value, ''.
+            // An empty string cannot be an executable name, so instead use the default.
+            return defaultName;
+        }
         if (path.startsWith('~/')) {
             return os.homedir() + path.slice('~'.length);
         }
