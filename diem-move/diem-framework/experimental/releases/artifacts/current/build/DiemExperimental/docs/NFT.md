@@ -9,6 +9,7 @@
 -  [Struct `TokenDataWrapper`](#0x1_NFT_TokenDataWrapper)
 -  [Resource `Token`](#0x1_NFT_Token)
 -  [Struct `MintEvent`](#0x1_NFT_MintEvent)
+-  [Struct `TransferEvent`](#0x1_NFT_TransferEvent)
 -  [Resource `Admin`](#0x1_NFT_Admin)
 -  [Resource `TokenDataCollection`](#0x1_NFT_TokenDataCollection)
 -  [Resource `CreationDelegation`](#0x1_NFT_CreationDelegation)
@@ -29,6 +30,7 @@
 -  [Function `create_impl`](#0x1_NFT_create_impl)
 -  [Function `publish_token_data_collection`](#0x1_NFT_publish_token_data_collection)
 -  [Function `allow_creation_delegation`](#0x1_NFT_allow_creation_delegation)
+-  [Function `emit_transfer_event`](#0x1_NFT_emit_transfer_event)
 
 
 <pre><code><b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors">0x1::Errors</a>;
@@ -226,6 +228,51 @@ under the creator's address.
 
 </details>
 
+<a name="0x1_NFT_TransferEvent"></a>
+
+## Struct `TransferEvent`
+
+
+
+<pre><code><b>struct</b> <a href="NFT.md#0x1_NFT_TransferEvent">TransferEvent</a> <b>has</b> <b>copy</b>, drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>id: <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID_ID">GUID::ID</a></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>from: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code><b>to</b>: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>amount: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a name="0x1_NFT_Admin"></a>
 
 ## Resource `Admin`
@@ -244,6 +291,12 @@ under the creator's address.
 <dl>
 <dt>
 <code>mint_events: <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event_EventHandle">Event::EventHandle</a>&lt;<a href="NFT.md#0x1_NFT_MintEvent">NFT::MintEvent</a>&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>transfer_events: <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event_EventHandle">Event::EventHandle</a>&lt;<a href="NFT.md#0x1_NFT_TransferEvent">NFT::TransferEvent</a>&gt;</code>
 </dt>
 <dd>
 
@@ -729,6 +782,7 @@ Initialize this module
     <b>assert</b>!(<a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(&account) == <a href="NFT.md#0x1_NFT_ADMIN">ADMIN</a>, <a href="NFT.md#0x1_NFT_ENOT_ADMIN">ENOT_ADMIN</a>);
     <b>move_to</b>(&account, <a href="NFT.md#0x1_NFT_Admin">Admin</a> {
         mint_events: <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event_new_event_handle">Event::new_event_handle</a>&lt;<a href="NFT.md#0x1_NFT_MintEvent">MintEvent</a>&gt;(&account),
+        transfer_events: <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event_new_event_handle">Event::new_event_handle</a>&lt;<a href="NFT.md#0x1_NFT_TransferEvent">TransferEvent</a>&gt;(&account),
     })
 }
 </code></pre>
@@ -920,6 +974,43 @@ This is useful in case a user is using a 3rd party app, which can create NFTs on
             <b>move_to</b>(account, <a href="NFT.md#0x1_NFT_TokenDataCollection">TokenDataCollection</a> { tokens: <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_empty">Vector::empty</a>&lt;<a href="NFT.md#0x1_NFT_TokenData">TokenData</a>&lt;TokenType&gt;&gt;() });
         };
     };
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_NFT_emit_transfer_event"></a>
+
+## Function `emit_transfer_event`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="NFT.md#0x1_NFT_emit_transfer_event">emit_transfer_event</a>(guid: &<a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID_ID">GUID::ID</a>, account: &signer, <b>to</b>: <b>address</b>, amount: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="NFT.md#0x1_NFT_emit_transfer_event">emit_transfer_event</a>(
+    guid: &<a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID_ID">GUID::ID</a>,
+    account: &signer,
+    <b>to</b>: <b>address</b>,
+    amount: u64,
+) <b>acquires</b> <a href="NFT.md#0x1_NFT_Admin">Admin</a> {
+    <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event_emit_event">Event::emit_event</a>(
+        &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="NFT.md#0x1_NFT_Admin">Admin</a>&gt;(<a href="NFT.md#0x1_NFT_ADMIN">ADMIN</a>).transfer_events,
+        <a href="NFT.md#0x1_NFT_TransferEvent">TransferEvent</a> {
+            id: *guid,
+            from: <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account),
+            <b>to</b>: <b>to</b>,
+            amount: amount,
+        }
+    );
 }
 </code></pre>
 

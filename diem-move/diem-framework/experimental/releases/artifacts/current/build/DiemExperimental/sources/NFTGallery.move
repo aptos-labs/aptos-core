@@ -109,8 +109,15 @@ module 0x1::NFTGallery {
 
             // Add tokens to `to`'s gallery
             add_to_gallery<TokenType>(to, to_token);
-        }
-        // TODO: add event emission
+        };
+
+        // Emit transfer event
+        NFT::emit_transfer_event(
+            &id,
+            &account,
+            to,
+            amount,
+        );
     }
 
     public fun publish_gallery<TokenType: store>(account: &signer) {

@@ -326,8 +326,15 @@ approved operator of the owner.
 
         // Add tokens <b>to</b> `<b>to</b>`'s gallery
         <a href="NFTGallery.md#0x1_NFTGallery_add_to_gallery">add_to_gallery</a>&lt;TokenType&gt;(<b>to</b>, to_token);
-    }
-    // TODO: add event emission
+    };
+
+    // Emit transfer event
+    <a href="NFT.md#0x1_NFT_emit_transfer_event">NFT::emit_transfer_event</a>(
+        &id,
+        &account,
+        <b>to</b>,
+        amount,
+    );
 }
 </code></pre>
 

@@ -48,8 +48,16 @@ address 0x1 {
             amount: u64,
         }
 
+        struct TransferEvent has copy, drop, store {
+            id: GUID::ID,
+            from: address,
+            to: address,
+            amount: u64,
+        }
+
         struct Admin has key {
             mint_events: Event::EventHandle<MintEvent>,
+            transfer_events: Event::EventHandle<TransferEvent>,
         }
 
         struct TokenDataCollection<TokenType: store> has key {
@@ -168,6 +176,7 @@ address 0x1 {
             assert!(Signer::address_of(&account) == ADMIN, ENOT_ADMIN);
             move_to(&account, Admin {
                 mint_events: Event::new_event_handle<MintEvent>(&account),
+                transfer_events: Event::new_event_handle<TransferEvent>(&account),
             })
         }
 
@@ -259,6 +268,23 @@ address 0x1 {
                     move_to(account, TokenDataCollection { tokens: Vector::empty<TokenData<TokenType>>() });
                 };
             };
+        }
+
+        public fun emit_transfer_event(
+            guid: &GUID::ID,
+            account: &signer,
+            to: address,
+            amount: u64,
+        ) acquires Admin {
+            Event::emit_event(
+                &mut borrow_global_mut<Admin>(ADMIN).transfer_events,
+                TransferEvent {
+                    id: *guid,
+                    from: Signer::address_of(account),
+                    to: to,
+                    amount: amount,
+                }
+            );
         }
     }
 }
