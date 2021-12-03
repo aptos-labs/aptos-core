@@ -26,8 +26,8 @@ BUILDING Message
 
 ## Run a Node
 
-Run `shuffle node` to deploy a local test node. If you are testing against a
-remote node, you can skip this step.
+Run `shuffle node` to deploy a local test node. Run this node on a separate
+terminal. If you are testing against a remote node, you can skip this step.
 
 Output:
 
@@ -109,18 +109,121 @@ Once you have your module deployed, you can use `shuffle console` to enter a
 typescript REPL. Enter the REPL inside your project folder and try running the
 below commands:
 
+Set the message field inside MessageHolder resource of your account to "hello
+blockchain"
+
 ```
-// Set the message field inside MessageHolder resource of your account to "hello blockchain"
-await main.setMessageScriptFunction("hello blockchain");
+> await main.setMessageScriptFunction("hello blockchain");
+{
+  type: "pending_transaction",
+  hash: "0x0d60430a2733e701fae009b88a61a4725e956c7a309d6344d05bb0a2ef46786e",
+  sender: "0x825b47b8fd2b30cf37c0e58579a78bc8",
+  sequence_number: "3",
+  max_gas_amount: "1000000",
+  gas_unit_price: "0",
+  gas_currency_code: "XUS",
+  expiration_timestamp_secs: "99999999999",
+  payload: {
+    type: "script_function_payload",
+    function: "0x825b47b8fd2b30cf37c0e58579a78bc8::Message::set_message",
+    type_arguments: [],
+    arguments: [ "0x68656c6c6f20626c6f636b636861696e" ]
+  },
+  signature: {
+    type: "ed25519_signature",
+    public_key: "0x171b9cd908c329b2b3f091729799b74cba8a25d7075067022bbc15f1faa02303",
+    signature: "0x2441dab7e423806041f55cc74fda3af79be019973a446e6f92cf15d281fc6c363fc53cb348c996db9155ec7a6984c93b46..."
+  }
+}
+```
 
-// Get the latest account transactions to see if your transaction was executed successfully
-await devapi.accountTransactions()
+Get the latest account transactions to see if your transaction was executed
+successfully
 
-// Get account resources
-await devapi.resources()
+```
+> await devapi.accountTransactions()
+[
+  {
+    type: "user_transaction",
+    version: "255",
+    hash: "0x0d60430a2733e701fae009b88a61a4725e956c7a309d6344d05bb0a2ef46786e",
+    state_root_hash: "0x58ba3634ed95a5232a575c1af7de043351ee225968b8b1efdc99bbd676b313ff",
+    event_root_hash: "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
+    gas_used: "36",
+    success: true,
+    vm_status: "Executed successfully",
+    sender: "0x825b47b8fd2b30cf37c0e58579a78bc8",
+    sequence_number: "3",
+    max_gas_amount: "1000000",
+    gas_unit_price: "0",
+    gas_currency_code: "XUS",
+    expiration_timestamp_secs: "99999999999",
+    payload: {
+      type: "script_function_payload",
+      function: "0x825b47b8fd2b30cf37c0e58579a78bc8::Message::set_message",
+      type_arguments: [],
+      arguments: [ "0x68656c6c6f20626c6f636b636861696e" ]
+    },
+    signature: {
+      type: "ed25519_signature",
+      public_key: "0x171b9cd908c329b2b3f091729799b74cba8a25d7075067022bbc15f1faa02303",
+      signature: "0x2441dab7e423806041f55cc74fda3af79be019973a446e6f92cf15d281fc6c363fc53cb348c996db9155ec7a6984c93b46..."
+    },
+    events: []
+  }
+]
+```
+Print all the resources in an account
 
-// Use decodedMessages to check that message was set to "hello blockchain"
-await main.decodedMessages()
+```
+> await devapi.resources()
+[
+  { type: "0x1::GUID::Generator", data: { counter: "5" } },
+  { type: "0x1::VASP::ParentVASP", data: { num_children: "0" } },
+  { type: "0x1::Roles::RoleId", data: { role_id: "5" } },
+  { type: "0x1::VASPDomain::VASPDomains", data: { domains: [] } },
+  {
+    type: "0x1::DiemAccount::Balance<0x1::XUS::XUS>",
+    data: { coin: { value: "0" } }
+  },
+  {
+    type: "0x1::DiemAccount::DiemAccount",
+    data: {
+      authentication_key: "0xd1a99d23710aaf0a05c70650623aa67b825b47b8fd2b30cf37c0e58579a78bc8",
+      key_rotation_capability: { vec: [Array] },
+      received_events: { counter: "0", guid: [Object] },
+      sent_events: { counter: "0", guid: [Object] },
+      sequence_number: "4",
+      withdraw_capability: { vec: [Array] }
+    }
+  },
+  { type: "0x1::AccountFreezing::FreezingBit", data: { is_frozen: false } },
+  {
+    type: "0x1::DualAttestation::Credential",
+    data: {
+      base_url: "0x",
+      base_url_rotation_events: { counter: "0", guid: [Object] },
+      compliance_key_rotation_events: { counter: "0", guid: [Object] },
+      compliance_public_key: "0x",
+      expiration_date: "18446744073709551615",
+      human_name: "0x"
+    }
+  },
+  {
+    type: "0x825b47b8fd2b30cf37c0e58579a78bc8::Message::MessageHolder",
+    data: {
+      message: "0x68656c6c6f20626c6f636b636861696e",
+      message_change_events: { counter: "0", guid: [Object] }
+    }
+  }
+]
+```
+
+Use decodedMessages to check that message was set to "hello blockchain"
+
+```
+> await main.decodedMessages()
+[ "hello blockchain" ]
 ```
 
 ## Write E2E Tests

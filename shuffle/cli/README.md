@@ -5,6 +5,13 @@ blockchain.
 
 ## Setup
 
+Prerequisites:
+
+```
+Install brew: https://brew.sh/
+Install deno: https://deno.land/#installation
+```
+
 From diem directory:
 
 - Install Diem dependencies including Rust, Clang, Deno, etc, by running the
@@ -20,11 +27,6 @@ From diem directory:
 cargo install --path shuffle/cli
 ```
 
-- Install deno package needed to run shuffle console
-
-```
-brew install deno
-```
 
 ## Commands Overview
 
