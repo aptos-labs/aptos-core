@@ -1,4 +1,4 @@
-module NamedAddr::Coin {
+module 0xCAFE::BasicCoin {
      // Only included in compilation for testing. Similar to #[cfg(testing)]
     // in Rust.
     #[test_only]
@@ -13,8 +13,8 @@ module NamedAddr::Coin {
     }
 
     // Declare a unit test. It takes a signer called `account` with an
-    // address value of `0xCAFE`.
-    #[test(account = @0xCAFE)]
+    // address value of `0xC0FFEE`.
+    #[test(account = @0xC0FFEE)]
     fun test_mint_10(account: signer) acquires Coin {
         let addr = Signer::address_of(&account);
         mint(account, 10);

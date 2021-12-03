@@ -1,8 +1,11 @@
-mpm test -g
+# Exercise 1
+move package test -g
 
-mpm test --coverage
+# Exercise 2
+move package test --coverage
 
 Followed by:
-mpm coverage summary
-mpm coverage summary --summarize-functions
-mpm coverage source --module Coin
+
+move package coverage summary
+move package coverage summary --summarize-functions
+move package coverage source --module BasicCoin
