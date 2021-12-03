@@ -653,7 +653,7 @@ mod test {
     fn test_generate_typescript_libraries() {
         let tmpdir = tempdir().unwrap();
         let dir_path = tmpdir.path();
-        new::write_example_move_packages(dir_path).expect("unable to create move main pkg");
+        new::write_move_project_template(dir_path).expect("unable to create move main pkg");
         let address =
             AccountAddress::from_hex_literal("0x1").expect("unable to create address 0x1");
         codegen_typescript_libraries(dir_path, &address).expect("unable to generate TS libraries");
