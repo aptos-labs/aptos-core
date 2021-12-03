@@ -16,8 +16,6 @@ use diem_types::{
 #[derive(Default)]
 pub struct ExecutedChunk {
     pub to_commit: Vec<(Transaction, TransactionData)>,
-    pub to_discard: Vec<Transaction>,
-    pub to_retry: Vec<Transaction>,
     pub result_view: ExecutedTrees,
     /// If set, this is the new epoch info that should be changed to if this is committed.
     pub next_epoch_state: Option<EpochState>,
@@ -49,16 +47,6 @@ impl ExecutedChunk {
             .flatten()
             .cloned()
             .collect()
-    }
-
-    pub fn ensure_no_discard(&self) -> Result<()> {
-        ensure!(self.to_discard.is_empty(), "Syncing discarded transactions");
-        Ok(())
-    }
-
-    pub fn ensure_no_retry(&self) -> Result<()> {
-        ensure!(self.to_retry.is_empty(), "Chunk crosses epoch boundary.",);
-        Ok(())
     }
 
     pub fn ensure_transaction_infos_match(
@@ -135,21 +123,12 @@ impl ExecutedChunk {
         }
     }
 
-    pub fn strip_transactions_to_retry(&mut self) -> Vec<Transaction> {
-        self.next_epoch_state.take();
-        self.to_retry.drain(..).collect()
-    }
-
     pub fn combine(self, rhs: Self) -> Result<Self> {
-        self.ensure_no_discard()?;
-        self.ensure_no_retry()?;
         let mut to_commit = self.to_commit;
         to_commit.extend(rhs.to_commit.into_iter());
 
         Ok(Self {
             to_commit,
-            to_discard: rhs.to_discard,
-            to_retry: rhs.to_retry,
             result_view: rhs.result_view,
             next_epoch_state: rhs.next_epoch_state,
             ledger_info: rhs.ledger_info,

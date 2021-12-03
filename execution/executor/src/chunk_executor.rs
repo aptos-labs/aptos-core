@@ -4,7 +4,11 @@
 #![forbid(unsafe_code)]
 
 use crate::{
-    components::{chunk_commit_queue::ChunkCommitQueue, chunk_output::ChunkOutput},
+    components::{
+        apply_chunk_output::{ensure_no_discard, ensure_no_retry},
+        chunk_commit_queue::ChunkCommitQueue,
+        chunk_output::ChunkOutput,
+    },
     logging::{LogEntry, LogSchema},
     metrics::{
         DIEM_EXECUTOR_APPLY_CHUNK_SECONDS, DIEM_EXECUTOR_COMMIT_CHUNK_SECONDS,
@@ -83,9 +87,10 @@ impl<V> ChunkExecutor<V> {
         chunk_output: ChunkOutput,
         transaction_infos: &[TransactionInfo],
     ) -> Result<ExecutedChunk> {
-        let mut executed_chunk = chunk_output.apply_to_ledger(latest_view.txn_accumulator())?;
-        executed_chunk.ensure_no_discard()?;
-        executed_chunk.ensure_no_retry()?;
+        let (mut executed_chunk, to_discard, to_retry) =
+            chunk_output.apply_to_ledger(latest_view.txn_accumulator())?;
+        ensure_no_discard(to_discard)?;
+        ensure_no_retry(to_retry)?;
         executed_chunk.ledger_info = executed_chunk
             .maybe_select_chunk_ending_ledger_info(verified_target_li, epoch_change_li)?;
         executed_chunk.ensure_transaction_infos_match(transaction_infos)?;
@@ -270,16 +275,17 @@ impl<V: VMExecutor> TransactionReplayer for ChunkExecutor<V> {
             // Execute transactions.
             let state_view = self.state_view(&latest_view, &persisted_view);
             let txns = to_run.take().unwrap();
-            let mut executed = ChunkOutput::by_transaction_execution::<V>(txns, state_view)?
-                .apply_to_ledger(latest_view.txn_accumulator())?;
+            let (executed, to_discard, to_retry) =
+                ChunkOutput::by_transaction_execution::<V>(txns, state_view)?
+                    .apply_to_ledger(latest_view.txn_accumulator())?;
 
             // Accumulate result and deal with retry
-            executed.ensure_no_discard()?;
+            ensure_no_discard(to_discard)?;
             let n = executed.to_commit.len();
             executed.ensure_transaction_infos_match(&transaction_infos[..n])?;
             transaction_infos.drain(..n);
 
-            to_run = Some(executed.strip_transactions_to_retry());
+            to_run = Some(to_retry);
             executed_chunk = executed_chunk.combine(executed)?;
             latest_view = executed_chunk.result_view.clone();
         }

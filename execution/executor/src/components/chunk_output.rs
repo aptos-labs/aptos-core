@@ -74,7 +74,7 @@ impl ChunkOutput {
     pub fn apply_to_ledger(
         self,
         base_accumulator: &Arc<InMemoryAccumulator<TransactionAccumulatorHasher>>,
-    ) -> Result<ExecutedChunk> {
+    ) -> Result<(ExecutedChunk, Vec<Transaction>, Vec<Transaction>)> {
         fail_point!("executor::vm_execute_chunk", |_| {
             Err(anyhow::anyhow!("Injected error in apply_to_ledger."))
         });

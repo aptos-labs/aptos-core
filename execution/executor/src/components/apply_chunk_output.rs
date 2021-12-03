@@ -6,7 +6,7 @@
 use crate::{
     components::chunk_output::ChunkOutput, metrics::DIEM_EXECUTOR_ERRORS, process_write_set,
 };
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, ensure, Result};
 use diem_crypto::{
     hash::{CryptoHash, EventAccumulatorHasher, TransactionAccumulatorHasher},
     HashValue,
@@ -36,7 +36,7 @@ impl ApplyChunkOutput {
     pub fn apply(
         chunk_output: ChunkOutput,
         base_accumulator: &Arc<InMemoryAccumulator<TransactionAccumulatorHasher>>,
-    ) -> Result<ExecutedChunk> {
+    ) -> Result<(ExecutedChunk, Vec<Transaction>, Vec<Transaction>)> {
         let ChunkOutput {
             state_cache,
             transactions,
@@ -55,17 +55,19 @@ impl ApplyChunkOutput {
         let (to_commit, transaction_info_hashes) =
             Self::assemble_ledger_diff(to_keep, account_blobs, roots_with_node_hashes);
 
-        Ok(ExecutedChunk {
-            to_commit,
+        Ok((
+            ExecutedChunk {
+                to_commit,
+                result_view: ExecutedTrees::new_copy(
+                    result_state,
+                    Arc::new(base_accumulator.append(&transaction_info_hashes)),
+                ),
+                next_epoch_state,
+                ledger_info: None,
+            },
             to_discard,
             to_retry,
-            result_view: ExecutedTrees::new_copy(
-                result_state,
-                Arc::new(base_accumulator.append(&transaction_info_hashes)),
-            ),
-            next_epoch_state,
-            ledger_info: None,
-        })
+        ))
     }
 
     fn sort_transactions(
@@ -271,4 +273,14 @@ impl ApplyChunkOutput {
         }
         (to_commit, txn_info_hashes)
     }
+}
+
+pub fn ensure_no_discard(to_discard: Vec<Transaction>) -> Result<()> {
+    ensure!(to_discard.is_empty(), "Syncing discarded transactions");
+    Ok(())
+}
+
+pub fn ensure_no_retry(to_retry: Vec<Transaction>) -> Result<()> {
+    ensure!(to_retry.is_empty(), "Chunk crosses epoch boundary.",);
+    Ok(())
 }
