@@ -1,7 +1,6 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use super::*;
 use crate::{
     chunk_executor::ChunkExecutor,
     db_bootstrapper::{generate_waypoint, maybe_bootstrap},
@@ -16,6 +15,7 @@ use diem_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    protocol_spec::DpnProto,
     transaction::{
         default_protocol::TransactionListWithProof, Transaction, TransactionStatus, Version,
     },
@@ -24,6 +24,7 @@ use diemdb::DiemDB;
 use executor_types::{BlockExecutorTrait, ChunkExecutorTrait, TransactionReplayer};
 use proptest::prelude::*;
 use std::collections::BTreeMap;
+use storage_interface::default_protocol::DbReaderWriter;
 
 mod chunk_executor_tests;
 

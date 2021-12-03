@@ -32,7 +32,7 @@ impl SerializerService {
 
         let output = match input {
             ExecutionCorrectnessInput::CommittedBlockId => {
-                bcs::to_bytes(&self.internal.committed_block_id())
+                bcs::to_bytes(&Result::<_, Error>::Ok(self.internal.committed_block_id()))
             }
             ExecutionCorrectnessInput::Reset => bcs::to_bytes(&self.internal.reset()),
             ExecutionCorrectnessInput::ExecuteBlock(block_with_parent_id) => bcs::to_bytes(

@@ -3,10 +3,8 @@
 
 #![forbid(unsafe_code)]
 
-use crate::{
-    components::chunk_output::ChunkOutput, metrics::DIEM_EXECUTOR_ERRORS, process_write_set,
-};
-use anyhow::{anyhow, ensure, Result};
+use crate::{components::chunk_output::ChunkOutput, metrics::DIEM_EXECUTOR_ERRORS};
+use anyhow::{anyhow, bail, ensure, Result};
 use diem_crypto::{
     hash::{CryptoHash, EventAccumulatorHasher, TransactionAccumulatorHasher},
     HashValue,
@@ -21,13 +19,20 @@ use diem_types::{
     on_chain_config,
     proof::accumulator::InMemoryAccumulator,
     transaction::{
-        Transaction, TransactionInfo, TransactionInfoTrait, TransactionOutput, TransactionStatus,
+        Transaction, TransactionInfo, TransactionInfoTrait, TransactionOutput, TransactionPayload,
+        TransactionStatus,
     },
+    write_set::{WriteOp, WriteSet},
 };
 use executor_types::{ExecutedChunk, ExecutedTrees, ProofReader, TransactionData};
 use rayon::prelude::*;
 use scratchpad::SparseMerkleTree;
-use std::{collections::HashMap, convert::TryFrom, sync::Arc};
+use std::{
+    collections::{hash_map, HashMap, HashSet},
+    convert::TryFrom,
+    iter::repeat,
+    sync::Arc,
+};
 use storage_interface::state_view::StateCache;
 
 pub struct ApplyChunkOutput;
@@ -44,7 +49,7 @@ impl ApplyChunkOutput {
         } = chunk_output;
 
         // Separate transactions with different VM statuses.
-        let (new_epoch, to_keep, to_discard, to_retry) =
+        let (new_epoch, status, to_keep, to_discard, to_retry) =
             Self::sort_transactions(transactions, transaction_outputs)?;
 
         // Apply the write set, get the latest state.
@@ -57,6 +62,7 @@ impl ApplyChunkOutput {
 
         Ok((
             ExecutedChunk {
+                status,
                 to_commit,
                 result_view: ExecutedTrees::new_copy(
                     result_state,
@@ -75,10 +81,12 @@ impl ApplyChunkOutput {
         mut transaction_outputs: Vec<TransactionOutput>,
     ) -> Result<(
         bool,
+        Vec<TransactionStatus>,
         Vec<(Transaction, TransactionOutput)>,
         Vec<Transaction>,
         Vec<Transaction>,
     )> {
+        let num_txns = transactions.len();
         // See if there's a new epoch started
         let new_epoch_event_key = on_chain_config::new_epoch_event_key();
         let new_epoch_marker = transaction_outputs
@@ -98,6 +106,15 @@ impl ApplyChunkOutput {
         } else {
             vec![]
         };
+
+        // N.B. Transaction status after the epoch marker are ignored and set to Retry forcibly.
+        let status = transaction_outputs
+            .iter()
+            .map(|t| t.status())
+            .cloned()
+            .chain(repeat(TransactionStatus::Retry))
+            .take(num_txns)
+            .collect();
 
         // Separate transactions with the Keep status out.
         let (to_keep, to_discard) =
@@ -128,7 +145,13 @@ impl ApplyChunkOutput {
             })
             .collect::<Result<Vec<_>>>()?;
 
-        Ok((new_epoch_marker.is_some(), to_keep, to_discard, to_retry))
+        Ok((
+            new_epoch_marker.is_some(),
+            status,
+            to_keep,
+            to_discard,
+            to_retry,
+        ))
     }
 
     fn apply_write_set(
@@ -283,4 +306,64 @@ pub fn ensure_no_discard(to_discard: Vec<Transaction>) -> Result<()> {
 pub fn ensure_no_retry(to_retry: Vec<Transaction>) -> Result<()> {
     ensure!(to_retry.is_empty(), "Chunk crosses epoch boundary.",);
     Ok(())
+}
+
+/// For all accounts modified by this transaction, find the previous blob and update it based
+/// on the write set. Returns the blob value of all these accounts.
+pub fn process_write_set(
+    transaction: &Transaction,
+    account_to_state: &mut HashMap<AccountAddress, AccountState>,
+    write_set: WriteSet,
+) -> Result<HashMap<AccountAddress, AccountState>> {
+    let mut updated_blobs = HashMap::new();
+
+    // Find all addresses this transaction touches while processing each write op.
+    let mut addrs = HashSet::new();
+    for (access_path, write_op) in write_set.into_iter() {
+        let address = access_path.address;
+        let path = access_path.path;
+        match account_to_state.entry(address) {
+            hash_map::Entry::Occupied(mut entry) => {
+                update_account_state(entry.get_mut(), path, write_op);
+            }
+            hash_map::Entry::Vacant(entry) => {
+                // Before writing to an account, VM should always read that account. So we
+                // should not reach this code path. The exception is genesis transaction (and
+                // maybe other writeset transactions).
+                match transaction {
+                    Transaction::GenesisTransaction(_) => (),
+                    Transaction::BlockMetadata(_) => {
+                        bail!("Write set should be a subset of read set.")
+                    }
+                    Transaction::UserTransaction(txn) => match txn.payload() {
+                        TransactionPayload::ModuleBundle(_)
+                        | TransactionPayload::Script(_)
+                        | TransactionPayload::ScriptFunction(_) => {
+                            bail!("Write set should be a subset of read set.")
+                        }
+                        TransactionPayload::WriteSet(_) => (),
+                    },
+                }
+
+                let mut account_state = Default::default();
+                update_account_state(&mut account_state, path, write_op);
+                entry.insert(account_state);
+            }
+        }
+        addrs.insert(address);
+    }
+
+    for addr in addrs {
+        let account_state = account_to_state.get(&addr).expect("Address should exist.");
+        updated_blobs.insert(addr, account_state.clone());
+    }
+
+    Ok(updated_blobs)
+}
+
+fn update_account_state(account_state: &mut AccountState, path: Vec<u8>, write_op: WriteOp) {
+    match write_op {
+        WriteOp::Value(new_value) => account_state.insert(path, new_value),
+        WriteOp::Deletion => account_state.remove(&path),
+    };
 }

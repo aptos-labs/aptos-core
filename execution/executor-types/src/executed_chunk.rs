@@ -3,18 +3,22 @@
 
 #![forbid(unsafe_code)]
 
-use crate::{ExecutedTrees, TransactionData};
+use crate::{ExecutedTrees, StateComputeResult, TransactionData};
 use anyhow::{ensure, Result};
-use diem_crypto::hash::CryptoHash;
+use diem_crypto::hash::{CryptoHash, TransactionAccumulatorHasher};
 use diem_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
-    transaction::{Transaction, TransactionInfo, TransactionToCommit},
+    on_chain_config,
+    proof::accumulator::InMemoryAccumulator,
+    transaction::{Transaction, TransactionInfo, TransactionStatus, TransactionToCommit},
 };
+use std::sync::Arc;
 
 #[derive(Default)]
 pub struct ExecutedChunk {
+    pub status: Vec<TransactionStatus>,
     pub to_commit: Vec<(Transaction, TransactionData)>,
     pub result_view: ExecutedTrees,
     /// If set, this is the new epoch info that should be changed to if this is committed.
@@ -23,6 +27,13 @@ pub struct ExecutedChunk {
 }
 
 impl ExecutedChunk {
+    pub fn new_empty(result_view: ExecutedTrees) -> Self {
+        Self {
+            result_view,
+            ..Default::default()
+        }
+    }
+
     pub fn transactions_to_commit(&self) -> Result<Vec<TransactionToCommit>> {
         self.to_commit
             .iter()
@@ -47,6 +58,10 @@ impl ExecutedChunk {
             .flatten()
             .cloned()
             .collect()
+    }
+
+    pub fn has_reconfiguration(&self) -> bool {
+        self.next_epoch_state.is_some()
     }
 
     pub fn ensure_transaction_infos_match(
@@ -126,12 +141,49 @@ impl ExecutedChunk {
     pub fn combine(self, rhs: Self) -> Result<Self> {
         let mut to_commit = self.to_commit;
         to_commit.extend(rhs.to_commit.into_iter());
+        let mut status = self.status;
+        status.extend(rhs.status.into_iter());
 
         Ok(Self {
+            status,
             to_commit,
             result_view: rhs.result_view,
             next_epoch_state: rhs.next_epoch_state,
             ledger_info: rhs.ledger_info,
         })
+    }
+
+    pub fn as_state_compute_result(
+        &self,
+        parent_accumulator: &Arc<InMemoryAccumulator<TransactionAccumulatorHasher>>,
+    ) -> StateComputeResult {
+        let new_epoch_event_key = on_chain_config::new_epoch_event_key();
+        let txn_accu = self.result_view.txn_accumulator();
+
+        let mut transaction_info_hashes = Vec::new();
+        let mut reconfig_events = Vec::new();
+
+        for (_, txn_data) in &self.to_commit {
+            transaction_info_hashes.push(txn_data.txn_info_hash().expect("Txn to be kept."));
+            reconfig_events.extend(
+                txn_data
+                    .events()
+                    .iter()
+                    .filter(|e| *e.key() == new_epoch_event_key)
+                    .cloned(),
+            )
+        }
+
+        StateComputeResult::new(
+            txn_accu.root_hash(),
+            txn_accu.frozen_subtree_roots().clone(),
+            txn_accu.num_leaves(),
+            parent_accumulator.frozen_subtree_roots().clone(),
+            parent_accumulator.num_leaves(),
+            self.next_epoch_state.clone(),
+            self.status.clone(),
+            transaction_info_hashes,
+            reconfig_events,
+        )
     }
 }

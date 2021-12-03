@@ -6,6 +6,7 @@ use executor_benchmark::{
     init_db_and_executor, transaction_executor::TransactionExecutor,
     transaction_generator::TransactionGenerator,
 };
+use executor_types::BlockExecutorTrait;
 use std::sync::Arc;
 
 pub const NUM_ACCOUNTS: usize = 1000;

@@ -226,7 +226,7 @@ impl TestContext {
             )
             .collect();
 
-        let parent_id = self.executor.committed_block_id().unwrap();
+        let parent_id = self.executor.committed_block_id();
         let result = self
             .executor
             .execute_block((metadata.id(), txns.clone()), parent_id)

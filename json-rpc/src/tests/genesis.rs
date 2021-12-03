@@ -6,7 +6,7 @@ use diem_types::{
     account_state_blob::AccountStateBlob,
     transaction::{Transaction, WriteSetPayload},
 };
-use executor::process_write_set;
+use executor::components::apply_chunk_output::process_write_set;
 use executor_types::ProofReader;
 use scratchpad::SparseMerkleTree;
 use std::{collections::HashMap, convert::TryFrom};

@@ -6,6 +6,7 @@
 use crate::components::apply_chunk_output::ApplyChunkOutput;
 use anyhow::Result;
 use diem_crypto::hash::TransactionAccumulatorHasher;
+use diem_logger::trace;
 use diem_state_view::StateView;
 use diem_types::{
     proof::accumulator::InMemoryAccumulator,
@@ -79,5 +80,18 @@ impl ChunkOutput {
             Err(anyhow::anyhow!("Injected error in apply_to_ledger."))
         });
         ApplyChunkOutput::apply(self, base_accumulator)
+    }
+
+    pub fn trace_log_transaction_status(&self) {
+        let status: Vec<_> = self
+            .transaction_outputs
+            .iter()
+            .map(TransactionOutput::status)
+            .cloned()
+            .collect();
+
+        if !status.is_empty() {
+            trace!("Execution status: {:?}", status);
+        }
     }
 }

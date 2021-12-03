@@ -24,7 +24,6 @@ use diem_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
     nibble::nibble_path::NibblePath,
-    on_chain_config,
     proof::{accumulator::InMemoryAccumulator, AccumulatorExtensionProof},
     transaction::{
         default_protocol::{TransactionListWithProof, TransactionOutputListWithProof},
@@ -64,7 +63,7 @@ pub trait ChunkExecutorTrait: Send + Sync {
     ) -> anyhow::Result<()>;
 
     /// Commit a previously executed chunks, returns a vector of reconfiguration events in the chunk.
-    fn commit_chunk(&self) -> anyhow::Result<Vec<ContractEvent>>;
+    fn commit_chunk(&self) -> Result<Vec<ContractEvent>>;
 
     fn execute_and_commit_chunk(
         &self,
@@ -83,7 +82,7 @@ pub trait ChunkExecutorTrait: Send + Sync {
 
 pub trait BlockExecutorTrait: Send + Sync {
     /// Get the latest committed block id
-    fn committed_block_id(&self) -> Result<HashValue, Error>;
+    fn committed_block_id(&self) -> HashValue;
 
     /// Reset the internal state including cache with newly fetched latest committed block from storage.
     fn reset(&self) -> Result<(), Error>;
@@ -354,6 +353,10 @@ impl ExecutedTrees {
     pub fn new_empty() -> ExecutedTrees {
         Self::new(*SPARSE_MERKLE_PLACEHOLDER_HASH, vec![], 0)
     }
+
+    pub fn is_same_view(&self, rhs: &Self) -> bool {
+        self.transaction_accumulator.root_hash() == rhs.transaction_accumulator.root_hash()
+    }
 }
 
 impl Default for ExecutedTrees {
@@ -473,102 +476,5 @@ impl TransactionData {
 
     pub fn txn_info_hash(&self) -> Option<HashValue> {
         self.txn_info_hash
-    }
-}
-
-/// The output of Processing the vm output of a series of transactions to the parent
-/// in-memory state merkle tree and accumulator.
-#[derive(Debug, Clone)]
-pub struct ProcessedVMOutput {
-    /// The entire set of data associated with each transaction.
-    transaction_data: Vec<TransactionData>,
-
-    /// The in-memory Merkle Accumulator and state Sparse Merkle Tree after appending all the
-    /// transactions in this set.
-    executed_trees: ExecutedTrees,
-
-    /// If set, this is the new epoch info that should be changed to if this block is committed.
-    epoch_state: Option<EpochState>,
-}
-
-impl ProcessedVMOutput {
-    pub fn new(
-        transaction_data: Vec<TransactionData>,
-        executed_trees: ExecutedTrees,
-        epoch_state: Option<EpochState>,
-    ) -> Self {
-        ProcessedVMOutput {
-            transaction_data,
-            executed_trees,
-            epoch_state,
-        }
-    }
-
-    pub fn transaction_data(&self) -> &[TransactionData] {
-        &self.transaction_data
-    }
-
-    pub fn executed_trees(&self) -> &ExecutedTrees {
-        &self.executed_trees
-    }
-
-    pub fn accu_root(&self) -> HashValue {
-        self.executed_trees().state_id()
-    }
-
-    pub fn version(&self) -> Option<Version> {
-        self.executed_trees().version()
-    }
-
-    pub fn epoch_state(&self) -> &Option<EpochState> {
-        &self.epoch_state
-    }
-
-    pub fn has_reconfiguration(&self) -> bool {
-        self.epoch_state.is_some()
-    }
-
-    pub fn compute_result(
-        &self,
-        parent_frozen_subtree_roots: Vec<HashValue>,
-        parent_num_leaves: u64,
-    ) -> StateComputeResult {
-        let new_epoch_event_key = on_chain_config::new_epoch_event_key();
-        let txn_accu = self.executed_trees().txn_accumulator();
-
-        let mut compute_status = Vec::new();
-        let mut transaction_info_hashes = Vec::new();
-        let mut reconfig_events = Vec::new();
-
-        for txn_data in self.transaction_data() {
-            let status = txn_data.status();
-            compute_status.push(status.clone());
-            if matches!(status, TransactionStatus::Keep(_)) {
-                transaction_info_hashes.push(txn_data.txn_info_hash().expect("Txn to be kept."));
-                reconfig_events.extend(
-                    txn_data
-                        .events()
-                        .iter()
-                        .filter(|e| *e.key() == new_epoch_event_key)
-                        .cloned(),
-                )
-            }
-        }
-
-        // Now that we have the root hash and execution status we can send the response to
-        // consensus.
-        // TODO: The VM will support a special transaction to set the validators for the
-        // next epoch that is part of a block execution.
-        StateComputeResult::new(
-            self.accu_root(),
-            txn_accu.frozen_subtree_roots().clone(),
-            txn_accu.num_leaves(),
-            parent_frozen_subtree_roots,
-            parent_num_leaves,
-            self.epoch_state.clone(),
-            compute_status,
-            transaction_info_hashes,
-            reconfig_events,
-        )
     }
 }

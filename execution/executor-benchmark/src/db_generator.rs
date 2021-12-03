@@ -17,6 +17,7 @@ use executor::{
     db_bootstrapper::{generate_waypoint, maybe_bootstrap},
     Executor,
 };
+use executor_types::BlockExecutorTrait;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::{
     fs,

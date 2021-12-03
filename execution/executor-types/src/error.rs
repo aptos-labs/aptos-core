@@ -1,15 +1,29 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_crypto::HashValue;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+
+use diem_crypto::HashValue;
+use diem_types::transaction::Version;
 
 #[derive(Debug, Deserialize, Error, PartialEq, Serialize)]
 /// Different reasons for proposal rejection
 pub enum Error {
     #[error("Cannot find speculation result for block id {0}")]
     BlockNotFound(HashValue),
+
+    #[error(
+        "Bad num_txns_to_commit. first version {}, num to commit: {}, target version: {}",
+        first_version,
+        to_commit,
+        target_version
+    )]
+    BadNumTxnsToCommit {
+        first_version: Version,
+        to_commit: usize,
+        target_version: Version,
+    },
 
     #[error("Internal error: {:?}", error)]
     InternalError { error: String },

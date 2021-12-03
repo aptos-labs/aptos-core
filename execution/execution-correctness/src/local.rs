@@ -40,7 +40,7 @@ impl LocalClient {
 
 impl ExecutionCorrectness for LocalClient {
     fn committed_block_id(&self) -> Result<HashValue, Error> {
-        self.internal.block_executor.committed_block_id()
+        Ok(self.internal.block_executor.committed_block_id())
     }
 
     fn reset(&self) -> Result<(), Error> {

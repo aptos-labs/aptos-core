@@ -16,6 +16,7 @@ use diem_types::protocol_spec::DpnProto;
 use diem_vm::DiemVM;
 use diemdb::DiemDB;
 use executor::Executor;
+use executor_types::BlockExecutorTrait;
 use std::{
     fs,
     path::Path,
