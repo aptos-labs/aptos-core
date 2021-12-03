@@ -4,8 +4,8 @@
 #![forbid(unsafe_code)]
 
 use crate::tasks::{
-    taskify, InitCommand, PublishCommand, RawAddress, RunCommand, SyntaxChoice, TaskCommand,
-    TaskInput, ViewCommand,
+    taskify, InitCommand, PrintBytecodeInputChoice, PublishCommand, RawAddress, RunCommand,
+    SyntaxChoice, TaskCommand, TaskInput, ViewCommand, PrintBytecodeCommand,
 };
 use anyhow::{anyhow, Result};
 use move_binary_format::{
@@ -33,6 +33,7 @@ use move_core_types::{
 use move_disassembler::disassembler::{Disassembler, DisassemblerOptions};
 use move_ir_types::location::Spanned;
 use move_symbol_pool::Symbol;
+use rayon::iter::Either;
 use std::{
     collections::{BTreeMap, VecDeque},
     fmt::Debug,
@@ -146,7 +147,7 @@ pub trait MoveTestAdapter<'a> {
             TaskCommand::Init { .. } => {
                 panic!("The 'init' command is optional. But if used, it must be the first command")
             }
-            TaskCommand::PrintBytecode { .. } => {
+            TaskCommand::PrintBytecode(PrintBytecodeCommand { input }) => {
                 let state = self.compiled_state();
                 let data = match data {
                     Some(f) => f,
@@ -156,10 +157,15 @@ pub trait MoveTestAdapter<'a> {
                     ),
                 };
                 let data_path = data.path().to_str().unwrap();
-                let script = compile_ir_module(state.dep_modules(), data_path)?;
-
+                let compiled = match input {
+                    PrintBytecodeInputChoice::Script => Either::Left(compile_ir_script(state.dep_modules(), data_path)?),
+                    PrintBytecodeInputChoice::Module => Either::Right(compile_ir_module(state.dep_modules(), data_path)?),
+                };
                 let source_mapping = SourceMapping::new_from_view(
-                    BinaryIndexedView::Module(&script),
+                    match &compiled {
+                        Either::Left(script) => BinaryIndexedView::Script(script),
+                        Either::Right(module) => BinaryIndexedView::Module(module),
+                    },
                     Spanned::unsafe_no_loc(()).loc,
                 )
                 .expect("Unable to build dummy source mapping");

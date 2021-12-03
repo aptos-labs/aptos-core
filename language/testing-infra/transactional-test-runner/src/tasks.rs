@@ -218,10 +218,21 @@ pub enum SyntaxChoice {
     IR,
 }
 
-/// Translates the given Move IR module into bytecode, then prints a textual representation of that
-/// bytecode.
+/// When printing bytecode, the input program must either be a script or a module.
+#[derive(Debug)]
+pub enum PrintBytecodeInputChoice {
+    Script,
+    Module,
+}
+
+/// Translates the given Move IR module or script into bytecode, then prints a textual
+/// representation of that bytecode.
 #[derive(Debug, StructOpt)]
-pub struct PrintBytecodeCommand {}
+pub struct PrintBytecodeCommand {
+    /// The kind of input: either a script, or a module.
+    #[structopt(long = "input", default_value = "script")]
+    pub input: PrintBytecodeInputChoice,
+}
 
 #[derive(Debug, StructOpt)]
 pub struct InitCommand {
@@ -380,6 +391,20 @@ impl FromStr for SyntaxChoice {
                 "Invalid syntax choice. Expected '{}' or '{}'",
                 MOVE_EXTENSION,
                 MOVE_IR_EXTENSION
+            )),
+        }
+    }
+}
+
+impl FromStr for PrintBytecodeInputChoice {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "script" => Ok(PrintBytecodeInputChoice::Script),
+            "module" => Ok(PrintBytecodeInputChoice::Module),
+            _ => Err(anyhow!(
+                "Invalid input choice. Expected 'script' or 'module'"
             )),
         }
     }

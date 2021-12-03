@@ -1,4 +1,4 @@
-//# print-bytecode
+//# print-bytecode --input=module
 module 0xE.Expressions {
     binary_add() {
         let x: u64;
