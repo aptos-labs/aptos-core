@@ -102,7 +102,7 @@ Let's try calling the `mint_nft` script function within the console.
 
 > let typeArguments: string[] = [];
 
-> let args: any[] = [move.Ascii(contentUri)];
+> let args: any[] = [mv.Ascii(contentUri)];
 
 > let txn = await helpers.invokeScriptFunction(scriptFunction, typeArguments, args);
 

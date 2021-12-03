@@ -27,7 +27,7 @@ pub fn handle(
         import * as main from "{main}";
         import * as codegen from "{codegen}";
         import * as help from "{repl_help}";
-        import * as move from "{mv}";"#,
+        import * as mv from "{mv}";"#,
         context = project_path
             .join(shared::MAIN_PKG_PATH)
             .join("context.ts")
