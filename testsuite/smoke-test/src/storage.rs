@@ -175,10 +175,14 @@ fn wait_for_backups(
     backup_path: &Path,
     trusted_waypoints: &[Waypoint],
 ) -> Result<()> {
-    for _ in 0..60 {
+    for i in 0..120 {
         // the verify should always succeed.
         db_backup_verify(backup_path, trusted_waypoints);
 
+        println!(
+            "{}th wait for the backup to reach epoch {}, version {}.",
+            i, target_epoch, target_version,
+        );
         let output = Command::new(bin_path)
             .current_dir(workspace_root())
             .args(&[
