@@ -4,6 +4,7 @@ module Sender::MessageTests {
     use Std::Signer;
     use Std::UnitTest;
     use Std::Vector;
+    use Std::ASCII;
 
     fun get_account(): signer {
         Vector::pop_back(&mut UnitTest::create_signers_for_testing(1))
@@ -16,7 +17,7 @@ module Sender::MessageTests {
         Message::set_message(account,  b"Hello Blockchain");
 
         assert!(
-          Message::get_message(addr) == b"Hello Blockchain",
+          Message::get_message(addr) == ASCII::string(b"Hello Blockchain"),
           0
         );
     }

@@ -145,6 +145,7 @@ successfully
 ```
 > await devapi.accountTransactions()
 [
+  ......
   {
     type: "user_transaction",
     version: "255",
@@ -214,14 +215,14 @@ Print all the resources in an account
   {
     type: "0x825b47b8fd2b30cf37c0e58579a78bc8::Message::MessageHolder",
     data: {
-      message: "0x68656c6c6f20626c6f636b636861696e",
+      message: "hello blockchain",
       message_change_events: { counter: "0", guid: [Object] }
     }
   }
 ]
 ```
 
-Use decodedMessages to check that message was set to "hello blockchain"
+Use decodedMessages to check account message:
 
 ```
 > await main.decodedMessages()

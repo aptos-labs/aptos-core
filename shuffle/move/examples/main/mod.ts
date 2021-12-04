@@ -134,7 +134,7 @@ async function invokeScriptFunction(
 export async function decodedMessages(addr?: string) {
   addr = addressOrDefault(addr);
   return (await devapi.resourcesWithName("MessageHolder", addr))
-    .map((entry) => DiemHelpers.hexToAscii(entry.data.message));
+    .map((entry) => entry.data.message);
 }
 
 export async function decodedNFTs(addr?: string) {

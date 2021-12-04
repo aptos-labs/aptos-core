@@ -2,26 +2,28 @@ module Sender::Message {
     use Std::Errors;
     use Std::Event;
     use Std::Signer;
+    use Std::ASCII;
 
     struct MessageHolder has key {
-        message: vector<u8>,
+        message: ASCII::String,
         message_change_events: Event::EventHandle<MessageChangeEvent>,
     }
     struct MessageChangeEvent has drop, store {
-        from_message: vector<u8>,
-        to_message: vector<u8>,
+        from_message: ASCII::String,
+        to_message: ASCII::String,
     }
 
     /// There is no message present
     const ENO_MESSAGE: u64 = 0;
 
-    public fun get_message(addr: address): vector<u8> acquires MessageHolder {
+    public fun get_message(addr: address): ASCII::String acquires MessageHolder {
         assert!(exists<MessageHolder>(addr), Errors::not_published(ENO_MESSAGE));
         *&borrow_global<MessageHolder>(addr).message
     }
 
-    public(script) fun set_message(account: signer, message: vector<u8>)
+    public(script) fun set_message(account: signer, message_bytes: vector<u8>)
     acquires MessageHolder {
+        let message = ASCII::string(message_bytes);
         let account_addr = Signer::address_of(&account);
         if (!exists<MessageHolder>(account_addr)) {
             move_to(&account, MessageHolder {
