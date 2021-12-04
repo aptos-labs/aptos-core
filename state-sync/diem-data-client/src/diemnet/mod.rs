@@ -7,7 +7,10 @@ use crate::{
     ResponseError, ResponseId, Result,
 };
 use async_trait::async_trait;
-use diem_config::{config::StorageServiceConfig, network_id::PeerNetworkId};
+use diem_config::{
+    config::{DiemDataClientConfig, StorageServiceConfig},
+    network_id::PeerNetworkId,
+};
 use diem_id_generator::{IdGenerator, U64IdGenerator};
 use diem_infallible::RwLock;
 use diem_logger::trace;
@@ -42,10 +45,6 @@ mod tests;
 // TODO(philiphayes): does this belong in a different crate? I feel like we're
 // accumulating a lot of tiny crates though...
 
-// TODO(philiphayes): configuration / pass as argument?
-const DEFAULT_TIMEOUT: Duration = Duration::from_millis(10_000);
-pub const DATA_SUMMARY_POLL_INTERVAL: Duration = Duration::from_millis(1_000);
-
 /// A [`DiemDataClient`] that fulfills requests from remote peers' Storage Service
 /// over DiemNet.
 ///
@@ -66,6 +65,8 @@ pub const DATA_SUMMARY_POLL_INTERVAL: Duration = Duration::from_millis(1_000);
 /// and/or threads.
 #[derive(Clone, Debug)]
 pub struct DiemNetDataClient {
+    /// Config for DiemNet data client.
+    data_client_config: DiemDataClientConfig,
     /// The underlying DiemNet storage service client.
     network_client: StorageServiceClient,
     /// All of the data-client specific data we have on each network peer.
@@ -78,18 +79,23 @@ pub struct DiemNetDataClient {
 
 impl DiemNetDataClient {
     pub fn new(
-        config: StorageServiceConfig,
+        data_client_config: DiemDataClientConfig,
+        storage_service_config: StorageServiceConfig,
         time_service: TimeService,
         network_client: StorageServiceClient,
     ) -> (Self, DataSummaryPoller) {
         let client = Self {
+            data_client_config,
             network_client,
-            peer_states: Arc::new(RwLock::new(PeerStates::new(config))),
+            peer_states: Arc::new(RwLock::new(PeerStates::new(storage_service_config))),
             global_summary_cache: Arc::new(RwLock::new(GlobalDataSummary::empty())),
             response_id_generator: Arc::new(U64IdGenerator::new()),
         };
-        let poller =
-            DataSummaryPoller::new(time_service, client.clone(), DATA_SUMMARY_POLL_INTERVAL);
+        let poller = DataSummaryPoller::new(
+            time_service,
+            client.clone(),
+            client.data_client_config.summary_poll_interval_ms,
+        );
         (client, poller)
     }
 
@@ -195,7 +201,11 @@ impl DiemNetDataClient {
         let id = self.next_response_id();
         let result = self
             .network_client
-            .send_request(peer, request.clone(), DEFAULT_TIMEOUT)
+            .send_request(
+                peer,
+                request.clone(),
+                self.data_client_config.response_timeout_ms,
+            )
             .await;
 
         match result {

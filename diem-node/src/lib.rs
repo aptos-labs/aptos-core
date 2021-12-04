@@ -12,8 +12,8 @@ use debug_interface::node_debug_service::NodeDebugService;
 use diem_api::runtime::bootstrap as bootstrap_api;
 use diem_config::{
     config::{
-        DataStreamingServiceConfig, NetworkConfig, NodeConfig, PersistableConfig,
-        StorageServiceConfig,
+        DataStreamingServiceConfig, DiemDataClientConfig, NetworkConfig, NodeConfig,
+        PersistableConfig, StorageServiceConfig,
     },
     network_id::NetworkId,
     utils::get_genesis_txn,
@@ -275,6 +275,7 @@ fn create_state_sync_runtimes<M: MempoolNotificationSender + 'static>(
     // Start the diem data client
     let (diem_data_client, diem_data_client_runtime) = setup_diem_data_client(
         node_config.state_sync.storage_service,
+        node_config.state_sync.diem_data_client,
         storage_service_client_network_handles,
         peer_metadata_storage,
     );
@@ -330,7 +331,8 @@ fn setup_data_streaming_service(
 }
 
 fn setup_diem_data_client(
-    config: StorageServiceConfig,
+    storage_service_config: StorageServiceConfig,
+    diem_data_client_config: DiemDataClientConfig,
     network_handles: HashMap<NetworkId, storage_service_client::StorageServiceNetworkSender>,
     peer_metadata_storage: Arc<PeerMetadataStorage>,
 ) -> (DiemNetDataClient, Runtime) {
@@ -341,8 +343,12 @@ fn setup_diem_data_client(
     );
 
     // Create the diem data client
-    let (diem_data_client, data_summary_poller) =
-        DiemNetDataClient::new(config, TimeService::real(), network_client);
+    let (diem_data_client, data_summary_poller) = DiemNetDataClient::new(
+        diem_data_client_config,
+        storage_service_config,
+        TimeService::real(),
+        network_client,
+    );
 
     // Create a new runtime for the diem data client and spawn the data poller
     let diem_data_client_runtime = Builder::new_multi_thread()

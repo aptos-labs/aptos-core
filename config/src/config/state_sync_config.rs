@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default)]
@@ -30,6 +31,7 @@ pub struct StateSyncConfig {
 
     // Everything above belongs to state sync v1 and will be removed in the future.
     pub data_streaming_service: DataStreamingServiceConfig,
+    pub diem_data_client: DiemDataClientConfig,
     pub state_sync_driver: StateSyncDriverConfig,
     pub storage_service: StorageServiceConfig,
 }
@@ -47,6 +49,7 @@ impl Default for StateSyncConfig {
             sync_request_timeout_ms: 60_000,
             tick_interval_ms: 100,
             data_streaming_service: DataStreamingServiceConfig::default(),
+            diem_data_client: DiemDataClientConfig::default(),
             state_sync_driver: StateSyncDriverConfig::default(),
             storage_service: StorageServiceConfig::default(),
         }
@@ -150,6 +153,22 @@ impl Default for DataStreamingServiceConfig {
             max_request_retry: 10,
             max_notification_id_mappings: 2000,
             progress_check_interval_ms: 100,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(default)]
+pub struct DiemDataClientConfig {
+    pub response_timeout_ms: Duration, // Timeout (in milliseconds) when waiting for a response
+    pub summary_poll_interval_ms: Duration, // Interval (in milliseconds) between data summary polls
+}
+
+impl Default for DiemDataClientConfig {
+    fn default() -> Self {
+        Self {
+            response_timeout_ms: Duration::from_millis(3_000),
+            summary_poll_interval_ms: Duration::from_millis(1_000),
         }
     }
 }

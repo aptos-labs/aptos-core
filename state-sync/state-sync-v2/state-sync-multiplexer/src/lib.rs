@@ -217,6 +217,7 @@ mod tests {
             PeerMetadataStorage::new(&[]),
         );
         let (diem_data_client, _) = DiemNetDataClient::new(
+            node_config.state_sync.diem_data_client,
             node_config.state_sync.storage_service,
             TimeService::mock(),
             network_client,

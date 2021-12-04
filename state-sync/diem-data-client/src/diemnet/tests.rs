@@ -1,13 +1,11 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{
-    DataSummaryPoller, DiemDataClient, DiemNetDataClient, Error, DATA_SUMMARY_POLL_INTERVAL,
-};
+use super::{DataSummaryPoller, DiemDataClient, DiemNetDataClient, Error};
 use channel::{diem_channel, message_queues::QueueStyle};
 use claim::{assert_err, assert_matches};
 use diem_config::{
-    config::StorageServiceConfig,
+    config::{DiemDataClientConfig, StorageServiceConfig},
     network_id::{NetworkId, PeerNetworkId},
 };
 use diem_crypto::HashValue;
@@ -26,7 +24,7 @@ use network::{
     protocols::{network::NewNetworkSender, wire::handshake::v1::ProtocolId},
     transport::ConnectionMetadata,
 };
-use std::{collections::BTreeMap, sync::Arc};
+use std::{collections::BTreeMap, sync::Arc, time::Duration};
 use storage_service_client::{StorageServiceClient, StorageServiceNetworkSender};
 use storage_service_server::network::{NetworkRequest, ResponseSender};
 use storage_service_types::{
@@ -86,6 +84,7 @@ impl MockNetwork {
 
         let mock_time = TimeService::mock();
         let (client, poller) = DiemNetDataClient::new(
+            DiemDataClientConfig::default(),
             StorageServiceConfig::default(),
             mock_time.clone(),
             network_client,
@@ -162,7 +161,7 @@ async fn test_request_works_only_when_data_available() {
 
     // advance time so the poller sends a data summary request
     tokio::task::yield_now().await;
-    mock_time.advance_async(DATA_SUMMARY_POLL_INTERVAL).await;
+    mock_time.advance_async(Duration::from_millis(1_000)).await;
 
     // receive their request and fulfill it
     let (peer, protocol, request, response_sender) = mock_network.next_request().await.unwrap();
@@ -381,7 +380,8 @@ async fn bad_peer_is_eventually_added_back() {
 
     // Advance time so the poller sends a data summary request.
     tokio::task::yield_now().await;
-    mock_time.advance_async(DATA_SUMMARY_POLL_INTERVAL).await;
+    let summary_poll_interval = Duration::from_millis(1_000);
+    mock_time.advance_async(summary_poll_interval).await;
 
     // Initially this request range is serviceable by this peer.
     let global_summary = client.get_global_data_summary();
@@ -414,7 +414,7 @@ async fn bad_peer_is_eventually_added_back() {
     // This peer still responds to the StorageServerSummary requests.
     // Its score keeps increasing and this peer is eventually added back.
     for _ in 0..20 {
-        mock_time.advance_async(DATA_SUMMARY_POLL_INTERVAL).await;
+        mock_time.advance_async(summary_poll_interval).await;
     }
 
     let global_summary = client.get_global_data_summary();
