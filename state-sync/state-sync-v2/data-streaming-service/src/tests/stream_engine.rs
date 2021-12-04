@@ -6,12 +6,10 @@ use crate::{
     error::Error,
     stream_engine::{DataStreamEngine, EpochEndingStreamEngine, StreamEngine},
     streaming_client::{GetAllEpochEndingLedgerInfosRequest, StreamRequest},
-    tests::utils::{initialize_logger, NoopResponseCallback},
+    tests::utils::initialize_logger,
 };
 use claim::{assert_matches, assert_ok};
-use diem_data_client::{
-    GlobalDataSummary, OptimalChunkSizes, Response, ResponseContext, ResponsePayload,
-};
+use diem_data_client::{GlobalDataSummary, OptimalChunkSizes, ResponsePayload};
 use diem_id_generator::U64IdGenerator;
 use std::{cmp, sync::Arc};
 use storage_service_types::CompleteDataRange;
@@ -283,12 +281,4 @@ fn create_notification_id_generator() -> Arc<U64IdGenerator> {
 
 fn create_empty_client_response_payload() -> ResponsePayload {
     ResponsePayload::EpochEndingLedgerInfos(vec![])
-}
-
-fn create_empty_client_response() -> Response<ResponsePayload> {
-    let context = ResponseContext {
-        id: 0,
-        response_callback: Box::new(NoopResponseCallback),
-    };
-    Response::new(context, create_empty_client_response_payload())
 }
