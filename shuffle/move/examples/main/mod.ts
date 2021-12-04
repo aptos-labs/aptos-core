@@ -6,7 +6,6 @@
 
 import * as DiemHelpers from "./helpers.ts";
 import {
-  addressOrDefault,
   consoleContext,
   defaultUserContext,
   UserContext,
@@ -132,13 +131,27 @@ async function invokeScriptFunction(
 }
 
 export async function decodedMessages(addr?: string) {
-  addr = addressOrDefault(addr);
   return (await devapi.resourcesWithName("MessageHolder", addr))
     .map((entry) => entry.data.message);
 }
 
+export async function messageEvents(
+  addr?: string,
+  start?: number,
+  limit?: number,
+  moduleAddress?: string
+) {
+  moduleAddress = moduleAddress || defaultUserContext.address;
+  return await devapi.events(
+    `${moduleAddress}::Message::MessageHolder`,
+    "message_change_events",
+    addr,
+    start,
+    limit
+  );
+}
+
 export async function decodedNFTs(addr?: string) {
-  addr = addressOrDefault(addr);
   const decodedNfts: any[] = [];
   const nfts = (await devapi.resourcesWithName("NFTStandard", addr))
     .filter((entry) => entry.data && entry.data.nfts)

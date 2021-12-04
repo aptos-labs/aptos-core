@@ -67,6 +67,19 @@ export class Client {
     return await this.fetch(this.url(`/accounts/${addr}/modules`));
   }
 
+  async getEventsByEventHandle(
+    addr: string,
+    handleStruct: string,
+    fieldName: string,
+    start?: number,
+    limit?: number
+  ): Promise<Event[]> {
+    start = start || 0;
+    limit = limit || 100;
+    const query = `start=${start}&limit=${limit}`
+    return await this.fetch(this.url(`/accounts/${addr}/events/${handleStruct}/${fieldName}?${query}`));
+  }
+
   async submitTransaction(
     txn: UserTransactionRequest,
   ): Promise<PendingTransaction> {

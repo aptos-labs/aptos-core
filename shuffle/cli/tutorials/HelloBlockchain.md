@@ -229,6 +229,43 @@ Use decodedMessages to check account message:
 [ "hello blockchain" ]
 ```
 
+Update message triggers an event, use `main.messageEvents` to find out all update events:
+
+```
+> await main.setMessageScriptFunction("hello again");
+{
+  type: "pending_transaction",
+  hash: "0x262cb8ae79e26f616ba7faf43927b4011b85c366084d5ddbfa15123b5eb2be07",
+  sender: "0x825b47b8fd2b30cf37c0e58579a78bc8",
+  sequence_number: "3",
+  max_gas_amount: "1000000",
+  gas_unit_price: "0",
+  gas_currency_code: "XUS",
+  expiration_timestamp_secs: "99999999999",
+  payload: {
+    type: "script_function_payload",
+    function: "0x825b47b8fd2b30cf37c0e58579a78bc8::Message::set_message",
+    type_arguments: [],
+    arguments: [ "0x68656c6c6f20616761696e" ]
+  },
+  signature: {
+    type: "ed25519_signature",
+    public_key: "0x171b9cd908c329b2b3f091729799b74cba8a25d7075067022bbc15f1faa02303",
+    signature: "0xa10c5a63ff6a474b2bbfeaaca366860ffddc12e4b51d99a14327afa651ab79e9ab21e7f1634a12c9045f47bb060addd2ee..."
+  }
+}
+
+> await main.messageEvents();
+[
+  {
+    key: "0x0400000000000000825b47b8fd2b30cf37c0e58579a78bc8",
+    sequence_number: "0",
+    type: "0x825b47b8fd2b30cf37c0e58579a78bc8::Message::MessageChangeEvent",
+    data: { from_message: "hello blockchain", to_message: "hello again" }
+  }
+]
+```
+
 ## Write E2E Tests
 
 You can also test your module by writing unit tests and integration tests. See

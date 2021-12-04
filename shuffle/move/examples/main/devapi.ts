@@ -10,6 +10,7 @@
 import * as context from "./context.ts";
 import {
   Account,
+  Event,
   OnChainTransaction,
   PendingTransaction,
   SigningMessage,
@@ -70,6 +71,18 @@ export async function modules(addr?: string) {
 export async function account(addr?: string): Promise<Account> {
   addr = context.addressOrDefault(addr);
   return await context.client().getAccount(addr);
+}
+
+// Returns events by account event handle.
+export async function events(
+  handleStruct: string,
+  fieldName: string,
+  addr?: string,
+  start?: number,
+  limit?: number
+): Promise<Event[]> {
+  addr = context.addressOrDefault(addr);
+  return await context.client().getEventsByEventHandle(addr, handleStruct, fieldName, start, limit);
 }
 
 // Returns the sequence number for a particular address, or the default account

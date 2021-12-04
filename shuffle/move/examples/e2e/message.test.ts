@@ -23,6 +23,20 @@ Deno.test("Ability to set message", async () => {
   const expected = "hello blockchain";
   const messages = await main.decodedMessages();
   assertEquals(messages[0], expected);
+
+  txn = await main.setMessageScriptFunction("hello again");
+  txn = await devapi.waitForTransaction(txn.hash);
+  assert(txn.success);
+
+  const events = await main.messageEvents();
+  // In case there is another test also set message,
+  // we only look for last event
+  assert(events.length >= 1);
+  const event = events[events.length - 1];
+  assertEquals(event.data, {
+    "from_message": "hello blockchain",
+    "to_message": "hello again"
+  });
 });
 
 Deno.test("Ability to set NFTs", async () => {
