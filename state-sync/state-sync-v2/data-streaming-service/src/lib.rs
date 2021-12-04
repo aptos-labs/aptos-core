@@ -3,9 +3,9 @@
 
 #![forbid(unsafe_code)]
 
-mod data_notification;
-mod data_stream;
-mod error;
+pub mod data_notification;
+pub mod data_stream;
+pub mod error;
 mod logging;
 mod metrics;
 mod stream_engine;
