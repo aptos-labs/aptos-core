@@ -7,6 +7,7 @@
 // deno-lint-ignore-file no-explicit-any camelcase
 
 import { delay } from "https://deno.land/std@0.114.0/async/delay.ts";
+import urlcat from 'https://deno.land/x/urlcat/src/index.ts';
 
 export class Client {
   baseUrl: string;
@@ -16,15 +17,15 @@ export class Client {
   }
 
   async getLedgerInfo(): Promise<LedgerInfo> {
-    return await this.fetch(this.url("/"));
+    return await this.fetch(this.baseUrl);
   }
 
-  async getTransactions(): Promise<OnChainTransaction[]> {
-    return await this.fetch(this.url("/transactions"));
+  async getTransactions(start?: number, limit?: number): Promise<OnChainTransaction[]> {
+    return await this.fetch(urlcat(this.baseUrl, "/transactions", {start, limit}));
   }
 
   async getTransaction(versionOrHash: number | string): Promise<Transaction> {
-    return await this.fetch(this.url(`/transactions/${versionOrHash}`));
+    return await this.fetch(urlcat(this.baseUrl, "/transactions/:versionOrHash", { versionOrHash }));
   }
 
   async waitForTransaction(
@@ -35,7 +36,7 @@ export class Client {
     const count = (timeout || 5000) / delayMs;
 
     for (let i = count; i >= 0; i--) {
-      const res = await fetch(this.url(`/transactions/${versionOrHash}`));
+      const res = await fetch(urlcat(this.baseUrl, "/transactions/:versionOrHash", { versionOrHash }));
       const body = await res.json();
       if (res.status === 200) {
         if (body.type !== "pending_transaction") {
@@ -52,19 +53,19 @@ export class Client {
   }
 
   async getAccount(addr: string): Promise<Account> {
-    return await this.fetch(this.url(`/accounts/${addr}`));
+    return await this.fetch(urlcat(this.baseUrl, "/accounts/:addr", { addr }));
   }
 
-  async getAccountTransactions(addr: string): Promise<OnChainTransaction[]> {
-    return await this.fetch(this.url(`/accounts/${addr}/transactions`));
+  async getAccountTransactions(addr: string, start?: number, limit?: number): Promise<OnChainTransaction[]> {
+    return await this.fetch(urlcat(this.baseUrl, "/accounts/:addr/transactions", { addr, start, limit }));
   }
 
   async getAccountResources(addr: string): Promise<any[]> {
-    return await this.fetch(this.url(`/accounts/${addr}/resources`));
+    return await this.fetch(urlcat(this.baseUrl, "/accounts/:addr/resources", { addr }));
   }
 
   async getAccountModules(addr: string): Promise<any[]> {
-    return await this.fetch(this.url(`/accounts/${addr}/modules`));
+    return await this.fetch(urlcat(this.baseUrl, "/accounts/:addr/modules", { addr }));
   }
 
   async getEventsByEventHandle(
@@ -74,28 +75,26 @@ export class Client {
     start?: number,
     limit?: number
   ): Promise<Event[]> {
-    start = start || 0;
-    limit = limit || 100;
-    const query = `start=${start}&limit=${limit}`
-    return await this.fetch(this.url(`/accounts/${addr}/events/${handleStruct}/${fieldName}?${query}`));
+    const path = "/accounts/:addr/events/:handleStruct/:fieldName";
+    return await this.fetch(urlcat(this.baseUrl, path, { addr, handleStruct, fieldName, start, limit }));
   }
 
   async submitTransaction(
     txn: UserTransactionRequest,
   ): Promise<PendingTransaction> {
-    return await this.post(this.url("/transactions"), txn);
+    return await this.post(urlcat(this.baseUrl, "/transactions"), txn);
   }
 
   async createSigningMessage(
     txn: SigningMessageRequest,
   ): Promise<SigningMessage> {
-    return await this.post(this.url("/transactions/signing_message"), txn);
+    return await this.post(urlcat(this.baseUrl, "/transactions/signing_message"), txn);
   }
 
   async submitBcsTransaction(
     txn: string | Uint8Array,
   ): Promise<PendingTransaction> {
-    return await this.fetch(this.url("/transactions"), {
+    return await this.fetch(urlcat(this.baseUrl, "/transactions"), {
       method: "POST",
       body: txn,
       headers: {
@@ -120,10 +119,6 @@ export class Client {
       throw new Error(JSON.stringify(await res.json()));
     }
     return await res.json();
-  }
-
-  private url(tail: string): string {
-    return new URL(tail, this.baseUrl).href;
   }
 }
 

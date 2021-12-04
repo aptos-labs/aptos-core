@@ -26,9 +26,9 @@ export async function ledgerInfo() {
 }
 
 // Returns a list of transactions, ascending from page 0.
-export async function transactions(): Promise<OnChainTransaction[]> {
+export async function transactions(start?: number, limit?: number): Promise<OnChainTransaction[]> {
   // TODO: Have below return a list of transactions desc by sequence number
-  return await context.client().getTransactions();
+  return await context.client().getTransactions(start, limit);
 }
 
 // Returns a specific transaction based on the version or hash.
@@ -49,9 +49,11 @@ export async function waitForTransaction(
 // Returns transactions specific to a particular address.
 export async function accountTransactions(
   addr?: string,
+  start?: number,
+  limit?: number
 ): Promise<OnChainTransaction[]> {
   addr = context.addressOrDefault(addr);
-  return await context.client().getAccountTransactions(addr);
+  return await context.client().getAccountTransactions(addr, start, limit);
 }
 
 // Returns resources for a specific address.
@@ -77,9 +79,9 @@ export async function account(addr?: string): Promise<Account> {
 export async function events(
   handleStruct: string,
   fieldName: string,
-  addr?: string,
   start?: number,
-  limit?: number
+  limit?: number,
+  addr?: string,
 ): Promise<Event[]> {
   addr = context.addressOrDefault(addr);
   return await context.client().getEventsByEventHandle(addr, handleStruct, fieldName, start, limit);

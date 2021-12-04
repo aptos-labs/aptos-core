@@ -136,18 +136,18 @@ export async function decodedMessages(addr?: string) {
 }
 
 export async function messageEvents(
-  addr?: string,
   start?: number,
   limit?: number,
+  addr?: string,
   moduleAddress?: string
 ) {
   moduleAddress = moduleAddress || defaultUserContext.address;
   return await devapi.events(
     `${moduleAddress}::Message::MessageHolder`,
     "message_change_events",
-    addr,
     start,
-    limit
+    limit,
+    addr,
   );
 }
 

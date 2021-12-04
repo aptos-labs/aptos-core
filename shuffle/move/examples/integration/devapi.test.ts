@@ -83,3 +83,21 @@ Deno.test("account", async () => {
   const actual = await devapi.account();
   assert(actual);
 });
+
+Deno.test("events", async () => {
+  const handleStruct = "0x1::DiemAccount::AccountOperationsCapability";
+  const accountAddress = "0xa550c18";
+  const events = await devapi.events(handleStruct, "creation_events", undefined, undefined, accountAddress);
+  // default limit is 25, we need at least 3 events for the following assertions
+  assert(events.length > 3);
+  // default start is 0
+  assertEquals(events[0].sequence_number, "0");
+
+  const events1 = await devapi.events(handleStruct, "creation_events", 0, 2, accountAddress);
+  assertEquals(events1.length, 2);
+
+  const events2 = await devapi.events(handleStruct, "creation_events", 1, 2, accountAddress);
+  assertEquals(events2.length, 2);
+
+  assertEquals(events1[1], events2[0]);
+});
