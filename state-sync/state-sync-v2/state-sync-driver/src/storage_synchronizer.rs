@@ -150,8 +150,8 @@ impl StorageSynchronizerInterface for StorageSynchronizer {
             .chunk_executor
             .apply_and_commit_chunk(
                 output_list_with_proof,
-                target_ledger_info,
-                end_of_epoch_ledger_info,
+                &target_ledger_info,
+                end_of_epoch_ledger_info.as_ref(),
             )
             .map_err(|error| {
                 Error::UnexpectedError(format!("Apply and commit chunk failed: {}", error))
@@ -171,8 +171,8 @@ impl StorageSynchronizerInterface for StorageSynchronizer {
             .chunk_executor
             .execute_and_commit_chunk(
                 transaction_list_with_proof,
-                target_ledger_info,
-                end_of_epoch_ledger_info,
+                &target_ledger_info,
+                end_of_epoch_ledger_info.as_ref(),
             )
             .map_err(|error| {
                 Error::UnexpectedError(format!("Execute and commit chunk failed: {}", error))

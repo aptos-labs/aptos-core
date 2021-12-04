@@ -367,11 +367,11 @@ fn test_state_sync_v2_fullnode() {
     swarm
         .validator_mut(validator_peer_id)
         .unwrap()
-        .wait_until_healthy(Instant::now() + Duration::from_secs(10))
+        .wait_until_healthy(Instant::now() + Duration::from_secs(30))
         .unwrap();
     for fullnode in swarm.full_nodes_mut() {
         fullnode
-            .wait_until_healthy(Instant::now() + Duration::from_secs(10))
+            .wait_until_healthy(Instant::now() + Duration::from_secs(30))
             .unwrap();
     }
 
@@ -399,6 +399,6 @@ fn test_state_sync_v2_fullnode() {
     // Restart the fullnode and verify it can sync
     swarm.fullnode_mut(vfn_peer_id).unwrap().restart().unwrap();
     swarm
-        .wait_for_all_nodes_to_catchup(Instant::now() + Duration::from_secs(10))
+        .wait_for_all_nodes_to_catchup(Instant::now() + Duration::from_secs(30))
         .unwrap();
 }
