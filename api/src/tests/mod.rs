@@ -5,6 +5,7 @@ mod accounts_test;
 mod events_test;
 mod index_test;
 mod invalid_post_request_test;
+mod string_resource_test;
 mod test_context;
 mod transactions_test;
 

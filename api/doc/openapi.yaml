@@ -1406,7 +1406,7 @@ components:
           * `vector<u64>{255, 255}` => `["255", "255"]`
           * `vector<u8>{255, 255}` => `0xffff`
 
-        Move `struct` type value is serialized into `object` that looks like this:
+        Move `struct` type value is serialized into `object` that looks like this (except some Move stdlib types, see the following section):
 
           ```json
           {
@@ -1418,6 +1418,10 @@ components:
 
         For example:
           `{ "created": "0xa550c18", "role_id": "0" }`
+
+        **Special serialization for Move stdlib types:**
+
+        * [0x1::ASCII::String](https://github.com/diem/diem/blob/main/language/move-stdlib/docs/ASCII.md) is serialized into `string`. For example, struct value `0x1::ASCII::String{bytes: b"hello world"}` is serialized as `"hello world"` in JSON.
 
       example: "3344000000"
     Event:

@@ -3,8 +3,8 @@
 
 use crate::{Address, Bytecode};
 
-use anyhow::format_err;
-use diem_types::{event::EventKey, transaction::Module};
+use anyhow::{bail, format_err};
+use diem_types::{account_config::CORE_CODE_ADDRESS, event::EventKey, transaction::Module};
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{
@@ -269,11 +269,26 @@ pub enum MoveValue {
     Vector(Vec<MoveValue>),
     Bytes(HexEncodedBytes),
     Struct(MoveStructValue),
+    String(String),
 }
 
 impl MoveValue {
     pub fn json(&self) -> anyhow::Result<serde_json::Value> {
         Ok(serde_json::to_value(self)?)
+    }
+
+    pub fn is_ascii_string(st: &StructTag) -> bool {
+        st.address == CORE_CODE_ADDRESS
+            && st.name.to_string() == "String"
+            && st.module.to_string() == "ASCII"
+    }
+
+    pub fn convert_ascii_string(v: AnnotatedMoveStruct) -> anyhow::Result<MoveValue> {
+        if let Some((_, AnnotatedMoveValue::Bytes(bytes))) = v.value.into_iter().next() {
+            Ok(MoveValue::String(String::from_utf8(bytes)?))
+        } else {
+            bail!("expect ASCII::String, but failed to decode struct value");
+        }
     }
 }
 
@@ -293,7 +308,13 @@ impl TryFrom<AnnotatedMoveValue> for MoveValue {
                     .collect::<anyhow::Result<_>>()?,
             ),
             AnnotatedMoveValue::Bytes(v) => MoveValue::Bytes(HexEncodedBytes(v)),
-            AnnotatedMoveValue::Struct(v) => MoveValue::Struct(v.try_into()?),
+            AnnotatedMoveValue::Struct(v) => {
+                if MoveValue::is_ascii_string(&v.type_) {
+                    MoveValue::convert_ascii_string(v)?
+                } else {
+                    MoveValue::Struct(v.try_into()?)
+                }
+            }
         })
     }
 }
@@ -322,6 +343,7 @@ impl Serialize for MoveValue {
             MoveValue::Vector(v) => v.serialize(serializer),
             MoveValue::Bytes(v) => v.serialize(serializer),
             MoveValue::Struct(v) => v.serialize(serializer),
+            MoveValue::String(v) => v.serialize(serializer),
         }
     }
 }
