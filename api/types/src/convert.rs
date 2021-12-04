@@ -25,7 +25,7 @@ use move_core_types::{
     language_storage::{ModuleId, StructTag},
     resolver::MoveResolver,
 };
-use resource_viewer::MoveValueAnnotator;
+use move_resource_viewer::MoveValueAnnotator;
 
 use crate::transaction::ModuleBundlePayload;
 use anyhow::{ensure, format_err, Result};

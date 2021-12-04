@@ -29,7 +29,7 @@ use diem_types::{
 };
 use fail::fail_point;
 use futures::{channel::oneshot, SinkExt};
-use resource_viewer::AnnotatedMoveStruct;
+use move_resource_viewer::AnnotatedMoveStruct;
 use serde_json::Value;
 use std::{borrow::Borrow, collections::BTreeMap, sync::Arc};
 use storage_interface::MoveDbReader;

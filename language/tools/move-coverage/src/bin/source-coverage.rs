@@ -3,8 +3,8 @@
 
 #![forbid(unsafe_code)]
 
-use bytecode_source_map::utils::source_map_from_file;
 use move_binary_format::file_format::CompiledModule;
+use move_bytecode_source_map::utils::source_map_from_file;
 use move_command_line_common::files::SOURCE_MAP_EXTENSION;
 use move_coverage::{coverage_map::CoverageMap, source_coverage::SourceCoverageBuilder};
 use std::{

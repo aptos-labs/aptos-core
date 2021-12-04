@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::release_flow::create::create_release_writeset;
-use bytecode_verifier::verify_module;
 use diem_types::{
     access_path::AccessPath,
     transaction::{ChangeSet, WriteSetPayload},
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use move_binary_format::file_format::{basic_test_module, empty_module};
+use move_bytecode_verifier::verify_module;
 use move_core_types::identifier::Identifier;
 
 #[test]

@@ -24,7 +24,7 @@ move-lang = { path = "../../move-lang" }
 move-vm-types = { path = "../../move-vm/types" }
 move-vm-runtime = { path = "../../move-vm/runtime" }
 move-vm-test-utils = { path = "../../move-vm/test-utils" }
-resource-viewer = { path = "../resource-viewer" }
+move-resource-viewer = { path = "../move-resource-viewer" }
 move-binary-format = { path = "../../move-binary-format" }
 move-model = { path = "../../move-model" }
 bytecode-interpreter = { path = "../../move-prover/interpreter" }

@@ -13,27 +13,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "abigen"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bcs",
- "bytecode-verifier",
- "codespan-reporting",
- "datatest-stable",
- "diem-workspace-hack",
- "heck",
- "log",
- "move-command-line-common",
- "move-core-types",
- "move-model",
- "move-prover",
- "move-prover-test-utils",
- "serde 1.0.130",
- "tempfile",
-]
-
-[[package]]
 name = "accumulator"
 version = "0.1.0"
 dependencies = [
@@ -541,14 +520,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "borrow-graph"
-version = "0.0.1"
-dependencies = [
- "diem-workspace-hack",
- "mirai-annotations",
-]
-
-[[package]]
 name = "bounded-executor"
 version = "0.1.0"
 dependencies = [
@@ -596,19 +567,19 @@ name = "bytecode"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "borrow-graph",
- "bytecode-verifier",
  "codespan",
  "codespan-reporting",
  "datatest-stable",
  "diem-workspace-hack",
  "im",
- "ir-to-bytecode",
  "itertools 0.10.1",
  "log",
  "move-binary-format",
+ "move-borrow-graph",
+ "move-bytecode-verifier",
  "move-command-line-common",
  "move-core-types",
+ "move-ir-to-bytecode",
  "move-model",
  "move-prover-test-utils",
  "move-read-write-set-types",
@@ -669,43 +640,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "bytecode-source-map"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bcs",
- "codespan-reporting",
- "diem-workspace-hack",
- "move-binary-format",
- "move-command-line-common",
- "move-core-types",
- "move-ir-types",
- "move-symbol-pool",
- "serde 1.0.130",
-]
-
-[[package]]
-name = "bytecode-verifier"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "borrow-graph",
- "diem-workspace-hack",
- "invalid-mutations",
- "mirai-annotations",
- "move-binary-format",
- "move-core-types",
- "petgraph 0.5.1",
-]
-
-[[package]]
 name = "bytecode-verifier-tests"
 version = "0.1.0"
 dependencies = [
- "bytecode-verifier",
  "diem-workspace-hack",
  "invalid-mutations",
  "move-binary-format",
+ "move-bytecode-verifier",
  "move-core-types",
  "petgraph 0.5.1",
  "proptest",
@@ -1643,11 +1584,11 @@ dependencies = [
  "hyper",
  "mempool-notifications",
  "move-core-types",
+ "move-resource-viewer",
  "once_cell",
  "percent-encoding",
  "rand 0.8.4",
  "reqwest",
- "resource-viewer",
  "serde 1.0.130",
  "serde_json",
  "storage-interface",
@@ -1669,7 +1610,7 @@ dependencies = [
  "hex",
  "move-binary-format",
  "move-core-types",
- "resource-viewer",
+ "move-resource-viewer",
  "serde 1.0.130",
  "serde_json",
  "warp",
@@ -1912,10 +1853,8 @@ dependencies = [
 name = "diem-framework"
 version = "0.1.0"
 dependencies = [
- "abigen",
  "anyhow",
  "bcs",
- "bytecode-verifier",
  "clap",
  "datatest-stable",
  "diem-crypto",
@@ -1923,15 +1862,17 @@ dependencies = [
  "diem-vm",
  "diem-workspace-hack",
  "dir-diff",
- "docgen",
- "errmapgen",
  "include_dir",
  "log",
+ "move-abigen",
  "move-binary-format",
  "move-bytecode-utils",
+ "move-bytecode-verifier",
  "move-cli",
  "move-command-line-common",
  "move-core-types",
+ "move-docgen",
+ "move-errmapgen",
  "move-lang",
  "move-package",
  "move-prover",
@@ -1955,13 +1896,13 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bcs",
- "bytecode-verifier",
  "diem-crypto",
  "diem-types",
  "diem-workspace-hack",
  "framework-releases",
  "include_dir",
  "move-binary-format",
+ "move-bytecode-verifier",
  "move-command-line-common",
  "once_cell",
 ]
@@ -2139,6 +2080,7 @@ dependencies = [
  "hex",
  "hyper",
  "move-core-types",
+ "move-resource-viewer",
  "move-vm-types",
  "network",
  "once_cell",
@@ -2146,7 +2088,6 @@ dependencies = [
  "rand 0.8.4",
  "regex",
  "reqwest",
- "resource-viewer",
  "scratchpad",
  "serde 1.0.130",
  "serde_json",
@@ -2517,7 +2458,7 @@ dependencies = [
  "diem-workspace-hack",
  "move-binary-format",
  "move-core-types",
- "resource-viewer",
+ "move-resource-viewer",
 ]
 
 [[package]]
@@ -2961,7 +2902,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bcs",
- "bytecode-verifier",
  "diem-crypto",
  "diem-crypto-derive",
  "diem-framework",
@@ -2976,6 +2916,7 @@ dependencies = [
  "handlebars",
  "hex",
  "move-binary-format",
+ "move-bytecode-verifier",
  "move-core-types",
  "move-lang",
  "move-vm-runtime",
@@ -3142,51 +3083,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "disassembler"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bytecode-source-map",
- "bytecode-verifier",
- "colored",
- "diem-workspace-hack",
- "move-binary-format",
- "move-command-line-common",
- "move-core-types",
- "move-coverage",
- "move-ir-types",
- "move-lang",
- "structopt 0.3.21",
-]
-
-[[package]]
 name = "discard"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "212d0f5754cb6769937f4501cc0e67f4f4483c8d2c3e1e922ee9edbe4ab4c7c0"
-
-[[package]]
-name = "docgen"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bytecode",
- "codespan",
- "codespan-reporting",
- "datatest-stable",
- "diem-workspace-hack",
- "itertools 0.10.1",
- "log",
- "move-lang",
- "move-model",
- "move-prover",
- "move-prover-test-utils",
- "num 0.4.0",
- "once_cell",
- "regex",
- "serde 1.0.130",
- "tempfile",
-]
 
 [[package]]
 name = "dtoa"
@@ -3302,23 +3202,6 @@ version = "0.3.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0465971a8cc1fa2455c8465aaa377131e1f1cf4983280f474a13e68793aa770c"
 dependencies = [
- "serde 1.0.130",
-]
-
-[[package]]
-name = "errmapgen"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bcs",
- "codespan-reporting",
- "datatest-stable",
- "diem-workspace-hack",
- "log",
- "move-command-line-common",
- "move-core-types",
- "move-model",
- "move-prover",
  "serde 1.0.130",
 ]
 
@@ -3645,7 +3528,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bcs",
- "bytecode-verifier",
  "clap",
  "diem-types",
  "diem-workspace-hack",
@@ -3653,6 +3535,7 @@ dependencies = [
  "log",
  "move-binary-format",
  "move-bytecode-utils",
+ "move-bytecode-verifier",
  "move-command-line-common",
  "move-core-types",
  "move-lang",
@@ -3695,7 +3578,6 @@ version = "0.1.0"
 dependencies = [
  "aho-corasick",
  "anyhow",
- "bytecode-verifier",
  "datatest-stable",
  "diem-config",
  "diem-crypto",
@@ -3712,6 +3594,7 @@ dependencies = [
  "language-e2e-tests",
  "mirai-annotations",
  "move-binary-format",
+ "move-bytecode-verifier",
  "move-command-line-common",
  "move-core-types",
  "once_cell",
@@ -4485,47 +4368,15 @@ name = "ir-testsuite"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bytecode-verifier",
  "datatest-stable",
  "diem-framework-releases",
  "diem-types",
  "diem-workspace-hack",
  "functional-tests",
- "ir-to-bytecode",
  "move-binary-format",
+ "move-bytecode-verifier",
  "move-core-types",
- "move-ir-types",
- "move-symbol-pool",
-]
-
-[[package]]
-name = "ir-to-bytecode"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bytecode-source-map",
- "codespan-reporting",
- "diem-workspace-hack",
- "ir-to-bytecode-syntax",
- "log",
- "move-binary-format",
- "move-command-line-common",
- "move-core-types",
- "move-ir-types",
- "move-symbol-pool",
- "ouroboros",
- "thiserror",
-]
-
-[[package]]
-name = "ir-to-bytecode-syntax"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "diem-workspace-hack",
- "hex",
- "move-command-line-common",
- "move-core-types",
+ "move-ir-to-bytecode",
  "move-ir-types",
  "move-symbol-pool",
 ]
@@ -4713,11 +4564,11 @@ name = "language-benchmarks"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bytecode-verifier",
  "criterion",
  "criterion-cpu-time",
  "diem-workspace-hack",
  "move-binary-format",
+ "move-bytecode-verifier",
  "move-core-types",
  "move-lang",
  "move-stdlib",
@@ -4767,7 +4618,6 @@ name = "language-e2e-testsuite"
 version = "0.1.0"
 dependencies = [
  "bcs",
- "bytecode-verifier",
  "diem-crypto",
  "diem-framework-releases",
  "diem-keygen",
@@ -4782,6 +4632,7 @@ dependencies = [
  "hex",
  "language-e2e-tests",
  "move-binary-format",
+ "move-bytecode-verifier",
  "move-core-types",
  "move-ir-compiler",
  "move-vm-runtime",
@@ -5055,14 +4906,35 @@ dependencies = [
 name = "module-generation"
 version = "0.1.0"
 dependencies = [
- "bytecode-verifier",
  "diem-workspace-hack",
- "ir-to-bytecode",
  "move-binary-format",
+ "move-bytecode-verifier",
  "move-core-types",
+ "move-ir-to-bytecode",
  "move-ir-types",
  "move-symbol-pool",
  "rand 0.8.4",
+]
+
+[[package]]
+name = "move-abigen"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bcs",
+ "codespan-reporting",
+ "datatest-stable",
+ "diem-workspace-hack",
+ "heck",
+ "log",
+ "move-bytecode-verifier",
+ "move-command-line-common",
+ "move-core-types",
+ "move-model",
+ "move-prover",
+ "move-prover-test-utils",
+ "serde 1.0.130",
+ "tempfile",
 ]
 
 [[package]]
@@ -5096,6 +4968,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "move-borrow-graph"
+version = "0.0.1"
+dependencies = [
+ "diem-workspace-hack",
+ "mirai-annotations",
+]
+
+[[package]]
+name = "move-bytecode-source-map"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bcs",
+ "codespan-reporting",
+ "diem-workspace-hack",
+ "move-binary-format",
+ "move-command-line-common",
+ "move-core-types",
+ "move-ir-types",
+ "move-symbol-pool",
+ "serde 1.0.130",
+]
+
+[[package]]
 name = "move-bytecode-utils"
 version = "0.1.0"
 dependencies = [
@@ -5107,15 +5003,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "move-bytecode-verifier"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "diem-workspace-hack",
+ "invalid-mutations",
+ "mirai-annotations",
+ "move-binary-format",
+ "move-borrow-graph",
+ "move-core-types",
+ "petgraph 0.5.1",
+]
+
+[[package]]
 name = "move-bytecode-viewer"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bytecode-source-map",
  "diem-workspace-hack",
- "disassembler",
  "move-binary-format",
+ "move-bytecode-source-map",
  "move-command-line-common",
+ "move-disassembler",
  "move-ir-types",
  "regex",
  "structopt 0.3.21",
@@ -5129,27 +5039,28 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bcs",
- "bytecode-source-map",
- "bytecode-verifier",
  "codespan-reporting",
  "colored",
  "datatest-stable",
  "diem-workspace-hack",
  "difference",
- "disassembler",
- "errmapgen",
  "include_dir",
  "itertools 0.10.1",
  "move-binary-format",
+ "move-bytecode-source-map",
  "move-bytecode-utils",
+ "move-bytecode-verifier",
  "move-bytecode-viewer",
  "move-command-line-common",
  "move-core-types",
  "move-coverage",
+ "move-disassembler",
+ "move-errmapgen",
  "move-ir-types",
  "move-lang",
  "move-package",
  "move-prover",
+ "move-resource-viewer",
  "move-stdlib",
  "move-symbol-pool",
  "move-unit-test",
@@ -5158,7 +5069,6 @@ dependencies = [
  "once_cell",
  "read-write-set",
  "read-write-set-dynamic",
- "resource-viewer",
  "serde 1.0.130",
  "serde_yaml",
  "structopt 0.3.21",
@@ -5205,12 +5115,12 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bcs",
- "bytecode-source-map",
- "bytecode-verifier",
  "codespan",
  "colored",
  "diem-workspace-hack",
  "move-binary-format",
+ "move-bytecode-source-map",
+ "move-bytecode-verifier",
  "move-command-line-common",
  "move-core-types",
  "move-ir-types",
@@ -5218,6 +5128,64 @@ dependencies = [
  "petgraph 0.5.1",
  "serde 1.0.130",
  "structopt 0.3.21",
+]
+
+[[package]]
+name = "move-disassembler"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "colored",
+ "diem-workspace-hack",
+ "move-binary-format",
+ "move-bytecode-source-map",
+ "move-bytecode-verifier",
+ "move-command-line-common",
+ "move-core-types",
+ "move-coverage",
+ "move-ir-types",
+ "move-lang",
+ "structopt 0.3.21",
+]
+
+[[package]]
+name = "move-docgen"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bytecode",
+ "codespan",
+ "codespan-reporting",
+ "datatest-stable",
+ "diem-workspace-hack",
+ "itertools 0.10.1",
+ "log",
+ "move-lang",
+ "move-model",
+ "move-prover",
+ "move-prover-test-utils",
+ "num 0.4.0",
+ "once_cell",
+ "regex",
+ "serde 1.0.130",
+ "tempfile",
+]
+
+[[package]]
+name = "move-errmapgen"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bcs",
+ "codespan-reporting",
+ "datatest-stable",
+ "diem-workspace-hack",
+ "log",
+ "move-command-line-common",
+ "move-core-types",
+ "move-model",
+ "move-prover",
+ "serde 1.0.130",
 ]
 
 [[package]]
@@ -5237,13 +5205,13 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bcs",
- "bytecode-source-map",
- "bytecode-verifier",
  "diem-workspace-hack",
- "ir-to-bytecode",
  "move-binary-format",
+ "move-bytecode-source-map",
+ "move-bytecode-verifier",
  "move-command-line-common",
  "move-core-types",
+ "move-ir-to-bytecode",
  "move-ir-types",
  "move-symbol-pool",
  "serde_json",
@@ -5257,6 +5225,38 @@ dependencies = [
  "datatest-stable",
  "diem-workspace-hack",
  "move-transactional-test-runner",
+]
+
+[[package]]
+name = "move-ir-to-bytecode"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "codespan-reporting",
+ "diem-workspace-hack",
+ "log",
+ "move-binary-format",
+ "move-bytecode-source-map",
+ "move-command-line-common",
+ "move-core-types",
+ "move-ir-to-bytecode-syntax",
+ "move-ir-types",
+ "move-symbol-pool",
+ "ouroboros",
+ "thiserror",
+]
+
+[[package]]
+name = "move-ir-to-bytecode-syntax"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "diem-workspace-hack",
+ "hex",
+ "move-command-line-common",
+ "move-core-types",
+ "move-ir-types",
+ "move-symbol-pool",
 ]
 
 [[package]]
@@ -5279,18 +5279,18 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "bcs",
- "borrow-graph",
- "bytecode-source-map",
- "bytecode-verifier",
  "codespan-reporting",
  "datatest-stable",
  "diem-workspace-hack",
  "difference",
  "hex",
- "ir-to-bytecode",
  "move-binary-format",
+ "move-borrow-graph",
+ "move-bytecode-source-map",
+ "move-bytecode-verifier",
  "move-command-line-common",
  "move-core-types",
+ "move-ir-to-bytecode",
  "move-ir-types",
  "move-stdlib",
  "move-symbol-pool",
@@ -5332,19 +5332,19 @@ name = "move-model"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bytecode-source-map",
- "bytecode-verifier",
  "codespan",
  "codespan-reporting",
  "datatest-stable",
  "diem-workspace-hack",
- "disassembler",
  "internment",
  "itertools 0.10.1",
  "log",
  "move-binary-format",
+ "move-bytecode-source-map",
+ "move-bytecode-verifier",
  "move-command-line-common",
  "move-core-types",
+ "move-disassembler",
  "move-ir-types",
  "move-lang",
  "move-prover-test-utils",
@@ -5383,19 +5383,19 @@ dependencies = [
 name = "move-package"
 version = "0.1.0"
 dependencies = [
- "abigen",
  "anyhow",
  "bcs",
- "bytecode-source-map",
  "colored",
  "datatest-stable",
  "diem-workspace-hack",
- "docgen",
- "errmapgen",
+ "move-abigen",
  "move-binary-format",
+ "move-bytecode-source-map",
  "move-bytecode-utils",
  "move-command-line-common",
  "move-core-types",
+ "move-docgen",
+ "move-errmapgen",
  "move-lang",
  "move-model",
  "move-symbol-pool",
@@ -5415,7 +5415,6 @@ dependencies = [
 name = "move-prover"
 version = "0.1.0"
 dependencies = [
- "abigen",
  "anyhow",
  "async-trait",
  "atty",
@@ -5427,15 +5426,16 @@ dependencies = [
  "codespan-reporting",
  "datatest-stable",
  "diem-workspace-hack",
- "docgen",
- "errmapgen",
  "futures",
  "hex",
  "itertools 0.10.1",
  "log",
+ "move-abigen",
  "move-binary-format",
  "move-command-line-common",
  "move-core-types",
+ "move-docgen",
+ "move-errmapgen",
  "move-ir-types",
  "move-lang",
  "move-model",
@@ -5477,19 +5477,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "move-resource-viewer"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bcs",
+ "diem-workspace-hack",
+ "hex",
+ "move-binary-format",
+ "move-core-types",
+ "move-vm-types",
+ "once_cell",
+ "serde 1.0.130",
+]
+
+[[package]]
 name = "move-stdlib"
 version = "0.1.0"
 dependencies = [
  "diem-workspace-hack",
  "dir-diff",
- "docgen",
- "errmapgen",
  "file_diff",
  "log",
  "move-binary-format",
  "move-cli",
  "move-command-line-common",
  "move-core-types",
+ "move-docgen",
+ "move-errmapgen",
  "move-lang",
  "move-package",
  "move-prover",
@@ -5519,20 +5534,21 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bytecode-interpreter",
- "bytecode-source-map",
  "colored",
  "datatest-stable",
  "diem-workspace-hack",
  "difference",
- "disassembler",
  "move-binary-format",
+ "move-bytecode-source-map",
  "move-bytecode-utils",
  "move-cli",
  "move-command-line-common",
  "move-core-types",
+ "move-disassembler",
  "move-ir-compiler",
  "move-ir-types",
  "move-lang",
+ "move-resource-viewer",
  "move-stdlib",
  "move-symbol-pool",
  "move-vm-runtime",
@@ -5541,7 +5557,6 @@ dependencies = [
  "once_cell",
  "rayon",
  "regex",
- "resource-viewer",
  "structopt 0.3.21",
  "tempfile",
 ]
@@ -5562,13 +5577,13 @@ dependencies = [
  "move-core-types",
  "move-lang",
  "move-model",
+ "move-resource-viewer",
  "move-stdlib",
  "move-vm-runtime",
  "move-vm-test-utils",
  "move-vm-types",
  "rayon",
  "regex",
- "resource-viewer",
  "structopt 0.3.21",
 ]
 
@@ -5593,12 +5608,12 @@ name = "move-vm-runtime"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bytecode-verifier",
  "diem-workspace-hack",
  "fail",
  "hex",
  "mirai-annotations",
  "move-binary-format",
+ "move-bytecode-verifier",
  "move-core-types",
  "move-ir-compiler",
  "move-lang",
@@ -6942,8 +6957,8 @@ dependencies = [
  "move-core-types",
  "move-model",
  "move-read-write-set-types",
+ "move-resource-viewer",
  "read-write-set-dynamic",
- "resource-viewer",
 ]
 
 [[package]]
@@ -7093,21 +7108,6 @@ dependencies = [
  "wasm-bindgen-futures",
  "web-sys",
  "winreg",
-]
-
-[[package]]
-name = "resource-viewer"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bcs",
- "diem-workspace-hack",
- "hex",
- "move-binary-format",
- "move-core-types",
- "move-vm-types",
- "once_cell",
- "serde 1.0.130",
 ]
 
 [[package]]
@@ -7936,7 +7936,6 @@ dependencies = [
 name = "shuffle"
 version = "0.1.0"
 dependencies = [
- "abigen",
  "anyhow",
  "bcs",
  "diem-api-types",
@@ -7957,6 +7956,7 @@ dependencies = [
  "generate-key",
  "hex",
  "include_dir",
+ "move-abigen",
  "move-binary-format",
  "move-cli",
  "move-core-types",
@@ -8716,7 +8716,6 @@ dependencies = [
 name = "test-generation"
 version = "0.1.0"
 dependencies = [
- "bytecode-verifier",
  "crossbeam-channel",
  "diem-workspace-hack",
  "getrandom 0.2.2",
@@ -8725,6 +8724,7 @@ dependencies = [
  "mirai-annotations",
  "module-generation",
  "move-binary-format",
+ "move-bytecode-verifier",
  "move-core-types",
  "move-lang",
  "move-stdlib",
@@ -9513,7 +9513,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bcs",
- "bytecode-verifier",
  "diem-config",
  "diem-crypto",
  "diem-framework",
@@ -9526,6 +9525,7 @@ dependencies = [
  "diem-workspace-hack",
  "move-binary-format",
  "move-bytecode-utils",
+ "move-bytecode-verifier",
  "move-core-types",
  "move-vm-runtime",
  "move-vm-types",

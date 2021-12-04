@@ -16,7 +16,7 @@ use diem_types::{
     account_state::AccountState, chain_id::ChainId, event::EventKey,
     ledger_info::LedgerInfoWithSignatures, protocol_spec::DpnProto,
 };
-use resource_viewer::{AnnotatedMoveStruct, MoveValueAnnotator};
+use move_resource_viewer::{AnnotatedMoveStruct, MoveValueAnnotator};
 use std::{
     collections::BTreeMap,
     convert::{TryFrom, TryInto},

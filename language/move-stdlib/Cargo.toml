@@ -12,8 +12,8 @@ publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-errmapgen = { path = "../move-prover/errmapgen" }
-docgen = { path = "../move-prover/docgen" }
+move-errmapgen = { path = "../move-prover/move-errmapgen" }
+move-docgen = { path = "../move-prover/move-docgen" }
 move-command-line-common = { path = "../move-command-line-common" }
 move-prover = { path = "../move-prover" }
 move-vm-types = { path = "../move-vm/types" }

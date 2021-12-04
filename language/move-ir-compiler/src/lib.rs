@@ -9,12 +9,12 @@ pub mod util;
 mod unit_tests;
 
 use anyhow::Result;
-use bytecode_source_map::source_map::SourceMap;
-use ir_to_bytecode::{
+use move_binary_format::file_format::{CompiledModule, CompiledScript};
+use move_bytecode_source_map::source_map::SourceMap;
+use move_ir_to_bytecode::{
     compiler::{compile_module, compile_script},
     parser::{parse_module, parse_script},
 };
-use move_binary_format::file_format::{CompiledModule, CompiledScript};
 
 /// An API for the compiler. Supports setting custom options.
 #[derive(Clone, Debug)]

@@ -10,11 +10,11 @@ license = "Apache-2.0"
 publish = false
 
 [dependencies]
-bytecode-verifier = { path = "../../language/bytecode-verifier" }
-abigen = { path = "../../language/move-prover/abigen" }
-docgen = { path = "../../language/move-prover/docgen" }
+move-bytecode-verifier = { path = "../../language/move-bytecode-verifier" }
+move-abigen = { path = "../../language/move-prover/move-abigen" }
+move-docgen = { path = "../../language/move-prover/move-docgen" }
 move-command-line-common = { path = "../../language/move-command-line-common" }
-errmapgen = { path = "../../language/move-prover/errmapgen" }
+move-errmapgen = { path = "../../language/move-prover/move-errmapgen" }
 move-lang = { path = "../../language/move-lang" }
 move-prover = { path = "../../language/move-prover" }
 diem-crypto = { path = "../../crates/diem-crypto" }

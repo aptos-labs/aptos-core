@@ -3,12 +3,12 @@
 
 #![forbid(unsafe_code)]
 use crate::interfaces::LeftScreen;
-use bytecode_source_map::{mapping::SourceMapping, source_map::SourceMap};
-use disassembler::disassembler::{Disassembler, DisassemblerOptions};
 use move_binary_format::{
     binary_views::BinaryIndexedView,
     file_format::{CodeOffset, CompiledModule, FunctionDefinitionIndex},
 };
+use move_bytecode_source_map::{mapping::SourceMapping, source_map::SourceMap};
+use move_disassembler::disassembler::{Disassembler, DisassemblerOptions};
 use regex::Regex;
 use std::collections::HashMap;
 

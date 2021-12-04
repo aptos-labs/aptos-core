@@ -35,7 +35,7 @@ diem-workspace-hack = { path = "../crates/diem-workspace-hack" }
 diem-api-types = { path = "./types", package = "diem-api-types" }
 storage-interface = { path = "../storage/storage-interface" }
 move-core-types = { path = "../language/move-core/types" }
-resource-viewer = { path = "../language/tools/resource-viewer" }
+move-resource-viewer = { path = "../language/tools/move-resource-viewer" }
 
 [dev-dependencies]
 rand = "0.8.3"

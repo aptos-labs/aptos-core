@@ -29,8 +29,8 @@ use move_lang::{
     diagnostics::{self, report_diagnostics, Diagnostic, Diagnostics, FileName},
 };
 use move_package::compilation::compiled_package::CompiledUnitWithSource;
+use move_resource_viewer::{AnnotatedMoveStruct, MoveValueAnnotator};
 use move_vm_types::gas_schedule::GasStatus;
-use resource_viewer::{AnnotatedMoveStruct, MoveValueAnnotator};
 use std::{
     collections::{BTreeMap, HashMap},
     fs,

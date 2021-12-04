@@ -8,12 +8,11 @@ use crate::tasks::{
     TaskInput, ViewCommand,
 };
 use anyhow::*;
-use bytecode_source_map::mapping::SourceMapping;
-use disassembler::disassembler::{Disassembler, DisassemblerOptions};
 use move_binary_format::{
     binary_views::BinaryIndexedView,
     file_format::{CompiledModule, CompiledScript},
 };
+use move_bytecode_source_map::mapping::SourceMapping;
 use move_command_line_common::{
     env::read_bool_env_var,
     files::{MOVE_EXTENSION, MOVE_IR_EXTENSION},
@@ -25,6 +24,7 @@ use move_core_types::{
     language_storage::{ModuleId, TypeTag},
     transaction_argument::TransactionArgument,
 };
+use move_disassembler::disassembler::{Disassembler, DisassemblerOptions};
 use move_ir_types::location::Spanned;
 use move_lang::{
     compiled_unit::AnnotatedCompiledUnit,

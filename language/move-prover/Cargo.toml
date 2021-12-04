@@ -13,9 +13,9 @@ move-command-line-common = { path = "../move-command-line-common" }
 move-binary-format = { path = "../move-binary-format" }
 move-lang = { path = "../move-lang" }
 move-model = { path = "../move-model" }
-docgen = { path = "docgen" }
-abigen = { path = "abigen" }
-errmapgen = { path = "errmapgen" }
+move-docgen = { path = "move-docgen" }
+move-abigen = { path = "move-abigen" }
+move-errmapgen = { path = "move-errmapgen" }
 bytecode = { path = "bytecode" }
 bytecode-interpreter = { path = "interpreter" }
 move-ir-types = { path = "../move-ir/types" }

@@ -24,4 +24,4 @@ bcs = "0.1.2"
 once_cell = "1.7.2"
 
 [dev-dependencies]
-bytecode-verifier = { path = "../../../../language/bytecode-verifier" }
+move-bytecode-verifier = { path = "../../../../language/move-bytecode-verifier" }

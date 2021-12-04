@@ -5,8 +5,8 @@ use crate::{
     bytecode_viewer::BytecodeViewer, source_viewer::ModuleViewer,
     tui::tui_interface::start_tui_with_interface, viewer::Viewer,
 };
-use bytecode_source_map::{source_map::SourceMap, utils::source_map_from_file};
 use move_binary_format::file_format::CompiledModule;
+use move_bytecode_source_map::{source_map::SourceMap, utils::source_map_from_file};
 use std::{
     fs,
     path::{Path, PathBuf},

@@ -19,8 +19,8 @@ use crate::{
     shared::{unique_map::UniqueMap, *},
     FullyCompiledProgram,
 };
-use bytecode_source_map::source_map::SourceMap;
 use move_binary_format::file_format as F;
+use move_bytecode_source_map::source_map::SourceMap;
 use move_core_types::account_address::AccountAddress as MoveAddress;
 use move_ir_types::{ast as IR, location::*};
 use move_symbol_pool::Symbol;
@@ -224,7 +224,8 @@ fn module(
         synthetics: vec![],
     };
     let deps: Vec<&F::CompiledModule> = vec![];
-    let (module, source_map) = match ir_to_bytecode::compiler::compile_module(ir_module, deps) {
+    let (module, source_map) = match move_ir_to_bytecode::compiler::compile_module(ir_module, deps)
+    {
         Ok(res) => res,
         Err(e) => {
             compilation_env.add_diag(diag!(
@@ -289,7 +290,8 @@ fn script(
         main,
     };
     let deps: Vec<&F::CompiledModule> = vec![];
-    let (script, source_map) = match ir_to_bytecode::compiler::compile_script(ir_script, deps) {
+    let (script, source_map) = match move_ir_to_bytecode::compiler::compile_script(ir_script, deps)
+    {
         Ok(res) => res,
         Err(e) => {
             compilation_env.add_diag(diag!(

@@ -9,13 +9,13 @@ use std::{
 use itertools::Itertools;
 use regex::Regex;
 
-use bytecode_source_map::source_map::SourceMap;
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{AbilitySet, Constant, FunctionDefinitionIndex, StructDefinitionIndex},
     views::{FunctionHandleView, StructHandleView},
     CompiledModule,
 };
+use move_bytecode_source_map::source_map::SourceMap;
 use move_ir_types::{ast::ConstantName, location::Spanned};
 use move_lang::{
     compiled_unit::{FunctionInfo, SpecInfo},

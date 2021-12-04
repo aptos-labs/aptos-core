@@ -25,7 +25,7 @@ tokio = { version = "1.8.1", features = ["full"] }
 toml = "0.5.8"
 url = { version = "2.2.2", features = ["serde"] }
 
-abigen = { path = "../../language/move-prover/abigen" }
+move-abigen = { path = "../../language/move-prover/move-abigen" }
 diem-api-types = { path = "../../api/types" }
 diem-config = { path = "../../config" }
 diem-crypto = { path = "../../crates/diem-crypto" }

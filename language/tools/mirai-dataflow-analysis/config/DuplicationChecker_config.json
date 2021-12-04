@@ -1,6 +1,6 @@
 {
     "reductions": [
-        {"Slice": "bytecode_verifier::check_duplication::{impl#0}::verify_module"},
+        {"Slice": "move_bytecode_verifier::check_duplication::{impl#0}::verify_module"},
         "Fold",
         "Clean"
     ],

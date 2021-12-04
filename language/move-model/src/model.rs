@@ -35,8 +35,6 @@ use move_command_line_common::files::FileHash;
 use num::{BigUint, One, ToPrimitive};
 use serde::{Deserialize, Serialize};
 
-use bytecode_source_map::{mapping::SourceMapping, source_map::SourceMap};
-use disassembler::disassembler::{Disassembler, DisassemblerOptions};
 use move_binary_format::{
     access::ModuleAccess,
     binary_views::BinaryIndexedView,
@@ -52,9 +50,11 @@ use move_binary_format::{
     },
     CompiledModule,
 };
+use move_bytecode_source_map::{mapping::SourceMapping, source_map::SourceMap};
 use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, language_storage, value::MoveValue,
 };
+use move_disassembler::disassembler::{Disassembler, DisassemblerOptions};
 
 use crate::{
     ast::{

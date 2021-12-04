@@ -26,13 +26,13 @@ use move_lang::{
     shared::{verify_and_create_named_address_mapping, NumericalAddress},
     FullyCompiledProgram,
 };
+use move_resource_viewer::MoveValueAnnotator;
 use move_stdlib::move_stdlib_named_addresses;
 use move_symbol_pool::Symbol;
 use move_vm_runtime::{move_vm::MoveVM, session::Session};
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas_schedule::GasStatus;
 use once_cell::sync::Lazy;
-use resource_viewer::MoveValueAnnotator;
 
 const STD_ADDR: AccountAddress =
     AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]);

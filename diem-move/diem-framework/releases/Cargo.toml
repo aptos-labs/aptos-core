@@ -10,7 +10,7 @@ license = "Apache-2.0"
 publish = false
 
 [dependencies]
-bytecode-verifier = { path = "../../../language/bytecode-verifier" }
+move-bytecode-verifier = { path = "../../../language/move-bytecode-verifier" }
 move-lang = { path = "../../../language/move-lang" }
 diem-types = { path = "../../../types" }
 diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }

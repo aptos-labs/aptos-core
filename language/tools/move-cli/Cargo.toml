@@ -24,9 +24,9 @@ codespan-reporting = "0.11.1"
 itertools = "0.10.0"
 
 bcs = "0.1.2"
-bytecode-verifier = { path = "../../bytecode-verifier" }
+move-bytecode-verifier = { path = "../../move-bytecode-verifier" }
 
-disassembler = { path = "../disassembler" }
+move-disassembler = { path = "../move-disassembler" }
 move-command-line-common = { path = "../../move-command-line-common" }
 move-bytecode-utils = { path = "../move-bytecode-utils" }
 move-coverage = { path = "../move-coverage" }
@@ -39,13 +39,13 @@ move-vm-types = { path = "../../move-vm/types" }
 move-vm-runtime = { path = "../../move-vm/runtime" }
 read-write-set = { path = "../read-write-set" }
 read-write-set-dynamic = { path = "../read-write-set/dynamic" }
-resource-viewer = { path = "../resource-viewer" }
+move-resource-viewer = { path = "../move-resource-viewer" }
 move-binary-format = { path = "../../move-binary-format" }
 move-package = { path = "../move-package" }
 move-prover = { path = "../../move-prover" }
 move-unit-test = { path = "../move-unit-test" }
-errmapgen = { path = "../../move-prover/errmapgen" }
-bytecode-source-map = { path = "../../move-ir-compiler/bytecode-source-map" }
+move-errmapgen = { path = "../../move-prover/move-errmapgen" }
+move-bytecode-source-map = { path = "../../move-ir-compiler/move-bytecode-source-map" }
 move-bytecode-viewer = { path = "../move-bytecode-viewer" }
 
 [dev-dependencies]

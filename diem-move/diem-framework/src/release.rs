@@ -133,7 +133,7 @@ fn generate_error_map(package_path: &Path, output_path: &Path, build_config: Bui
 
     recreate_dir(&errmap_path.parent().unwrap());
 
-    let errmap_options = errmapgen::ErrmapOptions {
+    let errmap_options = move_errmapgen::ErrmapOptions {
         output_file: errmap_path.to_string_lossy().to_string(),
         ..Default::default()
     };
@@ -148,7 +148,7 @@ fn generate_error_map(package_path: &Path, output_path: &Path, build_config: Bui
         )
         .unwrap();
 
-    let mut emapgen = errmapgen::ErrmapGen::new(&model, &errmap_options);
+    let mut emapgen = move_errmapgen::ErrmapGen::new(&model, &errmap_options);
     emapgen.gen();
     emapgen.save_result();
 }

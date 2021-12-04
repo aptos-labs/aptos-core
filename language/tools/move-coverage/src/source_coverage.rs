@@ -4,7 +4,6 @@
 #![forbid(unsafe_code)]
 
 use crate::coverage_map::CoverageMap;
-use bytecode_source_map::source_map::SourceMap;
 use codespan::{Files, Span};
 use colored::*;
 use move_binary_format::{
@@ -12,6 +11,7 @@ use move_binary_format::{
     file_format::{CodeOffset, FunctionDefinitionIndex},
     CompiledModule,
 };
+use move_bytecode_source_map::source_map::SourceMap;
 use move_core_types::identifier::Identifier;
 use move_ir_types::location::Loc;
 use serde::Serialize;

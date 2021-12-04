@@ -4,16 +4,16 @@
 #![forbid(unsafe_code)]
 
 use anyhow::Context;
-use bytecode_verifier::{dependencies, verify_module, verify_script};
-use ir_to_bytecode::parser::{parse_module, parse_script};
 use move_binary_format::{
     errors::VMError,
     file_format::{CompiledModule, CompiledScript},
 };
+use move_bytecode_verifier::{dependencies, verify_module, verify_script};
 use move_command_line_common::files::{
     MOVE_COMPILED_EXTENSION, MOVE_IR_EXTENSION, SOURCE_MAP_EXTENSION,
 };
 use move_ir_compiler::util;
+use move_ir_to_bytecode::parser::{parse_module, parse_script};
 use std::{
     fs,
     io::Write,

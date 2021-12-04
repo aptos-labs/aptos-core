@@ -23,8 +23,8 @@ move-command-line-common = { path = "../../move-command-line-common" }
 move-core-types = { path = "../../move-core/types" }
 move-ir-types = { path = "../../move-ir/types" }
 move-binary-format = { path = "../../move-binary-format" }
-bytecode-source-map = { path = "../../move-ir-compiler/bytecode-source-map" }
-bytecode-verifier = { path = "../../bytecode-verifier" }
+move-bytecode-source-map = { path = "../../move-ir-compiler/move-bytecode-source-map" }
+move-bytecode-verifier = { path = "../../move-bytecode-verifier" }
 
 [features]
 default = []

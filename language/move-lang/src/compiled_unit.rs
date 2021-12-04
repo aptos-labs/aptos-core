@@ -9,8 +9,8 @@ use crate::{
     parser::ast::{FunctionName, ModuleName, Var},
     shared::{unique_map::UniqueMap, Name, NumericalAddress},
 };
-use bytecode_source_map::source_map::SourceMap;
 use move_binary_format::file_format as F;
+use move_bytecode_source_map::source_map::SourceMap;
 use move_core_types::{
     account_address::AccountAddress, identifier::Identifier as MoveCoreIdentifier,
     language_storage::ModuleId,

@@ -12,10 +12,10 @@ edition = "2018"
 [dev-dependencies]
 diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 anyhow = "1.0.38"
-bytecode-verifier = { path = "../bytecode-verifier" }
+move-bytecode-verifier = { path = "../move-bytecode-verifier" }
 datatest-stable = "0.1.1"
 functional-tests = { path = "../testing-infra/functional-tests" }
-ir-to-bytecode = { path = "../move-ir-compiler/ir-to-bytecode" }
+move-ir-to-bytecode = { path = "../move-ir-compiler/move-ir-to-bytecode" }
 diem-types = { path = "../../types" }
 move-ir-types = { path = "../move-ir/types" }
 diem-framework-releases = { path = "../../diem-move/diem-framework/DPN/releases" }

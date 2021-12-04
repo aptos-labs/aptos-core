@@ -87,7 +87,7 @@ pub fn build_doc(
         move_named_address_values: move_prover::cli::named_addresses_for_options(&named_addresses),
         verbosity_level: LevelFilter::Warn,
         run_docgen: true,
-        docgen: docgen::DocgenOptions {
+        docgen: move_docgen::DocgenOptions {
             root_doc_templates: templates,
             references_file,
             doc_path: vec![doc_path.to_string()],
@@ -143,7 +143,7 @@ pub fn build_error_code_map(output_path: &str) {
         move_named_address_values: move_prover::cli::named_addresses_for_options(
             &move_stdlib_named_addresses(),
         ),
-        errmapgen: errmapgen::ErrmapOptions {
+        errmapgen: move_errmapgen::ErrmapOptions {
             output_file: output_path.to_string(),
             ..Default::default()
         },

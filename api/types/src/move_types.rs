@@ -18,7 +18,7 @@ use move_core_types::{
     parser::{parse_struct_tag, parse_type_tag},
     transaction_argument::TransactionArgument,
 };
-use resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue};
+use move_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue};
 
 use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
 use std::{
@@ -974,7 +974,7 @@ mod tests {
         identifier::Identifier,
         language_storage::{StructTag, TypeTag},
     };
-    use resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue};
+    use move_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue};
 
     use serde::{de::DeserializeOwned, Serialize};
     use serde_json::{json, to_value, Value};

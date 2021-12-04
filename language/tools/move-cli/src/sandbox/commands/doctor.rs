@@ -26,19 +26,19 @@ pub fn doctor(state: &OnDiskStateView) -> Result<()> {
     let all_modules = state.get_all_modules()?;
     let code_cache = Modules::new(&all_modules);
     for module in &all_modules {
-        if bytecode_verifier::verify_module(module).is_err() {
+        if move_bytecode_verifier::verify_module(module).is_err() {
             bail!("Failed to verify module {:?}", module.self_id())
         }
 
         let imm_deps = code_cache.get_immediate_dependencies(&module.self_id())?;
-        if bytecode_verifier::dependencies::verify_module(module, imm_deps).is_err() {
+        if move_bytecode_verifier::dependencies::verify_module(module, imm_deps).is_err() {
             bail!(
                 "Failed to link module {:?} against its dependencies",
                 module.self_id()
             )
         }
 
-        let cyclic_check_result = bytecode_verifier::cyclic_dependencies::verify_module(
+        let cyclic_check_result = move_bytecode_verifier::cyclic_dependencies::verify_module(
             module,
             |module_id| {
                 code_cache

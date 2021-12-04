@@ -4,7 +4,6 @@ use crate::release_flow::{
     create::create_release_from_artifact, hash_for_modules, load_latest_artifact,
 };
 use anyhow::{bail, Result};
-use bytecode_verifier::verify_module;
 use diem_transaction_replay::DiemDebugger;
 use diem_types::{
     access_path::Path,
@@ -14,6 +13,7 @@ use diem_types::{
 };
 use diem_validator_interface::{DiemValidatorInterface, JsonRpcDebuggerInterface};
 use move_binary_format::CompiledModule;
+use move_bytecode_verifier::verify_module;
 use move_core_types::vm_status::KeptVMStatus;
 use std::collections::BTreeMap;
 

@@ -2,15 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
-use bytecode_verifier::{verify_module, verify_script};
-use ir_to_bytecode::{
-    compiler::{compile_module, compile_script},
-    parser::{parse_module, parse_script},
-};
 use move_binary_format::{
     access::ScriptAccess,
     errors::{Location, VMError},
     file_format::{CompiledModule, CompiledScript},
+};
+use move_bytecode_verifier::{verify_module, verify_script};
+use move_ir_to_bytecode::{
+    compiler::{compile_module, compile_script},
+    parser::{parse_module, parse_script},
 };
 
 #[allow(unused_macros)]

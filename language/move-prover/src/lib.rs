@@ -4,7 +4,6 @@
 #![forbid(unsafe_code)]
 
 use crate::cli::Options;
-use abigen::Abigen;
 use anyhow::anyhow;
 use boogie_backend::{
     add_prelude, boogie_wrapper::BoogieWrapper, bytecode_translator::BoogieTranslator,
@@ -19,10 +18,11 @@ use codespan_reporting::{
     diagnostic::Severity,
     term::termcolor::{Buffer, ColorChoice, StandardStream, WriteColor},
 };
-use docgen::Docgen;
-use errmapgen::ErrmapGen;
 #[allow(unused_imports)]
 use log::{debug, info, warn};
+use move_abigen::Abigen;
+use move_docgen::Docgen;
+use move_errmapgen::ErrmapGen;
 use move_model::{
     code_writer::CodeWriter,
     model::{FunctionVisibility, GlobalEnv},

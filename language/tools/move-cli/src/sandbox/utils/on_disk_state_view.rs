@@ -3,7 +3,6 @@
 
 use crate::{BCS_EXTENSION, DEFAULT_BUILD_DIR, DEFAULT_STORAGE_DIR};
 use anyhow::{anyhow, bail, Result};
-use disassembler::disassembler::Disassembler;
 use move_binary_format::{
     access::ModuleAccess,
     binary_views::BinaryIndexedView,
@@ -19,8 +18,9 @@ use move_core_types::{
     resolver::{ModuleResolver, ResourceResolver},
     value::MoveStructLayout,
 };
+use move_disassembler::disassembler::Disassembler;
 use move_ir_types::location::Spanned;
-use resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue, MoveValueAnnotator};
+use move_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue, MoveValueAnnotator};
 use std::{
     convert::{TryFrom, TryInto},
     fs,

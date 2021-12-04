@@ -7,14 +7,14 @@ use diem_types::{
     contract_event::ContractEvent,
 };
 use move_core_types::language_storage::StructTag;
-use resource_viewer::MoveValueAnnotator;
+use move_resource_viewer::MoveValueAnnotator;
 use std::{
     collections::BTreeMap,
     fmt::{Display, Formatter},
 };
 
 use move_core_types::resolver::MoveResolver;
-pub use resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue};
+pub use move_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue};
 
 pub struct DiemValueAnnotator<'a, T>(MoveValueAnnotator<'a, T>);
 

@@ -6,7 +6,6 @@ use crate::{
     config::{global::Config as GlobalConfig, transaction::Config as TransactionConfig},
     errors::*,
 };
-use bytecode_verifier::{cyclic_dependencies, dependencies};
 use diem_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 use diem_state_view::StateView;
 use diem_types::{
@@ -32,6 +31,7 @@ use move_binary_format::{
     file_format::{CompiledModule, CompiledScript},
     views::ModuleView,
 };
+use move_bytecode_verifier::{cyclic_dependencies, dependencies};
 use move_core_types::{
     gas_schedule::{GasAlgebra, GasConstants},
     identifier::Identifier,
@@ -254,7 +254,7 @@ fn fetch_dependency(data_store: &FakeDataStore, ident: ModuleId) -> Option<Compi
     let ap = AccessPath::from(&ident);
     let blob: Vec<u8> = data_store.get(&ap).ok().flatten()?;
     let compiled: CompiledModule = CompiledModule::deserialize(&blob).ok()?;
-    match bytecode_verifier::verify_module(&compiled) {
+    match move_bytecode_verifier::verify_module(&compiled) {
         Ok(_) => Some(compiled),
         Err(_) => None,
     }
@@ -265,7 +265,7 @@ pub fn verify_script(
     script: CompiledScript,
     data_store: &FakeDataStore,
 ) -> std::result::Result<CompiledScript, VMError> {
-    bytecode_verifier::verify_script(&script)?;
+    move_bytecode_verifier::verify_script(&script)?;
 
     let imm_deps = fetch_script_dependencies(data_store, &script);
     dependencies::verify_script(&script, &imm_deps)?;
@@ -278,7 +278,7 @@ pub fn verify_module(
     module: CompiledModule,
     data_store: &FakeDataStore,
 ) -> std::result::Result<CompiledModule, VMError> {
-    bytecode_verifier::verify_module(&module)?;
+    move_bytecode_verifier::verify_module(&module)?;
 
     let imm_deps = fetch_module_dependencies(data_store, &module);
     dependencies::verify_module(&module, &imm_deps)?;

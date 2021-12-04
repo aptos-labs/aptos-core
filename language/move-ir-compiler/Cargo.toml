@@ -11,10 +11,10 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0.38"
-bytecode-verifier = { path = "../bytecode-verifier" }
+move-bytecode-verifier = { path = "../move-bytecode-verifier" }
 move-command-line-common = { path = "../move-command-line-common" }
-ir-to-bytecode = { path = "ir-to-bytecode" }
-bytecode-source-map = { path = "bytecode-source-map" }
+move-ir-to-bytecode = { path = "move-ir-to-bytecode" }
+move-bytecode-source-map = { path = "move-bytecode-source-map" }
 move-ir-types = { path = "../move-ir/types" }
 move-core-types = { path = "../move-core/types" }
 move-binary-format = { path = "../move-binary-format" }

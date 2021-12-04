@@ -14,7 +14,7 @@ anyhow = "1.0.38"
 once_cell = "1.7.2"
 rand = "0.8.3"
 
-bytecode-verifier = { path = "../../language/bytecode-verifier" }
+move-bytecode-verifier = { path = "../../language/move-bytecode-verifier" }
 bcs = "0.1.2"
 diem-config = { path = "../../config" }
 diem-crypto = { path = "../../crates/diem-crypto" }

@@ -63,7 +63,7 @@ impl<'r, 'l, S: MoveResolver> Session<'r, 'l, S> {
     ///   - The function does not exist.
     ///   - The function does not have script visibility.
     ///   - The signature is not valid for a script. Not all script-visible module functions can
-    ///     be invoked from this entry point. See `bytecode_verifier::script_signature` for the
+    ///     be invoked from this entry point. See `move_bytecode_verifier::script_signature` for the
     ///     rules.
     ///   - Type arguments refer to a non-existent type.
     ///   - Arguments (senders included) fail to deserialize or fail to match the signature of the
@@ -101,7 +101,7 @@ impl<'r, 'l, S: MoveResolver> Session<'r, 'l, S> {
     /// The Move VM MUST return a user error (in other words, an error that's not an invariant
     /// violation) if
     ///   - The script fails to deserialize or verify. Not all expressible signatures are valid.
-    ///     See `bytecode_verifier::script_signature` for the rules.
+    ///     See `move_bytecode_verifier::script_signature` for the rules.
     ///   - Type arguments refer to a non-existent type.
     ///   - Arguments (senders included) fail to deserialize or fail to match the signature of the
     ///     script function.

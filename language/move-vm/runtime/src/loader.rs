@@ -5,7 +5,6 @@ use crate::{
     logging::expect_no_verification_errors,
     native_functions::{NativeFunction, NativeFunctions},
 };
-use bytecode_verifier::{self, cyclic_dependencies, dependencies, script_signature};
 use move_binary_format::{
     access::{ModuleAccess, ScriptAccess},
     binary_views::BinaryIndexedView,
@@ -19,6 +18,7 @@ use move_binary_format::{
     },
     IndexKind,
 };
+use move_bytecode_verifier::{self, cyclic_dependencies, dependencies, script_signature};
 use move_core_types::{
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
@@ -527,7 +527,7 @@ impl Loader {
     // Script verification steps.
     // See `verify_module()` for module verification steps.
     fn verify_script(&self, script: &CompiledScript) -> VMResult<()> {
-        bytecode_verifier::verify_script(script)
+        move_bytecode_verifier::verify_script(script)
     }
 
     fn verify_script_dependencies(
@@ -653,7 +653,7 @@ impl Loader {
         // module will NOT show up in `module_cache`. In the module republishing case, it means
         // that the old module is still in the `module_cache`, unless a new Loader is created,
         // which means that a new MoveVM instance needs to be created.
-        bytecode_verifier::verify_module(module)?;
+        move_bytecode_verifier::verify_module(module)?;
         self.check_natives(module)?;
 
         let mut visited = BTreeSet::new();
@@ -874,7 +874,7 @@ impl Loader {
             .map_err(expect_no_verification_errors)?;
 
         // bytecode verifier checks that can be performed with the module itself
-        bytecode_verifier::verify_module(&module).map_err(expect_no_verification_errors)?;
+        move_bytecode_verifier::verify_module(&module).map_err(expect_no_verification_errors)?;
         self.check_natives(&module)
             .map_err(expect_no_verification_errors)?;
         Ok(module)

@@ -1,0 +1,25 @@
+[package]
+name = "move-bytecode-source-map"
+version = "0.1.0"
+authors = ["Diem Association <opensource@diem.com>"]
+license = "Apache-2.0"
+publish = false
+edition = "2018"
+
+[dependencies]
+anyhow = "1.0.38"
+move-core-types = { path = "../../move-core/types" }
+move-ir-types = { path = "../../move-ir/types" }
+move-symbol-pool = { path = "../../move-symbol-pool" }
+move-binary-format = { path = "../../move-binary-format" }
+move-command-line-common = { path = "../../move-command-line-common" }
+
+bcs = "0.1.2"
+codespan-reporting = "0.11.1"
+serde = { version = "1.0.124", default-features = false }
+
+[features]
+default = []
+
+[dev-dependencies]
+diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }

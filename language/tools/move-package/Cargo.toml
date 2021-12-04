@@ -23,10 +23,10 @@ ptree = "0.4.0"
 
 move-binary-format = { path = "../../move-binary-format" }
 move-lang = { path = "../../move-lang" }
-bytecode-source-map = { path = "../../move-ir-compiler/bytecode-source-map" }
-abigen = { path = "../../move-prover/abigen" }
-docgen = { path = "../../move-prover/docgen" }
-errmapgen = { path = "../../move-prover/errmapgen" }
+move-bytecode-source-map = { path = "../../move-ir-compiler/move-bytecode-source-map" }
+move-abigen = { path = "../../move-prover/move-abigen" }
+move-docgen = { path = "../../move-prover/move-docgen" }
+move-errmapgen = { path = "../../move-prover/move-errmapgen" }
 move-core-types = { path = "../../move-core/types" }
 move-symbol-pool = { path = "../../move-symbol-pool" }
 move-command-line-common = { path = "../../move-command-line-common" }

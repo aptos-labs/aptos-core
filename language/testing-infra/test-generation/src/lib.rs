@@ -17,7 +17,6 @@ extern crate mirai_annotations;
 
 use crate::config::{Args, EXECUTE_UNVERIFIED_MODULE, RUN_ON_VM};
 use bytecode_generator::BytecodeGenerator;
-use bytecode_verifier::verify_module;
 use crossbeam_channel::{bounded, unbounded, Receiver, Sender};
 use getrandom::getrandom;
 use module_generation::generate_module;
@@ -27,6 +26,7 @@ use move_binary_format::{
         AbilitySet, CompiledModule, FunctionDefinitionIndex, SignatureToken, StructHandleIndex,
     },
 };
+use move_bytecode_verifier::verify_module;
 use move_core_types::{
     account_address::AccountAddress,
     effects::ChangeSet,

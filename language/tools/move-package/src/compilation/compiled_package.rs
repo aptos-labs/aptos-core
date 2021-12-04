@@ -10,17 +10,17 @@ use crate::{
     },
     BuildConfig,
 };
-use abigen::{Abigen, AbigenOptions};
 use anyhow::Result;
-use bytecode_source_map::utils::source_map_from_file;
 use colored::Colorize;
-use docgen::{Docgen, DocgenOptions};
+use move_abigen::{Abigen, AbigenOptions};
 use move_binary_format::file_format::{CompiledModule, CompiledScript};
+use move_bytecode_source_map::utils::source_map_from_file;
 use move_bytecode_utils::Modules;
 use move_command_line_common::files::{
     extension_equals, find_filenames, MOVE_COMPILED_EXTENSION, MOVE_EXTENSION, SOURCE_MAP_EXTENSION,
 };
 use move_core_types::language_storage::ModuleId;
+use move_docgen::{Docgen, DocgenOptions};
 use move_lang::{
     compiled_unit::{
         AnnotatedCompiledUnit, CompiledUnit, NamedCompiledModule, NamedCompiledScript,

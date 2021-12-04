@@ -21,12 +21,12 @@ use simplelog::{
     CombinedLogger, Config, ConfigBuilder, LevelPadding, SimpleLogger, TermLogger, TerminalMode,
 };
 
-use abigen::AbigenOptions;
 use boogie_backend::options::{BoogieOptions, VectorTheory};
 use bytecode::options::{AutoTraceLevel, ProverOptions};
 use codespan_reporting::diagnostic::Severity;
-use docgen::DocgenOptions;
-use errmapgen::ErrmapOptions;
+use move_abigen::AbigenOptions;
+use move_docgen::DocgenOptions;
+use move_errmapgen::ErrmapOptions;
 use move_model::{
     model::VerificationScope, options::ModelBuilderOptions, simplifier::SimplificationPass,
 };

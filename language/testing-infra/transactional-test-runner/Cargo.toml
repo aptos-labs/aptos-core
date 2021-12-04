@@ -20,8 +20,8 @@ tempfile = "3.2.0"
 
 
 bytecode-interpreter = { path = "../../move-prover/interpreter" }
-bytecode-source-map = { path = "../../move-ir-compiler/bytecode-source-map" }
-disassembler = { path = "../../tools/disassembler" }
+move-bytecode-source-map = { path = "../../move-ir-compiler/move-bytecode-source-map" }
+move-disassembler = { path = "../../tools/move-disassembler" }
 move-binary-format = { path = "../../move-binary-format" }
 move-bytecode-utils = { path = "../../tools/move-bytecode-utils" }
 move-cli = { path = "../../tools/move-cli" }
@@ -35,7 +35,7 @@ move-symbol-pool = { path = "../../move-symbol-pool" }
 move-vm-test-utils = { path = "../../move-vm/test-utils" }
 move-vm-types = { path = "../../move-vm/types" }
 move-vm-runtime = { path = "../../move-vm/runtime" }
-resource-viewer = { path = "../../tools/resource-viewer" }
+move-resource-viewer = { path = "../../tools/move-resource-viewer" }
 
 [dev-dependencies]
 diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }

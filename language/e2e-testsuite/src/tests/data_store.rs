@@ -1,7 +1,6 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use bytecode_verifier::verify_module;
 use diem_types::{
     transaction::{Module, SignedTransaction, Transaction, TransactionStatus},
     vm_status::KeptVMStatus,
@@ -10,6 +9,7 @@ use language_e2e_tests::{
     account::AccountData, compile::compile_script, current_function_name, executor::FakeExecutor,
 };
 use move_binary_format::CompiledModule;
+use move_bytecode_verifier::verify_module;
 use move_ir_compiler::Compiler;
 
 #[test]

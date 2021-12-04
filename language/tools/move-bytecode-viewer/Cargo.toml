@@ -14,10 +14,10 @@ termion = "1.5"
 tui = "0.14.0"
 
 move-command-line-common = { path = "../../move-command-line-common" }
-bytecode-source-map = { path = "../../move-ir-compiler/bytecode-source-map" }
+move-bytecode-source-map = { path = "../../move-ir-compiler/move-bytecode-source-map" }
 move-ir-types = { path = "../../move-ir/types" }
 move-binary-format = { path = "../../move-binary-format" }
-disassembler = { path = "../disassembler" }
+move-disassembler = { path = "../move-disassembler" }
 
 
 [features]

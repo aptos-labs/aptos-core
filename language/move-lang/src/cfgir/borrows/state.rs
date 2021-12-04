@@ -23,7 +23,7 @@ use move_ir_types::location::*;
 use move_symbol_pool::Symbol;
 
 use crate::shared::unique_map::UniqueMap;
-use borrow_graph::references::RefID;
+use move_borrow_graph::references::RefID;
 use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
@@ -33,7 +33,7 @@ enum Label {
     Field(Symbol),
 }
 
-type BorrowGraph = borrow_graph::graph::BorrowGraph<Loc, Label>;
+type BorrowGraph = move_borrow_graph::graph::BorrowGraph<Loc, Label>;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Value {

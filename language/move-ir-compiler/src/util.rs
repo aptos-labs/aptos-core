@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Context;
-use bytecode_source_map::source_map::SourceMap;
-use ir_to_bytecode::{
+use move_binary_format::file_format::{CompiledModule, CompiledScript};
+use move_bytecode_source_map::source_map::SourceMap;
+use move_ir_to_bytecode::{
     compiler::{compile_module, compile_script},
     parser::{parse_module, parse_script},
 };
-use move_binary_format::file_format::{CompiledModule, CompiledScript};
 use std::{fs, path::Path};
 
 pub fn do_compile_script(

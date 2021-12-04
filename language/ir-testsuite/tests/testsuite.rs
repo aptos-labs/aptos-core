@@ -6,12 +6,12 @@ use functional_tests::{
     compiler::{Compiler, ScriptOrModule},
     testsuite,
 };
-use ir_to_bytecode::{
+use move_binary_format::CompiledModule;
+use move_core_types::language_storage::ModuleId;
+use move_ir_to_bytecode::{
     compiler::{compile_module, compile_script},
     parser::parse_script_or_module,
 };
-use move_binary_format::CompiledModule;
-use move_core_types::language_storage::ModuleId;
 use move_ir_types::ast;
 use std::{collections::HashMap, path::Path};
 

@@ -21,7 +21,7 @@ fn can_deserialize_and_verify_modules_from_all_versions() {
 
         // Verifiy modules
         for (i, module) in modules.iter().enumerate() {
-            bytecode_verifier::verify_module(module).unwrap_or_else(|_| {
+            move_bytecode_verifier::verify_module(module).unwrap_or_else(|_| {
                 panic!(
                     "failed to verify module {} from version {}",
                     module.self_id(),
@@ -29,7 +29,7 @@ fn can_deserialize_and_verify_modules_from_all_versions() {
                 )
             });
 
-            bytecode_verifier::dependencies::verify_module(
+            move_bytecode_verifier::dependencies::verify_module(
                 module,
                 modules
                     .iter()

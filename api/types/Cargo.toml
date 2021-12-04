@@ -23,7 +23,7 @@ diem-types = { path = "../../types" }
 diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 move-binary-format = { path = "../../language/move-binary-format" }
 move-core-types = { path = "../../language/move-core/types" }
-resource-viewer = { path = "../../language/tools/resource-viewer" }
+move-resource-viewer = { path = "../../language/tools/move-resource-viewer" }
 
 [dev-dependencies]
 move-binary-format = { path = "../../language/move-binary-format" }

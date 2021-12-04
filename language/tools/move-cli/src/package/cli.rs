@@ -13,7 +13,6 @@ use std::{
 
 use anyhow::{bail, Result};
 
-use disassembler::disassembler::Disassembler;
 use move_command_line_common::files::{FileHash, MOVE_COVERAGE_MAP_EXTENSION};
 use move_coverage::{
     coverage_map::{output_map_to_file, CoverageMap},
@@ -21,6 +20,7 @@ use move_coverage::{
     source_coverage::SourceCoverageBuilder,
     summary::summarize_inst_cov,
 };
+use move_disassembler::disassembler::Disassembler;
 use move_lang::{
     compiled_unit::{CompiledUnit, NamedCompiledModule},
     diagnostics::{self, codes::Severity},
@@ -345,7 +345,7 @@ pub fn handle_package_commands(
             error_prefix,
             output_file,
         } => {
-            let mut errmap_options = errmapgen::ErrmapOptions::default();
+            let mut errmap_options = move_errmapgen::ErrmapOptions::default();
             if let Some(err_prefix) = error_prefix {
                 errmap_options.error_prefix = err_prefix.to_string();
             }
@@ -360,7 +360,7 @@ pub fn handle_package_commands(
                     target_filter: None,
                 },
             )?;
-            let mut errmap_gen = errmapgen::ErrmapGen::new(&model, &errmap_options);
+            let mut errmap_gen = move_errmapgen::ErrmapGen::new(&model, &errmap_options);
             errmap_gen.gen();
             errmap_gen.save_result();
         }
