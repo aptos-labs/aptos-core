@@ -24,39 +24,54 @@ Now let's get started!
 
 ## Step 0: Installation<span id="Step0"><span>
 
+If you haven't already, open your terminal and clone [the Diem repository](https://github.com/diem/diem):
 
-- Open up your terminal of choice and clone [`diem`](https://github.com/diem/diem) repo if you don't already have it:
 ```bash
-$ git clone https://github.com/diem/diem.git
+git clone https://github.com/diem/diem.git
 ```
 
-- Go to `diem` folder and run the `dev_setup.sh` script:
+Go to the `diem` directory and run the `dev_setup.sh` script:
+
 ```bash
-$ cd diem && sh scripts/dev_setup.sh -ypt
+cd diem
+sh scripts/dev_setup.sh -ypt
 ```
 
-Follow the prompt to install all the necessary dependencies.
+Follow the script's prompts in order to install all of Diem's dependencies.
 
-- Include environment variable definitions in `~/.profile` by running this command:
+The script adds environment variable definitions to your `~/.profile` file.
+Include them by running this command:
+
 ```bash
-$ . ~/.profile
+source ~/.profile
 ````
-- Install Move's CLIs by running this command in diem repo:
+
+Next, install Move's command-line tools by running these commands:
+
 ```bash
-$ cargo build -p df-cli -p move-analyzer
+cargo install --path diem-move/df-cli
+cargo install --path language/move-analyzer
 ```
 
-Once this is done, you can alias the `move` command to point the `df-cli`
-binary:
+After running these commands, you should be able to confirm that they can be
+invoked from the command line:
 
-```bash
-$ alias move="<path_to_diem_repo>/target/debug/df-cli"
+```
+move-analyzer --version  # Outputs: move-analyzer 0.0.0
 ```
 
-You can check that it is working by running
+The `df-cli` executable is a convenient wrapper around Move's command line
+interface. In this tutorial, we will refer to it as `move`. You may add an alias
+so that you can invoke it as such:
 
 ```bash
-$ move package -h
+alias move="df-cli"
+```
+
+You can check that it is working by running the following command:
+
+```bash
+move package -h
 ```
 
 You should see something like this along with a list and description of a
@@ -75,14 +90,13 @@ If you want to find what commands are available and what they do, running
 a command or subcommand with the `-h` flag will print documentation.
 
 There is official Move support for Visual Studio Code. You can install this
-extension by opening VS Code, searching for the "move-analyzer" package and
-installing it. After installing, open your VS Code settings, search for
-`move-analyzer.server.path`, and set it to `<path_to_diem_repo>/target/debug/move-analyzer`.
-More detailed instructions can be found [here](https://github.com/diem/diem/tree/main/language/move-analyzer/editors/code).
+extension by opening VS Code, searching for the "move-analyzer" extension in
+the Extension Pane, and installing it. More detailed instructions can be found
+in the extension's [README](https://github.com/diem/diem/tree/main/language/move-analyzer/editors/code).
 
 Before running the next steps, `cd` to the tutorial directory:
 ```bash
-$ cd <path_to_diem_repo>/language/documentation/tutorial/
+cd <path_to_diem_repo>/language/documentation/tutorial
 ```
 
 ## Step 1: Writing my first Move module<span id="Step1"><span>
