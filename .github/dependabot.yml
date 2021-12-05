@@ -59,14 +59,6 @@ updates:
       - "dependencies"
 
   - package-ecosystem: "docker"
-    directory: "/docker/cluster-test"
-    schedule:
-      interval: "daily"
-    labels:
-      - "docker"
-      - "dependencies"
-
-  - package-ecosystem: "docker"
     directory: "/docker/init"
     schedule:
       interval: "daily"

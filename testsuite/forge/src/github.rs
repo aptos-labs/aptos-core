@@ -49,7 +49,7 @@ impl GitHub {
         })?;
         let request = self.client.get(url);
         let response = request
-            .header(USER_AGENT, "diem-cluster-test")
+            .header(USER_AGENT, "diem-forge")
             .send()
             .map_err(|e| format_err!("Failed to query github: {:?}", e))?;
         let response: Vec<CommitInfo> = response
