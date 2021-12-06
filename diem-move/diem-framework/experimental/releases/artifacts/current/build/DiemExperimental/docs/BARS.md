@@ -29,7 +29,7 @@
 
 
 
-<pre><code><b>struct</b> <a href="BARS.md#0x1_BARSToken">BARSToken</a> <b>has</b> store
+<pre><code><b>struct</b> <a href="BARS.md#0x1_BARSToken">BARSToken</a> <b>has</b> <b>copy</b>, drop, store
 </code></pre>
 
 

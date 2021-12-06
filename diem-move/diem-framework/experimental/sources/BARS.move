@@ -11,7 +11,7 @@ module 0x1::BARSToken {
     /// Function can only be called by the module owner
     const ENOT_BARS_OWNER: u64  = 0;
 
-    struct BARSToken has store {
+    struct BARSToken has copy, store, drop {
         artist_name: vector<u8>
     }
 
@@ -90,7 +90,7 @@ module 0x1::BARSToken {
 
         assert!(NFTGallery::has_token<BARSToken>(ArtistAddr, &token_id), EMINT_FAILED);
         assert!(NFTGallery::get_token_balance<BARSToken>(ArtistAddr, &token_id) == 7, EMINT_FAILED);
-        assert!(NFT::supply<BARSToken>(&token_id) == 7, EMINT_FAILED);
+        assert!(NFTGallery::get_token_supply<BARSToken>(ArtistAddr, &token_id) == 7, EMINT_FAILED);
 
 
         // Transfer 6 units of the token from creator to user

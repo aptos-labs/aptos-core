@@ -68,6 +68,24 @@ Balance holding tokens of <code>TokenType</code> as well as information of appro
 
 
 
+<a name="0x1_MultiTokenBalance_EID_NOT_FOUND"></a>
+
+
+
+<pre><code><b>const</b> <a href="MultiTokenBalance.md#0x1_MultiTokenBalance_EID_NOT_FOUND">EID_NOT_FOUND</a>: u64 = 0;
+</code></pre>
+
+
+
+<a name="0x1_MultiTokenBalance_EINVALID_AMOUNT_OF_TRANSFER"></a>
+
+
+
+<pre><code><b>const</b> <a href="MultiTokenBalance.md#0x1_MultiTokenBalance_EINVALID_AMOUNT_OF_TRANSFER">EINVALID_AMOUNT_OF_TRANSFER</a>: u64 = 3;
+</code></pre>
+
+
+
 <a name="0x1_MultiTokenBalance_EALREADY_IS_OPERATOR"></a>
 
 
@@ -91,24 +109,6 @@ Balance holding tokens of <code>TokenType</code> as well as information of appro
 
 
 <pre><code><b>const</b> <a href="MultiTokenBalance.md#0x1_MultiTokenBalance_EBALANCE_NOT_PUBLISHED">EBALANCE_NOT_PUBLISHED</a>: u64 = 1;
-</code></pre>
-
-
-
-<a name="0x1_MultiTokenBalance_EID_NOT_FOUND"></a>
-
-
-
-<pre><code><b>const</b> <a href="MultiTokenBalance.md#0x1_MultiTokenBalance_EID_NOT_FOUND">EID_NOT_FOUND</a>: u64 = 0;
-</code></pre>
-
-
-
-<a name="0x1_MultiTokenBalance_EINVALID_AMOUNT_OF_TRANSFER"></a>
-
-
-
-<pre><code><b>const</b> <a href="MultiTokenBalance.md#0x1_MultiTokenBalance_EINVALID_AMOUNT_OF_TRANSFER">EINVALID_AMOUNT_OF_TRANSFER</a>: u64 = 3;
 </code></pre>
 
 
