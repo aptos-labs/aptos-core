@@ -3,7 +3,7 @@
 Welcome to the Move Tutorial! In this tutorial, we are going to go through some steps of developing Move code
 including design, implementation, unit testing and formal verification of Move modules.
 
-There are eight steps in total:
+There are nine steps in total:
 
 - [Step 0: Installation](#Step0)
 - [Step 1: Writing my first Move module](#Step1)
@@ -34,7 +34,7 @@ Go to the `diem` directory and run the `dev_setup.sh` script:
 
 ```bash
 cd diem
-sh scripts/dev_setup.sh -ypt
+./scripts/dev_setup.sh -ypt
 ```
 
 Follow the script's prompts in order to install all of Diem's dependencies.
@@ -160,10 +160,10 @@ Let's take a look at this function and what it's saying:
 * It creates a `Coin` with the given value and stores it under the
   `account` using the `move_to` operator.
 
-Let's make sure it builds! This can be done with the `package build` command from within the package:
+Let's make sure it builds! This can be done with the `package build` command from within the package folder ([`step_1/BasicCoin`](./step_1/BasicCoin/)):
 
 ```bash
-$ move package build
+move package build
 ```
 
 <details>
@@ -171,7 +171,7 @@ $ move package build
 
 * You can create an empty Move package by calling:
     ```bash
-    $ move package new <pkg_name>
+    move package new <pkg_name>
     ```
 * Move code can also live a number of other places.  More information on the
   Move package system can be found in the [Move
@@ -221,12 +221,12 @@ unit tests in Rust if you're familiar with them -- tests are annotated with
 You can run the tests with the `package test` command:
 
 ```bash
-$ move package test
+move package test
 ```
 
 Let's now take a look at the contents of the [`FirstModule.move`
 file](./step_2/BasicCoin/sources/FirstModule.move). The first new thing you'll
-see this test:
+see is this test:
 
 ```
 module 0xCAFE::BasicCoin {
@@ -355,7 +355,7 @@ Roughly the Move blockchain state should look like this:
 <details>
 <summary><code>public(script)</code> functions</summary>
 
-Only functions with `public(script)` can be invoked directly in transactions. So if you would like to call the `transfer`
+Only functions with `public(script)` visibility can be invoked directly in transactions. So if you would like to call the `transfer`
 method directly from a transaction, you'll want to change its signature to:
 ```
 public(script) fun transfer(from: signer, to: address, amount: u64) acquires Balance { ... }
@@ -376,7 +376,7 @@ The Ethereum blockchain state might look like this:
 ## Step 4: Implementing my `BasicCoin` module<span id="Step4"><span>
 
 We have created a Move package for you in folder `step_4` called `BasicCoin`. The `sources` folder contains source code for
-all your Move modules. `BasicCoin.move` lives inside this folder. In this section, we will take a closer look at the
+all your Move modules in the package, including `BasicCoin.move`. In this section, we will take a closer look at the
 implementation of the methods inside [`BasicCoin.move`](./step_4/BasicCoin/sources/BasicCoin.move).
 
 ### Compiling our code
@@ -384,11 +384,11 @@ implementation of the methods inside [`BasicCoin.move`](./step_4/BasicCoin/sourc
 Let's first try building the code using Move package by running the following command
 in [`step_4/BasicCoin`](./step_4/BasicCoin) folder:
 ```bash
-$ move package build
+move package build
 ```
 
 ### Implementation of methods
-Now let's take a closer look at the implementation of the methods inside `BasicCoin.move`.
+Now let's take a closer look at the implementation of the methods inside [`BasicCoin.move`]((./step_4/BasicCoin/sources/BasicCoin.move)).
 
 <details>
 <summary>Method <code>publish_balance</code></summary>
@@ -438,6 +438,7 @@ borrow_global<Balance>(owner).coin.value
 
 <details>
 <summary>Method <code>transfer</code></summary>
+
 This function withdraws tokens from `from`'s balance and deposits the tokens into `to`s balance. We take a closer look
 at `withdraw` helper function:
 ```
@@ -473,7 +474,7 @@ take a look at some tools we can use to help us write tests.
 To get started, run the `package test` command in the [`step_5/BasicCoin`](./step_5/BasicCoin) folder
 
 ```bash
-$ move package test
+move package test
 ```
 
 You should see something like this:
@@ -544,7 +545,8 @@ to reuse code since the generic library module already provides a standard imple
 can provide customizations by wrapping the standard implementation.
 
 We provide a little module called [`MyOddCoin`](./step_6/BasicCoin/sources/MyOddCoin.move) that instantiates
-the `Coin` type and customizes its transfer policy: only odd number of coins can be transferred.
+the `Coin` type and customizes its transfer policy: only odd number of coins can be transferred. We also include two
+[tests](./step_6/BasicCoin/sources/MyOddCoin.move) to test this behavior. You can use the commands you learned in step 2 and step 5 to run the tests.
 
 #### Advanced topics:
 <details>
@@ -558,9 +560,19 @@ Read more about phantom type parameters <a href="https://diem.github.io/move/gen
 </details>
 
 ## Advanced steps
+
+Before moving on to the next steps, let's make sure you have all the prover dependencies installed.
+
+Try running `boogie /version `. If an error message shows up saying "command not found: boogie", you will have to run the
+setup script and source your profile:
+```bash
+# run the following in diem repo root directory
+./scripts/dev_setup.sh -yp
+source ~/.profile
+```
 ## Step 7:  Use the Move prover<span id="Step7"><span>
 
-Smart contracts deployed on the blockchain may maniputate high-value assets. As a technique that uses strict mathematical methods to describe behavior and reason correctness of computer systems, formal verification has been used in blockchains to prevent bugs in smart contracts. [The Move prover](https://github.com/diem/diem/tree/main/language/move-prover) is an evolving formal verification tool for smart contracts written in the Move language. The user can specify functional properties of smart contracts using the [Move Specification Language (MSL)](https://github.com/diem/diem/blob/main/language/move-prover/doc/user/spec-lang.md) and then use the prover to automatically check them statically. To illustrate how the prover is used, we add the following code snippet to the BasicCoin.move:
+Smart contracts deployed on the blockchain may maniputate high-value assets. As a technique that uses strict mathematical methods to describe behavior and reason correctness of computer systems, formal verification has been used in blockchains to prevent bugs in smart contracts. [The Move prover](https://github.com/diem/diem/tree/main/language/move-prover) is an evolving formal verification tool for smart contracts written in the Move language. The user can specify functional properties of smart contracts using the [Move Specification Language (MSL)](https://github.com/diem/diem/blob/main/language/move-prover/doc/user/spec-lang.md) and then use the prover to automatically check them statically. To illustrate how the prover is used, we have added the following code snippet to the [BasicCoin.move](./step_7/BasicCoin/sources/BasicCoin.move):
 
 ```
     spec balance_of {
@@ -568,7 +580,14 @@ Smart contracts deployed on the blockchain may maniputate high-value assets. As 
     }
 ```
 
-Informally speaking, the block `spec balance_of {...}` contains the property specification of the method `balance_of`. Let's first run the prover using the command `move package prove` inside the `sources` directory, which outputs the following error information:
+Informally speaking, the block `spec balance_of {...}` contains the property specification of the method `balance_of`.
+
+Let's first run the prover using the following command inside [`BasicCoin` directory](./step_7/BasicCoin/):
+```bash
+move package prove
+```
+
+which outputs the following error information:
 
 ```
 error: abort not covered by any of the `aborts_if` clauses
@@ -598,13 +617,14 @@ The prover basically tells us that we need to explicitly specify the condition u
         aborts_if !exists<Balance<CoinType>>(owner);
     }
 ```
-
+After adding this condition, try running the `prove` command again to confirm that there are no verification errors:
+```bash
+move package prove
+```
 Apart from the abort condition, we also want to define the functional properties. In Step 8, we will give more detailed introduction to the prover by specifying properties for the methods defined the `BasicCoin` module.
 
 
-## Advanced steps
-
-### Step 8: Write formal specifications for the `BasicCoin` module<span id="Step8"><span>
+## Step 8: Write formal specifications for the `BasicCoin` module<span id="Step8"><span>
 
 <details>
 
