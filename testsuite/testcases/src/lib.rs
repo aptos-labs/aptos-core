@@ -9,9 +9,7 @@ pub mod performance_test;
 pub mod reconfiguration_test;
 pub mod state_sync_performance;
 
-use diem_sdk::{
-    client::Client as JsonRpcClient, transaction_builder::TransactionFactory, types::PeerId,
-};
+use diem_sdk::{transaction_builder::TransactionFactory, types::PeerId};
 use forge::{EmitJobRequest, NetworkContext, NodeExt, Result, TxnEmitter, TxnStats, Version};
 use rand::SeedableRng;
 use std::{
@@ -61,7 +59,7 @@ pub fn generate_traffic<'t>(
     let mut emitter = TxnEmitter::new(
         chain_info.treasury_compliance_account,
         chain_info.designated_dealer_account,
-        JsonRpcClient::new(&chain_info.json_rpc_url),
+        validator_clients[0].clone(),
         transaction_factory,
         rng,
     );

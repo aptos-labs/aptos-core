@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::generate_traffic;
-use forge::{NetworkContext, NetworkTest, NodeExt, Result, Test};
+use forge::{NetworkContext, NetworkTest, Result, Test};
 use rand::{
     rngs::{OsRng, StdRng},
     seq::IteratorRandom,
@@ -66,7 +66,6 @@ impl NetworkTest for StateSyncPerformance {
         fullnode.clear_storage()?;
         println!("The fullnode is going to restart");
         fullnode.start()?;
-        fullnode.wait_until_healthy(Instant::now() + Duration::from_secs(60))?;
         println!(
             "The fullnode is now up. Waiting for it to state sync to the expected version: {}",
             validator_synced_version

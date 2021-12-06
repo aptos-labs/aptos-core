@@ -40,7 +40,6 @@ impl NetworkTest for PartialNodesDown {
             println!("Node {} is going to restart", node.name());
             node.start()?;
         }
-        thread::sleep(Duration::from_secs(5));
 
         Ok(())
     }

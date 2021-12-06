@@ -1,7 +1,9 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{scale_sts_replica, FullNode, HealthCheckError, Node, Result, Validator, Version};
+use crate::{
+    scale_sts_replica, FullNode, HealthCheckError, Node, NodeExt, Result, Validator, Version,
+};
 use anyhow::{format_err, Context};
 use diem_config::config::NodeConfig;
 use diem_sdk::{
@@ -15,7 +17,7 @@ use std::{
     process::{Command, Stdio},
     str::FromStr,
     thread,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 const NODE_METRIC_PORT: u64 = 9101;
@@ -95,7 +97,10 @@ impl Node for K8sNode {
     }
 
     fn start(&mut self) -> Result<()> {
-        scale_sts_replica(self.sts_name(), 1)
+        scale_sts_replica(self.sts_name(), 1)?;
+        self.wait_until_healthy(Instant::now() + Duration::from_secs(60))?;
+
+        Ok(())
     }
 
     fn stop(&mut self) -> Result<()> {

@@ -499,8 +499,6 @@ impl NetworkTest for RestartValidator {
         node.stop()?;
         println!("Restarting node {}", node.peer_id());
         node.start()?;
-        // wait node to recovery
-        std::thread::sleep(Duration::from_millis(1000));
         node.health_check().expect("node health check failed");
 
         Ok(())
