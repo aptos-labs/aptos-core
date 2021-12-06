@@ -8,8 +8,8 @@ module 0x42::TestArithmetic {
     // Basic arithmetic operation
     // --------------------------
 
-    // Most of the tests here just ensure that what the bytecode operation does is the same as the
-    // spec expressions.
+    // Most of the tests here just ensure that what the bytecode operation does
+    // is the same as the spec expressions.
 
     // succeeds.
 	fun add_two_number(x: u64, y: u64): (u64, u64) {

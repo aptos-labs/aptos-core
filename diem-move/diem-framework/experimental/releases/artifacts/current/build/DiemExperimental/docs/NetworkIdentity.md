@@ -570,6 +570,7 @@ to be a set and hence can have duplicated elements.
 
 
 <pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify=<b>false</b>;
 <b>ensures</b> [concrete] <b>true</b>;
 <b>aborts_if</b> <b>false</b>;
 <b>include</b> <a href="NetworkIdentity.md#0x1_NetworkIdentity_AddMembersInternalEnsures">AddMembersInternalEnsures</a>&lt;T&gt; {
