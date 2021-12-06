@@ -1,0 +1,24 @@
+validator:
+  storage:
+    class: io1
+  nodeSelector:
+    eks.amazonaws.com/nodegroup: validators
+
+safetyrules:
+  nodeSelector:
+    eks.amazonaws.com/nodegroup: validators
+
+fullnode:
+  nodeSelector:
+    eks.amazonaws.com/nodegroup: validators
+
+monitoring:
+  prometheus:
+    storage:
+      class: gp2
+  nodeSelector:
+    eks.amazonaws.com/nodegroup: utilities
+
+logging:
+  nodeSelector:
+    eks.amazonaws.com/nodegroup: utilities

@@ -1,0 +1,12 @@
+service:
+  type: "process"
+  server_address: "/ip4/0.0.0.0/tcp/6185"
+backend:
+  type: "vault"
+  server: "{{ .Values.vault.server.address }}"
+  {{- if .Values.vault.server.ca_cert }}
+  ca_certificate: "{{ .Values.vault.server.ca_cert }}"
+  {{- end }}
+  namespace: "{{ .Values.vault.namespace }}"
+  token:
+    from_disk: "/opt/vault/token"

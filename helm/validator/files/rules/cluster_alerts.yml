@@ -1,0 +1,67 @@
+#
+# The following alerts rely on cAdvisor/kube-state-metrics from kubernetes
+# We filter by the name of important pods we expect to be running, and exclude
+# containers created by k8s in the control plane, e.g. EKS/AKS containers themselves.
+#
+groups:
+- name: "Cluster alerts"
+  rules:
+{{ if .Values.monitoring.useKubeStateMetrics }}
+# Pod status alerts using kube-state-metrics if the variable is set
+{{- range list "validator" "safety-rules" "haproxy" "key-manager" "logging" "monitoring"}}
+  - alert: Container metrics are missing
+    expr: absent(kube_pod_container_status_restarts_total{container!="", container!="POD", pod=~".*{{ . }}.*"})
+    for: 5m
+    labels:
+      severity: warning
+      summary: "container metrics from validators are missing"
+{{- end }}
+# high severity alerts for core validator functionality
+{{- range list "validator-validator" "validator-safety-rules" "validator-haproxy" }}
+  - alert: Unexpected restart - {{ . }}
+    expr: increase(kube_pod_container_status_restarts_total{container!="", container!="POD", pod=~".*{{ . }}.*"}[5m]) > 2
+    for: 1m
+    labels:
+      severity: error
+      summary: "Kubernetes pod matching '{{ . }}' restarted 2 times in 5 mins"
+{{- end }}
+# lower severity alerts for monitoring and logging
+{{- range list "validator-logging" "validator-monitoring" }}
+  - alert: Unexpected restart - {{ . }}
+    expr: increase(kube_pod_container_status_restarts_total{container!="", container!="POD", pod=~".*{{ . }}.*"}[5m]) > 2
+    for: 1m
+    labels:
+      severity: warning
+      summary: "Kubernetes pod matching '{{ . }}' restarted 2 times in 5 mins"
+{{- end }}
+
+{{ else }}
+# Pod status alerts using cAdvisor (by default)
+{{- range list "validator" "safety-rules" "haproxy" "key-manager" "logging" "monitoring"}}
+  - alert: Container metrics are missing
+    expr: absent(container_start_time_seconds{container!="", container!="POD", pod=~".*{{ . }}.*"})
+    for: 5m
+    labels:
+      severity: warning
+      summary: "cAdvisor container metrics from validators are missing"
+{{- end }}
+# high severity alerts for core validator functionality
+{{- range list "validator-validator" "validator-safety-rules" "validator-haproxy" }}
+  - alert: Pod crashing - {{ . }}
+    expr: count(time() - container_start_time_seconds{container!="", container!="POD", pod=~".*{{ . }}.*"} < 60)
+    for: 1m
+    labels:
+      severity: error
+      summary: "Kubernetes pod matching '{{ . }}' is crashing or not returning cAdvisor metrics"
+{{- end }}
+# lower severity alerts for monitoring and logging
+{{- range list "validator-logging" "validator-monitoring" }}
+  - alert: Pod crashing - {{ . }}
+    expr: count(time() - container_start_time_seconds{container!="", container!="POD", pod=~".*{{ . }}.*"} < 60)
+    for: 1m
+    labels:
+      severity: warning
+      summary: "Kubernetes pod matching '{{ . }}' is crashing or not returning cAdvisor metrics"
+{{- end }}
+
+{{ end }}

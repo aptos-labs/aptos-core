@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "diem-validator.fullname" . }}
+  labels:
+    {{- include "diem-validator.labels" . | nindent 4 }}
+data:
+{{ tpl (.Files.Glob "files/configs/*.yaml").AsConfig . | indent 2 }}
+
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "diem-validator.fullname" . }}-dashboards
+  labels:
+    {{- include "diem-validator.labels" . | nindent 4 }}
+binaryData:
+{{ (.Files.Glob "files/dashboards/*.json.gz").AsSecrets | indent 2 }}

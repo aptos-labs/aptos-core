@@ -1,0 +1,13 @@
+groups:
+  - name: sla_rules
+    rules:
+    - record: proposal_uptime
+      expr: |
+        increase(diem_consensus_proposals_count[12h]) > bool 0
+    - record: commit_uptime
+      expr: |
+        increase(diem_consensus_last_committed_round[1m]) > bool 0
+    - record: fullnode_uptime
+      # consider fullnode up when synced to within latest 15 versions, which is about 5s lag
+      expr: |
+        (diem_state_sync_version{type="highest", role="fullnode"} - on(owner, role, kubernetes_pod_name, job) diem_state_sync_version{type="committed", role="fullnode"}) < bool 15

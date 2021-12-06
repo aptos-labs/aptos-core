@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "diem-validator.fullname" . }}-tools
+  labels:
+    {{- include "diem-validator.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "diem-validator.fullname" . }}-tools
+  replicas: 0
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      {{- include "diem-validator.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/name: tools
+  template:
+    metadata:
+      labels:
+        {{- include "diem-validator.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/name: tools
+      annotations:
+        seccomp.security.alpha.kubernetes.io/pod: runtime/default
+    spec:
+      containers:
+      - name: tools
+        image: {{ .Values.tools.image.repo }}:{{ .Values.tools.image.tag | default .Values.imageTag }}
+      {{- with .Values.tools }}
+        imagePullPolicy: {{ .image.pullPolicy }}
+      {{- end }}
+        command: ["sleep", "infinity"]
+        volumeMounts:
+        - name: diem-data
+          mountPath: /opt/diem/data
+        - name: tmp
+          mountPath: /tmp
+        securityContext:
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+      {{- with .nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 6180
+        runAsGroup: 6180
+        fsGroup: 6180
+      volumes:
+      - name: diem-data
+        persistentVolumeClaim:
+          claimName: {{ include "diem-validator.fullname" . }}-validator-e{{ .Values.chain.era }}
+      - name: tmp
+        emptyDir: {}
+      serviceAccountName: {{ include "diem-validator.serviceAccountName" . }}

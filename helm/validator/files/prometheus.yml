@@ -1,0 +1,149 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    chain_name: {{ .Values.chain.name }}
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+  - static_configs:
+    - targets:
+      - localhost:9093
+
+# Load rules once and periodically evaluate them according to the global 'evaluation_interval'.
+rule_files:
+{{- range $path, $_ := .Files.Glob "files/rules/*.yml" }}
+  - {{ base $path }}
+{{- end }}
+
+scrape_configs:
+{{ if .Values.monitoring.fullKubernetesScrape }}
+- job_name: 'kubernetes-apiservers'
+  scheme: https
+  tls_config:
+    ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+  bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+
+  kubernetes_sd_configs:
+  - role: endpoints
+
+  # Keep only the default/kubernetes service endpoints for the https port. This
+  # will add targets for each API server which Kubernetes adds an endpoint to
+  # the default/kubernetes service.
+  relabel_configs:
+  - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+    action: keep
+    regex: default;kubernetes;https
+  - target_label: owner
+    replacement: {{ .Values.validator.name }}
+{{ end }}
+
+- job_name: 'kubernetes-nodes'
+  scheme: https
+  tls_config:
+    ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+  bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+
+  kubernetes_sd_configs:
+  - role: node
+
+  {{ if not .Values.monitoring.fullKubernetesScrape }}
+  metric_relabel_configs:
+  - source_labels: [namespace]
+    action: keep
+    regex: "{{ .Release.Namespace }}"
+  {{ end }}
+
+  relabel_configs:
+  - action: labelmap
+    regex: __meta_kubernetes_node_label_(.+)
+  - target_label: __address__
+    replacement: kubernetes.default.svc:443
+  - source_labels: [__meta_kubernetes_node_name]
+    regex: (.+)
+    target_label: __metrics_path__
+    replacement: /api/v1/nodes/${1}/proxy/metrics
+  - target_label: owner
+    replacement: {{ .Values.validator.name }}
+
+- job_name: 'kubernetes-cadvisor'
+  scheme: https
+  tls_config:
+    ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+  bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+
+  kubernetes_sd_configs:
+  - role: node
+
+  relabel_configs:
+  - target_label: __address__
+    replacement: kubernetes.default.svc:443
+  - source_labels: [__meta_kubernetes_node_name]
+    regex: (.+)
+    target_label: __metrics_path__
+    replacement: /api/v1/nodes/${1}/proxy/metrics/cadvisor
+  - target_label: owner
+    replacement: {{ .Values.validator.name }}
+
+  {{ if not .Values.monitoring.fullKubernetesScrape }}
+  metric_relabel_configs:
+  - source_labels: [namespace, pod]
+    action: keep
+    regex: "{{ .Release.Namespace }};{{ .Release.Name }}-.*"
+  {{ end }}
+
+{{ if .Values.monitoring.useKubeStateMetrics }}
+- job_name: 'kube-state-metrics'
+  static_configs:
+  - targets: ['kube-state-metrics.default.svc.cluster.local:8080']
+    labels:
+      owner: {{ .Values.validator.name }}
+{{ end }}
+
+- job_name: "diem-procs"
+
+  kubernetes_sd_configs:
+  - role: pod
+
+  relabel_configs:
+  - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_part_of]
+    action: keep
+    regex: "{{ .Chart.Name }}"
+  - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_instance]
+    action: keep
+    regex: "{{ .Release.Name }}"
+  - source_labels: [__meta_kubernetes_pod_container_port_number]
+    action: keep
+    regex: "9101"
+  - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+    action: replace
+    target_label: role
+  - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+    action: replace
+    target_label: instance
+  - source_labels: [__meta_kubernetes_pod_name]
+    action: replace
+    target_label: kubernetes_pod_name
+  - target_label: owner
+    replacement: {{ .Values.validator.name }}
+
+- job_name: "pushgateway"
+  static_configs:
+  - targets: ['localhost:9091']
+    labels:
+      owner: {{ .Values.validator.name }}
+
+{{ if .Values.vault.prometheusTarget }}
+- job_name: "vault"
+  static_configs:
+  - targets: ['{{ .Values.vault.prometheusTarget }}']
+    labels:
+      owner: {{ .Values.validator.name }}
+  scheme: "https"
+  metrics_path: "/v1/sys/metrics"
+  params:
+    format: ["prometheus"]
+  tls_config:
+    insecure_skip_verify: true
+{{ end }}

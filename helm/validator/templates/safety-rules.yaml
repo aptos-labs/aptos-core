@@ -1,0 +1,215 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "diem-validator.fullname" . }}-safety-rules
+  labels:
+    {{- include "diem-validator.labels" . | nindent 4 }}
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "diem-validator.fullname" . }}-safety-rules
+  labels:
+    {{- include "diem-validator.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "diem-validator.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/name: safety-rules
+  ports:
+  - port: 6185
+
+---
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "diem-validator.fullname" . }}-safety-rules
+  labels:
+    {{- include "diem-validator.labels" . | nindent 4 }}
+    app.kubernetes.io/name: safety-rules
+spec:
+  serviceName: {{ include "diem-validator.fullname" . }}-safety-rules
+  replicas: 1
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      {{- include "diem-validator.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/name: safety-rules
+  template:
+    metadata:
+      labels:
+        {{- include "diem-validator.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/name: safety-rules
+      annotations:
+        seccomp.security.alpha.kubernetes.io/pod: runtime/default
+        checksum/safetyrules.yaml: {{ tpl (.Files.Get "files/configs/safetyrules.yaml") . | sha256sum }}
+        checksum/vault.json: {{ tpl (.Files.Get "files/vault.json") . | sha256sum }}
+        chain/era: "{{ .Values.chain.era }}"
+    spec:
+      priorityClassName: {{ include "diem-validator.fullname" . }}-high
+      terminationGracePeriodSeconds: 0
+      containers:
+      - name: safety-rules
+        image: {{ .Values.safetyrules.image.repo }}:{{ .Values.safetyrules.image.tag | default .Values.imageTag }}
+      {{- with .Values.safetyrules }}
+        imagePullPolicy: {{ .image.pullPolicy }}
+        command:
+        - bash
+        - -c
+        - |-
+          set -ex
+          while [ ! -e /opt/vault/token ] && [ $SECONDS -lt 30 ]; do sleep 1; done
+          exec /opt/diem/bin/safety-rules /opt/diem/etc/safetyrules.yaml
+        resources:
+          {{- toYaml .resources | nindent 10 }}
+        env:
+        - name: RUST_LOG
+          value: {{ .rust_log }}
+        - name: RUST_LOG_REMOTE
+          value: {{ .rust_log_remote }}
+      {{- end }}
+        - name: RUST_BACKTRACE
+          value: "1"
+        - name: PUSH_METRICS_ENDPOINT
+          value: 'http://{{ include "diem-validator.fullname" . }}-pushgateway:9091/metrics/job/safety_rules'
+        - name: STRUCT_LOG_TCP_ADDR
+          value: '{{ include "diem-validator.fullname" . }}-logging:5044'
+        volumeMounts:
+        - name: config-volume
+          mountPath: /opt/diem/etc
+        - name: vault-config
+          mountPath: /etc/vault
+        - name: vault-token
+          mountPath: /opt/vault
+        # Dummy dependency so safety-rules doesn't start before safety-data is reset
+        - name: genesis-config
+          mountPath: /opt/diem/genesis
+        ports:
+        - containerPort: 6185
+        securityContext:
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+      {{- with .Values.vault }}
+      - name: vault
+        image: {{ .image.repo }}:{{ .image.tag }}
+        imagePullPolicy: {{ .image.pullPolicy }}
+        command: ["vault", "agent", "-config=/etc/vault/safetyrules.json"]
+        resources:
+          {{- toYaml .resources | nindent 10 }}
+        volumeMounts:
+        - name: vault-config
+          mountPath: /etc/vault
+        - name: vault-token
+          mountPath: /opt/vault
+        securityContext:
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+      {{- end }}
+      {{- with .Values.safetyrules }}
+      {{- with .nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 6180
+        runAsGroup: 6180
+        fsGroup: 6180
+      {{- end }}
+      volumes:
+      - name: config-volume
+        configMap:
+          name: {{ include "diem-validator.fullname" . }}
+      - name: vault-config
+        configMap:
+          name: {{ include "diem-validator.fullname" . }}-vault
+      - name: vault-token
+        emptyDir:
+          medium: Memory
+      - name: genesis-config
+        configMap:
+          name: {{ include "diem-validator.fullname" . }}-genesis-e{{ .Values.chain.era }}
+      serviceAccountName: {{ include "diem-validator.fullname" . }}-safety-rules
+      {{- if .Values.imagePullSecret }}
+      imagePullSecrets:
+      - name: {{.Values.imagePullSecret}}
+      {{- end }}
+
+---
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "diem-validator.fullname" . }}-safety-rules
+  labels:
+    {{- include "diem-validator.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "diem-validator.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/name: safety-rules
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # DiemNet from validator
+  - from:
+    - podSelector:
+        matchLabels:
+          {{- include "diem-validator.selectorLabels" . | nindent 10 }}
+          app.kubernetes.io/name: validator
+    ports:
+    - protocol: TCP
+      port: 6185
+  egress:
+  # Vault protocol to Vault server
+  - ports:
+    - protocol: TCP
+      port: 8200
+    {{- if .Values.vault.serverIPRanges }}
+    to:
+    {{- range $cidr := .Values.vault.serverIPRanges }}
+    - ipBlock:
+        cidr: {{ $cidr }}
+    {{- end }}
+    {{- end }}
+  # TCP to prometheus pushgateway
+  - to:
+    - podSelector:
+        matchLabels:
+          {{- include "diem-validator.selectorLabels" . | nindent 10 }}
+          app.kubernetes.io/name: monitoring
+    ports:
+    - protocol: TCP
+      port: 9091
+  # TCP to Vector
+  - to:
+    - podSelector:
+        matchLabels:
+          {{- include "diem-validator.selectorLabels" . | nindent 10 }}
+          app.kubernetes.io/name: logging
+    ports:
+    - protocol: TCP
+      port: 5044
+  # DNS
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - protocol: UDP
+      port: 53

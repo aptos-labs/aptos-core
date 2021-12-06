@@ -1,0 +1,366 @@
+chain:
+  name: premainnet
+  era: 21
+  chain_id: 21
+
+imageTag: release-1.5_b0cbf54f
+
+validator:
+  name:
+  image:
+    repo: diem/validator
+    tag:
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 4
+      memory: 6.5Gi
+    requests:
+      cpu: 4
+      memory: 6.5Gi
+  storage:
+    class:
+    size: 350Gi
+  rust_log: info
+  rust_log_remote: debug,hyper=off
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  config:
+    provide_genesis: true
+    sync_only: false
+    mempool_poll_count:
+    round_initial_timeout_ms:
+
+tools:
+  image:
+    repo: diem/tools
+    tag:
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 0.5
+      memory: 512Mi
+    requests:
+      cpu: 0.5
+      memory: 512Mi
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+backup:
+  image:
+    repo: diem/tools
+    tag:
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 1
+      memory: 1Gi
+    requests:
+      cpu: 1
+      memory: 1Gi
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  serviceAccount:
+    annotations: {}
+  enable: true
+  config:
+    location:
+    s3:
+      bucket:
+    gcs:
+      bucket:
+    azure:
+      account:
+      container:
+      sas:
+    scw_s3:
+      access_key:
+      secret_key:
+      region:
+      endpoint_url:
+      bucket:
+    state_snapshot_interval: 200000
+    transaction_batch_size: 100000
+
+backup_verify:
+  schedule: "@daily"
+  resources:
+    limits:
+      cpu: 0.5
+      memory: 1Gi
+    requests:
+      cpu: 0.5
+      memory: 1Gi
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+restore:
+  image:
+    repo: diem/tools
+    tag:
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 4
+      memory: 6.5Gi
+    requests:
+      cpu: 4
+      memory: 6.5Gi
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  config:
+    location:
+    s3:
+      bucket:
+    gcs:
+      bucket:
+    azure:
+      account:
+      container:
+      sas:
+    trusted_waypoints: []
+    concurrent_downloads: 2
+    restore_era:
+
+safetyrules:
+  image:
+    repo: diem/validator_tcb
+    tag:
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 1
+      memory: 512Mi
+    requests:
+      cpu: 1
+      memory: 512Mi
+  rust_log: debug
+  rust_log_remote: debug,hyper=off
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+fullnode:
+  groups:
+  - name: fullnode
+    replicas: 1
+    enableJsonRpc: true
+    # enable the REST API
+    enableApi: false
+  resources:
+    limits:
+      cpu: 4
+      memory: 6.5Gi
+    requests:
+      cpu: 4
+      memory: 6.5Gi
+  storage:
+    class:
+    size: 350Gi
+  rust_log: info
+  rust_log_remote: debug,hyper=off
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  config:
+    max_inbound_connections: 1000
+
+keymanager:
+  image:
+    repo: diem/validator_tcb
+    tag:
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 0.25
+      memory: 256Mi
+    requests:
+      cpu: 0.25
+      memory: 256Mi
+  rust_log: debug
+  rust_log_remote: debug,hyper=off
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+vault:
+  image:
+    repo: vault
+    tag: 1.8.1@sha256:d35855569d87911f396bf951104ff6603ca1858ef2283719a935f8bcf9167e64
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 0.1
+      memory: 128Mi
+    requests:
+      cpu: 0.1
+      memory: 128Mi
+  server:
+    address:
+  serverIPRanges: []
+  prometheusTarget:
+  tls: {}
+  auth:
+    type: kubernetes
+    mount_path: auth/kubernetes-diem
+    config:
+      role: diem-<role>
+  namespace: diem
+
+haproxy:
+  replicas: 1
+  image:
+    repo: haproxy
+    tag: 2.2.14@sha256:36aa98fff27dcb2d12c93e68515a6686378c783ea9b1ab1d01ce993a5cbc73e1
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 2
+      memory: 2Gi
+    requests:
+      cpu: 2
+      memory: 2Gi
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  limits:
+    validator:
+      connectionsPerIPPerMin: 2
+  config:
+    send_proxy_protocol: false
+  tls_secret:
+
+monitoring:
+  fullKubernetesScrape: false
+  useKubeStateMetrics: false
+  prometheus:
+    image:
+      repo: prom/prometheus
+      tag: v2.27.1@sha256:ca9e612ba1b6382ccf3642e21c9ee328ed4baa49fe84600ead7b7790c139aab4
+      pullPolicy: IfNotPresent
+    resources:
+      limits:
+        cpu: 1
+        memory: 1.5Gi
+      requests:
+        cpu: 1
+        memory: 1.5Gi
+    storage:
+      class:
+      size: 100Gi
+  pushgateway:
+    image:
+      repo: prom/pushgateway
+      tag: v1.4.1@sha256:b561435cb17ee816c5d90c2408bcc1ffe25304f1608e18db16a3969f6cc44626
+      pullPolicy: IfNotPresent
+    resources:
+      limits:
+        cpu: 0.1
+        memory: 128Mi
+      requests:
+        cpu: 0.1
+        memory: 128Mi
+  alertmanager:
+    alertRouteTrees:
+      - match:
+          severity: critical
+        receiver: 'critical'
+      - match:
+          severity: error
+        receiver: 'error'
+    alertReceivers:
+      - name: 'critical'
+      - name: 'error'
+      - name: 'default'
+    image:
+      repo: prom/alertmanager
+      tag: v0.22.2@sha256:6ff24033b35ff1f6f66e2fc8fa4792cf91f0fee8da57955051036dbb8b6a6d44
+      pullPolicy: IfNotPresent
+    resources:
+      limits:
+        cpu: 0.1
+        memory: 128Mi
+      requests:
+        cpu: 0.1
+        memory: 128Mi
+  grafana:
+    image:
+      repo: grafana/grafana
+      tag: 7.5.7@sha256:c1134ea4c5a6bac38ddc246bd07eb1ff35680ea6cdda63a7bc30773e2f2a6085
+      pullPolicy: IfNotPresent
+    resources:
+      limits:
+        cpu: 0.2
+        memory: 128Mi
+      requests:
+        cpu: 0.2
+        memory: 128Mi
+  haproxy:
+    clientCertVerificationDisabled: false
+    resources:
+      limits:
+        cpu: 0.1
+        memory: 256Mi
+      requests:
+        cpu: 0.1
+        memory: 256Mi
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+logging:
+  vector:
+    verifyServer: # default is true
+    logToFile: false
+    image:
+      repo: timberio/vector
+      tag: 0.14.0-alpine@sha256:e4512856b5b07ffb8ee0e0c04d7b8bb0ded65c80d973bed9fd08fd8533f208b0
+      pullPolicy: IfNotPresent
+    resources:
+      limits:
+        cpu: 1.5
+        memory: 2Gi
+      requests:
+        cpu: 1.5
+        memory: 2Gi
+    outputs: []
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+service:
+  external:
+    type: LoadBalancer
+  validator:
+    loadBalancerSourceRanges:
+  fullnode:
+    loadBalancerSourceRanges:
+  monitoring:
+    loadBalancerSourceRanges:
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name:
+
+# Secrets for logging and monitoring
+tlsCert:
+tlsKey:
+clientCert:
+
+loggingClientCert:
+loggingClientKey:
+loggingCA:
+loggingCentralHost:
+loggingToNull: true
+
+# Used for testing purposes only!
+# Exposes the validator's JSON-RPC in addition to that of its VFN
+exposeValidatorJsonRpc: false

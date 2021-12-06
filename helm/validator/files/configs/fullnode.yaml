@@ -1,0 +1,75 @@
+base:
+  role: "full_node"
+  waypoint:
+    from_storage:
+      type: "vault"
+      server: "{{ .Values.vault.server.address }}"
+      {{- if .Values.vault.server.ca_cert }}
+      ca_certificate: "{{ .Values.vault.server.ca_cert }}"
+      {{- end }}
+      namespace: "{{ .Values.vault.namespace }}"
+      token:
+        from_disk: "/opt/vault/token"
+
+execution:
+  {{- if eq .Values.validator.config.provide_genesis true }}
+  genesis_file_location: "../genesis/genesis.blob"
+  {{- else }}
+  genesis_file_location: ""
+  {{- end}}
+
+
+storage:
+  backup_service_address: "0.0.0.0:6186"
+
+full_node_networks:
+- network_id:
+    private: "vfn"
+  listen_address: "/ip4/0.0.0.0/tcp/6181"
+  seeds:
+    d58bc7bb154b38039bc9096ce04e1237:
+      addresses:
+      - "/dns4/{{ include "diem-validator.fullname" . }}-validator/tcp/6181/ln-noise-ik/f0274c2774519281a8332d0bb9d8101bd58bc7bb154b38039bc9096ce04e1237/ln-handshake/0"
+      role: "Validator"
+
+- network_id: "public"
+  discovery_method: "onchain"
+  listen_address: "/ip4/0.0.0.0/tcp/6182"
+  {{- if .Values.haproxy.config.send_proxy_protocol }}
+  enable_proxy_protocol: true
+  {{- end }}
+  max_inbound_connections: {{ .Values.fullnode.config.max_inbound_connections }}
+  inbound_rate_limit_config:
+    ip_byte_bucket_rate: 1048576
+    ip_byte_bucket_size: 1048576
+    initial_bucket_fill_percentage: 25
+    enabled: true
+  outbound_rate_limit_config:
+    ip_byte_bucket_rate: 1048576
+    ip_byte_bucket_size: 1048576
+    initial_bucket_fill_percentage: 25
+    enabled: true
+  identity:
+    type: "from_storage"
+    key_name: "fullnode_network"
+    peer_id_name: "owner_account"
+    backend:
+      type: "vault"
+      server: "{{ .Values.vault.server.address }}"
+      {{- if .Values.vault.server.ca_cert }}
+      ca_certificate: "{{ .Values.vault.server.ca_cert }}"
+      {{- end }}
+      namespace: "{{ .Values.vault.namespace }}"
+      token:
+        from_disk: "/opt/vault/token"
+  seeds:
+    {{- .Values.fullnode.config.seeds | default dict | toYaml | nindent 6 }}
+
+json_rpc:
+  address: "0.0.0.0:8080"
+
+api:
+  # REST API will be enabled locally,
+  # to expose the endpoint through HAProxy, set the option in helm values.
+  enabled: true
+  address: "0.0.0.0:8081"

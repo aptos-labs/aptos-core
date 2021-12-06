@@ -1,0 +1,139 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "diem-validator.fullname" . }}-vector
+  labels:
+    {{- include "diem-validator.labels" . | nindent 4 }}
+data:
+  vector.toml: |-
+{{ (tpl (.Files.Get "files/vector.toml") .) | indent 4 }}
+
+---
+{{- if not .Values.loggingToNull }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "diem-validator.fullname" . }}-vector
+  labels:
+    {{- include "diem-validator.labels" . | nindent 4 }}
+type: kubernetes.io/tls
+data:
+  tls.crt: {{.Values.loggingClientCert}}
+  tls.key: {{.Values.loggingClientKey}}
+  ca.crt: {{.Values.loggingCA}}
+
+---
+{{- end }}
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "diem-validator.fullname" . }}-logging
+  labels:
+    {{- include "diem-validator.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "diem-validator.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/name: logging
+  ports:
+  - name: json
+    port: 5044
+  - name: syslog
+    protocol: UDP
+    port: 1514
+
+---
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "diem-validator.fullname" . }}-logging
+  labels:
+    {{- include "diem-validator.labels" . | nindent 4 }}
+    app.kubernetes.io/name: logging
+spec:
+  serviceName: {{ include "diem-validator.fullname" . }}-logging
+  replicas: 1
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      {{- include "diem-validator.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/name: logging
+  template:
+    metadata:
+      labels:
+        {{- include "diem-validator.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/name: logging
+      annotations:
+        seccomp.security.alpha.kubernetes.io/pod: runtime/default
+        checksum/vector.toml: {{ tpl (.Files.Get "files/vector.toml") . | sha256sum }}
+    spec:
+      volumes:
+      {{- if .Values.logging.vector.logToFile }}
+      - name: vector-logs
+        emptyDir: {}
+      {{- end }}
+      - name: vector-config
+        configMap:
+          name: {{ include "diem-validator.fullname" . }}-vector
+      {{- if not .Values.loggingToNull }}
+      - name: vector-secret
+        secret:
+          secretName: {{ include "diem-validator.fullname" . }}-vector
+      {{- end }}
+      {{- with .Values.logging }}
+      containers:
+      - name: vector
+        image: {{ .vector.image.repo }}:{{ .vector.image.tag }}
+        args:
+        - "--watch-config=true"
+        resources:
+          {{- toYaml .vector.resources | nindent 10 }}
+        securityContext:
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+          runAsUser: 65534
+          runAsGroup: 65534
+          capabilities:
+            drop:
+            - ALL
+        ports:
+        - containerPort: 5044
+        - containerPort: 1514
+        - containerPort: 9600
+        livenessProbe:
+          tcpSocket:
+            port: 5044
+          initialDelaySeconds: 10
+        readinessProbe:
+          tcpSocket:
+            port: 5044
+        volumeMounts:
+        - name: vector-config
+          mountPath: /etc/vector
+          readOnly: true
+        {{- if not $.Values.loggingToNull }}
+        - name: vector-secret
+          mountPath: /etc/vector/cert
+        {{- end }}
+        {{- if .vector.logToFile }}
+        - name: vector-logs
+          mountPath: /tmp/logs
+        {{- end }}
+      {{- with .nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        fsGroup: 65534
+      {{- end }}
+      serviceAccountName: {{ include "diem-validator.serviceAccountName" . }}

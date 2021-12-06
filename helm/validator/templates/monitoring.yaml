@@ -1,0 +1,409 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "diem-validator.fullname" . }}-grafana
+  labels:
+    {{- include "diem-validator.labels" . | nindent 4 }}
+data:
+  prometheus.yml: |-
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        isDefault: true
+        access: proxy
+        url: http://localhost:9090
+
+  dashboards.yml: |-
+    apiVersion: 1
+    providers:
+    - name: 'default'
+      folder: 'diem'
+      type: file
+      options:
+        path: /etc/grafana/dashboards/diem
+
+---
+{{- if .Values.tlsCert }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "diem-validator.fullname" . }}-monitoring-tls
+  labels:
+    {{- include "diem-validator.labels" . | nindent 4 }}
+type: kubernetes.io/tls
+data:
+  tls.crt: {{ .Values.tlsCert }}
+  tls.key: {{ .Values.tlsKey }}
+  tls.crt.key: {{ .Values.tlsKey }}
+  client.crt: {{ .Values.clientCert }}
+
+---
+{{- end }}
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "diem-validator.fullname" . }}-prometheus
+  labels:
+    {{- include "diem-validator.labels" . | nindent 4 }}
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: {{ .Values.monitoring.prometheus.storage.class }}
+  resources:
+    requests:
+      storage: {{ .Values.monitoring.prometheus.storage.size }}
+
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "diem-validator.fullname" . }}-monitoring
+  labels:
+    {{- include "diem-validator.labels" . | nindent 4 }}
+data:
+{{ (tpl (.Files.Glob "files/rules/*.yml").AsConfig .) | indent 2 }}
+  prometheus.yml: |-
+{{ (tpl (.Files.Get "files/prometheus.yml") .) | indent 4 }}
+  alertmanager.yml: |-
+{{ (tpl (.Files.Get "files/alertmanager.yml") .) | indent 4 }}
+  haproxy.cfg: |-
+{{ (tpl (.Files.Get "files/haproxy-mon.cfg") .) | indent 4 }}
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "diem-validator.fullname" . }}-pushgateway
+  labels:
+    {{- include "diem-validator.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "diem-validator.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/name: monitoring
+  ports:
+  - port: 9091
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "diem-validator.fullname" . }}-monitoring
+  labels:
+    {{- include "diem-validator.labels" . | nindent 4 }}
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: nlb
+    service.beta.kubernetes.io/oci-load-balancer-shape: 10Mbps
+    service.beta.kubernetes.io/oci-load-balancer-security-list-management-mode: All
+spec:
+  selector:
+    {{- include "diem-validator.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/name: monitoring
+  ports:
+  - port: 443
+    targetPort: 8443
+  type: {{ .Values.service.external.type }}
+  {{- with .Values.service.monitoring.loadBalancerSourceRanges }}
+  loadBalancerSourceRanges:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+
+---
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "diem-validator.fullname" . }}-prometheus
+  labels:
+    {{- include "diem-validator.labels" . | nindent 4 }}
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
+metadata:
+  name: {{ include "diem-validator.fullname" . }}-prometheus
+  labels:
+    {{- include "diem-validator.labels" . | nindent 4 }}
+rules:
+- apiGroups: [""]
+  resources:
+  - nodes
+  - nodes/proxy
+  - services
+  - endpoints
+  - pods
+  verbs: ["get", "list", "watch"]
+- apiGroups:
+  - extensions
+  resources:
+  - ingresses
+  verbs: ["get", "list", "watch"]
+- nonResourceURLs: ["/metrics"]
+  verbs: ["get"]
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "diem-validator.fullname" . }}-prometheus
+  labels:
+    {{- include "diem-validator.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "diem-validator.fullname" . }}-prometheus
+subjects:
+- kind: ServiceAccount
+  name: {{ include "diem-validator.fullname" . }}-prometheus
+  namespace: {{ .Release.Namespace }}
+
+---
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "diem-validator.fullname" . }}-monitoring
+  labels:
+    {{- include "diem-validator.labels" . | nindent 4 }}
+    app.kubernetes.io/name: monitoring
+spec:
+  serviceName: {{ include "diem-validator.fullname" . }}-monitoring
+  replicas: 1
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      {{- include "diem-validator.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/name: monitoring
+  template:
+    metadata:
+      labels:
+        {{- include "diem-validator.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/name: monitoring
+      annotations:
+        seccomp.security.alpha.kubernetes.io/pod: runtime/default
+        checksum/prometheus.yml: {{ tpl (.Files.Get "files/prometheus.yml") . | sha256sum }}
+        checksum/alertmanager.yml: {{ tpl (.Files.Get "files/alertmanager.yml") . | sha256sum }}
+        checksum/haproxy.cfg: {{ tpl (.Files.Get "files/haproxy-mon.cfg") . | sha256sum }}
+        checksum/rules.yml: {{ (tpl (.Files.Glob "files/rules/*.yml").AsConfig .) | sha256sum }}
+        checksum/dashboards.json: {{ (.Files.Glob "files/dashboards/*.json.gz").AsSecrets | sha256sum }}
+    spec:
+      priorityClassName: {{ include "diem-validator.fullname" . }}-medium
+      {{- with .Values.monitoring }}
+      containers:
+      - name: prometheus
+        image: {{ .prometheus.image.repo }}:{{ .prometheus.image.tag }}
+        imagePullPolicy: {{ .prometheus.image.pullPolicy }}
+        args:
+        - "--web.enable-lifecycle"
+        - "--config.file=/etc/prometheus/prometheus.yml"
+        resources:
+          {{- toYaml .prometheus.resources | nindent 10 }}
+        ports:
+        - containerPort: 9090
+        livenessProbe:
+          httpGet:
+            path: /-/healthy
+            port: 9090
+          initialDelaySeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /-/ready
+            port: 9090
+        volumeMounts:
+        - name: monitoring-config
+          mountPath: /etc/prometheus
+        - name: prometheus-data
+          mountPath: /prometheus
+        securityContext:
+          readOnlyRootFilesystem: true
+          runAsUser: 65534
+          runAsGroup: 65534
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+      - name: pushgateway
+        image: {{ .pushgateway.image.repo }}:{{ .pushgateway.image.tag }}
+        imagePullPolicy: {{ .pushgateway.image.pullPolicy }}
+        resources:
+          {{- toYaml .pushgateway.resources | nindent 10 }}
+        ports:
+        - containerPort: 9091
+        livenessProbe:
+          httpGet:
+            path: /-/healthy
+            port: 9091
+          initialDelaySeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /-/ready
+            port: 9091
+        volumeMounts:
+        - name: pushgateway-data
+          mountPath: /pushgateway
+        securityContext:
+          readOnlyRootFilesystem: true
+          runAsUser: 65534
+          runAsGroup: 65534
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+      - name: alertmanager
+        image: {{ .alertmanager.image.repo }}:{{ .alertmanager.image.tag }}
+        imagePullPolicy: {{ .alertmanager.image.pullPolicy }}
+        args:
+        - "--config.file=/etc/alertmanager/alertmanager.yml"
+        - "--storage.path=/alertmanager"
+        resources:
+          {{- toYaml .alertmanager.resources | nindent 10 }}
+        ports:
+        - containerPort: 9093
+        livenessProbe:
+          httpGet:
+            path: /-/healthy
+            port: 9093
+          initialDelaySeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /-/ready
+            port: 9093
+        volumeMounts:
+        - name: monitoring-config
+          mountPath: /etc/alertmanager
+        - name: alertmanager-data
+          mountPath: /alertmanager
+        securityContext:
+          readOnlyRootFilesystem: true
+          runAsUser: 65534
+          runAsGroup: 65534
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+      - name: grafana
+        image: {{ .grafana.image.repo }}:{{ .grafana.image.tag }}
+        imagePullPolicy: {{ .grafana.image.pullPolicy }}
+        command: ["/bin/sh", "-c"]
+        args: ["cp /dashboards/* /etc/grafana/dashboards/diem && gunzip -f /etc/grafana/dashboards/diem/*.json.gz && exec /run.sh"]
+        resources:
+          {{- toYaml .grafana.resources | nindent 10 }}
+        ports:
+        - containerPort: 3000
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          initialDelaySeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+        volumeMounts:
+        - name: grafana-provisioning
+          mountPath: /etc/grafana/provisioning
+        - name: grafana-dashboards-archive
+          mountPath: /dashboards
+        - name: grafana-dashboards
+          mountPath: /etc/grafana/dashboards/diem
+        - name: grafana-data
+          mountPath: /var/lib/grafana
+        env:
+        - name: GF_AUTH_ANONYMOUS_ENABLED
+          value: "true"
+        - name: GF_AUTH_ANONYMOUS_ORG_ROLE
+          value: "Editor"
+        securityContext:
+          readOnlyRootFilesystem: true
+          runAsUser: 472
+          runAsGroup: 472
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+      - name: haproxy
+        image: {{ $.Values.haproxy.image.repo }}:{{ $.Values.haproxy.image.tag }}
+        args: ["-f", "/etc/haproxy/haproxy.cfg"]
+        resources:
+          {{- toYaml .haproxy.resources | nindent 10 }}
+        ports:
+        - containerPort: 8443
+        livenessProbe:
+          tcpSocket:
+            port: 8443
+        readinessProbe:
+          tcpSocket:
+            port: 8443
+        volumeMounts:
+        - mountPath: /etc/haproxy
+          name: monitoring-config
+        {{- if $.Values.tlsCert }}
+        - mountPath: /etc/haproxy/tls
+          name: monitoring-tls
+        {{- end }}
+        securityContext:
+          readOnlyRootFilesystem: true
+          runAsUser: 65534
+          runAsGroup: 65534
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+      {{- with .nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        fsGroup: 65534
+      {{- end }}
+      volumes:
+      - name: grafana-provisioning
+        configMap:
+          name: {{ include "diem-validator.fullname" . }}-grafana
+          items:
+          - key: prometheus.yml
+            path: datasources/prometheus.yml
+          - key: dashboards.yml
+            path: dashboards/dashboards.yml
+      - name: grafana-dashboards-archive
+        configMap:
+          name: {{ include "diem-validator.fullname" . }}-dashboards
+      - name: grafana-dashboards
+        emptyDir: {}
+      - name: monitoring-config
+        configMap:
+          name: {{ include "diem-validator.fullname" . }}-monitoring
+      - name: prometheus-data
+        persistentVolumeClaim:
+          claimName: {{ include "diem-validator.fullname" . }}-prometheus
+      - name: pushgateway-data
+        emptyDir: {}
+      - name: alertmanager-data
+        emptyDir: {}
+      - name: grafana-data
+        emptyDir: {}
+      {{- if .Values.tlsCert }}
+      - name: monitoring-tls
+        secret:
+          secretName: {{ include "diem-validator.fullname" . }}-monitoring-tls
+      {{- end }}
+      serviceAccountName: {{ include "diem-validator.fullname" . }}-prometheus
+      {{- if .Values.imagePullSecret }}
+      imagePullSecrets:
+      - name: {{.Values.imagePullSecret}}
+      {{- end }}

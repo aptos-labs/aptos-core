@@ -1,0 +1,206 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "diem-validator.fullname" . }}-key-manager
+  labels:
+    {{- include "diem-validator.labels" . | nindent 4 }}
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "diem-validator.fullname" . }}-key-manager
+  labels:
+    {{- include "diem-validator.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "diem-validator.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/name: key-manager
+  ports:
+  - name: dummy
+    port: 1
+
+---
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "diem-validator.fullname" . }}-key-manager
+  labels:
+    {{- include "diem-validator.labels" . | nindent 4 }}
+    app.kubernetes.io/name: key-manager
+spec:
+  serviceName: {{ include "diem-validator.fullname" . }}-key-manager
+  replicas: 1
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      {{- include "diem-validator.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/name: key-manager
+  template:
+    metadata:
+      labels:
+        {{- include "diem-validator.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/name: key-manager
+      annotations:
+        seccomp.security.alpha.kubernetes.io/pod: runtime/default
+        checksum/keymanager.yaml: {{ tpl (.Files.Get "files/configs/keymanager.yaml") . | sha256sum }}
+        checksum/vault.json: {{ tpl (.Files.Get "files/vault.json") . | sha256sum }}
+        chain/era: "{{ .Values.chain.era }}"
+    spec:
+      terminationGracePeriodSeconds: 0
+      containers:
+      - name: key-manager
+        image: {{ .Values.keymanager.image.repo }}:{{ .Values.keymanager.image.tag | default .Values.imageTag }}
+      {{- with .Values.keymanager }}
+        imagePullPolicy: {{ .image.pullPolicy }}
+        command:
+        - bash
+        - -c
+        - |-
+          set -ex
+          while [ ! -e /opt/vault/token ] && [ $SECONDS -lt 30 ]; do sleep 1; done
+          exec /opt/diem/bin/diem-key-manager /opt/diem/etc/keymanager.yaml
+        resources:
+          {{- toYaml .resources | nindent 10 }}
+        env:
+        - name: RUST_LOG
+          value: {{ .rust_log }}
+        - name: RUST_LOG_REMOTE
+          value: {{ .rust_log_remote }}
+      {{- end }}
+        - name: RUST_BACKTRACE
+          value: "1"
+        - name: PUSH_METRICS_ENDPOINT
+          value: 'http://{{ include "diem-validator.fullname" . }}-pushgateway:9091/metrics/job/key_manager'
+        - name: STRUCT_LOG_TCP_ADDR
+          value: '{{ include "diem-validator.fullname" . }}-logging:5044'
+        volumeMounts:
+        - name: config-volume
+          mountPath: /opt/diem/etc
+        - name: vault-config
+          mountPath: /etc/vault
+        - name: vault-token
+          mountPath: /opt/vault
+        securityContext:
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+      {{- with .Values.vault }}
+      - name: vault
+        image: {{ .image.repo }}:{{ .image.tag }}
+        imagePullPolicy: {{ .image.pullPolicy }}
+        command: ["vault", "agent", "-config=/etc/vault/keymanager.json"]
+        resources:
+          {{- toYaml .resources | nindent 10 }}
+        volumeMounts:
+        - name: vault-config
+          mountPath: /etc/vault
+        - name: vault-token
+          mountPath: /opt/vault
+        securityContext:
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+      {{- end }}
+      {{- with .Values.keymanager }}
+      {{- with .nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 6180
+        runAsGroup: 6180
+        fsGroup: 6180
+      {{- end }}
+      volumes:
+      - name: config-volume
+        configMap:
+          name: {{ include "diem-validator.fullname" . }}
+      - name: vault-config
+        configMap:
+          name: {{ include "diem-validator.fullname" . }}-vault
+      - name: vault-token
+        emptyDir:
+          medium: Memory
+      serviceAccountName: {{ include "diem-validator.fullname" . }}-key-manager
+      {{- if .Values.imagePullSecret }}
+      imagePullSecrets:
+      - name: {{.Values.imagePullSecret}}
+      {{- end }}
+
+---
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "diem-validator.fullname" . }}-key-manager
+  labels:
+    {{- include "diem-validator.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "diem-validator.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/name: key-manager
+  policyTypes:
+  - Ingress
+  - Egress
+  egress:
+  # JSON-RPC to validator
+  - to:
+    - podSelector:
+        matchLabels:
+          {{- include "diem-validator.selectorLabels" . | nindent 10 }}
+          app.kubernetes.io/name: fullnode
+    ports:
+    - protocol: TCP
+      port: 8080
+  # Vault protocol to Vault server
+  - ports:
+    - protocol: TCP
+      port: 8200
+    {{- if .Values.vault.serverIPRanges }}
+    to:
+    {{- range $cidr := .Values.vault.serverIPRanges }}
+    - ipBlock:
+        cidr: {{ $cidr }}
+    {{- end }}
+    {{- end }}
+  # TCP to prometheus pushgateway
+  - to:
+    - podSelector:
+        matchLabels:
+          {{- include "diem-validator.selectorLabels" . | nindent 10 }}
+          app.kubernetes.io/name: monitoring
+    ports:
+    - protocol: TCP
+      port: 9091
+  # TCP to Vector
+  - to:
+    - podSelector:
+        matchLabels:
+          {{- include "diem-validator.selectorLabels" . | nindent 10 }}
+          app.kubernetes.io/name: logging
+    ports:
+    - protocol: TCP
+      port: 5044
+  # DNS
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - protocol: UDP
+      port: 53

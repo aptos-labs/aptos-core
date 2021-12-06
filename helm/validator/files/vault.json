@@ -1,0 +1,14 @@
+{
+  "vault": {{ .Values.vault.server | toJson }},
+  "auto_auth": {
+    "method": [{{ .Values.vault.auth | toRawJson }}],
+    "sinks": [{
+      "sink": {
+        "type": "file",
+        "config": {
+          "path": "/opt/vault/token"
+        }
+      }
+    }],
+  }
+}

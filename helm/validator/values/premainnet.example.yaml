@@ -1,0 +1,42 @@
+validator:
+  # Set this to the validator node owner
+  name:
+  storage:
+    # Set this to a StorageClass available on your Kubernetes cluster. Example values:
+    # AWS/EKS: "gp2"
+    # GCP: "standard"
+    # Azure: "managed-premium"
+    # DigitalOcean: "do-block-storage"
+    class:
+
+fullnode:
+  storage:
+    # Set this to a StorageClass available on your Kubernetes cluster
+    class:
+
+monitoring:
+  prometheus:
+    storage:
+      # Set this to a StorageClass available on your Kubernetes cluster
+      class:
+
+vault:
+  # The "server" section is provided verbatim to Vault Agent
+  server:
+    # Specify your Vault server URL
+    address:
+    # If you need to specify a CA certificate, provide the content under "tls"
+    # below and reference the file here.
+    #ca_cert: /etc/vault/ca.crt
+  tls:
+    # Any files specified here will appear in /etc/vault/
+    ca.crt:
+  # The "auth" section is provided verbatim to Vault Agent as the auto_auth
+  # section, with "<role>" replaced with "safety-rules/validator/fullnode".
+  auth:
+    type: kubernetes
+    mount_path: auth/kubernetes-diem
+    config:
+      role: diem-<role>
+  # If you changed the default vault-init namespace update it here
+  namespace: diem

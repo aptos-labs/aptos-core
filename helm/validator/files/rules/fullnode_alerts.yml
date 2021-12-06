@@ -1,0 +1,42 @@
+groups:
+- name: "fullnode alerts"
+  rules:
+{{- range .Values.fullnode.groups }}
+{{ if $.Values.monitoring.useKubeStateMetrics }}
+  - alert: Container metrics are missing
+    expr: absent(kube_pod_container_status_restarts_total{container!="", container!="POD", pod=~".*{{ .name }}.*"})
+    for: 5m
+    labels:
+      severity: warning
+      summary: "container metrics from validators are missing"
+  - alert: Unexpected restart - {{ .name }}
+    expr: increase(kube_pod_container_status_restarts_total{container!="", container!="POD", pod=~".*{{ .name }}.*"}[5m]) > 2
+    for: 1m
+    labels:
+      severity: error
+      summary: "Kubernetes pod matching '{{ .name }}' restarted 2 times in 5 mins"
+{{ else }}
+  # pod crashing
+  - alert: Pod crashing - {{ .name }}
+    expr: count(time() - container_start_time_seconds{pod=~".*{{ .name }}.*", container=~".+"} < 60)
+    for: 1m
+    labels:
+      severity: error
+      summary: "Kubernetes pod '{{ .name }}' is crashing or not returning cAdvisor metrics"
+{{ end }}
+  # storage
+  - alert: Low Disk Space - {{ .name }}
+    expr: (kubelet_volume_stats_capacity_bytes{persistentvolumeclaim=~".*{{ .name }}.*"} - kubelet_volume_stats_used_bytes) / 1024 / 1024 / 1024 < 50
+    for: 5m
+    labels:
+      severity: warning
+      summary: "Less than 50 GB of free space on DB volume."
+    annotations:
+  - alert: Very Low Disk Space - {{ .name }}
+    expr: (kubelet_volume_stats_capacity_bytes{persistentvolumeclaim=~".*{{ .name }}.*"} - kubelet_volume_stats_used_bytes) / 1024 / 1024 / 1024 < 20
+    for: 5m
+    labels:
+      severity: error
+      summary: "Less than 20 GB of free space on DB volume."
+    annotations:
+{{- end }}

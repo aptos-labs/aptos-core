@@ -1,0 +1,180 @@
+groups:
+- name: "Diem alerts"
+  rules:
+  # consensus
+  - alert: Zero Block Commit Rate
+    expr: rate(diem_consensus_last_committed_round{role="validator"}[1m]) == 0 OR absent(diem_consensus_last_committed_round{role="validator"})
+    for: 20m
+    labels:
+      severity: error
+      summary: "The block commit rate is low"
+    annotations:
+  - alert: High local timeout rate
+    expr: rate(libra_consensus_timeout_count{role="validator"}[1m]) > 0.5
+    for: 20m
+    labels:
+      severity: warning
+      summary: "Consensus timeout rate is high"
+    annotations:
+  - alert: High consensus error rate
+    expr: rate(libra_consensus_error_count{role="validator"}[1m]) / on (role) rate(consensus_duration_count{op='main_loop', role="validator"}[1m]) > 0.25
+    for: 20m
+    labels:
+      severity: warning
+      summary: "Consensus error rate is high"
+    annotations:
+
+    # State sync alerts
+  - alert: State sync is not making progress
+    expr: rate(diem_state_sync_version{type="synced"}[5m]) == 0 OR absent(diem_state_sync_version{type="synced"})
+    for: 5m
+    labels:
+      severity: error
+      summary: "State sync is not making progress (i.e., it is not keeping up with the head of the blockchain)"
+    annotations:
+  - alert: State sync has no active upstream peers
+    expr: (sum by (owner, kubernetes_pod_name) (diem_state_sync_active_upstream_peers)) == 0
+    for: 3m
+    labels:
+      severity: error
+      summary: "State sync has no active upstream peers (i.e., it has no peers to synchronize from!)"
+    annotations:
+
+    # Mempool alerts
+  - alert: Mempool has no active upstream peers
+    expr: (sum by (owner, kubernetes_pod_name) (diem_mempool_active_upstream_peers_count)) == 0
+    for: 3m
+    labels:
+      severity: error
+      summary: "Mempool has no active upstream peers (unable to forward transactions to anyone!)"
+    annotations:
+  - alert: Mempool is at >80% capacity
+    expr: diem_core_mempool_index_size{index="system_ttl"} > 800000 # assumes default mempool size 1_000_000
+    for: 5m
+    labels:
+      severity: warning
+      summary: "Mempool is at >80% capacity (it may soon become full!)"
+    annotations:
+  - alert: Mempool is growing at a significant rate
+    expr: rate(diem_core_mempool_index_size{index="system_ttl"}[1m]) > 30000
+    for: 10m
+    labels:
+      severity: warning
+      summary: "Mempool is growing at a significant rate (it may soon become full!)"
+    annotations:
+
+  # Networking alerts
+  - alert: Validator Connected Peers
+    expr: 0 == min(diem_network_peers{state="connected", role_type="validator", role="validator"})
+    for: 15m
+    labels:
+      severity: error
+      summary: "Validator node has zero connected peers"
+    annotations:
+
+  # Storage core metrics
+  - alert: Validator Low Disk Space
+    expr: (kubelet_volume_stats_capacity_bytes{persistentvolumeclaim=~".*validator-e.*"} - kubelet_volume_stats_used_bytes) / 1024 / 1024 / 1024 < 50
+    for: 5m
+    labels:
+      severity: warning
+      summary: "Less than 50 GB of free space on Validator DB volume."
+    annotations:
+  - alert: Validator Very Low Disk Space
+    expr: (kubelet_volume_stats_capacity_bytes{persistentvolumeclaim=~".*validator-e.*"} - kubelet_volume_stats_used_bytes) / 1024 / 1024 / 1024 < 20
+    for: 5m
+    labels:
+      severity: critical
+      summary: "Less than 20 GB of free space on Validator DB volume."
+    annotations:
+  - alert: DiemDB API Success Rate
+    expr: sum by(owner, kubernetes_pod_name) (rate(diem_storage_api_latency_seconds_count{result="Ok"}[1m])) / sum by(owner, kubernetes_pod_name) (rate(diem_storage_api_latency_seconds_count[1m])) < 0.99  # 99%
+    for: 5m
+    labels:
+      severity: error
+      summary: "DiemDB API success rate dropped."
+    annotations:
+  - alert: RocksDB Read Latency
+    expr: sum by (owner, kubernetes_pod_name) (rate(diem_schemadb_get_latency_seconds_sum[1m])) / sum by (owner, kubernetes_pod_name) (rate(diem_schemadb_get_latency_seconds_count[1m])) > 0.001  # 1 millisecond
+    for: 5m
+    labels:
+      severity: warning
+      summary: "RocksDB read latency raised."
+    annotations:
+
+  {{- if .Values.backup.enable }}
+  # DB Backup and Backup Verify
+  - alert: Backup Coordinator Liveness
+    # It's okay if one of these metrics stops changing but the pushgateway still reports the old value, since the alerts following this will detect the staleness. In fact this one is just to detect the absence of these metrics.
+    expr: absent(irate(diem_backup_metadata_num_file_downloads[1m]) > 0) and on() (absent(diem_db_backup_coordinator_heartbeat_timestamp_s) or absent(diem_db_backup_coordinator_epoch_ending_epoch) or absent(diem_db_backup_coordinator_transaction_version) or absent(diem_db_backup_coordinator_state_snapshot_version))
+    for: 10m
+    labels:
+      severity: warning
+      summary: "Backup coordinator or one of its work streams is not heartbeating."
+    annotations:
+  - alert: Epoch Ending Backup Timeliness
+    expr: max(diem_storage_next_block_epoch) by(owner) - on (owner) diem_db_backup_coordinator_epoch_ending_epoch > 1 # "==1" when caught up.
+    for: 10m
+    labels:
+      severity: warning
+      summary: "Epoch ending backup is not keeping up."
+    annotations:
+  - alert: Transaction Backup Timeliness
+    expr: max(diem_storage_latest_transaction_version) by(owner) - on (owner) diem_db_backup_coordinator_transaction_version > {{ .Values.backup.config.transaction_batch_size }}  #  more than txn_backup_batch_size
+    for: 10m
+    labels:
+      severity: warning
+      summary: "Transaction backup is not keeping up."
+    annotations:
+  - alert: State Snapshot Backup Timeliness
+    expr: max(diem_storage_latest_transaction_version) by(owner) - on (owner) diem_db_backup_coordinator_state_snapshot_version > {{ .Values.backup.config.state_snapshot_interval }}  # more than state_snapshot_interval
+    for: 10m
+    labels:
+      severity: warning
+      summary: "State snapshot backup is not keeping up."
+    annotations:
+  - alert: Backup Verify Scheduling
+    expr: absent(time() - max_over_time(diem_db_backup_verify_coordinator_start_timestamp_s[1w]) < 86400)  # assuming the verifier schedule is per day
+    for: 10m
+    labels:
+      severity: warning
+      summary: "Backup Verify not started as scheduled."
+    annotations:
+  - alert: Backup Verify Success Timeliness
+    expr: absent(max_over_time(diem_db_backup_verify_coordinator_succeed_timestamp_s[1w]) - max_over_time(diem_db_backup_verify_coordinator_start_timestamp_s[1w]) > 0)
+    for: 20h  # assuming backup verify succeeds in 20 hours
+    labels:
+      severity: warning
+      summary: "Backup Verify didn't finish succeeded in time."
+    annotations:
+  {{- end }}
+
+  # Logging alerts
+  - alert: Logs Being Dropped
+    expr: 1 < (rate(diem_struct_log_queue_error[1m]) + rate(diem_struct_log_send_error[1m]))
+    for: 5m
+    labels:
+      severity: warning
+      summary: "Logs being dropped"
+    annotations:
+      description: "Logging Transmit Error rate is high \
+        check the logging dashboard and \
+        there may be network issues, downstream throughput issues, or something wrong with Vector \
+        TODO: Runbook"
+
+  # Key manager alerts
+  - alert: Key manager is not making progress
+    expr: increase(diem_key_manager_state{state="keys_still_fresh"}[1h]) == 0 OR absent(diem_key_manager_state{state="keys_still_fresh"})
+    for: 20m
+    labels:
+      severity: error
+      summary: "The key manager has not reported the keys still being fresh in the last hour"
+    annotations:
+
+  - alert: The consensus key is stale
+    expr: increase(diem_key_manager_state{state="rotated_in_storage"}[15d]) == 0 OR absent(diem_key_manager_state{state="rotated_in_storage"})
+    for: 20m
+    labels:
+      severity: critical
+      summary: "The key manager has not rotated the consensus key in the last 15 days and it is now stale"
+    annotations:

@@ -1,0 +1,192 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "diem-validator.fullname" . }}-haproxy
+  labels:
+    {{- include "diem-validator.labels" . | nindent 4 }}
+
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "diem-validator.fullname" . }}-haproxy
+  labels:
+    {{- include "diem-validator.labels" . | nindent 4 }}
+data:
+  haproxy.cfg: |-
+{{ (tpl (.Files.Get "files/haproxy.cfg") .) | indent 4 }}
+  blocked.ips: ""
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "diem-validator.fullname" . }}-validator-lb
+  labels:
+    {{- include "diem-validator.labels" . | nindent 4 }}
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: nlb
+    service.beta.kubernetes.io/oci-load-balancer-security-list-management-mode: All
+spec:
+  selector:
+    {{- include "diem-validator.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/name: haproxy
+  ports:
+  - name: validator
+    port: 6180
+  {{- if .Values.exposeValidatorJsonRpc }}
+  - name: json-rpc
+    port: 80
+    targetPort: 8180
+  {{- end }}
+  type: {{ .Values.service.external.type }}
+  externalTrafficPolicy: Local
+  {{- with .Values.service.validator.loadBalancerSourceRanges }}
+  loadBalancerSourceRanges:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+
+{{- range $index, $config := $.Values.fullnode.groups }}
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "diem-validator.fullname" $ }}-{{ $config.name }}-lb
+  labels:
+    {{- include "diem-validator.labels" $ | nindent 4 }}
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: nlb
+    service.beta.kubernetes.io/oci-load-balancer-security-list-management-mode: All
+spec:
+  selector:
+    {{- include "diem-validator.selectorLabels" $ | nindent 4 }}
+    app.kubernetes.io/name: haproxy
+  ports:
+  - name: diemnet
+    port: 6182
+    targetPort: {{ add 6182 $index }}
+  {{- if $config.enableApi }}
+  - name: api
+    port: 8081
+    targetPort: {{ add 8081 $index }}
+  {{- end }}
+  {{- if $config.enableJsonRpc }}
+  - name: json-rpc
+    port: 80
+    targetPort: {{ add 8080 $index }}
+  {{- if $.Values.haproxy.tls_secret }}
+  - name: json-rpc-tls
+    port: 443
+    targetPort: {{ add 8443 $index }}
+  {{- end }}
+  {{- end }}
+  type: {{ $.Values.service.external.type }}
+  externalTrafficPolicy: Local
+  {{- with (index $.Values.service $config.name).loadBalancerSourceRanges }}
+  loadBalancerSourceRanges:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+
+{{- end }}
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "diem-validator.fullname" . }}-haproxy
+  labels:
+    {{- include "diem-validator.labels" . | nindent 4 }}
+    app.kubernetes.io/name: haproxy
+spec:
+  replicas: {{ .Values.haproxy.replicas }}
+  strategy:
+    rollingUpdate:
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      {{- include "diem-validator.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/name: haproxy
+  template:
+    metadata:
+      labels:
+        {{- include "diem-validator.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/name: haproxy
+      annotations:
+        seccomp.security.alpha.kubernetes.io/pod: runtime/default
+        checksum/haproxy.cfg: {{ tpl (.Files.Get "files/haproxy.cfg") . | sha256sum }}
+    spec:
+      {{- with .Values.haproxy }}
+      containers:
+      - name: haproxy
+        image: {{ .image.repo }}:{{ .image.tag }}
+        command: ["sh", "-c", "ulimit -n 1048576 && exec haproxy -f /usr/local/etc/haproxy/haproxy.cfg"]
+        imagePullPolicy: {{ .image.pullPolicy }}
+        resources:
+          {{- toYaml .resources | nindent 10 }}
+        ports:
+        - containerPort: 6180
+        - containerPort: 6182
+        - containerPort: 8080
+        - containerPort: 8081
+        - containerPort: 8180
+        - containerPort: 9101
+        livenessProbe:
+          httpGet:
+            path: /healthy
+            port: 9101
+        readinessProbe:
+          httpGet:
+            path: /healthy
+            port: 9101
+        volumeMounts:
+        - name: haproxy-config
+          mountPath: /usr/local/etc/haproxy
+        {{- if .tls_secret }}
+        - name: haproxy-tls
+          mountPath: /etc/haproxy/tls
+        {{- end }}
+        securityContext:
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - SYS_RESOURCE
+            - SETUID
+      {{- with .nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: false
+        runAsUser: 0
+        runAsGroup: 65534
+      {{- end }}
+      volumes:
+      - name: haproxy-config
+        configMap:
+          name: {{ include "diem-validator.fullname" . }}-haproxy
+      {{- if .Values.haproxy.tls_secret }}
+      - name: haproxy-tls
+        secret:
+          secretName: {{ .Values.haproxy.tls_secret }}
+      {{- end }}
+      serviceAccountName: {{ include "diem-validator.fullname" . }}-haproxy
+      {{- if .Values.imagePullSecret }}
+      imagePullSecrets:
+      - name: {{.Values.imagePullSecret}}
+      {{- end }}

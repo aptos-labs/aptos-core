@@ -680,16 +680,16 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
       - name: Check machine details for minikube
         run: |
-          kubectl version
+          kubectl version --client
           helm version
           lscpu
       - name: Helm lint
         working-directory: helm
         run: helm lint fullnode
-      - name: Install minikube v1.17.1
+      - name: Install minikube v1.24.0
         run: |
-          curl -LO https://storage.googleapis.com/minikube/releases/v1.17.1/minikube-linux-amd64
-          checksum="03a6d6cccecb7a33a09afc6dae40d8d76ccfe168aa4aba1a18c1f45bbab120c2"
+          curl -LO https://storage.googleapis.com/minikube/releases/v1.24.0/minikube-linux-amd64
+          checksum="3bc218476cf205acf11b078d45210a4882e136d24a3cbb7d8d645408e423b8fe"
           filename=minikube-linux-amd64
           if [[ $(sha256sum $filename | awk '{print $1}') != "$checksum" ]]; then
             echo "$filename checksum mismatch"

@@ -1,0 +1,83 @@
+base:
+  waypoint:
+    from_storage:
+      type: "vault"
+      server: "{{ .Values.vault.server.address }}"
+      {{- if .Values.vault.server.ca_cert }}
+      ca_certificate: "{{ .Values.vault.server.ca_cert }}"
+      {{- end }}
+      namespace: "{{ .Values.vault.namespace }}"
+      token:
+        from_disk: "/opt/vault/token"
+
+consensus:
+  safety_rules:
+    service:
+      type: "process"
+      server_address: "/dns4/{{ include "diem-validator.fullname" . }}-safety-rules/tcp/6185"
+  sync_only: {{ .Values.validator.config.sync_only | default false}}
+  {{- if .Values.validator.config.mempool_poll_count }}
+  mempool_poll_count: {{ .Values.validator.config.mempool_poll_count }}
+  {{- end }}
+  {{- if .Values.validator.config.round_initial_timeout_ms }}
+  round_initial_timeout_ms: {{ .Values.validator.config.round_initial_timeout_ms }}
+  {{- end }}
+
+execution:
+  {{- if eq .Values.validator.config.provide_genesis true }}
+  genesis_file_location: "../genesis/genesis.blob"
+  {{- else }}
+  genesis_file_location: ""
+  {{- end }}
+  backend:
+    type: "vault"
+    server: "{{ .Values.vault.server.address }}"
+    {{- if .Values.vault.server.ca_cert }}
+    ca_certificate: "{{ .Values.vault.server.ca_cert }}"
+    {{- end }}
+    namespace: "{{ .Values.vault.namespace }}"
+    token:
+      from_disk: "/opt/vault/token"
+
+validator_network:
+  discovery_method: "onchain"
+  mutual_authentication: true
+  {{- if .Values.haproxy.config.send_proxy_protocol }}
+  enable_proxy_protocol: true
+  {{- end }}
+  identity:
+    type: "from_storage"
+    key_name: "validator_network"
+    peer_id_name: "owner_account"
+    backend:
+      type: "vault"
+      server: "{{ .Values.vault.server.address }}"
+      {{- if .Values.vault.server.ca_cert }}
+      ca_certificate: "{{ .Values.vault.server.ca_cert }}"
+      {{- end }}
+      namespace: "{{ .Values.vault.namespace }}"
+      token:
+        from_disk: "/opt/vault/token"
+  network_address_key_backend:
+    type: "vault"
+    server: "{{ .Values.vault.server.address }}"
+    {{- if .Values.vault.server.ca_cert }}
+    ca_certificate: "{{ .Values.vault.server.ca_cert }}"
+    {{- end }}
+    namespace: "{{ .Values.vault.namespace }}"
+    token:
+      from_disk: "/opt/vault/token"
+
+full_node_networks:
+- network_id:
+    private: "vfn"
+  listen_address: "/ip4/0.0.0.0/tcp/6181"
+  identity:
+    type: "from_config"
+    key: "b0f405a3e75516763c43a2ae1d70423699f34cd68fa9f8c6bb2d67aa87d0af69"
+    peer_id: "d58bc7bb154b38039bc9096ce04e1237"
+
+{{- if .Values.exposeValidatorJsonRpc }}
+json_rpc:
+  address: "0.0.0.0:8080"
+{{- end }}
