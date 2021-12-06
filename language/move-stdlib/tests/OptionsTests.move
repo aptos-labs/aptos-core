@@ -93,6 +93,20 @@ module Std::OptionTests {
     }
 
     #[test]
+    fun swap_or_fill_some() {
+        let some = Option::some(5);
+        assert!(Option::swap_or_fill(&mut some, 1) == Option::some(5), 0);
+        assert!(*Option::borrow(&some) == 1, 1);
+    }
+
+    #[test]
+    fun swap_or_fill_none() {
+        let none = Option::none();
+        assert!(Option::swap_or_fill(&mut none, 1) == Option::none(), 0);
+        assert!(*Option::borrow(&none) == 1, 1);
+    }
+
+    #[test]
     #[expected_failure(abort_code = 263)]
     fun swap_none() {
         Option::swap(&mut Option::none<u64>(), 1);

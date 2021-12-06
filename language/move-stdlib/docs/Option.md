@@ -20,6 +20,7 @@ This module defines the Option type and its methods to represent and handle an o
 -  [Function `extract`](#0x1_Option_extract)
 -  [Function `borrow_mut`](#0x1_Option_borrow_mut)
 -  [Function `swap`](#0x1_Option_swap)
+-  [Function `swap_or_fill`](#0x1_Option_swap_or_fill)
 -  [Function `destroy_with_default`](#0x1_Option_destroy_with_default)
 -  [Function `destroy_some`](#0x1_Option_destroy_some)
 -  [Function `destroy_none`](#0x1_Option_destroy_none)
@@ -626,6 +627,51 @@ Aborts if <code>t</code> does not hold a value
 <b>include</b> <a href="Option.md#0x1_Option_AbortsIfNone">AbortsIfNone</a>&lt;Element&gt;;
 <b>ensures</b> result == <a href="Option.md#0x1_Option_borrow">borrow</a>(<b>old</b>(t));
 <b>ensures</b> <a href="Option.md#0x1_Option_is_some">is_some</a>(t);
+<b>ensures</b> <a href="Option.md#0x1_Option_borrow">borrow</a>(t) == e;
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_Option_swap_or_fill"></a>
+
+## Function `swap_or_fill`
+
+Swap the old value inside <code>t</code> with <code>e</code> and return the old value;
+or if there is no old value, fill it with <code>e</code>.
+Different from swap(), swap_or_fill() allows for <code>t</code> not holding a value.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="Option.md#0x1_Option_swap_or_fill">swap_or_fill</a>&lt;Element&gt;(t: &<b>mut</b> <a href="Option.md#0x1_Option_Option">Option::Option</a>&lt;Element&gt;, e: Element): <a href="Option.md#0x1_Option_Option">Option::Option</a>&lt;Element&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="Option.md#0x1_Option_swap_or_fill">swap_or_fill</a>&lt;Element&gt;(t: &<b>mut</b> <a href="Option.md#0x1_Option">Option</a>&lt;Element&gt;, e: Element): <a href="Option.md#0x1_Option">Option</a>&lt;Element&gt; {
+    <b>let</b> vec_ref = &<b>mut</b> t.vec;
+    <b>let</b> old_value = <b>if</b> (<a href="Vector.md#0x1_Vector_is_empty">Vector::is_empty</a>(vec_ref)) <a href="Option.md#0x1_Option_none">none</a>()
+        <b>else</b> <a href="Option.md#0x1_Option_some">some</a>(<a href="Vector.md#0x1_Vector_pop_back">Vector::pop_back</a>(vec_ref));
+    <a href="Vector.md#0x1_Vector_push_back">Vector::push_back</a>(vec_ref, e);
+    old_value
+}
+</code></pre>
+
+
+
+</details>
+
+<details>
+<summary>Specification</summary>
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>ensures</b> result == <b>old</b>(t);
 <b>ensures</b> <a href="Option.md#0x1_Option_borrow">borrow</a>(t) == e;
 </code></pre>
 

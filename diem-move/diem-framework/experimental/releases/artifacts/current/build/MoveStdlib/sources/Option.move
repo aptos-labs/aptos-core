@@ -178,6 +178,22 @@ module Std::Option {
         ensures borrow(t) == e;
     }
 
+    /// Swap the old value inside `t` with `e` and return the old value;
+    /// or if there is no old value, fill it with `e`.
+    /// Different from swap(), swap_or_fill() allows for `t` not holding a value.
+    public fun swap_or_fill<Element>(t: &mut Option<Element>, e: Element): Option<Element> {
+        let vec_ref = &mut t.vec;
+        let old_value = if (Vector::is_empty(vec_ref)) none()
+            else some(Vector::pop_back(vec_ref));
+        Vector::push_back(vec_ref, e);
+        old_value
+    }
+    spec swap_or_fill {
+        pragma opaque;
+        ensures result == old(t);
+        ensures borrow(t) == e;
+    }
+
     /// Destroys `t.` If `t` holds a value, return it. Returns `default` otherwise
     public fun destroy_with_default<Element: drop>(t: Option<Element>, default: Element): Element {
         let Option { vec } = t;
