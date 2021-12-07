@@ -7,7 +7,7 @@ use diem_types::{
     transaction::{Transaction, Version},
 };
 use diem_vm::DiemVM;
-use executor::Executor;
+use executor::block_executor::BlockExecutor;
 use executor_types::BlockExecutorTrait;
 use std::{
     sync::{mpsc, Arc},
@@ -15,7 +15,7 @@ use std::{
 };
 
 pub struct TransactionExecutor {
-    executor: Arc<Executor<DpnProto, DiemVM>>,
+    executor: Arc<BlockExecutor<DpnProto, DiemVM>>,
     parent_block_id: HashValue,
     start_time: Instant,
     version: Version,
@@ -25,7 +25,7 @@ pub struct TransactionExecutor {
 
 impl TransactionExecutor {
     pub fn new(
-        executor: Arc<Executor<DpnProto, DiemVM>>,
+        executor: Arc<BlockExecutor<DpnProto, DiemVM>>,
         parent_block_id: HashValue,
         version: Version,
         commit_sender: Option<

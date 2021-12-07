@@ -4,10 +4,11 @@
 #![forbid(unsafe_code)]
 
 use crate::{
+    block_executor::BlockExecutor,
     chunk_executor::ChunkExecutor,
     db_bootstrapper::{generate_waypoint, maybe_bootstrap},
     mock_vm::{encode_mint_transaction, MockVM},
-    tests, Executor,
+    tests,
 };
 use diem_crypto::HashValue;
 use diem_types::{
@@ -247,7 +248,7 @@ fn test_executor_execute_and_commit_chunk_local_result_mismatch() {
 
     // commit 5 txns first.
     {
-        let executor = Executor::<DpnProto, MockVM>::new(db);
+        let executor = BlockExecutor::<DpnProto, MockVM>::new(db);
         let parent_block_id = executor.committed_block_id();
         let block_id = tests::gen_block_id(1);
         let version = 5;

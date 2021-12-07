@@ -28,7 +28,7 @@ use diem_types::{
 };
 use diem_vm::DiemVM;
 use diemdb::DiemDB;
-use executor::Executor;
+use executor::block_executor::BlockExecutor;
 use executor_types::BlockExecutorTrait;
 use rand::SeedableRng;
 use std::{convert::TryFrom, sync::Arc};
@@ -517,12 +517,12 @@ pub fn create_db_and_executor<P: AsRef<std::path::Path>>(
 ) -> (
     Arc<DiemDB>,
     DbReaderWriter,
-    Executor<DpnProto, DiemVM>,
+    BlockExecutor<DpnProto, DiemVM>,
     Waypoint,
 ) {
     let (db, dbrw) = DbReaderWriter::wrap(DiemDB::new_for_test(&path));
     let waypoint = bootstrap_genesis::<DiemVM>(&dbrw, genesis).unwrap();
-    let executor = Executor::new(dbrw.clone());
+    let executor = BlockExecutor::new(dbrw.clone());
 
     (db, dbrw, executor, waypoint)
 }

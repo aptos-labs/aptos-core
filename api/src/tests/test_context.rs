@@ -35,12 +35,13 @@ use diem_types::{
 };
 use diem_vm::DiemVM;
 use diemdb::DiemDB;
-use executor::{db_bootstrapper, Executor};
+use executor::db_bootstrapper;
 use executor_types::BlockExecutorTrait;
 use hyper::Response;
 use mempool_notifications::MempoolNotificationSender;
 use storage_interface::DbReaderWriter;
 
+use executor::block_executor::BlockExecutor;
 use rand::{Rng, SeedableRng};
 use serde_json::{json, Value};
 use std::{boxed::Box, collections::BTreeMap, sync::Arc, time::SystemTime};
@@ -80,7 +81,7 @@ pub fn new_test_context() -> TestContext {
         rng,
         root_keys,
         validator_owner,
-        Box::new(Executor::<DpnProto, DiemVM>::new(db_rw)),
+        Box::new(BlockExecutor::<DpnProto, DiemVM>::new(db_rw)),
         mempool,
         db,
     )

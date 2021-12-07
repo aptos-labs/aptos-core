@@ -35,7 +35,7 @@ use diem_types::{
 };
 use diem_vm::DiemVM;
 use diemdb::DiemDB;
-use executor::Executor;
+use executor::block_executor::BlockExecutor;
 use executor_types::BlockExecutorTrait;
 use futures::{channel::mpsc::channel, StreamExt};
 use rand::{rngs::StdRng, SeedableRng};
@@ -49,7 +49,7 @@ use vm_validator::{
 const TXN_EXPIRATION_SECS: u64 = 100;
 
 struct Node<T: DiemInterface> {
-    executor: Executor<DpnProto, DiemVM>,
+    executor: BlockExecutor<DpnProto, DiemVM>,
     diem: DiemInterfaceTestHarness<T>,
     key_manager: KeyManager<DiemInterfaceTestHarness<T>, InMemoryStorage>,
     time: MockTimeService,
@@ -57,7 +57,7 @@ struct Node<T: DiemInterface> {
 
 impl<T: DiemInterface> Node<T> {
     pub fn new(
-        executor: Executor<DpnProto, DiemVM>,
+        executor: BlockExecutor<DpnProto, DiemVM>,
         diem: DiemInterfaceTestHarness<T>,
         key_manager: KeyManager<DiemInterfaceTestHarness<T>, InMemoryStorage>,
         time: MockTimeService,
@@ -317,7 +317,7 @@ fn setup_node_using_json_rpc() -> (Node<JsonRpcDiemInterface>, Runtime) {
 
     let (storage, db_rw) = setup_diem_db(&node_config);
     let (diem, server) = setup_diem_interface_and_json_server(storage);
-    let executor = Executor::new(db_rw);
+    let executor = BlockExecutor::new(db_rw);
 
     (
         setup_node(&node_config, &key_manager_config, executor, diem),
@@ -331,7 +331,7 @@ fn setup_node_using_test_mocks() -> Node<MockDiemInterface> {
     let (node_config, key_manager_config) = get_test_configs();
     let (storage, db_rw) = setup_diem_db(&node_config);
     let diem = MockDiemInterface { storage };
-    let executor = Executor::new(db_rw);
+    let executor = BlockExecutor::new(db_rw);
 
     setup_node(&node_config, &key_manager_config, executor, diem)
 }
@@ -350,7 +350,7 @@ fn setup_diem_db(config: &NodeConfig) -> (Arc<DiemDB>, DbReaderWriter) {
 fn setup_node<T: DiemInterface + Clone>(
     node_config: &NodeConfig,
     key_manager_config: &KeyManagerConfig,
-    executor: Executor<DpnProto, DiemVM>,
+    executor: BlockExecutor<DpnProto, DiemVM>,
     diem: T,
 ) -> Node<T> {
     let time = TimeService::mock();

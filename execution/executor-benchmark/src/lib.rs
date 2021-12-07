@@ -15,7 +15,7 @@ use diem_logger::prelude::*;
 use diem_types::protocol_spec::DpnProto;
 use diem_vm::DiemVM;
 use diemdb::DiemDB;
-use executor::Executor;
+use executor::block_executor::BlockExecutor;
 use executor_types::BlockExecutorTrait;
 use std::{
     fs,
@@ -26,7 +26,7 @@ use storage_interface::{default_protocol::DbReaderWriter, DbReader};
 
 pub fn init_db_and_executor(
     config: &NodeConfig,
-) -> (Arc<dyn DbReader<DpnProto>>, Executor<DpnProto, DiemVM>) {
+) -> (Arc<dyn DbReader<DpnProto>>, BlockExecutor<DpnProto, DiemVM>) {
     let (db, dbrw) = DbReaderWriter::wrap(
         DiemDB::open(
             &config.storage.dir(),
@@ -38,7 +38,7 @@ pub fn init_db_and_executor(
         .expect("DB should open."),
     );
 
-    let executor = Executor::new(dbrw);
+    let executor = BlockExecutor::new(dbrw);
 
     (db, executor)
 }

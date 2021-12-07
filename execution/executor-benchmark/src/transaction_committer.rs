@@ -12,11 +12,11 @@ use diem_types::{
 use diem_vm::DiemVM;
 use diemdb::metrics::DIEM_STORAGE_API_LATENCY_SECONDS;
 use executor::{
+    block_executor::BlockExecutor,
     metrics::{
         DIEM_EXECUTOR_COMMIT_BLOCKS_SECONDS, DIEM_EXECUTOR_EXECUTE_BLOCK_SECONDS,
         DIEM_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
     },
-    Executor,
 };
 use executor_types::BlockExecutorTrait;
 use std::{
@@ -45,14 +45,14 @@ pub(crate) fn gen_li_with_sigs(
 }
 
 pub struct TransactionCommitter {
-    executor: Arc<Executor<DpnProto, DiemVM>>,
+    executor: Arc<BlockExecutor<DpnProto, DiemVM>>,
     version: Version,
     block_receiver: mpsc::Receiver<(HashValue, HashValue, Instant, Instant, Duration, usize)>,
 }
 
 impl TransactionCommitter {
     pub fn new(
-        executor: Arc<Executor<DpnProto, DiemVM>>,
+        executor: Arc<BlockExecutor<DpnProto, DiemVM>>,
         version: Version,
         block_receiver: mpsc::Receiver<(HashValue, HashValue, Instant, Instant, Duration, usize)>,
     ) -> Self {

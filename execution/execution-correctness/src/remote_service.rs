@@ -10,7 +10,7 @@ use diem_logger::warn;
 use diem_secure_net::{NetworkClient, NetworkServer};
 use diem_types::protocol_spec::DpnProto;
 use diem_vm::DiemVM;
-use executor::Executor;
+use executor::block_executor::BlockExecutor;
 use executor_types::Error;
 use std::net::SocketAddr;
 use storage_client::StorageClient;
@@ -34,7 +34,7 @@ pub fn execute(
     prikey: Option<Ed25519PrivateKey>,
     network_timeout: u64,
 ) {
-    let block_executor = Box::new(Executor::<DpnProto, DiemVM>::new(DbReaderWriter::new(
+    let block_executor = Box::new(BlockExecutor::<DpnProto, DiemVM>::new(DbReaderWriter::new(
         StorageClient::new(&storage_addr, network_timeout),
     )));
     let serializer_service = SerializerService::new(block_executor, prikey);

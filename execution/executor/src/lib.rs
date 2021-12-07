@@ -16,5 +16,3 @@ pub mod block_executor;
 pub mod chunk_executor;
 pub mod components;
 pub mod db_bootstrapper;
-
-pub use block_executor::BlockExecutor as Executor;

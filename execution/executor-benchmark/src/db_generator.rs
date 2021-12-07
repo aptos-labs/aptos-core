@@ -14,8 +14,8 @@ use diemdb::{
     metrics::DIEM_STORAGE_ROCKSDB_PROPERTIES, schema::JELLYFISH_MERKLE_NODE_CF_NAME, DiemDB,
 };
 use executor::{
+    block_executor::BlockExecutor,
     db_bootstrapper::{generate_waypoint, maybe_bootstrap},
-    Executor,
 };
 use executor_types::BlockExecutorTrait;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -58,7 +58,7 @@ pub fn run(
     let waypoint = generate_waypoint::<DiemVM>(&db_rw, get_genesis_txn(&config).unwrap()).unwrap();
     maybe_bootstrap::<DiemVM>(&db_rw, get_genesis_txn(&config).unwrap(), waypoint).unwrap();
 
-    let executor = Arc::new(Executor::new(db_rw));
+    let executor = Arc::new(BlockExecutor::new(db_rw));
     let genesis_block_id = executor.committed_block_id();
     let (block_sender, block_receiver) = mpsc::sync_channel(50 /* bound */);
 

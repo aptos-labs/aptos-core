@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{chunk_executor::ChunkExecutor, Executor};
+use crate::{block_executor::BlockExecutor, chunk_executor::ChunkExecutor};
 use anyhow::Result;
 use diem_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
 use diem_state_view::StateView;
@@ -18,11 +18,11 @@ use diem_vm::VMExecutor;
 use executor_types::{BlockExecutorTrait, ChunkExecutorTrait};
 use storage_interface::{default_protocol::DbReaderWriter, DbReader, DbWriter, StartupInfo};
 
-fn create_test_executor() -> Executor<DpnProto, FakeVM> {
+fn create_test_executor() -> BlockExecutor<DpnProto, FakeVM> {
     // setup fake db
     let fake_db = FakeDb {};
     let db_reader_writer = DbReaderWriter::new(fake_db);
-    Executor::<DpnProto, FakeVM>::new(db_reader_writer)
+    BlockExecutor::<DpnProto, FakeVM>::new(db_reader_writer)
 }
 
 pub fn fuzz_execute_and_commit_chunk(

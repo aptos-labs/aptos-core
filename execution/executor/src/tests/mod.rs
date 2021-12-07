@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    block_executor::BlockExecutor,
     chunk_executor::ChunkExecutor,
     db_bootstrapper::{generate_waypoint, maybe_bootstrap},
     mock_vm::{
         encode_mint_transaction, encode_reconfiguration_transaction, encode_transfer_transaction,
         MockVM, DISCARD_STATUS, KEEP_STATUS,
     },
-    Executor,
 };
 use diem_crypto::HashValue;
 use diem_types::{
@@ -49,7 +49,7 @@ fn execute_and_commit_block(
 struct TestExecutor {
     _path: diem_temppath::TempPath,
     db: DbReaderWriter,
-    executor: Executor<DpnProto, MockVM>,
+    executor: BlockExecutor<DpnProto, MockVM>,
 }
 
 impl TestExecutor {
@@ -60,7 +60,7 @@ impl TestExecutor {
         let genesis = vm_genesis::test_genesis_transaction();
         let waypoint = generate_waypoint::<MockVM>(&db, &genesis).unwrap();
         maybe_bootstrap::<MockVM>(&db, &genesis, waypoint).unwrap();
-        let executor = Executor::new(db.clone());
+        let executor = BlockExecutor::new(db.clone());
 
         TestExecutor {
             _path: path,
@@ -71,7 +71,7 @@ impl TestExecutor {
 }
 
 impl std::ops::Deref for TestExecutor {
-    type Target = Executor<DpnProto, MockVM>;
+    type Target = BlockExecutor<DpnProto, MockVM>;
 
     fn deref(&self) -> &Self::Target {
         &self.executor
@@ -505,7 +505,7 @@ proptest! {
 
         // Now we construct a new executor and run one more block.
         {
-            let executor = Executor::<DpnProto, MockVM>::new(db);
+            let executor = BlockExecutor::<DpnProto, MockVM>::new(db);
             let output_b = executor.execute_block((block_b.id, block_b.txns.clone()), parent_block_id).unwrap();
             root_hash = output_b.root_hash();
             let ledger_info = gen_ledger_info(
