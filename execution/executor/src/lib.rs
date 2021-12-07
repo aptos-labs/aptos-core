@@ -11,7 +11,7 @@ use std::{
 };
 
 use anyhow::{bail, ensure, format_err, Result};
-use components::speculation_cache::SpeculationCache;
+use components::block_tree::SpeculationCache;
 
 use diem_crypto::{
     hash::{CryptoHash, EventAccumulatorHasher, TransactionAccumulatorHasher},
