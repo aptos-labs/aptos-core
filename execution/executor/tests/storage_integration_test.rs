@@ -19,7 +19,7 @@ use executor_test_helpers::{
         create_db_and_executor, test_execution_with_storage_impl, verify_committed_txn_status,
     },
 };
-use executor_types::BlockExecutor;
+use executor_types::BlockExecutorTrait;
 use move_ir_compiler::Compiler;
 use std::convert::TryFrom;
 

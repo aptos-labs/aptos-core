@@ -29,7 +29,7 @@ use diem_types::{
 use diem_vm::DiemVM;
 use diemdb::DiemDB;
 use executor::Executor;
-use executor_types::BlockExecutor;
+use executor_types::BlockExecutorTrait;
 use rand::SeedableRng;
 use std::{convert::TryFrom, sync::Arc};
 use storage_interface::{default_protocol::DbReaderWriter, Order};

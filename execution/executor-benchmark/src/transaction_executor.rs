@@ -8,7 +8,7 @@ use diem_types::{
 };
 use diem_vm::DiemVM;
 use executor::Executor;
-use executor_types::BlockExecutor;
+use executor_types::BlockExecutorTrait;
 use std::{
     sync::{mpsc, Arc},
     time::{Duration, Instant},

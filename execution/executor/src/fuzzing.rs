@@ -15,7 +15,7 @@ use diem_types::{
     vm_status::VMStatus,
 };
 use diem_vm::VMExecutor;
-use executor_types::{BlockExecutor, ChunkExecutorTrait};
+use executor_types::{BlockExecutorTrait, ChunkExecutorTrait};
 use storage_interface::{default_protocol::DbReaderWriter, DbReader, DbWriter, StartupInfo};
 
 fn create_test_executor() -> Executor<DpnProto, FakeVM> {

@@ -16,7 +16,7 @@ use diem_types::{
     transaction::default_protocol::{TransactionListWithProof, TransactionOutputListWithProof},
 };
 use diemdb::DiemDB;
-use executor_types::{BlockExecutor, ChunkExecutorTrait};
+use executor_types::{BlockExecutorTrait, ChunkExecutorTrait};
 use proptest::prelude::Rng;
 use storage_interface::default_protocol::DbReaderWriter;
 

@@ -36,7 +36,7 @@ use diem_types::{
 use diem_vm::DiemVM;
 use diemdb::DiemDB;
 use executor::Executor;
-use executor_types::BlockExecutor;
+use executor_types::BlockExecutorTrait;
 use futures::{channel::mpsc::channel, StreamExt};
 use rand::{rngs::StdRng, SeedableRng};
 use std::{cell::RefCell, collections::BTreeMap, convert::TryFrom, sync::Arc};

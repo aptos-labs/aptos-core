@@ -18,7 +18,7 @@ use executor::{
     },
     Executor,
 };
-use executor_types::BlockExecutor;
+use executor_types::BlockExecutorTrait;
 use std::{
     collections::BTreeMap,
     sync::{mpsc, Arc},

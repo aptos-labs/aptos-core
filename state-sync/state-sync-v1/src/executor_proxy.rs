@@ -239,7 +239,7 @@ mod tests {
     use executor_test_helpers::{
         bootstrap_genesis, gen_block_id, gen_ledger_info_with_sigs, get_test_signed_transaction,
     };
-    use executor_types::BlockExecutor;
+    use executor_types::BlockExecutorTrait;
     use futures::{future::FutureExt, stream::StreamExt};
     use move_core_types::language_storage::TypeTag;
     use serde::{Deserialize, Serialize};

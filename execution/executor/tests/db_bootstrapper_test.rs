@@ -41,7 +41,7 @@ use executor::{
 use executor_test_helpers::{
     bootstrap_genesis, gen_ledger_info_with_sigs, get_test_signed_transaction,
 };
-use executor_types::BlockExecutor;
+use executor_types::BlockExecutorTrait;
 use move_core_types::move_resource::MoveResource;
 use rand::SeedableRng;
 use std::{convert::TryFrom, sync::Arc};

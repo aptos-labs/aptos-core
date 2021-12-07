@@ -21,7 +21,7 @@ use diem_types::{
     },
 };
 use diemdb::DiemDB;
-use executor_types::{BlockExecutor, ChunkExecutorTrait, TransactionReplayer};
+use executor_types::{BlockExecutorTrait, ChunkExecutorTrait, TransactionReplayer};
 use proptest::prelude::*;
 use std::collections::BTreeMap;
 

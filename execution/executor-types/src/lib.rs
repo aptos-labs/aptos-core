@@ -81,7 +81,7 @@ pub trait ChunkExecutorTrait: Send + Sync {
     ) -> Result<Vec<ContractEvent>>;
 }
 
-pub trait BlockExecutor: Send + Sync {
+pub trait BlockExecutorTrait: Send + Sync {
     /// Get the latest committed block id
     fn committed_block_id(&self) -> Result<HashValue, Error>;
 

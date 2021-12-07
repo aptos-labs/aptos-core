@@ -15,7 +15,7 @@ use diem_types::{
     },
 };
 use diem_vm::VMExecutor;
-use executor_types::{BlockExecutor, Error, ProcessedVMOutput, StateComputeResult};
+use executor_types::{BlockExecutorTrait, Error, ProcessedVMOutput, StateComputeResult};
 use fail::fail_point;
 
 use crate::{
@@ -28,7 +28,7 @@ use crate::{
 };
 use diem_types::{proof::definition::LeafCount, protocol_spec::ProtocolSpec};
 
-impl<PS, V> BlockExecutor for Executor<PS, V>
+impl<PS, V> BlockExecutorTrait for Executor<PS, V>
 where
     PS: ProtocolSpec,
     V: VMExecutor,

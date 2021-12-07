@@ -20,7 +20,7 @@ use diem_types::{
     waypoint::Waypoint,
 };
 use diem_vm::VMExecutor;
-use executor_types::BlockExecutor;
+use executor_types::BlockExecutorTrait;
 use move_core_types::move_resource::MoveResource;
 use std::collections::btree_map::BTreeMap;
 use storage_interface::{

@@ -5,16 +5,19 @@ use crate::execution_correctness::ExecutionCorrectness;
 use consensus_types::{block::Block, vote_proposal::VoteProposal};
 use diem_crypto::{ed25519::Ed25519PrivateKey, traits::SigningKey, HashValue};
 use diem_types::ledger_info::LedgerInfoWithSignatures;
-use executor_types::{BlockExecutor, Error, StateComputeResult};
+use executor_types::{BlockExecutorTrait, Error, StateComputeResult};
 use std::{boxed::Box, sync::Arc};
 
 pub struct LocalService {
-    block_executor: Box<dyn BlockExecutor>,
+    block_executor: Box<dyn BlockExecutorTrait>,
     prikey: Option<Ed25519PrivateKey>,
 }
 
 impl LocalService {
-    pub fn new(block_executor: Box<dyn BlockExecutor>, prikey: Option<Ed25519PrivateKey>) -> Self {
+    pub fn new(
+        block_executor: Box<dyn BlockExecutorTrait>,
+        prikey: Option<Ed25519PrivateKey>,
+    ) -> Self {
         Self {
             block_executor,
             prikey,

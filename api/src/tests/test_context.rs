@@ -36,7 +36,7 @@ use diem_types::{
 use diem_vm::DiemVM;
 use diemdb::DiemDB;
 use executor::{db_bootstrapper, Executor};
-use executor_types::BlockExecutor;
+use executor_types::BlockExecutorTrait;
 use hyper::Response;
 use mempool_notifications::MempoolNotificationSender;
 use storage_interface::DbReaderWriter;
@@ -94,7 +94,7 @@ pub struct TestContext {
     pub db: Arc<DiemDB>,
     rng: rand::rngs::StdRng,
     root_keys: Arc<RootKeys>,
-    executor: Arc<dyn BlockExecutor>,
+    executor: Arc<dyn BlockExecutorTrait>,
     expect_status_code: u16,
 }
 
@@ -104,7 +104,7 @@ impl TestContext {
         rng: rand::rngs::StdRng,
         root_keys: RootKeys,
         validator_owner: AccountAddress,
-        executor: Box<dyn BlockExecutor>,
+        executor: Box<dyn BlockExecutorTrait>,
         mempool: MockSharedMempool,
         db: Arc<DiemDB>,
     ) -> Self {
