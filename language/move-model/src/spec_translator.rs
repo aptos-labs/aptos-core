@@ -262,10 +262,15 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
 
     /// Translate one inline property. If there are any references to `old(...)` they
     /// will be rewritten and respective memory/spec var saves will be generated.
-    pub fn translate_inline_property(builder: &'b mut T, prop: &Exp) -> (TranslatedSpec, Exp) {
+    pub fn translate_inline_property(
+        loc: &Loc,
+        auto_trace: bool,
+        builder: &'b mut T,
+        prop: &Exp,
+    ) -> (TranslatedSpec, Exp) {
         let fun_env = builder.function_env().clone();
         let mut translator = SpecTranslator {
-            auto_trace: false,
+            auto_trace,
             builder,
             fun_env: &fun_env,
             type_args: &[],
@@ -277,7 +282,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
             let_locals: Default::default(),
             in_old: false,
         };
-        let exp = translator.translate_exp(prop, false);
+        let exp = translator.translate_exp(&translator.auto_trace(loc, prop), false);
         (translator.result, exp)
     }
 
@@ -477,6 +482,15 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
                 ExpData::Temporary(..)
                 | ExpData::Call(_, Operation::Old, ..)
                 | ExpData::Call(_, Operation::Result(_), ..) => (true, e),
+                ExpData::Call(id, op @ Operation::Function(..), args) => (
+                    true,
+                    ExpData::Call(
+                        *id,
+                        op.clone(),
+                        args.iter().map(|e| self.auto_trace_sub(e)).collect(),
+                    )
+                    .into_exp(),
+                ),
                 ExpData::LocalVar(_, sym) => (self.let_locals.contains_key(sym), e),
                 ExpData::Call(id, Operation::Global(None), args) => (
                     true,
@@ -500,7 +514,8 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
             };
             if trace_this {
                 let l = self.builder.global_env().get_node_loc(e.node_id());
-                Ok(self.auto_trace_exp(&l, e, TraceKind::SubAuto))
+                let traced = self.auto_trace_exp(&l, e, TraceKind::SubAuto);
+                Ok(traced)
             } else {
                 // descent
                 Err(e)

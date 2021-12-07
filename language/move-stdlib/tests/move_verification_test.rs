@@ -3,12 +3,10 @@
 
 use move_cli::package::prover::ProverTest;
 
-#[test]
-fn prove_stdlib() {
-    ProverTest::create(".").run()
-}
+// TODO: split this into individual tests once the package system supports this.
 
 #[test]
-fn prove_nursery() {
+fn prove() {
+    ProverTest::create(".").run();
     ProverTest::create("nursery").run()
 }

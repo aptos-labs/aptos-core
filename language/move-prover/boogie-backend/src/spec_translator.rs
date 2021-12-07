@@ -244,7 +244,15 @@ impl<'env> SpecTranslator<'env> {
             self.error(&fun.loc, "function or tuple result type not yet supported");
             return;
         }
-        emitln!(self.writer, "// spec fun {}", fun.loc.display(self.env));
+        let recursive = self
+            .env
+            .is_spec_fun_recursive(module_env.get_id().qualified(id));
+        emitln!(
+            self.writer,
+            "// {}spec fun {}",
+            if recursive { "recursive " } else { "" },
+            fun.loc.display(self.env)
+        );
         let result_type = boogie_type(self.env, &self.inst(&fun.result_type));
         // it is possible that the spec fun may refer to the same memory after monomorphization,
         // (e.g., one via concrete type and the other via type parameter being instantiated).
@@ -274,7 +282,11 @@ impl<'env> SpecTranslator<'env> {
         self.writer.set_location(&fun.loc);
         let boogie_name = boogie_spec_fun_name(module_env, id, &self.type_inst);
         let param_list = mem_params.chain(params).join(", ");
-        let attrs = if fun.uninterpreted { "" } else { "{:inline}" };
+        let attrs = if fun.uninterpreted || recursive {
+            ""
+        } else {
+            "{:inline}"
+        };
         emit!(
             self.writer,
             "function {} {}({}): {}",

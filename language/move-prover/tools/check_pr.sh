@@ -12,6 +12,9 @@ BUILD_MODE=--release
 BASE=$(git rev-parse --show-toplevel)
 echo "*************** [check-pr] Assuming diem root at $BASE"
 
+# Run only tests which would also be run on CI
+export ENV_TEST_ON_CI=1
+
 while getopts "hcxtdgmea" opt; do
   case $opt in
     h)

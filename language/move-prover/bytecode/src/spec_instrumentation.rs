@@ -229,9 +229,11 @@ impl<'a> Instrumenter<'a> {
 
         // Translate the specification. This deals with elimination of `old(..)` expressions,
         // as well as replaces `result_n` references with `ret_locals`.
+        let auto_trace = options.auto_trace_level.verified_functions()
+            && builder.data.variant.is_verified()
+            || options.auto_trace_level.functions();
         let spec = SpecTranslator::translate_fun_spec(
-            options.auto_trace_level.verified_functions() && builder.data.variant.is_verified()
-                || options.auto_trace_level.functions(),
+            auto_trace,
             false,
             &mut builder,
             fun_env,
@@ -245,9 +247,15 @@ impl<'a> Instrumenter<'a> {
         let inlined_props: BTreeMap<_, _> = props
             .into_iter()
             .map(|(id, prop)| {
+                let loc = builder.get_loc(id);
                 (
                     id,
-                    SpecTranslator::translate_inline_property(&mut builder, &prop),
+                    SpecTranslator::translate_inline_property(
+                        &loc,
+                        auto_trace,
+                        &mut builder,
+                        &prop,
+                    ),
                 )
             })
             .collect();
@@ -424,11 +432,15 @@ impl<'a> Instrumenter<'a> {
                 self.can_abort = true;
             }
             Prop(id, kind @ PropKind::Assume, prop) | Prop(id, kind @ PropKind::Assert, prop) => {
-                let prop = match inlined_props.get(&id) {
-                    None => prop,
-                    Some((_, exp)) => exp.clone(),
-                };
-                self.builder.emit(Prop(id, kind, prop));
+                match inlined_props.get(&id) {
+                    None => {
+                        self.builder.emit(Prop(id, kind, prop));
+                    }
+                    Some((translated_spec, exp)) => {
+                        self.emit_traces(translated_spec, exp);
+                        self.builder.emit(Prop(id, kind, exp.clone()));
+                    }
+                }
             }
             _ => self.builder.emit(bc),
         }

@@ -3,17 +3,10 @@
 
 use move_cli::package::prover::ProverTest;
 
+// TODO: split this into individual tests once the package system supports this.
 #[test]
-fn prove_core() {
-    ProverTest::create("core").run()
-}
-
-#[test]
-fn prove_experimental() {
-    ProverTest::create("experimental").run()
-}
-
-#[test]
-fn prove_dpn() {
+fn prove_all() {
+    ProverTest::create("core").run();
+    ProverTest::create("experimental").run();
     ProverTest::create("DPN").run()
 }

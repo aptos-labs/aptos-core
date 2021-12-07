@@ -195,7 +195,8 @@ public fun Test::test_borrow_mut_local(): Test::R<u64> {
      # VC: data invariant does not hold at tests/data_invariant_instrumentation/borrow.move:17:9+16
  19: assert Gt(select Test::S.y(select Test::R.s($t6)), 0)
  20: write_back[LocalRoot($t0)@]($t6)
- 21: $t12 := move($t0)
- 22: label L1
- 23: return $t12
+ 21: trace_local[d]($t0)
+ 22: $t12 := move($t0)
+ 23: label L1
+ 24: return $t12
 }

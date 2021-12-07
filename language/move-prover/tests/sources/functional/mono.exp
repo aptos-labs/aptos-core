@@ -7,6 +7,7 @@ error: post-condition does not hold
    │
    =     at tests/sources/functional/mono.move:70: vec_addr
    =         x = <redacted>
+   =         x = <redacted>
    =         result = <redacted>
    =     at tests/sources/functional/mono.move:71: vec_addr (spec)
 
@@ -17,6 +18,7 @@ error: post-condition does not hold
    │                     ^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
    =     at tests/sources/functional/mono.move:72: vec_bool
+   =         x = <redacted>
    =         x = <redacted>
    =         result = <redacted>
    =     at tests/sources/functional/mono.move:73: vec_bool (spec)
@@ -29,6 +31,7 @@ error: post-condition does not hold
    │
    =     at tests/sources/functional/mono.move:68: vec_int
    =         x = <redacted>
+   =         x = <redacted>
    =         result = <redacted>
    =     at tests/sources/functional/mono.move:69: vec_int (spec)
 
@@ -40,6 +43,7 @@ error: post-condition does not hold
    │
    =     at tests/sources/functional/mono.move:76: vec_struct_addr
    =         x = <redacted>
+   =         x = <redacted>
    =         result = <redacted>
    =     at tests/sources/functional/mono.move:77: vec_struct_addr (spec)
 
@@ -50,6 +54,7 @@ error: post-condition does not hold
    │                           ^^^^^^^^^^^^^^^^^^^^^^^^^
    │
    =     at tests/sources/functional/mono.move:74: vec_struct_int
+   =         x = <redacted>
    =         x = <redacted>
    =         result = <redacted>
    =     at tests/sources/functional/mono.move:75: vec_struct_int (spec)
@@ -63,6 +68,7 @@ error: post-condition does not hold
    =     at tests/sources/functional/mono.move:79: vec_vec
    =         x = <redacted>
    =     at tests/sources/functional/mono.move:80: vec_vec
+   =         x = <redacted>
    =         result = <redacted>
    =     at tests/sources/functional/mono.move:81: vec_vec
    =     at tests/sources/functional/mono.move:82: vec_vec (spec)

@@ -134,7 +134,12 @@ impl ExpInliner<'_> {
                 let callee_menv = self.env.get_module(*mid);
                 let callee_decl = callee_menv.get_spec_fun(*fid);
                 debug_assert_eq!(args.len(), callee_decl.params.len());
-                if callee_decl.is_native || callee_decl.uninterpreted || callee_decl.body.is_none()
+                if callee_decl.is_native
+                    || callee_decl.uninterpreted
+                    || callee_decl.body.is_none()
+                    || self
+                        .env
+                        .is_spec_fun_recursive(callee_menv.get_id().qualified(*fid))
                 {
                     Err(e)
                 } else {

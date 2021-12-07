@@ -275,8 +275,9 @@ fun TestPackref::test1(): TestPackref::R {
   5: write_ref($t5, $t6)
   6: write_back[Reference($t4).x (u64)]($t5)
   7: write_back[LocalRoot($t0)@]($t4)
-  8: $t7 := move($t0)
-  9: return $t7
+  8: trace_local[r]($t0)
+  9: $t7 := move($t0)
+ 10: return $t7
 }
 
 
@@ -296,7 +297,8 @@ public fun TestPackref::test3($t0|r_ref: &mut TestPackref::R, $t1|v: u64) {
   1: TestPackref::test2($t3, $t1)
   2: write_back[Reference($t0).x (u64)]($t3)
   3: trace_local[r_ref]($t0)
-  4: return ()
+  4: trace_local[r_ref]($t0)
+  5: return ()
 }
 
 
@@ -314,8 +316,9 @@ fun TestPackref::test4(): TestPackref::R {
   3: $t4 := 0
   4: TestPackref::test3($t3, $t4)
   5: write_back[LocalRoot($t0)@]($t3)
-  6: $t5 := move($t0)
-  7: return $t5
+  6: trace_local[r]($t0)
+  7: $t5 := move($t0)
+  8: return $t5
 }
 
 
@@ -325,7 +328,8 @@ public fun TestPackref::test5($t0|r_ref: &mut TestPackref::R): &mut u64 {
   0: $t1 := borrow_field<TestPackref::R>.x($t0)
   1: trace_local[r_ref]($t0)
   2: write_back[Reference($t0).x (u64)]($t1)
-  3: return $t1
+  3: trace_local[r_ref]($t0)
+  4: return $t1
 }
 
 
@@ -347,8 +351,9 @@ fun TestPackref::test6(): TestPackref::R {
   5: TestPackref::test2($t5, $t6)
   6: write_back[Reference($t4).x (u64)]($t5)
   7: write_back[LocalRoot($t0)@]($t4)
-  8: $t7 := move($t0)
-  9: return $t7
+  8: trace_local[r]($t0)
+  9: $t7 := move($t0)
+ 10: return $t7
 }
 
 
@@ -368,25 +373,29 @@ fun TestPackref::test7($t0|b: bool) {
   4: $t6 := borrow_local($t1)
   5: $t3 := $t6
   6: write_back[LocalRoot($t1)@]($t6)
-  7: if ($t0) goto 19 else goto 23
-  8: label L1
-  9: goto 13
- 10: label L0
- 11: destroy($t6)
- 12: $t3 := borrow_local($t2)
- 13: label L2
- 14: $t7 := 0
- 15: TestPackref::test3($t3, $t7)
- 16: write_back[LocalRoot($t1)@]($t3)
- 17: write_back[LocalRoot($t2)@]($t3)
- 18: return ()
- 19: label L3
- 20: write_back[LocalRoot($t1)@]($t3)
- 21: destroy($t3)
- 22: goto 10
- 23: label L4
- 24: destroy($t6)
- 25: goto 8
+  7: trace_local[r1]($t1)
+  8: if ($t0) goto 22 else goto 27
+  9: label L1
+ 10: goto 14
+ 11: label L0
+ 12: destroy($t6)
+ 13: $t3 := borrow_local($t2)
+ 14: label L2
+ 15: $t7 := 0
+ 16: TestPackref::test3($t3, $t7)
+ 17: write_back[LocalRoot($t1)@]($t3)
+ 18: trace_local[r1]($t1)
+ 19: write_back[LocalRoot($t2)@]($t3)
+ 20: trace_local[r2]($t2)
+ 21: return ()
+ 22: label L3
+ 23: write_back[LocalRoot($t1)@]($t3)
+ 24: trace_local[r1]($t1)
+ 25: destroy($t3)
+ 26: goto 11
+ 27: label L4
+ 28: destroy($t6)
+ 29: goto 9
 }
 
 
@@ -416,45 +425,51 @@ fun TestPackref::test8($t0|b: bool, $t1|n: u64, $t2|r_ref: &mut TestPackref::R) 
   7: $t9 := <($t8, $t1)
   8: if ($t9) goto 11 else goto 9
   9: label L1
- 10: goto 31
+ 10: goto 33
  11: label L0
  12: write_back[LocalRoot($t3)@]($t5)
- 13: write_back[LocalRoot($t4)@]($t5)
- 14: destroy($t5)
- 15: $t10 := 2
- 16: $t11 := /($t1, $t10)
- 17: $t12 := 0
- 18: $t13 := ==($t11, $t12)
- 19: if ($t13) goto 22 else goto 20
- 20: label L4
- 21: goto 25
- 22: label L3
- 23: $t5 := borrow_local($t3)
- 24: goto 27
- 25: label L5
- 26: $t5 := borrow_local($t4)
- 27: label L6
- 28: $t14 := 1
- 29: $t1 := -($t1, $t14)
- 30: goto 5
- 31: label L2
- 32: if ($t0) goto 35 else goto 33
- 33: label L9
- 34: goto 42
- 35: label L8
- 36: write_back[LocalRoot($t3)@]($t5)
- 37: write_back[LocalRoot($t4)@]($t5)
- 38: destroy($t5)
- 39: $t15 := 0
- 40: TestPackref::test3($t2, $t15)
- 41: goto 48
- 42: label L10
- 43: destroy($t2)
- 44: $t16 := 0
- 45: TestPackref::test3($t5, $t16)
- 46: write_back[LocalRoot($t3)@]($t5)
- 47: write_back[LocalRoot($t4)@]($t5)
- 48: label L11
- 49: trace_local[r_ref]($t2)
- 50: return ()
+ 13: trace_local[r1]($t3)
+ 14: write_back[LocalRoot($t4)@]($t5)
+ 15: trace_local[r2]($t4)
+ 16: destroy($t5)
+ 17: $t10 := 2
+ 18: $t11 := /($t1, $t10)
+ 19: $t12 := 0
+ 20: $t13 := ==($t11, $t12)
+ 21: if ($t13) goto 24 else goto 22
+ 22: label L4
+ 23: goto 27
+ 24: label L3
+ 25: $t5 := borrow_local($t3)
+ 26: goto 29
+ 27: label L5
+ 28: $t5 := borrow_local($t4)
+ 29: label L6
+ 30: $t14 := 1
+ 31: $t1 := -($t1, $t14)
+ 32: goto 5
+ 33: label L2
+ 34: if ($t0) goto 37 else goto 35
+ 35: label L9
+ 36: goto 46
+ 37: label L8
+ 38: write_back[LocalRoot($t3)@]($t5)
+ 39: trace_local[r1]($t3)
+ 40: write_back[LocalRoot($t4)@]($t5)
+ 41: trace_local[r2]($t4)
+ 42: destroy($t5)
+ 43: $t15 := 0
+ 44: TestPackref::test3($t2, $t15)
+ 45: goto 54
+ 46: label L10
+ 47: destroy($t2)
+ 48: $t16 := 0
+ 49: TestPackref::test3($t5, $t16)
+ 50: write_back[LocalRoot($t3)@]($t5)
+ 51: trace_local[r1]($t3)
+ 52: write_back[LocalRoot($t4)@]($t5)
+ 53: trace_local[r2]($t4)
+ 54: label L11
+ 55: trace_local[r_ref]($t2)
+ 56: return ()
 }

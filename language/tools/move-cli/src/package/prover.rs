@@ -59,8 +59,13 @@ impl ProverTest {
         if self.local_only && in_ci() {
             return;
         }
+        // Save current directory -- unfortunately the package system currently modifies it.
+        // This treatment also requires us to run prover tests sequentially.
+        // TODO: fix the side-effect in the package system, which makes it impossible to
+        //   parallelize package based tests.
+        let saved_cd = std::env::current_dir().expect("current directory");
         let pkg_path = path_in_crate(std::mem::take(&mut self.path));
-        cli::handle_package_commands(
+        let res = cli::handle_package_commands(
             &pkg_path,
             move_package::BuildConfig::default(),
             &cli::PackageCommand::Prove {
@@ -71,8 +76,9 @@ impl ProverTest {
                 ))),
             },
             vec![], // prover does not need natives
-        )
-        .unwrap()
+        );
+        std::env::set_current_dir(saved_cd).expect("restore current directory");
+        res.unwrap()
     }
 }
 

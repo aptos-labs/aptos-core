@@ -27,7 +27,9 @@ use crate::{
 use internment::LocalIntern;
 use itertools::Itertools;
 use once_cell::sync::Lazy;
-use std::{borrow::Borrow, collections::HashSet, fmt::Debug, hash::Hash, ops::Deref};
+use std::{
+    borrow::Borrow, cell::RefCell, collections::HashSet, fmt::Debug, hash::Hash, ops::Deref,
+};
 
 // =================================================================================================
 /// # Declarations
@@ -54,6 +56,8 @@ pub struct SpecFunDecl {
     pub is_move_fun: bool,
     pub is_native: bool,
     pub body: Option<Exp>,
+    pub callees: BTreeSet<QualifiedId<SpecFunId>>,
+    pub is_recursive: RefCell<Option<bool>>,
 }
 
 // =================================================================================================

@@ -37,8 +37,9 @@ use crate::{
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     model::{
         AbilityConstraint, FieldId, FunId, FunctionData, FunctionVisibility, Loc, ModuleId,
-        MoveIrLoc, NamedConstantData, NamedConstantId, NodeId, QualifiedInstId, SchemaId,
-        SpecFunId, SpecVarId, StructData, StructId, TypeParameter, SCRIPT_BYTECODE_FUN_NAME,
+        MoveIrLoc, NamedConstantData, NamedConstantId, NodeId, QualifiedId, QualifiedInstId,
+        SchemaId, SpecFunId, SpecVarId, StructData, StructId, TypeParameter,
+        SCRIPT_BYTECODE_FUN_NAME,
     },
     options::ModelBuilderOptions,
     pragmas::{
@@ -371,6 +372,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             is_move_fun: true,
             is_native: false,
             body: None,
+            callees: Default::default(),
+            is_recursive: Default::default(),
         };
         if let EA::FunctionBody_::Native = def.body.value {
             fun_decl.is_native = true;
@@ -452,6 +455,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             is_move_fun: false,
             is_native: false,
             body: None,
+            callees: Default::default(),
+            is_recursive: Default::default(),
         };
         self.spec_funs.push(fun_decl);
     }
@@ -2678,7 +2683,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     fn compute_state_usage(&mut self) {
         let mut visited = BTreeSet::new();
         for idx in 0..self.spec_funs.len() {
-            self.compute_state_usage_for_fun(&mut visited, idx);
+            self.compute_state_usage_and_callees_for_fun(&mut visited, idx);
         }
         // Check for purity requirements. All data invariants must be pure expressions and
         // not depend on global state.
@@ -2714,7 +2719,11 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     /// Compute state usage for a given spec fun, defined via its index into the spec_funs
     /// vector of the currently translated module. This recursively computes the values for
     /// functions called from this one; the visited set is there to break cycles.
-    fn compute_state_usage_for_fun(&mut self, visited: &mut BTreeSet<usize>, fun_idx: usize) {
+    fn compute_state_usage_and_callees_for_fun(
+        &mut self,
+        visited: &mut BTreeSet<usize>,
+        fun_idx: usize,
+    ) {
         if !visited.insert(fun_idx) {
             return;
         }
@@ -2729,24 +2738,31 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             return;
         };
 
-        let used_memory = self.compute_state_usage_for_exp(Some(visited), &body);
+        let (used_memory, callees) =
+            self.compute_state_usage_and_callees_for_exp(Some(visited), &body);
         let fun_decl = &mut self.spec_funs[fun_idx];
         fun_decl.body = Some(body);
         fun_decl.used_memory = used_memory;
+        fun_decl.callees = callees;
     }
 
-    /// Computes state usage for an expression. If the visited_opt is available, this recurses
-    /// to compute the usage for any functions called. Otherwise it assumes this information is
-    /// already computed.
-    fn compute_state_usage_for_exp(
+    /// Computes state usage and called functions for an expression. If the visited_opt is
+    /// available, this recurses to compute the usage for any functions called. Otherwise
+    /// it assumes this information is already computed.
+    fn compute_state_usage_and_callees_for_exp(
         &mut self,
         mut visited_opt: Option<&mut BTreeSet<usize>>,
         exp: &ExpData,
-    ) -> BTreeSet<QualifiedInstId<StructId>> {
+    ) -> (
+        BTreeSet<QualifiedInstId<StructId>>,
+        BTreeSet<QualifiedId<SpecFunId>>,
+    ) {
         let mut used_memory = BTreeSet::new();
+        let mut callees = BTreeSet::new();
         exp.visit(&mut |e: &ExpData| {
             match e {
                 ExpData::Call(id, Operation::Function(mid, fid, _), _) => {
+                    callees.insert(mid.qualified(*fid));
                     let inst = self.parent.env.get_node_instantiation(*id);
                     // Extend used memory with that of called functions, after applying type
                     // instantiation of this call.
@@ -2767,7 +2783,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                         // arbitrary call graphs, including cyclic. If visted_opt is not set,
                         // we know we already computed this.
                         if let Some(visited) = &mut visited_opt {
-                            self.compute_state_usage_for_fun(visited, fid.as_usize());
+                            self.compute_state_usage_and_callees_for_fun(visited, fid.as_usize());
                         }
                         let fun_decl = &self.spec_funs[fid.as_usize()];
                         used_memory.extend(
@@ -2791,7 +2807,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 _ => {}
             }
         });
-        used_memory
+        (used_memory, callees)
     }
 }
 
@@ -2805,7 +2821,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 cond.kind,
                 ConditionKind::GlobalInvariant(..) | ConditionKind::GlobalInvariantUpdate(..)
             ) {
-                let mem_usage = self.compute_state_usage_for_exp(None, &cond.exp);
+                let (mem_usage, _) = self.compute_state_usage_and_callees_for_exp(None, &cond.exp);
                 let id = self.parent.env.new_global_id();
                 let Condition { loc, exp, .. } = cond;
                 self.parent.env.add_global_invariant(GlobalInvariant {

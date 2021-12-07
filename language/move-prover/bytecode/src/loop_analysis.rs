@@ -423,7 +423,7 @@ impl LoopAnalysisProcessor {
                 Self::collect_loop_targets(&cfg, &func_target, &sub_loops);
             let back_edges = Self::collect_loop_back_edges(code, &cfg, label, &sub_loops);
 
-            // done with all information collection
+            // done with all information collection.
             fat_loops.insert(
                 label,
                 FatLoop {

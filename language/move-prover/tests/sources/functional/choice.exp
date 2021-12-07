@@ -82,6 +82,7 @@ error: post-condition does not hold
    =     at tests/sources/functional/choice.move:79: test_not_using_min_incorrect
    =     at tests/sources/functional/choice.move:80: test_not_using_min_incorrect
    =     at tests/sources/functional/choice.move:81: test_not_using_min_incorrect
+   =         v = <redacted>
    =     at tests/sources/functional/choice.move:82: test_not_using_min_incorrect
    =         result = <redacted>
    =     at tests/sources/functional/choice.move:83: test_not_using_min_incorrect

@@ -1,5 +1,5 @@
-
-
+// CVC5 does take excessively long on this:
+// exclude_for: cvc5
 module 0x42::TestEmits {
     use Std::Event::{Self, EventHandle};
 

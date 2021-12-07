@@ -26,7 +26,7 @@ A generic module for role-based access control (RBAC).
 
 
 
-<pre><code><b>struct</b> <a href="Role.md#0x1_Role">Role</a>&lt;Type&gt; has key
+<pre><code><b>struct</b> <a href="Role.md#0x1_Role">Role</a>&lt;Type&gt; <b>has</b> key
 </code></pre>
 
 
@@ -80,7 +80,7 @@ expected to be a function of the module that defines <code>Type</code>.
 
 <pre><code><b>public</b> <b>fun</b> <a href="Role.md#0x1_Role_assign_role">assign_role</a>&lt;Type&gt;(<b>to</b>: &signer, _witness: &Type) {
     <b>assert</b>!(!<a href="Role.md#0x1_Role_has_role">has_role</a>&lt;Type&gt;(<a href="_address_of">Signer::address_of</a>(<b>to</b>)), <a href="_already_published">Errors::already_published</a>(<a href="Role.md#0x1_Role_EROLE">EROLE</a>));
-    move_to&lt;<a href="Role.md#0x1_Role">Role</a>&lt;Type&gt;&gt;(<b>to</b>, <a href="Role.md#0x1_Role">Role</a>&lt;Type&gt;{});
+    <b>move_to</b>&lt;<a href="Role.md#0x1_Role">Role</a>&lt;Type&gt;&gt;(<b>to</b>, <a href="Role.md#0x1_Role">Role</a>&lt;Type&gt;{});
 }
 </code></pre>
 
@@ -107,7 +107,7 @@ expected to be a function of the module that defines <code>Type</code>.
 
 <pre><code><b>public</b> <b>fun</b> <a href="Role.md#0x1_Role_revoke_role">revoke_role</a>&lt;Type&gt;(from: &signer, _witness: &Type) <b>acquires</b> <a href="Role.md#0x1_Role">Role</a> {
     <b>assert</b>!(<a href="Role.md#0x1_Role_has_role">has_role</a>&lt;Type&gt;(<a href="_address_of">Signer::address_of</a>(from)), <a href="_not_published">Errors::not_published</a>(<a href="Role.md#0x1_Role_EROLE">EROLE</a>));
-    <b>let</b> <a href="Role.md#0x1_Role">Role</a>&lt;Type&gt;{} = move_from&lt;<a href="Role.md#0x1_Role">Role</a>&lt;Type&gt;&gt;(<a href="_address_of">Signer::address_of</a>(from));
+    <b>let</b> <a href="Role.md#0x1_Role">Role</a>&lt;Type&gt;{} = <b>move_from</b>&lt;<a href="Role.md#0x1_Role">Role</a>&lt;Type&gt;&gt;(<a href="_address_of">Signer::address_of</a>(from));
 }
 </code></pre>
 
@@ -122,7 +122,7 @@ expected to be a function of the module that defines <code>Type</code>.
 Return true iff the address has the role.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="Role.md#0x1_Role_has_role">has_role</a>&lt;Type&gt;(addr: address): bool
+<pre><code><b>public</b> <b>fun</b> <a href="Role.md#0x1_Role_has_role">has_role</a>&lt;Type&gt;(addr: <b>address</b>): bool
 </code></pre>
 
 
@@ -131,7 +131,7 @@ Return true iff the address has the role.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="Role.md#0x1_Role_has_role">has_role</a>&lt;Type&gt;(addr: address): bool {
+<pre><code><b>public</b> <b>fun</b> <a href="Role.md#0x1_Role_has_role">has_role</a>&lt;Type&gt;(addr: <b>address</b>): bool {
     <b>exists</b>&lt;<a href="Role.md#0x1_Role">Role</a>&lt;Type&gt;&gt;(addr)
 }
 </code></pre>

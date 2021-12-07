@@ -183,11 +183,28 @@ impl<'a> Instrumenter<'a> {
                         Bytecode::Call(
                             id,
                             vec![],
-                            Operation::WriteBack(parent, edge),
+                            Operation::WriteBack(parent.clone(), edge),
                             vec![*idx],
                             None,
                         )
                     });
+                    // Add a trace for written back value if it's a user variable.
+                    match parent {
+                        BorrowNode::LocalRoot(temp) | BorrowNode::Reference(temp) => {
+                            if temp < self.builder.fun_env.get_local_count() {
+                                self.builder.emit_with(|id| {
+                                    Bytecode::Call(
+                                        id,
+                                        vec![],
+                                        Operation::TraceLocal(temp),
+                                        vec![temp],
+                                        None,
+                                    )
+                                });
+                            }
+                        }
+                        _ => {}
+                    }
                     if let Some(label) = skip_label_opt {
                         self.builder.emit_with(|id| Bytecode::Label(id, label));
                     }

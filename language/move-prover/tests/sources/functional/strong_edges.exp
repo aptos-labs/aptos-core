@@ -27,4 +27,5 @@ error: unknown assertion failed
    =     at tests/sources/functional/strong_edges.move:61: loc__edge_incorrect
    =         r_ref = <redacted>
    =     at tests/sources/functional/strong_edges.move:62: loc__edge_incorrect
+   =         r = <redacted>
    =     at tests/sources/functional/strong_edges.move:64: loc__edge_incorrect

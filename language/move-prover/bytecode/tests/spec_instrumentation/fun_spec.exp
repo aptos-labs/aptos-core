@@ -275,25 +275,26 @@ fun Test::mut_ref_param($t0|r: &mut Test::R): u64 {
   1: $t3 := get_field<Test::R>.v($t0)
   2: $t4 := get_field<Test::R>.v($t0)
   3: $t5 := 1
-  4: $t6 := -($t4, $t5) on_abort goto 14 with $t7
+  4: $t6 := -($t4, $t5) on_abort goto 15 with $t7
   5: $t8 := borrow_field<Test::R>.v($t0)
   6: write_ref($t8, $t6)
   7: write_back[Reference($t0).v (u64)]($t8)
   8: trace_local[r]($t0)
-  9: label L1
+  9: trace_local[r]($t0)
+ 10: label L1
      # VC: function does not abort under this condition at tests/spec_instrumentation/fun_spec.move:67:6+42
- 10: assert Not(Eq<u64>(select Test::R.v($t2), 0))
+ 11: assert Not(Eq<u64>(select Test::R.v($t2), 0))
      # VC: post-condition does not hold at tests/spec_instrumentation/fun_spec.move:68:6+27
- 11: assert Eq<u64>($t3, select Test::R.v($t2))
+ 12: assert Eq<u64>($t3, select Test::R.v($t2))
      # VC: post-condition does not hold at tests/spec_instrumentation/fun_spec.move:69:6+28
- 12: assert Eq<u64>(select Test::R.v($t0), Add(select Test::R.v($t2), 1))
- 13: return $t3
- 14: label L2
+ 13: assert Eq<u64>(select Test::R.v($t0), Add(select Test::R.v($t2), 1))
+ 14: return $t3
+ 15: label L2
      # VC: abort not covered by any of the `aborts_if` clauses at tests/spec_instrumentation/fun_spec.move:66:2+138
- 15: assert Eq<u64>(select Test::R.v($t2), 0)
+ 16: assert Eq<u64>(select Test::R.v($t2), 0)
      # VC: abort code not covered by any of the `aborts_if` or `aborts_with` clauses at tests/spec_instrumentation/fun_spec.move:66:2+138
- 16: assert And(Eq<u64>(select Test::R.v($t2), 0), Eq(-1, $t7))
- 17: abort($t7)
+ 17: assert And(Eq<u64>(select Test::R.v($t2), 0), Eq(-1, $t7))
+ 18: abort($t7)
 }
 
 

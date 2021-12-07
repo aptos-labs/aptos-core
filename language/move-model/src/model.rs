@@ -936,9 +936,38 @@ impl GlobalEnv {
     }
 
     /// Returns true if a spec fun is used in specs.
-    pub fn is_spec_fun_used(&self, module_id: ModuleId, spec_fun_id: SpecFunId) -> bool {
-        self.used_spec_funs
-            .contains(&module_id.qualified(spec_fun_id))
+    pub fn is_spec_fun_used(&self, id: QualifiedId<SpecFunId>) -> bool {
+        self.used_spec_funs.contains(&id)
+    }
+
+    /// Determines whether the given spec fun is recursive.
+    pub fn is_spec_fun_recursive(&self, id: QualifiedId<SpecFunId>) -> bool {
+        fn is_caller(
+            env: &GlobalEnv,
+            visited: &mut BTreeSet<QualifiedId<SpecFunId>>,
+            caller: QualifiedId<SpecFunId>,
+            fun: QualifiedId<SpecFunId>,
+        ) -> bool {
+            if !visited.insert(caller) {
+                return false;
+            }
+            let module = env.get_module(caller.module_id);
+            let decl = module.get_spec_fun(caller.id);
+            decl.callees.contains(&fun)
+                || decl
+                    .callees
+                    .iter()
+                    .any(|trans_caller| is_caller(env, visited, *trans_caller, fun))
+        }
+        let module = self.get_module(id.module_id);
+        let is_recursive = *module.get_spec_fun(id.id).is_recursive.borrow();
+        if let Some(b) = is_recursive {
+            b
+        } else {
+            let b = is_caller(self, &mut BTreeSet::new(), id, id);
+            *module.get_spec_fun(id.id).is_recursive.borrow_mut() = Some(b);
+            b
+        }
     }
 
     /// Returns true if the type represents the well-known event handle type.

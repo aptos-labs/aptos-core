@@ -1083,7 +1083,7 @@ fn at_end_of_exp(context: &mut Context) -> bool {
 //            <LambdaBindList> <Exp>        spec only
 //          | <Quantifier>                  spec only
 //          | "if" "(" <Exp> ")" <Exp> ("else" <Exp>)?
-//          | "while" "(" <Exp> ")" <Exp>
+//          | "while" "(" <Exp> ")" <Exp> (SpecBlock)?
 //          | "loop" <Exp>
 //          | "return" <Exp>?
 //          | "abort" <Exp>
@@ -1114,10 +1114,46 @@ fn parse_exp(context: &mut Context) -> Result<Exp, Diagnostic> {
         Tok::While => {
             context.tokens.advance()?;
             consume_token(context.tokens, Tok::LParen)?;
-            let eb = Box::new(parse_exp(context)?);
+            let econd = parse_exp(context)?;
             consume_token(context.tokens, Tok::RParen)?;
             let eloop = Box::new(parse_exp(context)?);
-            Exp_::While(eb, eloop)
+            let econd = if context.tokens.peek() == Tok::Spec {
+                // Parse a loop invariant. Also validate that only `invariant`
+                // properties are contained in the spec block. This is
+                // transformed into `while ({spec { .. }; cond) body`.
+                let spec = parse_spec_block(vec![], context)?;
+                for member in &spec.value.members {
+                    match member.value {
+                        SpecBlockMember_::Condition {
+                            kind: sp!(_, SpecConditionKind_::Invariant(..)),
+                            ..
+                        } => {
+                            // Ok
+                        }
+                        _ => {
+                            return Err(diag!(
+                                Syntax::InvalidSpecBlockMember,
+                                (member.loc, "only 'invariant' allowed here")
+                            ))
+                        }
+                    }
+                }
+                sp(
+                    econd.loc,
+                    Exp_::Block((
+                        vec![],
+                        vec![sp(
+                            spec.loc,
+                            SequenceItem_::Seq(Box::new(sp(spec.loc, Exp_::Spec(spec)))),
+                        )],
+                        None,
+                        Box::new(Some(econd)),
+                    )),
+                )
+            } else {
+                econd
+            };
+            Exp_::While(Box::new(econd), eloop)
         }
         Tok::Loop => {
             context.tokens.advance()?;
