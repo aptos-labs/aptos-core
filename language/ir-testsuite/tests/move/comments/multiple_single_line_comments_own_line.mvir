@@ -1,6 +1,0 @@
-main() {
-label b0:
-  // This is a comment
-  // This is another comment
-  return;
-}

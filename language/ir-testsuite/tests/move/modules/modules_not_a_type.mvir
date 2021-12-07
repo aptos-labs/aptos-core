@@ -1,8 +1,0 @@
-// check: "Unbound struct Self.M"
-
-module {{default}}.M {
-    public no(x: Self.M) {
-    label b0:
-        return;
-    }
-}

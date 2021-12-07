@@ -1,0 +1,25 @@
+//# publish
+module 0x0.Test {
+    struct T { b: bool }
+
+    public new_t(): Self.T {
+    label b0:
+        return T { b: true };
+    }
+}
+
+
+//# print-bytecode
+module 0x0.M {
+    import 0x0.Test;
+
+    foo() {
+        let t: Test.T;
+        let b: bool;
+    label b0:
+        t = Test.new_t();
+        T { b } = move(t);
+
+        return;
+    }
+}

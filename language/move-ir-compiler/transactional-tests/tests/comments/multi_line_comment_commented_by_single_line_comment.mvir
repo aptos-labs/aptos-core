@@ -1,0 +1,9 @@
+//# print-bytecode
+module 0x0.M {
+    foo() {
+    label b0:
+        // /*
+        return;
+        // */
+    }
+}

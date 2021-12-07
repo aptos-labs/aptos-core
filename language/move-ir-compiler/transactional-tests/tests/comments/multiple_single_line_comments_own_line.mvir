@@ -1,0 +1,9 @@
+//# print-bytecode
+module 0x0.M {
+foo() {
+label b0:
+  // This is a comment
+  // This is another comment
+  return;
+}
+}

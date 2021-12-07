@@ -1,0 +1,16 @@
+//# print-bytecode
+module 0x0.M {
+    foo() {
+    label b0:
+        jump_if (true) b2;
+    label b1:
+        y = 0;
+        jump b3;
+    label b2:
+        y = 5;
+        jump b3;
+    label b3:
+        assert(copy(y) == 5, 42);
+        return;
+    }
+}

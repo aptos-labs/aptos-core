@@ -1,0 +1,12 @@
+processed 1 task
+
+task 0 'print-bytecode'. lines 1-8:
+// Move bytecode v4
+module 0.M {
+
+
+foo() {
+B0:
+	0: Ret
+}
+}

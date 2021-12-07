@@ -1,0 +1,9 @@
+//# print-bytecode
+module 0x0.M {
+    foo() {
+        let x: u64;
+        let x: u64;
+    label b0:
+        return;
+    }
+}

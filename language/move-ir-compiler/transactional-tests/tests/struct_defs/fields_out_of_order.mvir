@@ -1,0 +1,11 @@
+//# print-bytecode
+module 0x0.M {
+    struct T {
+        x: u64,
+        y: u64
+    }
+    public new(): Self.T {
+    label b0:
+        return T { y: 1, x: 2 };
+    }
+}
