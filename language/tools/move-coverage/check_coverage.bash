@@ -14,14 +14,7 @@ pushd ../../../diem-move/diem-framework || exit 1
 cargo run
 popd || exit 1
 
-#cargo test -p ir-testsuite -p language-e2e-tests -p move-lang-functional-tests
-
-echo "---------------------------------------------------------------------------"
-echo "Running IR testsuite..."
-echo "---------------------------------------------------------------------------"
-pushd ../../ir-testsuite || exit 1
-cargo test
-popd || exit 1
+# TODO: add coverage for transactional tests
 
 echo "---------------------------------------------------------------------------"
 echo "Running e2e testsuite..."

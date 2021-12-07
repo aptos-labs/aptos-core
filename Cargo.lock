@@ -4364,24 +4364,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "47be2f14c678be2fdcab04ab1171db51b2762ce6f0a8ee87c8dd4a04ed216135"
 
 [[package]]
-name = "ir-testsuite"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "datatest-stable",
- "diem-framework-releases",
- "diem-types",
- "diem-workspace-hack",
- "functional-tests",
- "move-binary-format",
- "move-bytecode-verifier",
- "move-core-types",
- "move-ir-to-bytecode",
- "move-ir-types",
- "move-symbol-pool",
-]
-
-[[package]]
 name = "itertools"
 version = "0.7.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"

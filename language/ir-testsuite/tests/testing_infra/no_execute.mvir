@@ -1,7 +1,0 @@
-//! no-run: runtime
-
-main() {
-label b0:
-    assert(false, 42);
-    return;
-}

@@ -82,7 +82,6 @@ members = [
     "json-rpc/types/proto",
     "language/benchmarks",
     "language/e2e-testsuite",
-    "language/ir-testsuite",
     "language/move-analyzer",
     "language/move-binary-format",
     "language/move-binary-format/serializer-tests",
