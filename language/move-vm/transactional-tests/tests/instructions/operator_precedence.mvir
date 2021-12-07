@@ -1,3 +1,4 @@
+//# run
 main() {
 label b0:
     assert(true || true && false, 99); // "&&" has precedence over "||"
