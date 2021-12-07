@@ -101,7 +101,7 @@ cd <path_to_diem_repo>/language/documentation/tutorial
 
 ## Step 1: Writing my first Move module<span id="Step1"><span>
 
-Change directory into the [`step_1`](./step_1) directory.
+Change directory into the [`step_1/BasicCoin`](./step_1/BasicCoin) directory.
 You should see a directory called `sources` -- this is the place where all
 the Move code for this package lives. You should also see a
 `Move.toml` file as well. This file specifies dependencies and other information about
@@ -206,8 +206,7 @@ move package build
     called from a transaction script. `public(script)` functions can also be
     called by other `public(script)` functions.
 * `move_to` is one of the [five different global storage
-  operators](https://diem.github.io/move/global-storage-operators.html)
-  `move_to`.
+  operators](https://diem.github.io/move/global-storage-operators.html).
 </details>
 
 ## Step 2: Adding unit tests to my first Move module<span id="Step2"><span>
@@ -269,7 +268,7 @@ assertion fails the unit test will fail.
   package dependencies [here](https://diem.github.io/move/packages.html#movetoml).
 
 
-#### Exercise
+#### Exercises
 * Change the assertion to `11` so that the test fails. Find a flag that you can
   pass to the `move package test` command that will show you the global state when
   the test fails. It should look something like this:
