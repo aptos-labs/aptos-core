@@ -69,14 +69,12 @@ impl<V> ChunkExecutor<V> {
         latest_view: &ExecutedTrees,
         persisted_view: &ExecutedTrees,
     ) -> VerifiedStateView<DpnProto> {
-        VerifiedStateView::new(
+        latest_view.state_view(
+            persisted_view,
             StateViewId::ChunkExecution {
                 first_version: latest_view.txn_accumulator().num_leaves(),
             },
             Arc::clone(&self.db.reader),
-            persisted_view.version(),
-            persisted_view.state_root(),
-            latest_view.state_tree().clone(),
         )
     }
 

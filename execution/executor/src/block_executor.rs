@@ -25,9 +25,7 @@ use crate::{
     },
 };
 use diem_types::protocol_spec::ProtocolSpec;
-use storage_interface::{
-    default_protocol::DbReaderWriter, state_view::default_protocol::VerifiedStateView,
-};
+use storage_interface::default_protocol::DbReaderWriter;
 
 pub struct BlockExecutor<PS, V> {
     pub db: DbReaderWriter,
@@ -96,12 +94,10 @@ where
                     "execute_block"
                 );
                 let _timer = DIEM_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
-                let state_view = VerifiedStateView::new(
+                let state_view = parent_block.output.result_view.state_view(
+                    &committed_block.output.result_view,
                     StateViewId::BlockExecution { block_id },
                     self.db.reader.clone(),
-                    committed_block.output.result_view.version(),
-                    committed_block.output.result_view.state_root(),
-                    parent_block.output.result_view.state_tree().clone(),
                 );
 
                 let chunk_output = {

@@ -17,6 +17,7 @@ thiserror = "1.0.24"
 bcs = "0.1.2"
 diem-crypto = { path = "../../crates/diem-crypto" }
 diem-secure-net = { path = "../../secure/net" }
+diem-state-view = { path = "../../storage/state-view" }
 diem-types = { path = "../../types" }
 diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
 scratchpad = { path = "../../storage/scratchpad" }

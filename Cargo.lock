@@ -3365,6 +3365,7 @@ dependencies = [
  "bcs",
  "diem-crypto",
  "diem-secure-net",
+ "diem-state-view",
  "diem-types",
  "diem-workspace-hack",
  "scratchpad",

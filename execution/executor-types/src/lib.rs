@@ -17,6 +17,7 @@ use diem_crypto::{
     },
     HashValue,
 };
+use diem_state_view::StateViewId;
 use diem_types::{
     account_address::AccountAddress,
     account_state_blob::AccountStateBlob,
@@ -25,6 +26,7 @@ use diem_types::{
     ledger_info::LedgerInfoWithSignatures,
     nibble::nibble_path::NibblePath,
     proof::{accumulator::InMemoryAccumulator, AccumulatorExtensionProof},
+    protocol_spec::DpnProto,
     transaction::{
         default_protocol::{TransactionListWithProof, TransactionOutputListWithProof},
         Transaction, TransactionInfo, TransactionStatus, Version,
@@ -34,9 +36,10 @@ use diem_types::{
 use scratchpad::ProofRead;
 use serde::{Deserialize, Serialize};
 use std::{cmp::max, collections::HashMap, sync::Arc};
-use storage_interface::TreeState;
+use storage_interface::{DbReader, TreeState};
 
 pub use executed_chunk::ExecutedChunk;
+use storage_interface::state_view::VerifiedStateView;
 
 type SparseMerkleProof = diem_types::proof::SparseMerkleProof<AccountStateBlob>;
 type SparseMerkleTree = scratchpad::SparseMerkleTree<AccountStateBlob>;
@@ -356,6 +359,21 @@ impl ExecutedTrees {
 
     pub fn is_same_view(&self, rhs: &Self) -> bool {
         self.transaction_accumulator.root_hash() == rhs.transaction_accumulator.root_hash()
+    }
+
+    pub fn state_view(
+        &self,
+        persisted_view: &Self,
+        id: StateViewId,
+        reader: Arc<dyn DbReader<DpnProto>>,
+    ) -> VerifiedStateView<DpnProto> {
+        VerifiedStateView::new(
+            id,
+            reader.clone(),
+            persisted_view.version(),
+            persisted_view.state_tree.root_hash(),
+            self.state_tree.clone(),
+        )
     }
 }
 

@@ -114,13 +114,8 @@ pub fn calculate_genesis<V: VMExecutor>(
     // second use case said above.
     let genesis_version = tree_state.num_transactions;
     let base_view: ExecutedTrees = tree_state.into();
-    let base_state_view = VerifiedStateView::new(
-        StateViewId::Miscellaneous,
-        db.reader.clone(),
-        base_view.version(),
-        base_view.state_root(),
-        base_view.state_tree().clone(),
-    );
+    let base_state_view =
+        base_view.state_view(&base_view, StateViewId::Miscellaneous, db.reader.clone());
 
     let epoch = if genesis_version == 0 {
         GENESIS_EPOCH
@@ -140,12 +135,10 @@ pub fn calculate_genesis<V: VMExecutor>(
         // TODO(aldenhu): fix existing tests before using real timestamp and check on-chain epoch.
         GENESIS_TIMESTAMP_USECS
     } else {
-        let state_view = VerifiedStateView::new(
+        let state_view = output.result_view.state_view(
+            &base_view,
             StateViewId::Miscellaneous,
             db.reader.clone(),
-            base_view.version(),
-            base_view.state_root(),
-            output.result_view.state_tree().clone(),
         );
         let next_epoch = epoch
             .checked_add(1)
