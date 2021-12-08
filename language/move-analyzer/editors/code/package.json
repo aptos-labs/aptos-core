@@ -15,7 +15,7 @@
         "url": "https://github.com/diem/diem/issues"
     },
     "engines": {
-        "vscode": "^1.55.2"
+        "vscode": "^1.58.2"
     },
     "categories": [
         "Programming Languages"
@@ -108,7 +108,7 @@
         "@types/glob": "^7.1.4",
         "@types/mocha": "^9.0.0",
         "@types/node": "^14.17.22",
-        "@types/vscode": "^1.55.2",
+        "@types/vscode": "^1.58.2",
         "@typescript-eslint/eslint-plugin": "^4.33.0",
         "@typescript-eslint/parser": "^4.33.0",
         "@vscode/test-electron": "^1.6.1",
