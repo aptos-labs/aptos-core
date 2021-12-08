@@ -19,7 +19,7 @@ diem-logger = { path = "../../crates/diem-logger" }
 diem-infallible = { path = "../../crates/diem-infallible" }
 diem-secure-net = { path = "../../secure/net" }
 diem-types = { path = "../../types" }
-diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
+diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
 storage-interface = { path = "../storage-interface" }
 
 [features]

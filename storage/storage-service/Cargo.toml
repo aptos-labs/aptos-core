@@ -23,7 +23,7 @@ diem-metrics = { path = "../../crates/diem-metrics" }
 diem-secure-net = { path = "../../secure/net" }
 storage-interface = { path = "../storage-interface" }
 diem-types = { path = "../../types" }
-diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
+diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
 rand = { version = "0.8.3", optional = true }
 storage-client = { path = "../storage-client", optional = true }
 proptest = { version = "1.0.0", optional = true }

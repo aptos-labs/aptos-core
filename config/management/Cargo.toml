@@ -26,7 +26,7 @@ diem-network-address-encryption = {path = "network-address-encryption"}
 diem-secure-storage = { path = "../../secure/storage" }
 diem-time-service = { path = "../../crates/diem-time-service" }
 diem-types = { path = "../../types" }
-diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
+diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
 diem-temppath = { path = "../../crates/diem-temppath" }
 diem-transaction-builder = { path = "../../sdk/transaction-builder" }
 

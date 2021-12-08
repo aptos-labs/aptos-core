@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::anyhow;
-use guppy::PackageId;
+use guppy::{DependencyKind, PackageId};
 use hakari::HakariBuilder;
 use x_core::XCoreContext;
 use x_lint::prelude::*;
@@ -97,7 +97,6 @@ impl<'cfg> PackageLinter for WorkspaceHackDep<'cfg> {
         out: &mut LintFormatter<'l, '_>,
     ) -> Result<RunStatus<'l>> {
         let package = ctx.metadata();
-        let pkg_graph = ctx.package_graph();
 
         // Exclude omitted packages (including the workspace-hack package itself) from consideration.
         if self
@@ -109,11 +108,28 @@ impl<'cfg> PackageLinter for WorkspaceHackDep<'cfg> {
         }
 
         let has_links = package.direct_links().next().is_some();
-        let has_hack_dep = pkg_graph
-            .directly_depends_on(package.id(), self.hakari_id)
-            .expect("valid package ID");
-        if has_links && !has_hack_dep {
-            out.write(LintLevel::Error, "missing diem-workspace-hack dependency");
+        if !has_links {
+            return Ok(RunStatus::Executed);
+        }
+
+        let link = package.link_to(self.hakari_id).expect("hakari ID is valid");
+        match link {
+            Some(link) => {
+                // Ensure that the workspace-hack is not in dev or build, only as a normal
+                // dependency.
+                for kind in [DependencyKind::Development, DependencyKind::Build] {
+                    let req = link.req_for_kind(kind);
+                    if req.is_present() {
+                        out.write(
+                            LintLevel::Error,
+                            format!("workspace-hack specified in [{}-dependencies] (move to [dependencies])", kind),
+                        );
+                    }
+                }
+            }
+            None => {
+                out.write(LintLevel::Error, "missing workspace-hack dependency");
+            }
         }
 
         Ok(RunStatus::Executed)

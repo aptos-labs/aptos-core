@@ -9,5 +9,5 @@ The downside is that all code is compiled with the features needed for any
 invocation.
 
 See the
-[rustc-workspace-hack](https://github.com/rust-lang/rust/tree/master/src/tools/rustc-workspace-hack)
+[cargo-hakari documentation](https://docs.rs/cargo-hakari/latest/cargo_hakari/)
 for further details.

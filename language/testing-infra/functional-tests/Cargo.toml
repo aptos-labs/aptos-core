@@ -36,6 +36,4 @@ itertools = "0.10.0"
 difference = "2.0.0"
 term_size = "0.3.2"
 vm-genesis = { path = "../../../diem-move/vm-genesis" }
-
-[dev-dependencies]
-diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }
+diem-workspace-hack = { version = "0.1", path = "../../../crates/diem-workspace-hack" }

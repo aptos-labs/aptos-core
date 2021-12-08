@@ -28,9 +28,9 @@ move-borrow-graph = { path = "../move-borrow-graph" }
 move-bytecode-source-map = { path = "../move-ir-compiler/move-bytecode-source-map" }
 bcs = "0.1.2"
 move-command-line-common = { path = "../move-command-line-common" }
+diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
 
 [dev-dependencies]
-diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 move-stdlib = { path = "../move-stdlib" }
 datatest-stable = "0.1.1"
 

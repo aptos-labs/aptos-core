@@ -16,7 +16,4 @@ walkdir = "2.3.1"
 sha2 = "0.9.3"
 hex = "0.4.3"
 serde = { version = "1.0.124", features = ["derive"] }
-
-
-[dev-dependencies]
-diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
+diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }

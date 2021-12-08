@@ -33,7 +33,7 @@ diem-metrics = { path = "../crates/diem-metrics" }
 diem-infallible = { path = "../crates/diem-infallible" }
 diem-proptest-helpers = { path = "../crates/diem-proptest-helpers", optional = true }
 diem-types = { path = "../types" }
-diem-workspace-hack = { path = "../crates/diem-workspace-hack" }
+diem-workspace-hack = { version = "0.1", path = "../crates/diem-workspace-hack" }
 event-notifications = { path = "../state-sync/inter-component/event-notifications" }
 mirai-annotations = "1.10.1"
 mempool-notifications = { path = "../state-sync/inter-component/mempool-notifications" }

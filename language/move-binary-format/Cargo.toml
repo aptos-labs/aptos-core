@@ -19,9 +19,9 @@ ref-cast = "1.0.6"
 variant_count = "1.1.0"
 move-core-types = { path = "../move-core/types", version = "0.0.3" }
 serde = { version = "1.0.124", default-features = false }
+diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
 
 [dev-dependencies]
-diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 proptest = "1.0.0"
 proptest-derive = "0.3.0"
 move-core-types = { path = "../move-core/types", features = ["fuzzing"] }

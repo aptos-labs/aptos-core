@@ -20,9 +20,9 @@ smallvec = "1.6.1"
 bcs = "0.1.2"
 move-core-types = { path = "../../move-core/types" }
 move-binary-format = { path = "../../move-binary-format" }
+diem-workspace-hack = { version = "0.1", path = "../../../crates/diem-workspace-hack" }
 
 [dev-dependencies]
-diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }
 proptest = "1.0.0"
 
 [features]

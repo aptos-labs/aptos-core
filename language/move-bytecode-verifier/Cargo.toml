@@ -17,9 +17,9 @@ petgraph = "0.5.1"
 move-borrow-graph = { path = "../move-borrow-graph" }
 move-binary-format = { path = "../move-binary-format" }
 move-core-types = { path = "../move-core/types" }
+diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
 
 [dev-dependencies]
-diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 invalid-mutations = { path = "invalid-mutations" }
 
 [features]

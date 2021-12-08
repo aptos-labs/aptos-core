@@ -21,9 +21,9 @@ rand = "0.8.3"
 ref-cast = "1.0.6"
 serde = { version = "1.0.124", default-features = false }
 serde_bytes = "0.11.5"
+diem-workspace-hack = { version = "0.1", path = "../../../crates/diem-workspace-hack" }
 
 [dev-dependencies]
-diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }
 proptest = "1.0.0"
 proptest-derive = "0.3.0"
 regex = "1.4.3"

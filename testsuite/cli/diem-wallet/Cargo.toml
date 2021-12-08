@@ -22,7 +22,7 @@ thiserror = "1.0.24"
 diem-crypto = { path = "../../../crates/diem-crypto", features = ["fuzzing"] }
 diem-temppath = { path = "../../../crates/diem-temppath/" }
 diem-types = { path = "../../../types" }
-diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }
+diem-workspace-hack = { version = "0.1", path = "../../../crates/diem-workspace-hack" }
 mirai-annotations = "1.10.1"
 
 [features]

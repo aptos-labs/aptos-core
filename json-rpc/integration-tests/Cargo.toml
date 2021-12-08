@@ -18,7 +18,7 @@ serde_json = "1.0.64"
 diem-json-rpc-types = { path = "../types" }
 diem-sdk = { path = "../../sdk" }
 forge = { path = "../../testsuite/forge" }
-diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
+diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
 
 [[test]]
 name = "jsonrpc-forge"

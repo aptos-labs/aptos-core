@@ -36,7 +36,7 @@ diem-logger =  { path = "../../crates/diem-logger" }
 diem-metrics = { path = "../../crates/diem-metrics" }
 diem-types = { path = "../../types" }
 diem-temppath = { path = "../../crates/diem-temppath/" }
-diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
+diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
 diem-resource-viewer = { path = "../../diem-move/diem-resource-viewer" }
 diem-framework = { path = "../../diem-move/diem-framework" }
 diem-framework-releases = { path = "../../diem-move/diem-framework/DPN/releases" }

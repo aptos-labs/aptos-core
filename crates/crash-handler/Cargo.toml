@@ -14,5 +14,5 @@ backtrace = "0.3.56"
 toml = "0.5.8"
 
 diem-logger = { path = "../../crates/diem-logger" }
-diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
+diem-workspace-hack = { version = "0.1", path = "../diem-workspace-hack" }
 serde = { version = "1.0.124", features = ["derive"] }

@@ -9,8 +9,10 @@ license = "Apache-2.0"
 publish = false
 edition = "2018"
 
+[dependencies]
+diem-workspace-hack = { version = "0.1", path = "../../../crates/diem-workspace-hack" }
+
 [dev-dependencies]
-diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }
 petgraph = "0.5.1"
 proptest = "1.0.0"
 

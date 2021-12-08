@@ -32,9 +32,9 @@ move-symbol-pool = { path = "../../move-symbol-pool" }
 move-command-line-common = { path = "../../move-command-line-common" }
 move-model = { path = "../../move-model" }
 move-bytecode-utils = { path = "../move-bytecode-utils" }
+diem-workspace-hack = { version = "0.1", path = "../../../crates/diem-workspace-hack" }
 
 [dev-dependencies]
-diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }
 datatest-stable = "0.1.1"
 
 [[test]]

@@ -23,6 +23,6 @@ diem-logger = { path = "../../crates/diem-logger" }
 diem-genesis-tool = {path = "../../config/management/genesis", features = ["testing"] }
 diem-temppath = { path = "../../crates/diem-temppath" }
 diem-types = { path = "../../types" }
-diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
+diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
 forge = { path = "../forge" }
 rand = "0.8.3"

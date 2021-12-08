@@ -25,4 +25,4 @@ diem-config = { path = "../../config" }
 diem-crypto = { path = "../diem-crypto" }
 diem-logger = { path = "../../crates/diem-logger" }
 diem-sdk = { path = "../../sdk" }
-diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
+diem-workspace-hack = { version = "0.1", path = "../diem-workspace-hack" }

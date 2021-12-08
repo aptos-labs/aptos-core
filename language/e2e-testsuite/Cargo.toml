@@ -32,9 +32,7 @@ diem-writeset-generator = { path = "../../diem-move/writeset-transaction-generat
 diem-state-view = { path = "../../storage/state-view" }
 read-write-set = { path = "../tools/read-write-set" }
 diem-parallel-executor = { path = "../../diem-move/parallel-executor" }
+diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
 
 [features]
 default = ["diem-transaction-builder/fuzzing"]
-
-[dev-dependencies]
-diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }

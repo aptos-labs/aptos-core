@@ -14,5 +14,4 @@ bcs = "0.1.2"
 rand = "0.8.3"
 diem-sdk = { path = ".." }
 once_cell = "1.7.2"
-
-diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
+diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }

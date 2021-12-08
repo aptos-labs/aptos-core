@@ -16,6 +16,6 @@ thiserror = "1.0.24"
 channel = { path = "../../../crates/channel" }
 diem-config = { path = "../../../config" }
 diem-types = { path = "../../../types" }
-diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }
+diem-workspace-hack = { version = "0.1", path = "../../../crates/diem-workspace-hack" }
 network = { path = "../../../network" }
 storage-service-types = { path = "../types" }

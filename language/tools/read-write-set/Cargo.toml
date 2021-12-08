@@ -19,6 +19,4 @@ prover_bytecode = { path = "../../move-prover/bytecode", package="bytecode" }
 move-resource-viewer = { path = "../move-resource-viewer" }
 move-read-write-set-types = { path = "types" }
 read-write-set-dynamic = { path = "dynamic" }
-
-[dev-dependencies]
-diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }
+diem-workspace-hack = { version = "0.1", path = "../../../crates/diem-workspace-hack" }

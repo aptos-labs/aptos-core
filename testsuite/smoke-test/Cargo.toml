@@ -31,6 +31,7 @@ move-ir-compiler = { path = "../../language/move-ir-compiler" }
 move-stdlib = { path = "../../language/move-stdlib" }
 diem-types = { path = "../../types" }
 forge = { path = "../forge" }
+diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
 
 [dev-dependencies]
 base64 = "0.13.0"
@@ -58,7 +59,6 @@ diem-swarm = { path = "../diem-swarm"}
 diem-time-service = { path = "../../crates/diem-time-service", features = ["testing"] }
 diem-vault-client = { path = "../../secure/storage/vault", features = ["fuzzing"] }
 diem-validator-interface = { path = "../../diem-move/diem-validator-interface" }
-diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 diem-writeset-generator = { path = "../../diem-move/writeset-transaction-generator" }
 diem-transaction-builder = { path = "../../sdk/transaction-builder" }
 

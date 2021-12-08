@@ -26,7 +26,7 @@ ureq = { version = "1.5.4", features = ["json", "native-tls"], default-features 
 
 bcs = "0.1.2"
 diem-proptest-helpers = { path = "../../crates/diem-proptest-helpers" }
-diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
+diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
 
 # List out modules with data structures being fuzzed here.
 accumulator = { path = "../../storage/accumulator", features = ["fuzzing"] }

@@ -37,7 +37,7 @@ diem-node = { path = "../../diem-node" }
 diem-sdk = { path = "../../sdk" }
 diem-types = { path = "../../types" }
 diem-vm = { path = "../../diem-move/diem-vm" }
-diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
+diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
 diemdb = { path = "../../storage/diemdb" }
 forge = { path = "../../testsuite/forge" }
 generate-key = { path = "../../config/generate-key" }

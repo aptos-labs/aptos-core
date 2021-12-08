@@ -17,9 +17,9 @@ bcs = "0.1.2"
 log = "0.4.14"
 anyhow = "1.0.38"
 serde = { version = "1.0.124", features = ["derive"] }
+diem-workspace-hack = { version = "0.1", path = "../../../crates/diem-workspace-hack" }
 
 [dev-dependencies]
-diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }
 codespan-reporting = "0.11.1"
 move-prover = { path = ".." }
 datatest-stable = "0.1.1"

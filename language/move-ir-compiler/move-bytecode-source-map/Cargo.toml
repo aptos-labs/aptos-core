@@ -17,9 +17,7 @@ move-command-line-common = { path = "../../move-command-line-common" }
 bcs = "0.1.2"
 codespan-reporting = "0.11.1"
 serde = { version = "1.0.124", default-features = false }
+diem-workspace-hack = { version = "0.1", path = "../../../crates/diem-workspace-hack" }
 
 [features]
 default = []
-
-[dev-dependencies]
-diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }

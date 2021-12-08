@@ -17,7 +17,7 @@ proptest = {version = "1.0.0", optional = true}
 diem-config = { path = "../../config" }
 diem-logger = { path = "../../crates/diem-logger" }
 diem-metrics = { path = "../../crates/diem-metrics" }
-diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
+diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
 
 [dependencies.rocksdb]
 version = "0.17.0"

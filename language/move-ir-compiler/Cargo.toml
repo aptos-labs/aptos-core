@@ -22,9 +22,7 @@ move-symbol-pool = { path = "../move-symbol-pool" }
 bcs = "0.1.2"
 structopt = "0.3.21"
 serde_json = "1.0.64"
+diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
 
 [features]
 default = []
-
-[dev-dependencies]
-diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }

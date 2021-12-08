@@ -17,7 +17,7 @@ thiserror = "1.0.24"
 tokio = { version = "1.8.1", features = ["macros", "rt-multi-thread", "time"], optional = true }
 
 diem-infallible = { path = "../../crates/diem-infallible" }
-diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
+diem-workspace-hack = { version = "0.1", path = "../diem-workspace-hack" }
 
 [dev-dependencies]
 futures = "0.3.12"

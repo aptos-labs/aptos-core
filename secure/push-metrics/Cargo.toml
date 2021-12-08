@@ -13,4 +13,4 @@ edition = "2018"
 ureq = { version = "1.5.4", features = ["json", "native-tls"], default-features = false }
 diem-logger = { path = "../../crates/diem-logger" }
 diem-metrics-core = { path = "../../crates/diem-metrics-core" }
-diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
+diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }

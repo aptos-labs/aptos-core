@@ -12,10 +12,10 @@ edition = "2018"
 [dependencies]
 once_cell = "1.7.2"
 serde = { version = "1.0.124", features = ["derive"] }
+diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
 
 
 [dev-dependencies]
-diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 serde_json = { version = "1.0.64" }
 
 [features]

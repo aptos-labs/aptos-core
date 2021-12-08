@@ -16,7 +16,7 @@ proc-macro = true
 syn = { version = "1.0.64", features = ["derive"] }
 quote = "1.0.9"
 proc-macro2 = "1.0.24"
+diem-workspace-hack = { version = "0.1", path = "../diem-workspace-hack" }
 
 [dev-dependencies]
 anyhow = "1.0.38"
-diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }

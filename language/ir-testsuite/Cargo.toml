@@ -9,8 +9,10 @@ license = "Apache-2.0"
 publish = false
 edition = "2018"
 
+[dependencies]
+diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
+
 [dev-dependencies]
-diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 anyhow = "1.0.38"
 move-bytecode-verifier = { path = "../move-bytecode-verifier" }
 datatest-stable = "0.1.1"

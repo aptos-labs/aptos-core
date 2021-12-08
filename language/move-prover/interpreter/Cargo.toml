@@ -22,8 +22,8 @@ itertools = "0.10.0"
 num = "0.4.0"
 serde = { version = "1.0.124", features = ["derive"] }
 structopt = "0.3.21"
+diem-workspace-hack = { version = "0.1", path = "../../../crates/diem-workspace-hack" }
 
 [dev-dependencies]
-diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }
 datatest-stable = "0.1.1"
 move-prover-test-utils = { path = "../test-utils" }

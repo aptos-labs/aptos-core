@@ -27,7 +27,7 @@ diem-network-address-encryption = { path = "management/network-address-encryptio
 diem-secure-storage = { path = "../secure/storage" }
 diem-temppath = { path = "../crates/diem-temppath" }
 diem-types = { path = "../types" }
-diem-workspace-hack = { path = "../crates/diem-workspace-hack" }
+diem-workspace-hack = { version = "0.1", path = "../crates/diem-workspace-hack" }
 short-hex-str = { path = "../crates/short-hex-str" }
 
 [dev-dependencies]

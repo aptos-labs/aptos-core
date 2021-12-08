@@ -29,9 +29,9 @@ move-binary-format = { path = "../../move-binary-format" }
 move-model = { path = "../../move-model" }
 bytecode-interpreter = { path = "../../move-prover/interpreter" }
 move-bytecode-utils = { path = "../move-bytecode-utils" }
+diem-workspace-hack = { version = "0.1", path = "../../../crates/diem-workspace-hack" }
 
 [dev-dependencies]
-diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }
 datatest-stable = "0.1.1"
 difference = "2.0.0"
 

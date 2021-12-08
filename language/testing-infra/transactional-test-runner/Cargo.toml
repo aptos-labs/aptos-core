@@ -36,9 +36,9 @@ move-vm-test-utils = { path = "../../move-vm/test-utils" }
 move-vm-types = { path = "../../move-vm/types" }
 move-vm-runtime = { path = "../../move-vm/runtime" }
 move-resource-viewer = { path = "../../tools/move-resource-viewer" }
+diem-workspace-hack = { version = "0.1", path = "../../../crates/diem-workspace-hack" }
 
 [dev-dependencies]
-diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }
 datatest-stable = "0.1.1"
 difference = "2.0.0"
 

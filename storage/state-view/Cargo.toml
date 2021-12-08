@@ -13,7 +13,7 @@ edition = "2018"
 anyhow = "1.0.38"
 diem-crypto = { path = "../../crates/diem-crypto" }
 diem-types = { path = "../../types" }
-diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
+diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
 
 [features]
 default = []

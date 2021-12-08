@@ -27,9 +27,9 @@ walkdir = "2.3.1"
 smallvec = "1.6.1"
 sha2 = "0.9.3"
 sha3 = "0.9.1"
+diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
 
 [dev-dependencies]
-diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 move-unit-test = { path = "../tools/move-unit-test" }
 tempfile = "3.2.0"
 dir-diff = "0.3.2"

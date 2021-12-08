@@ -29,7 +29,7 @@ diem-management = { path = ".." }
 diem-network-address-encryption = {path = "../network-address-encryption"}
 diem-secure-storage = { path = "../../../secure/storage" }
 diem-types = { path = "../../../types" }
-diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }
+diem-workspace-hack = { version = "0.1", path = "../../../crates/diem-workspace-hack" }
 diem-temppath = { path = "../../../crates/diem-temppath" }
 diem-vm = { path = "../../../diem-move/diem-vm" }
 diemdb = { path = "../../../storage/diemdb" }

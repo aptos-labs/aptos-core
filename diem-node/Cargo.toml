@@ -45,7 +45,7 @@ diem-temppath = { path = "../crates/diem-temppath" }
 diem-time-service = { path = "../crates/diem-time-service" }
 diem-types = { path = "../types" }
 diem-vm = { path = "../diem-move/diem-vm" }
-diem-workspace-hack = { path = "../crates/diem-workspace-hack" }
+diem-workspace-hack = { version = "0.1", path = "../crates/diem-workspace-hack" }
 diemdb = { path = "../storage/diemdb" }
 mempool-notifications = { path = "../state-sync/inter-component/mempool-notifications" }
 network = { path = "../network" }

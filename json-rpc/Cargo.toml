@@ -43,7 +43,7 @@ diem-metrics = { path = "../crates/diem-metrics" }
 diem-proptest-helpers = { path = "../crates/diem-proptest-helpers", optional = true }
 diem-types = { path = "../types" }
 diem-temppath = { path = "../crates/diem-temppath", optional = true }
-diem-workspace-hack = { path = "../crates/diem-workspace-hack" }
+diem-workspace-hack = { version = "0.1", path = "../crates/diem-workspace-hack" }
 executor = { path = "../execution/executor" , optional = true}
 executor-types = { path = "../execution/executor-types" , optional = true}
 move-core-types = { path = "../language/move-core/types" }

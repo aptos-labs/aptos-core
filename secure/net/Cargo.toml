@@ -16,7 +16,7 @@ thiserror = "1.0.24"
 
 diem-logger = { path = "../../crates/diem-logger" }
 diem-secure-push-metrics = { path = "../push-metrics" }
-diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
+diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
 
 [dev-dependencies]
 diem-config = { path = "../../config" }

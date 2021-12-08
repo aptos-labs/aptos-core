@@ -31,7 +31,7 @@ diem-logger = { path = "../crates/diem-logger" }
 diem-mempool = { path = "../mempool"}
 diem-metrics = { path = "../crates/diem-metrics" }
 diem-types = { path = "../types" }
-diem-workspace-hack = { path = "../crates/diem-workspace-hack" }
+diem-workspace-hack = { version = "0.1", path = "../crates/diem-workspace-hack" }
 diem-api-types = { path = "./types", package = "diem-api-types" }
 storage-interface = { path = "../storage/storage-interface" }
 move-core-types = { path = "../language/move-core/types" }

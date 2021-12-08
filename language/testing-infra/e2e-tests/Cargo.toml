@@ -37,6 +37,4 @@ diem-transaction-builder = { path = "../../../sdk/transaction-builder" }
 move-command-line-common = { path = "../../move-command-line-common" }
 read-write-set = { path = "../../tools/read-write-set" }
 hex = "0.4.3"
-
-[dev-dependencies]
-diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }
+diem-workspace-hack = { version = "0.1", path = "../../../crates/diem-workspace-hack" }

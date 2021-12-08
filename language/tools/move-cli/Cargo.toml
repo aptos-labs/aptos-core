@@ -47,9 +47,9 @@ move-unit-test = { path = "../move-unit-test" }
 move-errmapgen = { path = "../../move-prover/move-errmapgen" }
 move-bytecode-source-map = { path = "../../move-ir-compiler/move-bytecode-source-map" }
 move-bytecode-viewer = { path = "../move-bytecode-viewer" }
+diem-workspace-hack = { version = "0.1", path = "../../../crates/diem-workspace-hack" }
 
 [dev-dependencies]
-diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }
 datatest-stable = "0.1.1"
 
 [[bin]]

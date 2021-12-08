@@ -24,10 +24,8 @@ move-vm-test-utils = { path = "../move-vm/test-utils" }
 move-vm-types = { path = "../move-vm/types" }
 move-binary-format = { path = "../move-binary-format" }
 move-stdlib = { path = "../move-stdlib" }
+diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
 
 [[bench]]
 name = "vm_benches"
 harness = false
-
-[dev-dependencies]
-diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }

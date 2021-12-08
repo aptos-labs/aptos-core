@@ -22,6 +22,4 @@ move-vm-runtime = { path = "../runtime" }
 move-vm-types = { path = "../types" }
 move-vm-test-utils = { path = "../test-utils" }
 move-stdlib = { path = "../../move-stdlib" }
-
-[dev-dependencies]
-diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }
+diem-workspace-hack = { version = "0.1", path = "../../../crates/diem-workspace-hack" }

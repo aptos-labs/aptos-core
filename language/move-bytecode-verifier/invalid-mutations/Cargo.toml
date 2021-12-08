@@ -13,9 +13,7 @@ publish = false
 move-core-types = { path = "../../move-core/types" }
 move-binary-format = { path = "../../move-binary-format" }
 proptest = "1.0.0"
+diem-workspace-hack = { version = "0.1", path = "../../../crates/diem-workspace-hack" }
 
 [features]
 default = []
-
-[dev-dependencies]
-diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }

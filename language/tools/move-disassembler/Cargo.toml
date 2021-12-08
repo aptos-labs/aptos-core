@@ -20,9 +20,7 @@ move-coverage = { path = "../move-coverage" }
 move-lang = { path = "../../move-lang" }
 
 structopt = "0.3.21"
+diem-workspace-hack = { version = "0.1", path = "../../../crates/diem-workspace-hack" }
 
 [features]
 default = []
-
-[dev-dependencies]
-diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }

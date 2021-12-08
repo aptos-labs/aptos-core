@@ -16,5 +16,5 @@ rand = "0.8.3"
 diem-crypto = { path = "../diem-crypto" }
 diem-json-rpc-types  = { path = "../../json-rpc/types" }
 diem-types = { path = "../../types" }
-diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
+diem-workspace-hack = { version = "0.1", path = "../diem-workspace-hack" }
 diem-client = { path = "../diem-client" }

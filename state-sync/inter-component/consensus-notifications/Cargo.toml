@@ -18,7 +18,7 @@ tokio = { version = "1.8.1" }
 
 diem-crypto = { path = "../../../crates/diem-crypto" }
 diem-types = { path = "../../../types" }
-diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }
+diem-workspace-hack = { version = "0.1", path = "../../../crates/diem-workspace-hack" }
 
 [dev-dependencies]
 claim = "0.5.0"

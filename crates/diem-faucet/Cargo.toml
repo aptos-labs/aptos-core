@@ -23,8 +23,7 @@ warp = "0.3.0"
 generate-key = { path = "../../config/generate-key" }
 diem-logger = { path = "../../crates/diem-logger" }
 diem-sdk = { path = "../../sdk" }
-
-diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
+diem-workspace-hack = { version = "0.1", path = "../diem-workspace-hack" }
 
 [dev-dependencies]
 serde_json = "1.0.64"

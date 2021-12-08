@@ -18,7 +18,7 @@ diem-crypto = { path = "../../crates/diem-crypto" }
 diem-config = { path = "../../config" }
 diem-logger = { path = "../../crates/diem-logger" }
 diem-types = { path = "../../types" }
-diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
+diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
 memsocket = { path = "../memsocket" }
 netcore = { path = "../netcore", features = ["fuzzing", "testing"] }
 network = { path = "../.", features = ["testing", "fuzzing"] }

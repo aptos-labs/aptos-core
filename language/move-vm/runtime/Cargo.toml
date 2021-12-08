@@ -23,9 +23,9 @@ move-bytecode-verifier = { path = "../../move-bytecode-verifier" }
 move-core-types = { path = "../../move-core/types" }
 move-vm-types = { path = "../types" }
 move-binary-format = { path = "../../move-binary-format" }
+diem-workspace-hack = { version = "0.1", path = "../../../crates/diem-workspace-hack" }
 
 [dev-dependencies]
-diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }
 anyhow = "1.0.38"
 hex = "0.4.3"
 proptest = "1.0.0"

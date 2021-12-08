@@ -46,7 +46,7 @@ diem-proptest-helpers = { path = "../crates/diem-proptest-helpers", optional = t
 diem-rate-limiter = { path = "../crates/diem-rate-limiter"}
 diem-time-service = { path = "../crates/diem-time-service", features = ["async"] }
 diem-types = { path = "../types" }
-diem-workspace-hack = { path = "../crates/diem-workspace-hack" }
+diem-workspace-hack = { version = "0.1", path = "../crates/diem-workspace-hack" }
 memsocket = { path = "./memsocket", optional = true }
 netcore = { path = "./netcore" }
 num-variants = { path = "../crates/num-variants" }

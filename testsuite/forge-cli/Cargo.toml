@@ -19,8 +19,7 @@ structopt = "0.3.21"
 tokio = { version = "1.8.1", features = ["full"] }
 testcases = { path = "../testcases" }
 url = "2.2.2"
-
-diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
+diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
 
 [[bin]]
 name = "forge"

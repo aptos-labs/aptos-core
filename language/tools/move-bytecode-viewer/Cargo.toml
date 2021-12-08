@@ -18,10 +18,8 @@ move-bytecode-source-map = { path = "../../move-ir-compiler/move-bytecode-source
 move-ir-types = { path = "../../move-ir/types" }
 move-binary-format = { path = "../../move-binary-format" }
 move-disassembler = { path = "../move-disassembler" }
+diem-workspace-hack = { version = "0.1", path = "../../../crates/diem-workspace-hack" }
 
 
 [features]
 default = []
-
-[dev-dependencies]
-diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }

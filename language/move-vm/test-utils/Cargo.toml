@@ -17,6 +17,4 @@ anyhow = "1.0.38"
 move-vm-runtime = { path = "../runtime" }
 move-core-types = {path = "../../move-core/types" }
 move-binary-format = { path = "../../move-binary-format" }
-
-[dev-dependencies]
-diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }
+diem-workspace-hack = { version = "0.1", path = "../../../crates/diem-workspace-hack" }
