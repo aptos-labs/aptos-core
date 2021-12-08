@@ -744,7 +744,7 @@ fn run(
         }
         PassResult::HLIR(hprog) => {
             let cprog = cfgir::translate::program(compilation_env, pre_compiled_lib, hprog);
-            compilation_env.check_diags_at_or_above_severity(Severity::BlockingError)?;
+            compilation_env.check_diags_at_or_above_severity(Severity::NonblockingError)?;
             run(
                 compilation_env,
                 pre_compiled_lib,

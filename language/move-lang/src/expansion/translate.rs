@@ -412,17 +412,14 @@ fn script_(context: &mut Context, pscript: P::Script) -> E::Script {
     let P::Script {
         attributes,
         loc,
-        uses,
+        uses: puses,
         constants: pconstants,
         function: pfunction,
         specs: pspecs,
     } = pscript;
 
     let attributes = flatten_attributes(context, AttributePosition::Script, attributes);
-    let mut new_scope = AliasMapBuilder::new();
-    for u in uses {
-        use_(context, &mut new_scope, u.use_);
-    }
+    let new_scope = uses(context, puses);
     let old_aliases = context.aliases.add_and_shadow_all(new_scope);
     assert!(
         old_aliases.is_empty(),
@@ -709,7 +706,7 @@ fn aliases_from_member(
 
     match member {
         P::ModuleMember::Use(u) => {
-            use_(context, acc, u.use_);
+            use_(context, acc, u);
             None
         }
         f @ P::ModuleMember::Friend(_) => {
@@ -759,7 +756,20 @@ fn aliases_from_member(
     }
 }
 
-fn use_(context: &mut Context, acc: &mut AliasMapBuilder, u: P::Use) {
+fn uses(context: &mut Context, uses: Vec<P::UseDecl>) -> AliasMapBuilder {
+    let mut new_scope = AliasMapBuilder::new();
+    for u in uses {
+        use_(context, &mut new_scope, u);
+    }
+    new_scope
+}
+
+fn use_(context: &mut Context, acc: &mut AliasMapBuilder, u: P::UseDecl) {
+    let P::UseDecl {
+        use_: u,
+        attributes,
+    } = u;
+    flatten_attributes(context, AttributePosition::Use, attributes);
     let unbound_module = |mident: &ModuleIdent| -> Diagnostic {
         diag!(
             NameResolution::UnboundModule,
@@ -1134,16 +1144,13 @@ fn spec(context: &mut Context, sp!(loc, pspec): P::SpecBlock) -> E::SpecBlock {
     let P::SpecBlock_ {
         attributes: pattributes,
         target,
-        uses,
+        uses: puses,
         members: pmembers,
     } = pspec;
 
     let attributes = flatten_attributes(context, AttributePosition::Spec, pattributes);
     context.in_spec_context = true;
-    let mut new_scope = AliasMapBuilder::new();
-    for u in uses {
-        use_(context, &mut new_scope, u.use_);
-    }
+    let new_scope = uses(context, puses);
     let old_aliases = context.aliases.add_and_shadow_all(new_scope);
 
     let members = pmembers
@@ -1576,12 +1583,9 @@ fn unexpected_address_module_error(loc: Loc, nloc: Loc, access: Access) -> Diagn
 //**************************************************************************************************
 
 fn sequence(context: &mut Context, loc: Loc, seq: P::Sequence) -> E::Sequence {
-    let (uses, pitems, maybe_last_semicolon_loc, pfinal_item) = seq;
+    let (puses, pitems, maybe_last_semicolon_loc, pfinal_item) = seq;
 
-    let mut new_scope = AliasMapBuilder::new();
-    for u in uses {
-        use_(context, &mut new_scope, u.use_);
-    }
+    let new_scope = uses(context, puses);
     let old_aliases = context.aliases.add_and_shadow_all(new_scope);
     let mut items: VecDeque<E::SequenceItem> = pitems
         .into_iter()

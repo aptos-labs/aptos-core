@@ -143,17 +143,16 @@ fn move_check_for_errors(
             unit_test::plan_builder::construct_test_plan(compilation_env, &cfgir);
         }
 
-        compilation_env.check_diags_at_or_above_severity(codes::Severity::Warning)?;
-        let (units, warnings) = compiler.at_cfgir(cfgir).build()?;
-        Ok((units, warnings))
+        let (units, diags) = compiler.at_cfgir(cfgir).build()?;
+        Ok((units, diags))
     }
 
-    let (units, warnings) = match try_impl(comments_and_compiler_res) {
-        Ok((units, warnings)) => (units, warnings),
-        Err(diags) => return diags,
+    let (units, inner_diags) = match try_impl(comments_and_compiler_res) {
+        Ok((units, inner_diags)) => (units, inner_diags),
+        Err(inner_diags) => return inner_diags,
     };
     let mut diags = move_lang::compiled_unit::verify_units(&units);
-    diags.extend(warnings);
+    diags.extend(inner_diags);
     diags
 }
 

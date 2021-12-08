@@ -1,25 +1,16 @@
-error[E02015]: invalid attribute
-  ┌─ tests/move_check/unit_test/expected_failure_not_test.move:3:7
+error[E10004]: invalid usage of known attribute
+  ┌─ tests/move_check/unit_test/expected_failure_not_test.move:4:9
   │
 3 │     #[expected_failure]
-  │       ^^^^^^^^^^^^^^^^
-  │       │
-  │       Known attribute 'expected_failure' is not expected with a struct
-  │       Expected to be used with one of the following: function
+  │       ---------------- Attributed as #[expected_failure] here
+4 │     fun foo() { }
+  │         ^^^ Only functions defined as a test with #[test] can also have an #[expected_failure] attribute
 
 error[E10004]: invalid usage of known attribute
   ┌─ tests/move_check/unit_test/expected_failure_not_test.move:7:9
   │
-6 │     #[expected_failure]
-  │       ---------------- Attributed as #[expected_failure] here
-7 │     fun foo() { }
+6 │     #[test_only, expected_failure]
+  │                  ---------------- Attributed as #[expected_failure] here
+7 │     fun bar() { }
   │         ^^^ Only functions defined as a test with #[test] can also have an #[expected_failure] attribute
-
-error[E10004]: invalid usage of known attribute
-   ┌─ tests/move_check/unit_test/expected_failure_not_test.move:10:9
-   │
- 9 │     #[test_only, expected_failure]
-   │                  ---------------- Attributed as #[expected_failure] here
-10 │     fun bar() { }
-   │         ^^^ Only functions defined as a test with #[test] can also have an #[expected_failure] attribute
 

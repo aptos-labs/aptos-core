@@ -647,6 +647,13 @@ fn function_body(
         .for_each(|(var, _)| assert!(locals_map.remove(var).is_some()));
     let locals = locals_map
         .into_iter()
+        .filter(|(_, ty)| {
+            // filter out any locals generated for unreachable code
+            let bt = match &ty.value {
+                H::SingleType_::Base(b) | H::SingleType_::Ref(_, b) => b,
+            };
+            !matches!(&bt.value, H::BaseType_::Unreachable)
+        })
         .map(|(v, ty)| (var(v), single_type(context, ty)))
         .collect();
     let mut blocks = blocks_map.into_iter().collect::<Vec<_>>();

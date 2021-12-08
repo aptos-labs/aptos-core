@@ -299,12 +299,16 @@ fn filter_tests_from_module_member(
 // * It is annotated as a test function (test_only, test, abort) and test mode is not set; or
 // * If it is a library and is annotated as #[test]
 fn should_remove_node(env: &CompilationEnv, attrs: &[P::Attributes], is_source_def: bool) -> bool {
+    use known_attributes::TestingAttribute;
     let flattened_attrs: Vec<_> = attrs.iter().flat_map(test_attributes).collect();
-    !flattened_attrs.is_empty() && !env.flags().is_testing()
+    let is_test_only = flattened_attrs
+        .iter()
+        .any(|attr| matches!(attr.1, TestingAttribute::Test | TestingAttribute::TestOnly));
+    is_test_only && !env.flags().is_testing()
         || (!is_source_def
             && flattened_attrs
                 .iter()
-                .any(|attr| attr.1 == known_attributes::TestingAttribute::Test))
+                .any(|attr| attr.1 == TestingAttribute::Test))
 }
 
 fn test_attributes(attrs: &P::Attributes) -> Vec<(Loc, known_attributes::TestingAttribute)> {

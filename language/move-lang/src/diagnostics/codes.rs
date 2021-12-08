@@ -169,7 +169,7 @@ codes!(
             { msg: "invalid statement or expression in constant", severity: BlockingError },
         InvalidLoopControl: { msg: "invalid loop control", severity: BlockingError },
         InvalidNativeUsage: { msg: "invalid use of native item", severity: BlockingError },
-        TooFewArguments: { msg: "too few arguments", severity: NonblockingError },
+        TooFewArguments: { msg: "too few arguments", severity: BlockingError },
         TooManyArguments: { msg: "too many arguments", severity: NonblockingError },
         CyclicData: { msg: "cyclic data", severity: NonblockingError },
         CyclicInstantiation:
