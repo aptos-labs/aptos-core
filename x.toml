@@ -226,9 +226,6 @@ members = [
 # yelling at you, you should redesign your crate and properly remove that
 # dependency, instead of adding the crate to this list and silencing the lint.
 diem_crates_in_language = [
-    "diem-transactional-test-harness",
-    "language-e2e-testsuite",
-    "language-e2e-tests",
     "functional-tests",
     "move-compiler-functional-tests",
 ]

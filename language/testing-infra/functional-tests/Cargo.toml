@@ -18,7 +18,7 @@ diem-types = { path = "../../../types" }
 diem-vm = { path = "../../../diem-move/diem-vm" }
 move-binary-format = { path = "../../move-binary-format" }
 move-bytecode-verifier = { path = "../../move-bytecode-verifier" }
-language-e2e-tests = { path = "../e2e-tests" }
+language-e2e-tests = { path = "../../../diem-move/e2e-tests" }
 diem-keygen = { path = "../../../diem-move/diem-keygen" }
 diem-config = { path = "../../../config", features = ["fuzzing"] }
 diem-crypto = { path = "../../../crates/diem-crypto" }

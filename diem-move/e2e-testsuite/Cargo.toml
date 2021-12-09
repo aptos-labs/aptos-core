@@ -1,0 +1,44 @@
+[package]
+name = "language-e2e-testsuite"
+version = "0.1.0"
+edition = "2018"
+authors = ["Diem Association <opensource@diem.com>"]
+description = "Diem language e2e tests"
+repository = "https://github.com/diem/diem"
+homepage = "https://diem.com"
+license = "Apache-2.0"
+publish = false
+
+[dependencies]
+serde_json = "1.0.64"
+hex = "0.4.3"
+bcs = "0.1.2"
+proptest = "1.0.0"
+
+## Move dependencies
+move-core-types = { path = "../../language/move-core/types" }
+move-ir-compiler = { path = "../../language/move-ir-compiler" }
+move-vm-runtime = { path = "../../language/move-vm/runtime" }
+move-vm-types = { path = "../../language/move-vm/types" }
+move-binary-format = { path = "../../language/move-binary-format" }
+move-bytecode-verifier = { path = "../../language/move-bytecode-verifier" }
+read-write-set = { path = "../../language/tools/read-write-set" }
+
+## Diem-Move dependencies
+language-e2e-tests = { path = "../e2e-tests" }
+diem-keygen = { path = "../diem-keygen" }
+diem-vm = { path = "../diem-vm" }
+diem-framework-releases = { path = "../diem-framework/DPN/releases" }
+diem-parallel-executor = { path = "../parallel-executor" }
+diem-writeset-generator = { path = "../writeset-transaction-generator"}
+
+## Other Diem dependencies
+diem-crypto = { path = "../../crates/diem-crypto", features = ["fuzzing"] }
+diem-types = { path = "../../types", features = ["fuzzing"] }
+diem-transaction-builder = { path = "../../sdk/transaction-builder"}
+diem-logger = { path = "../../crates/diem-logger" }
+diem-state-view = { path = "../../storage/state-view" }
+diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
+
+[features]
+default = ["diem-transaction-builder/fuzzing"]

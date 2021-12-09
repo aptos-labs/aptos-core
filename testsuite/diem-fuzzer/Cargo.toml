@@ -34,7 +34,7 @@ consensus = { path = "../../consensus", features = ["fuzzing"] }
 consensus-types = { path = "../../consensus/consensus-types", features = ["fuzzing"] }
 executor = { path = "../../execution/executor", features = ["fuzzing"] }
 executor-types = { path = "../../execution/executor-types", features = ["fuzzing"] }
-language-e2e-tests = { path = "../../language/testing-infra/e2e-tests" }
+language-e2e-tests = { path = "../../diem-move/e2e-tests" }
 diem-crypto = { path = "../../crates/diem-crypto", features = ["fuzzing"]}
 diem-jellyfish-merkle = { path = "../../storage/jellyfish-merkle", features = ["fuzzing"] }
 diem-json-rpc = { path = "../../json-rpc", features = ["fuzzing"] }
