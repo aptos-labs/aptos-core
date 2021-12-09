@@ -1,5 +1,5 @@
 //# print-bytecode
-module 0x0.M {
+module 0x1.M {
     struct T{
         x: u64,
         no() {

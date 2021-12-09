@@ -1,5 +1,5 @@
 //# publish
-module 0x0.Test {
+module 0x1.Test {
     struct T { b: bool }
 
     public new_t(): Self.T {
@@ -10,8 +10,8 @@ module 0x0.Test {
 
 
 //# print-bytecode
-module 0x0.M {
-    import 0x0.Test;
+module 0x1.M {
+    import 0x1.Test;
 
     foo() {
         let t: Test.T;

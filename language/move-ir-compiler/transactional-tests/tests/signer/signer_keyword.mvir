@@ -1,5 +1,5 @@
 //# print-bytecode
-module 0x0.M {
+module 0x1.M {
     // "signer" is a keyword so it cannot be used as a parameter name
     foo(signer: address) {
         return;
