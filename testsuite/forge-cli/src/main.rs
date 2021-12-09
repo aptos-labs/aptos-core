@@ -24,12 +24,21 @@ struct Args {
     accounts_per_client: usize,
     #[structopt(long)]
     workers_per_ac: Option<usize>,
+    #[structopt(long, default_value = "0")]
+    wait_millis: u64,
+    #[structopt(long)]
+    burst: bool,
     #[structopt(flatten)]
     options: Options,
     #[structopt(long, help = "Specify a test suite to run")]
     suite: Option<String>,
     #[structopt(long, multiple = true)]
     changelog: Option<Vec<String>>,
+    #[structopt(
+        long,
+        help = "Whether transactions should be submitted to validators or full nodes"
+    )]
+    pub emit_to_validator: Option<bool>,
 
     // subcommand groups
     #[structopt(flatten)]
@@ -155,6 +164,16 @@ struct Resize {
 
 fn main() -> Result<()> {
     let args = Args::from_args();
+    let mut global_emit_job_request = EmitJobRequest::default()
+        .accounts_per_client(args.accounts_per_client)
+        .thread_params(EmitThreadParams {
+            wait_millis: args.wait_millis,
+            wait_committed: !args.burst,
+        });
+    if let Some(workers_per_endpoint) = args.workers_per_ac {
+        global_emit_job_request =
+            global_emit_job_request.workers_per_endpoint(workers_per_endpoint);
+    }
 
     match args.cli_cmd {
         // cmd input for test
@@ -164,6 +183,7 @@ fn main() -> Result<()> {
                 LocalFactory::from_workspace()?,
                 &args.options,
                 args.changelog,
+                global_emit_job_request,
             ),
             TestCommand::K8sSwarm(k8s) => {
                 let mut test_suite = k8s_test_suite();
@@ -184,6 +204,7 @@ fn main() -> Result<()> {
                     .unwrap(),
                     &args.options,
                     args.changelog,
+                    global_emit_job_request,
                 )
             }
         },
@@ -224,8 +245,9 @@ pub fn run_forge<F: Factory>(
     factory: F,
     options: &Options,
     logs: Option<Vec<String>>,
+    global_job_request: EmitJobRequest,
 ) -> Result<()> {
-    let forge = Forge::new(options, tests, factory);
+    let forge = Forge::new(options, tests, factory, global_job_request);
 
     if options.list {
         forge.list()?;
@@ -306,7 +328,7 @@ fn get_test_suite(suite_name: &str) -> ForgeConfig<'static> {
         "land_blocking_compat" => land_blocking_test_compat_suite(),
         "land_blocking" => land_blocking_test_suite(),
         "pre_release" => pre_release_suite(),
-        _ => k8s_test_suite(),
+        single_test => single_test_suite(single_test),
     }
 }
 
@@ -323,6 +345,18 @@ fn k8s_test_suite() -> ForgeConfig<'static> {
         .with_public_usage_tests(&[&FundAccount, &TransferCoins])
         .with_admin_tests(&[&GetMetadata])
         .with_network_tests(&[&EmitTransaction, &SimpleValidatorUpgrade])
+}
+
+fn single_test_suite(test_name: &str) -> ForgeConfig<'static> {
+    let config =
+        ForgeConfig::default().with_initial_validator_count(NonZeroUsize::new(30).unwrap());
+    match test_name {
+        "bench" => config.with_network_tests(&[&PerformanceBenchmark]),
+        "state_sync" => config.with_network_tests(&[&StateSyncPerformance]),
+        "compat" => config.with_network_tests(&[&SimpleValidatorUpgrade]),
+        "config" => config.with_network_tests(&[&ReconfigurationTest]),
+        _ => config.with_network_tests(&[&PerformanceBenchmark]),
+    }
 }
 
 fn land_blocking_test_suite() -> ForgeConfig<'static> {

@@ -10,7 +10,7 @@ pub mod reconfiguration_test;
 pub mod state_sync_performance;
 
 use diem_sdk::{transaction_builder::TransactionFactory, types::PeerId};
-use forge::{EmitJobRequest, NetworkContext, NodeExt, Result, TxnEmitter, TxnStats, Version};
+use forge::{NetworkContext, NodeExt, Result, TxnEmitter, TxnStats, Version};
 use rand::SeedableRng;
 use std::{
     convert::TryInto,
@@ -54,6 +54,7 @@ pub fn generate_traffic<'t>(
         .filter(|v| validators.contains(&v.peer_id()))
         .map(|n| n.async_json_rpc_client())
         .collect::<Vec<_>>();
+    let mut emit_job_request = ctx.global_job.clone();
     let chain_info = ctx.swarm().chain_info();
     let transaction_factory = TransactionFactory::new(chain_info.chain_id);
     let mut emitter = TxnEmitter::new(
@@ -63,7 +64,10 @@ pub fn generate_traffic<'t>(
         transaction_factory,
         rng,
     );
-    let mut emit_job_request = EmitJobRequest::new(validator_clients).gas_price(gas_price);
+
+    emit_job_request = emit_job_request
+        .json_rpc_clients(validator_clients)
+        .gas_price(gas_price);
     if let Some(target_tps) = fixed_tps {
         emit_job_request = emit_job_request.fixed_tps(target_tps.try_into().unwrap());
     }

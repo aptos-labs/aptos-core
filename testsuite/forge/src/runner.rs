@@ -71,7 +71,7 @@ impl Default for Format {
 }
 
 pub fn forge_main<F: Factory>(tests: ForgeConfig<'_>, factory: F, options: &Options) -> Result<()> {
-    let forge = Forge::new(options, tests, factory);
+    let forge = Forge::new(options, tests, factory, EmitJobRequest::default());
 
     if options.list {
         forge.list()?;
@@ -182,14 +182,21 @@ pub struct Forge<'cfg, F> {
     options: &'cfg Options,
     tests: ForgeConfig<'cfg>,
     factory: F,
+    global_job_request: EmitJobRequest,
 }
 
 impl<'cfg, F: Factory> Forge<'cfg, F> {
-    pub fn new(options: &'cfg Options, tests: ForgeConfig<'cfg>, factory: F) -> Self {
+    pub fn new(
+        options: &'cfg Options,
+        tests: ForgeConfig<'cfg>,
+        factory: F,
+        global_job_request: EmitJobRequest,
+    ) -> Self {
         Self {
             options,
             tests,
             factory,
+            global_job_request,
         }
     }
 
@@ -275,8 +282,12 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
             }
 
             for test in self.filter_tests(self.tests.network_tests.iter()) {
-                let mut network_ctx =
-                    NetworkContext::new(CoreContext::from_rng(&mut rng), &mut *swarm, &mut report);
+                let mut network_ctx = NetworkContext::new(
+                    CoreContext::from_rng(&mut rng),
+                    &mut *swarm,
+                    &mut report,
+                    self.global_job_request.clone(),
+                );
                 let result = run_test(|| test.run(&mut network_ctx));
                 summary.handle_result(test.name().to_owned(), result)?;
             }

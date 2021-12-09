@@ -3,6 +3,7 @@
 
 use super::Test;
 use crate::{CoreContext, Result, Swarm, TestReport};
+use transaction_emitter::EmitJobRequest;
 
 /// The testing interface which defines a test written with full control over an existing network.
 /// Tests written against this interface will have access to both the Root account as well as the
@@ -16,14 +17,21 @@ pub struct NetworkContext<'t> {
     core: CoreContext,
     swarm: &'t mut dyn Swarm,
     pub report: &'t mut TestReport,
+    pub global_job: EmitJobRequest,
 }
 
 impl<'t> NetworkContext<'t> {
-    pub fn new(core: CoreContext, swarm: &'t mut dyn Swarm, report: &'t mut TestReport) -> Self {
+    pub fn new(
+        core: CoreContext,
+        swarm: &'t mut dyn Swarm,
+        report: &'t mut TestReport,
+        global_job: EmitJobRequest,
+    ) -> Self {
         Self {
             core,
             swarm,
             report,
+            global_job,
         }
     }
 
