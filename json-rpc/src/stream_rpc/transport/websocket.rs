@@ -20,12 +20,11 @@ use crate::stream_rpc::{
     subscription_types::SubscriptionConfig,
     transport::util::{get_remote_addr, Transport},
 };
-use diem_types::protocol_spec::DpnProto;
 
 pub fn get_websocket_routes(
     config: &StreamConfig,
     content_length_limit: u64,
-    diem_db: Arc<dyn MoveDbReader<DpnProto>>,
+    diem_db: Arc<dyn MoveDbReader>,
     connection_manager: Option<ConnectionManager>,
 ) -> (BoxedFilter<(impl Reply,)>, ConnectionManager) {
     let sub_config = Arc::new(SubscriptionConfig {

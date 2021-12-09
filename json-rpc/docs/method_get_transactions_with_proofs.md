@@ -29,7 +29,7 @@ The proofs:
 | Name                                   | Type   | Description                                                                                                                                              |
 |----------------------------------------|--------|----------------------------------------------------------------------------------------------------------------------------------------------------------|
 | ledger_info_to_transaction_infos_proof | string | An hex encoded string of raw bytes of a `Vec<AccumulatorRangeProof<TransactionAccumulatorHasher>>` that contains the proofs of the returned transactions |
-| transaction_infos                      | string | An hex encoded string of raw bytes of a `Vec<TransactionInfo>` that corresponds to returned transcations                                                 |
+| transaction_infos                      | string | An hex encoded string of raw bytes of a `Vec` that corresponds to returned transcations                                                 |
 
 Note:
  - all raw bytes encoded strings are containing BCS encoded data.

@@ -10,8 +10,7 @@ use crate::{
 use diem_logger::prelude::*;
 use diem_types::{
     contract_event::ContractEvent, ledger_info::LedgerInfoWithSignatures,
-    move_resource::MoveStorage, protocol_spec::DpnProto,
-    transaction::default_protocol::TransactionListWithProof,
+    move_resource::MoveStorage, transaction::TransactionListWithProof,
 };
 use event_notifications::{EventNotificationSender, EventSubscriptionService};
 use executor_types::{ChunkExecutorTrait, ExecutedTrees};
@@ -54,14 +53,14 @@ pub trait ExecutorProxyTrait: Send {
 }
 
 pub(crate) struct ExecutorProxy {
-    storage: Arc<dyn DbReader<DpnProto>>,
+    storage: Arc<dyn DbReader>,
     executor: Box<dyn ChunkExecutorTrait>,
     event_subscription_service: EventSubscriptionService,
 }
 
 impl ExecutorProxy {
     pub(crate) fn new(
-        storage: Arc<dyn DbReader<DpnProto>>,
+        storage: Arc<dyn DbReader>,
         executor: Box<dyn ChunkExecutorTrait>,
         event_subscription_service: EventSubscriptionService,
     ) -> Self {
@@ -573,7 +572,7 @@ mod tests {
 
         // Initialize the configs and verify that the node doesn't panic
         // (even though it can't find the TestOnChainConfig on the blockchain!).
-        let storage: Arc<dyn DbReader<DpnProto>> = db.clone();
+        let storage: Arc<dyn DbReader> = db.clone();
         let synced_version = (&*storage).fetch_synced_version().unwrap();
         event_subscription_service
             .notify_initial_configs(synced_version)
@@ -598,7 +597,7 @@ mod tests {
         let allowlist_txn = create_new_update_consensus_config_transaction(0);
 
         // Execute and commit the reconfig block
-        let mut block_executor = Box::new(BlockExecutor::<DpnProto, DiemVM>::new(db_rw));
+        let mut block_executor = Box::new(BlockExecutor::<DiemVM>::new(db_rw));
         let block = vec![dummy_txn, allowlist_txn];
         let (reconfig_events, _) = execute_and_commit_block(&mut block_executor, block, 1);
 
@@ -622,7 +621,7 @@ mod tests {
         verify_initial_config: bool,
     ) -> (
         Vec<TestValidator>,
-        Box<BlockExecutor<DpnProto, DiemVM>>,
+        Box<BlockExecutor<DiemVM>>,
         ExecutorProxy,
         ReconfigNotificationListener,
     ) {
@@ -646,7 +645,7 @@ mod tests {
         let mut reconfig_receiver = event_subscription_service
             .subscribe_to_reconfigurations()
             .unwrap();
-        let storage: Arc<dyn DbReader<DpnProto>> = db.clone();
+        let storage: Arc<dyn DbReader> = db.clone();
         let synced_version = (&*storage).fetch_synced_version().unwrap();
         assert_ok!(event_subscription_service.notify_initial_configs(synced_version));
 
@@ -662,7 +661,7 @@ mod tests {
         }
 
         // Create the executors
-        let block_executor = Box::new(BlockExecutor::<DpnProto, DiemVM>::new(db_rw.clone()));
+        let block_executor = Box::new(BlockExecutor::<DiemVM>::new(db_rw.clone()));
         let chunk_executor = Box::new(ChunkExecutor::<DiemVM>::new(db_rw).unwrap());
         let executor_proxy = ExecutorProxy::new(db, chunk_executor, event_subscription_service);
 
@@ -769,7 +768,7 @@ mod tests {
 
     /// Executes and commits a given block that will cause a reconfiguration event.
     fn execute_and_commit_block(
-        block_executor: &mut Box<BlockExecutor<DpnProto, DiemVM>>,
+        block_executor: &mut Box<BlockExecutor<DiemVM>>,
         block: Vec<Transaction>,
         block_id: u8,
     ) -> (Vec<ContractEvent>, LedgerInfoWithSignatures) {

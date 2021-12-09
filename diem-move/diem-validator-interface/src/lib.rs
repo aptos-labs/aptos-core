@@ -14,7 +14,7 @@ use diem_types::{
     account_address::AccountAddress,
     account_config,
     account_state::AccountState,
-    contract_event::default_protocol::EventWithProof,
+    contract_event::EventWithProof,
     event::EventKey,
     on_chain_config::ValidatorSet,
     transaction::{Transaction, Version},

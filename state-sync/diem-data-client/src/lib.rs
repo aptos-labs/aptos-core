@@ -7,10 +7,7 @@ use async_trait::async_trait;
 use diem_types::{
     account_state_blob::AccountStatesChunkWithProof,
     ledger_info::LedgerInfoWithSignatures,
-    transaction::{
-        default_protocol::{TransactionListWithProof, TransactionOutputListWithProof},
-        Version,
-    },
+    transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
 };
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};

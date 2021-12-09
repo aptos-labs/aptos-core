@@ -18,7 +18,6 @@ use diem_types::{
     account_config::AccountSequenceInfo,
     mempool_status::MempoolStatusCode,
     on_chain_config::ON_CHAIN_CONFIG_REGISTRY,
-    protocol_spec::DpnProto,
     transaction::{GovernanceRole, SignedTransaction},
 };
 use event_notifications::EventSubscriptionService;
@@ -74,7 +73,7 @@ impl MockSharedMempool {
     /// Creates a mock of a running instance of shared mempool inside a tokio runtime;
     /// Holds a runtime handle instead.
     pub fn new_in_runtime<V: TransactionValidation + 'static>(
-        db: &DbReaderWriter<DpnProto>,
+        db: &DbReaderWriter,
         validator: V,
     ) -> Self {
         let handle = Handle::current();
@@ -92,7 +91,7 @@ impl MockSharedMempool {
 
     pub fn start<V: TransactionValidation + 'static>(
         handle: &Handle,
-        db: &DbReaderWriter<DpnProto>,
+        db: &DbReaderWriter,
         validator: V,
     ) -> (
         MempoolClientSender,

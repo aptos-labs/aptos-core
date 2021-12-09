@@ -5,7 +5,7 @@ use crate::{methods, runtime, tests};
 use diem_config::config;
 use diem_mempool::MempoolClientRequest;
 use diem_proptest_helpers::ValueGenerator;
-use diem_types::account_state_blob::default_protocol::AccountStateWithProof;
+use diem_types::account_state_blob::AccountStateWithProof;
 use futures::{channel::mpsc::channel, StreamExt};
 use std::sync::Arc;
 use warp::reply::Reply;

@@ -7,16 +7,15 @@ use diem_config::config::RocksdbConfig;
 use diem_types::{
     account_address::AccountAddress,
     account_state::AccountState,
-    contract_event::default_protocol::EventWithProof,
+    contract_event::EventWithProof,
     event::EventKey,
-    protocol_spec::DpnProto,
     transaction::{Transaction, Version},
 };
 use diemdb::DiemDB;
 use std::{convert::TryFrom, path::Path, sync::Arc};
 use storage_interface::{DbReader, Order};
 
-pub struct DBDebuggerInterface(Arc<dyn DbReader<DpnProto>>);
+pub struct DBDebuggerInterface(Arc<dyn DbReader>);
 
 impl DBDebuggerInterface {
     pub fn open<P: AsRef<Path> + Clone>(db_root_path: P) -> Result<Self> {

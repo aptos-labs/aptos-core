@@ -12,7 +12,6 @@ use diem_types::{
     account_state_blob::AccountStateBlob,
     ledger_info::LedgerInfoWithSignatures,
     proof::SparseMerkleProof,
-    protocol_spec::DpnProto,
     transaction::{TransactionToCommit, Version},
 };
 use serde::de::DeserializeOwned;
@@ -88,7 +87,7 @@ impl StorageClient {
     }
 }
 
-impl DbReader<DpnProto> for StorageClient {
+impl DbReader for StorageClient {
     fn get_account_state_with_proof_by_version(
         &self,
         address: AccountAddress,
@@ -107,7 +106,7 @@ impl DbReader<DpnProto> for StorageClient {
     }
 }
 
-impl DbWriter<DpnProto> for StorageClient {
+impl DbWriter for StorageClient {
     fn save_transactions(
         &self,
         txns_to_commit: &[TransactionToCommit],

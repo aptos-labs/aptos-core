@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::errors::JsonRpcError;
-use diem_types::protocol_spec::DpnProto;
+
 use std::sync::Arc;
 use storage_interface::MoveDbReader;
 use tokio::task::JoinHandle;
@@ -19,7 +19,7 @@ pub struct CallableStreamMethod(pub StreamMethodRequest);
 impl CallableStreamMethod {
     pub fn call_method(
         self,
-        db: Arc<dyn MoveDbReader<DpnProto>>,
+        db: Arc<dyn MoveDbReader>,
         client: ClientConnection,
         jsonrpc_id: Id,
     ) -> Result<JoinHandle<()>, JsonRpcError> {

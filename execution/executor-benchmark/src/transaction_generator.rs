@@ -16,7 +16,6 @@ use diem_types::{
         XUS_NAME,
     },
     chain_id::ChainId,
-    protocol_spec::DpnProto,
     transaction::{
         authenticator::AuthenticationKey, RawTransaction, Script, SignedTransaction, Transaction,
         Version,
@@ -314,7 +313,7 @@ impl TransactionGenerator {
     }
 
     /// Verifies the sequence numbers in storage match what we have locally.
-    pub fn verify_sequence_number(&self, db: &dyn DbReader<DpnProto>) {
+    pub fn verify_sequence_number(&self, db: &dyn DbReader) {
         for account in &self.accounts_cache {
             let address = account.address;
             let blob = db

@@ -2,10 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use diem_crypto::hash::HashValue;
-use diem_types::{
-    protocol_spec::DpnProto,
-    transaction::{Transaction, Version},
-};
+use diem_types::transaction::{Transaction, Version};
 use diem_vm::DiemVM;
 use executor::block_executor::BlockExecutor;
 use executor_types::BlockExecutorTrait;
@@ -15,7 +12,7 @@ use std::{
 };
 
 pub struct TransactionExecutor {
-    executor: Arc<BlockExecutor<DpnProto, DiemVM>>,
+    executor: Arc<BlockExecutor<DiemVM>>,
     parent_block_id: HashValue,
     start_time: Instant,
     version: Version,
@@ -25,7 +22,7 @@ pub struct TransactionExecutor {
 
 impl TransactionExecutor {
     pub fn new(
-        executor: Arc<BlockExecutor<DpnProto, DiemVM>>,
+        executor: Arc<BlockExecutor<DiemVM>>,
         parent_block_id: HashValue,
         version: Version,
         commit_sender: Option<

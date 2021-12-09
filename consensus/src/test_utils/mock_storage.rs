@@ -18,7 +18,6 @@ use diem_types::{
     epoch_change::EpochChangeProof,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::ValidatorSet,
-    protocol_spec::DpnProto,
 };
 use std::{
     collections::{BTreeMap, HashMap},
@@ -245,7 +244,7 @@ impl PersistentLivenessStorage for MockStorage {
         Ok(EpochChangeProof::new(vec![lis], false))
     }
 
-    fn diem_db(&self) -> Arc<dyn DbReader<DpnProto>> {
+    fn diem_db(&self) -> Arc<dyn DbReader> {
         unimplemented!()
     }
 }
@@ -317,7 +316,7 @@ impl PersistentLivenessStorage for EmptyStorage {
         Ok(EpochChangeProof::new(vec![], false))
     }
 
-    fn diem_db(&self) -> Arc<dyn DbReader<DpnProto>> {
+    fn diem_db(&self) -> Arc<dyn DbReader> {
         unimplemented!()
     }
 }

@@ -25,11 +25,9 @@ use diem_types::{
     ledger_info::LedgerInfoWithSignatures,
     proof::{
         definition::LeafCount, position::Position, AccumulatorConsistencyProof,
-        TransactionAccumulatorProof, TransactionAccumulatorRangeProof,
+        TransactionAccumulatorProof, TransactionAccumulatorRangeProof, TransactionInfoWithProof,
     },
-    transaction::{
-        default_protocol::TransactionInfoWithProof, TransactionInfo, TransactionInfoTrait, Version,
-    },
+    transaction::{TransactionInfo, Version},
 };
 use itertools::Itertools;
 use schemadb::{ReadOptions, SchemaIterator, DB};

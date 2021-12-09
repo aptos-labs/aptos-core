@@ -12,7 +12,7 @@ mod unit_tests;
 
 use crate::{
     ledger_info::LedgerInfo,
-    transaction::{TransactionInfoTrait, Version},
+    transaction::{TransactionInfo, Version},
 };
 use anyhow::{ensure, Result};
 use diem_crypto::{
@@ -39,10 +39,10 @@ pub use self::definition::{
 pub use self::definition::{TestAccumulatorProof, TestAccumulatorRangeProof};
 
 /// Verifies that a given `transaction_info` exists in the ledger using provided proof.
-fn verify_transaction_info<T: TransactionInfoTrait>(
+fn verify_transaction_info(
     ledger_info: &LedgerInfo,
     transaction_version: Version,
-    transaction_info: &T,
+    transaction_info: &TransactionInfo,
     ledger_info_to_transaction_info_proof: &TransactionAccumulatorProof,
 ) -> Result<()> {
     ensure!(
@@ -124,14 +124,4 @@ impl CryptoHash for SparseMerkleLeafNode {
         state.update(self.value_hash.as_ref());
         state.finish()
     }
-}
-
-pub mod default_protocol {
-    pub use super::definition::default_protocol::{
-        AccountStateProof, AccumulatorConsistencyProof, AccumulatorExtensionProof,
-        AccumulatorProof, AccumulatorRangeProof, EventAccumulatorProof, EventProof,
-        SparseMerkleProof, SparseMerkleRangeProof, TransactionAccumulatorProof,
-        TransactionAccumulatorRangeProof, TransactionAccumulatorSummary,
-        TransactionInfoListWithProof, TransactionInfoWithProof,
-    };
 }

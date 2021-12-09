@@ -19,10 +19,7 @@ use diem_types::{
     account_state_blob::AccountStatesChunkWithProof,
     epoch_change::EpochChangeProof,
     ledger_info::LedgerInfoWithSignatures,
-    transaction::{
-        default_protocol::{TransactionListWithProof, TransactionOutputListWithProof},
-        Version,
-    },
+    transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
 };
 use futures::StreamExt;
 use network::{

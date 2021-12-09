@@ -17,8 +17,7 @@ use diem_types::{
     contract_event::ContractEvent,
     transaction::{
         authenticator::{AccountAuthenticator, TransactionAuthenticator},
-        default_protocol::TransactionWithProof,
-        Script, SignedTransaction, TransactionInfoTrait,
+        Script, SignedTransaction, TransactionWithProof,
     },
 };
 
@@ -31,34 +30,32 @@ use std::{
 };
 
 #[derive(Clone, Debug)]
-pub enum TransactionData<T: TransactionInfoTrait> {
-    OnChain(TransactionOnChainData<T>),
+pub enum TransactionData {
+    OnChain(TransactionOnChainData),
     Pending(Box<SignedTransaction>),
 }
 
-impl<T: TransactionInfoTrait> From<TransactionOnChainData<T>> for TransactionData<T> {
-    fn from(txn: TransactionOnChainData<T>) -> Self {
+impl From<TransactionOnChainData> for TransactionData {
+    fn from(txn: TransactionOnChainData) -> Self {
         Self::OnChain(txn)
     }
 }
 
-impl<T: TransactionInfoTrait> From<SignedTransaction> for TransactionData<T> {
+impl From<SignedTransaction> for TransactionData {
     fn from(txn: SignedTransaction) -> Self {
         Self::Pending(Box::new(txn))
     }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct TransactionOnChainData<T: TransactionInfoTrait> {
+pub struct TransactionOnChainData {
     pub version: u64,
     pub transaction: diem_types::transaction::Transaction,
-    pub info: T,
+    pub info: diem_types::transaction::TransactionInfo,
     pub events: Vec<ContractEvent>,
 }
 
-impl From<TransactionWithProof>
-    for TransactionOnChainData<diem_types::transaction::TransactionInfo>
-{
+impl From<TransactionWithProof> for TransactionOnChainData {
     fn from(txn: TransactionWithProof) -> Self {
         Self {
             version: txn.version,
@@ -69,19 +66,19 @@ impl From<TransactionWithProof>
     }
 }
 
-impl<T: TransactionInfoTrait>
+impl
     From<(
         u64,
         diem_types::transaction::Transaction,
-        T,
+        diem_types::transaction::TransactionInfo,
         Vec<ContractEvent>,
-    )> for TransactionOnChainData<T>
+    )> for TransactionOnChainData
 {
     fn from(
         (version, transaction, info, events): (
             u64,
             diem_types::transaction::Transaction,
-            T,
+            diem_types::transaction::TransactionInfo,
             Vec<ContractEvent>,
         ),
     ) -> Self {

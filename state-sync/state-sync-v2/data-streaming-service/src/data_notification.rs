@@ -6,10 +6,7 @@ use diem_data_client::{Response, ResponsePayload};
 use diem_types::{
     account_state_blob::AccountStatesChunkWithProof,
     ledger_info::LedgerInfoWithSignatures,
-    transaction::{
-        default_protocol::{TransactionListWithProof, TransactionOutputListWithProof},
-        Version,
-    },
+    transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
 };
 use std::fmt::{Debug, Formatter};
 

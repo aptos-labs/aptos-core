@@ -12,20 +12,20 @@ use futures::StreamExt;
 use std::{collections::HashMap, sync::Arc};
 
 use diem_id_generator::{IdGenerator, U64IdGenerator};
-use diem_types::protocol_spec::DpnProto;
+
 use storage_interface::MoveDbReader;
 
 #[derive(Clone)]
 pub struct ConnectionManager {
     pub clients: Arc<RwLock<HashMap<u64, ClientConnection>>>,
-    pub diem_db: Arc<dyn MoveDbReader<DpnProto>>,
+    pub diem_db: Arc<dyn MoveDbReader>,
     pub config: Arc<SubscriptionConfig>,
     /// Our unique user id counter.
     user_id_generator: Arc<U64IdGenerator>,
 }
 
 impl ConnectionManager {
-    pub fn new(diem_db: Arc<dyn MoveDbReader<DpnProto>>, config: Arc<SubscriptionConfig>) -> Self {
+    pub fn new(diem_db: Arc<dyn MoveDbReader>, config: Arc<SubscriptionConfig>) -> Self {
         Self {
             clients: Arc::new(RwLock::new(HashMap::new())),
             diem_db,
@@ -34,7 +34,7 @@ impl ConnectionManager {
         }
     }
 
-    fn get_db(&self) -> Arc<dyn MoveDbReader<DpnProto>> {
+    fn get_db(&self) -> Arc<dyn MoveDbReader> {
         self.diem_db.clone()
     }
 

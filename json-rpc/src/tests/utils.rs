@@ -11,27 +11,21 @@ use diem_mempool::{MempoolClientSender, MempoolEventsReceiver};
 use diem_types::{
     account_address::AccountAddress,
     account_state::AccountState,
-    account_state_blob::{default_protocol::AccountStateWithProof, AccountStateBlob},
+    account_state_blob::{AccountStateBlob, AccountStateWithProof},
     block_info::BlockInfo,
     chain_id::ChainId,
-    contract_event::{
-        default_protocol::{EventByVersionWithProof, EventWithProof},
-        ContractEvent,
-    },
+    contract_event::{ContractEvent, EventByVersionWithProof, EventWithProof},
     epoch_change::EpochChangeProof,
     event::EventKey,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    proof::default_protocol::{
+    proof::{
         AccumulatorConsistencyProof, AccumulatorRangeProof, SparseMerkleProof,
         TransactionAccumulatorProof, TransactionInfoListWithProof, TransactionInfoWithProof,
     },
-    protocol_spec::DpnProto,
     state_proof::StateProof,
     transaction::{
-        default_protocol::{
-            AccountTransactionsWithProof, TransactionListWithProof, TransactionWithProof,
-        },
-        Transaction, TransactionInfo, TransactionInfoTrait, Version,
+        AccountTransactionsWithProof, Transaction, TransactionInfo, TransactionListWithProof,
+        TransactionWithProof, Version,
     },
     vm_status::KeptVMStatus,
 };
@@ -64,7 +58,7 @@ use tokio::runtime::Runtime;
 #[allow(unused)]
 pub fn test_bootstrap(
     address: SocketAddr,
-    diem_db: Arc<dyn MoveDbReader<DpnProto>>,
+    diem_db: Arc<dyn MoveDbReader>,
     mp_sender: MempoolClientSender,
 ) -> Runtime {
     let stream_rpc = StreamConfig {
@@ -98,7 +92,7 @@ pub struct MockDiemDB {
     pub timestamps: Vec<u64>,
 }
 
-impl DbReader<DpnProto> for MockDiemDB {
+impl DbReader for MockDiemDB {
     fn get_latest_account_state(
         &self,
         address: AccountAddress,
@@ -399,7 +393,7 @@ impl ResourceResolver for MockDiemDB {
     }
 }
 
-impl MoveDbReader<DpnProto> for MockDiemDB {}
+impl MoveDbReader for MockDiemDB {}
 
 // returns MockDiemDB for unit-testing
 #[allow(unused)]

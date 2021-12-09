@@ -6,7 +6,6 @@ use diem_logger::prelude::*;
 use diem_types::{
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    protocol_spec::DpnProto,
     transaction::Version,
 };
 use diem_vm::DiemVM;
@@ -45,14 +44,14 @@ pub(crate) fn gen_li_with_sigs(
 }
 
 pub struct TransactionCommitter {
-    executor: Arc<BlockExecutor<DpnProto, DiemVM>>,
+    executor: Arc<BlockExecutor<DiemVM>>,
     version: Version,
     block_receiver: mpsc::Receiver<(HashValue, HashValue, Instant, Instant, Duration, usize)>,
 }
 
 impl TransactionCommitter {
     pub fn new(
-        executor: Arc<BlockExecutor<DpnProto, DiemVM>>,
+        executor: Arc<BlockExecutor<DiemVM>>,
         version: Version,
         block_receiver: mpsc::Receiver<(HashValue, HashValue, Instant, Instant, Duration, usize)>,
     ) -> Self {

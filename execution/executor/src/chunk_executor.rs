@@ -22,17 +22,15 @@ use diem_state_view::StateViewId;
 use diem_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
-    protocol_spec::DpnProto,
     transaction::{
-        default_protocol::{TransactionListWithProof, TransactionOutputListWithProof},
-        Transaction, TransactionInfo,
+        Transaction, TransactionInfo, TransactionListWithProof, TransactionOutputListWithProof,
     },
 };
 use diem_vm::VMExecutor;
 use executor_types::{ChunkExecutorTrait, ExecutedChunk, ExecutedTrees, TransactionReplayer};
 use fail::fail_point;
 use std::{marker::PhantomData, sync::Arc};
-use storage_interface::{default_protocol::DbReaderWriter, state_view::VerifiedStateView};
+use storage_interface::{state_view::VerifiedStateView, DbReaderWriter};
 
 pub struct ChunkExecutor<V> {
     db: DbReaderWriter,
@@ -68,7 +66,7 @@ impl<V> ChunkExecutor<V> {
         &self,
         latest_view: &ExecutedTrees,
         persisted_view: &ExecutedTrees,
-    ) -> VerifiedStateView<DpnProto> {
+    ) -> VerifiedStateView {
         latest_view.state_view(
             persisted_view,
             StateViewId::ChunkExecution {

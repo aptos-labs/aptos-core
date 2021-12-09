@@ -8,7 +8,6 @@ use diem_types::{
     account_config::{AccountResource, AccountSequenceInfo},
     account_state::AccountState,
     on_chain_config::{DiemVersion, OnChainConfigPayload, VMConfig, VMPublishingOption},
-    protocol_spec::DpnProto,
     transaction::{SignedTransaction, VMValidatorResult},
 };
 use diem_vm::DiemVM;
@@ -34,7 +33,7 @@ pub trait TransactionValidation: Send + Sync + Clone {
     fn notify_commit(&mut self);
 }
 
-fn latest_state_view(db_reader: &Arc<dyn DbReader<DpnProto>>) -> VerifiedStateView<DpnProto> {
+fn latest_state_view(db_reader: &Arc<dyn DbReader>) -> VerifiedStateView {
     let (version, state_root) = db_reader.get_latest_state_root().expect("Should not fail.");
 
     VerifiedStateView::new(
@@ -49,8 +48,8 @@ fn latest_state_view(db_reader: &Arc<dyn DbReader<DpnProto>>) -> VerifiedStateVi
 }
 
 pub struct VMValidator {
-    db_reader: Arc<dyn DbReader<DpnProto>>,
-    cached_state_view: VerifiedStateView<DpnProto>,
+    db_reader: Arc<dyn DbReader>,
+    cached_state_view: VerifiedStateView,
     vm: DiemVM,
 }
 
@@ -61,7 +60,7 @@ impl Clone for VMValidator {
 }
 
 impl VMValidator {
-    pub fn new(db_reader: Arc<dyn DbReader<DpnProto>>) -> Self {
+    pub fn new(db_reader: Arc<dyn DbReader>) -> Self {
         let cached_state_view = latest_state_view(&db_reader);
 
         let vm = DiemVM::new_for_validation(&cached_state_view);
@@ -104,7 +103,7 @@ impl TransactionValidation for VMValidator {
 
 /// returns account's sequence number from storage
 pub fn get_account_sequence_number(
-    storage: &dyn DbReader<DpnProto>,
+    storage: &dyn DbReader,
     address: AccountAddress,
 ) -> Result<AccountSequenceInfo> {
     fail_point!("vm_validator::get_account_sequence_number", |_| {

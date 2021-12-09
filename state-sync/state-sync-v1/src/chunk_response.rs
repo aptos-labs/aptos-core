@@ -3,7 +3,7 @@
 
 use diem_types::{
     ledger_info::LedgerInfoWithSignatures,
-    transaction::{default_protocol::TransactionListWithProof, Version},
+    transaction::{TransactionListWithProof, Version},
 };
 use serde::{Deserialize, Serialize};
 use std::fmt;

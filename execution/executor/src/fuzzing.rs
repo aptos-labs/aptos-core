@@ -7,22 +7,20 @@ use diem_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
 use diem_state_view::StateView;
 use diem_types::{
     ledger_info::LedgerInfoWithSignatures,
-    protocol_spec::DpnProto,
     transaction::{
-        default_protocol::TransactionListWithProof, Transaction, TransactionOutput,
-        TransactionToCommit, Version,
+        Transaction, TransactionListWithProof, TransactionOutput, TransactionToCommit, Version,
     },
     vm_status::VMStatus,
 };
 use diem_vm::VMExecutor;
 use executor_types::{BlockExecutorTrait, ChunkExecutorTrait};
-use storage_interface::{default_protocol::DbReaderWriter, DbReader, DbWriter, StartupInfo};
+use storage_interface::{DbReader, DbReaderWriter, DbWriter, StartupInfo};
 
-fn create_test_executor() -> BlockExecutor<DpnProto, FakeVM> {
+fn create_test_executor() -> BlockExecutor<FakeVM> {
     // setup fake db
     let fake_db = FakeDb {};
     let db_reader_writer = DbReaderWriter::new(fake_db);
-    BlockExecutor::<DpnProto, FakeVM>::new(db_reader_writer)
+    BlockExecutor::<FakeVM>::new(db_reader_writer)
 }
 
 pub fn fuzz_execute_and_commit_chunk(
@@ -67,7 +65,7 @@ impl VMExecutor for FakeVM {
 /// A fake database implementing DbReader and DbWriter
 pub struct FakeDb;
 
-impl DbReader<DpnProto> for FakeDb {
+impl DbReader for FakeDb {
     fn get_latest_version(&self) -> Result<Version> {
         Ok(self.get_latest_ledger_info()?.ledger_info().version())
     }
@@ -83,7 +81,7 @@ impl DbReader<DpnProto> for FakeDb {
     }
 }
 
-impl DbWriter<DpnProto> for FakeDb {
+impl DbWriter for FakeDb {
     fn save_transactions(
         &self,
         _txns_to_commit: &[TransactionToCommit],

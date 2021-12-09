@@ -12,7 +12,7 @@ use crate::{
 };
 use diem_config::{config::NodeConfig, network_id::NetworkId};
 use diem_infallible::{Mutex, RwLock};
-use diem_types::protocol_spec::DpnProto;
+
 use event_notifications::ReconfigNotificationListener;
 use futures::channel::mpsc::{self, Receiver, UnboundedSender};
 use mempool_notifications::MempoolNotificationListener;
@@ -38,7 +38,7 @@ pub(crate) fn start_shared_mempool<V>(
     consensus_requests: mpsc::Receiver<ConsensusRequest>,
     mempool_listener: MempoolNotificationListener,
     mempool_reconfig_events: ReconfigNotificationListener,
-    db: Arc<dyn DbReader<DpnProto>>,
+    db: Arc<dyn DbReader>,
     validator: Arc<RwLock<V>>,
     subscribers: Vec<UnboundedSender<SharedMempoolNotification>>,
     peer_metadata_storage: Arc<PeerMetadataStorage>,
@@ -86,7 +86,7 @@ pub(crate) fn start_shared_mempool<V>(
 
 pub fn bootstrap(
     config: &NodeConfig,
-    db: Arc<dyn DbReader<DpnProto>>,
+    db: Arc<dyn DbReader>,
     // The first element in the tuple is the ID of the network that this network is a handle to.
     // See `NodeConfig::is_upstream_peer` for the definition of network ID.
     mempool_network_handles: Vec<(NetworkId, MempoolNetworkSender, MempoolNetworkEvents)>,

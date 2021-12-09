@@ -62,13 +62,8 @@ use diem_logger::prelude::*;
 use diem_types::{
     account_address::AccountAddress,
     account_state::AccountState,
-    account_state_blob::{
-        default_protocol::AccountStateWithProof, AccountStateBlob, AccountStatesChunkWithProof,
-    },
-    contract_event::{
-        default_protocol::{EventByVersionWithProof, EventWithProof},
-        ContractEvent,
-    },
+    account_state_blob::{AccountStateBlob, AccountStateWithProof, AccountStatesChunkWithProof},
+    contract_event::{ContractEvent, EventByVersionWithProof, EventWithProof},
     epoch_change::EpochChangeProof,
     event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
@@ -76,14 +71,10 @@ use diem_types::{
         AccountStateProof, AccumulatorConsistencyProof, EventProof, SparseMerkleProof,
         TransactionInfoListWithProof,
     },
-    protocol_spec::DpnProto,
     state_proof::StateProof,
     transaction::{
-        default_protocol::{
-            AccountTransactionsWithProof, TransactionListWithProof, TransactionOutputListWithProof,
-            TransactionWithProof,
-        },
-        TransactionInfo, TransactionInfoTrait, TransactionOutput, TransactionToCommit, Version,
+        AccountTransactionsWithProof, TransactionInfo, TransactionListWithProof, TransactionOutput,
+        TransactionOutputListWithProof, TransactionToCommit, TransactionWithProof, Version,
         PRE_GENESIS_VERSION,
     },
 };
@@ -652,7 +643,7 @@ impl DiemDB {
     }
 }
 
-impl DbReader<DpnProto> for DiemDB {
+impl DbReader for DiemDB {
     fn get_epoch_ending_ledger_infos(
         &self,
         start_epoch: u64,
@@ -1246,9 +1237,9 @@ impl ResourceResolver for DiemDB {
     }
 }
 
-impl MoveDbReader<DpnProto> for DiemDB {}
+impl MoveDbReader for DiemDB {}
 
-impl DbWriter<DpnProto> for DiemDB {
+impl DbWriter for DiemDB {
     /// `first_version` is the version of the first transaction in `txns_to_commit`.
     /// When `ledger_info_with_sigs` is provided, verify that the transaction accumulator root hash
     /// it carries is generated after the `txns_to_commit` are applied.

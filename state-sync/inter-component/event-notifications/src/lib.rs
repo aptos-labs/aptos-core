@@ -26,7 +26,7 @@ use std::{
     sync::Arc,
     task::{Context, Poll},
 };
-use storage_interface::default_protocol::DbReaderWriter;
+use storage_interface::DbReaderWriter;
 use thiserror::Error;
 
 #[cfg(test)]

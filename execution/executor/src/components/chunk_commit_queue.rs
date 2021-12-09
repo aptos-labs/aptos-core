@@ -4,7 +4,7 @@
 #![forbid(unsafe_code)]
 
 use anyhow::{anyhow, Result};
-use diem_types::protocol_spec::DpnProto;
+
 use executor_types::{ExecutedChunk, ExecutedTrees};
 use std::{collections::VecDeque, sync::Arc};
 use storage_interface::DbReader;
@@ -15,7 +15,7 @@ pub struct ChunkCommitQueue {
 }
 
 impl ChunkCommitQueue {
-    pub fn new_from_db(db: &Arc<dyn DbReader<DpnProto>>) -> Result<Self> {
+    pub fn new_from_db(db: &Arc<dyn DbReader>) -> Result<Self> {
         let persisted_view = db
             .get_startup_info()?
             .ok_or_else(|| anyhow!("DB not bootstrapped."))?

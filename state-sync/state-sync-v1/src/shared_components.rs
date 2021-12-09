@@ -91,7 +91,6 @@ pub(crate) mod test_utils {
     use diem_types::{
         move_resource::MoveStorage,
         on_chain_config::ON_CHAIN_CONFIG_REGISTRY,
-        protocol_spec::DpnProto,
         transaction::{Transaction, WriteSetPayload},
         waypoint::Waypoint,
     };
@@ -165,7 +164,7 @@ pub(crate) mod test_utils {
         bootstrap_genesis::<DiemVM>(&db_rw, &genesis_txn).unwrap();
 
         // Create the event subscription service and notify initial configs
-        let storage: Arc<dyn DbReader<DpnProto>> = db.clone();
+        let storage: Arc<dyn DbReader> = db.clone();
         let synced_version = (&*storage).fetch_synced_version().unwrap();
         let mut event_subscription_service = EventSubscriptionService::new(
             ON_CHAIN_CONFIG_REGISTRY,

@@ -10,7 +10,6 @@ use diem_logger::trace;
 use diem_state_view::StateView;
 use diem_types::{
     proof::accumulator::InMemoryAccumulator,
-    protocol_spec::DpnProto,
     transaction::{Transaction, TransactionOutput},
 };
 use diem_vm::VMExecutor;
@@ -33,7 +32,7 @@ pub struct ChunkOutput {
 impl ChunkOutput {
     pub fn by_transaction_execution<V: VMExecutor>(
         transactions: Vec<Transaction>,
-        state_view: VerifiedStateView<DpnProto>,
+        state_view: VerifiedStateView,
     ) -> Result<Self> {
         let transaction_outputs = V::execute_block(transactions.clone(), &state_view)?;
 
@@ -46,7 +45,7 @@ impl ChunkOutput {
 
     pub fn by_transaction_output(
         transactions_and_outputs: Vec<(Transaction, TransactionOutput)>,
-        state_view: VerifiedStateView<DpnProto>,
+        state_view: VerifiedStateView,
     ) -> Result<Self> {
         let (transactions, transaction_outputs): (Vec<_>, Vec<_>) =
             transactions_and_outputs.into_iter().unzip();

@@ -26,10 +26,9 @@ use diem_types::{
     ledger_info::LedgerInfoWithSignatures,
     nibble::nibble_path::NibblePath,
     proof::{accumulator::InMemoryAccumulator, AccumulatorExtensionProof},
-    protocol_spec::DpnProto,
     transaction::{
-        default_protocol::{TransactionListWithProof, TransactionOutputListWithProof},
-        Transaction, TransactionInfo, TransactionStatus, Version,
+        Transaction, TransactionInfo, TransactionListWithProof, TransactionOutputListWithProof,
+        TransactionStatus, Version,
     },
     write_set::WriteSet,
 };
@@ -365,8 +364,8 @@ impl ExecutedTrees {
         &self,
         persisted_view: &Self,
         id: StateViewId,
-        reader: Arc<dyn DbReader<DpnProto>>,
-    ) -> VerifiedStateView<DpnProto> {
+        reader: Arc<dyn DbReader>,
+    ) -> VerifiedStateView {
         VerifiedStateView::new(
             id,
             reader.clone(),

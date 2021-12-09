@@ -12,7 +12,7 @@ use consensus_types::block::Block as ConsensusBlock;
 use diem_crypto::HashValue;
 use diem_infallible::Mutex;
 use diem_logger::{debug, info};
-use diem_types::{ledger_info::LedgerInfo, proof::definition::LeafCount, protocol_spec::DpnProto};
+use diem_types::{ledger_info::LedgerInfo, proof::definition::LeafCount};
 use executor_types::{Error, ExecutedChunk};
 use std::{
     collections::{hash_map::Entry, HashMap},
@@ -176,14 +176,14 @@ pub struct BlockTree {
 }
 
 impl BlockTree {
-    pub fn new(db: &Arc<dyn DbReader<DpnProto>>) -> Result<Self> {
+    pub fn new(db: &Arc<dyn DbReader>) -> Result<Self> {
         let block_lookup = Arc::new(BlockLookup::new());
         let root = Mutex::new(Self::root_from_db(&block_lookup, db)?);
 
         Ok(Self { root, block_lookup })
     }
 
-    pub fn reset(&self, db: &Arc<dyn DbReader<DpnProto>>) -> Result<()> {
+    pub fn reset(&self, db: &Arc<dyn DbReader>) -> Result<()> {
         *self.root.lock() = Self::root_from_db(&self.block_lookup, db)?;
         Ok(())
     }
@@ -204,10 +204,7 @@ impl BlockTree {
         self.block_lookup.multi_get(ids)
     }
 
-    fn root_from_db(
-        block_lookup: &Arc<BlockLookup>,
-        db: &Arc<dyn DbReader<DpnProto>>,
-    ) -> Result<Arc<Block>> {
+    fn root_from_db(block_lookup: &Arc<BlockLookup>, db: &Arc<dyn DbReader>) -> Result<Arc<Block>> {
         let startup_info = db
             .get_startup_info()?
             .ok_or_else(|| anyhow!("DB not bootstrapped."))?;

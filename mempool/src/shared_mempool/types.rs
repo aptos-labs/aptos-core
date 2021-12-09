@@ -14,8 +14,8 @@ use diem_config::{
 use diem_crypto::HashValue;
 use diem_infallible::{Mutex, RwLock};
 use diem_types::{
-    account_address::AccountAddress, mempool_status::MempoolStatus, protocol_spec::DpnProto,
-    transaction::SignedTransaction, vm_status::DiscardedVMStatus,
+    account_address::AccountAddress, mempool_status::MempoolStatus, transaction::SignedTransaction,
+    vm_status::DiscardedVMStatus,
 };
 use futures::{
     channel::{mpsc, mpsc::UnboundedSender, oneshot},
@@ -45,7 +45,7 @@ where
     pub mempool: Arc<Mutex<CoreMempool>>,
     pub config: MempoolConfig,
     pub(crate) network_interface: MempoolNetworkInterface,
-    pub db: Arc<dyn DbReader<DpnProto>>,
+    pub db: Arc<dyn DbReader>,
     pub validator: Arc<RwLock<V>>,
     pub subscribers: Vec<UnboundedSender<SharedMempoolNotification>>,
 }
@@ -55,7 +55,7 @@ impl<V: TransactionValidation + 'static> SharedMempool<V> {
         mempool: Arc<Mutex<CoreMempool>>,
         config: MempoolConfig,
         network_senders: HashMap<NetworkId, MempoolNetworkSender>,
-        db: Arc<dyn DbReader<DpnProto>>,
+        db: Arc<dyn DbReader>,
         validator: Arc<RwLock<V>>,
         subscribers: Vec<UnboundedSender<SharedMempoolNotification>>,
         role: RoleType,

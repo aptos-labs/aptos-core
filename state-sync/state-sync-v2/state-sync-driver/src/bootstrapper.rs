@@ -21,10 +21,7 @@ use diem_types::{
     epoch_change::Verifier,
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
-    transaction::{
-        default_protocol::{TransactionListWithProof, TransactionOutputListWithProof},
-        Version,
-    },
+    transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
     waypoint::Waypoint,
 };
 use event_notifications::EventSubscriptionService;

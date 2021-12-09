@@ -15,16 +15,13 @@ use diem_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    protocol_spec::DpnProto,
-    transaction::{
-        default_protocol::TransactionListWithProof, Transaction, TransactionStatus, Version,
-    },
+    transaction::{Transaction, TransactionListWithProof, TransactionStatus, Version},
 };
 use diemdb::DiemDB;
 use executor_types::{BlockExecutorTrait, ChunkExecutorTrait, TransactionReplayer};
 use proptest::prelude::*;
 use std::collections::BTreeMap;
-use storage_interface::default_protocol::DbReaderWriter;
+use storage_interface::DbReaderWriter;
 
 mod chunk_executor_tests;
 
@@ -49,7 +46,7 @@ fn execute_and_commit_block(
 struct TestExecutor {
     _path: diem_temppath::TempPath,
     db: DbReaderWriter,
-    executor: BlockExecutor<DpnProto, MockVM>,
+    executor: BlockExecutor<MockVM>,
 }
 
 impl TestExecutor {
@@ -71,7 +68,7 @@ impl TestExecutor {
 }
 
 impl std::ops::Deref for TestExecutor {
-    type Target = BlockExecutor<DpnProto, MockVM>;
+    type Target = BlockExecutor<MockVM>;
 
     fn deref(&self) -> &Self::Target {
         &self.executor
@@ -505,7 +502,7 @@ proptest! {
 
         // Now we construct a new executor and run one more block.
         {
-            let executor = BlockExecutor::<DpnProto, MockVM>::new(db);
+            let executor = BlockExecutor::<MockVM>::new(db);
             let output_b = executor.execute_block((block_b.id, block_b.txns.clone()), parent_block_id).unwrap();
             root_hash = output_b.root_hash();
             let ledger_info = gen_ledger_info(

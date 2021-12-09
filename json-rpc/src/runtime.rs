@@ -14,9 +14,7 @@ use diem_config::config::{JsonRpcConfig, NodeConfig, RoleType};
 use diem_json_rpc_types::Method;
 use diem_logger::{debug, Schema};
 use diem_mempool::MempoolClientSender;
-use diem_types::{
-    chain_id::ChainId, ledger_info::LedgerInfoWithSignatures, protocol_spec::DpnProto,
-};
+use diem_types::{chain_id::ChainId, ledger_info::LedgerInfoWithSignatures};
 use futures::future::{join_all, Either};
 use rand::{rngs::OsRng, RngCore};
 use serde_json::Value;
@@ -99,7 +97,7 @@ macro_rules! log_response {
 /// Returns handle to corresponding Tokio runtime
 pub fn bootstrap(
     config: &JsonRpcConfig,
-    diem_db: Arc<dyn MoveDbReader<DpnProto>>,
+    diem_db: Arc<dyn MoveDbReader>,
     mp_sender: MempoolClientSender,
     role: RoleType,
     chain_id: ChainId,
@@ -144,7 +142,7 @@ pub fn bootstrap(
 pub fn bootstrap_from_config(
     config: &NodeConfig,
     chain_id: ChainId,
-    diem_db: Arc<dyn MoveDbReader<DpnProto>>,
+    diem_db: Arc<dyn MoveDbReader>,
     mp_sender: MempoolClientSender,
 ) -> Runtime {
     bootstrap(
@@ -157,7 +155,7 @@ pub fn bootstrap_from_config(
 }
 
 pub fn jsonrpc_routes(
-    diem_db: Arc<dyn MoveDbReader<DpnProto>>,
+    diem_db: Arc<dyn MoveDbReader>,
     mp_sender: MempoolClientSender,
     role: RoleType,
     chain_id: ChainId,
@@ -226,9 +224,7 @@ pub fn jsonrpc_routes(
         .boxed()
 }
 
-pub fn health_check_route(
-    health_diem_db: Arc<dyn MoveDbReader<DpnProto>>,
-) -> BoxedFilter<(impl Reply,)> {
+pub fn health_check_route(health_diem_db: Arc<dyn MoveDbReader>) -> BoxedFilter<(impl Reply,)> {
     warp::path!("-" / "healthy")
         .and(warp::path::end())
         .and(warp::query().map(move |params: HealthCheckParams| params))
@@ -240,7 +236,7 @@ pub fn health_check_route(
 
 async fn health_check(
     params: HealthCheckParams,
-    db: Arc<dyn MoveDbReader<DpnProto>>,
+    db: Arc<dyn MoveDbReader>,
     now: SystemTime,
 ) -> Result<Box<dyn warp::Reply>, warp::Rejection> {
     if let Some(duration) = params.duration_secs {

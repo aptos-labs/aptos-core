@@ -366,7 +366,7 @@ struct TransactionInfo {
 The ledger history is a Merkle accumulator. It starts with a single item that represents the genesis transaction and state. As more transactions are committed to the Blockchain, more `TransactionInfo` objects are appended to the accumulator.
 
 ```rust
-type LedgerHistory = MerkleAccumulator<TransactionInfo>;
+type LedgerHistory = MerkleAccumulator;
 ```
 
 Therefore, the root hash of the ledger history accumulator acts as the authenticator for all the `TransactionInfo` objects, which in turn authenticate everything that has happened on the Blockchain, including all the transactions, current and historical ledger state, and all the contract events that were emitted. When the network is running, the consensus protocol will periodically distributed signed `LedgerInfo` which contains the root hash. Clients can use this to verify anything linked to the root of the accumulator.

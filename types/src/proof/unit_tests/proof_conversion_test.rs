@@ -4,7 +4,7 @@
 use crate::{
     account_state_blob::AccountStateBlob,
     proof::{
-        definition::default_protocol::{
+        definition::{
             AccountStateProof, EventProof, TransactionInfoListWithProof, TransactionInfoWithProof,
         },
         AccumulatorConsistencyProof, SparseMerkleRangeProof, TestAccumulatorProof,

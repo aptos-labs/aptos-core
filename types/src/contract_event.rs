@@ -11,7 +11,7 @@ use crate::{
     event::EventKey,
     ledger_info::LedgerInfo,
     proof::EventProof,
-    transaction::{TransactionInfoTrait, Version},
+    transaction::Version,
 };
 use anyhow::{ensure, Context, Error, Result};
 use diem_crypto::hash::CryptoHash;
@@ -299,14 +299,14 @@ impl std::fmt::Display for ContractEvent {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
-pub struct EventWithProof<T> {
+pub struct EventWithProof {
     pub transaction_version: u64, // Should be `Version`
     pub event_index: u64,
     pub event: ContractEvent,
-    pub proof: EventProof<T>,
+    pub proof: EventProof,
 }
 
-impl<T: TransactionInfoTrait> std::fmt::Display for EventWithProof<T> {
+impl std::fmt::Display for EventWithProof {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -317,13 +317,13 @@ impl<T: TransactionInfoTrait> std::fmt::Display for EventWithProof<T> {
     }
 }
 
-impl<T: TransactionInfoTrait> EventWithProof<T> {
+impl EventWithProof {
     /// Constructor.
     pub fn new(
         transaction_version: Version,
         event_index: u64,
         event: ContractEvent,
-        proof: EventProof<T>,
+        proof: EventProof,
     ) -> Self {
         Self {
             transaction_version,
@@ -424,15 +424,15 @@ impl<T: TransactionInfoTrait> EventWithProof<T> {
 /// version.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
-pub struct EventByVersionWithProof<T> {
-    pub lower_bound_incl: Option<EventWithProof<T>>,
-    pub upper_bound_excl: Option<EventWithProof<T>>,
+pub struct EventByVersionWithProof {
+    pub lower_bound_incl: Option<EventWithProof>,
+    pub upper_bound_excl: Option<EventWithProof>,
 }
 
-impl<T: TransactionInfoTrait> EventByVersionWithProof<T> {
+impl EventByVersionWithProof {
     pub fn new(
-        lower_bound_incl: Option<EventWithProof<T>>,
-        upper_bound_excl: Option<EventWithProof<T>>,
+        lower_bound_incl: Option<EventWithProof>,
+        upper_bound_excl: Option<EventWithProof>,
     ) -> Self {
         Self {
             lower_bound_incl,
@@ -565,11 +565,4 @@ impl<T: TransactionInfoTrait> EventByVersionWithProof<T> {
 
         Ok(())
     }
-}
-
-pub mod default_protocol {
-    use crate::transaction::TransactionInfo;
-
-    pub type EventWithProof = super::EventWithProof<TransactionInfo>;
-    pub type EventByVersionWithProof = super::EventByVersionWithProof<TransactionInfo>;
 }

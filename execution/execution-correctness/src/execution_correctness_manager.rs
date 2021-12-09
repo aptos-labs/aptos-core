@@ -13,12 +13,12 @@ use diem_config::config::{ExecutionCorrectnessService, NodeConfig};
 use diem_crypto::ed25519::Ed25519PrivateKey;
 use diem_global_constants::EXECUTION_KEY;
 use diem_secure_storage::{CryptoStorage, Storage};
-use diem_types::protocol_spec::DpnProto;
+
 use diem_vm::DiemVM;
 use executor::block_executor::BlockExecutor;
 use std::{convert::TryInto, net::SocketAddr, sync::Arc};
 use storage_client::StorageClient;
-use storage_interface::default_protocol::DbReaderWriter;
+use storage_interface::DbReaderWriter;
 
 pub fn extract_execution_prikey(config: &NodeConfig) -> Option<Ed25519PrivateKey> {
     let backend = &config.execution.backend;
@@ -84,7 +84,7 @@ impl ExecutionCorrectnessManager {
     }
 
     pub fn new_local(db: DbReaderWriter, execution_prikey: Option<Ed25519PrivateKey>) -> Self {
-        let block_executor = Box::new(BlockExecutor::<DpnProto, DiemVM>::new(db));
+        let block_executor = Box::new(BlockExecutor::<DiemVM>::new(db));
         Self {
             internal_execution_correctness: ExecutionCorrectnessWrapper::Local(Arc::new(
                 LocalService::new(block_executor, execution_prikey),
@@ -104,7 +104,7 @@ impl ExecutionCorrectnessManager {
         execution_prikey: Option<Ed25519PrivateKey>,
         timeout: u64,
     ) -> Self {
-        let block_executor = Box::new(BlockExecutor::<DpnProto, DiemVM>::new(DbReaderWriter::new(
+        let block_executor = Box::new(BlockExecutor::<DiemVM>::new(DbReaderWriter::new(
             StorageClient::new(&storage_address, timeout),
         )));
         let serializer_service = SerializerService::new(block_executor, execution_prikey);

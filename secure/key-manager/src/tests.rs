@@ -28,7 +28,6 @@ use diem_types::{
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     mempool_status::{MempoolStatus, MempoolStatusCode},
     on_chain_config::{ConfigurationResource, ValidatorSet},
-    protocol_spec::DpnProto,
     transaction::{RawTransaction, Transaction},
     validator_config::ValidatorConfig,
     validator_info::ValidatorInfo,
@@ -40,7 +39,7 @@ use executor_types::BlockExecutorTrait;
 use futures::{channel::mpsc::channel, StreamExt};
 use rand::{rngs::StdRng, SeedableRng};
 use std::{cell::RefCell, collections::BTreeMap, convert::TryFrom, sync::Arc};
-use storage_interface::{default_protocol::DbReaderWriter, DbReader, MoveDbReader};
+use storage_interface::{DbReader, DbReaderWriter, MoveDbReader};
 use tokio::runtime::Runtime;
 use vm_validator::{
     mocks::mock_vm_validator::MockVMValidator, vm_validator::TransactionValidation,
@@ -49,7 +48,7 @@ use vm_validator::{
 const TXN_EXPIRATION_SECS: u64 = 100;
 
 struct Node<T: DiemInterface> {
-    executor: BlockExecutor<DpnProto, DiemVM>,
+    executor: BlockExecutor<DiemVM>,
     diem: DiemInterfaceTestHarness<T>,
     key_manager: KeyManager<DiemInterfaceTestHarness<T>, InMemoryStorage>,
     time: MockTimeService,
@@ -57,7 +56,7 @@ struct Node<T: DiemInterface> {
 
 impl<T: DiemInterface> Node<T> {
     pub fn new(
-        executor: BlockExecutor<DpnProto, DiemVM>,
+        executor: BlockExecutor<DiemVM>,
         diem: DiemInterfaceTestHarness<T>,
         key_manager: KeyManager<DiemInterfaceTestHarness<T>, InMemoryStorage>,
         time: MockTimeService,
@@ -350,7 +349,7 @@ fn setup_diem_db(config: &NodeConfig) -> (Arc<DiemDB>, DbReaderWriter) {
 fn setup_node<T: DiemInterface + Clone>(
     node_config: &NodeConfig,
     key_manager_config: &KeyManagerConfig,
-    executor: BlockExecutor<DpnProto, DiemVM>,
+    executor: BlockExecutor<DiemVM>,
     diem: T,
 ) -> Node<T> {
     let time = TimeService::mock();
@@ -407,7 +406,7 @@ fn setup_secure_storage(config: &NodeConfig, time: TimeService) -> InMemoryStora
 // that serves the JSON RPC requests. The server communicates with the given database reader/writer
 // to handle each JSON RPC request.
 fn setup_diem_interface_and_json_server(
-    db_reader: Arc<dyn MoveDbReader<DpnProto>>,
+    db_reader: Arc<dyn MoveDbReader>,
 ) -> (JsonRpcDiemInterface, Runtime) {
     let address = "127.0.0.1";
     let port = utils::get_available_port();

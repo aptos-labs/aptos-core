@@ -24,18 +24,16 @@ use crate::{
         DIEM_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
     },
 };
-use diem_types::protocol_spec::ProtocolSpec;
-use storage_interface::default_protocol::DbReaderWriter;
+use storage_interface::DbReaderWriter;
 
-pub struct BlockExecutor<PS, V> {
+pub struct BlockExecutor<V> {
     pub db: DbReaderWriter,
     block_tree: BlockTree,
-    phantom: PhantomData<(PS, V)>,
+    phantom: PhantomData<V>,
 }
 
-impl<PS, V> BlockExecutor<PS, V>
+impl<V> BlockExecutor<V>
 where
-    PS: ProtocolSpec,
     V: VMExecutor,
 {
     pub fn new(db: DbReaderWriter) -> Self {
@@ -48,9 +46,8 @@ where
     }
 }
 
-impl<PS, V> BlockExecutorTrait for BlockExecutor<PS, V>
+impl<V> BlockExecutorTrait for BlockExecutor<V>
 where
-    PS: ProtocolSpec,
     V: VMExecutor,
 {
     fn committed_block_id(&self) -> HashValue {

@@ -19,9 +19,8 @@ use crate::{
     proof::TransactionInfoListWithProof,
     transaction::{
         ChangeSet, Module, ModuleBundle, RawTransaction, Script, SignatureCheckedTransaction,
-        SignedTransaction, Transaction, TransactionArgument, TransactionInfo,
-        TransactionListWithProof, TransactionPayload, TransactionStatus, TransactionToCommit,
-        Version, WriteSetPayload,
+        SignedTransaction, Transaction, TransactionArgument, TransactionListWithProof,
+        TransactionPayload, TransactionStatus, TransactionToCommit, Version, WriteSetPayload,
     },
     validator_info::ValidatorInfo,
     validator_signer::ValidatorSigner,
@@ -890,8 +889,7 @@ impl Arbitrary for TransactionToCommitGen {
     type Strategy = BoxedStrategy<Self>;
 }
 
-fn arb_transaction_list_with_proof(
-) -> impl Strategy<Value = TransactionListWithProof<TransactionInfo>> {
+fn arb_transaction_list_with_proof() -> impl Strategy<Value = TransactionListWithProof> {
     (
         vec(
             (
@@ -900,7 +898,7 @@ fn arb_transaction_list_with_proof(
             ),
             0..10,
         ),
-        any::<TransactionInfoListWithProof<TransactionInfo>>(),
+        any::<TransactionInfoListWithProof>(),
     )
         .prop_flat_map(|(transaction_and_events, proof)| {
             let transactions: Vec<_> = transaction_and_events
@@ -929,7 +927,7 @@ fn arb_transaction_list_with_proof(
         })
 }
 
-impl Arbitrary for TransactionListWithProof<TransactionInfo> {
+impl Arbitrary for TransactionListWithProof {
     type Parameters = ();
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
         arb_transaction_list_with_proof().boxed()

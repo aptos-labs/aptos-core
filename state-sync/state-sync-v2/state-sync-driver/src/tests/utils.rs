@@ -19,7 +19,6 @@ use diem_types::{
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     move_resource::MoveStorage,
     on_chain_config::ON_CHAIN_CONFIG_REGISTRY,
-    protocol_spec::DpnProto,
     transaction::{
         RawTransaction, Script, SignedTransaction, Transaction, TransactionPayload, Version,
         WriteSetPayload,
@@ -39,7 +38,7 @@ use std::{
     collections::{BTreeMap, HashMap},
     sync::Arc,
 };
-use storage_interface::{default_protocol::DbReaderWriter, DbReader};
+use storage_interface::{DbReader, DbReaderWriter};
 use storage_service_client::StorageServiceClient;
 
 /// Creates a state sync driver with the given config and waypoint
@@ -103,7 +102,7 @@ fn create_driver_for_tests(
     bootstrap_genesis::<DiemVM>(&db_rw, &genesis_txn).unwrap();
 
     // Create the event subscription service and notify initial configs
-    let storage: Arc<dyn DbReader<DpnProto>> = db;
+    let storage: Arc<dyn DbReader> = db;
     let synced_version = (&*storage).fetch_synced_version().unwrap();
     let mut event_subscription_service = EventSubscriptionService::new(
         ON_CHAIN_CONFIG_REGISTRY,

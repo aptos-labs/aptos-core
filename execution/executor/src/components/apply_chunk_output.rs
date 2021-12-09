@@ -19,8 +19,7 @@ use diem_types::{
     on_chain_config,
     proof::accumulator::InMemoryAccumulator,
     transaction::{
-        Transaction, TransactionInfo, TransactionInfoTrait, TransactionOutput, TransactionPayload,
-        TransactionStatus,
+        Transaction, TransactionInfo, TransactionOutput, TransactionPayload, TransactionStatus,
     },
     write_set::{WriteOp, WriteSet},
 };

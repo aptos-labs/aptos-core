@@ -6,7 +6,7 @@ use diem_json_rpc_types::views::{AccountStateWithProofView, EventWithProofView};
 use diem_types::{
     account_state::AccountState,
     account_state_blob::AccountStateBlob,
-    contract_event::{ContractEvent, default_protocol::EventWithProof},
+    contract_event::{ContractEvent, EventWithProof},
 };
 use move_core_types::{language_storage::TypeTag, move_resource::{MoveResource, MoveStructType}};
 use serde::de::DeserializeOwned;

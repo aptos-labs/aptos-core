@@ -13,13 +13,12 @@ use crate::{
 use diem_crypto::HashValue;
 use diem_types::{
     ledger_info::LedgerInfoWithSignatures,
-    protocol_spec::DpnProto,
-    transaction::default_protocol::{TransactionListWithProof, TransactionOutputListWithProof},
+    transaction::{TransactionListWithProof, TransactionOutputListWithProof},
 };
 use diemdb::DiemDB;
 use executor_types::{BlockExecutorTrait, ChunkExecutorTrait};
 use proptest::prelude::Rng;
-use storage_interface::default_protocol::DbReaderWriter;
+use storage_interface::DbReaderWriter;
 
 pub struct TestExecutor {
     _path: diem_temppath::TempPath,
@@ -248,7 +247,7 @@ fn test_executor_execute_and_commit_chunk_local_result_mismatch() {
 
     // commit 5 txns first.
     {
-        let executor = BlockExecutor::<DpnProto, MockVM>::new(db);
+        let executor = BlockExecutor::<MockVM>::new(db);
         let parent_block_id = executor.committed_block_id();
         let block_id = tests::gen_block_id(1);
         let version = 5;

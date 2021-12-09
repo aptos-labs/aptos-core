@@ -8,14 +8,11 @@ use diem_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
-    transaction::{
-        default_protocol::{TransactionListWithProof, TransactionOutputListWithProof},
-        Version,
-    },
+    transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
 };
 use executor_types::{ChunkExecutorTrait, ExecutedTrees};
 use std::sync::Arc;
-use storage_interface::default_protocol::DbReaderWriter;
+use storage_interface::DbReaderWriter;
 
 /// A summary of the state of local storage at a specific snapshot (e.g., version)
 #[derive(Clone, Debug)]

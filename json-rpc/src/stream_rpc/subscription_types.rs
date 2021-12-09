@@ -41,7 +41,7 @@ use diem_json_rpc_types::{
     Id,
 };
 use diem_logger::debug;
-use diem_types::protocol_spec::DpnProto;
+
 use serde::Serialize;
 use std::{iter::Map, sync::Arc, time::Duration};
 use storage_interface::MoveDbReader;
@@ -73,7 +73,7 @@ pub fn create_backoff(poll_interval_ms: u64, max_poll_interval_ms: u64) -> Jitte
 
 #[derive(Clone)]
 pub struct SubscriptionHelper {
-    pub db: Arc<dyn MoveDbReader<DpnProto>>,
+    pub db: Arc<dyn MoveDbReader>,
     pub client: ClientConnection,
     pub jsonrpc_id: Id,
     pub method: StreamMethod,
@@ -82,7 +82,7 @@ pub struct SubscriptionHelper {
 
 impl SubscriptionHelper {
     pub fn new(
-        db: Arc<dyn MoveDbReader<DpnProto>>,
+        db: Arc<dyn MoveDbReader>,
         client: ClientConnection,
         jsonrpc_id: Id,
         method: StreamMethod,

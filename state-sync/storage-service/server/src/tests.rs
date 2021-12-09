@@ -20,11 +20,10 @@ use diem_types::{
     event::EventKey,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     proof::{SparseMerkleRangeProof, TransactionInfoListWithProof},
-    protocol_spec::DpnProto,
     transaction::{
-        default_protocol::{TransactionListWithProof, TransactionOutputListWithProof},
-        RawTransaction, Script, SignedTransaction, Transaction, TransactionOutput,
-        TransactionPayload, TransactionStatus, Version,
+        RawTransaction, Script, SignedTransaction, Transaction, TransactionListWithProof,
+        TransactionOutput, TransactionOutputListWithProof, TransactionPayload, TransactionStatus,
+        Version,
     },
     write_set::WriteSet,
     PeerId,
@@ -431,7 +430,7 @@ fn create_test_ledger_info_with_sigs(epoch: u64, version: u64) -> LedgerInfoWith
 #[derive(Clone)]
 struct MockDbReader;
 
-impl DbReader<DpnProto> for MockDbReader {
+impl DbReader for MockDbReader {
     fn get_epoch_ending_ledger_infos(
         &self,
         start_epoch: u64,

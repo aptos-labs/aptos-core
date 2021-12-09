@@ -18,9 +18,9 @@ use diem_types::{
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     proof::SparseMerkleRangeProof,
     transaction::{
-        default_protocol::{TransactionListWithProof, TransactionOutputListWithProof},
-        RawTransaction, Script, SignedTransaction, Transaction, TransactionOutput,
-        TransactionPayload, TransactionStatus, Version,
+        RawTransaction, Script, SignedTransaction, Transaction, TransactionListWithProof,
+        TransactionOutput, TransactionOutputListWithProof, TransactionPayload, TransactionStatus,
+        Version,
     },
     write_set::WriteSet,
 };

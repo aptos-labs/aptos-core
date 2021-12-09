@@ -18,10 +18,8 @@ use diem_types::{
     account_state_blob::AccountStateBlob,
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
-    proof::{SparseMerkleRangeProof, TransactionAccumulatorRangeProof},
-    transaction::{
-        default_protocol::TransactionInfoWithProof, Transaction, TransactionInfo, Version,
-    },
+    proof::{SparseMerkleRangeProof, TransactionAccumulatorRangeProof, TransactionInfoWithProof},
+    transaction::{Transaction, TransactionInfo, Version},
 };
 use itertools::zip_eq;
 use serde::{Deserialize, Serialize};

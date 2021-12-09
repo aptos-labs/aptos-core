@@ -10,7 +10,7 @@ use super::{
 use crate::{
     account_state_blob::AccountStateBlob,
     ledger_info::LedgerInfo,
-    transaction::{TransactionInfoTrait, Version},
+    transaction::{TransactionInfo, Version},
 };
 use anyhow::{bail, ensure, format_err, Context, Result};
 #[cfg(any(test, feature = "fuzzing"))]
@@ -662,21 +662,21 @@ impl SparseMerkleRangeProof {
 /// `TransactionInfo` and a `TransactionAccumulatorProof` connecting it to the ledger root.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
-pub struct TransactionInfoWithProof<T> {
+pub struct TransactionInfoWithProof {
     /// The accumulator proof from ledger info root to leaf that authenticates the hash of the
     /// `TransactionInfo` object.
     pub ledger_info_to_transaction_info_proof: TransactionAccumulatorProof,
 
     /// The `TransactionInfo` object at the leaf of the accumulator.
-    pub transaction_info: T,
+    pub transaction_info: TransactionInfo,
 }
 
-impl<T: TransactionInfoTrait> TransactionInfoWithProof<T> {
+impl TransactionInfoWithProof {
     /// Constructs a new `TransactionWithProof` object using given
     /// `ledger_info_to_transaction_info_proof`.
     pub fn new(
         ledger_info_to_transaction_info_proof: TransactionAccumulatorProof,
-        transaction_info: T,
+        transaction_info: TransactionInfo,
     ) -> Self {
         Self {
             ledger_info_to_transaction_info_proof,
@@ -690,7 +690,7 @@ impl<T: TransactionInfoTrait> TransactionInfoWithProof<T> {
     }
 
     /// Returns the `transaction_info` object in this proof.
-    pub fn transaction_info(&self) -> &T {
+    pub fn transaction_info(&self) -> &TransactionInfo {
         &self.transaction_info
     }
 
@@ -712,18 +712,18 @@ impl<T: TransactionInfoTrait> TransactionInfoWithProof<T> {
 /// `SparseMerkleProof` from state root to the account.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
-pub struct AccountStateProof<T> {
-    transaction_info_with_proof: TransactionInfoWithProof<T>,
+pub struct AccountStateProof {
+    transaction_info_with_proof: TransactionInfoWithProof,
 
     /// The sparse merkle proof from state root to the account state.
     transaction_info_to_account_proof: SparseMerkleProof<AccountStateBlob>,
 }
 
-impl<T: TransactionInfoTrait> AccountStateProof<T> {
+impl AccountStateProof {
     /// Constructs a new `AccountStateProof` using given `ledger_info_to_transaction_info_proof`,
     /// `transaction_info` and `transaction_info_to_account_proof`.
     pub fn new(
-        transaction_info_with_proof: TransactionInfoWithProof<T>,
+        transaction_info_with_proof: TransactionInfoWithProof,
         transaction_info_to_account_proof: SparseMerkleProof<AccountStateBlob>,
     ) -> Self {
         AccountStateProof {
@@ -733,7 +733,7 @@ impl<T: TransactionInfoTrait> AccountStateProof<T> {
     }
 
     /// Returns the `transaction_info_with_proof` object in this proof.
-    pub fn transaction_info_with_proof(&self) -> &TransactionInfoWithProof<T> {
+    pub fn transaction_info_with_proof(&self) -> &TransactionInfoWithProof {
         &self.transaction_info_with_proof
     }
 
@@ -772,18 +772,18 @@ impl<T: TransactionInfoTrait> AccountStateProof<T> {
 /// `AccumulatorProof` from event accumulator root to the event.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
-pub struct EventProof<T> {
-    transaction_info_with_proof: TransactionInfoWithProof<T>,
+pub struct EventProof {
+    transaction_info_with_proof: TransactionInfoWithProof,
 
     /// The accumulator proof from event root to the actual event.
     transaction_info_to_event_proof: EventAccumulatorProof,
 }
 
-impl<T: TransactionInfoTrait> EventProof<T> {
+impl EventProof {
     /// Constructs a new `EventProof` using given `ledger_info_to_transaction_info_proof`,
     /// `transaction_info` and `transaction_info_to_event_proof`.
     pub fn new(
-        transaction_info_with_proof: TransactionInfoWithProof<T>,
+        transaction_info_with_proof: TransactionInfoWithProof,
         transaction_info_to_event_proof: EventAccumulatorProof,
     ) -> Self {
         EventProof {
@@ -793,7 +793,7 @@ impl<T: TransactionInfoTrait> EventProof<T> {
     }
 
     /// Returns the `transaction_info_with_proof` object in this proof.
-    pub fn transaction_info_with_proof(&self) -> &TransactionInfoWithProof<T> {
+    pub fn transaction_info_with_proof(&self) -> &TransactionInfoWithProof {
         &self.transaction_info_with_proof
     }
 
@@ -823,15 +823,15 @@ impl<T: TransactionInfoTrait> EventProof<T> {
 /// The proof used to authenticate a list of consecutive transaction infos.
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
-pub struct TransactionInfoListWithProof<T> {
+pub struct TransactionInfoListWithProof {
     pub ledger_info_to_transaction_infos_proof: TransactionAccumulatorRangeProof,
-    pub transaction_infos: Vec<T>,
+    pub transaction_infos: Vec<TransactionInfo>,
 }
 
-impl<T: TransactionInfoTrait> TransactionInfoListWithProof<T> {
+impl TransactionInfoListWithProof {
     pub fn new(
         ledger_info_to_transaction_infos_proof: TransactionAccumulatorRangeProof,
-        transaction_infos: Vec<T>,
+        transaction_infos: Vec<TransactionInfo>,
     ) -> Self {
         Self {
             ledger_info_to_transaction_infos_proof,
@@ -957,20 +957,4 @@ impl<H: CryptoHasher> AccumulatorExtensionProof<H> {
 
         Ok(original_tree.append(self.leaves.as_slice()))
     }
-}
-
-pub mod default_protocol {
-    use crate::transaction::TransactionInfo;
-
-    pub use super::{
-        AccumulatorConsistencyProof, AccumulatorExtensionProof, AccumulatorProof,
-        AccumulatorRangeProof, EventAccumulatorProof, SparseMerkleProof, SparseMerkleRangeProof,
-        TransactionAccumulatorProof, TransactionAccumulatorRangeProof,
-        TransactionAccumulatorSummary,
-    };
-
-    pub type AccountStateProof = super::AccountStateProof<TransactionInfo>;
-    pub type EventProof = super::EventProof<TransactionInfo>;
-    pub type TransactionInfoListWithProof = super::TransactionInfoListWithProof<TransactionInfo>;
-    pub type TransactionInfoWithProof = super::TransactionInfoWithProof<TransactionInfo>;
 }

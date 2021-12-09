@@ -15,7 +15,7 @@ use diem_api_types::{
 };
 use diem_types::{
     mempool_status::MempoolStatusCode,
-    transaction::{RawTransaction, SignedTransaction, TransactionInfo},
+    transaction::{RawTransaction, SignedTransaction},
 };
 
 use anyhow::Result;
@@ -240,10 +240,7 @@ impl Transactions {
         self.render_transactions(data)
     }
 
-    fn render_transactions(
-        self,
-        data: Vec<TransactionOnChainData<TransactionInfo>>,
-    ) -> Result<impl Reply, Error> {
+    fn render_transactions(self, data: Vec<TransactionOnChainData>) -> Result<impl Reply, Error> {
         if data.is_empty() {
             let txns: Vec<Transaction> = vec![];
             return Response::new(self.ledger_info, &txns);
@@ -301,7 +298,7 @@ impl Transactions {
         Error::not_found("transaction", id, self.ledger_info.version())
     }
 
-    fn get_by_version(&self, version: u64) -> Result<Option<TransactionData<TransactionInfo>>> {
+    fn get_by_version(&self, version: u64) -> Result<Option<TransactionData>> {
         if version > self.ledger_info.version() {
             return Ok(None);
         }
@@ -316,10 +313,7 @@ impl Transactions {
     // because the period a transaction stay in the mempool is likely short.
     // Although the mempool get transation is async, but looking up txn in database is a sync call,
     // thus we keep it simple and call them in sequence.
-    async fn get_by_hash(
-        &self,
-        hash: diem_crypto::HashValue,
-    ) -> Result<Option<TransactionData<TransactionInfo>>> {
+    async fn get_by_hash(&self, hash: diem_crypto::HashValue) -> Result<Option<TransactionData>> {
         let from_db = self
             .context
             .get_transaction_by_hash(hash, self.ledger_info.version())?;

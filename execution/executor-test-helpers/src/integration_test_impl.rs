@@ -15,13 +15,11 @@ use diem_types::{
         xus_tag, XUS_NAME,
     },
     account_state::AccountState,
-    account_state_blob::default_protocol::AccountStateWithProof,
+    account_state_blob::AccountStateWithProof,
     event::EventKey,
-    protocol_spec::DpnProto,
     transaction::{
-        authenticator::AuthenticationKey,
-        default_protocol::{TransactionListWithProof, TransactionWithProof},
-        Transaction, TransactionPayload, WriteSetPayload,
+        authenticator::AuthenticationKey, Transaction, TransactionListWithProof,
+        TransactionPayload, TransactionWithProof, WriteSetPayload,
     },
     trusted_state::{TrustedState, TrustedStateChange},
     waypoint::Waypoint,
@@ -32,7 +30,7 @@ use executor::block_executor::BlockExecutor;
 use executor_types::BlockExecutorTrait;
 use rand::SeedableRng;
 use std::{convert::TryFrom, sync::Arc};
-use storage_interface::{default_protocol::DbReaderWriter, Order};
+use storage_interface::{DbReaderWriter, Order};
 
 pub fn test_execution_with_storage_impl() -> Arc<DiemDB> {
     let (genesis, validators) = vm_genesis::test_genesis_change_set_and_validators(Some(1));
@@ -514,12 +512,7 @@ pub fn test_execution_with_storage_impl() -> Arc<DiemDB> {
 pub fn create_db_and_executor<P: AsRef<std::path::Path>>(
     path: P,
     genesis: &Transaction,
-) -> (
-    Arc<DiemDB>,
-    DbReaderWriter,
-    BlockExecutor<DpnProto, DiemVM>,
-    Waypoint,
-) {
+) -> (Arc<DiemDB>, DbReaderWriter, BlockExecutor<DiemVM>, Waypoint) {
     let (db, dbrw) = DbReaderWriter::wrap(DiemDB::new_for_test(&path));
     let waypoint = bootstrap_genesis::<DiemVM>(&dbrw, genesis).unwrap();
     let executor = BlockExecutor::new(dbrw.clone());

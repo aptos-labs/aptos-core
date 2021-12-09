@@ -9,7 +9,7 @@ use diem_types::{
     account_address::AccountAddress,
     account_state::AccountState,
     account_state_blob::AccountStateBlob,
-    contract_event::default_protocol::EventWithProof,
+    contract_event::EventWithProof,
     event::EventKey,
     transaction::{Transaction, Version, WriteSetPayload},
     write_set::WriteOp,

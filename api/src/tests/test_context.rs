@@ -30,8 +30,7 @@ use diem_types::{
     chain_id::ChainId,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::VMPublishingOption,
-    protocol_spec::DpnProto,
-    transaction::{Transaction, TransactionInfo, TransactionStatus},
+    transaction::{Transaction, TransactionStatus},
 };
 use diem_vm::DiemVM;
 use diemdb::DiemDB;
@@ -81,7 +80,7 @@ pub fn new_test_context() -> TestContext {
         rng,
         root_keys,
         validator_owner,
-        Box::new(BlockExecutor::<DpnProto, DiemVM>::new(db_rw)),
+        Box::new(BlockExecutor::<DiemVM>::new(db_rw)),
         mempool,
         db,
     )
@@ -191,11 +190,7 @@ impl TestContext {
         self.context.get_latest_ledger_info().unwrap()
     }
 
-    pub fn get_transactions(
-        &self,
-        start: u64,
-        limit: u16,
-    ) -> Vec<TransactionOnChainData<TransactionInfo>> {
+    pub fn get_transactions(&self, start: u64, limit: u16) -> Vec<TransactionOnChainData> {
         self.context
             .get_transactions(start, limit, self.get_latest_ledger_info().version())
             .unwrap()

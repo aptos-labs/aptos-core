@@ -20,7 +20,7 @@ use execution_correctness::ExecutionCorrectnessManager;
 use futures::channel::mpsc;
 use network::application::storage::PeerMetadataStorage;
 use std::sync::Arc;
-use storage_interface::default_protocol::DbReaderWriter;
+use storage_interface::DbReaderWriter;
 use tokio::runtime::{self, Runtime};
 
 /// Helper function to start consensus based on configuration and return the runtime

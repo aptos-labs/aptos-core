@@ -12,8 +12,7 @@ use crate::{
 use diem_config::network_id::NetworkId;
 use diem_infallible::Mutex;
 use diem_types::{
-    ledger_info::LedgerInfoWithSignatures, transaction::default_protocol::TransactionListWithProof,
-    PeerId,
+    ledger_info::LedgerInfoWithSignatures, transaction::TransactionListWithProof, PeerId,
 };
 use futures::executor::block_on;
 use mempool_notifications::MempoolNotifier;

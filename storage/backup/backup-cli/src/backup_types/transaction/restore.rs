@@ -25,9 +25,7 @@ use diem_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
     proof::{TransactionAccumulatorRangeProof, TransactionInfoListWithProof},
-    transaction::{
-        default_protocol::TransactionListWithProof, Transaction, TransactionInfo, Version,
-    },
+    transaction::{Transaction, TransactionInfo, TransactionListWithProof, Version},
 };
 use diem_vm::DiemVM;
 use diemdb::backup::restore_handler::RestoreHandler;

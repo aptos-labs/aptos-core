@@ -15,7 +15,6 @@ use diem_types::{
     diem_timestamp::DiemTimestampResource,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::{config_address, ConfigurationResource},
-    protocol_spec::DpnProto,
     transaction::Transaction,
     waypoint::Waypoint,
 };
@@ -23,10 +22,7 @@ use diem_vm::VMExecutor;
 use executor_types::{ExecutedChunk, ExecutedTrees};
 use move_core_types::move_resource::MoveResource;
 use std::{collections::btree_map::BTreeMap, sync::Arc};
-use storage_interface::{
-    default_protocol::DbReaderWriter, state_view::default_protocol::VerifiedStateView, DbWriter,
-    TreeState,
-};
+use storage_interface::{state_view::VerifiedStateView, DbReaderWriter, DbWriter, TreeState};
 
 pub fn generate_waypoint<V: VMExecutor>(
     db: &DbReaderWriter,
@@ -66,13 +62,13 @@ pub fn maybe_bootstrap<V: VMExecutor>(
 }
 
 pub struct GenesisCommitter {
-    db: Arc<dyn DbWriter<DpnProto>>,
+    db: Arc<dyn DbWriter>,
     output: ExecutedChunk,
     waypoint: Waypoint,
 }
 
 impl GenesisCommitter {
-    pub fn new(db: Arc<dyn DbWriter<DpnProto>>, output: ExecutedChunk) -> Result<Self> {
+    pub fn new(db: Arc<dyn DbWriter>, output: ExecutedChunk) -> Result<Self> {
         let ledger_info = output
             .ledger_info
             .as_ref()

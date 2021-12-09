@@ -16,10 +16,7 @@ use diem_types::{
     contract_event::ContractEvent,
     epoch_change::Verifier,
     ledger_info::LedgerInfoWithSignatures,
-    transaction::{
-        default_protocol::{TransactionListWithProof, TransactionOutputListWithProof},
-        Version,
-    },
+    transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
 };
 use event_notifications::EventSubscriptionService;
 use std::sync::Arc;

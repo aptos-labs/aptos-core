@@ -12,10 +12,7 @@ use diem_types::{
     access_path::{AccessPath, Path},
     chain_id::ChainId,
     contract_event::ContractEvent,
-    transaction::{
-        ModuleBundle, RawTransaction, Script, ScriptFunction, SignedTransaction,
-        TransactionInfoTrait,
-    },
+    transaction::{ModuleBundle, RawTransaction, Script, ScriptFunction, SignedTransaction},
     vm_status::{AbortLocation, KeptVMStatus},
     write_set::WriteOp,
 };
@@ -71,10 +68,10 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
         Ok((txn, payload).into())
     }
 
-    pub fn try_into_onchain_transaction<T: TransactionInfoTrait>(
+    pub fn try_into_onchain_transaction(
         &self,
         timestamp: u64,
-        data: TransactionOnChainData<T>,
+        data: TransactionOnChainData,
     ) -> Result<Transaction> {
         use diem_types::transaction::Transaction::*;
         let info = self.into_transaction_info(data.version, &data.info);
@@ -92,10 +89,10 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
         })
     }
 
-    pub fn into_transaction_info<T: TransactionInfoTrait>(
+    pub fn into_transaction_info(
         &self,
         version: u64,
-        info: &T,
+        info: &diem_types::transaction::TransactionInfo,
     ) -> TransactionInfo {
         TransactionInfo {
             version: version.into(),

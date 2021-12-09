@@ -16,7 +16,7 @@ use diem_types::{
     account_config::{from_currency_code_string, xus_tag, XUS_NAME},
     transaction::{
         authenticator::{AuthenticationKey, TransactionAuthenticator},
-        ChangeSet, Script, ScriptFunction, Transaction, TransactionInfoTrait,
+        ChangeSet, Script, ScriptFunction, Transaction,
     },
     write_set::{WriteOp, WriteSetMut},
 };

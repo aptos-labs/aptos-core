@@ -17,7 +17,7 @@ use diem_types::{
     account_state::AccountState,
     account_state_blob::AccountStateWithProof,
     block_metadata::new_block_event_key,
-    contract_event::{default_protocol::{EventByVersionWithProof, EventWithProof}},
+    contract_event::{{EventByVersionWithProof, EventWithProof}},
     event::EventKey,
     ledger_info::LedgerInfo,
     proof::{AccumulatorConsistencyProof, TransactionAccumulatorSummary},

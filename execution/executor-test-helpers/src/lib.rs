@@ -26,7 +26,7 @@ use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
     thread::JoinHandle,
 };
-use storage_interface::default_protocol::DbReaderWriter;
+use storage_interface::DbReaderWriter;
 use storage_service::start_storage_service_with_db;
 
 /// Helper function for test to blindly bootstrap without waypoint.

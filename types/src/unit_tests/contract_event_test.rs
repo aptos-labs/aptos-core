@@ -2,10 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    contract_event::{
-        default_protocol::{EventByVersionWithProof, EventWithProof},
-        ContractEvent,
-    },
+    contract_event::{ContractEvent, EventByVersionWithProof, EventWithProof},
     event::EventKey,
 };
 use bcs::test_helpers::assert_canonical_encode_decode;

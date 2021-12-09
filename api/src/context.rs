@@ -6,15 +6,9 @@ use diem_config::config::{ApiConfig, JsonRpcConfig, RoleType};
 use diem_crypto::HashValue;
 use diem_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
 use diem_types::{
-    account_address::AccountAddress,
-    account_state::AccountState,
-    account_state_blob::AccountStateBlob,
-    chain_id::ChainId,
-    contract_event::ContractEvent,
-    event::EventKey,
-    ledger_info::LedgerInfoWithSignatures,
-    protocol_spec::DpnProto,
-    transaction::{SignedTransaction, TransactionInfo},
+    account_address::AccountAddress, account_state::AccountState,
+    account_state_blob::AccountStateBlob, chain_id::ChainId, contract_event::ContractEvent,
+    event::EventKey, ledger_info::LedgerInfoWithSignatures, transaction::SignedTransaction,
 };
 use storage_interface::{MoveDbReader, Order};
 
@@ -31,7 +25,7 @@ use warp::{filters::BoxedFilter, Filter, Reply};
 #[derive(Clone)]
 pub struct Context {
     chain_id: ChainId,
-    db: Arc<dyn MoveDbReader<DpnProto>>,
+    db: Arc<dyn MoveDbReader>,
     mp_sender: MempoolClientSender,
     role: RoleType,
     jsonrpc_config: JsonRpcConfig,
@@ -41,7 +35,7 @@ pub struct Context {
 impl Context {
     pub fn new(
         chain_id: ChainId,
-        db: Arc<dyn MoveDbReader<DpnProto>>,
+        db: Arc<dyn MoveDbReader>,
         mp_sender: MempoolClientSender,
         role: RoleType,
         jsonrpc_config: JsonRpcConfig,
@@ -57,7 +51,7 @@ impl Context {
         }
     }
 
-    pub fn move_converter(&self) -> MoveConverter<dyn MoveDbReader<DpnProto> + '_> {
+    pub fn move_converter(&self) -> MoveConverter<dyn MoveDbReader + '_> {
         MoveConverter::new(self.db.borrow())
     }
 
@@ -126,7 +120,7 @@ impl Context {
         start_version: u64,
         limit: u16,
         ledger_version: u64,
-    ) -> Result<Vec<TransactionOnChainData<TransactionInfo>>> {
+    ) -> Result<Vec<TransactionOnChainData>> {
         let data = self
             .db
             .get_transactions(start_version, limit as u64, ledger_version, true)?;
@@ -167,7 +161,7 @@ impl Context {
         start_seq_number: u64,
         limit: u16,
         ledger_version: u64,
-    ) -> Result<Vec<TransactionOnChainData<TransactionInfo>>> {
+    ) -> Result<Vec<TransactionOnChainData>> {
         let txns = self.db.get_account_transactions(
             address,
             start_seq_number,
@@ -182,7 +176,7 @@ impl Context {
         &self,
         hash: HashValue,
         ledger_version: u64,
-    ) -> Result<Option<TransactionOnChainData<TransactionInfo>>> {
+    ) -> Result<Option<TransactionOnChainData>> {
         Ok(self
             .db
             .get_transaction_by_hash(hash, ledger_version, true)?
@@ -208,7 +202,7 @@ impl Context {
         &self,
         version: u64,
         ledger_version: u64,
-    ) -> Result<TransactionOnChainData<TransactionInfo>> {
+    ) -> Result<TransactionOnChainData> {
         Ok(self
             .db
             .get_transaction_by_version(version, ledger_version, true)?

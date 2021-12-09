@@ -18,7 +18,7 @@ use state_sync_v1::{
     bootstrapper::StateSyncBootstrapper,
     network::{StateSyncEvents, StateSyncSender},
 };
-use storage_interface::default_protocol::DbReaderWriter;
+use storage_interface::DbReaderWriter;
 use tokio::runtime::Runtime;
 
 /// A struct for holding the various runtimes required by state sync v2.
@@ -182,7 +182,7 @@ mod tests {
     use mempool_notifications::new_mempool_notifier_listener_pair;
     use network::application::{interface::MultiNetworkSender, storage::PeerMetadataStorage};
     use std::{collections::HashMap, sync::Arc};
-    use storage_interface::default_protocol::DbReaderWriter;
+    use storage_interface::DbReaderWriter;
     use storage_service_client::StorageServiceClient;
 
     #[test]

@@ -13,22 +13,18 @@ use diem_types::{
         SentPaymentEvent, ToXDXExchangeRateUpdateEvent, VASPDomainEvent,
     },
     account_state::AccountState,
-    account_state_blob::{default_protocol::AccountStateWithProof, AccountStateBlob},
-    contract_event::{
-        default_protocol::{EventByVersionWithProof, EventWithProof},
-        ContractEvent,
-    },
+    account_state_blob::{AccountStateBlob, AccountStateWithProof},
+    contract_event::{ContractEvent, EventByVersionWithProof, EventWithProof},
     diem_id_identifier::DiemIdVaspDomainIdentifier,
     event::EventKey,
-    proof::default_protocol::{
+    proof::{
         AccountStateProof, AccumulatorConsistencyProof, SparseMerkleProof,
         TransactionAccumulatorProof, TransactionInfoListWithProof, TransactionInfoWithProof,
     },
     state_proof::StateProof,
     transaction::{
-        default_protocol::{AccountTransactionsWithProof, TransactionListWithProof},
-        Script, ScriptFunction, Transaction, TransactionArgument, TransactionInfoTrait,
-        TransactionPayload,
+        AccountTransactionsWithProof, Script, ScriptFunction, Transaction, TransactionArgument,
+        TransactionInfo, TransactionListWithProof, TransactionPayload,
     },
     vm_status::KeptVMStatus,
 };
@@ -831,10 +827,10 @@ pub struct TransactionView {
 }
 
 impl TransactionView {
-    pub fn try_from_tx_and_events<T: TransactionInfoTrait>(
+    pub fn try_from_tx_and_events(
         version: u64,
         tx: Transaction,
-        tx_info: T,
+        tx_info: TransactionInfo,
         events: Vec<ContractEvent>,
     ) -> Result<Self> {
         let events = events

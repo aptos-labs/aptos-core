@@ -5,7 +5,7 @@ use crate::{context::Context, index};
 
 use diem_config::config::{ApiConfig, JsonRpcConfig, NodeConfig};
 use diem_mempool::MempoolClientSender;
-use diem_types::{chain_id::ChainId, protocol_spec::DpnProto};
+use diem_types::chain_id::ChainId;
 use futures::join;
 use storage_interface::MoveDbReader;
 use warp::{Filter, Reply};
@@ -21,7 +21,7 @@ use tokio::runtime::{Builder, Runtime};
 pub fn bootstrap(
     config: &NodeConfig,
     chain_id: ChainId,
-    db: Arc<dyn MoveDbReader<DpnProto>>,
+    db: Arc<dyn MoveDbReader>,
     mp_sender: MempoolClientSender,
 ) -> anyhow::Result<Runtime> {
     let runtime = Builder::new_multi_thread()

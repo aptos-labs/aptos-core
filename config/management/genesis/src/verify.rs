@@ -14,7 +14,7 @@ use diem_network_address_encryption::Error as NetworkAddressError;
 use diem_temppath::TempPath;
 use diem_types::{
     account_address::AccountAddress, account_config, account_state::AccountState,
-    network_address::NetworkAddress, on_chain_config::ValidatorSet, protocol_spec::DpnProto,
+    network_address::NetworkAddress, on_chain_config::ValidatorSet,
     validator_config::ValidatorConfig, waypoint::Waypoint,
 };
 use diem_vm::DiemVM;
@@ -29,7 +29,7 @@ use std::{
     str::FromStr,
     sync::Arc,
 };
-use storage_interface::{default_protocol::DbReaderWriter, DbReader};
+use storage_interface::{DbReader, DbReaderWriter};
 use structopt::StructOpt;
 
 /// Prints the public information within a store
@@ -242,7 +242,7 @@ fn compute_genesis(
 /// Read from the ledger the validator config from the validator set for the specified account
 fn validator_config(
     validator_account: AccountAddress,
-    reader: Arc<dyn DbReader<DpnProto>>,
+    reader: Arc<dyn DbReader>,
 ) -> Result<ValidatorConfig, Error> {
     let blob = reader
         .get_latest_account_state(account_config::validator_set_address())

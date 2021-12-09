@@ -24,7 +24,7 @@ use futures::{FutureExt, StreamExt};
 use move_core_types::language_storage::TypeTag;
 use serde::{Deserialize, Serialize};
 use std::{convert::TryInto, sync::Arc};
-use storage_interface::default_protocol::DbReaderWriter;
+use storage_interface::DbReaderWriter;
 
 #[test]
 fn test_all_configs_returned() {

@@ -15,11 +15,7 @@ use diem_logger::prelude::*;
 use diem_types::{
     account_state_blob::AccountStatesChunkWithProof,
     epoch_change::EpochChangeProof,
-    protocol_spec::DpnProto,
-    transaction::{
-        default_protocol::{TransactionListWithProof, TransactionOutputListWithProof},
-        Version,
-    },
+    transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
 };
 use futures::stream::StreamExt;
 use serde::{Deserialize, Serialize};
@@ -351,11 +347,11 @@ pub trait StorageReaderInterface: Clone + Send + 'static {
 /// storage server.
 #[derive(Clone)]
 pub struct StorageReader {
-    storage: Arc<dyn DbReader<DpnProto>>,
+    storage: Arc<dyn DbReader>,
 }
 
 impl StorageReader {
-    pub fn new(storage: Arc<dyn DbReader<DpnProto>>) -> Self {
+    pub fn new(storage: Arc<dyn DbReader>) -> Self {
         Self { storage }
     }
 

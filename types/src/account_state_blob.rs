@@ -7,7 +7,7 @@ use crate::{
     account_state::AccountState,
     ledger_info::LedgerInfo,
     proof::{AccountStateProof, SparseMerkleRangeProof},
-    transaction::{TransactionInfoTrait, Version},
+    transaction::Version,
 };
 use anyhow::{anyhow, ensure, Error, Result};
 use diem_crypto::{
@@ -162,23 +162,19 @@ impl Arbitrary for AccountStateBlob {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
-pub struct AccountStateWithProof<T> {
+pub struct AccountStateWithProof {
     /// The transaction version at which this account state is seen.
     pub version: Version,
     /// Blob value representing the account state. If this field is not set, it
     /// means the account does not exist.
     pub blob: Option<AccountStateBlob>,
     /// The proof the client can use to authenticate the value.
-    pub proof: AccountStateProof<T>,
+    pub proof: AccountStateProof,
 }
 
-impl<T: TransactionInfoTrait> AccountStateWithProof<T> {
+impl AccountStateWithProof {
     /// Constructor.
-    pub fn new(
-        version: Version,
-        blob: Option<AccountStateBlob>,
-        proof: AccountStateProof<T>,
-    ) -> Self {
+    pub fn new(version: Version, blob: Option<AccountStateBlob>, proof: AccountStateProof) -> Self {
         Self {
             version,
             blob,
@@ -211,12 +207,6 @@ impl<T: TransactionInfoTrait> AccountStateWithProof<T> {
     }
 }
 
-pub mod default_protocol {
-    use crate::transaction::TransactionInfo;
-
-    pub type AccountStateWithProof = super::AccountStateWithProof<TransactionInfo>;
-}
-
 /// TODO(joshlind): add a proof implementation (e.g., verify()) and unit tests
 /// for these once we start supporting them.
 ///
@@ -240,7 +230,7 @@ pub struct AccountStatesChunkWithProof {
 
 #[cfg(test)]
 mod tests {
-    use super::{default_protocol::AccountStateWithProof, *};
+    use super::{AccountStateWithProof, *};
     use bcs::test_helpers::assert_canonical_encode_decode;
     use proptest::collection::vec;
 

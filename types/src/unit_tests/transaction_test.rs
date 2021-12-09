@@ -6,11 +6,9 @@ use crate::{
     account_config::XUS_NAME,
     chain_id::ChainId,
     transaction::{
-        default_protocol::{
-            AccountTransactionsWithProof, TransactionListWithProof, TransactionWithProof,
-        },
-        metadata, GovernanceRole, RawTransaction, Script, SignedTransaction, Transaction,
-        TransactionInfo, TransactionPayload,
+        metadata, AccountTransactionsWithProof, GovernanceRole, RawTransaction, Script,
+        SignedTransaction, Transaction, TransactionInfo, TransactionListWithProof,
+        TransactionPayload, TransactionWithProof,
     },
 };
 use bcs::test_helpers::assert_canonical_encode_decode;

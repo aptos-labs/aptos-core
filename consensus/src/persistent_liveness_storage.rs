@@ -14,7 +14,6 @@ use diem_logger::prelude::*;
 use diem_types::{
     epoch_change::EpochChangeProof,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    protocol_spec::DpnProto,
     transaction::Version,
 };
 use executor_types::ExecutedTrees;
@@ -59,7 +58,7 @@ pub trait PersistentLivenessStorage: Send + Sync {
     fn retrieve_epoch_change_proof(&self, version: u64) -> Result<EpochChangeProof>;
 
     /// Returns a handle of the diemdb.
-    fn diem_db(&self) -> Arc<dyn DbReader<DpnProto>>;
+    fn diem_db(&self) -> Arc<dyn DbReader>;
 }
 
 #[derive(Clone)]
@@ -308,11 +307,11 @@ impl RecoveryData {
 /// The proxy we use to persist data in diem db storage service via grpc.
 pub struct StorageWriteProxy {
     db: Arc<ConsensusDB>,
-    diem_db: Arc<dyn DbReader<DpnProto>>,
+    diem_db: Arc<dyn DbReader>,
 }
 
 impl StorageWriteProxy {
-    pub fn new(config: &NodeConfig, diem_db: Arc<dyn DbReader<DpnProto>>) -> Self {
+    pub fn new(config: &NodeConfig, diem_db: Arc<dyn DbReader>) -> Self {
         let db = Arc::new(ConsensusDB::new(config.storage.dir()));
         StorageWriteProxy { db, diem_db }
     }
@@ -489,7 +488,7 @@ impl PersistentLivenessStorage for StorageWriteProxy {
         Ok(proofs)
     }
 
-    fn diem_db(&self) -> Arc<dyn DbReader<DpnProto>> {
+    fn diem_db(&self) -> Arc<dyn DbReader> {
         self.diem_db.clone()
     }
 }

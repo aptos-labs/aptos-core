@@ -18,7 +18,6 @@ use diem_types::{
         definition::LeafCount, AccumulatorConsistencyProof, SparseMerkleProof,
         SparseMerkleRangeProof, TransactionAccumulatorSummary,
     },
-    protocol_spec::ProtocolSpec,
     state_proof::StateProof,
     transaction::{
         AccountTransactionsWithProof, TransactionInfo, TransactionListWithProof,
@@ -186,7 +185,7 @@ pub enum Order {
 /// Trait that is implemented by a DB that supports certain public (to client) read APIs
 /// expected of a Diem DB
 #[allow(unused_variables)]
-pub trait DbReader<PS: ProtocolSpec>: Send + Sync {
+pub trait DbReader: Send + Sync {
     /// See [`DiemDB::get_epoch_ending_ledger_infos`].
     ///
     /// [`DiemDB::get_epoch_ending_ledger_infos`]:
@@ -208,7 +207,7 @@ pub trait DbReader<PS: ProtocolSpec>: Send + Sync {
         batch_size: u64,
         ledger_version: Version,
         fetch_events: bool,
-    ) -> Result<TransactionListWithProof<PS::TransactionInfo>> {
+    ) -> Result<TransactionListWithProof> {
         unimplemented!()
     }
 
@@ -220,7 +219,7 @@ pub trait DbReader<PS: ProtocolSpec>: Send + Sync {
         hash: HashValue,
         ledger_version: Version,
         fetch_events: bool,
-    ) -> Result<Option<TransactionWithProof<PS::TransactionInfo>>> {
+    ) -> Result<Option<TransactionWithProof>> {
         unimplemented!()
     }
 
@@ -232,7 +231,7 @@ pub trait DbReader<PS: ProtocolSpec>: Send + Sync {
         version: Version,
         ledger_version: Version,
         fetch_events: bool,
-    ) -> Result<TransactionWithProof<PS::TransactionInfo>> {
+    ) -> Result<TransactionWithProof> {
         unimplemented!()
     }
 
@@ -258,7 +257,7 @@ pub trait DbReader<PS: ProtocolSpec>: Send + Sync {
         start_version: Version,
         limit: u64,
         ledger_version: Version,
-    ) -> Result<TransactionOutputListWithProof<PS::TransactionInfo>> {
+    ) -> Result<TransactionOutputListWithProof> {
         unimplemented!()
     }
 
@@ -281,7 +280,7 @@ pub trait DbReader<PS: ProtocolSpec>: Send + Sync {
         order: Order,
         limit: u64,
         known_version: Option<u64>,
-    ) -> Result<Vec<EventWithProof<PS::TransactionInfo>>> {
+    ) -> Result<Vec<EventWithProof>> {
         unimplemented!()
     }
 
@@ -300,7 +299,7 @@ pub trait DbReader<PS: ProtocolSpec>: Send + Sync {
         event_key: &EventKey,
         event_version: u64,
         proof_version: u64,
-    ) -> Result<EventByVersionWithProof<PS::TransactionInfo>> {
+    ) -> Result<EventByVersionWithProof> {
         unimplemented!()
     }
 
@@ -360,7 +359,7 @@ pub trait DbReader<PS: ProtocolSpec>: Send + Sync {
         seq_num: u64,
         include_events: bool,
         ledger_version: Version,
-    ) -> Result<Option<TransactionWithProof<PS::TransactionInfo>>> {
+    ) -> Result<Option<TransactionWithProof>> {
         unimplemented!()
     }
 
@@ -375,7 +374,7 @@ pub trait DbReader<PS: ProtocolSpec>: Send + Sync {
         limit: u64,
         include_events: bool,
         ledger_version: Version,
-    ) -> Result<AccountTransactionsWithProof<PS::TransactionInfo>> {
+    ) -> Result<AccountTransactionsWithProof> {
         unimplemented!()
     }
 
@@ -401,7 +400,7 @@ pub trait DbReader<PS: ProtocolSpec>: Send + Sync {
         address: AccountAddress,
         version: Version,
         ledger_version: Version,
-    ) -> Result<AccountStateWithProof<PS::TransactionInfo>> {
+    ) -> Result<AccountStateWithProof> {
         unimplemented!()
     }
 
@@ -515,7 +514,7 @@ pub trait DbReader<PS: ProtocolSpec>: Send + Sync {
     }
 }
 
-impl<PS: ProtocolSpec> MoveStorage for &dyn DbReader<PS> {
+impl MoveStorage for &dyn DbReader {
     fn batch_fetch_resources(&self, access_paths: Vec<AccessPath>) -> Result<Vec<Vec<u8>>> {
         self.batch_fetch_resources_by_version(access_paths, self.fetch_synced_version()?)
     }
@@ -579,7 +578,7 @@ impl<PS: ProtocolSpec> MoveStorage for &dyn DbReader<PS> {
 /// Trait that is implemented by a DB that supports certain public (to client) write APIs
 /// expected of a Diem DB. This adds write APIs to DbReader.
 #[allow(unused_variables)]
-pub trait DbWriter<PS: ProtocolSpec>: Send + Sync {
+pub trait DbWriter: Send + Sync {
     /// Persist transactions. Called by the executor module when either syncing nodes or committing
     /// blocks during normal operation.
     /// See [`DiemDB::save_transactions`].
@@ -606,52 +605,37 @@ pub trait DbWriter<PS: ProtocolSpec>: Send + Sync {
     }
 }
 
-pub trait MoveDbReader<PS: ProtocolSpec>:
-    DbReader<PS> + ResourceResolver<Error = anyhow::Error> + ModuleResolver<Error = anyhow::Error>
+pub trait MoveDbReader:
+    DbReader + ResourceResolver<Error = anyhow::Error> + ModuleResolver<Error = anyhow::Error>
 {
 }
 
 #[derive(Clone)]
-pub struct DbReaderWriter<PS: ProtocolSpec> {
-    pub reader: Arc<dyn DbReader<PS>>,
-    pub writer: Arc<dyn DbWriter<PS>>,
+pub struct DbReaderWriter {
+    pub reader: Arc<dyn DbReader>,
+    pub writer: Arc<dyn DbWriter>,
 }
 
-impl<PS: ProtocolSpec> DbReaderWriter<PS> {
-    pub fn new<D: 'static + DbReader<PS> + DbWriter<PS>>(db: D) -> Self {
+impl DbReaderWriter {
+    pub fn new<D: 'static + DbReader + DbWriter>(db: D) -> Self {
         let reader = Arc::new(db);
         let writer = Arc::clone(&reader);
 
         Self { reader, writer }
     }
 
-    pub fn from_arc<D: 'static + DbReader<PS> + DbWriter<PS>>(arc_db: Arc<D>) -> Self {
+    pub fn from_arc<D: 'static + DbReader + DbWriter>(arc_db: Arc<D>) -> Self {
         let reader = Arc::clone(&arc_db);
         let writer = Arc::clone(&arc_db);
 
         Self { reader, writer }
     }
 
-    pub fn wrap<D: 'static + DbReader<PS> + DbWriter<PS>>(db: D) -> (Arc<D>, Self) {
+    pub fn wrap<D: 'static + DbReader + DbWriter>(db: D) -> (Arc<D>, Self) {
         let arc_db = Arc::new(db);
         (Arc::clone(&arc_db), Self::from_arc(arc_db))
     }
 }
-
-/*
-getting this error: conflicting implementation in crate `core`:
-            - impl<T> From<T> for T;
-
-impl<D, PS> From<D> for DbReaderWriter<PS>
-where
-    D: 'static + DbReader<PS> + DbWriter<PS>,
-    PS: ProtocolSpec,
-{
-    fn from(db: D) -> Self {
-        Self::new(db)
-    }
-}
- */
 
 /// Network types for storage service
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -697,13 +681,4 @@ impl SaveTransactionsRequest {
             ledger_info_with_signatures,
         }
     }
-}
-
-pub mod default_protocol {
-    use diem_types::protocol_spec::DpnProto;
-
-    // trait aliases are experimental
-    // pub trait DbReader = super::DbReader<DpnProto>;
-    // pub trait DbWriter = super::DbWriter<DpnProto>;
-    pub type DbReaderWriter = super::DbReaderWriter<DpnProto>;
 }

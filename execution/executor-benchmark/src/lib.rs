@@ -12,7 +12,7 @@ use crate::{
 };
 use diem_config::config::{NodeConfig, RocksdbConfig};
 use diem_logger::prelude::*;
-use diem_types::protocol_spec::DpnProto;
+
 use diem_vm::DiemVM;
 use diemdb::DiemDB;
 use executor::block_executor::BlockExecutor;
@@ -22,11 +22,9 @@ use std::{
     path::Path,
     sync::{mpsc, Arc},
 };
-use storage_interface::{default_protocol::DbReaderWriter, DbReader};
+use storage_interface::{DbReader, DbReaderWriter};
 
-pub fn init_db_and_executor(
-    config: &NodeConfig,
-) -> (Arc<dyn DbReader<DpnProto>>, BlockExecutor<DpnProto, DiemVM>) {
+pub fn init_db_and_executor(config: &NodeConfig) -> (Arc<dyn DbReader>, BlockExecutor<DiemVM>) {
     let (db, dbrw) = DbReaderWriter::wrap(
         DiemDB::open(
             &config.storage.dir(),

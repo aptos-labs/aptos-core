@@ -18,7 +18,7 @@ use executor_types::ChunkExecutorTrait;
 use futures::channel::mpsc;
 use mempool_notifications::MempoolNotificationSender;
 use std::{boxed::Box, sync::Arc};
-use storage_interface::default_protocol::DbReaderWriter;
+use storage_interface::DbReaderWriter;
 use tokio::runtime::{Builder, Runtime};
 
 /// Creates a new state sync driver and client

@@ -15,10 +15,8 @@ use bytes::Bytes;
 use diem_crypto::HashValue;
 use diem_logger::prelude::*;
 use diem_types::{
-    account_state_blob::AccountStateBlob,
-    ledger_info::LedgerInfoWithSignatures,
-    proof::default_protocol::TransactionInfoWithProof,
-    transaction::{TransactionInfoTrait, Version},
+    account_state_blob::AccountStateBlob, ledger_info::LedgerInfoWithSignatures,
+    proof::TransactionInfoWithProof, transaction::Version,
 };
 use once_cell::sync::Lazy;
 use std::{convert::TryInto, str::FromStr, sync::Arc};
