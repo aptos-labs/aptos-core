@@ -1,0 +1,129 @@
+//# publish
+module 0x1.M {
+    struct T has key { b: bool }
+
+    public new(): Self.T {
+    label b0:
+        return T { b: true };
+    }
+}
+
+
+//# publish
+module 0x1.N {
+    import 0x1.Signer;
+    import 0x1.M;
+
+    foo(account: signer) {
+        let t: M.T;
+        let r: &bool;
+    label b0:
+        t = M.new();
+        _ = &(&mut t).T::b;
+        return;
+    }
+}
+
+
+//# publish
+module 0x1.N {
+    import 0x1.Signer;
+    import 0x1.M;
+
+    foo(account: signer) {
+        let t: M.T;
+        let r: &bool;
+    label b0:
+        t = M.new();
+        _ = &mut (&mut t).T::b;
+        return;
+    }
+}
+
+
+//# publish
+module 0x1.N {
+    import 0x1.Signer;
+    import 0x1.M;
+
+    foo(account: signer) {
+        let t: M.T;
+        let r: &bool;
+    label b0:
+        t = M.new();
+        _ = &(&mut t).M.T::b;
+        return;
+    }
+}
+
+
+//# publish
+module 0x1.N {
+    import 0x1.Signer;
+    import 0x1.M;
+
+    foo(account: signer) {
+        let t: M.T;
+        let r: &bool;
+    label b0:
+        t = M.new();
+        _ = &mut (&mut t).M.T::b;
+        return;
+    }
+}
+
+
+//# run
+import 0x1.Signer;
+import 0x1.M;
+
+main(account: signer) {
+    let t: M.T;
+    let r: &bool;
+label b0:
+    t = M.new();
+    _ = &(&mut t).T::b;
+    return;
+}
+
+
+//# run
+import 0x1.Signer;
+import 0x1.M;
+
+main(account: signer) {
+    let t: M.T;
+    let r: &bool;
+label b0:
+    t = M.new();
+    _ = &mut (&mut t).T::b;
+    return;
+}
+
+
+//# run
+import 0x1.Signer;
+import 0x1.M;
+
+main(account: signer) {
+    let t: M.T;
+    let r: &bool;
+label b0:
+    t = M.new();
+    _ = &(&mut t).M.T::b;
+    return;
+}
+
+
+//# run
+import 0x1.Signer;
+import 0x1.M;
+
+main(account: signer) {
+    let t: M.T;
+    let r: &bool;
+label b0:
+    t = M.new();
+    _ = &mut (&mut t).M.T::b;
+    return;
+}

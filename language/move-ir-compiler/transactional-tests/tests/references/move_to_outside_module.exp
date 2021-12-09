@@ -1,0 +1,13 @@
+processed 5 tasks
+
+task 1 'publish'. lines 12-20:
+Error: Missing struct definition for T
+
+task 2 'publish'. lines 23-31:
+Error: ParserError: Invalid Token: expected Tok::NameValue
+
+task 3 'run'. lines 34-40:
+Error: Missing struct definition for T
+
+task 4 'run'. lines 43-49:
+Error: ParserError: Invalid Token: expected Tok::NameValue

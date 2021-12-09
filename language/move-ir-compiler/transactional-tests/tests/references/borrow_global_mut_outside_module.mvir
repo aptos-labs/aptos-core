@@ -1,0 +1,56 @@
+//# publish
+module 0x1.M {
+    struct T has key { b: bool }
+}
+
+
+//# publish
+module 0x1.N {
+    import 0x1.Signer;
+    import 0x1.M;
+
+    foo(account: signer) {
+        let r: &mut M.T;
+    label b0:
+        r = borrow_global_mut<T>(&account);
+        return;
+    }
+}
+
+
+//# publish
+module 0x1.N {
+    import 0x1.Signer;
+    import 0x1.M;
+
+    foo(account: signer) {
+        let r: &mut M.T;
+    label b0:
+        r = borrow_global_mut<M.T>(&account);
+        return;
+    }
+}
+
+
+//# run
+import 0x1.Signer;
+import 0x1.M;
+
+main(account: signer) {
+    let r: &mut M.T;
+label b0:
+    r = borrow_global_mut<T>(&account);
+    return;
+}
+
+
+//# run
+import 0x1.Signer;
+import 0x1.M;
+
+main(account: signer) {
+    let r: &mut M.T;
+label b0:
+    r = borrow_global_mut<M.T>(&account);
+    return;
+}
