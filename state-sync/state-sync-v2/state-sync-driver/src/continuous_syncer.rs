@@ -10,7 +10,7 @@ use data_streaming_service::{
     data_stream::DataStreamListener,
     streaming_client::{DataStreamingClient, NotificationFeedback, StreamingServiceClient},
 };
-use diem_config::config::SyncingMode;
+use diem_config::config::ContinuousSyncingMode;
 use diem_infallible::Mutex;
 use diem_types::{
     contract_event::ContractEvent,
@@ -91,8 +91,8 @@ impl<S: StorageSynchronizerInterface> ContinuousSyncer<S> {
             .lock()
             .as_ref()
             .map(|sync_request| sync_request.get_sync_target());
-        let active_data_stream = match self.driver_configuration.config.syncing_mode {
-            SyncingMode::ApplyTransactionOutputs => {
+        let active_data_stream = match self.driver_configuration.config.continuous_syncing_mode {
+            ContinuousSyncingMode::ApplyTransactionOutputs => {
                 self.streaming_service_client
                     .continuously_stream_transaction_outputs(
                         next_version,
@@ -101,7 +101,7 @@ impl<S: StorageSynchronizerInterface> ContinuousSyncer<S> {
                     )
                     .await?
             }
-            SyncingMode::ExecuteTransactions => {
+            ContinuousSyncingMode::ExecuteTransactions => {
                 self.streaming_service_client
                     .continuously_stream_transactions(
                         next_version,
@@ -202,8 +202,8 @@ impl<S: StorageSynchronizerInterface> ContinuousSyncer<S> {
         .await?;
 
         // Execute/apply and commit the transactions/outputs
-        let committed_events = match self.driver_configuration.config.syncing_mode {
-            SyncingMode::ApplyTransactionOutputs => {
+        let committed_events = match self.driver_configuration.config.continuous_syncing_mode {
+            ContinuousSyncingMode::ApplyTransactionOutputs => {
                 if let Some(transaction_outputs_with_proof) = transaction_outputs_with_proof {
                     self.storage_synchronizer
                         .lock()
@@ -221,7 +221,7 @@ impl<S: StorageSynchronizerInterface> ContinuousSyncer<S> {
                         .await;
                 }
             }
-            SyncingMode::ExecuteTransactions => {
+            ContinuousSyncingMode::ExecuteTransactions => {
                 if let Some(transaction_list_with_proof) = transaction_list_with_proof {
                     self.storage_synchronizer
                         .lock()
