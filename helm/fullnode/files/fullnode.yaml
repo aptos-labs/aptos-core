@@ -9,14 +9,32 @@ execution:
 full_node_networks:
 - network_id: "public"
   discovery_method: "onchain"
+  {{- if .Values.fullnode_identity }}
+  identity:
+    {{- .Values.fullnode_identity | toYaml | nindent 6 }}
+  {{- end }}
   seeds:
     {{- (get .Values.diem_chains .Values.chain.name).seeds | default dict | toYaml | nindent 6 }}
-
-metrics:
-  enabled: false
+  inbound_rate_limit_config:
+    ip_byte_bucket_rate: 1048576
+    ip_byte_bucket_size: 1048576
+    initial_bucket_fill_percentage: 25
+    enabled: true
+  outbound_rate_limit_config:
+    ip_byte_bucket_rate: 1048576
+    ip_byte_bucket_size: 1048576
+    initial_bucket_fill_percentage: 25
+    enabled: true
 
 storage:
   backup_service_address: "0.0.0.0:6186"
 
 json_rpc:
+  {{- if .Values.json_rpc.content_length_limit }}
+  content_length_limit: {{ .Values.json_rpc.content_length_limit }}
+  {{- end }}
   address: "0.0.0.0:8080"
+
+api:
+  enabled: {{ .Values.enableApi | default false}}
+  address: "0.0.0.0:8081"

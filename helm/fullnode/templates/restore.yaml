@@ -51,7 +51,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: "metadata.labels['controller-uid']"
-        {{- include "backup.backupEnvironment" (dict "config" .config "era" $.Values.chain.era) | nindent 8 }}
+        {{- include "backup.backupEnvironment" (dict "config" .config "era" (default $.Values.chain.era .config.restore_era)) | nindent 8 }}
         volumeMounts:
         - name: backup-config
           mountPath: /opt/diem/etc

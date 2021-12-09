@@ -36,6 +36,8 @@ spec:
         {{- end }}
         - name: RUST_LOG
           value: {{ .Values.rust_log }}
+        - name: RUST_LOG_REMOTE
+          value: {{ .Values.rust_log_remote }}
         - name: RUST_BACKTRACE
           value: "1"
         volumeMounts:
@@ -50,6 +52,7 @@ spec:
         ports:
         - containerPort: 6186
         - containerPort: 8080
+        - containerPort: 8081
         - containerPort: 9101
         livenessProbe:
           tcpSocket:

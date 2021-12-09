@@ -32,6 +32,12 @@
 - name: ENDPOINT_URL
   value: {{ .config.scw_s3.endpoint_url }}
 {{- end }}
+{{- if hasPrefix "oci" (toString .config.location) }}
+- name: ACCESS_URI
+  value: {{ .config.oci.access_uri }}
+- name: ENDPOINT
+  value: {{ .config.oci.endpoint }}
+{{- end }}
 - name: SUB_DIR
   value: e{{ .era }}
 {{- end -}}

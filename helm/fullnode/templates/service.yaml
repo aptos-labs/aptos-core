@@ -16,6 +16,9 @@ spec:
   - name: json-rpc
     port: 80
     targetPort: 8080
+  - name: rest-api
+    port: 8081
+    targetPort: 8081
   {{- with .Values.service }}
   type: {{ .type }}
   externalTrafficPolicy: {{ .externalTrafficPolicy }}

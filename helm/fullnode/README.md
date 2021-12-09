@@ -24,7 +24,10 @@ See [values.yaml][] for the full list of options you can configure.
   "LoadBalancer".
 * `service.loadBalancerSourceRanges`: If you enable the LoadBalancer service you
   can set this to a list of IP ranges to restrict access to.
-* `image.tag`: Select the image tag to deploy. For a full list of image tags, check out the [Diem dockerhub][]. Backup and restore images are specified separately in `backup.image.tag` and `restore.image.tag`
+* `image.tag`: Select the image tag to deploy. Backup and restore images are specified separately in `backup.image.tag` and `restore.image.tag`. For a full list of image tags, check out the [Diem dockerhub][]. Some useful tags:
+  - `testnet`: the image Testnet validators are running
+  - `devnet`: nightly build off of main
+  - `release-*`: build off of the corresponding release branch
 
 Connecting to Testnet
 -------------
@@ -34,6 +37,9 @@ To connect to the Diem testnet, you must have the correct genesis blob and waypo
 * https://testnet.diem.com/genesis.blob
 
 The waypoint is configured as a helm value in `diem_chains.testnet.waypoint`, and the genesis blob should be copied to `files/genesis/testnet.blob`
+
+You may also need to change the chain era helm value in `chain.era` to the source of truth hosted at:
+* https://testnet.diem.com/era.txt
 
 Deployment
 ----------
