@@ -235,22 +235,22 @@ print(
 print("**********\n")
 
 test_res = 'failed'
+# perf report
+test_report = []
+read_lines = False
+with open(f"{OUTPUT_TEE}", 'r') as file:
+    for line in file.readlines():
+        if 'json-report-end' in line: read_lines = False
+        if read_lines:
+            test_report.append(line)
+        if 'json-report-begin' in line: read_lines = True
+        if 'test result: ok' in line: test_res = 'passed'
+if len(test_report) == 0:
+    test_report.append("{\"text\": \"Forge test runner is terminated\"}")
+temp = json.loads(''.join(test_report))
+temp["logs"] = "Logs: " + LOGGING_LINK
+temp["dashboard"] = "Dashboard: " + DASHBOARD_LINK
 if args.report:
-    # perf report
-    test_report = []
-    read_lines = False
-    with open(f"{OUTPUT_TEE}", 'r') as file:
-        for line in file.readlines():
-            if 'json-report-end' in line: read_lines = False
-            if read_lines:
-                test_report.append(line)
-            if 'json-report-begin' in line: read_lines = True
-            if 'test result: ok' in line: test_res = 'passed'
-    if len(test_report) == 0:
-        test_report.append("{\"text\": \"Forge test runner is terminated\"}")
-    temp = json.loads(''.join(test_report))
-    temp["logs"] = "Logs: " + LOGGING_LINK
-    temp["dashboard"] = "Dashboard: " + DASHBOARD_LINK
     with open(f"{REPORT}", 'w') as file_object:
         file_object.write(json.dumps(temp))
 
