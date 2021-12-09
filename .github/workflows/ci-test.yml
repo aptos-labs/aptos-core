@@ -809,7 +809,12 @@ jobs:
       - run: $pre_command && cargo xcheck -j ${max_threads} --workspace --all-targets
       - run: |
           $pre_command && rustup target add powerpc-unknown-linux-gnu
+          # disable the workspace-hack because it contains some code that doesn't build on powerpc
+          $pre_command && cargo x generate-workspace-hack --mode disable
           $pre_command && cargo xcheck -j ${max_threads} -p diem-transaction-builder -p move-vm-types --target powerpc-unknown-linux-gnu
+          # we can't just re-enable the workspace-hack at the end, because it can result in a different
+          # Cargo.lock resolution result in some cases. So use git reset instead.
+          $pre_command && git reset --hard HEAD
       - uses: ./.github/actions/build-teardown
       - name: Early terminate workflow
         if: ${{ failure() }}
