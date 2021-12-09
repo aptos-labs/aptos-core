@@ -73,11 +73,10 @@ diem-framework-releases= { path = "../diem-move/diem-framework/DPN/releases" }
 vm-genesis = { path = "../diem-move/vm-genesis" }
 executor = { path = "../execution/executor" }
 executor-types = { path = "../execution/executor-types" }
-scratchpad = { path = "../storage/scratchpad" }
 move-vm-types = { path = "../language/move-vm/types" }
 diem-transaction-builder = { path = "../sdk/transaction-builder" }
 diem-sdk = { path = "../sdk" }
 
 [features]
-fuzzing = ["proptest", "diem-client", "diem-mempool/fuzzing", "diemdb/fuzzing", "diem-proptest-helpers", "diem-temppath", "executor", "executor-types", "move-vm-types", "reqwest", "scratchpad", "vm-genesis"]
+fuzzing = ["proptest", "diem-client", "diem-mempool/fuzzing", "diemdb/fuzzing", "diem-proptest-helpers", "diem-temppath", "executor", "executor-types", "move-vm-types", "reqwest", "scratchpad/fuzzing", "vm-genesis"]
 failpoints = ["fail/failpoints"]
