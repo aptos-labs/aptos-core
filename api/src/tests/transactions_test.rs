@@ -54,7 +54,7 @@ async fn test_get_transactions_output_genesis_transaction() {
     assert_eq!(txn["hash"], info.transaction_hash().to_hex_literal());
     assert_eq!(
         txn["state_root_hash"],
-        info.state_root_hash().to_hex_literal()
+        info.state_change_hash().to_hex_literal()
     );
     assert_eq!(
         txn["event_root_hash"],
@@ -281,7 +281,7 @@ async fn test_get_transactions_output_user_transaction_with_script_function_payl
             "type": "block_metadata_transaction",
             "version": "1",
             "hash": metadata.transaction_hash().to_hex_literal(),
-            "state_root_hash": metadata.state_root_hash().to_hex_literal(),
+            "state_root_hash": metadata.state_change_hash().to_hex_literal(),
             "event_root_hash": metadata.event_root_hash().to_hex_literal(),
             "gas_used": metadata.gas_used().to_string(),
             "success": true,
@@ -311,7 +311,7 @@ async fn test_get_transactions_output_user_transaction_with_script_function_payl
             "type": "user_transaction",
             "version": "2",
             "hash": user_txn_info.transaction_hash().to_hex_literal(),
-            "state_root_hash": user_txn_info.state_root_hash().to_hex_literal(),
+            "state_root_hash": user_txn_info.state_change_hash().to_hex_literal(),
             "event_root_hash": user_txn_info.event_root_hash().to_hex_literal(),
             "gas_used": user_txn_info.gas_used().to_string(),
             "success": true,

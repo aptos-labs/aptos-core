@@ -102,10 +102,10 @@ impl StateSnapshotRestoreController {
             self.storage.load_bcs_file(&manifest.proof).await?;
         txn_info_with_proof.verify(li.ledger_info(), manifest.version)?;
         ensure!(
-            txn_info_with_proof.transaction_info().state_root_hash() == manifest.root_hash,
+            txn_info_with_proof.transaction_info().state_change_hash() == manifest.root_hash,
             "Root hash mismatch with that in proof. root hash: {}, expected: {}",
             manifest.root_hash,
-            txn_info_with_proof.transaction_info().state_root_hash(),
+            txn_info_with_proof.transaction_info().state_change_hash(),
         );
         if let Some(epoch_history) = self.epoch_history.as_ref() {
             epoch_history.verify_ledger_info(&li)?;

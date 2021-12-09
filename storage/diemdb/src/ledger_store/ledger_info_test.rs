@@ -162,13 +162,13 @@ proptest! {
         let committed_version = get_last_version(&ledger_infos_with_sigs);
         assert_eq!(
             startup_info.committed_tree_state.account_state_root_hash,
-            txn_infos[committed_version as usize].state_root_hash(),
+            txn_infos[committed_version as usize].state_change_hash(),
         );
         let synced_version = (txn_infos.len() - 1) as u64;
         if synced_version > committed_version {
             assert_eq!(
                 startup_info.synced_tree_state.unwrap().account_state_root_hash,
-                txn_infos.last().unwrap().state_root_hash(),
+                txn_infos.last().unwrap().state_change_hash(),
             );
         } else {
             assert!(startup_info.synced_tree_state.is_none());

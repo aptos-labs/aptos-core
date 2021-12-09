@@ -973,40 +973,81 @@ impl TransactionOutput {
 /// transaction as well as the execution result of this transaction.
 #[derive(Clone, CryptoHasher, BCSCryptoHash, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
-pub struct TransactionInfo {
-    /// The hash of this transaction.
-    transaction_hash: HashValue,
-
-    /// The root hash of Sparse Merkle Tree describing the world state at the end of this
-    /// transaction.
-    state_root_hash: HashValue,
-
-    /// The root hash of Merkle Accumulator storing all events emitted during this transaction.
-    event_root_hash: HashValue,
-
-    /// The amount of gas used.
-    gas_used: u64,
-
-    /// The vm status. If it is not `Executed`, this will provide the general error class. Execution
-    /// failures and Move abort's recieve more detailed information. But other errors are generally
-    /// categorized with no status code or other information
-    status: KeptVMStatus,
+pub enum TransactionInfo {
+    V0(TransactionInfoV0),
 }
 
 impl TransactionInfo {
     pub fn new(
         transaction_hash: HashValue,
-        state_root_hash: HashValue,
+        state_change_hash: HashValue,
         event_root_hash: HashValue,
         gas_used: u64,
         status: KeptVMStatus,
-    ) -> TransactionInfo {
-        TransactionInfo {
+    ) -> Self {
+        Self::V0(TransactionInfoV0::new(
             transaction_hash,
-            state_root_hash,
+            state_change_hash,
             event_root_hash,
             gas_used,
             status,
+        ))
+    }
+}
+
+impl Deref for TransactionInfo {
+    type Target = TransactionInfoV0;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Self::V0(txn_info) => txn_info,
+        }
+    }
+}
+
+#[derive(Clone, CryptoHasher, BCSCryptoHash, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+pub struct TransactionInfoV0 {
+    /// The amount of gas used.
+    gas_used: u64,
+
+    /// The vm status. If it is not `Executed`, this will provide the general error class. Execution
+    /// failures and Move abort's receive more detailed information. But other errors are generally
+    /// categorized with no status code or other information
+    status: KeptVMStatus,
+
+    /// The hash of this transaction.
+    transaction_hash: HashValue,
+
+    /// The root hash of Merkle Accumulator storing all events emitted during this transaction.
+    event_root_hash: HashValue,
+
+    /// The hash value summarizing all changes caused to the world state by this transaction.
+    /// Depending on the protocol configuration, it can be the root hash of an accumulator of
+    /// the write set or all updated accounts, or the global Sparse Merkle Tree root hash.
+    state_change_hash: HashValue,
+
+    /// The root hash of the Sparse Merkle Tree describing the world state at the end of this
+    /// transaction. Depending on the protocol configuration, this can be generated periodical
+    /// only, like per block.
+    state_checkpoint_hash: Option<HashValue>,
+}
+
+impl TransactionInfoV0 {
+    pub fn new(
+        transaction_hash: HashValue,
+        state_change_hash: HashValue,
+        event_root_hash: HashValue,
+        gas_used: u64,
+        status: KeptVMStatus,
+    ) -> Self {
+        Self {
+            gas_used,
+            status,
+            transaction_hash,
+            event_root_hash,
+            state_change_hash,
+            state_checkpoint_hash: None,
         }
     }
 
@@ -1014,8 +1055,8 @@ impl TransactionInfo {
         self.transaction_hash
     }
 
-    pub fn state_root_hash(&self) -> HashValue {
-        self.state_root_hash
+    pub fn state_change_hash(&self) -> HashValue {
+        self.state_change_hash
     }
 
     pub fn event_root_hash(&self) -> HashValue {
@@ -1036,7 +1077,7 @@ impl Display for TransactionInfo {
         write!(
             f,
             "TransactionInfo: [txn_hash: {}, state_root_hash: {}, event_root_hash: {}, gas_used: {}, recorded_status: {:?}]",
-            self.transaction_hash(), self.state_root_hash(), self.event_root_hash(), self.gas_used(), self.status(),
+            self.transaction_hash(), self.state_change_hash(), self.event_root_hash(), self.gas_used(), self.status(),
         )
     }
 }

@@ -165,7 +165,7 @@ impl LedgerStore {
         Ok(TreeState::new(
             num_transactions,
             self.get_frozen_subtree_hashes(num_transactions)?,
-            transaction_info.state_root_hash(),
+            transaction_info.state_change_hash(),
         ))
     }
 

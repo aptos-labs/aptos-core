@@ -1021,7 +1021,7 @@ impl DbReader for DiemDB {
     fn get_latest_state_root(&self) -> Result<(Version, HashValue)> {
         gauged_api("get_latest_state_root", || {
             let (version, txn_info) = self.ledger_store.get_latest_transaction_info()?;
-            Ok((version, txn_info.state_root_hash()))
+            Ok((version, txn_info.state_change_hash()))
         })
     }
 

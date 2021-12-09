@@ -657,7 +657,7 @@ fn test_get_latest_tree_state() {
     let bootstrapped = db.get_latest_tree_state().unwrap();
     assert_eq!(
         bootstrapped,
-        TreeState::new(1, vec![txn_info.hash()], txn_info.state_root_hash())
+        TreeState::new(1, vec![txn_info.hash()], txn_info.state_change_hash())
     );
 }
 
