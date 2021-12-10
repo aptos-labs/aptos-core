@@ -10,7 +10,7 @@ license = "Apache-2.0"
 # diem dependencies
 move-model = { path = "../../move-model" }
 move-prover = { path = ".." }
-bytecode = { path = "../bytecode"}
+move-stackless-bytecode = { path = "../bytecode"}
 
 # FB external dependencies
 z3tracer = "0.8.0"

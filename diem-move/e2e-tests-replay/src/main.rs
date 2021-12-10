@@ -5,10 +5,12 @@ use anyhow::{bail, Result};
 use std::collections::{BTreeMap, BTreeSet};
 use structopt::StructOpt;
 
-use bytecode_interpreter::{concrete::settings::InterpreterSettings, StacklessBytecodeInterpreter};
 use diem_framework::diem_stdlib_files;
 use diem_types::on_chain_config::{DiemVersion, DIEM_MAX_KNOWN_VERSION};
 use move_model::run_model_builder;
+use move_stackless_bytecode_interpreter::{
+    concrete::settings::InterpreterSettings, StacklessBytecodeInterpreter,
+};
 
 use diem_e2e_tests_replay::{self, ReplayFlags};
 

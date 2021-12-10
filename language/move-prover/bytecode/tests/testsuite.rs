@@ -2,7 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::anyhow;
-use bytecode::{
+use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
+use move_command_line_common::testing::EXP_EXT;
+use move_model::{model::GlobalEnv, options::ModelBuilderOptions, run_model_builder_with_options};
+use move_prover_test_utils::{baseline_test::verify_or_update_baseline, extract_test_directives};
+use move_stackless_bytecode::{
     borrow_analysis::BorrowAnalysisProcessor,
     clean_and_optimize::CleanAndOptimizeProcessor,
     data_invariant_instrumentation::DataInvariantInstrumentationProcessor,
@@ -26,10 +30,6 @@ use bytecode::{
     verification_analysis::VerificationAnalysisProcessor,
     well_formed_instrumentation::WellFormedInstrumentationProcessor,
 };
-use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
-use move_command_line_common::testing::EXP_EXT;
-use move_model::{model::GlobalEnv, options::ModelBuilderOptions, run_model_builder_with_options};
-use move_prover_test_utils::{baseline_test::verify_or_update_baseline, extract_test_directives};
 use std::path::Path;
 
 fn get_tested_transformation_pipeline(

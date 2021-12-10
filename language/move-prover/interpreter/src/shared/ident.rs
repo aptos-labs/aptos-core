@@ -3,9 +3,11 @@
 
 use std::fmt;
 
-use bytecode::{function_target::FunctionTarget, function_target_pipeline::FunctionVariant};
 use move_core_types::account_address::AccountAddress;
 use move_model::model::{ModuleEnv, StructEnv};
+use move_stackless_bytecode::{
+    function_target::FunctionTarget, function_target_pipeline::FunctionVariant,
+};
 
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub struct ModuleIdent {

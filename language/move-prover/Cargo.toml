@@ -7,8 +7,8 @@ edition = "2018"
 license = "Apache-2.0"
 
 [dependencies]
-# diem dependencies
-boogie-backend = { path = "boogie-backend" }
+# move dependencies
+move-prover-boogie-backend = { path = "boogie-backend" }
 move-command-line-common = { path = "../move-command-line-common" }
 move-binary-format = { path = "../move-binary-format" }
 move-compiler = { path = "../move-compiler" }
@@ -16,8 +16,8 @@ move-model = { path = "../move-model" }
 move-docgen = { path = "move-docgen" }
 move-abigen = { path = "move-abigen" }
 move-errmapgen = { path = "move-errmapgen" }
-bytecode = { path = "bytecode" }
-bytecode-interpreter = { path = "interpreter" }
+move-stackless-bytecode = { path = "bytecode" }
+move-stackless-bytecode-interpreter = { path = "interpreter" }
 move-ir-types = { path = "../move-ir/types" }
 move-core-types = { path = "../move-core/types" }
 

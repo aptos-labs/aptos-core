@@ -4,11 +4,11 @@
 use anyhow::Result;
 use std::collections::BTreeMap;
 
-use bytecode::function_target::FunctionTarget;
 use move_model::{
     ast::{ConditionKind, Spec},
     model::{FunId, QualifiedId},
 };
+use move_stackless_bytecode::function_target::FunctionTarget;
 
 use crate::workflow::{prepare_with_override, prove, WorkflowOptions};
 

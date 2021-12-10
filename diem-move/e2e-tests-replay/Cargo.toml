@@ -14,7 +14,7 @@ structopt = "0.3.21"
 walkdir = "2.3.1"
 
 diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
-bytecode-interpreter = { path = "../../language/move-prover/interpreter" }
+move-stackless-bytecode-interpreter = { path = "../../language/move-prover/interpreter" }
 diem-types = { path = "../../types", features = ["fuzzing"] }
 diem-framework = { path = "../../diem-move/diem-framework" }
 diem-vm = { path = "../../diem-move/diem-vm" }

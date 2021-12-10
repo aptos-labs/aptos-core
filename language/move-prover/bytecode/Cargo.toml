@@ -1,5 +1,5 @@
 [package]
-name = "bytecode"
+name = "move-stackless-bytecode"
 version = "0.1.0"
 authors = ["Diem Association <opensource@diem.com>"]
 description = "Move stackless bytecode"

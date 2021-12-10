@@ -10,7 +10,7 @@ license = "Apache-2.0"
 # diem dependencies
 move-compiler = { path = "../../move-compiler" }
 move-model = { path = "../../move-model" }
-bytecode = { path = "../bytecode" }
+move-stackless-bytecode = { path = "../bytecode" }
 
 # external dependencies
 codespan = "0.11.1"

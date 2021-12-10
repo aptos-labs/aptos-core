@@ -9,15 +9,6 @@ use std::{
 };
 use walkdir::WalkDir;
 
-use bytecode_interpreter::{
-    concrete::{
-        runtime::{convert_move_struct_tag, convert_move_value},
-        ty::BaseType,
-        value::GlobalState,
-    },
-    shared::bridge::{adapt_move_vm_change_set, adapt_move_vm_result},
-    StacklessBytecodeInterpreter,
-};
 use diem_types::{
     access_path::Path as AP,
     account_address::AccountAddress,
@@ -56,6 +47,15 @@ use move_core_types::{
     language_storage::{ModuleId, TypeTag},
     value::MoveValue,
     vm_status::{KeptVMStatus, VMStatus},
+};
+use move_stackless_bytecode_interpreter::{
+    concrete::{
+        runtime::{convert_move_struct_tag, convert_move_value},
+        ty::BaseType,
+        value::GlobalState,
+    },
+    shared::bridge::{adapt_move_vm_change_set, adapt_move_vm_result},
+    StacklessBytecodeInterpreter,
 };
 use move_vm_runtime::{move_vm::MoveVM, session::Session};
 use move_vm_types::gas_schedule::GasStatus;

@@ -6,7 +6,6 @@
 //! of the interpreter should never directly interact with the statement player (in `player.rs`) nor
 //! the expression evaluator (in `evaluator.rs`).
 
-use bytecode::{function_target::FunctionTarget, function_target_pipeline::FunctionTargetsHolder};
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
 use move_core_types::{
     language_storage::{StructTag, TypeTag},
@@ -16,6 +15,9 @@ use move_core_types::{
 use move_model::{
     model::{AbilitySet, FunctionEnv, GlobalEnv, TypeParameter},
     ty as MT,
+};
+use move_stackless_bytecode::{
+    function_target::FunctionTarget, function_target_pipeline::FunctionTargetsHolder,
 };
 
 use crate::{

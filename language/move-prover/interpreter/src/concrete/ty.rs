@@ -15,7 +15,6 @@
 
 use std::fmt;
 
-use bytecode::stackless_bytecode::Constant;
 use move_core_types::{
     identifier::Identifier,
     language_storage::{StructTag, TypeTag},
@@ -25,6 +24,7 @@ use move_model::{
     model::{GlobalEnv, ModuleId, StructId},
     ty as MT,
 };
+use move_stackless_bytecode::stackless_bytecode::Constant;
 
 use crate::shared::ident::StructIdent;
 

@@ -5,10 +5,6 @@ use anyhow::{anyhow, Result};
 use std::collections::BTreeMap;
 use structopt::StructOpt;
 
-use bytecode::{
-    function_target_pipeline::FunctionTargetsHolder, options::ProverOptions,
-    pipeline_factory::default_pipeline_with_options,
-};
 use move_compiler::shared::{parse_named_address, NumericalAddress};
 use move_model::{
     ast::Spec,
@@ -18,6 +14,10 @@ use move_model::{
     simplifier::SimplificationPass,
 };
 use move_prover::{cli::Options as CliOptions, generate_boogie, verify_boogie};
+use move_stackless_bytecode::{
+    function_target_pipeline::FunctionTargetsHolder, options::ProverOptions,
+    pipeline_factory::default_pipeline_with_options,
+};
 
 /// Options passed into the workflow pipeline.
 #[derive(StructOpt, Clone)]

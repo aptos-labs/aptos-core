@@ -19,7 +19,7 @@ structopt = "0.3.21"
 tempfile = "3.2.0"
 
 
-bytecode-interpreter = { path = "../../move-prover/interpreter" }
+move-stackless-bytecode-interpreter = { path = "../../move-prover/interpreter" }
 move-bytecode-source-map = { path = "../../move-ir-compiler/move-bytecode-source-map" }
 move-disassembler = { path = "../../tools/move-disassembler" }
 move-binary-format = { path = "../../move-binary-format" }

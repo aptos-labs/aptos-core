@@ -5,8 +5,8 @@ use anyhow::{anyhow, Result};
 use std::{collections::BTreeMap, str::FromStr};
 use structopt::StructOpt;
 
-use bytecode::function_target_pipeline::{FunctionVariant, VerificationFlavor};
 use move_model::ast::SpecBlockTarget;
+use move_stackless_bytecode::function_target_pipeline::{FunctionVariant, VerificationFlavor};
 
 mod ast_print;
 mod workflow;

@@ -1,11 +1,11 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use bytecode::{
+use move_model::model::FunctionEnv;
+use move_stackless_bytecode::{
     function_target::FunctionTarget,
     function_target_pipeline::{FunctionTargetsHolder, FunctionVariant, VerificationFlavor},
 };
-use move_model::model::FunctionEnv;
 
 // TODO (mengxu): find a better way to determine which variant to call
 pub fn choose_variant<'env>(

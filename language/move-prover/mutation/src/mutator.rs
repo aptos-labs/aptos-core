@@ -3,7 +3,6 @@
 
 // Functions for running move programs with mutations and reporting errors if found
 
-use bytecode::{mutation_tester::MutationManager, options::ProverOptions};
 use clap::{App, Arg};
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 use itertools::Itertools;
@@ -16,6 +15,7 @@ use move_model::{
 use move_prover::{
     check_errors, cli::Options, create_and_process_bytecode, generate_boogie, verify_boogie,
 };
+use move_stackless_bytecode::{mutation_tester::MutationManager, options::ProverOptions};
 use std::{
     io::Write,
     path::PathBuf,

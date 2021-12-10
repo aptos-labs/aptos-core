@@ -5,15 +5,6 @@
 
 use crate::cli::Options;
 use anyhow::anyhow;
-use boogie_backend::{
-    add_prelude, boogie_wrapper::BoogieWrapper, bytecode_translator::BoogieTranslator,
-};
-use bytecode::{
-    escape_analysis::EscapeAnalysisProcessor,
-    function_target_pipeline::{FunctionTargetPipeline, FunctionTargetsHolder},
-    pipeline_factory,
-    read_write_set_analysis::{self, ReadWriteSetProcessor},
-};
 use codespan_reporting::{
     diagnostic::Severity,
     term::termcolor::{Buffer, ColorChoice, StandardStream, WriteColor},
@@ -27,6 +18,15 @@ use move_model::{
     code_writer::CodeWriter,
     model::{FunctionVisibility, GlobalEnv},
     parse_addresses_from_options, run_model_builder_with_options,
+};
+use move_prover_boogie_backend::{
+    add_prelude, boogie_wrapper::BoogieWrapper, bytecode_translator::BoogieTranslator,
+};
+use move_stackless_bytecode::{
+    escape_analysis::EscapeAnalysisProcessor,
+    function_target_pipeline::{FunctionTargetPipeline, FunctionTargetsHolder},
+    pipeline_factory,
+    read_write_set_analysis::{self, ReadWriteSetProcessor},
 };
 use std::{
     collections::BTreeSet,

@@ -7,7 +7,6 @@ use itertools::Itertools;
 use num::{BigInt, ToPrimitive, Zero};
 use std::{cell::Cell, collections::BTreeMap, rc::Rc};
 
-use bytecode::{function_target::FunctionTarget, function_target_pipeline::FunctionTargetsHolder};
 use move_core_types::account_address::AccountAddress;
 use move_model::{
     ast::{
@@ -16,6 +15,9 @@ use move_model::{
     },
     model::{FieldId, ModuleEnv, ModuleId, NodeId, SpecFunId, StructId},
     ty as MTy,
+};
+use move_stackless_bytecode::{
+    function_target::FunctionTarget, function_target_pipeline::FunctionTargetsHolder,
 };
 
 use crate::{

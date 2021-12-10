@@ -6,11 +6,6 @@ use crate::{
     test_reporter::{FailureReason, TestFailure, TestResults, TestRunInfo, TestStatistics},
 };
 use anyhow::Result;
-use bytecode_interpreter::{
-    concrete::{settings::InterpreterSettings, value::GlobalState},
-    shared::bridge::{adapt_move_vm_change_set, adapt_move_vm_result},
-    StacklessBytecodeInterpreter,
-};
 use colored::*;
 use move_binary_format::{errors::VMResult, file_format::CompiledModule};
 use move_bytecode_utils::Modules;
@@ -31,6 +26,11 @@ use move_model::{
     run_model_builder_with_options_and_compilation_flags,
 };
 use move_resource_viewer::MoveValueAnnotator;
+use move_stackless_bytecode_interpreter::{
+    concrete::{settings::InterpreterSettings, value::GlobalState},
+    shared::bridge::{adapt_move_vm_change_set, adapt_move_vm_result},
+    StacklessBytecodeInterpreter,
+};
 use move_vm_runtime::{move_vm::MoveVM, native_functions::NativeFunctionTable};
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas_schedule::{zero_cost_schedule, GasStatus};

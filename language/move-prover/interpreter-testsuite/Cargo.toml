@@ -13,7 +13,7 @@ diem-workspace-hack = { version = "0.1", path = "../../../crates/diem-workspace-
 [dev-dependencies]
 
 # diem dependencies
-bytecode-interpreter = { path = "../interpreter" }
+move-stackless-bytecode-interpreter = { path = "../interpreter" }
 move-command-line-common = { path = "../../move-command-line-common" }
 move-prover-test-utils = { path = "../test-utils" }
 move-stdlib = { path = "../../move-stdlib" }

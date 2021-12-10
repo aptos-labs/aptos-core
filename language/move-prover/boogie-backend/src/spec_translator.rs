@@ -30,11 +30,11 @@ use crate::{
     },
     options::BoogieOptions,
 };
-use bytecode::mono_analysis::MonoInfo;
 use move_model::{
     ast::{Exp, MemoryLabel, QuantKind, SpecFunDecl, SpecVarDecl, TempIndex},
     model::{QualifiedInstId, SpecVarId},
 };
+use move_stackless_bytecode::mono_analysis::MonoInfo;
 use std::cell::RefCell;
 
 #[derive(Clone)]

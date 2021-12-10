@@ -5,13 +5,6 @@ use anyhow::{bail, Result};
 use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
 use structopt::StructOpt;
 
-use bytecode::{
-    function_target_pipeline::{
-        FunctionTargetProcessor, FunctionTargetsHolder, ProcessorResultDisplay,
-    },
-    options::ProverOptions,
-    pipeline_factory::default_pipeline_with_options,
-};
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
 use move_core_types::{
     account_address::AccountAddress,
@@ -26,6 +19,13 @@ use move_core_types::{
 use move_model::{
     model::{FunctionEnv, GlobalEnv},
     ty::{PrimitiveType as ModelPrimitiveType, Type as ModelType},
+};
+use move_stackless_bytecode::{
+    function_target_pipeline::{
+        FunctionTargetProcessor, FunctionTargetsHolder, ProcessorResultDisplay,
+    },
+    options::ProverOptions,
+    pipeline_factory::default_pipeline_with_options,
 };
 
 pub mod concrete;

@@ -5,7 +5,6 @@
 // benchmark data back into memory.
 
 use anyhow::anyhow;
-use bytecode::options::ProverOptions;
 use clap::{App, Arg};
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 use itertools::Itertools;
@@ -17,6 +16,7 @@ use move_model::{
 use move_prover::{
     check_errors, cli::Options, create_and_process_bytecode, generate_boogie, verify_boogie,
 };
+use move_stackless_bytecode::options::ProverOptions;
 use std::{
     fmt::Debug,
     fs::File,

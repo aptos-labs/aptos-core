@@ -4,7 +4,6 @@
 //! Helpers for emitting Boogie code.
 
 use crate::options::BoogieOptions;
-use bytecode::function_target::FunctionTarget;
 use itertools::Itertools;
 use move_model::{
     ast::{MemoryLabel, TempIndex},
@@ -15,6 +14,7 @@ use move_model::{
     symbol::Symbol,
     ty::{PrimitiveType, Type},
 };
+use move_stackless_bytecode::function_target::FunctionTarget;
 
 pub const MAX_MAKE_VEC_ARGS: usize = 4;
 

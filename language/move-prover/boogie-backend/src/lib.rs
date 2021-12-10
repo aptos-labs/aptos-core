@@ -11,13 +11,13 @@ use log::{debug, info, warn};
 use serde::{Deserialize, Serialize};
 use tera::{Context, Tera};
 
-use bytecode::mono_analysis;
 use move_model::{
     code_writer::CodeWriter,
     emit, emitln,
     model::GlobalEnv,
     ty::{PrimitiveType, Type},
 };
+use move_stackless_bytecode::mono_analysis;
 
 use crate::{
     boogie_helpers::{boogie_type, boogie_type_suffix},

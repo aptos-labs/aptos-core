@@ -9,18 +9,18 @@ use itertools::Itertools;
 #[allow(unused_imports)]
 use log::{debug, info, log, warn, Level};
 
-use bytecode::{
-    function_target::FunctionTarget,
-    function_target_pipeline::{FunctionTargetsHolder, VerificationFlavor},
-    mono_analysis,
-    stackless_bytecode::{BorrowEdge, BorrowNode, Bytecode, Constant, HavocKind, Operation},
-};
 use move_model::{
     code_writer::CodeWriter,
     emit, emitln,
     model::{GlobalEnv, StructEnv},
     pragmas::{ADDITION_OVERFLOW_UNCHECKED_PRAGMA, SEED_PRAGMA, TIMEOUT_PRAGMA},
     ty::{PrimitiveType, Type},
+};
+use move_stackless_bytecode::{
+    function_target::FunctionTarget,
+    function_target_pipeline::{FunctionTargetsHolder, VerificationFlavor},
+    mono_analysis,
+    stackless_bytecode::{BorrowEdge, BorrowNode, Bytecode, Constant, HavocKind, Operation},
 };
 
 use crate::{
@@ -35,15 +35,15 @@ use crate::{
     options::BoogieOptions,
     spec_translator::SpecTranslator,
 };
-use bytecode::{
-    function_target_pipeline::FunctionVariant,
-    stackless_bytecode::{AbortAction, PropKind},
-};
 use codespan::LineIndex;
 use move_model::{
     ast::{TempIndex, TraceKind},
     model::{Loc, NodeId},
     ty::{TypeDisplayContext, BOOL_TYPE},
+};
+use move_stackless_bytecode::{
+    function_target_pipeline::FunctionVariant,
+    stackless_bytecode::{AbortAction, PropKind},
 };
 
 pub struct BoogieTranslator<'env> {

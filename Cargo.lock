@@ -492,34 +492,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8d696c370c750c948ada61c69a0ee2cbbb9c50b1019ddb86d9317157a99c2cae"
 
 [[package]]
-name = "boogie-backend"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "bytecode",
- "codespan",
- "codespan-reporting",
- "diem-workspace-hack",
- "futures",
- "itertools 0.10.1",
- "log",
- "move-binary-format",
- "move-command-line-common",
- "move-core-types",
- "move-model",
- "num 0.4.0",
- "once_cell",
- "pretty",
- "rand 0.8.4",
- "regex",
- "serde 1.0.130",
- "serde_json",
- "tera",
- "tokio",
-]
-
-[[package]]
 name = "bounded-executor"
 version = "0.1.0"
 dependencies = [
@@ -563,57 +535,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e3b5ca7a04898ad4bcd41c90c5285445ff5b791899bb1b0abdd2a2aa791211d7"
 
 [[package]]
-name = "bytecode"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "codespan",
- "codespan-reporting",
- "datatest-stable",
- "diem-workspace-hack",
- "im",
- "itertools 0.10.1",
- "log",
- "move-binary-format",
- "move-borrow-graph",
- "move-bytecode-verifier",
- "move-command-line-common",
- "move-core-types",
- "move-ir-to-bytecode",
- "move-model",
- "move-prover-test-utils",
- "move-read-write-set-types",
- "move-stdlib",
- "num 0.4.0",
- "once_cell",
- "paste",
- "petgraph 0.5.1",
- "serde 1.0.130",
- "serde_json",
-]
-
-[[package]]
-name = "bytecode-interpreter"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bytecode",
- "bytecode-interpreter-crypto",
- "codespan-reporting",
- "datatest-stable",
- "diem-workspace-hack",
- "itertools 0.10.1",
- "move-binary-format",
- "move-core-types",
- "move-model",
- "move-prover-test-utils",
- "move-vm-runtime",
- "num 0.4.0",
- "serde 1.0.130",
- "structopt 0.3.21",
-]
-
-[[package]]
 name = "bytecode-interpreter-crypto"
 version = "0.1.0"
 dependencies = [
@@ -630,11 +551,11 @@ name = "bytecode-interpreter-testsuite"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bytecode-interpreter",
  "datatest-stable",
  "diem-workspace-hack",
  "move-command-line-common",
  "move-prover-test-utils",
+ "move-stackless-bytecode-interpreter",
  "move-stdlib",
  "move-unit-test",
 ]
@@ -1795,7 +1716,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bcs",
- "bytecode-interpreter",
  "diem-framework",
  "diem-types",
  "diem-vm",
@@ -1804,6 +1724,7 @@ dependencies = [
  "move-binary-format",
  "move-core-types",
  "move-model",
+ "move-stackless-bytecode-interpreter",
  "move-vm-runtime",
  "move-vm-types",
  "structopt 0.3.21",
@@ -5190,7 +5111,6 @@ name = "move-docgen"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bytecode",
  "codespan",
  "codespan-reporting",
  "datatest-stable",
@@ -5201,6 +5121,7 @@ dependencies = [
  "move-model",
  "move-prover",
  "move-prover-test-utils",
+ "move-stackless-bytecode",
  "num 0.4.0",
  "once_cell",
  "regex",
@@ -5401,9 +5322,6 @@ dependencies = [
  "anyhow",
  "async-trait",
  "atty",
- "boogie-backend",
- "bytecode",
- "bytecode-interpreter",
  "clap",
  "codespan",
  "codespan-reporting",
@@ -5422,7 +5340,10 @@ dependencies = [
  "move-errmapgen",
  "move-ir-types",
  "move-model",
+ "move-prover-boogie-backend",
  "move-prover-test-utils",
+ "move-stackless-bytecode",
+ "move-stackless-bytecode-interpreter",
  "num 0.4.0",
  "once_cell",
  "pretty",
@@ -5435,6 +5356,34 @@ dependencies = [
  "tokio",
  "toml",
  "walkdir",
+]
+
+[[package]]
+name = "move-prover-boogie-backend"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "codespan",
+ "codespan-reporting",
+ "diem-workspace-hack",
+ "futures",
+ "itertools 0.10.1",
+ "log",
+ "move-binary-format",
+ "move-command-line-common",
+ "move-core-types",
+ "move-model",
+ "move-stackless-bytecode",
+ "num 0.4.0",
+ "once_cell",
+ "pretty",
+ "rand 0.8.4",
+ "regex",
+ "serde 1.0.130",
+ "serde_json",
+ "tera",
+ "tokio",
 ]
 
 [[package]]
@@ -5472,6 +5421,57 @@ dependencies = [
  "move-vm-types",
  "once_cell",
  "serde 1.0.130",
+]
+
+[[package]]
+name = "move-stackless-bytecode"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "codespan",
+ "codespan-reporting",
+ "datatest-stable",
+ "diem-workspace-hack",
+ "im",
+ "itertools 0.10.1",
+ "log",
+ "move-binary-format",
+ "move-borrow-graph",
+ "move-bytecode-verifier",
+ "move-command-line-common",
+ "move-core-types",
+ "move-ir-to-bytecode",
+ "move-model",
+ "move-prover-test-utils",
+ "move-read-write-set-types",
+ "move-stdlib",
+ "num 0.4.0",
+ "once_cell",
+ "paste",
+ "petgraph 0.5.1",
+ "serde 1.0.130",
+ "serde_json",
+]
+
+[[package]]
+name = "move-stackless-bytecode-interpreter"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bytecode-interpreter-crypto",
+ "codespan-reporting",
+ "datatest-stable",
+ "diem-workspace-hack",
+ "itertools 0.10.1",
+ "move-binary-format",
+ "move-core-types",
+ "move-model",
+ "move-prover-test-utils",
+ "move-stackless-bytecode",
+ "move-vm-runtime",
+ "num 0.4.0",
+ "serde 1.0.130",
+ "structopt 0.3.21",
 ]
 
 [[package]]
@@ -5516,7 +5516,6 @@ name = "move-transactional-test-runner"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bytecode-interpreter",
  "colored",
  "datatest-stable",
  "diem-workspace-hack",
@@ -5532,6 +5531,7 @@ dependencies = [
  "move-ir-compiler",
  "move-ir-types",
  "move-resource-viewer",
+ "move-stackless-bytecode-interpreter",
  "move-stdlib",
  "move-symbol-pool",
  "move-vm-runtime",
@@ -5549,7 +5549,6 @@ name = "move-unit-test"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bytecode-interpreter",
  "colored",
  "datatest-stable",
  "diem-workspace-hack",
@@ -5561,6 +5560,7 @@ dependencies = [
  "move-core-types",
  "move-model",
  "move-resource-viewer",
+ "move-stackless-bytecode-interpreter",
  "move-stdlib",
  "move-vm-runtime",
  "move-vm-test-utils",
@@ -6660,7 +6660,6 @@ name = "prover-lab"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bytecode",
  "chrono",
  "clap",
  "codespan-reporting",
@@ -6672,6 +6671,7 @@ dependencies = [
  "move-model",
  "move-prover",
  "move-prover-test-utils",
+ "move-stackless-bytecode",
  "num 0.4.0",
  "plotters",
  "serde 1.0.130",
@@ -6685,7 +6685,6 @@ name = "prover-mutation"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bytecode",
  "chrono",
  "clap",
  "codespan",
@@ -6698,6 +6697,7 @@ dependencies = [
  "move-model",
  "move-prover",
  "move-prover-test-utils",
+ "move-stackless-bytecode",
  "num 0.4.0",
  "plotters",
  "serde 1.0.130",
@@ -6933,7 +6933,6 @@ name = "read-write-set"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bytecode",
  "diem-workspace-hack",
  "move-binary-format",
  "move-bytecode-utils",
@@ -6941,6 +6940,7 @@ dependencies = [
  "move-model",
  "move-read-write-set-types",
  "move-resource-viewer",
+ "move-stackless-bytecode",
  "read-write-set-dynamic",
 ]
 
@@ -8146,12 +8146,12 @@ name = "spec-flatten"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bytecode",
  "diem-workspace-hack",
  "itertools 0.10.1",
  "move-compiler",
  "move-model",
  "move-prover",
+ "move-stackless-bytecode",
  "pretty",
  "structopt 0.3.21",
 ]

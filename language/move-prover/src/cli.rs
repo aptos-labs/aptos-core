@@ -21,8 +21,6 @@ use simplelog::{
     CombinedLogger, Config, ConfigBuilder, LevelPadding, SimpleLogger, TermLogger, TerminalMode,
 };
 
-use boogie_backend::options::{BoogieOptions, VectorTheory};
-use bytecode::options::{AutoTraceLevel, ProverOptions};
 use codespan_reporting::diagnostic::Severity;
 use move_abigen::AbigenOptions;
 use move_docgen::DocgenOptions;
@@ -30,6 +28,8 @@ use move_errmapgen::ErrmapOptions;
 use move_model::{
     model::VerificationScope, options::ModelBuilderOptions, simplifier::SimplificationPass,
 };
+use move_prover_boogie_backend::options::{BoogieOptions, VectorTheory};
+use move_stackless_bytecode::options::{AutoTraceLevel, ProverOptions};
 
 /// Atomic used to prevent re-initialization of logging.
 static LOGGER_CONFIGURED: AtomicBool = AtomicBool::new(false);

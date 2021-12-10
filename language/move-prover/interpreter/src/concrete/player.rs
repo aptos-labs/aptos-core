@@ -6,14 +6,6 @@
 use num::{BigInt, ToPrimitive, Zero};
 use std::{collections::BTreeMap, rc::Rc};
 
-use bytecode::{
-    function_target::FunctionTarget,
-    function_target_pipeline::FunctionTargetsHolder,
-    stackless_bytecode::{
-        AbortAction, AssignKind, BorrowEdge, BorrowNode, Bytecode, Constant, HavocKind, Label,
-        Operation, PropKind,
-    },
-};
 use bytecode_interpreter_crypto::{
     ed25519_deserialize_public_key, ed25519_deserialize_signature, ed25519_verify_signature,
     sha2_256_of, sha3_256_of,
@@ -27,6 +19,14 @@ use move_model::{
     ast::{Exp, MemoryLabel, TempIndex},
     model::{FunId, FunctionEnv, ModuleId, StructId},
     ty as MT,
+};
+use move_stackless_bytecode::{
+    function_target::FunctionTarget,
+    function_target_pipeline::FunctionTargetsHolder,
+    stackless_bytecode::{
+        AbortAction, AssignKind, BorrowEdge, BorrowNode, Bytecode, Constant, HavocKind, Label,
+        Operation, PropKind,
+    },
 };
 
 use crate::{
