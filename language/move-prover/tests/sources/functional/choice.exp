@@ -1,5 +1,29 @@
 Move prover returns: exiting with verification errors
 error: post-condition does not hold
+    ┌─ tests/sources/functional/choice.move:301:9
+    │
+301 │ ╭         ensures !(get_ballot<Proposal>(Signer::address_of(ballot_account), result).expiration_timestamp_secs
+302 │ │             <= 0);
+    │ ╰──────────────────^
+    │
+    =     at tests/sources/functional/choice.move:279: create_ballot
+    =         ballot_account = <redacted>
+    =     at tests/sources/functional/choice.move:283: create_ballot
+    =     at tests/sources/functional/choice.move:282: create_ballot
+    =     at tests/sources/functional/choice.move:290
+    =     at tests/sources/functional/choice.move:285: create_ballot
+    =     at tests/sources/functional/choice.move:271: new_ballot_id
+    =         counter = <redacted>
+    =     at tests/sources/functional/choice.move:274: new_ballot_id
+    =         result = <redacted>
+    =     at tests/sources/functional/choice.move:277: new_ballot_id
+    =         ballot_id = <redacted>
+    =     at tests/sources/functional/choice.move:286: create_ballot
+    =         result = <redacted>
+    =     at tests/sources/functional/choice.move:287: create_ballot
+    =     at tests/sources/functional/choice.move:301: create_ballot (spec)
+
+error: post-condition does not hold
    ┌─ tests/sources/functional/choice.move:55:9
    │
 55 │         ensures choice == Signer::address_of(s2);

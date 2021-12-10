@@ -57,7 +57,7 @@ pub struct SpecTranslator<'env> {
     /// choice function. If an expression is duplicated and then later specialized by a type
     /// instantiation, it will have a different node id, but again the same instantiations
     /// map to the same node id, which is the desired semantics.
-    lifted_choice_infos: Rc<RefCell<HashMap<ExpData, LiftedChoiceInfo>>>,
+    lifted_choice_infos: Rc<RefCell<HashMap<(ExpData, Vec<Type>), LiftedChoiceInfo>>>,
 }
 
 /// A struct which contains information about a lifted choice expression (like `some x:int: p(x)`).
@@ -356,13 +356,20 @@ impl<'env> SpecTranslator<'env> {
         // need the sorting here because `lifted_choice_infos` is a hashmap while we want
         // deterministic ordering of the output. Sorting uses the `.id` field, which represents the
         // insertion order.
-        let infos_sorted = infos_ref.values().sorted_by(|v1, v2| v1.id.cmp(&v2.id));
-        for info in infos_sorted {
+        let infos_sorted_with_keys = infos_ref.iter().sorted_by(|v1, v2| v1.1.id.cmp(&v2.1.id));
+        assert!(self.type_inst.is_empty());
+        for (key, info) in infos_sorted_with_keys {
             let fun_name = boogie_choice_fun_name(info.id);
             let result_ty = &env.get_node_type(info.node_id);
             let exp_loc = env.get_node_loc(info.node_id);
             let var_name = info.var.display(env.symbol_pool()).to_string();
             self.writer.set_location(&exp_loc);
+
+            let new_spec_trans = SpecTranslator {
+                type_inst: key.1.clone(),
+                ..self.clone()
+            };
+
             // Pairs of context parameter names and boogie types
             let param_decls = info
                 .free_vars
@@ -394,19 +401,19 @@ impl<'env> SpecTranslator<'env> {
             let mk_arg = |(n, _): &(String, String)| n.to_owned();
             let emit_valid = |n: &str, ty: &Type| {
                 let suffix = boogie_type_suffix(env, ty.skip_reference());
-                emit!(self.writer, "$IsValid'{}'({})", suffix, n);
+                emit!(new_spec_trans.writer, "$IsValid'{}'({})", suffix, n);
             };
             let mk_temp = |t: TempIndex| format!("$t{}", t);
 
             emitln!(
-                self.writer,
+                new_spec_trans.writer,
                 "// choice expression {}",
-                exp_loc.display(self.env)
+                exp_loc.display(new_spec_trans.env)
             );
 
             // Emit predicate function characterizing the choice.
             emitln!(
-                self.writer,
+                new_spec_trans.writer,
                 "function {{:inline}} {}_pred({}): bool {{",
                 fun_name,
                 vec![&var_decl]
@@ -415,25 +422,25 @@ impl<'env> SpecTranslator<'env> {
                     .map(mk_decl)
                     .join(", ")
             );
-            self.writer.indent();
+            new_spec_trans.writer.indent();
             emit_valid(&var_decl.0, result_ty);
             match env.get_node_type(info.range.node_id()) {
                 Type::Vector(..) => {
-                    emit!(self.writer, " && InRangeVec(");
-                    self.translate_exp(&info.range);
-                    emit!(self.writer, ", {})", &var_decl.0);
+                    emit!(new_spec_trans.writer, " && InRangeVec(");
+                    new_spec_trans.translate_exp(&info.range);
+                    emit!(new_spec_trans.writer, ", {})", &var_decl.0);
                 }
                 Type::Primitive(PrimitiveType::Range) => {
-                    emit!(self.writer, " && $InRange(");
-                    self.translate_exp(&info.range);
-                    emit!(self.writer, ", {})", &var_decl.0);
+                    emit!(new_spec_trans.writer, " && $InRange(");
+                    new_spec_trans.translate_exp(&info.range);
+                    emit!(new_spec_trans.writer, ", {})", &var_decl.0);
                 }
                 _ => {}
             }
-            emitln!(self.writer, " &&");
-            self.translate_exp(&info.condition);
-            self.writer.unindent();
-            emitln!(self.writer, "\n}");
+            emitln!(new_spec_trans.writer, " &&");
+            new_spec_trans.translate_exp(&info.condition);
+            new_spec_trans.writer.unindent();
+            emitln!(new_spec_trans.writer, "\n}");
             // Create call to predicate
             let predicate = format!(
                 "{}_pred({})",
@@ -447,7 +454,7 @@ impl<'env> SpecTranslator<'env> {
 
             // Emit choice function
             emitln!(
-                self.writer,
+                new_spec_trans.writer,
                 "function {}({}): {};",
                 fun_name,
                 param_decls.iter().map(mk_decl).join(", "),
@@ -463,7 +470,7 @@ impl<'env> SpecTranslator<'env> {
             // Emit choice axiom
             if !param_decls.is_empty() {
                 emit!(
-                    self.writer,
+                    new_spec_trans.writer,
                     "axiom (forall {}:: ",
                     param_decls.iter().map(mk_decl).join(", ")
                 );
@@ -471,29 +478,29 @@ impl<'env> SpecTranslator<'env> {
                     // TODO: IsValid for memory?
                     let mut sep = "";
                     for (s, ty) in &info.free_vars {
-                        emit!(self.writer, sep);
+                        emit!(new_spec_trans.writer, sep);
                         emit_valid(env.symbol_pool().string(*s).as_ref(), ty);
                         sep = " && ";
                     }
                     for (t, ty) in &info.used_temps {
-                        emit!(self.writer, sep);
+                        emit!(new_spec_trans.writer, sep);
                         emit_valid(&mk_temp(*t), ty);
                         sep = " && ";
                     }
-                    emitln!(self.writer, " ==>");
+                    emitln!(new_spec_trans.writer, " ==>");
                 }
             } else {
-                emitln!(self.writer, "axiom");
+                emitln!(new_spec_trans.writer, "axiom");
             }
-            self.writer.indent();
+            new_spec_trans.writer.indent();
             emitln!(
-                self.writer,
+                new_spec_trans.writer,
                 "(exists {}:: {}) ==> ",
                 mk_decl(&var_decl),
                 predicate
             );
             emitln!(
-                self.writer,
+                new_spec_trans.writer,
                 "(var {} := {}; {}",
                 &var_decl.0,
                 choice,
@@ -510,20 +517,20 @@ impl<'env> SpecTranslator<'env> {
                     )
                 }
                 // Add the condition that there does not exist a smaller satisfying value.
-                emit!(self.writer, " && (var $$c := {}; ", &var_decl.0);
+                emit!(new_spec_trans.writer, " && (var $$c := {}; ", &var_decl.0);
                 emit!(
-                    self.writer,
+                    new_spec_trans.writer,
                     "(forall {}:: {} < $$c ==> !{}))",
                     mk_decl(&var_decl),
                     &var_decl.0,
                     predicate
                 );
             }
-            self.writer.unindent();
+            new_spec_trans.writer.unindent();
             if !param_decls.is_empty() {
-                emit!(self.writer, ")");
+                emit!(new_spec_trans.writer, ")");
             }
-            emitln!(self.writer, ");\n");
+            emitln!(new_spec_trans.writer, ");\n");
         }
     }
 }
@@ -1208,6 +1215,7 @@ impl<'env> SpecTranslator<'env> {
             .free_vars(self.env)
             .into_iter()
             .filter(|(s, _)| *s != some_var)
+            .map(|(s, ty)| (s, self.inst(ty.skip_reference())))
             .collect_vec();
         let used_temps = range_and_body
             .used_temporaries(self.env)
@@ -1225,10 +1233,13 @@ impl<'env> SpecTranslator<'env> {
         // This expression might be duplicated many times e.g. via opaque function caller
         // sites. We want that the choice consistently returns the same value in each case;
         // we can only guarantee this if we use the same uninterpreted function for each instance.
+        // We also need to consider the type instantiation.
+        // As a result, (ExpData, Vec<Type>) is used as the key
+        let choice_infos_key_pair = (range_and_body, self.type_inst.clone());
         let mut choice_infos = self.lifted_choice_infos.borrow_mut();
         let choice_count = choice_infos.len();
         let info = choice_infos
-            .entry(range_and_body)
+            .entry(choice_infos_key_pair)
             .or_insert_with(|| LiftedChoiceInfo {
                 id: choice_count,
                 node_id,
