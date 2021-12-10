@@ -7,7 +7,10 @@ use diem_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 use diem_sdk::client::AccountAddress;
 use diem_types::transaction::authenticator::AuthenticationKey;
 use directories::BaseDirs;
-use move_package::compilation::compiled_package::CompiledPackage;
+use move_package::{
+    compilation::compiled_package::CompiledPackage,
+    source_package::{layout::SourcePackageLayout, manifest_parser},
+};
 use serde::{Deserialize, Serialize};
 use serde_generate as serdegen;
 use serde_generate::SourceInstaller;
@@ -28,8 +31,6 @@ use url::Url;
 pub const MAIN_PKG_PATH: &str = "main";
 
 pub const LOCALHOST_NAME: &str = "localhost";
-
-pub const SENDER_ADDRESS_NAME: &str = "Sender";
 
 /// Temporary address for initial codegen, replaced on subsequent commands
 /// when accounts are available.
@@ -473,16 +474,37 @@ pub fn build_move_package(
     publishing_address: &AccountAddress,
 ) -> Result<CompiledPackage> {
     println!("Building {}...", pkg_path.display());
-    let mut additional_named_addresses = BTreeMap::new();
-    additional_named_addresses.insert(SENDER_ADDRESS_NAME.to_string(), *publishing_address);
+
+    let named_publishing_addresses =
+        inject_publishing_address_into_manifest(pkg_path, publishing_address)?;
     let config = move_package::BuildConfig {
         dev_mode: true,
         generate_abis: true,
-        additional_named_addresses,
+        additional_named_addresses: named_publishing_addresses,
         ..Default::default()
     };
 
     config.compile_package(pkg_path, &mut std::io::stdout())
+}
+
+pub fn inject_publishing_address_into_manifest(
+    pkg_path: &Path,
+    publishing_address: &AccountAddress,
+) -> Result<BTreeMap<String, AccountAddress>> {
+    let path = SourcePackageLayout::try_find_root(pkg_path)?;
+    let manifest_string = std::fs::read_to_string(path.join(SourcePackageLayout::Manifest.path()))?;
+    let toml_manifest = manifest_parser::parse_move_manifest_string(manifest_string)?;
+    let manifest = manifest_parser::parse_source_manifest(toml_manifest)?;
+
+    let mut additional_named_addresses = BTreeMap::new();
+    if let Some(address_decls) = manifest.addresses {
+        for (name, addr) in address_decls {
+            if addr.is_none() {
+                additional_named_addresses.insert(name.to_string(), *publishing_address);
+            }
+        }
+    }
+    Ok(additional_named_addresses)
 }
 
 fn generate_transaction_builders(pkg_path: &Path, target_dir: &Path) -> Result<()> {

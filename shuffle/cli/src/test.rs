@@ -19,7 +19,6 @@ use move_cli::package::cli::{self, UnitTestResult};
 use move_package::BuildConfig;
 use move_unit_test::UnitTestingConfig;
 use std::{
-    collections::BTreeMap,
     path::{Path, PathBuf},
     process::{Command, ExitStatus},
 };
@@ -165,16 +164,22 @@ pub fn run_move_unit_tests(project_path: &Path) -> Result<UnitTestResult> {
     let publishing_address = AccountAddress::from_hex_literal(shared::PLACEHOLDER_ADDRESS)?;
     cli::run_move_unit_tests(
         &project_path.join(shared::MAIN_PKG_PATH),
-        generate_build_config_for_testing(&publishing_address)?,
+        generate_build_config_for_testing(
+            &project_path.join(shared::MAIN_PKG_PATH),
+            &publishing_address,
+        )?,
         unit_test_config,
         diem_vm::natives::diem_natives(),
         false,
     )
 }
 
-fn generate_build_config_for_testing(publishing_address: &AccountAddress) -> Result<BuildConfig> {
-    let mut additional_named_addresses = BTreeMap::new();
-    additional_named_addresses.insert(shared::SENDER_ADDRESS_NAME.to_string(), *publishing_address);
+fn generate_build_config_for_testing(
+    pkg_path: &Path,
+    publishing_address: &AccountAddress,
+) -> Result<BuildConfig> {
+    let additional_named_addresses =
+        shared::inject_publishing_address_into_manifest(pkg_path, publishing_address)?;
     Ok(BuildConfig {
         dev_mode: true,
         test_mode: true,
