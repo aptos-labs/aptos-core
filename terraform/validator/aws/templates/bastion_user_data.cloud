@@ -1,0 +1,11 @@
+#cloud-config
+
+repo_update: false
+
+write_files:
+- path: /usr/local/bin/proxy
+  permissions: '0755'
+  content: |
+    #!/bin/bash
+    exec 3<>/dev/tcp/$1/$2
+    cat <&3 & cat >&3
