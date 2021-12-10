@@ -16,13 +16,13 @@ use move_binary_format::{
     CompiledModule,
 };
 use move_bytecode_source_map::source_map::SourceMap;
-use move_ir_types::{ast::ConstantName, location::Spanned};
-use move_lang::{
+use move_compiler::{
     compiled_unit::{FunctionInfo, SpecInfo},
     expansion::ast as EA,
     parser::ast as PA,
     shared::{unique_map::UniqueMap, Name},
 };
+use move_ir_types::{ast::ConstantName, location::Spanned};
 
 use crate::{
     ast::{

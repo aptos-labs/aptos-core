@@ -17,7 +17,7 @@ tempfile = "3.2.0"
 
 move-core-types = {path = "../../move-core/types" }
 move-binary-format = { path = "../../move-binary-format" }
-move-lang = { path = "../../move-lang" }
+move-compiler = { path = "../../move-compiler" }
 move-vm-runtime = { path = "../runtime" }
 move-vm-types = { path = "../types" }
 move-vm-test-utils = { path = "../test-utils" }

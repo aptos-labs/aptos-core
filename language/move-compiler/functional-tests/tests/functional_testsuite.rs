@@ -8,7 +8,7 @@ use functional_tests::{
     testsuite,
 };
 use move_command_line_common::env::read_bool_env_var;
-use move_lang::{
+use move_compiler::{
     self, compiled_unit::AnnotatedCompiledUnit, diagnostics, Compiler as MoveCompiler, Flags,
     FullyCompiledProgram, PASS_COMPILATION,
 };
@@ -129,7 +129,7 @@ impl<'a> Compiler for MoveSourceCompiler<'a> {
 }
 
 static DIEM_PRECOMPILED_STDLIB: Lazy<FullyCompiledProgram> = Lazy::new(|| {
-    let program_res = move_lang::construct_pre_compiled_lib(
+    let program_res = move_compiler::construct_pre_compiled_lib(
         &diem_framework::diem_stdlib_files(),
         None,
         Flags::empty().set_sources_shadow_deps(false),

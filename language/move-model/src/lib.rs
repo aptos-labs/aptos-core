@@ -20,9 +20,7 @@ use move_binary_format::{
         StructDefinitionIndex, Visibility,
     },
 };
-use move_core_types::{account_address::AccountAddress, identifier::Identifier};
-use move_ir_types::location::sp;
-use move_lang::{
+use move_compiler::{
     self,
     compiled_unit::{self, AnnotatedCompiledScript, AnnotatedCompiledUnit},
     diagnostics::Diagnostics,
@@ -31,6 +29,8 @@ use move_lang::{
     shared::{parse_named_address, unique_map::UniqueMap, NumericalAddress},
     Compiler, Flags, PASS_COMPILATION, PASS_EXPANSION, PASS_PARSER,
 };
+use move_core_types::{account_address::AccountAddress, identifier::Identifier};
+use move_ir_types::location::sp;
 use move_symbol_pool::Symbol as MoveStringSymbol;
 use num::{BigUint, Num};
 
@@ -493,7 +493,7 @@ fn run_spec_checker(
                     named_script: script,
                     function_info,
                 }) => {
-                    let move_lang::expansion::ast::Script {
+                    let move_compiler::expansion::ast::Script {
                         attributes,
                         loc,
                         immediate_neighbors,

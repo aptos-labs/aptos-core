@@ -15,7 +15,7 @@ module 0x42::M {
         // Should be ok (we do not check types of values)
         pragma verify = Self::a_valid_id;
 
-        // The below produces an error from move_lang because the relative module name cannot be resolved.
+        // The below produces an error from move_compiler because the relative module name cannot be resolved.
         // We leave it here for illustration.
         // pragma verify = M::a_valid_id;
     }

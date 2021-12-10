@@ -8,8 +8,8 @@ use move_command_line_common::{
     files::{find_filenames, path_to_string},
     testing::{format_diff, read_env_update_baseline, EXP_EXT},
 };
+use move_compiler::command_line::COLOR_MODE_ENV_VAR;
 use move_coverage::coverage_map::{CoverageMap, ExecCoverageMapWithModules};
-use move_lang::command_line::COLOR_MODE_ENV_VAR;
 use move_package::{
     compilation::{compiled_package::OnDiskCompiledPackage, package_layout::CompiledPackageLayout},
     resolution::resolution_graph::ResolvedGraph,

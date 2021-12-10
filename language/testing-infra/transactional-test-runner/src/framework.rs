@@ -18,6 +18,12 @@ use move_command_line_common::{
     files::{MOVE_EXTENSION, MOVE_IR_EXTENSION},
     testing::{format_diff, read_env_update_baseline, EXP_EXT},
 };
+use move_compiler::{
+    compiled_unit::AnnotatedCompiledUnit,
+    diagnostics::{Diagnostics, FilesSourceText},
+    shared::NumericalAddress,
+    FullyCompiledProgram,
+};
 use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
@@ -26,12 +32,6 @@ use move_core_types::{
 };
 use move_disassembler::disassembler::{Disassembler, DisassemblerOptions};
 use move_ir_types::location::Spanned;
-use move_lang::{
-    compiled_unit::AnnotatedCompiledUnit,
-    diagnostics::{Diagnostics, FilesSourceText},
-    shared::NumericalAddress,
-    FullyCompiledProgram,
-};
 use move_symbol_pool::Symbol;
 use std::{
     collections::{BTreeMap, VecDeque},
@@ -344,7 +344,7 @@ impl<'a> CompiledState<'a> {
         {
             let file = NamedTempFile::new().unwrap();
             let path = file.path().to_str().unwrap().to_owned();
-            let (_id, interface_text) = move_lang::interface_generator::write_module_to_string(
+            let (_id, interface_text) = move_compiler::interface_generator::write_module_to_string(
                 &self.compiled_module_named_address_mapping,
                 &pmod.module,
             )
@@ -388,15 +388,15 @@ fn compile_source_unit(
         }
 
         let error_buffer = if read_bool_env_var(move_command_line_common::testing::PRETTY) {
-            move_lang::diagnostics::report_diagnostics_to_color_buffer(files, diags)
+            move_compiler::diagnostics::report_diagnostics_to_color_buffer(files, diags)
         } else {
-            move_lang::diagnostics::report_diagnostics_to_buffer(files, diags)
+            move_compiler::diagnostics::report_diagnostics_to_buffer(files, diags)
         };
         Some(String::from_utf8(error_buffer).unwrap())
     }
 
-    use move_lang::PASS_COMPILATION;
-    let (mut files, comments_and_compiler_res) = move_lang::Compiler::new(&[path], deps)
+    use move_compiler::PASS_COMPILATION;
+    let (mut files, comments_and_compiler_res) = move_compiler::Compiler::new(&[path], deps)
         .set_pre_compiled_lib_opt(pre_compiled_deps)
         .set_named_address_values(named_address_mapping)
         .run::<PASS_COMPILATION>()?;

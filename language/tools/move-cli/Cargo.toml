@@ -32,7 +32,7 @@ move-bytecode-utils = { path = "../move-bytecode-utils" }
 move-coverage = { path = "../move-coverage" }
 move-core-types = { path = "../../move-core/types" }
 move-ir-types = { path = "../../move-ir/types" }
-move-lang = { path = "../../move-lang" }
+move-compiler = { path = "../../move-compiler" }
 move-stdlib = { path = "../../move-stdlib", features = ["testing"] }
 move-symbol-pool = { path = "../../move-symbol-pool" }
 move-vm-types = { path = "../../move-vm/types" }

@@ -14,7 +14,7 @@ use std::{
 use anyhow::anyhow;
 use clap::{App, Arg};
 use log::LevelFilter;
-use move_lang::shared::NumericalAddress;
+use move_compiler::shared::NumericalAddress;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use simplelog::{

@@ -14,6 +14,10 @@ use bytecode_interpreter::{
 use colored::*;
 use move_binary_format::{errors::VMResult, file_format::CompiledModule};
 use move_bytecode_utils::Modules;
+use move_compiler::{
+    shared::{Flags, NumericalAddress},
+    unit_test::{ExpectedFailure, ModuleTestPlan, TestCase, TestPlan},
+};
 use move_core_types::{
     account_address::AccountAddress,
     effects::ChangeSet,
@@ -21,10 +25,6 @@ use move_core_types::{
     identifier::IdentStr,
     value::serialize_values,
     vm_status::StatusCode,
-};
-use move_lang::{
-    shared::{Flags, NumericalAddress},
-    unit_test::{ExpectedFailure, ModuleTestPlan, TestCase, TestPlan},
 };
 use move_model::{
     model::GlobalEnv, options::ModelBuilderOptions,

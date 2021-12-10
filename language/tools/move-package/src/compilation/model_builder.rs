@@ -3,7 +3,7 @@
 
 use crate::{resolution::resolution_graph::ResolvedGraph, ModelConfig};
 use anyhow::Result;
-use move_lang::shared::NumericalAddress;
+use move_compiler::shared::NumericalAddress;
 use move_model::{model::GlobalEnv, options::ModelBuilderOptions, run_model_builder_with_options};
 
 #[derive(Debug, Clone)]
@@ -83,7 +83,7 @@ impl ModelBuilder {
                 .map(|(ident, addr)| {
                     let addr = NumericalAddress::new(
                         addr.into_bytes(),
-                        move_lang::shared::NumberFormat::Hex,
+                        move_compiler::shared::NumberFormat::Hex,
                     );
                     (ident.to_string(), addr)
                 })

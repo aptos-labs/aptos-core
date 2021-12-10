@@ -4,7 +4,7 @@
 use std::collections::BTreeMap;
 
 use anyhow::Result;
-use move_lang::{
+use move_compiler::{
     self,
     shared::{Flags, NumericalAddress},
     Compiler,

@@ -5,7 +5,7 @@ use crate::context::Context;
 use lsp_server::Request;
 use lsp_types::{CompletionItem, CompletionItemKind, CompletionParams, Position};
 use move_command_line_common::files::FileHash;
-use move_lang::{
+use move_compiler::{
     diagnostics::Diagnostic,
     parser::{
         keywords::{BUILTINS, CONTEXTUAL_KEYWORDS, KEYWORDS},
@@ -165,8 +165,8 @@ pub fn on_completion_request(context: &Context, request: &Request) {
         items.extend_from_slice(&identifiers);
         if !diagnostics.is_empty() {
             // TODO: A language server is capable of surfacing diagnostics to its client, but to do so
-            // would require us to translate move_lang's diagnostic location (a private member
-            // represented as a byte offset) to a line and column number. The move_lang::diagnostics
+            // would require us to translate move_compiler's diagnostic location (a private member
+            // represented as a byte offset) to a line and column number. The move_compiler::diagnostics
             // module currently only allows for printing a set of diagnostics to stderr, but that could
             // be changed. (If this server *was* to surface diagnostics, it would also be responsible
             // for notifying the client when the diagnostics were fixed and ought to be cleared. It

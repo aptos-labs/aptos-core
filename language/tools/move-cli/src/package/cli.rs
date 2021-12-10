@@ -14,6 +14,12 @@ use std::{
 use anyhow::{bail, Result};
 
 use move_command_line_common::files::{FileHash, MOVE_COVERAGE_MAP_EXTENSION};
+use move_compiler::{
+    compiled_unit::{CompiledUnit, NamedCompiledModule},
+    diagnostics::{self, codes::Severity},
+    unit_test::{plan_builder::construct_test_plan, TestPlan},
+    PASS_CFGIR,
+};
 use move_coverage::{
     coverage_map::{output_map_to_file, CoverageMap},
     format_csv_summary, format_human_summary,
@@ -21,12 +27,6 @@ use move_coverage::{
     summary::summarize_inst_cov,
 };
 use move_disassembler::disassembler::Disassembler;
-use move_lang::{
-    compiled_unit::{CompiledUnit, NamedCompiledModule},
-    diagnostics::{self, codes::Severity},
-    unit_test::{plan_builder::construct_test_plan, TestPlan},
-    PASS_CFGIR,
-};
 use move_package::{
     compilation::{build_plan::BuildPlan, compiled_package::CompiledUnitWithSource},
     source_package::layout::SourcePackageLayout,

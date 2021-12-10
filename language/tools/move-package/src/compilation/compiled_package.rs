@@ -19,9 +19,7 @@ use move_bytecode_utils::Modules;
 use move_command_line_common::files::{
     extension_equals, find_filenames, MOVE_COMPILED_EXTENSION, MOVE_EXTENSION, SOURCE_MAP_EXTENSION,
 };
-use move_core_types::language_storage::ModuleId;
-use move_docgen::{Docgen, DocgenOptions};
-use move_lang::{
+use move_compiler::{
     compiled_unit::{
         AnnotatedCompiledUnit, CompiledUnit, NamedCompiledModule, NamedCompiledScript,
     },
@@ -29,6 +27,8 @@ use move_lang::{
     shared::{Flags, NumericalAddress},
     Compiler,
 };
+use move_core_types::language_storage::ModuleId;
+use move_docgen::{Docgen, DocgenOptions};
 use move_model::{model::GlobalEnv, options::ModelBuilderOptions, run_model_builder_with_options};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -198,7 +198,7 @@ impl OnDiskCompiledPackage {
                             let id = module.self_id();
                             let parsed_addr = NumericalAddress::new(
                                 id.address().into_bytes(),
-                                move_lang::shared::NumberFormat::Hex,
+                                move_compiler::shared::NumberFormat::Hex,
                             );
                             let module_name = FileName::from(id.name().as_str());
                             (parsed_addr, module_name)
@@ -540,8 +540,10 @@ impl CompiledPackage {
             .resolution_table
             .iter()
             .map(|(ident, addr)| {
-                let parsed_addr =
-                    NumericalAddress::new(addr.into_bytes(), move_lang::shared::NumberFormat::Hex);
+                let parsed_addr = NumericalAddress::new(
+                    addr.into_bytes(),
+                    move_compiler::shared::NumberFormat::Hex,
+                );
                 (ident.to_string(), parsed_addr)
             })
             .collect::<BTreeMap<_, _>>();

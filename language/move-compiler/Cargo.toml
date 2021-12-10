@@ -1,5 +1,5 @@
 [package]
-name = "move-lang"
+name = "move-compiler"
 version = "0.0.1"
 authors = ["Diem Association <opensource@diem.com>"]
 publish = false

@@ -169,7 +169,7 @@ pub type MoveIrLoc = move_ir_types::location::Loc;
 ///
 /// We have two kinds of ids: those based on an index, and those based on a symbol. We use
 /// the symbol based ids where we do not have control of the definition index order in bytecode
-/// (i.e. we do not know in which order move-lang enters functions and structs into file format),
+/// (i.e. we do not know in which order move-compiler enters functions and structs into file format),
 /// and index based ids where we do have control (for modules, SpecFun and SpecVar).
 ///
 /// In any case, ids are opaque in the sense that if someone has a StructId or similar in hand,
@@ -739,8 +739,8 @@ impl GlobalEnv {
         self.internal_loc.clone()
     }
 
-    /// Converts a Loc as used by the move-lang compiler to the one we are using here.
-    /// TODO: move-lang should use FileId as well so we don't need this here. There is already
+    /// Converts a Loc as used by the move-compiler compiler to the one we are using here.
+    /// TODO: move-compiler should use FileId as well so we don't need this here. There is already
     /// a todo in their code to remove the current use of `&'static str` for file names in Loc.
     pub fn to_loc(&self, loc: &MoveIrLoc) -> Loc {
         let file_id = self.get_file_id(loc.file_hash()).unwrap_or_else(|| {

@@ -11,7 +11,7 @@ publish = false
 
 [dependencies]
 move-bytecode-verifier = { path = "../../../language/move-bytecode-verifier" }
-move-lang = { path = "../../../language/move-lang" }
+move-compiler = { path = "../../../language/move-compiler" }
 diem-types = { path = "../../../types" }
 diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }
 move-binary-format = { path = "../../../language/move-binary-format" }

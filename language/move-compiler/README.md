@@ -1,7 +1,7 @@
 ---
-id: move-lang
+id: move-compiler
 title: Move Source Language
-custom_edit_url: https://github.com/diem/diem/edit/main/language/move-lang/README.md
+custom_edit_url: https://github.com/diem/diem/edit/main/language/move-compiler/README.md
 ---
 
 ## Code under this subtree is experimental. It is out of scope for the Diem Bug Bounty until it is no longer marked experimental.
@@ -55,10 +55,10 @@ Deliver a minimalistic, expressive, safe, and transparent language to produce--a
 
 The two available programs are Move check and Move build.
 
-* They can be built using `cargo build -p move-lang`
+* They can be built using `cargo build -p move-compiler`
 * Or run directly with
-  * `cargo run -p move-lang --bin move-check -- [ARGS]`
-  * `cargo run -p move-lang --bin move-build -- [ARGS]`
+  * `cargo run -p move-compiler --bin move-check -- [ARGS]`
+  * `cargo run -p move-compiler --bin move-build -- [ARGS]`
 
 
 Move check is a command line tool for checking Move programs without producing bytecode
@@ -109,7 +109,7 @@ ARGS:
 ## Folder Structure
 
 ```text
-move-lang                                     # Main crate
+move-compiler                                     # Main crate
 ├── src                                       # Source code for Move lang
 │   ├── lib.rs                                # The entry points into compilation
 |   |

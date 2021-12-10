@@ -1,5 +1,5 @@
 [package]
-name = "move-lang-functional-tests"
+name = "move-compiler-functional-tests"
 version = "0.1.0"
 authors = ["Diem Association <opensource@diem.com>"]
 publish = false
@@ -20,7 +20,7 @@ datatest-stable = "0.1.1"
 move-command-line-common = { path = "../../move-command-line-common" }
 functional-tests = { path = "../../testing-infra/functional-tests" }
 diem-types = { path = "../../../types" }
-move-lang = { path = ".." }
+move-compiler = { path = ".." }
 diem-framework = { path = "../../../diem-move/diem-framework" }
 
 [[test]]

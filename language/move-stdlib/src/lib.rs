@@ -3,7 +3,7 @@
 
 use log::LevelFilter;
 use move_command_line_common::files::{extension_equals, find_filenames, MOVE_EXTENSION};
-use move_lang::shared::NumericalAddress;
+use move_compiler::shared::NumericalAddress;
 use std::{collections::BTreeMap, path::PathBuf};
 
 #[cfg(test)]

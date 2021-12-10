@@ -9,7 +9,7 @@ use bytecode::{
     function_target_pipeline::FunctionTargetsHolder, options::ProverOptions,
     pipeline_factory::default_pipeline_with_options,
 };
-use move_lang::shared::{parse_named_address, NumericalAddress};
+use move_compiler::shared::{parse_named_address, NumericalAddress};
 use move_model::{
     ast::Spec,
     model::{FunId, GlobalEnv, QualifiedId, VerificationScope},

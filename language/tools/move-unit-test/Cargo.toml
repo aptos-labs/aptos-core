@@ -20,7 +20,7 @@ regex = "1.1.9"
 move-command-line-common = { path = "../../move-command-line-common" }
 move-stdlib = { path = "../../move-stdlib", features = ["testing"] }
 move-core-types = { path = "../../move-core/types" }
-move-lang = { path = "../../move-lang" }
+move-compiler = { path = "../../move-compiler" }
 move-vm-types = { path = "../../move-vm/types" }
 move-vm-runtime = { path = "../../move-vm/runtime" }
 move-vm-test-utils = { path = "../../move-vm/test-utils" }

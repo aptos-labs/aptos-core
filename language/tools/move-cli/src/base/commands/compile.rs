@@ -4,7 +4,7 @@
 use std::collections::BTreeMap;
 
 use anyhow::Result;
-use move_lang::{
+use move_compiler::{
     self,
     shared::{Flags, NumericalAddress},
     Compiler,
@@ -28,5 +28,5 @@ pub fn compile(
         .set_flags(Flags::empty().set_sources_shadow_deps(sources_shadow_deps))
         .set_named_address_values(named_address_mapping)
         .build_and_report()?;
-    move_lang::output_compiled_units(emit_source_map, files, compiled_units, output_dir)
+    move_compiler::output_compiled_units(emit_source_map, files, compiled_units, output_dir)
 }

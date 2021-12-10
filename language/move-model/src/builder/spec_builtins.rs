@@ -8,7 +8,7 @@ use crate::{
     builder::model_builder::{ConstEntry, ModelBuilder, SpecFunEntry},
     ty::{PrimitiveType, Type},
 };
-use move_lang::parser::ast::{self as PA};
+use move_compiler::parser::ast::{self as PA};
 use num::BigInt;
 
 /// Declares builtins in the build. This adds functions and operators

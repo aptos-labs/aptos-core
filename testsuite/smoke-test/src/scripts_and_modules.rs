@@ -261,7 +261,7 @@ pub fn compile_program(file_path: &str, dependency_paths: &[&str]) -> Result<Vec
 
     let mut command = Command::new("cargo");
     command
-        .args(&["run", "-p", "move-lang", "--bin", "move-build", "--"])
+        .args(&["run", "-p", "move-compiler", "--bin", "move-build", "--"])
         .arg(file_path)
         .args(&["-o", &tmp_output_path]);
 

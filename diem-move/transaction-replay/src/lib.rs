@@ -23,8 +23,8 @@ use diem_vm::{
 };
 use move_binary_format::{errors::VMResult, file_format::CompiledModule};
 use move_cli::sandbox::utils::on_disk_state_view::OnDiskStateView;
+use move_compiler::{compiled_unit::AnnotatedCompiledUnit, Compiler, Flags};
 use move_core_types::{effects::ChangeSet as MoveChanges, language_storage::TypeTag};
-use move_lang::{compiled_unit::AnnotatedCompiledUnit, Compiler, Flags};
 use move_vm_runtime::{move_vm::MoveVM, session::Session};
 use move_vm_test_utils::DeltaStorage;
 use move_vm_types::gas_schedule::GasStatus;
@@ -413,12 +413,12 @@ fn compile_move_script(file_path: &str) -> Result<Vec<u8>> {
     let unit = match units_or_diags {
         Err(diags) => {
             let diag_buffer =
-                move_lang::diagnostics::report_diagnostics_to_color_buffer(&files, diags);
+                move_compiler::diagnostics::report_diagnostics_to_color_buffer(&files, diags);
             bail!(String::from_utf8(diag_buffer).unwrap());
         }
         Ok((_, warnings)) if !warnings.is_empty() => {
             let diag_buffer =
-                move_lang::diagnostics::report_diagnostics_to_color_buffer(&files, warnings);
+                move_compiler::diagnostics::report_diagnostics_to_color_buffer(&files, warnings);
             bail!(String::from_utf8(diag_buffer).unwrap());
         }
         Ok((mut units, _)) => {

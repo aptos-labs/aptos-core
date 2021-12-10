@@ -9,8 +9,8 @@ use diem_types::{
     transaction::{Script, WriteSetPayload},
 };
 use handlebars::Handlebars;
+use move_compiler::{compiled_unit::AnnotatedCompiledUnit, Compiler, Flags};
 use move_core_types::transaction_argument::TransactionArgument;
-use move_lang::{compiled_unit::AnnotatedCompiledUnit, Compiler, Flags};
 use read_write_set::analyze;
 use serde::Serialize;
 use std::{collections::HashMap, io::Write, path::PathBuf};

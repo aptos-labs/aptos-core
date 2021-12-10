@@ -1036,7 +1036,7 @@ impl ModuleName {
     }
 
     pub fn from_address_bytes_and_name(
-        addr: move_lang::shared::NumericalAddress,
+        addr: move_compiler::shared::NumericalAddress,
         name: Symbol,
     ) -> ModuleName {
         ModuleName(BigUint::from_bytes_be(&addr.into_bytes()), name)
@@ -1058,7 +1058,7 @@ impl ModuleName {
         self.1
     }
 
-    /// Determine whether this is a script. The move-lang infrastructure uses MAX_ADDR
+    /// Determine whether this is a script. The move-compiler infrastructure uses MAX_ADDR
     /// for pseudo modules created from scripts, so use this address to check.
     pub fn is_script(&self) -> bool {
         static MAX_ADDR: Lazy<BigUint> = Lazy::new(|| {

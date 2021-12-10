@@ -29,7 +29,7 @@ move-command-line-common = { path = "../../move-command-line-common" }
 move-core-types = { path = "../../move-core/types" }
 move-ir-compiler = { path = "../../move-ir-compiler" }
 move-ir-types = { path = "../../move-ir/types" }
-move-lang = { path = "../../move-lang" }
+move-compiler = { path = "../../move-compiler" }
 move-stdlib = { path = "../../move-stdlib", features = ["testing"] }
 move-symbol-pool = { path = "../../move-symbol-pool" }
 move-vm-test-utils = { path = "../../move-vm/test-utils" }

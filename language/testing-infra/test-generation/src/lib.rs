@@ -27,6 +27,7 @@ use move_binary_format::{
     },
 };
 use move_bytecode_verifier::verify_module;
+use move_compiler::{compiled_unit::AnnotatedCompiledUnit, Compiler};
 use move_core_types::{
     account_address::AccountAddress,
     effects::ChangeSet,
@@ -35,7 +36,6 @@ use move_core_types::{
     value::MoveValue,
     vm_status::{StatusCode, VMStatus},
 };
-use move_lang::{compiled_unit::AnnotatedCompiledUnit, Compiler};
 use move_vm_runtime::move_vm::MoveVM;
 use move_vm_test_utils::{DeltaStorage, InMemoryStorage};
 use move_vm_types::gas_schedule::GasStatus;

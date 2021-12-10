@@ -22,7 +22,7 @@ regex = "1.1.9"
 ptree = "0.4.0"
 
 move-binary-format = { path = "../../move-binary-format" }
-move-lang = { path = "../../move-lang" }
+move-compiler = { path = "../../move-compiler" }
 move-bytecode-source-map = { path = "../../move-ir-compiler/move-bytecode-source-map" }
 move-abigen = { path = "../../move-prover/move-abigen" }
 move-docgen = { path = "../../move-prover/move-docgen" }

@@ -3,12 +3,12 @@
 
 use criterion::{measurement::Measurement, Criterion};
 use move_binary_format::CompiledModule;
+use move_compiler::{compiled_unit::AnnotatedCompiledUnit, Compiler, Flags};
 use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, CORE_CODE_ADDRESS},
 };
-use move_lang::{compiled_unit::AnnotatedCompiledUnit, Compiler, Flags};
 use move_vm_runtime::move_vm::MoveVM;
 use move_vm_test_utils::BlankStorage;
 use move_vm_types::gas_schedule::GasStatus;

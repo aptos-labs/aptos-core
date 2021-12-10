@@ -12,7 +12,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use log::{debug, info, warn};
 use num::BigUint;
 
-use move_lang::{expansion::ast as EA, parser::ast as PA, shared::NumericalAddress};
+use move_compiler::{expansion::ast as EA, parser::ast as PA, shared::NumericalAddress};
 use move_symbol_pool::Symbol as MoveStringSymbol;
 
 use crate::{

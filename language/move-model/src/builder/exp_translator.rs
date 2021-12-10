@@ -9,11 +9,11 @@ use std::{
 use itertools::Itertools;
 use num::{BigInt, BigUint, FromPrimitive, Zero};
 
-use move_core_types::value::MoveValue;
-use move_ir_types::location::Spanned;
-use move_lang::{
+use move_compiler::{
     expansion::ast as EA, hlir::ast as HA, naming::ast as NA, parser::ast as PA, shared::Name,
 };
+use move_core_types::value::MoveValue;
+use move_ir_types::location::Spanned;
 
 use crate::{
     ast::{Exp, ExpData, LocalVarDecl, ModuleName, Operation, QualifiedSymbol, QuantKind, Value},

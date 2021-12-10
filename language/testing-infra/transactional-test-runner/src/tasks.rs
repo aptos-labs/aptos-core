@@ -5,6 +5,7 @@
 
 use anyhow::*;
 use move_command_line_common::files::{MOVE_EXTENSION, MOVE_IR_EXTENSION};
+use move_compiler::shared::NumericalAddress;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
@@ -12,7 +13,6 @@ use move_core_types::{
     parser,
     transaction_argument::TransactionArgument,
 };
-use move_lang::shared::NumericalAddress;
 use std::{fmt::Debug, path::Path, str::FromStr};
 use structopt::*;
 use tempfile::NamedTempFile;
@@ -24,7 +24,7 @@ pub enum RawAddress {
 }
 
 fn parse_address_literal(s: &str) -> Result<AccountAddress> {
-    let (number, _number_format) = move_lang::shared::parse_u128(s)
+    let (number, _number_format) = move_compiler::shared::parse_u128(s)
         .map_err(|e| anyhow!("Failed to parse address. Got error: {}", e))?;
 
     Ok(AccountAddress::new(number.to_be_bytes()))
@@ -227,7 +227,7 @@ pub struct PrintBytecodeCommand {}
 pub struct InitCommand {
     #[structopt(
         long = "addresses",
-        parse(try_from_str = move_lang::shared::parse_named_address)
+        parse(try_from_str = move_compiler::shared::parse_named_address)
     )]
     pub named_addresses: Vec<(String, NumericalAddress)>,
 }

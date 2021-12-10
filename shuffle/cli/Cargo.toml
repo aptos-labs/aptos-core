@@ -44,7 +44,7 @@ generate-key = { path = "../../config/generate-key" }
 move-binary-format = { path = "../../language/move-binary-format" }
 move-cli = { path = "../../language/tools/move-cli" }
 move-core-types = { path = "../../language/move-core/types" }
-move-lang = { path = "../../language/move-lang" }
+move-compiler = { path = "../../language/move-compiler" }
 move-package = { path = "../../language/tools/move-package" }
 move-unit-test = { path = "../../language/tools/move-unit-test" }
 serde-reflection = "0.3.5"

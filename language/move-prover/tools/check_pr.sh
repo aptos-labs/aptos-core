@@ -112,7 +112,7 @@ MOVE_TEST_CRATES="\
 "
 
 MOVE_E2E_TEST_CRATES="\
-  $BASE/language/move-lang/functional-tests\
+  $BASE/language/move-compiler/functional-tests\
   $BASE/language/e2e-testsuite\
   $BASE/language/tools/move-cli\
   $BASE/diem-move/df-cli\

@@ -6,7 +6,7 @@ use log::{debug, info, warn};
 
 use codespan::{ByteIndex, Span};
 use itertools::Itertools;
-use move_lang::parser::keywords::{BUILTINS, CONTEXTUAL_KEYWORDS, KEYWORDS};
+use move_compiler::parser::keywords::{BUILTINS, CONTEXTUAL_KEYWORDS, KEYWORDS};
 use move_model::{
     ast::{ModuleName, SpecBlockInfo, SpecBlockTarget},
     code_writer::{CodeWriter, CodeWriterLabel},

@@ -25,6 +25,10 @@ use diem_types::{
 use diem_vm::DiemVM;
 use language_e2e_tests::data_store::{FakeDataStore, GENESIS_CHANGE_SET_FRESH};
 use move_binary_format::file_format::{CompiledModule, CompiledScript};
+use move_compiler::{
+    shared::{verify_and_create_named_address_mapping, NumberFormat, NumericalAddress},
+    FullyCompiledProgram,
+};
 use move_core_types::{
     account_address::AccountAddress,
     gas_schedule::{GasAlgebra, GasConstants},
@@ -32,10 +36,6 @@ use move_core_types::{
     language_storage::{ModuleId, ResourceKey, StructTag, TypeTag},
     move_resource::MoveStructType,
     transaction_argument::{convert_txn_args, TransactionArgument},
-};
-use move_lang::{
-    shared::{verify_and_create_named_address_mapping, NumberFormat, NumericalAddress},
-    FullyCompiledProgram,
 };
 use move_transactional_test_runner::{
     framework::{run_test_impl, CompiledState, MoveTestAdapter},
@@ -263,10 +263,10 @@ fn panic_missing_private_key(cmd_name: &str) -> ! {
 }
 
 static PRECOMPILED_DIEM_FRAMEWORK: Lazy<FullyCompiledProgram> = Lazy::new(|| {
-    let program_res = move_lang::construct_pre_compiled_lib(
+    let program_res = move_compiler::construct_pre_compiled_lib(
         &diem_framework::diem_stdlib_files(),
         None,
-        move_lang::Flags::empty().set_sources_shadow_deps(false),
+        move_compiler::Flags::empty().set_sources_shadow_deps(false),
         diem_framework::diem_framework_named_addresses(),
     )
     .unwrap();
@@ -274,7 +274,7 @@ static PRECOMPILED_DIEM_FRAMEWORK: Lazy<FullyCompiledProgram> = Lazy::new(|| {
         Ok(df) => df,
         Err((files, errors)) => {
             eprintln!("!!!Diem Framework failed to compile!!!");
-            move_lang::diagnostics::report_diagnostics(&files, errors)
+            move_compiler::diagnostics::report_diagnostics(&files, errors)
         }
     }
 });

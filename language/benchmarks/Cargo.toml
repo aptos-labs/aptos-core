@@ -18,7 +18,7 @@ criterion-cpu-time = "0.1.0"
 
 move-bytecode-verifier = { path = "../move-bytecode-verifier" }
 move-core-types = { path = "../move-core/types" }
-move-lang = { path = "../move-lang" }
+move-compiler = { path = "../move-compiler" }
 move-vm-runtime = { path = "../move-vm/runtime" }
 move-vm-test-utils = { path = "../move-vm/test-utils" }
 move-vm-types = { path = "../move-vm/types" }

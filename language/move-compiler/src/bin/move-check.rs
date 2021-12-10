@@ -3,7 +3,7 @@
 
 #![forbid(unsafe_code)]
 
-use move_lang::{
+use move_compiler::{
     command_line::{self as cli},
     shared::{self, verify_and_create_named_address_mapping, Flags, NumericalAddress},
 };
@@ -58,7 +58,7 @@ pub fn main() -> anyhow::Result<()> {
         named_addresses,
     } = Options::from_args();
 
-    let _files = move_lang::Compiler::new(&source_files, &dependencies)
+    let _files = move_compiler::Compiler::new(&source_files, &dependencies)
         .set_interface_files_dir_opt(out_dir)
         .set_named_address_values(verify_and_create_named_address_mapping(named_addresses)?)
         .set_flags(flags)

@@ -4,11 +4,11 @@
 use crate::format_module_id;
 use colored::{control, Colorize};
 use move_binary_format::errors::{Location, VMError, VMResult};
-use move_core_types::{effects::ChangeSet, language_storage::ModuleId};
-use move_lang::{
+use move_compiler::{
     diagnostics::{self, Diagnostic},
     unit_test::{ModuleTestPlan, TestPlan},
 };
+use move_core_types::{effects::ChangeSet, language_storage::ModuleId};
 use std::{
     collections::{BTreeMap, BTreeSet},
     io::{Result, Write},

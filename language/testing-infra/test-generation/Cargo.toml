@@ -30,7 +30,7 @@ move-vm-types = { path = "../../move-vm/types" }
 module-generation = { path = "../module-generation" }
 move-binary-format = { path = "../../move-binary-format" }
 move-stdlib = { path = "../../move-stdlib" }
-move-lang = { path = "../../move-lang" }
+move-compiler = { path = "../../move-compiler" }
 diem-workspace-hack = { version = "0.1", path = "../../../crates/diem-workspace-hack" }
 
 [features]

@@ -5,8 +5,8 @@ use move_binary_format::{compatibility::Compatibility, normalized::Module, Compi
 use move_command_line_common::files::{
     extension_equals, find_filenames, MOVE_COMPILED_EXTENSION, MOVE_ERROR_DESC_EXTENSION,
 };
+use move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule};
 use move_core_types::language_storage::ModuleId;
-use move_lang::compiled_unit::{CompiledUnit, NamedCompiledModule};
 use move_package::{BuildConfig, ModelConfig};
 use std::{
     collections::BTreeMap,

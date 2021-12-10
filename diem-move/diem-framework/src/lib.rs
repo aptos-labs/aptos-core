@@ -5,7 +5,7 @@
 
 use move_binary_format::file_format::CompiledModule;
 use move_command_line_common::files::{extension_equals, find_filenames, MOVE_EXTENSION};
-use move_lang::{
+use move_compiler::{
     compiled_unit::{CompiledUnit, NamedCompiledModule},
     shared::{NumberFormat, NumericalAddress},
 };

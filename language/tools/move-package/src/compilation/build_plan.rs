@@ -6,7 +6,7 @@ use crate::{
     source_package::parsed_manifest::PackageName,
 };
 use anyhow::Result;
-use move_lang::{compiled_unit::AnnotatedCompiledUnit, diagnostics::FilesSourceText, Compiler};
+use move_compiler::{compiled_unit::AnnotatedCompiledUnit, diagnostics::FilesSourceText, Compiler};
 use petgraph::algo::toposort;
 use std::{
     collections::{BTreeMap, BTreeSet},

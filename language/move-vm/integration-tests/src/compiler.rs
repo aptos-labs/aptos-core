@@ -3,7 +3,7 @@
 
 use anyhow::{bail, Result};
 use move_binary_format::file_format::{CompiledModule, CompiledScript};
-use move_lang::{compiled_unit::AnnotatedCompiledUnit, Compiler as MoveCompiler, Flags};
+use move_compiler::{compiled_unit::AnnotatedCompiledUnit, Compiler as MoveCompiler, Flags};
 use std::{fs::File, io::Write, path::Path};
 use tempfile::tempdir;
 

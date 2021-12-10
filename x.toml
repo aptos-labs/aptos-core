@@ -189,9 +189,9 @@ members = [
     "memsocket",
     "mirai-dataflow-analysis",
     "module-generation",
+    "move-compiler-functional-tests",
+    "move-compiler-transactional-tests",
     "move-ir-compiler-transactional-tests",
-    "move-lang-functional-tests",
-    "move-lang-transactional-tests",
     "move-oncall-trainer",
     "move-prover-test-utils",
     "move-transactional-test-runner",
@@ -229,7 +229,7 @@ diem_crates_in_language = [
     "language-e2e-testsuite",
     "language-e2e-tests",
     "functional-tests",
-    "move-lang-functional-tests",
+    "move-compiler-functional-tests",
 ]
 # A special set of diem crates Move crates are allowed to depend on.
 #

@@ -3,7 +3,7 @@
 //
 // Note that even though we only test parsing, we still need to ensure that the move code (not the specification)
 // is type checking correctly, because with no parsing error, the test harness
-// will run subsequent phases of the move-lang compiler.
+// will run subsequent phases of the move-compiler compiler.
 //
 // For parse failures, see the `spec_*_fail.move` test cases.
 

@@ -14,6 +14,10 @@ use move_binary_format::{
 };
 use move_bytecode_utils::Modules;
 use move_command_line_common::files::{FileHash, MOVE_COMPILED_EXTENSION};
+use move_compiler::{
+    compiled_unit::{CompiledUnit, NamedCompiledModule},
+    diagnostics::{self, report_diagnostics, Diagnostic, Diagnostics, FileName},
+};
 use move_core_types::{
     account_address::AccountAddress,
     effects::{ChangeSet, Event},
@@ -24,10 +28,6 @@ use move_core_types::{
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
 use move_ir_types::location::Loc;
-use move_lang::{
-    compiled_unit::{CompiledUnit, NamedCompiledModule},
-    diagnostics::{self, report_diagnostics, Diagnostic, Diagnostics, FileName},
-};
 use move_package::compilation::compiled_package::CompiledUnitWithSource;
 use move_resource_viewer::{AnnotatedMoveStruct, MoveValueAnnotator};
 use move_vm_types::gas_schedule::GasStatus;

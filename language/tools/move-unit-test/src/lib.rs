@@ -5,14 +5,14 @@ pub mod cargo_runner;
 pub mod test_reporter;
 pub mod test_runner;
 use crate::test_runner::TestRunner;
-use move_core_types::language_storage::ModuleId;
-use move_lang::{
+use move_compiler::{
     self,
     diagnostics::{self, codes::Severity},
     shared::{self, NumericalAddress},
     unit_test::{self, TestPlan},
     Compiler, Flags, PASS_CFGIR,
 };
+use move_core_types::language_storage::ModuleId;
 use move_vm_runtime::native_functions::NativeFunctionTable;
 use std::{
     collections::BTreeMap,
