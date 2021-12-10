@@ -34,6 +34,15 @@ impl ExecutedChunk {
         }
     }
 
+    pub fn reconfig_suffix(&self) -> Self {
+        assert!(self.next_epoch_state.is_some());
+        Self {
+            result_view: self.result_view.clone(),
+            next_epoch_state: self.next_epoch_state.clone(),
+            ..Default::default()
+        }
+    }
+
     pub fn transactions_to_commit(&self) -> Result<Vec<TransactionToCommit>> {
         self.to_commit
             .iter()

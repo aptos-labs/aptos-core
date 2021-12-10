@@ -12,7 +12,7 @@ use diem_logger::prelude::*;
 use diem_state_view::StateViewId;
 use diem_types::{ledger_info::LedgerInfoWithSignatures, transaction::Transaction};
 use diem_vm::VMExecutor;
-use executor_types::{BlockExecutorTrait, Error, ExecutedChunk, StateComputeResult};
+use executor_types::{BlockExecutorTrait, Error, StateComputeResult};
 use fail::fail_point;
 use std::marker::PhantomData;
 
@@ -87,7 +87,7 @@ where
                     LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
                     "reconfig_descendant_block_received"
                 );
-                ExecutedChunk::new_empty(parent_block.output.result_view.clone())
+                parent_block.output.reconfig_suffix()
             } else {
                 info!(
                     LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
