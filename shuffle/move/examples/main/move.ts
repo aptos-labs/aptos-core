@@ -46,23 +46,34 @@
 
 import * as util from "https://deno.land/std@0.85.0/node/util.ts";
 
-export class MoveType {
+export interface MoveType {
+  encode(): string | number;
+}
+
+class StringType {
   constructor(readonly value: string) {}
   encode(): string {
     return this.value;
   }
 }
 
-export class AsciiType extends MoveType {
+class NumberType {
+  constructor(readonly value: number) {}
+  encode(): number {
+    return this.value;
+  }
+}
+
+export class AsciiType extends StringType {
   encode(): string {
     return asciiToHex(this.value);
   }
 }
 
-export class AddressType extends MoveType {}
-export class HexType extends MoveType {}
-export class U64Type extends MoveType {}
-export class U8Type extends MoveType {}
+export class AddressType extends StringType {}
+export class HexType extends StringType {} // Hex encoded bytes
+export class U64Type extends StringType {} // Must be string to keep precision
+export class U8Type extends NumberType {}
 
 export function Address(value: string): MoveType {
   return new AddressType(value);
@@ -80,8 +91,11 @@ export function U64(value: string): MoveType {
   return new U64Type(value);
 }
 
-export function U8(value: string | number): MoveType {
-  return new U8Type(value.toString());
+export function U8(value: number): MoveType {
+  if (value < 0) {
+    throw 'cannot be a negative, or signed, integer'
+  }
+  return new U8Type(value);
 }
 
 const textEncoder = new util.TextEncoder();
