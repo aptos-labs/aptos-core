@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    diemnet::state::{ErrorType, PeerStates},
+    diemnet::{
+        logging::{LogEntry, LogEvent, LogSchema},
+        state::{ErrorType, PeerStates},
+    },
     DiemDataClient, Error, GlobalDataSummary, Response, ResponseCallback, ResponseContext,
     ResponseError, ResponseId, Result,
 };
@@ -13,7 +16,7 @@ use diem_config::{
 };
 use diem_id_generator::{IdGenerator, U64IdGenerator};
 use diem_infallible::RwLock;
-use diem_logger::trace;
+use diem_logger::{debug, error, info};
 use diem_time_service::{TimeService, TimeServiceTrait};
 use diem_types::{
     account_state_blob::AccountStatesChunkWithProof,
@@ -35,6 +38,7 @@ use storage_service_types::{
     TransactionsWithProofRequest,
 };
 
+mod logging;
 mod state;
 #[cfg(test)]
 mod tests;
@@ -131,7 +135,7 @@ impl DiemNetDataClient {
 
         if all_connected.is_empty() {
             return Err(Error::DataIsUnavailable(
-                "no connected diemnet peers".to_owned(),
+                "No connected diemnet peers".to_owned(),
             ));
         }
 
@@ -146,7 +150,7 @@ impl DiemNetDataClient {
             .copied()
             .ok_or_else(|| {
                 Error::DataIsUnavailable(
-                    "no connected peers are advertising that they can serve this data range"
+                    "No connected peers are advertising that they can serve this data range"
                         .to_owned(),
                 )
             })
@@ -160,7 +164,15 @@ impl DiemNetDataClient {
         T: TryFrom<StorageServiceResponse, Error = E>,
         E: Into<Error>,
     {
-        let peer = self.choose_peer(&request)?;
+        let peer = self.choose_peer(&request).map_err(|error| {
+            error!(
+                (LogSchema::new(LogEntry::StorageServiceRequest)
+                    .event(LogEvent::PeerSelectionError)
+                    .message("Unable to select next peer")
+                    .error(&error))
+            );
+            error
+        })?;
         self.send_request_to_peer_and_decode(peer, request).await
     }
 
@@ -196,6 +208,16 @@ impl DiemNetDataClient {
         request: StorageServiceRequest,
     ) -> Result<Response<StorageServiceResponse>, Error> {
         let id = self.next_response_id();
+
+        debug!(
+            (LogSchema::new(LogEntry::StorageServiceRequest)
+                .event(LogEvent::SendRequest)
+                .request_type(request.get_label())
+                .request_id(id)
+                .peer(&peer)
+                .request_data(&request))
+        );
+
         let result = self
             .network_client
             .send_request(
@@ -207,6 +229,15 @@ impl DiemNetDataClient {
 
         match result {
             Ok(response) => {
+                // TODO(khiemngo): consider logging response payload
+                // after we override Debug for some response types with large payload.
+                debug!(
+                    (LogSchema::new(LogEntry::StorageServiceResponse)
+                        .event(LogEvent::ResponseSuccess)
+                        .request_type(request.get_label())
+                        .request_id(id)
+                        .peer(&peer))
+                );
                 // For now, record all responses that at least pass the data
                 // client layer successfully. An alternative might also have the
                 // consumer notify both success and failure via the callback.
@@ -215,7 +246,7 @@ impl DiemNetDataClient {
                 // feels simpler for the consumer.
                 self.peer_states.write().update_score_success(peer);
 
-                // package up all of the context needed to fully report an error
+                // Package up all of the context needed to fully report an error
                 // with this RPC.
                 let response_callback = DiemNetResponseCallback {
                     data_client: self.clone(),
@@ -230,8 +261,8 @@ impl DiemNetDataClient {
                 Ok(Response::new(context, response))
             }
             Err(err) => {
-                // convert network error and storage service error types into
-                // data client errors. also categorize the error type for scoring
+                // Convert network error and storage service error types into
+                // data client errors. Also categorize the error type for scoring
                 // purposes.
                 let client_err = match err {
                     storage_service_client::Error::RpcError(err) => match err {
@@ -243,6 +274,15 @@ impl DiemNetDataClient {
                         Error::UnexpectedErrorEncountered(err.to_string())
                     }
                 };
+
+                error!(
+                    (LogSchema::new(LogEntry::StorageServiceResponse)
+                        .event(LogEvent::ResponseError)
+                        .request_type(request.get_label())
+                        .request_id(id)
+                        .peer(&peer)
+                        .error(&client_err))
+                );
 
                 self.notify_bad_response(id, peer, &request, ErrorType::NotUseful);
                 Err(client_err)
@@ -393,8 +433,10 @@ impl DataSummaryPoller {
     }
 
     pub async fn start(self) {
-        trace!("Starting the diem data poller!");
-
+        info!(
+            (LogSchema::new(LogEntry::DataSummaryPollerStart)
+                .message("Starting the diem data poller!"))
+        );
         let ticker = self.time_service.interval(self.poll_interval);
         futures::pin_mut!(ticker);
 
@@ -412,12 +454,15 @@ impl DataSummaryPoller {
             {
                 Ok(peer) => peer,
                 Err(error) => {
-                    trace!("Unable to select the next peer! Error: {:?}", error);
+                    error!(
+                        (LogSchema::new(LogEntry::StorageSummaryRequest)
+                            .event(LogEvent::NoPeersToPoll)
+                            .message("Unable to select next peer")
+                            .error(&error))
+                    );
                     continue;
                 }
             };
-
-            trace!("Polling peer: {:?}", peer);
 
             let result: Result<StorageServerSummary> = self
                 .data_client
@@ -431,10 +476,12 @@ impl DataSummaryPoller {
             let storage_summary = match result {
                 Ok(storage_summary) => storage_summary,
                 Err(error) => {
-                    trace!(
-                        "Error encountered when polling peer ({:?})! Error: {:?}",
-                        peer,
-                        error
+                    error!(
+                        (LogSchema::new(LogEntry::StorageSummaryResponse)
+                            .event(LogEvent::PeerPollingError)
+                            .message("Error encountered when polling peer")
+                            .error(&error)
+                            .peer(&peer))
                     );
                     continue;
                 }
@@ -442,6 +489,16 @@ impl DataSummaryPoller {
 
             self.data_client.update_summary(peer, storage_summary);
             self.data_client.update_global_summary_cache();
+
+            // TODO(khiemngo): implement overriding Debug for GlobalDataSummary struct
+            debug!(
+                (LogSchema::new(LogEntry::PeerStates)
+                    .event(LogEvent::AggregateSummary)
+                    .message(&format!(
+                        "Global data summary: {:?}",
+                        self.data_client.get_global_data_summary()
+                    )))
+            );
         }
     }
 }

@@ -1,8 +1,12 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{AdvertisedData, GlobalDataSummary, OptimalChunkSizes, ResponseError};
+use crate::{
+    diemnet::logging::{LogEntry, LogEvent, LogSchema},
+    AdvertisedData, GlobalDataSummary, OptimalChunkSizes, ResponseError,
+};
 use diem_config::{config::StorageServiceConfig, network_id::PeerNetworkId};
+use diem_logger::debug;
 use std::collections::HashMap;
 use storage_service_types::{StorageServerSummary, StorageServiceRequest};
 
@@ -118,14 +122,34 @@ impl PeerStates {
     }
 
     pub fn update_score_success(&mut self, peer: PeerNetworkId) {
-        self.inner.entry(peer).or_default().update_score_success()
+        let old_score = self.inner.entry(peer).or_default().score;
+        self.inner.entry(peer).or_default().update_score_success();
+        let new_score = self.inner.entry(peer).or_default().score;
+        if old_score <= IGNORE_PEER_THRESHOLD && new_score > IGNORE_PEER_THRESHOLD {
+            debug!(
+                (LogSchema::new(LogEntry::PeerStates)
+                    .event(LogEvent::PeerNoLongerIgnored)
+                    .message("Peer will no longer be ignored")
+                    .peer(&peer))
+            );
+        }
     }
 
     pub fn update_score_error(&mut self, peer: PeerNetworkId, error: ErrorType) {
+        let old_score = self.inner.entry(peer).or_default().score;
         self.inner
             .entry(peer)
             .or_default()
-            .update_score_error(error)
+            .update_score_error(error);
+        let new_score = self.inner.entry(peer).or_default().score;
+        if old_score > IGNORE_PEER_THRESHOLD && new_score <= IGNORE_PEER_THRESHOLD {
+            debug!(
+                (LogSchema::new(LogEntry::PeerStates)
+                    .event(LogEvent::PeerIgnored)
+                    .message("Peer will be ignored")
+                    .peer(&peer))
+            );
+        }
     }
 
     pub fn update_summary(&mut self, peer: PeerNetworkId, summary: StorageServerSummary) {
